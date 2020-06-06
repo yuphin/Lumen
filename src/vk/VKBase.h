@@ -31,6 +31,7 @@ class VKBase {
 	void create_image_views();
 	void create_sync_primitives();
 	void cleanup_swapchain();
+	void recreate_swap_chain();
 
 
 	// Utils
@@ -133,6 +134,7 @@ class VKBase {
 	virtual void create_command_buffers();
 
 	public:
+	bool resized = false;
 	VKBase(int width, int height, bool fullscreen, bool validation_layers);
 
 

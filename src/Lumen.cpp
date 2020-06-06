@@ -236,10 +236,7 @@ void Lumen::create_command_buffers() {
 
 void Lumen::run() {
 	VKBase::init();
-	create_render_pass();
-	create_gfx_pipeline();
-	create_framebuffers();
-	create_command_buffers();
+
 	VKBase::render_loop();
 	VKBase::cleanup();
 }

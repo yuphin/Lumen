@@ -188,12 +188,19 @@ void VKBase::init_vulkan() {
 
 }
 
+static void fb_resize_callback(GLFWwindow* window, int width, int height) {
+	auto app = reinterpret_cast<VKBase*>(glfwGetWindowUserPointer(window));
+	app->resized = true;
+}
+
 void VKBase::init_window() {
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 	window = glfwCreateWindow(width, height, "Vulkan", fullscreen ?
 		glfwGetPrimaryMonitor() : nullptr, nullptr);
+	glfwSetWindowUserPointer(window, this);
+	glfwSetFramebufferSizeCallback(window, fb_resize_callback);
 }
 
 void VKBase::render_loop() {
@@ -211,13 +218,21 @@ void VKBase::draw_frame() {
 	vkWaitForFences(device, 1, &in_flight_fences[current_frame], VK_TRUE, UINT64_MAX);
 
 	uint32_t image_idx;
-	vkAcquireNextImageKHR(
+	VkResult result = vkAcquireNextImageKHR(
 		device, 
 		swapchain,
 		UINT64_MAX, 
 		image_available_sem[current_frame], 
 		VK_NULL_HANDLE,
 		&image_idx);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+		// Window resize
+		recreate_swap_chain();
+		return;
+	} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+		throw std::runtime_error("Failed to acquire new swap chain image");
+	}
 
 	if (images_in_flight[image_idx] != VK_NULL_HANDLE) {
 		vkWaitForFences(device, 1, &images_in_flight[image_idx], VK_TRUE, UINT64_MAX);
@@ -257,33 +272,66 @@ void VKBase::draw_frame() {
 
 	present_info.pImageIndices = &image_idx;
 
-	vkQueuePresentKHR(present_queue, &present_info);
+	result = vkQueuePresentKHR(present_queue, &present_info);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR ||
+		result == VK_SUBOPTIMAL_KHR ||
+		resized) {
+		resized = false;
+		recreate_swap_chain();
+	} else if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to present swap chain image");
+	}
 
 	current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 
 }
 
+void VKBase::cleanup_swapchain() {
+	// Order:
+		// 1- Destroy Framebuffers
+		// 2- Destroy Commandbuffers
+		// 3- Destroy the pipelines
+		// 4- Destroy pipeline layout	
+		// 5- Destroy render pass
+		// 6- Destroy image views
+		// 7- Destroy swapchain
+	for (auto framebuffer : swapchain_framebuffers) {
+		vkDestroyFramebuffer(device, framebuffer, nullptr);
+	}
 
+	vkFreeCommandBuffers(device, command_pool,
+		static_cast<uint32_t>(command_buffers.size()), command_buffers.data());
+
+	vkDestroyPipeline(device, gfx_pipeline, nullptr);
+	vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
+	vkDestroyRenderPass(device, render_pass, nullptr);
+
+	for (auto image_view : swapchain_image_views) {
+		vkDestroyImageView(device, image_view, nullptr);
+	}
+
+	vkDestroySwapchainKHR(device, swapchain, nullptr);
+}
 
 void VKBase::cleanup() {
+	cleanup_swapchain();
+
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		vkDestroySemaphore(device, render_finished_sem[i], nullptr);
 		vkDestroySemaphore(device, image_available_sem[i], nullptr);
+		vkDestroySemaphore(device, render_finished_sem[i], nullptr);
 		vkDestroyFence(device, in_flight_fences[i], nullptr);
 	}
 
 	vkDestroyCommandPool(device, command_pool, nullptr);
-
+	vkDestroySurfaceKHR(instance, surface, nullptr);
 
 	vkDestroyDevice(device, nullptr);
-
 	if (enable_validation_layers) {
 		vkExt_destroy_debug_messenger(instance, debug_messenger, nullptr);
 	}
 
-	vkDestroySurfaceKHR(instance, surface, nullptr);
 	vkDestroyInstance(instance, nullptr);
-
 	glfwDestroyWindow(window);
 
 	glfwTerminate();
@@ -477,9 +525,13 @@ void VKBase::create_swapchain() {
 		return VK_PRESENT_MODE_FIFO_KHR;
 	}(swapchain_support.present_modes);
 	VkExtent2D extent = [&](const VkSurfaceCapabilitiesKHR& capabilities) {
+		// Choose swap chain extent
 		if (capabilities.currentExtent.width != UINT32_MAX) {
 			return capabilities.currentExtent;
 		} else {
+			int width, height;
+			glfwGetFramebufferSize(window, &width, &height);
+
 			VkExtent2D actual_extent = { 
 				 static_cast<uint32_t>(width), 
 				 static_cast<uint32_t>(height) 
@@ -626,6 +678,30 @@ void VKBase::create_sync_primitives() {
 			throw std::runtime_error("Failed to create synchronization primitives for a frame");
 		}
 	}
+
+}
+
+
+
+void VKBase::recreate_swap_chain() {
+	int width = 0, height = 0;
+	glfwGetFramebufferSize(window, &width, &height);
+	while (width == 0 || height == 0) {
+		// Window is minimized
+		glfwGetFramebufferSize(window, &width, &height);
+		glfwWaitEvents();
+	}
+
+	vkDeviceWaitIdle(device);
+	cleanup_swapchain();
+
+	create_swapchain();
+	create_image_views();
+	create_render_pass();
+	create_gfx_pipeline();
+	create_framebuffers();
+	create_command_buffers();
+
 
 }
 
