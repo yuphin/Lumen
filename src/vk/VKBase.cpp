@@ -627,22 +627,6 @@ void VKBase::create_image_views() {
 
 
 }
-
-
-void VKBase::create_render_pass() {
-
-
-
-}
-
-void VKBase::create_gfx_pipeline() {
-
-}
-
-void VKBase::create_framebuffers() {
-
-}
-
 void VKBase::create_command_pool() {
 	QueueFamilyIndices queue_family_idxs = find_queue_families(physical_device);
 

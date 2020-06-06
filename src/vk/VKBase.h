@@ -30,6 +30,7 @@ class VKBase {
 	void create_swapchain();
 	void create_image_views();
 	void create_sync_primitives();
+	void create_command_pool();
 	void cleanup_swapchain();
 	void recreate_swap_chain();
 
@@ -127,11 +128,10 @@ class VKBase {
 	void init();
 	void cleanup();
 	void render_loop();
-	virtual void create_render_pass();
-	virtual void create_gfx_pipeline();
-	virtual void create_framebuffers();
-	virtual void create_command_pool();
-	virtual void create_command_buffers();
+	virtual void create_render_pass() = 0;
+	virtual void create_gfx_pipeline() = 0;
+	virtual void create_framebuffers() = 0;
+	virtual void create_command_buffers() = 0;
 
 	public:
 	bool resized = false;
