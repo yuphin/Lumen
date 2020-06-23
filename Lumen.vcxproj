@@ -42,14 +42,14 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>NotSet</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>NotSet</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -156,14 +156,23 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\core\Event.cpp" />
+    <ClCompile Include="src\gfx\vulkan\Buffer.cpp" />
     <ClCompile Include="src\Lumen.cpp" />
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\vk\VKBase.cpp" />
+    <ClCompile Include="src\gfx\vulkan\VKBase.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\core\Event.h" />
+    <ClInclude Include="src\gfx\Shader.h" />
+    <ClInclude Include="src\gfx\vulkan\Buffer.h" />
+    <ClInclude Include="src\gfx\vulkan\pipelines\DefaultPipeline.h" />
+    <ClInclude Include="src\gfx\vulkan\pipelines\Pipeline.h" />
     <ClInclude Include="src\Lumen.h" />
-    <ClInclude Include="src\vk\VKBase.h" />
-    <ClInclude Include="src\vk\VKStructs.h" />
+    <ClInclude Include="src\gfx\vulkan\Model.h" />
+    <ClInclude Include="src\gfx\vulkan\VKBase.h" />
+    <ClInclude Include="src\gfx\vulkan\VKStructs.h" />
+    <ClInclude Include="src\gfx\vulkan\VKUtils.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />

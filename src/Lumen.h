@@ -1,6 +1,8 @@
 #pragma once
 
-#include "vk/VKBase.h"
+#include "gfx/vulkan/VKBase.h"
+#include "gfx/Shader.h"
+#include "gfx/vulkan/pipelines/DefaultPipeline.h"
 
 
 
@@ -8,9 +10,12 @@ class Lumen : public VKBase {
     public: 
     Lumen(int width, int height, bool fullscreen, bool debug);
     void run();
-    virtual void create_render_pass();
-    virtual void create_gfx_pipeline();
-    virtual void create_framebuffers();
-    virtual void create_command_buffers();
+    void create_render_pass() override;
+    void create_gfx_pipeline() override;
+    void prepare_vertex_buffers();
+    void prepare_render();
+    void setup_vertex_descriptions();
+    void build_command_buffers() override;
+    ~Lumen();
 
 };

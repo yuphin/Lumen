@@ -21,7 +21,13 @@
     <ClCompile Include="src\Lumen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\vk\VKBase.cpp">
+    <ClCompile Include="src\gfx\vulkan\Buffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\gfx\vulkan\VKBase.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\Event.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -29,10 +35,31 @@
     <ClInclude Include="src\Lumen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\vk\VKStructs.h">
+    <ClInclude Include="src\gfx\vulkan\Buffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\vk\VKBase.h">
+    <ClInclude Include="src\gfx\vulkan\Model.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gfx\vulkan\VKBase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gfx\vulkan\VKStructs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gfx\vulkan\VKUtils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gfx\Shader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gfx\vulkan\pipelines\Pipeline.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gfx\vulkan\pipelines\DefaultPipeline.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\Event.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

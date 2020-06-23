@@ -1,9 +1,45 @@
 #include "Lumen.h"
+#include <glm/glm.hpp>
+
+#define BIND_ID 0
+
+struct {
+	VkPipelineVertexInputStateCreateInfo input_state;
+	std::vector<VkVertexInputBindingDescription> binding_descriptions;
+	std::vector<VkVertexInputAttributeDescription> attribute_descriptions;
+} vertex_descriptions;
+
+struct {
+	Buffer triangle;
+
+} vertex_buffers;
 
 
+struct Vertex {
+	glm::vec3 pos;
+	glm::vec3 color;
+};
+
+const std::vector<Vertex> vertices = {
+	{{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+	{{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+	{{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}
+};
+
+
+std::unique_ptr<DefaultPipeline> demo_pipeline;
+
+std::vector<Shader> shaders = {
+	{"src/shaders/triangle.vert"},
+	{"src/shaders/triangle.frag"}
+};
+
+std::vector<VkDynamicState> dynamic_state_enables = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR
+};
 Lumen::Lumen(int width, int height, bool fullscreen, bool debug) :
 	VKBase(width, height, fullscreen, debug) {}
-
 
 
 
@@ -50,157 +86,81 @@ void Lumen::create_render_pass() {
 	}
 }
 
-void Lumen::create_gfx_pipeline() {
-	const std::string vert_shader_name = "triangle.vert.spv";
-	const std::string frag_shader_name = "triangle.frag.spv";
-	auto vert_shader_code = read_file("src/shaders/spv/" + vert_shader_name);
-	auto frag_shader_code = read_file("src/shaders/spv/" + frag_shader_name);
-
-	VkShaderModule vert_shader = create_shader(vert_shader_code);
-	VkShaderModule frag_shader = create_shader(frag_shader_code);
 
 
-	VkPipelineShaderStageCreateInfo vert_shader_CI{};
-	vert_shader_CI.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	vert_shader_CI.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	vert_shader_CI.module = vert_shader;
-	vert_shader_CI.pName = "main";
+void Lumen::setup_vertex_descriptions() {
+	VertexLayout layout = {
+		{
+		vks::Component::L_POSITION,
+		vks::Component::L_COLOR
+		}
+	};
 
-	VkPipelineShaderStageCreateInfo frag_shader_CI{};
-	frag_shader_CI.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	frag_shader_CI.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	frag_shader_CI.module = frag_shader;
-	frag_shader_CI.pName = "main";
+	// Binding description
+	vertex_descriptions.binding_descriptions.resize(1);
+	vertex_descriptions.binding_descriptions[0] =
+		vks::vertex_input_binding_description(
+			BIND_ID,
+			layout.size(),
+			VK_VERTEX_INPUT_RATE_VERTEX);
 
-	VkPipelineShaderStageCreateInfo shader_stages[] = { vert_shader_CI, frag_shader_CI };
-
-	VkPipelineVertexInputStateCreateInfo vertex_input_info = vks::pipeline_vertex_input_state_CI();
-	vertex_input_info.vertexBindingDescriptionCount = 0;
-	vertex_input_info.vertexAttributeDescriptionCount = 0;
-
-	VkPipelineInputAssemblyStateCreateInfo input_asssembly_CI =
-		vks::pipeline_vertex_input_assembly_state_CI(
-			VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-			VK_NULL_HANDLE,
-			VK_FALSE
+	vertex_descriptions.attribute_descriptions.resize(layout.components.size());
+	vertex_descriptions.attribute_descriptions[0] =
+		vks::vertex_input_attribute_description(
+			BIND_ID,
+			0,
+			VK_FORMAT_R32G32B32_SFLOAT,
+			0
+		);
+	vertex_descriptions.attribute_descriptions[1] =
+		vks::vertex_input_attribute_description(
+			BIND_ID,
+			1,
+			VK_FORMAT_R32G32B32_SFLOAT,
+			3 * sizeof(float)
 		);
 
-	VkViewport viewport = vks::viewport(
-		static_cast<float>(swapchain_extent.width), 
-		static_cast<float>(swapchain_extent.height), 
-		0.0, 
-		1.0
-	);
-	VkRect2D scissor = vks::rect2D(swapchain_extent.width,
-		swapchain_extent.height, 0, 0
-	);
-
-	VkPipelineViewportStateCreateInfo viewport_state = vks::pipeline_viewport_state_CI(
-		1, &viewport, 1, &scissor
-	);
-
-	VkPipelineRasterizationStateCreateInfo rasterizer = vks::pipeline_rasterization_state_CI(
-		VK_POLYGON_MODE_FILL,
-		VK_CULL_MODE_BACK_BIT,
-		VK_FRONT_FACE_CLOCKWISE
-	);
-	rasterizer.lineWidth = 1;
-	rasterizer.depthClampEnable = VK_FALSE;
-	rasterizer.rasterizerDiscardEnable = VK_FALSE;
-	rasterizer.depthBiasEnable = VK_FALSE;
-
-
-	VkPipelineMultisampleStateCreateInfo multisampling = vks::pipeline_multisample_state_CI(
-		VK_SAMPLE_COUNT_1_BIT
-	);
-	multisampling.sampleShadingEnable = VK_FALSE;
-
-	VkPipelineColorBlendAttachmentState color_blend_attachment = vks::pipeline_color_blend_attachment_state(
-		VK_COLOR_COMPONENT_R_BIT | 
-		VK_COLOR_COMPONENT_G_BIT | 
-		VK_COLOR_COMPONENT_B_BIT |
-		VK_COLOR_COMPONENT_A_BIT,
-		VK_FALSE
-	);
-
-	VkPipelineColorBlendStateCreateInfo color_blend = vks::pipeline_color_blend_state_CI(
-		1,
-		&color_blend_attachment
-	);
-	color_blend.logicOpEnable = VK_FALSE;
-	color_blend.logicOp = VK_LOGIC_OP_COPY;
-	color_blend.blendConstants[0] = 0.0f;
-	color_blend.blendConstants[1] = 0.0f;
-	color_blend.blendConstants[2] = 0.0f;
-	color_blend.blendConstants[3] = 0.0f;
-
-	VkPipelineLayoutCreateInfo pipeline_CI = vks::pipeline_layout_CI((uint32_t)0);
-	pipeline_CI.pushConstantRangeCount = 0;
-
-	if (vkCreatePipelineLayout(device, &pipeline_CI, nullptr, &pipeline_layout) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create pipeline layout!");
-	}
-
-	VkGraphicsPipelineCreateInfo pipelineInfo{};
-	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	pipelineInfo.stageCount = 2;
-	pipelineInfo.pStages = shader_stages;
-	pipelineInfo.pVertexInputState = &vertex_input_info;
-	pipelineInfo.pInputAssemblyState = &input_asssembly_CI;
-	pipelineInfo.pViewportState = &viewport_state;
-	pipelineInfo.pRasterizationState = &rasterizer;
-	pipelineInfo.pMultisampleState = &multisampling;
-	pipelineInfo.pColorBlendState = &color_blend;
-	pipelineInfo.layout = pipeline_layout;
-	// Currently a class field
-	pipelineInfo.renderPass = render_pass;
-	pipelineInfo.subpass = 0;
-	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-
-	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &gfx_pipeline) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create graphics pipeline!");
-	}
-
-	vkDestroyShaderModule(device, frag_shader, nullptr);
-	vkDestroyShaderModule(device, vert_shader, nullptr);
+	vertex_descriptions.input_state = vks::pipeline_vertex_input_state_CI();
+	vertex_descriptions.input_state.vertexBindingDescriptionCount =
+		static_cast<uint32_t>(vertex_descriptions.binding_descriptions.size());
+	vertex_descriptions.input_state.pVertexBindingDescriptions =
+		vertex_descriptions.binding_descriptions.data();
+	vertex_descriptions.input_state.vertexAttributeDescriptionCount =
+		static_cast<uint32_t>(vertex_descriptions.attribute_descriptions.size());
+	vertex_descriptions.input_state.pVertexAttributeDescriptions =
+		vertex_descriptions.attribute_descriptions.data();
 }
 
-void Lumen::create_framebuffers() {
-	swapchain_framebuffers.resize(swapchain_image_views.size());
+void Lumen::create_gfx_pipeline() {
 
-	for (size_t i = 0; i < swapchain_image_views.size(); i++) {
-		VkImageView attachments[] = {
-			swapchain_image_views[i]
-		};
 
-		VkFramebufferCreateInfo frame_buffer_info{};
-		frame_buffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		frame_buffer_info.renderPass = render_pass;
-		frame_buffer_info.attachmentCount = 1;
-		frame_buffer_info.pAttachments = attachments;
-		frame_buffer_info.width = swapchain_extent.width;
-		frame_buffer_info.height = swapchain_extent.height;
-		frame_buffer_info.layers = 1;
-
-		if (vkCreateFramebuffer(device, &frame_buffer_info, nullptr, &swapchain_framebuffers[i]) != VK_SUCCESS) {
-			throw std::runtime_error("Failed to create framebuffer");
-		}
+	if (demo_pipeline) {
+		demo_pipeline->cleanup();
 	}
+
+	demo_pipeline = std::make_unique<DefaultPipeline>(
+		device,
+		vertex_descriptions.input_state,
+		shaders,
+		dynamic_state_enables,
+		render_pass
+		);
 
 }
 
-void Lumen::create_command_buffers() {
-	command_buffers.resize(swapchain_framebuffers.size());
+void Lumen::prepare_vertex_buffers() {
 
-	VkCommandBufferAllocateInfo alloc_info = vks::command_buffer_allocate_info(
-		command_pool,
-		VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		(uint32_t)command_buffers.size()
+	VKBase::create_buffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		VK_SHARING_MODE_EXCLUSIVE,
+		vertex_buffers.triangle,
+		sizeof(vertices[0]) * vertices.size(),
+		(void*)vertices.data()
 	);
 
-	if (vkAllocateCommandBuffers(device, &alloc_info, command_buffers.data()) != VK_SUCCESS) {
-		throw std::runtime_error("failed to allocate command buffers!");
-	}
+}
+
+void Lumen::build_command_buffers() {
 
 	for (size_t i = 0; i < command_buffers.size(); i++) {
 		VkCommandBufferBeginInfo begin_info = vks::command_buffer_begin_info();
@@ -219,8 +179,16 @@ void Lumen::create_command_buffers() {
 		render_pass_info.pClearValues = &clearColor;
 
 		vkCmdBeginRenderPass(command_buffers[i], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+		VkViewport viewport = vks::viewport((float)width, (float)height, 0.0f, 1.0f);
+		vkCmdSetViewport(command_buffers[i], 0, 1, &viewport);
 
-		vkCmdBindPipeline(command_buffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, gfx_pipeline);
+		VkRect2D scissor = vks::rect2D(width, height, 0, 0);
+		vkCmdSetScissor(command_buffers[i], 0, 1, &scissor);
+
+		vkCmdBindPipeline(command_buffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, demo_pipeline->handle);
+		VkBuffer vert_buffers[] = { vertex_buffers.triangle.handle };
+		VkDeviceSize offsets[] = { 0 };
+		vkCmdBindVertexBuffers(command_buffers[i], 0, 1, vert_buffers, offsets);
 
 		vkCmdDraw(command_buffers[i], 3, 1, 0, 0);
 
@@ -234,10 +202,25 @@ void Lumen::create_command_buffers() {
 
 }
 
+void Lumen::prepare_render() {
+	prepare_vertex_buffers();
+	build_command_buffers();
+}
+
+
 void Lumen::run() {
+
+	setup_vertex_descriptions();
 	VKBase::init();
+	prepare_render();
 	VKBase::render_loop();
+}
+
+Lumen::~Lumen() {
+	vertex_buffers.triangle.destroy();
+	demo_pipeline->cleanup();
 	VKBase::cleanup();
+
 }
 
 
