@@ -1,6 +1,6 @@
 #pragma once
-#include "VKBase.h"
-
+#include "VKStructs.h"
+#include "lmhpch.h"
 struct VertexLayout {
 
 	std::vector<vks::Component> components;
@@ -9,19 +9,5 @@ struct VertexLayout {
 
 	}
 
-	uint32_t size() {
-		uint32_t res = 0;
-		for (auto& component : components) {
-			switch (component) {
-			case vks::Component::L_UV:
-				res += 2 * sizeof(float);
-				break;
-			default:
-				// Rest are 3 floats
-				res += 3 * sizeof(float);
-			}
-		}
-		return res;
-	}
-
+	uint32_t stride();
 };

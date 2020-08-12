@@ -1,7 +1,7 @@
+#include "lmhpch.h"
 #include "Lumen.h"
 #include <glm/glm.hpp>
 
-#define BIND_ID 0
 
 struct {
 	VkPipelineVertexInputStateCreateInfo input_state;
@@ -29,17 +29,20 @@ const std::vector<Vertex> vertices = {
 
 std::unique_ptr<DefaultPipeline> demo_pipeline;
 
-std::vector<Shader> shaders = {
-	{"src/shaders/triangle.vert"},
-	{"src/shaders/triangle.frag"}
-};
+
 
 std::vector<VkDynamicState> dynamic_state_enables = {
 		VK_DYNAMIC_STATE_VIEWPORT,
 		VK_DYNAMIC_STATE_SCISSOR
 };
 Lumen::Lumen(int width, int height, bool fullscreen, bool debug) :
-	VKBase(width, height, fullscreen, debug) {}
+	VulkanBase(width, height, fullscreen, debug) {
+	shaders = {
+	{"src/shaders/triangle.vert"},
+	{"src/shaders/triangle.frag"}
+	};
+
+}
 
 
 
@@ -82,13 +85,14 @@ void Lumen::create_render_pass() {
 	render_pass_CI.pDependencies = &dependency;
 
 	if (vkCreateRenderPass(device, &render_pass_CI, nullptr, &render_pass) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create render pass!");
+		LUMEN_ERROR("failed to create render pass!");
 	}
 }
 
 
 
 void Lumen::setup_vertex_descriptions() {
+	constexpr int BIND_ID = 0;
 	VertexLayout layout = {
 		{
 		vks::Component::L_POSITION,
@@ -101,7 +105,7 @@ void Lumen::setup_vertex_descriptions() {
 	vertex_descriptions.binding_descriptions[0] =
 		vks::vertex_input_binding_description(
 			BIND_ID,
-			layout.size(),
+			layout.stride(),
 			VK_VERTEX_INPUT_RATE_VERTEX);
 
 	vertex_descriptions.attribute_descriptions.resize(layout.components.size());
@@ -133,10 +137,10 @@ void Lumen::setup_vertex_descriptions() {
 
 void Lumen::create_gfx_pipeline() {
 
-
 	if (demo_pipeline) {
 		demo_pipeline->cleanup();
 	}
+
 
 	demo_pipeline = std::make_unique<DefaultPipeline>(
 		device,
@@ -150,7 +154,7 @@ void Lumen::create_gfx_pipeline() {
 
 void Lumen::prepare_vertex_buffers() {
 
-	VKBase::create_buffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+	VulkanBase::create_buffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		VK_SHARING_MODE_EXCLUSIVE,
 		vertex_buffers.triangle,
@@ -165,7 +169,7 @@ void Lumen::build_command_buffers() {
 	for (size_t i = 0; i < command_buffers.size(); i++) {
 		VkCommandBufferBeginInfo begin_info = vks::command_buffer_begin_info();
 		if (vkBeginCommandBuffer(command_buffers[i], &begin_info) != VK_SUCCESS) {
-			throw std::runtime_error("failed to begin recording command buffer!");
+			LUMEN_ERROR("failed to begin recording command buffer!");
 		}
 
 		VkRenderPassBeginInfo render_pass_info = vks::render_pass_begin_info();
@@ -195,7 +199,7 @@ void Lumen::build_command_buffers() {
 		vkCmdEndRenderPass(command_buffers[i]);
 
 		if (vkEndCommandBuffer(command_buffers[i]) != VK_SUCCESS) {
-			throw std::runtime_error("Failed to record command buffer");
+			LUMEN_ERROR("Failed to record command buffer");
 		}
 	}
 
@@ -211,15 +215,15 @@ void Lumen::prepare_render() {
 void Lumen::run() {
 
 	setup_vertex_descriptions();
-	VKBase::init();
+	VulkanBase::init();
 	prepare_render();
-	VKBase::render_loop();
+	VulkanBase::render_loop();
 }
 
 Lumen::~Lumen() {
 	vertex_buffers.triangle.destroy();
 	demo_pipeline->cleanup();
-	VKBase::cleanup();
+	VulkanBase::cleanup();
 
 }
 

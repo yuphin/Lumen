@@ -1,23 +1,11 @@
 #pragma once
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include "lmhpch.h"
 #include "Buffer.h"
-#include "VKStructs.h"
 #include "VKUtils.h"
 #include "Model.h"
-#include <iostream>
+#include "core/Event.h"
 
-#include <stdexcept>
-#include <algorithm>
-#include <vector>
-#include <cstring>
-#include <cstdlib>
-#include <cstdint>
-#include <set>
-#include <optional>
-#include "../../src/core/Event.h"
-
-class VKBase {
+class VulkanBase {
 
 	void init_vulkan();
 	void init_window();
@@ -145,7 +133,7 @@ class VKBase {
 
 	public:
 	bool resized = false;
-	VKBase(int width, int height, bool fullscreen, bool validation_layers);
+	VulkanBase(int width, int height, bool fullscreen, bool validation_layers);
 
 
 };

@@ -1,9 +1,6 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
-#include <vector>
-
-// Taken from Sascha Willems' repository
+// Adapted from Sascha Willems' repository
 // https://github.com/SaschaWillems/Vulkan
 
 namespace vks {
