@@ -1,15 +1,30 @@
 #include "lmhpch.h"
-#include "core/Logger.h"
 #include "Lumen.h"
+#include "gfx/Window.h"
+
+
+void window_size_callback(GLFWwindow* window, int width, int height) {
+
+}
 
 int main() {
-	bool enable_debug = true;
 #ifdef NDEBUG
-	enable_debug = false;
+	bool enable_debug = false;
+#else
+	bool enable_debug = true;
 #endif  
+	bool fullscreen = false;
+	int width = 1024;
+	int height = 768;
 	Logger::init();
 	LUMEN_TRACE("Logger initialized");
-	Lumen app(1024, 768, /* fullscreen */ false, /* debug */ enable_debug);
-	app.run();
+	Window window(width, height, fullscreen);
+	Lumen app(width, height, enable_debug);
+	auto wnd_handle = window.get_window_ptr();
+	app.init(wnd_handle);
+	while (!window.should_close()) {
+		window.poll();
+		app.update();
+	}
 	return 0;
 }

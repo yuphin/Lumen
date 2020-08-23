@@ -1,12 +1,11 @@
 #pragma once
 #include "lmhpch.h"
-#include "VKUtils.h"
 struct Buffer {
 	VkBuffer handle = VK_NULL_HANDLE;
 	VkDeviceMemory buffer_memory = VK_NULL_HANDLE;
 	VkDevice device = VK_NULL_HANDLE;
 	void* data = nullptr;
-	VkDescriptorBufferInfo descriptor;
+	VkDescriptorBufferInfo descriptor = {};
 	VkDeviceSize size = 0;
 	VkDeviceSize alignment = 0;
 	VkBufferUsageFlags usage_flags = 0;
@@ -18,12 +17,12 @@ struct Buffer {
 	}
 
 	inline void bind(VkDeviceSize offset = 0) {
-		check(vkBindBufferMemory(device, handle, buffer_memory, offset), "Failed to bind buffer");
+		vks::check(vkBindBufferMemory(device, handle, buffer_memory, offset), "Failed to bind buffer");
 
 	}
 
 	inline void map_memory(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0) {
-		check(vkMapMemory(device, buffer_memory, offset, size, 0, &data), "Unable to map memory");
+		vks::check(vkMapMemory(device, buffer_memory, offset, size, 0, &data), "Unable to map memory");
 	}
 
 	inline void unmap() {

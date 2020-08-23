@@ -1,11 +1,12 @@
 #include "lmhpch.h"
-#include "DefaultPipeline.h"
+#include "PipelineDefault.h"
 
 DefaultPipeline::DefaultPipeline(const VkDevice& device,
 	const VkPipelineVertexInputStateCreateInfo& vertex_input_state_CI,
 	std::vector<Shader>& arg_shaders,
 	const std::vector<VkDynamicState>& dynamic_state_enables,
-	const VkRenderPass& render_pass)
+	const VkRenderPass& render_pass,
+	const VkPipelineLayout& arg_pipeline_layout)
 	: Pipeline(device, arg_shaders), render_pass(render_pass) {
 	// Default pipeline setup
 	input_asssembly_CI =
@@ -21,7 +22,7 @@ DefaultPipeline::DefaultPipeline(const VkDevice& device,
 	rasterizer = vks::pipeline_rasterization_state_CI(
 		VK_POLYGON_MODE_FILL,
 		VK_CULL_MODE_BACK_BIT,
-		VK_FRONT_FACE_CLOCKWISE
+		VK_FRONT_FACE_COUNTER_CLOCKWISE
 	);
 	rasterizer.lineWidth = 1;
 	rasterizer.depthClampEnable = VK_FALSE;
@@ -52,12 +53,15 @@ DefaultPipeline::DefaultPipeline(const VkDevice& device,
 	color_blend.blendConstants[1] = 0.0f;
 	color_blend.blendConstants[2] = 0.0f;
 	color_blend.blendConstants[3] = 0.0f;
+	if (arg_pipeline_layout == VK_NULL_HANDLE) {
+		pipeline_layout_CI = vks::pipeline_layout_CI((uint32_t)0);
+		pipeline_layout_CI.pushConstantRangeCount = 0;
+		if (vkCreatePipelineLayout(device, &pipeline_layout_CI, nullptr, &pipeline_layout) != VK_SUCCESS) {
+			LUMEN_ERROR("Failed to create pipeline layout!");
+		}
 
-	pipeline_layout_CI = vks::pipeline_layout_CI((uint32_t)0);
-	pipeline_layout_CI.pushConstantRangeCount = 0;
-
-	if (vkCreatePipelineLayout(device, &pipeline_layout_CI, nullptr, &pipeline_layout) != VK_SUCCESS) {
-		LUMEN_ERROR("failed to create pipeline layout!");
+	} else {
+		pipeline_layout = arg_pipeline_layout;
 	}
 
 	dynamic_state_CI =

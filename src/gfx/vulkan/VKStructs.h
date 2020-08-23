@@ -12,20 +12,35 @@ namespace vks {
 		L_UV,
 	};
 
+	inline void check(VkResult result, const char* msg) {
+		if (result != VK_SUCCESS) {
+			LUMEN_ERROR(msg);
+		}
+	}
+
+	template<std::size_t Size>
+	inline void check(std::array<VkResult, Size> results, const char* msg) {
+		for (const auto& result : results) {
+			if (result != VK_SUCCESS) {
+				LUMEN_ERROR(msg);
+			}
+		}
+	}
+
 	inline VkDebugUtilsMessengerCreateInfoEXT debug_messenger_CI(PFN_vkDebugUtilsMessengerCallbackEXT debug_callback) {
-        VkDebugUtilsMessengerCreateInfoEXT CI = {};
-        CI.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        CI.messageSeverity = 
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | 
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | 
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-        CI.messageType = 
-            VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | 
-            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | 
-            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-        CI.pfnUserCallback = debug_callback;
-        return CI;
-    }
+		VkDebugUtilsMessengerCreateInfoEXT CI = {};
+		CI.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+		CI.messageSeverity =
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		CI.messageType =
+			VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+		CI.pfnUserCallback = debug_callback;
+		return CI;
+	}
 
 	inline VkMemoryAllocateInfo memory_allocate_info() {
 		VkMemoryAllocateInfo memAllocInfo{};
@@ -202,34 +217,34 @@ namespace vks {
 	}
 
 	inline VkDescriptorPoolCreateInfo descriptor_pool_CI(
-		uint32_t poolSizeCount,
+		size_t poolSizeCount,
 		VkDescriptorPoolSize* pPoolSizes,
-		uint32_t maxSets) {
+		size_t maxSets) {
 		VkDescriptorPoolCreateInfo descriptorPoolInfo{};
 		descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		descriptorPoolInfo.poolSizeCount = poolSizeCount;
+		descriptorPoolInfo.poolSizeCount = static_cast<uint32_t>(poolSizeCount);
 		descriptorPoolInfo.pPoolSizes = pPoolSizes;
-		descriptorPoolInfo.maxSets = maxSets;
+		descriptorPoolInfo.maxSets = static_cast<uint32_t>(maxSets);
 		return descriptorPoolInfo;
 	}
 
 	inline VkDescriptorPoolCreateInfo descriptor_pool_CI(
 		const std::vector<VkDescriptorPoolSize>& poolSizes,
-		uint32_t maxSets) {
+		size_t maxSets) {
 		VkDescriptorPoolCreateInfo descriptorPoolInfo{};
 		descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		descriptorPoolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
 		descriptorPoolInfo.pPoolSizes = poolSizes.data();
-		descriptorPoolInfo.maxSets = maxSets;
+		descriptorPoolInfo.maxSets = static_cast<uint32_t>(maxSets);
 		return descriptorPoolInfo;
 	}
 
 	inline VkDescriptorPoolSize descriptor_pool_size(
 		VkDescriptorType type,
-		uint32_t descriptorCount) {
+		size_t descriptorCount) {
 		VkDescriptorPoolSize descriptorPoolSize{};
 		descriptorPoolSize.type = type;
-		descriptorPoolSize.descriptorCount = descriptorCount;
+		descriptorPoolSize.descriptorCount = static_cast<uint32_t>(descriptorCount);
 		return descriptorPoolSize;
 	}
 
@@ -237,22 +252,22 @@ namespace vks {
 		VkDescriptorType type,
 		VkShaderStageFlags stageFlags,
 		uint32_t binding,
-		uint32_t descriptorCount = 1) {
+		size_t descriptorCount = 1) {
 		VkDescriptorSetLayoutBinding setLayoutBinding{};
 		setLayoutBinding.descriptorType = type;
 		setLayoutBinding.stageFlags = stageFlags;
 		setLayoutBinding.binding = binding;
-		setLayoutBinding.descriptorCount = descriptorCount;
+		setLayoutBinding.descriptorCount = static_cast<uint32_t>(descriptorCount);
 		return setLayoutBinding;
 	}
 
 	inline VkDescriptorSetLayoutCreateInfo descriptor_set_layout_CI(
 		const VkDescriptorSetLayoutBinding* pBindings,
-		uint32_t bindingCount) {
+		size_t bindingCount) {
 		VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
 		descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		descriptorSetLayoutCreateInfo.pBindings = pBindings;
-		descriptorSetLayoutCreateInfo.bindingCount = bindingCount;
+		descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(bindingCount);
 		return descriptorSetLayoutCreateInfo;
 	}
 
@@ -286,12 +301,13 @@ namespace vks {
 	inline VkDescriptorSetAllocateInfo descriptor_set_allocate_info(
 		VkDescriptorPool descriptorPool,
 		const VkDescriptorSetLayout* pSetLayouts,
-		uint32_t descriptorSetCount) {
+		size_t descriptorSetCount) {
 		VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
 		descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		descriptorSetAllocateInfo.descriptorPool = descriptorPool;
 		descriptorSetAllocateInfo.pSetLayouts = pSetLayouts;
-		descriptorSetAllocateInfo.descriptorSetCount = descriptorSetCount;
+		descriptorSetAllocateInfo.descriptorSetCount = 
+			static_cast<uint32_t>(descriptorSetCount);
 		return descriptorSetAllocateInfo;
 	}
 

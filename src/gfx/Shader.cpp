@@ -2,23 +2,35 @@
 #include "Shader.h"
 Shader::Shader() {}
 Shader::Shader(const std::string& filename) : filename(filename) {
-	compile();
 }
-void Shader::compile() {
+int Shader::compile() {
+	std::string file_path = filename + ".spv";
+#ifdef NDEBUG
+	auto str = std::string("glslc.exe " + filename +  " -O" + " -o " + filename + ".spv");
+#else 
+	auto str = std::string("glslc.exe " + filename + " -g" + " -o " +filename + ".spv");
+#endif //  NDEBUG
+
 	binary.clear();
 	LUMEN_TRACE("Compiling shader: {0}", filename);
-	auto str = std::string("glslc.exe " + filename + " -o " + filename + ".spv");
-	std::system(str.data());
-	std::ifstream bin(filename + ".spv", std::ios::ate | std::ios::binary);
-	if (!bin.good()) {
-		LUMEN_ERROR(
-			std::string("Failed to compile shader " + filename).data());
+	int ret_val  = std::system(str.data());
+	std::ifstream bin(file_path, std::ios::ate | std::ios::binary);
+	if (!bin.good() && ret_val) {
+		LUMEN_CRITICAL(
+			std::string("Shader compilation failed: " + filename).data());
+		bin.close();
+		return ret_val;
+	}
+	else if (ret_val) {
+		LUMEN_WARN(
+			std::string("Shader compilation failed, resuming from old shader: " + filename).data());
 	}
 	size_t file_size = (size_t)bin.tellg();
 	bin.seekg(0);
 	binary.resize(file_size);
 	bin.read(binary.data(), file_size);
 	bin.close();
+	return ret_val;
 
 }
 

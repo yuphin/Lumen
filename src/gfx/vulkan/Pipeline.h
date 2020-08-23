@@ -16,12 +16,14 @@ struct Pipeline {
 
 	Pipeline(const VkDevice& device, std::vector<Shader>& shaders);	
 	
-	void track();
 	void cleanup();
 	virtual void create_pipeline_with_shaders(VkGraphicsPipelineCreateInfo& ci) = 0;
+private:
+	void track();
 
-	protected:
+protected:
 	VkRenderPass render_pass;
+
 	VkPipelineShaderStageCreateInfo vert_shader_CI;
 	VkPipelineShaderStageCreateInfo frag_shader_CI;
 	VkPipelineInputAssemblyStateCreateInfo input_asssembly_CI;

@@ -112,6 +112,8 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>lmhpch.h</PrecompiledHeaderFile>
+      <DisableSpecificWarnings>
+      </DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -150,6 +152,8 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>lmhpch.h</PrecompiledHeaderFile>
+      <DisableSpecificWarnings>
+      </DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -157,16 +161,19 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>vulkan-1.lib;glfw3.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>D:\Projects\VSProjects\Lumen\libs\glfw\src\Release;C:\VulkanSDK\1.2.135.0\Lib</AdditionalLibraryDirectories>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\gfx\Camera.cpp" />
+    <ClCompile Include="src\gfx\PerspectiveCamera.cpp" />
     <ClCompile Include="src\core\Logger.cpp" />
     <ClCompile Include="src\core\Event.cpp" />
     <ClCompile Include="src\gfx\Shader.cpp" />
     <ClCompile Include="src\gfx\vulkan\Buffer.cpp" />
     <ClCompile Include="src\gfx\vulkan\Model.cpp" />
-    <ClCompile Include="src\gfx\vulkan\pipelines\Pipeline.cpp" />
-    <ClCompile Include="src\gfx\vulkan\pipelines\DefaultPipeline.cpp" />
+    <ClCompile Include="src\gfx\vulkan\Pipeline.cpp" />
+    <ClCompile Include="src\gfx\vulkan\PipelineDefault.cpp" />
     <ClCompile Include="src\lmhpch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
@@ -174,21 +181,24 @@
     <ClCompile Include="src\Lumen.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\gfx\vulkan\Base.cpp" />
+    <ClCompile Include="src\gfx\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\gfx\Camera.h" />
+    <ClInclude Include="src\gfx\PerspectiveCamera.h" />
     <ClInclude Include="src\core\Logger.h" />
     <ClInclude Include="src\core\Event.h" />
     <ClInclude Include="src\gfx\Shader.h" />
     <ClInclude Include="src\gfx\vulkan\Buffer.h" />
-    <ClInclude Include="src\gfx\vulkan\pipelines\DefaultPipeline.h" />
-    <ClInclude Include="src\gfx\vulkan\pipelines\Pipeline.h" />
+    <ClInclude Include="src\gfx\vulkan\PipelineDefault.h" />
+    <ClInclude Include="src\gfx\vulkan\Pipeline.h" />
     <ClInclude Include="src\lmhpch.h" />
     <ClInclude Include="src\Lumen.h" />
     <ClInclude Include="src\gfx\vulkan\Model.h" />
     <ClInclude Include="src\gfx\vulkan\Base.h" />
     <ClInclude Include="src\gfx\vulkan\VKStructs.h" />
-    <ClInclude Include="src\gfx\vulkan\VKUtils.h" />
     <ClInclude Include="src\lmnpch.h" />
+    <ClInclude Include="src\gfx\Window.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitmodules" />

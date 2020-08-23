@@ -6,7 +6,7 @@ void Buffer::flush(VkDeviceSize size, VkDeviceSize offset) {
 	mapped_range.memory = buffer_memory;
 	mapped_range.offset = offset;
 	mapped_range.size = size;
-	check(vkFlushMappedMemoryRanges(device, 1, &mapped_range), "Failed to flush mapped memory ranges");
+	vks::check(vkFlushMappedMemoryRanges(device, 1, &mapped_range), "Failed to flush mapped memory ranges");
 }
 
 void Buffer::invalidate(VkDeviceSize size, VkDeviceSize offset) {
@@ -15,7 +15,7 @@ void Buffer::invalidate(VkDeviceSize size, VkDeviceSize offset) {
 	mapped_range.memory = buffer_memory;
 	mapped_range.offset = offset;
 	mapped_range.size = size;
-	check(vkInvalidateMappedMemoryRanges(device, 1, &mapped_range),
+	vks::check(vkInvalidateMappedMemoryRanges(device, 1, &mapped_range),
 		"Failed to invalidate mapped memory range");
 }
 

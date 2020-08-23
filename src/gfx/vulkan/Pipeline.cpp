@@ -25,15 +25,15 @@ void Pipeline::track() {
 				last_write != paths[file.filename]) {
 				LUMEN_TRACE("Shader changed: {0}", file.filename);
 				paths[file.filename] = last_write;
-				file.compile();
-				pipeline_CI.flags |= VK_PIPELINE_CREATE_DERIVATIVE_BIT;
-				pipeline_CI.basePipelineHandle = handle;
-				pipeline_CI.basePipelineIndex = -1;
-				EventHandler::obsolete_pipelines.push_back(handle);
-				create_pipeline_with_shaders(pipeline_CI);
-				EventHandler::set(LumenEvent::EVENT_SHADER_RELOAD);
+				if (!file.compile()) {
+					pipeline_CI.flags |= VK_PIPELINE_CREATE_DERIVATIVE_BIT;
+					pipeline_CI.basePipelineHandle = handle;
+					pipeline_CI.basePipelineIndex = -1;
+					EventHandler::obsolete_pipelines.push_back(handle);
+					create_pipeline_with_shaders(pipeline_CI);
+					EventHandler::set(LumenEvent::EVENT_SHADER_RELOAD);
+				}
 			}
-
 		}
 	}
 

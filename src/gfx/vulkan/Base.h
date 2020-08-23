@@ -1,16 +1,14 @@
 #pragma once
 #include "lmhpch.h"
 #include "Buffer.h"
-#include "VKUtils.h"
 #include "Model.h"
 #include "core/Event.h"
 
 class VulkanBase {
-
+	
 	void init_vulkan();
 	void init_window();
-	void draw_frame();
-	// Create VKInstance with the current extensions
+	// Create VKInstance with current extensions
 	void create_instance();
 	void setup_debug_messenger();
 	void create_surface();
@@ -27,7 +25,7 @@ class VulkanBase {
 
 
 	// Utils
-	// Taken from https://vulkan-tutorial.com
+	// Adapted from https://vulkan-tutorial.com
 	struct QueueFamilyIndices {
 		std::optional<uint32_t> gfx_family;
 		std::optional<uint32_t> present_family;
@@ -41,7 +39,8 @@ class VulkanBase {
 	};
 
 	struct SwapChainSupportDetails {
-		VkSurfaceCapabilitiesKHR capabilities;
+		
+		VkSurfaceCapabilitiesKHR capabilities = {};
 		std::vector<VkSurfaceFormatKHR> formats;
 		std::vector<VkPresentModeKHR> present_modes;
 	};
@@ -87,7 +86,7 @@ class VulkanBase {
 	int width;
 	int height;
 	bool fullscreen;
-
+	bool initialized = false;
 	GLFWwindow* window = nullptr;
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debug_messenger;
@@ -114,10 +113,11 @@ class VulkanBase {
 	VkCommandPool command_pool;
 	std::vector<VkCommandBuffer> command_buffers;
 
+	VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
+
 	VkShaderModule create_shader(const std::vector<char>& code);
-	void init();
+	void init(GLFWwindow*);
 	void cleanup();
-	void render_loop();
 
 	void create_buffer(VkBufferUsageFlags usage,
 		VkMemoryPropertyFlags mem_property_flags,
@@ -130,6 +130,7 @@ class VulkanBase {
 	virtual void create_gfx_pipeline() = 0;
 	virtual void build_command_buffers() = 0;
 	virtual void prepare_render() = 0;
+	void draw_frame();
 
 	public:
 	bool resized = false;

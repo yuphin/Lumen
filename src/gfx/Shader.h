@@ -6,7 +6,7 @@ struct Shader {
 
 	Shader();
 	Shader(const std::string& filename);
-	void compile();
+	int compile();
 	VkShaderModule create_vk_shader_module(const VkDevice& device);
 
 
