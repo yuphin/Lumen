@@ -1,5 +1,6 @@
 #pragma once
 #include "lmhpch.h"
+#include "gfx/vulkan/Pipeline.h"
 
 enum class LumenEvent {
 	EVENT_SHADER_RELOAD

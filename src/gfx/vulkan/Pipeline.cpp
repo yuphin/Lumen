@@ -8,10 +8,9 @@ Pipeline::Pipeline(const VkDevice& device, std::vector<Shader>& shaders)
 		const std::filesystem::path path = file.filename;
 		paths[file.filename] = std::filesystem::last_write_time(path);
 	}
-	tracker = std::thread([=] {
+	ThreadPool::submit([this] {
 		track();
-		});
-
+	});
 }
 
 void Pipeline::track() {
@@ -30,7 +29,7 @@ void Pipeline::track() {
 					pipeline_CI.basePipelineHandle = handle;
 					pipeline_CI.basePipelineIndex = -1;
 					EventHandler::obsolete_pipelines.push_back(handle);
-					create_pipeline_with_shaders(pipeline_CI);
+					update_pipeline();
 					EventHandler::set(LumenEvent::EVENT_SHADER_RELOAD);
 				}
 			}

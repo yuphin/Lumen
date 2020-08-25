@@ -5,9 +5,10 @@ DefaultPipeline::DefaultPipeline(const VkDevice& device,
 	const VkPipelineVertexInputStateCreateInfo& vertex_input_state_CI,
 	std::vector<Shader>& arg_shaders,
 	const std::vector<VkDynamicState>& dynamic_state_enables,
-	const VkRenderPass& render_pass,
+	const VkRenderPass& render_pass_arg,
 	const VkPipelineLayout& arg_pipeline_layout)
-	: Pipeline(device, arg_shaders), render_pass(render_pass) {
+	: Pipeline(device, arg_shaders), render_pass(render_pass_arg), 
+	 dynamic_states(dynamic_state_enables){
 	// Default pipeline setup
 	input_asssembly_CI =
 		vks::pipeline_vertex_input_assembly_state_CI(
@@ -66,8 +67,8 @@ DefaultPipeline::DefaultPipeline(const VkDevice& device,
 
 	dynamic_state_CI =
 		vks::pipeline_dynamic_state_CI(
-			dynamic_state_enables.data(),
-			static_cast<uint32_t>(dynamic_state_enables.size()),
+			dynamic_states.data(),
+			static_cast<uint32_t>(dynamic_states.size()),
 			static_cast<uint32_t>(0));
 
 	pipeline_CI = {};
@@ -91,11 +92,11 @@ DefaultPipeline::DefaultPipeline(const VkDevice& device,
 	pipeline_CI.subpass = 0;
 	pipeline_CI.basePipelineHandle = VK_NULL_HANDLE;
 
-	create_pipeline_with_shaders(pipeline_CI);
+	update_pipeline();
 
 }
 
-void DefaultPipeline::create_pipeline_with_shaders(VkGraphicsPipelineCreateInfo& ci) {
+void DefaultPipeline::update_pipeline() {
 	VkShaderModule vert_shader = shaders[0].create_vk_shader_module(device);
 	VkShaderModule frag_shader = shaders[1].create_vk_shader_module(device);
 
@@ -111,9 +112,9 @@ void DefaultPipeline::create_pipeline_with_shaders(VkGraphicsPipelineCreateInfo&
 
 	VkPipelineShaderStageCreateInfo shader_stages[] = { vert_shader_CI, frag_shader_CI };
 
-	ci.pStages = shader_stages;
+	pipeline_CI.pStages = shader_stages;
 
-	ci.flags |= VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
+	pipeline_CI.flags |= VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
 
 	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle) != VK_SUCCESS) {
 		LUMEN_ERROR("failed to create graphics pipeline!");

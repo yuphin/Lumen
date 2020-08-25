@@ -182,6 +182,7 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\gfx\vulkan\Base.cpp" />
     <ClCompile Include="src\gfx\Window.cpp" />
+    <ClCompile Include="src\core\ThreadPool.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\gfx\Camera.h" />
@@ -199,6 +200,7 @@
     <ClInclude Include="src\gfx\vulkan\VKStructs.h" />
     <ClInclude Include="src\lmnpch.h" />
     <ClInclude Include="src\gfx\Window.h" />
+    <ClInclude Include="src\core\ThreadPool.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitmodules" />

@@ -17,7 +17,7 @@ struct Pipeline {
 	Pipeline(const VkDevice& device, std::vector<Shader>& shaders);	
 	
 	void cleanup();
-	virtual void create_pipeline_with_shaders(VkGraphicsPipelineCreateInfo& ci) = 0;
+	virtual void update_pipeline() = 0;
 private:
 	void track();
 

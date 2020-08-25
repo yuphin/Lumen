@@ -17,6 +17,7 @@ int main() {
 	int width = 1024;
 	int height = 768;
 	Logger::init();
+	ThreadPool::init();
 	LUMEN_TRACE("Logger initialized");
 	Window window(width, height, fullscreen);
 	Lumen app(width, height, enable_debug);
@@ -26,5 +27,6 @@ int main() {
 		window.poll();
 		app.update();
 	}
+	ThreadPool::destroy();
 	return 0;
 }

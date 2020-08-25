@@ -27,6 +27,8 @@
 #include <chrono>
 #include <thread>
 #include <functional>
+#include <queue>
+#include <future>
 #include "gfx/vulkan/VKStructs.h"
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -36,3 +38,4 @@
 #include <glm/ext.hpp>
 #include <glm/gtx/euler_angles.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include "core/ThreadPool.h"
