@@ -23,13 +23,9 @@ void ThreadPool::init() {
 							break;
 						}
 						task = std::move(work_queue.front());
-					}
-					task();
-					{
-						std::lock_guard<std::mutex> lock(queue_mutex);
 						work_queue.pop();
 					}
-
+					task();
 				}
 				}
 			);

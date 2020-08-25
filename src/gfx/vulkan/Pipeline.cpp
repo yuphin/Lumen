@@ -42,5 +42,4 @@ void Pipeline::cleanup() {
 	if (handle != VK_NULL_HANDLE) 	vkDestroyPipeline(device, handle, nullptr);
 	if (pipeline_layout != VK_NULL_HANDLE)	vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
 	running = false;
-	tracker.join();
 }

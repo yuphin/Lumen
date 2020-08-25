@@ -20,7 +20,7 @@ private:
 template<typename FunctionType, typename ...Args>
  auto ThreadPool::submit(FunctionType&& f, Args && ...args) {
 	using result_type = std::invoke_result_t<FunctionType, Args...>;
-	auto task = std::make_unique<std::packaged_task<result_type()>>(
+	auto task = std::make_shared<std::packaged_task<result_type()>>(
 		std::bind(std::forward<FunctionType>(f), std::forward<Args>(args)...)
 		);
 	auto result = task->get_future();
@@ -29,9 +29,8 @@ template<typename FunctionType, typename ...Args>
 		if (done) {
 			LUMEN_ERROR("ThreadPool has been terminated");
 		}
-		auto task_ptr = task.get();
-		work_queue.emplace([task_ptr]() {
-			(*task_ptr)();
+		work_queue.emplace([task]() {
+			(*task)();
 			});
 	}
 	cv.notify_one();
