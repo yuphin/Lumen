@@ -80,6 +80,11 @@ class VulkanBase {
 	std::vector<VkFence> in_flight_fences;
 	std::vector<VkFence> images_in_flight;
 
+	VkPhysicalDeviceFeatures supported_features;
+	VkPhysicalDeviceProperties device_properties;
+	VkPhysicalDeviceMemoryProperties memory_properties;
+	std::vector<VkQueueFamilyProperties> queue_families;
+
 	protected:
 
 	bool enable_validation_layers;
@@ -119,24 +124,22 @@ class VulkanBase {
 	void init(GLFWwindow*);
 	void cleanup();
 
-	void create_buffer(VkBufferUsageFlags usage,
-		VkMemoryPropertyFlags mem_property_flags,
-		VkSharingMode sharing_mode,
-		Buffer& buffer,
-		VkDeviceSize size,
-		void* data = nullptr);
+	
 
 	virtual void create_render_pass() = 0;
 	virtual void create_gfx_pipeline() = 0;
 	virtual void build_command_buffers() = 0;
 	virtual void prepare_render() = 0;
 	void draw_frame();
-
 	public:
 	bool resized = false;
+	inline VkCommandPool& get_command_pool(){ return command_pool; }
+	inline VkDevice& get_device() { return device; }
+	inline VkPhysicalDevice& get_physical_device() { return physical_device; }
+	inline VkQueue& get_gfx_queue() { return gfx_queue; }
+	inline VkPhysicalDeviceFeatures& get_supported_features() { return supported_features; }
+	inline VkPhysicalDeviceProperties& get_device_properties() { return  device_properties; }
 	VulkanBase(int width, int height, bool fullscreen, bool validation_layers);
-
-
-};
+	};
 
 

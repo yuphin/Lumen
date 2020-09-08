@@ -5,7 +5,7 @@
 #include "gfx/vulkan/PipelineDefault.h"
 #include "lmhpch.h"
 #include "gfx/PerspectiveCamera.h"
-
+#include "gfx/Texture.h"
 #include <glm/glm.hpp>
 
 class Lumen : public VulkanBase {
@@ -15,6 +15,8 @@ public:
 	void update();
 	~Lumen();
 	int width, height, fullscreen, debug;
+	static Lumen* instance;
+	inline static Lumen* get() { return instance; }
 private:
 	void create_render_pass() override;
 	void create_gfx_pipeline() override;
@@ -42,6 +44,7 @@ private:
 	struct Vertex {
 		glm::vec3 pos;
 		glm::vec3 color;
+		glm::vec2 tex_coord;
 	};
 
 	struct SceneUBO {
@@ -50,9 +53,12 @@ private:
 		alignas(16) glm::mat4 model;
 	};
 	std::unique_ptr<DefaultPipeline> demo_pipeline = nullptr;
-	std::unique_ptr<Camera> cam;
+	std::unique_ptr<Camera> cam = nullptr;
+	std::unique_ptr<Texture2D> tri_texture = nullptr;
 	VkDescriptorSetLayout set_layout = VK_NULL_HANDLE;
 	VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;;
 	std::vector<VkDescriptorSet> descriptor_sets{};
+
+
 
 };

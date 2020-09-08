@@ -1,6 +1,7 @@
 #include "lmhpch.h"
 #include "Lumen.h"
-
+#include "gfx/vulkan/Utils.h"
+Lumen* Lumen::instance = nullptr;
 Lumen::Lumen(int width, int height, bool debug) :
 	width(width), height(height), fullscreen(fullscreen), debug(debug),
 	VulkanBase(width, height, fullscreen, debug),
@@ -8,8 +9,8 @@ Lumen::Lumen(int width, int height, bool debug) :
 		{
 			{"src/shaders/triangle.vert"},
 			{"src/shaders/triangle.frag"}
-		}
-	) {
+		}) {
+	this->instance = this;
 	cam = std::unique_ptr<PerspectiveCamera>(
 		new PerspectiveCamera(90.0f, 0.1f, 1000.0f, (float)width / height)
 		);
@@ -72,7 +73,8 @@ void Lumen::setup_vertex_descriptions() {
 	VertexLayout layout = {
 		{
 		vks::Component::L_POSITION,
-		vks::Component::L_COLOR
+		vks::Component::L_COLOR,
+		vks::Component::L_UV
 		}
 	};
 
@@ -90,14 +92,21 @@ void Lumen::setup_vertex_descriptions() {
 			BIND_ID,
 			0,
 			VK_FORMAT_R32G32B32_SFLOAT,
-			0
+			offsetof(Vertex,pos)
 		);
 	vertex_descriptions.attribute_descriptions[1] =
 		vks::vertex_input_attribute_description(
 			BIND_ID,
 			1,
 			VK_FORMAT_R32G32B32_SFLOAT,
-			3 * sizeof(float)
+			offsetof(Vertex, color)
+		);
+	vertex_descriptions.attribute_descriptions[2] =
+		vks::vertex_input_attribute_description(
+			BIND_ID,
+			2,
+			VK_FORMAT_R32G32_SFLOAT,
+			offsetof(Vertex, tex_coord)
 		);
 
 	vertex_descriptions.input_state = vks::pipeline_vertex_input_state_CI();
@@ -139,12 +148,12 @@ void Lumen::create_gfx_pipeline() {
 void Lumen::prepare_buffers() {
 
 	const std::vector<Vertex> vertices = {
-	{{0.0f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-	{{-0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-	{{0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}
+	{{0.0f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.5,0.5}},
+	{{-0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0,0.0}},
+	{{0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0,1.0}}
 	};
 
-	VulkanBase::create_buffer(
+	create_buffer(
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		VK_SHARING_MODE_EXCLUSIVE,
@@ -153,7 +162,7 @@ void Lumen::prepare_buffers() {
 		(void*)vertices.data()
 	);
 
-	VulkanBase::create_buffer(
+	create_buffer(
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		VK_SHARING_MODE_EXCLUSIVE,
@@ -161,16 +170,20 @@ void Lumen::prepare_buffers() {
 		sizeof(SceneUBO));
 	vertex_buffers.scene_ubo.map_memory();
 
-
 }
 
 void Lumen::prepare_descriptor_layouts() {
 	constexpr int SCENE_LAYOUT_BINDING = 0;
+	constexpr int SAMPLER_BINDING = 1;
 	std::vector<VkDescriptorSetLayoutBinding> set_layout_bindings = {
 			vks::descriptor_set_layout_binding(
 				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 				VK_SHADER_STAGE_VERTEX_BIT,
-				SCENE_LAYOUT_BINDING)
+				SCENE_LAYOUT_BINDING),
+			vks::descriptor_set_layout_binding(
+				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				VK_SHADER_STAGE_FRAGMENT_BIT,
+				SAMPLER_BINDING)
 	};
 	auto set_layout_ci = vks::descriptor_set_layout_CI(
 		set_layout_bindings.data(),
@@ -190,8 +203,8 @@ void Lumen::prepare_descriptor_layouts() {
 
 void Lumen::prepare_descriptor_pool() {
 	std::vector<VkDescriptorPoolSize> pool_sizes = {
-		vks::descriptor_pool_size(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		swapchain_images.size())
+		vks::descriptor_pool_size(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,swapchain_images.size()),
+		vks::descriptor_pool_size(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, swapchain_images.size())
 	};
 	auto descriptor_pool_ci = vks::descriptor_pool_CI(
 		pool_sizes.size(),
@@ -221,10 +234,15 @@ void Lumen::prepare_descriptor_sets() {
 				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 				0,
 				&vertex_buffers.scene_ubo.descriptor
-			)
+			),
+			vks::write_descriptor_set(
+				descriptor_sets[i],
+				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				1,
+				&tri_texture->descriptor_image_info)
 		};
-		vkUpdateDescriptorSets(device, 
-			static_cast<uint32_t>(write_descriptor_sets.size()), 
+		vkUpdateDescriptorSets(device,
+			static_cast<uint32_t>(write_descriptor_sets.size()),
 			write_descriptor_sets.data(), 0, nullptr);
 	}
 }
@@ -297,6 +315,8 @@ void Lumen::init(GLFWwindow* window_ptr) {
 	this->window = window_ptr;
 	setup_vertex_descriptions();
 	VulkanBase::init(window);
+	tri_texture = std::make_unique<Texture2D>();
+	tri_texture->load_from_file("assets/textures/test.png", nullptr, true);
 	prepare_render();
 }
 
@@ -306,9 +326,11 @@ void Lumen::update() {
 }
 
 Lumen::~Lumen() {
+
 	vkDeviceWaitIdle(device);
 	vertex_buffers.triangle.destroy();
 	vertex_buffers.scene_ubo.destroy();
+	tri_texture->destroy();
 	vkDestroyDescriptorSetLayout(device, set_layout, nullptr);
 	if (demo_pipeline) { demo_pipeline->cleanup(); }
 	if (initialized) { VulkanBase::cleanup(); }

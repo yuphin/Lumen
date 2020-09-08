@@ -36,10 +36,19 @@ void Pipeline::track() {
 		}
 	}
 
+	{
+		std::lock_guard<std::mutex> lk(mut);
+		tracking_stopped = true;
+	}
+	cv.notify_one();
 }
 
 void Pipeline::cleanup() {
+
 	if (handle != VK_NULL_HANDLE) 	vkDestroyPipeline(device, handle, nullptr);
 	if (pipeline_layout != VK_NULL_HANDLE)	vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
 	running = false;
+	std::unique_lock<std::mutex> tracker_lk(mut);
+	cv.wait(tracker_lk, [this] {return tracking_stopped; });
+
 }

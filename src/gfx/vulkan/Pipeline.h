@@ -20,6 +20,9 @@ struct Pipeline {
 	virtual void update_pipeline() = 0;
 private:
 	void track();
+	bool tracking_stopped = false;
+	std::mutex mut;
+	std::condition_variable cv;
 
 protected:
 	VkRenderPass render_pass;

@@ -17,6 +17,7 @@ private:
 
 };
 
+// Adapted from C++ Concurrency In Action
 template<typename FunctionType, typename ...Args>
  auto ThreadPool::submit(FunctionType&& f, Args && ...args) {
 	using result_type = std::invoke_result_t<FunctionType, Args...>;

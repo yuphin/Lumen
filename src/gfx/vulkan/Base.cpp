@@ -1,5 +1,6 @@
 #include "lmhpch.h"
 #include "Base.h"
+#include "Utils.h"
 VulkanBase::VulkanBase(int width, int height, bool fullscreen, bool debug) {
 	this->width = width;
 	this->height = height;
@@ -27,7 +28,7 @@ VulkanBase::QueueFamilyIndices VulkanBase::find_queue_families(VkPhysicalDevice 
 	QueueFamilyIndices indices;
 	uint32_t queue_family_count = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, nullptr);
-	std::vector<VkQueueFamilyProperties> queue_families(queue_family_count);
+	queue_families.resize(queue_family_count);
 	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_families.data());
 
 	int i = 0;
@@ -294,7 +295,7 @@ void VulkanBase::cleanup_swapchain() {
 
 void VulkanBase::cleanup() {
 	cleanup_swapchain();
-	
+
 	vkDestroyDescriptorPool(device, descriptor_pool, nullptr);
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -418,6 +419,9 @@ void VulkanBase::pick_physical_device() {
 	for (const auto& device : devices) {
 		if (is_suitable(device)) {
 			physical_device = device;
+			vkGetPhysicalDeviceFeatures(physical_device, &supported_features);
+			vkGetPhysicalDeviceProperties(physical_device, &device_properties);
+			vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
 			break;
 		}
 	}
@@ -449,6 +453,7 @@ void VulkanBase::create_logical_device() {
 	}
 
 	VkPhysicalDeviceFeatures device_features{};
+	device_features.samplerAnisotropy = VK_TRUE;
 
 	VkDeviceCreateInfo logical_device_CI{};
 	logical_device_CI.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -593,24 +598,7 @@ void VulkanBase::create_image_views() {
 	swapchain_image_views.resize(swapchain_images.size());
 
 	for (size_t i = 0; i < swapchain_images.size(); i++) {
-		VkImageViewCreateInfo image_view_CI = vks::image_view_CI();
-		image_view_CI.image = swapchain_images[i];
-		image_view_CI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		image_view_CI.format = swapchain_image_format;
-		image_view_CI.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-		image_view_CI.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-		image_view_CI.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-		image_view_CI.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-		image_view_CI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		image_view_CI.subresourceRange.baseMipLevel = 0;
-		image_view_CI.subresourceRange.levelCount = 1;
-		image_view_CI.subresourceRange.baseArrayLayer = 0;
-		image_view_CI.subresourceRange.layerCount = 1;
-
-		vks::check(
-			vkCreateImageView(device, &image_view_CI, nullptr, &swapchain_image_views[i]),
-			"Failed to create image views!"
-		);
+		swapchain_image_views[i] = create_image_view(swapchain_images[i], swapchain_image_format);
 	}
 
 
@@ -745,75 +733,6 @@ bool VulkanBase::check_validation_layer_support() {
 
 	return true;
 
-}
-
-void VulkanBase::create_buffer(VkBufferUsageFlags usage,
-	VkMemoryPropertyFlags mem_property_flags,
-	VkSharingMode sharing_mode,
-	Buffer& buffer,
-	VkDeviceSize size,
-	void* data) {
-	buffer.device = this->device;
-
-	// Create the buffer handle
-	VkBufferCreateInfo buffer_CI = vks::buffer_create_info(
-		usage,
-		size,
-		sharing_mode
-	);
-
-
-	vks::check(
-		vkCreateBuffer(this->device, &buffer_CI, nullptr, &buffer.handle),
-		"Failed to create vertex buffer!"
-	);
-
-	auto find_memory_type = [this](uint32_t type_filter, VkMemoryPropertyFlags props) {
-		VkPhysicalDeviceMemoryProperties mem_props;
-		vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_props);
-		for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++) {
-			if ((type_filter & (1 << i)) &&
-				(mem_props.memoryTypes[i].propertyFlags & props) == props) {
-				return i;
-			}
-		}
-		LUMEN_ASSERT(true, "Failed to find suitable memory type!");
-		return static_cast<uint32_t>(-1);
-	};
-
-
-	// Create the memory backing up the buffer handle
-	VkMemoryRequirements mem_reqs;
-	VkMemoryAllocateInfo mem_alloc_info = vks::memory_allocate_info();
-	vkGetBufferMemoryRequirements(this->device, buffer.handle, &mem_reqs);
-
-	mem_alloc_info.allocationSize = mem_reqs.size;
-	// Find a memory type index that fits the properties of the buffer
-	mem_alloc_info.memoryTypeIndex = find_memory_type(mem_reqs.memoryTypeBits, mem_property_flags);
-	vks::check(
-		vkAllocateMemory(device, &mem_alloc_info, nullptr, &buffer.buffer_memory),
-		"Failed to allocate vertex buffer memory!"
-	);
-
-	buffer.alignment = mem_reqs.alignment;
-	buffer.size = size;
-	buffer.usage_flags = usage;
-	buffer.mem_property_flags = mem_property_flags;
-
-	// If a pointer to the buffer data has been passed, map the buffer and copy over the data
-	if (data != nullptr) {
-		buffer.map_memory();
-		memcpy(buffer.data, data, size);
-		if ((mem_property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
-			buffer.flush();
-		}
-		buffer.unmap();
-	}
-
-	// Initialize a default descriptor that covers the whole buffer size
-	buffer.prepare_descriptor();
-
-	buffer.bind();
 }
 
 void VulkanBase::init(GLFWwindow* window_ptr) {
