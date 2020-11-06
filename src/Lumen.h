@@ -1,11 +1,12 @@
 #pragma once
 
-#include "gfx/vulkan/Base.h"
-#include "gfx/Shader.h"
-#include "gfx/vulkan/PipelineDefault.h"
-#include "lmhpch.h"
-#include "gfx/PerspectiveCamera.h"
-#include "gfx/Texture.h"
+#include "LumenPCH.h"
+#include "Framework/VulkanBase.h"
+#include "Framework/Shader.h"
+#include "Framework/Pipeline.h"
+#include "Framework/Camera.h"
+#include "Framework/Texture.h"
+#include "Framework/Scene.h"
 #include <glm/glm.hpp>
 
 class Lumen : public VulkanBase {
@@ -19,46 +20,40 @@ public:
 	inline static Lumen* get() { return instance; }
 private:
 	void create_render_pass() override;
-	void create_gfx_pipeline() override;
 	void build_command_buffers() override;
-	void setup_vertex_descriptions();
-	void prepare_render();
 	void prepare_buffers();
-	void prepare_descriptor_layouts();
+	void prepare_descriptors();
 	void prepare_descriptor_pool();
-	void prepare_descriptor_sets();
 	void update_buffers();
-	std::vector<Shader> shaders;
-
-	struct {
-		VkPipelineVertexInputStateCreateInfo input_state;
-		std::vector<VkVertexInputBindingDescription> binding_descriptions;
-		std::vector<VkVertexInputAttributeDescription> attribute_descriptions;
-	} vertex_descriptions = {};
-
-	struct {
-		Buffer triangle;
-		Buffer scene_ubo;
-	} vertex_buffers;
-
-	struct Vertex {
-		glm::vec3 pos;
-		glm::vec3 color;
-		glm::vec2 tex_coord;
-	};
-
+	void init_resources();
+	std::string get_asset_path() const;
 	struct SceneUBO {
-		alignas(16)	glm::mat4 projection;
-		alignas(16) glm::mat4 view;
-		alignas(16) glm::mat4 model;
+		glm::mat4 projection;
+		glm::mat4 view;
+		glm::mat4 model = glm::mat4(1.0f);
+		glm::vec4 light_pos = glm::vec4(3.0f, 2.5f, 1.0f, 1.0f);
+		glm::vec4 view_pos;
 	};
-	std::unique_ptr<DefaultPipeline> demo_pipeline = nullptr;
-	std::unique_ptr<Camera> cam = nullptr;
-	std::unique_ptr<Texture2D> tri_texture = nullptr;
-	VkDescriptorSetLayout set_layout = VK_NULL_HANDLE;
-	VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;;
-	std::vector<VkDescriptorSet> descriptor_sets{};
 
+	struct SceneResources {
+		struct {
+			Buffer scene_ubo;
+		} vertex_buffers = {};
 
-
+		struct MaterialPushConst {
+			glm::vec4 base_color_factor;
+			int base_color_set;
+		} material_push_const;
+		Model::Material cube_material;
+		GraphicsPipelineSettings cube_pipeline_settings;
+		VkDescriptorSetLayout uniform_set_layout = VK_NULL_HANDLE;
+		VkDescriptorSetLayout scene_set_layout = VK_NULL_HANDLE;
+		VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
+		std::vector<VkDescriptorSet> uniform_descriptor_sets{};
+		std::unique_ptr<Pipeline> cube_pipeline = nullptr;
+		Model::RenderFunction material_render_func = nullptr;
+	} resources;
+	std::unique_ptr<Camera> camera = nullptr;
+	Scene scene;
+	VulkanContext lumen_ctx;
 };

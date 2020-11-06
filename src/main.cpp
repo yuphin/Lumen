@@ -1,17 +1,15 @@
-#include "lmhpch.h"
+#include "LumenPCH.h"
 #include "Lumen.h"
-#include "gfx/Window.h"
+#include "Framework/Window.h"
 
 
-void window_size_callback(GLFWwindow* window, int width, int height) {
-
-}
+void window_size_callback(GLFWwindow* window, int width, int height) { }
 
 int main() {
 #ifdef NDEBUG
 	bool enable_debug = false;
 #else
-	bool enable_debug = true;
+	bool enable_debug = false;
 #endif  
 	bool fullscreen = false;
 	int width = 1024;
@@ -24,7 +22,7 @@ int main() {
 		Lumen app(width, height, enable_debug);
 		auto wnd_handle = window.get_window_ptr();
 		app.init(wnd_handle);
-		while (!window.should_close()) {
+		while(!window.should_close()) {
 			window.poll();
 			app.update();
 		}
