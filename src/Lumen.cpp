@@ -101,7 +101,7 @@ void Lumen::init_resources() {
 	resources.cube_pipeline_settings.render_pass = this->render_pass;
 	resources.cube_pipeline_settings.bound_models = std::span<Model>{ scene.models };
 	resources.cube_pipeline_settings.front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	resources.cube_pipeline_settings.enable_tracking = false;
+	resources.cube_pipeline_settings.enable_tracking = true;
 	scene.num_textures = 1;
 	scene.num_materials = 1;
 	resources.material_render_func = [this](Model::Material* primitive_material,
@@ -128,9 +128,11 @@ void Lumen::init_resources() {
 
 	resources.cube_pipeline_settings.pipeline_layout = resources.pipeline_layout;
 	resources.cube_pipeline_settings.pipeline = {};
+	
 
 	resources.cube_pipeline = std::make_unique<Pipeline>(this->device);
 	resources.cube_pipeline->create_pipeline(resources.cube_pipeline_settings);
+	resources.cube_pipeline->track_for_changes();
 
 }
 

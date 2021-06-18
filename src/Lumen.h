@@ -45,7 +45,7 @@ private:
 			int base_color_set;
 		} material_push_const;
 		Model::Material cube_material;
-		GraphicsPipelineSettings cube_pipeline_settings;
+		GraphicsPipelineSettings cube_pipeline_settings = {};
 		VkDescriptorSetLayout uniform_set_layout = VK_NULL_HANDLE;
 		VkDescriptorSetLayout scene_set_layout = VK_NULL_HANDLE;
 		VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;

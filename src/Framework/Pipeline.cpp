@@ -153,7 +153,7 @@ void Pipeline::create_pipeline(const GraphicsPipelineSettings& settings) {
 		settings.custom_func(this, settings.bound_models);
 	} else {
 		vk::check(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle),
-				   "Failed to create pipeline");
+				  "Failed to create pipeline");
 	}
 	vkDestroyShaderModule(device, frag_shader, nullptr);
 	vkDestroyShaderModule(device, vert_shader, nullptr);
@@ -162,26 +162,38 @@ void Pipeline::create_pipeline(const GraphicsPipelineSettings& settings) {
 void Pipeline::recompile_pipeline() {
 	VkShaderModule vert_shader = settings.shaders[0].create_vk_shader_module(device);
 	VkShaderModule frag_shader = settings.shaders[1].create_vk_shader_module(device);
-
+	auto vertex_input_state_CI = vk::pipeline_vertex_input_state_CI();
 	vert_shader_CI.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	vert_shader_CI.stage = VK_SHADER_STAGE_VERTEX_BIT;
 	vert_shader_CI.module = vert_shader;
 	vert_shader_CI.pName = "main";
+	vert_shader_CI.pNext = nullptr;
+	vert_shader_CI.flags = 0;
+	vert_shader_CI.pSpecializationInfo = nullptr;
 
 	frag_shader_CI.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	frag_shader_CI.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	frag_shader_CI.module = frag_shader;
 	frag_shader_CI.pName = "main";
+	frag_shader_CI.pNext = nullptr;
+	frag_shader_CI.flags = 0;
+	frag_shader_CI.pSpecializationInfo = nullptr;
 	VkPipelineShaderStageCreateInfo shader_stages[] = { vert_shader_CI, frag_shader_CI };
 	pipeline_CI.pStages = shader_stages;
+
+	vertex_input_state_CI.vertexAttributeDescriptionCount =
+		static_cast<uint32_t>(settings.attribute_desc.size());
+	vertex_input_state_CI.pVertexAttributeDescriptions = settings.attribute_desc.data();
+	vertex_input_state_CI.vertexBindingDescriptionCount =
+		static_cast<uint32_t>(settings.binding_desc.size());
+	vertex_input_state_CI.pVertexBindingDescriptions = settings.binding_desc.data();
+	pipeline_CI.pVertexInputState = &vertex_input_state_CI;
 	if(settings.custom_func) {
 		settings.custom_func(this, settings.bound_models);
 	} else {
 		vk::check(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle),
-				   "Failed to create pipeline");
+				  "Failed to create pipeline");
 	}
 	vkDestroyShaderModule(device, frag_shader, nullptr);
 	vkDestroyShaderModule(device, vert_shader, nullptr);
 }
-
-

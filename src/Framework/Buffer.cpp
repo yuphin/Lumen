@@ -70,7 +70,7 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage, VkMemoryProper
 		);
 
 		alignment = mem_reqs.alignment;
-		size = size;
+		this->size = size;
 		usage_flags = usage;
 		mem_property_flags = mem_property_flags;
 
