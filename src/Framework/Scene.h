@@ -1,19 +1,22 @@
 #pragma once
 #include "LumenPCH.h"
-#include "Model.h"
-
+#include "Framework/VulkanBase.h"
+#include "Framework/Shader.h"
+#include "Framework/Pipeline.h"
+#include "Framework/Camera.h"
+#include "Framework/Texture.h"
+#include "Framework/MeshLoader.h"
+#include "Framework/Window.h"
+#include <glm/glm.hpp>
 class Scene {
 public:
-	inline void init(VulkanContext* ctx) { this->ctx = ctx; };
-	void add_model(const std::string& filename, const std::string& name);
-	void add_cube_model(Model::Material& material);
-	void load_models();
-	void destroy();
-	uint32_t num_materials;
-	uint32_t num_textures;
-	std::vector<Model> models;
-private:
-	VulkanContext* ctx;
-	bool load_gltf(Model& model);
-
+	Scene(int width, int height, int debug) : width(width), height(height), debug(debug),
+		vkb(debug) {};
+	VulkanBase vkb;
+	VulkanContext& vk_ctx = vkb.ctx;
+	int width, height, debug;
+	virtual void init(Window*) = 0;
+	virtual void update() = 0;
+	virtual void cleanup() = 0;
 };
+

@@ -108,7 +108,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)libs\glm;$(SolutionDir)libs\glfw\include;$(VULKAN_SDK)\Include;$(SolutionDir)libs\spdlog\include;$(SolutionDir)src;$(SolutionDir)libs\stb_image;$(SolutionDir)libs\gli;$(SolutionDir)libs\tinygltf</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)libs\glm;$(SolutionDir)libs\glfw\include;$(VULKAN_SDK)\Include;$(SolutionDir)libs\spdlog\include;$(SolutionDir)src;$(SolutionDir)libs\stb_image;$(SolutionDir)libs\gli;$(SolutionDir)libs\tinygltf;$(SolutionDir)libs\imgui</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>LumenPCH.h</PrecompiledHeaderFile>
@@ -147,7 +147,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)libs\glm;$(SolutionDir)libs\glfw\include;$(VULKAN_SDK)\Include;$(SolutionDir)libs\spdlog\include;$(SolutionDir)src;$(SolutionDir)libs\stb_image;$(SolutionDir)libs\gli;$(SolutionDir)libs\tinygltf</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)libs\glm;$(SolutionDir)libs\glfw\include;$(VULKAN_SDK)\Include;$(SolutionDir)libs\spdlog\include;$(SolutionDir)src;$(SolutionDir)libs\stb_image;$(SolutionDir)libs\gli;$(SolutionDir)libs\tinygltf;$(SolutionDir)libs\imgui</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -165,10 +165,40 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="libs\imgui\imgui.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="libs\imgui\imgui_demo.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="libs\imgui\imgui_draw.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="libs\imgui\imgui_impl_glfw.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="libs\imgui\imgui_impl_vulkan.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="libs\imgui\imgui_tables.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="libs\imgui\imgui_widgets.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\RTScene.cpp" />
+    <ClCompile Include="src\Framework\Scene.cpp" />
     <ClCompile Include="src\Framework\CommandBuffer.cpp" />
     <ClCompile Include="src\Framework\Logger.cpp" />
     <ClCompile Include="src\Framework\Event.cpp" />
-    <ClCompile Include="src\Framework\Scene.cpp" />
+    <ClCompile Include="src\Framework\MeshLoader.cpp" />
     <ClCompile Include="src\Framework\Shader.cpp" />
     <ClCompile Include="src\Framework\Buffer.cpp" />
     <ClCompile Include="src\Framework\Model.cpp" />
@@ -178,7 +208,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="src\Lumen.cpp" />
+    <ClCompile Include="src\BoxScene.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Framework\VulkanBase.cpp" />
     <ClCompile Include="src\Framework\Window.cpp" />
@@ -186,19 +216,30 @@
     <ClCompile Include="src\Framework\Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="libs\imgui\imconfig.h" />
+    <ClInclude Include="libs\imgui\imgui.h" />
+    <ClInclude Include="libs\imgui\imgui_impl_glfw.h" />
+    <ClInclude Include="libs\imgui\imgui_impl_vulkan.h" />
+    <ClInclude Include="libs\imgui\imgui_internal.h" />
+    <ClInclude Include="libs\imgui\imstb_rectpack.h" />
+    <ClInclude Include="libs\imgui\imstb_textedit.h" />
+    <ClInclude Include="libs\imgui\imstb_truetype.h" />
+    <ClInclude Include="src\Framework\Model.h" />
+    <ClInclude Include="src\RTScene.h" />
+    <ClInclude Include="src\Framework\Scene.h" />
     <ClInclude Include="src\Framework\CommandBuffer.h" />
     <ClInclude Include="src\Framework\Camera.h" />
     <ClInclude Include="src\Framework\Logger.h" />
     <ClInclude Include="src\Framework\Event.h" />
-    <ClInclude Include="src\Framework\Scene.h" />
+    <ClInclude Include="src\Framework\MeshLoader.h" />
     <ClInclude Include="src\Framework\Shader.h" />
     <ClInclude Include="src\Framework\Buffer.h" />
     <ClInclude Include="src\Framework\Pipeline.h" />
     <ClInclude Include="src\gfx\vulkan\Sampler.h" />
     <ClInclude Include="src\Framework\Utils.h" />
     <ClInclude Include="src\LumenPCH.h" />
-    <ClInclude Include="src\Lumen.h" />
-    <ClInclude Include="src\Framework\Model.h" />
+    <ClInclude Include="src\BoxScene.h" />
+    <ClInclude Include="src\Framework\GLTFModel.h" />
     <ClInclude Include="src\Framework\VulkanBase.h" />
     <ClInclude Include="src\Framework\VulkanStructs.h" />
     <ClInclude Include="src\lmnpch.h" />

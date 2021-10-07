@@ -15,8 +15,8 @@ struct GraphicsPipelineSettings {
 	VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
 	VkPipeline pipeline = VK_NULL_HANDLE;
 	VkRenderPass render_pass = VK_NULL_HANDLE;
-	std::span<Model> bound_models = {};
-	std::function<void(Pipeline*, const std::span<Model>&)> custom_func = nullptr;
+	std::span<Model*> bound_models = {};
+	std::function<void(Pipeline*, const std::span<Model*>&)> custom_func = nullptr;
 	VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
 	VkCullModeFlags cull_mode = VK_CULL_MODE_FRONT_BIT;

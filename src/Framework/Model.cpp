@@ -6,16 +6,14 @@
 #include "Framework/Utils.h"
 
 
-Model::Model(VulkanContext* ctx) : ctx() {}
+GLTFModel::GLTFModel(const std::string path, const std::string& name) :
+	Model(path, name) {}
 
-Model::Model(VulkanContext* ctx, const std::string path, const std::string& name) :
-	ctx(ctx), path(path), name(name) {}
-
-VkDescriptorImageInfo Model::get_texture_descriptor(const size_t index) {
+VkDescriptorImageInfo GLTFModel::get_texture_descriptor(const size_t index) {
 	return textures[index].descriptor_image_info;
 }
 
-void Model::load_materials(const tinygltf::Model& input) {
+void GLTFModel::load_materials(const tinygltf::Model& input) {
 	materials.resize(input.materials.size());
 	for(size_t i = 0; i < input.materials.size(); i++) {
 		tinygltf::Material gltf_material = input.materials[i];
@@ -102,10 +100,10 @@ void Model::load_materials(const tinygltf::Model& input) {
 	}
 }
 
-void Model::load_textures(const tinygltf::Model& input) {
-	textures = std::vector(input.images.size(), Texture2D(this->ctx));
+void GLTFModel::load_textures(VulkanContext *ctx, const tinygltf::Model& input) {
+	textures = std::vector(input.images.size(), Texture2D(ctx));
 	for(auto i = 0; i < input.images.size(); i++) {
-		auto gltf_image = input.images[i];
+		auto& gltf_image = input.images[i];
 		textures[i].load_from_img(path + "/" + gltf_image.uri);
 	}
 
@@ -115,11 +113,11 @@ void Model::load_textures(const tinygltf::Model& input) {
 	//}
 }
 
-void Model::load_node(const tinygltf::Node& input_node, const tinygltf::Model& model,
-					  Model::Node* parent, std::vector<uint32_t>& idx_buffer,
-					  std::vector<Model::Vertex>& vertex_buffer) {
+void GLTFModel::load_node(const tinygltf::Node& input_node, const tinygltf::Model& GLTFModel,
+					  GLTFModel::Node* parent, std::vector<uint32_t>& idx_buffer,
+					  std::vector<GLTFModel::Vertex>& vertex_buffer) {
 
-	Model::Node node;
+	GLTFModel::Node node;
 	node.name = input_node.name;
 	// Load local TRS matrix
 	node.matrix = glm::mat4(1.0f);
@@ -142,12 +140,12 @@ void Model::load_node(const tinygltf::Node& input_node, const tinygltf::Model& m
 	// Load children
 	if(input_node.children.size() > 0) {
 		for(size_t i = 0; i < input_node.children.size(); i++) {
-			load_node(model.nodes[input_node.children[i]], model, &node, idx_buffer, vertex_buffer);
+			load_node(GLTFModel.nodes[input_node.children[i]], GLTFModel, &node, idx_buffer, vertex_buffer);
 		}
 	}
 
 	if(input_node.mesh > -1) {
-		auto mesh = model.meshes[input_node.mesh];
+		auto mesh = GLTFModel.meshes[input_node.mesh];
 
 		for(const auto& primitive : mesh.primitives) {
 			auto first_idx = static_cast<uint32_t>(idx_buffer.size());
@@ -162,30 +160,30 @@ void Model::load_node(const tinygltf::Node& input_node, const tinygltf::Model& m
 			const float* tangents = nullptr;
 
 			for(const auto& attrib : primitive.attributes) {
-				const auto& accessor = model.accessors[attrib.second];
-				const auto& view = model.bufferViews[accessor.bufferView];
+				const auto& accessor = GLTFModel.accessors[attrib.second];
+				const auto& view = GLTFModel.bufferViews[accessor.bufferView];
 				auto accessor_offset = accessor.byteOffset;
 				auto buffer_view_offset = view.byteOffset;
 				if(attrib.first == "POSITION") {
 					positions = reinterpret_cast<const float*>(
-						&(model.buffers[view.buffer].data[accessor_offset + buffer_view_offset])
+						&(GLTFModel.buffers[view.buffer].data[accessor_offset + buffer_view_offset])
 						);
 					vertex_count = accessor.count;
 				} else if(attrib.first == "NORMAL") {
 					normals = reinterpret_cast<const float*>(
-						&(model.buffers[view.buffer].data[accessor_offset + buffer_view_offset])
+						&(GLTFModel.buffers[view.buffer].data[accessor_offset + buffer_view_offset])
 						);
 				} else if(attrib.first == "TEXCOORD_0") {
 					tex_coords0 = reinterpret_cast<const float*>(
-						&(model.buffers[view.buffer].data[accessor_offset + buffer_view_offset])
+						&(GLTFModel.buffers[view.buffer].data[accessor_offset + buffer_view_offset])
 						);
 				} else if(attrib.first == "TEXCOORD_1") {
 					tex_coords1 = reinterpret_cast<const float*>(
-						&(model.buffers[view.buffer].data[accessor_offset + buffer_view_offset])
+						&(GLTFModel.buffers[view.buffer].data[accessor_offset + buffer_view_offset])
 						);
 				} else if(attrib.first == "TANGENT") {
 					tangents = reinterpret_cast<const float*>(
-						&(model.buffers[view.buffer].data[accessor_offset + buffer_view_offset])
+						&(GLTFModel.buffers[view.buffer].data[accessor_offset + buffer_view_offset])
 						);
 				}
 			}
@@ -205,9 +203,9 @@ void Model::load_node(const tinygltf::Node& input_node, const tinygltf::Model& m
 
 			}
 			// Indices
-			const auto& accessor = model.accessors[primitive.indices];
-			const auto& buffer_view = model.bufferViews[accessor.bufferView];
-			const auto& buffer = model.buffers[buffer_view.buffer];
+			const auto& accessor = GLTFModel.accessors[primitive.indices];
+			const auto& buffer_view = GLTFModel.bufferViews[accessor.bufferView];
+			const auto& buffer = GLTFModel.buffers[buffer_view.buffer];
 			idx_count += static_cast<uint32_t>(accessor.count);
 			idx_buffer.reserve(idx_buffer.size() + accessor.count);
 			switch(accessor.componentType) {
@@ -258,9 +256,9 @@ void Model::load_node(const tinygltf::Node& input_node, const tinygltf::Model& m
 	}
 }
 
-void Model::draw_node(const VkCommandBuffer& cmd_buffer,
+void GLTFModel::draw_node(const VkCommandBuffer& cmd_buffer,
 					  const VkPipelineLayout& pipeline_layout,
-					  const Model::Node& node,
+					  const GLTFModel::Node& node,
 					  size_t cb_index, RenderFunction render_func) {
 	if(!node.visible) {
 		return;
@@ -273,6 +271,7 @@ void Model::draw_node(const VkCommandBuffer& cmd_buffer,
 			global_matrix = current_parent->matrix * global_matrix;
 			current_parent = current_parent->parent;
 		}
+		vkCmdPushConstants(cmd_buffer, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &global_matrix);
 		for(const auto& primitive : node.mesh.primitives) {
 			if(primitive.idx_cnt) {
 				auto& material = materials[primitive.material_idx];
@@ -293,7 +292,7 @@ void Model::draw_node(const VkCommandBuffer& cmd_buffer,
 	}
 }
 
-void Model::draw(const VkCommandBuffer& commandBuffer, const VkPipelineLayout& pipelineLayout,
+void GLTFModel::draw(const VkCommandBuffer& commandBuffer, const VkPipelineLayout& pipelineLayout,
 				 size_t cb_index, RenderFunction render_func) {
 	VkDeviceSize offsets[1] = { 0 };
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertices.handle, offsets);
@@ -304,7 +303,7 @@ void Model::draw(const VkCommandBuffer& commandBuffer, const VkPipelineLayout& p
 }
 
 
-void Model::destroy(const VkDevice& device) {
+void GLTFModel::destroy(VulkanContext* ctx) {
 	vertices.destroy();
 	indices.destroy();
 	for(auto& texture : textures) {
@@ -312,7 +311,7 @@ void Model::destroy(const VkDevice& device) {
 	}
 	for(auto& material : materials) {
 		if(material.pipeline) {
-			vkDestroyPipeline(device, material.pipeline, nullptr);
+			vkDestroyPipeline(ctx->device, material.pipeline, nullptr);
 		}
 	}
 }

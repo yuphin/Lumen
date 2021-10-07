@@ -1,18 +1,35 @@
 #pragma once
 
-// Adapted from Sascha Willems' repository
-// https://github.com/SaschaWillems/Vulkan
-
 struct VulkanContext {
-	VkDevice* device;
-	VkQueue* gfx_queue;
-	VkQueue* present_queue;
-	VkQueue* compute_queue;
-	VkPhysicalDeviceFeatures* supported_features;
-	VkPhysicalDeviceProperties* device_properties;
-	VkPhysicalDeviceMemoryProperties* memory_properties;
-	VkCommandPool* command_pool;
-	VkPhysicalDevice* physical_device;
+	GLFWwindow* window_ptr = nullptr;
+	VkInstance instance;
+	VkDebugUtilsMessengerEXT debug_messenger;
+	VkSurfaceKHR surface;
+	VkPhysicalDevice physical_device = VK_NULL_HANDLE;
+	VkDevice device;
+	VkQueue gfx_queue;
+	VkQueue present_queue;
+	VkQueue compute_queue;
+	VkRenderPass render_pass;
+	VkPipelineLayout pipeline_layout;
+	VkPipeline gfx_pipeline;
+	// Swapchain related stuff
+	VkFormat swapchain_image_format;
+	VkExtent2D swapchain_extent;
+	VkSwapchainKHR swapchain;
+	std::vector<VkImage> swapchain_images;
+	std::vector<VkImageView> swapchain_image_views;
+	std::vector<VkFramebuffer> swapchain_framebuffers;
+	VkCommandPool command_pool;
+	std::vector<VkCommandBuffer> command_buffers;
+	VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
+	VkPhysicalDeviceFeatures supported_features;
+	VkPhysicalDeviceProperties device_properties;
+	VkPhysicalDeviceMemoryProperties memory_properties;
+
+	VkImage depth_img;
+	VkDeviceMemory depth_img_memory;
+	VkImageView depth_img_view;
 };
 
 namespace vk {
@@ -32,16 +49,16 @@ namespace vk {
 		std::vector<VkSpecializationMapEntry> entry;
 		LumenStage shader_stage;
 	};
-	inline void check(VkResult result, const char* msg) {
-		if(result != VK_SUCCESS) {
+	inline void check(VkResult result, const char* msg = 0) {
+		if(result != VK_SUCCESS && msg) {
 			LUMEN_ERROR(msg);
 		}
 	}
 
 	template<std::size_t Size>
-	inline void check(std::array<VkResult, Size> results, const char* msg) {
+	inline void check(std::array<VkResult, Size> results, const char* msg = 0) {
 		for(const auto& result : results) {
-			if(result != VK_SUCCESS) {
+			if(result != VK_SUCCESS && msg) {
 				LUMEN_ERROR(msg);
 			}
 		}
@@ -86,15 +103,19 @@ namespace vk {
 		return commandBufferAllocateInfo;
 	}
 
-	inline VkCommandPoolCreateInfo command_pool_CI() {
+	inline VkCommandPoolCreateInfo command_pool_CI(VkCommandPoolCreateFlags flags = 0) {
 		VkCommandPoolCreateInfo cmdPoolCreateInfo{};
 		cmdPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		cmdPoolCreateInfo.flags = flags;
 		return cmdPoolCreateInfo;
 	}
 
-	inline VkCommandBufferBeginInfo command_buffer_begin_info() {
+	inline VkCommandBufferBeginInfo command_buffer_begin_info(VkCommandBufferUsageFlags flags = 0) {
 		VkCommandBufferBeginInfo cmdBufferBeginInfo{};
 		cmdBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		cmdBufferBeginInfo.pNext = nullptr;
+		cmdBufferBeginInfo.pInheritanceInfo = nullptr;
+		cmdBufferBeginInfo.flags = flags;
 		return cmdBufferBeginInfo;
 	}
 
@@ -140,10 +161,23 @@ namespace vk {
 		return memoryBarrier;
 	}
 
-	inline VkImageCreateInfo image_create_info() {
-		VkImageCreateInfo imageCreateInfo{};
-		imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		return imageCreateInfo;
+	inline VkImageCreateInfo image_create_info(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent) {
+		VkImageCreateInfo info = { };
+		info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		info.pNext = nullptr;
+
+		info.imageType = VK_IMAGE_TYPE_2D;
+
+		info.format = format;
+		info.extent = extent;
+
+		info.mipLevels = 1;
+		info.arrayLayers = 1;
+		info.samples = VK_SAMPLE_COUNT_1_BIT;
+		info.tiling = VK_IMAGE_TILING_OPTIMAL;
+		info.usage = usageFlags;
+
+		return info;
 	}
 
 	inline VkSamplerCreateInfo sampler_create_info() {

@@ -1,5 +1,6 @@
 #pragma once
 #include "LumenPCH.h"
+
 enum class KeyInput {
 	SPACE = 32,
 	APOSTROPHE = 39,
@@ -127,15 +128,19 @@ enum class KeyInput {
 enum class KeyAction {
 	RELEASE,
 	PRESS,
-	REPEAT
+	REPEAT,
+	UNKNOWN
 };
 
 enum class MouseAction {
 	LEFT,
 	RIGHT,
-	MIDDLE
+	MIDDLE,
+	UNKNOWN
 };
-
+using MouseClickCallback = std::function<void(MouseAction button, KeyAction action)>;
+using MouseMoveCallback = std::function<void(double x, double y)>;
+using MouseScrollCallback = std::function<void(double x, double y)>;
 class Window {
 public:
 	Window(int width, int height, bool fullscreen);
@@ -147,8 +152,17 @@ public:
 	inline bool is_key_up(KeyInput input) {
 		return key_map[input] == KeyAction::RELEASE;
 	}
-	inline bool is_key_repeat(KeyInput input) {
-		return key_map[input] == KeyAction::REPEAT;
+	inline bool is_key_held(KeyInput input) {
+		return key_map[input] == KeyAction::REPEAT || key_map[input] == KeyAction::PRESS;
+	}
+	inline bool is_mouse_held(MouseAction mb) {
+		return mouse_map[mb] == KeyAction::PRESS || mouse_map[mb] == KeyAction::REPEAT;
+	}
+	inline bool is_mouse_down(MouseAction mb) {
+		return mouse_map[mb] == KeyAction::PRESS;
+	}
+	inline bool is_mouse_up(MouseAction mb) {
+		return mouse_map[mb] == KeyAction::RELEASE;
 	}
 	~Window();
 	inline GLFWwindow* get_window_ptr() {
@@ -158,12 +172,26 @@ public:
 		return resized;
 	}
 	bool resized = false;
-
+	void add_mouse_click_callback(MouseClickCallback callback);
+	void add_mouse_move_callback(MouseMoveCallback callback);
+	void add_scroll_callback(MouseScrollCallback callback);
 private:
 	GLFWwindow* window_handle;
 	int width{}, height{};
 	static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 	static void window_size_callback(GLFWwindow* window, int width, int height);
+	static void char_callback(GLFWwindow* window, uint32_t codepoint);
+	static void mouse_click_callback(GLFWwindow* window, int button, int action, int mods);
+	static void mouse_move_callback(GLFWwindow* window, double x, double y);
+	static void scroll_callback(GLFWwindow* window, double x, double y);
 	std::unordered_map<KeyInput, KeyAction> key_map{};
+	std::unordered_map<MouseAction, KeyAction> mouse_map{};
+	std::vector<MouseClickCallback> mouse_click_callbacks;
+	std::vector<MouseMoveCallback> mouse_move_callbacks;
+	std::vector<MouseScrollCallback> mouse_scroll_callbacks;
+	double mouse_pos_x, mouse_pos_y;
+	double mouse_prev_x, mouse_prev_y;
+	double mouse_delta_prev_x, mouse_delta_prev_y;
+	double mouse_last_x, mouse_last_y;
 
 };

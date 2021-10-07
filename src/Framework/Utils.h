@@ -13,7 +13,8 @@ void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image, VkImageLay
 							 VkImageLayout new_layout, VkPipelineStageFlags source_stage,
 							 VkPipelineStageFlags destination_stage, VkImageSubresourceRange subresource_range);
 
-VkImageView create_image_view(VkDevice* device, const VkImage& img, VkFormat format);
+VkImageView create_image_view(VkDevice device, const VkImage& img, VkFormat format,
+							  VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT);
 
 
 inline bool has_extension(std::string_view filename, std::string_view ext) {

@@ -110,7 +110,8 @@ void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
 		1, &image_memory_barrier);
 }
 
-VkImageView create_image_view(VkDevice* device, const VkImage& img, VkFormat format) {
+VkImageView create_image_view(VkDevice device, const VkImage& img, VkFormat format,
+							  VkImageAspectFlags flags) {
 	VkImageView image_view;
 	VkImageViewCreateInfo image_view_CI = vk::image_view_CI();
 	image_view_CI.image = img;
@@ -120,13 +121,13 @@ VkImageView create_image_view(VkDevice* device, const VkImage& img, VkFormat for
 	image_view_CI.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 	image_view_CI.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
 	image_view_CI.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-	image_view_CI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	image_view_CI.subresourceRange.aspectMask = flags;
 	image_view_CI.subresourceRange.baseMipLevel = 0;
 	image_view_CI.subresourceRange.levelCount = 1;
 	image_view_CI.subresourceRange.baseArrayLayer = 0;
 	image_view_CI.subresourceRange.layerCount = 1;
 	vk::check(
-		vkCreateImageView(*device, &image_view_CI, nullptr, &image_view),
+		vkCreateImageView(device, &image_view_CI, nullptr, &image_view),
 		"Failed to create image view!"
 	);
 	return image_view;

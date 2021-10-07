@@ -1,5 +1,6 @@
 #include "LumenPCH.h"
-#include "Lumen.h"
+#include "BoxScene.h"
+#include "RTScene.h"
 #include "Framework/Window.h"
 
 
@@ -9,23 +10,23 @@ int main() {
 #ifdef NDEBUG
 	bool enable_debug = false;
 #else
-	bool enable_debug = false;
+	bool enable_debug = true;
 #endif  
 	bool fullscreen = false;
-	int width = 1024;
-	int height = 768;
+	int width = 1600;
+	int height = 900;
 	Logger::init();
 	ThreadPool::init();
 	LUMEN_TRACE("Logger initialized");
 	Window window(width, height, fullscreen);
 	{
-		Lumen app(width, height, enable_debug);
-		auto wnd_handle = window.get_window_ptr();
-		app.init(wnd_handle);
+		RTScene app(width, height, enable_debug);
+		app.init(&window);
 		while(!window.should_close()) {
 			window.poll();
 			app.update();
 		}
+		app.cleanup();
 	}
 
 	ThreadPool::destroy();

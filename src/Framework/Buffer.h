@@ -12,20 +12,20 @@ struct Buffer {
 	VkMemoryPropertyFlags mem_property_flags = 0;
 
 	inline void destroy() {
-		if(handle) vkDestroyBuffer(*ctx->device, handle, nullptr);
-		if(buffer_memory) vkFreeMemory(*ctx->device, buffer_memory, nullptr);
+		if(handle) vkDestroyBuffer(ctx->device, handle, nullptr);
+		if(buffer_memory) vkFreeMemory(ctx->device, buffer_memory, nullptr);
 	}
 
 	inline void bind(VkDeviceSize offset = 0) {
-		vk::check(vkBindBufferMemory(*ctx->device, handle, buffer_memory, offset), "Failed to bind buffer");
+		vk::check(vkBindBufferMemory(ctx->device, handle, buffer_memory, offset), "Failed to bind buffer");
 	}
 
-	inline void map_memory(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0) {
-		vk::check(vkMapMemory(*ctx->device, buffer_memory, offset, size, 0, &data), "Unable to map memory");
+	inline void map(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0) {
+		vk::check(vkMapMemory(ctx->device, buffer_memory, offset, size, 0, &data), "Unable to map memory");
 	}
 
 	inline void unmap() {
-		vkUnmapMemory(*ctx->device, buffer_memory);
+		vkUnmapMemory(ctx->device, buffer_memory);
 	}
 
 	void create(VulkanContext*, VkBufferUsageFlags, VkMemoryPropertyFlags, VkSharingMode,

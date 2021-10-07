@@ -110,7 +110,7 @@ void Texture2D::load_from_img(const std::string& filename, VkSamplerCreateInfo* 
 		int mip_width = tex_width;
 		int mip_height = tex_height;
 		VkFormatProperties format_properties;
-		vkGetPhysicalDeviceFormatProperties(*ctx->physical_device, format, &format_properties);
+		vkGetPhysicalDeviceFormatProperties(ctx->physical_device, format, &format_properties);
 		LUMEN_ASSERT((format_properties.optimalTilingFeatures &
 					 VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT),
 					 "Texture image format doesn't support linear blitting");
@@ -164,7 +164,7 @@ void Texture2D::load_from_img(const std::string& filename, VkSamplerCreateInfo* 
 		transition_image_layout(copy_cmd.handle, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 								VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresource_range);
 	}
-	copy_cmd.submit(*ctx->gfx_queue);
+	copy_cmd.submit(ctx->gfx_queue);
 	staging_buffer.destroy();
 	img_view = create_image_view(ctx->device, img, format);
 	if(!ci) {
@@ -181,18 +181,18 @@ void Texture2D::load_from_img(const std::string& filename, VkSamplerCreateInfo* 
 		sampler_CI.compareOp = VK_COMPARE_OP_NEVER;
 		sampler_CI.minLod = 0.0f;
 		sampler_CI.maxLod = (float) mip_levels;
-		sampler_CI.anisotropyEnable = ctx->supported_features->samplerAnisotropy;
-		sampler_CI.maxAnisotropy = ctx->supported_features->samplerAnisotropy ?
-			ctx->device_properties->limits.maxSamplerAnisotropy : 1.0f;
+		sampler_CI.anisotropyEnable = ctx->supported_features.samplerAnisotropy;
+		sampler_CI.maxAnisotropy = ctx->supported_features.samplerAnisotropy ?
+			ctx->device_properties.limits.maxSamplerAnisotropy : 1.0f;
 
 		sampler_CI.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 		vk::check(
-			vkCreateSampler(*ctx->device, &sampler_CI, nullptr, &sampler),
+			vkCreateSampler(ctx->device, &sampler_CI, nullptr, &sampler),
 			"Could not create image sampler"
 		);
 	} else {
 		vk::check(
-			vkCreateSampler(*ctx->device, ci, nullptr, &sampler),
+			vkCreateSampler(ctx->device, ci, nullptr, &sampler),
 			"Could not create image sampler"
 		);
 	}
@@ -219,40 +219,37 @@ Texture::Texture(VulkanContext* ctx, VkFormat format,
 
 
 void Texture::create_image() {
-	auto image_CI = vk::image_create_info();
+	auto image_CI = vk::image_create_info(format, usage_flags, base_extent);
 	image_CI.imageType = image_type;
-	image_CI.extent = base_extent;
 	image_CI.mipLevels = mip_levels;
 	image_CI.arrayLayers = array_layers;
-	image_CI.format = format;
 	image_CI.tiling = tiling;
 	image_CI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	image_CI.usage = usage_flags;
 	image_CI.samples = sample_count;
 	image_CI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 	vk::check(
-		vkCreateImage(*ctx->device, &image_CI, nullptr, &img),
+		vkCreateImage(ctx->device, &image_CI, nullptr, &img),
 		"Failed to create image"
 	);
 
 	VkMemoryRequirements mem_req;
-	vkGetImageMemoryRequirements(*ctx->device, img, &mem_req);
+	vkGetImageMemoryRequirements(ctx->device, img, &mem_req);
 	auto alloc_info = vk::memory_allocate_info();
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type(ctx->physical_device, mem_req.memoryTypeBits,
+	alloc_info.memoryTypeIndex = find_memory_type(&ctx->physical_device, mem_req.memoryTypeBits,
 												  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	vk::check(
-		vkAllocateMemory(*ctx->device, &alloc_info, nullptr, &img_mem),
+		vkAllocateMemory(ctx->device, &alloc_info, nullptr, &img_mem),
 		"Failed to allocate image memory"
 	);
-	vkBindImageMemory(*ctx->device, img, img_mem, 0);
+	vkBindImageMemory(ctx->device, img, img_mem, 0);
 }
 
 void Texture::destroy() {
-	vkDestroySampler(*ctx->device, sampler, nullptr);
-	vkDestroyImageView(*ctx->device, img_view, nullptr);
-	vkDestroyImage(*ctx->device, img, nullptr);
-	vkFreeMemory(*ctx->device, img_mem, nullptr);
+	vkDestroySampler(ctx->device, sampler, nullptr);
+	vkDestroyImageView(ctx->device, img_view, nullptr);
+	vkDestroyImage(ctx->device, img, nullptr);
+	vkFreeMemory(ctx->device, img_mem, nullptr);
 }

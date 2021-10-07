@@ -1,4 +1,5 @@
 #include "LumenPCH.h"
+
 #include "Pipeline.h"
 
 
@@ -57,7 +58,7 @@ void Pipeline::create_pipeline(const GraphicsPipelineSettings& settings) {
 	input_asssembly_CI =
 		vk::pipeline_vertex_input_assembly_state_CI(
 			settings.topology,
-			VK_NULL_HANDLE,
+			0,
 			VK_FALSE
 		);
 	viewport_state = vk::pipeline_viewport_state_CI(1, 1, 0);
@@ -125,6 +126,8 @@ void Pipeline::create_pipeline(const GraphicsPipelineSettings& settings) {
 	frag_shader_CI.pSpecializationInfo = nullptr;
 	VkPipelineShaderStageCreateInfo shader_stages[] = { vert_shader_CI, frag_shader_CI };
 
+	auto depth_stencil_state_ci = vk::pipeline_depth_stencil_CI(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+
 	pipeline_CI = vk::graphics_pipeline_CI();
 	pipeline_CI.pNext = nullptr;
 	pipeline_CI.stageCount = 2;
@@ -140,6 +143,7 @@ void Pipeline::create_pipeline(const GraphicsPipelineSettings& settings) {
 	pipeline_CI.renderPass = settings.render_pass;
 	pipeline_CI.subpass = 0;
 	pipeline_CI.basePipelineHandle = VK_NULL_HANDLE;
+	pipeline_CI.pDepthStencilState = &depth_stencil_state_ci;
 
 	this->handle = settings.pipeline;
 	this->settings = settings;

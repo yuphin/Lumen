@@ -6,6 +6,8 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage, VkMemoryProper
 					VkDeviceSize size, void* data, bool use_staging) {
 	if(!this->ctx) {
 		this->ctx = ctx;
+		this->mem_property_flags = mem_property_flags;
+		this->usage_flags = usage;
 	}
 
 	if(use_staging) {
@@ -42,7 +44,7 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage, VkMemoryProper
 			1,
 			&copy_region
 		);
-		copy_cmd.submit(*ctx->gfx_queue);
+		copy_cmd.submit(ctx->gfx_queue);
 		staging_buffer.destroy();
 	} else {
 		// Create the buffer handle
@@ -51,34 +53,35 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage, VkMemoryProper
 			size,
 			sharing_mode
 		);
-		vk::check(vkCreateBuffer(*ctx->device, &buffer_CI, nullptr, &this->handle),
+		vk::check(vkCreateBuffer(ctx->device, &buffer_CI, nullptr, &this->handle),
 				  "Failed to create vertex buffer!"
 		);
 
 		// Create the memory backing up the buffer handle
 		VkMemoryRequirements mem_reqs;
 		VkMemoryAllocateInfo mem_alloc_info = vk::memory_allocate_info();
-		vkGetBufferMemoryRequirements(*ctx->device, this->handle, &mem_reqs);
+		vkGetBufferMemoryRequirements(ctx->device, this->handle, &mem_reqs);
 
 		mem_alloc_info.allocationSize = mem_reqs.size;
 		// Find a memory type index that fits the properties of the buffer
 		mem_alloc_info.memoryTypeIndex = find_memory_type(
-			ctx->physical_device, mem_reqs.memoryTypeBits, mem_property_flags
+			&ctx->physical_device, mem_reqs.memoryTypeBits, mem_property_flags
 		);
-		vk::check(vkAllocateMemory(*ctx->device, &mem_alloc_info, nullptr, &this->buffer_memory),
+		vk::check(vkAllocateMemory(ctx->device, &mem_alloc_info, nullptr, &this->buffer_memory),
 				  "Failed to allocate vertex buffer memory!"
 		);
 
 		alignment = mem_reqs.alignment;
 		this->size = size;
 		usage_flags = usage;
-		mem_property_flags = mem_property_flags;
+		if (mem_property_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
+			this->map();
+		}
 
 		// If a pointer to the buffer data has been passed, map the buffer and copy over the data
 		if(data != nullptr) {
-			this->map_memory();
+			// Memory is assumed mapped at this point
 			memcpy(this->data, data, size);
-			this->unmap();
 			if((mem_property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
 				this->flush();
 			}
@@ -96,7 +99,7 @@ void Buffer::flush(VkDeviceSize size, VkDeviceSize offset) {
 	mapped_range.memory = buffer_memory;
 	mapped_range.offset = offset;
 	mapped_range.size = size;
-	vk::check(vkFlushMappedMemoryRanges(*ctx->device, 1, &mapped_range),
+	vk::check(vkFlushMappedMemoryRanges(ctx->device, 1, &mapped_range),
 			  "Failed to flush mapped memory ranges"
 	);
 }
@@ -107,7 +110,7 @@ void Buffer::invalidate(VkDeviceSize size, VkDeviceSize offset) {
 	mapped_range.memory = buffer_memory;
 	mapped_range.offset = offset;
 	mapped_range.size = size;
-	vk::check(vkInvalidateMappedMemoryRanges(*ctx->device, 1, &mapped_range),
+	vk::check(vkInvalidateMappedMemoryRanges(ctx->device, 1, &mapped_range),
 			  "Failed to invalidate mapped memory range");
 }
 
