@@ -3,7 +3,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "RTScene.h"
-const bool USE_RTX = true;
+bool use_rtx = true;
 //TODO: Use instances in the rasterization pipeline
 //TODO: Use a single scratch buffer
 
@@ -59,7 +59,8 @@ void RTScene::init(Window* window) {
 	create_graphics_pipeline();
 	create_uniform_buffers();
 	update_descriptors();
-	if (USE_RTX) {
+	rt_initialized = use_rtx;
+	if (use_rtx) {
 		create_blas();
 		create_tlas();
 		create_rt_descriptors();
@@ -70,7 +71,7 @@ void RTScene::init(Window* window) {
 	update_post_desc_set();
 	create_post_pipeline();
 
-	//init_imgui();
+	init_imgui();
 }
 
 void RTScene::init_scene() {
@@ -201,17 +202,6 @@ void RTScene::create_blas() {
 void RTScene::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
 	tlas.reserve(instances.size());
-	for (const ModelInstance& inst : instances) {
-		VkAccelerationStructureInstanceKHR rayInst{};
-		rayInst.transform = to_vk_matrix(inst.transform);
-		rayInst.instanceCustomIndex = inst.idx;
-		rayInst.accelerationStructureReference = vkb.get_blas_device_address(inst.idx);
-		rayInst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-		rayInst.mask = 0xFF; //  Only be hit if rayMask & instance.mask != 0
-		rayInst.instanceShaderBindingTableRecordOffset = 0;	// We will use the same hit group for all objects
-		tlas.emplace_back(rayInst);
-	}
-
 	for (auto& node : gltf_scene.nodes) {
 		VkAccelerationStructureInstanceKHR rayInst{};
 		rayInst.transform = to_vk_matrix(node.world_matrix);
@@ -615,6 +605,11 @@ void RTScene::trace_rays() {
 
 double RTScene::draw_frame() {
 	auto t_begin = std::chrono::high_resolution_clock::now();
+
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+	ImGui::Checkbox("Enable RTX", &use_rtx);
+
 	vk::check(vkWaitForFences(vkb.ctx.device, 1, &vkb.in_flight_fences[vkb.current_frame], VK_TRUE, 1000000000),
 			  "Timeout");
 	uint32_t image_idx;
@@ -942,7 +937,7 @@ void RTScene::render(uint32_t i) {
 	VkViewport viewport = vk::viewport((float)width, (float)height, 0.0f, 1.0f);
 	VkClearValue clear_values[] = { clear_color, clear_depth };
 	// 1st pass
-	if (USE_RTX) {
+	if (use_rtx) {
 		// Initializing push constant values
 		glm::vec4 clearColor{ 1,1,1,1 };
 		pc_ray.clear_color = clearColor;
@@ -994,21 +989,20 @@ void RTScene::render(uint32_t i) {
 	vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, post_pipeline->handle);
 	vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, post_pipeline_layout, 0, 1, &post_desc_set, 0, nullptr);
 	vkCmdDraw(cmdbuf, 3, 1, 0, 0);
+	ImGui::Render();
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdbuf);
 	vkCmdEndRenderPass(cmdbuf);
 
 
 	//ImGui_ImplVulkan_NewFrame();
 	//ImGui_ImplGlfw_NewFrame();
 	//ImGui::NewFrame();
-	//bool open = true;
-	//ImGui::ShowDemoWindow(&open);
-	//ImGui::Render();
+	
 	//ImDrawData* draw_data = ImGui::GetDrawData();
 	//const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
 	//if (is_minimized) {
 	//	return;
 	//}
-	//ImGui_ImplVulkan_RenderDrawData(draw_data, cmdbuf);
 
 
 	vk::check(vkEndCommandBuffer(cmdbuf),
@@ -1058,6 +1052,7 @@ void RTScene::update() {
 
 void RTScene::cleanup() {
 	auto device = vkb.ctx.device;
+	bool rt = use_rtx || rt_initialized;
 	vkDeviceWaitIdle(device);
 	std::vector<Buffer> buffer_list = {
 		vertex_buffer,
@@ -1069,7 +1064,7 @@ void RTScene::cleanup() {
 		scene_desc_buffer,
 		scene_ubo_buffer
 	};
-	if (USE_RTX) {
+	if (rt) {
 		buffer_list.push_back(sbt_buffer);
 	}
 	for (auto& b : buffer_list) {
@@ -1083,6 +1078,7 @@ void RTScene::cleanup() {
 
 	vkDestroyDescriptorPool(device, gfx_desc_pool, nullptr);
 	vkDestroyDescriptorPool(device, post_desc_pool, nullptr);
+	vkDestroyDescriptorPool(device, imgui_pool, nullptr);
 
 	vkDestroyPipelineLayout(device, gfx_pipeline_layout, nullptr);
 	vkDestroyPipelineLayout(device, post_pipeline_layout, nullptr);
@@ -1092,8 +1088,10 @@ void RTScene::cleanup() {
 
 	if (gfx_pipeline) { gfx_pipeline->cleanup(); }
 	if (post_pipeline) { post_pipeline->cleanup(); }
-
-	if (USE_RTX) {
+	ImGui_ImplVulkan_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+	if (rt) {
 		vkDestroyPipeline(vkb.ctx.device, rt_pipeline, nullptr);
 		vkDestroyDescriptorSetLayout(device, rt_desc_layout, nullptr);
 		vkDestroyDescriptorPool(device, rt_desc_pool, nullptr);

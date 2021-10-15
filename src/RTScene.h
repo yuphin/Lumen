@@ -89,6 +89,7 @@ private:
 	//MeshLoader loader;
 	Window* window;
 	bool initialized = false;
+	bool rt_initialized = false;
 	int cnt = 0;
 	VkDescriptorPool imgui_pool;
 	std::vector<ModelInstance> instances;
