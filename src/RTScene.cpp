@@ -585,24 +585,6 @@ void RTScene::update_post_desc_set() {
 	vkUpdateDescriptorSets(vkb.ctx.device, 1, &write_desc_set, 0, nullptr);
 }
 
-void RTScene::trace_rays() {
-	// Initializing push constant values
-	glm::vec4 clearColor{ 1,1,1,1 };
-	pc_ray.clear_color = clearColor;
-	pc_ray.light_pos = scene_ubo.light_pos;
-	pc_ray.light_intensity = 10;
-	CommandBuffer cmdBuf(&vkb.ctx);
-	std::vector<VkDescriptorSet> descSets{ rt_desc_set, uniform_descriptor_sets[0] };
-	vkCmdBindPipeline(cmdBuf.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt_pipeline);
-	vkCmdBindDescriptorSets(cmdBuf.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt_pipeline_layout, 0,
-							(uint32_t)descSets.size(), descSets.data(), 0, nullptr);
-	vkCmdPushConstants(cmdBuf.handle, rt_pipeline_layout,
-					   VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR,
-					   0, sizeof(PushConstantRay), &pc_ray);
-	vkCmdTraceRaysKHR(cmdBuf.handle, &rgen_region, &rmiss_region, &hit_region, &call_region, width, height, 1);
-}
-
-
 double RTScene::draw_frame() {
 	auto t_begin = std::chrono::high_resolution_clock::now();
 

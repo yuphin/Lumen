@@ -43,7 +43,6 @@ private:
 	void create_post_pipeline();
 	void update_post_desc_set();
 
-	void trace_rays();
 	void render(uint32_t idx);
 	double draw_frame();
 	struct ModelInstance {
