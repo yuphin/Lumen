@@ -1,6 +1,17 @@
 #pragma once
 #include "LumenPCH.h"
 
+struct TextureSettings {
+	VkFormat format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
+	VkImageUsageFlags usage_flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	uint32_t mip_levels = 1;
+	uint32_t array_layers = 1;
+	VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
+	VkExtent3D base_extent = { 0, 0, 1 };
+	VkImageType image_type = VK_IMAGE_TYPE_2D;
+};
+
 class Texture {
 public:
 	Texture() = default;
@@ -14,8 +25,8 @@ public:
 	VkDescriptorImageInfo descriptor_image_info = {};
 	void destroy();
 	inline void set_context(VulkanContext* ctx) { this->ctx = ctx; }
-protected:
 	void create_image();
+
 	VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
 	VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
 	VkImageUsageFlags usage_flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -35,4 +46,6 @@ public:
 			  uint32_t array_layers, VkSampleCountFlagBits, VkImageType);
 	void load_from_img(const std::string& filename,
 					   VkSamplerCreateInfo* = nullptr, bool generate_mipmaps = false);
+	void create_empty_texture(VulkanContext* ctx, const TextureSettings& settings, VkImageLayout img_layout,
+							  VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT);
 };

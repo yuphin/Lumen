@@ -2,15 +2,16 @@
 #include "Buffer.h"
 #include "CommandBuffer.h"
 #include "Utils.h"
+
 void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage, VkMemoryPropertyFlags mem_property_flags, VkSharingMode sharing_mode,
 					VkDeviceSize size, void* data, bool use_staging) {
-	if(!this->ctx) {
+	if (!this->ctx) {
 		this->ctx = ctx;
 		this->mem_property_flags = mem_property_flags;
 		this->usage_flags = usage;
 	}
 
-	if(use_staging) {
+	if (use_staging) {
 		Buffer staging_buffer;
 
 		LUMEN_ASSERT(mem_property_flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -24,6 +25,8 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage, VkMemoryProper
 			size,
 			data
 		);
+
+		staging_buffer.unmap();
 		this->create(
 			ctx,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
@@ -33,7 +36,7 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage, VkMemoryProper
 			nullptr
 		);
 
-		CommandBuffer copy_cmd(ctx, VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		CommandBuffer copy_cmd(ctx, true);
 		VkBufferCopy copy_region = {};
 
 		copy_region.size = size;
@@ -44,7 +47,7 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage, VkMemoryProper
 			1,
 			&copy_region
 		);
-		copy_cmd.submit(ctx->gfx_queue);
+		copy_cmd.submit(ctx->queues[0]);
 		staging_buffer.destroy();
 	} else {
 		// Create the buffer handle
@@ -67,6 +70,12 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage, VkMemoryProper
 		mem_alloc_info.memoryTypeIndex = find_memory_type(
 			&ctx->physical_device, mem_reqs.memoryTypeBits, mem_property_flags
 		);
+
+		VkMemoryAllocateFlagsInfo flags_info{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO };
+		if (usage_flags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
+			flags_info.flags |= VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+			mem_alloc_info.pNext = &flags_info;
+		}
 		vk::check(vkAllocateMemory(ctx->device, &mem_alloc_info, nullptr, &this->buffer_memory),
 				  "Failed to allocate vertex buffer memory!"
 		);
@@ -79,10 +88,10 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage, VkMemoryProper
 		}
 
 		// If a pointer to the buffer data has been passed, map the buffer and copy over the data
-		if(data != nullptr) {
+		if (data != nullptr) {
 			// Memory is assumed mapped at this point
 			memcpy(this->data, data, size);
-			if((mem_property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
+			if ((mem_property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
 				this->flush();
 			}
 		}
@@ -92,7 +101,6 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage, VkMemoryProper
 		this->bind();
 	}
 }
-
 void Buffer::flush(VkDeviceSize size, VkDeviceSize offset) {
 	VkMappedMemoryRange mapped_range = {};
 	mapped_range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
@@ -119,3 +127,5 @@ void Buffer::prepare_descriptor(VkDeviceSize size, VkDeviceSize offset) {
 	descriptor.buffer = handle;
 	descriptor.range = size;
 }
+
+

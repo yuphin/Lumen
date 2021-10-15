@@ -6,10 +6,14 @@
 #include "Framework/Pipeline.h"
 #include "Framework/Camera.h"
 #include "Framework/Texture.h"
-#include "Framework/MeshLoader.h"
 #include "Framework/Window.h"
 #include "Framework/Scene.h"
+#include "Framework/Utils.h"
+#include "Framework/CommandBuffer.h"
 #include <glm/glm.hpp>
+#include "shaders/commons.h"
+#include "Framework/gltfscene.hpp"
+
 
 class RTScene : public Scene {
 public:
@@ -22,49 +26,91 @@ public:
 	inline static RTScene* get() { return instance; }
 	bool resized = false;
 private:
-	void prepare_buffers();
-	void prepare_descriptors();
-	void prepare_descriptor_pool();
-	void update_buffers();
+	void init_scene();
+	void create_offscreen_resources();
+	void create_graphics_pipeline();
+	void create_descriptors();
+	void update_descriptors();
+	void create_uniform_buffers();
+	void update_uniform_buffers();
 	void init_imgui();
-	void init_resources();
+	void create_blas();
+	void create_tlas();
+	void create_rt_descriptors();
+	void create_rt_pipeline();
+	void create_rt_sbt();
+	void create_post_descriptor();
+	void create_post_pipeline();
+	void update_post_desc_set();
+
+	void trace_rays();
 	void render(uint32_t idx);
 	double draw_frame();
-	std::string get_asset_path() const;
-	struct SceneUBO {
-		glm::mat4 projection;
-		glm::mat4 view;
-		glm::mat4 model = glm::mat4(1.0f);
-		glm::vec4 light_pos = glm::vec4(3.0f, 2.5f, 1.0f, 1.0f);
-		glm::vec4 view_pos;
+	struct ModelInstance {
+		glm::mat4 transform;
+		uint32_t idx;
 	};
+	struct MaterialPushConst {
+		glm::vec4 base_color_factor;
+	} material_push_const;
+	struct ModelPushConst {
+		glm::mat4 transform;
+	} model_push_const;
+	GraphicsPipelineSettings gfx_pipeline_settings = {};
 
-	struct SceneResources {
-		struct {
-			Buffer scene_ubo;
-		} vertex_buffers = {};
+	VkDescriptorSetLayout uniform_set_layout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout rt_desc_layout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout post_desc_layout = VK_NULL_HANDLE;
 
-		struct MaterialPushConst {
-			glm::vec4 base_color_factor;
-			int base_color_set;
-		} material_push_const;
-		struct ModelPushConst {
-			glm::mat4 transform;
-		};
-		GLTFModel::Material cube_material;
-		GraphicsPipelineSettings cube_pipeline_settings = {};
-		VkDescriptorSetLayout uniform_set_layout = VK_NULL_HANDLE;
-		VkDescriptorSetLayout scene_set_layout = VK_NULL_HANDLE;
-		VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
-		std::vector<VkDescriptorSet> uniform_descriptor_sets{};
-		std::unique_ptr<Pipeline> cube_pipeline = nullptr;
-		Model::RenderFunction material_render_func = nullptr;
-	} resources;
+	VkDescriptorPool gfx_desc_pool = VK_NULL_HANDLE;
+	VkDescriptorPool rt_desc_pool = VK_NULL_HANDLE;
+	VkDescriptorPool post_desc_pool = VK_NULL_HANDLE;
+
+	VkPipelineLayout gfx_pipeline_layout = VK_NULL_HANDLE;
+	VkPipelineLayout post_pipeline_layout = VK_NULL_HANDLE;
+
+	std::vector<VkDescriptorSet> uniform_descriptor_sets{};
+	VkDescriptorSet rt_desc_set;
+	VkDescriptorSet post_desc_set;
+
+	std::unique_ptr<Pipeline> gfx_pipeline = nullptr;
+	std::unique_ptr<Pipeline> post_pipeline = nullptr;
+
+	VkRenderPass offscreen_renderpass;
+
+	VkFramebuffer offscreen_framebuffer;
+
+	Texture2D offscreen_img;
+	Texture2D offscreen_depth;
+
+
+	std::vector<VkRayTracingShaderGroupCreateInfoKHR> shader_groups;
 	std::unique_ptr<Camera> camera = nullptr;
-	MeshLoader loader;
+	//MeshLoader loader;
 	Window* window;
 	bool initialized = false;
 	int cnt = 0;
 	VkDescriptorPool imgui_pool;
-	GLTFModel cornell_box_model{ "scenes/cornellBox.gltf", "Cornell Box" };
+	std::vector<ModelInstance> instances;
+	SceneUBO scene_ubo{};
+	GltfScene gltf_scene;
+	Buffer vertex_buffer;
+	Buffer normal_buffer;
+	Buffer uv_buffer;
+	Buffer index_buffer;
+	Buffer materials_buffer;
+	Buffer prim_lookup_buffer;
+	Buffer scene_desc_buffer;
+	Buffer scene_ubo_buffer;
+
+	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
+	// TODO: Move to pipeline header
+	VkPipelineLayout rt_pipeline_layout;
+	VkPipeline rt_pipeline;
+	Buffer sbt_buffer;
+	VkStridedDeviceAddressRegionKHR rgen_region{};
+	VkStridedDeviceAddressRegionKHR rmiss_region{};
+	VkStridedDeviceAddressRegionKHR hit_region{};
+	VkStridedDeviceAddressRegionKHR call_region{};
+	PushConstantRay pc_ray;
 };

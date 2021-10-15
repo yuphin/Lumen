@@ -93,7 +93,7 @@ void Texture2D::load_from_img(const std::string& filename, VkSamplerCreateInfo* 
 	subresource_range.baseMipLevel = 0;
 	subresource_range.levelCount = mip_levels;
 
-	CommandBuffer copy_cmd(ctx, VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+	CommandBuffer copy_cmd(ctx, true);
 	transition_image_layout(copy_cmd.handle, img, VK_IMAGE_LAYOUT_UNDEFINED,
 							VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresource_range);
 
@@ -164,7 +164,7 @@ void Texture2D::load_from_img(const std::string& filename, VkSamplerCreateInfo* 
 		transition_image_layout(copy_cmd.handle, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 								VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresource_range);
 	}
-	copy_cmd.submit(ctx->gfx_queue);
+	copy_cmd.submit();
 	staging_buffer.destroy();
 	img_view = create_image_view(ctx->device, img, format);
 	if(!ci) {
@@ -203,6 +203,47 @@ void Texture2D::load_from_img(const std::string& filename, VkSamplerCreateInfo* 
 	if(!is_tex_format) {
 		stbi_image_free(img_data);
 	}
+}
+
+void Texture2D::create_empty_texture(VulkanContext* ctx, const TextureSettings& settings, VkImageLayout img_layout,
+									 VkImageAspectFlags flags/*=VK_IMAGE_ASPECT_COLOR_BIT*/) {
+	this->ctx = ctx;
+	this->format = settings.format;
+	this->tiling = settings.tiling;
+	this->usage_flags = settings.usage_flags;
+	this->mip_levels = settings.mip_levels;
+	this->array_layers = settings.array_layers;
+	this->sample_count = settings.sample_count;
+	this->base_extent = settings.base_extent;
+	this->image_type = settings.image_type;
+
+	create_image();
+	img_view = create_image_view(ctx->device, img, settings.format, flags);
+	// Create a default sampler
+	// TODO: Select sampler from a sampler pool
+	VkSamplerCreateInfo sampler_CI = vk::sampler_create_info();
+	sampler_CI.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	sampler_CI.magFilter = VK_FILTER_LINEAR;
+	sampler_CI.minFilter = VK_FILTER_LINEAR;
+	sampler_CI.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	sampler_CI.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	sampler_CI.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	sampler_CI.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	sampler_CI.mipLodBias = 0.0f;
+	sampler_CI.compareOp = VK_COMPARE_OP_NEVER;
+	sampler_CI.minLod = 0.0f;
+	sampler_CI.maxLod = (float)settings.mip_levels;
+	sampler_CI.anisotropyEnable = ctx->supported_features.samplerAnisotropy;
+	sampler_CI.maxAnisotropy = ctx->supported_features.samplerAnisotropy ?
+		ctx->device_properties.limits.maxSamplerAnisotropy : 1.0f;
+	sampler_CI.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+	vk::check(
+		vkCreateSampler(ctx->device, &sampler_CI, nullptr, &sampler),
+		"Could not create image sampler"
+	);
+	descriptor_image_info.imageLayout = img_layout;
+	descriptor_image_info.imageView = img_view;
+	descriptor_image_info.sampler = sampler;
 }
 
 Texture::Texture(VulkanContext* ctx) : ctx(ctx) {}

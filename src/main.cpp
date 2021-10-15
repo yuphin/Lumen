@@ -1,5 +1,4 @@
 #include "LumenPCH.h"
-#include "BoxScene.h"
 #include "RTScene.h"
 #include "Framework/Window.h"
 

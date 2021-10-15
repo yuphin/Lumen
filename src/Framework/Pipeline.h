@@ -2,8 +2,6 @@
 #include "LumenPCH.h"
 #include "Framework/Shader.h"
 #include "Framework/Event.h"
-#include "Framework/Model.h"
-
 struct Pipeline;
 
 struct GraphicsPipelineSettings {
@@ -15,8 +13,6 @@ struct GraphicsPipelineSettings {
 	VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
 	VkPipeline pipeline = VK_NULL_HANDLE;
 	VkRenderPass render_pass = VK_NULL_HANDLE;
-	std::span<Model*> bound_models = {};
-	std::function<void(Pipeline*, const std::span<Model*>&)> custom_func = nullptr;
 	VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
 	VkCullModeFlags cull_mode = VK_CULL_MODE_FRONT_BIT;
@@ -28,11 +24,18 @@ struct GraphicsPipelineSettings {
 
 };
 
+struct RTPipelineSettings {
+	std::vector<VkPipelineShaderStageCreateInfo> stages;
+	VkRayTracingShaderGroupCreateInfoKHR group{ VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
+	VkPipeline pipeline = VK_NULL_HANDLE;
+};
+
 struct Pipeline {
 public:
 	Pipeline(const VkDevice& device);	
 	void cleanup();
-	void create_pipeline(const GraphicsPipelineSettings&);
+	void create_gfx_pipeline(const GraphicsPipelineSettings&);
+	void create_rt_pipeline(const RTPipelineSettings&);
 	void track_for_changes();
 	std::unordered_map<std::string, std::filesystem::file_time_type> paths;
 	VkPipelineShaderStageCreateInfo vert_shader_CI;

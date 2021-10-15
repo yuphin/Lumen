@@ -5,9 +5,9 @@ Shader::Shader(const std::string& filename) : filename(filename) {}
 int Shader::compile() {
 	std::string file_path = filename + ".spv";
 #ifdef NDEBUG
-	auto str = std::string("glslc.exe " + filename + " -O" + " -o " + filename + ".spv");
+	auto str = std::string("glslangValidator.exe --target-env vulkan1.2 " + filename + "-V " + " -o " + filename + ".spv");
 #else 
-	auto str = std::string("glslc.exe " + filename + " -g" + " -o " + filename + ".spv");
+	auto str = std::string("glslangValidator.exe --target-env vulkan1.2 " + filename + " -V " +  " -g " + " -o " + filename + ".spv");
 #endif //  NDEBUG
 
 	binary.clear();

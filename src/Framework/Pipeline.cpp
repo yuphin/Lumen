@@ -51,7 +51,7 @@ void Pipeline::cleanup() {
 	cv.wait(tracker_lk, [this] {return tracking_stopped; });
 }
 
-void Pipeline::create_pipeline(const GraphicsPipelineSettings& settings) {
+void Pipeline::create_gfx_pipeline(const GraphicsPipelineSettings& settings) {
 	LUMEN_ASSERT(settings.pipeline_layout, "Pipeline layout cannot be null");
 	LUMEN_ASSERT(settings.render_pass, "Render pass cannot be null");
 
@@ -151,16 +151,16 @@ void Pipeline::create_pipeline(const GraphicsPipelineSettings& settings) {
 	if(settings.enable_tracking) {
 		pipeline_CI.flags |= VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
 	}
+	vk::check(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle),
+			  "Failed to create pipeline");
 
-	if(settings.custom_func) {
-		// We assume custom_func creates the pipeline
-		settings.custom_func(this, settings.bound_models);
-	} else {
-		vk::check(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle),
-				  "Failed to create pipeline");
-	}
 	vkDestroyShaderModule(device, frag_shader, nullptr);
 	vkDestroyShaderModule(device, vert_shader, nullptr);
+}
+
+void Pipeline::create_rt_pipeline(const RTPipelineSettings& settings) {
+	// TODO:
+	
 }
 
 void Pipeline::recompile_pipeline() {
@@ -192,12 +192,8 @@ void Pipeline::recompile_pipeline() {
 		static_cast<uint32_t>(settings.binding_desc.size());
 	vertex_input_state_CI.pVertexBindingDescriptions = settings.binding_desc.data();
 	pipeline_CI.pVertexInputState = &vertex_input_state_CI;
-	if(settings.custom_func) {
-		settings.custom_func(this, settings.bound_models);
-	} else {
-		vk::check(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle),
-				  "Failed to create pipeline");
-	}
+	vk::check(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle),
+			  "Failed to create pipeline");
 	vkDestroyShaderModule(device, frag_shader, nullptr);
 	vkDestroyShaderModule(device, vert_shader, nullptr);
 }

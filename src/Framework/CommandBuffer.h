@@ -6,10 +6,12 @@
 
 class CommandBuffer {
 public:
-	CommandBuffer(VulkanContext* ctx, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-				  bool begin = false);
+
+	CommandBuffer(VulkanContext* ctx, bool begin = false,
+				  QueueType type = QueueType::GFX, 
+				  VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 	~CommandBuffer();
-	void submit(VkQueue queue, bool wait_fences = true);
+	void submit(bool wait_fences = true);
 
 	VkCommandBuffer handle = VK_NULL_HANDLE;
 private:
@@ -19,4 +21,5 @@ private:
 	};
 	VulkanContext* ctx;
 	CommandBufferState state = CommandBufferState::STOPPED;
+	QueueType type;
 };

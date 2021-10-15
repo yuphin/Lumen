@@ -1,4 +1,8 @@
 #pragma once
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
+struct AccelKHR;
 
 struct VulkanContext {
 	GLFWwindow* window_ptr = nullptr;
@@ -7,10 +11,10 @@ struct VulkanContext {
 	VkSurfaceKHR surface;
 	VkPhysicalDevice physical_device = VK_NULL_HANDLE;
 	VkDevice device;
-	VkQueue gfx_queue;
-	VkQueue present_queue;
-	VkQueue compute_queue;
-	VkRenderPass render_pass;
+	//VkQueue gfx_queue;
+	//VkQueue present_queue;
+	//VkQueue compute_queue;
+	VkRenderPass default_render_pass;
 	VkPipelineLayout pipeline_layout;
 	VkPipeline gfx_pipeline;
 	// Swapchain related stuff
@@ -20,16 +24,32 @@ struct VulkanContext {
 	std::vector<VkImage> swapchain_images;
 	std::vector<VkImageView> swapchain_image_views;
 	std::vector<VkFramebuffer> swapchain_framebuffers;
-	VkCommandPool command_pool;
+	std::vector<VkCommandPool> cmd_pools;
+	std::vector<VkQueue> queues;
 	std::vector<VkCommandBuffer> command_buffers;
-	VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
 	VkPhysicalDeviceFeatures supported_features;
 	VkPhysicalDeviceProperties device_properties;
+	VkPhysicalDeviceProperties2 device_properties2;
 	VkPhysicalDeviceMemoryProperties memory_properties;
 
 	VkImage depth_img;
 	VkDeviceMemory depth_img_memory;
 	VkImageView depth_img_view;
+
+};
+
+enum class QueueType {
+	GFX,
+	COMPUTE,
+	PRESENT
+};
+
+struct BlasInput
+{
+	// Data used to build acceleration structure geometry
+	std::vector<VkAccelerationStructureGeometryKHR>       as_geom;
+	std::vector<VkAccelerationStructureBuildRangeInfoKHR> as_build_offset_info;
+	VkBuildAccelerationStructureFlagsKHR                  flags{ 0 };
 };
 
 namespace vk {
@@ -50,15 +70,15 @@ namespace vk {
 		LumenStage shader_stage;
 	};
 	inline void check(VkResult result, const char* msg = 0) {
-		if(result != VK_SUCCESS && msg) {
+		if (result != VK_SUCCESS && msg) {
 			LUMEN_ERROR(msg);
 		}
 	}
 
 	template<std::size_t Size>
 	inline void check(std::array<VkResult, Size> results, const char* msg = 0) {
-		for(const auto& result : results) {
-			if(result != VK_SUCCESS && msg) {
+		for (const auto& result : results) {
+			if (result != VK_SUCCESS && msg) {
 				LUMEN_ERROR(msg);
 			}
 		}
@@ -239,6 +259,21 @@ namespace vk {
 		return viewport;
 	}
 
+	inline VkViewport viewport2(
+		float width,
+		float height,
+		float minDepth,
+		float maxDepth) {
+		VkViewport viewport{};
+		viewport.x = 0.0f;
+		viewport.y = height;
+		viewport.width = width;
+		viewport.height = -height;
+		viewport.minDepth = minDepth;
+		viewport.maxDepth = maxDepth;
+		return viewport;
+	}
+
 	inline VkRect2D rect2D(
 		int32_t width,
 		int32_t height,
@@ -267,6 +302,16 @@ namespace vk {
 		buffer_CI.usage = usage;
 		buffer_CI.size = size;
 		buffer_CI.sharingMode = sharing_mode;
+		return buffer_CI;
+	}
+
+	inline VkBufferCreateInfo buffer_create_info(
+		VkBufferUsageFlags usage,
+		VkDeviceSize size) {
+		VkBufferCreateInfo buffer_CI{};
+		buffer_CI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		buffer_CI.usage = usage;
+		buffer_CI.size = size;
 		return buffer_CI;
 	}
 
@@ -404,7 +449,25 @@ namespace vk {
 		writeDescriptorSet.descriptorCount = descriptorCount;
 		return writeDescriptorSet;
 	}
-
+#if VK_KHR_acceleration_structure
+	inline VkWriteDescriptorSet write_descriptor_set(
+		VkDescriptorSet dstSet,
+		VkDescriptorType type,
+		uint32_t binding,
+		const VkWriteDescriptorSetAccelerationStructureKHR* pAccel,
+		uint32_t descriptorCount = 1,
+		uint32_t arrayElement = 0) {
+		VkWriteDescriptorSet writeDescriptorSet{};
+		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeDescriptorSet.dstSet = dstSet;
+		writeDescriptorSet.descriptorType = type;
+		writeDescriptorSet.dstBinding = binding;
+		writeDescriptorSet.descriptorCount = descriptorCount;
+		writeDescriptorSet.dstArrayElement = arrayElement;
+		writeDescriptorSet.pNext = pAccel;
+		return writeDescriptorSet;
+	}
+#endif
 	inline VkVertexInputBindingDescription vertex_input_binding_description(
 		uint32_t binding,
 		uint32_t stride,

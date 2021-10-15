@@ -1,7 +1,7 @@
 #pragma once
 #include "LumenPCH.h"
 struct Buffer {
-	VkBuffer handle = VK_NULL_HANDLE;
+	VkBuffer handle{};
 	VkDeviceMemory buffer_memory = VK_NULL_HANDLE;
 	VulkanContext* ctx = nullptr;
 	void* data = nullptr;
@@ -28,12 +28,17 @@ struct Buffer {
 		vkUnmapMemory(ctx->device, buffer_memory);
 	}
 
+	inline VkDeviceAddress get_device_address() {
+		VkBufferDeviceAddressInfo info = { VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
+		info.buffer = handle;
+		return vkGetBufferDeviceAddress(ctx->device, &info);
+	}
+
 	void create(VulkanContext*, VkBufferUsageFlags, VkMemoryPropertyFlags, VkSharingMode,
 				VkDeviceSize,
 				void* data = nullptr,
 				bool use_staging = false
 	);
-
 	void flush(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
 	void invalidate(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
 	void prepare_descriptor(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
