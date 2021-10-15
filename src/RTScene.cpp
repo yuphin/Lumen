@@ -307,7 +307,7 @@ void RTScene::create_rt_pipeline() {
 		{"src/shaders/raytrace.rchit"}
 	};
 	for (auto& shader : shaders) {
-		assert(shader.compile() == 0);
+		shader.compile();
 	}
 	// All stages
 	std::array<VkPipelineShaderStageCreateInfo, eShaderGroupCount> stages{};
