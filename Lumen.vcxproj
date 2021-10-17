@@ -228,7 +228,6 @@
     <ClInclude Include="libs\imgui\imstb_textedit.h" />
     <ClInclude Include="libs\imgui\imstb_truetype.h" />
     <ClInclude Include="src\Framework\GltfScene.hpp" />
-    <ClInclude Include="src\Framework\RTStructs.h" />
     <ClInclude Include="src\RTScene.h" />
     <ClInclude Include="src\Framework\Scene.h" />
     <ClInclude Include="src\Framework\CommandBuffer.h" />

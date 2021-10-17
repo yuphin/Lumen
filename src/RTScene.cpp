@@ -80,7 +80,8 @@ void RTScene::init_scene() {
 		new PerspectiveCamera(45.0f, 0.1f, 1000.0f, (float)width / height,
 		glm::vec3(1.25, 1.5, 6.5))
 		);
-	std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
+	//std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
+	std::string filename = "scenes/cornellBox.gltf";
 	using vkBU = VkBufferUsageFlagBits;
 	tinygltf::Model tmodel;
 	tinygltf::TinyGLTF tcontext;
@@ -1057,7 +1058,7 @@ void RTScene::update() {
 	double frame_time = draw_frame();
 	cpu_avg_time = 0.95 * cpu_avg_time + 0.05 * frame_time;
 	glm::vec3 translation{};
-	float trans_speed = 0.1f;
+	float trans_speed = 0.01f;
 	glm::vec3 front;
 	if (window->is_key_held(KeyInput::KEY_LEFT_SHIFT)) {
 		trans_speed *= 4;
