@@ -18,12 +18,14 @@ Texture2D::Texture2D(
 	VkImageType image_type) :
 	Texture(ctx, format, tiling, usage_flags, mip_levels, array_layers, sample_count, image_type) {}
 
-void Texture2D::load_from_img(const std::string& filename, VkSamplerCreateInfo* ci, bool generate_mipmaps) {
+void Texture2D::load_from_img(const std::string& filename, VulkanContext* ctx,
+							  VkSampler a_sampler, VkSamplerCreateInfo* ci, bool generate_mipmaps) {
 	int tex_width, tex_height, tex_size;
 	uint8_t* img_data = nullptr;
+	this->ctx = ctx;
 	bool is_tex_format = has_extension(filename.c_str(), ".ktx") || has_extension(filename.c_str(), ".dds");
 	std::unique_ptr<gli::texture2d> tex_2d;
-	if(is_tex_format) {
+	if (is_tex_format) {
 		tex_2d = std::make_unique<gli::texture2d>(gli::load(filename.c_str()));
 		img_data = static_cast<uint8_t*>(tex_2d->data());
 		tex_width = (*tex_2d)[0].extent().x;
@@ -55,17 +57,26 @@ void Texture2D::load_from_img(const std::string& filename, VkSamplerCreateInfo* 
 	base_extent.depth = 1;
 
 	// Need to do this check pre image creation
-	if(generate_mipmaps) {
+	if (generate_mipmaps) {
 		usage_flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 		mip_levels = static_cast<uint32_t>(
 			std::floor(std::log2(std::max(tex_width, tex_height)))) + 1;
 	}
-	this->create_image();
+
+	auto image_CI = vk::image_create_info(format, usage_flags, base_extent);
+	image_CI.imageType = image_type;
+	image_CI.mipLevels = mip_levels;
+	image_CI.arrayLayers = array_layers;
+	image_CI.tiling = tiling;
+	image_CI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	image_CI.samples = sample_count;
+	image_CI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	this->create_image(image_CI);
 
 	std::vector<VkBufferImageCopy> regions;
 	uint32_t existing_mip_levels = generate_mipmaps ? 1 : mip_levels;
 	uint32_t offset = 0;
-	for(uint32_t i = 0; i < existing_mip_levels; i++) {
+	for (uint32_t i = 0; i < existing_mip_levels; i++) {
 		VkBufferImageCopy region{};
 
 		region.bufferOffset = offset;
@@ -106,60 +117,8 @@ void Texture2D::load_from_img(const std::string& filename, VkSamplerCreateInfo* 
 		regions.data()
 	);
 
-	if(generate_mipmaps) {
-		int mip_width = tex_width;
-		int mip_height = tex_height;
-		VkFormatProperties format_properties;
-		vkGetPhysicalDeviceFormatProperties(ctx->physical_device, format, &format_properties);
-		LUMEN_ASSERT((format_properties.optimalTilingFeatures &
-					 VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT),
-					 "Texture image format doesn't support linear blitting");
-
-		VkImageSubresourceRange subresource_range = {};
-		subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		subresource_range.baseArrayLayer = 0;
-		subresource_range.layerCount = 1;
-		subresource_range.levelCount = 1;
-		for(uint32_t i = 1; i < mip_levels; i++) {
-			subresource_range.baseMipLevel = i - 1;
-			transition_image_layout(copy_cmd.handle, img,
-									VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-									VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-									subresource_range
-			);
-
-			VkImageBlit blit{};
-			blit.srcOffsets[0] = { 0, 0, 0 };
-			blit.srcOffsets[1] = { mip_width, mip_height, 1 };
-			blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			blit.srcSubresource.mipLevel = i - 1;
-			blit.srcSubresource.baseArrayLayer = 0;
-			blit.srcSubresource.layerCount = 1;
-			blit.dstOffsets[0] = { 0, 0, 0 };
-			blit.dstOffsets[1] = { mip_width > 1 ? mip_width >> 1 : 1, mip_height > 1 ? mip_height >> 1 : 1, 1 };
-			blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			blit.dstSubresource.mipLevel = i;
-			blit.dstSubresource.baseArrayLayer = 0;
-			blit.dstSubresource.layerCount = 1;
-			vkCmdBlitImage(copy_cmd.handle,
-						   img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-						   img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-						   1, &blit,
-						   VK_FILTER_LINEAR);
-
-			transition_image_layout(copy_cmd.handle, img,
-									VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-									VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-									subresource_range);
-
-			if(mip_width > 1) mip_width >>= 1;
-			if(mip_height > 1) mip_height >>= 1;
-		}
-		subresource_range.baseMipLevel = mip_levels - 1;
-		transition_image_layout(copy_cmd.handle, img,
-								VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-								VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-								subresource_range);
+	if (generate_mipmaps) {
+		cmd_generate_mipmaps(tex_width, tex_height, copy_cmd.handle);
 	} else {
 		transition_image_layout(copy_cmd.handle, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 								VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresource_range);
@@ -167,8 +126,11 @@ void Texture2D::load_from_img(const std::string& filename, VkSamplerCreateInfo* 
 	copy_cmd.submit();
 	staging_buffer.destroy();
 	img_view = create_image_view(ctx->device, img, format);
-	if(!ci) {
+	if (sampler) {
+		this->sampler = a_sampler;
+	} else if (!ci) {
 		// Create a default sampler
+		sampler_allocated = true;
 		VkSamplerCreateInfo sampler_CI = vk::sampler_create_info();
 		sampler_CI.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 		sampler_CI.magFilter = VK_FILTER_LINEAR;
@@ -180,7 +142,7 @@ void Texture2D::load_from_img(const std::string& filename, VkSamplerCreateInfo* 
 		sampler_CI.mipLodBias = 0.0f;
 		sampler_CI.compareOp = VK_COMPARE_OP_NEVER;
 		sampler_CI.minLod = 0.0f;
-		sampler_CI.maxLod = (float) mip_levels;
+		sampler_CI.maxLod = (float)mip_levels;
 		sampler_CI.anisotropyEnable = ctx->supported_features.samplerAnisotropy;
 		sampler_CI.maxAnisotropy = ctx->supported_features.samplerAnisotropy ?
 			ctx->device_properties.limits.maxSamplerAnisotropy : 1.0f;
@@ -191,36 +153,103 @@ void Texture2D::load_from_img(const std::string& filename, VkSamplerCreateInfo* 
 			"Could not create image sampler"
 		);
 	} else {
-		vk::check(
-			vkCreateSampler(ctx->device, ci, nullptr, &sampler),
-			"Could not create image sampler"
-		);
+		LUMEN_ERROR("No sampler nor a sampler create info is provided");
 	}
+	descriptor_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	descriptor_image_info.imageView = img_view;
+	descriptor_image_info.sampler = sampler;
+	if (!is_tex_format) {
+		stbi_image_free(img_data);
+	}
+}
+
+
+void Texture2D::load_from_data(VulkanContext* ctx, void* data, VkDeviceSize size,
+							   const VkImageCreateInfo& info,
+							   VkSampler a_sampler, bool generate_mipmaps) {
+	this->ctx = ctx;
+	Buffer staging_buffer;
+	staging_buffer.create(
+		ctx,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		VK_SHARING_MODE_EXCLUSIVE,
+		size,
+		data
+	);
+
+	// Need to do this check pre image creation
+	if (generate_mipmaps) {
+		usage_flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		mip_levels = info.mipLevels;
+	}
+	create_image(info);
+
+	// Copy from staging buffer to image
+	VkImageSubresourceRange subresource_range = {};
+	subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	subresource_range.baseArrayLayer = 0;
+	subresource_range.layerCount = 1;
+	subresource_range.baseMipLevel = 0;
+	subresource_range.levelCount = mip_levels;
+
+	VkBufferImageCopy region{};
+
+	region.bufferOffset = 0;
+	region.bufferRowLength = 0;
+	region.bufferImageHeight = 0;
+	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.imageSubresource.mipLevel = 0;
+	region.imageSubresource.baseArrayLayer = 0;
+	region.imageSubresource.layerCount = 1;
+	region.imageExtent.width = info.extent.width;
+	region.imageExtent.height = info.extent.height;
+	region.imageExtent.depth = 1;
+	CommandBuffer copy_cmd(ctx, true);
+	transition_image_layout(copy_cmd.handle, img, VK_IMAGE_LAYOUT_UNDEFINED,
+							VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresource_range);
+
+	vkCmdCopyBufferToImage(
+		copy_cmd.handle,
+		staging_buffer.handle,
+		img,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1,
+		&region
+	);
+
+	if (generate_mipmaps) {
+		cmd_generate_mipmaps(info.extent.width, info.extent.height, copy_cmd.handle);
+	} else {
+		transition_image_layout(copy_cmd.handle, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+								VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresource_range);
+	}
+	copy_cmd.submit();
+	staging_buffer.destroy();
+	img_view = create_image_view(ctx->device, img, info.format);
+	this->sampler = a_sampler;
 
 	descriptor_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	descriptor_image_info.imageView = img_view;
 	descriptor_image_info.sampler = sampler;
-	if(!is_tex_format) {
-		stbi_image_free(img_data);
-	}
 }
 
 void Texture2D::create_empty_texture(VulkanContext* ctx, const TextureSettings& settings, VkImageLayout img_layout,
 									 VkImageAspectFlags flags/*=VK_IMAGE_ASPECT_COLOR_BIT*/) {
 	this->ctx = ctx;
-	this->format = settings.format;
-	this->tiling = settings.tiling;
-	this->usage_flags = settings.usage_flags;
-	this->mip_levels = settings.mip_levels;
-	this->array_layers = settings.array_layers;
-	this->sample_count = settings.sample_count;
-	this->base_extent = settings.base_extent;
-	this->image_type = settings.image_type;
-
-	create_image();
+	auto image_CI = vk::image_create_info(settings.format, settings.usage_flags, settings.base_extent);
+	image_CI.imageType = settings.image_type;
+	image_CI.mipLevels = settings.mip_levels;
+	image_CI.arrayLayers = settings.array_layers;
+	image_CI.tiling = settings.tiling;
+	image_CI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	image_CI.samples = settings.sample_count;
+	image_CI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	create_image(image_CI);
 	img_view = create_image_view(ctx->device, img, settings.format, flags);
 	// Create a default sampler
 	// TODO: Select sampler from a sampler pool
+	sampler_allocated = true;
 	VkSamplerCreateInfo sampler_CI = vk::sampler_create_info();
 	sampler_CI.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 	sampler_CI.magFilter = VK_FILTER_LINEAR;
@@ -246,6 +275,8 @@ void Texture2D::create_empty_texture(VulkanContext* ctx, const TextureSettings& 
 	descriptor_image_info.sampler = sampler;
 }
 
+
+
 Texture::Texture(VulkanContext* ctx) : ctx(ctx) {}
 
 Texture::Texture(VulkanContext* ctx, VkFormat format,
@@ -259,7 +290,7 @@ Texture::Texture(VulkanContext* ctx, VkFormat format,
 	sample_count(sample_count), base_extent(base_extent), image_type(image_type) {}
 
 
-void Texture::create_image() {
+void Texture::create_image(const VkImageCreateInfo& info) {
 	auto image_CI = vk::image_create_info(format, usage_flags, base_extent);
 	image_CI.imageType = image_type;
 	image_CI.mipLevels = mip_levels;
@@ -270,7 +301,7 @@ void Texture::create_image() {
 	image_CI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 	vk::check(
-		vkCreateImage(ctx->device, &image_CI, nullptr, &img),
+		vkCreateImage(ctx->device, &info, nullptr, &img),
 		"Failed to create image"
 	);
 
@@ -288,8 +319,63 @@ void Texture::create_image() {
 	vkBindImageMemory(ctx->device, img, img_mem, 0);
 }
 
+void Texture::cmd_generate_mipmaps(int mip_width, int mip_height, VkCommandBuffer cmd) {
+	VkFormatProperties format_properties;
+	vkGetPhysicalDeviceFormatProperties(ctx->physical_device, format, &format_properties);
+	LUMEN_ASSERT((format_properties.optimalTilingFeatures &
+				 VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT),
+				 "Texture image format doesn't support linear blitting");
+
+	VkImageSubresourceRange subresource_range = {};
+	subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	subresource_range.baseArrayLayer = 0;
+	subresource_range.layerCount = 1;
+	subresource_range.levelCount = 1;
+	for (uint32_t i = 1; i < mip_levels; i++) {
+		subresource_range.baseMipLevel = i - 1;
+		transition_image_layout(cmd, img,
+								VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+								VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+								subresource_range
+		);
+		VkImageBlit blit{};
+		blit.srcOffsets[0] = { 0, 0, 0 };
+		blit.srcOffsets[1] = { mip_width, mip_height, 1 };
+		blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		blit.srcSubresource.mipLevel = i - 1;
+		blit.srcSubresource.baseArrayLayer = 0;
+		blit.srcSubresource.layerCount = 1;
+		blit.dstOffsets[0] = { 0, 0, 0 };
+		blit.dstOffsets[1] = { mip_width > 1 ? mip_width >> 1 : 1, mip_height > 1 ? mip_height >> 1 : 1, 1 };
+		blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		blit.dstSubresource.mipLevel = i;
+		blit.dstSubresource.baseArrayLayer = 0;
+		blit.dstSubresource.layerCount = 1;
+		vkCmdBlitImage(cmd,
+					   img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+					   img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					   1, &blit,
+					   VK_FILTER_LINEAR);
+
+		transition_image_layout(cmd, img,
+								VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+								VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+								subresource_range);
+
+		if (mip_width > 1) mip_width >>= 1;
+		if (mip_height > 1) mip_height >>= 1;
+	}
+	subresource_range.baseMipLevel = mip_levels - 1;
+	transition_image_layout(cmd, img,
+							VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+							VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+							subresource_range);
+}
+
 void Texture::destroy() {
-	vkDestroySampler(ctx->device, sampler, nullptr);
+	if (sampler_allocated) {
+		vkDestroySampler(ctx->device, sampler, nullptr);
+	}
 	vkDestroyImageView(ctx->device, img_view, nullptr);
 	vkDestroyImage(ctx->device, img, nullptr);
 	vkFreeMemory(ctx->device, img_mem, nullptr);

@@ -362,6 +362,8 @@ void VulkanBase::create_logical_device() {
 	rt_fts.rayTracingPipeline = true;
 	rt_fts.pNext = &accel_fts;
 	features12.bufferDeviceAddress = true;
+	features12.runtimeDescriptorArray = true;
+	features12.shaderSampledImageArrayNonUniformIndexing = true;
 	features12.pNext = &rt_fts;
 	device_features2.features.samplerAnisotropy = true;
 	device_features2.features.shaderInt64 = true;

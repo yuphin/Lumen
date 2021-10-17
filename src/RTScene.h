@@ -45,19 +45,16 @@ private:
 
 	void render(uint32_t idx);
 	double draw_frame();
-	struct ModelInstance {
-		glm::mat4 transform;
-		uint32_t idx;
-	};
 	struct MaterialPushConst {
 		glm::vec4 base_color_factor;
+		int texture_id = -1;
 	} material_push_const;
 	struct ModelPushConst {
 		glm::mat4 transform;
 	} model_push_const;
 	GraphicsPipelineSettings gfx_pipeline_settings = {};
 
-	VkDescriptorSetLayout uniform_set_layout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout desc_set_layout = VK_NULL_HANDLE;
 	VkDescriptorSetLayout rt_desc_layout = VK_NULL_HANDLE;
 	VkDescriptorSetLayout post_desc_layout = VK_NULL_HANDLE;
 
@@ -82,6 +79,9 @@ private:
 	Texture2D offscreen_img;
 	Texture2D offscreen_depth;
 
+	VkSampler texture_sampler;
+	std::vector<Texture2D> textures;
+
 
 	std::vector<VkRayTracingShaderGroupCreateInfoKHR> shader_groups;
 	std::unique_ptr<Camera> camera = nullptr;
@@ -89,9 +89,9 @@ private:
 	Window* window;
 	bool initialized = false;
 	bool rt_initialized = false;
+	float cpu_avg_time = 0;
 	int cnt = 0;
 	VkDescriptorPool imgui_pool;
-	std::vector<ModelInstance> instances;
 	SceneUBO scene_ubo{};
 	GltfScene gltf_scene;
 	Buffer vertex_buffer;

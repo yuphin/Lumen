@@ -40,6 +40,7 @@ struct Vertex {
 
 struct GLTFMaterial {
 	vec4 base_color_factor;
+	int texture_id;
 };
 
 // Scene buffer addresses

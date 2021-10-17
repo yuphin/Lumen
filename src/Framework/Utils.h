@@ -75,3 +75,14 @@ inline VkDeviceAddress get_device_address(VkDevice device, VkBuffer handle) {
 	info.buffer = handle;
 	return vkGetBufferDeviceAddress(device, &info);
 }
+
+inline uint32_t calc_mip_levels(VkExtent2D extent) {
+	return static_cast<uint32_t>(std::floor(std::log2(std::max(extent.width, extent.height)))) + 1;
+}
+
+
+VkImageCreateInfo make_img2d_ci(const VkExtent2D& size,
+								VkFormat format = VK_FORMAT_R8G8B8A8_UNORM,
+								VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT,
+								bool mipmaps = false);
+

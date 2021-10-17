@@ -358,3 +358,17 @@ VkRenderPass create_render_pass(VkDevice device,
 	vk::check(vkCreateRenderPass(device, &rpi, nullptr, &rp));
 	return rp;
 }
+
+VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format, VkImageUsageFlags usage, bool mipmaps) {
+	VkImageCreateInfo ici = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+	ici.imageType = VK_IMAGE_TYPE_2D;
+	ici.format = format;
+	ici.samples = VK_SAMPLE_COUNT_1_BIT;
+	ici.mipLevels = mipmaps ? calc_mip_levels(size) : 1;
+	ici.arrayLayers = 1;
+	ici.extent.width = size.width;
+	ici.extent.height = size.height;
+	ici.extent.depth = 1;
+	ici.usage = usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	return ici;
+}

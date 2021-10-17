@@ -25,7 +25,7 @@ public:
 	VkDescriptorImageInfo descriptor_image_info = {};
 	void destroy();
 	inline void set_context(VulkanContext* ctx) { this->ctx = ctx; }
-	void create_image();
+
 
 	VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
 	VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -36,6 +36,10 @@ public:
 	VkExtent3D base_extent = { 0, 0, 0 };
 	VkImageType image_type = VK_IMAGE_TYPE_2D;
 	VulkanContext* ctx;
+	bool sampler_allocated = false;
+protected:
+	void create_image(const VkImageCreateInfo& info);
+	void cmd_generate_mipmaps(int mip_width, int mip_height, VkCommandBuffer cmd);
 };
 
 class Texture2D : public Texture {
@@ -45,7 +49,14 @@ public:
 	Texture2D(VulkanContext*, VkFormat, VkImageTiling, VkImageUsageFlags, uint32_t mip_levels,
 			  uint32_t array_layers, VkSampleCountFlagBits, VkImageType);
 	void load_from_img(const std::string& filename,
-					   VkSamplerCreateInfo* = nullptr, bool generate_mipmaps = false);
+					   VulkanContext* ctx,
+					   VkSampler, VkSamplerCreateInfo* = nullptr, bool generate_mipmaps = true);
+
+	void load_from_data(
+		VulkanContext* ctx, void* data, VkDeviceSize size,
+		const VkImageCreateInfo& info,
+		VkSampler a_sampler, bool generate_mipmaps = true);
 	void create_empty_texture(VulkanContext* ctx, const TextureSettings& settings, VkImageLayout img_layout,
 							  VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT);
+private:
 };

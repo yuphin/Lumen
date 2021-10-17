@@ -80,7 +80,7 @@ void RTScene::init_scene() {
 		new PerspectiveCamera(45.0f, 0.1f, 1000.0f, (float)width / height,
 		glm::vec3(1.25, 1.5, 6.5))
 		);
-	std::string filename = "scenes/cornellBox.gltf";
+	std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
 	using vkBU = VkBufferUsageFlagBits;
 	tinygltf::Model tmodel;
 	tinygltf::TinyGLTF tcontext;
@@ -103,7 +103,7 @@ void RTScene::init_scene() {
 	std::vector<MaterialPushConst> materials;
 	std::vector<PrimMeshInfo> prim_lookup;
 	for (const auto& m : gltf_scene.materials) {
-		materials.push_back({ m.base_color_factor });
+		materials.push_back({ m.base_color_factor, m.base_color_texture });
 	}
 
 	for (auto& pm : gltf_scene.prim_meshes) {
@@ -146,7 +146,7 @@ void RTScene::init_scene() {
 		| VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		VK_SHARING_MODE_EXCLUSIVE,
-		gltf_scene.texcoords0.size() * sizeof(gltf_scene.texcoords0[0]),
+		gltf_scene.texcoords0.size() * sizeof(glm::vec2),
 		gltf_scene.texcoords0.data(),
 		true
 	);
@@ -185,7 +185,58 @@ void RTScene::init_scene() {
 		&desc,
 		true
 	);
-	instances.emplace_back(ModelInstance{ glm::mat4(1.0f), (uint32_t)instances.size() });
+
+	// Create a sampler for textures
+	VkSamplerCreateInfo sampler_ci = vk::sampler_create_info();
+	sampler_ci.minFilter = VK_FILTER_LINEAR;
+	sampler_ci.magFilter = VK_FILTER_LINEAR;
+	sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	sampler_ci.maxLod = FLT_MAX;
+	vk::check(
+		vkCreateSampler(vkb.ctx.device, &sampler_ci, nullptr, &texture_sampler),
+		"Could not create image sampler"
+	);
+
+	auto add_default_texture = [this]() {
+		std::array<uint8_t, 4> nil = { 0,0,0,0 };
+		textures.resize(1);
+		auto ci = make_img2d_ci(VkExtent2D{ 1,1 });
+		textures[0].load_from_data(&vkb.ctx,
+								   nil.data(),
+								   4,
+								   ci,
+								   texture_sampler
+		);
+	};
+
+	if (tmodel.images.empty()) {
+		add_default_texture();
+		return;
+	}
+
+	textures.resize(tmodel.images.size());
+	for (int i = 0; i < tmodel.images.size(); i++) {
+		auto& gltf_img = tmodel.images[i];
+		void* data = &gltf_img.image[0];
+		VkDeviceSize size = gltf_img.image.size();
+		auto img_dims = VkExtent2D{ (uint32_t)gltf_img.width, (uint32_t)gltf_img.height };
+
+		if (size == 0 || gltf_img.width == -1 || gltf_img.height == -1) {
+			add_default_texture();
+			continue;
+		}
+
+		auto create_info = make_img2d_ci(img_dims,
+										 VK_FORMAT_R8G8B8A8_SRGB,
+										 VK_IMAGE_USAGE_SAMPLED_BIT,
+										 true
+		);
+		textures[i].load_from_data(&vkb.ctx,
+								   data,
+								   size,
+								   create_info,
+								   texture_sampler);
+	}
 }
 
 void RTScene::create_blas() {
@@ -201,7 +252,6 @@ void RTScene::create_blas() {
 
 void RTScene::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
-	tlas.reserve(instances.size());
 	for (auto& node : gltf_scene.nodes) {
 		VkAccelerationStructureInstanceKHR rayInst{};
 		rayInst.transform = to_vk_matrix(node.world_matrix);
@@ -254,17 +304,16 @@ void RTScene::create_rt_descriptors() {
 	vk::check(vkCreateDescriptorSetLayout(vkb.ctx.device, &set_layout_ci, nullptr, &rt_desc_layout),
 			  "Failed to create RT descriptor set layout");
 
-	VkDescriptorSetAllocateInfo allocateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-	allocateInfo.descriptorPool = rt_desc_pool;
-	allocateInfo.descriptorSetCount = 1;
-	allocateInfo.pSetLayouts = &rt_desc_layout;
-	vkAllocateDescriptorSets(vkb.ctx.device, &allocateInfo, &rt_desc_set);
+	VkDescriptorSetAllocateInfo set_allocate_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+	set_allocate_info.descriptorPool = rt_desc_pool;
+	set_allocate_info.descriptorSetCount = 1;
+	set_allocate_info.pSetLayouts = &rt_desc_layout;
+	vkAllocateDescriptorSets(vkb.ctx.device, &set_allocate_info, &rt_desc_set);
 
 	VkAccelerationStructureKHR tlas = vkb.tlas.accel;
-	VkWriteDescriptorSetAccelerationStructureKHR descASInfo{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR };
-	descASInfo.accelerationStructureCount = 1;
-	descASInfo.pAccelerationStructures = &tlas;
-	//VkDescriptorImageInfo imageInfo{ {}, offscreen_img.descriptor_image_info.imageView, VK_IMAGE_LAYOUT_GENERAL };
+	VkWriteDescriptorSetAccelerationStructureKHR desc_as_info{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR };
+	desc_as_info.accelerationStructureCount = 1;
+	desc_as_info.pAccelerationStructures = &tlas;
 
 	// TODO: Abstraction
 	std::vector<VkWriteDescriptorSet> writes{
@@ -272,7 +321,7 @@ void RTScene::create_rt_descriptors() {
 				rt_desc_set,
 				VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
 				TLAS_BINDING,
-				&descASInfo
+				&desc_as_info
 			),
 			vk::write_descriptor_set(
 				rt_desc_set,
@@ -291,8 +340,7 @@ void RTScene::create_rt_descriptors() {
 }
 
 void RTScene::create_rt_pipeline() {
-	enum StageIndices
-	{
+	enum StageIndices {
 		eRaygen,
 		eMiss,
 		eMiss2,
@@ -303,7 +351,7 @@ void RTScene::create_rt_pipeline() {
 	std::vector<Shader> shaders{
 		{"src/shaders/raytrace.rgen"},
 		{"src/shaders/raytrace.rmiss"},
-		{"src/shaders/raytraceShadow.rmiss"},
+		{"src/shaders/rt_shadow.rmiss"},
 		{"src/shaders/raytrace.rchit"}
 	};
 	for (auto& shader : shaders) {
@@ -369,7 +417,7 @@ void RTScene::create_rt_pipeline() {
 	pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstant;
 
 	// Descriptor sets: one specific to ray tracing, and one shared with the rasterization pipeline
-	std::vector<VkDescriptorSetLayout> rtDescSetLayouts = { rt_desc_layout, uniform_set_layout };
+	std::vector<VkDescriptorSetLayout> rtDescSetLayouts = { rt_desc_layout, desc_set_layout };
 	pipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(rtDescSetLayouts.size());
 	pipelineLayoutCreateInfo.pSetLayouts = rtDescSetLayouts.data();
 
@@ -586,11 +634,12 @@ void RTScene::update_post_desc_set() {
 }
 
 double RTScene::draw_frame() {
-	auto t_begin = std::chrono::high_resolution_clock::now();
+	auto t_begin = glfwGetTime() * 1000;
 
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 	ImGui::Checkbox("Enable RTX", &use_rtx);
+	ImGui::Text("Frame time %f ms ( %f FPS", cpu_avg_time, 1000 / cpu_avg_time);
 
 	vk::check(vkWaitForFences(vkb.ctx.device, 1, &vkb.in_flight_fences[vkb.current_frame], VK_TRUE, 1000000000),
 			  "Timeout");
@@ -604,8 +653,8 @@ double RTScene::draw_frame() {
 		&image_idx);
 	vk::check(vkResetCommandBuffer(vkb.ctx.command_buffers[image_idx], 0));
 	if (result == VK_NOT_READY) {
-		auto t_end = std::chrono::high_resolution_clock::now();
-		auto t_diff = std::chrono::duration<double, std::milli>(t_end - t_begin).count();
+		auto t_end = glfwGetTime() * 1000;
+		auto t_diff = t_end - t_begin;
 		return t_diff;
 	}
 	if (EventHandler::consume_event(LumenEvent::EVENT_SHADER_RELOAD)) {
@@ -616,16 +665,16 @@ double RTScene::draw_frame() {
 		}
 		EventHandler::obsolete_pipelines.clear();
 		vkb.create_command_buffers();
-		auto t_end = std::chrono::high_resolution_clock::now();
-		auto t_diff = std::chrono::duration<double, std::milli>(t_end - t_begin).count();
+		auto t_end = glfwGetTime() * 1000;
+		auto t_diff = t_end - t_begin;
 		return t_diff;
 	}
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 		// Window resize
 		vkb.recreate_swap_chain(create_default_render_pass, vkb.ctx);
-		auto t_end = std::chrono::high_resolution_clock::now();
-		auto t_diff = std::chrono::duration<double, std::milli>(t_end - t_begin).count();
+		auto t_end = glfwGetTime() * 1000;
+		auto t_diff = t_end - t_begin;
 		return t_diff;
 	} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
 		LUMEN_ERROR("Failed to acquire new swap chain image");
@@ -681,24 +730,26 @@ double RTScene::draw_frame() {
 	}
 
 	vkb.current_frame = (vkb.current_frame + 1) % vkb.MAX_FRAMES_IN_FLIGHT;
-	auto t_end = std::chrono::high_resolution_clock::now();
-	auto t_diff = std::chrono::duration<double, std::milli>(t_end - t_begin).count();
+	auto t_end = glfwGetTime() * 1000;
+	auto t_diff = t_end - t_begin;
 	return t_diff;
 }
 
 void RTScene::create_descriptors() {
 	constexpr int UNIFORM_BUFFER_BINDING = 0;
 	constexpr int SCENE_DESC_BINDING = 1;
+	constexpr int TEXTURES_BINDING = 2;
 
+	auto num_textures = textures.size();
 	std::vector<VkDescriptorPoolSize> pool_sizes = {
-	vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,vkb.ctx.swapchain_images.size()),
-	vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<size_t>(gltf_scene.materials.size()) * 2),
-	vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,1),
+	vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,1),
+	vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, num_textures),
+	vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1),
 	};
 	auto descriptor_pool_ci = vk::descriptor_pool_CI(
 		pool_sizes.size(),
 		pool_sizes.data(),
-		gltf_scene.materials.size() + vkb.ctx.swapchain_images.size() + 1
+		vkb.ctx.swapchain_images.size()
 	);
 
 	vk::check(vkCreateDescriptorPool(vkb.ctx.device, &descriptor_pool_ci, nullptr, &gfx_desc_pool),
@@ -715,16 +766,21 @@ void RTScene::create_descriptors() {
 			 VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
 					  | VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
 			SCENE_DESC_BINDING),
+			vk::descriptor_set_layout_binding(
+			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			 VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
+			TEXTURES_BINDING,
+			num_textures)
 	};
 	auto set_layout_ci = vk::descriptor_set_layout_CI(
 		set_layout_bindings.data(),
 		set_layout_bindings.size()
 	);
-	vk::check(vkCreateDescriptorSetLayout(vkb.ctx.device, &set_layout_ci, nullptr, &uniform_set_layout),
+	vk::check(vkCreateDescriptorSetLayout(vkb.ctx.device, &set_layout_ci, nullptr, &desc_set_layout),
 			  "Failed to create descriptor set layout");
 
 	// Descriptor sets for the uniform matrices(For each swapchain image)
-	auto set_layout_vec = std::vector<VkDescriptorSetLayout>(vkb.ctx.swapchain_images.size(), uniform_set_layout);
+	auto set_layout_vec = std::vector<VkDescriptorSetLayout>(vkb.ctx.swapchain_images.size(), desc_set_layout);
 	auto set_allocate_info = vk::descriptor_set_allocate_info(
 		gfx_desc_pool,
 		set_layout_vec.data(),
@@ -739,6 +795,7 @@ void RTScene::create_descriptors() {
 void RTScene::update_descriptors() {
 	constexpr int UNIFORM_BUFFER_BINDING = 0;
 	constexpr int SCENE_DESC_BINDING = 1;
+	constexpr int TEXTURES_BINDING = 2;
 
 	for (auto i = 0; i < uniform_descriptor_sets.size(); i++) {
 		std::vector<VkWriteDescriptorSet> write_descriptor_sets{
@@ -755,6 +812,21 @@ void RTScene::update_descriptors() {
 				&scene_desc_buffer.descriptor
 			)
 		};
+
+		std::vector<VkDescriptorImageInfo> image_infos;
+		for (auto& tex : textures) {
+			image_infos.push_back(tex.descriptor_image_info);
+		
+		}
+		write_descriptor_sets.push_back(
+			vk::write_descriptor_set(
+			uniform_descriptor_sets[i],
+			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			TEXTURES_BINDING,
+			image_infos.data(),
+			(uint32_t)image_infos.size()
+		)
+		);
 		vkUpdateDescriptorSets(vkb.ctx.device,
 							   static_cast<uint32_t>(write_descriptor_sets.size()),
 							   write_descriptor_sets.data(), 0, nullptr);
@@ -784,7 +856,7 @@ void RTScene::create_graphics_pipeline() {
 		sizeof(MaterialPushConst), sizeof(ModelPushConst)
 	);
 
-	std::array<VkDescriptorSetLayout, 1> set_layouts = { uniform_set_layout };
+	std::array<VkDescriptorSetLayout, 1> set_layouts = { desc_set_layout };
 	auto pipeline_layout_ci = vk::pipeline_layout_CI(
 		set_layouts.data(),
 		static_cast<uint32_t>(set_layouts.size())
@@ -903,6 +975,7 @@ void RTScene::render(uint32_t i) {
 			vkCmdPushConstants(cmd, layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
 							   sizeof(glm::mat4), &node.world_matrix);
 			material_push_const.base_color_factor = material.base_color_factor;
+			material_push_const.texture_id = material.base_color_texture;
 			vkCmdPushConstants(cmd, layout, VK_SHADER_STAGE_FRAGMENT_BIT,
 							   sizeof(ModelPushConst), sizeof(MaterialPushConst), &material_push_const
 			);
@@ -921,15 +994,15 @@ void RTScene::render(uint32_t i) {
 	// 1st pass
 	if (use_rtx) {
 		// Initializing push constant values
-		glm::vec4 clearColor{ 1,1,1,1 };
-		pc_ray.clear_color = clearColor;
+		glm::vec4 clear_color{ 1,1,1,1 };
+		pc_ray.clear_color = clear_color;
 		pc_ray.light_pos = scene_ubo.light_pos;
 		pc_ray.light_type = 0;
 		pc_ray.light_intensity = 10;
-		std::vector<VkDescriptorSet> descSets{ rt_desc_set, uniform_descriptor_sets[0] };
+		std::vector<VkDescriptorSet> desc_sets{ rt_desc_set, uniform_descriptor_sets[0] };
 		vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt_pipeline);
 		vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt_pipeline_layout, 0,
-								(uint32_t)descSets.size(), descSets.data(), 0, nullptr);
+								(uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
 		vkCmdPushConstants(cmdbuf, rt_pipeline_layout,
 						   VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR,
 						   0, sizeof(PushConstantRay), &pc_ray);
@@ -974,19 +1047,6 @@ void RTScene::render(uint32_t i) {
 	ImGui::Render();
 	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdbuf);
 	vkCmdEndRenderPass(cmdbuf);
-
-
-	//ImGui_ImplVulkan_NewFrame();
-	//ImGui_ImplGlfw_NewFrame();
-	//ImGui::NewFrame();
-	
-	//ImDrawData* draw_data = ImGui::GetDrawData();
-	//const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
-	//if (is_minimized) {
-	//	return;
-	//}
-
-
 	vk::check(vkEndCommandBuffer(cmdbuf),
 			  "Failed to record command buffer"
 	);
@@ -995,9 +1055,9 @@ void RTScene::render(uint32_t i) {
 void RTScene::update() {
 
 	double frame_time = draw_frame();
-	frame_time /= 1000.0;
+	cpu_avg_time = 0.95 * cpu_avg_time + 0.05 * frame_time;
 	glm::vec3 translation{};
-	float trans_speed = 0.001f;
+	float trans_speed = 0.1f;
 	glm::vec3 front;
 	if (window->is_key_held(KeyInput::KEY_LEFT_SHIFT)) {
 		trans_speed *= 4;
@@ -1055,7 +1115,12 @@ void RTScene::cleanup() {
 	offscreen_img.destroy();
 	offscreen_depth.destroy();
 
-	vkDestroyDescriptorSetLayout(device, uniform_set_layout, nullptr);
+	for (auto& tex : textures) {
+		tex.destroy();
+	}
+	vkDestroySampler(vkb.ctx.device, texture_sampler, nullptr);
+
+	vkDestroyDescriptorSetLayout(device, desc_set_layout, nullptr);
 	vkDestroyDescriptorSetLayout(device, post_desc_layout, nullptr);
 
 	vkDestroyDescriptorPool(device, gfx_desc_pool, nullptr);

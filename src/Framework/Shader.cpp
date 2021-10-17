@@ -5,7 +5,7 @@ Shader::Shader(const std::string& filename) : filename(filename) {}
 int Shader::compile() {
 	std::string file_path = filename + ".spv";
 #ifdef NDEBUG
-	auto str = std::string("glslangValidator.exe --target-env vulkan1.2 " + filename + "-V " + " -o " + filename + ".spv");
+	auto str = std::string("glslangValidator.exe --target-env vulkan1.2 " + filename + " -V " + " -o " + filename + ".spv");
 #else 
 	auto str = std::string("glslangValidator.exe --target-env vulkan1.2 " + filename + " -V " +  " -g " + " -o " + filename + ".spv");
 #endif //  NDEBUG
@@ -15,7 +15,7 @@ int Shader::compile() {
 	int ret_val = std::system(str.data());
 	std::ifstream bin(file_path, std::ios::ate | std::ios::binary);
 	if(!bin.good() && ret_val) {
-		LUMEN_CRITICAL(
+		LUMEN_ERROR(
 			std::string("Shader compilation failed: " + filename).data());
 		bin.close();
 		return ret_val;
