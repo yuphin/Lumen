@@ -9,6 +9,7 @@ layout (location = 0) out vec4 out_color;
 
 layout(push_constant) uniform MaterialPushConst {
 	layout(offset = 64) vec4 base_color_factor;
+	vec3 emissive_factor;
 	int texture_id;
 };
 

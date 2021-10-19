@@ -1,0 +1,175 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+
+#include "raystructs.glsl"
+#include "commons.h"
+layout(location = 0) rayPayloadEXT HitPayload payload;
+layout(set = 0, binding = 0) uniform accelerationStructureEXT tlas;
+layout(set = 0, binding = 1, rgba32f) uniform image2D image;
+layout(set = 1, binding = 0) uniform SceneUBOBuffer { SceneUBO ubo; };
+layout(set = 1, binding = 1, scalar) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(set = 1, binding = 2) uniform sampler2D textures[];
+layout(buffer_reference, scalar) readonly buffer Vertices {vec3 v[]; };
+layout(buffer_reference, scalar) readonly buffer Indices {uint i[]; };
+layout(buffer_reference, scalar) readonly buffer Normals {vec3 n[]; };
+layout(buffer_reference, scalar) readonly buffer TexCoords {vec2 t[]; };
+layout(buffer_reference, scalar) readonly buffer Materials {GLTFMaterial m[]; };
+
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pcRay; };
+
+
+#define MAX_DEPTH 10
+#define MIN_DEPTH 3
+
+// Ray Tracing Gems chapter 6
+vec3 offset_ray(const vec3 p, const vec3 n) {
+	const float origin = 1.0f / 32.0f;
+	const float float_scale = 1.0f / 65536.0f;
+	const float int_scale = 256.0f;
+
+	ivec3 of_i = ivec3(int_scale * n.x, int_scale * n.y, int_scale * n.z);
+
+	vec3 p_i = vec3(
+		intBitsToFloat(floatBitsToInt(p.x) + ((p.x < 0) ? -of_i.x : of_i.x)),
+		intBitsToFloat(floatBitsToInt(p.y) + ((p.y < 0) ? -of_i.y : of_i.y)),
+		intBitsToFloat(floatBitsToInt(p.z) + ((p.z < 0) ? -of_i.z : of_i.z)));
+
+	return vec3(abs(p.x) < origin ? p.x + float_scale * n.x : p_i.x,
+		abs(p.y) < origin ? p.y + float_scale * n.y : p_i.y,
+		abs(p.z) < origin ? p.z + float_scale * n.z : p_i.z);
+}
+
+float luminance(vec3 rgb) {
+	return dot(rgb, vec3(0.2126f, 0.7152f, 0.0722f));
+}
+
+// PCG random numbers generator
+// Source: "Hash Functions for GPU Rendering" by Jarzynski & Olano
+uvec4 pcg4d(uvec4 v) {
+	v = v * 1664525u + 1013904223u;
+	v.x += v.y * v.w; 
+	v.y += v.z * v.x; 
+	v.z += v.x * v.y; 
+	v.w += v.y * v.z;
+	v = v ^ (v >> 16u);
+	v.x += v.y * v.w; 
+	v.y += v.z * v.x; 
+	v.z += v.x * v.y; 
+	v.w += v.y * v.z;
+	return v;
+}
+
+vec3 eval_material_opaque(GLTFMaterial m, vec2 uv){
+    vec3 albedo = m.base_color_factor.xyz;
+    if(m.texture_id > -1){
+        albedo *=  texture(textures[m.texture_id], uv).xyz;
+    }
+    return albedo;
+}
+
+// Returns a float between 0 and 1
+float uint_to_float(uint x) {
+	return uintBitsToFloat(0x3f800000 | (x >> 9)) - 1.0f;
+}
+
+uvec4 init_rng(uvec2 pixel_coords, uvec2 resolution, uint frame_num) {
+	return uvec4(pixel_coords.xy, frame_num, 0); 
+}
+
+// Return random float in (0, 1) range
+float rand(inout uvec4 rng_state) {
+	rng_state.w++;
+	return uint_to_float(pcg4d(rng_state).x);
+}
+
+vec3 sample_cos_hemisphere(vec2 uv, vec3 n){
+    float phi = PI2 * uv.x;
+    float cos_theta = 2.0*uv.y - 1.0;
+    return normalize( n + vec3(sqrt(1.0-cos_theta*cos_theta) * vec2(cos(phi), sin(phi)), cos_theta) );
+}
+
+
+void main() {
+  const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+  const vec2 inUV = pixel / vec2(gl_LaunchSizeEXT.xy);
+  vec2 d = inUV * 2.0 - 1.0;
+
+  vec4 origin    = ubo.inv_view * vec4(0, 0, 0, 1);
+  vec4 target    = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
+  vec4 direction = ubo.inv_view * vec4(normalize(target.xyz), 0);
+
+  uint  flags = gl_RayFlagsOpaqueEXT;
+  float tmin     = 0.001;
+  float tmax     = 10000.0;
+
+
+  vec3 col = vec3(0);
+  vec3 throughput = vec3(1.,1.,1.);
+  const vec3 sky_col = vec3(0.,0.,0.);
+  Materials materials = Materials(scene_desc.material_addr);
+  uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy , pcRay.frame_num); 
+  float brdf_pdf;
+  for(int depth = 0; depth < MAX_DEPTH; depth++){
+     traceRayEXT(
+              tlas,           // acceleration structure
+              flags,          // rayFlags
+              0xFF,           // cullMask
+              0,              // sbtRecordOffset
+              0,              // sbtRecordStride
+              0,              // missIndex
+              origin.xyz,     // ray origin
+              tmin,           // ray min range
+              direction.xyz,  // ray direction
+              tmax,           // ray max range
+              0               // payload (location = 0)
+       );
+       vec3 shading_normal = payload.shading_nrm;
+       vec3 geometry_normal = payload.geometry_nrm;
+       if(payload.material_idx == -1){
+            col += throughput * sky_col;
+            break;
+       }
+
+       GLTFMaterial mat = materials.m[payload.material_idx];
+       
+       col += throughput * mat.emissive_factor;
+
+       if(depth == MAX_DEPTH -1) break;
+        
+        if(depth > MIN_DEPTH){
+            float rr_p = min(0.95f, luminance(throughput));
+			if (rr_p < rand(seed)) break;
+			else throughput /= rr_p;
+        }
+        vec3 v = -direction.xyz;
+        
+        if (dot(geometry_normal, v) < 0.) geometry_normal = -geometry_normal;
+        float cos_theta = dot(v, shading_normal);
+        if(cos_theta < 0){
+            cos_theta = -cos_theta;
+            shading_normal = -shading_normal;
+        }
+
+        vec3 lambertian_brdf = eval_material_opaque(mat, payload.uv) / PI;
+        throughput *= lambertian_brdf;
+        origin.xyz = offset_ray(payload.pos, geometry_normal);
+        direction.xyz = sample_cos_hemisphere(vec2(rand(seed), rand(seed)), shading_normal);
+     
+        brdf_pdf = cos_theta / PI;
+  } 
+
+  if(pcRay.frame_num > 0) {
+    float w = 1. / float(pcRay.frame_num + 1);
+    vec3  old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+    imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
+  }
+  else {
+    imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+  }
+}

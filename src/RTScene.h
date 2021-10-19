@@ -38,6 +38,7 @@ private:
 	void create_tlas();
 	void create_rt_descriptors();
 	void create_rt_pipeline();
+	void create_pt_pipeline();
 	void create_rt_sbt();
 	void create_post_descriptor();
 	void create_post_pipeline();
@@ -47,6 +48,7 @@ private:
 	double draw_frame();
 	struct MaterialPushConst {
 		glm::vec4 base_color_factor;
+		glm::vec3 emissive_factor;
 		int texture_id = -1;
 	} material_push_const;
 	struct ModelPushConst {
@@ -106,8 +108,10 @@ private:
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
 	// TODO: Move to pipeline header
 	VkPipelineLayout rt_pipeline_layout;
+	VkPipelineLayout pt_pipeline_layout;
 	VkPipeline rt_pipeline;
-	Buffer sbt_buffer;
+	VkPipeline pt_pipeline;
+	Buffer rt_sbt_buffer;
 	VkStridedDeviceAddressRegionKHR rgen_region{};
 	VkStridedDeviceAddressRegionKHR rmiss_region{};
 	VkStridedDeviceAddressRegionKHR hit_region{};

@@ -49,9 +49,10 @@ void RTScene::init(Window* window) {
 
 	init_scene();
 	auto cam_ptr = camera.get();
-	window->add_mouse_move_callback([window, cam_ptr](double delta_x, double delta_y) {
+	window->add_mouse_move_callback([window, cam_ptr, this](double delta_x, double delta_y) {
 		if (window->is_mouse_held(MouseAction::LEFT)) {
 			cam_ptr->rotate(0.05f * (float)delta_y, -0.05f * (float)delta_x, 0.0f);
+			pc_ray.frame_num = -1;
 		}
 	});
 	create_offscreen_resources();
@@ -64,7 +65,8 @@ void RTScene::init(Window* window) {
 		create_blas();
 		create_tlas();
 		create_rt_descriptors();
-		create_rt_pipeline();
+		//create_rt_pipeline();
+		create_pt_pipeline();
 		create_rt_sbt();
 	}
 	create_post_descriptor();
@@ -104,7 +106,7 @@ void RTScene::init_scene() {
 	std::vector<MaterialPushConst> materials;
 	std::vector<PrimMeshInfo> prim_lookup;
 	for (const auto& m : gltf_scene.materials) {
-		materials.push_back({ m.base_color_factor, m.base_color_texture });
+		materials.push_back({ m.base_color_factor, m.emissive_factor, m.base_color_texture });
 	}
 
 	for (auto& pm : gltf_scene.prim_meshes) {
@@ -238,6 +240,8 @@ void RTScene::init_scene() {
 								   create_info,
 								   texture_sampler);
 	}
+
+	pc_ray.frame_num = -1;
 }
 
 void RTScene::create_blas() {
@@ -454,13 +458,117 @@ void RTScene::create_rt_pipeline() {
 	}
 }
 
+void RTScene::create_pt_pipeline() {
+	enum StageIndices {
+		eRaygen,
+		eMiss,
+		eClosestHit,
+		eShaderGroupCount
+	};
+
+	std::vector<Shader> shaders{
+		{"src/shaders/pathtrace.rgen"},
+		{"src/shaders/pathtrace.rmiss"},
+		{"src/shaders/pathtrace.rchit"}
+	};
+	for (auto& shader : shaders) {
+		shader.compile();
+	}
+	// All stages
+	std::array<VkPipelineShaderStageCreateInfo, eShaderGroupCount> stages{};
+	VkPipelineShaderStageCreateInfo stage{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+	stage.pName = "main";  // All the same entry point
+	// Raygen
+	stage.module = shaders[eRaygen].create_vk_shader_module(vkb.ctx.device);
+	stage.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+	stages[eRaygen] = stage;
+	// Miss
+	stage.module = shaders[eMiss].create_vk_shader_module(vkb.ctx.device);
+	stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
+	stages[eMiss] = stage;
+	// Hit Group - Closest Hit
+	stage.module = shaders[eClosestHit].create_vk_shader_module(vkb.ctx.device);
+	stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+	stages[eClosestHit] = stage;
+
+
+	// Shader groups
+	VkRayTracingShaderGroupCreateInfoKHR group{ VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
+	group.anyHitShader = VK_SHADER_UNUSED_KHR;
+	group.closestHitShader = VK_SHADER_UNUSED_KHR;
+	group.generalShader = VK_SHADER_UNUSED_KHR;
+	group.intersectionShader = VK_SHADER_UNUSED_KHR;
+
+	// Raygen
+	group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+	group.generalShader = eRaygen;
+	shader_groups.push_back(group);
+
+	// Miss
+	group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+	group.generalShader = eMiss;
+	shader_groups.push_back(group);
+
+	// closest hit shader
+	group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+	group.generalShader = VK_SHADER_UNUSED_KHR;
+	group.closestHitShader = eClosestHit;
+	shader_groups.push_back(group);
+
+	// Push constant: we want to be able to update constants used by the shaders
+	VkPushConstantRange pushConstant{
+		VK_SHADER_STAGE_RAYGEN_BIT_KHR
+		| VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
+		| VK_SHADER_STAGE_MISS_BIT_KHR,
+		0, sizeof(PushConstantRay)
+	};
+
+
+	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+	pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+	pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstant;
+
+	// Descriptor sets: one specific to ray tracing, and one shared with the rasterization pipeline
+	std::vector<VkDescriptorSetLayout> rtDescSetLayouts = { rt_desc_layout, desc_set_layout };
+	pipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(rtDescSetLayouts.size());
+	pipelineLayoutCreateInfo.pSetLayouts = rtDescSetLayouts.data();
+
+	vkCreatePipelineLayout(vkb.ctx.device, &pipelineLayoutCreateInfo, nullptr, &rt_pipeline_layout);
+
+
+	// Assemble the shader stages and recursion depth info into the ray tracing pipeline
+	VkRayTracingPipelineCreateInfoKHR rayPipelineInfo{ VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR };
+	rayPipelineInfo.stageCount = static_cast<uint32_t>(stages.size());  // Stages are shaders
+	rayPipelineInfo.pStages = stages.data();
+
+	// In this case, m_rtShaderGroups.size() == 4: we have one raygen group,
+	// two miss shader groups, and one hit group.
+	rayPipelineInfo.groupCount = static_cast<uint32_t>(shader_groups.size());
+	rayPipelineInfo.pGroups = shader_groups.data();
+
+	rayPipelineInfo.maxPipelineRayRecursionDepth = 1;
+	rayPipelineInfo.layout = rt_pipeline_layout;
+
+	vkCreateRayTracingPipelinesKHR(vkb.ctx.device, {}, {}, 1, &rayPipelineInfo, nullptr, &rt_pipeline);
+
+	// Spec only guarantees 1 level of "recursion". Check for that sad possibility here.
+	if (rt_props.maxRayRecursionDepth <= 1) {
+		throw std::runtime_error("Device fails to support ray recursion (m_rtProperties.maxRayRecursionDepth <= 1)");
+	}
+
+	for (auto& s : stages) {
+		vkDestroyShaderModule(vkb.ctx.device, s.module, nullptr);
+	}
+
+}
+
 //--------------------------------------------------------------------------------------------------
 // The Shader Binding Table (SBT)
 // - getting all shader handles and write them in a SBT buffer
 // - Besides exception, this could be always done like this
 //
 void RTScene::create_rt_sbt() {
-	uint32_t missCount{ 2 };
+	uint32_t missCount{ 1 };
 	uint32_t hitCount{ 1 };
 	auto     handleCount = 1 + missCount + hitCount;
 	uint32_t handleSize = rt_props.shaderGroupHandleSize;
@@ -483,15 +591,15 @@ void RTScene::create_rt_sbt() {
 
 	// Allocate a buffer for storing the SBT.
 	VkDeviceSize sbtSize = rgen_region.size + rmiss_region.size + hit_region.size + call_region.size;
-	sbt_buffer.create(&vkb.ctx,
-					  VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
-					  | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR,
-					  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-					  VK_SHARING_MODE_EXCLUSIVE,
-					  sbtSize
+	rt_sbt_buffer.create(&vkb.ctx,
+						 VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
+						 | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR,
+						 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+						 VK_SHARING_MODE_EXCLUSIVE,
+						 sbtSize
 	);
 	// Find the SBT addresses of each group
-	VkBufferDeviceAddressInfo info{ VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, sbt_buffer.handle };
+	VkBufferDeviceAddressInfo info{ VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, rt_sbt_buffer.handle };
 	VkDeviceAddress sbtAddress = vkGetBufferDeviceAddress(vkb.ctx.device, &info);
 	rgen_region.deviceAddress = sbtAddress;
 	rmiss_region.deviceAddress = sbtAddress + rgen_region.size;
@@ -501,7 +609,7 @@ void RTScene::create_rt_sbt() {
 	auto getHandle = [&](int i) { return handles.data() + i * handleSize; };
 
 	// Map the SBT buffer and write in the handles.
-	auto* pSBTBuffer = reinterpret_cast<uint8_t*>(sbt_buffer.data);
+	auto* pSBTBuffer = reinterpret_cast<uint8_t*>(rt_sbt_buffer.data);
 	uint8_t* pData{ nullptr };
 	uint32_t handleIdx{ 0 };
 	// Raygen
@@ -519,7 +627,7 @@ void RTScene::create_rt_sbt() {
 		memcpy(pData, getHandle(handleIdx++), handleSize);
 		pData += hit_region.stride;
 	}
-	sbt_buffer.unmap();
+	rt_sbt_buffer.unmap();
 }
 
 void RTScene::create_offscreen_resources() {
@@ -640,7 +748,7 @@ double RTScene::draw_frame() {
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 	ImGui::Checkbox("Enable RTX", &use_rtx);
-	ImGui::Text("Frame time %f ms ( %f FPS", cpu_avg_time, 1000 / cpu_avg_time);
+	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time, 1000 / cpu_avg_time);
 
 	vk::check(vkWaitForFences(vkb.ctx.device, 1, &vkb.in_flight_fences[vkb.current_frame], VK_TRUE, 1000000000),
 			  "Timeout");
@@ -765,11 +873,11 @@ void RTScene::create_descriptors() {
 			vk::descriptor_set_layout_binding(
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 			 VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
-					  | VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
+					  | VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
 			SCENE_DESC_BINDING),
 			vk::descriptor_set_layout_binding(
 			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			 VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
+			 VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
 			TEXTURES_BINDING,
 			num_textures)
 	};
@@ -817,7 +925,7 @@ void RTScene::update_descriptors() {
 		std::vector<VkDescriptorImageInfo> image_infos;
 		for (auto& tex : textures) {
 			image_infos.push_back(tex.descriptor_image_info);
-		
+
 		}
 		write_descriptor_sets.push_back(
 			vk::write_descriptor_set(
@@ -1055,6 +1163,8 @@ void RTScene::render(uint32_t i) {
 
 void RTScene::update() {
 
+	pc_ray.frame_num++;
+	bool updated = false;
 	double frame_time = draw_frame();
 	cpu_avg_time = 0.95 * cpu_avg_time + 0.05 * frame_time;
 	glm::vec3 translation{};
@@ -1069,26 +1179,35 @@ void RTScene::update() {
 	front = glm::normalize(-front);
 	if (window->is_key_held(KeyInput::KEY_W)) {
 		camera->position += front * trans_speed;
+		updated = true;
 	}
 	if (window->is_key_held(KeyInput::KEY_A)) {
 		camera->position -= glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * trans_speed;
+		updated = true;
 	}
 	if (window->is_key_held(KeyInput::KEY_S)) {
 		camera->position -= front * trans_speed;
+		updated = true;
 	}
 	if (window->is_key_held(KeyInput::KEY_D)) {
 		camera->position += glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * trans_speed;
+		updated = true;
 	}
 	if (window->is_key_held(KeyInput::SPACE)) {
 		// Right
 		auto right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
 		auto up = glm::cross(right, front);
 		camera->position += up * trans_speed;
+		updated = true;
 	}
 	if (window->is_key_held(KeyInput::KEY_LEFT_CONTROL)) {
 		auto right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
 		auto up = glm::cross(right, front);
 		camera->position -= up * trans_speed;
+		updated = true;
+	}
+	if (updated) {
+		pc_ray.frame_num = -1;
 	}
 	update_uniform_buffers();
 }
@@ -1108,7 +1227,7 @@ void RTScene::cleanup() {
 		scene_ubo_buffer
 	};
 	if (rt) {
-		buffer_list.push_back(sbt_buffer);
+		buffer_list.push_back(rt_sbt_buffer);
 	}
 	for (auto& b : buffer_list) {
 		b.destroy();

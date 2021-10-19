@@ -20,6 +20,7 @@ struct PushConstantRay
 	vec3  light_pos;
 	float light_intensity;
 	int   light_type;
+	uint  frame_num;
 };
 
 struct SceneUBO {
@@ -40,6 +41,7 @@ struct Vertex {
 
 struct GLTFMaterial {
 	vec4 base_color_factor;
+	vec3 emissive_factor;
 	int texture_id;
 };
 

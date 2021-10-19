@@ -12,6 +12,9 @@ layout(set = 1, binding = 0) uniform SceneUBOBuffer { SceneUBO ubo; };
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pcRay; };
 
 
+
+
+
 void main() {
   const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
   const vec2 inUV = pixel / vec2(gl_LaunchSizeEXT.xy);
