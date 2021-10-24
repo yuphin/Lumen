@@ -2,9 +2,7 @@
 #include "LumenPCH.h"
 #include "Framework/Pipeline.h"
 
-enum class LumenEvent {
-	EVENT_SHADER_RELOAD
-};
+enum class LumenEvent { EVENT_SHADER_RELOAD };
 
 struct EventHandler {
 	static std::unordered_map<LumenEvent, bool> event_table;

@@ -1,7 +1,7 @@
 #pragma once
 #include "LumenPCH.h"
-#include "Framework/Shader.h"
 #include "Framework/Event.h"
+#include "Framework/Shader.h"
 struct Pipeline;
 
 struct GraphicsPipelineSettings {
@@ -21,18 +21,18 @@ struct GraphicsPipelineSettings {
 	float line_width = 1.0;
 	bool blend_enable = false;
 	bool enable_tracking = true;
-
 };
 
 struct RTPipelineSettings {
 	std::vector<VkPipelineShaderStageCreateInfo> stages;
-	VkRayTracingShaderGroupCreateInfoKHR group{ VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
+	VkRayTracingShaderGroupCreateInfoKHR group{
+		VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
 	VkPipeline pipeline = VK_NULL_HANDLE;
 };
 
 struct Pipeline {
 public:
-	Pipeline(const VkDevice& device);	
+	Pipeline(const VkDevice& device);
 	void cleanup();
 	void create_gfx_pipeline(const GraphicsPipelineSettings&);
 	void create_rt_pipeline(const RTPipelineSettings&);
@@ -53,10 +53,10 @@ public:
 	VkDevice device = VK_NULL_HANDLE;
 	VkPipeline handle = VK_NULL_HANDLE;
 	bool running = true;
+
 private:
 	void recompile_pipeline();
 	bool tracking_stopped = true;
 	std::mutex mut;
 	std::condition_variable cv;
 };
-

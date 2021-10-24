@@ -1,16 +1,15 @@
 #include "LumenPCH.h"
-#include "RTScene.h"
 #include "Framework/Window.h"
+#include "RTScene.h"
 
-
-void window_size_callback(GLFWwindow* window, int width, int height) { }
+void window_size_callback(GLFWwindow* window, int width, int height) {}
 
 int main() {
 #ifdef NDEBUG
 	bool enable_debug = false;
 #else
-	bool enable_debug = false;
-#endif  
+	bool enable_debug = true;
+#endif
 	bool fullscreen = false;
 	int width = 1600;
 	int height = 900;
@@ -21,7 +20,7 @@ int main() {
 	{
 		RTScene app(width, height, enable_debug);
 		app.init(&window);
-		while(!window.should_close()) {
+		while (!window.should_close()) {
 			window.poll();
 			app.update();
 		}

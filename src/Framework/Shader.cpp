@@ -5,25 +5,30 @@ Shader::Shader(const std::string& filename) : filename(filename) {}
 int Shader::compile() {
 	std::string file_path = filename + ".spv";
 #ifdef NDEBUG
-	auto str = std::string("glslangValidator.exe --target-env vulkan1.2 " + filename + " -V " + " -o " + filename + ".spv");
-#else 
-	auto str = std::string("glslangValidator.exe --target-env vulkan1.2 " + filename + " -V " +  " -g " + " -o " + filename + ".spv");
+	auto str = std::string("glslangValidator.exe --target-env vulkan1.2 " +
+						   filename + " -V " + " -o " + filename + ".spv");
+#else
+	auto str =
+		std::string("glslangValidator.exe --target-env vulkan1.2 " + filename +
+					" -V " + " -g " + " -o " + filename + ".spv");
 #endif //  NDEBUG
 
 	binary.clear();
 	LUMEN_TRACE("Compiling shader: {0}", filename);
 	int ret_val = std::system(str.data());
 	std::ifstream bin(file_path, std::ios::ate | std::ios::binary);
-	if(!bin.good() && ret_val) {
+	if (!bin.good() && ret_val) {
 		LUMEN_ERROR(
 			std::string("Shader compilation failed: " + filename).data());
 		bin.close();
 		return ret_val;
-	} else if(ret_val) {
-		LUMEN_WARN(
-			std::string("Shader compilation failed, resuming from old shader: " + filename).data());
+	} else if (ret_val) {
+		LUMEN_WARN(std::string(
+			"Shader compilation failed, resuming from old shader: " +
+			filename)
+			.data());
 	}
-	size_t file_size = (size_t) bin.tellg();
+	size_t file_size = (size_t)bin.tellg();
 	bin.seekg(0);
 	binary.resize(file_size);
 	bin.read(binary.data(), file_size);
@@ -39,7 +44,8 @@ VkShaderModule Shader::create_vk_shader_module(const VkDevice& device) const {
 	shader_module_CI.pNext = nullptr;
 
 	VkShaderModule shader_module;
-	if(vkCreateShaderModule(device, &shader_module_CI, nullptr, &shader_module) != VK_SUCCESS) {
+	if (vkCreateShaderModule(device, &shader_module_CI, nullptr,
+		&shader_module) != VK_SUCCESS) {
 		LUMEN_ERROR("Failed to create shader module!");
 	}
 	return shader_module;

@@ -10,16 +10,15 @@ void ThreadPool::init() {
 	done = false;
 	try {
 		threads.reserve(thread_count);
-		for(uint32_t i = 0; i < thread_count; i++) {
+		for (uint32_t i = 0; i < thread_count; i++) {
 			threads.emplace_back([] {
-				while(true) {
+				while (true) {
 					std::function<void()> task;
 					{
 						std::unique_lock<std::mutex> lock(queue_mutex);
-						cv.wait(lock, [] {
-							return !work_queue.empty() || done;
-						});
-						if(done && work_queue.empty()) {
+						cv.wait(lock,
+								[] { return !work_queue.empty() || done; });
+						if (done && work_queue.empty()) {
 							break;
 						}
 						task = std::move(work_queue.front());
@@ -27,10 +26,9 @@ void ThreadPool::init() {
 					}
 					task();
 				}
-			}
-			);
+			});
 		}
-	} catch(const std::exception& ex) {
+	} catch (const std::exception& ex) {
 		LUMEN_ERROR(ex.what());
 	}
 }
@@ -38,7 +36,7 @@ void ThreadPool::init() {
 void ThreadPool::destroy() {
 	done = true;
 	cv.notify_all();
-	for(auto& thread : threads) {
+	for (auto& thread : threads) {
 		thread.join();
 	}
 }

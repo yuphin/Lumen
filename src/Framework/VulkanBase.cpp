@@ -2,8 +2,8 @@
 #include "VulkanBase.h"
 #include "CommandBuffer.h"
 #include "Utils.h"
-#include <numeric>
 #include <extensions_vk.hpp>
+#include <numeric>
 
 uint32_t VertexLayout::stride() {
 	uint32_t res = 0;
@@ -24,16 +24,15 @@ uint32_t VertexLayout::stride() {
 
 bool has_flag(VkFlags item, VkFlags flag) { return (item & flag) == flag; }
 
-VulkanBase::VulkanBase(bool debug) {
-	this->enable_validation_layers = debug;
-}
+VulkanBase::VulkanBase(bool debug) { this->enable_validation_layers = debug; }
 
 std::vector<const char*> VulkanBase::get_req_extensions() {
 	uint32_t glfwExtensionCount = 0;
 	const char** glfwExtensions;
 	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
-	std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+	std::vector<const char*> extensions(glfwExtensions,
+										glfwExtensions + glfwExtensionCount);
 
 	if (enable_validation_layers) {
 		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -41,13 +40,16 @@ std::vector<const char*> VulkanBase::get_req_extensions() {
 	return extensions;
 }
 
-VulkanBase::QueueFamilyIndices VulkanBase::find_queue_families(VkPhysicalDevice device) {
+VulkanBase::QueueFamilyIndices
+VulkanBase::find_queue_families(VkPhysicalDevice device) {
 
 	QueueFamilyIndices indices;
 	uint32_t queue_family_count = 0;
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, nullptr);
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count,
+											 nullptr);
 	queue_families.resize(queue_family_count);
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_families.data());
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count,
+											 queue_families.data());
 
 	int i = 0;
 	for (const auto& queueFamily : queue_families) {
@@ -60,7 +62,8 @@ VulkanBase::QueueFamilyIndices VulkanBase::find_queue_families(VkPhysicalDevice 
 		}
 
 		VkBool32 present_support = false;
-		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, ctx.surface, &present_support);
+		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, ctx.surface,
+											 &present_support);
 
 		if (present_support) {
 			indices.present_family = i;
@@ -75,31 +78,37 @@ VulkanBase::QueueFamilyIndices VulkanBase::find_queue_families(VkPhysicalDevice 
 	return indices;
 }
 
-VulkanBase::SwapChainSupportDetails VulkanBase::query_swapchain_support(VkPhysicalDevice device) {
+VulkanBase::SwapChainSupportDetails
+VulkanBase::query_swapchain_support(VkPhysicalDevice device) {
 	// Basically returns present modes and surface modes in a struct
 
 	SwapChainSupportDetails details;
 
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, ctx.surface, &details.capabilities);
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, ctx.surface,
+											  &details.capabilities);
 
 	uint32_t format_cnt;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(device, ctx.surface, &format_cnt, nullptr);
+	vkGetPhysicalDeviceSurfaceFormatsKHR(device, ctx.surface, &format_cnt,
+										 nullptr);
 
 	if (format_cnt != 0) {
 		details.formats.resize(format_cnt);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(device, ctx.surface, &format_cnt, details.formats.data());
+		vkGetPhysicalDeviceSurfaceFormatsKHR(device, ctx.surface, &format_cnt,
+											 details.formats.data());
 	}
 
 	uint32_t present_mode_cnt;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(device, ctx.surface, &present_mode_cnt, nullptr);
+	vkGetPhysicalDeviceSurfacePresentModesKHR(device, ctx.surface,
+											  &present_mode_cnt, nullptr);
 
 	if (present_mode_cnt != 0) {
 		details.present_modes.resize(present_mode_cnt);
-		vkGetPhysicalDeviceSurfacePresentModesKHR(device, ctx.surface, &present_mode_cnt, details.present_modes.data());
+		vkGetPhysicalDeviceSurfacePresentModesKHR(device, ctx.surface,
+												  &present_mode_cnt,
+												  details.present_modes.data());
 	}
 	return details;
 }
-
 
 VkShaderModule VulkanBase::create_shader(const std::vector<char>& code) {
 	VkShaderModuleCreateInfo shader_module_CI{};
@@ -108,22 +117,19 @@ VkShaderModule VulkanBase::create_shader(const std::vector<char>& code) {
 	shader_module_CI.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
 	VkShaderModule shaderModule;
-	vk::check(
-		vkCreateShaderModule(ctx.device, &shader_module_CI, nullptr, &shaderModule),
-		"Failed to create shader module!"
-	);
+	vk::check(vkCreateShaderModule(ctx.device, &shader_module_CI, nullptr,
+			  &shaderModule),
+			  "Failed to create shader module!");
 	return shaderModule;
 }
 
-
 VkResult VulkanBase::vkExt_create_debug_messenger(
-	VkInstance instance,
-	const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
+	VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
 	const VkAllocationCallbacks* pAllocator,
 	VkDebugUtilsMessengerEXT* pDebugMessenger) {
 
-	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)
-		vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+		instance, "vkCreateDebugUtilsMessengerEXT");
 
 	if (func != nullptr) {
 		return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
@@ -132,22 +138,24 @@ VkResult VulkanBase::vkExt_create_debug_messenger(
 	}
 }
 
-void VulkanBase::vkExt_destroy_debug_messenger(VkInstance instance,
-											   VkDebugUtilsMessengerEXT debug_messenger,
-											   const VkAllocationCallbacks* pAllocator) {
-	auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)
-		vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+void VulkanBase::vkExt_destroy_debug_messenger(
+	VkInstance instance, VkDebugUtilsMessengerEXT debug_messenger,
+	const VkAllocationCallbacks* pAllocator) {
+	auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+		instance, "vkDestroyDebugUtilsMessengerEXT");
 	if (func != nullptr) {
 		func(instance, debug_messenger, pAllocator);
 	}
 }
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
-	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-	VkDebugUtilsMessageTypeFlagsEXT messageType,
-	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-	void* pUserData) {
-	if ((messageSeverity & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) == 0) {
+static VKAPI_ATTR VkBool32 VKAPI_CALL
+debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+			   VkDebugUtilsMessageTypeFlagsEXT messageType,
+			   const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+			   void* pUserData) {
+	if ((messageSeverity & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+		VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) ==
+		0) {
 		return VK_TRUE;
 	}
 	LUMEN_ERROR("Validation Error: {0} ", pCallbackData->pMessage);
@@ -156,27 +164,27 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 
 void VulkanBase::setup_debug_messenger() {
 
-
 	auto ci = vk::debug_messenger_CI(debug_callback);
 
-	vk::check(vkExt_create_debug_messenger(ctx.instance, &ci, nullptr, &ctx.debug_messenger),
-			  "Failed to set up debug messenger!"
-	);
+	vk::check(vkExt_create_debug_messenger(ctx.instance, &ci, nullptr,
+			  &ctx.debug_messenger),
+			  "Failed to set up debug messenger!");
 }
 void VulkanBase::cleanup_swapchain() {
 	// Order:
-		// 1- Destroy Framebuffers
-		// 2- Destroy Commandbuffers
-		// 3- Destroy the pipelines
-		// 4- Destroy pipeline layout	
-		// 5- Destroy render pass
-		// 6- Destroy image views
-		// 7- Destroy swapchain
+	// 1- Destroy Framebuffers
+	// 2- Destroy Commandbuffers
+	// 3- Destroy the pipelines
+	// 4- Destroy pipeline layout
+	// 5- Destroy render pass
+	// 6- Destroy image views
+	// 7- Destroy swapchain
 	for (auto framebuffer : ctx.swapchain_framebuffers) {
 		vkDestroyFramebuffer(ctx.device, framebuffer, nullptr);
 	}
 	vkFreeCommandBuffers(ctx.device, ctx.cmd_pools[0],
-						 static_cast<uint32_t>(ctx.command_buffers.size()), ctx.command_buffers.data());
+						 static_cast<uint32_t>(ctx.command_buffers.size()),
+						 ctx.command_buffers.data());
 	vkDestroyPipeline(ctx.device, ctx.gfx_pipeline, nullptr);
 	vkDestroyPipelineLayout(ctx.device, ctx.pipeline_layout, nullptr);
 	vkDestroyRenderPass(ctx.device, ctx.default_render_pass, nullptr);
@@ -197,15 +205,12 @@ void VulkanBase::cleanup() {
 	if (tlas.buffer.ctx) {
 		tlas.buffer.destroy();
 		vkDestroyAccelerationStructureKHR(ctx.device, tlas.accel, nullptr);
-
 	}
 	cleanup_swapchain();
 
 	vkDestroyImageView(ctx.device, ctx.depth_img_view, 0);
 	vkDestroyImage(ctx.device, ctx.depth_img, 0);
 	vkFreeMemory(ctx.device, ctx.depth_img_memory, 0);
-
-
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		vkDestroySemaphore(ctx.device, image_available_sem[i], nullptr);
@@ -220,14 +225,13 @@ void VulkanBase::cleanup() {
 
 	vkDestroyDevice(ctx.device, nullptr);
 	if (enable_validation_layers) {
-		vkExt_destroy_debug_messenger(ctx.instance, ctx.debug_messenger, nullptr);
+		vkExt_destroy_debug_messenger(ctx.instance, ctx.debug_messenger,
+									  nullptr);
 	}
 	vkDestroyInstance(ctx.instance, nullptr);
 	glfwDestroyWindow(ctx.window_ptr);
 	glfwTerminate();
 }
-
-
 
 void VulkanBase::create_instance() {
 
@@ -247,14 +251,16 @@ void VulkanBase::create_instance() {
 	instance_CI.pApplicationInfo = &app_info;
 
 	auto extensions = get_req_extensions();
-	instance_CI.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+	instance_CI.enabledExtensionCount =
+		static_cast<uint32_t>(extensions.size());
 	instance_CI.ppEnabledExtensionNames = extensions.data();
 
-
 	if (enable_validation_layers) {
-		instance_CI.enabledLayerCount = static_cast<uint32_t>(validation_layers_lst.size());
+		instance_CI.enabledLayerCount =
+			static_cast<uint32_t>(validation_layers_lst.size());
 		instance_CI.ppEnabledLayerNames = validation_layers_lst.data();
-		VkDebugUtilsMessengerCreateInfoEXT debug_CI = vk::debug_messenger_CI(debug_callback);
+		VkDebugUtilsMessengerCreateInfoEXT debug_CI =
+			vk::debug_messenger_CI(debug_callback);
 		instance_CI.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debug_CI;
 	} else {
 		instance_CI.enabledLayerCount = 0;
@@ -262,15 +268,14 @@ void VulkanBase::create_instance() {
 	}
 
 	vk::check(vkCreateInstance(&instance_CI, nullptr, &ctx.instance),
-			  "Failed to create instance"
-	);
+			  "Failed to create instance");
 }
 
 void VulkanBase::create_surface() {
 
-	vk::check(glfwCreateWindowSurface(ctx.instance, ctx.window_ptr, nullptr, &ctx.surface),
-			  "Failed to create window surface"
-	);
+	vk::check(glfwCreateWindowSurface(ctx.instance, ctx.window_ptr, nullptr,
+			  &ctx.surface),
+			  "Failed to create window surface");
 }
 
 void VulkanBase::pick_physical_device() {
@@ -289,39 +294,47 @@ void VulkanBase::pick_physical_device() {
 
 		// Check device extension support
 		auto extensions_supported = [this](VkPhysicalDevice device) {
-
 			uint32_t extension_cnt;
-			vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_cnt, nullptr);
+			vkEnumerateDeviceExtensionProperties(device, nullptr,
+												 &extension_cnt, nullptr);
 
-			std::vector<VkExtensionProperties> available_extensions(extension_cnt);
-			vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_cnt, available_extensions.data());
+			std::vector<VkExtensionProperties> available_extensions(
+				extension_cnt);
+			vkEnumerateDeviceExtensionProperties(
+				device, nullptr, &extension_cnt, available_extensions.data());
 
-			std::set<std::string> required_extensions(device_extensions.begin(), device_extensions.end());
+			std::set<std::string> required_extensions(device_extensions.begin(),
+													  device_extensions.end());
 
 			for (const auto& extension : available_extensions) {
 				required_extensions.erase(extension.extensionName);
 			}
 			return required_extensions.empty();
-
 		}(device);
 
 		// Query swaphcain support
 		bool swapchain_adequate = false;
 		if (extensions_supported) {
-			SwapChainSupportDetails swapchain_support = query_swapchain_support(device);
+			SwapChainSupportDetails swapchain_support =
+				query_swapchain_support(device);
 			// If we have a format and present mode, it's adequate
 			swapchain_adequate = !swapchain_support.formats.empty() &&
 				!swapchain_support.present_modes.empty();
 		}
-		// If we have the appropiate queue families, extensions and adequate swapchain, return true
-		return indices.is_complete() && extensions_supported && swapchain_adequate;
+		// If we have the appropiate queue families, extensions and adequate
+		// swapchain, return true
+		return indices.is_complete() && extensions_supported &&
+			swapchain_adequate;
 	};
 	for (const auto& device : devices) {
 		if (is_suitable(device)) {
 			ctx.physical_device = device;
-			vkGetPhysicalDeviceFeatures(ctx.physical_device, &ctx.supported_features);
-			vkGetPhysicalDeviceProperties(ctx.physical_device, &ctx.device_properties);
-			vkGetPhysicalDeviceMemoryProperties(ctx.physical_device, &ctx.memory_properties);
+			vkGetPhysicalDeviceFeatures(ctx.physical_device,
+										&ctx.supported_features);
+			vkGetPhysicalDeviceProperties(ctx.physical_device,
+										  &ctx.device_properties);
+			vkGetPhysicalDeviceMemoryProperties(ctx.physical_device,
+												&ctx.memory_properties);
 			break;
 		}
 	}
@@ -336,13 +349,12 @@ void VulkanBase::create_logical_device() {
 	QueueFamilyIndices indices = find_queue_families(ctx.physical_device);
 
 	std::vector<VkDeviceQueueCreateInfo> queue_CIs;
-	std::set<uint32_t> unique_queue_families = {
-		indices.gfx_family.value(),
-		indices.present_family.value(),
-		indices.compute_family.value()
-	};
+	std::set<uint32_t> unique_queue_families = { indices.gfx_family.value(),
+												indices.present_family.value(),
+												indices.compute_family.value() };
 
-	ctx.queues.resize(indices.gfx_family.has_value() + indices.present_family.has_value() +
+	ctx.queues.resize(indices.gfx_family.has_value() +
+					  indices.present_family.has_value() +
 					  indices.compute_family.has_value());
 	float queue_priority = 1.0f;
 	for (uint32_t queue_family_idx : unique_queue_families) {
@@ -354,10 +366,14 @@ void VulkanBase::create_logical_device() {
 		queue_CIs.push_back(queue_CI);
 	}
 	// TODO: Pass these externally
-	VkPhysicalDeviceFeatures2 device_features2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-	VkPhysicalDeviceVulkan12Features features12 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
-	VkPhysicalDeviceRayTracingPipelineFeaturesKHR rt_fts{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
-	VkPhysicalDeviceAccelerationStructureFeaturesKHR accel_fts{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+	VkPhysicalDeviceFeatures2 device_features2{
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+	VkPhysicalDeviceVulkan12Features features12 = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+	VkPhysicalDeviceRayTracingPipelineFeaturesKHR rt_fts{
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
+	VkPhysicalDeviceAccelerationStructureFeaturesKHR accel_fts{
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
 	accel_fts.accelerationStructure = true;
 	rt_fts.rayTracingPipeline = true;
 	rt_fts.pNext = &accel_fts;
@@ -365,7 +381,6 @@ void VulkanBase::create_logical_device() {
 	features12.runtimeDescriptorArray = true;
 	features12.shaderSampledImageArrayNonUniformIndexing = true;
 	features12.pNext = &rt_fts;
-
 
 	device_features2.features.samplerAnisotropy = true;
 	device_features2.features.shaderInt64 = true;
@@ -379,50 +394,61 @@ void VulkanBase::create_logical_device() {
 	VkDeviceCreateInfo logical_device_CI{};
 	logical_device_CI.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
-	logical_device_CI.queueCreateInfoCount = static_cast<uint32_t>(queue_CIs.size());
+	logical_device_CI.queueCreateInfoCount =
+		static_cast<uint32_t>(queue_CIs.size());
 	logical_device_CI.pQueueCreateInfos = queue_CIs.data();
 
-
-	logical_device_CI.enabledExtensionCount = static_cast<uint32_t>(device_extensions.size());
+	logical_device_CI.enabledExtensionCount =
+		static_cast<uint32_t>(device_extensions.size());
 	logical_device_CI.ppEnabledExtensionNames = device_extensions.data();
 
 	logical_device_CI.pNext = &device_features2;
 
 	if (enable_validation_layers) {
-		logical_device_CI.enabledLayerCount = static_cast<uint32_t>(validation_layers_lst.size());
+		logical_device_CI.enabledLayerCount =
+			static_cast<uint32_t>(validation_layers_lst.size());
 		logical_device_CI.ppEnabledLayerNames = validation_layers_lst.data();
 	} else {
 		logical_device_CI.enabledLayerCount = 0;
 	}
 
-	vk::check(vkCreateDevice(ctx.physical_device, &logical_device_CI, nullptr, &ctx.device),
-			  "Failed to create logical device"
-	);
+	vk::check(vkCreateDevice(ctx.physical_device, &logical_device_CI, nullptr,
+			  &ctx.device),
+			  "Failed to create logical device");
 
-	load_VK_EXTENSIONS(ctx.instance, vkGetInstanceProcAddr, ctx.device, vkGetDeviceProcAddr);
-	vkGetDeviceQueue(ctx.device, indices.gfx_family.value(), 0, &ctx.queues[(int)QueueType::GFX]);
-	vkGetDeviceQueue(ctx.device, indices.compute_family.value(), 0, &ctx.queues[(int)QueueType::COMPUTE]);
-	vkGetDeviceQueue(ctx.device, indices.present_family.value(), 0, &ctx.queues[(int)QueueType::PRESENT]);
+	load_VK_EXTENSIONS(ctx.instance, vkGetInstanceProcAddr, ctx.device,
+					   vkGetDeviceProcAddr);
+	vkGetDeviceQueue(ctx.device, indices.gfx_family.value(), 0,
+					 &ctx.queues[(int)QueueType::GFX]);
+	vkGetDeviceQueue(ctx.device, indices.compute_family.value(), 0,
+					 &ctx.queues[(int)QueueType::COMPUTE]);
+	vkGetDeviceQueue(ctx.device, indices.present_family.value(), 0,
+					 &ctx.queues[(int)QueueType::PRESENT]);
 }
 
 void VulkanBase::create_swapchain() {
 
-	SwapChainSupportDetails swapchain_support = query_swapchain_support(ctx.physical_device);
+	SwapChainSupportDetails swapchain_support =
+		query_swapchain_support(ctx.physical_device);
 
-	// Pick surface format, present mode and extent(preferrably width and height):
+	// Pick surface format, present mode and extent(preferrably width and
+	// height):
 
-	VkSurfaceFormatKHR surface_format = [this](const std::vector<VkSurfaceFormatKHR>& available_formats) {
+	VkSurfaceFormatKHR surface_format =
+		[this](const std::vector<VkSurfaceFormatKHR>& available_formats) {
 		for (const auto& available_format : available_formats) {
 			// Preferrably SRGB32 for now
 			if (available_format.format == VK_FORMAT_B8G8R8A8_SRGB &&
-				available_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+				available_format.colorSpace ==
+				VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
 				return available_format;
 			}
 		}
 		return available_formats[0];
 	}(swapchain_support.formats);
 
-	VkPresentModeKHR present_mode = [this](const std::vector<VkPresentModeKHR>& present_modes) {
+	VkPresentModeKHR present_mode =
+		[this](const std::vector<VkPresentModeKHR>& present_modes) {
 		for (const auto& available_present_mode : present_modes) {
 			// For now we prefer Mailbox
 			if (available_present_mode == VK_PRESENT_MODE_MAILBOX_KHR) {
@@ -441,17 +467,19 @@ void VulkanBase::create_swapchain() {
 			int width, height;
 			glfwGetFramebufferSize(ctx.window_ptr, &width, &height);
 
-			VkExtent2D actual_extent = {
-				 static_cast<uint32_t>(width),
-				 static_cast<uint32_t>(height)
-			};
+			VkExtent2D actual_extent = { static_cast<uint32_t>(width),
+										static_cast<uint32_t>(height) };
 
 			// Clamp width and height
-			actual_extent.width = std::max(capabilities.minImageExtent.width,
-										   std::min(capabilities.maxImageExtent.width, actual_extent.width));
+			actual_extent.width =
+				std::max(capabilities.minImageExtent.width,
+						 std::min(capabilities.maxImageExtent.width,
+						 actual_extent.width));
 
-			actual_extent.height = std::max(capabilities.minImageExtent.height,
-											std::min(capabilities.maxImageExtent.height, actual_extent.height));
+			actual_extent.height =
+				std::max(capabilities.minImageExtent.height,
+						 std::min(capabilities.maxImageExtent.height,
+						 actual_extent.height));
 
 			return actual_extent;
 		}
@@ -476,10 +504,8 @@ void VulkanBase::create_swapchain() {
 	swapchain_CI.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
 	QueueFamilyIndices indices = find_queue_families(ctx.physical_device);
-	uint32_t queue_family_indices_arr[] = {
-		indices.gfx_family.value(),
-		indices.present_family.value()
-	};
+	uint32_t queue_family_indices_arr[] = { indices.gfx_family.value(),
+										   indices.present_family.value() };
 
 	if (indices.gfx_family != indices.present_family) {
 		swapchain_CI.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
@@ -496,14 +522,14 @@ void VulkanBase::create_swapchain() {
 
 	swapchain_CI.oldSwapchain = VK_NULL_HANDLE;
 
-
-	vk::check(vkCreateSwapchainKHR(ctx.device, &swapchain_CI, nullptr, &ctx.swapchain),
-			  "Failed to create swap chain!"
-	);
+	vk::check(vkCreateSwapchainKHR(ctx.device, &swapchain_CI, nullptr,
+			  &ctx.swapchain),
+			  "Failed to create swap chain!");
 
 	vkGetSwapchainImagesKHR(ctx.device, ctx.swapchain, &image_cnt, nullptr);
 	ctx.swapchain_images.resize(image_cnt);
-	vkGetSwapchainImagesKHR(ctx.device, ctx.swapchain, &image_cnt, ctx.swapchain_images.data());
+	vkGetSwapchainImagesKHR(ctx.device, ctx.swapchain, &image_cnt,
+							ctx.swapchain_images.data());
 
 	ctx.swapchain_image_format = surface_format.format;
 	ctx.swapchain_extent = extent;
@@ -512,56 +538,59 @@ void VulkanBase::create_swapchain() {
 
 	for (size_t i = 0; i < ctx.swapchain_images.size(); i++) {
 		ctx.swapchain_image_views[i] = create_image_view(
-			ctx.device, ctx.swapchain_images[i],
-			ctx.swapchain_image_format
-		);
+			ctx.device, ctx.swapchain_images[i], ctx.swapchain_image_format);
 	}
 
 	auto extend3d = VkExtent3D{ extent.width, extent.height, 1 };
-	auto image_ci = vk::image_create_info(VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, extend3d);
+	auto image_ci = vk::image_create_info(
+		VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		extend3d);
 	vkCreateImage(ctx.device, &image_ci, 0, &ctx.depth_img);
 	VkMemoryRequirements mem_reqs;
 	vkGetImageMemoryRequirements(ctx.device, ctx.depth_img, &mem_reqs);
-	auto mem_type_idx = find_memory_type(&ctx.physical_device, mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	auto mem_type_idx =
+		find_memory_type(&ctx.physical_device, mem_reqs.memoryTypeBits,
+						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	assert(mem_type_idx != ~0u);
 	VkMemoryAllocateInfo alloc_info = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
 	alloc_info.allocationSize = mem_reqs.size;
 	alloc_info.memoryTypeIndex = mem_type_idx;
 	VkDeviceMemory memory = 0;
-	vk::check(vkAllocateMemory(ctx.device, &alloc_info, 0, &ctx.depth_img_memory));
-	vk::check(vkBindImageMemory(ctx.device, ctx.depth_img, ctx.depth_img_memory, 0));
-	ctx.depth_img_view = create_image_view(
-		ctx.device, ctx.depth_img,
-		VK_FORMAT_D32_SFLOAT,
-		VK_IMAGE_ASPECT_DEPTH_BIT
-	);
+	vk::check(
+		vkAllocateMemory(ctx.device, &alloc_info, 0, &ctx.depth_img_memory));
+	vk::check(
+		vkBindImageMemory(ctx.device, ctx.depth_img, ctx.depth_img_memory, 0));
+	ctx.depth_img_view =
+		create_image_view(ctx.device, ctx.depth_img, VK_FORMAT_D32_SFLOAT,
+						  VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
 void VulkanBase::create_command_pool() {
-	QueueFamilyIndices queue_family_idxs = find_queue_families(ctx.physical_device);
+	QueueFamilyIndices queue_family_idxs =
+		find_queue_families(ctx.physical_device);
 
-	VkCommandPoolCreateInfo pool_info = vk::command_pool_CI(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+	VkCommandPoolCreateInfo pool_info =
+		vk::command_pool_CI(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 	pool_info.queueFamilyIndex = queue_family_idxs.gfx_family.value();
 	ctx.cmd_pools.resize(2);
-	vk::check(vkCreateCommandPool(ctx.device, &pool_info, nullptr, &ctx.cmd_pools[0]),
-			  "Failed to create command pool!"
-	);
+	vk::check(
+		vkCreateCommandPool(ctx.device, &pool_info, nullptr, &ctx.cmd_pools[0]),
+		"Failed to create command pool!");
 	pool_info.queueFamilyIndex = queue_family_idxs.compute_family.value();
-	vk::check(vkCreateCommandPool(ctx.device, &pool_info, nullptr, &ctx.cmd_pools[1]),
-			  "Failed to create command pool!"
-	);
+	vk::check(
+		vkCreateCommandPool(ctx.device, &pool_info, nullptr, &ctx.cmd_pools[1]),
+		"Failed to create command pool!");
 }
 
 void VulkanBase::create_framebuffers(VkRenderPass render_pass) {
 	ctx.swapchain_framebuffers.resize(ctx.swapchain_image_views.size());
 
 	for (size_t i = 0; i < ctx.swapchain_image_views.size(); i++) {
-		VkImageView attachments[2] = {
-			ctx.swapchain_image_views[i],
-			ctx.depth_img_view
-		};
+		VkImageView attachments[2] = { ctx.swapchain_image_views[i],
+									  ctx.depth_img_view };
 
-		VkFramebufferCreateInfo frame_buffer_info = vk::framebuffer_create_info();
+		VkFramebufferCreateInfo frame_buffer_info =
+			vk::framebuffer_create_info();
 		frame_buffer_info.renderPass = render_pass;
 		frame_buffer_info.attachmentCount = 2;
 		frame_buffer_info.pAttachments = attachments;
@@ -569,9 +598,9 @@ void VulkanBase::create_framebuffers(VkRenderPass render_pass) {
 		frame_buffer_info.height = ctx.swapchain_extent.height;
 		frame_buffer_info.layers = 1;
 
-		vk::check(vkCreateFramebuffer(ctx.device, &frame_buffer_info, nullptr, &ctx.swapchain_framebuffers[i]),
-				  "Failed to create framebuffer"
-		);
+		vk::check(vkCreateFramebuffer(ctx.device, &frame_buffer_info, nullptr,
+				  &ctx.swapchain_framebuffers[i]),
+				  "Failed to create framebuffer");
 	}
 }
 
@@ -580,14 +609,12 @@ void VulkanBase::create_command_buffers() {
 
 	// TODO: Factor
 	VkCommandBufferAllocateInfo alloc_info = vk::command_buffer_allocate_info(
-		ctx.cmd_pools[0],
-		VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		(uint32_t)ctx.command_buffers.size()
-	);
+		ctx.cmd_pools[0], VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		(uint32_t)ctx.command_buffers.size());
 
-	vk::check(vkAllocateCommandBuffers(ctx.device, &alloc_info, ctx.command_buffers.data()),
-			  "Failed to allocate command buffers!"
-	);
+	vk::check(vkAllocateCommandBuffers(ctx.device, &alloc_info,
+			  ctx.command_buffers.data()),
+			  "Failed to allocate command buffers!");
 }
 
 void VulkanBase::create_sync_primitives() {
@@ -598,23 +625,23 @@ void VulkanBase::create_sync_primitives() {
 
 	VkSemaphoreCreateInfo semaphore_info = vk::semaphore_create_info();
 
-	VkFenceCreateInfo fence_info = vk::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
-
+	VkFenceCreateInfo fence_info =
+		vk::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		vk::check<3>(
-			{
-				vkCreateSemaphore(ctx.device, &semaphore_info, nullptr, &image_available_sem[i]),
-				vkCreateSemaphore(ctx.device, &semaphore_info, nullptr, &render_finished_sem[i]),
-				vkCreateFence(ctx.device, &fence_info, nullptr, &in_flight_fences[i])
-			},
-			"Failed to create synchronization primitives for a frame"
-			);
+		vk::check<3>({ vkCreateSemaphore(ctx.device, &semaphore_info, nullptr,
+										&image_available_sem[i]),
+					  vkCreateSemaphore(ctx.device, &semaphore_info, nullptr,
+										&render_finished_sem[i]),
+					  vkCreateFence(ctx.device, &fence_info, nullptr,
+									&in_flight_fences[i]) },
+					 "Failed to create synchronization primitives for a frame");
 	}
 }
 
 // Called after window resize
-void VulkanBase::recreate_swap_chain(const std::function<void(VulkanContext&)>& func, VulkanContext& ctx) {
+void VulkanBase::recreate_swap_chain(
+	const std::function<void(VulkanContext&)>& func, VulkanContext& ctx) {
 	int width = 0, height = 0;
 	glfwGetFramebufferSize(ctx.window_ptr, &width, &height);
 	while (width == 0 || height == 0) {
@@ -655,51 +682,55 @@ bool VulkanBase::check_validation_layer_support() {
 
 void create_default_render_pass(VulkanContext& ctx) {
 	ctx.default_render_pass = create_render_pass(
-		ctx.device,
-		{ ctx.swapchain_image_format },
-		VK_FORMAT_D32_SFLOAT,
-		1);
+		ctx.device, { ctx.swapchain_image_format }, VK_FORMAT_D32_SFLOAT, 1);
 }
 
-AccelKHR VulkanBase::create_acceleration(VkAccelerationStructureCreateInfoKHR& accel) {
+AccelKHR
+VulkanBase::create_acceleration(VkAccelerationStructureCreateInfoKHR& accel) {
 	AccelKHR result_accel;
 	// Allocating the buffer to hold the acceleration structure
 	Buffer accel_buff;
-	accel_buff.create(&ctx, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR
-					  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+	accel_buff.create(&ctx,
+					  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
+					  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 					  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 					  VK_SHARING_MODE_EXCLUSIVE, accel.size);
 	// Setting the buffer
 	result_accel.buffer = accel_buff;
 	accel.buffer = result_accel.buffer.handle;
 	// Create the acceleration structure
-	vkCreateAccelerationStructureKHR(ctx.device, &accel, nullptr, &result_accel.accel);
+	vkCreateAccelerationStructureKHR(ctx.device, &accel, nullptr,
+									 &result_accel.accel);
 	return result_accel;
 }
 
-
-void VulkanBase::cmd_compact_blas(VkCommandBuffer   cmdBuf,
-								  std::vector<uint32_t>                    indices,
-								  std::vector<BuildAccelerationStructure>& buildAs,
-								  VkQueryPool                              queryPool) {
+void VulkanBase::cmd_compact_blas(
+	VkCommandBuffer cmdBuf, std::vector<uint32_t> indices,
+	std::vector<BuildAccelerationStructure>& buildAs, VkQueryPool queryPool) {
 	uint32_t query_cnt{ 0 };
-	std::vector<AccelKHR> cleanupAS;  // previous AS to destroy
+	std::vector<AccelKHR> cleanupAS; // previous AS to destroy
 
 	// Get the compacted size result back
-	std::vector<VkDeviceSize> compact_sizes(static_cast<uint32_t>(indices.size()));
-	vkGetQueryPoolResults(ctx.device, queryPool, 0, (uint32_t)compact_sizes.size(), compact_sizes.size() * sizeof(VkDeviceSize),
-						  compact_sizes.data(), sizeof(VkDeviceSize), VK_QUERY_RESULT_WAIT_BIT);
+	std::vector<VkDeviceSize> compact_sizes(
+		static_cast<uint32_t>(indices.size()));
+	vkGetQueryPoolResults(
+		ctx.device, queryPool, 0, (uint32_t)compact_sizes.size(),
+		compact_sizes.size() * sizeof(VkDeviceSize), compact_sizes.data(),
+		sizeof(VkDeviceSize), VK_QUERY_RESULT_WAIT_BIT);
 
 	for (auto idx : indices) {
-		buildAs[idx].cleanup_as = buildAs[idx].as;           // previous AS to destroy
-		buildAs[idx].size_info.accelerationStructureSize = compact_sizes[query_cnt++];  // new reduced size
+		buildAs[idx].cleanup_as = buildAs[idx].as; // previous AS to destroy
+		buildAs[idx].size_info.accelerationStructureSize =
+			compact_sizes[query_cnt++]; // new reduced size
 		// Creating a compact version of the AS
-		VkAccelerationStructureCreateInfoKHR asCreateInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };
+		VkAccelerationStructureCreateInfoKHR asCreateInfo{
+			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };
 		asCreateInfo.size = buildAs[idx].size_info.accelerationStructureSize;
 		asCreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 		buildAs[idx].as = create_acceleration(asCreateInfo);
 		// Copy the original BLAS to a compact version
-		VkCopyAccelerationStructureInfoKHR copyInfo{ VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR };
+		VkCopyAccelerationStructureInfoKHR copyInfo{
+			VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR };
 		copyInfo.src = buildAs[idx].build_info.dstAccelerationStructure;
 		copyInfo.dst = buildAs[idx].as.accel;
 		copyInfo.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR;
@@ -707,77 +738,100 @@ void VulkanBase::cmd_compact_blas(VkCommandBuffer   cmdBuf,
 	}
 }
 
-void VulkanBase::cmd_create_blas(VkCommandBuffer                          cmdBuf,
-								 std::vector<uint32_t>                    indices,
-								 std::vector<BuildAccelerationStructure>& buildAs,
-								 VkDeviceAddress                          scratchAddress,
-								 VkQueryPool                              queryPool) {
-	if (queryPool)  // For querying the compaction size
-		vkResetQueryPool(ctx.device, queryPool, 0, static_cast<uint32_t>(indices.size()));
+void VulkanBase::cmd_create_blas(
+	VkCommandBuffer cmdBuf, std::vector<uint32_t> indices,
+	std::vector<BuildAccelerationStructure>& buildAs,
+	VkDeviceAddress scratchAddress, VkQueryPool queryPool) {
+	if (queryPool) // For querying the compaction size
+		vkResetQueryPool(ctx.device, queryPool, 0,
+						 static_cast<uint32_t>(indices.size()));
 	uint32_t query_cnt{ 0 };
 	for (const auto& idx : indices) {
 
 		// Actual allocation of buffer and acceleration structure.
-		VkAccelerationStructureCreateInfoKHR createInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };
+		VkAccelerationStructureCreateInfoKHR createInfo{
+			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };
 		createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-		createInfo.size = buildAs[idx].size_info.accelerationStructureSize;  // Will be used to allocate memory.
+		createInfo.size =
+			buildAs[idx]
+			.size_info
+			.accelerationStructureSize; // Will be used to allocate memory.
 		buildAs[idx].as = create_acceleration(createInfo);
 		// BuildInfo #2 part
-		buildAs[idx].build_info.dstAccelerationStructure = buildAs[idx].as.accel;  // Setting where the build lands
-		buildAs[idx].build_info.scratchData.deviceAddress = scratchAddress;  // All build are using the same scratch buffer
+		buildAs[idx].build_info.dstAccelerationStructure =
+			buildAs[idx].as.accel; // Setting where the build lands
+		buildAs[idx].build_info.scratchData.deviceAddress =
+			scratchAddress; // All build are using the same scratch buffer
 		// Building the bottom-level-acceleration-structure
-		vkCmdBuildAccelerationStructuresKHR(cmdBuf, 1, &buildAs[idx].build_info, &buildAs[idx].range_info);
+		vkCmdBuildAccelerationStructuresKHR(cmdBuf, 1, &buildAs[idx].build_info,
+											&buildAs[idx].range_info);
 
-		// Since the scratch buffer is reused across builds, we need a barrier to ensure one build
-		// is finished before starting the next one.
+		// Since the scratch buffer is reused across builds, we need a barrier
+		// to ensure one build is finished before starting the next one.
 		VkMemoryBarrier barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
 		barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
 		barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
-		vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-							 VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0, nullptr);
+		vkCmdPipelineBarrier(
+			cmdBuf, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+			VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1,
+			&barrier, 0, nullptr, 0, nullptr);
 
 		if (queryPool) {
-			// Add a query to find the 'real' amount of memory needed, use for compaction
-			vkCmdWriteAccelerationStructuresPropertiesKHR(cmdBuf, 1, &buildAs[idx].build_info.dstAccelerationStructure,
-														  VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, queryPool, query_cnt++);
+			// Add a query to find the 'real' amount of memory needed, use for
+			// compaction
+			vkCmdWriteAccelerationStructuresPropertiesKHR(
+				cmdBuf, 1, &buildAs[idx].build_info.dstAccelerationStructure,
+				VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR,
+				queryPool, query_cnt++);
 		}
 	}
 }
 
-void VulkanBase::cmd_create_tlas(VkCommandBuffer cmdBuf,
-								 uint32_t countInstance, Buffer& scratchBuffer, VkDeviceAddress instBufferAddr,
-								 VkBuildAccelerationStructureFlagsKHR flags, bool update) {
+void VulkanBase::cmd_create_tlas(VkCommandBuffer cmdBuf, uint32_t countInstance,
+								 Buffer& scratchBuffer,
+								 VkDeviceAddress instBufferAddr,
+								 VkBuildAccelerationStructureFlagsKHR flags,
+								 bool update) {
 	// Wraps a device pointer to the above uploaded instances.
-	VkAccelerationStructureGeometryInstancesDataKHR instances_vk{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR };
+	VkAccelerationStructureGeometryInstancesDataKHR instances_vk{
+		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR };
 	instances_vk.data.deviceAddress = instBufferAddr;
 
-	// Put the above into a VkAccelerationStructureGeometryKHR. We need to put the instances struct in a union and label it as instance data.
-	VkAccelerationStructureGeometryKHR topASGeometry{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
+	// Put the above into a VkAccelerationStructureGeometryKHR. We need to put
+	// the instances struct in a union and label it as instance data.
+	VkAccelerationStructureGeometryKHR topASGeometry{
+		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
 	topASGeometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
 	topASGeometry.geometry.instances = instances_vk;
 
 	// Find sizes
-	VkAccelerationStructureBuildGeometryInfoKHR build_info{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
+	VkAccelerationStructureBuildGeometryInfoKHR build_info{
+		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
 	build_info.flags = flags;
 	build_info.geometryCount = 1;
 	build_info.pGeometries = &topASGeometry;
-	build_info.mode = update ? VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR : VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+	build_info.mode = update ? VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR
+		: VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
 	build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
 	build_info.srcAccelerationStructure = VK_NULL_HANDLE;
 
-	VkAccelerationStructureBuildSizesInfoKHR size_info{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR };
-	vkGetAccelerationStructureBuildSizesKHR(ctx.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &build_info,
-											&countInstance, &size_info);
+	VkAccelerationStructureBuildSizesInfoKHR size_info{
+		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR };
+	vkGetAccelerationStructureBuildSizesKHR(
+		ctx.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+		&build_info, &countInstance, &size_info);
 
 #ifdef VK_NV_ray_tracing_motion_blur
-	VkAccelerationStructureMotionInfoNV motionInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MOTION_INFO_NV };
+	VkAccelerationStructureMotionInfoNV motionInfo{
+		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MOTION_INFO_NV };
 	motionInfo.maxInstances = countInstance;
 #endif
 
 	// Create TLAS
 	if (update == false) {
 
-		VkAccelerationStructureCreateInfoKHR create_info{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };
+		VkAccelerationStructureCreateInfoKHR create_info{
+			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };
 		create_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
 		create_info.size = size_info.accelerationStructureSize;
 		tlas = create_acceleration(create_info);
@@ -785,13 +839,15 @@ void VulkanBase::cmd_create_tlas(VkCommandBuffer cmdBuf,
 
 	// Allocate the scratch memory
 	scratchBuffer.create(&ctx,
-						 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+						 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-						 VK_SHARING_MODE_EXCLUSIVE,
-						 size_info.buildScratchSize
-	);
-	VkBufferDeviceAddressInfo bufferInfo{ VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, scratchBuffer.handle };
-	VkDeviceAddress           scratchAddress = vkGetBufferDeviceAddress(ctx.device, &bufferInfo);
+						 VK_SHARING_MODE_EXCLUSIVE, size_info.buildScratchSize);
+	VkBufferDeviceAddressInfo bufferInfo{
+		VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr,
+		scratchBuffer.handle };
+	VkDeviceAddress scratchAddress =
+		vkGetBufferDeviceAddress(ctx.device, &bufferInfo);
 
 	// Update build information
 	build_info.srcAccelerationStructure = update ? tlas.accel : VK_NULL_HANDLE;
@@ -799,80 +855,105 @@ void VulkanBase::cmd_create_tlas(VkCommandBuffer cmdBuf,
 	build_info.scratchData.deviceAddress = scratchAddress;
 
 	// Build Offsets info: n instances
-	VkAccelerationStructureBuildRangeInfoKHR        buildOffsetInfo{ countInstance, 0, 0, 0 };
-	const VkAccelerationStructureBuildRangeInfoKHR* pBuildOffsetInfo = &buildOffsetInfo;
+	VkAccelerationStructureBuildRangeInfoKHR buildOffsetInfo{ countInstance, 0,
+															 0, 0 };
+	const VkAccelerationStructureBuildRangeInfoKHR* pBuildOffsetInfo =
+		&buildOffsetInfo;
 
 	// Build the TLAS
-	vkCmdBuildAccelerationStructuresKHR(cmdBuf, 1, &build_info, &pBuildOffsetInfo);
+	vkCmdBuildAccelerationStructuresKHR(cmdBuf, 1, &build_info,
+										&pBuildOffsetInfo);
 }
 
 //--------------------------------------------------------------------------------------------------
 // Create all the BLAS from the vector of BlasInput
 // - There will be one BLAS per input-vector entry
 // - There will be as many BLAS as input.size()
-// - The resulting BLAS (along with the inputs used to build) are stored in m_blas,
+// - The resulting BLAS (along with the inputs used to build) are stored in
+// m_blas,
 //   and can be referenced by index.
 // - if flag has the 'Compact' flag, the BLAS will be compacted
 //
 void VulkanBase::build_blas(const std::vector<BlasInput>& input,
 							VkBuildAccelerationStructureFlagsKHR flags) {
-	uint32_t     nb_blas = static_cast<uint32_t>(input.size());
-	VkDeviceSize as_total_size{ 0 };     // Memory size of all allocated BLAS
-	uint32_t     nb_compactions{ 0 };   // Nb of BLAS requesting compaction
-	VkDeviceSize max_scratch_size{ 0 };  // Largest scratch size
+	uint32_t nb_blas = static_cast<uint32_t>(input.size());
+	VkDeviceSize as_total_size{ 0 };    // Memory size of all allocated BLAS
+	uint32_t nb_compactions{ 0 };       // Nb of BLAS requesting compaction
+	VkDeviceSize max_scratch_size{ 0 }; // Largest scratch size
 
 	// Preparing the information for the acceleration build commands.
 	std::vector<BuildAccelerationStructure> buildAs(nb_blas);
 	for (uint32_t idx = 0; idx < nb_blas; idx++) {
-		// Filling partially the VkAccelerationStructureBuildGeometryInfoKHR for querying the build sizes.
-		// Other information will be filled in the createBlas (see #2)
-		buildAs[idx].build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-		buildAs[idx].build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+		// Filling partially the VkAccelerationStructureBuildGeometryInfoKHR for
+		// querying the build sizes. Other information will be filled in the
+		// createBlas (see #2)
+		buildAs[idx].build_info.type =
+			VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+		buildAs[idx].build_info.mode =
+			VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
 		buildAs[idx].build_info.flags = input[idx].flags | flags;
-		buildAs[idx].build_info.geometryCount = static_cast<uint32_t>(input[idx].as_geom.size());
+		buildAs[idx].build_info.geometryCount =
+			static_cast<uint32_t>(input[idx].as_geom.size());
 		buildAs[idx].build_info.pGeometries = input[idx].as_geom.data();
 
 		// Build range information
 		buildAs[idx].range_info = input[idx].as_build_offset_info.data();
 
 		// Finding sizes to create acceleration structures and scratch
-		std::vector<uint32_t> maxPrimCount(input[idx].as_build_offset_info.size());
+		std::vector<uint32_t> maxPrimCount(
+			input[idx].as_build_offset_info.size());
 		for (auto tt = 0; tt < input[idx].as_build_offset_info.size(); tt++) {
-			maxPrimCount[tt] = input[idx].as_build_offset_info[tt].primitiveCount;  // Number of primitives/triangles
+			maxPrimCount[tt] =
+				input[idx]
+				.as_build_offset_info[tt]
+				.primitiveCount; // Number of primitives/triangles
 		}
-		vkGetAccelerationStructureBuildSizesKHR(ctx.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
-												&buildAs[idx].build_info, maxPrimCount.data(), &buildAs[idx].size_info);
+		vkGetAccelerationStructureBuildSizesKHR(
+			ctx.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+			&buildAs[idx].build_info, maxPrimCount.data(),
+			&buildAs[idx].size_info);
 
 		// Extra info
 		as_total_size += buildAs[idx].size_info.accelerationStructureSize;
-		max_scratch_size = std::max(max_scratch_size, buildAs[idx].size_info.buildScratchSize);
-		nb_compactions += has_flag(buildAs[idx].build_info.flags, VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
+		max_scratch_size =
+			std::max(max_scratch_size, buildAs[idx].size_info.buildScratchSize);
+		nb_compactions +=
+			has_flag(buildAs[idx].build_info.flags,
+					 VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 	}
 
-	// Allocate the scratch buffers holding the temporary data of the acceleration structure builder
+	// Allocate the scratch buffers holding the temporary data of the
+	// acceleration structure builder
 	Buffer scratch_buffer;
-	scratch_buffer.create(&ctx, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+	scratch_buffer.create(&ctx,
+						  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-						  VK_SHARING_MODE_EXCLUSIVE,
-						  max_scratch_size
-	);
-	VkBufferDeviceAddressInfo buffer_info{ VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, scratch_buffer.handle };
-	VkDeviceAddress           scratchAddress = vkGetBufferDeviceAddress(ctx.device, &buffer_info);
+						  VK_SHARING_MODE_EXCLUSIVE, max_scratch_size);
+	VkBufferDeviceAddressInfo buffer_info{
+		VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr,
+		scratch_buffer.handle };
+	VkDeviceAddress scratchAddress =
+		vkGetBufferDeviceAddress(ctx.device, &buffer_info);
 
-	// Allocate a query pool for storing the needed size for every BLAS compaction.
+	// Allocate a query pool for storing the needed size for every BLAS
+	// compaction.
 	VkQueryPool queryPool{ VK_NULL_HANDLE };
-	if (nb_compactions > 0)  // Is compaction requested?
+	if (nb_compactions > 0) // Is compaction requested?
 	{
-		assert(nb_compactions == nb_blas);  // Don't allow mix of on/off compaction
+		assert(nb_compactions ==
+			   nb_blas); // Don't allow mix of on/off compaction
 		VkQueryPoolCreateInfo qpci{ VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO };
 		qpci.queryCount = nb_blas;
-		qpci.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
+		qpci.queryType =
+			VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
 		vkCreateQueryPool(ctx.device, &qpci, nullptr, &queryPool);
 	}
-	// Batching creation/compaction of BLAS to allow staying in restricted amount of memory
-	std::vector<uint32_t> indices;  // Indices of the BLAS to create
-	VkDeviceSize          batchSize{ 0 };
-	VkDeviceSize          batchLimit{ 256'000'000 };  // 256 MB
+	// Batching creation/compaction of BLAS to allow staying in restricted
+	// amount of memory
+	std::vector<uint32_t> indices; // Indices of the BLAS to create
+	VkDeviceSize batchSize{ 0 };
+	VkDeviceSize batchLimit{ 256'000'000 }; // 256 MB
 	for (uint32_t idx = 0; idx < nb_blas; idx++) {
 		indices.push_back(idx);
 		batchSize += buildAs[idx].size_info.accelerationStructureSize;
@@ -880,14 +961,16 @@ void VulkanBase::build_blas(const std::vector<BlasInput>& input,
 		if (batchSize >= batchLimit || idx == nb_blas - 1) {
 
 			CommandBuffer cmdBuf(&ctx, true, QueueType::COMPUTE);
-			cmd_create_blas(cmdBuf.handle, indices, buildAs, scratchAddress, queryPool);
+			cmd_create_blas(cmdBuf.handle, indices, buildAs, scratchAddress,
+							queryPool);
 			cmdBuf.submit();
 			if (queryPool) {
 				cmd_compact_blas(cmdBuf.handle, indices, buildAs, queryPool);
 				cmdBuf.submit();
 				// Destroy the non-compacted version
 				for (auto i : indices) {
-					vkDestroyAccelerationStructureKHR(ctx.device, buildAs[i].cleanup_as.accel, nullptr);
+					vkDestroyAccelerationStructureKHR(
+						ctx.device, buildAs[i].cleanup_as.accel, nullptr);
 					buildAs[i].cleanup_as.buffer.destroy();
 				}
 			}
@@ -899,11 +982,15 @@ void VulkanBase::build_blas(const std::vector<BlasInput>& input,
 
 	// Logging reduction
 	if (queryPool) {
-		VkDeviceSize compact_size = std::accumulate(buildAs.begin(), buildAs.end(), 0ULL, [](const auto& a, const auto& b) {
+		VkDeviceSize compact_size = std::accumulate(
+			buildAs.begin(), buildAs.end(), 0ULL,
+			[](const auto& a, const auto& b) {
 			return a + b.size_info.accelerationStructureSize;
 		});
-		LUMEN_TRACE(" RT BLAS: reducing from: %u to: %u = %u (%2.2f%s smaller) \n", as_total_size, compact_size,
-					as_total_size - compact_size, (as_total_size - compact_size) / float(as_total_size) * 100.f, "%");
+		LUMEN_TRACE(
+			" RT BLAS: reducing from: %u to: %u = %u (%2.2f%s smaller) \n",
+			as_total_size, compact_size, as_total_size - compact_size,
+			(as_total_size - compact_size) / float(as_total_size) * 100.f, "%");
 	}
 
 	// Keeping all the created acceleration structures
@@ -913,59 +1000,63 @@ void VulkanBase::build_blas(const std::vector<BlasInput>& input,
 	// Clean up
 	vkDestroyQueryPool(ctx.device, queryPool, nullptr);
 	scratch_buffer.destroy();
-
 }
 
 VkDeviceAddress VulkanBase::get_blas_device_address(uint32_t blas_idx) {
 	assert(size_t(blas_idx) < blases.size());
-	VkAccelerationStructureDeviceAddressInfoKHR addr_info{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR };
+	VkAccelerationStructureDeviceAddressInfoKHR addr_info{
+		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR };
 	addr_info.accelerationStructure = blases[blas_idx].accel;
 	return vkGetAccelerationStructureDeviceAddressKHR(ctx.device, &addr_info);
 }
 
-
 // Build TLAS from an array of VkAccelerationStructureInstanceKHR
- // - Use motion=true with VkAccelerationStructureMotionInstanceNV
- // - The resulting TLAS will be stored in m_tlas
- // - update is to rebuild the Tlas with updated matrices, flag must have the 'allow_update'
-void VulkanBase::build_tlas(std::vector<VkAccelerationStructureInstanceKHR>& instances,
-							VkBuildAccelerationStructureFlagsKHR flags, bool update) {
+// - Use motion=true with VkAccelerationStructureMotionInstanceNV
+// - The resulting TLAS will be stored in m_tlas
+// - update is to rebuild the Tlas with updated matrices, flag must have the
+// 'allow_update'
+void VulkanBase::build_tlas(
+	std::vector<VkAccelerationStructureInstanceKHR>& instances,
+	VkBuildAccelerationStructureFlagsKHR flags, bool update) {
 	// Cannot call buildTlas twice except to update.
 	assert(tlas.accel == VK_NULL_HANDLE || update);
 	uint32_t count_instance = static_cast<uint32_t>(instances.size());
 
 	// Command buffer to create the TLAS
 
-
-	// Create a buffer holding the actual instance data (matrices++) for use by the AS builder
-	Buffer instances_buf;  // Buffer of instances containing the matrices and BLAS ids
-	instances_buf.create(&ctx, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
-						   | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-						   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-						   VK_SHARING_MODE_EXCLUSIVE,
-						   sizeof(VkAccelerationStructureInstanceKHR) * instances.size(),
-						   instances.data(),
-						   true
-	);
+	// Create a buffer holding the actual instance data (matrices++) for use by
+	// the AS builder
+	Buffer instances_buf; // Buffer of instances containing the matrices and
+						  // BLAS ids
+	instances_buf.create(
+		&ctx,
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		sizeof(VkAccelerationStructureInstanceKHR) * instances.size(),
+		instances.data(), true);
 	VkBufferDeviceAddressInfo buffer_info{
-		VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, instances_buf.handle
-	};
-	VkDeviceAddress           instBufferAddr = vkGetBufferDeviceAddress(ctx.device, &buffer_info);
+		VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr,
+		instances_buf.handle };
+	VkDeviceAddress instBufferAddr =
+		vkGetBufferDeviceAddress(ctx.device, &buffer_info);
 	CommandBuffer cmd(&ctx, true, QueueType::COMPUTE);
-	// Make sure the copy of the instance buffer are copied before triggering the acceleration structure build
+	// Make sure the copy of the instance buffer are copied before triggering
+	// the acceleration structure build
 	VkMemoryBarrier barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
 	barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 	barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
-	vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+	vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_TRANSFER_BIT,
+						 VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
 						 0, 1, &barrier, 0, nullptr, 0, nullptr);
 
 	Buffer scratch_buffer;
 	// Creating the TLAS
-	cmd_create_tlas(cmd.handle, count_instance, scratch_buffer, instBufferAddr, flags, update);
+	cmd_create_tlas(cmd.handle, count_instance, scratch_buffer, instBufferAddr,
+					flags, update);
 
 	// Finalizing and destroying temporary data
 	cmd.submit();
 	instances_buf.destroy();
 	scratch_buffer.destroy();
 }
-

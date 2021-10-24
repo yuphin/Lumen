@@ -1,12 +1,14 @@
 #include "LumenPCH.h"
 #include "Window.h"
 
-Window::Window(int width, int height, bool fullscreen) : height(height), width(width) {
+Window::Window(int width, int height, bool fullscreen)
+	: height(height), width(width) {
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-	window_handle = glfwCreateWindow(width, height, "Vulkan",
-									 fullscreen ? glfwGetPrimaryMonitor() : nullptr, nullptr);
+	window_handle = glfwCreateWindow(
+		width, height, "Vulkan", fullscreen ? glfwGetPrimaryMonitor() : nullptr,
+		nullptr);
 	LUMEN_ASSERT(window_handle, "Failed to create a window!");
 	glfwSetWindowUserPointer(window_handle, this);
 	glfwSetKeyCallback(window_handle, key_callback);
@@ -17,16 +19,15 @@ Window::Window(int width, int height, bool fullscreen) : height(height), width(w
 	glfwSetScrollCallback(window_handle, scroll_callback);
 }
 
-void Window::poll() {
-	glfwPollEvents();
-}
+void Window::poll() { glfwPollEvents(); }
 
 Window::~Window() {
 	glfwDestroyWindow(window_handle);
 	glfwTerminate();
 }
 
-void Window::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+void Window::key_callback(GLFWwindow* window, int key, int scancode, int action,
+						  int mods) {
 	auto ptr = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
 	ptr->key_map[static_cast<KeyInput>(key)] = static_cast<KeyAction>(action);
 }
@@ -37,10 +38,12 @@ void Window::window_size_callback(GLFWwindow* window, int width, int height) {
 }
 
 void Window::char_callback(GLFWwindow* window, uint32_t codepoint) {
-	auto window_ptr = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
+	auto window_ptr =
+		reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
 }
 
-void Window::mouse_click_callback(GLFWwindow* window, int button, int action, int mods) {
+void Window::mouse_click_callback(GLFWwindow* window, int button, int action,
+								  int mods) {
 	KeyAction callback_action;
 	switch (action) {
 		case GLFW_RELEASE:
@@ -73,7 +76,8 @@ void Window::mouse_click_callback(GLFWwindow* window, int button, int action, in
 			break;
 	}
 
-	auto window_ptr = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
+	auto window_ptr =
+		reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
 	window_ptr->mouse_map[mouse_button] = callback_action;
 	for (auto& cb : window_ptr->mouse_click_callbacks) {
 		cb(mouse_button, callback_action);
@@ -81,7 +85,8 @@ void Window::mouse_click_callback(GLFWwindow* window, int button, int action, in
 }
 
 void Window::mouse_move_callback(GLFWwindow* window, double x, double y) {
-	const auto window_ptr = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
+	const auto window_ptr =
+		reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
 	window_ptr->mouse_prev_x = window_ptr->mouse_pos_x;
 	window_ptr->mouse_prev_y = window_ptr->mouse_pos_y;
 	window_ptr->mouse_pos_x = x;
@@ -99,8 +104,10 @@ void Window::mouse_move_callback(GLFWwindow* window, double x, double y) {
 }
 
 void Window::scroll_callback(GLFWwindow* window, double x, double y) {
-	const auto window_ptr = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
-	for (auto& cb : window_ptr->mouse_scroll_callbacks) cb(x, y);
+	const auto window_ptr =
+		reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
+	for (auto& cb : window_ptr->mouse_scroll_callbacks)
+		cb(x, y);
 }
 
 void Window::add_mouse_click_callback(MouseClickCallback callback) {

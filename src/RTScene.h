@@ -1,19 +1,18 @@
 #pragma once
 
 #include "LumenPCH.h"
-#include "Framework/VulkanBase.h"
-#include "Framework/Shader.h"
-#include "Framework/Pipeline.h"
 #include "Framework/Camera.h"
-#include "Framework/Texture.h"
-#include "Framework/Window.h"
-#include "Framework/Scene.h"
-#include "Framework/Utils.h"
 #include "Framework/CommandBuffer.h"
-#include <glm/glm.hpp>
-#include "shaders/commons.h"
+#include "Framework/Pipeline.h"
+#include "Framework/Scene.h"
+#include "Framework/Shader.h"
+#include "Framework/Texture.h"
+#include "Framework/Utils.h"
+#include "Framework/VulkanBase.h"
+#include "Framework/Window.h"
 #include "Framework/gltfscene.hpp"
-
+#include "shaders/commons.h"
+#include <glm/glm.hpp>
 
 class RTScene : public Scene {
 public:
@@ -25,6 +24,7 @@ public:
 	static RTScene* instance;
 	inline static RTScene* get() { return instance; }
 	bool resized = false;
+
 private:
 	void init_scene();
 	void create_offscreen_resources();
@@ -84,10 +84,9 @@ private:
 	VkSampler texture_sampler;
 	std::vector<Texture2D> textures;
 
-
 	std::vector<VkRayTracingShaderGroupCreateInfoKHR> shader_groups;
 	std::unique_ptr<Camera> camera = nullptr;
-	//MeshLoader loader;
+	// MeshLoader loader;
 	Window* window;
 	bool initialized = false;
 	bool rt_initialized = false;
@@ -107,13 +106,13 @@ private:
 
 	Buffer mesh_lights_buffer;
 	std::vector<MeshLight> lights;
+	Buffer light_matrices_buffer;
 
-	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
+	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props{
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
 	// TODO: Move to pipeline header
 	VkPipelineLayout rt_pipeline_layout;
-	VkPipelineLayout pt_pipeline_layout;
 	VkPipeline rt_pipeline;
-	VkPipeline pt_pipeline;
 	Buffer rt_sbt_buffer;
 	VkStridedDeviceAddressRegionKHR rgen_region{};
 	VkStridedDeviceAddressRegionKHR rmiss_region{};

@@ -254,11 +254,21 @@
     <None Include="cpp.hint" />
     <None Include="src\Shaders\cube.frag" />
     <None Include="src\Shaders\cube.vert" />
+    <None Include="src\shaders\gltf_simple.frag" />
+    <None Include="src\shaders\gltf_simple.vert" />
+    <None Include="src\shaders\pathtrace.rahit" />
+    <None Include="src\shaders\pathtrace.rchit" />
+    <None Include="src\shaders\pathtrace.rgen" />
+    <None Include="src\shaders\pathtrace.rmiss" />
+    <None Include="src\shaders\pathtrace_shadow.rmiss" />
+    <None Include="src\shaders\post.frag" />
+    <None Include="src\shaders\post.vert" />
     <None Include="src\Shaders\scene.frag" />
     <None Include="src\Shaders\scene.vert" />
     <None Include="src\Shaders\triangle.frag" />
     <None Include="src\Shaders\triangle.vert" />
     <None Include="src\Shaders\util.vert" />
+    <None Include="src\shaders\utils.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

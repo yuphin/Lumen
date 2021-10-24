@@ -3,8 +3,10 @@
 #include "CommandBuffer.h"
 #include "Utils.h"
 
-void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage, VkMemoryPropertyFlags mem_property_flags, VkSharingMode sharing_mode,
-					VkDeviceSize size, void* data, bool use_staging) {
+void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage,
+					VkMemoryPropertyFlags mem_property_flags,
+					VkSharingMode sharing_mode, VkDeviceSize size, void* data,
+					bool use_staging) {
 	if (!this->ctx) {
 		this->ctx = ctx;
 		this->mem_property_flags = mem_property_flags;
@@ -15,50 +17,31 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage, VkMemoryProper
 		Buffer staging_buffer;
 
 		LUMEN_ASSERT(mem_property_flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-					 "Buffer creation error"
-		);
-		staging_buffer.create(
-			ctx,
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-			VK_SHARING_MODE_EXCLUSIVE,
-			size,
-			data
-		);
+					 "Buffer creation error");
+		staging_buffer.create(ctx, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+							  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
+							  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+							  VK_SHARING_MODE_EXCLUSIVE, size, data);
 
 		staging_buffer.unmap();
-		this->create(
-			ctx,
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
-			mem_property_flags,
-			sharing_mode,
-			size,
-			nullptr
-		);
+		this->create(ctx, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
+					 mem_property_flags, sharing_mode, size, nullptr);
 
 		CommandBuffer copy_cmd(ctx, true);
 		VkBufferCopy copy_region = {};
 
 		copy_region.size = size;
-		vkCmdCopyBuffer(
-			copy_cmd.handle,
-			staging_buffer.handle,
-			this->handle,
-			1,
-			&copy_region
-		);
+		vkCmdCopyBuffer(copy_cmd.handle, staging_buffer.handle, this->handle, 1,
+						&copy_region);
 		copy_cmd.submit(ctx->queues[0]);
 		staging_buffer.destroy();
 	} else {
 		// Create the buffer handle
-		VkBufferCreateInfo buffer_CI = vk::buffer_create_info(
-			usage,
-			size,
-			sharing_mode
-		);
-		vk::check(vkCreateBuffer(ctx->device, &buffer_CI, nullptr, &this->handle),
-				  "Failed to create vertex buffer!"
-		);
+		VkBufferCreateInfo buffer_CI =
+			vk::buffer_create_info(usage, size, sharing_mode);
+		vk::check(
+			vkCreateBuffer(ctx->device, &buffer_CI, nullptr, &this->handle),
+			"Failed to create vertex buffer!");
 
 		// Create the memory backing up the buffer handle
 		VkMemoryRequirements mem_reqs;
@@ -68,17 +51,17 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage, VkMemoryProper
 		mem_alloc_info.allocationSize = mem_reqs.size;
 		// Find a memory type index that fits the properties of the buffer
 		mem_alloc_info.memoryTypeIndex = find_memory_type(
-			&ctx->physical_device, mem_reqs.memoryTypeBits, mem_property_flags
-		);
+			&ctx->physical_device, mem_reqs.memoryTypeBits, mem_property_flags);
 
-		VkMemoryAllocateFlagsInfo flags_info{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO };
+		VkMemoryAllocateFlagsInfo flags_info{
+			VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO };
 		if (usage_flags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
 			flags_info.flags |= VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
 			mem_alloc_info.pNext = &flags_info;
 		}
-		vk::check(vkAllocateMemory(ctx->device, &mem_alloc_info, nullptr, &this->buffer_memory),
-				  "Failed to allocate vertex buffer memory!"
-		);
+		vk::check(vkAllocateMemory(ctx->device, &mem_alloc_info, nullptr,
+				  &this->buffer_memory),
+				  "Failed to allocate vertex buffer memory!");
 
 		alignment = mem_reqs.alignment;
 		this->size = size;
@@ -87,11 +70,13 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage, VkMemoryProper
 			this->map();
 		}
 
-		// If a pointer to the buffer data has been passed, map the buffer and copy over the data
+		// If a pointer to the buffer data has been passed, map the buffer and
+		// copy over the data
 		if (data != nullptr) {
 			// Memory is assumed mapped at this point
 			memcpy(this->data, data, size);
-			if ((mem_property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
+			if ((mem_property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) ==
+				0) {
 				this->flush();
 			}
 		}
@@ -108,8 +93,7 @@ void Buffer::flush(VkDeviceSize size, VkDeviceSize offset) {
 	mapped_range.offset = offset;
 	mapped_range.size = size;
 	vk::check(vkFlushMappedMemoryRanges(ctx->device, 1, &mapped_range),
-			  "Failed to flush mapped memory ranges"
-	);
+			  "Failed to flush mapped memory ranges");
 }
 
 void Buffer::invalidate(VkDeviceSize size, VkDeviceSize offset) {
@@ -127,5 +111,3 @@ void Buffer::prepare_descriptor(VkDeviceSize size, VkDeviceSize offset) {
 	descriptor.buffer = handle;
 	descriptor.range = size;
 }
-
-
