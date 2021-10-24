@@ -286,7 +286,7 @@ void main() {
         float ray_len = length(shadow_ray_dir);
         shadow_ray_dir /= ray_len;
         float cos_x = dot(shadow_ray_dir, shading_normal);
-        if (true) {
+        if (cos_x > 0.0) {
             any_hit_payload.hit = 1;
             traceRayEXT(tlas, // acceleration structure
                         gl_RayFlagsTerminateOnFirstHitEXT |
