@@ -365,8 +365,15 @@ void VulkanBase::create_logical_device() {
 	features12.runtimeDescriptorArray = true;
 	features12.shaderSampledImageArrayNonUniformIndexing = true;
 	features12.pNext = &rt_fts;
+
+
 	device_features2.features.samplerAnisotropy = true;
 	device_features2.features.shaderInt64 = true;
+	//
+	device_features2.features.fragmentStoresAndAtomics = true;
+	device_features2.features.vertexPipelineStoresAndAtomics = true;
+	//
+
 	device_features2.pNext = &features12;
 
 	VkDeviceCreateInfo logical_device_CI{};

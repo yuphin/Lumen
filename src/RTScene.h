@@ -105,6 +105,9 @@ private:
 	Buffer scene_desc_buffer;
 	Buffer scene_ubo_buffer;
 
+	Buffer mesh_lights_buffer;
+	std::vector<MeshLight> lights;
+
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
 	// TODO: Move to pipeline header
 	VkPipelineLayout rt_pipeline_layout;

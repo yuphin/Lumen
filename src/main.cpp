@@ -9,7 +9,7 @@ int main() {
 #ifdef NDEBUG
 	bool enable_debug = false;
 #else
-	bool enable_debug = true;
+	bool enable_debug = false;
 #endif  
 	bool fullscreen = false;
 	int width = 1600;

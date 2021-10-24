@@ -3,6 +3,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "RTScene.h"
+#include <algorithm>
 bool use_rtx = true;
 //TODO: Use instances in the rasterization pipeline
 //TODO: Use a single scratch buffer
@@ -27,6 +28,7 @@ void RTScene::init(Window* window) {
 	vkb.add_device_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
 	vkb.add_device_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
 	vkb.add_device_extension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+	vkb.add_device_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 	vkb.create_instance();
 	if (vkb.enable_validation_layers) {
 		vkb.setup_debug_messenger();
@@ -80,8 +82,9 @@ void RTScene::init_scene() {
 	constexpr int VERTEX_BINDING_ID = 0;
 	camera = std::unique_ptr<PerspectiveCamera>(
 		new PerspectiveCamera(45.0f, 0.1f, 1000.0f, (float)width / height,
-		glm::vec3(1.25, 1.5, 6.5))
+		glm::vec3(2.7, -1.5, 8.5))
 		);
+	pc_ray.total_light_area = 0;
 	//std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
 	std::string filename = "scenes/cornellBox.gltf";
 	using vkBU = VkBufferUsageFlagBits;
@@ -108,9 +111,17 @@ void RTScene::init_scene() {
 	for (const auto& m : gltf_scene.materials) {
 		materials.push_back({ m.base_color_factor, m.emissive_factor, m.base_color_texture });
 	}
-
+	uint32_t idx = 0;
 	for (auto& pm : gltf_scene.prim_meshes) {
 		prim_lookup.push_back({ pm.first_idx, pm.vtx_offset, pm.material_idx });
+		auto& mef = materials[pm.material_idx].emissive_factor;
+		if (mef.x > 0 || mef.y > 0 || mef.z > 0) {
+			MeshLight light;
+            light.num_triangles = pm.idx_count / 3;
+            light.prim_mesh_idx = idx;
+			lights.emplace_back(light);
+		}
+		idx++;
 	}
 	vertex_buffer.create(
 		&vkb.ctx,
@@ -171,6 +182,8 @@ void RTScene::init_scene() {
 		prim_lookup.data(),
 		true
 	);
+
+
 	SceneDesc desc;
 	desc.vertex_addr = vertex_buffer.get_device_address();
 	desc.index_addr = index_buffer.get_device_address();
@@ -257,16 +270,52 @@ void RTScene::create_blas() {
 
 void RTScene::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
+	float total_light_triangle_area = 0.0f;
 	for (auto& node : gltf_scene.nodes) {
-		VkAccelerationStructureInstanceKHR rayInst{};
-		rayInst.transform = to_vk_matrix(node.world_matrix);
-		rayInst.instanceCustomIndex = node.prim_mesh;  // gl_InstanceCustomIndexEXT: to find which primitive
-		rayInst.accelerationStructureReference = vkb.get_blas_device_address(node.prim_mesh);
-		rayInst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-		rayInst.mask = 0xFF;
-		rayInst.instanceShaderBindingTableRecordOffset = 0;  // We will use the same hit group for all objects
-		tlas.emplace_back(rayInst);
+		auto it = std::find_if(lights.begin(), lights.end(), [&](const MeshLight& light) {
+			return light.prim_mesh_idx == node.prim_mesh;
+		});
+		if (it != lights.end()) {
+            auto idx = it - lights.begin();
+            lights[idx].world_matrix = node.world_matrix;
+			auto& prim_mesh = gltf_scene.prim_meshes[node.prim_mesh];
+			auto& vtx_offset = prim_mesh.vtx_offset;
+			auto& idx_base_offset = prim_mesh.first_idx;
+			auto& vertices = gltf_scene.positions;
+			auto& indices = gltf_scene.indices;
+			for (int i = 0; i < prim_mesh.idx_count / 3; i++) {
+				auto idx_offset = idx_base_offset + 3 * i;
+				glm::ivec3 ind = {indices[idx_offset],indices[idx_offset +1], indices[idx_offset+2] };
+				ind += glm::vec3{ vtx_offset, vtx_offset, vtx_offset };
+				const vec3 v0 = node.world_matrix * glm::vec4(vertices[ind.x], 1.0);
+				const vec3 v1 = node.world_matrix * glm::vec4(vertices[ind.y], 1.0);
+				const vec3 v2 = node.world_matrix * glm::vec4(vertices[ind.z], 1.0);
+				
+				total_light_triangle_area += glm::length(glm::cross(v1 - v0, v2 - v0));
+
+			}
+		}
+		
+		VkAccelerationStructureInstanceKHR ray_inst{};
+		ray_inst.transform = to_vk_matrix(node.world_matrix);
+		ray_inst.instanceCustomIndex = node.prim_mesh;  // gl_InstanceCustomIndexEXT: to find which primitive
+		ray_inst.accelerationStructureReference = vkb.get_blas_device_address(node.prim_mesh);
+		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+		ray_inst.mask = 0xFF;
+		ray_inst.instanceShaderBindingTableRecordOffset = 0;  // We will use the same hit group for all objects
+		tlas.emplace_back(ray_inst);
 	}
+
+	if (lights.size()) {
+		mesh_lights_buffer.create(
+                &vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+                lights.size() * sizeof(MeshLight), lights.data(), true);
+           
+	}
+
+	pc_ray.total_light_area += total_light_triangle_area;
+
 	vkb.build_tlas(tlas, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
@@ -274,6 +323,7 @@ void RTScene::create_rt_descriptors() {
 	constexpr int TLAS_BINDING = 0;
 	constexpr int IMAGE_BINDING = 1;
 	constexpr int INSTANCE_BINDING = 2;
+	constexpr int LIGHTS_BINDING = 3;
 
 	std::vector<VkDescriptorPoolSize> pool_sizes = {
 		vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1),
@@ -299,8 +349,12 @@ void RTScene::create_rt_descriptors() {
 			IMAGE_BINDING),
 		vk::descriptor_set_layout_binding(
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-			VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
-			INSTANCE_BINDING)
+			VK_SHADER_STAGE_RAYGEN_BIT_KHR| VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
+			INSTANCE_BINDING),
+		vk::descriptor_set_layout_binding(
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+			LIGHTS_BINDING)
 	};
 	auto set_layout_ci = vk::descriptor_set_layout_CI(
 		set_layout_bindings.data(),
@@ -341,6 +395,14 @@ void RTScene::create_rt_descriptors() {
 				&prim_lookup_buffer.descriptor
 			)
 	};
+	if (lights.size()) {
+		writes.push_back(vk::write_descriptor_set(
+			rt_desc_set,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			LIGHTS_BINDING,
+			&mesh_lights_buffer.descriptor
+		));
+	}
 	vkUpdateDescriptorSets(vkb.ctx.device, (uint32_t)writes.size(), writes.data(), 0, nullptr);
 }
 
@@ -462,14 +524,18 @@ void RTScene::create_pt_pipeline() {
 	enum StageIndices {
 		eRaygen,
 		eMiss,
+		eAMiss,
 		eClosestHit,
+		eAnyHit,
 		eShaderGroupCount
 	};
 
 	std::vector<Shader> shaders{
 		{"src/shaders/pathtrace.rgen"},
 		{"src/shaders/pathtrace.rmiss"},
-		{"src/shaders/pathtrace.rchit"}
+		{"src/shaders/pathtrace_shadow.rmiss"},
+		{"src/shaders/pathtrace.rchit"},
+		{"src/shaders/pathtrace.rahit"}
 	};
 	for (auto& shader : shaders) {
 		shader.compile();
@@ -486,10 +552,18 @@ void RTScene::create_pt_pipeline() {
 	stage.module = shaders[eMiss].create_vk_shader_module(vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
 	stages[eMiss] = stage;
+
+	stage.module = shaders[eAMiss].create_vk_shader_module(vkb.ctx.device);
+	stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
+	stages[eAMiss] = stage;
 	// Hit Group - Closest Hit
 	stage.module = shaders[eClosestHit].create_vk_shader_module(vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 	stages[eClosestHit] = stage;
+	// Hit Group - Any hit
+	stage.module = shaders[eAnyHit].create_vk_shader_module(vkb.ctx.device);
+	stage.stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+	stages[eAnyHit] = stage;
 
 
 	// Shader groups
@@ -509,10 +583,20 @@ void RTScene::create_pt_pipeline() {
 	group.generalShader = eMiss;
 	shader_groups.push_back(group);
 
+	group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+	group.generalShader = eAMiss;
+	shader_groups.push_back(group);
+
 	// closest hit shader
 	group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
 	group.generalShader = VK_SHADER_UNUSED_KHR;
 	group.closestHitShader = eClosestHit;
+	shader_groups.push_back(group);
+
+	// Any hit shader
+	group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+	group.generalShader = VK_SHADER_UNUSED_KHR;
+	group.anyHitShader = eAnyHit;
 	shader_groups.push_back(group);
 
 	// Push constant: we want to be able to update constants used by the shaders
@@ -524,16 +608,16 @@ void RTScene::create_pt_pipeline() {
 	};
 
 
-	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-	pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-	pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstant;
+	VkPipelineLayoutCreateInfo pipeline_layout_create_info{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+	pipeline_layout_create_info.pushConstantRangeCount = 1;
+	pipeline_layout_create_info.pPushConstantRanges = &pushConstant;
 
 	// Descriptor sets: one specific to ray tracing, and one shared with the rasterization pipeline
-	std::vector<VkDescriptorSetLayout> rtDescSetLayouts = { rt_desc_layout, desc_set_layout };
-	pipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(rtDescSetLayouts.size());
-	pipelineLayoutCreateInfo.pSetLayouts = rtDescSetLayouts.data();
+	std::vector<VkDescriptorSetLayout> rt_desc_layouts = { rt_desc_layout, desc_set_layout };
+	pipeline_layout_create_info.setLayoutCount = static_cast<uint32_t>(rt_desc_layouts.size());
+	pipeline_layout_create_info.pSetLayouts = rt_desc_layouts.data();
 
-	vkCreatePipelineLayout(vkb.ctx.device, &pipelineLayoutCreateInfo, nullptr, &rt_pipeline_layout);
+	vkCreatePipelineLayout(vkb.ctx.device, &pipeline_layout_create_info, nullptr, &rt_pipeline_layout);
 
 
 	// Assemble the shader stages and recursion depth info into the ray tracing pipeline
@@ -559,7 +643,6 @@ void RTScene::create_pt_pipeline() {
 	for (auto& s : stages) {
 		vkDestroyShaderModule(vkb.ctx.device, s.module, nullptr);
 	}
-
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -568,8 +651,8 @@ void RTScene::create_pt_pipeline() {
 // - Besides exception, this could be always done like this
 //
 void RTScene::create_rt_sbt() {
-	uint32_t missCount{ 1 };
-	uint32_t hitCount{ 1 };
+	uint32_t missCount{ 2 };
+	uint32_t hitCount{ 2 };
 	auto     handleCount = 1 + missCount + hitCount;
 	uint32_t handleSize = rt_props.shaderGroupHandleSize;
 
@@ -584,7 +667,7 @@ void RTScene::create_rt_sbt() {
 	hit_region.size = align_up(hitCount * handleSizeAligned, rt_props.shaderGroupBaseAlignment);
 
 	// Get the shader group handles
-	uint32_t             dataSize = handleCount * handleSize;
+	uint32_t dataSize = handleCount * handleSize;
 	std::vector<uint8_t> handles(dataSize);
 	auto result = vkGetRayTracingShaderGroupHandlesKHR(vkb.ctx.device, rt_pipeline, 0, handleCount, dataSize, handles.data());
 	assert(result == VK_SUCCESS);
@@ -1108,6 +1191,7 @@ void RTScene::render(uint32_t i) {
 		pc_ray.light_pos = scene_ubo.light_pos;
 		pc_ray.light_type = 0;
 		pc_ray.light_intensity = 10;
+		pc_ray.num_mesh_lights = lights.size();
 		std::vector<VkDescriptorSet> desc_sets{ rt_desc_set, uniform_descriptor_sets[0] };
 		vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt_pipeline);
 		vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt_pipeline_layout, 0,
@@ -1224,8 +1308,11 @@ void RTScene::cleanup() {
 		materials_buffer,
 		prim_lookup_buffer,
 		scene_desc_buffer,
-		scene_ubo_buffer
+		scene_ubo_buffer,
 	};
+	if (lights.size()) {
+		buffer_list.push_back(mesh_lights_buffer);
+	}
 	if (rt) {
 		buffer_list.push_back(rt_sbt_buffer);
 	}

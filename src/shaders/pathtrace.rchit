@@ -7,7 +7,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 
-#include "raystructs.glsl"
+#include "utils.glsl"
 #include "commons.h"
 
 hitAttributeEXT vec2 attribs;
@@ -25,14 +25,6 @@ layout(buffer_reference, scalar) readonly buffer TexCoords {vec2 t[]; };
 layout(buffer_reference, scalar) readonly buffer Materials {GLTFMaterial m[]; };
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 
-
-vec3 compute_diffuse(GLTFMaterial mat, vec3 light_dir, vec3 normal)
-{
-  // Lambertian
-  float dot_nl = max(dot(normal, light_dir), 0.0);
-  vec3  c     = vec3(mat.base_color_factor) * dot_nl;
-  return c;
-}
 
 void main() {
   PrimMeshInfo pinfo = prim_info[gl_InstanceCustomIndexEXT];
@@ -66,13 +58,13 @@ void main() {
   const vec2 uv2 = tex_coords.t[ind.z];
   const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
   // Computing the coordinates of the hit position
-  const vec3 pos      = v0 * barycentrics.x + v1 * barycentrics.y + v2 * barycentrics.z;
-  const vec3 world_pos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.0));  // Transforming the position to world space
+  const vec3 pos = v0 * barycentrics.x + v1 * barycentrics.y + v2 * barycentrics.z;
+ const vec3 world_pos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.0));
 
   // Computing the normal at hit position
-  const vec3 nrm      = normalize(n0 * barycentrics.x + n1 * barycentrics.y + n2 * barycentrics.z);
-  //const vec3 world_nrm = vec3(normalize(gl_ObjectToWorldEXT * vec4(nrm,0.0)));  // Transforming the normal to world space
-  const vec3 world_nrm = vec3(normalize(gl_ObjectToWorldEXT * vec4(nrm,0.0)));  // Transforming the normal to world space
+  const vec3 nrm = normalize(n0 * barycentrics.x + n1 * barycentrics.y + n2 * barycentrics.z);
+  // Note that this is the transpose of the inverse of gl_ObjectToWorldEXT
+  const vec3 world_nrm =  normalize(vec3(nrm * gl_WorldToObjectEXT));
 
   const vec2 uv = uv0 * barycentrics.x + uv1 * barycentrics.y + uv2 * barycentrics.z;
 
@@ -84,4 +76,6 @@ void main() {
   payload.pos = world_pos;
   payload.uv = uv;
   payload.material_idx = material_index;
+  payload.area = 0.5 * length(cross(gl_ObjectToWorldEXT * vec4(e0, 1.0), 
+					  gl_ObjectToWorldEXT * vec4(e1, 1.0)));
 }

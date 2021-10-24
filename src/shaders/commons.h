@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 // GLSL Type
 using vec2 = glm::vec2;
+using ivec3 = glm::ivec3;
 using vec3 = glm::vec3;
 using vec4 = glm::vec4;
 using mat4 = glm::mat4;
@@ -16,11 +17,13 @@ using uint = unsigned int;
 
 struct PushConstantRay
 {
-	vec4  clear_color;
-	vec3  light_pos;
+	vec4 clear_color;
+	vec3 light_pos;
 	float light_intensity;
-	int   light_type;
-	uint  frame_num;
+	int light_type;
+	int num_mesh_lights;
+	float total_light_area;
+	uint frame_num;
 };
 
 struct SceneUBO {
@@ -37,6 +40,14 @@ struct Vertex {
 	vec3 pos;
 	vec3 normal;
 	vec2 uv0;
+};
+
+struct MeshLight {
+	mat4 world_matrix;
+	uint prim_mesh_idx;
+	uint num_triangles;
+	uint pad0;
+	uint pad1;
 };
 
 struct GLTFMaterial {
@@ -72,4 +83,4 @@ struct PrimMeshInfo
 #define END_BINDING() 
 #endif
 
-#endif // !COMMONS_HOST_DEVICE
+#endif
