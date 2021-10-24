@@ -37,9 +37,9 @@ layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 #define MAX_DEPTH 10
 #define MIN_DEPTH 3
 #define NEE 1
-#define MIS 0
+#define MIS 1
 #define EPS 0.001
-#define SAMPLE_VISIBLE_LIGHTS 0
+#define SAMPLE_VISIBLE_LIGHTS 1
 #define MAX_LIGHT_SAMPLES 8
 #define MAX_LIGHTS 12
 
@@ -121,7 +121,7 @@ void main() {
 
     vec3 col = vec3(0);
     vec3 throughput = vec3(1., 1., 1.);
-    const vec3 sky_col = vec3(1., 1., 1.);
+    const vec3 sky_col = vec3(0., 0., 0.);
     uvec4 seed =
         init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
     float brdf_pdf;
@@ -189,7 +189,7 @@ void main() {
         }
         vec3 lambertian_brdf = eval_material_opaque(mat, payload.uv);
         throughput *= lambertian_brdf;
-        origin.xyz = offset_ray(payload.pos, geometry_normal);
+        origin.xyz = offset_ray(payload.pos, shading_normal);
         direction.xyz =
             sample_cos_hemisphere(vec2(rand(seed), rand(seed)), shading_normal);
         brdf_pdf = cos_theta / PI;
@@ -286,7 +286,7 @@ void main() {
         float ray_len = length(shadow_ray_dir);
         shadow_ray_dir /= ray_len;
         float cos_x = dot(shadow_ray_dir, shading_normal);
-        if (cos_x > 0.0) {
+        if (true) {
             any_hit_payload.hit = 1;
             traceRayEXT(tlas, // acceleration structure
                         gl_RayFlagsTerminateOnFirstHitEXT |

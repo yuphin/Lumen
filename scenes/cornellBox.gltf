@@ -587,9 +587,9 @@
         {
           "arguments": {
             "emissive_factor": [
-              10.0,
-              10.0,
-              10.0
+              1.0,
+              1.0,
+              1.0
             ],
             "metallic_factor": 0.0,
             "roughness_factor": 0.0
@@ -730,9 +730,9 @@
     {
       "doubleSided": true,
       "emissiveFactor": [
-        10.0,
-        10.0,
-        10.0
+        1.0,
+        1.0,
+        1.0
       ],
       "extensions": {
         "NV_materials_mdl": {
