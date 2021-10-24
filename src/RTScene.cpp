@@ -52,12 +52,22 @@ void RTScene::init(Window* window) {
 
 	init_scene();
 	auto cam_ptr = camera.get();
+	window->add_mouse_click_callback(
+		[window, cam_ptr, this](MouseAction button, KeyAction action) {
+		if (updated && window->is_mouse_up(MouseAction::LEFT)) {
+			updated = true;
+		}
+		if (updated && window->is_mouse_down(MouseAction::LEFT)) {
+			updated = true;
+		}
+	});
 	window->add_mouse_move_callback(
 		[window, cam_ptr, this](double delta_x, double delta_y) {
 		if (window->is_mouse_held(MouseAction::LEFT)) {
 			cam_ptr->rotate(0.05f * (float)delta_y, -0.05f * (float)delta_x,
 							0.0f);
-			pc_ray.frame_num = -1;
+			//pc_ray.frame_num = -1;
+			updated = true;
 		}
 	});
 	create_offscreen_resources();
@@ -70,7 +80,6 @@ void RTScene::init(Window* window) {
 		create_blas();
 		create_tlas();
 		create_rt_descriptors();
-		// create_rt_pipeline();
 		create_pt_pipeline();
 		create_rt_sbt();
 	}
@@ -85,9 +94,9 @@ void RTScene::init_scene() {
 	constexpr int VERTEX_BINDING_ID = 0;
 	camera = std::unique_ptr<PerspectiveCamera>(
 		new PerspectiveCamera(45.0f, 0.1f, 1000.0f, (float)width / height,
-		glm::vec3(2.7, -1.5, 8.5)));
+		glm::vec3(0.7, 2.5, 10.5)));
 	pc_ray.total_light_area = 0;
-	// std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
+	//std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
 	std::string filename = "scenes/cornellBox.gltf";
 	using vkBU = VkBufferUsageFlagBits;
 	tinygltf::Model tmodel;
@@ -116,6 +125,7 @@ void RTScene::init_scene() {
 			{ m.base_color_factor, m.emissive_factor, m.base_color_texture });
 	}
 	uint32_t idx = 0;
+	uint32_t total_light_triangle_cnt = 0;
 	for (auto& pm : gltf_scene.prim_meshes) {
 		prim_lookup.push_back({ pm.first_idx, pm.vtx_offset, pm.material_idx });
 		auto& mef = materials[pm.material_idx].emissive_factor;
@@ -124,6 +134,7 @@ void RTScene::init_scene() {
 			light.num_triangles = pm.idx_count / 3;
 			light.prim_mesh_idx = idx;
 			lights.emplace_back(light);
+			total_light_triangle_cnt += light.num_triangles;
 		}
 		idx++;
 	}
@@ -169,6 +180,17 @@ void RTScene::init_scene() {
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		prim_lookup.size() * sizeof(PrimMeshInfo), prim_lookup.data(), true);
 
+
+	if (total_light_triangle_cnt) {
+		light_vis_buffer.create(
+			&vkb.ctx,
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+			(VkDeviceSize)width * height * 2 *
+			total_light_triangle_cnt * sizeof(float));
+	}
+
 	SceneDesc desc;
 	desc.vertex_addr = vertex_buffer.get_device_address();
 	desc.index_addr = index_buffer.get_device_address();
@@ -176,6 +198,9 @@ void RTScene::init_scene() {
 	desc.uv_addr = uv_buffer.get_device_address();
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
+	if (total_light_triangle_cnt) {
+		desc.light_vis_addr = light_vis_buffer.get_device_address();
+	}
 
 	scene_desc_buffer.create(&vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -326,18 +351,21 @@ void RTScene::create_rt_descriptors() {
 			VK_SHADER_STAGE_RAYGEN_BIT_KHR |
 				VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
 			TLAS_BINDING),
-		vk::descriptor_set_layout_binding(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-										  VK_SHADER_STAGE_RAYGEN_BIT_KHR,
-										  IMAGE_BINDING),
+		vk::descriptor_set_layout_binding(
+			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+			IMAGE_BINDING),
 		vk::descriptor_set_layout_binding(
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 			VK_SHADER_STAGE_RAYGEN_BIT_KHR |
 				VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
 				VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
 			INSTANCE_BINDING),
-		vk::descriptor_set_layout_binding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-										  VK_SHADER_STAGE_RAYGEN_BIT_KHR,
-										  LIGHTS_BINDING) };
+		vk::descriptor_set_layout_binding(
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+			LIGHTS_BINDING)
+	};
 	auto set_layout_ci = vk::descriptor_set_layout_CI(
 		set_layout_bindings.data(), set_layout_bindings.size());
 	vk::check(vkCreateDescriptorSetLayout(vkb.ctx.device, &set_layout_ci,
@@ -367,7 +395,8 @@ void RTScene::create_rt_descriptors() {
 								 &offscreen_img.descriptor_image_info),
 		vk::write_descriptor_set(rt_desc_set, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 								 INSTANCE_BINDING,
-								 &prim_lookup_buffer.descriptor) };
+								 &prim_lookup_buffer.descriptor)
+	};
 	if (lights.size()) {
 		writes.push_back(vk::write_descriptor_set(
 			rt_desc_set, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, LIGHTS_BINDING,
@@ -516,13 +545,13 @@ void RTScene::create_pt_pipeline() {
 void RTScene::create_rt_sbt() {
 	uint32_t missCount{ 2 };
 	uint32_t hitCount{ 2 };
-	auto handleCount = 1 + missCount + hitCount;
-	uint32_t handleSize = rt_props.shaderGroupHandleSize;
+	auto handle_cnt = 1 + missCount + hitCount;
+	uint32_t handle_size = rt_props.shaderGroupHandleSize;
 
 	// The SBT (buffer) need to have starting groups to be aligned and handles
 	// in the group to be aligned.
 	uint32_t handleSizeAligned =
-		align_up(handleSize, rt_props.shaderGroupHandleAlignment);
+		align_up(handle_size, rt_props.shaderGroupHandleAlignment);
 
 	rgen_region.stride =
 		align_up(handleSizeAligned, rt_props.shaderGroupBaseAlignment);
@@ -537,10 +566,10 @@ void RTScene::create_rt_sbt() {
 							   rt_props.shaderGroupBaseAlignment);
 
 	// Get the shader group handles
-	uint32_t dataSize = handleCount * handleSize;
-	std::vector<uint8_t> handles(dataSize);
+	uint32_t data_size = handle_cnt * handle_size;
+	std::vector<uint8_t> handles(data_size);
 	auto result = vkGetRayTracingShaderGroupHandlesKHR(
-		vkb.ctx.device, rt_pipeline, 0, handleCount, dataSize, handles.data());
+		vkb.ctx.device, rt_pipeline, 0, handle_cnt, data_size, handles.data());
 	assert(result == VK_SUCCESS);
 
 	// Allocate a buffer for storing the SBT.
@@ -556,33 +585,33 @@ void RTScene::create_rt_sbt() {
 	// Find the SBT addresses of each group
 	VkBufferDeviceAddressInfo info{ VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
 								   nullptr, rt_sbt_buffer.handle };
-	VkDeviceAddress sbtAddress =
+	VkDeviceAddress sbt_address =
 		vkGetBufferDeviceAddress(vkb.ctx.device, &info);
-	rgen_region.deviceAddress = sbtAddress;
-	rmiss_region.deviceAddress = sbtAddress + rgen_region.size;
+	rgen_region.deviceAddress = sbt_address;
+	rmiss_region.deviceAddress = sbt_address + rgen_region.size;
 	hit_region.deviceAddress =
-		sbtAddress + rgen_region.size + rmiss_region.size;
+		sbt_address + rgen_region.size + rmiss_region.size;
 
 	// Helper to retrieve the handle data
-	auto getHandle = [&](int i) { return handles.data() + i * handleSize; };
+	auto getHandle = [&](int i) { return handles.data() + i * handle_size; };
 
 	// Map the SBT buffer and write in the handles.
-	auto* pSBTBuffer = reinterpret_cast<uint8_t*>(rt_sbt_buffer.data);
+	auto* p_sbt_buffer = reinterpret_cast<uint8_t*>(rt_sbt_buffer.data);
 	uint8_t* pData{ nullptr };
 	uint32_t handleIdx{ 0 };
 	// Raygen
-	pData = pSBTBuffer;
-	memcpy(pData, getHandle(handleIdx++), handleSize);
+	pData = p_sbt_buffer;
+	memcpy(pData, getHandle(handleIdx++), handle_size);
 	// Miss
-	pData = pSBTBuffer + rgen_region.size;
+	pData = p_sbt_buffer + rgen_region.size;
 	for (uint32_t c = 0; c < missCount; c++) {
-		memcpy(pData, getHandle(handleIdx++), handleSize);
+		memcpy(pData, getHandle(handleIdx++), handle_size);
 		pData += rmiss_region.stride;
 	}
 	// Hit
-	pData = pSBTBuffer + rgen_region.size + rmiss_region.size;
+	pData = p_sbt_buffer + rgen_region.size + rmiss_region.size;
 	for (uint32_t c = 0; c < hitCount; c++) {
-		memcpy(pData, getHandle(handleIdx++), handleSize);
+		memcpy(pData, getHandle(handleIdx++), handle_size);
 		pData += hit_region.stride;
 	}
 	rt_sbt_buffer.unmap();
@@ -953,6 +982,8 @@ void RTScene::update_uniform_buffers() {
 	scene_ubo.model = glm::mat4(1.0);
 	scene_ubo.light_pos = glm::vec4(3.0f, 2.5f, 1.0f, 1.0f);
 	memcpy(scene_ubo_buffer.data, &scene_ubo, sizeof(scene_ubo));
+
+	std::vector<VkWriteDescriptorSet> writes;
 }
 
 void RTScene::init_imgui() {
@@ -1110,7 +1141,6 @@ void RTScene::render(uint32_t i) {
 void RTScene::update() {
 
 	pc_ray.frame_num++;
-	bool updated = false;
 	double frame_time = draw_frame();
 	cpu_avg_time = 0.95 * cpu_avg_time + 0.05 * frame_time;
 	glm::vec3 translation{};
@@ -1119,6 +1149,7 @@ void RTScene::update() {
 	if (window->is_key_held(KeyInput::KEY_LEFT_SHIFT)) {
 		trans_speed *= 4;
 	}
+
 	front.x = cos(glm::radians(camera->rotation.x)) *
 		sin(glm::radians(camera->rotation.y));
 	front.y = sin(glm::radians(camera->rotation.x));
@@ -1162,6 +1193,7 @@ void RTScene::update() {
 	}
 	if (updated) {
 		pc_ray.frame_num = -1;
+		updated = false;
 	}
 	update_uniform_buffers();
 }
@@ -1173,7 +1205,7 @@ void RTScene::cleanup() {
 	std::vector<Buffer> buffer_list = {
 		vertex_buffer,     normal_buffer,    uv_buffer,
 		index_buffer,      materials_buffer, prim_lookup_buffer,
-		scene_desc_buffer, scene_ubo_buffer,
+		scene_desc_buffer, scene_ubo_buffer, light_vis_buffer
 	};
 	if (lights.size()) {
 		buffer_list.push_back(mesh_lights_buffer);

@@ -50,6 +50,11 @@ struct MeshLight {
 	uint pad1;
 };
 
+struct LightVisibility {
+	float weight;
+	float cdf;
+};
+
 struct GLTFMaterial {
 	vec4 base_color_factor;
 	vec3 emissive_factor;
@@ -64,6 +69,8 @@ struct SceneDesc {
 	uint64_t index_addr;
 	uint64_t material_addr;
 	uint64_t prim_info_addr;
+	uint64_t mesh_lights_addr;
+	uint64_t light_vis_addr;
 };
 
 // Structure used for retrieving the primitive information in the closest hit

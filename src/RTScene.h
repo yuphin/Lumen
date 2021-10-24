@@ -103,6 +103,7 @@ private:
 	Buffer prim_lookup_buffer;
 	Buffer scene_desc_buffer;
 	Buffer scene_ubo_buffer;
+	Buffer light_vis_buffer;
 
 	Buffer mesh_lights_buffer;
 	std::vector<MeshLight> lights;
@@ -119,4 +120,6 @@ private:
 	VkStridedDeviceAddressRegionKHR hit_region{};
 	VkStridedDeviceAddressRegionKHR call_region{};
 	PushConstantRay pc_ray;
+
+	bool updated = false;
 };
