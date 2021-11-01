@@ -61,6 +61,25 @@ struct GLTFMaterial {
 	int texture_id;
 };
 
+struct PathVertex {
+	vec3 dir;
+	vec3 shading_nrm;
+	vec3 pos;
+	vec2 uv;
+	vec3 throughput;
+	uint material_idx;
+	float area;
+	float pdf_fwd;
+	float pdf_rev;
+	int vertex_type;
+};
+
+struct VertexBackup {
+	float pdf_fwd;
+	float pdf_rev;
+};
+
+
 // Scene buffer addresses
 struct SceneDesc {
 	uint64_t vertex_addr;
@@ -71,6 +90,11 @@ struct SceneDesc {
 	uint64_t prim_info_addr;
 	uint64_t mesh_lights_addr;
 	uint64_t light_vis_addr;
+	uint64_t light_path_addr;
+	uint64_t camera_path_addr;
+	uint64_t path_backup_addr;
+	uint64_t color_storage_addr;
+
 };
 
 // Structure used for retrieving the primitive information in the closest hit

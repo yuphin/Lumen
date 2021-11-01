@@ -5,6 +5,7 @@
 #include "RTScene.h"
 #include <algorithm>
 bool use_rtx = true;
+constexpr int MAX_DEPTH = 10;
 // TODO: Use instances in the rasterization pipeline
 // TODO: Use a single scratch buffer
 
@@ -93,11 +94,12 @@ void RTScene::init(Window* window) {
 void RTScene::init_scene() {
 	constexpr int VERTEX_BINDING_ID = 0;
 	camera = std::unique_ptr<PerspectiveCamera>(
-		new PerspectiveCamera(45.0f, 0.1f, 1000.0f, (float)width / height,
-		glm::vec3(0.7, 2.5, 10.5)));
+		new PerspectiveCamera(45.0f, 0.01f, 1000.0f, (float)width / height,
+		glm::vec3(0.7, 2.5, 15.5)));
 	pc_ray.total_light_area = 0;
 	//std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
-	std::string filename = "scenes/cornellBox.gltf";
+	//std::string filename = "scenes/cornellBox.gltf";
+	std::string filename = "scenes/scene3.gltf";
 	using vkBU = VkBufferUsageFlagBits;
 	tinygltf::Model tmodel;
 	tinygltf::TinyGLTF tcontext;
@@ -181,6 +183,37 @@ void RTScene::init_scene() {
 		prim_lookup.size() * sizeof(PrimMeshInfo), prim_lookup.data(), true);
 
 
+	// BDPT related buffers, TODO: Add a check
+	light_path_buffer.create(
+		&vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		width * height * (MAX_DEPTH+1) * sizeof(PathVertex));
+
+	camera_path_buffer.create(
+		&vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		width * height * (MAX_DEPTH+2) * sizeof(PathVertex));
+
+	path_backup_buffer.create(
+		&vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		width * height * 7 * sizeof(VertexBackup));
+
+	color_storage_buffer.create(
+		&vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		width * height * 3 * sizeof(float)
+	);
+
+
 	if (total_light_triangle_cnt) {
 		light_vis_buffer.create(
 			&vkb.ctx,
@@ -198,6 +231,10 @@ void RTScene::init_scene() {
 	desc.uv_addr = uv_buffer.get_device_address();
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
+	desc.camera_path_addr = camera_path_buffer.get_device_address();
+	desc.light_path_addr = light_path_buffer.get_device_address();
+	desc.path_backup_addr = path_backup_buffer.get_device_address();
+	desc.color_storage_addr = color_storage_buffer.get_device_address();
 	if (total_light_triangle_cnt) {
 		desc.light_vis_addr = light_vis_buffer.get_device_address();
 	}
@@ -333,6 +370,7 @@ void RTScene::create_rt_descriptors() {
 	constexpr int IMAGE_BINDING = 1;
 	constexpr int INSTANCE_BINDING = 2;
 	constexpr int LIGHTS_BINDING = 3;
+	constexpr int TMP_IMG_BINDING = 4;
 
 	std::vector<VkDescriptorPoolSize> pool_sizes = {
 		vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
@@ -364,7 +402,11 @@ void RTScene::create_rt_descriptors() {
 		vk::descriptor_set_layout_binding(
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 			VK_SHADER_STAGE_RAYGEN_BIT_KHR,
-			LIGHTS_BINDING)
+			LIGHTS_BINDING),
+			vk::descriptor_set_layout_binding(
+			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+			TMP_IMG_BINDING)
 	};
 	auto set_layout_ci = vk::descriptor_set_layout_CI(
 		set_layout_bindings.data(), set_layout_bindings.size());
@@ -395,7 +437,10 @@ void RTScene::create_rt_descriptors() {
 								 &offscreen_img.descriptor_image_info),
 		vk::write_descriptor_set(rt_desc_set, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 								 INSTANCE_BINDING,
-								 &prim_lookup_buffer.descriptor)
+								 &prim_lookup_buffer.descriptor),
+		vk::write_descriptor_set(rt_desc_set, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+								 TMP_IMG_BINDING,
+								 &offscreen_tmp_img.descriptor_image_info)
 	};
 	if (lights.size()) {
 		writes.push_back(vk::write_descriptor_set(
@@ -627,6 +672,9 @@ void RTScene::create_offscreen_resources() {
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	offscreen_img.create_empty_texture(&vkb.ctx, settings,
 									   VK_IMAGE_LAYOUT_GENERAL);
+	settings.usage_flags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	offscreen_tmp_img.create_empty_texture(&vkb.ctx, settings,
+									   VK_IMAGE_LAYOUT_GENERAL);
 
 	settings.usage_flags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 	settings.format = VK_FORMAT_X8_D24_UNORM_PACK32;
@@ -636,6 +684,8 @@ void RTScene::create_offscreen_resources() {
 	CommandBuffer cmd(&vkb.ctx, true);
 
 	transition_image_layout(cmd.handle, offscreen_img.img,
+							VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+	transition_image_layout(cmd.handle, offscreen_tmp_img.img,
 							VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 	transition_image_layout(cmd.handle, offscreen_depth.img,
 							VK_IMAGE_LAYOUT_UNDEFINED,
@@ -1068,6 +1118,8 @@ void RTScene::render(uint32_t i) {
 	VkClearValue clear_depth = { 1.0f, 0 };
 	VkViewport viewport = vk::viewport((float)width, (float)height, 0.0f, 1.0f);
 	VkClearValue clear_values[] = { clear_color, clear_depth };
+
+	
 	// 1st pass
 	if (use_rtx) {
 		// Initializing push constant values
@@ -1079,6 +1131,7 @@ void RTScene::render(uint32_t i) {
 		pc_ray.num_mesh_lights = lights.size();
 		std::vector<VkDescriptorSet> desc_sets{ rt_desc_set,
 											   uniform_descriptor_sets[0] };
+	
 		vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
 						  rt_pipeline);
 		vkCmdBindDescriptorSets(
@@ -1135,6 +1188,20 @@ void RTScene::render(uint32_t i) {
 	ImGui::Render();
 	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdbuf);
 	vkCmdEndRenderPass(cmdbuf);
+	VkClearColorValue val = { 0,0,0,1 };
+	VkImageSubresourceRange range;
+	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	range.baseMipLevel = 0;
+	range.levelCount = 1;
+	range.baseArrayLayer = 0;
+	range.layerCount = 1;
+	auto clear_color_barrier = image_barrier(offscreen_tmp_img.img, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT,
+											 offscreen_img.layout, offscreen_img.layout, VK_IMAGE_ASPECT_COLOR_BIT);
+	vkCmdClearColorImage(cmdbuf, offscreen_tmp_img.img, offscreen_img.layout, &val, 1, &range);
+	//vkCmdFillBuffer(cmdbuf, color_storage_buffer.handle, 0, color_storage_buffer.size, 0);
+	auto fbb = buffer_barrier(color_storage_buffer.handle, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+	vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &clear_color_barrier);
 	vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
 }
 
@@ -1205,7 +1272,9 @@ void RTScene::cleanup() {
 	std::vector<Buffer> buffer_list = {
 		vertex_buffer,     normal_buffer,    uv_buffer,
 		index_buffer,      materials_buffer, prim_lookup_buffer,
-		scene_desc_buffer, scene_ubo_buffer, light_vis_buffer
+		scene_desc_buffer, scene_ubo_buffer, light_vis_buffer,
+		light_path_buffer, camera_path_buffer, path_backup_buffer,
+		color_storage_buffer
 	};
 	if (lights.size()) {
 		buffer_list.push_back(mesh_lights_buffer);
@@ -1217,6 +1286,7 @@ void RTScene::cleanup() {
 		b.destroy();
 	}
 	offscreen_img.destroy();
+	offscreen_tmp_img.destroy();
 	offscreen_depth.destroy();
 
 	for (auto& tex : textures) {

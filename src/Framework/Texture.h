@@ -38,6 +38,7 @@ public:
 	VkExtent3D base_extent = { 0, 0, 0 };
 	VkImageType image_type = VK_IMAGE_TYPE_2D;
 	VulkanContext* ctx;
+	VkImageLayout layout;
 	bool sampler_allocated = false;
 
 protected:

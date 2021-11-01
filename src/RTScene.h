@@ -79,6 +79,7 @@ private:
 	VkFramebuffer offscreen_framebuffer;
 
 	Texture2D offscreen_img;
+	Texture2D offscreen_tmp_img;
 	Texture2D offscreen_depth;
 
 	VkSampler texture_sampler;
@@ -104,6 +105,13 @@ private:
 	Buffer scene_desc_buffer;
 	Buffer scene_ubo_buffer;
 	Buffer light_vis_buffer;
+
+	// BDPT buffers
+	Buffer light_path_buffer;
+	Buffer camera_path_buffer;
+	Buffer path_backup_buffer;
+	Buffer color_storage_buffer;
+
 
 	Buffer mesh_lights_buffer;
 	std::vector<MeshLight> lights;

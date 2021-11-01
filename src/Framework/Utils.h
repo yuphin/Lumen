@@ -72,6 +72,28 @@ inline VkBufferMemoryBarrier buffer_barrier(VkBuffer buffer,
 	return result;
 }
 
+inline VkImageMemoryBarrier image_barrier(VkImage image,
+										  VkAccessFlags src_accesss,
+										  VkAccessFlags dst_access,
+										  VkImageLayout old_layout,
+										  VkImageLayout new_layout,
+										  VkImageAspectFlags aspect_mask) {
+	VkImageMemoryBarrier result = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+
+	result.srcAccessMask = src_accesss;
+	result.dstAccessMask = dst_access;
+	result.oldLayout = old_layout;
+	result.newLayout = new_layout;
+	result.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	result.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	result.image = image;
+	result.subresourceRange.aspectMask = aspect_mask;
+	result.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+	result.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
+	return result;
+}
+
 inline VkDeviceAddress get_device_address(VkDevice device, VkBuffer handle) {
 	VkBufferDeviceAddressInfo info = {
 		VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };

@@ -265,6 +265,7 @@ void Texture2D::create_empty_texture(
 	descriptor_image_info.imageLayout = img_layout;
 	descriptor_image_info.imageView = img_view;
 	descriptor_image_info.sampler = sampler;
+	layout = img_layout;
 }
 
 Texture::Texture(VulkanContext* ctx) : ctx(ctx) {}

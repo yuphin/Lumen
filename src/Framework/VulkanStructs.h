@@ -56,7 +56,7 @@ namespace vk {
 	};
 	inline void check(VkResult result, const char* msg = 0) {
 		if (result != VK_SUCCESS && msg) {
-			LUMEN_ERROR(msg);
+		LUMEN_ERROR(msg);
 		}
 	}
 
