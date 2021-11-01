@@ -189,14 +189,14 @@ void RTScene::init_scene() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * (MAX_DEPTH+1) * sizeof(PathVertex));
+		width * height * (MAX_DEPTH + 1) * sizeof(PathVertex));
 
 	camera_path_buffer.create(
 		&vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * (MAX_DEPTH+2) * sizeof(PathVertex));
+		width * height * (MAX_DEPTH + 2) * sizeof(PathVertex));
 
 	path_backup_buffer.create(
 		&vkb.ctx,
@@ -674,7 +674,7 @@ void RTScene::create_offscreen_resources() {
 									   VK_IMAGE_LAYOUT_GENERAL);
 	settings.usage_flags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	offscreen_tmp_img.create_empty_texture(&vkb.ctx, settings,
-									   VK_IMAGE_LAYOUT_GENERAL);
+										   VK_IMAGE_LAYOUT_GENERAL);
 
 	settings.usage_flags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 	settings.format = VK_FORMAT_X8_D24_UNORM_PACK32;
@@ -1119,7 +1119,7 @@ void RTScene::render(uint32_t i) {
 	VkViewport viewport = vk::viewport((float)width, (float)height, 0.0f, 1.0f);
 	VkClearValue clear_values[] = { clear_color, clear_depth };
 
-	
+
 	// 1st pass
 	if (use_rtx) {
 		// Initializing push constant values
@@ -1131,7 +1131,7 @@ void RTScene::render(uint32_t i) {
 		pc_ray.num_mesh_lights = lights.size();
 		std::vector<VkDescriptorSet> desc_sets{ rt_desc_set,
 											   uniform_descriptor_sets[0] };
-	
+
 		vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
 						  rt_pipeline);
 		vkCmdBindDescriptorSets(

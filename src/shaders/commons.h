@@ -15,8 +15,7 @@ using uint = unsigned int;
 #define ALIGN16
 #endif
 
-struct PushConstantRay
-{
+struct PushConstantRay {
 	vec4 clear_color;
 	vec3 light_pos;
 	float light_intensity;
@@ -98,8 +97,7 @@ struct SceneDesc {
 };
 
 // Structure used for retrieving the primitive information in the closest hit
-struct PrimMeshInfo
-{
+struct PrimMeshInfo {
 	uint index_offset;
 	uint vertex_offset;
 	int  material_index;
