@@ -1,6 +1,8 @@
 #pragma once
 #include "LumenPCH.h"
 #include "gltfscene.hpp"
+#include "Buffer.h"
+#include "Pipeline.h"
 uint32_t find_memory_type(VkPhysicalDevice* physical_device,
 						  uint32_t type_filter, VkMemoryPropertyFlags props);
 
@@ -110,3 +112,10 @@ inline uint32_t calc_mip_levels(VkExtent2D extent) {
 VkImageCreateInfo make_img2d_ci(
 	const VkExtent2D& size, VkFormat format = VK_FORMAT_R8G8B8A8_UNORM,
 	VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT, bool mipmaps = false);
+
+void reduce(VkCommandBuffer cmdbuf, Buffer& residual_buffer, Buffer& counter_buffer,
+			Pipeline& op_pipeline, Pipeline& reduce_pipeline,
+			int dim);
+
+void dispatch_compute(const Pipeline& pipeline, VkCommandBuffer cmdbuf,
+					  int wg_x, int wg_y, int width, int height);

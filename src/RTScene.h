@@ -39,6 +39,7 @@ private:
 	void create_rt_descriptors();
 	void create_rt_pipeline();
 	void create_pt_pipeline();
+	void create_compute_pipelines();
 	void create_rt_sbt();
 	void create_post_descriptor();
 	void create_post_pipeline();
@@ -73,6 +74,13 @@ private:
 
 	std::unique_ptr<Pipeline> gfx_pipeline = nullptr;
 	std::unique_ptr<Pipeline> post_pipeline = nullptr;
+	std::unique_ptr<Pipeline> voxelize_pipeline = nullptr;
+	std::unique_ptr<Pipeline> min_pipeline = nullptr;
+	std::unique_ptr<Pipeline> min_reduce_pipeline = nullptr;
+	std::unique_ptr<Pipeline> max_pipeline = nullptr;
+	std::unique_ptr<Pipeline> max_reduce_pipeline = nullptr;
+	std::unique_ptr<Pipeline> calc_bounds_pipeline = nullptr;
+
 
 	VkRenderPass offscreen_renderpass;
 
@@ -111,6 +119,11 @@ private:
 	Buffer camera_path_buffer;
 	Buffer path_backup_buffer;
 	Buffer color_storage_buffer;
+	// SPPM buffers
+	Buffer sppm_data_buffer;
+	Buffer atomic_data_buffer;
+	Buffer residual_buffer;
+	Buffer counter_buffer;
 
 
 	Buffer mesh_lights_buffer;

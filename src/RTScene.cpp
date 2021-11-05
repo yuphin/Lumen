@@ -5,7 +5,7 @@
 #include "RTScene.h"
 #include <algorithm>
 bool use_rtx = true;
-constexpr int MAX_DEPTH = 10;
+constexpr int MAX_DEPTH = 4;
 // TODO: Use instances in the rasterization pipeline
 // TODO: Use a single scratch buffer
 
@@ -87,6 +87,7 @@ void RTScene::init(Window* window) {
 	create_post_descriptor();
 	update_post_desc_set();
 	create_post_pipeline();
+	create_compute_pipelines();
 
 	init_imgui();
 }
@@ -98,8 +99,8 @@ void RTScene::init_scene() {
 		glm::vec3(0.7, 2.5, 15.5)));
 	pc_ray.total_light_area = 0;
 	//std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
-	//std::string filename = "scenes/cornellBox.gltf";
-	std::string filename = "scenes/scene3.gltf";
+	std::string filename = "scenes/cornellBox.gltf";
+	//std::string filename = "scenes/scene3.gltf";
 	using vkBU = VkBufferUsageFlagBits;
 	tinygltf::Model tmodel;
 	tinygltf::TinyGLTF tcontext;
@@ -212,7 +213,39 @@ void RTScene::init_scene() {
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		width * height * 3 * sizeof(float)
 	);
+	sppm_data_buffer.create(
+		&vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		width * height * sizeof(SPPMData) * sizeof(float)
+	);
 
+	atomic_data_buffer.create(
+		&vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		sizeof(AtomicData) * sizeof(float)
+	);
+
+	residual_buffer.create(
+		&vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		width * height * 3 * sizeof(float)
+	);
+
+	counter_buffer.create(
+		&vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		sizeof(int)
+	);
 
 	if (total_light_triangle_cnt) {
 		light_vis_buffer.create(
@@ -235,6 +268,10 @@ void RTScene::init_scene() {
 	desc.light_path_addr = light_path_buffer.get_device_address();
 	desc.path_backup_addr = path_backup_buffer.get_device_address();
 	desc.color_storage_addr = color_storage_buffer.get_device_address();
+	desc.sppm_data_addr = sppm_data_buffer.get_device_address();
+	desc.atomic_data_addr = atomic_data_buffer.get_device_address();
+	desc.residual_addr = residual_buffer.get_device_address();
+	desc.counter_addr = counter_buffer.get_device_address();
 	if (total_light_triangle_cnt) {
 		desc.light_vis_addr = light_vis_buffer.get_device_address();
 	}
@@ -582,6 +619,34 @@ void RTScene::create_pt_pipeline() {
 	}
 }
 
+void RTScene::create_compute_pipelines() {
+	voxelize_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
+	min_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
+	min_reduce_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
+	max_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
+	max_reduce_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
+	calc_bounds_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
+	std::vector<Shader> shaders = {
+		{"src/shaders/voxelize.comp"},
+		{"src/shaders/gpgpu/max.comp"},
+		{"src/shaders/gpgpu/reduce_max.comp"},
+		{"src/shaders/gpgpu/min.comp"},
+		{"src/shaders/gpgpu/reduce_min.comp"},
+		{"src/shaders/calc_bounds.comp"},
+	};
+	for (auto& shader : shaders) {
+		shader.compile();
+	}
+	std::vector<VkDescriptorSetLayout> desc_layouts = { rt_desc_layout,
+														  desc_set_layout };
+	voxelize_pipeline->create_compute_pipeline(shaders[0], 2, desc_layouts.data(), {}, 4);
+	min_pipeline->create_compute_pipeline(shaders[1], 2, desc_layouts.data(), {}, 4);
+	min_reduce_pipeline->create_compute_pipeline(shaders[2], 2, desc_layouts.data(), {}, 4);
+	max_pipeline->create_compute_pipeline(shaders[3], 2, desc_layouts.data(), {}, 4);
+	max_reduce_pipeline->create_compute_pipeline(shaders[4], 2, desc_layouts.data(), {}, 4);
+	calc_bounds_pipeline->create_compute_pipeline(shaders[5], 2, desc_layouts.data(), {}, 4);
+}
+
 //--------------------------------------------------------------------------------------------------
 // The Shader Binding Table (SBT)
 // - getting all shader handles and write them in a SBT buffer
@@ -913,7 +978,8 @@ void RTScene::create_descriptors() {
 			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT |
 				VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
 				VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-				VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
+				VK_SHADER_STAGE_ANY_HIT_BIT_KHR |
+				VK_SHADER_STAGE_COMPUTE_BIT,
 			SCENE_DESC_BINDING),
 		vk::descriptor_set_layout_binding(
 			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -1144,7 +1210,54 @@ void RTScene::render(uint32_t i) {
 						   0, sizeof(PushConstantRay), &pc_ray);
 		vkCmdTraceRaysKHR(cmdbuf, &rgen_region, &rmiss_region, &hit_region,
 						  &call_region, width, height, 1);
+		auto wg_x = 1024;
+		auto wg_y = 1;
+		const auto num_wg_x = (uint32_t)ceil(width * height / float(wg_x));
+		const auto num_wg_y = 1;
 
+		// Compute scene bounds
+		vkCmdBindDescriptorSets(
+			cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, max_pipeline->pipeline_layout,
+			0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+		vkCmdBindDescriptorSets(
+			cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, min_pipeline->pipeline_layout,
+			0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+		vkCmdBindDescriptorSets(
+			cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, max_reduce_pipeline->pipeline_layout,
+			0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+		vkCmdBindDescriptorSets(
+			cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, min_reduce_pipeline->pipeline_layout,
+			0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+		// @Performance: Maybe we can have multiple residual buffers?
+		reduce(cmdbuf, residual_buffer, counter_buffer, *max_pipeline, *max_reduce_pipeline,
+			   width * height);
+		auto buf_barrier = buffer_barrier(atomic_data_buffer.handle,
+										  VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT);
+		vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+							 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1,
+							 &buf_barrier, 0, 0);
+		reduce(cmdbuf, residual_buffer, counter_buffer, *min_pipeline, *min_reduce_pipeline,
+			   width * height);
+		buf_barrier = buffer_barrier(atomic_data_buffer.handle,
+									 VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT);
+		vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+							 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1,
+							 &buf_barrier, 0, 0);
+		vkCmdBindDescriptorSets(
+			cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, calc_bounds_pipeline->pipeline_layout,
+			0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+		vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE,
+						  calc_bounds_pipeline->handle);
+		vkCmdDispatch(cmdbuf, 1, 1, 1);
+		buf_barrier = buffer_barrier(atomic_data_buffer.handle,
+									 VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
+		vkCmdBindDescriptorSets(
+			cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, voxelize_pipeline->pipeline_layout,
+			0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+		vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE,
+						  voxelize_pipeline->handle);
+	
+		vkCmdDispatch(cmdbuf, num_wg_x, num_wg_y, 1);
 	} else {
 		VkRenderPassBeginInfo gfx_rpi = vk::render_pass_begin_info();
 		gfx_rpi.renderPass = offscreen_renderpass;
@@ -1274,7 +1387,19 @@ void RTScene::cleanup() {
 		index_buffer,      materials_buffer, prim_lookup_buffer,
 		scene_desc_buffer, scene_ubo_buffer, light_vis_buffer,
 		light_path_buffer, camera_path_buffer, path_backup_buffer,
-		color_storage_buffer
+		color_storage_buffer, sppm_data_buffer, atomic_data_buffer,
+		residual_buffer, counter_buffer
+	};
+
+	std::vector<Pipeline*> pipeline_list = {
+		gfx_pipeline.get(),
+		post_pipeline.get(),
+		voxelize_pipeline.get(),
+		min_pipeline.get(),
+		max_pipeline.get(),
+		min_reduce_pipeline.get(),
+		max_reduce_pipeline.get(),
+		calc_bounds_pipeline.get()
 	};
 	if (lights.size()) {
 		buffer_list.push_back(mesh_lights_buffer);
@@ -1306,12 +1431,10 @@ void RTScene::cleanup() {
 
 	vkDestroyRenderPass(device, offscreen_renderpass, nullptr);
 	vkDestroyFramebuffer(device, offscreen_framebuffer, nullptr);
-
-	if (gfx_pipeline) {
-		gfx_pipeline->cleanup();
-	}
-	if (post_pipeline) {
-		post_pipeline->cleanup();
+	for (auto p : pipeline_list) {
+		if (p) {
+			p->cleanup();
+		}
 	}
 	ImGui_ImplVulkan_Shutdown();
 	ImGui_ImplGlfw_Shutdown();

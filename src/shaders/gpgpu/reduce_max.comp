@@ -1,0 +1,55 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../commons.h"
+#include "../utils.glsl"
+layout(local_size_x = 1024, local_size_y =1, local_size_z = 1) in;
+layout(set = 1, binding = 1, scalar) buffer SceneDesc_ {
+    SceneDesc scene_desc;
+};
+layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
+layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
+layout(buffer_reference, scalar) buffer ResidualData { vec3 d[]; };
+layout(buffer_reference, scalar) buffer CounterData {  int d; };
+// TODO: Send the dimension info later
+int size = 1600 * 900;
+SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
+ResidualData res_data = ResidualData(scene_desc.residual_addr);
+CounterData cnt = CounterData(scene_desc.counter_addr);
+AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
+shared vec3 data[32];
+void main() {
+	uint idx = gl_GlobalInvocationID.x;
+	vec3 val;
+	int limit = cnt.d == 0 ? size : ((size + 1023) >> (10 * cnt.d));
+	if(idx < limit){
+		val = res_data.d[idx];
+	}
+	memoryBarrier();
+	barrier();
+
+	val = subgroupMax(val);
+	if (gl_SubgroupInvocationID == 0) {
+        data[gl_SubgroupID] = val;
+    }
+	barrier();
+
+	if (gl_SubgroupID == 0) {
+        val = data[gl_SubgroupInvocationID];
+		subgroupBarrier();
+        val = subgroupMax(val); 
+    }
+	if (gl_LocalInvocationID.x == 0) {
+        res_data.d[gl_WorkGroupID.x] = val;
+    }
+	if(idx == 0){
+		cnt = cnt + 1;
+		atomic_data.d.max_bnds = val;
+	}
+}

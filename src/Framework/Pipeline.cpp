@@ -45,6 +45,11 @@ void Pipeline::cleanup() {
 	if (handle != VK_NULL_HANDLE) {
 		vkDestroyPipeline(device, handle, nullptr);
 	}
+	// Note: pipeline layout is usually given exernally, but in the case
+	// of compute shaders, it's allocated internally
+	if (pipeline_layout != VK_NULL_HANDLE) {
+		vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
+	}
 	running = false;
 	std::unique_lock<std::mutex> tracker_lk(mut);
 	cv.wait(tracker_lk, [this] { return tracking_stopped; });
@@ -149,6 +154,55 @@ void Pipeline::create_gfx_pipeline(const GraphicsPipelineSettings& settings) {
 
 void Pipeline::create_rt_pipeline(const RTPipelineSettings& settings) {
 	// TODO:
+}
+
+void Pipeline::create_compute_pipeline(const Shader& shader, uint32_t desc_set_layout_cnt,
+									   VkDescriptorSetLayout* desc_sets,
+									   std::vector<uint32_t> specialization_data,
+									   uint32_t push_const_size) {
+
+	std::vector<VkSpecializationMapEntry> entries(specialization_data.size());
+	for (int i = 0; i < entries.size(); i++) {
+		entries[i].constantID = i;
+		entries[i].size = sizeof(uint32_t);
+		entries[i].offset = i * sizeof(uint32_t);
+	}
+	VkSpecializationInfo specialization_info{};
+	specialization_info.dataSize = specialization_data.size() * sizeof(uint32_t);
+	specialization_info.mapEntryCount = (uint32_t)specialization_data.size();
+	specialization_info.pMapEntries = entries.data();
+	specialization_info.pData = specialization_data.data();
+
+	VkPushConstantRange push_constant_range{};
+	push_constant_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	push_constant_range.offset = 0;
+	push_constant_range.size = push_const_size;
+	auto compute_shader_module = shader.create_vk_shader_module(device);
+	VkPipelineShaderStageCreateInfo shader_stage_create_info = {};
+	shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shader_stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	shader_stage_create_info.module = compute_shader_module;
+	if (!specialization_data.empty()) {
+		shader_stage_create_info.pSpecializationInfo = &specialization_info;
+	}
+	shader_stage_create_info.pName = "main";
+
+	VkPipelineLayoutCreateInfo pipeline_layout_create_info = {};
+	pipeline_layout_create_info.setLayoutCount = desc_set_layout_cnt;
+	pipeline_layout_create_info.pSetLayouts = desc_sets;
+	if (push_const_size) {
+		pipeline_layout_create_info.pushConstantRangeCount = 1;
+		pipeline_layout_create_info.pPushConstantRanges = &push_constant_range;
+	}
+	pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	vk::check(vkCreatePipelineLayout(device, &pipeline_layout_create_info, NULL, &pipeline_layout));
+
+	VkComputePipelineCreateInfo pipeline_create_info = {};
+	pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	pipeline_create_info.stage = shader_stage_create_info;
+	pipeline_create_info.layout = pipeline_layout;
+	vk::check(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipeline_create_info, NULL, &handle));
+	vkDestroyShaderModule(device, compute_shader_module, nullptr);
 }
 
 void Pipeline::recompile_pipeline() {

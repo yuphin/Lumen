@@ -383,3 +383,42 @@ VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 	return ici;
 }
+
+void dispatch_compute(const Pipeline& pipeline, VkCommandBuffer cmdbuf,
+					  int wg_x, int wg_y, int width, int height) {
+	vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline.handle);
+	const auto num_wg_x = (uint32_t)ceil(width / float(wg_x));
+	const auto num_wg_y = (uint32_t)ceil(height / float(wg_y));
+	vkCmdDispatch(cmdbuf, num_wg_x, num_wg_y, 1);
+}
+
+void reduce(VkCommandBuffer cmdbuf, Buffer& residual_buffer, Buffer& counter_buffer, Pipeline& op_pipeline,
+				   Pipeline& reduce_pipeline, int dim ) {
+	vkCmdFillBuffer(cmdbuf, residual_buffer.handle, 0, residual_buffer.size, 0);
+	VkBufferMemoryBarrier fill_barrier =
+		buffer_barrier(residual_buffer.handle, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT);
+	vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT,
+						 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1, &fill_barrier, 0, 0);
+	VkBufferMemoryBarrier res_barrier = buffer_barrier(residual_buffer.handle, VK_ACCESS_SHADER_WRITE_BIT,
+													   VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT);
+	dispatch_compute(op_pipeline, cmdbuf, 1024, 1, dim, 1);
+	vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+						 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1, &res_barrier, 0, 0);
+	int num_wgs = (int)ceil(dim / 1024.0f);
+	vkCmdFillBuffer(cmdbuf, counter_buffer.handle, 0, counter_buffer.size, 1);
+	fill_barrier = buffer_barrier(counter_buffer.handle, VK_ACCESS_TRANSFER_WRITE_BIT,
+								  VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT);
+	VkBufferMemoryBarrier counter_barrier = buffer_barrier(counter_buffer.handle, VK_ACCESS_SHADER_WRITE_BIT,
+														   VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT);
+	vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT,
+						 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1, &fill_barrier, 0, 0);
+	std::vector<VkBufferMemoryBarrier> barriers{ res_barrier, counter_barrier };
+	while (num_wgs != 1) {
+		dispatch_compute(reduce_pipeline, cmdbuf, 1024, 1, dim, 1);
+		num_wgs = (int)ceil(num_wgs / 1024.0f);
+		if (num_wgs > 1) {
+			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+								 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 2, barriers.data(), 0, 0);
+		}
+	}
+}

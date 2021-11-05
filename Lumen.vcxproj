@@ -252,10 +252,15 @@
   <ItemGroup>
     <None Include=".gitmodules" />
     <None Include="cpp.hint" />
+    <None Include="src\shaders\calc_bounds.comp" />
     <None Include="src\Shaders\cube.frag" />
     <None Include="src\Shaders\cube.vert" />
     <None Include="src\shaders\gltf_simple.frag" />
     <None Include="src\shaders\gltf_simple.vert" />
+    <None Include="src\shaders\gpgpu\max.comp" />
+    <None Include="src\shaders\gpgpu\min.comp" />
+    <None Include="src\shaders\gpgpu\reduce_max.comp" />
+    <None Include="src\shaders\gpgpu\reduce_min.comp" />
     <None Include="src\shaders\pathtrace.rahit" />
     <None Include="src\shaders\pathtrace.rchit" />
     <None Include="src\shaders\pathtrace.rgen" />
@@ -269,6 +274,7 @@
     <None Include="src\Shaders\triangle.vert" />
     <None Include="src\Shaders\util.vert" />
     <None Include="src\shaders\utils.glsl" />
+    <None Include="src\shaders\voxelize.comp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

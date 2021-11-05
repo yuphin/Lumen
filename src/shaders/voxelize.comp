@@ -1,0 +1,31 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "commons.h"
+#include "utils.glsl"
+layout(local_size_x = 1024, local_size_y =1, local_size_z = 1) in;
+layout(set = 1, binding = 1, scalar) buffer SceneDesc_ {
+    SceneDesc scene_desc;
+};
+layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
+layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
+
+SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
+AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
+// TODO: Send the dimension info later
+uint size = 1600 * 900;
+void main() {
+	uint idx = gl_GlobalInvocationID.x;
+    if(idx >= size){
+        return;
+    }
+//    if(idx == 300){
+//      debugPrintfEXT("%v3f %v3f\n", atomic_data.d.max_bnds, atomic_data.d.min_bnds);
+//    }
+}

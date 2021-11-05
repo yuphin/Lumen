@@ -36,6 +36,9 @@ public:
 	void cleanup();
 	void create_gfx_pipeline(const GraphicsPipelineSettings&);
 	void create_rt_pipeline(const RTPipelineSettings&);
+	void create_compute_pipeline(const Shader& shader, uint32_t desc_set_layout_cnt, 
+								 VkDescriptorSetLayout* desc_sets, std::vector<uint32_t> specialization_data = {},
+								 uint32_t push_const_size = 0);
 	void track_for_changes();
 	std::unordered_map<std::string, std::filesystem::file_time_type> paths;
 	VkPipelineShaderStageCreateInfo vert_shader_CI;
@@ -52,6 +55,7 @@ public:
 	GraphicsPipelineSettings settings;
 	VkDevice device = VK_NULL_HANDLE;
 	VkPipeline handle = VK_NULL_HANDLE;
+	VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
 	bool running = true;
 
 private:

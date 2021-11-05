@@ -73,6 +73,30 @@ struct PathVertex {
 	int vertex_type;
 };
 
+struct SPPMData {
+	vec3 p;
+	vec3 wo;
+	vec3 throughput;
+	vec3 tau;
+	vec3 col;
+	float phi;
+	int M;
+	float N;
+	float radius;
+};
+
+struct Bounds {
+	vec3 min_bnds;
+	vec3 max_bnds;
+};
+
+struct AtomicData {
+	vec3 min_bnds;
+	vec3 max_bnds;
+	ivec3 grid_res;
+	float max_radius;
+};
+
 struct VertexBackup {
 	float pdf_fwd;
 	float pdf_rev;
@@ -87,13 +111,19 @@ struct SceneDesc {
 	uint64_t index_addr;
 	uint64_t material_addr;
 	uint64_t prim_info_addr;
+	// NEE
 	uint64_t mesh_lights_addr;
 	uint64_t light_vis_addr;
+	// BDPT
 	uint64_t light_path_addr;
 	uint64_t camera_path_addr;
 	uint64_t path_backup_addr;
 	uint64_t color_storage_addr;
-
+	// SPPM 
+	uint64_t sppm_data_addr;
+	uint64_t residual_addr;
+	uint64_t counter_addr;
+	uint64_t atomic_data_addr;
 };
 
 // Structure used for retrieving the primitive information in the closest hit
