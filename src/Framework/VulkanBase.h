@@ -58,19 +58,6 @@ struct VulkanBase {
 				   bool update = false);
 	VkDeviceAddress get_blas_device_address(uint32_t blas_idx);
 
-	// Utils
-	struct QueueFamilyIndices {
-		std::optional<uint32_t> gfx_family;
-		std::optional<uint32_t> present_family;
-		std::optional<uint32_t> compute_family;
-
-		// TODO: Extend to other families
-		bool is_complete() {
-			return (gfx_family.has_value() && present_family.has_value()) &&
-				compute_family.has_value();
-		}
-	};
-
 	struct SwapChainSupportDetails {
 
 		VkSurfaceCapabilitiesKHR capabilities = {};

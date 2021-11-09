@@ -1,6 +1,12 @@
 #ifndef COMMONS_HOST_DEVICE
 #define COMMONS_HOST_DEVICE
 
+#define INTEGRATOR_PT 0
+#define INTEGRATOR_BDPT 1
+#define INTEGRATOR_PPM_EYE 2
+#define INTEGRATOR_PPM_LIGHT 3
+#define INTERATOR_COUNT 4
+
 #ifdef __cplusplus
 #include <glm/glm.hpp>
 // GLSL Type
@@ -21,8 +27,10 @@ struct PushConstantRay {
 	float light_intensity;
 	int light_type;
 	int num_mesh_lights;
+	int max_depth;
 	float total_light_area;
 	uint frame_num;
+	uint time;
 };
 
 struct SceneUBO {
@@ -76,18 +84,30 @@ struct PathVertex {
 struct SPPMData {
 	vec3 p;
 	vec3 wo;
-	vec3 throughput;
+	vec3 bsdf;
 	vec3 tau;
 	vec3 col;
-	float phi;
+	vec3 phi;
 	int M;
 	float N;
 	float radius;
 };
 
+struct PhotonHash {
+	vec3 pos;
+	vec3 wi;
+	vec3 throughput;
+	int photon_count;
+};
+
 struct Bounds {
 	vec3 min_bnds;
 	vec3 max_bnds;
+};
+
+struct HashData {
+	uint hash_idx;
+	uint pixel_idx;
 };
 
 struct AtomicData {
@@ -124,6 +144,8 @@ struct SceneDesc {
 	uint64_t residual_addr;
 	uint64_t counter_addr;
 	uint64_t atomic_data_addr;
+	uint64_t hash_addr;
+	uint64_t photon_addr;
 };
 
 // Structure used for retrieving the primitive information in the closest hit

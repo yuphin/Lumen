@@ -8,7 +8,7 @@ public:
 				  QueueType type = QueueType::GFX,
 				  VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 	~CommandBuffer();
-	void submit(bool wait_fences = true);
+	void submit(bool wait_fences = true, bool queue_wait_idle = true);
 
 	VkCommandBuffer handle = VK_NULL_HANDLE;
 

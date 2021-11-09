@@ -14,6 +14,13 @@
 #include "shaders/commons.h"
 #include <glm/glm.hpp>
 
+enum Integrator {
+	PT,
+	BDPT,
+	PPM,
+	PIPELINE_COUNT = 4 // +1 from 2nd PPM pass
+};
+
 class RTScene : public Scene {
 public:
 	RTScene(int width, int height, bool debug);
@@ -37,10 +44,8 @@ private:
 	void create_blas();
 	void create_tlas();
 	void create_rt_descriptors();
-	void create_rt_pipeline();
-	void create_pt_pipeline();
+	void create_rt_pipelines();
 	void create_compute_pipelines();
-	void create_rt_sbt();
 	void create_post_descriptor();
 	void create_post_pipeline();
 	void update_post_desc_set();
@@ -74,13 +79,14 @@ private:
 
 	std::unique_ptr<Pipeline> gfx_pipeline = nullptr;
 	std::unique_ptr<Pipeline> post_pipeline = nullptr;
-	std::unique_ptr<Pipeline> voxelize_pipeline = nullptr;
+	std::unique_ptr<Pipeline> gather_pipeline = nullptr;
 	std::unique_ptr<Pipeline> min_pipeline = nullptr;
 	std::unique_ptr<Pipeline> min_reduce_pipeline = nullptr;
 	std::unique_ptr<Pipeline> max_pipeline = nullptr;
 	std::unique_ptr<Pipeline> max_reduce_pipeline = nullptr;
 	std::unique_ptr<Pipeline> calc_bounds_pipeline = nullptr;
-
+	std::unique_ptr<Pipeline> update_pipeline = nullptr;
+	std::vector<std::unique_ptr<Pipeline>> rt_pipelines;
 
 	VkRenderPass offscreen_renderpass;
 
@@ -93,7 +99,7 @@ private:
 	VkSampler texture_sampler;
 	std::vector<Texture2D> textures;
 
-	std::vector<VkRayTracingShaderGroupCreateInfoKHR> shader_groups;
+	//std::vector<VkRayTracingShaderGroupCreateInfoKHR> shader_groups;
 	std::unique_ptr<Camera> camera = nullptr;
 	// MeshLoader loader;
 	Window* window;
@@ -113,7 +119,6 @@ private:
 	Buffer scene_desc_buffer;
 	Buffer scene_ubo_buffer;
 	Buffer light_vis_buffer;
-
 	// BDPT buffers
 	Buffer light_path_buffer;
 	Buffer camera_path_buffer;
@@ -122,8 +127,11 @@ private:
 	// SPPM buffers
 	Buffer sppm_data_buffer;
 	Buffer atomic_data_buffer;
+	Buffer photon_buffer;
 	Buffer residual_buffer;
+	Buffer residual2_buffer;
 	Buffer counter_buffer;
+	Buffer hash_buffer;
 
 
 	Buffer mesh_lights_buffer;
@@ -132,15 +140,8 @@ private:
 
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props{
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
-	// TODO: Move to pipeline header
-	VkPipelineLayout rt_pipeline_layout;
-	VkPipeline rt_pipeline;
-	Buffer rt_sbt_buffer;
-	VkStridedDeviceAddressRegionKHR rgen_region{};
-	VkStridedDeviceAddressRegionKHR rmiss_region{};
-	VkStridedDeviceAddressRegionKHR hit_region{};
-	VkStridedDeviceAddressRegionKHR call_region{};
 	PushConstantRay pc_ray;
-
+	
+	std::array<VkPipeline, 3> integrator_pipelines;
 	bool updated = false;
 };

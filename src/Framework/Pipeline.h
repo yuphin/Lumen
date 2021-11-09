@@ -2,6 +2,8 @@
 #include "LumenPCH.h"
 #include "Framework/Event.h"
 #include "Framework/Shader.h"
+#include "Framework/Buffer.h"
+#include "Framework/SBTWrapper.h"
 struct Pipeline;
 
 struct GraphicsPipelineSettings {
@@ -25,9 +27,12 @@ struct GraphicsPipelineSettings {
 
 struct RTPipelineSettings {
 	std::vector<VkPipelineShaderStageCreateInfo> stages;
-	VkRayTracingShaderGroupCreateInfoKHR group{
-		VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
-	VkPipeline pipeline = VK_NULL_HANDLE;
+	std::vector<VkRayTracingShaderGroupCreateInfoKHR> groups;
+	std::vector<VkDescriptorSetLayout> desc_layouts;
+	std::vector<VkPushConstantRange> push_consts;
+	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props;
+	uint32_t max_recursion_depth = 1;
+	VulkanContext* ctx;
 };
 
 struct Pipeline {
@@ -35,10 +40,11 @@ public:
 	Pipeline(const VkDevice& device);
 	void cleanup();
 	void create_gfx_pipeline(const GraphicsPipelineSettings&);
-	void create_rt_pipeline(const RTPipelineSettings&);
+	void create_rt_pipeline(RTPipelineSettings&, const std::vector<uint32_t> specialization_data = {});
 	void create_compute_pipeline(const Shader& shader, uint32_t desc_set_layout_cnt, 
 								 VkDescriptorSetLayout* desc_sets, std::vector<uint32_t> specialization_data = {},
 								 uint32_t push_const_size = 0);
+	const std::array<VkStridedDeviceAddressRegionKHR, 4> get_rt_regions();
 	void track_for_changes();
 	std::unordered_map<std::string, std::filesystem::file_time_type> paths;
 	VkPipelineShaderStageCreateInfo vert_shader_CI;
@@ -56,6 +62,8 @@ public:
 	VkDevice device = VK_NULL_HANDLE;
 	VkPipeline handle = VK_NULL_HANDLE;
 	VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
+	SBTWrapper sbt_wrapper;
+
 	bool running = true;
 
 private:

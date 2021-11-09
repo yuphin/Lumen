@@ -4,13 +4,13 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "RTScene.h"
 #include <algorithm>
+#include <chrono>
 bool use_rtx = true;
-constexpr int MAX_DEPTH = 4;
+int integrator = 2;
+int max_depth = 6;
 // TODO: Use instances in the rasterization pipeline
 // TODO: Use a single scratch buffer
-
 RTScene* RTScene::instance = nullptr;
-
 static void fb_resize_callback(GLFWwindow* window, int width, int height) {
 	auto app = reinterpret_cast<RTScene*>(glfwGetWindowUserPointer(window));
 	app->resized = true;
@@ -22,6 +22,7 @@ RTScene::RTScene(int width, int height, bool debug)
 }
 
 void RTScene::init(Window* window) {
+	srand(time(NULL));
 	this->window = window;
 	vkb.ctx.window_ptr = window->get_window_ptr();
 	glfwSetFramebufferSizeCallback(vkb.ctx.window_ptr, fb_resize_callback);
@@ -81,8 +82,7 @@ void RTScene::init(Window* window) {
 		create_blas();
 		create_tlas();
 		create_rt_descriptors();
-		create_pt_pipeline();
-		create_rt_sbt();
+		create_rt_pipelines();
 	}
 	create_post_descriptor();
 	update_post_desc_set();
@@ -96,11 +96,11 @@ void RTScene::init_scene() {
 	constexpr int VERTEX_BINDING_ID = 0;
 	camera = std::unique_ptr<PerspectiveCamera>(
 		new PerspectiveCamera(45.0f, 0.01f, 1000.0f, (float)width / height,
-		glm::vec3(0.7, 2.5, 15.5)));
+		glm::vec3(0.7, 0.5, 15.5)));
 	pc_ray.total_light_area = 0;
 	//std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
-	std::string filename = "scenes/cornellBox.gltf";
-	//std::string filename = "scenes/scene3.gltf";
+	//std::string filename = "scenes/cornellBox.gltf";
+	std::string filename = "scenes/scene3.gltf";
 	using vkBU = VkBufferUsageFlagBits;
 	tinygltf::Model tmodel;
 	tinygltf::TinyGLTF tcontext;
@@ -190,14 +190,14 @@ void RTScene::init_scene() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * (MAX_DEPTH + 1) * sizeof(PathVertex));
+		width * height * (max_depth + 1) * sizeof(PathVertex));
 
 	camera_path_buffer.create(
 		&vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * (MAX_DEPTH + 2) * sizeof(PathVertex));
+		width * height * (max_depth + 2) * sizeof(PathVertex));
 
 	path_backup_buffer.create(
 		&vkb.ctx,
@@ -216,7 +216,8 @@ void RTScene::init_scene() {
 	sppm_data_buffer.create(
 		&vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		width * height * sizeof(SPPMData) * sizeof(float)
 	);
@@ -235,7 +236,7 @@ void RTScene::init_scene() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * 3 * sizeof(float)
+		width * height * 4 * sizeof(float)
 	);
 
 	counter_buffer.create(
@@ -245,6 +246,23 @@ void RTScene::init_scene() {
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		sizeof(int)
+	);
+	hash_buffer.create(
+		&vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		width * height * sizeof(HashData)
+	);
+
+	photon_buffer.create(
+		&vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		20 * width * height * sizeof(PhotonHash)
 	);
 
 	if (total_light_triangle_cnt) {
@@ -272,6 +290,8 @@ void RTScene::init_scene() {
 	desc.atomic_data_addr = atomic_data_buffer.get_device_address();
 	desc.residual_addr = residual_buffer.get_device_address();
 	desc.counter_addr = counter_buffer.get_device_address();
+	desc.hash_addr = hash_buffer.get_device_address();
+	desc.photon_addr = photon_buffer.get_device_address();
 	if (total_light_triangle_cnt) {
 		desc.light_vis_addr = light_vis_buffer.get_device_address();
 	}
@@ -428,7 +448,7 @@ void RTScene::create_rt_descriptors() {
 			TLAS_BINDING),
 		vk::descriptor_set_layout_binding(
 			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-			VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+			VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_COMPUTE_BIT,
 			IMAGE_BINDING),
 		vk::descriptor_set_layout_binding(
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -488,7 +508,7 @@ void RTScene::create_rt_descriptors() {
 						   writes.data(), 0, nullptr);
 }
 
-void RTScene::create_pt_pipeline() {
+void RTScene::create_rt_pipelines() {
 	enum StageIndices {
 		eRaygen,
 		eMiss,
@@ -498,6 +518,8 @@ void RTScene::create_pt_pipeline() {
 		eShaderGroupCount
 	};
 
+	RTPipelineSettings settings;
+
 	std::vector<Shader> shaders{ {"src/shaders/pathtrace.rgen"},
 								{"src/shaders/pathtrace.rmiss"},
 								{"src/shaders/pathtrace_shadow.rmiss"},
@@ -506,8 +528,13 @@ void RTScene::create_pt_pipeline() {
 	for (auto& shader : shaders) {
 		shader.compile();
 	}
+	settings.ctx = &vkb.ctx;
+	settings.rt_props = rt_props;
 	// All stages
-	std::array<VkPipelineShaderStageCreateInfo, eShaderGroupCount> stages{};
+
+	std::vector<VkPipelineShaderStageCreateInfo> stages;
+	stages.resize(eShaderGroupCount);
+
 	VkPipelineShaderStageCreateInfo stage{
 		VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
 	stage.pName = "main"; // All the same entry point
@@ -532,6 +559,7 @@ void RTScene::create_pt_pipeline() {
 	stage.stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
 	stages[eAnyHit] = stage;
 
+
 	// Shader groups
 	VkRayTracingShaderGroupCreateInfoKHR group{
 		VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
@@ -543,188 +571,82 @@ void RTScene::create_pt_pipeline() {
 	// Raygen
 	group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
 	group.generalShader = eRaygen;
-	shader_groups.push_back(group);
+	settings.groups.push_back(group);
 
 	// Miss
 	group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
 	group.generalShader = eMiss;
-	shader_groups.push_back(group);
+	settings.groups.push_back(group);
 
 	group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
 	group.generalShader = eAMiss;
-	shader_groups.push_back(group);
+	settings.groups.push_back(group);
 
 	// closest hit shader
 	group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
 	group.generalShader = VK_SHADER_UNUSED_KHR;
 	group.closestHitShader = eClosestHit;
-	shader_groups.push_back(group);
+	settings.groups.push_back(group);
 
 	// Any hit shader
 	group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
 	group.generalShader = VK_SHADER_UNUSED_KHR;
 	group.anyHitShader = eAnyHit;
-	shader_groups.push_back(group);
+	settings.groups.push_back(group);
 
-	// Push constant: we want to be able to update constants used by the shaders
-	VkPushConstantRange pushConstant{ VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+	settings.push_consts.push_back({ VK_SHADER_STAGE_RAYGEN_BIT_KHR |
 										 VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
 										 VK_SHADER_STAGE_MISS_BIT_KHR,
-									 0, sizeof(PushConstantRay) };
-
-	VkPipelineLayoutCreateInfo pipeline_layout_create_info{
-		VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-	pipeline_layout_create_info.pushConstantRangeCount = 1;
-	pipeline_layout_create_info.pPushConstantRanges = &pushConstant;
-
+									 0, sizeof(PushConstantRay) });
 	// Descriptor sets: one specific to ray tracing, and one shared with the
 	// rasterization pipeline
-	std::vector<VkDescriptorSetLayout> rt_desc_layouts = { rt_desc_layout,
-														  desc_set_layout };
-	pipeline_layout_create_info.setLayoutCount =
-		static_cast<uint32_t>(rt_desc_layouts.size());
-	pipeline_layout_create_info.pSetLayouts = rt_desc_layouts.data();
+	settings.desc_layouts = { rt_desc_layout,desc_set_layout };
+	
+	rt_pipelines.resize(Integrator::PIPELINE_COUNT);
+	rt_pipelines[Integrator::PT] = std::make_unique<Pipeline>(vkb.ctx.device);
+	rt_pipelines[Integrator::BDPT] = std::make_unique<Pipeline>(vkb.ctx.device);
+	rt_pipelines[Integrator::PPM] = std::make_unique<Pipeline>(vkb.ctx.device);
+	rt_pipelines[Integrator::PPM+1] = std::make_unique<Pipeline>(vkb.ctx.device);
 
-	vkCreatePipelineLayout(vkb.ctx.device, &pipeline_layout_create_info,
-						   nullptr, &rt_pipeline_layout);
-
-	// Assemble the shader stages and recursion depth info into the ray tracing
-	// pipeline
-	VkRayTracingPipelineCreateInfoKHR rayPipelineInfo{
-		VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR };
-	rayPipelineInfo.stageCount =
-		static_cast<uint32_t>(stages.size()); // Stages are shaders
-	rayPipelineInfo.pStages = stages.data();
-
-	// In this case, m_rtShaderGroups.size() == 4: we have one raygen group,
-	// two miss shader groups, and one hit group.
-	rayPipelineInfo.groupCount = static_cast<uint32_t>(shader_groups.size());
-	rayPipelineInfo.pGroups = shader_groups.data();
-
-	rayPipelineInfo.maxPipelineRayRecursionDepth = 1;
-	rayPipelineInfo.layout = rt_pipeline_layout;
-
-	vkCreateRayTracingPipelinesKHR(vkb.ctx.device, {}, {}, 1, &rayPipelineInfo,
-								   nullptr, &rt_pipeline);
-
-	// Spec only guarantees 1 level of "recursion". Check for that sad
-	// possibility here.
-	if (rt_props.maxRayRecursionDepth <= 1) {
-		throw std::runtime_error("Device fails to support ray recursion "
-								 "(m_rtProperties.maxRayRecursionDepth <= 1)");
-	}
-
-	for (auto& s : stages) {
+	settings.stages = stages;
+	rt_pipelines[Integrator::PT]->create_rt_pipeline(settings, { INTEGRATOR_PT });
+	rt_pipelines[Integrator::BDPT]->create_rt_pipeline(settings, { INTEGRATOR_BDPT });
+	rt_pipelines[Integrator::PPM]->create_rt_pipeline(settings, { INTEGRATOR_PPM_EYE });
+	rt_pipelines[Integrator::PPM + 1]->create_rt_pipeline(settings, { INTEGRATOR_PPM_LIGHT });
+	for (auto& s : settings.stages) {
 		vkDestroyShaderModule(vkb.ctx.device, s.module, nullptr);
 	}
 }
 
 void RTScene::create_compute_pipelines() {
-	voxelize_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
+	gather_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
 	min_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
 	min_reduce_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
 	max_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
 	max_reduce_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
 	calc_bounds_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
+	update_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
 	std::vector<Shader> shaders = {
-		{"src/shaders/voxelize.comp"},
+		{"src/shaders/gather.comp"},
 		{"src/shaders/gpgpu/max.comp"},
 		{"src/shaders/gpgpu/reduce_max.comp"},
 		{"src/shaders/gpgpu/min.comp"},
 		{"src/shaders/gpgpu/reduce_min.comp"},
 		{"src/shaders/calc_bounds.comp"},
+		{"src/shaders/update.comp"},
 	};
 	for (auto& shader : shaders) {
 		shader.compile();
 	}
 	std::vector<VkDescriptorSetLayout> desc_layouts = { rt_desc_layout,
 														  desc_set_layout };
-	voxelize_pipeline->create_compute_pipeline(shaders[0], 2, desc_layouts.data(), {}, 4);
+	gather_pipeline->create_compute_pipeline(shaders[0], 2, desc_layouts.data(), {}, 4);
 	min_pipeline->create_compute_pipeline(shaders[1], 2, desc_layouts.data(), {}, 4);
 	min_reduce_pipeline->create_compute_pipeline(shaders[2], 2, desc_layouts.data(), {}, 4);
 	max_pipeline->create_compute_pipeline(shaders[3], 2, desc_layouts.data(), {}, 4);
 	max_reduce_pipeline->create_compute_pipeline(shaders[4], 2, desc_layouts.data(), {}, 4);
 	calc_bounds_pipeline->create_compute_pipeline(shaders[5], 2, desc_layouts.data(), {}, 4);
-}
-
-//--------------------------------------------------------------------------------------------------
-// The Shader Binding Table (SBT)
-// - getting all shader handles and write them in a SBT buffer
-// - Besides exception, this could be always done like this
-//
-void RTScene::create_rt_sbt() {
-	uint32_t missCount{ 2 };
-	uint32_t hitCount{ 2 };
-	auto handle_cnt = 1 + missCount + hitCount;
-	uint32_t handle_size = rt_props.shaderGroupHandleSize;
-
-	// The SBT (buffer) need to have starting groups to be aligned and handles
-	// in the group to be aligned.
-	uint32_t handleSizeAligned =
-		align_up(handle_size, rt_props.shaderGroupHandleAlignment);
-
-	rgen_region.stride =
-		align_up(handleSizeAligned, rt_props.shaderGroupBaseAlignment);
-	rgen_region.size =
-		rgen_region.stride; // The size member of pRayGenShaderBindingTable must
-							// be equal to its stride member
-	rmiss_region.stride = handleSizeAligned;
-	rmiss_region.size = align_up(missCount * handleSizeAligned,
-								 rt_props.shaderGroupBaseAlignment);
-	hit_region.stride = handleSizeAligned;
-	hit_region.size = align_up(hitCount * handleSizeAligned,
-							   rt_props.shaderGroupBaseAlignment);
-
-	// Get the shader group handles
-	uint32_t data_size = handle_cnt * handle_size;
-	std::vector<uint8_t> handles(data_size);
-	auto result = vkGetRayTracingShaderGroupHandlesKHR(
-		vkb.ctx.device, rt_pipeline, 0, handle_cnt, data_size, handles.data());
-	assert(result == VK_SUCCESS);
-
-	// Allocate a buffer for storing the SBT.
-	VkDeviceSize sbtSize = rgen_region.size + rmiss_region.size +
-		hit_region.size + call_region.size;
-	rt_sbt_buffer.create(&vkb.ctx,
-						 VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
-						 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-						 VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR,
-						 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-						 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-						 VK_SHARING_MODE_EXCLUSIVE, sbtSize);
-	// Find the SBT addresses of each group
-	VkBufferDeviceAddressInfo info{ VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-								   nullptr, rt_sbt_buffer.handle };
-	VkDeviceAddress sbt_address =
-		vkGetBufferDeviceAddress(vkb.ctx.device, &info);
-	rgen_region.deviceAddress = sbt_address;
-	rmiss_region.deviceAddress = sbt_address + rgen_region.size;
-	hit_region.deviceAddress =
-		sbt_address + rgen_region.size + rmiss_region.size;
-
-	// Helper to retrieve the handle data
-	auto getHandle = [&](int i) { return handles.data() + i * handle_size; };
-
-	// Map the SBT buffer and write in the handles.
-	auto* p_sbt_buffer = reinterpret_cast<uint8_t*>(rt_sbt_buffer.data);
-	uint8_t* pData{ nullptr };
-	uint32_t handleIdx{ 0 };
-	// Raygen
-	pData = p_sbt_buffer;
-	memcpy(pData, getHandle(handleIdx++), handle_size);
-	// Miss
-	pData = p_sbt_buffer + rgen_region.size;
-	for (uint32_t c = 0; c < missCount; c++) {
-		memcpy(pData, getHandle(handleIdx++), handle_size);
-		pData += rmiss_region.stride;
-	}
-	// Hit
-	pData = p_sbt_buffer + rgen_region.size + rmiss_region.size;
-	for (uint32_t c = 0; c < hitCount; c++) {
-		memcpy(pData, getHandle(handleIdx++), handle_size);
-		pData += hit_region.stride;
-	}
-	rt_sbt_buffer.unmap();
+	update_pipeline->create_compute_pipeline(shaders[6], 2, desc_layouts.data(), {}, 4);
 }
 
 void RTScene::create_offscreen_resources() {
@@ -732,7 +654,8 @@ void RTScene::create_offscreen_resources() {
 	TextureSettings settings;
 	settings.usage_flags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
 		VK_IMAGE_USAGE_SAMPLED_BIT |
-		VK_IMAGE_USAGE_STORAGE_BIT;
+		VK_IMAGE_USAGE_STORAGE_BIT |
+		VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	settings.base_extent = { (uint32_t)width, (uint32_t)height, 1 };
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	offscreen_img.create_empty_texture(&vkb.ctx, settings,
@@ -840,15 +763,23 @@ void RTScene::update_post_desc_set() {
 }
 
 double RTScene::draw_frame() {
+	static const char* integrators[] = { "Unidirectional PT",
+	"Bidirectional PT", "Progressive Photon Mapping" };
+	bool ui_updated = false;
 	auto t_begin = glfwGetTime() * 1000;
-
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
-	if (ImGui::Checkbox("Enable RTX", &use_rtx)) {
-		pc_ray.frame_num = -1;
-	}
 	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time,
-				1000 / cpu_avg_time);
+		1000 / cpu_avg_time);
+	updated ^= ImGui::Checkbox("Enable RTX", &use_rtx);
+	updated ^= ImGui::Combo("Integrator", &integrator, integrators, IM_ARRAYSIZE(integrators));
+
+	if (updated) {
+		ImGui::Render();
+		auto t_end = glfwGetTime() * 1000;
+		auto t_diff = t_end - t_begin;
+		return t_diff;
+	}
 
 	vk::check(vkWaitForFences(vkb.ctx.device, 1,
 			  &vkb.in_flight_fences[vkb.current_frame], VK_TRUE,
@@ -1076,7 +1007,6 @@ void RTScene::create_graphics_pipeline() {
 			LUMEN_ERROR("Shader compilation failed");
 		}
 	}
-	gfx_pipeline_settings.name = "Cornell Box";
 	gfx_pipeline_settings.render_pass = offscreen_renderpass;
 	gfx_pipeline_settings.front_face = VK_FRONT_FACE_CLOCKWISE;
 	gfx_pipeline_settings.enable_tracking = false;
@@ -1185,7 +1115,6 @@ void RTScene::render(uint32_t i) {
 	VkViewport viewport = vk::viewport((float)width, (float)height, 0.0f, 1.0f);
 	VkClearValue clear_values[] = { clear_color, clear_depth };
 
-
 	// 1st pass
 	if (use_rtx) {
 		// Initializing push constant values
@@ -1195,69 +1124,137 @@ void RTScene::render(uint32_t i) {
 		pc_ray.light_type = 0;
 		pc_ray.light_intensity = 10;
 		pc_ray.num_mesh_lights = lights.size();
+		pc_ray.time = rand() % UINT_MAX;
+		pc_ray.max_depth = max_depth;
 		std::vector<VkDescriptorSet> desc_sets{ rt_desc_set,
 											   uniform_descriptor_sets[0] };
 
+		// Trace rays
+		vkCmdFillBuffer(cmdbuf, photon_buffer.handle, 0, photon_buffer.size, 0);
+		VkBufferMemoryBarrier fbb;
+		fbb = buffer_barrier(photon_buffer.handle,
+							 VK_ACCESS_TRANSFER_WRITE_BIT,
+							 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+		vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+		if (pc_ray.frame_num == 0) {
+			vkCmdFillBuffer(cmdbuf, sppm_data_buffer.handle, 0, sppm_data_buffer.size, 0);
+			fbb = buffer_barrier(sppm_data_buffer.handle,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+		}
+		// Trace rays from eye
 		vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-						  rt_pipeline);
+						  rt_pipelines[integrator]->handle);
 		vkCmdBindDescriptorSets(
-			cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt_pipeline_layout,
+			cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt_pipelines[integrator]->pipeline_layout,
 			0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
-		vkCmdPushConstants(cmdbuf, rt_pipeline_layout,
+		vkCmdPushConstants(cmdbuf, rt_pipelines[integrator]->pipeline_layout,
 						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
 						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
 						   VK_SHADER_STAGE_MISS_BIT_KHR,
 						   0, sizeof(PushConstantRay), &pc_ray);
-		vkCmdTraceRaysKHR(cmdbuf, &rgen_region, &rmiss_region, &hit_region,
-						  &call_region, width, height, 1);
-		auto wg_x = 1024;
-		auto wg_y = 1;
-		const auto num_wg_x = (uint32_t)ceil(width * height / float(wg_x));
-		const auto num_wg_y = 1;
+		auto& regions = rt_pipelines[integrator]->get_rt_regions();
+		vkCmdTraceRaysKHR(cmdbuf, &regions[0], &regions[1], &regions[2], &regions[3], width, height, 1);
 
-		// Compute scene bounds
-		vkCmdBindDescriptorSets(
-			cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, max_pipeline->pipeline_layout,
-			0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
-		vkCmdBindDescriptorSets(
-			cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, min_pipeline->pipeline_layout,
-			0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
-		vkCmdBindDescriptorSets(
-			cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, max_reduce_pipeline->pipeline_layout,
-			0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
-		vkCmdBindDescriptorSets(
-			cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, min_reduce_pipeline->pipeline_layout,
-			0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
-		// @Performance: Maybe we can have multiple residual buffers?
-		reduce(cmdbuf, residual_buffer, counter_buffer, *max_pipeline, *max_reduce_pipeline,
-			   width * height);
-		auto buf_barrier = buffer_barrier(atomic_data_buffer.handle,
-										  VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT);
-		vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-							 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1,
-							 &buf_barrier, 0, 0);
-		reduce(cmdbuf, residual_buffer, counter_buffer, *min_pipeline, *min_reduce_pipeline,
-			   width * height);
-		buf_barrier = buffer_barrier(atomic_data_buffer.handle,
-									 VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT);
-		vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-							 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1,
-							 &buf_barrier, 0, 0);
-		vkCmdBindDescriptorSets(
-			cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, calc_bounds_pipeline->pipeline_layout,
-			0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
-		vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE,
-						  calc_bounds_pipeline->handle);
-		vkCmdDispatch(cmdbuf, 1, 1, 1);
-		buf_barrier = buffer_barrier(atomic_data_buffer.handle,
-									 VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
-		vkCmdBindDescriptorSets(
-			cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, voxelize_pipeline->pipeline_layout,
-			0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
-		vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE,
-						  voxelize_pipeline->handle);
-	
-		vkCmdDispatch(cmdbuf, num_wg_x, num_wg_y, 1);
+		if (integrator == Integrator::PPM) {
+			const auto& ppm_eye_pipeline = rt_pipelines[Integrator::PPM];
+			const auto& ppm_light_pipeline = rt_pipelines[Integrator::PPM + 1];
+			// Calc bbox of visible rays
+			fbb = buffer_barrier(sppm_data_buffer.handle,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+			auto wg_x = 1024;
+			auto wg_y = 1;
+			const auto num_wg_x = (uint32_t)ceil(width * height / float(wg_x));
+			const auto num_wg_y = 1;
+			vkCmdBindDescriptorSets(
+				cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, max_pipeline->pipeline_layout,
+				0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+			vkCmdBindDescriptorSets(
+				cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, min_pipeline->pipeline_layout,
+				0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+			vkCmdBindDescriptorSets(
+				cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, max_reduce_pipeline->pipeline_layout,
+				0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+			vkCmdBindDescriptorSets(
+				cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, min_reduce_pipeline->pipeline_layout,
+				0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+			// @Performance: Maybe we can have multiple residual buffers?
+			reduce(cmdbuf, residual_buffer, counter_buffer, *max_pipeline, *max_reduce_pipeline,
+				width * height);
+			auto buf_barrier = buffer_barrier(atomic_data_buffer.handle,
+				VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1,
+				&buf_barrier, 0, 0);
+			reduce(cmdbuf, residual_buffer, counter_buffer, *min_pipeline, *min_reduce_pipeline,
+				width * height);
+			buf_barrier = buffer_barrier(atomic_data_buffer.handle,
+				VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1,
+				&buf_barrier, 0, 0);
+			vkCmdBindDescriptorSets(
+				cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, calc_bounds_pipeline->pipeline_layout,
+				0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+			vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE,
+				calc_bounds_pipeline->handle);
+			vkCmdDispatch(cmdbuf, 1, 1, 1);
+			buf_barrier = buffer_barrier(atomic_data_buffer.handle,
+				VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
+
+			// Trace from lights
+			vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+				ppm_light_pipeline->handle);
+			vkCmdBindDescriptorSets(
+				cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, ppm_light_pipeline->pipeline_layout,
+				0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+			vkCmdPushConstants(cmdbuf, ppm_light_pipeline->pipeline_layout,
+				VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+				VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+				VK_SHADER_STAGE_MISS_BIT_KHR,
+				0, sizeof(PushConstantRay), &pc_ray);
+			auto& regions = ppm_light_pipeline->get_rt_regions();
+			vkCmdTraceRaysKHR(cmdbuf, &regions[0], &regions[1], &regions[2], &regions[3], width, height, 1);
+			fbb = buffer_barrier(photon_buffer.handle,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+
+			vkCmdBindDescriptorSets(
+				cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, gather_pipeline->pipeline_layout,
+				0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+			vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE,
+				gather_pipeline->handle);
+			vkCmdDispatch(cmdbuf, num_wg_x, num_wg_y, 1);
+			fbb = buffer_barrier(sppm_data_buffer.handle,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+
+			// Update SPPM data and add image
+			vkCmdPushConstants(cmdbuf, update_pipeline->pipeline_layout,
+				VK_SHADER_STAGE_COMPUTE_BIT,
+				0, 4, &pc_ray.frame_num);
+			vkCmdBindDescriptorSets(
+				cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, update_pipeline->pipeline_layout,
+				0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+			vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE,
+				update_pipeline->handle);
+			vkCmdDispatch(cmdbuf, num_wg_x, num_wg_y, 1);
+			fbb = buffer_barrier(sppm_data_buffer.handle,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+		}
 	} else {
 		VkRenderPassBeginInfo gfx_rpi = vk::render_pass_begin_info();
 		gfx_rpi.renderPass = offscreen_renderpass;
@@ -1322,6 +1319,7 @@ void RTScene::update() {
 
 	pc_ray.frame_num++;
 	double frame_time = draw_frame();
+
 	cpu_avg_time = 0.95 * cpu_avg_time + 0.05 * frame_time;
 	glm::vec3 translation{};
 	float trans_speed = 0.01f;
@@ -1388,24 +1386,22 @@ void RTScene::cleanup() {
 		scene_desc_buffer, scene_ubo_buffer, light_vis_buffer,
 		light_path_buffer, camera_path_buffer, path_backup_buffer,
 		color_storage_buffer, sppm_data_buffer, atomic_data_buffer,
-		residual_buffer, counter_buffer
+		residual_buffer, counter_buffer, hash_buffer, photon_buffer
 	};
 
 	std::vector<Pipeline*> pipeline_list = {
 		gfx_pipeline.get(),
 		post_pipeline.get(),
-		voxelize_pipeline.get(),
+		gather_pipeline.get(),
 		min_pipeline.get(),
 		max_pipeline.get(),
 		min_reduce_pipeline.get(),
 		max_reduce_pipeline.get(),
-		calc_bounds_pipeline.get()
+		calc_bounds_pipeline.get(),
+		update_pipeline.get()
 	};
 	if (lights.size()) {
 		buffer_list.push_back(mesh_lights_buffer);
-	}
-	if (rt) {
-		buffer_list.push_back(rt_sbt_buffer);
 	}
 	for (auto& b : buffer_list) {
 		b.destroy();
@@ -1440,10 +1436,12 @@ void RTScene::cleanup() {
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 	if (rt) {
-		vkDestroyPipeline(vkb.ctx.device, rt_pipeline, nullptr);
+		for (auto& p: rt_pipelines) {
+			p->cleanup();
+
+		}
 		vkDestroyDescriptorSetLayout(device, rt_desc_layout, nullptr);
 		vkDestroyDescriptorPool(device, rt_desc_pool, nullptr);
-		vkDestroyPipelineLayout(device, rt_pipeline_layout, nullptr);
 	}
 	if (initialized) {
 		vkb.cleanup();

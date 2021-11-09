@@ -40,8 +40,7 @@ std::vector<const char*> VulkanBase::get_req_extensions() {
 	return extensions;
 }
 
-VulkanBase::QueueFamilyIndices
-VulkanBase::find_queue_families(VkPhysicalDevice device) {
+QueueFamilyIndices VulkanBase::find_queue_families(VkPhysicalDevice device) {
 
 	QueueFamilyIndices indices;
 	uint32_t queue_family_count = 0;
@@ -346,16 +345,16 @@ void VulkanBase::pick_physical_device() {
 
 void VulkanBase::create_logical_device() {
 
-	QueueFamilyIndices indices = find_queue_families(ctx.physical_device);
+	ctx.indices = find_queue_families(ctx.physical_device);
 
 	std::vector<VkDeviceQueueCreateInfo> queue_CIs;
-	std::set<uint32_t> unique_queue_families = { indices.gfx_family.value(),
-												indices.present_family.value(),
-												indices.compute_family.value() };
+	std::set<uint32_t> unique_queue_families = { ctx.indices.gfx_family.value(),
+												ctx.indices.present_family.value(),
+												ctx.indices.compute_family.value() };
 
-	ctx.queues.resize(indices.gfx_family.has_value() +
-					  indices.present_family.has_value() +
-					  indices.compute_family.has_value());
+	ctx.queues.resize(ctx.indices.gfx_family.has_value() +
+					  ctx.indices.present_family.has_value() +
+					  ctx.indices.compute_family.has_value());
 	float queue_priority = 1.0f;
 	for (uint32_t queue_family_idx : unique_queue_families) {
 		VkDeviceQueueCreateInfo queue_CI{};
@@ -418,11 +417,11 @@ void VulkanBase::create_logical_device() {
 
 	load_VK_EXTENSIONS(ctx.instance, vkGetInstanceProcAddr, ctx.device,
 					   vkGetDeviceProcAddr);
-	vkGetDeviceQueue(ctx.device, indices.gfx_family.value(), 0,
+	vkGetDeviceQueue(ctx.device, ctx.indices.gfx_family.value(), 0,
 					 &ctx.queues[(int)QueueType::GFX]);
-	vkGetDeviceQueue(ctx.device, indices.compute_family.value(), 0,
+	vkGetDeviceQueue(ctx.device, ctx.indices.compute_family.value(), 0,
 					 &ctx.queues[(int)QueueType::COMPUTE]);
-	vkGetDeviceQueue(ctx.device, indices.present_family.value(), 0,
+	vkGetDeviceQueue(ctx.device, ctx.indices.present_family.value(), 0,
 					 &ctx.queues[(int)QueueType::PRESENT]);
 }
 

@@ -90,6 +90,7 @@ void main() {
     payload.pos = world_pos;
     payload.uv = uv;
     payload.material_idx = material_index;
+    payload.triangle_idx = gl_PrimitiveID;
     payload.area = 0.5 * length(cross(gl_ObjectToWorldEXT * vec4(e0, 1.0),
                                       gl_ObjectToWorldEXT * vec4(e1, 1.0)));
 }

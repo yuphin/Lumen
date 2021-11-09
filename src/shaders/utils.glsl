@@ -7,6 +7,7 @@ struct HitPayload {
     vec3 pos;
     vec2 uv;
     uint material_idx;
+    uint triangle_idx;
     float area;
 };
 
@@ -19,6 +20,12 @@ struct TriangleRecord {
     vec3 triangle_normal;
     float triangle_pdf;
 };
+
+uint hash(ivec3 p, uint size) {
+  return uint((p.x * 73856093) ^ (p.y * 19349663) ^
+              p.z * 83492791) %  (20 * size);
+ //return uint(p.x + p.y * grid_res.x + p.z * grid_res.x * grid_res.y);
+}
 
 // Ray Tracing Gems chapter 6
 vec3 offset_ray(const vec3 p, const vec3 n) {

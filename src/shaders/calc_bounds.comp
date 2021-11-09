@@ -21,10 +21,12 @@ AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
 // TODO: Send the dimension info later
 uint size = 1600 * 900;
 // TODO
-const float max_radius = 0.1;
 void main() {
+   const float max_radius = atomic_data.d.max_radius;
    vec3 data = atomic_data.d.max_bnds - atomic_data.d.min_bnds;
    float max_comp = max(data.x, max(data.y, data.z));
    int base_grid_res = int(max_comp / max_radius);
    atomic_data.d.grid_res = max(ivec3(base_grid_res * data / max_comp), ivec3(1));
+//   if(max_radius != 0.1)
+//   debugPrintfEXT("%f\n", max_radius);
 }

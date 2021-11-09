@@ -415,6 +415,7 @@ void reduce(VkCommandBuffer cmdbuf, Buffer& residual_buffer, Buffer& counter_buf
 	std::vector<VkBufferMemoryBarrier> barriers{ res_barrier, counter_barrier };
 	while (num_wgs != 1) {
 		dispatch_compute(reduce_pipeline, cmdbuf, 1024, 1, dim, 1);
+
 		num_wgs = (int)ceil(num_wgs / 1024.0f);
 		if (num_wgs > 1) {
 			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,

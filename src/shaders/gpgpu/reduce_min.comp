@@ -15,7 +15,7 @@ layout(set = 1, binding = 1, scalar) buffer SceneDesc_ {
 };
 layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
 layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
-layout(buffer_reference, scalar) buffer ResidualData { vec3 d[]; };
+layout(buffer_reference, scalar) buffer ResidualData { vec4 d[]; };
 layout(buffer_reference, scalar) buffer CounterData {  int d; };
 // TODO: Send the dimension info later
 int size = 1600 * 900;
@@ -28,28 +28,29 @@ void main() {
 	uint idx = gl_GlobalInvocationID.x;
 	vec3 val;
 	int limit = cnt.d == 0 ? size : ((size + 1023) >> (10 * cnt.d));
-	if(idx < limit){
-		val = res_data.d[idx];
+	if(idx >= limit) {
+		return;
 	}
+	val = res_data.d[idx].xyz;
 	memoryBarrier();
 	barrier();
 
 	val = subgroupMin(val);
 	if (gl_SubgroupInvocationID == 0) {
-        data[gl_SubgroupID] = val;
+        data[gl_SubgroupID].xyz = val;
     }
 	barrier();
 
 	if (gl_SubgroupID == 0) {
-        val = data[gl_SubgroupInvocationID];
+        val = data[gl_SubgroupInvocationID].xyz;
 		subgroupBarrier();
         val = subgroupMin(val); 
     }
 	if (gl_LocalInvocationID.x == 0) {
-        res_data.d[gl_WorkGroupID.x] = val;
+        res_data.d[gl_WorkGroupID.x].xyz = val;
     }
 	if(idx == 0){
-		cnt = cnt + 1;
+		cnt.d += 1;
 		atomic_data.d.min_bnds = val;
 	}
 }

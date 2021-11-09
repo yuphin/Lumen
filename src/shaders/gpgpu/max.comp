@@ -16,29 +16,36 @@ layout(set = 1, binding = 1, scalar) buffer SceneDesc_ {
 layout(push_constant) uniform ResidualIdx {uint residual_idx;};
 layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
 layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
-layout(buffer_reference, scalar) buffer ResidualData { vec3 d[]; };
+layout(buffer_reference, scalar) buffer ResidualData { vec4 d[]; };
 // TODO: Send the dimension info later
 uint size = 1600 * 900;
 SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
 ResidualData res_data = ResidualData(scene_desc.residual_addr);
-shared vec3 data[32];
+shared vec4 data[32];
 void main() {
     uint idx = gl_GlobalInvocationID.x;
     vec3 val = vec3(0);
+    float radius_val = 0;
     if(idx < size){
 		val = sppm_data.d[idx].p + sppm_data.d[idx].radius;
+        radius_val = sppm_data.d[idx].radius;
 	}
 	val = subgroupMax(val);
+    radius_val = subgroupMax(radius_val);
 	if (gl_SubgroupInvocationID == 0) {
-        data[gl_SubgroupID] = val;
+        data[gl_SubgroupID].xyz = val;
+        data[gl_SubgroupID].w = radius_val;
     }
 	barrier();
 	if (gl_SubgroupID == 0) {
-    	val = data[gl_SubgroupInvocationID];
+    	val = data[gl_SubgroupInvocationID].xyz;
+        radius_val = data[gl_SubgroupInvocationID].w;
 		subgroupBarrier();
         val = subgroupMax(val);
+        radius_val = subgroupMax(radius_val);
     }
 	if (gl_LocalInvocationID.x == 0) {
-        res_data.d[gl_WorkGroupID.x] = val;
+        res_data.d[gl_WorkGroupID.x].xyz = val;
+        res_data.d[gl_WorkGroupID.x].w = radius_val;
     }
 }
