@@ -1532,9 +1532,9 @@
         "roughnessFactor": 0
       },
       "emissiveFactor": [
-        1,
-        1,
-        1
+        5,
+        5,
+        5
       ],
       "doubleSided": true,
       "name": "cube_instance_8_material",

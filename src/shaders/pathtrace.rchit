@@ -85,12 +85,16 @@ void main() {
     const vec3 e0 = v2 - v0;
     const vec3 e1 = v1 - v0;
 
+    const vec3 v0t = gl_ObjectToWorldEXT * vec4(v0, 1);
+    const vec3 v1t = gl_ObjectToWorldEXT * vec4(v1, 1);
+    const vec3 v2t = gl_ObjectToWorldEXT * vec4(v2, 1);
+
+
     payload.geometry_nrm = normalize(cross(e0, e1));
     payload.shading_nrm = world_nrm;
     payload.pos = world_pos;
     payload.uv = uv;
     payload.material_idx = material_index;
     payload.triangle_idx = gl_PrimitiveID;
-    payload.area = 0.5 * length(cross(gl_ObjectToWorldEXT * vec4(e0, 1.0),
-                                      gl_ObjectToWorldEXT * vec4(e1, 1.0)));
+    payload.area = 0.5 * length(cross(v1 - v0, v2 - v0));
 }

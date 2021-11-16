@@ -47,4 +47,5 @@ struct Buffer {
 	void invalidate(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
 	void prepare_descriptor(VkDeviceSize size = VK_WHOLE_SIZE,
 							VkDeviceSize offset = 0);
+	void copy(Buffer& dst_buffer, VkCommandBuffer cmdbuf);
 };

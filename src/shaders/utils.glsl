@@ -11,6 +11,19 @@ struct HitPayload {
     float area;
 };
 
+struct VCMState {
+    vec3 wi;
+	vec3 shading_nrm;
+	vec3 pos;
+	vec2 uv;
+	vec3 throughput;
+	uint material_idx;
+	float area;
+	float d_vcm;
+	float d_vc;
+	float d_vm;
+};
+
 struct AnyHitPayload {
     int hit;
 };

@@ -6,8 +6,9 @@
 #include <algorithm>
 #include <chrono>
 bool use_rtx = true;
-int integrator = 2;
-int max_depth = 6;
+int integrator = 3;
+const int max_depth = 6;
+const int max_light_depth = 6;
 // TODO: Use instances in the rasterization pipeline
 // TODO: Use a single scratch buffer
 RTScene* RTScene::instance = nullptr;
@@ -99,8 +100,8 @@ void RTScene::init_scene() {
 		glm::vec3(0.7, 0.5, 15.5)));
 	pc_ray.total_light_area = 0;
 	//std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
-	//std::string filename = "scenes/cornellBox.gltf";
-	std::string filename = "scenes/scene3.gltf";
+	std::string filename = "scenes/cornellBox.gltf";
+	//std::string filename = "scenes/scene3.gltf";
 	using vkBU = VkBufferUsageFlagBits;
 	tinygltf::Model tmodel;
 	tinygltf::TinyGLTF tcontext;
@@ -264,6 +265,23 @@ void RTScene::init_scene() {
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		20 * width * height * sizeof(PhotonHash)
 	);
+	vcm_light_vertices_buffer.create(
+		&vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		width * height * max_light_depth * sizeof(VCMVertex)
+	);
+
+	light_path_cnt_buffer.create(
+		&vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		width* height * 4
+	);
 
 	if (total_light_triangle_cnt) {
 		light_vis_buffer.create(
@@ -292,6 +310,8 @@ void RTScene::init_scene() {
 	desc.counter_addr = counter_buffer.get_device_address();
 	desc.hash_addr = hash_buffer.get_device_address();
 	desc.photon_addr = photon_buffer.get_device_address();
+	desc.vcm_light_vertices_addr = vcm_light_vertices_buffer.get_device_address();
+	desc.light_path_cnt_addr = light_path_cnt_buffer.get_device_address();
 	if (total_light_triangle_cnt) {
 		desc.light_vis_addr = light_vis_buffer.get_device_address();
 	}
@@ -388,9 +408,8 @@ void RTScene::create_tlas() {
 					node.world_matrix * glm::vec4(vertices[ind.y], 1.0);
 				const vec3 v2 =
 					node.world_matrix * glm::vec4(vertices[ind.z], 1.0);
-
-				total_light_triangle_area +=
-					glm::length(glm::cross(v1 - v0, v2 - v0));
+				auto area = 0.5 * glm::length(glm::cross(v1 - v0, v2 - v0));
+				total_light_triangle_area += area;
 			}
 		}
 
@@ -607,12 +626,16 @@ void RTScene::create_rt_pipelines() {
 	rt_pipelines[Integrator::BDPT] = std::make_unique<Pipeline>(vkb.ctx.device);
 	rt_pipelines[Integrator::PPM] = std::make_unique<Pipeline>(vkb.ctx.device);
 	rt_pipelines[Integrator::PPM+1] = std::make_unique<Pipeline>(vkb.ctx.device);
+	rt_pipelines[Integrator::VCM] = std::make_unique<Pipeline>(vkb.ctx.device);
+	rt_pipelines[Integrator::VCM + 1] = std::make_unique<Pipeline>(vkb.ctx.device);
 
 	settings.stages = stages;
 	rt_pipelines[Integrator::PT]->create_rt_pipeline(settings, { INTEGRATOR_PT });
 	rt_pipelines[Integrator::BDPT]->create_rt_pipeline(settings, { INTEGRATOR_BDPT });
 	rt_pipelines[Integrator::PPM]->create_rt_pipeline(settings, { INTEGRATOR_PPM_EYE });
 	rt_pipelines[Integrator::PPM + 1]->create_rt_pipeline(settings, { INTEGRATOR_PPM_LIGHT });
+	rt_pipelines[Integrator::VCM]->create_rt_pipeline(settings, { INTEGRATOR_VCM_LIGHT });
+	rt_pipelines[Integrator::VCM + 1]->create_rt_pipeline(settings, { INTEGRATOR_VCM_EYE });
 	for (auto& s : settings.stages) {
 		vkDestroyShaderModule(vkb.ctx.device, s.module, nullptr);
 	}
@@ -764,8 +787,7 @@ void RTScene::update_post_desc_set() {
 
 double RTScene::draw_frame() {
 	static const char* integrators[] = { "Unidirectional PT",
-	"Bidirectional PT", "Progressive Photon Mapping" };
-	bool ui_updated = false;
+	"Bidirectional PT", "Progressive Photon Mapping" , "Vertex Connection And Merging"};
 	auto t_begin = glfwGetTime() * 1000;
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
@@ -773,7 +795,6 @@ double RTScene::draw_frame() {
 		1000 / cpu_avg_time);
 	updated ^= ImGui::Checkbox("Enable RTX", &use_rtx);
 	updated ^= ImGui::Combo("Integrator", &integrator, integrators, IM_ARRAYSIZE(integrators));
-
 	if (updated) {
 		ImGui::Render();
 		auto t_end = glfwGetTime() * 1000;
@@ -1079,6 +1100,7 @@ void RTScene::init_imgui() {
 }
 
 void RTScene::render(uint32_t i) {
+	auto sel_integrator = integrator_map[integrator];
 	auto cmdbuf = vkb.ctx.command_buffers[i];
 	auto draw_gltf = [this](VkCommandBuffer cmd, VkPipelineLayout layout,
 							VkPipeline pipeline) {
@@ -1126,40 +1148,60 @@ void RTScene::render(uint32_t i) {
 		pc_ray.num_mesh_lights = lights.size();
 		pc_ray.time = rand() % UINT_MAX;
 		pc_ray.max_depth = max_depth;
+		pc_ray.max_depth_light = max_light_depth;
+		pc_ray.radius = gltf_scene.m_dimensions.radius * 1 / 100;
+		pc_ray.min_bounds = gltf_scene.m_dimensions.min;
+		pc_ray.max_bounds = gltf_scene.m_dimensions.max;
+		pc_ray.radius /= pow(pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
+		const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
+		const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
+		const int base_grid_res = int(max_comp / pc_ray.radius);
+		pc_ray.grid_res = glm::max(ivec3(diam * float(base_grid_res)/ max_comp), ivec3(1));
+		if (pc_ray.radius < 0.0000001) pc_ray.radius = 0.0000001;
 		std::vector<VkDescriptorSet> desc_sets{ rt_desc_set,
 											   uniform_descriptor_sets[0] };
 
 		// Trace rays
-		vkCmdFillBuffer(cmdbuf, photon_buffer.handle, 0, photon_buffer.size, 0);
 		VkBufferMemoryBarrier fbb;
-		fbb = buffer_barrier(photon_buffer.handle,
-							 VK_ACCESS_TRANSFER_WRITE_BIT,
-							 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-		vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
-		if (pc_ray.frame_num == 0) {
-			vkCmdFillBuffer(cmdbuf, sppm_data_buffer.handle, 0, sppm_data_buffer.size, 0);
-			fbb = buffer_barrier(sppm_data_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+		if (sel_integrator == Integrator::PPM) {
+			vkCmdFillBuffer(cmdbuf, photon_buffer.handle, 0, photon_buffer.size, 0);
+			fbb = buffer_barrier(photon_buffer.handle,
+				VK_ACCESS_TRANSFER_WRITE_BIT,
 				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+			if (pc_ray.frame_num == 0) {
+				vkCmdFillBuffer(cmdbuf, sppm_data_buffer.handle, 0, sppm_data_buffer.size, 0);
+				fbb = buffer_barrier(sppm_data_buffer.handle,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+				vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+					VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+			}
+		}
+		if (sel_integrator == Integrator::VCM) {
+			vkCmdFillBuffer(cmdbuf, photon_buffer.handle, 0, photon_buffer.size, 0);
+			fbb = buffer_barrier(photon_buffer.handle,
+				VK_ACCESS_TRANSFER_WRITE_BIT,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
 		}
 		// Trace rays from eye
 		vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-						  rt_pipelines[integrator]->handle);
+						  rt_pipelines[sel_integrator]->handle);
 		vkCmdBindDescriptorSets(
-			cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt_pipelines[integrator]->pipeline_layout,
+			cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt_pipelines[sel_integrator]->pipeline_layout,
 			0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
-		vkCmdPushConstants(cmdbuf, rt_pipelines[integrator]->pipeline_layout,
+		vkCmdPushConstants(cmdbuf, rt_pipelines[sel_integrator]->pipeline_layout,
 						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
 						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
 						   VK_SHADER_STAGE_MISS_BIT_KHR,
 						   0, sizeof(PushConstantRay), &pc_ray);
-		auto& regions = rt_pipelines[integrator]->get_rt_regions();
+		auto& regions = rt_pipelines[sel_integrator]->get_rt_regions();
 		vkCmdTraceRaysKHR(cmdbuf, &regions[0], &regions[1], &regions[2], &regions[3], width, height, 1);
 
-		if (integrator == Integrator::PPM) {
+		if (sel_integrator == Integrator::PPM) {
 			const auto& ppm_eye_pipeline = rt_pipelines[Integrator::PPM];
 			const auto& ppm_light_pipeline = rt_pipelines[Integrator::PPM + 1];
 			// Calc bbox of visible rays
@@ -1254,6 +1296,29 @@ void RTScene::render(uint32_t i) {
 				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+		}
+		if (sel_integrator == Integrator::VCM) {
+			// TODO: VCM stuff
+			const auto& vcm_light_pipeline = rt_pipelines[Integrator::VCM];
+			const auto& vcm_eye_pipeline = rt_pipelines[Integrator::VCM + 1];
+			fbb = buffer_barrier(photon_buffer.handle,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+			// Trace from eye
+			vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+				vcm_eye_pipeline->handle);
+			vkCmdBindDescriptorSets(
+				cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vcm_eye_pipeline->pipeline_layout,
+				0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+			vkCmdPushConstants(cmdbuf, vcm_eye_pipeline->pipeline_layout,
+				VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+				VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+				VK_SHADER_STAGE_MISS_BIT_KHR,
+				0, sizeof(PushConstantRay), &pc_ray);
+			auto& regions = vcm_eye_pipeline->get_rt_regions();
+			vkCmdTraceRaysKHR(cmdbuf, &regions[0], &regions[1], &regions[2], &regions[3], width, height, 1);
 		}
 	} else {
 		VkRenderPassBeginInfo gfx_rpi = vk::render_pass_begin_info();
@@ -1386,7 +1451,8 @@ void RTScene::cleanup() {
 		scene_desc_buffer, scene_ubo_buffer, light_vis_buffer,
 		light_path_buffer, camera_path_buffer, path_backup_buffer,
 		color_storage_buffer, sppm_data_buffer, atomic_data_buffer,
-		residual_buffer, counter_buffer, hash_buffer, photon_buffer
+		residual_buffer, counter_buffer, hash_buffer, photon_buffer,
+		vcm_light_vertices_buffer, light_path_cnt_buffer 
 	};
 
 	std::vector<Pipeline*> pipeline_list = {

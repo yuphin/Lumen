@@ -15,11 +15,13 @@
 #include <glm/glm.hpp>
 
 enum Integrator {
-	PT,
-	BDPT,
-	PPM,
-	PIPELINE_COUNT = 4 // +1 from 2nd PPM pass
+	PT = 0,
+	BDPT = 1,
+	PPM = 2,
+	VCM = 4,
+	PIPELINE_COUNT = 6 // +2 from PPM & VCM pass
 };
+static const uint32_t integrator_map[] = { 0, 1, 2, 4 };
 
 class RTScene : public Scene {
 public:
@@ -132,7 +134,9 @@ private:
 	Buffer residual2_buffer;
 	Buffer counter_buffer;
 	Buffer hash_buffer;
-
+	// VCM buffers
+	Buffer vcm_light_vertices_buffer;
+	Buffer light_path_cnt_buffer;
 
 	Buffer mesh_lights_buffer;
 	std::vector<MeshLight> lights;
@@ -142,6 +146,5 @@ private:
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
 	PushConstantRay pc_ray;
 	
-	std::array<VkPipeline, 3> integrator_pipelines;
 	bool updated = false;
 };

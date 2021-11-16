@@ -5,7 +5,9 @@
 #define INTEGRATOR_BDPT 1
 #define INTEGRATOR_PPM_EYE 2
 #define INTEGRATOR_PPM_LIGHT 3
-#define INTERATOR_COUNT 4
+#define INTEGRATOR_VCM_LIGHT 4
+#define INTEGRATOR_VCM_EYE 5
+#define INTERATOR_COUNT 6
 
 #ifdef __cplusplus
 #include <glm/glm.hpp>
@@ -25,12 +27,17 @@ struct PushConstantRay {
 	vec4 clear_color;
 	vec3 light_pos;
 	float light_intensity;
+	vec3 min_bounds;
 	int light_type;
+	vec3 max_bounds;
 	int num_mesh_lights;
+	ivec3 grid_res;
 	int max_depth;
+	int max_depth_light;
 	float total_light_area;
 	uint frame_num;
 	uint time;
+	float radius;
 };
 
 struct SceneUBO {
@@ -81,6 +88,21 @@ struct PathVertex {
 	int vertex_type;
 };
 
+struct VCMVertex {
+	vec3 wi;
+	vec3 shading_nrm;
+	vec3 pos;
+	vec2 uv;
+	vec3 throughput;
+	uint material_idx;
+	uint path_len;
+	float area;
+	float d_vcm;
+	float d_vc;
+	float d_vm;
+	float pdf_rev;
+};
+
 struct SPPMData {
 	vec3 p;
 	vec3 wo;
@@ -95,7 +117,9 @@ struct SPPMData {
 
 struct PhotonHash {
 	vec3 pos;
+	float d_vm;
 	vec3 wi;
+	float d_vcm;
 	vec3 throughput;
 	int photon_count;
 };
@@ -146,6 +170,9 @@ struct SceneDesc {
 	uint64_t atomic_data_addr;
 	uint64_t hash_addr;
 	uint64_t photon_addr;
+	// VCM
+	uint64_t vcm_light_vertices_addr;
+	uint64_t light_path_cnt_addr;
 };
 
 // Structure used for retrieving the primitive information in the closest hit
