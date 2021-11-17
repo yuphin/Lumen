@@ -7,8 +7,10 @@
 #include <chrono>
 bool use_rtx = true;
 int integrator = 3;
+float ppm_base_radius = 0.1;
 const int max_depth = 6;
 const int max_light_depth = 6;
+constexpr float RADIUS_FACTOR = 1.0 / 100;
 // TODO: Use instances in the rasterization pipeline
 // TODO: Use a single scratch buffer
 RTScene* RTScene::instance = nullptr;
@@ -226,8 +228,18 @@ void RTScene::init_scene() {
 	atomic_data_buffer.create(
 		&vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		sizeof(AtomicData) * sizeof(float)
+	);
+
+	atomic_data_cpu.create(
+		&vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		sizeof(AtomicData) * sizeof(float)
 	);
 
@@ -366,6 +378,8 @@ void RTScene::init_scene() {
 	}
 
 	pc_ray.frame_num = -1;
+	pc_ray.size_x = width;
+	pc_ray.size_y = height;
 }
 
 void RTScene::create_blas() {
@@ -795,7 +809,19 @@ double RTScene::draw_frame() {
 		1000 / cpu_avg_time);
 	updated ^= ImGui::Checkbox("Enable RTX", &use_rtx);
 	updated ^= ImGui::Combo("Integrator", &integrator, integrators, IM_ARRAYSIZE(integrators));
+	if (integrator == 2) {
+		updated ^= ImGui::SliderFloat("PPM Base Radius", &ppm_base_radius, 0.01, 1);
+		AtomicData* data = (AtomicData*)atomic_data_cpu.data;
+		if (data) {
+			ImGui::Text("PPM Max Radius: %f", data->max_radius);
+		}
+	} else if(integrator == 3){
+		ImGui::Text("VCM Photon Base Radius: %f", 
+			gltf_scene.m_dimensions.radius * RADIUS_FACTOR);
+		ImGui::Text("VCM Photon Base Radius: %f", pc_ray.radius);
+	}
 	if (updated) {
+		pc_ray.frame_num == -1;
 		ImGui::Render();
 		auto t_end = glfwGetTime() * 1000;
 		auto t_diff = t_end - t_begin;
@@ -1149,9 +1175,10 @@ void RTScene::render(uint32_t i) {
 		pc_ray.time = rand() % UINT_MAX;
 		pc_ray.max_depth = max_depth;
 		pc_ray.max_depth_light = max_light_depth;
-		pc_ray.radius = gltf_scene.m_dimensions.radius * 1 / 100;
+		pc_ray.radius = gltf_scene.m_dimensions.radius * RADIUS_FACTOR;
 		pc_ray.min_bounds = gltf_scene.m_dimensions.min;
 		pc_ray.max_bounds = gltf_scene.m_dimensions.max;
+		pc_ray.ppm_base_radius = ppm_base_radius;
 		pc_ray.radius /= pow(pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
 		const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
 		const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
@@ -1249,7 +1276,7 @@ void RTScene::render(uint32_t i) {
 			vkCmdDispatch(cmdbuf, 1, 1, 1);
 			buf_barrier = buffer_barrier(atomic_data_buffer.handle,
 				VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
-
+			atomic_data_buffer.copy(atomic_data_cpu, cmdbuf);
 			// Trace from lights
 			vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
 				ppm_light_pipeline->handle);
@@ -1452,7 +1479,7 @@ void RTScene::cleanup() {
 		light_path_buffer, camera_path_buffer, path_backup_buffer,
 		color_storage_buffer, sppm_data_buffer, atomic_data_buffer,
 		residual_buffer, counter_buffer, hash_buffer, photon_buffer,
-		vcm_light_vertices_buffer, light_path_cnt_buffer 
+		vcm_light_vertices_buffer, light_path_cnt_buffer, atomic_data_cpu
 	};
 
 	std::vector<Pipeline*> pipeline_list = {

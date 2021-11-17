@@ -1203,9 +1203,8 @@ void main() {
             sppm_data.d[col_idx].wo = v;
             sppm_data.d[col_idx].p = payload.pos;
             sppm_data.d[col_idx].bsdf = albedo / PI;
-            // TODO:
             if (pc_ray.frame_num <= 1) {
-                sppm_data.d[col_idx].radius = 0.1;
+                sppm_data.d[col_idx].radius = pc_ray.ppm_base_radius;
             }
             break;
         }

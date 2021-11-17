@@ -134,6 +134,7 @@ private:
 	Buffer residual2_buffer;
 	Buffer counter_buffer;
 	Buffer hash_buffer;
+	Buffer atomic_data_cpu;
 	// VCM buffers
 	Buffer vcm_light_vertices_buffer;
 	Buffer light_path_cnt_buffer;
