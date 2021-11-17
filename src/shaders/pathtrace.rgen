@@ -1270,7 +1270,7 @@ void main() {
         const float radius_sqr = radius * radius;
         float eta_vcm = PI * radius_sqr * size;
         float eta_vc = 1.0 / eta_vcm;
-        float eta_vm = eta_vcm;
+        float eta_vm = (pc_ray.use_vm == 1) ? eta_vcm : 0;
         VCMState light_state;
         if (!vcm_generate_light_sample(eta_vc, light_state)) {
             return;
@@ -1376,17 +1376,20 @@ void main() {
 
         // "Build" the hash grid
         // TODO: Add sorting later
-        for (int i = 1; i < d; i++) {
-            ivec3 grid_idx = get_grid_idx(light_vtx(i).pos, pc_ray.min_bounds,
-                                          pc_ray.max_bounds, pc_ray.grid_res);
-            uint h = hash(grid_idx, size);
-            photons.d[h].pos = light_vtx(i).pos;
-            photons.d[h].wi = -light_vtx(i).wi;
-            photons.d[h].d_vm = light_vtx(i).d_vm;
-            photons.d[h].d_vcm = light_vtx(i).d_vcm;
-            photons.d[h].throughput = light_vtx(i).throughput;
-            atomicAdd(photons.d[h].photon_count, 1);
+        if(pc_ray.use_vm == 1) {
+			for (int i = 1; i < d; i++) {
+				ivec3 grid_idx = get_grid_idx(light_vtx(i).pos, pc_ray.min_bounds,
+											  pc_ray.max_bounds, pc_ray.grid_res);
+				uint h = hash(grid_idx, size);
+				photons.d[h].pos = light_vtx(i).pos;
+				photons.d[h].wi = -light_vtx(i).wi;
+				photons.d[h].d_vm = light_vtx(i).d_vm;
+				photons.d[h].d_vcm = light_vtx(i).d_vcm;
+				photons.d[h].throughput = light_vtx(i).throughput;
+				atomicAdd(photons.d[h].photon_count, 1);
+			} 
         }
+       
 #undef light_vtx
 
     } else if (INTEGRATOR == 5) {
@@ -1584,51 +1587,54 @@ void main() {
                 }
             }
             // Vertex merging
-            ivec3 grid_min_bnds_idx =
-                get_grid_idx(payload.pos - vec3(radius), pc_ray.min_bounds,
-                             pc_ray.max_bounds, pc_ray.grid_res);
-            ivec3 grid_max_bnds_idx =
-                get_grid_idx(payload.pos + vec3(radius), pc_ray.min_bounds,
-                             pc_ray.max_bounds, pc_ray.grid_res);
-            for (int x = grid_min_bnds_idx.x; x <= grid_max_bnds_idx.x; x++) {
-                for (int y = grid_min_bnds_idx.y; y <= grid_max_bnds_idx.y;
-                     y++) {
-                    for (int z = grid_min_bnds_idx.z; z <= grid_max_bnds_idx.z;
-                         z++) {
-                        const uint h = hash(ivec3(x, y, z), size);
-                        if (photons.d[h].photon_count > 0) {
-                            const vec3 pp = payload.pos - photons.d[h].pos;
-                            if (dot(pp, pp) > radius_sqr) {
-                                continue;
-                            }
-                            //                                const float
-                            //                                cam_pdf_fwd =
-                            //                                same_hemisphere(photons.d[h].wi,
-                            //                                wo,
-                            //                                payload.shading_nrm)
-                            //                                  ?
-                            //                                  dot(photons.d[h].wi,
-                            //                                  payload.shading_nrm)
-                            //                                  / PI : 0;
-                            const float cam_pdf_fwd =
-                                abs(dot(photons.d[h].wi, payload.shading_nrm)) /
-                                PI;
-                            const float cam_pdf_rev =
-                                dot(wo, payload.shading_nrm) / PI;
-                            const float w_light =
-                                photons.d[h].d_vcm * eta_vc +
-                                photons.d[h].d_vm * cam_pdf_fwd;
-                            const float w_cam = camera_state.d_vcm * eta_vc +
-                                                camera_state.d_vm * cam_pdf_rev;
-                            const float mis_weight = 1. / (w_light + w_cam + 1);
-                            col += mis_weight * photons.d[h].photon_count *
-                                   photons.d[h].throughput * brdf1 *
-                                   camera_state.throughput *
-                                   normalization_factor;
-                        }
-                    }
-                }
+            if(pc_ray.use_vm == 1) {
+				 ivec3 grid_min_bnds_idx =
+					get_grid_idx(payload.pos - vec3(radius), pc_ray.min_bounds,
+								 pc_ray.max_bounds, pc_ray.grid_res);
+				ivec3 grid_max_bnds_idx =
+					get_grid_idx(payload.pos + vec3(radius), pc_ray.min_bounds,
+								 pc_ray.max_bounds, pc_ray.grid_res);
+				for (int x = grid_min_bnds_idx.x; x <= grid_max_bnds_idx.x; x++) {
+					for (int y = grid_min_bnds_idx.y; y <= grid_max_bnds_idx.y;
+						 y++) {
+						for (int z = grid_min_bnds_idx.z; z <= grid_max_bnds_idx.z;
+							 z++) {
+							const uint h = hash(ivec3(x, y, z), size);
+							if (photons.d[h].photon_count > 0) {
+								const vec3 pp = payload.pos - photons.d[h].pos;
+								if (dot(pp, pp) > radius_sqr) {
+									continue;
+								}
+								//                                const float
+								//                                cam_pdf_fwd =
+								//                                same_hemisphere(photons.d[h].wi,
+								//                                wo,
+								//                                payload.shading_nrm)
+								//                                  ?
+								//                                  dot(photons.d[h].wi,
+								//                                  payload.shading_nrm)
+								//                                  / PI : 0;
+								const float cam_pdf_fwd =
+									abs(dot(photons.d[h].wi, payload.shading_nrm)) /
+									PI;
+								const float cam_pdf_rev =
+									dot(wo, payload.shading_nrm) / PI;
+								const float w_light =
+									photons.d[h].d_vcm * eta_vc +
+									photons.d[h].d_vm * cam_pdf_fwd;
+								const float w_cam = camera_state.d_vcm * eta_vc +
+													camera_state.d_vm * cam_pdf_rev;
+								const float mis_weight = 1. / (w_light + w_cam + 1);
+								col += mis_weight * photons.d[h].photon_count *
+									   photons.d[h].throughput * brdf1 *
+									   camera_state.throughput *
+									   normalization_factor;
+							}
+						}
+					}
+                } 
             }
+          
 
             // Scattering
             camera_state.wi = sample_cos_hemisphere(

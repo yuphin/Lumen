@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <chrono>
 bool use_rtx = true;
+bool use_vm = true;
 int integrator = 3;
 float ppm_base_radius = 0.1;
 const int max_depth = 6;
@@ -819,6 +820,7 @@ double RTScene::draw_frame() {
 		ImGui::Text("VCM Photon Base Radius: %f", 
 			gltf_scene.m_dimensions.radius * RADIUS_FACTOR);
 		ImGui::Text("VCM Photon Base Radius: %f", pc_ray.radius);
+		updated ^= ImGui::Checkbox("Enable VM", &use_vm);
 	}
 	if (updated) {
 		pc_ray.frame_num == -1;
@@ -1180,6 +1182,7 @@ void RTScene::render(uint32_t i) {
 		pc_ray.max_bounds = gltf_scene.m_dimensions.max;
 		pc_ray.ppm_base_radius = ppm_base_radius;
 		pc_ray.radius /= pow(pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
+		pc_ray.use_vm = use_vm;
 		const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
 		const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
 		const int base_grid_res = int(max_comp / pc_ray.radius);
@@ -1206,7 +1209,7 @@ void RTScene::render(uint32_t i) {
 					VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
 			}
 		}
-		if (sel_integrator == Integrator::VCM) {
+		if (sel_integrator == Integrator::VCM && use_vm) {
 			vkCmdFillBuffer(cmdbuf, photon_buffer.handle, 0, photon_buffer.size, 0);
 			fbb = buffer_barrier(photon_buffer.handle,
 				VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -1328,11 +1331,13 @@ void RTScene::render(uint32_t i) {
 			// TODO: VCM stuff
 			const auto& vcm_light_pipeline = rt_pipelines[Integrator::VCM];
 			const auto& vcm_eye_pipeline = rt_pipelines[Integrator::VCM + 1];
-			fbb = buffer_barrier(photon_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+			if (use_vm) {
+				fbb = buffer_barrier(photon_buffer.handle,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+				vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+					VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+			}
 			// Trace from eye
 			vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
 				vcm_eye_pipeline->handle);

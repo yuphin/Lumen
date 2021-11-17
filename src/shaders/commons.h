@@ -41,6 +41,7 @@ struct PushConstantRay {
 	uint size_x;
 	uint size_y;
 	float ppm_base_radius;
+	int use_vm;
 };
 
 struct SceneUBO {
