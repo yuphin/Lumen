@@ -52,16 +52,13 @@ void main() {
 		float n_new = pixel(idx).N + gamma * pixel(idx).M;
 		float r_new = pixel(idx).radius * 
 			sqrt(n_new / ( pixel(idx).N + pixel(idx).M));
-//            if(idx == 194578) {
-//                debugPrintfEXT("%d %f %f\n", idx, pixel(idx).radius, r_new);
-//            }
 		pixel(idx).tau = (pixel(idx).tau +  pixel(idx).phi) * r_new * r_new / 
 			(pixel(idx).radius * pixel(idx).radius);
 		pixel(idx).N = n_new;
 		pixel(idx).radius = r_new;
 		pixel(idx).M = 0;
 		pixel(idx).phi = vec3(0);
-        col += pixel(idx).tau / (1600 * 900 * 8 * r_new * r_new); 
+        col += pixel(idx).tau / (1600 * 900 * PI * r_new * r_new); 
     }
     pixel(idx).tau = vec3(0);
     ivec2 pixels = ivec2(idx / size_y, idx % size_y);
