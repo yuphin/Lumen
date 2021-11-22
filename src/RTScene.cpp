@@ -6,12 +6,14 @@
 #include <algorithm>
 #include <chrono>
 bool use_rtx = true;
-bool use_vm = true;
+bool use_vm = false;
+bool delay_pt = false;
+bool use_area_sampling = true;
 int integrator = 3;
 float ppm_base_radius = 0.1;
-const int max_depth = 6;
-const int max_light_depth = 6;
-constexpr float RADIUS_FACTOR = 1.0 / 100;
+const int max_depth = 5;
+const int max_light_depth = 5;
+constexpr float RADIUS_FACTOR = 1.25 / 100;
 // TODO: Use instances in the rasterization pipeline
 // TODO: Use a single scratch buffer
 RTScene* RTScene::instance = nullptr;
@@ -103,8 +105,8 @@ void RTScene::init_scene() {
 		glm::vec3(0.7, 0.5, 15.5)));
 	pc_ray.total_light_area = 0;
 	//std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
-	std::string filename = "scenes/cornellBox.gltf";
-	//std::string filename = "scenes/scene3.gltf";
+	//std::string filename = "scenes/cornellBox.gltf";
+	std::string filename = "scenes/scene3.gltf";
 	using vkBU = VkBufferUsageFlagBits;
 	tinygltf::Model tmodel;
 	tinygltf::TinyGLTF tcontext;
@@ -276,7 +278,7 @@ void RTScene::init_scene() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		20 * width * height * sizeof(PhotonHash)
+		4 * width * height * sizeof(PhotonHash)
 	);
 	vcm_light_vertices_buffer.create(
 		&vkb.ctx,
@@ -399,6 +401,7 @@ void RTScene::create_blas() {
 void RTScene::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
 	float total_light_triangle_area = 0.0f;
+	int light_triangle_cnt = 0;
 	for (auto& node : gltf_scene.nodes) {
 		auto it = std::find_if(lights.begin(), lights.end(),
 							   [&](const MeshLight& light) {
@@ -425,6 +428,7 @@ void RTScene::create_tlas() {
 					node.world_matrix * glm::vec4(vertices[ind.z], 1.0);
 				auto area = 0.5 * glm::length(glm::cross(v1 - v0, v2 - v0));
 				total_light_triangle_area += area;
+				light_triangle_cnt++;
 			}
 		}
 
@@ -451,6 +455,9 @@ void RTScene::create_tlas() {
 	}
 
 	pc_ray.total_light_area += total_light_triangle_area;
+	if (light_triangle_cnt > 0) {
+		pc_ray.light_triangle_count = light_triangle_cnt;
+	}
 
 	vkb.build_tlas(tlas,
 				   VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
@@ -558,7 +565,8 @@ void RTScene::create_rt_pipelines() {
 								{"src/shaders/pathtrace.rmiss"},
 								{"src/shaders/pathtrace_shadow.rmiss"},
 								{"src/shaders/pathtrace.rchit"},
-								{"src/shaders/pathtrace.rahit"} };
+								{"src/shaders/pathtrace.rahit"},
+								{"src/shaders/pathtrace_new.rgen"} };
 	for (auto& shader : shaders) {
 		shader.compile();
 	}
@@ -573,7 +581,7 @@ void RTScene::create_rt_pipelines() {
 		VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
 	stage.pName = "main"; // All the same entry point
 	// Raygen
-	stage.module = shaders[eRaygen].create_vk_shader_module(vkb.ctx.device);
+	stage.module = shaders[5].create_vk_shader_module(vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 	stages[eRaygen] = stage;
 	// Miss
@@ -635,9 +643,9 @@ void RTScene::create_rt_pipelines() {
 	// Descriptor sets: one specific to ray tracing, and one shared with the
 	// rasterization pipeline
 	settings.desc_layouts = { rt_desc_layout,desc_set_layout };
-	
 	rt_pipelines.resize(Integrator::PIPELINE_COUNT);
 	rt_pipelines[Integrator::PT] = std::make_unique<Pipeline>(vkb.ctx.device);
+	rt_pipelines[Integrator::DELAYED_PT] = std::make_unique<Pipeline>(vkb.ctx.device);
 	rt_pipelines[Integrator::BDPT] = std::make_unique<Pipeline>(vkb.ctx.device);
 	rt_pipelines[Integrator::PPM] = std::make_unique<Pipeline>(vkb.ctx.device);
 	rt_pipelines[Integrator::PPM+1] = std::make_unique<Pipeline>(vkb.ctx.device);
@@ -651,6 +659,9 @@ void RTScene::create_rt_pipelines() {
 	rt_pipelines[Integrator::PPM + 1]->create_rt_pipeline(settings, { INTEGRATOR_PPM_LIGHT });
 	rt_pipelines[Integrator::VCM]->create_rt_pipeline(settings, { INTEGRATOR_VCM_LIGHT });
 	rt_pipelines[Integrator::VCM + 1]->create_rt_pipeline(settings, { INTEGRATOR_VCM_EYE });
+	stages[eRaygen].module = shaders[0].create_vk_shader_module(vkb.ctx.device);
+	settings.stages = stages;
+	rt_pipelines[Integrator::DELAYED_PT]->create_rt_pipeline(settings, { INTEGRATOR_PT });
 	for (auto& s : settings.stages) {
 		vkDestroyShaderModule(vkb.ctx.device, s.module, nullptr);
 	}
@@ -810,6 +821,12 @@ double RTScene::draw_frame() {
 		1000 / cpu_avg_time);
 	updated ^= ImGui::Checkbox("Enable RTX", &use_rtx);
 	updated ^= ImGui::Combo("Integrator", &integrator, integrators, IM_ARRAYSIZE(integrators));
+	if (integrator == 0) {
+		updated ^= ImGui::Checkbox("Use area sampling", &use_area_sampling);
+		updated ^= ImGui::Checkbox("Delay NEE", &delay_pt);
+
+	}
+
 	if (integrator == 2) {
 		updated ^= ImGui::SliderFloat("PPM Base Radius", &ppm_base_radius, 0.01, 1);
 		AtomicData* data = (AtomicData*)atomic_data_cpu.data;
@@ -1182,6 +1199,8 @@ void RTScene::render(uint32_t i) {
 		pc_ray.max_bounds = gltf_scene.m_dimensions.max;
 		pc_ray.ppm_base_radius = ppm_base_radius;
 		pc_ray.radius /= pow(pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
+		pc_ray.use_area_sampling = use_area_sampling;
+		pc_ray.sky_col = vec3(0, 0, 0);
 		pc_ray.use_vm = use_vm;
 		const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
 		const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
@@ -1190,7 +1209,9 @@ void RTScene::render(uint32_t i) {
 		if (pc_ray.radius < 0.0000001) pc_ray.radius = 0.0000001;
 		std::vector<VkDescriptorSet> desc_sets{ rt_desc_set,
 											   uniform_descriptor_sets[0] };
-
+		if (sel_integrator == Integrator::PT && delay_pt) {
+			sel_integrator = Integrator::DELAYED_PT;
+		}
 		// Trace rays
 		VkBufferMemoryBarrier fbb;
 		if (sel_integrator == Integrator::PPM) {

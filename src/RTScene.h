@@ -19,7 +19,8 @@ enum Integrator {
 	BDPT = 1,
 	PPM = 2,
 	VCM = 4,
-	PIPELINE_COUNT = 6 // +2 from PPM & VCM pass
+	DELAYED_PT = 6,
+	PIPELINE_COUNT = 7 // +2 from PPM & VCM pass
 };
 static const uint32_t integrator_map[] = { 0, 1, 2, 4 };
 

@@ -1,0 +1,746 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+
+#include "commons.h"
+#include "utils.glsl"
+
+layout(location = 0) rayPayloadEXT HitPayload payload;
+layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
+layout(set = 0, binding = 0) uniform accelerationStructureEXT tlas;
+layout(set = 0, binding = 1, rgba32f) uniform image2D image;
+layout(set = 0, binding = 2) readonly buffer InstanceInfo_ {
+    PrimMeshInfo prim_info[];
+};
+layout(set = 0, binding = 3) readonly buffer Lights { MeshLight lights[]; };
+layout(set = 0, binding = 4, rgba32f) uniform image2D tmp_image;
+
+layout(set = 1, binding = 0) uniform SceneUBOBuffer { SceneUBO ubo; };
+layout(set = 1, binding = 1, scalar) buffer SceneDesc_ {
+    SceneDesc scene_desc;
+};
+layout(set = 1, binding = 2) uniform sampler2D textures[];
+layout(buffer_reference, scalar) readonly buffer ColorBuffer { vec3 d[]; };
+layout(buffer_reference, scalar) readonly buffer Vertices { vec3 v[]; };
+layout(buffer_reference, scalar) readonly buffer LightVisibility_ {
+    LightVisibility v[];
+};
+layout(buffer_reference, scalar) readonly buffer Indices { uint i[]; };
+layout(buffer_reference, scalar) readonly buffer Normals { vec3 n[]; };
+layout(buffer_reference, scalar) readonly buffer TexCoords { vec2 t[]; };
+layout(buffer_reference, scalar) readonly buffer Materials {
+    GLTFMaterial m[];
+};
+// BDPT buffers
+layout(buffer_reference, scalar) buffer LightVertices { PathVertex d[]; };
+layout(buffer_reference, scalar) buffer CameraVertices { PathVertex d[]; };
+layout(buffer_reference, scalar) buffer VertexBackups { VertexBackup d[]; };
+layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
+
+// SPPM buffers
+layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
+layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
+layout(buffer_reference, scalar) buffer HashData_ { HashData d[]; };
+layout(buffer_reference, scalar) buffer PhotonData_ { PhotonHash d[]; };
+
+// VCM buffers
+layout(buffer_reference, scalar) buffer VCMVertex_ { VCMVertex d[]; };
+layout(buffer_reference, scalar) buffer LightPathCnt { uint d[]; };
+
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(constant_id = 0) const uint INTEGRATOR = 0;
+
+#define MAX_DEPTH 6
+#define MAX_LIGHT_DEPTH 3
+#define MIN_DEPTH 3
+#define NEE 1
+#define MIS 1
+#define EPS 0.001
+#define SAMPLE_VISIBLE_LIGHTS 0
+#define MAX_LIGHT_SAMPLES 8
+#define MAX_LIGHTS 12
+
+const int VERTEX_TYPE_CAM = 0;
+const int VERTEX_TYPE_LIGHT = 1;
+
+Indices indices = Indices(scene_desc.index_addr);
+Vertices vertices = Vertices(scene_desc.vertex_addr);
+Normals normals = Normals(scene_desc.normal_addr);
+Materials materials = Materials(scene_desc.material_addr);
+LightVisibility_ vis = LightVisibility_(scene_desc.light_vis_addr);
+ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
+
+LightVertices light_verts = LightVertices(scene_desc.light_path_addr);
+CameraVertices camera_verts = CameraVertices(scene_desc.camera_path_addr);
+VertexBackups vert_backups = VertexBackups(scene_desc.path_backup_addr);
+
+SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
+AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
+HashData_ hash_data = HashData_(scene_desc.hash_addr);
+PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
+
+VCMVertex_ vcm_lights = VCMVertex_(scene_desc.vcm_light_vertices_addr);
+LightPathCnt light_path_cnts = LightPathCnt(scene_desc.light_path_cnt_addr);
+
+uint col_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
+uint camera_path_idx =
+    (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
+    (pc_ray.max_depth + 2);
+uint light_path_idx =
+    (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
+    (pc_ray.max_depth + 1);
+uint vcm_light_path_idx =
+    (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
+    (pc_ray.max_depth_light);
+uint backup_idx =
+    (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) * 7;
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
+uint size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
+
+vec3 normalize_grid(vec3 p, vec3 min_bnds, vec3 max_bnds) {
+    return (p - min_bnds) / (max_bnds - min_bnds);
+}
+
+ivec3 get_grid_idx(vec3 p, vec3 min_bnds, vec3 max_bnds, ivec3 grid_res) {
+    ivec3 res = ivec3(normalize_grid(p, min_bnds, max_bnds) * grid_res);
+    clamp(res, vec3(0), grid_res - vec3(1));
+    return res;
+}
+
+vec3 eval_material_opaque(GLTFMaterial m, vec2 uv) {
+    vec3 albedo = m.base_color_factor.xyz;
+    if (m.texture_id > -1) {
+        albedo *= texture(textures[m.texture_id], uv).xyz;
+    }
+    return albedo;
+}
+
+bool same_hemisphere(in vec3 wi, in vec3 wo, in vec3 n) {
+    return sign(dot(wi, n) * dot(wo, n)) > 0;
+}
+
+vec3 sample_cos_hemisphere(vec2 uv, vec3 n) {
+    float phi = PI2 * uv.x;
+    float cos_theta = 2.0 * uv.y - 1.0;
+    return normalize(
+        n + vec3(sqrt(1.0 - cos_theta * cos_theta) * vec2(cos(phi), sin(phi)),
+                 cos_theta));
+}
+
+TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands,
+                               uint triangle_idx, in mat4 world_matrix) {
+    TriangleRecord result;
+    uint index_offset = pinfo.index_offset + 3 * triangle_idx;
+    uint vertex_offset = pinfo.vertex_offset;
+    ivec3 ind = ivec3(indices.i[index_offset + 0], indices.i[index_offset + 1],
+                      indices.i[index_offset + 2]);
+    ind += ivec3(vertex_offset);
+    const vec4 v0 = vec4(vertices.v[ind.x], 1.0);
+    const vec4 v1 = vec4(vertices.v[ind.y], 1.0);
+    const vec4 v2 = vec4(vertices.v[ind.z], 1.0);
+
+    const vec4 n0 = vec4(normals.n[ind.x], 1.0);
+    const vec4 n1 = vec4(normals.n[ind.y], 1.0);
+    const vec4 n2 = vec4(normals.n[ind.z], 1.0);
+    //    mat4x3 matrix = mat4x3(vec3(world_matrix[0]), vec3(world_matrix[1]),
+    //                           vec3(world_matrix[2]), vec3(world_matrix[3]));
+    mat4x4 inv_tr_mat = transpose(inverse(world_matrix));
+    //    mat4x3 nrm_mat = mat4x3(vec3(inv_tr_mat[0]), vec3(inv_tr_mat[1]),
+    //                            vec3(inv_tr_mat[2]), vec3(inv_tr_mat[3]));
+    float u = 1 - sqrt(rands.x);
+    float v = rands.y * sqrt(rands.x);
+    const vec3 barycentrics = vec3(1.0 - u - v, u, v);
+
+    const vec4 vtmp0 = world_matrix * v0;
+    const vec4 vtmp1 = world_matrix * v1;
+    const vec4 vtmp2 = world_matrix * v2;
+    const vec4 etmp0 = vtmp1 - vtmp0;
+    const vec4 etmp1 = vtmp2 - vtmp0;
+    const vec4 pos =
+        v0 * barycentrics.x + v1 * barycentrics.y + v2 * barycentrics.z;
+    const vec4 nrm = normalize(n0 * barycentrics.x + n1 * barycentrics.y +
+                               n2 * barycentrics.z);
+    const vec4 world_pos = world_matrix * pos;
+
+    result.triangle_normal = normalize(vec3(inv_tr_mat * nrm));
+    result.triangle_pdf = 2. / length((cross(vec3(etmp0), vec3(etmp1))));
+    result.pos = vec3(world_pos);
+    return result;
+}
+
+vec4 sample_camera(in vec2 d) {
+    vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
+    return ubo.inv_view * vec4(normalize(target.xyz), 0); // direction
+}
+
+TriangleRecord sample_area_light(out uint light_idx, out uint triangle_idx,
+                                 out MeshLight light) {
+    uint light_mesh_idx = uint(rand(seed) * pc_ray.num_mesh_lights);
+    light = lights[light_mesh_idx];
+    light_idx = light.prim_mesh_idx;
+    PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
+    triangle_idx = uint(rand(seed) * light.num_triangles);
+    vec2 rands = vec2(rand(seed), rand(seed));
+    return sample_triangle(pinfo, rands, triangle_idx, light.world_matrix);
+}
+
+vec3 eval_albedo(const GLTFMaterial m) {
+    vec3 albedo = m.base_color_factor.xyz;
+    if (m.texture_id > -1) {
+        albedo *= texture(textures[m.texture_id], payload.uv).xyz;
+    }
+    return albedo;
+}
+
+bool vcm_generate_light_sample(float eta_vc, out VCMState light_state) {
+    // Sample light
+    uint light_idx;
+    uint light_triangle_idx;
+    MeshLight light;
+    const TriangleRecord record =
+        sample_area_light(light_idx, light_triangle_idx, light);
+    GLTFMaterial light_mat = materials.m[light_idx];
+    vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
+                                    record.triangle_normal);
+    float pdf_pos = record.triangle_pdf * (1.0 / pc_ray.light_triangle_count);
+    float cos_theta = abs(dot(wi, record.triangle_normal));
+    float pdf_dir = cos_theta / PI;
+    if (pdf_dir <= EPS) {
+        return false;
+    }
+    light_state.pos = record.pos;
+    light_state.shading_nrm = record.triangle_normal;
+    light_state.area = 1.0 / record.triangle_pdf;
+    light_state.wi = wi;
+    light_state.throughput =
+        light_mat.emissive_factor * cos_theta / (pdf_dir * pdf_pos);
+    // Partially evaluate pdfs (area formulation)
+    // At s = 0 this is p_rev / p_fwd, in the case of area lights:
+    // p_rev = p_connect = 1/area, p_fwd = cos_theta / (PI * area)
+    // Note that pdf_fwd is in area formulation, so cos_y / r^2 is missing
+    // currently.
+    light_state.d_vcm = PI / cos_theta;
+    // g_prev / p_fwd
+    // Note that g_prev component in d_vc and d_vm lags by 1 iter
+    // So we initialize g_prev to cos_theta of the current iter
+    // Also note that 1/r^2 in the geometry term cancels for vc and vm
+    // By convention pdf_fwd sample the i'th vertex from i-1
+    // g_prev or pdf_prev samples from i'th vertex to i-1
+    // In that sense, cos_theta terms will be common in g_prev and pdf_pwd
+    light_state.d_vc = cos_theta / (pdf_dir * pdf_pos);
+    // Similar argument, with the eta
+    light_state.d_vm = light_state.d_vc * eta_vc;
+    return true;
+}
+
+vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
+                     const float cam_A, const vec3 pos, const in VCMState state,
+                     const float eta_vm, const float pdf_rev,
+                     const uint mat_idx, out ivec2 coords) {
+    vec3 L = vec3(0);
+    vec3 dir = cam_pos - pos;
+    float len = length(dir);
+    dir /= len;
+    float cos_y = dot(dir, nrm);
+    float cos_theta = dot(cam_nrm, -dir);
+    if (cos_theta <= 0.) {
+        return vec3(0);
+    }
+
+    // pdf_rev / pdf_fwd
+    // in the case of light coming to camera
+    // simplifies to abs(cos(theta)) / (A * cos^3(theta) * len^2)
+    float cos_3_theta = cos_theta * cos_theta * cos_theta;
+    const float cam_pdf_ratio = abs(cos_y) / (cam_A * cos_3_theta * len * len);
+
+    const float w_light = (cam_pdf_ratio / (size)) *
+                          (eta_vm + state.d_vcm + pdf_rev * state.d_vc);
+    const float mis_weight = 1. / (1. + w_light);
+    vec3 ray_origin = offset_ray(pos, nrm);
+
+    if (cam_pdf_ratio > 0.0) {
+        any_hit_payload.hit = 1;
+        traceRayEXT(tlas, // acceleration structure
+                    gl_RayFlagsTerminateOnFirstHitEXT |
+                        gl_RayFlagsSkipClosestHitShaderEXT,
+                    0xFF,       // cullMask
+                    1,          // sbtRecordOffset
+                    0,          // sbtRecordStride
+                    1,          // missIndex
+                    ray_origin, // ray origin
+                    0,          // ray min range
+                    dir,        // ray direction
+                    len - EPS,  // ray max range
+                    1           // payload (location = 1)
+        );
+        GLTFMaterial mat = materials.m[mat_idx];
+        vec3 lambertian_brdf = eval_material_opaque(mat, payload.uv) / PI;
+        if (any_hit_payload.hit == 0) {
+            // We / pdf_we * abs(cos_theta) = cam_pdf_ratio
+            L = mis_weight * state.throughput * cam_pdf_ratio *
+                lambertian_brdf / size;
+        }
+    }
+    float aspect = float(gl_LaunchSizeEXT.x) / gl_LaunchSizeEXT.y;
+    float tan_fov = -1. / ubo.projection[1][1];
+    dir = -dir;
+    vec4 target = ubo.view * vec4(dir.x, dir.y, dir.z, 0);
+    target /= target.z;
+    target = -ubo.projection * target;
+    coords = ivec2(0.5 * (1 + target.xy) * gl_LaunchSizeEXT.xy - 0.5);
+    if (coords.x < 0 || coords.x >= gl_LaunchSizeEXT.x || coords.y < 0 ||
+        coords.y >= gl_LaunchSizeEXT.y || dot(dir, cam_nrm) < 0) {
+        return vec3(0);
+    }
+    return L;
+}
+
+vec3 vcm_get_light_radiance(in const GLTFMaterial mat,
+                            in const VCMState camera_state, int d) {
+    if (d == 1) {
+        return mat.emissive_factor;
+    }
+    const float pdf_light_pos = 1.0 / (pc_ray.total_light_area);
+    const float pdf_light_dir =
+        abs(dot(payload.shading_nrm, -camera_state.wi)) / PI;
+    const float w_camera = pdf_light_pos / camera_state.d_vcm +
+                           (pdf_light_pos * pdf_light_dir) * camera_state.d_vc;
+
+    const float mis_weight = 1. / (1. + w_camera);
+    return mis_weight * mat.emissive_factor;
+}
+
+void main() {
+    const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+    const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
+    vec2 d = in_uv * 2.0 - 1.0;
+    vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
+    vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
+    vec4 direction = sample_camera(d);
+    uint flags = gl_RayFlagsOpaqueEXT;
+    float tmin = 0.001;
+    float tmax = 10000.0;
+    vec3 col = vec3(0);
+    vec3 throughput = vec3(1);
+    bool specular_bounce = false;
+    if (INTEGRATOR == INTEGRATOR_PT) {
+        for (int depth = 0;; depth++) {
+            traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin,
+                        direction.xyz, tmax, 0);
+            bool found_isect = payload.material_idx != -1;
+            if (depth >= pc_ray.max_depth) {
+                break;
+            }
+            if (!found_isect) {
+                col += throughput * pc_ray.sky_col;
+                break;
+            }
+            GLTFMaterial hit_mat = materials.m[payload.material_idx];
+            if (depth == 0) {
+                col += throughput * hit_mat.emissive_factor;
+            }
+            const vec3 wo = -direction.xyz;
+            vec3 shading_nrm = payload.shading_nrm;
+            float cos_wo = dot(wo, shading_nrm);
+#if 0
+            vec3 geometry_nrm = payload.geometry_nrm;
+            if (dot(payload.geometry_nrm, wo) < 0.)
+                geometry_nrm = -geometry_nrm;
+            if (cos_wo < 0.) {
+                cos_wo = -cos_wo;
+                shading_nrm = -shading_nrm;
+            }
+            if (dot(geometry_nrm, wo) * dot(shading_nrm, wo) < 0) {
+                // We dont handle BTDF at the moment
+                break;
+            }
+#endif
+            // Sample light
+            uint light_idx;
+            uint light_triangle_idx;
+            MeshLight light;
+            const TriangleRecord record =
+                sample_area_light(light_idx, light_triangle_idx, light);
+            GLTFMaterial light_mat = materials.m[light_idx];
+            vec3 wi = record.pos - payload.pos;
+            const float wi_len = length(wi);
+            wi /= wi_len;
+            const vec3 albedo = eval_albedo(hit_mat);
+            const vec3 f = albedo / PI;
+            const vec3 pos = offset_ray(payload.pos, shading_nrm);
+            float cos_x = abs(dot(shading_nrm, wi));
+            float bsdf_pdf = cos_x / PI;
+            any_hit_payload.hit = 1;
+            traceRayEXT(tlas,
+                        gl_RayFlagsTerminateOnFirstHitEXT |
+                            gl_RayFlagsSkipClosestHitShaderEXT,
+                        0xFF, 1, 0, 1, pos, 0, wi, wi_len - EPS, 1);
+            bool visible = any_hit_payload.hit == 0;
+            float pdf_light;
+            float g = abs(dot(record.triangle_normal, -wi)) / (wi_len * wi_len);
+            if (pc_ray.use_area_sampling == 0) {
+                pdf_light = record.triangle_pdf / g;
+            } else {
+                bsdf_pdf *= g;
+                pdf_light = record.triangle_pdf;
+            }
+            if (visible && pdf_light > 0) {
+                const float ratio =
+                    (1.0 / record.triangle_pdf) / pc_ray.total_light_area;
+                const float mis_weight = 1 / (1 + bsdf_pdf / pdf_light);
+                col += throughput * f * cos_x *
+                       (pc_ray.use_area_sampling == 1 ? g : 1) * mis_weight *
+                       light_mat.emissive_factor /
+                       (pdf_light / pc_ray.light_triangle_count);
+            }
+            // Sample BSDF
+            wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
+                                       shading_nrm);
+            cos_x = abs(dot(wi, shading_nrm));
+            bsdf_pdf = cos_x / PI;
+            traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, pos, tmin, wi, tmax, 0);
+            if (payload.material_idx == light_idx &&
+                payload.triangle_idx == light_triangle_idx) {
+                const float wi_len = length(payload.pos - pos);
+                float g =
+                    abs(dot(payload.shading_nrm, -wi)) / (wi_len * wi_len);
+                if (pc_ray.use_area_sampling == 1) {
+                    bsdf_pdf *= g;
+
+                } else {
+                    pdf_light = record.triangle_pdf / g;
+                }
+                const float mis_weight = 1. / (1 + pdf_light / bsdf_pdf);
+                col += throughput * f * cos_x *
+                       (pc_ray.use_area_sampling == 1 ? g : 1) * mis_weight *
+                       light_mat.emissive_factor /
+                       (bsdf_pdf / pc_ray.light_triangle_count);
+            }
+            // Sample direction & update throughput
+            direction.xyz = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
+                                                  shading_nrm);
+            throughput *= albedo;
+            origin.xyz = pos;
+            if (depth > MIN_DEPTH) {
+                float rr_prob = min(0.95f, luminance(throughput));
+                if (rr_prob < rand(seed))
+                    break;
+                else
+                    throughput /= rr_prob;
+            }
+        }
+
+    } else if (INTEGRATOR == INTEGRATOR_BDPT) {
+
+    } else if (INTEGRATOR == INTEGRATOR_PPM_EYE) {
+
+    } else if (INTEGRATOR == INTEGRATOR_PPM_LIGHT) {
+
+    } else if (INTEGRATOR == INTEGRATOR_VCM_LIGHT) {
+#define light_vtx(i) vcm_lights.d[vcm_light_path_idx + i]
+        const float radius = pc_ray.radius;
+        const float radius_sqr = radius * radius;
+        float eta_vcm = PI * radius_sqr * size;
+        float eta_vc = 1.0 / eta_vcm;
+        float eta_vm = (pc_ray.use_vm == 1) ? PI * radius_sqr * size : 0;
+        VCMState light_state;
+        if (!vcm_generate_light_sample(eta_vc, light_state)) {
+            return;
+        }
+        const float ar = float(gl_LaunchSizeEXT.x) / gl_LaunchSizeEXT.y;
+        vec4 area_int =
+            (ubo.inv_projection *
+             vec4(ar / gl_LaunchSizeEXT.x, 1. / gl_LaunchSizeEXT.x, 0, 1));
+        const float cam_area = 4. * abs(area_int.x * area_int.y);
+        // const float fov = -1. / ubo.projection[1][1];
+        // area_int /= (area_int.z);
+        // const float cam_area = 4 * fov * fov * (gl_LaunchSizeEXT.x /
+        // gl_LaunchSizeEXT.y) / (size);
+        const vec3 cam_pos = origin.xyz;
+        const vec3 cam_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
+        int d;
+        for (d = 1;; d++) {
+            traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, light_state.pos, tmin,
+                        light_state.wi, tmax, 0);
+            if (payload.material_idx == -1) {
+                break;
+            }
+            vec3 wo = light_state.pos - payload.pos;
+
+            vec3 shading_nrm = payload.shading_nrm;
+            float cos_wo = dot(wo, shading_nrm);
+            vec3 geometry_nrm = payload.geometry_nrm;
+            if (dot(payload.geometry_nrm, wo) < 0.)
+                geometry_nrm = -geometry_nrm;
+            if (cos_wo < 0.) {
+                cos_wo = -cos_wo;
+                shading_nrm = -shading_nrm;
+            }
+
+            if (dot(geometry_nrm, wo) * dot(shading_nrm, wo) < 0) {
+                // We dont handle BTDF at the moment
+                break;
+            }
+            float dist = length(payload.pos - light_state.pos);
+            float dist_sqr = dist * dist;
+            wo /= dist;
+            // Complete the missing geometry terms
+            float cos_theta_wo = abs(dot(wo, shading_nrm));
+            light_vtx(d - 1).d_vcm *= dist_sqr;
+            light_vtx(d - 1).d_vcm /= cos_theta_wo;
+            light_vtx(d - 1).d_vc /= cos_theta_wo;
+            light_vtx(d - 1).d_vm /= cos_theta_wo;
+            // Copy to light vertex buffer
+            light_vtx(d - 1).wi = light_state.wi;
+            // light_vtx(d-1).wo = wo;
+            light_vtx(d - 1).shading_nrm = light_state.shading_nrm;
+            light_vtx(d - 1).pos = light_state.pos;
+            light_vtx(d - 1).uv = light_state.uv;
+            light_vtx(d - 1).throughput = light_state.throughput;
+            light_vtx(d - 1).material_idx = light_state.material_idx;
+            light_vtx(d - 1).area = light_state.area;
+            light_vtx(d - 1).d_vcm = light_state.d_vcm;
+            light_vtx(d - 1).d_vc = light_state.d_vc;
+            light_vtx(d - 1).d_vm = light_state.d_vm;
+            light_vtx(d - 1).path_len = d;
+            // Reverse pdf in solid angle form, since we have geometry term
+            // at the outer paranthesis
+            float pdf_rev = abs(dot(shading_nrm, wo)) / PI;
+            light_vtx(d - 1).pdf_rev = pdf_rev;
+            // Connect to camera
+            ivec2 coords;
+            vec3 splat_col = vcm_connect_cam(
+                cam_pos, cam_nrm, shading_nrm, cam_area, payload.pos,
+                light_state, eta_vm, pdf_rev, payload.material_idx, coords);
+            if (luminance(splat_col) > 0) {
+                uint idx = coords.x * gl_LaunchSizeEXT.y + coords.y;
+                tmp_col.d[idx] += splat_col;
+            }
+            if (d + 1 >= pc_ray.max_depth_light) {
+                break;
+            }
+            // Continue the walk
+            light_state.wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
+                                                   shading_nrm);
+            const float cos_theta = dot(shading_nrm, light_state.wi);
+            const float pdf_dir =
+                same_hemisphere(light_state.wi, wo, shading_nrm)
+                    ? cos_theta / PI
+                    : 0;
+            light_state.pos = offset_ray(payload.pos, shading_nrm);
+            light_state.d_vcm = 1.0 / pdf_dir;
+            // Note, same cancellations also occur here from now on
+            // see _vcm_generate_light_sample_
+            light_state.d_vc =
+                (cos_theta / pdf_dir) *
+                (eta_vm + light_state.d_vcm + pdf_rev * light_state.d_vc);
+            light_state.d_vm =
+                (cos_theta / pdf_dir) *
+                (1 + light_state.d_vcm * eta_vc + pdf_rev * light_state.d_vm);
+            GLTFMaterial mat = materials.m[payload.material_idx];
+            vec3 lambertian_brdf = eval_material_opaque(mat, payload.uv);
+            light_state.throughput *= lambertian_brdf;
+            light_state.shading_nrm = shading_nrm;
+            light_state.area = payload.area;
+        }
+        light_path_cnts.d[col_idx] = d;
+
+        // "Build" the hash grid
+        // TODO: Add sorting later
+        if (pc_ray.use_vm == 1) {
+            for (int i = 0; i < d; i++) {
+                ivec3 grid_idx =
+                    get_grid_idx(light_vtx(i).pos, pc_ray.min_bounds,
+                                 pc_ray.max_bounds, pc_ray.grid_res);
+                uint h = hash(grid_idx, size);
+                photons.d[h].pos = light_vtx(i).pos;
+                photons.d[h].wi = -light_vtx(i).wi;
+                photons.d[h].d_vm = light_vtx(i).d_vm;
+                photons.d[h].d_vcm = light_vtx(i).d_vcm;
+                photons.d[h].throughput = light_vtx(i).throughput;
+                atomicAdd(photons.d[h].photon_count, 1);
+            }
+        }
+
+    } else if (INTEGRATOR == INTEGRATOR_VCM_EYE) {
+        const float radius = pc_ray.radius;
+        const float radius_sqr = radius * radius;
+        float eta_vcm = PI * radius_sqr * size;
+        float eta_vc = 1.0 / eta_vcm;
+        float eta_vm = pc_ray.use_vm == 1 ? PI * radius_sqr * size : 0;
+        const float normalization_factor = 1. / (PI * radius_sqr * size);
+        const float fov = ubo.projection[1][1];
+        const float cam_area = 4. / (fov * fov * size);
+        const vec3 cam_pos = origin.xyz;
+        VCMState camera_state;
+        // Generate camera sample
+        camera_state.wi = direction.xyz;
+        camera_state.pos = origin.xyz;
+        camera_state.throughput = vec3(1.0);
+        camera_state.shading_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
+        float cos_theta = abs(dot(camera_state.shading_nrm, direction.xyz));
+        // Defer r^2 / cos term
+        camera_state.d_vcm =
+            cam_area * size * cos_theta * cos_theta * cos_theta;
+        camera_state.d_vc = 0;
+        camera_state.d_vm = 0;
+        int d;
+        for (d = 1;; d++) {
+            traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, camera_state.pos, tmin,
+                        camera_state.wi, tmax, 0);
+            if (payload.material_idx == -1) {
+                // TODO:
+                col += camera_state.throughput * pc_ray.sky_col;
+                break;
+            }
+            if (d >= pc_ray.max_depth) {
+                break;
+            }
+            GLTFMaterial hit_mat = materials.m[payload.material_idx];
+            const vec3 f = eval_material_opaque(hit_mat, payload.uv) / PI;
+            vec3 wo = camera_state.pos - payload.pos;
+            float dist = length(payload.pos - camera_state.pos);
+            float dist_sqr = dist * dist;
+            wo /= dist;
+            const float pdf_rev = dot(wo, payload.shading_nrm) / PI;
+            // Complete the missing geometry terms
+            float cos_theta_wo = abs(dot(wo, payload.shading_nrm));
+            camera_state.d_vcm *= dist_sqr;
+            camera_state.d_vcm /= cos_theta_wo;
+            camera_state.d_vc /= cos_theta_wo;
+            camera_state.d_vm /= cos_theta_wo;
+            // Get the radiance
+            if (luminance(hit_mat.emissive_factor) > 0) {
+                col += camera_state.throughput *
+                       vcm_get_light_radiance(hit_mat, camera_state, d);
+                break;
+            }
+            // Connect to light
+            uint light_idx;
+            uint light_triangle_idx;
+            MeshLight light;
+            const TriangleRecord record =
+                sample_area_light(light_idx, light_triangle_idx, light);
+            GLTFMaterial light_mat = materials.m[light_idx];
+            vec3 wi = record.pos - payload.pos;
+            float ray_len = length(wi);
+            float ray_len_sqr = ray_len * ray_len;
+            wi /= ray_len;
+            const float cos_x = abs(dot(wi, payload.shading_nrm));
+            const vec3 ray_origin =
+                offset_ray(payload.pos, payload.shading_nrm);
+            any_hit_payload.hit = 1;
+            traceRayEXT(tlas,
+                        gl_RayFlagsTerminateOnFirstHitEXT |
+                            gl_RayFlagsSkipClosestHitShaderEXT,
+                        0xFF, 1, 0, 1, ray_origin, 0, wi, ray_len - EPS, 1);
+            const bool visible = any_hit_payload.hit == 0;
+            if (visible) {
+                float g = abs(dot(record.triangle_normal, -wi)) / (ray_len_sqr);
+                const float cos_y = abs(dot(-wi, record.triangle_normal));
+                const float pdf_pos_dir = record.triangle_pdf * cos_y / PI;
+                const float bsdf_pdf = cos_x / PI;
+                const float pdf_light_w = record.triangle_pdf / g;
+                const float w_light =
+                    bsdf_pdf / (pdf_light_w);
+                const float w_cam =
+                    pdf_pos_dir * cos_x / (pdf_light_w * cos_y) *
+                    (eta_vm + camera_state.d_vcm + camera_state.d_vc * pdf_rev);
+                const float mis_weight = 1. / (1. + w_cam + w_light);
+                col += mis_weight * cos_x * f * camera_state.throughput *
+                       light_mat.emissive_factor /
+                       (pdf_light_w / pc_ray.light_triangle_count);
+            }
+
+            // Connect to light vertices
+            uint light_path_len = light_path_cnts.d[col_idx];
+            for (int i = 0; i < light_path_len; i++) {
+                if (light_vtx(i).path_len + d + 1 >= pc_ray.max_depth) {
+                    break;
+                }
+                vec3 dir = light_vtx(i).pos - payload.pos;
+                const float len = length(dir);
+                const float len_sqr = len * len;
+                dir /= len;
+                float cos_cam = dot(payload.shading_nrm, dir);
+                float cos_light = dot(light_vtx(i).shading_nrm, -dir);
+                const float G = cos_cam * cos_light / len_sqr;
+                if (G > 0) {
+                    const float cam_pdf_fwd = G / PI;
+                    const float light_pdf_fwd = G / PI;
+                    const float w_light =
+                        cam_pdf_fwd *
+                        (eta_vm + light_vtx(i).d_vcm +
+                         light_vtx(i).pdf_rev * light_vtx(i).d_vc);
+                    const float w_camera =
+                        light_pdf_fwd * (eta_vm + camera_state.d_vcm +
+                                         pdf_rev * camera_state.d_vc);
+                    const float mis_weight = 1. / (1 + w_light + w_camera);
+                    const vec3 ray_origin =
+                        offset_ray(payload.pos, payload.shading_nrm);
+                    any_hit_payload.hit = 1;
+                    traceRayEXT(tlas,
+                                gl_RayFlagsTerminateOnFirstHitEXT |
+                                    gl_RayFlagsSkipClosestHitShaderEXT,
+                                0xFF, 1, 0, 1, ray_origin, 0, dir, len - EPS,
+                                1);
+                    const bool visible = any_hit_payload.hit == 0;
+                    if (visible) {
+                        GLTFMaterial mat_light =
+                            materials.m[light_vtx(i).material_idx];
+                        const vec3 f_light =
+                            eval_material_opaque(mat_light, payload.uv) / PI;
+                        col += mis_weight * G * camera_state.throughput *
+                               light_vtx(i).throughput * f * f_light;
+                    }
+                }
+            }
+            // Vertex merging
+
+            // Scattering
+            camera_state.wi = sample_cos_hemisphere(
+                vec2(rand(seed), rand(seed)), payload.shading_nrm);
+            float cos_theta = dot(payload.shading_nrm, camera_state.wi);
+            float pdf_dir =
+                same_hemisphere(camera_state.wi, wo, payload.shading_nrm)
+                    ? cos_theta / PI
+                    : 0;
+
+            camera_state.pos = offset_ray(payload.pos, payload.shading_nrm);
+            camera_state.d_vcm = 1.0 / pdf_dir;
+            // Note, same cancellations also occur here from now on
+            // see _vcm_generate_light_sample_
+            camera_state.d_vc =
+                (cos_theta / pdf_dir) *
+                (eta_vm + camera_state.d_vcm + pdf_rev * camera_state.d_vc);
+            camera_state.d_vm =
+                (cos_theta / pdf_dir) *
+                (1 + camera_state.d_vcm * eta_vc + pdf_rev * camera_state.d_vm);
+            camera_state.throughput *= f;
+            camera_state.shading_nrm = payload.shading_nrm;
+            camera_state.area = payload.area;
+        }
+        vec3 splat_img = tmp_col.d[col_idx];
+        col += splat_img;
+        tmp_col.d[col_idx] = vec3(0);
+
+#undef light_vtx
+    }
+    if (INTEGRATOR == 0 || INTEGRATOR == 1 || INTEGRATOR == 5) {
+        if (pc_ray.frame_num > 0) {
+            float w = 1. / float(pc_ray.frame_num + 1);
+            vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+            // imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+            imageStore(image, ivec2(gl_LaunchIDEXT.xy),
+                       vec4(mix(old_col, col, w), 1.f));
+        } else {
+            imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+        }
+    }
+}
