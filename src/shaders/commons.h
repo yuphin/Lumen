@@ -129,6 +129,7 @@ struct PhotonHash {
 	float d_vcm;
 	vec3 throughput;
 	int photon_count;
+	vec3 nrm;
 };
 
 struct Bounds {

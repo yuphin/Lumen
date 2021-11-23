@@ -158,11 +158,8 @@ TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands,
     float v = rands.y * sqrt(rands.x);
     const vec3 barycentrics = vec3(1.0 - u - v, u, v);
 
-    const vec4 vtmp0 = world_matrix * v0;
-    const vec4 vtmp1 = world_matrix * v1;
-    const vec4 vtmp2 = world_matrix * v2;
-    const vec4 etmp0 = vtmp1 - vtmp0;
-    const vec4 etmp1 = vtmp2 - vtmp0;
+    const vec4 etmp0 = world_matrix * (v1 - v0);
+    const vec4 etmp1 = world_matrix * (v2 - v0);
     const vec4 pos =
         v0 * barycentrics.x + v1 * barycentrics.y + v2 * barycentrics.z;
     const vec4 nrm = normalize(n0 * barycentrics.x + n1 * barycentrics.y +
@@ -567,6 +564,7 @@ void main() {
                 photons.d[h].d_vm = light_vtx(i).d_vm;
                 photons.d[h].d_vcm = light_vtx(i).d_vcm;
                 photons.d[h].throughput = light_vtx(i).throughput;
+                photons.d[h].nrm = light_vtx(i).shading_nrm;
                 atomicAdd(photons.d[h].photon_count, 1);
             }
         }
@@ -605,14 +603,25 @@ void main() {
                 col += camera_state.throughput * pc_ray.sky_col;
                 break;
             }
-            GLTFMaterial hit_mat = materials.m[payload.material_idx];
-
-            const vec3 albedo = eval_albedo(hit_mat);
-            const vec3 f = albedo / PI;
             vec3 wo = camera_state.pos - payload.pos;
             float dist = length(payload.pos - camera_state.pos);
             float dist_sqr = dist * dist;
             wo /= dist;
+            vec3 shading_nrm = payload.shading_nrm;
+            float cos_wo = dot(wo, shading_nrm);
+            vec3 geometry_nrm = payload.geometry_nrm;
+            if (dot(payload.geometry_nrm, wo) < 0.)
+                geometry_nrm = -geometry_nrm;
+            if (cos_wo < 0.) {
+                cos_wo = -cos_wo;
+                shading_nrm = -shading_nrm;
+            }
+
+            GLTFMaterial hit_mat = materials.m[payload.material_idx];
+
+            const vec3 albedo = eval_albedo(hit_mat);
+            const vec3 f = albedo / PI;
+          
             const float pdf_rev = dot(wo, payload.shading_nrm) / PI;
             // Complete the missing geometry terms
             float cos_theta_wo = abs(dot(wo, payload.shading_nrm));
@@ -725,7 +734,7 @@ void main() {
 
             // Vertex merging
             vec3 r = vec3(radius);
-            float r_sqr = dot(r,r);
+            float r_sqr = radius * radius;
             if(pc_ray.use_vm == 1) {
 				 ivec3 grid_min_bnds_idx =
 					get_grid_idx(payload.pos - vec3(radius), pc_ray.min_bounds,
@@ -741,7 +750,8 @@ void main() {
 							const uint h = hash(ivec3(x, y, z), size);
 							if (photons.d[h].photon_count > 0) {
 								const vec3 pp = payload.pos - photons.d[h].pos;
-								if (dot(pp, pp) > r_sqr) {
+                                const float dist_sqr = dot(pp,pp);
+								if (dist_sqr > r_sqr) {
 									continue;
 								}
 								const float cam_pdf_fwd =
@@ -755,10 +765,16 @@ void main() {
 								const float w_cam = camera_state.d_vcm * eta_vc +
 													camera_state.d_vm * cam_pdf_rev;
 								const float mis_weight = 1. / (w_light + w_cam + 1);
-							    col += mis_weight * photons.d[h].photon_count *
+                                float cos_nrm = dot(photons.d[h].nrm, payload.shading_nrm);
+                                if(cos_nrm > EPS) {
+                                  const float w = 1. - sqrt(dist_sqr)/ radius;
+                                  const float w_normalization = 3.; // 1. / (1 - 2/(3*k)) where k = 1
+                                  col += w * mis_weight * photons.d[h].photon_count *
 									   photons.d[h].throughput * f *
 									   camera_state.throughput *
-									   normalization_factor;
+									   normalization_factor * w_normalization; 
+                                }
+							 
 							}
 						}
 					}

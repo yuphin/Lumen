@@ -105,8 +105,8 @@ void RTScene::init_scene() {
 		glm::vec3(0.7, 0.5, 15.5)));
 	pc_ray.total_light_area = 0;
 	//std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
-	std::string filename = "scenes/cornellBox.gltf";
-	//std::string filename = "scenes/scene3.gltf";
+	//std::string filename = "scenes/cornellBox.gltf";
+	std::string filename = "scenes/scene3.gltf";
 	using vkBU = VkBufferUsageFlagBits;
 	tinygltf::Model tmodel;
 	tinygltf::TinyGLTF tcontext;
@@ -834,10 +834,10 @@ double RTScene::draw_frame() {
 			ImGui::Text("PPM Max Radius: %f", data->max_radius);
 		}
 	} else if(integrator == 3){
-		ImGui::Text("VCM Photon Base Radius: %f", 
-			gltf_scene.m_dimensions.radius * vcm_radius_factor);
-		ImGui::Text("VCM Photon Base Radius: %f", pc_ray.radius);
 		if (use_vm) {
+			ImGui::Text("VCM Photon Base Radius: %f",
+				gltf_scene.m_dimensions.radius * vcm_radius_factor * 0.01);
+			ImGui::Text("VCM Photon Current Radius: %f", pc_ray.radius);
 			updated ^= ImGui::SliderFloat("VCM Radius %", &vcm_radius_factor, 0.01, 10);
 		}
 		updated ^= ImGui::Checkbox("Enable VM", &use_vm);
