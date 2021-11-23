@@ -34,7 +34,6 @@ struct PushConstantRay {
 	ivec3 grid_res;
 	int max_depth;
 	vec3 sky_col;
-	int max_depth_light;
 	float total_light_area;
 	uint frame_num;
 	uint time;
@@ -43,6 +42,7 @@ struct PushConstantRay {
 	uint size_y;
 	float ppm_base_radius;
 	int use_vm;
+	int use_vc;
 	int light_triangle_count;
 	int use_area_sampling;
 };

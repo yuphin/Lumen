@@ -96,5 +96,5 @@ void main() {
     payload.uv = uv;
     payload.material_idx = material_index;
     payload.triangle_idx = gl_PrimitiveID;
-    payload.area = 0.5 * length(cross(v1 - v0, v2 - v0));
+    payload.area = 0.5 * length(cross(v1t - v0t, v2t - v0t));
 }

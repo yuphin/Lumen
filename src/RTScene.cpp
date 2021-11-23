@@ -7,13 +7,13 @@
 #include <chrono>
 bool use_rtx = true;
 bool use_vm = false;
+bool use_vc = true;
 bool delay_pt = false;
 bool use_area_sampling = true;
+float vcm_radius_factor = 0.1;
 int integrator = 3;
 float ppm_base_radius = 0.1;
 const int max_depth = 5;
-const int max_light_depth = 5;
-constexpr float RADIUS_FACTOR = 1.25 / 100;
 // TODO: Use instances in the rasterization pipeline
 // TODO: Use a single scratch buffer
 RTScene* RTScene::instance = nullptr;
@@ -105,8 +105,8 @@ void RTScene::init_scene() {
 		glm::vec3(0.7, 0.5, 15.5)));
 	pc_ray.total_light_area = 0;
 	//std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
-	//std::string filename = "scenes/cornellBox.gltf";
-	std::string filename = "scenes/scene3.gltf";
+	std::string filename = "scenes/cornellBox.gltf";
+	//std::string filename = "scenes/scene3.gltf";
 	using vkBU = VkBufferUsageFlagBits;
 	tinygltf::Model tmodel;
 	tinygltf::TinyGLTF tcontext;
@@ -278,7 +278,7 @@ void RTScene::init_scene() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		4 * width * height * sizeof(PhotonHash)
+		20 * width * height * sizeof(PhotonHash)
 	);
 	vcm_light_vertices_buffer.create(
 		&vkb.ctx,
@@ -286,7 +286,7 @@ void RTScene::init_scene() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * max_light_depth * sizeof(VCMVertex)
+		width * height * max_depth * sizeof(VCMVertex)
 	);
 
 	light_path_cnt_buffer.create(
@@ -561,7 +561,7 @@ void RTScene::create_rt_pipelines() {
 
 	RTPipelineSettings settings;
 
-	std::vector<Shader> shaders{ {"src/shaders/pathtrace.rgen"},
+	std::vector<Shader> shaders{ {"src/shaders/pt_unidir.rgen"},
 								{"src/shaders/pathtrace.rmiss"},
 								{"src/shaders/pathtrace_shadow.rmiss"},
 								{"src/shaders/pathtrace.rchit"},
@@ -835,9 +835,13 @@ double RTScene::draw_frame() {
 		}
 	} else if(integrator == 3){
 		ImGui::Text("VCM Photon Base Radius: %f", 
-			gltf_scene.m_dimensions.radius * RADIUS_FACTOR);
+			gltf_scene.m_dimensions.radius * vcm_radius_factor);
 		ImGui::Text("VCM Photon Base Radius: %f", pc_ray.radius);
+		if (use_vm) {
+			updated ^= ImGui::SliderFloat("VCM Radius %", &vcm_radius_factor, 0.01, 10);
+		}
 		updated ^= ImGui::Checkbox("Enable VM", &use_vm);
+		updated ^= ImGui::Checkbox("Enable VC", &use_vc);
 	}
 	if (updated) {
 		pc_ray.frame_num == -1;
@@ -1193,8 +1197,7 @@ void RTScene::render(uint32_t i) {
 		pc_ray.num_mesh_lights = lights.size();
 		pc_ray.time = rand() % UINT_MAX;
 		pc_ray.max_depth = max_depth;
-		pc_ray.max_depth_light = max_light_depth;
-		pc_ray.radius = gltf_scene.m_dimensions.radius * RADIUS_FACTOR;
+		pc_ray.radius = gltf_scene.m_dimensions.radius * vcm_radius_factor / 100.f;
 		pc_ray.min_bounds = gltf_scene.m_dimensions.min;
 		pc_ray.max_bounds = gltf_scene.m_dimensions.max;
 		pc_ray.ppm_base_radius = ppm_base_radius;
@@ -1202,6 +1205,7 @@ void RTScene::render(uint32_t i) {
 		pc_ray.use_area_sampling = use_area_sampling;
 		pc_ray.sky_col = vec3(0, 0, 0);
 		pc_ray.use_vm = use_vm;
+		pc_ray.use_vc = use_vc;
 		const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
 		const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
 		const int base_grid_res = int(max_comp / pc_ray.radius);
