@@ -25,5 +25,9 @@ void main() {
    vec3 data = atomic_data.d.max_bnds - atomic_data.d.min_bnds;
    float max_comp = max(data.x, max(data.y, data.z));
    int base_grid_res = int(max_comp / max_radius);
-   atomic_data.d.grid_res = max(ivec3(base_grid_res * data / max_comp), ivec3(1));
+   if(max_comp > 0. && max_radius > 0.) {
+      atomic_data.d.grid_res = max(ivec3(base_grid_res * data / max_comp), ivec3(1));
+   } else {
+      atomic_data.d.grid_res = ivec3(0,0,0);
+   }
 }

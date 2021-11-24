@@ -1,6 +1,7 @@
 #define PI 3.14159265359
 #define PI2 6.28318530718
 #include "commons.h"
+#define INF 1e10
 struct HitPayload {
     vec3 geometry_nrm;
     vec3 shading_nrm;

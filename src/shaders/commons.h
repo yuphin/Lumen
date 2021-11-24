@@ -3,8 +3,8 @@
 
 #define INTEGRATOR_PT 0
 #define INTEGRATOR_BDPT 1
-#define INTEGRATOR_PPM_EYE 2
-#define INTEGRATOR_PPM_LIGHT 3
+#define INTEGRATOR_PPM_LIGHT 2
+#define INTEGRATOR_PPM_EYE 3
 #define INTEGRATOR_VCM_LIGHT 4
 #define INTEGRATOR_VCM_EYE 5
 #define INTERATOR_COUNT 6
@@ -112,12 +112,6 @@ struct VCMVertex {
 
 struct SPPMData {
 	vec3 p;
-	vec3 wo;
-	vec3 bsdf;
-	vec3 tau;
-	vec3 col;
-	vec3 phi;
-	int M;
 	float N;
 	float radius;
 };

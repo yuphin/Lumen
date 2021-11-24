@@ -11,8 +11,8 @@ bool use_vc = true;
 bool delay_pt = false;
 bool use_area_sampling = true;
 float vcm_radius_factor = 0.1;
-int integrator = 3;
-float ppm_base_radius = 0.1;
+int integrator = 2;
+float ppm_base_radius = 0.25;
 const int max_depth = 5;
 // TODO: Use instances in the rasterization pipeline
 // TODO: Use a single scratch buffer
@@ -105,8 +105,8 @@ void RTScene::init_scene() {
 		glm::vec3(0.7, 0.5, 15.5)));
 	pc_ray.total_light_area = 0;
 	//std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
-	//std::string filename = "scenes/cornellBox.gltf";
-	std::string filename = "scenes/scene3.gltf";
+	std::string filename = "scenes/cornellBox.gltf";
+	//std::string filename = "scenes/scene3.gltf";
 	using vkBU = VkBufferUsageFlagBits;
 	tinygltf::Model tmodel;
 	tinygltf::TinyGLTF tcontext;
@@ -232,7 +232,7 @@ void RTScene::init_scene() {
 		&vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		sizeof(AtomicData) * sizeof(float)
 	);
@@ -240,8 +240,7 @@ void RTScene::init_scene() {
 	atomic_data_cpu.create(
 		&vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		sizeof(AtomicData) * sizeof(float)
 	);
@@ -358,26 +357,26 @@ void RTScene::init_scene() {
 
 	if (tmodel.images.empty()) {
 		add_default_texture();
-		return;
 	}
+	else {
+		textures.resize(tmodel.images.size());
+		for (int i = 0; i < tmodel.images.size(); i++) {
+			auto& gltf_img = tmodel.images[i];
+			void* data = &gltf_img.image[0];
+			VkDeviceSize size = gltf_img.image.size();
+			auto img_dims =
+				VkExtent2D{ (uint32_t)gltf_img.width, (uint32_t)gltf_img.height };
 
-	textures.resize(tmodel.images.size());
-	for (int i = 0; i < tmodel.images.size(); i++) {
-		auto& gltf_img = tmodel.images[i];
-		void* data = &gltf_img.image[0];
-		VkDeviceSize size = gltf_img.image.size();
-		auto img_dims =
-			VkExtent2D{ (uint32_t)gltf_img.width, (uint32_t)gltf_img.height };
+			if (size == 0 || gltf_img.width == -1 || gltf_img.height == -1) {
+				add_default_texture();
+				continue;
+			}
 
-		if (size == 0 || gltf_img.width == -1 || gltf_img.height == -1) {
-			add_default_texture();
-			continue;
+			auto create_info = make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB,
+				VK_IMAGE_USAGE_SAMPLED_BIT, true);
+			textures[i].load_from_data(&vkb.ctx, data, size, create_info,
+				texture_sampler);
 		}
-
-		auto create_info = make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB,
-										 VK_IMAGE_USAGE_SAMPLED_BIT, true);
-		textures[i].load_from_data(&vkb.ctx, data, size, create_info,
-								   texture_sampler);
 	}
 
 	pc_ray.frame_num = -1;
@@ -566,7 +565,7 @@ void RTScene::create_rt_pipelines() {
 								{"src/shaders/pathtrace_shadow.rmiss"},
 								{"src/shaders/pathtrace.rchit"},
 								{"src/shaders/pathtrace.rahit"},
-								{"src/shaders/pathtrace_new.rgen"} };
+								{"src/shaders/integrators.rgen"} };
 	for (auto& shader : shaders) {
 		shader.compile();
 	}
@@ -655,8 +654,8 @@ void RTScene::create_rt_pipelines() {
 	settings.stages = stages;
 	rt_pipelines[Integrator::PT]->create_rt_pipeline(settings, { INTEGRATOR_PT });
 	rt_pipelines[Integrator::BDPT]->create_rt_pipeline(settings, { INTEGRATOR_BDPT });
-	rt_pipelines[Integrator::PPM]->create_rt_pipeline(settings, { INTEGRATOR_PPM_EYE });
-	rt_pipelines[Integrator::PPM + 1]->create_rt_pipeline(settings, { INTEGRATOR_PPM_LIGHT });
+	rt_pipelines[Integrator::PPM]->create_rt_pipeline(settings, { INTEGRATOR_PPM_LIGHT });
+	rt_pipelines[Integrator::PPM + 1]->create_rt_pipeline(settings, { INTEGRATOR_PPM_EYE });
 	rt_pipelines[Integrator::VCM]->create_rt_pipeline(settings, { INTEGRATOR_VCM_LIGHT });
 	rt_pipelines[Integrator::VCM + 1]->create_rt_pipeline(settings, { INTEGRATOR_VCM_EYE });
 	stages[eRaygen].module = shaders[0].create_vk_shader_module(vkb.ctx.device);
@@ -676,26 +675,26 @@ void RTScene::create_compute_pipelines() {
 	calc_bounds_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
 	update_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
 	std::vector<Shader> shaders = {
-		{"src/shaders/gather.comp"},
+		//{"src/shaders/gather.comp"},
 		{"src/shaders/gpgpu/max.comp"},
 		{"src/shaders/gpgpu/reduce_max.comp"},
 		{"src/shaders/gpgpu/min.comp"},
 		{"src/shaders/gpgpu/reduce_min.comp"},
 		{"src/shaders/calc_bounds.comp"},
-		{"src/shaders/update.comp"},
+		//{"src/shaders/update.comp"},
 	};
 	for (auto& shader : shaders) {
 		shader.compile();
 	}
 	std::vector<VkDescriptorSetLayout> desc_layouts = { rt_desc_layout,
 														  desc_set_layout };
-	gather_pipeline->create_compute_pipeline(shaders[0], 2, desc_layouts.data(), {}, 4);
-	min_pipeline->create_compute_pipeline(shaders[1], 2, desc_layouts.data(), {}, 4);
-	min_reduce_pipeline->create_compute_pipeline(shaders[2], 2, desc_layouts.data(), {}, 4);
-	max_pipeline->create_compute_pipeline(shaders[3], 2, desc_layouts.data(), {}, 4);
-	max_reduce_pipeline->create_compute_pipeline(shaders[4], 2, desc_layouts.data(), {}, 4);
-	calc_bounds_pipeline->create_compute_pipeline(shaders[5], 2, desc_layouts.data(), {}, 4);
-	update_pipeline->create_compute_pipeline(shaders[6], 2, desc_layouts.data(), {}, 4);
+	//gather_pipeline->create_compute_pipeline(shaders[0], 2, desc_layouts.data(), {}, 4);
+	min_pipeline->create_compute_pipeline(shaders[2], 2, desc_layouts.data(), {}, 4);
+	min_reduce_pipeline->create_compute_pipeline(shaders[3], 2, desc_layouts.data(), {}, 4);
+	max_pipeline->create_compute_pipeline(shaders[0], 2, desc_layouts.data(), {}, 4);
+	max_reduce_pipeline->create_compute_pipeline(shaders[1], 2, desc_layouts.data(), {}, 4);
+	calc_bounds_pipeline->create_compute_pipeline(shaders[4], 2, desc_layouts.data(), {}, 4);
+	//update_pipeline->create_compute_pipeline(shaders[6], 2, desc_layouts.data(), {}, 4);
 }
 
 void RTScene::create_offscreen_resources() {
@@ -844,7 +843,7 @@ double RTScene::draw_frame() {
 		updated ^= ImGui::Checkbox("Enable VC", &use_vc);
 	}
 	if (updated) {
-		pc_ray.frame_num == -1;
+		pc_ray.frame_num = -1;
 		ImGui::Render();
 		auto t_end = glfwGetTime() * 1000;
 		auto t_diff = t_end - t_begin;
@@ -1197,11 +1196,16 @@ void RTScene::render(uint32_t i) {
 		pc_ray.num_mesh_lights = lights.size();
 		pc_ray.time = rand() % UINT_MAX;
 		pc_ray.max_depth = max_depth;
-		pc_ray.radius = gltf_scene.m_dimensions.radius * vcm_radius_factor / 100.f;
+		if (sel_integrator == Integrator::PPM) {
+			pc_ray.radius = ppm_base_radius;
+		}
+		else if (sel_integrator == Integrator::VCM) {
+			pc_ray.radius =gltf_scene.m_dimensions.radius * vcm_radius_factor / 100.f;
+			pc_ray.radius /= pow(pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
+		}
 		pc_ray.min_bounds = gltf_scene.m_dimensions.min;
 		pc_ray.max_bounds = gltf_scene.m_dimensions.max;
 		pc_ray.ppm_base_radius = ppm_base_radius;
-		pc_ray.radius /= pow(pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
 		pc_ray.use_area_sampling = use_area_sampling;
 		pc_ray.sky_col = vec3(0, 0, 0);
 		pc_ray.use_vm = use_vm;
@@ -1217,30 +1221,31 @@ void RTScene::render(uint32_t i) {
 			sel_integrator = Integrator::DELAYED_PT;
 		}
 		// Trace rays
-		VkBufferMemoryBarrier fbb;
+		VkBufferMemoryBarrier barrier;
 		if (sel_integrator == Integrator::PPM) {
 			vkCmdFillBuffer(cmdbuf, photon_buffer.handle, 0, photon_buffer.size, 0);
-			fbb = buffer_barrier(photon_buffer.handle,
+			barrier = buffer_barrier(photon_buffer.handle,
 				VK_ACCESS_TRANSFER_WRITE_BIT,
 				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 			if (pc_ray.frame_num == 0) {
+				AtomicData* data = (AtomicData*)atomic_data_cpu.data;
+				data->max_radius = ppm_base_radius;
 				vkCmdFillBuffer(cmdbuf, sppm_data_buffer.handle, 0, sppm_data_buffer.size, 0);
-				fbb = buffer_barrier(sppm_data_buffer.handle,
+				barrier = buffer_barrier(sppm_data_buffer.handle,
 					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 				vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-					VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+					VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 			}
-		}
-		if (sel_integrator == Integrator::VCM && use_vm) {
+		} else if (sel_integrator == Integrator::VCM && use_vm) {
 			vkCmdFillBuffer(cmdbuf, photon_buffer.handle, 0, photon_buffer.size, 0);
-			fbb = buffer_barrier(photon_buffer.handle,
+			barrier = buffer_barrier(photon_buffer.handle,
 				VK_ACCESS_TRANSFER_WRITE_BIT,
 				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 		}
 		// Trace rays from eye
 		vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
@@ -1257,14 +1262,35 @@ void RTScene::render(uint32_t i) {
 		vkCmdTraceRaysKHR(cmdbuf, &regions[0], &regions[1], &regions[2], &regions[3], width, height, 1);
 
 		if (sel_integrator == Integrator::PPM) {
-			const auto& ppm_eye_pipeline = rt_pipelines[Integrator::PPM];
-			const auto& ppm_light_pipeline = rt_pipelines[Integrator::PPM + 1];
+			//const auto& ppm_light_pipeline = rt_pipelines[Integrator::PPM];
+			const auto& ppm_eye_pipeline = rt_pipelines[Integrator::PPM+1];
 			// Calc bbox of visible rays
-			fbb = buffer_barrier(sppm_data_buffer.handle,
+	
+			barrier = buffer_barrier(photon_buffer.handle,
 				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
+		
+			// Trace from eye
+			vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+				ppm_eye_pipeline->handle);
+			vkCmdBindDescriptorSets(
+				cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, ppm_eye_pipeline->pipeline_layout,
+				0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
+			vkCmdPushConstants(cmdbuf, ppm_eye_pipeline->pipeline_layout,
+				VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+				VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+				VK_SHADER_STAGE_MISS_BIT_KHR,
+				0, sizeof(PushConstantRay), &pc_ray);
+			auto& regions = ppm_eye_pipeline->get_rt_regions();
+			vkCmdTraceRaysKHR(cmdbuf, &regions[0], &regions[1], &regions[2], &regions[3], width, height, 1);
+			barrier = buffer_barrier(sppm_data_buffer.handle,
+			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+			VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
+
 			auto wg_x = 1024;
 			auto wg_y = 1;
 			const auto num_wg_x = (uint32_t)ceil(width * height / float(wg_x));
@@ -1284,84 +1310,40 @@ void RTScene::render(uint32_t i) {
 			// @Performance: Maybe we can have multiple residual buffers?
 			reduce(cmdbuf, residual_buffer, counter_buffer, *max_pipeline, *max_reduce_pipeline,
 				width * height);
-			auto buf_barrier = buffer_barrier(atomic_data_buffer.handle,
+			barrier = buffer_barrier(atomic_data_buffer.handle,
 				VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1,
-				&buf_barrier, 0, 0);
+				&barrier, 0, 0);
 			reduce(cmdbuf, residual_buffer, counter_buffer, *min_pipeline, *min_reduce_pipeline,
 				width * height);
-			buf_barrier = buffer_barrier(atomic_data_buffer.handle,
+			barrier = buffer_barrier(atomic_data_buffer.handle,
 				VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1,
-				&buf_barrier, 0, 0);
+				&barrier, 0, 0);
 			vkCmdBindDescriptorSets(
 				cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, calc_bounds_pipeline->pipeline_layout,
 				0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
 			vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE,
 				calc_bounds_pipeline->handle);
 			vkCmdDispatch(cmdbuf, 1, 1, 1);
-			buf_barrier = buffer_barrier(atomic_data_buffer.handle,
+			barrier = buffer_barrier(atomic_data_buffer.handle,
 				VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
+			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 			atomic_data_buffer.copy(atomic_data_cpu, cmdbuf);
-			// Trace from lights
-			vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-				ppm_light_pipeline->handle);
-			vkCmdBindDescriptorSets(
-				cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, ppm_light_pipeline->pipeline_layout,
-				0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
-			vkCmdPushConstants(cmdbuf, ppm_light_pipeline->pipeline_layout,
-				VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-				VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-				VK_SHADER_STAGE_MISS_BIT_KHR,
-				0, sizeof(PushConstantRay), &pc_ray);
-			auto& regions = ppm_light_pipeline->get_rt_regions();
-			vkCmdTraceRaysKHR(cmdbuf, &regions[0], &regions[1], &regions[2], &regions[3], width, height, 1);
-			fbb = buffer_barrier(photon_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
-
-			vkCmdBindDescriptorSets(
-				cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, gather_pipeline->pipeline_layout,
-				0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
-			vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE,
-				gather_pipeline->handle);
-			vkCmdDispatch(cmdbuf, num_wg_x, num_wg_y, 1);
-			fbb = buffer_barrier(sppm_data_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
-
-			// Update SPPM data and add image
-			vkCmdPushConstants(cmdbuf, update_pipeline->pipeline_layout,
-				VK_SHADER_STAGE_COMPUTE_BIT,
-				0, 4, &pc_ray.frame_num);
-			vkCmdBindDescriptorSets(
-				cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, update_pipeline->pipeline_layout,
-				0, (uint32_t)desc_sets.size(), desc_sets.data(), 0, nullptr);
-			vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE,
-				update_pipeline->handle);
-			vkCmdDispatch(cmdbuf, num_wg_x, num_wg_y, 1);
-			fbb = buffer_barrier(sppm_data_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
 		}
 		if (sel_integrator == Integrator::VCM) {
 			// TODO: VCM stuff
 			const auto& vcm_light_pipeline = rt_pipelines[Integrator::VCM];
 			const auto& vcm_eye_pipeline = rt_pipelines[Integrator::VCM + 1];
 			if (use_vm) {
-				fbb = buffer_barrier(photon_buffer.handle,
+				barrier = buffer_barrier(photon_buffer.handle,
 					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 				vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-					VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &fbb, 0, 0);
+					VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 			}
 			// Trace from eye
 			vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
