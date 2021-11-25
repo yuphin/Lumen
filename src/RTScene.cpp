@@ -11,7 +11,7 @@ bool use_vc = true;
 bool delay_pt = false;
 bool use_area_sampling = true;
 float vcm_radius_factor = 0.1;
-int integrator = 2;
+int integrator = 1;
 float ppm_base_radius = 0.25;
 const int max_depth = 5;
 // TODO: Use instances in the rasterization pipeline
@@ -105,8 +105,8 @@ void RTScene::init_scene() {
 		glm::vec3(0.7, 0.5, 15.5)));
 	pc_ray.total_light_area = 0;
 	//std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
-	std::string filename = "scenes/cornellBox.gltf";
-	//std::string filename = "scenes/scene3.gltf";
+	//std::string filename = "scenes/cornellBox.gltf";
+	std::string filename = "scenes/scene3.gltf";
 	using vkBU = VkBufferUsageFlagBits;
 	tinygltf::Model tmodel;
 	tinygltf::TinyGLTF tcontext;

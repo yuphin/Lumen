@@ -92,7 +92,6 @@ struct PathVertex {
 	float area;
 	float pdf_fwd;
 	float pdf_rev;
-	int vertex_type;
 };
 
 struct VCMVertex {

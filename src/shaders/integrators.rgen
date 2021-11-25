@@ -137,6 +137,15 @@ vec3 sample_cos_hemisphere(vec2 uv, vec3 n) {
                  cos_theta));
 }
 
+void correct_shading_normal(const vec3 wo, const vec3 wi,
+                            inout vec3 shading_nrm, inout vec3 geometry_nrm) {
+    float res1 = abs(dot(wo, shading_nrm)) * abs(dot(wi, geometry_nrm));
+    float res2 = abs(dot(wo, geometry_nrm)) * abs(dot(wi, shading_nrm));
+    if (res1 != res2) {
+        shading_nrm *= -1;
+    }
+}
+
 TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands,
                                uint triangle_idx, in mat4 world_matrix) {
     TriangleRecord result;
@@ -197,6 +206,415 @@ vec3 eval_albedo(const GLTFMaterial m) {
         albedo *= texture(textures[m.texture_id], payload.uv).xyz;
     }
     return albedo;
+}
+
+int bdpt_random_walk(const int max_depth, in vec3 throughput, const float pdf,
+                     const int type) {
+#define vtx(i, prop)                                                                 \
+    (type == 0 ? light_verts.d[light_path_idx + i].prop                             \
+               : camera_verts.d[camera_path_idx + i].prop)
+#define vtx_assign(i, prop, expr)                                              \
+    type == 0 ? light_verts.d[light_path_idx + i].prop = (expr)                \
+              : camera_verts.d[camera_path_idx + i].prop = (expr)
+
+    if (max_depth == 0)
+        return 0;
+    int b = 0;
+    int prev = 0;
+    const uint flags = gl_RayFlagsOpaqueEXT;
+    const float tmin = 0.001;
+    const float tmax = 10000.0;
+    vec3 ray_pos = vtx(0, pos);
+    float pdf_fwd = pdf;
+    float pdf_rev = 0.;
+    vec3 wi = vtx(0, dir);
+    while (true) {
+        traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, ray_pos, tmin, wi, tmax, 0);
+        if (payload.material_idx == -1) {
+            if(type == 0) {
+				const vec3 t = vtx(b-1, throughput);
+				vtx_assign(b, throughput, throughput);
+				b++; 
+            }
+            break;
+        }
+        prev = b;
+        vtx_assign(b, throughput, throughput);
+        b++;
+        wi = (payload.pos - vtx(prev, pos));
+        float wi_len = length(wi);
+        wi /= wi_len;
+        vec3 wo = vtx(b-1, pos) - payload.pos;
+        float wo_len = length(wo);
+        wo /= wo_len;
+        vec3 shading_nrm = payload.shading_nrm;
+        if (type == 0 && dot(wo, shading_nrm) < 0) {
+            shading_nrm *= -1;
+        }
+        vtx_assign(b, pdf_fwd,
+                   pdf_fwd * abs(dot(wi, shading_nrm)) / (wi_len * wi_len));
+        vtx_assign(b, shading_nrm, shading_nrm);
+        vtx_assign(b, area, payload.area);
+        vtx_assign(b, pos, payload.pos);
+        vtx_assign(b, uv, payload.uv);
+        vtx_assign(b, material_idx, payload.material_idx);
+
+        if (b >= max_depth) {
+            break;
+        }
+        wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)), shading_nrm);
+
+        // TODO: Add other materials
+        pdf_fwd = same_hemisphere(wi, wo, shading_nrm)
+                      ? dot(shading_nrm, wi) / PI
+                      : 0;
+        if (pdf_fwd == 0.) {
+            break;
+        }
+        // Lambertian brdf = C / PI
+        // => brdf * cos / pdf = C (albedo)
+        // TODO : Change this when we add other BSDF's
+        GLTFMaterial mat = materials.m[payload.material_idx];
+        vec3 albedo = eval_albedo(mat);
+        throughput *= albedo;
+        pdf_rev = same_hemisphere(wi, wo, shading_nrm)
+                      ? dot(shading_nrm, wo) / PI
+                      : 0;
+        pdf_rev *= abs(dot(vtx(b-1, shading_nrm), wo)) / (wo_len * wo_len);
+        vtx_assign(prev, pdf_rev, pdf_rev);
+        ray_pos = offset_ray(payload.pos, shading_nrm);
+    }
+#undef vtx
+#undef vtx_assign
+    return b;
+}
+
+int bdpt_generate_light_subpath(int max_depth) {
+    uint light_idx;
+    uint light_triangle_idx;
+    MeshLight light;
+    const TriangleRecord record =
+        sample_area_light(light_idx, light_triangle_idx, light);
+    GLTFMaterial light_mat = materials.m[light_idx];
+    light_verts.d[light_path_idx + 0].pos = record.pos;
+    light_verts.d[light_path_idx + 0].shading_nrm = record.triangle_normal;
+    light_verts.d[light_path_idx + 0].area = 1.0 / record.triangle_pdf;
+    vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
+                                    record.triangle_normal);
+    light_verts.d[light_path_idx + 0].dir = wi;
+    float pdf_dir = dot(wi, record.triangle_normal) / PI;
+    light_verts.d[light_path_idx + 0].pdf_fwd =
+        record.triangle_pdf * (1.0 / pc_ray.light_triangle_count);
+    vec3 throughput = light_mat.emissive_factor *
+                      abs(dot(record.triangle_normal, wi)) /
+                      (pdf_dir * light_verts.d[light_path_idx + 0].pdf_fwd);
+
+    return bdpt_random_walk(max_depth - 1, throughput, pdf_dir, 0) + 1;
+}
+
+int bdpt_generate_camera_subpath(const vec2 d, const vec3 origin, int max_depth,
+                                 const float cam_area) {
+    camera_verts.d[camera_path_idx + 0].pos = origin;
+    // Use geometry_nrm as camera direction
+    // TODO:
+    camera_verts.d[camera_path_idx + 0].dir = vec3(sample_camera(d));
+    camera_verts.d[camera_path_idx + 0].area = cam_area;
+    camera_verts.d[camera_path_idx + 0].throughput = vec3(1.0);
+    camera_verts.d[camera_path_idx + 0].shading_nrm =
+        vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
+    float cos_theta = dot(camera_verts.d[camera_path_idx + 0].dir,
+                          camera_verts.d[camera_path_idx + 0].shading_nrm);
+    float pdf = 1 / (cam_area * size * cos_theta * cos_theta * cos_theta);
+    return bdpt_random_walk(max_depth - 1, vec3(1), pdf, 1) + 1;
+}
+
+float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
+#define cam_vtx(i) camera_verts.d[camera_path_idx + i]
+#define light_vtx(i) light_verts.d[light_path_idx + i]
+    bool s_0_changed = false;
+    float s_0_pdf;
+    vec3 s_0_pdf_pos;
+    vec3 s_0_pdf_nrm;
+    bool t_0_changed = false;
+    uint idx_1 = -1;
+    float idx_1_val;
+    uint idx_2 = -1;
+    float idx_2_val;
+    uint idx_3 = -1;
+    float idx_3_val;
+    uint idx_4 = -1;
+    float idx_4_val;
+    if (s + t == 2) {
+        return 1.0;
+    }
+    if (s == 1) {
+        s_0_pdf = light_vtx(0).pdf_fwd;
+        s_0_pdf_pos = light_vtx(0).pos;
+        s_0_pdf_nrm = light_vtx(0).shading_nrm;
+        light_vtx(0).pdf_fwd = s_fwd_pdf.pdf_fwd;
+        light_vtx(0).pos = s_fwd_pdf.pos;
+        light_vtx(0).shading_nrm = s_fwd_pdf.shading_nrm;
+        s_0_changed = true;
+    }
+    if (t == 1) {
+        s_0_pdf = cam_vtx(0).pdf_fwd;
+        s_0_pdf_pos = cam_vtx(0).pos;
+        s_0_pdf_nrm = cam_vtx(0).shading_nrm;
+        cam_vtx(0).pdf_fwd = s_fwd_pdf.pdf_fwd;
+        cam_vtx(0).pos = s_fwd_pdf.pos;
+        cam_vtx(0).shading_nrm = s_fwd_pdf.shading_nrm;
+        t_0_changed = true;
+    }
+    if (t > 0) {
+        idx_1_val = cam_vtx(t - 1).pdf_rev;
+        idx_1 = t;
+        if (s > 0) {
+            vec3 dir = (cam_vtx(t - 1).pos - light_vtx(s - 1).pos);
+            float dir_len = length(dir);
+            dir /= dir_len;
+            cam_vtx(t - 1).pdf_rev =
+                abs(dot(dir, cam_vtx(t - 1).shading_nrm) *
+                    dot(dir, light_vtx(s - 1).shading_nrm)) /
+                (PI * dir_len * dir_len);
+        } else {
+            cam_vtx(t - 1).pdf_rev =
+                1.0 / (pc_ray.light_triangle_count * cam_vtx(t - 1).area);
+        }
+    }
+    if (t > 1) {
+        idx_2_val = cam_vtx(t - 2).pdf_rev;
+        idx_2 = t;
+        vec3 dir = (cam_vtx(t - 2).pos - cam_vtx(t - 1).pos);
+        float dir_len = length(dir);
+        dir /= dir_len;
+        if (s > 0) {
+            cam_vtx(t - 2).pdf_rev = abs(dot(dir, cam_vtx(t - 1).shading_nrm) *
+                                         dot(dir, cam_vtx(t - 2).shading_nrm)) /
+                                     (PI * dir_len * dir_len);
+        } else {
+            float cos_x = dot(cam_vtx(t - 1).shading_nrm, dir);
+            float cos_y = dot(cam_vtx(t - 2).shading_nrm, dir);
+            cam_vtx(t - 2).pdf_rev =
+                abs(cos_x * cos_y) / (PI * dir_len * dir_len);
+        }
+    }
+    if (s > 0) {
+        // t is always > 0
+        idx_3_val = light_vtx(s - 1).pdf_rev;
+        idx_3 = s;
+        vec3 dir = (light_vtx(s - 1).pos - cam_vtx(t - 1).pos);
+        float dir_len = length(dir);
+        dir /= dir_len;
+        if (t == 1) {
+            float cos_theta = dot(cam_vtx(0).shading_nrm, dir);
+            float pdf =
+                1.0 / (cam_vtx(0).area * size * 4 * ar * cos_theta * cos_theta * cos_theta);
+            pdf *= abs(dot(dir, light_vtx(s - 1).shading_nrm)) /
+                   (dir_len * dir_len);
+            light_vtx(s - 1).pdf_rev = pdf;
+        } else {
+            vec3 wo = normalize(cam_vtx(t - 2).pos - cam_vtx(t - 1).pos);
+            light_vtx(s - 1).pdf_rev =
+                same_hemisphere(dir, wo, cam_vtx(t - 1).shading_nrm)
+                    ? abs(dot(dir, cam_vtx(t - 1).shading_nrm) *
+                          dot(dir, light_vtx(s - 1).shading_nrm)) /
+                          (PI * dir_len * dir_len)
+                    : 0;
+        }
+    }
+    if (s > 1) {
+        idx_4_val = light_vtx(s - 2).pdf_rev;
+        idx_4 = s;
+        vec3 dir = (light_vtx(s - 2).pos - light_vtx(s - 1).pos);
+        vec3 wo = normalize(cam_vtx(t - 1).pos - light_vtx(s - 1).pos);
+        float dir_len = length(dir);
+        dir /= dir_len;
+        light_vtx(s - 2).pdf_rev =
+            same_hemisphere(dir, wo, light_vtx(s - 1).shading_nrm)
+                ? abs(dot(dir, light_vtx(s - 1).shading_nrm) *
+                      dot(dir, light_vtx(s - 2).shading_nrm)) /
+                      (PI * dir_len * dir_len)
+                : 0;
+    }
+    float sum_ri = 0.;
+    float weight = 1.0;
+    for (int i = t - 1; i > 0; i--) {
+        weight *= cam_vtx(i).pdf_rev / cam_vtx(i).pdf_fwd;
+
+        sum_ri += weight;
+    }
+    weight = 1.0;
+
+    for (int i = s - 1; i >= 0; i--) {
+        weight *= (light_vtx(i).pdf_rev / light_vtx(i).pdf_fwd);
+        sum_ri += weight;
+    }
+
+    if (s_0_changed) {
+        light_vtx(0).pdf_fwd = s_0_pdf;
+        light_vtx(0).pos = s_0_pdf_pos;
+        light_vtx(0).shading_nrm = s_0_pdf_nrm;
+    }
+    if (t_0_changed) {
+        cam_vtx(0).pdf_fwd = s_0_pdf;
+        cam_vtx(0).pos = s_0_pdf_pos;
+        cam_vtx(0).shading_nrm = s_0_pdf_nrm;
+    }
+    if (idx_1 != -1) {
+        cam_vtx(idx_1 - 1).pdf_rev = idx_1_val;
+    }
+    if (idx_2 != -1) {
+        cam_vtx(idx_2 - 2).pdf_rev = idx_2_val;
+    }
+    if (idx_3 != -1) {
+        light_vtx(idx_3 - 1).pdf_rev = idx_3_val;
+    }
+    if (idx_4 != -1) {
+        light_vtx(idx_4 - 2).pdf_rev = idx_4_val;
+    }
+#undef cam_vtx
+#undef light_vtx
+    return 1 / (1 + sum_ri);
+}
+
+vec3 bdpt_connect_cam(int s, out ivec2 coords) {
+#define cam_vtx(i) camera_verts.d[camera_path_idx + i]
+#define light_vtx(i) light_verts.d[light_path_idx + i]
+    PathVertex sampled;
+    vec3 throughput = vec3(1.0);
+    vec3 L = vec3(0);
+    vec3 dir = cam_vtx(0).pos - light_vtx(s - 1).pos;
+    float len = length(dir);
+    dir /= len;
+    float cos_y = dot(dir, light_vtx(s - 1).shading_nrm);
+    float cos_theta = dot(cam_vtx(0).shading_nrm, -dir);
+    if (cos_theta <= 0.) {
+        return vec3(0);
+    }
+    float cos_3_theta = cos_theta * cos_theta * cos_theta;
+    const float cam_pdf_ratio =
+        abs(cos_theta * cos_y) / (cam_vtx(0).area * cos_3_theta * len * len);
+
+    vec3 ray_origin =
+        offset_ray(light_vtx(s - 1).pos, light_vtx(s - 1).shading_nrm);
+
+    if (cam_pdf_ratio > 0.0) {
+        any_hit_payload.hit = 1;
+        traceRayEXT(tlas,
+                    gl_RayFlagsTerminateOnFirstHitEXT |
+                        gl_RayFlagsSkipClosestHitShaderEXT,
+                    0xFF, 1, 0, 1, ray_origin, 0, dir, len - EPS, 1);
+        GLTFMaterial mat = materials.m[light_vtx(s - 1).material_idx];
+        vec3 f = eval_albedo(mat) / PI;
+        if (any_hit_payload.hit == 0) {
+            sampled.pos = cam_vtx(0).pos;
+            sampled.shading_nrm = cam_vtx(0).shading_nrm;
+            // We / pdf_we * abs(cos_theta) = cam_pdf_ratio
+            L = light_vtx(s - 1).throughput * cam_pdf_ratio / (  PI * size);
+        }
+    }
+    dir = -dir;
+    vec4 target = ubo.view * vec4(dir.x, dir.y, dir.z, 0);
+    target /= target.z;
+    target = -ubo.projection * target;
+    coords = ivec2(0.5 * (1 + target.xy) * gl_LaunchSizeEXT.xy - 0.5);
+    if (coords.x < 0 || coords.x >= gl_LaunchSizeEXT.x || coords.y < 0 ||
+        coords.y >= gl_LaunchSizeEXT.y ||
+        dot(dir, cam_vtx(0).shading_nrm) < 0) {
+        return vec3(0);
+    }
+    float mis_weight = 1.0;
+    if (luminance(L) != 0.) {
+       mis_weight = calc_mis_weight(s, 1, sampled);
+    }
+    return mis_weight * L;
+    #undef cam_vtx
+    #undef light_vtx
+}
+
+vec3 bdpt_connect(int s, int t) {
+#define cam_vtx(i) camera_verts.d[camera_path_idx + i]
+#define light_vtx(i) light_verts.d[light_path_idx + i]
+    vec3 L = vec3(0);
+    PathVertex s_fwd_pdf;
+    if (s == 0) {
+        // Pure camera path
+        uint mat_idx = cam_vtx(t - 1).material_idx;
+        GLTFMaterial mat = materials.m[mat_idx];
+        if (mat_idx != -1) {
+            L = mat.emissive_factor * cam_vtx(t - 1).throughput;
+        }
+    } else if (s == 1) {
+        // Connect from camera path to light(aka NEE)
+        uint light_idx;
+        uint light_triangle_idx;
+        MeshLight light;
+        const TriangleRecord record =
+            sample_area_light(light_idx, light_triangle_idx, light);
+        GLTFMaterial light_mat = materials.m[light_idx];
+        vec3 wi = record.pos - cam_vtx(t - 1).pos;
+        float ray_len = length(wi);
+        float ray_len_sqr = ray_len * ray_len;
+        wi /= ray_len;
+        const float cos_x = abs(dot(wi, cam_vtx(t - 1).shading_nrm));
+        const vec3 ray_origin =
+            offset_ray(cam_vtx(t - 1).pos, cam_vtx(t - 1).shading_nrm);
+        any_hit_payload.hit = 1;
+        traceRayEXT(tlas,
+                    gl_RayFlagsTerminateOnFirstHitEXT |
+                        gl_RayFlagsSkipClosestHitShaderEXT,
+                    0xFF, 1, 0, 1, ray_origin, 0, wi, ray_len - EPS, 1);
+        const bool visible = any_hit_payload.hit == 0;
+        if (visible) {
+            float cos_y = abs(dot(-wi, record.triangle_normal));
+            float G = abs(cos_x * cos_y) / ray_len_sqr;
+            float pdf = record.triangle_pdf;
+            bool visibility = (any_hit_payload.hit == 0);
+            GLTFMaterial mat = materials.m[cam_vtx(t - 1).material_idx];
+            vec3 f = eval_albedo(mat) / PI;
+            s_fwd_pdf.pdf_fwd = pdf;
+            s_fwd_pdf.pos = record.pos;
+            s_fwd_pdf.shading_nrm = record.triangle_normal;
+            vec3 throughput = light_mat.emissive_factor / pdf;
+            L = cam_vtx(t - 1).throughput * f * G * throughput;
+        }
+    } else {
+        // Eval G
+        vec3 n_s = light_vtx(s - 1).shading_nrm;
+        vec3 n_t = cam_vtx(t - 1).shading_nrm;
+        vec3 d = light_vtx(s - 1).pos - cam_vtx(t - 1).pos;
+        float len = length(d);
+        d /= len;
+        float G = (dot(n_s, d)) * abs(dot(n_t, d)) / (len * len);
+
+        if (G > 0) {
+            GLTFMaterial mat_1 = materials.m[cam_vtx(t - 1).material_idx];
+            vec3 brdf1 = eval_albedo(mat_1) / PI;
+            GLTFMaterial mat_2 = materials.m[light_vtx(s - 1).material_idx];
+            vec3 brdf2 = eval_albedo(mat_2) / PI;
+            vec3 ray_origin =
+                offset_ray(cam_vtx(t - 1).pos, cam_vtx(t - 1).shading_nrm);
+            // Check visibility
+            any_hit_payload.hit = 1;
+            traceRayEXT(tlas,
+                        gl_RayFlagsTerminateOnFirstHitEXT |
+                            gl_RayFlagsSkipClosestHitShaderEXT,
+                        0xFF, 1, 0, 1, ray_origin, 0, d, len - EPS, 1);
+            const bool visible = any_hit_payload.hit == 0;
+            if (visible) {
+                L = light_vtx(s - 1).throughput * G * brdf1 * brdf2 *
+                    cam_vtx(t - 1).throughput;
+            }
+        }
+    }
+#undef cam_vtx
+#undef light_vtx
+    float mis_weight = 1.0f;
+    if (luminance(L) != 0.) {
+        mis_weight = calc_mis_weight(s, t, s_fwd_pdf);
+        L *= mis_weight;
+    }
+    return vec3(L);
 }
 
 bool vcm_generate_light_sample(float eta_vc, out VCMState light_state) {
@@ -260,26 +678,17 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
     float cos_3_theta = cos_theta * cos_theta * cos_theta;
     const float cam_pdf_ratio = abs(cos_y) / (cam_A * cos_3_theta * len * len);
 
-    const float w_light = (cam_pdf_ratio / (size * 0.25 / ar)) *
+    const float w_light = (cam_pdf_ratio / (size * 0.25 /  ar )) *
                           (eta_vm + state.d_vcm + pdf_rev * state.d_vc);
     const float mis_weight = 1. / (1. + w_light);
     vec3 ray_origin = offset_ray(pos, nrm);
 
     if (cam_pdf_ratio > 0.0) {
         any_hit_payload.hit = 1;
-        traceRayEXT(tlas, // acceleration structure
+        traceRayEXT(tlas,
                     gl_RayFlagsTerminateOnFirstHitEXT |
                         gl_RayFlagsSkipClosestHitShaderEXT,
-                    0xFF,       // cullMask
-                    1,          // sbtRecordOffset
-                    0,          // sbtRecordStride
-                    1,          // missIndex
-                    ray_origin, // ray origin
-                    0,          // ray min range
-                    dir,        // ray direction
-                    len - EPS,  // ray max range
-                    1           // payload (location = 1)
-        );
+                    0xFF, 1, 0, 1, ray_origin, 0, dir, len - EPS, 1);
         GLTFMaterial mat = materials.m[mat_idx];
         vec3 lambertian_brdf = eval_albedo(mat) / PI;
         if (any_hit_payload.hit == 0) {
@@ -319,64 +728,61 @@ vec3 vcm_get_light_radiance(in const GLTFMaterial mat,
     return mis_weight * mat.emissive_factor;
 }
 
-
-vec3 uniform_sample_light(const vec3 albedo, const vec3 pos, const vec3 shading_nrm) {
+vec3 uniform_sample_light(const vec3 albedo, const vec3 pos,
+                          const vec3 shading_nrm) {
     vec3 res = vec3(0);
-     // Sample light
-            uint light_idx;
-            uint light_triangle_idx;
-            MeshLight light;
-            const TriangleRecord record =
-                sample_area_light(light_idx, light_triangle_idx, light);
-            GLTFMaterial light_mat = materials.m[light_idx];
-            vec3 wi = record.pos - payload.pos;
-            const float wi_len = length(wi);
-            wi /= wi_len;
-            const vec3 f = albedo / PI;
-            float cos_x = abs(dot(shading_nrm, wi));
-            float bsdf_pdf = cos_x / PI;
-            any_hit_payload.hit = 1;
-            traceRayEXT(tlas,
-                        gl_RayFlagsTerminateOnFirstHitEXT |
-                            gl_RayFlagsSkipClosestHitShaderEXT,
-                        0xFF, 1, 0, 1, pos, 0, wi, wi_len - EPS, 1);
-            bool visible = any_hit_payload.hit == 0;
-            float pdf_light;
-            float g = abs(dot(record.triangle_normal, -wi)) / (wi_len * wi_len);
-            if (pc_ray.use_area_sampling == 0) {
-                pdf_light = record.triangle_pdf / g;
-            } else {
-                bsdf_pdf *= g;
-                pdf_light = record.triangle_pdf;
-            }
-            if (visible && pdf_light > 0) {
-                const float mis_weight = 1 / (1 + bsdf_pdf / pdf_light);
-                res += f * cos_x * mis_weight *
-                       (pc_ray.use_area_sampling == 1 ? g : 1) *
-                       light_mat.emissive_factor / pdf_light;
-            }
-            // Sample BSDF
-            wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
-                                       shading_nrm);
-            cos_x = abs(dot(wi, shading_nrm));
-            bsdf_pdf = cos_x / PI;
-            traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, pos, tmin, wi, tmax, 0);
-            if (payload.material_idx == light_idx &&
-                payload.triangle_idx == light_triangle_idx) {
-                const float wi_len = length(payload.pos - pos);
-                float g =
-                    abs(dot(payload.shading_nrm, -wi)) / (wi_len * wi_len);
-                if (pc_ray.use_area_sampling == 1) {
-                    bsdf_pdf *= g;
+    // Sample light
+    uint light_idx;
+    uint light_triangle_idx;
+    MeshLight light;
+    const TriangleRecord record =
+        sample_area_light(light_idx, light_triangle_idx, light);
+    GLTFMaterial light_mat = materials.m[light_idx];
+    vec3 wi = record.pos - payload.pos;
+    const float wi_len = length(wi);
+    wi /= wi_len;
+    const vec3 f = albedo / PI;
+    float cos_x = abs(dot(shading_nrm, wi));
+    float bsdf_pdf = cos_x / PI;
+    any_hit_payload.hit = 1;
+    traceRayEXT(tlas,
+                gl_RayFlagsTerminateOnFirstHitEXT |
+                    gl_RayFlagsSkipClosestHitShaderEXT,
+                0xFF, 1, 0, 1, pos, 0, wi, wi_len - EPS, 1);
+    bool visible = any_hit_payload.hit == 0;
+    float pdf_light;
+    float g = abs(dot(record.triangle_normal, -wi)) / (wi_len * wi_len);
+    if (pc_ray.use_area_sampling == 0) {
+        pdf_light = record.triangle_pdf / g;
+    } else {
+        bsdf_pdf *= g;
+        pdf_light = record.triangle_pdf;
+    }
+    if (visible && pdf_light > 0) {
+        const float mis_weight = 1 / (1 + bsdf_pdf / pdf_light);
+        res += f * cos_x * mis_weight *
+               (pc_ray.use_area_sampling == 1 ? g : 1) *
+               light_mat.emissive_factor / pdf_light;
+    }
+    // Sample BSDF
+    wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)), shading_nrm);
+    cos_x = abs(dot(wi, shading_nrm));
+    bsdf_pdf = cos_x / PI;
+    traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, pos, tmin, wi, tmax, 0);
+    if (payload.material_idx == light_idx &&
+        payload.triangle_idx == light_triangle_idx) {
+        const float wi_len = length(payload.pos - pos);
+        float g = abs(dot(payload.shading_nrm, -wi)) / (wi_len * wi_len);
+        if (pc_ray.use_area_sampling == 1) {
+            bsdf_pdf *= g;
 
-                } else {
-                    pdf_light = record.triangle_pdf / g;
-                }
-                const float mis_weight = 1. / (1 + pdf_light / bsdf_pdf);
-                res += f * cos_x *
-                       (pc_ray.use_area_sampling == 1 ? g : 1) * mis_weight *
-                       light_mat.emissive_factor / bsdf_pdf;
-            }
+        } else {
+            pdf_light = record.triangle_pdf / g;
+        }
+        const float mis_weight = 1. / (1 + pdf_light / bsdf_pdf);
+        res += f * cos_x * (pc_ray.use_area_sampling == 1 ? g : 1) *
+               mis_weight * light_mat.emissive_factor / bsdf_pdf;
+    }
     return res;
 }
 
@@ -387,7 +793,7 @@ void main() {
     vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
     vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
     vec4 direction = sample_camera(d);
-   
+
     vec3 col = vec3(0);
     vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
                                                2. / gl_LaunchSizeEXT.y, 0, 1));
@@ -431,7 +837,8 @@ void main() {
             const vec3 albedo = eval_albedo(hit_mat);
             const vec3 pos = offset_ray(payload.pos, shading_nrm);
             const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
-            col += throughput * uniform_sample_light(albedo, pos, shading_nrm) /  light_pick_pdf;
+            col += throughput * uniform_sample_light(albedo, pos, shading_nrm) /
+                   light_pick_pdf;
             // Sample direction & update throughput
             direction.xyz = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
                                                   shading_nrm);
@@ -447,15 +854,43 @@ void main() {
         }
 
     } else if (INTEGRATOR == INTEGRATOR_BDPT) {
+        int num_light_paths = bdpt_generate_light_subpath(pc_ray.max_depth + 1);
+        int num_cam_paths = bdpt_generate_camera_subpath(
+            d, origin.xyz, pc_ray.max_depth + 2, cam_area);
 
-    }  else if (INTEGRATOR == INTEGRATOR_PPM_LIGHT) {
+        for (int t = 1; t <= num_cam_paths; t++) {
+            for (int s = 0; s <= num_light_paths; s++) {
+                int depth = s + t - 2;
+                if (depth < 0 || (s == 1 && t == 1) ||
+                    depth > pc_ray.max_depth) {
+                    continue;
+                }
+                if (t != 1) {
+                    col += bdpt_connect(s, t);
+                } else {
+                    ivec2 coords;
+                    vec3 splat_col = bdpt_connect_cam(s, coords);
+                    if (luminance(splat_col) > 0) {
+                        uint idx = coords.x * gl_LaunchSizeEXT.y + coords.y;
+                        tmp_col.d[idx] += splat_col;
+                    }
+                }
+            }
+        }
+        // vec3 splat_img = imageLoad(tmp_image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+        vec3 splat_img = tmp_col.d[col_idx];
+        col += splat_img;
+        tmp_col.d[col_idx] = vec3(0);
+
+    } else if (INTEGRATOR == INTEGRATOR_PPM_LIGHT) {
         uint light_idx;
         uint light_triangle_idx;
         MeshLight light;
         const TriangleRecord record =
             sample_area_light(light_idx, light_triangle_idx, light);
         GLTFMaterial light_mat = materials.m[light_idx];
-        vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)), record.triangle_normal);
+        vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
+                                        record.triangle_normal);
         vec3 o = record.pos;
         const float pdf_dir = dot(wi, record.triangle_normal) / PI;
         vec3 throughput =
@@ -477,19 +912,17 @@ void main() {
                 vec3 min_bnds;
                 vec3 max_bnds;
                 ivec3 grid_res;
-                if(pc_ray.frame_num == 0) {
+                if (pc_ray.frame_num == 0) {
                     min_bnds = pc_ray.min_bounds;
                     max_bnds = pc_ray.max_bounds;
                     grid_res = pc_ray.grid_res;
-                }else {
-                   min_bnds = atomic_data.d.min_bnds;
-                   max_bnds = atomic_data.d.max_bnds;
-                   grid_res = atomic_data.d.grid_res;
-                  
+                } else {
+                    min_bnds = atomic_data.d.min_bnds;
+                    max_bnds = atomic_data.d.max_bnds;
+                    grid_res = atomic_data.d.grid_res;
                 }
-                const ivec3 grid_idx = get_grid_idx(
-                    payload.pos, min_bnds, max_bnds,
-                    grid_res);
+                const ivec3 grid_idx =
+                    get_grid_idx(payload.pos, min_bnds, max_bnds, grid_res);
                 const uint h = hash(grid_idx, size);
                 // float val = rand(seed);
                 photons.d[h].pos = payload.pos;
@@ -497,7 +930,6 @@ void main() {
                 photons.d[h].throughput = throughput;
                 photons.d[h].nrm = shading_nrm;
                 atomicAdd(photons.d[h].photon_count, 1);
-                       
             }
             wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
                                        shading_nrm);
@@ -508,9 +940,10 @@ void main() {
         vec3 throughput = vec3(1.);
         vec3 phi_total = vec3(0);
         uint M = 0;
-        float r = pc_ray.frame_num <= 1 ? pc_ray.radius : sppm_data.d[col_idx].radius;
+        float r =
+            pc_ray.frame_num <= 1 ? pc_ray.radius : sppm_data.d[col_idx].radius;
         const float r_sqr = r * r;
-        if(r < EPS) {
+        if (r < EPS) {
             r = EPS;
         }
         vec3 hit_point;
@@ -519,7 +952,7 @@ void main() {
                         direction.xyz, tmax, 0);
             bool found_isect = payload.material_idx != -1;
             if (depth >= pc_ray.max_depth) {
-              
+
                 break;
             }
             if (!found_isect) {
@@ -550,32 +983,37 @@ void main() {
             const vec3 albedo = eval_albedo(hit_mat);
             const vec3 pos = offset_ray(payload.pos, shading_nrm);
             const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
-            col += throughput * uniform_sample_light(albedo, pos, shading_nrm) /  light_pick_pdf;
+            col += throughput * uniform_sample_light(albedo, pos, shading_nrm) /
+                   light_pick_pdf;
             // Gather
             const vec3 bsdf = albedo / PI;
             const vec3 p = payload.pos;
-           
+
             vec3 min_bnds;
-			vec3 max_bnds;
-			ivec3 grid_res;
-			if(pc_ray.frame_num == 0) {
-				min_bnds = pc_ray.min_bounds;
-				max_bnds = pc_ray.max_bounds;
-				grid_res = pc_ray.grid_res;
-			}else {
-            min_bnds = pc_ray.min_bounds;
-                    max_bnds = pc_ray.max_bounds;
-                    grid_res = pc_ray.grid_res;
-			   min_bnds = atomic_data.d.min_bnds;
-			   max_bnds = atomic_data.d.max_bnds;
-			   grid_res = atomic_data.d.grid_res;
-			}
-            ivec3 grid_min_bnds_idx = get_grid_idx(p - r, min_bnds, max_bnds, grid_res);
-            ivec3 grid_max_bnds_idx = get_grid_idx(p + r, min_bnds, max_bnds, grid_res);
+            vec3 max_bnds;
+            ivec3 grid_res;
+            if (pc_ray.frame_num == 0) {
+                min_bnds = pc_ray.min_bounds;
+                max_bnds = pc_ray.max_bounds;
+                grid_res = pc_ray.grid_res;
+            } else {
+                min_bnds = pc_ray.min_bounds;
+                max_bnds = pc_ray.max_bounds;
+                grid_res = pc_ray.grid_res;
+                min_bnds = atomic_data.d.min_bnds;
+                max_bnds = atomic_data.d.max_bnds;
+                grid_res = atomic_data.d.grid_res;
+            }
+            ivec3 grid_min_bnds_idx =
+                get_grid_idx(p - r, min_bnds, max_bnds, grid_res);
+            ivec3 grid_max_bnds_idx =
+                get_grid_idx(p + r, min_bnds, max_bnds, grid_res);
 
             for (int x = grid_min_bnds_idx.x; x <= grid_max_bnds_idx.x; x++) {
-                for (int y = grid_min_bnds_idx.y; y <= grid_max_bnds_idx.y; y++) {
-                    for (int z = grid_min_bnds_idx.z; z <= grid_max_bnds_idx.z; z++) {
+                for (int y = grid_min_bnds_idx.y; y <= grid_max_bnds_idx.y;
+                     y++) {
+                    for (int z = grid_min_bnds_idx.z; z <= grid_max_bnds_idx.z;
+                         z++) {
                         uint h = hash(ivec3(x, y, z), size);
                         if (photons.d[h].photon_count > 0) {
                             vec3 pp = p - photons.d[h].pos;
@@ -583,17 +1021,19 @@ void main() {
                             if (dist_sqr > r_sqr) {
                                 continue;
                             }
-                            float cos_nrm = dot(photons.d[h].nrm, payload.shading_nrm);
+                            float cos_nrm =
+                                dot(photons.d[h].nrm, payload.shading_nrm);
                             const float w = 1. - sqrt(dist_sqr) / r;
-						    const float w_normalization = 3.; // 1. / (1 - 2/(3*k)) where k = 1
-	                        vec3 phi = w * photons.d[h].throughput * 
-										   bsdf * w_normalization;
-                            if(cos_nrm > EPS) {
-							    phi *= photons.d[h].photon_count;	
+                            const float w_normalization =
+                                3.; // 1. / (1 - 2/(3*k)) where k = 1
+                            vec3 phi = w * photons.d[h].throughput * bsdf *
+                                       w_normalization;
+                            if (cos_nrm > EPS) {
+                                phi *= photons.d[h].photon_count;
                             }
-                            if(cos_nrm >= 0) {
+                            if (cos_nrm >= 0) {
                                 phi_total += phi;
-							    M++;
+                                M++;
                             }
                         }
                     }
@@ -603,14 +1043,14 @@ void main() {
             pixel(col_idx).p = p;
             break;
         }
-        if(M > 0) {
+        if (M > 0) {
             const float gamma = 2.0 / 3.0;
-		    const float n_new = pixel(col_idx).N + gamma * M;
-		    const float r_new = r * sqrt(n_new / ( pixel(col_idx).N + M));
-		    phi_total = phi_total * r_new * r_new / (r_sqr);
-		    pixel(col_idx).N = n_new;
-			pixel(col_idx).radius = r_new;
-			col += phi_total / (size * PI * r_new * r_new); 
+            const float n_new = pixel(col_idx).N + gamma * M;
+            const float r_new = r * sqrt(n_new / (pixel(col_idx).N + M));
+            phi_total = phi_total * r_new * r_new / (r_sqr);
+            pixel(col_idx).N = n_new;
+            pixel(col_idx).radius = r_new;
+            col += phi_total / (size * PI * r_new * r_new);
         }
 #undef pixel
     } else if (INTEGRATOR == INTEGRATOR_VCM_LIGHT) {
@@ -638,14 +1078,14 @@ void main() {
             vec3 shading_nrm = payload.shading_nrm;
             float cos_wo = dot(wo, shading_nrm);
             vec3 geometry_nrm = payload.geometry_nrm;
-            if (dot(payload.geometry_nrm, wo) < 0.)
+            if (dot(payload.geometry_nrm, wo) <= 0.)
                 geometry_nrm = -geometry_nrm;
-            if (cos_wo < 0.) {
+            if (cos_wo <= 0.) {
                 cos_wo = -cos_wo;
                 shading_nrm = -shading_nrm;
             }
 
-            if (dot(geometry_nrm, wo) * dot(shading_nrm, wo) < 0) {
+            if (dot(geometry_nrm, wo) * dot(shading_nrm, wo) <= 0) {
                 // We dont handle BTDF at the moment
                 break;
             }
@@ -985,7 +1425,8 @@ void main() {
 
 #undef light_vtx
     }
-    if (INTEGRATOR == 0 || INTEGRATOR == 1 || INTEGRATOR == 3 || INTEGRATOR == 5) {
+    if (INTEGRATOR == 0 || INTEGRATOR == 1 || INTEGRATOR == 3 ||
+        INTEGRATOR == 5) {
         if (pc_ray.frame_num > 0) {
             float w = 1. / float(pc_ray.frame_num + 1);
             vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
