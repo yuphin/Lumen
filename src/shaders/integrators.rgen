@@ -324,7 +324,7 @@ int bdpt_generate_camera_subpath(const vec2 d, const vec3 origin, int max_depth,
         vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
     float cos_theta = dot(camera_verts.d[camera_path_idx + 0].dir,
                           camera_verts.d[camera_path_idx + 0].shading_nrm);
-    float pdf = 1 / (cam_area * size * cos_theta * cos_theta * cos_theta);
+    float pdf = 1 / (cam_area * size * 4 * ar * cos_theta * cos_theta * cos_theta);
     return bdpt_random_walk(max_depth - 1, vec3(1), pdf, 1) + 1;
 }
 
@@ -585,7 +585,7 @@ vec3 bdpt_connect(int s, int t) {
         vec3 d = light_vtx(s - 1).pos - cam_vtx(t - 1).pos;
         float len = length(d);
         d /= len;
-        float G = (dot(n_s, d)) * abs(dot(n_t, d)) / (len * len);
+        float G = (dot(n_s, -d)) * abs(dot(n_t, d)) / (len * len);
 
         if (G > 0) {
             GLTFMaterial mat_1 = materials.m[cam_vtx(t - 1).material_idx];
