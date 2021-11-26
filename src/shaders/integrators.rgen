@@ -232,15 +232,14 @@ int bdpt_random_walk(const int max_depth, in vec3 throughput, const float pdf,
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, ray_pos, tmin, wi, tmax, 0);
         if (payload.material_idx == -1) {
             if(type == 0) {
-				const vec3 t = vtx(b-1, throughput);
 				vtx_assign(b, throughput, throughput);
 				b++; 
             }
             break;
         }
         prev = b;
-        vtx_assign(b, throughput, throughput);
         b++;
+        vtx_assign(b, throughput, throughput);
         wi = (payload.pos - vtx(prev, pos));
         float wi_len = length(wi);
         wi /= wi_len;
@@ -302,7 +301,7 @@ int bdpt_generate_light_subpath(int max_depth) {
     vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
                                     record.triangle_normal);
     light_verts.d[light_path_idx + 0].dir = wi;
-    float pdf_dir = dot(wi, record.triangle_normal) / PI;
+    float pdf_dir = abs(dot(wi, record.triangle_normal)) / PI;
     light_verts.d[light_path_idx + 0].pdf_fwd =
         record.triangle_pdf * (1.0 / pc_ray.light_triangle_count);
     vec3 throughput = light_mat.emissive_factor *
@@ -324,7 +323,7 @@ int bdpt_generate_camera_subpath(const vec2 d, const vec3 origin, int max_depth,
         vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
     float cos_theta = dot(camera_verts.d[camera_path_idx + 0].dir,
                           camera_verts.d[camera_path_idx + 0].shading_nrm);
-    float pdf = 1 / (cam_area * size * 4 * ar * cos_theta * cos_theta * cos_theta);
+    float pdf = 1 / (cam_area * size * cos_theta * cos_theta * cos_theta);
     return bdpt_random_walk(max_depth - 1, vec3(1), pdf, 1) + 1;
 }
 
@@ -408,7 +407,7 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
         if (t == 1) {
             float cos_theta = dot(cam_vtx(0).shading_nrm, dir);
             float pdf =
-                1.0 / (cam_vtx(0).area * size * 4 * ar * cos_theta * cos_theta * cos_theta);
+                1.0 / (cam_vtx(0).area * size * cos_theta * cos_theta * cos_theta);
             pdf *= abs(dot(dir, light_vtx(s - 1).shading_nrm)) /
                    (dir_len * dir_len);
             light_vtx(s - 1).pdf_rev = pdf;
@@ -510,7 +509,7 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
             sampled.pos = cam_vtx(0).pos;
             sampled.shading_nrm = cam_vtx(0).shading_nrm;
             // We / pdf_we * abs(cos_theta) = cam_pdf_ratio
-            L = light_vtx(s - 1).throughput * cam_pdf_ratio / (  PI * size);
+            L = light_vtx(s - 1).throughput * cam_pdf_ratio * f / ( size);
         }
     }
     dir = -dir;
@@ -678,7 +677,7 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
     float cos_3_theta = cos_theta * cos_theta * cos_theta;
     const float cam_pdf_ratio = abs(cos_y) / (cam_A * cos_3_theta * len * len);
 
-    const float w_light = (cam_pdf_ratio / (size * 0.25 /  ar )) *
+    const float w_light = (cam_pdf_ratio / (size )) *
                           (eta_vm + state.d_vcm + pdf_rev * state.d_vc);
     const float mis_weight = 1. / (1. + w_light);
     vec3 ray_origin = offset_ray(pos, nrm);
@@ -1095,10 +1094,10 @@ void main() {
             // Complete the missing geometry terms
             float cos_theta_wo = abs(dot(wo, shading_nrm));
             if (pc_ray.use_vc == 1 || pc_ray.use_vm == 1) {
-                light_vtx(d - 1).d_vcm *= dist_sqr;
-                light_vtx(d - 1).d_vcm /= cos_theta_wo;
-                light_vtx(d - 1).d_vc /= cos_theta_wo;
-                light_vtx(d - 1).d_vm /= cos_theta_wo;
+                light_state.d_vcm *= dist_sqr;
+                light_state.d_vcm /= cos_theta_wo;
+                light_state.d_vc /= cos_theta_wo;
+                light_state.d_vm /= cos_theta_wo;
                 // Copy to light vertex buffer
                 light_vtx(d - 1).wi = light_state.wi;
                 light_vtx(d - 1).shading_nrm = light_state.shading_nrm;
@@ -1141,7 +1140,6 @@ void main() {
                     ? cos_theta / PI
                     : 0;
             light_state.pos = offset_ray(payload.pos, shading_nrm);
-            light_state.d_vcm = 1.0 / pdf_dir;
             // Note, same cancellations also occur here from now on
             // see _vcm_generate_light_sample_
             light_state.d_vc =
@@ -1150,6 +1148,7 @@ void main() {
             light_state.d_vm =
                 (cos_theta / pdf_dir) *
                 (1 + light_state.d_vcm * eta_vc + pdf_rev * light_state.d_vm);
+            light_state.d_vcm = 1.0 / pdf_dir;
             GLTFMaterial mat = materials.m[payload.material_idx];
             vec3 albedo = eval_albedo(mat);
             light_state.throughput *= albedo;
@@ -1195,7 +1194,7 @@ void main() {
         float cos_theta = abs(dot(camera_state.shading_nrm, direction.xyz));
         // Defer r^2 / cos term
         camera_state.d_vcm =
-            cam_area * size * cos_theta * cos_theta * cos_theta * 0.25 / ar;
+            cam_area * size * cos_theta * cos_theta * cos_theta;
         camera_state.d_vc = 0;
         camera_state.d_vm = 0;
         int d;
@@ -1229,7 +1228,8 @@ void main() {
             const vec3 albedo = eval_albedo(hit_mat);
             const vec3 f = albedo / PI;
 
-            const float pdf_rev = dot(wo, payload.shading_nrm) / PI;
+            
+            const float pdf_rev = abs(dot(wo, payload.shading_nrm)) / PI;
             // Complete the missing geometry terms
             float cos_theta_wo = abs(dot(wo, payload.shading_nrm));
             camera_state.d_vcm *= dist_sqr;
@@ -1241,7 +1241,7 @@ void main() {
                 col += camera_state.throughput *
                        vcm_get_light_radiance(hit_mat, camera_state, d);
                 if (pc_ray.use_vc == 1 || pc_ray.use_vm == 1) {
-                    break;
+                    //break;
                 }
             }
 
@@ -1406,7 +1406,6 @@ void main() {
                     : 0;
 
             camera_state.pos = offset_ray(payload.pos, payload.shading_nrm);
-            camera_state.d_vcm = 1.0 / pdf_dir;
             // Note, same cancellations also occur here from now on
             // see _vcm_generate_light_sample_
             camera_state.d_vc =
@@ -1415,6 +1414,7 @@ void main() {
             camera_state.d_vm =
                 (cos_theta / pdf_dir) *
                 (1 + camera_state.d_vcm * eta_vc + pdf_rev * camera_state.d_vm);
+            camera_state.d_vcm = 1.0 / pdf_dir;
             camera_state.throughput *= albedo;
             camera_state.shading_nrm = payload.shading_nrm;
             camera_state.area = payload.area;
