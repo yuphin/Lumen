@@ -1366,10 +1366,11 @@ void main() {
                                 if (dist_sqr > r_sqr) {
                                     continue;
                                 }
-                                uint depth = photons.d[h].path_len + d - 1;
-                                if (depth > pc_ray.max_depth) {
-                                    continue;
-                                }
+                                // Should we?
+//                                uint depth = photons.d[h].path_len + d - 1;
+//                                if (depth > pc_ray.max_depth) {
+//                                    continue;
+//                                }
                                 const float cam_pdf_fwd =
                                     abs(dot(photons.d[h].wi,
                                             payload.shading_nrm)) /

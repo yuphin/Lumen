@@ -13,7 +13,7 @@ bool use_area_sampling = true;
 float vcm_radius_factor = 0.1;
 int integrator = 0;
 float ppm_base_radius = 0.25;
-const int max_depth = 3;
+const int max_depth = 6;
 // TODO: Use instances in the rasterization pipeline
 // TODO: Use a single scratch buffer
 RTScene* RTScene::instance = nullptr;
