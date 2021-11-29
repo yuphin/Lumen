@@ -11,9 +11,9 @@ bool use_vc = true;
 bool delay_pt = false;
 bool use_area_sampling = true;
 float vcm_radius_factor = 0.1;
-int integrator = 1;
+int integrator = 0;
 float ppm_base_radius = 0.25;
-const int max_depth = 5;
+const int max_depth = 3;
 // TODO: Use instances in the rasterization pipeline
 // TODO: Use a single scratch buffer
 RTScene* RTScene::instance = nullptr;
@@ -203,7 +203,7 @@ void RTScene::init_scene() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * (max_depth + 2) * sizeof(PathVertex));
+		width * height * (max_depth + 1) * sizeof(PathVertex));
 
 	path_backup_buffer.create(
 		&vkb.ctx,
@@ -285,7 +285,7 @@ void RTScene::init_scene() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * max_depth * sizeof(VCMVertex)
+		width * height * (max_depth + 1) * sizeof(VCMVertex)
 	);
 
 	light_path_cnt_buffer.create(
@@ -658,6 +658,7 @@ void RTScene::create_rt_pipelines() {
 	rt_pipelines[Integrator::PPM + 1]->create_rt_pipeline(settings, { INTEGRATOR_PPM_EYE });
 	rt_pipelines[Integrator::VCM]->create_rt_pipeline(settings, { INTEGRATOR_VCM_LIGHT });
 	rt_pipelines[Integrator::VCM + 1]->create_rt_pipeline(settings, { INTEGRATOR_VCM_EYE });
+	vkDestroyShaderModule(vkb.ctx.device, stages[eRaygen].module, nullptr);
 	stages[eRaygen].module = shaders[0].create_vk_shader_module(vkb.ctx.device);
 	settings.stages = stages;
 	rt_pipelines[Integrator::DELAYED_PT]->create_rt_pipeline(settings, { INTEGRATOR_PT });

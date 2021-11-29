@@ -52,9 +52,16 @@ vec3 offset_ray(const vec3 p, const vec3 n) {
         intBitsToFloat(floatBitsToInt(p.y) + ((p.y < 0) ? -of_i.y : of_i.y)),
         intBitsToFloat(floatBitsToInt(p.z) + ((p.z < 0) ? -of_i.z : of_i.z)));
 
+#if 0
     return vec3(abs(p.x) < origin ? p.x + float_scale * n.x : p_i.x,
                 abs(p.y) < origin ? p.y + float_scale * n.y : p_i.y,
                 abs(p.z) < origin ? p.z + float_scale * n.z : p_i.z);
+#else
+  return vec3(p.x + float_scale * n.x ,
+              p.y + float_scale * n.y,
+              p.z + float_scale * n.z 
+              );
+#endif
 }
 
 float luminance(vec3 rgb) { return dot(rgb, vec3(0.2126f, 0.7152f, 0.0722f)); }

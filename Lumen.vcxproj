@@ -263,6 +263,7 @@
     <None Include="src\shaders\gpgpu\min.comp" />
     <None Include="src\shaders\gpgpu\reduce_max.comp" />
     <None Include="src\shaders\gpgpu\reduce_min.comp" />
+    <None Include="src\shaders\integrators.rgen" />
     <None Include="src\shaders\pathtrace.rahit" />
     <None Include="src\shaders\pathtrace.rchit" />
     <None Include="src\shaders\pathtrace.rgen" />
@@ -270,6 +271,7 @@
     <None Include="src\shaders\pathtrace_shadow.rmiss" />
     <None Include="src\shaders\post.frag" />
     <None Include="src\shaders\post.vert" />
+    <None Include="src\shaders\pt_unidir.rgen" />
     <None Include="src\Shaders\scene.frag" />
     <None Include="src\Shaders\scene.vert" />
     <None Include="src\Shaders\triangle.frag" />

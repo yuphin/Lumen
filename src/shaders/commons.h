@@ -123,6 +123,7 @@ struct PhotonHash {
 	vec3 throughput;
 	int photon_count;
 	vec3 nrm;
+	uint path_len;
 };
 
 struct Bounds {

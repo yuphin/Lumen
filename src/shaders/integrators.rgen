@@ -91,7 +91,7 @@ LightPathCnt light_path_cnts = LightPathCnt(scene_desc.light_path_cnt_addr);
 uint col_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uint camera_path_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
-    (pc_ray.max_depth + 2);
+    (pc_ray.max_depth + 1);
 uint light_path_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
     (pc_ray.max_depth + 1);
@@ -210,8 +210,8 @@ vec3 eval_albedo(const GLTFMaterial m) {
 
 int bdpt_random_walk(const int max_depth, in vec3 throughput, const float pdf,
                      const int type) {
-#define vtx(i, prop)                                                                 \
-    (type == 0 ? light_verts.d[light_path_idx + i].prop                             \
+#define vtx(i, prop)                                                           \
+    (type == 0 ? light_verts.d[light_path_idx + i].prop                        \
                : camera_verts.d[camera_path_idx + i].prop)
 #define vtx_assign(i, prop, expr)                                              \
     type == 0 ? light_verts.d[light_path_idx + i].prop = (expr)                \
@@ -231,9 +231,9 @@ int bdpt_random_walk(const int max_depth, in vec3 throughput, const float pdf,
     while (true) {
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, ray_pos, tmin, wi, tmax, 0);
         if (payload.material_idx == -1) {
-            if(type == 0) {
-				vtx_assign(b, throughput, throughput);
-				b++; 
+            if (type == 0) {
+                vtx_assign(b, throughput, throughput);
+                b++;
             }
             break;
         }
@@ -243,11 +243,11 @@ int bdpt_random_walk(const int max_depth, in vec3 throughput, const float pdf,
         wi = (payload.pos - vtx(prev, pos));
         float wi_len = length(wi);
         wi /= wi_len;
-        vec3 wo = vtx(b-1, pos) - payload.pos;
+        vec3 wo = vtx(b - 1, pos) - payload.pos;
         float wo_len = length(wo);
         wo /= wo_len;
         vec3 shading_nrm = payload.shading_nrm;
-        if (type == 0 && dot(wo, shading_nrm) < 0) {
+        if (dot(wo, shading_nrm) < 0) {
             shading_nrm *= -1;
         }
         vtx_assign(b, pdf_fwd,
@@ -279,7 +279,7 @@ int bdpt_random_walk(const int max_depth, in vec3 throughput, const float pdf,
         pdf_rev = same_hemisphere(wi, wo, shading_nrm)
                       ? dot(shading_nrm, wo) / PI
                       : 0;
-        pdf_rev *= abs(dot(vtx(b-1, shading_nrm), wo)) / (wo_len * wo_len);
+        pdf_rev *= abs(dot(vtx(b - 1, shading_nrm), wo)) / (wo_len * wo_len);
         vtx_assign(prev, pdf_rev, pdf_rev);
         ray_pos = offset_ray(payload.pos, shading_nrm);
     }
@@ -406,8 +406,8 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
         dir /= dir_len;
         if (t == 1) {
             float cos_theta = dot(cam_vtx(0).shading_nrm, dir);
-            float pdf =
-                1.0 / (cam_vtx(0).area * size * cos_theta * cos_theta * cos_theta);
+            float pdf = 1.0 / (cam_vtx(0).area * size * cos_theta * cos_theta *
+                               cos_theta);
             pdf *= abs(dot(dir, light_vtx(s - 1).shading_nrm)) /
                    (dir_len * dir_len);
             light_vtx(s - 1).pdf_rev = pdf;
@@ -509,7 +509,7 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
             sampled.pos = cam_vtx(0).pos;
             sampled.shading_nrm = cam_vtx(0).shading_nrm;
             // We / pdf_we * abs(cos_theta) = cam_pdf_ratio
-            L = light_vtx(s - 1).throughput * cam_pdf_ratio * f / ( size);
+            L = light_vtx(s - 1).throughput * cam_pdf_ratio * f / (size);
         }
     }
     dir = -dir;
@@ -524,11 +524,11 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
     }
     float mis_weight = 1.0;
     if (luminance(L) != 0.) {
-       mis_weight = calc_mis_weight(s, 1, sampled);
+        mis_weight = calc_mis_weight(s, 1, sampled);
     }
     return mis_weight * L;
-    #undef cam_vtx
-    #undef light_vtx
+#undef cam_vtx
+#undef light_vtx
 }
 
 vec3 bdpt_connect(int s, int t) {
@@ -567,7 +567,7 @@ vec3 bdpt_connect(int s, int t) {
         if (visible) {
             float cos_y = abs(dot(-wi, record.triangle_normal));
             float G = abs(cos_x * cos_y) / ray_len_sqr;
-            float pdf = record.triangle_pdf;
+            float pdf = record.triangle_pdf / pc_ray.light_triangle_count;
             bool visibility = (any_hit_payload.hit == 0);
             GLTFMaterial mat = materials.m[cam_vtx(t - 1).material_idx];
             vec3 f = eval_albedo(mat) / PI;
@@ -584,7 +584,7 @@ vec3 bdpt_connect(int s, int t) {
         vec3 d = light_vtx(s - 1).pos - cam_vtx(t - 1).pos;
         float len = length(d);
         d /= len;
-        float G = (dot(n_s, -d)) * abs(dot(n_t, d)) / (len * len);
+        float G = (dot(n_s, -d)) * (dot(n_t, d)) / (len * len);
 
         if (G > 0) {
             GLTFMaterial mat_1 = materials.m[cam_vtx(t - 1).material_idx];
@@ -677,7 +677,7 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
     float cos_3_theta = cos_theta * cos_theta * cos_theta;
     const float cam_pdf_ratio = abs(cos_y) / (cam_A * cos_3_theta * len * len);
 
-    const float w_light = (cam_pdf_ratio / (size )) *
+    const float w_light = (cam_pdf_ratio / (size)) *
                           (eta_vm + state.d_vcm + pdf_rev * state.d_vc);
     const float mis_weight = 1. / (1. + w_light);
     vec3 ray_origin = offset_ray(pos, nrm);
@@ -806,7 +806,7 @@ void main() {
             traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin,
                         direction.xyz, tmax, 0);
             bool found_isect = payload.material_idx != -1;
-            if (depth >= pc_ray.max_depth) {
+            if (depth >= pc_ray.max_depth - 1) {
                 break;
             }
             if (!found_isect) {
@@ -855,15 +855,18 @@ void main() {
     } else if (INTEGRATOR == INTEGRATOR_BDPT) {
         int num_light_paths = bdpt_generate_light_subpath(pc_ray.max_depth + 1);
         int num_cam_paths = bdpt_generate_camera_subpath(
-            d, origin.xyz, pc_ray.max_depth + 2, cam_area);
+            d, origin.xyz, pc_ray.max_depth + 1, cam_area);
 
-        for (int t = 1; t <= num_cam_paths; t++) {
-            for (int s = 0; s <= num_light_paths; s++) {
-                int depth = s + t - 2;
-                if (depth < 0 || (s == 1 && t == 1) ||
-                    depth > pc_ray.max_depth) {
+        for (int t = 1; t < num_cam_paths; t++) {
+            for (int s = 0; s < num_light_paths; s++) {
+                int depth = s + t - 1;
+                if (depth == 0) {
                     continue;
                 }
+                if (depth > pc_ray.max_depth) {
+                    break;
+                }
+
                 if (t != 1) {
                     col += bdpt_connect(s, t);
                 } else {
@@ -895,7 +898,7 @@ void main() {
         vec3 throughput =
             light_mat.emissive_factor * abs(dot(record.triangle_normal, wi)) /
             (pdf_dir * record.triangle_pdf / pc_ray.light_triangle_count);
-        for (int d = 0; d < pc_ray.max_depth; d++) {
+        for (int d = 0; d < pc_ray.max_depth - 1; d++) {
             traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, o, tmin, wi, tmax, 0);
             bool found_isect = payload.material_idx != -1;
             if (!found_isect) {
@@ -928,6 +931,7 @@ void main() {
                 photons.d[h].wi = -wi;
                 photons.d[h].throughput = throughput;
                 photons.d[h].nrm = shading_nrm;
+                photons.d[h].path_len = d + 1;
                 atomicAdd(photons.d[h].photon_count, 1);
             }
             wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
@@ -946,21 +950,17 @@ void main() {
             r = EPS;
         }
         vec3 hit_point;
-        for (int depth = 0; depth < pc_ray.max_depth; depth++) {
+        for (int d = 0; d < pc_ray.max_depth - 1; d++) {
             traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin,
                         direction.xyz, tmax, 0);
             bool found_isect = payload.material_idx != -1;
-            if (depth >= pc_ray.max_depth) {
-
-                break;
-            }
             if (!found_isect) {
                 col += throughput * pc_ray.sky_col;
                 break;
             }
             hit_point = offset_ray(payload.pos, payload.shading_nrm);
             GLTFMaterial hit_mat = materials.m[payload.material_idx];
-            if (depth == 0) {
+            if (d == 0) {
                 col += throughput * hit_mat.emissive_factor;
             }
             const vec3 wo = -direction.xyz;
@@ -1111,12 +1111,14 @@ void main() {
                 light_vtx(d - 1).d_vm = light_state.d_vm;
                 light_vtx(d - 1).path_len = d;
             }
-
+            if (d >= pc_ray.max_depth + 1) {
+                break;
+            }
             // Reverse pdf in solid angle form, since we have geometry term
             // at the outer paranthesis
             float pdf_rev = abs(dot(shading_nrm, wo)) / PI;
             light_vtx(d - 1).pdf_rev = pdf_rev;
-            if (pc_ray.use_vc == 1) {
+            if (pc_ray.use_vc == 1 && d < pc_ray.max_depth) {
                 // Connect to camera
                 ivec2 coords;
                 vec3 splat_col = vcm_connect_cam(
@@ -1128,9 +1130,6 @@ void main() {
                 }
             }
 
-            if (d + 1 > pc_ray.max_depth) {
-                break;
-            }
             // Continue the walk
             light_state.wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
                                                    shading_nrm);
@@ -1154,6 +1153,7 @@ void main() {
             light_state.throughput *= albedo;
             light_state.shading_nrm = shading_nrm;
             light_state.area = payload.area;
+            light_state.material_idx = payload.material_idx;
         }
         light_path_cnts.d[col_idx] = d;
 
@@ -1171,6 +1171,7 @@ void main() {
                 photons.d[h].d_vcm = light_vtx(i).d_vcm;
                 photons.d[h].throughput = light_vtx(i).throughput;
                 photons.d[h].nrm = light_vtx(i).shading_nrm;
+                photons.d[h].path_len = light_vtx(i).path_len;
                 atomicAdd(photons.d[h].photon_count, 1);
             }
         }
@@ -1198,10 +1199,10 @@ void main() {
         camera_state.d_vc = 0;
         camera_state.d_vm = 0;
         int d;
-        for (d = 1;; d++) {
+        for (d = 2;; d++) {
             traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, camera_state.pos, tmin,
                         camera_state.wi, tmax, 0);
-            if (d > pc_ray.max_depth) {
+            if (d >= pc_ray.max_depth + 1) {
                 break;
             }
             if (payload.material_idx == -1) {
@@ -1228,7 +1229,6 @@ void main() {
             const vec3 albedo = eval_albedo(hit_mat);
             const vec3 f = albedo / PI;
 
-            
             const float pdf_rev = abs(dot(wo, payload.shading_nrm)) / PI;
             // Complete the missing geometry terms
             float cos_theta_wo = abs(dot(wo, payload.shading_nrm));
@@ -1241,7 +1241,7 @@ void main() {
                 col += camera_state.throughput *
                        vcm_get_light_radiance(hit_mat, camera_state, d);
                 if (pc_ray.use_vc == 1 || pc_ray.use_vm == 1) {
-                    //break;
+                    // break;
                 }
             }
 
@@ -1289,11 +1289,14 @@ void main() {
 #define light_vtx(i) vcm_lights.d[i]
                 uint light_path_idx = uint(rand(seed) * size);
                 uint light_path_len = light_path_cnts.d[light_path_idx];
-
                 for (int i = 0; i < light_path_len; i++) {
-                    if (light_vtx(light_path_idx + i).path_len + d + 1 >
-                        pc_ray.max_depth) {
+                    uint s = light_vtx(light_path_idx + i).path_len;
+                    uint depth = s + d - 1;
+                    if (depth > pc_ray.max_depth) {
                         break;
+                    }
+                    if (s == 1) {
+                        continue;
                     }
                     vec3 dir = light_vtx(light_path_idx + i).pos - payload.pos;
                     const float len = length(dir);
@@ -1340,6 +1343,7 @@ void main() {
             }
 
             // Vertex merging
+
             vec3 r = vec3(radius);
             float r_sqr = radius * radius;
             if (pc_ray.use_vm == 1) {
@@ -1360,6 +1364,10 @@ void main() {
                                 const vec3 pp = payload.pos - photons.d[h].pos;
                                 const float dist_sqr = dot(pp, pp);
                                 if (dist_sqr > r_sqr) {
+                                    continue;
+                                }
+                                uint depth = photons.d[h].path_len + d - 1;
+                                if (depth > pc_ray.max_depth) {
                                     continue;
                                 }
                                 const float cam_pdf_fwd =

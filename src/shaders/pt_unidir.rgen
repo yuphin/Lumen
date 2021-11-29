@@ -158,7 +158,7 @@ void main() {
     const vec3 sky_col = vec3(0., 0., 0.);
 
     float brdf_pdf;
-    for (int depth = 0; depth <= pc_ray.max_depth; depth++) {
+    for (int depth = 0; depth < pc_ray.max_depth - 1; depth++) {
         traceRayEXT(tlas,          // acceleration structure
                     flags,         // rayFlags
                     0xFF,          // cullMask
