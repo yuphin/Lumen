@@ -82,13 +82,11 @@ private:
 
 	std::unique_ptr<Pipeline> gfx_pipeline = nullptr;
 	std::unique_ptr<Pipeline> post_pipeline = nullptr;
-	std::unique_ptr<Pipeline> gather_pipeline = nullptr;
 	std::unique_ptr<Pipeline> min_pipeline = nullptr;
 	std::unique_ptr<Pipeline> min_reduce_pipeline = nullptr;
 	std::unique_ptr<Pipeline> max_pipeline = nullptr;
 	std::unique_ptr<Pipeline> max_reduce_pipeline = nullptr;
 	std::unique_ptr<Pipeline> calc_bounds_pipeline = nullptr;
-	std::unique_ptr<Pipeline> update_pipeline = nullptr;
 	std::vector<std::unique_ptr<Pipeline>> rt_pipelines;
 
 	VkRenderPass offscreen_renderpass;

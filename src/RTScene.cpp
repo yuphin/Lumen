@@ -668,34 +668,28 @@ void RTScene::create_rt_pipelines() {
 }
 
 void RTScene::create_compute_pipelines() {
-	gather_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
 	min_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
 	min_reduce_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
 	max_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
 	max_reduce_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
 	calc_bounds_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
-	update_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
 	std::vector<Shader> shaders = {
-		//{"src/shaders/gather.comp"},
 		{"src/shaders/gpgpu/max.comp"},
 		{"src/shaders/gpgpu/reduce_max.comp"},
 		{"src/shaders/gpgpu/min.comp"},
 		{"src/shaders/gpgpu/reduce_min.comp"},
 		{"src/shaders/calc_bounds.comp"},
-		//{"src/shaders/update.comp"},
 	};
 	for (auto& shader : shaders) {
 		shader.compile();
 	}
 	std::vector<VkDescriptorSetLayout> desc_layouts = { rt_desc_layout,
 														  desc_set_layout };
-	//gather_pipeline->create_compute_pipeline(shaders[0], 2, desc_layouts.data(), {}, 4);
-	min_pipeline->create_compute_pipeline(shaders[2], 2, desc_layouts.data(), {}, 4);
-	min_reduce_pipeline->create_compute_pipeline(shaders[3], 2, desc_layouts.data(), {}, 4);
 	max_pipeline->create_compute_pipeline(shaders[0], 2, desc_layouts.data(), {}, 4);
 	max_reduce_pipeline->create_compute_pipeline(shaders[1], 2, desc_layouts.data(), {}, 4);
+	min_pipeline->create_compute_pipeline(shaders[2], 2, desc_layouts.data(), {}, 4);
+	min_reduce_pipeline->create_compute_pipeline(shaders[3], 2, desc_layouts.data(), {}, 4);
 	calc_bounds_pipeline->create_compute_pipeline(shaders[4], 2, desc_layouts.data(), {}, 4);
-	//update_pipeline->create_compute_pipeline(shaders[6], 2, desc_layouts.data(), {}, 4);
 }
 
 void RTScene::create_offscreen_resources() {
@@ -1498,13 +1492,11 @@ void RTScene::cleanup() {
 	std::vector<Pipeline*> pipeline_list = {
 		gfx_pipeline.get(),
 		post_pipeline.get(),
-		gather_pipeline.get(),
 		min_pipeline.get(),
 		max_pipeline.get(),
 		min_reduce_pipeline.get(),
 		max_reduce_pipeline.get(),
-		calc_bounds_pipeline.get(),
-		update_pipeline.get()
+		calc_bounds_pipeline.get()
 	};
 	if (lights.size()) {
 		buffer_list.push_back(mesh_lights_buffer);
