@@ -712,7 +712,7 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
 
 vec3 vcm_get_light_radiance(in const GLTFMaterial mat,
                             in const VCMState camera_state, int d) {
-    if (d == 1) {
+    if (d == 2) {
         return mat.emissive_factor;
     }
     const float pdf_light_pos =
