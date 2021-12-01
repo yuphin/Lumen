@@ -1,0 +1,83 @@
+{
+    "bsdfs": [
+        {
+            "ior": 1.5,
+            "name": "Glass",
+            "refs": [
+                "glass"
+            ],
+            "type": "glass"
+        },
+        {
+            "name": "Mirror",
+            "refs": [
+                "mirror"
+            ],
+            "type": "mirror"
+        },
+        {
+            "albedo": [
+                0.63,
+                0.065,
+                0.05
+            ],
+            "name": "Left Wall",
+            "refs": [
+                "left_wall"
+            ],
+            "type": "lambertian"
+        },
+        {
+            "albedo": [
+                0.14,
+                0.45,
+                0.091
+            ],
+            "name": "Right Wall",
+            "refs": [
+                "right_wall"
+            ],
+            "type": "lambertian"
+        },
+        {
+            "albedo": [
+                0.725,
+                0.71,
+                0.68
+            ],
+            "name": "Other Walls",
+            "refs": [
+                "floor",
+                "ceiling",
+                "back_wall"
+            ],
+            "type": "lambertian"
+        },
+        {
+            "albedo": [
+                1,
+                1,
+                1
+            ],
+            "emissive_factor": [
+                1,
+                1,
+                1
+            ],
+            "name": "Light",
+            "refs": [
+                "light"
+            ],
+            "type": "lambertian"
+        }
+    ],
+    "camera": {
+        "fov": 45,
+        "position": [
+            0.7,
+            0.5,
+            15.5
+        ]
+    },
+    "mesh_file": "specular.obj"
+}

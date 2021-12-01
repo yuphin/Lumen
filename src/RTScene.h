@@ -10,7 +10,8 @@
 #include "Framework/Utils.h"
 #include "Framework/VulkanBase.h"
 #include "Framework/Window.h"
-#include "Framework/gltfscene.hpp"
+#include "Framework/GltfScene.hpp"
+#include "Framework/LumenScene.h"
 #include "shaders/commons.h"
 #include <glm/glm.hpp>
 
@@ -63,6 +64,10 @@ private:
 	struct ModelPushConst {
 		glm::mat4 transform;
 	} model_push_const;
+
+	GltfScene gltf_scene;
+	LumenScene lumen_scene;
+
 	GraphicsPipelineSettings gfx_pipeline_settings = {};
 
 	VkDescriptorSetLayout desc_set_layout = VK_NULL_HANDLE;
@@ -110,7 +115,6 @@ private:
 	int cnt = 0;
 	VkDescriptorPool imgui_pool;
 	SceneUBO scene_ubo{};
-	GltfScene gltf_scene;
 	Buffer vertex_buffer;
 	Buffer normal_buffer;
 	Buffer uv_buffer;

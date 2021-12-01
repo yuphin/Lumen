@@ -2,6 +2,7 @@
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#define TINYOBJLOADER_IMPLEMENTATION
 #include "RTScene.h"
 #include <algorithm>
 #include <chrono>
@@ -28,6 +29,7 @@ RTScene::RTScene(int width, int height, bool debug)
 }
 
 void RTScene::init(Window* window) {
+	lumen_scene.load_scene("scenes/", "cornell_box.json");
 	srand(time(NULL));
 	this->window = window;
 	vkb.ctx.window_ptr = window->get_window_ptr();
@@ -106,7 +108,7 @@ void RTScene::init_scene() {
 	pc_ray.total_light_area = 0;
 	//std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
 	//std::string filename = "scenes/cornellBox.gltf";
-	std::string filename = "scenes/scene3.gltf";
+	std::string filename = "scenes/Specular.gltf";
 	using vkBU = VkBufferUsageFlagBits;
 	tinygltf::Model tmodel;
 	tinygltf::TinyGLTF tcontext;

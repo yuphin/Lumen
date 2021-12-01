@@ -197,8 +197,12 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="src\Framework\LumenScene.cpp" />
     <ClCompile Include="src\Framework\SBTWrapper.cpp" />
-    <ClCompile Include="src\Framework\GltfScene.cpp" />
+    <ClCompile Include="src\Framework\GltfScene.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="src\RTScene.cpp" />
     <ClCompile Include="src\Framework\Scene.cpp" />
     <ClCompile Include="src\Framework\CommandBuffer.cpp" />
@@ -228,6 +232,7 @@
     <ClInclude Include="libs\imgui\imstb_rectpack.h" />
     <ClInclude Include="libs\imgui\imstb_textedit.h" />
     <ClInclude Include="libs\imgui\imstb_truetype.h" />
+    <ClInclude Include="src\Framework\LumenScene.h" />
     <ClInclude Include="src\Framework\SBTWrapper.h" />
     <ClInclude Include="src\Framework\GltfScene.hpp" />
     <ClInclude Include="src\RTScene.h" />
