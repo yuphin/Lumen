@@ -866,6 +866,9 @@ void main() {
                 tmp_col.d[idx] += splat_col;
             } 
         }
+        for (int t = 1; t < num_cam_paths; t++) {
+                col += bdpt_connect(0, t);
+        }
         for (int t = 2; t < num_cam_paths; t++) {
             for (int s = 0; s < num_light_paths; s++) {
                 int depth = s + t - 1;
