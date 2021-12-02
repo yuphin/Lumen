@@ -65,7 +65,7 @@ private:
 		glm::mat4 transform;
 	} model_push_const;
 
-	GltfScene gltf_scene;
+	//GltfScene gltf_scene;
 	LumenScene lumen_scene;
 
 	GraphicsPipelineSettings gfx_pipeline_settings = {};

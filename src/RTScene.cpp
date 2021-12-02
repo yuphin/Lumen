@@ -29,7 +29,6 @@ RTScene::RTScene(int width, int height, bool debug)
 }
 
 void RTScene::init(Window* window) {
-	lumen_scene.load_scene("scenes/", "cornell_box.json");
 	srand(time(NULL));
 	this->window = window;
 	vkb.ctx.window_ptr = window->get_window_ptr();
@@ -108,36 +107,36 @@ void RTScene::init_scene() {
 	pc_ray.total_light_area = 0;
 	//std::string filename = "scenes/Sponza/glTF/Sponza.gltf";
 	//std::string filename = "scenes/cornellBox.gltf";
-	std::string filename = "scenes/Specular.gltf";
-	using vkBU = VkBufferUsageFlagBits;
-	tinygltf::Model tmodel;
-	tinygltf::TinyGLTF tcontext;
-	std::string warn, error;
-	LUMEN_TRACE("Loading file: {}", filename.c_str());
-	if (!tcontext.LoadASCIIFromFile(&tmodel, &error, &warn, filename)) {
-		assert(!"Error while loading scene");
-	}
-	if (!warn.empty()) {
-		LUMEN_WARN(warn.c_str());
-	}
-	if (!error.empty()) {
-		LUMEN_ERROR(error.c_str());
-	}
-	gltf_scene.import_materials(tmodel);
-	gltf_scene.import_drawable_nodes(tmodel, GltfAttributes::Normal |
-									 GltfAttributes::Texcoord_0);
-
-	auto vertex_buf_size = gltf_scene.positions.size() * sizeof(glm::vec3);
-	auto idx_buf_size = gltf_scene.indices.size() * sizeof(uint32_t);
+	//std::string filename = "scenes/scene3.gltf";
+	//using vkBU = VkBufferUsageFlagBits;
+	//tinygltf::Model tmodel;
+	//tinygltf::TinyGLTF tcontext;
+	//std::string warn, error;
+	//LUMEN_TRACE("Loading file: {}", filename.c_str());
+	//if (!tcontext.LoadASCIIFromFile(&tmodel, &error, &warn, filename)) {
+	//	assert(!"Error while loading scene");
+	//}
+	//if (!warn.empty()) {
+	//	LUMEN_WARN(warn.c_str());
+	//}
+	//if (!error.empty()) {
+	//	LUMEN_ERROR(error.c_str());
+	//}
+	//gltf_scene.import_materials(tmodel);
+	//gltf_scene.import_drawable_nodes(tmodel, GltfAttributes::Normal |
+	//								 GltfAttributes::Texcoord_0);
+	lumen_scene.load_scene("scenes/", "cornell_box.json");
+	auto vertex_buf_size = lumen_scene.positions.size() * sizeof(glm::vec3);
+	auto idx_buf_size = lumen_scene.indices.size() * sizeof(uint32_t);
 	std::vector<MaterialPushConst> materials;
 	std::vector<PrimMeshInfo> prim_lookup;
-	for (const auto& m : gltf_scene.materials) {
+	for (const auto& m : lumen_scene.materials) {
 		materials.push_back(
-			{ m.base_color_factor, m.emissive_factor, m.base_color_texture });
+			{ glm::vec4(m.albedo, 1.), m.emissive_factor, -1});
 	}
 	uint32_t idx = 0;
 	uint32_t total_light_triangle_cnt = 0;
-	for (auto& pm : gltf_scene.prim_meshes) {
+	for (auto& pm : lumen_scene.prim_meshes) {
 		prim_lookup.push_back({ pm.first_idx, pm.vtx_offset, pm.material_idx });
 		auto& mef = materials[pm.material_idx].emissive_factor;
 		if (mef.x > 0 || mef.y > 0 || mef.z > 0) {
@@ -155,29 +154,29 @@ void RTScene::init_scene() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		vertex_buf_size, gltf_scene.positions.data(), true);
+		vertex_buf_size, lumen_scene.positions.data(), true);
 	index_buffer.create(
 		&vkb.ctx,
 		VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		idx_buf_size, gltf_scene.indices.data(), true);
+		idx_buf_size, lumen_scene.indices.data(), true);
 
 	normal_buffer.create(
 		&vkb.ctx,
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		gltf_scene.normals.size() * sizeof(gltf_scene.normals[0]),
-		gltf_scene.normals.data(), true);
+		lumen_scene.normals.size() * sizeof(lumen_scene.normals[0]),
+		lumen_scene.normals.data(), true);
 	uv_buffer.create(
 		&vkb.ctx,
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		gltf_scene.texcoords0.size() * sizeof(glm::vec2),
-		gltf_scene.texcoords0.data(), true);
+		lumen_scene.texcoords0.size() * sizeof(glm::vec2),
+		lumen_scene.texcoords0.data(), true);
 	materials_buffer.create(
 		&vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -357,11 +356,12 @@ void RTScene::init_scene() {
 								   texture_sampler);
 	};
 
-	if (tmodel.images.empty()) {
+	// TODO: Add textures
+	if (true) {
 		add_default_texture();
 	}
 	else {
-		textures.resize(tmodel.images.size());
+	/*	textures.resize(tmodel.images.size());
 		for (int i = 0; i < tmodel.images.size(); i++) {
 			auto& gltf_img = tmodel.images[i];
 			void* data = &gltf_img.image[0];
@@ -378,7 +378,7 @@ void RTScene::init_scene() {
 				VK_IMAGE_USAGE_SAMPLED_BIT, true);
 			textures[i].load_from_data(&vkb.ctx, data, size, create_info,
 				texture_sampler);
-		}
+		}*/
 	}
 
 	pc_ray.frame_num = -1;
@@ -391,8 +391,8 @@ void RTScene::create_blas() {
 	auto vertex_address =
 		get_device_address(vkb.ctx.device, vertex_buffer.handle);
 	auto idx_address = get_device_address(vkb.ctx.device, index_buffer.handle);
-	for (auto& primMesh : gltf_scene.prim_meshes) {
-		BlasInput geo = to_vk_geometry(primMesh, vertex_address, idx_address);
+	for (auto& prim_mesh : lumen_scene.prim_meshes) {
+		BlasInput geo = to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({ geo });
 	}
 	vkb.build_blas(blas_inputs,
@@ -403,49 +403,89 @@ void RTScene::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
 	float total_light_triangle_area = 0.0f;
 	int light_triangle_cnt = 0;
-	for (auto& node : gltf_scene.nodes) {
-		auto it = std::find_if(lights.begin(), lights.end(),
-							   [&](const MeshLight& light) {
-			return light.prim_mesh_idx == node.prim_mesh;
-		});
-		if (it != lights.end()) {
-			auto idx = it - lights.begin();
-			lights[idx].world_matrix = node.world_matrix;
-			auto& prim_mesh = gltf_scene.prim_meshes[node.prim_mesh];
-			auto& vtx_offset = prim_mesh.vtx_offset;
-			auto& idx_base_offset = prim_mesh.first_idx;
-			auto& vertices = gltf_scene.positions;
-			auto& indices = gltf_scene.indices;
-			for (int i = 0; i < prim_mesh.idx_count / 3; i++) {
-				auto idx_offset = idx_base_offset + 3 * i;
-				glm::ivec3 ind = { indices[idx_offset], indices[idx_offset + 1],
-								  indices[idx_offset + 2] };
-				ind += glm::vec3{ vtx_offset, vtx_offset, vtx_offset };
-				const vec3 v0 =
-					node.world_matrix * glm::vec4(vertices[ind.x], 1.0);
-				const vec3 v1 =
-					node.world_matrix * glm::vec4(vertices[ind.y], 1.0);
-				const vec3 v2 =
-					node.world_matrix * glm::vec4(vertices[ind.z], 1.0);
-				auto area = 0.5 * glm::length(glm::cross(v1 - v0, v2 - v0));
-				total_light_triangle_area += area;
-				light_triangle_cnt++;
-			}
-		}
+	//for (auto& node : gltf_scene.nodes) {
+	//	auto it = std::find_if(lights.begin(), lights.end(),
+	//						   [&](const MeshLight& light) {
+	//		return light.prim_mesh_idx == node.prim_mesh;
+	//	});
+	//	if (it != lights.end()) {
+	//		auto idx = it - lights.begin();
+	//		lights[idx].world_matrix = node.world_matrix;
+	//		auto& prim_mesh = gltf_scene.prim_meshes[node.prim_mesh];
+	//		auto& vtx_offset = prim_mesh.vtx_offset;
+	//		auto& idx_base_offset = prim_mesh.first_idx;
+	//		auto& vertices = gltf_scene.positions;
+	//		auto& indices = gltf_scene.indices;
+	//		for (int i = 0; i < prim_mesh.idx_count / 3; i++) {
+	//			auto idx_offset = idx_base_offset + 3 * i;
+	//			glm::ivec3 ind = { indices[idx_offset], indices[idx_offset + 1],
+	//							  indices[idx_offset + 2] };
+	//			ind += glm::vec3{ vtx_offset, vtx_offset, vtx_offset };
+	//			const vec3 v0 =
+	//				node.world_matrix * glm::vec4(vertices[ind.x], 1.0);
+	//			const vec3 v1 =
+	//				node.world_matrix * glm::vec4(vertices[ind.y], 1.0);
+	//			const vec3 v2 =
+	//				node.world_matrix * glm::vec4(vertices[ind.z], 1.0);
+	//			auto area = 0.5 * glm::length(glm::cross(v1 - v0, v2 - v0));
+	//			total_light_triangle_area += area;
+	//			light_triangle_cnt++;
+	//		}
+	//	}
 
+	//	VkAccelerationStructureInstanceKHR ray_inst{};
+	//	ray_inst.transform = to_vk_matrix(node.world_matrix);
+	//	ray_inst.instanceCustomIndex =
+	//		node.prim_mesh; // gl_InstanceCustomIndexEXT: to find which
+	//						// primitive
+	//	ray_inst.accelerationStructureReference =
+	//		vkb.get_blas_device_address(node.prim_mesh);
+	//	ray_inst.flags =
+	//		VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+	//	ray_inst.mask = 0xFF;
+	//	ray_inst.instanceShaderBindingTableRecordOffset =
+	//		0; // We will use the same hit group for all objects
+	//	tlas.emplace_back(ray_inst);
+	//}
+
+	const auto& indices = lumen_scene.indices;
+	const auto& vertices = lumen_scene.positions;
+	for (const auto& pm: lumen_scene.prim_meshes) {
+	
+		
 		VkAccelerationStructureInstanceKHR ray_inst{};
-		ray_inst.transform = to_vk_matrix(node.world_matrix);
-		ray_inst.instanceCustomIndex =
-			node.prim_mesh; // gl_InstanceCustomIndexEXT: to find which
-							// primitive
+		ray_inst.transform = to_vk_matrix(pm.world_matrix);
+		ray_inst.instanceCustomIndex = pm.prim_idx;
 		ray_inst.accelerationStructureReference =
-			vkb.get_blas_device_address(node.prim_mesh);
+			vkb.get_blas_device_address(pm.prim_idx);
 		ray_inst.flags =
 			VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		ray_inst.mask = 0xFF;
 		ray_inst.instanceShaderBindingTableRecordOffset =
 			0; // We will use the same hit group for all objects
 		tlas.emplace_back(ray_inst);
+	}
+
+	for (auto& l : lights) {
+		const auto& pm = lumen_scene.prim_meshes[l.prim_mesh_idx];
+		l.world_matrix = pm.world_matrix;
+		auto& idx_base_offset = pm.first_idx;
+		auto& vtx_offset = pm.vtx_offset;
+		for (int i = 0; i < l.num_triangles; i++) {
+			auto idx_offset = idx_base_offset + 3 * i;
+			glm::ivec3 ind = { indices[idx_offset], indices[idx_offset + 1],
+							  indices[idx_offset + 2] };
+			ind += glm::vec3{ vtx_offset, vtx_offset, vtx_offset };
+			const vec3 v0 =
+				pm.world_matrix * glm::vec4(vertices[ind.x], 1.0);
+			const vec3 v1 =
+				pm.world_matrix * glm::vec4(vertices[ind.y], 1.0);
+			const vec3 v2 =
+				pm.world_matrix * glm::vec4(vertices[ind.z], 1.0);
+			auto area = 0.5 * glm::length(glm::cross(v1 - v0, v2 - v0));
+			total_light_triangle_area += area;
+		}
+		light_triangle_cnt += l.num_triangles;
 	}
 
 	if (lights.size()) {
@@ -462,6 +502,7 @@ void RTScene::create_tlas() {
 
 	vkb.build_tlas(tlas,
 				   VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+	
 }
 
 void RTScene::create_rt_descriptors() {
@@ -832,7 +873,7 @@ double RTScene::draw_frame() {
 	} else if(integrator == 3){
 		if (use_vm) {
 			ImGui::Text("VCM Photon Base Radius: %f",
-				gltf_scene.m_dimensions.radius * vcm_radius_factor * 0.01);
+				lumen_scene.m_dimensions.radius * vcm_radius_factor * 0.01);
 			ImGui::Text("VCM Photon Current Radius: %f", pc_ray.radius);
 			updated ^= ImGui::SliderFloat("VCM Radius %", &vcm_radius_factor, 0.01, 10);
 		}
@@ -1159,7 +1200,7 @@ void RTScene::render(uint32_t i) {
 							   buffers.data(), offsets.data());
 		vkCmdBindIndexBuffer(cmd, index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
 		uint32_t idx_node = 0;
-		for (auto& node : gltf_scene.nodes) {
+	/*	for (auto& node : gltf_scene.nodes) {
 			auto& primitive = gltf_scene.prim_meshes[node.prim_mesh];
 			auto& material = gltf_scene.materials[primitive.material_idx];
 			vkCmdPushConstants(cmd, layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
@@ -1171,7 +1212,20 @@ void RTScene::render(uint32_t i) {
 							   sizeof(MaterialPushConst), &material_push_const);
 			vkCmdDrawIndexed(cmd, primitive.idx_count, 1, primitive.first_idx,
 							 primitive.vtx_offset, 0);
+		}*/
+		for (auto& pm : lumen_scene.prim_meshes) {
+			auto& material = lumen_scene.materials[pm.material_idx];
+			vkCmdPushConstants(cmd, layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+				sizeof(glm::mat4), &pm.world_matrix);
+			material_push_const.base_color_factor = glm::vec4(material.albedo, 1.0);
+			material_push_const.texture_id = -1;
+			vkCmdPushConstants(cmd, layout, VK_SHADER_STAGE_FRAGMENT_BIT,
+				sizeof(ModelPushConst),
+				sizeof(MaterialPushConst), &material_push_const);
+			vkCmdDrawIndexed(cmd, pm.idx_count, 1, pm.first_idx,
+				pm.vtx_offset, 0);
 		}
+	
 	};
 
 	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(
@@ -1197,11 +1251,11 @@ void RTScene::render(uint32_t i) {
 			pc_ray.radius = ppm_base_radius;
 		}
 		else if (sel_integrator == Integrator::VCM) {
-			pc_ray.radius =gltf_scene.m_dimensions.radius * vcm_radius_factor / 100.f;
+			pc_ray.radius =lumen_scene.m_dimensions.radius * vcm_radius_factor / 100.f;
 			pc_ray.radius /= pow(pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
 		}
-		pc_ray.min_bounds = gltf_scene.m_dimensions.min;
-		pc_ray.max_bounds = gltf_scene.m_dimensions.max;
+		pc_ray.min_bounds = lumen_scene.m_dimensions.min;
+		pc_ray.max_bounds = lumen_scene.m_dimensions.max;
 		pc_ray.ppm_base_radius = ppm_base_radius;
 		pc_ray.use_area_sampling = use_area_sampling;
 		pc_ray.sky_col = vec3(0, 0, 0);
