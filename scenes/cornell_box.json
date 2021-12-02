@@ -6,12 +6,22 @@
             "refs": [
                 "glass"
             ],
+            "albedo": [
+                1,
+                1,
+                1
+            ],
             "type": "glass"
         },
         {
             "name": "Mirror",
             "refs": [
                 "mirror"
+            ],
+            "albedo": [
+                1,
+                1,
+                1
             ],
             "type": "mirror"
         },
