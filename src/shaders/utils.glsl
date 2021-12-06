@@ -15,6 +15,7 @@ struct HitPayload {
 struct MaterialProps {
     vec3 emissive_factor;
     uint bsdf_type;
+    uint bsdf_props;
     vec3 albedo;
     float ior;
 };

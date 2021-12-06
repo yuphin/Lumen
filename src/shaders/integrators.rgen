@@ -150,20 +150,36 @@ MaterialProps load_material(const uint material_idx, const vec2 uv) {
     res.emissive_factor = mat.emissive_factor;
     res.albedo = vec3(mat.base_color_factor);
     res.bsdf_type = mat.bsdf_type;
+    res.bsdf_props = 0;
+    switch (res.bsdf_type) {
+    case BSDF_LAMBERTIAN:
+        res.bsdf_props |= BSDF_OPAQUE;
+        break;
+    case BSDF_GLASS:
+        res.bsdf_props |= BSDF_SPECULAR;
+        res.bsdf_props |= BSDF_TRANSMISSIVE;
+        break;
+    case BSDF_MIRROR:
+        res.bsdf_props |= BSDF_SPECULAR;
+        res.bsdf_props |= BSDF_REFLECTIVE;
+        break;
+    default:
+        break;
+    }
     res.ior = mat.ior;
     return res;
 }
 
 vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
-                 const uint mode, bool side, out vec3 dir, out float pdf_w,
-                 inout float cos_theta) {
+                 const uint mode, const bool side, out vec3 dir,
+                 out float pdf_w, inout float cos_theta) {
     vec3 f;
     switch (mat.bsdf_type) {
     case BSDF_LAMBERTIAN: {
         f = mat.albedo / PI;
         dir = sample_cos_hemisphere(vec2(rand(seed), rand(seed)), shading_nrm);
         cos_theta = dot(shading_nrm, dir);
-        pdf_w = cos_theta / PI;
+        pdf_w = max(cos_theta / PI, 0);
     } break;
     case BSDF_MIRROR: {
         dir = reflect(-wo, shading_nrm);
@@ -194,8 +210,54 @@ vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
     default: // Unknown
         break;
     }
-
     return f;
+}
+
+vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
+                 const uint mode, const bool side, const vec3 dir,
+                 out float pdf_w, inout float cos_theta) {
+    vec3 f;
+    switch (mat.bsdf_type) {
+    case BSDF_LAMBERTIAN: {
+        f = mat.albedo / PI;
+        cos_theta = dot(shading_nrm, dir);
+        pdf_w = max(cos_theta / PI, 0);
+    } break;
+    case BSDF_MIRROR: {
+        cos_theta = dot(shading_nrm, dir);
+        f = vec3(1.) / abs(cos_theta);
+        pdf_w = 1.;
+    } break;
+    case BSDF_GLASS: {
+        const float ior = side ? 1. / mat.ior : mat.ior;
+        cos_theta = dot(shading_nrm, dir);
+        f = vec3(1.) / abs(cos_theta);
+        if (mode == 0) {
+            f *= ior * ior;
+        }
+        pdf_w = 1.;
+    } break;
+    default: // Unknown
+        break;
+    }
+    return f;
+}
+
+vec3 eval_bsdf_selective(const vec3 shading_nrm, const vec3 wo,
+                           const MaterialProps mat, const uint mode,
+                           const bool side, const uint bsdf_props, const vec3 dir,
+                           out float pdf_w, inout float cos_theta) {
+    if ((bsdf_props & BSDF_ALL) == 1) {
+        return eval_bsdf(shading_nrm, wo, mat, mode, side, dir, pdf_w,
+                           cos_theta);
+    } else if (bsdf_props == (BSDF_ALL & ~BSDF_SPECULAR)) {
+        if (mat.bsdf_type == BSDF_LAMBERTIAN) {
+            vec3 f = mat.albedo / PI;
+            cos_theta = dot(shading_nrm, dir);
+            pdf_w = cos_theta / PI;
+            return f;
+        }
+    }
 }
 
 TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands,
@@ -782,8 +844,8 @@ vec3 vcm_get_light_radiance(in const Material mat,
     return mis_weight * mat.emissive_factor;
 }
 
-vec3 uniform_sample_light(const vec3 albedo, const vec3 pos,
-                          const vec3 shading_nrm) {
+vec3 uniform_sample_light(const MaterialProps mat, const vec3 pos, const bool side,
+                          const vec3 shading_nrm, const vec3 wo, const bool is_specular) {
     vec3 res = vec3(0);
     // Sample light
     uint light_idx;
@@ -795,9 +857,9 @@ vec3 uniform_sample_light(const vec3 albedo, const vec3 pos,
     vec3 wi = record.pos - payload.pos;
     const float wi_len = length(wi);
     wi /= wi_len;
-    const vec3 f = albedo / PI;
-    float cos_x = abs(dot(shading_nrm, wi));
-    float bsdf_pdf = cos_x / PI;
+    float bsdf_pdf, cos_x;
+    const uint props = is_specular ? BSDF_ALL : BSDF_ALL & ~BSDF_SPECULAR;
+    const vec3 f = eval_bsdf_selective(shading_nrm, wo, mat, 0, side, props, wi, bsdf_pdf, cos_x);
     any_hit_payload.hit = 1;
     traceRayEXT(tlas,
                 gl_RayFlagsTerminateOnFirstHitEXT |
@@ -814,7 +876,7 @@ vec3 uniform_sample_light(const vec3 albedo, const vec3 pos,
     }
     if (visible && pdf_light > 0) {
         const float mis_weight = 1 / (1 + bsdf_pdf / pdf_light);
-        res += f * cos_x * mis_weight *
+        res += f * abs(cos_x) * mis_weight *
                (pc_ray.use_area_sampling == 1 ? g : 1) *
                light_mat.emissive_factor / pdf_light;
     }
@@ -834,7 +896,7 @@ vec3 uniform_sample_light(const vec3 albedo, const vec3 pos,
             pdf_light = record.triangle_pdf / g;
         }
         const float mis_weight = 1. / (1 + pdf_light / bsdf_pdf);
-        res += f * cos_x * (pc_ray.use_area_sampling == 1 ? g : 1) *
+        res += f * abs(cos_x) * (pc_ray.use_area_sampling == 1 ? g : 1) *
                mis_weight * light_mat.emissive_factor / bsdf_pdf;
     }
     return res;
@@ -892,17 +954,18 @@ void main() {
             if (hit_mat.bsdf_type == BSDF_LAMBERTIAN) {
                 const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
                 col += throughput *
-                       uniform_sample_light(hit_mat.albedo, pos, shading_nrm) /
+                       uniform_sample_light(hit_mat, pos, side, shading_nrm, wo, specular) /
                        light_pick_pdf;
             }
             // Sample direction & update throughput
             float pdf, cos_theta;
             const vec3 f = sample_bsdf(shading_nrm, wo, hit_mat, 0 /*radiance*/,
                                        side, direction, pdf, cos_theta);
-            throughput *= f * (cos_theta) / pdf;
-            specular = hit_mat.bsdf_type == BSDF_MIRROR ||
-                       hit_mat.bsdf_type == BSDF_GLASS;
-
+            if(pdf == 0){
+                break;
+            }
+            throughput *= f * abs(cos_theta) / pdf;
+            specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
             origin.xyz = pos;
             float rr_scale = 1.0;
             if (hit_mat.bsdf_type == BSDF_GLASS) {
@@ -1044,8 +1107,9 @@ void main() {
             const vec3 albedo = eval_albedo(hit_mat);
             const vec3 pos = offset_ray(payload.pos, shading_nrm);
             const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
-            col += throughput * uniform_sample_light(albedo, pos, shading_nrm) /
-                   light_pick_pdf;
+            // TODO
+//            col += throughput * uniform_sample_light(albedo, pos, shading_nrm) /
+//                   light_pick_pdf;
             // Gather
             const vec3 bsdf = albedo / PI;
             const vec3 p = payload.pos;

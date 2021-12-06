@@ -10,10 +10,17 @@
 #define INTERATOR_COUNT 6
 
 // BSDF Types
-#define BSDF_LAMBERTIAN 0
-#define BSDF_MIRROR 1
-#define BSDF_GLASS 2
+#define BSDF_LAMBERTIAN 1 << 0
+#define BSDF_MIRROR 1 << 1
+#define BSDF_GLASS 1 << 2
 #define BSDF_NONE -1
+
+// BSDF Props
+#define BSDF_SPECULAR 1 << 0
+#define BSDF_TRANSMISSIVE 1 << 1
+#define BSDF_REFLECTIVE 1 << 2
+#define BSDF_OPAQUE 1 << 3
+#define BSDF_ALL BSDF_SPECULAR | BSDF_TRANSMISSIVE | BSDF_REFLECTIVE | BSDF_OPAQUE
 
 #ifdef __cplusplus
 #include <glm/glm.hpp>
