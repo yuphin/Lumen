@@ -1,10 +1,10 @@
 {
     "bsdfs": [
         {
-            "ior": 1.5,
+            "ior": 1.52,
             "name": "Glass",
             "refs": [
-                "glass"
+                "glass_sphere"
             ],
             "albedo": [
                 1,
@@ -16,7 +16,7 @@
         {
             "name": "Mirror",
             "refs": [
-                "mirror"
+                "mirror_sphere"
             ],
             "albedo": [
                 1,

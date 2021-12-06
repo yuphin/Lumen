@@ -34,7 +34,7 @@ layout(buffer_reference, scalar) readonly buffer Indices { uint i[]; };
 layout(buffer_reference, scalar) readonly buffer Normals { vec3 n[]; };
 layout(buffer_reference, scalar) readonly buffer TexCoords { vec2 t[]; };
 layout(buffer_reference, scalar) readonly buffer Materials {
-    GLTFMaterial m[];
+    Material m[];
 };
 // BDPT buffers
 layout(buffer_reference, scalar) buffer LightVertices { PathVertex d[]; };
@@ -56,8 +56,8 @@ layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 layout(constant_id = 0) const uint INTEGRATOR = 0;
 
 #define MIN_DEPTH 3
-#define NEE 1
-#define MIS 1
+#define NEE 0
+#define MIS 0
 #define EPS 0.001
 #define SAMPLE_VISIBLE_LIGHTS 0
 #define MAX_LIGHT_SAMPLES 8
@@ -74,7 +74,7 @@ uint col_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
 uint size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 
-vec3 eval_material_opaque(GLTFMaterial m, vec2 uv) {
+vec3 eval_material_opaque(Material m, vec2 uv) {
     vec3 albedo = m.base_color_factor.xyz;
     if (m.texture_id > -1) {
         albedo *= texture(textures[m.texture_id], uv).xyz;
@@ -190,7 +190,7 @@ void main() {
             break;
         }
 
-        GLTFMaterial mat = materials.m[payload.material_idx];
+        Material mat = materials.m[payload.material_idx];
 #if NEE == 0
         col += throughput * mat.emissive_factor;
 
@@ -223,7 +223,7 @@ void main() {
             light.num_triangles;
         uint light_idx = light.prim_mesh_idx;
         PrimMeshInfo pinfo = prim_info[light_idx];
-        GLTFMaterial light_mat = materials.m[light_idx];
+        Material light_mat = materials.m[light_idx];
 #if SAMPLE_VISIBLE_LIGHTS == 1
         float weight_sum = 0.;
         float total_area = 0.;

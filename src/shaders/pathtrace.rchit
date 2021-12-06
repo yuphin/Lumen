@@ -28,7 +28,7 @@ layout(buffer_reference, scalar) readonly buffer Indices { uint i[]; };
 layout(buffer_reference, scalar) readonly buffer Normals { vec3 n[]; };
 layout(buffer_reference, scalar) readonly buffer TexCoords { vec2 t[]; };
 layout(buffer_reference, scalar) readonly buffer Materials {
-    GLTFMaterial m[];
+    Material m[];
 };
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 
@@ -39,8 +39,7 @@ void main() {
     uint index_offset = pinfo.index_offset + 3 * gl_PrimitiveID;
     uint vertex_offset =
         pinfo.vertex_offset; // Vertex offset as defined in glTF
-    uint material_index =
-        max(0, pinfo.material_index); // material of primitive mesh
+    uint material_index = pinfo.material_index; // material of primitive mesh
 
     // Object data
     Materials materials = Materials(scene_desc.material_addr);

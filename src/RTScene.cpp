@@ -128,16 +128,16 @@ void RTScene::init_scene() {
 	lumen_scene.load_scene("scenes/", "cornell_box.json");
 	auto vertex_buf_size = lumen_scene.positions.size() * sizeof(glm::vec3);
 	auto idx_buf_size = lumen_scene.indices.size() * sizeof(uint32_t);
-	std::vector<MaterialPushConst> materials;
+	std::vector<Material> materials;
 	std::vector<PrimMeshInfo> prim_lookup;
 	for (const auto& m : lumen_scene.materials) {
 		materials.push_back(
-			{ glm::vec4(m.albedo, 1.), m.emissive_factor, -1});
+			{ glm::vec4(m.albedo, 1.), m.emissive_factor, -1, m.bsdf_type, m.ior});
 	}
 	uint32_t idx = 0;
 	uint32_t total_light_triangle_cnt = 0;
 	for (auto& pm : lumen_scene.prim_meshes) {
-		prim_lookup.push_back({ pm.first_idx, pm.vtx_offset, pm.material_idx });
+		prim_lookup.push_back({ pm.first_idx, pm.vtx_offset, pm.material_idx});
 		auto& mef = materials[pm.material_idx].emissive_factor;
 		if (mef.x > 0 || mef.y > 0 || mef.z > 0) {
 			MeshLight light;
@@ -182,7 +182,7 @@ void RTScene::init_scene() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		materials.size() * sizeof(GLTFMaterial), materials.data(), true);
+		materials.size() * sizeof(Material), materials.data(), true);
 	prim_lookup_buffer.create(
 		&vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -278,7 +278,7 @@ void RTScene::init_scene() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		20 * width * height * sizeof(PhotonHash)
+		10 * width * height * sizeof(PhotonHash)
 	);
 	vcm_light_vertices_buffer.create(
 		&vkb.ctx,

@@ -9,7 +9,7 @@ struct CameraConfiguration {
 
 struct LumenPrimMesh {
 	std::string name;
-	int material_idx;
+	uint32_t material_idx;
 	uint32_t vtx_offset;
 	uint32_t first_idx;
 	uint32_t idx_count;
@@ -23,6 +23,9 @@ struct LumenPrimMesh {
 struct LumenMaterial {
 	glm::vec3 albedo;
 	glm::vec3 emissive_factor;
+	float ior;
+	uint32_t bsdf_type;
+
 };
 class LumenScene {
 public:

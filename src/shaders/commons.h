@@ -9,6 +9,12 @@
 #define INTEGRATOR_VCM_EYE 5
 #define INTERATOR_COUNT 6
 
+// BSDF Types
+#define BSDF_LAMBERTIAN 0
+#define BSDF_MIRROR 1
+#define BSDF_GLASS 2
+#define BSDF_NONE -1
+
 #ifdef __cplusplus
 #include <glm/glm.hpp>
 // GLSL Type
@@ -76,10 +82,12 @@ struct LightVisibility {
 	float cdf;
 };
 
-struct GLTFMaterial {
+struct Material {
 	vec4 base_color_factor;
 	vec3 emissive_factor;
 	int texture_id;
+	uint bsdf_type;
+	float ior;
 };
 
 struct PathVertex {
@@ -181,7 +189,7 @@ struct SceneDesc {
 struct PrimMeshInfo {
 	uint index_offset;
 	uint vertex_offset;
-	int  material_index;
+	uint  material_index;
 };
 
 

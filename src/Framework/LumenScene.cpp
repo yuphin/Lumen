@@ -2,6 +2,7 @@
 #include "LumenScene.h"
 #include <json.hpp>
 #include <tiny_obj_loader.h>
+#include "shaders/commons.h"
 
 struct Bbox {
 	Bbox() = default;
@@ -153,11 +154,20 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 			float f0 = f[0];
 			float f1 = f[1];
 			float f2 = f[2];
-			materials[bsdf_idx].albedo = glm::vec3({f[0], f[1], f[2]});
+			materials[bsdf_idx].albedo = glm::vec3({ f[0], f[1], f[2] });
 		}
 		if (!bsdf["emissive_factor"].is_null()) {
 			const auto& f = bsdf["emissive_factor"];
 			materials[bsdf_idx].emissive_factor = glm::vec3({ f[0], f[1], f[2] });
+		}
+
+		if (bsdf["type"] == "lambertian") {
+			materials[bsdf_idx].bsdf_type = BSDF_LAMBERTIAN;
+		} else if (bsdf["type"] == "mirror") {
+			materials[bsdf_idx].bsdf_type = BSDF_MIRROR;
+		} else if (bsdf["type"] == "glass") {
+			materials[bsdf_idx].bsdf_type = BSDF_GLASS;
+			materials[bsdf_idx].ior = bsdf["ior"];
 		}
 
 		for (auto& ref : refs) {

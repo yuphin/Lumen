@@ -12,6 +12,13 @@ struct HitPayload {
     float area;
 };
 
+struct MaterialProps {
+    vec3 emissive_factor;
+    uint bsdf_type;
+    vec3 albedo;
+    float ior;
+};
+
 struct VCMState {
     vec3 wi;
 	vec3 shading_nrm;
@@ -37,7 +44,7 @@ struct TriangleRecord {
 
 uint hash(ivec3 p, uint size) {
   return uint((p.x * 73856093) ^ (p.y * 19349663) ^
-              p.z * 83492791) %  (20 * size);
+              p.z * 83492791) %  (10 * size);
  //return uint(p.x + p.y * grid_res.x + p.z * grid_res.x * grid_res.y);
 }
 
