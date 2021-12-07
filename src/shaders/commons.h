@@ -16,11 +16,11 @@
 #define BSDF_NONE -1
 
 // BSDF Props
-#define BSDF_SPECULAR 1 << 0
-#define BSDF_TRANSMISSIVE 1 << 1
-#define BSDF_REFLECTIVE 1 << 2
-#define BSDF_OPAQUE 1 << 3
-#define BSDF_ALL BSDF_SPECULAR | BSDF_TRANSMISSIVE | BSDF_REFLECTIVE | BSDF_OPAQUE
+#define BSDF_SPECULAR 1 << 3
+#define BSDF_TRANSMISSIVE 1 << 4
+#define BSDF_REFLECTIVE 1 << 5
+#define BSDF_OPAQUE 1 << 6
+#define BSDF_ALL BSDF_SPECULAR | BSDF_TRANSMISSIVE | BSDF_REFLECTIVE | BSDF_OPAQUE | BSDF_LAMBERTIAN
 
 #ifdef __cplusplus
 #include <glm/glm.hpp>
@@ -121,7 +121,7 @@ struct VCMVertex {
 	float d_vcm;
 	float d_vc;
 	float d_vm;
-	float pdf_rev;
+	uint side;
 };
 
 struct SPPMData {

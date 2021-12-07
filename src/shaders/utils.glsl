@@ -31,6 +31,7 @@ struct VCMState {
 	float d_vcm;
 	float d_vc;
 	float d_vm;
+    uint pure_spec;
 };
 
 struct AnyHitPayload {
