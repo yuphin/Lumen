@@ -1292,11 +1292,12 @@ void main() {
             // Complete the missing geometry terms
             float cos_theta_wo = abs(dot(wo, shading_nrm));
             // Can't connect from specular to camera path, can't merge either
+            light_state.d_vcm *= dist_sqr;
+            light_state.d_vcm /= cos_theta_wo;
+            light_state.d_vc /= cos_theta_wo;
+            light_state.d_vm /= cos_theta_wo;
             if (!mat_specular && (pc_ray.use_vc == 1 || pc_ray.use_vm == 1)) {
-                light_state.d_vcm *= dist_sqr;
-                light_state.d_vcm /= cos_theta_wo;
-                light_state.d_vc /= cos_theta_wo;
-                light_state.d_vm /= cos_theta_wo;
+
                 // Copy to light vertex buffer
                 light_vtx(path_idx).wi = light_state.wi;
                 light_vtx(path_idx).shading_nrm = light_state.shading_nrm;
@@ -1610,39 +1611,41 @@ void main() {
                                     continue;
                                 }
                                 // Should we?
-                                //                                uint depth =
-                                //                                photons.d[h].path_len
-                                //                                + d - 1; if
-                                //                                (depth >
-                                //                                pc_ray.max_depth)
-                                //                                {
-                                //                                    continue;
-                                //                                }
-                                float cam_pdf_fwd = max(
-                                    dot(photons.d[h].wi, shading_nrm) / PI, 0);
-                                float cam_pdf_rev =
-                                    max(dot(wo, shading_nrm) / PI, 0);
-                                const float w_light =
-                                    photons.d[h].d_vcm * eta_vc +
-                                    photons.d[h].d_vm * cam_pdf_fwd;
-                                const float w_cam =
-                                    camera_state.d_vcm * eta_vc +
-                                    camera_state.d_vm * cam_pdf_rev;
-                                const float mis_weight =
-                                    1. / (w_light + w_cam + 1);
-                                float cos_nrm =
-                                    dot(photons.d[h].nrm, shading_nrm);
-                                if (cos_nrm > EPS) {
-                                    const float w =
-                                        1. - sqrt(dist_sqr) / radius;
-                                    const float w_normalization =
-                                        3.; // 1. / (1 - 2/(3*k)) where k = 1
-                                    col += w * mis_weight *
-                                           photons.d[h].photon_count *
-                                           photons.d[h].throughput * f *
-                                           camera_state.throughput *
-                                           normalization_factor *
-                                           w_normalization;
+                                uint depth = photons.d[h].path_len + d - 1;
+                                if (depth > pc_ray.max_depth) {
+                                    continue;
+                                }
+                                float cam_pdf_fwd, cam_pdf_rev;
+                                const float cos_theta =
+                                    dot(photons.d[h].wi, shading_nrm);
+                                f = eval_bsdf(shading_nrm, wo, mat, 1, side,
+                                              photons.d[h].wi, cam_pdf_fwd,
+                                              cam_pdf_rev, cos_theta);
+
+                                if (f != vec3(0)) {
+                                    const float w_light =
+                                        photons.d[h].d_vcm * eta_vc +
+                                        photons.d[h].d_vm * cam_pdf_fwd;
+                                    const float w_cam =
+                                        camera_state.d_vcm * eta_vc +
+                                        camera_state.d_vm * cam_pdf_rev;
+                                    const float mis_weight =
+                                        1. / (1 + w_light + w_cam);
+                                    float cos_nrm =
+                                        dot(photons.d[h].nrm, shading_nrm);
+                                    if (cos_nrm > EPS) {
+                                        const float w =
+                                            1. - sqrt(dist_sqr) / radius;
+                                        const float w_normalization =
+                                            3.; // 1. / (1 - 2/(3*k)) where k =
+                                                // 1
+                                        col += w * mis_weight *
+                                               photons.d[h].photon_count *
+                                               photons.d[h].throughput * f *
+                                               camera_state.throughput *
+                                               normalization_factor *
+                                               w_normalization;
+                                    }
                                 }
                             }
                         }
@@ -1660,10 +1663,6 @@ void main() {
                 (mat.bsdf_props & BSDF_TRANSMISSIVE) == BSDF_TRANSMISSIVE;
             const bool same_hemisphere =
                 same_hemisphere(camera_state.wi, wo, shading_nrm);
-            //                    if(gl_LaunchIDEXT.x == 954 && gl_LaunchIDEXT.y
-            //                    == 759){
-            //                        debugPrintfEXT("%d\n", mat.bsdf_props);
-            //                    }
             if (f == vec3(0) || pdf_dir == 0 ||
                 (!same_hemisphere && !mat_transmissive)) {
                 break;
