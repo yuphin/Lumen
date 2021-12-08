@@ -104,6 +104,7 @@ struct PathVertex {
 	vec2 uv;
 	vec3 throughput;
 	uint material_idx;
+	uint delta;
 	float area;
 	float pdf_fwd;
 	float pdf_rev;
