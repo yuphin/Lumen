@@ -658,8 +658,6 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
     }
     weight = 1.0;
     for (int i = s - 1; i >= 0; i--) {
-        float pdf1 = remap0(light_vtx(i).pdf_rev);
-        float pdf2 = remap0(light_vtx(i).pdf_fwd);
         weight *= remap0(light_vtx(i).pdf_rev) / remap0(light_vtx(i).pdf_fwd);
         bool delta_prev = i > 0 ? light_vtx(i - 1).delta == 0 : false;
         if (light_vtx(i).delta == 0 && delta_prev) {
