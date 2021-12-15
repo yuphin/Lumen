@@ -1,0 +1,96 @@
+{
+    "bsdfs": [
+        {
+            "ior": 1.52,
+            "name": "Glass",
+            "refs": [
+                "glass_sphere"
+            ],
+            "albedo": [
+                1,
+                1,
+                1
+            ],
+            "type": "glass"
+        },
+        {
+            "name": "Mirror",
+            "refs": [
+                "mirror_sphere"
+            ],
+            "albedo": [
+                1,
+                1,
+                1
+            ],
+            "type": "mirror"
+        },
+        {
+            "albedo": [
+                0.63,
+                0.065,
+                0.05
+            ],
+            "name": "Left Wall",
+            "refs": [
+                "left_wall"
+            ],
+            "type": "lambertian"
+        },
+        {
+            "albedo": [
+                0.14,
+                0.45,
+                0.091
+            ],
+            "name": "Right Wall",
+            "refs": [
+                "right_wall"
+            ],
+            "type": "lambertian"
+        },
+        {
+            "albedo": [
+                0.725,
+                0.71,
+                0.68
+            ],
+            "name": "Other Walls",
+            "refs": [
+                "floor",
+                "ceiling",
+                "back_wall",
+                "cube1",
+                "cube2",
+                "obstacle"
+            ],
+            "type": "lambertian"
+        },
+        {
+            "albedo": [
+                1,
+                1,
+                1
+            ],
+            "emissive_factor": [
+                10,
+                10,
+                10
+            ],
+            "name": "Light",
+            "refs": [
+                "light"
+            ],
+            "type": "lambertian"
+        }
+    ],
+    "camera": {
+        "fov": 45,
+        "position": [
+            0.7,
+            0.5,
+            15.5
+        ]
+    },
+    "mesh_file": "occluded.obj"
+}

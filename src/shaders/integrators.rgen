@@ -1317,6 +1317,7 @@ void main() {
                                 eval_bsdf(hit_mat, unused, photons.d[h].wi);
                             vec3 phi = w * photons.d[h].throughput * f_eval *
                                        w_normalization;
+                            #if 0
                             if (cos_nrm > EPS) {
                                 phi *= photons.d[h].photon_count;
                             }
@@ -1324,6 +1325,11 @@ void main() {
                                 phi_total += phi;
                                 M++;
                             }
+                            #else
+                                phi *= photons.d[h].photon_count;
+                                phi_total += phi;
+                                M++;
+                            #endif
                         }
                     }
                 }

@@ -125,7 +125,7 @@ void RTScene::init_scene() {
 	//gltf_scene.import_materials(tmodel);
 	//gltf_scene.import_drawable_nodes(tmodel, GltfAttributes::Normal |
 	//								 GltfAttributes::Texcoord_0);
-	lumen_scene.load_scene("scenes/", "cornell_box.json");
+	lumen_scene.load_scene("scenes/", "occluded.json");
 	auto vertex_buf_size = lumen_scene.positions.size() * sizeof(glm::vec3);
 	auto idx_buf_size = lumen_scene.indices.size() * sizeof(uint32_t);
 	std::vector<Material> materials;
@@ -278,7 +278,7 @@ void RTScene::init_scene() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		10 * width * height * sizeof(PhotonHash)
+		20 * width * height * sizeof(PhotonHash)
 	);
 	vcm_light_vertices_buffer.create(
 		&vkb.ctx,
