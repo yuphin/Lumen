@@ -1375,7 +1375,7 @@ void main() {
         const vec3 cam_pos = origin.xyz;
         const vec3 cam_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
         int d;
-        int path_idx = 1;
+        int path_idx = 0;
         for (d = 1;; d++) {
             traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, light_state.pos, tmin,
                         light_state.wi, tmax, 0);
@@ -1644,6 +1644,7 @@ void main() {
 #define light_vtx(i) vcm_lights.d[i]
                 uint light_path_idx = uint(rand(seed) * size);
                 uint light_path_len = light_path_cnts.d[light_path_idx];
+                light_path_idx *= pc_ray.max_depth;
                 for (int i = 0; i < light_path_len; i++) {
                     uint s = light_vtx(light_path_idx + i).path_len;
                     uint depth = s + d - 1;
