@@ -486,7 +486,7 @@ void Path::create_rt_pipelines() {
 	};
 	RTPipelineSettings settings;
 
-	std::vector<Shader> shaders{ {"src/shaders/integrators/path.rgen"},
+	std::vector<Shader> shaders{ {"src/shaders/integrators/path/path.rgen"},
 								{"src/shaders/integrators/ray.rmiss"},
 								{"src/shaders/integrators/ray_shadow.rmiss"},
 								{"src/shaders/integrators/ray.rchit"},

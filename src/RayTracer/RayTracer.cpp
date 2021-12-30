@@ -150,7 +150,6 @@ void RayTracer::create_post_descriptor() {
 		nullptr, &post_desc_pool),
 		"Failed to create descriptor pool");
 
-	// Uniform buffer descriptors
 	std::vector<VkDescriptorSetLayoutBinding> set_layout_bindings = {
 		vk::descriptor_set_layout_binding(
 			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
