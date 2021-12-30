@@ -8,7 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
-#include "../commons.glsl"
+#include "../../commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
