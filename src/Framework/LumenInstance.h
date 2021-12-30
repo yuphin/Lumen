@@ -7,9 +7,9 @@
 #include "Framework/VulkanBase.h"
 #include "Framework/Window.h"
 #include <glm/glm.hpp>
-class Scene {
+class LumenInstance {
 public:
-	Scene(int width, int height, int debug)
+	LumenInstance(int width, int height, int debug)
 		: width(width), height(height), debug(debug), vkb(debug) {};
 	VulkanBase vkb;
 	VulkanContext& vk_ctx = vkb.ctx;
@@ -17,4 +17,5 @@ public:
 	virtual void init(Window*) = 0;
 	virtual void update() = 0;
 	virtual void cleanup() = 0;
+	Window* window;
 };

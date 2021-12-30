@@ -1,6 +1,8 @@
 #include "LumenPCH.h"
 #include "CommandBuffer.h"
-CommandBuffer::CommandBuffer(VulkanContext* ctx, bool begin, QueueType type,
+CommandBuffer::CommandBuffer(VulkanContext* ctx, bool begin,
+							 VkCommandBufferUsageFlags begin_flags, 
+							 QueueType type,
 	VkCommandBufferLevel level) {
 	this->ctx = ctx;
 	this->type = type;
@@ -10,7 +12,7 @@ CommandBuffer::CommandBuffer(VulkanContext* ctx, bool begin, QueueType type,
 		vkAllocateCommandBuffers(ctx->device, &cmd_buf_allocate_info, &handle),
 		"Could not allocate command buffer");
 	if (begin) {
-		auto begin_info = vk::command_buffer_begin_info();
+		auto begin_info = vk::command_buffer_begin_info(begin_flags);
 		vk::check(vkBeginCommandBuffer(handle, &begin_info),
 			"Could not begin the command buffer");
 		state = CommandBufferState::RECORDING;

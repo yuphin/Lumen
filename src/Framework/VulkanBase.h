@@ -57,6 +57,8 @@ struct VulkanBase {
 				   VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
 				   bool update = false);
 	VkDeviceAddress get_blas_device_address(uint32_t blas_idx);
+	uint32_t prepare_frame();
+	VkResult submit_frame(uint32_t image_idx, bool& resized);
 
 	struct SwapChainSupportDetails {
 

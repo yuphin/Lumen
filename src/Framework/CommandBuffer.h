@@ -5,6 +5,7 @@
 class CommandBuffer {
 public:
 	CommandBuffer(VulkanContext* ctx, bool begin = false,
+				  VkCommandBufferUsageFlags begin_flags = 0,
 				  QueueType type = QueueType::GFX,
 				  VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 	~CommandBuffer();

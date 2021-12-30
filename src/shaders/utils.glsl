@@ -2,6 +2,7 @@
 #define PI2 6.28318530718
 #include "commons.h"
 #define INF 1e10
+#define EPS 0.001
 struct HitPayload {
     vec3 geometry_nrm;
     vec3 shading_nrm;
@@ -103,4 +104,25 @@ uvec4 init_rng(uvec2 pixel_coords, uvec2 resolution, uint frame_num) {
 float rand(inout uvec4 rng_state) {
     rng_state.w++;
     return uint_to_float(pcg4d(rng_state).x);
+}
+
+bool same_hemisphere(in vec3 wi, in vec3 wo, in vec3 n) {
+    return dot(wi, n) * dot(wo, n) > 0;
+}
+
+vec3 sample_cos_hemisphere(vec2 uv, vec3 n) {
+    float phi = PI2 * uv.x;
+    float cos_theta = 2.0 * uv.y - 1.0;
+    return normalize(
+        n + vec3(sqrt(1.0 - cos_theta * cos_theta) * vec2(cos(phi), sin(phi)),
+                 cos_theta));
+}
+
+void correct_shading_normal(const vec3 wo, const vec3 wi,
+                            inout vec3 shading_nrm, inout vec3 geometry_nrm) {
+    float res1 = abs(dot(wo, shading_nrm)) * abs(dot(wi, geometry_nrm));
+    float res2 = abs(dot(wo, geometry_nrm)) * abs(dot(wi, shading_nrm));
+    if (res1 != res2) {
+        shading_nrm *= -1;
+    }
 }

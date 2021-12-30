@@ -959,7 +959,7 @@ void VulkanBase::build_blas(const std::vector<BlasInput>& input,
 		// Over the limit or last BLAS element
 		if (batchSize >= batchLimit || idx == nb_blas - 1) {
 
-			CommandBuffer cmdBuf(&ctx, true, QueueType::COMPUTE);
+			CommandBuffer cmdBuf(&ctx, true, 0, QueueType::COMPUTE);
 			cmd_create_blas(cmdBuf.handle, indices, buildAs, scratchAddress,
 							queryPool);
 			cmdBuf.submit();
@@ -1009,6 +1009,96 @@ VkDeviceAddress VulkanBase::get_blas_device_address(uint32_t blas_idx) {
 	return vkGetAccelerationStructureDeviceAddressKHR(ctx.device, &addr_info);
 }
 
+uint32_t VulkanBase::prepare_frame() {
+	vk::check(vkWaitForFences(ctx.device, 1,
+		&in_flight_fences[current_frame], VK_TRUE,
+		1000000000),
+		"Timeout");
+
+	uint32_t image_idx;
+	VkResult result = vkAcquireNextImageKHR(
+		ctx.device, ctx.swapchain, UINT64_MAX,
+		image_available_sem[current_frame], VK_NULL_HANDLE, &image_idx);
+	vk::check(vkResetCommandBuffer(ctx.command_buffers[image_idx], 0));
+	if (result == VK_NOT_READY) {
+		return UINT32_MAX;
+	}else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+		// Window resize
+		recreate_swap_chain(create_default_render_pass, ctx);
+		return UINT32_MAX;
+	} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+		LUMEN_ERROR("Failed to acquire new swap chain image");
+	}
+	if (images_in_flight[image_idx] != VK_NULL_HANDLE) {
+		vkWaitForFences(ctx.device, 1, &images_in_flight[image_idx],
+			VK_TRUE, UINT64_MAX);
+	}
+	EventHandler::begin();
+	if (EventHandler::consume_event(LumenEvent::EVENT_SHADER_RELOAD)) {
+		// We don't want any command buffers in flight, might change in the
+		// future
+		vkDeviceWaitIdle(ctx.device);
+		for (auto& old_pipeline : EventHandler::obsolete_pipelines) {
+			vkDestroyPipeline(ctx.device, old_pipeline, nullptr);
+		}
+		EventHandler::obsolete_pipelines.clear();
+		create_command_buffers();
+	}
+	images_in_flight[image_idx] = in_flight_fences[current_frame];
+	return image_idx;
+}
+
+VkResult VulkanBase::submit_frame(uint32_t image_idx, bool& resized) {
+	VkSubmitInfo submit_info = vk::submit_info();
+	VkSemaphore wait_semaphores[] = {
+		image_available_sem[current_frame] };
+	VkPipelineStageFlags wait_stages[] = {
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	submit_info.waitSemaphoreCount = 1;
+	submit_info.pWaitSemaphores = wait_semaphores;
+	submit_info.pWaitDstStageMask = wait_stages;
+
+	submit_info.commandBufferCount = 1;
+	submit_info.pCommandBuffers = &ctx.command_buffers[image_idx];
+
+	VkSemaphore signal_semaphores[] = {
+		render_finished_sem[current_frame] };
+	submit_info.signalSemaphoreCount = 1;
+	submit_info.pSignalSemaphores = signal_semaphores;
+
+	vkResetFences(ctx.device, 1, &in_flight_fences[current_frame]);
+
+	vk::check(vkQueueSubmit(ctx.queues[(int)QueueType::GFX], 1,
+		&submit_info,
+		in_flight_fences[current_frame]),
+		"Failed to submit draw command buffer");
+	VkPresentInfoKHR present_info{};
+	present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+	present_info.waitSemaphoreCount = 1;
+	present_info.pWaitSemaphores = signal_semaphores;
+
+	VkSwapchainKHR swapchains[] = { ctx.swapchain };
+	present_info.swapchainCount = 1;
+	present_info.pSwapchains = swapchains;
+
+	present_info.pImageIndices = &image_idx;
+
+	VkResult result = vkQueuePresentKHR(ctx.queues[(int)QueueType::PRESENT],
+		&present_info);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
+		resized) {
+		resized = false;
+		recreate_swap_chain(create_default_render_pass, ctx);
+	}
+	else if (result != VK_SUCCESS) {
+		LUMEN_ERROR("Failed to present swap chain image");
+	}
+	current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+	return result;
+}
+
 // Build TLAS from an array of VkAccelerationStructureInstanceKHR
 // - Use motion=true with VkAccelerationStructureMotionInstanceNV
 // - The resulting TLAS will be stored in m_tlas
@@ -1039,7 +1129,7 @@ void VulkanBase::build_tlas(
 		instances_buf.handle };
 	VkDeviceAddress instBufferAddr =
 		vkGetBufferDeviceAddress(ctx.device, &buffer_info);
-	CommandBuffer cmd(&ctx, true, QueueType::COMPUTE);
+	CommandBuffer cmd(&ctx, true, 0, QueueType::COMPUTE);
 	// Make sure the copy of the instance buffer are copied before triggering
 	// the acceleration structure build
 	VkMemoryBarrier barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };

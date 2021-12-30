@@ -4,6 +4,11 @@
 
 std::unordered_map<LumenEvent, bool> EventHandler::event_table = {};
 std::vector<VkPipeline> EventHandler::obsolete_pipelines = {};
+std::vector<uint32_t> EventHandler::event_histogram = {};
+
+void EventHandler::begin() {
+	event_histogram.resize(event_count);
+}
 
 void EventHandler::set(LumenEvent event) { event_table[event] = true; }
 
@@ -14,5 +19,6 @@ bool EventHandler::consume_event(LumenEvent event) {
 		event_table[event] = false;
 		return true;
 	}
+	event_histogram[(uint32_t)event]++;
 	return false;
 }

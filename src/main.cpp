@@ -1,6 +1,7 @@
 #include "LumenPCH.h"
 #include "Framework/Window.h"
-#include "RTScene.h"
+//#include "RTScene.h"
+#include "RayTracer/RayTracer.h"
 
 void window_size_callback(GLFWwindow* window, int width, int height) {}
 
@@ -18,7 +19,7 @@ int main() {
 	LUMEN_TRACE("Logger initialized");
 	Window window(width, height, fullscreen);
 	{
-		RTScene app(width, height, enable_debug);
+		RayTracer app(width, height, enable_debug);
 		app.init(&window);
 		while (!window.should_close()) {
 			window.poll();
