@@ -24,7 +24,7 @@ static void fb_resize_callback(GLFWwindow* window, int width, int height) {
 }
 
 RTScene::RTScene(int width, int height, bool debug)
-	: Scene(width, height, debug) {
+	: LumenInstance(width, height, debug) {
 	this->instance = this;
 }
 
@@ -59,7 +59,6 @@ void RTScene::init(Window* window) {
 	prop2.pNext = &rt_props;
 	vkGetPhysicalDeviceProperties2(vkb.ctx.physical_device, &prop2);
 
-	init_scene();
 	auto cam_ptr = camera.get();
 	window->add_mouse_click_callback(
 		[window, cam_ptr, this](MouseAction button, KeyAction action) {
@@ -79,6 +78,7 @@ void RTScene::init(Window* window) {
 			updated = true;
 		}
 	});
+	init_scene();
 	create_offscreen_resources();
 	create_descriptors();
 	create_graphics_pipeline();
@@ -191,122 +191,122 @@ void RTScene::init_scene() {
 		prim_lookup.size() * sizeof(PrimMeshInfo), prim_lookup.data(), true);
 
 
-	// BDPT related buffers, TODO: Add a check
-	light_path_buffer.create(
-		&vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * (max_depth + 1) * sizeof(PathVertex));
+	//// BDPT related buffers, TODO: Add a check
+	//light_path_buffer.create(
+	//	&vkb.ctx,
+	//	VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	//	VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+	//	VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+	//	width * height * (max_depth + 1) * sizeof(PathVertex));
 
-	camera_path_buffer.create(
-		&vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * (max_depth + 1) * sizeof(PathVertex));
+	//camera_path_buffer.create(
+	//	&vkb.ctx,
+	//	VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	//	VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+	//	VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+	//	width * height * (max_depth + 1) * sizeof(PathVertex));
 
-	path_backup_buffer.create(
-		&vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * 7 * sizeof(VertexBackup));
+	//path_backup_buffer.create(
+	//	&vkb.ctx,
+	//	VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	//	VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+	//	VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+	//	width * height * 7 * sizeof(VertexBackup));
 
-	color_storage_buffer.create(
-		&vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * 3 * sizeof(float)
-	);
-	sppm_data_buffer.create(
-		&vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * sizeof(SPPMData) * sizeof(float)
-	);
+	//color_storage_buffer.create(
+	//	&vkb.ctx,
+	//	VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	//	VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+	//	VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+	//	width * height * 3 * sizeof(float)
+	//);
+	//sppm_data_buffer.create(
+	//	&vkb.ctx,
+	//	VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	//	VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	//	VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	//	VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+	//	width * height * sizeof(SPPMData) * sizeof(float)
+	//);
 
-	atomic_data_buffer.create(
-		&vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		sizeof(AtomicData) * sizeof(float)
-	);
+	//atomic_data_buffer.create(
+	//	&vkb.ctx,
+	//	VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	//	VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	//	VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	//	VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+	//	sizeof(AtomicData) * sizeof(float)
+	//);
 
-	atomic_data_cpu.create(
-		&vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		sizeof(AtomicData) * sizeof(float)
-	);
+	//atomic_data_cpu.create(
+	//	&vkb.ctx,
+	//	VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	//	VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+	//	VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VK_SHARING_MODE_EXCLUSIVE,
+	//	sizeof(AtomicData) * sizeof(float)
+	//);
 
-	residual_buffer.create(
-		&vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * 4 * sizeof(float)
-	);
+	//residual_buffer.create(
+	//	&vkb.ctx,
+	//	VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	//	VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	//	VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	//	VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+	//	width * height * 4 * sizeof(float)
+	//);
 
-	counter_buffer.create(
-		&vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		sizeof(int)
-	);
-	hash_buffer.create(
-		&vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * sizeof(HashData)
-	);
+	//counter_buffer.create(
+	//	&vkb.ctx,
+	//	VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	//	VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	//	VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	//	VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+	//	sizeof(int)
+	//);
+	//hash_buffer.create(
+	//	&vkb.ctx,
+	//	VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	//	VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	//	VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	//	VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+	//	width * height * sizeof(HashData)
+	//);
 
-	photon_buffer.create(
-		&vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		10 * width * height * sizeof(PhotonHash)
-	);
-	vcm_light_vertices_buffer.create(
-		&vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width * height * (max_depth + 1) * sizeof(VCMVertex)
-	);
+	//photon_buffer.create(
+	//	&vkb.ctx,
+	//	VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	//	VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	//	VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	//	VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+	//	10 * width * height * sizeof(PhotonHash)
+	//);
+	//vcm_light_vertices_buffer.create(
+	//	&vkb.ctx,
+	//	VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	//	VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	//	VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	//	VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+	//	width * height * (max_depth + 1) * sizeof(VCMVertex)
+	//);
 
-	light_path_cnt_buffer.create(
-		&vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		width* height * 4
-	);
+	//light_path_cnt_buffer.create(
+	//	&vkb.ctx,
+	//	VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	//	VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	//	VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	//	VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+	//	width* height * 4
+	//);
 
-	if (total_light_triangle_cnt) {
-		light_vis_buffer.create(
-			&vkb.ctx,
-			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-			(VkDeviceSize)width * height * 2 *
-			total_light_triangle_cnt * sizeof(float));
-	}
+	//if (total_light_triangle_cnt) {
+	//	light_vis_buffer.create(
+	//		&vkb.ctx,
+	//		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	//		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+	//		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+	//		(VkDeviceSize)width * height * 2 *
+	//		total_light_triangle_cnt * sizeof(float));
+	//}
 
 	SceneDesc desc;
 	desc.vertex_addr = vertex_buffer.get_device_address();
@@ -315,21 +315,21 @@ void RTScene::init_scene() {
 	desc.uv_addr = uv_buffer.get_device_address();
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
-	desc.camera_path_addr = camera_path_buffer.get_device_address();
-	desc.light_path_addr = light_path_buffer.get_device_address();
-	desc.path_backup_addr = path_backup_buffer.get_device_address();
-	desc.color_storage_addr = color_storage_buffer.get_device_address();
-	desc.sppm_data_addr = sppm_data_buffer.get_device_address();
-	desc.atomic_data_addr = atomic_data_buffer.get_device_address();
-	desc.residual_addr = residual_buffer.get_device_address();
-	desc.counter_addr = counter_buffer.get_device_address();
-	desc.hash_addr = hash_buffer.get_device_address();
-	desc.photon_addr = photon_buffer.get_device_address();
-	desc.vcm_light_vertices_addr = vcm_light_vertices_buffer.get_device_address();
-	desc.light_path_cnt_addr = light_path_cnt_buffer.get_device_address();
-	if (total_light_triangle_cnt) {
-		desc.light_vis_addr = light_vis_buffer.get_device_address();
-	}
+	//desc.camera_path_addr = camera_path_buffer.get_device_address();
+	//desc.light_path_addr = light_path_buffer.get_device_address();
+	//desc.path_backup_addr = path_backup_buffer.get_device_address();
+	//desc.color_storage_addr = color_storage_buffer.get_device_address();
+	//desc.sppm_data_addr = sppm_data_buffer.get_device_address();
+	//desc.atomic_data_addr = atomic_data_buffer.get_device_address();
+	//desc.residual_addr = residual_buffer.get_device_address();
+	//desc.counter_addr = counter_buffer.get_device_address();
+	//desc.hash_addr = hash_buffer.get_device_address();
+	//desc.photon_addr = photon_buffer.get_device_address();
+	//desc.vcm_light_vertices_addr = vcm_light_vertices_buffer.get_device_address();
+	//desc.light_path_cnt_addr = light_path_cnt_buffer.get_device_address();
+	//if (total_light_triangle_cnt) {
+	//	desc.light_vis_addr = light_vis_buffer.get_device_address();
+	//}
 
 	scene_desc_buffer.create(&vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -902,6 +902,7 @@ double RTScene::draw_frame() {
 		auto t_diff = t_end - t_begin;
 		return t_diff;
 	}
+	EventHandler::begin();
 	if (EventHandler::consume_event(LumenEvent::EVENT_SHADER_RELOAD)) {
 		// We don't want any command buffers in flight, might change in the
 		// future

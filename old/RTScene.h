@@ -4,7 +4,7 @@
 #include "Framework/Camera.h"
 #include "Framework/CommandBuffer.h"
 #include "Framework/Pipeline.h"
-#include "Framework/Scene.h"
+#include "Framework/LumenInstance.h"
 #include "Framework/Shader.h"
 #include "Framework/Texture.h"
 #include "Framework/Utils.h"
@@ -25,7 +25,7 @@ enum Integrator {
 };
 static const uint32_t integrator_map[] = { 0, 1, 2, 4 };
 
-class RTScene : public Scene {
+class RTScene : public LumenInstance {
 public:
 	RTScene(int width, int height, bool debug);
 	void init(Window*) override;
@@ -108,7 +108,6 @@ private:
 	//std::vector<VkRayTracingShaderGroupCreateInfoKHR> shader_groups;
 	std::unique_ptr<Camera> camera = nullptr;
 	// MeshLoader loader;
-	Window* window;
 	bool initialized = false;
 	bool rt_initialized = false;
 	float cpu_avg_time = 0;

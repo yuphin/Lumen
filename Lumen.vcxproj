@@ -198,6 +198,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\RayTracer\BDPT.cpp" />
+    <ClCompile Include="src\RayTracer\PSSMLT.cpp" />
     <ClCompile Include="src\RayTracer\RayTracer.cpp" />
     <ClCompile Include="src\RayTracer\Path.cpp" />
     <ClCompile Include="src\Framework\LumenScene.cpp" />
@@ -209,7 +210,6 @@
     <ClCompile Include="src\RayTracer\Integrator.cpp" />
     <ClCompile Include="src\RayTracer\SPPM.cpp" />
     <ClCompile Include="src\RayTracer\VCM.cpp" />
-    <ClCompile Include="src\RTScene.cpp" />
     <ClCompile Include="src\Framework\LumenInstance.cpp" />
     <ClCompile Include="src\Framework\CommandBuffer.cpp" />
     <ClCompile Include="src\Framework\Logger.cpp" />
@@ -239,6 +239,7 @@
     <ClInclude Include="libs\imgui\imstb_textedit.h" />
     <ClInclude Include="libs\imgui\imstb_truetype.h" />
     <ClInclude Include="src\RayTracer\BDPT.h" />
+    <ClInclude Include="src\RayTracer\PSSMLT.h" />
     <ClInclude Include="src\RayTracer\RayTracer.h" />
     <ClInclude Include="src\RayTracer\Path.h" />
     <ClInclude Include="src\Framework\LumenScene.h" />
@@ -247,7 +248,6 @@
     <ClInclude Include="src\RayTracer\Integrator.h" />
     <ClInclude Include="src\RayTracer\SPPM.h" />
     <ClInclude Include="src\RayTracer\VCM.h" />
-    <ClInclude Include="src\RTScene.h" />
     <ClInclude Include="src\Framework\LumenInstance.h" />
     <ClInclude Include="src\Framework\CommandBuffer.h" />
     <ClInclude Include="src\Framework\Camera.h" />
@@ -281,6 +281,28 @@
     <None Include="src\shaders\gpgpu\reduce_max.comp" />
     <None Include="src\shaders\gpgpu\reduce_min.comp" />
     <None Include="src\shaders\integrators.rgen" />
+    <None Include="src\shaders\integrators\bdpt\bdpt.rgen" />
+    <None Include="src\shaders\integrators\path\path.rgen" />
+    <None Include="src\shaders\integrators\pssmlt\calc_cdf.comp" />
+    <None Include="src\shaders\integrators\pssmlt\composite.comp" />
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_commons.glsl" />
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_mutate.rgen" />
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_preprocess.rgen" />
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_seed.rgen" />
+    <None Include="src\shaders\integrators\pssmlt\select_seeds.comp" />
+    <None Include="src\shaders\integrators\ray.rahit" />
+    <None Include="src\shaders\integrators\ray.rchit" />
+    <None Include="src\shaders\integrators\ray.rmiss" />
+    <None Include="src\shaders\integrators\ray_shadow.rmiss" />
+    <None Include="src\shaders\integrators\sppm\calc_bounds.comp" />
+    <None Include="src\shaders\integrators\sppm\max.comp" />
+    <None Include="src\shaders\integrators\sppm\min.comp" />
+    <None Include="src\shaders\integrators\sppm\reduce_max.comp" />
+    <None Include="src\shaders\integrators\sppm\reduce_min.comp" />
+    <None Include="src\shaders\integrators\sppm\sppm_eye.rgen" />
+    <None Include="src\shaders\integrators\sppm\sppm_light.rgen" />
+    <None Include="src\shaders\integrators\vcm\vcm_eye.rgen" />
+    <None Include="src\shaders\integrators\vcm\vcm_light.rgen" />
     <None Include="src\shaders\pathtrace.rahit" />
     <None Include="src\shaders\pathtrace.rchit" />
     <None Include="src\shaders\pathtrace.rgen" />

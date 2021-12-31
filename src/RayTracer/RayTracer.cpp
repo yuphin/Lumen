@@ -1,10 +1,9 @@
 #include "LumenPCH.h"
-#include "RayTracer.h"
-
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define TINYOBJLOADER_IMPLEMENTATION
+#include "RayTracer.h"
 RayTracer* RayTracer::instance = nullptr;
 
 static void fb_resize_callback(GLFWwindow* window, int width, int height) {

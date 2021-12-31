@@ -90,9 +90,6 @@
     <ClCompile Include="src\Framework\GltfScene.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\RTScene.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\RayTracer\Integrator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -109,6 +106,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\RayTracer\VCM.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\PSSMLT.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -200,9 +200,6 @@
     <ClInclude Include="src\Framework\GltfScene.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\RTScene.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\Framework\GLTFModel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -225,6 +222,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\RayTracer\VCM.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\PSSMLT.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -256,5 +256,27 @@
     <None Include="src\shaders\pt_unidir.rgen" />
     <None Include="src\shaders\utils.glsl" />
     <None Include="src\shaders\gather.comp" />
+    <None Include="src\shaders\integrators\pssmlt\calc_cdf.comp" />
+    <None Include="src\shaders\integrators\pssmlt\composite.comp" />
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_commons.glsl" />
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_mutate.rgen" />
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_preprocess.rgen" />
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_seed.rgen" />
+    <None Include="src\shaders\integrators\pssmlt\select_seeds.comp" />
+    <None Include="src\shaders\integrators\path\path.rgen" />
+    <None Include="src\shaders\integrators\bdpt\bdpt.rgen" />
+    <None Include="src\shaders\integrators\ray.rahit" />
+    <None Include="src\shaders\integrators\ray.rchit" />
+    <None Include="src\shaders\integrators\ray.rmiss" />
+    <None Include="src\shaders\integrators\ray_shadow.rmiss" />
+    <None Include="src\shaders\integrators\sppm\calc_bounds.comp" />
+    <None Include="src\shaders\integrators\sppm\max.comp" />
+    <None Include="src\shaders\integrators\sppm\min.comp" />
+    <None Include="src\shaders\integrators\sppm\reduce_max.comp" />
+    <None Include="src\shaders\integrators\sppm\reduce_min.comp" />
+    <None Include="src\shaders\integrators\sppm\sppm_eye.rgen" />
+    <None Include="src\shaders\integrators\sppm\sppm_light.rgen" />
+    <None Include="src\shaders\integrators\vcm\vcm_eye.rgen" />
+    <None Include="src\shaders\integrators\vcm\vcm_light.rgen" />
   </ItemGroup>
 </Project>
