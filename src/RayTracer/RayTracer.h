@@ -5,6 +5,7 @@
 #include "BDPT.h"
 #include "SPPM.h"
 #include "VCM.h"
+#include "PSSMLT.h"
 class RayTracer : public LumenInstance {
 public:
 	RayTracer(int width, int height, bool debug);

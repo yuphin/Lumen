@@ -1,10 +1,12 @@
 #ifndef UTILS_DEVICE
 #define UTILS_DEVICE
+#include "commons.h"
 #define PI 3.14159265359
 #define PI2 6.28318530718
-#include "commons.h"
 #define INF 1e10
 #define EPS 0.001
+#define sqrt2 1.41421356237309504880
+
 struct HitPayload {
     vec3 geometry_nrm;
     vec3 shading_nrm;
@@ -25,15 +27,15 @@ struct MaterialProps {
 
 struct VCMState {
     vec3 wi;
-	vec3 shading_nrm;
-	vec3 pos;
-	vec2 uv;
-	vec3 throughput;
-	uint material_idx;
-	float area;
-	float d_vcm;
-	float d_vc;
-	float d_vm;
+    vec3 shading_nrm;
+    vec3 pos;
+    vec2 uv;
+    vec3 throughput;
+    uint material_idx;
+    float area;
+    float d_vcm;
+    float d_vc;
+    float d_vm;
 };
 
 struct AnyHitPayload {
@@ -47,9 +49,9 @@ struct TriangleRecord {
 };
 
 uint hash(ivec3 p, uint size) {
-  return uint((p.x * 73856093) ^ (p.y * 19349663) ^
-              p.z * 83492791) %  (10 * size);
- //return uint(p.x + p.y * grid_res.x + p.z * grid_res.x * grid_res.y);
+    return uint((p.x * 73856093) ^ (p.y * 19349663) ^ p.z * 83492791) %
+           (10 * size);
+    // return uint(p.x + p.y * grid_res.x + p.z * grid_res.x * grid_res.y);
 }
 
 // Ray Tracing Gems chapter 6
@@ -68,10 +70,8 @@ vec3 offset_ray(const vec3 p, const vec3 n) {
                 abs(p.y) < origin ? p.y + float_scale * n.y : p_i.y,
                 abs(p.z) < origin ? p.z + float_scale * n.z : p_i.z);
 #else
-  return vec3(p.x + float_scale * n.x ,
-              p.y + float_scale * n.y,
-              p.z + float_scale * n.z 
-              );
+    return vec3(p.x + float_scale * n.x, p.y + float_scale * n.y,
+                p.z + float_scale * n.z);
 #endif
 }
 
@@ -127,6 +127,37 @@ void correct_shading_normal(const vec3 wo, const vec3 wi,
     if (res1 != res2) {
         shading_nrm *= -1;
     }
+}
+
+// From PBRT
+float erf_inv(float x) {
+    float w, p;
+    x = clamp(x, -.99999, .99999);
+    w = -log((1 - x) * (1 + x));
+    if (w < 5) {
+        w = w - 2.5;
+        p = 2.81022636e-08;
+        p = 3.43273939e-07 + p * w;
+        p = -3.5233877e-06 + p * w;
+        p = -4.39150654e-06 + p * w;
+        p = 0.00021858087 + p * w;
+        p = -0.00125372503 + p * w;
+        p = -0.00417768164 + p * w;
+        p = 0.246640727 + p * w;
+        p = 1.50140941 + p * w;
+    } else {
+        w = sqrt(w) - 3;
+        p = -0.000200214257;
+        p = 0.000100950558 + p * w;
+        p = 0.00134934322 + p * w;
+        p = -0.00367342844 + p * w;
+        p = 0.00573950773 + p * w;
+        p = -0.0076224613 + p * w;
+        p = 0.00943887047 + p * w;
+        p = 1.00167406 + p * w;
+        p = 2.83297682 + p * w;
+    }
+    return p * x;
 }
 
 #endif

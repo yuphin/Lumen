@@ -41,7 +41,7 @@ void RayTracer::init(Window* window) {
 	vkb.create_command_buffers();
 	vkb.create_sync_primitives();
 	initialized = true;
-	integrator = std::make_unique<VCM>(this);
+	integrator = std::make_unique<PSSMLT>(this);
 	integrator->init();
 	create_post_descriptor();
 	update_post_desc_set();

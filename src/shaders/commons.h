@@ -30,6 +30,7 @@ using ivec3 = glm::ivec3;
 using vec3 = glm::vec3;
 using vec4 = glm::vec4;
 using mat4 = glm::mat4;
+using uvec4 = glm::uvec4;
 using uint = unsigned int;
 #define ALIGN16 alignas(16)
 #else
@@ -58,6 +59,12 @@ struct PushConstantRay {
 	int use_vc;
 	int light_triangle_count;
 	int use_area_sampling;
+	uint mutation_counter;
+	uint light_rand_count;
+	uint cam_rand_count;
+	uint connection_rand_count;
+	uint random_num;
+	uint num_bootstrap_samples;
 };
 
 struct SceneUBO {
@@ -108,6 +115,20 @@ struct PathVertex {
 	float area;
 	float pdf_fwd;
 	float pdf_rev;
+};
+
+struct MLTPathVertex {
+	vec3 dir;
+	vec3 shading_nrm;
+	vec3 pos;
+	vec2 uv;
+	vec3 throughput;
+	uint material_idx;
+	uint delta;
+	float area;
+	float pdf_fwd;
+	float pdf_rev;
+	uint coords;
 };
 
 struct VCMVertex {
@@ -164,6 +185,48 @@ struct VertexBackup {
 	float pdf_rev;
 };
 
+struct PrimarySample {
+	float val;
+	float backup;
+	uint last_modified;
+	uint last_modified_backup;
+};
+
+struct MLTSampler {
+	uint last_large_step;
+	uint iter;
+	//uint sampler_idx;
+	uint num_light_samples;
+	uint num_cam_samples;
+	uint num_connection_samples;
+	float luminance;
+	uint splat_cnt;
+	uint past_splat_cnt;
+	uint swap;
+	uint type;
+};
+
+struct SeedData {
+	uvec4 chain_seed;
+};
+
+struct ChainData {
+	float total_luminance;
+	uint lum_samples;
+	float total_samples;
+	float normalization;
+};
+
+struct Splat {
+	uint idx;
+	vec3 L;
+};
+
+struct BootstrapSample {
+	uvec4 seed;
+	float lum;
+};
+
 
 // Scene buffer addresses
 struct SceneDesc {
@@ -191,6 +254,19 @@ struct SceneDesc {
 	// VCM
 	uint64_t vcm_light_vertices_addr;
 	uint64_t light_path_cnt_addr;
+	// MLT
+	uint64_t bootstrap_addr;
+	uint64_t cdf_addr;
+	uint64_t cdf_sum_addr;
+	uint64_t seeds_addr;
+	uint64_t mlt_samplers_addr;
+	uint64_t light_primary_samples_addr;
+	uint64_t cam_primary_samples_addr;
+	uint64_t connection_primary_samples_addr;
+	uint64_t mlt_col_addr;
+	uint64_t chain_stats_addr;
+	uint64_t splat_addr;
+	uint64_t past_splat_addr;
 };
 
 // Structure used for retrieving the primitive information in the closest hit
