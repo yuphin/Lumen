@@ -197,6 +197,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="src\RayTracer\BDPT.cpp" />
     <ClCompile Include="src\RayTracer\RayTracer.cpp" />
     <ClCompile Include="src\RayTracer\Path.cpp" />
     <ClCompile Include="src\Framework\LumenScene.cpp" />
@@ -206,6 +207,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\RayTracer\Integrator.cpp" />
+    <ClCompile Include="src\RayTracer\SPPM.cpp" />
+    <ClCompile Include="src\RayTracer\VCM.cpp" />
     <ClCompile Include="src\RTScene.cpp" />
     <ClCompile Include="src\Framework\LumenInstance.cpp" />
     <ClCompile Include="src\Framework\CommandBuffer.cpp" />
@@ -235,12 +238,15 @@
     <ClInclude Include="libs\imgui\imstb_rectpack.h" />
     <ClInclude Include="libs\imgui\imstb_textedit.h" />
     <ClInclude Include="libs\imgui\imstb_truetype.h" />
+    <ClInclude Include="src\RayTracer\BDPT.h" />
     <ClInclude Include="src\RayTracer\RayTracer.h" />
     <ClInclude Include="src\RayTracer\Path.h" />
     <ClInclude Include="src\Framework\LumenScene.h" />
     <ClInclude Include="src\Framework\SBTWrapper.h" />
     <ClInclude Include="src\Framework\GltfScene.hpp" />
     <ClInclude Include="src\RayTracer\Integrator.h" />
+    <ClInclude Include="src\RayTracer\SPPM.h" />
+    <ClInclude Include="src\RayTracer\VCM.h" />
     <ClInclude Include="src\RTScene.h" />
     <ClInclude Include="src\Framework\LumenInstance.h" />
     <ClInclude Include="src\Framework\CommandBuffer.h" />

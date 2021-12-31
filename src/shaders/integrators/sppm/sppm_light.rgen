@@ -1,0 +1,127 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+
+#include "../../commons.glsl"
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+// SPPM buffers
+layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
+layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
+layout(buffer_reference, scalar) buffer HashData_ { HashData d[]; };
+layout(buffer_reference, scalar) buffer PhotonData_ { PhotonHash d[]; };
+
+SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
+AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
+HashData_ hash_data = HashData_(scene_desc.hash_addr);
+PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
+
+uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
+
+const uint flags = gl_RayFlagsOpaqueEXT;
+const float tmin = 0.001;
+const float tmax = 10000.0;
+#define RR_MIN_DEPTH 3
+uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
+
+vec3 normalize_grid(vec3 p, vec3 min_bnds, vec3 max_bnds) {
+    return (p - min_bnds) / (max_bnds - min_bnds);
+}
+
+ivec3 get_grid_idx(vec3 p, vec3 min_bnds, vec3 max_bnds, ivec3 grid_res) {
+    ivec3 res = ivec3(normalize_grid(p, min_bnds, max_bnds) * grid_res);
+    clamp(res, vec3(0), grid_res - vec3(1));
+    return res;
+}
+
+void main() {
+    uint light_idx;
+    uint light_triangle_idx;
+    uint light_material_idx;
+    vec2 uv_unused;
+    MeshLight light;
+    const TriangleRecord record =
+        sample_area_light(light_idx, light_triangle_idx, light_material_idx,
+                          light, seed, pc_ray.num_mesh_lights);
+    const MaterialProps light_mat =
+        load_material(light_material_idx, uv_unused);
+    vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
+                                    record.triangle_normal);
+    vec3 o = record.pos;
+    float abs_cos_light = abs(dot(record.triangle_normal, wi));
+    const float pdf_dir = dot(wi, record.triangle_normal) / PI;
+    vec3 throughput;
+    if (abs_cos_light == 0) {
+        throughput = vec3(0);
+    } else {
+        throughput =
+            vec3(1.0) * abs_cos_light /
+            (pdf_dir * record.triangle_pdf / pc_ray.light_triangle_count);
+    }
+    for (int d = 0; d < pc_ray.max_depth - 1; d++) {
+        traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, o, tmin, wi, tmax, 0);
+        bool found_isect = payload.material_idx != -1;
+        if (!found_isect) {
+            break;
+        }
+        vec3 shading_nrm = payload.shading_nrm;
+        const vec3 wo = -wi;
+        float cos_wo = dot(wo, shading_nrm);
+        bool side = true;
+        if (cos_wo < 0.) {
+            cos_wo = -cos_wo;
+            shading_nrm = -shading_nrm;
+            side = false;
+        }
+
+        MaterialProps hit_mat = load_material(payload.material_idx, payload.uv);
+        const vec3 old_wi = wi;
+        float pdf_dir, cos_theta;
+        const vec3 f = sample_bsdf(shading_nrm, wo, hit_mat, 0, side, wi,
+                                   pdf_dir, cos_theta, seed);
+        if (pdf_dir == 0) {
+            break;
+        }
+        throughput *= f * abs(cos_theta) / pdf_dir;
+        if (d > RR_MIN_DEPTH) {
+            float rr_prob = min(0.95f, luminance(throughput));
+            if (rr_prob < rand(seed))
+                break;
+            else
+                throughput /= rr_prob;
+        }
+        const bool mat_diffuse = (hit_mat.bsdf_props & BSDF_LAMBERTIAN) != 0;
+        if (d >= 0 && mat_diffuse) {
+            // Ignore the first bounce
+            vec3 min_bnds;
+            vec3 max_bnds;
+            ivec3 grid_res;
+            if (pc_ray.frame_num == 0) {
+                min_bnds = pc_ray.min_bounds;
+                max_bnds = pc_ray.max_bounds;
+                grid_res = pc_ray.grid_res;
+            } else {
+                min_bnds = atomic_data.d.min_bnds;
+                max_bnds = atomic_data.d.max_bnds;
+                grid_res = atomic_data.d.grid_res;
+            }
+            const ivec3 grid_idx =
+                get_grid_idx(payload.pos, min_bnds, max_bnds, grid_res);
+            const uint h = hash(grid_idx, screen_size);
+            // float val = rand(seed);
+            photons.d[h].pos = payload.pos;
+            photons.d[h].wi = -old_wi;
+            photons.d[h].throughput = throughput;
+            photons.d[h].nrm = shading_nrm;
+            photons.d[h].path_len = d + 1;
+            atomicAdd(photons.d[h].photon_count, 1);
+        }
+        o = offset_ray(payload.pos, shading_nrm);
+    }
+}

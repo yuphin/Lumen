@@ -1,8 +1,8 @@
 #pragma once
 #include "Integrator.h"
-class Path : public Integrator {
+class BDPT : public Integrator {
 public:
-	Path(LumenInstance* scene) : Integrator(scene) {}
+	BDPT(LumenInstance* scene) : Integrator(scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -17,6 +17,9 @@ private:
 	VkDescriptorPool desc_pool;
 	VkDescriptorSetLayout desc_set_layout;
 	VkDescriptorSet desc_set;
-	std::unique_ptr<Pipeline> rt_pipeline;
+	std::unique_ptr<Pipeline> bdpt_pipeline;
+	Buffer light_path_buffer;
+	Buffer camera_path_buffer;
+	Buffer color_storage_buffer;
 };
 

@@ -41,7 +41,7 @@ void RayTracer::init(Window* window) {
 	vkb.create_command_buffers();
 	vkb.create_sync_primitives();
 	initialized = true;
-	integrator = std::make_unique<Path>(this);
+	integrator = std::make_unique<VCM>(this);
 	integrator->init();
 	create_post_descriptor();
 	update_post_desc_set();
@@ -53,23 +53,6 @@ void RayTracer::update() {
 	float frame_time = draw_frame();
 	cpu_avg_time = 0.95f * cpu_avg_time + 0.05f * frame_time;
 	integrator->update();
-}
-
-void RayTracer::cleanup() {
-	const auto device = vkb.ctx.device;
-	vkDeviceWaitIdle(device);
-	if (initialized) {
-		vkDestroyDescriptorSetLayout(device, post_desc_layout, nullptr);
-		vkDestroyDescriptorPool(device, post_desc_pool, nullptr);
-		vkDestroyDescriptorPool(device, imgui_pool, nullptr);
-		vkDestroyPipelineLayout(device, post_pipeline_layout, nullptr);
-		ImGui_ImplVulkan_Shutdown();
-		ImGui_ImplGlfw_Shutdown();
-		ImGui::DestroyContext();
-		integrator->destroy();
-		post_pipeline->cleanup();
-		vkb.cleanup();
-	}
 }
 
 void RayTracer::render(uint32_t i) {
@@ -247,4 +230,21 @@ void RayTracer::init_imgui() {
 	ImGui_ImplVulkan_CreateFontsTexture(cmd.handle);
 	cmd.submit(vkb.ctx.queues[(int)QueueType::GFX]);
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
+}
+
+void RayTracer::cleanup() {
+	const auto device = vkb.ctx.device;
+	vkDeviceWaitIdle(device);
+	if (initialized) {
+		vkDestroyDescriptorSetLayout(device, post_desc_layout, nullptr);
+		vkDestroyDescriptorPool(device, post_desc_pool, nullptr);
+		vkDestroyDescriptorPool(device, imgui_pool, nullptr);
+		vkDestroyPipelineLayout(device, post_pipeline_layout, nullptr);
+		ImGui_ImplVulkan_Shutdown();
+		ImGui_ImplGlfw_Shutdown();
+		ImGui::DestroyContext();
+		integrator->destroy();
+		post_pipeline->cleanup();
+		vkb.cleanup();
+	}
 }

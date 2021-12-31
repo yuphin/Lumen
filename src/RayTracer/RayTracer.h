@@ -2,6 +2,9 @@
 #include "LumenPCH.h"
 #include "Framework/LumenInstance.h"
 #include "Path.h"
+#include "BDPT.h"
+#include "SPPM.h"
+#include "VCM.h"
 class RayTracer : public LumenInstance {
 public:
 	RayTracer(int width, int height, bool debug);

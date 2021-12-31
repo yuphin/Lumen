@@ -1,0 +1,54 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../commons.h"
+#include "../../utils.glsl"
+layout(local_size_x = 1024, local_size_y =1, local_size_z = 1) in;
+layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
+layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
+layout(buffer_reference, scalar) buffer ResidualData { vec4 d[]; };
+layout(buffer_reference, scalar) buffer CounterData {  int d; };
+uint size = pc_ray.size_x * pc_ray.size_y;
+SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
+ResidualData res_data = ResidualData(scene_desc.residual_addr);
+CounterData cnt = CounterData(scene_desc.counter_addr);
+AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
+shared vec3 data[32];
+void main() {
+	uint idx = gl_GlobalInvocationID.x;
+	vec3 val;
+	uint limit = cnt.d == 0 ? size : ((size + 1023) >> (10 * cnt.d));
+	if(idx >= limit) {
+		return;
+	}
+	val = res_data.d[idx].xyz;
+	memoryBarrier();
+	barrier();
+
+	val = subgroupMin(val);
+	if (gl_SubgroupInvocationID == 0) {
+        data[gl_SubgroupID].xyz = val;
+    }
+	barrier();
+
+	if (gl_SubgroupID == 0) {
+        val = data[gl_SubgroupInvocationID].xyz;
+		subgroupBarrier();
+        val = subgroupMin(val); 
+    }
+	if (gl_LocalInvocationID.x == 0) {
+        res_data.d[gl_WorkGroupID.x].xyz = val;
+    }
+	if(idx == 0){
+		cnt.d += 1;
+		atomic_data.d.min_bnds = val;
+	}
+}

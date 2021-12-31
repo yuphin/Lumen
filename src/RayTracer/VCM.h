@@ -1,8 +1,8 @@
 #pragma once
 #include "Integrator.h"
-class Path : public Integrator {
+class VCM : public Integrator {
 public:
-	Path(LumenInstance* scene) : Integrator(scene) {}
+	VCM(LumenInstance* scene) : Integrator(scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -17,6 +17,12 @@ private:
 	VkDescriptorPool desc_pool;
 	VkDescriptorSetLayout desc_set_layout;
 	VkDescriptorSet desc_set;
-	std::unique_ptr<Pipeline> rt_pipeline;
+	std::unique_ptr<Pipeline> vcm_light_pipeline;
+	std::unique_ptr<Pipeline> vcm_eye_pipeline;
+
+	Buffer photon_buffer;
+	Buffer vcm_light_vertices_buffer;
+	Buffer light_path_cnt_buffer;
+	Buffer color_storage_buffer;
 };
 

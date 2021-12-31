@@ -14,14 +14,16 @@
 #include "shaders/commons.h"
 class Integrator {
 public:
-	virtual void init() = 0;
+	Integrator(LumenInstance* scene) : scene(scene) {}
+	virtual void init();
 	virtual void render() = 0;
 	virtual bool update() = 0;
-	virtual void destroy() = 0;
+	virtual void destroy();
 	Texture2D output_tex;
 	std::unique_ptr<Camera> camera = nullptr;
 	bool updated = false;
 protected:
+	void update_uniform_buffers();
 	SceneUBO scene_ubo{};
 	Buffer vertex_buffer;
 	Buffer normal_buffer;
@@ -32,5 +34,13 @@ protected:
 	Buffer scene_desc_buffer;
 	Buffer scene_ubo_buffer;
 	Buffer mesh_lights_buffer;
+	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props{
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
+	LumenInstance* scene;
+	LumenScene lumen_scene;
+	std::vector<MeshLight> lights;
+	VkSampler texture_sampler;
+	std::vector<Texture2D> textures;
+private:
 };
 

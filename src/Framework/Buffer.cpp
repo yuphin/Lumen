@@ -61,7 +61,7 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage,
 		}
 		vk::check(vkAllocateMemory(ctx->device, &mem_alloc_info, nullptr,
 				  &this->buffer_memory),
-				  "Failed to allocate vertex buffer memory!");
+				  "Failed to allocate buffer memory!");
 
 		alignment = mem_reqs.alignment;
 		this->size = size;

@@ -1,0 +1,261 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+
+#include "../../commons.glsl"
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+// SPPM buffers
+layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
+layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
+layout(buffer_reference, scalar) buffer HashData_ { HashData d[]; };
+layout(buffer_reference, scalar) buffer PhotonData_ { PhotonHash d[]; };
+
+SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
+AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
+HashData_ hash_data = HashData_(scene_desc.hash_addr);
+PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
+
+uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
+const uint flags = gl_RayFlagsOpaqueEXT;
+const float tmin = 0.001;
+const float tmax = 10000.0;
+#define RR_MIN_DEPTH 3
+uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
+
+vec3 normalize_grid(vec3 p, vec3 min_bnds, vec3 max_bnds) {
+    return (p - min_bnds) / (max_bnds - min_bnds);
+}
+
+ivec3 get_grid_idx(vec3 p, vec3 min_bnds, vec3 max_bnds, ivec3 grid_res) {
+    ivec3 res = ivec3(normalize_grid(p, min_bnds, max_bnds) * grid_res);
+    clamp(res, vec3(0), grid_res - vec3(1));
+    return res;
+}
+
+vec3 uniform_sample_light(const MaterialProps mat, const vec3 pos,
+                          const bool side, const vec3 shading_nrm,
+                          const vec3 wo, const bool is_specular) {
+    vec3 res = vec3(0);
+    // Sample light
+    uint light_idx;
+    uint light_triangle_idx;
+    uint light_material_idx;
+    MeshLight light;
+    const TriangleRecord record =
+        sample_area_light(light_idx, light_triangle_idx, light_material_idx,
+                          light, seed, pc_ray.num_mesh_lights);
+    vec2 uv_unused;
+    const MaterialProps light_mat =
+        load_material(light_material_idx, uv_unused);
+    vec3 wi = record.pos - payload.pos;
+    const float wi_len = length(wi);
+    wi /= wi_len;
+    float bsdf_pdf;
+    float cos_x = dot(shading_nrm, wi);
+    const uint props = is_specular ? BSDF_ALL : BSDF_ALL & ~BSDF_SPECULAR;
+    vec3 f = eval_bsdf_selective(shading_nrm, wo, mat, 0, side, props, wi,
+                                 bsdf_pdf, cos_x);
+    float pdf_light;
+    if (f != vec3(0)) {
+        any_hit_payload.hit = 1;
+        traceRayEXT(tlas,
+                    gl_RayFlagsTerminateOnFirstHitEXT |
+                        gl_RayFlagsSkipClosestHitShaderEXT,
+                    0xFF, 1, 0, 1, pos, 0, wi, wi_len - EPS, 1);
+        bool visible = any_hit_payload.hit == 0;
+        float g = abs(dot(record.triangle_normal, -wi)) / (wi_len * wi_len);
+        if (pc_ray.use_area_sampling == 0) {
+            pdf_light = record.triangle_pdf / g;
+        } else {
+            bsdf_pdf *= g;
+            pdf_light = record.triangle_pdf;
+        }
+        if (visible && pdf_light > 0) {
+            const float mis_weight = 1 / (1 + bsdf_pdf / pdf_light);
+            res += f * abs(cos_x) * mis_weight *
+                   (pc_ray.use_area_sampling == 1 ? g : 1) *
+                   light_mat.emissive_factor / pdf_light;
+        }
+    }
+
+    // Sample BSDF
+    f = sample_bsdf_selective(shading_nrm, wo, mat, 0, side, props, wi,
+                              bsdf_pdf, cos_x, seed);
+    traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, pos, tmin, wi, tmax, 0);
+    if (payload.material_idx == light_idx &&
+        payload.triangle_idx == light_triangle_idx) {
+        const float wi_len = length(payload.pos - pos);
+        float g = abs(dot(payload.shading_nrm, -wi)) / (wi_len * wi_len);
+        if (pc_ray.use_area_sampling == 1) {
+            bsdf_pdf *= g;
+
+        } else {
+            pdf_light = record.triangle_pdf / g;
+        }
+        const float mis_weight = 1. / (1 + pdf_light / bsdf_pdf);
+        res += f * abs(cos_x) * (pc_ray.use_area_sampling == 1 ? g : 1) *
+               mis_weight * light_mat.emissive_factor / bsdf_pdf;
+    }
+    return res;
+}
+
+void main() {
+    const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+    const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
+    vec2 d = in_uv * 2.0 - 1.0;
+    vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
+    vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
+    vec3 direction = vec3(sample_camera(d));
+    vec3 col = vec3(0);
+    vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
+                                               2. / gl_LaunchSizeEXT.y, 0, 1));
+    area_int /= (area_int.w);
+    const float cam_area = abs(area_int.x * area_int.y);
+
+    vec3 throughput = vec3(1.);
+    vec3 phi_total = vec3(0);
+    uint M = 0;
+    float r =
+        pc_ray.frame_num < 1 ? pc_ray.radius : sppm_data.d[pixel_idx].radius;
+    const float r_sqr = r * r;
+    if (r < EPS) {
+        r = EPS;
+    }
+    bool specular = false;
+    for (int d = 0;; d++) {
+        traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction,
+                    tmax, 0);
+        const bool found_isect = payload.material_idx != -1;
+        if (!found_isect) {
+            col += throughput * pc_ray.sky_col;
+            break;
+        }
+        const MaterialProps hit_mat =
+            load_material(payload.material_idx, payload.uv);
+        if (d == 0 || specular) {
+            col += throughput * hit_mat.emissive_factor;
+        }
+        const vec3 wo = -direction;
+        vec3 shading_nrm = payload.shading_nrm;
+        float cos_wo = dot(wo, shading_nrm);
+#if 1
+        vec3 geometry_nrm = payload.geometry_nrm;
+        bool side = true;
+        if (dot(payload.geometry_nrm, wo) < 0.)
+            geometry_nrm = -geometry_nrm;
+        if (cos_wo < 0.) {
+            cos_wo = -cos_wo;
+            shading_nrm = -shading_nrm;
+            side = false;
+        }
+#endif
+        const vec3 pos = offset_ray(payload.pos, shading_nrm);
+        if (hit_mat.bsdf_type == BSDF_LAMBERTIAN) {
+            const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+            col += throughput *
+                   uniform_sample_light(hit_mat, pos, side, shading_nrm, wo,
+                                        specular) /
+                   light_pick_pdf;
+        }
+
+        specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
+        origin.xyz = pos;
+        // Gather
+        const vec3 p = payload.pos;
+        vec3 min_bnds;
+        vec3 max_bnds;
+        ivec3 grid_res;
+        if (pc_ray.frame_num == 0) {
+            min_bnds = pc_ray.min_bounds;
+            max_bnds = pc_ray.max_bounds;
+            grid_res = pc_ray.grid_res;
+        } else {
+            min_bnds = pc_ray.min_bounds;
+            max_bnds = pc_ray.max_bounds;
+            grid_res = pc_ray.grid_res;
+            min_bnds = atomic_data.d.min_bnds;
+            max_bnds = atomic_data.d.max_bnds;
+            grid_res = atomic_data.d.grid_res;
+        }
+        ivec3 grid_min_bnds_idx =
+            get_grid_idx(p - r, min_bnds, max_bnds, grid_res);
+        ivec3 grid_max_bnds_idx =
+            get_grid_idx(p + r, min_bnds, max_bnds, grid_res);
+        vec3 unused;
+        for (int x = grid_min_bnds_idx.x; x <= grid_max_bnds_idx.x; x++) {
+            for (int y = grid_min_bnds_idx.y; y <= grid_max_bnds_idx.y; y++) {
+                for (int z = grid_min_bnds_idx.z; z <= grid_max_bnds_idx.z;
+                     z++) {
+                    uint h = hash(ivec3(x, y, z), screen_size);
+                    if (photons.d[h].photon_count > 0) {
+                        vec3 pp = p - photons.d[h].pos;
+                        const float dist_sqr = dot(pp, pp);
+                        if (dist_sqr > r_sqr) {
+                            continue;
+                        }
+                        float cos_nrm =
+                            dot(photons.d[h].nrm, payload.shading_nrm);
+                        const float w = 1. - sqrt(dist_sqr) / r;
+                        const float w_normalization =
+                            3.; // 1. / (1 - 2/(3*k)) where k  = 1
+                        const vec3 f_eval =
+                            eval_bsdf(hit_mat, unused, photons.d[h].wi);
+                        vec3 phi = w * throughput * photons.d[h].throughput *
+                                   f_eval * w_normalization;
+#if 0
+                            if (cos_nrm > EPS) {
+                                phi *= photons.d[h].photon_count;
+                            }
+                            if (cos_nrm >= 0) {
+                                phi_total += phi;
+                                M++;
+                            }
+#else
+                        phi *= photons.d[h].photon_count;
+                        phi_total += phi;
+                        M++;
+#endif
+                    }
+                }
+            }
+        }
+        const bool mat_diffuse = (hit_mat.bsdf_props & BSDF_LAMBERTIAN) != 0;
+        const bool mat_specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
+        if (mat_diffuse || (mat_specular && d >= pc_ray.max_depth - 1)) {
+            break;
+        }
+        float pdf, cos_theta;
+        const vec3 f = sample_bsdf(shading_nrm, wo, hit_mat, 1, side, direction,
+                                   pdf, cos_theta, seed);
+        throughput *= f * abs(cos_theta) / pdf;
+    }
+#define pixel(idx) sppm_data.d[idx]
+    if (M > 0) {
+        const float gamma = 2.0 / 3.0;
+        const float n_new = pixel(pixel_idx).N + gamma * M;
+        const float r_new = r * sqrt(n_new / (pixel(pixel_idx).N + M));
+        phi_total = phi_total * r_new * r_new / (r_sqr);
+        pixel(pixel_idx).N = n_new;
+        pixel(pixel_idx).radius = r_new;
+        col += phi_total / (screen_size * PI * r_new * r_new);
+    }
+#undef pixel
+   
+    if (pc_ray.frame_num > 0) {
+        float w = 1. / float(pc_ray.frame_num + 1);
+        vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+        // imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+        imageStore(image, ivec2(gl_LaunchIDEXT.xy),
+                   vec4(mix(old_col, col, w), 1.f));
+    } else {
+
+        imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+    }
+}

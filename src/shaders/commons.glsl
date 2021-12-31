@@ -1,3 +1,5 @@
+#ifndef COMMONS_DEVICE
+#define COMMONS_DEVICE
 #include "commons.h"
 #include "utils.glsl"
 layout(location = 0) rayPayloadEXT HitPayload payload;
@@ -267,3 +269,5 @@ TriangleRecord sample_area_light(out uint light_idx, out uint triangle_idx,
     return sample_triangle(pinfo, rands, triangle_idx,
                            area_lights[light_mesh_idx].world_matrix);
 }
+
+#endif

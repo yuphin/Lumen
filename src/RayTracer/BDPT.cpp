@@ -1,10 +1,31 @@
 #include "LumenPCH.h"
-#include "Path.h"
+#include "BDPT.h"
 
 const int max_depth = 6;
 const vec3 sky_col(0, 0, 0);
-void Path::init() {
+void BDPT::init() {
 	Integrator::init();
+	light_path_buffer.create(
+		&scene->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		scene->width * scene->height * (max_depth + 1) * sizeof(PathVertex));
+
+	camera_path_buffer.create(
+		&scene->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		scene->width * scene->height * (max_depth + 1) * sizeof(PathVertex));
+
+	color_storage_buffer.create(
+		&scene->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		scene->width * scene->height * 3 * 4
+	);
 	SceneDesc desc;
 	desc.vertex_addr = vertex_buffer.get_device_address();
 	desc.index_addr = index_buffer.get_device_address();
@@ -12,6 +33,11 @@ void Path::init() {
 	desc.uv_addr = uv_buffer.get_device_address();
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
+	// BDPT
+	desc.light_path_addr = light_path_buffer.get_device_address();
+	desc.camera_path_addr = camera_path_buffer.get_device_address();
+	desc.color_storage_addr = color_storage_buffer.get_device_address();
+
 	scene_desc_buffer.create(&scene->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -29,7 +55,7 @@ void Path::init() {
 	pc_ray.size_y = scene->height;
 }
 
-void Path::render() {
+void BDPT::render() {
 	CommandBuffer cmd(&scene->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = { 0.25f, 0.25f, 0.25f, 1.0f };
 	VkClearValue clear_depth = { 1.0f, 0 };
@@ -38,27 +64,27 @@ void Path::render() {
 	pc_ray.light_pos = scene_ubo.light_pos;
 	pc_ray.light_type = 0;
 	pc_ray.light_intensity = 10;
-	pc_ray.num_mesh_lights = lights.size();
+	pc_ray.num_mesh_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = max_depth;
 	pc_ray.sky_col = sky_col;
 	// Trace rays
 	vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-		rt_pipeline->handle);
+		bdpt_pipeline->handle);
 	vkCmdBindDescriptorSets(
-		cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt_pipeline->pipeline_layout,
+		cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, bdpt_pipeline->pipeline_layout,
 		0, 1, &desc_set, 0, nullptr);
-	vkCmdPushConstants(cmd.handle, rt_pipeline->pipeline_layout,
+	vkCmdPushConstants(cmd.handle, bdpt_pipeline->pipeline_layout,
 		VK_SHADER_STAGE_RAYGEN_BIT_KHR |
 		VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
 		VK_SHADER_STAGE_MISS_BIT_KHR,
 		0, sizeof(PushConstantRay), &pc_ray);
-	auto& regions = rt_pipeline->get_rt_regions();
+	auto& regions = bdpt_pipeline->get_rt_regions();
 	vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3], scene->width, scene->height, 1);
 	cmd.submit();
 }
 
-bool Path::update() {
+bool BDPT::update() {
 	pc_ray.frame_num++;
 	glm::vec3 translation{};
 	float trans_speed = 0.01f;
@@ -118,7 +144,7 @@ bool Path::update() {
 	return result;
 }
 
-void Path::create_offscreen_resources() {
+void BDPT::create_offscreen_resources() {
 	// Create offscreen image for output
 	TextureSettings settings;
 	settings.usage_flags =
@@ -134,7 +160,7 @@ void Path::create_offscreen_resources() {
 	cmd.submit();
 }
 
-void Path::create_descriptors() {
+void BDPT::create_descriptors() {
 	constexpr int TLAS_BINDING = 0;
 	constexpr int IMAGE_BINDING = 1;
 	constexpr int INSTANCE_BINDING = 2;
@@ -255,7 +281,7 @@ void Path::create_descriptors() {
 };
 
 
-void Path::create_blas() {
+void BDPT::create_blas() {
 	std::vector<BlasInput> blas_inputs;
 	auto vertex_address =
 		get_device_address(scene->vkb.ctx.device, vertex_buffer.handle);
@@ -268,7 +294,7 @@ void Path::create_blas() {
 		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
-void Path::create_tlas() {
+void BDPT::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
 	float total_light_triangle_area = 0.0f;
 	int light_triangle_cnt = 0;
@@ -325,7 +351,7 @@ void Path::create_tlas() {
 		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
-void Path::create_rt_pipelines() {
+void BDPT::create_rt_pipelines() {
 	enum StageIndices {
 		Raygen,
 		CMiss,
@@ -336,11 +362,11 @@ void Path::create_rt_pipelines() {
 	};
 	RTPipelineSettings settings;
 
-	std::vector<Shader> shaders{ {"src/shaders/integrators/path/path.rgen"},
+	std::vector<Shader> shaders{ {"src/shaders/integrators/bdpt/bdpt.rgen"},
 								{"src/shaders/integrators/ray.rmiss"},
 								{"src/shaders/integrators/ray_shadow.rmiss"},
 								{"src/shaders/integrators/ray.rchit"},
-								{"src/shaders/integrators/ray.rahit"}};
+								{"src/shaders/integrators/ray.rahit"} };
 	for (auto& shader : shaders) {
 		shader.compile();
 	}
@@ -416,17 +442,25 @@ void Path::create_rt_pipelines() {
 									 0, sizeof(PushConstantRay) });
 	settings.desc_layouts = { desc_set_layout };
 	settings.stages = stages;
-	rt_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
-	rt_pipeline->create_rt_pipeline(settings);
+	bdpt_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
+	bdpt_pipeline->create_rt_pipeline(settings);
 	for (auto& s : settings.stages) {
 		vkDestroyShaderModule(scene->vkb.ctx.device, s.module, nullptr);
 	}
 }
 
-void Path::destroy() {
+void BDPT::destroy() {
 	const auto device = scene->vkb.ctx.device;
 	Integrator::destroy();
-	rt_pipeline->cleanup();
+	std::vector<Buffer*> buffer_list = {
+		&light_path_buffer,
+		&camera_path_buffer,
+		&color_storage_buffer
+	};
+	for (auto b : buffer_list) {
+		b->destroy();
+	}
+	bdpt_pipeline->cleanup();
 	vkDestroyDescriptorSetLayout(device, desc_set_layout, nullptr);
 	vkDestroyDescriptorPool(device, desc_pool, nullptr);
 }

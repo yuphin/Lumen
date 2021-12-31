@@ -1,3 +1,5 @@
+#ifndef UTILS_DEVICE
+#define UTILS_DEVICE
 #define PI 3.14159265359
 #define PI2 6.28318530718
 #include "commons.h"
@@ -126,3 +128,5 @@ void correct_shading_normal(const vec3 wo, const vec3 wi,
         shading_nrm *= -1;
     }
 }
+
+#endif

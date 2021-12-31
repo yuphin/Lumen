@@ -102,6 +102,15 @@
     <ClCompile Include="src\RayTracer\RayTracer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\RayTracer\BDPT.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\SPPM.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\VCM.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\lmnpch.h">
@@ -207,6 +216,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\RayTracer\RayTracer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\BDPT.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\SPPM.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\VCM.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
