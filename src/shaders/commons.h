@@ -67,6 +67,14 @@ struct PushConstantRay {
 	uint num_bootstrap_samples;
 };
 
+struct PushConstantCompute {
+	uint base_idx;
+	uint block_idx;
+	uint n;
+	uint num_elems;
+	uint store_sum;
+};
+
 struct SceneUBO {
 	mat4 projection;
 	mat4 view;
@@ -267,6 +275,7 @@ struct SceneDesc {
 	uint64_t chain_stats_addr;
 	uint64_t splat_addr;
 	uint64_t past_splat_addr;
+	uint64_t block_sums_addr;
 };
 
 // Structure used for retrieving the primitive information in the closest hit

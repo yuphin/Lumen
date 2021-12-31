@@ -371,10 +371,10 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
     vec4 target = ubo.view * vec4(dir.x, dir.y, dir.z, 0);
     target /= target.z;
     target = -ubo.projection * target;
-    coords = ivec2(0.5 * (1 + target.xy) * gl_LaunchSizeEXT.xy - 0.5);
-    if (coords.x < 0 || coords.x >= gl_LaunchSizeEXT.x || coords.y < 0 ||
-        coords.y >= gl_LaunchSizeEXT.y ||
-        dot(dir, cam_vtx(0).shading_nrm) < 0) {
+    coords =
+        ivec2(0.5 * (1 + target.xy) * vec2(pc_ray.size_x, pc_ray.size_y) - 0.5);
+    if (coords.x < 0 || coords.x >= pc_ray.size_x || coords.y < 0 ||
+        coords.y >= pc_ray.size_y || dot(dir, cam_vtx(0).shading_nrm) < 0) {
         return vec3(0);
     }
     float mis_weight = 1.0;

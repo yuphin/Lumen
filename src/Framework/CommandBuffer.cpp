@@ -19,14 +19,13 @@ CommandBuffer::CommandBuffer(VulkanContext* ctx, bool begin,
 	}
 }
 
-CommandBuffer::~CommandBuffer() {
-	if (handle == VK_NULL_HANDLE) {
-		return;
-	}
-	if (state == CommandBufferState::RECORDING) {
-		vk::check(vkEndCommandBuffer(handle), "Failed to end command buffer");
-	}
-	vkFreeCommandBuffers(ctx->device, ctx->cmd_pools[(int)type], 1, &handle);
+
+void CommandBuffer::begin(VkCommandBufferUsageFlags begin_flags) {
+	LUMEN_ASSERT(state != CommandBufferState::RECORDING, "Command buffer is already recording");
+	auto begin_info = vk::command_buffer_begin_info(begin_flags);
+	vk::check(vkBeginCommandBuffer(handle, &begin_info),
+		"Could not begin the command buffer");
+	state = CommandBufferState::RECORDING;
 }
 
 void CommandBuffer::submit(bool wait_fences, bool queue_wait_idle) {
@@ -57,4 +56,14 @@ void CommandBuffer::submit(bool wait_fences, bool queue_wait_idle) {
 			"Queue wait error! Check previous submissions");
 
 	}
+}
+
+CommandBuffer::~CommandBuffer() {
+	if (handle == VK_NULL_HANDLE) {
+		return;
+	}
+	if (state == CommandBufferState::RECORDING) {
+		vk::check(vkEndCommandBuffer(handle), "Failed to end command buffer");
+	}
+	vkFreeCommandBuffers(ctx->device, ctx->cmd_pools[(int)type], 1, &handle);
 }

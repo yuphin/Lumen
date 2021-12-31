@@ -1,0 +1,97 @@
+// https://www.eecs.umich.edu/courses/eecs570/hw/parprefix.pdf
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../commons.h"
+#include "../../utils.glsl"
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+layout(set = 1, binding = 1, scalar) buffer SceneDesc_ {
+    SceneDesc scene_desc;
+};
+layout(push_constant) uniform _PushConstantCompute { PushConstantCompute pc; };
+layout(buffer_reference, scalar) buffer BootstrapData { BootstrapSample d[]; };
+layout(buffer_reference, scalar) buffer CDFSum { float d; };
+layout(buffer_reference, scalar) buffer CDF { float d[]; };
+layout(buffer_reference, scalar) buffer BlockSums { float d[]; };
+
+layout(push_constant) uniform ResidualIdx { uint residual_idx; };
+layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
+layout(buffer_reference, scalar) buffer ResidualData { float d[]; };
+ResidualData res_data = ResidualData(scene_desc.residual_addr);
+BootstrapData bootstrap_data = BootstrapData(scene_desc.bootstrap_addr);
+CDFSum cdf_sum = CDFSum(scene_desc.cdf_sum_addr);
+CDF cdf_data = CDF(scene_desc.cdf_addr);
+BlockSums block_sums = BlockSums(scene_desc.block_sums_addr);
+
+#define NUM_BANKS 32
+#define LOG_NUM_BANKS 5
+#define CONFLICT_FREE_OFFSET(index) ((index) >> LOG_NUM_BANKS)
+shared float s_data[2048];
+void main() {
+
+    uint tid, ai, bi, mem_ai, mem_bi, bank_offset_a, bank_offset_b;
+    // Load data into shared memory
+    tid = gl_LocalInvocationID.x;
+    mem_ai = pc.base_idx + gl_LocalInvocationID.x;
+    mem_bi = mem_ai + gl_WorkGroupSize.x;
+    ai = tid;
+    bi = tid + gl_WorkGroupSize.x;
+    bank_offset_a = CONFLICT_FREE_OFFSET(ai);
+    bank_offset_b = CONFLICT_FREE_OFFSET(bi);
+    s_data[ai + bank_offset_a] = bootstrap_data.d[mem_ai].lum / pc.num_elems;
+    s_data[bi + bank_offset_b] =
+        bi < pc.n ? bootstrap_data.d[mem_bi].lum / pc.num_elems : 0;
+    // Traverse from leafs to root (Reduction)
+    uint stride = 1;
+    for(uint d = gl_WorkGroupSize.x; d > 0; d >>= 1) {
+        memoryBarrierShared();
+        barrier();
+        if(tid < d) {
+            uint ai = 2 * stride * tid + stride - 1;
+            uint bi = ai + stride;
+            ai += CONFLICT_FREE_OFFSET(ai);
+            bi += CONFLICT_FREE_OFFSET(bi);
+            s_data[bi] += s_data[ai];
+        }
+        stride *= 2;
+    }
+    uint block_idx = pc.block_idx == 0 ? gl_WorkGroupID.x : pc.block_idx;
+
+    // Zero out the last element and store the sum
+    if(tid == 0) {
+        uint idx = (gl_WorkGroupSize.x << 1) - 1;
+        idx += CONFLICT_FREE_OFFSET(idx);
+        if(pc.store_sum == 1) {
+            block_sums.d[block_idx] = s_data[idx];
+        }
+        s_data[idx] = 0;
+    }
+    // Traverse from root to leaf
+    for(uint d = 1; d <= gl_WorkGroupSize.x; d*= 2) {
+        stride >>= 1;
+        memoryBarrierShared();
+        barrier();
+        if(tid  < d) {
+            uint ai = 2 * stride * tid + stride - 1;
+            uint bi = ai + stride;
+            ai += CONFLICT_FREE_OFFSET(ai);
+            bi += CONFLICT_FREE_OFFSET(bi);
+            const float t = s_data[ai];
+            s_data[ai] = s_data[bi];
+            s_data[bi] += t;
+        }
+    }
+    // Write into device memory
+    memoryBarrierShared();
+    barrier();
+    cdf_data.d[mem_ai] = s_data[ai + bank_offset_a];
+    if(bi < pc.n) {
+        cdf_data.d[mem_bi] = s_data[bi + bank_offset_b];
+    }
+}

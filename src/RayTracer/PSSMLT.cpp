@@ -3,9 +3,9 @@
 
 const int max_depth = 6;
 const vec3 sky_col(0, 0, 0);
-const int num_mlt_threads = 2000;
+const int num_mlt_threads = 200000;
 const int num_bootstrap_samples = 100000;
-const int mutation_count = 100;
+const int mutation_count = 20;
 const int light_path_rand_count = 7 + 2 * max_depth;
 const int cam_path_rand_count = 2 + 2 * max_depth;
 const int connect_path_rand_count = 4 * max_depth;

@@ -41,6 +41,7 @@ private:
 	Buffer past_splat_buffer;
 	Buffer light_path_buffer;
 	Buffer camera_path_buffer;
+	Buffer block_sums_buffer;
 
 };
 
