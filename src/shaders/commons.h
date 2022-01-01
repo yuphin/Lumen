@@ -65,14 +65,18 @@ struct PushConstantRay {
 	uint connection_rand_count;
 	uint random_num;
 	uint num_bootstrap_samples;
+	uint mutations_per_pixel;
 };
 
 struct PushConstantCompute {
+	uint num_elems;
 	uint base_idx;
 	uint block_idx;
 	uint n;
-	uint num_elems;
 	uint store_sum;
+	uint scan_sums;
+	uint64_t block_sum_addr;
+	uint64_t out_addr;
 };
 
 struct SceneUBO {

@@ -195,7 +195,7 @@ void LumenScene::compute_scene_dimensions() {
 	}
 	if (scene_bbox.is_empty() || !scene_bbox.isVolume()) {
 		LUMEN_WARN("glTF: Scene bounding box invalid, Setting to: [-1,-1,-1], "
-			"[1,1,1]");
+				   "[1,1,1]");
 		scene_bbox.insert({ -1.0f, -1.0f, -1.0f });
 		scene_bbox.insert({ 1.0f, 1.0f, 1.0f });
 	}

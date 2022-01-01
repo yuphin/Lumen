@@ -38,7 +38,7 @@ void Pipeline::track_for_changes() {
 			tracking_stopped = true;
 		}
 		cv.notify_one();
-		});
+	});
 }
 
 
@@ -132,15 +132,15 @@ void Pipeline::create_gfx_pipeline(const GraphicsPipelineSettings& settings) {
 		pipeline_CI.flags |= VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
 	}
 	vk::check(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_CI,
-		nullptr, &handle),
-		"Failed to create pipeline");
+			  nullptr, &handle),
+			  "Failed to create pipeline");
 
 	vkDestroyShaderModule(device, frag_shader, nullptr);
 	vkDestroyShaderModule(device, vert_shader, nullptr);
 }
 
 void Pipeline::create_rt_pipeline(RTPipelineSettings& settings,
-	const std::vector<uint32_t> specialization_data) {
+								  const std::vector<uint32_t> specialization_data) {
 	VkPipelineLayoutCreateInfo pipeline_layout_create_info{
 		VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
 	pipeline_layout_create_info.setLayoutCount = settings.desc_layouts.size();
@@ -169,7 +169,7 @@ void Pipeline::create_rt_pipeline(RTPipelineSettings& settings,
 	}
 
 	vkCreatePipelineLayout(device, &pipeline_layout_create_info,
-		nullptr, &pipeline_layout);
+						   nullptr, &pipeline_layout);
 	VkRayTracingPipelineCreateInfoKHR pipeline_create_info{
 	VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR };
 	pipeline_create_info.stageCount =
@@ -180,15 +180,15 @@ void Pipeline::create_rt_pipeline(RTPipelineSettings& settings,
 	pipeline_create_info.maxPipelineRayRecursionDepth = settings.max_recursion_depth;
 	pipeline_create_info.layout = pipeline_layout;
 	vkCreateRayTracingPipelinesKHR(device, {}, {}, 1, &pipeline_create_info,
-		nullptr, &handle);
+								   nullptr, &handle);
 	sbt_wrapper.setup(settings.ctx, settings.ctx->indices.gfx_family.value(), settings.rt_props);
 	sbt_wrapper.create(handle, pipeline_create_info);
 }
 
 void Pipeline::create_compute_pipeline(const Shader& shader, uint32_t desc_set_layout_cnt,
-	VkDescriptorSetLayout* desc_sets,
-	std::vector<uint32_t> specialization_data,
-	uint32_t push_const_size) {
+									   VkDescriptorSetLayout* desc_sets,
+									   std::vector<uint32_t> specialization_data,
+									   uint32_t push_const_size) {
 
 	std::vector<VkSpecializationMapEntry> entries(specialization_data.size());
 	for (int i = 0; i < entries.size(); i++) {
@@ -273,8 +273,8 @@ void Pipeline::recompile_pipeline() {
 		settings.binding_desc.data();
 	pipeline_CI.pVertexInputState = &vertex_input_state_CI;
 	vk::check(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_CI,
-		nullptr, &handle),
-		"Failed to create pipeline");
+			  nullptr, &handle),
+			  "Failed to create pipeline");
 	vkDestroyShaderModule(device, frag_shader, nullptr);
 	vkDestroyShaderModule(device, vert_shader, nullptr);
 }

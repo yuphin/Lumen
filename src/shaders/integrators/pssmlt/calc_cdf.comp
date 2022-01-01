@@ -10,28 +10,19 @@
 #include "../../commons.h"
 #include "../../utils.glsl"
 // TODO
-layout(local_size_x = 1, local_size_y =1, local_size_z = 1) in;
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(buffer_reference, scalar) buffer BootstrapData { BootstrapSample d[]; };
 layout(buffer_reference, scalar) buffer CDFSum { float d; };
 layout(buffer_reference, scalar) buffer CDF { float d[]; };
-BootstrapData bootstrap_data = BootstrapData(scene_desc.bootstrap_addr);
 CDFSum cdf_sum = CDFSum(scene_desc.cdf_sum_addr);
 CDF cdf_data = CDF(scene_desc.cdf_addr);
 void main() {
     uint idx = gl_GlobalInvocationID.x;
-    float sum = 0;
-    cdf_data.d[0] = 0;
-    for(int i = 1; i < pc_ray.num_bootstrap_samples; i++) {
-        //sum += bootstrap_data.d[i].lum;
-        cdf_data.d[i] = cdf_data.d[i-1] + bootstrap_data.d[i].lum / pc_ray.num_bootstrap_samples;
+    if (idx == 0) {
+        cdf_sum.d = cdf_data.d[pc_ray.num_bootstrap_samples - 1];
     }
-    
-    cdf_sum.d = cdf_data.d[pc_ray.num_bootstrap_samples - 1];
-    debugPrintfEXT("%f\n", cdf_sum.d);
-    const float inv_sum = 1. / cdf_sum.d;
-    for(int i = 1; i < pc_ray.num_bootstrap_samples; i++) {
-        cdf_data.d[i] *= inv_sum;
-    }
+    const float inv_sum = 1. / cdf_data.d[pc_ray.num_bootstrap_samples - 1];
+    cdf_data.d[idx] *= inv_sum;
 }

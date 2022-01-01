@@ -28,7 +28,7 @@ void main() {
     // if (luminance(mlt_col.d[gl_GlobalInvocationID.x]) > 0) {
     //     debugPrintfEXT("%d - %v3f\n", gl_GlobalInvocationID.x, mlt_col.d[gl_GlobalInvocationID.x]);
     // }
-    col += mlt_col.d[gl_GlobalInvocationID.x]  * cdf_sum.d / 1.3888; //* cdf_sum.d / 100;
+    col += mlt_col.d[gl_GlobalInvocationID.x]  * cdf_sum.d / pc_ray.mutations_per_pixel;
     // for(int i = 0; i < 2; i++) {
     //     col += mlt_col.d[gl_GlobalInvocationID.x] * cdf_sum.d;
     // }

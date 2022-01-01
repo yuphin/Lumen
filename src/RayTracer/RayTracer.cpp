@@ -79,10 +79,10 @@ void RayTracer::render(uint32_t i) {
 	VkRect2D scissor = vk::rect2D(width, height, 0, 0);
 	vkCmdSetScissor(cmdbuf, 0, 1, &scissor);
 	vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
-		post_pipeline->handle);
+					  post_pipeline->handle);
 	vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
-		post_pipeline_layout, 0, 1, &post_desc_set, 0,
-		nullptr);
+							post_pipeline_layout, 0, 1, &post_desc_set, 0,
+							nullptr);
 	vkCmdDraw(cmdbuf, 3, 1, 0, 0);
 	ImGui::Render();
 	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdbuf);
@@ -102,7 +102,7 @@ float RayTracer::draw_frame() {
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time,
-		1000 / cpu_avg_time);
+				1000 / cpu_avg_time);
 	if (integrator->updated) {
 		ImGui::Render();
 		auto t_end = glfwGetTime() * 1000;
@@ -129,8 +129,8 @@ void RayTracer::create_post_descriptor() {
 	auto descriptor_pool_ci =
 		vk::descriptor_pool_CI(pool_sizes.size(), pool_sizes.data(), 1);
 	vk::check(vkCreateDescriptorPool(vkb.ctx.device, &descriptor_pool_ci,
-		nullptr, &post_desc_pool),
-		"Failed to create descriptor pool");
+			  nullptr, &post_desc_pool),
+			  "Failed to create descriptor pool");
 
 	std::vector<VkDescriptorSetLayoutBinding> set_layout_bindings = {
 		vk::descriptor_set_layout_binding(
@@ -140,14 +140,14 @@ void RayTracer::create_post_descriptor() {
 	auto set_layout_ci = vk::descriptor_set_layout_CI(
 		set_layout_bindings.data(), set_layout_bindings.size());
 	vk::check(vkCreateDescriptorSetLayout(vkb.ctx.device, &set_layout_ci,
-		nullptr, &post_desc_layout),
-		"Failed to create descriptor set layout");
+			  nullptr, &post_desc_layout),
+			  "Failed to create descriptor set layout");
 
 	auto set_allocate_info =
 		vk::descriptor_set_allocate_info(post_desc_pool, &post_desc_layout, 1);
 	vk::check(vkAllocateDescriptorSets(vkb.ctx.device, &set_allocate_info,
-		&post_desc_set),
-		"Failed to allocate descriptor sets");
+			  &post_desc_set),
+			  "Failed to allocate descriptor sets");
 }
 
 void RayTracer::update_post_desc_set() {
@@ -165,7 +165,7 @@ void RayTracer::create_post_pipeline() {
 	create_info.setLayoutCount = 1;
 	create_info.pSetLayouts = &post_desc_layout;
 	vkCreatePipelineLayout(vkb.ctx.device, &create_info, nullptr,
-		&post_pipeline_layout);
+						   &post_pipeline_layout);
 
 	post_settings.pipeline_layout = post_pipeline_layout;
 	post_settings.render_pass = vkb.ctx.default_render_pass;
@@ -206,7 +206,7 @@ void RayTracer::init_imgui() {
 	pool_info.poolSizeCount = (uint32_t)std::size(pool_sizes);
 	pool_info.pPoolSizes = pool_sizes;
 	vk::check(vkCreateDescriptorPool(vkb.ctx.device, &pool_info, nullptr,
-		&imgui_pool));
+			  &imgui_pool));
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	// Setup Platform/Renderer backends

@@ -1,14 +1,6 @@
 #include "LumenPCH.h"
 #include "PSSMLT.h"
 
-const int max_depth = 6;
-const vec3 sky_col(0, 0, 0);
-const int num_mlt_threads = 200000;
-const int num_bootstrap_samples = 100000;
-const int mutation_count = 20;
-const int light_path_rand_count = 7 + 2 * max_depth;
-const int cam_path_rand_count = 2 + 2 * max_depth;
-const int connect_path_rand_count = 4 * max_depth;
 void PSSMLT::init() {
 	Integrator::init();
 
@@ -17,17 +9,37 @@ void PSSMLT::init() {
 		&scene->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_bootstrap_samples * sizeof(BootstrapSample) 
+		num_bootstrap_samples * sizeof(BootstrapSample)
 	);
+
 
 	cdf_buffer.create(
 		&scene->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		num_bootstrap_samples * 4
+	);
+
+	bootstrap_cpu.create(
+		&scene->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		VK_SHARING_MODE_EXCLUSIVE,
+		num_bootstrap_samples * sizeof(BootstrapSample)
+	);
+
+
+	cdf_cpu.create(
+		&scene->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		VK_SHARING_MODE_EXCLUSIVE,
 		num_bootstrap_samples * 4
 	);
 
@@ -45,7 +57,7 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * sizeof(SeedData) 
+		num_mlt_threads * sizeof(SeedData)
 	);
 
 	light_primary_samples_buffer.create(
@@ -97,7 +109,7 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * sizeof(ChainData) 
+		num_mlt_threads * sizeof(ChainData)
 	);
 
 	splat_buffer.create(
@@ -121,14 +133,39 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		path_size* (max_depth + 1) * sizeof(MLTPathVertex));
+		path_size * (max_depth + 1) * sizeof(MLTPathVertex));
 
 	camera_path_buffer.create(
 		&scene->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		path_size* (max_depth + 1) * sizeof(MLTPathVertex));
+		path_size * (max_depth + 1) * sizeof(MLTPathVertex));
+
+	int size = 0;
+	int arr_size = num_bootstrap_samples;
+	do {
+		int num_blocks = std::max(1, (int)ceil(arr_size / (2.0f * 1024)));
+		if (num_blocks > 1) {
+			size++;
+		}
+		arr_size = num_blocks;
+	} while (arr_size > 1);
+	block_sums.resize(size);
+	int i = 0;
+	arr_size = num_bootstrap_samples;
+	do {
+		int num_blocks = std::max(1, (int)ceil(arr_size / (2.0f * 1024)));
+		if (num_blocks > 1) {
+			block_sums[i++].create(&scene->vkb.ctx,
+								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+								   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								   num_blocks * 4);
+		}
+		arr_size = num_blocks;
+	} while (arr_size > 1);
+
 
 	SceneDesc desc;
 	desc.vertex_addr = vertex_buffer.get_device_address();
@@ -154,11 +191,11 @@ void PSSMLT::init() {
 	desc.camera_path_addr = camera_path_buffer.get_device_address();
 
 	scene_desc_buffer.create(&scene->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc),
-		&desc, true);
+							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+							 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+							 VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc),
+							 &desc, true);
 	create_blas();
 	create_tlas();
 	create_offscreen_resources();
@@ -169,6 +206,9 @@ void PSSMLT::init() {
 	pc_ray.frame_num = 0;
 	pc_ray.size_x = scene->width;
 	pc_ray.size_y = scene->height;
+
+	mutation_count = int(scene->width * scene->height * mutations_per_pixel / float(num_mlt_threads));
+	pc_ray.mutations_per_pixel = mutations_per_pixel;
 }
 
 void PSSMLT::render() {
@@ -194,39 +234,37 @@ void PSSMLT::render() {
 	// Start bootstrap sampling
 	{
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-			seed_pipeline->handle);
+						  seed_pipeline->handle);
 		vkCmdBindDescriptorSets(
 			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, seed_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
 		vkCmdPushConstants(cmd.handle, seed_pipeline->pipeline_layout,
-			VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-			VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-			VK_SHADER_STAGE_MISS_BIT_KHR,
-			0, sizeof(PushConstantRay), &pc_ray);
+						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+						   VK_SHADER_STAGE_MISS_BIT_KHR,
+						   0, sizeof(PushConstantRay), &pc_ray);
 		auto& regions = seed_pipeline->get_rt_regions();
 		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3], num_bootstrap_samples, 1, 1);
 		auto barrier = buffer_barrier(bootstrap_buffer.handle,
-			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
-			&barrier, 0, 0);
+							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
+							 &barrier, 0, 0);
 	}
+	bootstrap_buffer.copy(bootstrap_cpu, cmd.handle);
+	prefix_scan(0, num_bootstrap_samples, cmd);
+
 	// Calculate CDF
 	{
-		pc_ray.random_num = rand() % UINT_MAX;
 		vkCmdBindDescriptorSets(
 			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, calc_cdf_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
-			calc_cdf_pipeline->handle);
+						  calc_cdf_pipeline->handle);
 		vkCmdPushConstants(cmd.handle, calc_cdf_pipeline->pipeline_layout,
-			VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantRay), &pc_ray);
-		vkCmdDispatch(cmd.handle, 1, 1, 1);
-		auto barrier = buffer_barrier(bootstrap_buffer.handle,
-			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
-			&barrier, 0, 0);
+						   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantRay), &pc_ray);
+		auto num_wgs = (num_bootstrap_samples + 1023) / 1024;
+		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 		std::array<VkBufferMemoryBarrier, 2> barriers = {
 			buffer_barrier(cdf_sum_buffer.handle,
 			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
@@ -234,64 +272,86 @@ void PSSMLT::render() {
 			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
 		};
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, barriers.size(),
-			barriers.data(), 0, 0);
+							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, barriers.size(),
+							 barriers.data(), 0, 0);
 	}
+
+// Debugging code
+#if 0
+	cdf_buffer.copy(cdf_cpu, cmd.handle);
+	cmd.submit();
+	std::vector<BootstrapSample> samples;
+	samples.assign((BootstrapSample*)bootstrap_cpu.data,
+				   (BootstrapSample*)bootstrap_cpu.data + num_bootstrap_samples);
+	std::vector<float> cdf1(num_bootstrap_samples, 0);
+	std::vector<float> cdf2(num_bootstrap_samples, 0);
+
+	cdf1[0] = 0;
+	for (int i = 1; i < num_bootstrap_samples; i++) {
+		cdf1[i] = cdf1[i - 1] + samples[i - 1].lum / num_bootstrap_samples;
+	}
+	float sum = cdf1[num_bootstrap_samples - 1];
+	for (int i = 1; i < num_bootstrap_samples; i++) {
+		cdf1[i] *= 1. / sum;
+	}
+	cdf2.assign((float*)cdf_cpu.data,
+				(float*)cdf_cpu.data + num_bootstrap_samples);
+	float EPS = 1e-3;
+	for (int i = 0; i < num_bootstrap_samples; i++) {
+		float val1 = cdf1[i];
+		float val2 = cdf2[i];
+		float diff = abs(val1 - val2);
+		if (diff > EPS) {
+			assert(false);
+		}
+
+	}
+	sum = cdf1[num_bootstrap_samples - 1];
+	float sum2 = cdf2[num_bootstrap_samples - 1];
+	return;
+#endif
 	// Select seeds
 	{
 		vkCmdBindDescriptorSets(
 			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, select_seeds_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
-			select_seeds_pipeline->handle);
+						  select_seeds_pipeline->handle);
 		vkCmdPushConstants(cmd.handle, select_seeds_pipeline->pipeline_layout,
-			VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantRay), &pc_ray);
+						   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantRay), &pc_ray);
 		uint32_t num_wgs = (num_mlt_threads + 1023) / 1024;
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 		auto barrier = buffer_barrier(seeds_buffer.handle,
-			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
-			&barrier, 0, 0);
+							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
+							 &barrier, 0, 0);
 	}
 	// Fill in the samplers for mutations
 	{
 		vkCmdFillBuffer(cmd.handle, mlt_samplers_buffer.handle, 0, mlt_samplers_buffer.size, 0);
 		auto barrier = buffer_barrier(mlt_samplers_buffer.handle,
-			VK_ACCESS_TRANSFER_WRITE_BIT,
-			VK_ACCESS_SHADER_READ_BIT |
-			VK_ACCESS_SHADER_WRITE_BIT);
+									  VK_ACCESS_TRANSFER_WRITE_BIT,
+									  VK_ACCESS_SHADER_READ_BIT |
+									  VK_ACCESS_SHADER_WRITE_BIT);
 		vkCmdPipelineBarrier(
 			cmd.handle, VK_PIPELINE_STAGE_TRANSFER_BIT,
 			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 			VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier,
 			0, 0);
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-			preprocess_pipeline->handle);
+						  preprocess_pipeline->handle);
 		vkCmdBindDescriptorSets(
 			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, preprocess_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
 		vkCmdPushConstants(cmd.handle, preprocess_pipeline->pipeline_layout,
-			VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-			VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-			VK_SHADER_STAGE_MISS_BIT_KHR,
-			0, sizeof(PushConstantRay), &pc_ray);
+						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+						   VK_SHADER_STAGE_MISS_BIT_KHR,
+						   0, sizeof(PushConstantRay), &pc_ray);
 		auto& preprocess_regions = preprocess_pipeline->get_rt_regions();
 		vkCmdTraceRaysKHR(cmd.handle, &preprocess_regions[0], &preprocess_regions[1],
-			&preprocess_regions[2], &preprocess_regions[3], num_mlt_threads, 1, 1);
-		/*	const std::array<VkBufferMemoryBarrier, 4> preprocess_barriers = {
-				 buffer_barrier(seeds_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
-				buffer_barrier(mlt_samplers_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
-				buffer_barrier(chain_stats_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
-				buffer_barrier(past_splat_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
-			};
-			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-				VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, preprocess_barriers.size(),
-				preprocess_barriers.data(), 0, 0);*/
+						  &preprocess_regions[2], &preprocess_regions[3], num_mlt_threads, 1, 1);
 	}
 	cmd.submit();
 
@@ -301,37 +361,37 @@ void PSSMLT::render() {
 			pc_ray.random_num = rand() % UINT_MAX;
 			pc_ray.mutation_counter = i;
 			vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-				mutate_pipeline->handle);
+							  mutate_pipeline->handle);
 			vkCmdBindDescriptorSets(
 				cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, mutate_pipeline->pipeline_layout,
 				0, 1, &desc_set, 0, nullptr);
 			vkCmdPushConstants(cmd.handle, mutate_pipeline->pipeline_layout,
-				VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-				VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-				VK_SHADER_STAGE_MISS_BIT_KHR,
-				0, sizeof(PushConstantRay), &pc_ray);
+							   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+							   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+							   VK_SHADER_STAGE_MISS_BIT_KHR,
+							   0, sizeof(PushConstantRay), &pc_ray);
 			auto& regions = mutate_pipeline->get_rt_regions();
 			vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3], num_mlt_threads, 1, 1);
 			const std::array<VkBufferMemoryBarrier, 5> mutation_barriers = {
 				buffer_barrier(splat_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, 
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
 				buffer_barrier(past_splat_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, 
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
 				buffer_barrier(mlt_samplers_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, 
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
 				buffer_barrier(chain_stats_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, 
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
 				buffer_barrier(mlt_col_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, 
+				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
 			};
 			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-				VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, mutation_barriers.size(),
-				mutation_barriers.data(), 0, 0);
+								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, mutation_barriers.size(),
+								 mutation_barriers.data(), 0, 0);
 		};
 		const uint32_t iter_cnt = 100;
 		const uint32_t freq = mutation_count / iter_cnt;
@@ -358,9 +418,9 @@ void PSSMLT::render() {
 			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, composite_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
-			composite_pipeline->handle);
+						  composite_pipeline->handle);
 		vkCmdPushConstants(cmd.handle, composite_pipeline->pipeline_layout,
-			VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantRay), &pc_ray);
+						   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantRay), &pc_ray);
 		int num_wgs = (scene->width * scene->height + 1023) / 1024;
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 	}
@@ -436,10 +496,10 @@ void PSSMLT::create_offscreen_resources() {
 	settings.base_extent = { (uint32_t)scene->width, (uint32_t)scene->height, 1 };
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	output_tex.create_empty_texture(&scene->vkb.ctx, settings,
-		VK_IMAGE_LAYOUT_GENERAL);
+									VK_IMAGE_LAYOUT_GENERAL);
 	CommandBuffer cmd(&scene->vkb.ctx, true);
 	transition_image_layout(cmd.handle, output_tex.img,
-		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+							VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 	cmd.submit();
 }
 
@@ -463,11 +523,11 @@ void PSSMLT::create_descriptors() {
 		vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1) };
 	auto descriptor_pool_ci =
 		vk::descriptor_pool_CI(pool_sizes.size(), pool_sizes.data(),
-			scene->vkb.ctx.swapchain_images.size());
+							   scene->vkb.ctx.swapchain_images.size());
 
 	vk::check(vkCreateDescriptorPool(scene->vkb.ctx.device, &descriptor_pool_ci,
-		nullptr, &desc_pool),
-		"Failed to create descriptor pool");
+			  nullptr, &desc_pool),
+			  "Failed to create descriptor pool");
 
 	// Uniform buffer descriptors
 	std::vector<VkDescriptorSetLayoutBinding> set_layout_bindings = {
@@ -513,8 +573,8 @@ void PSSMLT::create_descriptors() {
 	auto set_layout_ci = vk::descriptor_set_layout_CI(
 		set_layout_bindings.data(), set_layout_bindings.size());
 	vk::check(vkCreateDescriptorSetLayout(scene->vkb.ctx.device, &set_layout_ci,
-		nullptr, &desc_set_layout),
-		"Failed to create escriptor set layout");
+			  nullptr, &desc_set_layout),
+			  "Failed to create escriptor set layout");
 	VkDescriptorSetAllocateInfo set_allocate_info{
 			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 	set_allocate_info.descriptorPool = desc_pool;
@@ -551,8 +611,8 @@ void PSSMLT::create_descriptors() {
 		image_infos.push_back(tex.descriptor_image_info);
 	}
 	writes.push_back(vk::write_descriptor_set(desc_set,
-		VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, TEXTURES_BINDING,
-		image_infos.data(), (uint32_t)image_infos.size()));
+					 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, TEXTURES_BINDING,
+					 image_infos.data(), (uint32_t)image_infos.size()));
 	if (lights.size()) {
 		writes.push_back(vk::write_descriptor_set(
 			desc_set, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, LIGHTS_BINDING,
@@ -574,7 +634,7 @@ void PSSMLT::create_blas() {
 		blas_inputs.push_back({ geo });
 	}
 	scene->vkb.build_blas(blas_inputs,
-		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void PSSMLT::create_tlas() {
@@ -631,7 +691,7 @@ void PSSMLT::create_tlas() {
 		pc_ray.light_triangle_count = light_triangle_cnt;
 	}
 	scene->vkb.build_tlas(tlas,
-		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void PSSMLT::create_rt_pipelines() {
@@ -730,15 +790,15 @@ void PSSMLT::create_rt_pipelines() {
 	seed_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
 	preprocess_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
 	mutate_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
-	seed_pipeline->create_rt_pipeline(settings, {1});
+	seed_pipeline->create_rt_pipeline(settings, { 1 });
 	vkDestroyShaderModule(scene->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[1].create_vk_shader_module(scene->vkb.ctx.device);
 	settings.stages = stages;
-	preprocess_pipeline->create_rt_pipeline(settings, {0});
+	preprocess_pipeline->create_rt_pipeline(settings, { 0 });
 	vkDestroyShaderModule(scene->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[2].create_vk_shader_module(scene->vkb.ctx.device);
 	settings.stages = stages;
-	mutate_pipeline->create_rt_pipeline(settings, {0});
+	mutate_pipeline->create_rt_pipeline(settings, { 0 });
 	for (auto& s : settings.stages) {
 		vkDestroyShaderModule(scene->vkb.ctx.device, s.module, nullptr);
 	}
@@ -748,10 +808,14 @@ void PSSMLT::create_compute_pipelines() {
 	calc_cdf_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
 	select_seeds_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
 	composite_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
+	prefix_scan_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
+	uniform_add_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
 	std::vector<Shader> shaders = {
 		{"src/shaders/integrators/pssmlt/calc_cdf.comp"},
 		{"src/shaders/integrators/pssmlt/select_seeds.comp"},
 		{"src/shaders/integrators/pssmlt/composite.comp"},
+		{"src/shaders/integrators/pssmlt/prefix_scan.comp"},
+		{"src/shaders/integrators/pssmlt/uniform_add.comp"},
 	};
 	for (auto& shader : shaders) {
 		shader.compile();
@@ -759,6 +823,106 @@ void PSSMLT::create_compute_pipelines() {
 	calc_cdf_pipeline->create_compute_pipeline(shaders[0], 1, &desc_set_layout, {}, sizeof(PushConstantRay));
 	select_seeds_pipeline->create_compute_pipeline(shaders[1], 1, &desc_set_layout, {}, sizeof(PushConstantRay));
 	composite_pipeline->create_compute_pipeline(shaders[2], 1, &desc_set_layout, {}, sizeof(PushConstantRay));
+	prefix_scan_pipeline->create_compute_pipeline(shaders[3], 1, &desc_set_layout, {}, sizeof(PushConstantCompute));
+	uniform_add_pipeline->create_compute_pipeline(shaders[4], 1, &desc_set_layout, {}, sizeof(PushConstantCompute));
+}
+
+void PSSMLT::prefix_scan(int level, int num_elems, CommandBuffer& cmd) {
+	const bool scan_sums = level > 0;
+	int num_wgs = std::max(1, (int)ceil(num_elems / (2 * 1024.0f)));
+	int num_grids = num_wgs - int((num_elems % 2048) != 0);
+	pc_compute.num_elems = num_elems;
+	auto scan = [&](int num_wgs, int idx) {
+		vkCmdBindDescriptorSets(
+			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, prefix_scan_pipeline->pipeline_layout,
+			0, 1, &desc_set, 0, nullptr);
+		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
+						  prefix_scan_pipeline->handle);
+		vkCmdPushConstants(cmd.handle, prefix_scan_pipeline->pipeline_layout,
+						   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantCompute), &pc_compute);
+		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
+		if (scan_sums) {
+			auto barrier = buffer_barrier(block_sums[idx].handle,
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
+								 &barrier, 0, 0);
+		} else {
+			auto barrier = buffer_barrier(cdf_buffer.handle,
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
+								 &barrier, 0, 0);
+		}
+
+	};
+	auto uniform_add = [&](int num_wgs, int output_idx) {
+		vkCmdBindDescriptorSets(
+			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, uniform_add_pipeline->pipeline_layout,
+			0, 1, &desc_set, 0, nullptr);
+		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
+						  uniform_add_pipeline->handle);
+		vkCmdPushConstants(cmd.handle, uniform_add_pipeline->pipeline_layout,
+						   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantCompute), &pc_compute);
+		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
+		if (scan_sums) {
+			auto barrier = buffer_barrier(block_sums[output_idx].handle,
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
+								 &barrier, 0, 0);
+		} else {
+			auto barrier = buffer_barrier(cdf_buffer.handle,
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
+								 &barrier, 0, 0);
+		}
+	};
+	if (num_wgs > 1) {
+		pc_compute.base_idx = 0;
+		pc_compute.block_idx = 0;
+		pc_compute.n = 2 * 1024;
+		pc_compute.store_sum = 1;
+		pc_compute.scan_sums = int(scan_sums);
+		pc_compute.block_sum_addr = block_sums[level].get_device_address();
+		scan(num_grids, level);
+		int rem = num_elems % (2 * 1024);
+		if (rem) {
+			pc_compute.base_idx = num_elems - rem;
+			pc_compute.block_idx = num_wgs - 1;
+			pc_compute.n = rem;
+			scan(1, level);
+		}
+		prefix_scan(level + 1, num_wgs, cmd);
+		pc_compute.base_idx = 0;
+		pc_compute.block_idx = 0;
+		pc_compute.n = num_elems - rem;
+		pc_compute.store_sum = 1;
+		pc_compute.scan_sums = int(scan_sums);
+		pc_compute.block_sum_addr = block_sums[level].get_device_address();
+		if (scan_sums) {
+			pc_compute.out_addr = block_sums[level - 1].get_device_address();
+		}
+		uniform_add(num_grids, level - 1);
+		if (rem) {
+			pc_compute.base_idx = num_elems - rem;
+			pc_compute.block_idx = num_wgs - 1;
+			pc_compute.n = rem;
+			uniform_add(1, level - 1);
+		}
+	} else {
+		int rem = num_elems % 2048;
+		pc_compute.n = rem == 0 ? 2048 : rem;
+		pc_compute.base_idx = 0;
+		pc_compute.block_idx = 0;
+		pc_compute.store_sum = 0;
+		pc_compute.scan_sums = bool(scan_sums);
+		if (scan_sums) {
+			pc_compute.block_sum_addr = block_sums[level - 1].get_device_address();
+		}
+		scan(num_wgs, level - 1);
+	}
 }
 
 void PSSMLT::destroy() {
@@ -783,13 +947,24 @@ void PSSMLT::destroy() {
 	for (auto b : buffer_list) {
 		b->destroy();
 	}
+	for (auto& b : block_sums) {
+		b.destroy();
+	}
+	if (bootstrap_cpu.size) {
+		bootstrap_cpu.destroy();
+	}
+	if (cdf_cpu.size) {
+		cdf_cpu.destroy();
+	}
 	std::vector<Pipeline*> pipeline_list = {
 		seed_pipeline.get(),
 		preprocess_pipeline.get(),
 		mutate_pipeline.get(),
 		calc_cdf_pipeline.get(),
 		select_seeds_pipeline.get(),
-		composite_pipeline.get()
+		composite_pipeline.get(),
+		prefix_scan_pipeline.get(),
+		uniform_add_pipeline.get()
 	};
 	for (auto p : pipeline_list) {
 		p->cleanup();

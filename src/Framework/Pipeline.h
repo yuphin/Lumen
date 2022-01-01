@@ -41,7 +41,7 @@ public:
 	void cleanup();
 	void create_gfx_pipeline(const GraphicsPipelineSettings&);
 	void create_rt_pipeline(RTPipelineSettings&, const std::vector<uint32_t> specialization_data = {});
-	void create_compute_pipeline(const Shader& shader, uint32_t desc_set_layout_cnt, 
+	void create_compute_pipeline(const Shader& shader, uint32_t desc_set_layout_cnt,
 								 VkDescriptorSetLayout* desc_sets, std::vector<uint32_t> specialization_data = {},
 								 uint32_t push_const_size = 0);
 	const std::array<VkStridedDeviceAddressRegionKHR, 4> get_rt_regions();

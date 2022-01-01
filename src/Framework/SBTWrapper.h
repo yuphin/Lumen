@@ -5,8 +5,7 @@
 
 class SBTWrapper {
 public:
-	enum GroupType
-	{
+	enum GroupType {
 		eRaygen,
 		eMiss,
 		eHit,
@@ -14,22 +13,22 @@ public:
 	};
 
 	void setup(VulkanContext* ctx,
-		uint32_t familyIndex,
-		const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rtProperties);
+			   uint32_t familyIndex,
+			   const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rtProperties);
 	void destroy();
 
 	// To call after the ray tracer pipeline creation
 	// The rayPipelineInfo parameter is the structure used to define the pipeline,
 	// while librariesInfo describe the potential input pipeline libraries
 	void create(VkPipeline rtPipeline,
-		VkRayTracingPipelineCreateInfoKHR rayPipelineInfo = {},
-		const std::vector<VkRayTracingPipelineCreateInfoKHR>& librariesInfo = {});
+				VkRayTracingPipelineCreateInfoKHR rayPipelineInfo = {},
+				const std::vector<VkRayTracingPipelineCreateInfoKHR>& librariesInfo = {});
 
 	// Optional, to be used in combination with addIndex. Leave create() `rayPipelineInfo`
 	// and 'librariesInfo' empty.  The rayPipelineInfo parameter is the structure used to
 	// define the pipeline, while librariesInfo describe the potential input pipeline libraries
 	void add_indices(VkRayTracingPipelineCreateInfoKHR                     rayPipelineInfo,
-		const std::vector<VkRayTracingPipelineCreateInfoKHR>& libraries = {});
+					 const std::vector<VkRayTracingPipelineCreateInfoKHR>& libraries = {});
 
 	// Pushing back a GroupType and the handle pipeline index to use
 	// i.e addIndex(eHit, 3) is pushing a Hit shader group using the 3rd entry in the pipeline
@@ -38,13 +37,11 @@ public:
 	// Adding 'Shader Record' data to the group index.
 	// i.e. addData(eHit, 0, myValue) is adding 'myValue' to the HIT group 0.
 	template <typename T>
-	void add_data(GroupType t, uint32_t groupIndex, T& data)
-	{
+	void add_data(GroupType t, uint32_t groupIndex, T& data) {
 		add_data(t, groupIndex, (uint8_t*)&data, sizeof(T));
 	}
 
-	void add_data(GroupType t, uint32_t groupIndex, uint8_t* data, size_t dataSize)
-	{
+	void add_data(GroupType t, uint32_t groupIndex, uint8_t* data, size_t dataSize) {
 		std::vector<uint8_t> dst(data, data + dataSize);
 		m_data[t][groupIndex] = dst;
 	}

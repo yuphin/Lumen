@@ -39,11 +39,11 @@ void BDPT::init() {
 	desc.color_storage_addr = color_storage_buffer.get_device_address();
 
 	scene_desc_buffer.create(&scene->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc),
-		&desc, true);
+							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+							 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+							 VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc),
+							 &desc, true);
 	create_blas();
 	create_tlas();
 	create_offscreen_resources();
@@ -70,15 +70,15 @@ void BDPT::render() {
 	pc_ray.sky_col = sky_col;
 	// Trace rays
 	vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-		bdpt_pipeline->handle);
+					  bdpt_pipeline->handle);
 	vkCmdBindDescriptorSets(
 		cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, bdpt_pipeline->pipeline_layout,
 		0, 1, &desc_set, 0, nullptr);
 	vkCmdPushConstants(cmd.handle, bdpt_pipeline->pipeline_layout,
-		VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-		VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-		VK_SHADER_STAGE_MISS_BIT_KHR,
-		0, sizeof(PushConstantRay), &pc_ray);
+					   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+					   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+					   VK_SHADER_STAGE_MISS_BIT_KHR,
+					   0, sizeof(PushConstantRay), &pc_ray);
 	auto& regions = bdpt_pipeline->get_rt_regions();
 	vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3], scene->width, scene->height, 1);
 	cmd.submit();
@@ -153,10 +153,10 @@ void BDPT::create_offscreen_resources() {
 	settings.base_extent = { (uint32_t)scene->width, (uint32_t)scene->height, 1 };
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	output_tex.create_empty_texture(&scene->vkb.ctx, settings,
-		VK_IMAGE_LAYOUT_GENERAL);
+									VK_IMAGE_LAYOUT_GENERAL);
 	CommandBuffer cmd(&scene->vkb.ctx, true);
 	transition_image_layout(cmd.handle, output_tex.img,
-		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+							VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 	cmd.submit();
 }
 
@@ -180,11 +180,11 @@ void BDPT::create_descriptors() {
 		vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1) };
 	auto descriptor_pool_ci =
 		vk::descriptor_pool_CI(pool_sizes.size(), pool_sizes.data(),
-			scene->vkb.ctx.swapchain_images.size());
+							   scene->vkb.ctx.swapchain_images.size());
 
 	vk::check(vkCreateDescriptorPool(scene->vkb.ctx.device, &descriptor_pool_ci,
-		nullptr, &desc_pool),
-		"Failed to create descriptor pool");
+			  nullptr, &desc_pool),
+			  "Failed to create descriptor pool");
 
 	// Uniform buffer descriptors
 	std::vector<VkDescriptorSetLayoutBinding> set_layout_bindings = {
@@ -230,8 +230,8 @@ void BDPT::create_descriptors() {
 	auto set_layout_ci = vk::descriptor_set_layout_CI(
 		set_layout_bindings.data(), set_layout_bindings.size());
 	vk::check(vkCreateDescriptorSetLayout(scene->vkb.ctx.device, &set_layout_ci,
-		nullptr, &desc_set_layout),
-		"Failed to create escriptor set layout");
+			  nullptr, &desc_set_layout),
+			  "Failed to create escriptor set layout");
 	VkDescriptorSetAllocateInfo set_allocate_info{
 			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 	set_allocate_info.descriptorPool = desc_pool;
@@ -268,8 +268,8 @@ void BDPT::create_descriptors() {
 		image_infos.push_back(tex.descriptor_image_info);
 	}
 	writes.push_back(vk::write_descriptor_set(desc_set,
-		VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, TEXTURES_BINDING,
-		image_infos.data(), (uint32_t)image_infos.size()));
+					 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, TEXTURES_BINDING,
+					 image_infos.data(), (uint32_t)image_infos.size()));
 	if (lights.size()) {
 		writes.push_back(vk::write_descriptor_set(
 			desc_set, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, LIGHTS_BINDING,
@@ -291,7 +291,7 @@ void BDPT::create_blas() {
 		blas_inputs.push_back({ geo });
 	}
 	scene->vkb.build_blas(blas_inputs,
-		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void BDPT::create_tlas() {
@@ -348,7 +348,7 @@ void BDPT::create_tlas() {
 		pc_ray.light_triangle_count = light_triangle_cnt;
 	}
 	scene->vkb.build_tlas(tlas,
-		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void BDPT::create_rt_pipelines() {

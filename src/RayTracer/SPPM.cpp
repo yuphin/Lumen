@@ -81,11 +81,11 @@ void SPPM::init() {
 	desc.hash_addr = hash_buffer.get_device_address();
 
 	scene_desc_buffer.create(&scene->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc),
-		&desc, true);
+							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+							 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+							 VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc),
+							 &desc, true);
 	create_blas();
 	create_tlas();
 	create_offscreen_resources();
@@ -126,53 +126,53 @@ void SPPM::render() {
 	{
 		vkCmdFillBuffer(cmd.handle, photon_buffer.handle, 0, photon_buffer.size, 0);
 		auto barrier = buffer_barrier(photon_buffer.handle,
-			VK_ACCESS_TRANSFER_WRITE_BIT,
-			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+									  VK_ACCESS_TRANSFER_WRITE_BIT,
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-			VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
+							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 		if (pc_ray.frame_num == 0) {
 			AtomicData* data = (AtomicData*)atomic_data_cpu.data;
 			data->max_radius = ppm_base_radius;
 			vkCmdFillBuffer(cmd.handle, sppm_data_buffer.handle, 0, sppm_data_buffer.size, 0);
 			barrier = buffer_barrier(sppm_data_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+									 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+									 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
+								 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 		}
 	}
 	// Trace rays from light
 	{
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-			sppm_light_pipeline->handle);
+						  sppm_light_pipeline->handle);
 		vkCmdBindDescriptorSets(
 			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, sppm_light_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
 		vkCmdPushConstants(cmd.handle, sppm_light_pipeline->pipeline_layout,
-			VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-			VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-			VK_SHADER_STAGE_MISS_BIT_KHR,
-			0, sizeof(PushConstantRay), &pc_ray);
+						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+						   VK_SHADER_STAGE_MISS_BIT_KHR,
+						   0, sizeof(PushConstantRay), &pc_ray);
 		auto& regions = sppm_light_pipeline->get_rt_regions();
 		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3], scene->width, scene->height, 1);
 	}
 	// Trace from eye
 	{
 		auto barrier = buffer_barrier(photon_buffer.handle,
-			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-			VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
+							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-			sppm_eye_pipeline->handle);
+						  sppm_eye_pipeline->handle);
 		vkCmdBindDescriptorSets(
 			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, sppm_eye_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
 		vkCmdPushConstants(cmd.handle, sppm_eye_pipeline->pipeline_layout,
-			VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-			VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-			VK_SHADER_STAGE_MISS_BIT_KHR,
-			0, sizeof(PushConstantRay), &pc_ray);
+						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+						   VK_SHADER_STAGE_MISS_BIT_KHR,
+						   0, sizeof(PushConstantRay), &pc_ray);
 		auto& regions = sppm_eye_pipeline->get_rt_regions();
 		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3], scene->width, scene->height, 1);
 	}
@@ -195,42 +195,42 @@ void SPPM::render() {
 			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, min_reduce_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
 		vkCmdPushConstants(cmd.handle, max_pipeline->pipeline_layout,
-			VK_SHADER_STAGE_COMPUTE_BIT,
-			0, sizeof(PushConstantRay), &pc_ray);
+						   VK_SHADER_STAGE_COMPUTE_BIT,
+						   0, sizeof(PushConstantRay), &pc_ray);
 		vkCmdPushConstants(cmd.handle, min_pipeline->pipeline_layout,
-			VK_SHADER_STAGE_COMPUTE_BIT,
-			0, sizeof(PushConstantRay), &pc_ray);
+						   VK_SHADER_STAGE_COMPUTE_BIT,
+						   0, sizeof(PushConstantRay), &pc_ray);
 		vkCmdPushConstants(cmd.handle, max_reduce_pipeline->pipeline_layout,
-			VK_SHADER_STAGE_COMPUTE_BIT,
-			0, sizeof(PushConstantRay), &pc_ray);
+						   VK_SHADER_STAGE_COMPUTE_BIT,
+						   0, sizeof(PushConstantRay), &pc_ray);
 		vkCmdPushConstants(cmd.handle, min_reduce_pipeline->pipeline_layout,
-			VK_SHADER_STAGE_COMPUTE_BIT,
-			0, sizeof(PushConstantRay), &pc_ray);
+						   VK_SHADER_STAGE_COMPUTE_BIT,
+						   0, sizeof(PushConstantRay), &pc_ray);
 		// @Performance: Maybe we can have multiple residual buffers?
 		reduce(cmd.handle, residual_buffer, counter_buffer, *max_pipeline, *max_reduce_pipeline,
-			scene->width * scene->height);
+			   scene->width * scene->height);
 		auto barrier = buffer_barrier(atomic_data_buffer.handle,
-			VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+									  VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1,
-			&barrier, 0, 0);
+							 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1,
+							 &barrier, 0, 0);
 		reduce(cmd.handle, residual_buffer, counter_buffer, *min_pipeline, *min_reduce_pipeline,
-			scene->width * scene->height);
+			   scene->width * scene->height);
 		barrier = buffer_barrier(atomic_data_buffer.handle,
-			VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+								 VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1,
-			&barrier, 0, 0);
+							 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1,
+							 &barrier, 0, 0);
 		vkCmdBindDescriptorSets(
 			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, calc_bounds_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
-			calc_bounds_pipeline->handle);
+						  calc_bounds_pipeline->handle);
 		vkCmdDispatch(cmd.handle, 1, 1, 1);
 		barrier = buffer_barrier(atomic_data_buffer.handle,
-			VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
+								 VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-			VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
+							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 		atomic_data_buffer.copy(atomic_data_cpu, cmd.handle);
 	}
 	cmd.submit();
@@ -305,10 +305,10 @@ void SPPM::create_offscreen_resources() {
 	settings.base_extent = { (uint32_t)scene->width, (uint32_t)scene->height, 1 };
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	output_tex.create_empty_texture(&scene->vkb.ctx, settings,
-		VK_IMAGE_LAYOUT_GENERAL);
+									VK_IMAGE_LAYOUT_GENERAL);
 	CommandBuffer cmd(&scene->vkb.ctx, true);
 	transition_image_layout(cmd.handle, output_tex.img,
-		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+							VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 	cmd.submit();
 }
 
@@ -332,11 +332,11 @@ void SPPM::create_descriptors() {
 		vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1) };
 	auto descriptor_pool_ci =
 		vk::descriptor_pool_CI(pool_sizes.size(), pool_sizes.data(),
-			scene->vkb.ctx.swapchain_images.size());
+							   scene->vkb.ctx.swapchain_images.size());
 
 	vk::check(vkCreateDescriptorPool(scene->vkb.ctx.device, &descriptor_pool_ci,
-		nullptr, &desc_pool),
-		"Failed to create descriptor pool");
+			  nullptr, &desc_pool),
+			  "Failed to create descriptor pool");
 
 	// Uniform buffer descriptors
 	std::vector<VkDescriptorSetLayoutBinding> set_layout_bindings = {
@@ -382,8 +382,8 @@ void SPPM::create_descriptors() {
 	auto set_layout_ci = vk::descriptor_set_layout_CI(
 		set_layout_bindings.data(), set_layout_bindings.size());
 	vk::check(vkCreateDescriptorSetLayout(scene->vkb.ctx.device, &set_layout_ci,
-		nullptr, &desc_set_layout),
-		"Failed to create escriptor set layout");
+			  nullptr, &desc_set_layout),
+			  "Failed to create escriptor set layout");
 	VkDescriptorSetAllocateInfo set_allocate_info{
 			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 	set_allocate_info.descriptorPool = desc_pool;
@@ -420,8 +420,8 @@ void SPPM::create_descriptors() {
 		image_infos.push_back(tex.descriptor_image_info);
 	}
 	writes.push_back(vk::write_descriptor_set(desc_set,
-		VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, TEXTURES_BINDING,
-		image_infos.data(), (uint32_t)image_infos.size()));
+					 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, TEXTURES_BINDING,
+					 image_infos.data(), (uint32_t)image_infos.size()));
 	if (lights.size()) {
 		writes.push_back(vk::write_descriptor_set(
 			desc_set, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, LIGHTS_BINDING,
@@ -443,7 +443,7 @@ void SPPM::create_blas() {
 		blas_inputs.push_back({ geo });
 	}
 	scene->vkb.build_blas(blas_inputs,
-		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void SPPM::create_tlas() {
@@ -500,7 +500,7 @@ void SPPM::create_tlas() {
 		pc_ray.light_triangle_count = light_triangle_cnt;
 	}
 	scene->vkb.build_tlas(tlas,
-		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void SPPM::create_rt_pipelines() {

@@ -11,48 +11,51 @@
 #include "../../commons.h"
 #include "../../utils.glsl"
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
-layout(set = 1, binding = 1, scalar) buffer SceneDesc_ {
-    SceneDesc scene_desc;
-};
+layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantCompute { PushConstantCompute pc; };
 layout(buffer_reference, scalar) buffer BootstrapData { BootstrapSample d[]; };
 layout(buffer_reference, scalar) buffer CDFSum { float d; };
 layout(buffer_reference, scalar) buffer CDF { float d[]; };
 layout(buffer_reference, scalar) buffer BlockSums { float d[]; };
 
-layout(push_constant) uniform ResidualIdx { uint residual_idx; };
 layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
 layout(buffer_reference, scalar) buffer ResidualData { float d[]; };
 ResidualData res_data = ResidualData(scene_desc.residual_addr);
 BootstrapData bootstrap_data = BootstrapData(scene_desc.bootstrap_addr);
 CDFSum cdf_sum = CDFSum(scene_desc.cdf_sum_addr);
 CDF cdf_data = CDF(scene_desc.cdf_addr);
-BlockSums block_sums = BlockSums(scene_desc.block_sums_addr);
+BlockSums block_sums = BlockSums(pc.block_sum_addr);
 
 #define NUM_BANKS 32
 #define LOG_NUM_BANKS 5
 #define CONFLICT_FREE_OFFSET(index) ((index) >> LOG_NUM_BANKS)
-shared float s_data[2048];
+shared float s_data[2048 + 64];
 void main() {
-
     uint tid, ai, bi, mem_ai, mem_bi, bank_offset_a, bank_offset_b;
     // Load data into shared memory
     tid = gl_LocalInvocationID.x;
-    mem_ai = pc.base_idx + gl_LocalInvocationID.x;
+    mem_ai = (pc.base_idx == 0 ? (gl_WorkGroupID.x * 2 * gl_WorkGroupSize.x)
+                               : pc.base_idx) +
+             gl_LocalInvocationID.x;
     mem_bi = mem_ai + gl_WorkGroupSize.x;
     ai = tid;
     bi = tid + gl_WorkGroupSize.x;
     bank_offset_a = CONFLICT_FREE_OFFSET(ai);
     bank_offset_b = CONFLICT_FREE_OFFSET(bi);
-    s_data[ai + bank_offset_a] = bootstrap_data.d[mem_ai].lum / pc.num_elems;
+    const float div = pc.scan_sums == 1 ? 1. : 1. / pc.num_elems;
+    s_data[ai + bank_offset_a] =
+        pc.scan_sums == 0 ? bootstrap_data.d[mem_ai].lum * div
+                          : block_sums.d[mem_ai];
     s_data[bi + bank_offset_b] =
-        bi < pc.n ? bootstrap_data.d[mem_bi].lum / pc.num_elems : 0;
+        pc.scan_sums == 0
+            ? (bi < pc.n ? bootstrap_data.d[mem_bi].lum * div : 0)
+            : (bi < pc.n ? block_sums.d[mem_bi] : 0);
     // Traverse from leafs to root (Reduction)
     uint stride = 1;
-    for(uint d = gl_WorkGroupSize.x; d > 0; d >>= 1) {
+    for (uint d = gl_WorkGroupSize.x; d > 0; d >>= 1) {
         memoryBarrierShared();
         barrier();
-        if(tid < d) {
+        if (tid < d) {
             uint ai = 2 * stride * tid + stride - 1;
             uint bi = ai + stride;
             ai += CONFLICT_FREE_OFFSET(ai);
@@ -64,20 +67,20 @@ void main() {
     uint block_idx = pc.block_idx == 0 ? gl_WorkGroupID.x : pc.block_idx;
 
     // Zero out the last element and store the sum
-    if(tid == 0) {
+    if (tid == 0) {
         uint idx = (gl_WorkGroupSize.x << 1) - 1;
         idx += CONFLICT_FREE_OFFSET(idx);
-        if(pc.store_sum == 1) {
+        if (pc.store_sum == 1) {
             block_sums.d[block_idx] = s_data[idx];
         }
         s_data[idx] = 0;
     }
     // Traverse from root to leaf
-    for(uint d = 1; d <= gl_WorkGroupSize.x; d*= 2) {
+    for (uint d = 1; d <= gl_WorkGroupSize.x; d *= 2) {
         stride >>= 1;
         memoryBarrierShared();
         barrier();
-        if(tid  < d) {
+        if (tid < d) {
             uint ai = 2 * stride * tid + stride - 1;
             uint bi = ai + stride;
             ai += CONFLICT_FREE_OFFSET(ai);
@@ -90,8 +93,16 @@ void main() {
     // Write into device memory
     memoryBarrierShared();
     barrier();
-    cdf_data.d[mem_ai] = s_data[ai + bank_offset_a];
-    if(bi < pc.n) {
-        cdf_data.d[mem_bi] = s_data[bi + bank_offset_b];
+    if (pc.scan_sums == 0) {
+        cdf_data.d[mem_ai] = s_data[ai + bank_offset_a];
+    } else {
+        block_sums.d[mem_ai] = s_data[ai + bank_offset_a];
+    }
+    if (bi < pc.n) {
+        if (pc.scan_sums == 0) {
+            cdf_data.d[mem_bi] = s_data[bi + bank_offset_b];
+        } else {
+            block_sums.d[mem_bi] = s_data[bi + bank_offset_b];
+        }
     }
 }

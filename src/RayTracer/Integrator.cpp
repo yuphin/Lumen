@@ -26,7 +26,7 @@ void Integrator::init() {
 		[window, cam_ptr, this](double delta_x, double delta_y) {
 		if (window->is_mouse_held(MouseAction::LEFT)) {
 			cam_ptr->rotate(0.05f * (float)delta_y, -0.05f * (float)delta_x,
-				0.0f);
+							0.0f);
 			//pc_ray.frame_num = -1;
 			updated = true;
 		}
@@ -111,15 +111,15 @@ void Integrator::init() {
 	sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	sampler_ci.maxLod = FLT_MAX;
 	vk::check(vkCreateSampler(scene->vkb.ctx.device, &sampler_ci, nullptr,
-		&texture_sampler),
-		"Could not create image sampler");
+			  &texture_sampler),
+			  "Could not create image sampler");
 
 	auto add_default_texture = [this, scene]() {
 		std::array<uint8_t, 4> nil = { 0, 0, 0, 0 };
 		textures.resize(1);
 		auto ci = make_img2d_ci(VkExtent2D{ 1, 1 });
 		textures[0].load_from_data(&scene->vkb.ctx, nil.data(), 4, ci,
-			texture_sampler);
+								   texture_sampler);
 	};
 
 	// TODO: Add textures

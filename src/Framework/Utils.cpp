@@ -434,7 +434,7 @@ void dispatch_compute(const Pipeline& pipeline, VkCommandBuffer cmdbuf,
 }
 
 void reduce(VkCommandBuffer cmdbuf, Buffer& residual_buffer, Buffer& counter_buffer, Pipeline& op_pipeline,
-				   Pipeline& reduce_pipeline, int dim ) {
+			Pipeline& reduce_pipeline, int dim) {
 	vkCmdFillBuffer(cmdbuf, residual_buffer.handle, 0, residual_buffer.size, 0);
 	VkBufferMemoryBarrier fill_barrier =
 		buffer_barrier(residual_buffer.handle, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT);

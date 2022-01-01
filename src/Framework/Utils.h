@@ -39,7 +39,7 @@ create_image_view(VkDevice device, const VkImage& img, VkFormat format,
 BlasInput to_vk_geometry(GltfPrimMesh& prim, VkDeviceAddress vertex_address,
 						 VkDeviceAddress index_address);
 BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertex_address,
-	VkDeviceAddress index_address);
+						 VkDeviceAddress index_address);
 
 VkRenderPass create_render_pass(
 	VkDevice device, const std::vector<VkFormat>& color_attachment_formats,
