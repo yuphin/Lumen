@@ -336,12 +336,12 @@ void Path::create_rt_pipelines() {
 	};
 	RTPipelineSettings settings;
 
-	std::vector<Shader> shaders{ {"src/shaders/integrators/path/path.rgen"},
+	settings.shaders = { {"src/shaders/integrators/path/path.rgen"},
 								{"src/shaders/integrators/ray.rmiss"},
 								{"src/shaders/integrators/ray_shadow.rmiss"},
 								{"src/shaders/integrators/ray.rchit"},
 								{"src/shaders/integrators/ray.rahit"} };
-	for (auto& shader : shaders) {
+	for (auto& shader : settings.shaders) {
 		shader.compile();
 	}
 	settings.ctx = &scene->vkb.ctx;
@@ -355,23 +355,23 @@ void Path::create_rt_pipelines() {
 		VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
 	stage.pName = "main";
 	// Raygen
-	stage.module = shaders[Raygen].create_vk_shader_module(scene->vkb.ctx.device);
+	stage.module = settings.shaders[Raygen].create_vk_shader_module(scene->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 	stages[Raygen] = stage;
 	// Miss
-	stage.module = shaders[CMiss].create_vk_shader_module(scene->vkb.ctx.device);
+	stage.module = settings.shaders[CMiss].create_vk_shader_module(scene->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
 	stages[CMiss] = stage;
 
-	stage.module = shaders[AMiss].create_vk_shader_module(scene->vkb.ctx.device);
+	stage.module = settings.shaders[AMiss].create_vk_shader_module(scene->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
 	stages[AMiss] = stage;
 	// Hit Group - Closest Hit
-	stage.module = shaders[ClosestHit].create_vk_shader_module(scene->vkb.ctx.device);
+	stage.module = settings.shaders[ClosestHit].create_vk_shader_module(scene->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 	stages[ClosestHit] = stage;
 	// Hit Group - Any hit
-	stage.module = shaders[AnyHit].create_vk_shader_module(scene->vkb.ctx.device);
+	stage.module = settings.shaders[AnyHit].create_vk_shader_module(scene->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
 	stages[AnyHit] = stage;
 
@@ -429,4 +429,8 @@ void Path::destroy() {
 	rt_pipeline->cleanup();
 	vkDestroyDescriptorSetLayout(device, desc_set_layout, nullptr);
 	vkDestroyDescriptorPool(device, desc_pool, nullptr);
+}
+
+void Path::reload() {
+	rt_pipeline->reload();
 }

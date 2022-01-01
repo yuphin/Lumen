@@ -14,7 +14,6 @@ void PSSMLT::init() {
 		num_bootstrap_samples * sizeof(BootstrapSample)
 	);
 
-
 	cdf_buffer.create(
 		&scene->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -797,14 +796,17 @@ void PSSMLT::create_rt_pipelines() {
 	seed_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
 	preprocess_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
 	mutate_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
+	settings.shaders = { shaders[0], shaders[3], shaders[4], shaders[5], shaders[6] };
 	seed_pipeline->create_rt_pipeline(settings, { 1 });
 	vkDestroyShaderModule(scene->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[1].create_vk_shader_module(scene->vkb.ctx.device);
 	settings.stages = stages;
+	settings.shaders = { shaders[1], shaders[3], shaders[4], shaders[5], shaders[6] };
 	preprocess_pipeline->create_rt_pipeline(settings, { 0 });
 	vkDestroyShaderModule(scene->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[2].create_vk_shader_module(scene->vkb.ctx.device);
 	settings.stages = stages;
+	settings.shaders = { shaders[2], shaders[3], shaders[4], shaders[5], shaders[6] };
 	mutate_pipeline->create_rt_pipeline(settings, { 0 });
 	for (auto& s : settings.stages) {
 		vkDestroyShaderModule(scene->vkb.ctx.device, s.module, nullptr);
@@ -827,16 +829,21 @@ void PSSMLT::create_compute_pipelines() {
 	for (auto& shader : shaders) {
 		shader.compile();
 	}
-	calc_cdf_pipeline->create_compute_pipeline(shaders[0], 1, &desc_set_layout, {},
-											   sizeof(PushConstantRay));
-	select_seeds_pipeline->create_compute_pipeline(shaders[1], 1, &desc_set_layout, {},
-												   sizeof(PushConstantRay));
-	composite_pipeline->create_compute_pipeline(shaders[2], 1, &desc_set_layout, {},
-												sizeof(PushConstantRay));
-	prefix_scan_pipeline->create_compute_pipeline(shaders[3], 1, &desc_set_layout, {},
-												  sizeof(PushConstantCompute));
-	uniform_add_pipeline->create_compute_pipeline(shaders[4], 1, &desc_set_layout, {},
-												  sizeof(PushConstantCompute));
+	ComputePipelineSettings settings;
+	settings.desc_sets = &desc_set_layout;
+	settings.desc_set_layout_cnt = 1;
+	settings.push_const_size = sizeof(PushConstantRay);
+	settings.shader = shaders[0];
+	calc_cdf_pipeline->create_compute_pipeline(settings);
+	settings.shader = shaders[1];
+	select_seeds_pipeline->create_compute_pipeline(settings);
+	settings.shader = shaders[2];
+	composite_pipeline->create_compute_pipeline(settings);
+	settings.push_const_size = sizeof(PushConstantCompute);
+	settings.shader = shaders[3];
+	prefix_scan_pipeline->create_compute_pipeline(settings);
+	settings.shader = shaders[4];
+	uniform_add_pipeline->create_compute_pipeline(settings);
 }
 
 void PSSMLT::prefix_scan(int level, int num_elems, CommandBuffer& cmd) {
@@ -987,4 +994,15 @@ void PSSMLT::destroy() {
 	}
 	vkDestroyDescriptorSetLayout(device, desc_set_layout, nullptr);
 	vkDestroyDescriptorPool(device, desc_pool, nullptr);
+}
+
+void PSSMLT::reload() {
+	seed_pipeline->reload();
+	preprocess_pipeline->reload();
+	mutate_pipeline->reload();
+	calc_cdf_pipeline->reload();
+	select_seeds_pipeline->reload();
+	composite_pipeline->reload();
+	prefix_scan_pipeline->reload();
+	uniform_add_pipeline->reload();
 }

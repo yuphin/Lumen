@@ -1034,12 +1034,17 @@ uint32_t VulkanBase::prepare_frame() {
 			VK_TRUE, UINT64_MAX);
 	}
 	EventHandler::begin();
-	if (EventHandler::consume_event(LumenEvent::EVENT_SHADER_RELOAD)) {
+	if (EventHandler::consume_event(LumenEvent::SHADER_RELOAD)) {
 		// We don't want any command buffers in flight, might change in the
 		// future
 		vkDeviceWaitIdle(ctx.device);
+		std::set<Pipeline*> refs;
 		for (auto& old_pipeline : EventHandler::obsolete_pipelines) {
-			vkDestroyPipeline(ctx.device, old_pipeline, nullptr);
+			vkDestroyPipeline(ctx.device, old_pipeline.handle, nullptr);
+			refs.emplace(old_pipeline.ref);
+		}
+		for (auto ref : refs) {
+			ref->refresh();
 		}
 		EventHandler::obsolete_pipelines.clear();
 		create_command_buffers();

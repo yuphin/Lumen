@@ -7,6 +7,7 @@ public:
 	virtual void render() override;
 	virtual bool update() override;
 	virtual void destroy() override;
+	virtual void reload() override;
 private:
 	void create_offscreen_resources();
 	void create_descriptors();

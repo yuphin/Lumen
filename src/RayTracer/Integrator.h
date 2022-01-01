@@ -18,6 +18,7 @@ public:
 	virtual void init();
 	virtual void render() = 0;
 	virtual bool update() = 0;
+	virtual void reload() = 0;
 	virtual void destroy();
 	Texture2D output_tex;
 	std::unique_ptr<Camera> camera = nullptr;

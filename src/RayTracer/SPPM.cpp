@@ -597,9 +597,11 @@ void SPPM::create_rt_pipelines() {
 	settings.stages = stages;
 	sppm_light_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
 	sppm_eye_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
+	settings.shaders = { shaders[0], shaders[2], shaders[3], shaders[4], shaders[5] };
 	sppm_light_pipeline->create_rt_pipeline(settings);
 	vkDestroyShaderModule(scene->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[1].create_vk_shader_module(scene->vkb.ctx.device);
+	settings.shaders = { shaders[1], shaders[2], shaders[3], shaders[4], shaders[5] };
 	settings.stages = stages;
 	sppm_eye_pipeline->create_rt_pipeline(settings);
 	for (auto& s : settings.stages) {
@@ -623,17 +625,20 @@ void SPPM::create_compute_pipelines() {
 	for (auto& shader : shaders) {
 		shader.compile();
 	}
-	std::vector<VkDescriptorSetLayout> desc_layouts = { desc_set_layout };
-	max_pipeline->create_compute_pipeline(
-		shaders[0], desc_layouts.size(), desc_layouts.data(), {}, sizeof(PushConstantRay));
-	max_reduce_pipeline->create_compute_pipeline(
-		shaders[1], desc_layouts.size(), desc_layouts.data(), {}, sizeof(PushConstantRay));
-	min_pipeline->create_compute_pipeline(
-		shaders[2], desc_layouts.size(), desc_layouts.data(), {}, sizeof(PushConstantRay));
-	min_reduce_pipeline->create_compute_pipeline(
-		shaders[3], desc_layouts.size(), desc_layouts.data(), {}, sizeof(PushConstantRay));
-	calc_bounds_pipeline->create_compute_pipeline(
-		shaders[4], desc_layouts.size(), desc_layouts.data(), {}, sizeof(PushConstantRay));
+	ComputePipelineSettings settings;
+	settings.desc_sets = &desc_set_layout;
+	settings.desc_set_layout_cnt = 1;
+	settings.push_const_size = sizeof(PushConstantRay);
+	settings.shader = shaders[0];
+	max_pipeline->create_compute_pipeline(settings);
+	settings.shader = shaders[1];
+	max_reduce_pipeline->create_compute_pipeline(settings);
+	settings.shader = shaders[2];
+	min_pipeline->create_compute_pipeline(settings);
+	settings.shader = shaders[3];
+	min_reduce_pipeline->create_compute_pipeline(settings);
+	settings.shader = shaders[4];
+	calc_bounds_pipeline->create_compute_pipeline(settings);
 }
 
 void SPPM::destroy() {
@@ -665,4 +670,14 @@ void SPPM::destroy() {
 	}
 	vkDestroyDescriptorSetLayout(device, desc_set_layout, nullptr);
 	vkDestroyDescriptorPool(device, desc_pool, nullptr);
+}
+
+void SPPM::reload() {
+	sppm_light_pipeline->reload();
+	sppm_eye_pipeline->reload();
+	min_pipeline->reload();
+	min_reduce_pipeline->reload();
+	max_pipeline->reload();
+	max_reduce_pipeline->reload();
+	calc_bounds_pipeline->reload();
 }

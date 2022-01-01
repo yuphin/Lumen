@@ -21,6 +21,7 @@ void SBTWrapper::setup(VulkanContext* ctx,
 //
 void SBTWrapper::destroy() {
 	for (auto& b : m_buffer) {
+		int a = 4;
 		b.destroy();
 	}
 	for (auto& i : m_index)

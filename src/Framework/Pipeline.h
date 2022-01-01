@@ -6,6 +6,11 @@
 #include "Framework/SBTWrapper.h"
 struct Pipeline;
 
+struct PipelineTrace {
+	VkPipeline handle;
+	Pipeline* ref;
+};
+
 struct GraphicsPipelineSettings {
 	std::vector<VkVertexInputBindingDescription> binding_desc;
 	std::vector<VkVertexInputAttributeDescription> attribute_desc;
@@ -33,41 +38,81 @@ struct RTPipelineSettings {
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props;
 	uint32_t max_recursion_depth = 1;
 	VulkanContext* ctx;
+	std::string name = "";
+	std::vector<Shader> shaders;
+};
+
+struct ComputePipelineSettings {
+	Shader shader;
+	uint32_t desc_set_layout_cnt;
+	VkDescriptorSetLayout* desc_sets;
+	std::vector<uint32_t> specialization_data = {};
+	uint32_t push_const_size = 0;
+	std::string name = "";
 };
 
 struct Pipeline {
 public:
+	enum class PipelineType {
+		GFX = 0,
+		RT = 1,
+		COMPUTE = 2
+	};
 	Pipeline(const VkDevice& device);
+	void reload();
 	void cleanup();
 	void create_gfx_pipeline(const GraphicsPipelineSettings&);
 	void create_rt_pipeline(RTPipelineSettings&, const std::vector<uint32_t> specialization_data = {});
-	void create_compute_pipeline(const Shader& shader, uint32_t desc_set_layout_cnt,
-								 VkDescriptorSetLayout* desc_sets, std::vector<uint32_t> specialization_data = {},
-								 uint32_t push_const_size = 0);
+	void create_compute_pipeline(const ComputePipelineSettings& settings = {});
 	const std::array<VkStridedDeviceAddressRegionKHR, 4> get_rt_regions();
 	void track_for_changes();
+	// Manually called after the pipeline is reloaded
+	void refresh();
+	struct {
+		VkPipelineShaderStageCreateInfo vert_shader_CI;
+		VkPipelineShaderStageCreateInfo frag_shader_CI;
+		VkPipelineInputAssemblyStateCreateInfo input_asssembly_CI;
+		VkPipelineViewportStateCreateInfo viewport_state;
+		VkPipelineRasterizationStateCreateInfo rasterizer;
+		VkPipelineMultisampleStateCreateInfo multisampling;
+		VkPipelineColorBlendAttachmentState color_blend_attachment;
+		VkPipelineColorBlendStateCreateInfo color_blend;
+		VkPipelineLayoutCreateInfo pipeline_layout_CI;
+		VkPipelineDynamicStateCreateInfo dynamic_state_CI;
+		VkGraphicsPipelineCreateInfo pipeline_CI;
+	} gfx_cis;
 	std::unordered_map<std::string, std::filesystem::file_time_type> paths;
-	VkPipelineShaderStageCreateInfo vert_shader_CI;
-	VkPipelineShaderStageCreateInfo frag_shader_CI;
-	VkPipelineInputAssemblyStateCreateInfo input_asssembly_CI;
-	VkPipelineViewportStateCreateInfo viewport_state;
-	VkPipelineRasterizationStateCreateInfo rasterizer;
-	VkPipelineMultisampleStateCreateInfo multisampling;
-	VkPipelineColorBlendAttachmentState color_blend_attachment;
-	VkPipelineColorBlendStateCreateInfo color_blend;
-	VkPipelineLayoutCreateInfo pipeline_layout_CI;
-	VkPipelineDynamicStateCreateInfo dynamic_state_CI;
-	VkGraphicsPipelineCreateInfo pipeline_CI;
-	GraphicsPipelineSettings settings;
+
+	struct {
+		uint32_t max_recursion_depth;
+		std::vector<VkPipelineShaderStageCreateInfo> stages;
+		std::vector<VkRayTracingShaderGroupCreateInfoKHR> groups;
+		VkRayTracingPipelineCreateInfoKHR pipeline_CI = { VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR };
+	} rt_cis;
+
+	struct {
+		VkSpecializationInfo specialization_info = {};
+		VkPipelineShaderStageCreateInfo shader_stage_ci = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+		VkComputePipelineCreateInfo pipeline_CI = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+	} compute_cis;
+
+
+	GraphicsPipelineSettings gfx_settings;
+	RTPipelineSettings rt_settings;
+	ComputePipelineSettings compute_settings;
 	VkDevice device = VK_NULL_HANDLE;
 	VkPipeline handle = VK_NULL_HANDLE;
 	VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
 	SBTWrapper sbt_wrapper;
+	SBTWrapper sbt_wrapper_tmp;
+	PipelineType type;
 
 	bool running = true;
 
+protected:
+	void recompile_pipeline(PipelineType type = PipelineType::GFX);
+
 private:
-	void recompile_pipeline();
 	bool tracking_stopped = true;
 	std::mutex mut;
 	std::condition_variable cv;

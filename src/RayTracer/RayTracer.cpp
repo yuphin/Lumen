@@ -40,7 +40,7 @@ void RayTracer::init(Window* window) {
 	vkb.create_command_buffers();
 	vkb.create_sync_primitives();
 	initialized = true;
-	integrator = std::make_unique<PSSMLT>(this);
+	integrator = std::make_unique<Path>(this);
 	integrator->init();
 	create_post_descriptor();
 	update_post_desc_set();
@@ -103,13 +103,19 @@ float RayTracer::draw_frame() {
 	ImGui::NewFrame();
 	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time,
 				1000 / cpu_avg_time);
+	if (ImGui::Button("Reload shaders")) {
+		integrator->reload();
+		integrator->updated = true;
+	}
 	if (integrator->updated) {
 		ImGui::Render();
 		auto t_end = glfwGetTime() * 1000;
 		auto t_diff = t_end - t_begin;
 		return (float)t_diff;
 	}
+
 	uint32_t image_idx = vkb.prepare_frame();
+
 	if (image_idx == UINT32_MAX) {
 		auto t_end = glfwGetTime() * 1000;
 		auto t_diff = t_end - t_begin;

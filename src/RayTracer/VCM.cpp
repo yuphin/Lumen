@@ -516,10 +516,12 @@ void VCM::create_rt_pipelines() {
 	settings.stages = stages;
 	vcm_light_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
 	vcm_eye_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
+	settings.shaders = { shaders[0], shaders[2], shaders[3], shaders[4], shaders[5] };
 	vcm_light_pipeline->create_rt_pipeline(settings);
 	vkDestroyShaderModule(scene->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[1].create_vk_shader_module(scene->vkb.ctx.device);
 	settings.stages = stages;
+	settings.shaders = { shaders[1], shaders[2], shaders[3], shaders[4], shaders[5] };
 	vcm_eye_pipeline->create_rt_pipeline(settings);
 	for (auto& s : settings.stages) {
 		vkDestroyShaderModule(scene->vkb.ctx.device, s.module, nullptr);
@@ -547,4 +549,9 @@ void VCM::destroy() {
 	}
 	vkDestroyDescriptorSetLayout(device, desc_set_layout, nullptr);
 	vkDestroyDescriptorPool(device, desc_pool, nullptr);
+}
+
+void VCM::reload() {
+	vcm_light_pipeline->reload();
+	vcm_eye_pipeline->reload();
 }
