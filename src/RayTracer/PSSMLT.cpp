@@ -244,9 +244,11 @@ void PSSMLT::render() {
 						   VK_SHADER_STAGE_MISS_BIT_KHR,
 						   0, sizeof(PushConstantRay), &pc_ray);
 		auto& regions = seed_pipeline->get_rt_regions();
-		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3], num_bootstrap_samples, 1, 1);
+		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3],
+						  num_bootstrap_samples, 1, 1);
 		auto barrier = buffer_barrier(bootstrap_buffer.handle,
-									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
 							 &barrier, 0, 0);
@@ -267,17 +269,19 @@ void PSSMLT::render() {
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 		std::array<VkBufferMemoryBarrier, 2> barriers = {
 			buffer_barrier(cdf_sum_buffer.handle,
-			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
 			buffer_barrier(cdf_buffer.handle,
-			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
+			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
 		};
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, barriers.size(),
 							 barriers.data(), 0, 0);
 	}
 
-// Debugging code
 #if 0
+	// Debugging code
 	cdf_buffer.copy(cdf_cpu, cmd.handle);
 	cmd.submit();
 	std::vector<BootstrapSample> samples;
@@ -322,7 +326,8 @@ void PSSMLT::render() {
 		uint32_t num_wgs = (num_mlt_threads + 1023) / 1024;
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 		auto barrier = buffer_barrier(seeds_buffer.handle,
-									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
 							 &barrier, 0, 0);
@@ -371,7 +376,8 @@ void PSSMLT::render() {
 							   VK_SHADER_STAGE_MISS_BIT_KHR,
 							   0, sizeof(PushConstantRay), &pc_ray);
 			auto& regions = mutate_pipeline->get_rt_regions();
-			vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3], num_mlt_threads, 1, 1);
+			vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2],
+							  &regions[3], num_mlt_threads, 1, 1);
 			const std::array<VkBufferMemoryBarrier, 5> mutation_barriers = {
 				buffer_barrier(splat_buffer.handle,
 				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
@@ -390,7 +396,8 @@ void PSSMLT::render() {
 				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
 			};
 			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, mutation_barriers.size(),
+								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0,
+								 mutation_barriers.size(),
 								 mutation_barriers.data(), 0, 0);
 		};
 		const uint32_t iter_cnt = 100;
@@ -820,11 +827,16 @@ void PSSMLT::create_compute_pipelines() {
 	for (auto& shader : shaders) {
 		shader.compile();
 	}
-	calc_cdf_pipeline->create_compute_pipeline(shaders[0], 1, &desc_set_layout, {}, sizeof(PushConstantRay));
-	select_seeds_pipeline->create_compute_pipeline(shaders[1], 1, &desc_set_layout, {}, sizeof(PushConstantRay));
-	composite_pipeline->create_compute_pipeline(shaders[2], 1, &desc_set_layout, {}, sizeof(PushConstantRay));
-	prefix_scan_pipeline->create_compute_pipeline(shaders[3], 1, &desc_set_layout, {}, sizeof(PushConstantCompute));
-	uniform_add_pipeline->create_compute_pipeline(shaders[4], 1, &desc_set_layout, {}, sizeof(PushConstantCompute));
+	calc_cdf_pipeline->create_compute_pipeline(shaders[0], 1, &desc_set_layout, {},
+											   sizeof(PushConstantRay));
+	select_seeds_pipeline->create_compute_pipeline(shaders[1], 1, &desc_set_layout, {},
+												   sizeof(PushConstantRay));
+	composite_pipeline->create_compute_pipeline(shaders[2], 1, &desc_set_layout, {},
+												sizeof(PushConstantRay));
+	prefix_scan_pipeline->create_compute_pipeline(shaders[3], 1, &desc_set_layout, {},
+												  sizeof(PushConstantCompute));
+	uniform_add_pipeline->create_compute_pipeline(shaders[4], 1, &desc_set_layout, {},
+												  sizeof(PushConstantCompute));
 }
 
 void PSSMLT::prefix_scan(int level, int num_elems, CommandBuffer& cmd) {
@@ -843,13 +855,15 @@ void PSSMLT::prefix_scan(int level, int num_elems, CommandBuffer& cmd) {
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 		if (scan_sums) {
 			auto barrier = buffer_barrier(block_sums[idx].handle,
-										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
 								 &barrier, 0, 0);
 		} else {
 			auto barrier = buffer_barrier(cdf_buffer.handle,
-										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
 								 &barrier, 0, 0);
@@ -867,13 +881,15 @@ void PSSMLT::prefix_scan(int level, int num_elems, CommandBuffer& cmd) {
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 		if (scan_sums) {
 			auto barrier = buffer_barrier(block_sums[output_idx].handle,
-										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
 								 &barrier, 0, 0);
 		} else {
 			auto barrier = buffer_barrier(cdf_buffer.handle,
-										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
 								 &barrier, 0, 0);
