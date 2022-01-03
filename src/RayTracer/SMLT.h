@@ -59,7 +59,7 @@ private:
 
 
 	int max_depth = 6;
-	float mutations_per_pixel = 10.;
+	float mutations_per_pixel = 100.;
 	vec3 sky_col = vec3(0, 0, 0);
 	int num_mlt_threads = 200000;
 	int num_bootstrap_samples = 100000;

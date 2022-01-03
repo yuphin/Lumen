@@ -20,7 +20,8 @@ layout(buffer_reference, scalar) buffer ProbCarryover { uint d[]; };
 
 TmpSeeds tmp_seeds_data = TmpSeeds(scene_desc.tmp_seeds_addr);
 TmpLuminance tmp_lum_data = TmpLuminance(scene_desc.tmp_lum_addr);
-ProbCarryover prob_carryover_data = ProbCarryover(scene_desc.prob_carryover_addr);
+ProbCarryover prob_carryover_data =
+    ProbCarryover(scene_desc.prob_carryover_addr);
 
 LightVertices light_verts = LightVertices(scene_desc.vcm_vertices_addr);
 // CameraVertices camera_verts = CameraVertices(scene_desc.vcm_vertices_addr);
@@ -37,8 +38,8 @@ PrimarySamples light_primary_samples =
     PrimarySamples(scene_desc.light_primary_samples_addr);
 PrimarySamples cam_primary_samples =
     PrimarySamples(scene_desc.cam_primary_samples_addr);
-PrimarySamples prim_samples[2] = PrimarySamples[](
-    light_primary_samples, cam_primary_samples);
+PrimarySamples prim_samples[2] =
+    PrimarySamples[](light_primary_samples, cam_primary_samples);
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
@@ -73,7 +74,7 @@ uint mlt_get_next() {
         cnt = mlt_sampler.num_light_samples++;
     } else {
         cnt = mlt_sampler.num_cam_samples++;
-    } 
+    }
     return cnt;
 }
 
@@ -196,7 +197,8 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
     return L;
 }
 
-bool vcm_generate_light_sample(out VCMState light_state, bool large_step) {
+bool vcm_generate_light_sample(out VCMState light_state, inout uvec4 seed,
+                               bool large_step) {
     // Sample light
     uint light_idx;
     uint light_triangle_idx;
@@ -232,8 +234,8 @@ bool vcm_generate_light_sample(out VCMState light_state, bool large_step) {
 }
 
 float mlt_fill_light_path(const vec4 origin, const float cam_area,
-                         bool large_step, inout uvec4 seed,
-                         bool save_radiance) {
+                          bool large_step, inout uvec4 seed,
+                          bool save_radiance) {
 #define light_vtx(i) light_verts.d[vcm_light_path_idx + i]
 #define splat(i) splat_data.d[splat_idx + i]
     VCMState light_state;
@@ -241,7 +243,7 @@ float mlt_fill_light_path(const vec4 origin, const float cam_area,
     mlt_sampler.splat_cnt = 0;
     float lum_sum = 0;
 
-    if (!vcm_generate_light_sample(light_state, large_step)) {
+    if (!vcm_generate_light_sample(light_state, seed, large_step)) {
         return 0;
     }
     const vec3 cam_pos = origin.xyz;
@@ -315,7 +317,7 @@ float mlt_fill_light_path(const vec4 origin, const float cam_area,
                 mlt_sampler.splat_cnt++;
                 splat(splat_cnt).idx = idx;
                 splat(splat_cnt).L = splat_col;
-            } else if(lum > 0) {
+            } else if (lum > 0) {
                 connected_lights.d[pixel_idx] = 1;
                 lum_sum += lum;
             }
@@ -405,7 +407,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
                 splat(splat_cnt).L = splat_data.d[light_splat_idx + i].L;
             }
         }
-    } else if(connected_lights.d[light_path_idx] == 1) {
+    } else if (connected_lights.d[light_path_idx] == 1) {
         lum += tmp_lum_data.d[light_path_idx];
     }
     VCMState camera_state;
