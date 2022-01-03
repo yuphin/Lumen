@@ -17,5 +17,5 @@ public:
 	virtual void init(Window*) = 0;
 	virtual void update() = 0;
 	virtual void cleanup() = 0;
-	Window* window;
+	Window* window = nullptr;
 };

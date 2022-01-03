@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{cf812c64-b925-49a7-984f-fee0c8cdaf5a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -109,6 +112,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\RayTracer\PSSMLT.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\SMLT.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -227,56 +233,155 @@
     <ClInclude Include="src\RayTracer\PSSMLT.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\RayTracer\SMLT.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="cpp.hint" />
     <None Include=".gitmodules" />
-    <None Include="src\Shaders\cube.frag" />
-    <None Include="src\Shaders\cube.vert" />
-    <None Include="src\Shaders\scene.frag" />
-    <None Include="src\Shaders\scene.vert" />
-    <None Include="src\Shaders\triangle.frag" />
-    <None Include="src\Shaders\triangle.vert" />
-    <None Include="src\Shaders\util.vert" />
-    <None Include="src\shaders\calc_bounds.comp" />
-    <None Include="src\shaders\gltf_simple.frag" />
-    <None Include="src\shaders\gltf_simple.vert" />
-    <None Include="src\shaders\gpgpu\max.comp" />
-    <None Include="src\shaders\gpgpu\min.comp" />
-    <None Include="src\shaders\gpgpu\reduce_max.comp" />
-    <None Include="src\shaders\gpgpu\reduce_min.comp" />
-    <None Include="src\shaders\integrators.rgen" />
-    <None Include="src\shaders\pathtrace.rahit" />
-    <None Include="src\shaders\pathtrace.rchit" />
-    <None Include="src\shaders\pathtrace.rgen" />
-    <None Include="src\shaders\pathtrace.rmiss" />
-    <None Include="src\shaders\pathtrace_shadow.rmiss" />
-    <None Include="src\shaders\post.frag" />
-    <None Include="src\shaders\post.vert" />
-    <None Include="src\shaders\pt_unidir.rgen" />
-    <None Include="src\shaders\utils.glsl" />
-    <None Include="src\shaders\gather.comp" />
-    <None Include="src\shaders\integrators\pssmlt\calc_cdf.comp" />
-    <None Include="src\shaders\integrators\pssmlt\composite.comp" />
-    <None Include="src\shaders\integrators\pssmlt\pssmlt_commons.glsl" />
-    <None Include="src\shaders\integrators\pssmlt\pssmlt_mutate.rgen" />
-    <None Include="src\shaders\integrators\pssmlt\pssmlt_preprocess.rgen" />
-    <None Include="src\shaders\integrators\pssmlt\pssmlt_seed.rgen" />
-    <None Include="src\shaders\integrators\pssmlt\select_seeds.comp" />
-    <None Include="src\shaders\integrators\path\path.rgen" />
-    <None Include="src\shaders\integrators\bdpt\bdpt.rgen" />
-    <None Include="src\shaders\integrators\ray.rahit" />
-    <None Include="src\shaders\integrators\ray.rchit" />
-    <None Include="src\shaders\integrators\ray.rmiss" />
-    <None Include="src\shaders\integrators\ray_shadow.rmiss" />
-    <None Include="src\shaders\integrators\sppm\calc_bounds.comp" />
-    <None Include="src\shaders\integrators\sppm\max.comp" />
-    <None Include="src\shaders\integrators\sppm\min.comp" />
-    <None Include="src\shaders\integrators\sppm\reduce_max.comp" />
-    <None Include="src\shaders\integrators\sppm\reduce_min.comp" />
-    <None Include="src\shaders\integrators\sppm\sppm_eye.rgen" />
-    <None Include="src\shaders\integrators\sppm\sppm_light.rgen" />
-    <None Include="src\shaders\integrators\vcm\vcm_eye.rgen" />
-    <None Include="src\shaders\integrators\vcm\vcm_light.rgen" />
+    <None Include="src\shaders\integrators\bdpt\bdpt.rgen">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\calc_bounds.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\calc_bounds.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\calc_cdf.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\composite.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="cpp.hint">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\Shaders\cube.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\Shaders\cube.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\gather.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\gltf_simple.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\gltf_simple.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators.rgen">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\max.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\gpgpu\max.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\min.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\gpgpu\min.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\path\path.rgen">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\pathtrace.rahit">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\pathtrace.rchit">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\pathtrace.rgen">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\pathtrace.rmiss">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\pathtrace_shadow.rmiss">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\post.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\post.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_commons.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_mutate.rgen">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_preprocess.rgen">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_seed.rgen">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\pt_unidir.rgen">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\ray.rahit">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\ray.rchit">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\ray.rmiss">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\ray_shadow.rmiss">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\reduce_max.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\gpgpu\reduce_max.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\reduce_min.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\gpgpu\reduce_min.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\Shaders\scene.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\Shaders\scene.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\select_seeds.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\sppm_eye.rgen">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\sppm_light.rgen">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\Shaders\triangle.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\Shaders\triangle.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\Shaders\util.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\utils.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcm\vcm_eye.rgen">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcm\vcm_light.rgen">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

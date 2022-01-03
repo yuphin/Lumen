@@ -188,11 +188,11 @@ void Pipeline::create_rt_pipeline(RTPipelineSettings& settings,
 								  const std::vector<uint32_t> specialization_data) {
 	VkPipelineLayoutCreateInfo pipeline_layout_create_info{
 		VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-	pipeline_layout_create_info.setLayoutCount = settings.desc_layouts.size();
+	pipeline_layout_create_info.setLayoutCount = (uint32_t)settings.desc_layouts.size();
 	pipeline_layout_create_info.pSetLayouts = settings.desc_layouts.data();
 
 	type = PipelineType::RT;
-	auto pcr_cnt = settings.push_consts.size();
+	auto pcr_cnt = (uint32_t)settings.push_consts.size();
 	if (pcr_cnt) {
 		pipeline_layout_create_info.pushConstantRangeCount = pcr_cnt;
 		pipeline_layout_create_info.pPushConstantRanges = settings.push_consts.data();

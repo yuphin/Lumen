@@ -1,0 +1,28 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../commons.h"
+#include "../../utils.glsl"
+// TODO
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(buffer_reference, scalar) buffer BootstrapData { BootstrapSample d[]; };
+layout(buffer_reference, scalar) buffer CDFSum { float d; };
+layout(buffer_reference, scalar) buffer CDF { float d[]; };
+CDFSum cdf_sum = CDFSum(scene_desc.cdf_sum_addr);
+CDF cdf_data = CDF(scene_desc.cdf_addr);
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx == 0) {
+        cdf_sum.d = cdf_data.d[pc_ray.num_bootstrap_samples - 1];
+    }
+    const float inv_sum = 1. / cdf_data.d[pc_ray.num_bootstrap_samples - 1];
+    cdf_data.d[idx] *= inv_sum;
+}

@@ -1,6 +1,8 @@
 #include "LumenPCH.h"
 #include "LumenScene.h"
+#pragma warning(push,0)
 #include <json.hpp>
+#pragma warning(pop)
 #include <tiny_obj_loader.h>
 #include "shaders/commons.h"
 
@@ -99,43 +101,41 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 	auto& shapes = reader.GetShapes();
 
 	prim_meshes.resize(shapes.size());
-	for (size_t s = 0; s < shapes.size(); s++) {
-		prim_meshes[s].first_idx = indices.size();
-		prim_meshes[s].vtx_offset = positions.size();
+	for (uint32_t s = 0; s < shapes.size(); s++) {
+		prim_meshes[s].first_idx = (uint32_t)indices.size();
+		prim_meshes[s].vtx_offset = (uint32_t)positions.size();
 		prim_meshes[s].name = shapes[s].name;
-		prim_meshes[s].idx_count = shapes[s].mesh.indices.size();
-		prim_meshes[s].vtx_count = shapes[s].mesh.num_face_vertices.size();
+		prim_meshes[s].idx_count = (uint32_t)shapes[s].mesh.indices.size();
+		prim_meshes[s].vtx_count = (uint32_t)shapes[s].mesh.num_face_vertices.size();
 		prim_meshes[s].prim_idx = s;
 		glm::vec3 min_vtx = glm::vec3(FLT_MAX);
 		glm::vec3 max_vtx = glm::vec3(-FLT_MAX);
-		size_t index_offset = 0;
+		uint32_t index_offset = 0;
 		uint32_t idx_val = 0;
-		for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
-			for (size_t v = 0; v < 3; v++) {
+		for (uint32_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+			for (uint32_t v = 0; v < 3; v++) {
 				tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
 				indices.push_back(idx_val++);
-				tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
-				tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
-				tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
+				tinyobj::real_t vx = attrib.vertices[3 * uint32_t(idx.vertex_index) + 0];
+				tinyobj::real_t vy = attrib.vertices[3 * uint32_t(idx.vertex_index) + 1];
+				tinyobj::real_t vz = attrib.vertices[3 * uint32_t(idx.vertex_index) + 2];
 				positions.push_back({ vx,vy,vz });
 				min_vtx = glm::min(positions[positions.size() - 1], min_vtx);
 				max_vtx = glm::max(positions[positions.size() - 1], max_vtx);
 				if (idx.normal_index >= 0) {
-					tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
-					tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
-					tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
+					tinyobj::real_t nx = attrib.normals[3 * uint32_t(idx.normal_index) + 0];
+					tinyobj::real_t ny = attrib.normals[3 * uint32_t(idx.normal_index) + 1];
+					tinyobj::real_t nz = attrib.normals[3 * uint32_t(idx.normal_index) + 2];
 					normals.push_back({ nx,ny,nz });
 				}
 				if (idx.texcoord_index >= 0) {
-					tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
-					tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
+					tinyobj::real_t tx = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 0];
+					tinyobj::real_t ty = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 1];
 					texcoords0.push_back({ tx,ty });
 				}
 			}
 
 			index_offset += 3;
-			// per-face material
-			shapes[s].mesh.material_ids[f];
 		}
 		prim_meshes[s].min_pos = min_vtx;
 		prim_meshes[s].max_pos = max_vtx;

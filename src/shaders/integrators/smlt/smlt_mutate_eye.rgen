@@ -8,7 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 // Includes all the buffer addresses and indices
-#include "pssmlt_commons.glsl"
+#include "smlt_commons.glsl"
 
 void main() {
 #define mlt_sampler mlt_samplers.d[mlt_sampler_idx]
@@ -19,35 +19,36 @@ void main() {
                                                2. / gl_LaunchSizeEXT.y, 0, 1));
     area_int /= area_int.w;
     const float cam_area = abs(area_int.x * area_int.y);
+
     uvec4 chain_seed = seeds_data.d[pixel_idx].chain_seed;
-    const float large_step_prob = 0.3;
-    const bool large_step = rand(seed) < large_step_prob;
-    mlt_start_iteration();
-    float proposed_luminance = mlt_L(origin, cam_area, large_step, chain_seed, true);
+    const bool large_step = prob_carryover_data.d[pixel_idx] == 1;
+    uvec4 seed = tmp_seeds_data.d[pixel_idx].chain_seed;
+    
+    mlt_start_chain(1);
+    float proposed_luminance = mlt_trace_eye(origin, cam_area, large_step, chain_seed, true);
 
     if (isnan(proposed_luminance) || isinf(proposed_luminance)) {
         debugPrintfEXT("Luminance is not a finite number\n");
     }
     const float accept = min(1, proposed_luminance / mlt_sampler.luminance);
-    if (accept > 0) {
-        const float inv_proposed_luminance = 1. / proposed_luminance;
-        for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
-            // if (proposed_luminance > 0) {
-            //     ivec2 coords = ivec2(splat(i).idx / pc_ray.size_y,
-            //                          splat(i).idx % pc_ray.size_y);
-            //     debugPrintfEXT("%v2i - %d\n", coords,
-            //     pc_ray.mutation_counter);
-            //     //debugPrintfEXT("%d - %v3f\n", splat(i).idx,
-            //     splat(i).L);
-            // }
-            mlt_col.d[splat(i).idx] +=
-                splat(i).L * accept * inv_proposed_luminance;
-        }
-    }
-   
+    // if (accept > 0) {
+    //     const float inv_proposed_luminance = 1. / proposed_luminance;
+    //     for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
+    //         // if (proposed_luminance > 0) {
+    //         //     ivec2 coords = ivec2(splat(i).idx / pc_ray.size_y,
+    //         //                          splat(i).idx % pc_ray.size_y);
+    //         //     debugPrintfEXT("%v2i - %d\n", coords,
+    //         //     pc_ray.mutation_counter);
+    //         //     //debugPrintfEXT("%d - %v3f\n", splat(i).idx,
+    //         //     splat(i).L);
+    //         // }
+    //         mlt_col.d[splat(i).idx] +=
+    //             splat(i).L * accept * inv_proposed_luminance;
+    //     }
+    // }
     const float inv_past_luminance = 1. / mlt_sampler.luminance;
-     
     for (int i = 0; i < mlt_sampler.past_splat_cnt; i++) {
+           
         mlt_col.d[past_splat(i).idx] +=
             past_splat(i).L * (1 - accept) * inv_past_luminance;
     }
@@ -62,6 +63,5 @@ void main() {
     } else {
         mlt_reject();
     }
-    mlt_sampler.splat_cnt = 0;
     seeds_data.d[pixel_idx].chain_seed = chain_seed;
 }

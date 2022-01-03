@@ -1,0 +1,44 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../commons.h"
+#include "../../utils.glsl"
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(push_constant) uniform _PushConstantCompute { PushConstantCompute pc; };
+layout(buffer_reference, scalar) buffer BlockSums { float d[]; };
+layout(buffer_reference, scalar) buffer CDF { float d[]; };
+BlockSums block_sums = BlockSums(pc.block_sum_addr);
+BlockSums output_data = BlockSums(pc.block_sum_addr);
+CDF cdf_data = CDF(scene_desc.cdf_addr);
+shared float block_sum;
+void main() {
+    if (gl_LocalInvocationID.x >= pc.n) {
+        return;
+    }
+    if (gl_LocalInvocationID.x == 0) {
+        block_sum = block_sums.d[gl_WorkGroupID.x + pc.block_idx];
+    }
+    uint address = gl_WorkGroupID.x * (gl_WorkGroupSize.x << 1) + pc.base_idx +
+                   gl_LocalInvocationID.x;
+    memoryBarrierShared();
+    barrier();
+
+    if (pc.scan_sums == 0) {
+        cdf_data.d[address] += block_sum;
+        cdf_data.d[address + gl_WorkGroupSize.x] +=
+            uint((gl_LocalInvocationID.x + gl_WorkGroupSize.x < pc.n)) *
+            block_sum;
+    } else {
+        output_data.d[address] += block_sum;
+        output_data.d[address + gl_WorkGroupSize.x] +=
+            uint((gl_LocalInvocationID.x + gl_WorkGroupSize.x < pc.n)) *
+            block_sum;
+    }
+}

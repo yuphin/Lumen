@@ -65,7 +65,7 @@ struct PushConstantRay {
 	uint connection_rand_count;
 	uint random_num;
 	uint num_bootstrap_samples;
-	uint mutations_per_pixel;
+	float mutations_per_pixel;
 };
 
 struct PushConstantCompute {
@@ -156,7 +156,9 @@ struct VCMVertex {
 	float d_vc;
 	float d_vm;
 	uint side;
+	uint coords;
 };
+
 
 struct SPPMData {
 	vec3 p;
@@ -264,8 +266,8 @@ struct SceneDesc {
 	uint64_t hash_addr;
 	uint64_t photon_addr;
 	// VCM
-	uint64_t vcm_light_vertices_addr;
-	uint64_t light_path_cnt_addr;
+	uint64_t vcm_vertices_addr;
+	uint64_t path_cnt_addr;
 	// MLT
 	uint64_t bootstrap_addr;
 	uint64_t cdf_addr;
@@ -280,6 +282,11 @@ struct SceneDesc {
 	uint64_t splat_addr;
 	uint64_t past_splat_addr;
 	uint64_t block_sums_addr;
+
+	uint64_t connected_lights_addr;
+	uint64_t tmp_seeds_addr;
+	uint64_t tmp_lum_addr;
+	uint64_t prob_carryover_addr;
 };
 
 // Structure used for retrieving the primitive information in the closest hit

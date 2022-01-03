@@ -8,7 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 // Includes all the buffer addresses and indices
-#include "pssmlt_commons.glsl"
+#include "smlt_commons.glsl"
 void main() {
 #define mlt_sampler mlt_samplers.d[mlt_sampler_idx]
 #define past_splat(i) past_splat_data.d[splat_idx + i]
@@ -19,12 +19,11 @@ void main() {
     area_int /= area_int.w;
     const float cam_area = abs(area_int.x * area_int.y);
     uvec4 chain_seed = seeds_data.d[pixel_idx].chain_seed;
-    mlt_sampler.luminance = mlt_L(origin, cam_area, true, chain_seed, true);
+    mlt_sampler.luminance = mlt_trace_eye(origin, cam_area, true, chain_seed, true);
     for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
         past_splat(i).idx = splat(i).idx;
         past_splat(i).L = splat(i).L;
     }
     mlt_sampler.past_splat_cnt = mlt_sampler.splat_cnt;
-    mlt_sampler.splat_cnt = 0;
     seeds_data.d[pixel_idx].chain_seed = chain_seed;
 }

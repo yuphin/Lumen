@@ -11,7 +11,7 @@ void SPPM::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		scene->width * scene->height * sizeof(SPPMData) * sizeof(float)
+		scene->width * scene->height * sizeof(SPPMData)
 	);
 
 	atomic_data_buffer.create(
@@ -20,7 +20,7 @@ void SPPM::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		sizeof(AtomicData) * sizeof(float)
+		sizeof(AtomicData)
 	);
 
 	photon_buffer.create(
@@ -62,7 +62,7 @@ void SPPM::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		sizeof(AtomicData) * sizeof(float)
+		sizeof(AtomicData)
 	);
 
 	SceneDesc desc;
@@ -121,7 +121,7 @@ void SPPM::render() {
 	const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
 	const int base_grid_res = int(max_comp / pc_ray.radius);
 	pc_ray.grid_res = glm::max(ivec3(diam * float(base_grid_res) / max_comp), ivec3(1));
-	if (pc_ray.radius < 0.0000001) pc_ray.radius = 0.0000001;
+	if (pc_ray.radius < 1e-7f) pc_ray.radius = 1e-7f;
 	// Prepare
 	{
 		vkCmdFillBuffer(cmd.handle, photon_buffer.handle, 0, photon_buffer.size, 0);

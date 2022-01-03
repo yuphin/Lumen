@@ -3,7 +3,7 @@
 
 const int max_depth = 6;
 const vec3 sky_col(0, 0, 0);
-static float vcm_radius_factor = 0.1;
+static float vcm_radius_factor = 0.1f;
 static bool use_vm = true;
 static bool use_vc = true;
 void VCM::init() {
@@ -33,7 +33,7 @@ void VCM::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		scene->width * scene->height * 4
+		scene->width * scene->height * sizeof(float)
 	);
 
 	color_storage_buffer.create(
@@ -41,7 +41,7 @@ void VCM::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		scene->width * scene->height * 3 * 4
+		scene->width * scene->height * 3 * sizeof(float)
 	);
 
 	SceneDesc desc;
@@ -53,8 +53,8 @@ void VCM::init() {
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
 	// VCM
 	desc.photon_addr = photon_buffer.get_device_address();
-	desc.vcm_light_vertices_addr = vcm_light_vertices_buffer.get_device_address();
-	desc.light_path_cnt_addr = light_path_cnt_buffer.get_device_address();
+	desc.vcm_vertices_addr = vcm_light_vertices_buffer.get_device_address();
+	desc.path_cnt_addr = light_path_cnt_buffer.get_device_address();
 	desc.color_storage_addr = color_storage_buffer.get_device_address();
 
 	scene_desc_buffer.create(&scene->vkb.ctx,
@@ -90,7 +90,7 @@ void VCM::render() {
 	pc_ray.sky_col = sky_col;
 	// VCM related constants
 	pc_ray.radius = lumen_scene.m_dimensions.radius * vcm_radius_factor / 100.f;
-	pc_ray.radius /= pow(pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
+	pc_ray.radius /= (float)pow((double)pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
 	pc_ray.min_bounds = lumen_scene.m_dimensions.min;
 	pc_ray.max_bounds = lumen_scene.m_dimensions.max;
 	pc_ray.ppm_base_radius = ppm_base_radius;

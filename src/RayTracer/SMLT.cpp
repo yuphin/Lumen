@@ -1,7 +1,7 @@
 #include "LumenPCH.h"
-#include "PSSMLT.h"
+#include "SMLT.h"
 
-void PSSMLT::init() {
+void SMLT::init() {
 	Integrator::init();
 
 	// MLTVCM buffers
@@ -20,7 +20,7 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_bootstrap_samples * sizeof(float)
+		num_bootstrap_samples * 4
 	);
 
 	bootstrap_cpu.create(
@@ -39,7 +39,7 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		VK_SHARING_MODE_EXCLUSIVE,
-		num_bootstrap_samples * sizeof(float)
+		num_bootstrap_samples * 4
 	);
 
 	cdf_sum_buffer.create(
@@ -75,15 +75,6 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		num_mlt_threads * cam_path_rand_count * sizeof(PrimarySample)
-	);
-
-	connection_primary_samples_buffer.create(
-		&scene->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * connect_path_rand_count * sizeof(PrimarySample)
 	);
 
 	mlt_samplers_buffer.create(
@@ -126,20 +117,53 @@ void PSSMLT::init() {
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		num_mlt_threads * (max_depth * (max_depth + 1)) * sizeof(Splat)
 	);
+
 	auto path_size = std::max(num_mlt_threads, num_bootstrap_samples);
 	light_path_buffer.create(
 		&scene->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		path_size * (max_depth + 1) * sizeof(MLTPathVertex));
+		path_size * (max_depth + 1) * sizeof(VCMVertex));
 
-	camera_path_buffer.create(
+	connected_lights_buffer.create(
 		&scene->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		path_size * (max_depth + 1) * sizeof(MLTPathVertex));
+		path_size * sizeof(uint32_t));
+
+	tmp_seeds_buffer.create(
+		&scene->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		path_size * sizeof(SeedData));
+
+
+	light_path_cnt_buffer.create(
+		&scene->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		path_size * sizeof(float)
+	);
+
+	// ---- //
+	tmp_lum_buffer.create(
+		&scene->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		num_bootstrap_samples * sizeof(float));
+
+	prob_carryover_buffer.create(
+		&scene->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		num_mlt_threads * sizeof(uint32_t));
 
 	int size = 0;
 	int arr_size = num_bootstrap_samples;
@@ -160,7 +184,7 @@ void PSSMLT::init() {
 								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 								   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-								   num_blocks * sizeof(float));
+								   num_blocks * 4);
 		}
 		arr_size = num_blocks;
 	} while (arr_size > 1);
@@ -173,21 +197,26 @@ void PSSMLT::init() {
 	desc.uv_addr = uv_buffer.get_device_address();
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
-	// PSSMLT
+	// SMLT
 	desc.bootstrap_addr = bootstrap_buffer.get_device_address();
 	desc.cdf_addr = cdf_buffer.get_device_address();
 	desc.cdf_sum_addr = cdf_sum_buffer.get_device_address();
 	desc.seeds_addr = seeds_buffer.get_device_address();
 	desc.light_primary_samples_addr = light_primary_samples_buffer.get_device_address();
 	desc.cam_primary_samples_addr = cam_primary_samples_buffer.get_device_address();
-	desc.connection_primary_samples_addr = connection_primary_samples_buffer.get_device_address();
 	desc.mlt_samplers_addr = mlt_samplers_buffer.get_device_address();
 	desc.mlt_col_addr = mlt_col_buffer.get_device_address();
 	desc.chain_stats_addr = chain_stats_buffer.get_device_address();
 	desc.splat_addr = splat_buffer.get_device_address();
 	desc.past_splat_addr = past_splat_buffer.get_device_address();
 	desc.light_path_addr = light_path_buffer.get_device_address();
-	desc.camera_path_addr = camera_path_buffer.get_device_address();
+
+	desc.connected_lights_addr = connected_lights_buffer.get_device_address();
+	desc.tmp_seeds_addr = tmp_seeds_buffer.get_device_address();
+	desc.tmp_lum_addr = tmp_lum_buffer.get_device_address();
+	desc.prob_carryover_addr = prob_carryover_buffer.get_device_address();
+	desc.path_cnt_addr = light_path_buffer.get_device_address();
+
 
 	scene_desc_buffer.create(&scene->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -210,7 +239,7 @@ void PSSMLT::init() {
 	pc_ray.mutations_per_pixel = mutations_per_pixel;
 }
 
-void PSSMLT::render() {
+void SMLT::render() {
 	const float ppm_base_radius = 0.25f;
 	CommandBuffer cmd(&scene->vkb.ctx, /*start*/ true);
 	VkClearValue clear_color = { 0.25f, 0.25f, 0.25f, 1.0f };
@@ -224,35 +253,70 @@ void PSSMLT::render() {
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = max_depth;
 	pc_ray.sky_col = sky_col;
-	// PSSMLT related constants
+	// SMLT related constants
 	pc_ray.light_rand_count = light_path_rand_count;
 	pc_ray.cam_rand_count = cam_path_rand_count;
-	pc_ray.connection_rand_count = connect_path_rand_count;
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.num_bootstrap_samples = num_bootstrap_samples;
+
 	// Start bootstrap sampling
 	{
-		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-						  seed_pipeline->handle);
-		vkCmdBindDescriptorSets(
-			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, seed_pipeline->pipeline_layout,
-			0, 1, &desc_set, 0, nullptr);
-		vkCmdPushConstants(cmd.handle, seed_pipeline->pipeline_layout,
-						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-						   VK_SHADER_STAGE_MISS_BIT_KHR,
-						   0, sizeof(PushConstantRay), &pc_ray);
-		auto& regions = seed_pipeline->get_rt_regions();
-		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3],
-						  num_bootstrap_samples, 1, 1);
-		auto barrier = buffer_barrier(bootstrap_buffer.handle,
-									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
-							 &barrier, 0, 0);
+		// Fill light buffer
+		{
+			vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+							  seed_light_pipeline->handle);
+			vkCmdBindDescriptorSets(
+				cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, seed_light_pipeline->pipeline_layout,
+				0, 1, &desc_set, 0, nullptr);
+			vkCmdPushConstants(cmd.handle, seed_light_pipeline->pipeline_layout,
+							   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+							   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+							   VK_SHADER_STAGE_MISS_BIT_KHR,
+							   0, sizeof(PushConstantRay), &pc_ray);
+			auto& regions = seed_light_pipeline->get_rt_regions();
+			vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3],
+							  num_bootstrap_samples, 1, 1);
+			std::array< VkBufferMemoryBarrier, 3> barriers = {
+				buffer_barrier(tmp_lum_buffer.handle,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+				buffer_barrier(tmp_seeds_buffer.handle,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+				buffer_barrier(connected_lights_buffer.handle,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+			};
+			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, (uint32_t)barriers.size(),
+								 barriers.data(), 0, 0);
+
+		}
+		// Trace from eye
+		{
+			vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+							  seed_eye_pipeline->handle);
+			vkCmdBindDescriptorSets(
+				cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, seed_eye_pipeline->pipeline_layout,
+				0, 1, &desc_set, 0, nullptr);
+			vkCmdPushConstants(cmd.handle, seed_eye_pipeline->pipeline_layout,
+							   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+							   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+							   VK_SHADER_STAGE_MISS_BIT_KHR,
+							   0, sizeof(PushConstantRay), &pc_ray);
+			auto& regions = seed_eye_pipeline->get_rt_regions();
+			vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3],
+							  num_bootstrap_samples, 1, 1);
+			auto barrier = buffer_barrier(bootstrap_buffer.handle,
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
+								 &barrier, 0, 0);
+		}
 	}
 	prefix_scan(0, num_bootstrap_samples, cmd);
+
 	// Calculate CDF
 	{
 		vkCmdBindDescriptorSets(
@@ -279,8 +343,8 @@ void PSSMLT::render() {
 
 #if 0
 	// Debugging code
-	cdf_buffer.copy(cdf_cpu, cmd.handle);
 	bootstrap_buffer.copy(bootstrap_cpu, cmd.handle);
+	cdf_buffer.copy(cdf_cpu, cmd.handle);
 	cmd.submit();
 	std::vector<BootstrapSample> samples;
 	samples.assign((BootstrapSample*)bootstrap_cpu.data,
@@ -307,11 +371,12 @@ void PSSMLT::render() {
 			assert(false);
 		}
 
-	}
+		}
 	sum = cdf1[num_bootstrap_samples - 1];
 	float sum2 = cdf2[num_bootstrap_samples - 1];
 	return;
 #endif
+
 	// Select seeds
 	{
 		vkCmdBindDescriptorSets(
@@ -332,29 +397,73 @@ void PSSMLT::render() {
 	}
 	// Fill in the samplers for mutations
 	{
-		vkCmdFillBuffer(cmd.handle, mlt_samplers_buffer.handle, 0, mlt_samplers_buffer.size, 0);
-		auto barrier = buffer_barrier(mlt_samplers_buffer.handle,
-									  VK_ACCESS_TRANSFER_WRITE_BIT,
-									  VK_ACCESS_SHADER_READ_BIT |
-									  VK_ACCESS_SHADER_WRITE_BIT);
-		vkCmdPipelineBarrier(
-			cmd.handle, VK_PIPELINE_STAGE_TRANSFER_BIT,
-			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-			VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier,
-			0, 0);
-		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-						  preprocess_pipeline->handle);
-		vkCmdBindDescriptorSets(
-			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, preprocess_pipeline->pipeline_layout,
-			0, 1, &desc_set, 0, nullptr);
-		vkCmdPushConstants(cmd.handle, preprocess_pipeline->pipeline_layout,
-						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-						   VK_SHADER_STAGE_MISS_BIT_KHR,
-						   0, sizeof(PushConstantRay), &pc_ray);
-		auto& preprocess_regions = preprocess_pipeline->get_rt_regions();
-		vkCmdTraceRaysKHR(cmd.handle, &preprocess_regions[0], &preprocess_regions[1],
-						  &preprocess_regions[2], &preprocess_regions[3], num_mlt_threads, 1, 1);
+		// Light
+		{
+			vkCmdFillBuffer(cmd.handle, mlt_samplers_buffer.handle, 0, mlt_samplers_buffer.size, 0);
+			auto barrier = buffer_barrier(mlt_samplers_buffer.handle,
+										  VK_ACCESS_TRANSFER_WRITE_BIT,
+										  VK_ACCESS_SHADER_READ_BIT |
+										  VK_ACCESS_SHADER_WRITE_BIT);
+			vkCmdPipelineBarrier(
+				cmd.handle, VK_PIPELINE_STAGE_TRANSFER_BIT,
+				VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier,
+				0, 0);
+			vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+							  preprocess_light_pipeline->handle);
+			vkCmdBindDescriptorSets(
+				cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, preprocess_light_pipeline->pipeline_layout,
+				0, 1, &desc_set, 0, nullptr);
+			vkCmdPushConstants(cmd.handle, preprocess_light_pipeline->pipeline_layout,
+							   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+							   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+							   VK_SHADER_STAGE_MISS_BIT_KHR,
+							   0, sizeof(PushConstantRay), &pc_ray);
+			auto& preprocess_regions = preprocess_light_pipeline->get_rt_regions();
+			vkCmdTraceRaysKHR(cmd.handle, &preprocess_regions[0], &preprocess_regions[1],
+							  &preprocess_regions[2], &preprocess_regions[3], num_mlt_threads, 1, 1);
+			std::array<VkBufferMemoryBarrier, 6> barriers = {
+				buffer_barrier(seeds_buffer.handle,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+				buffer_barrier(light_path_buffer.handle,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+				buffer_barrier(light_path_cnt_buffer.handle,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+				buffer_barrier(splat_buffer.handle,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+				buffer_barrier(mlt_samplers_buffer.handle,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+				buffer_barrier(connected_lights_buffer.handle,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+			};
+			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, (uint32_t)barriers.size(),
+								 barriers.data(), 0, 0);
+
+		}
+		// Eye
+		{
+			vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+							  preprocess_eye_pipeline->handle);
+			vkCmdBindDescriptorSets(
+				cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, preprocess_eye_pipeline->pipeline_layout,
+				0, 1, &desc_set, 0, nullptr);
+			vkCmdPushConstants(cmd.handle, preprocess_eye_pipeline->pipeline_layout,
+							   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+							   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+							   VK_SHADER_STAGE_MISS_BIT_KHR,
+							   0, sizeof(PushConstantRay), &pc_ray);
+			auto& preprocess_regions = preprocess_eye_pipeline->get_rt_regions();
+			vkCmdTraceRaysKHR(cmd.handle, &preprocess_regions[0], &preprocess_regions[1],
+							  &preprocess_regions[2], &preprocess_regions[3], num_mlt_threads, 1, 1);
+
+		}
 	}
 	cmd.submit();
 
@@ -363,40 +472,86 @@ void PSSMLT::render() {
 		auto mutate = [&](uint32_t i) {
 			pc_ray.random_num = rand() % UINT_MAX;
 			pc_ray.mutation_counter = i;
-			vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-							  mutate_pipeline->handle);
-			vkCmdBindDescriptorSets(
-				cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, mutate_pipeline->pipeline_layout,
-				0, 1, &desc_set, 0, nullptr);
-			vkCmdPushConstants(cmd.handle, mutate_pipeline->pipeline_layout,
-							   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-							   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-							   VK_SHADER_STAGE_MISS_BIT_KHR,
-							   0, sizeof(PushConstantRay), &pc_ray);
-			auto& regions = mutate_pipeline->get_rt_regions();
-			vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2],
-							  &regions[3], num_mlt_threads, 1, 1);
-			const std::array<VkBufferMemoryBarrier, 5> mutation_barriers = {
-				buffer_barrier(splat_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
-				buffer_barrier(past_splat_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
-				buffer_barrier(mlt_samplers_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
-				buffer_barrier(seeds_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
-				buffer_barrier(mlt_col_buffer.handle,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
-			};
-			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0,
-								 (uint32_t)mutation_barriers.size(),
-								 mutation_barriers.data(), 0, 0);
+			// Light
+			{
+				vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+								  mutate_light_pipeline->handle);
+				vkCmdBindDescriptorSets(
+					cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, mutate_light_pipeline->pipeline_layout,
+					0, 1, &desc_set, 0, nullptr);
+				vkCmdPushConstants(cmd.handle, mutate_light_pipeline->pipeline_layout,
+								   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+								   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+								   VK_SHADER_STAGE_MISS_BIT_KHR,
+								   0, sizeof(PushConstantRay), &pc_ray);
+				auto& regions = mutate_light_pipeline->get_rt_regions();
+				vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2],
+								  &regions[3], num_mlt_threads, 1, 1);
+				std::array<VkBufferMemoryBarrier, 6> mutation_barriers = {
+					buffer_barrier(splat_buffer.handle,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+					buffer_barrier(mlt_samplers_buffer.handle,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+					buffer_barrier(seeds_buffer.handle,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+					buffer_barrier(tmp_seeds_buffer.handle,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+					buffer_barrier(prob_carryover_buffer.handle,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+					buffer_barrier(connected_lights_buffer.handle,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+				};
+				vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+									 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0,
+									 (uint32_t)mutation_barriers.size(),
+									 mutation_barriers.data(), 0, 0);
+
+			}
+			
+			// Eye
+			{
+				vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+								  mutate_eye_pipeline->handle);
+				vkCmdBindDescriptorSets(
+					cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, mutate_eye_pipeline->pipeline_layout,
+					0, 1, &desc_set, 0, nullptr);
+				vkCmdPushConstants(cmd.handle, mutate_eye_pipeline->pipeline_layout,
+								   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+								   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+								   VK_SHADER_STAGE_MISS_BIT_KHR,
+								   0, sizeof(PushConstantRay), &pc_ray);
+				auto& regions = mutate_eye_pipeline->get_rt_regions();
+				vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2],
+								  &regions[3], num_mlt_threads, 1, 1);
+				std::array<VkBufferMemoryBarrier, 5> mutation_barriers = {
+					buffer_barrier(splat_buffer.handle,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+					buffer_barrier(past_splat_buffer.handle,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+					buffer_barrier(mlt_samplers_buffer.handle,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+					buffer_barrier(seeds_buffer.handle,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+					buffer_barrier(mlt_col_buffer.handle,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+				};
+				vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+									 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0,
+									 (uint32_t)mutation_barriers.size(),
+									 mutation_barriers.data(), 0, 0);
+
+			}
 		};
 		const uint32_t iter_cnt = 100;
 		const uint32_t freq = mutation_count / iter_cnt;
@@ -430,9 +585,9 @@ void PSSMLT::render() {
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 	}
 	cmd.submit();
-}
+	}
 
-bool PSSMLT::update() {
+bool SMLT::update() {
 	pc_ray.frame_num++;
 	glm::vec3 translation{};
 	float trans_speed = 0.01f;
@@ -492,7 +647,7 @@ bool PSSMLT::update() {
 	return result;
 }
 
-void PSSMLT::create_offscreen_resources() {
+void SMLT::create_offscreen_resources() {
 	// Create offscreen image for output
 	TextureSettings settings;
 	settings.usage_flags =
@@ -508,7 +663,7 @@ void PSSMLT::create_offscreen_resources() {
 	cmd.submit();
 }
 
-void PSSMLT::create_descriptors() {
+void SMLT::create_descriptors() {
 	constexpr int TLAS_BINDING = 0;
 	constexpr int IMAGE_BINDING = 1;
 	constexpr int INSTANCE_BINDING = 2;
@@ -629,7 +784,7 @@ void PSSMLT::create_descriptors() {
 };
 
 
-void PSSMLT::create_blas() {
+void SMLT::create_blas() {
 	std::vector<BlasInput> blas_inputs;
 	auto vertex_address =
 		get_device_address(scene->vkb.ctx.device, vertex_buffer.handle);
@@ -642,7 +797,7 @@ void PSSMLT::create_blas() {
 						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
-void PSSMLT::create_tlas() {
+void SMLT::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
 	float total_light_triangle_area = 0.0f;
 	int light_triangle_cnt = 0;
@@ -699,7 +854,7 @@ void PSSMLT::create_tlas() {
 						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
-void PSSMLT::create_rt_pipelines() {
+void SMLT::create_rt_pipelines() {
 	enum StageIndices {
 		Raygen = 0,
 		CMiss = 1,
@@ -710,9 +865,12 @@ void PSSMLT::create_rt_pipelines() {
 	};
 	RTPipelineSettings settings;
 
-	std::vector<Shader> shaders{ {"src/shaders/integrators/pssmlt/pssmlt_seed.rgen"},
-								{"src/shaders/integrators/pssmlt/pssmlt_preprocess.rgen"},
-								{"src/shaders/integrators/pssmlt/pssmlt_mutate.rgen"},
+	std::vector<Shader> shaders{ {"src/shaders/integrators/smlt/smlt_seed_light.rgen"},
+								{"src/shaders/integrators/smlt/smlt_seed_eye.rgen"},
+								{"src/shaders/integrators/smlt/smlt_preprocess_light.rgen"},
+								{"src/shaders/integrators/smlt/smlt_preprocess_eye.rgen"},
+								{"src/shaders/integrators/smlt/smlt_mutate_light.rgen"},
+								{"src/shaders/integrators/smlt/smlt_mutate_eye.rgen"},
 								{"src/shaders/integrators/ray.rmiss"},
 								{"src/shaders/integrators/ray_shadow.rmiss"},
 								{"src/shaders/integrators/ray.rchit"},
@@ -735,19 +893,19 @@ void PSSMLT::create_rt_pipelines() {
 	stage.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 	stages[Raygen] = stage;
 	// Miss
-	stage.module = shaders[3].create_vk_shader_module(scene->vkb.ctx.device);
+	stage.module = shaders[6].create_vk_shader_module(scene->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
 	stages[CMiss] = stage;
 
-	stage.module = shaders[4].create_vk_shader_module(scene->vkb.ctx.device);
+	stage.module = shaders[7].create_vk_shader_module(scene->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
 	stages[AMiss] = stage;
 	// Hit Group - Closest Hit
-	stage.module = shaders[5].create_vk_shader_module(scene->vkb.ctx.device);
+	stage.module = shaders[8].create_vk_shader_module(scene->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 	stages[ClosestHit] = stage;
 	// Hit Group - Any hit
-	stage.module = shaders[6].create_vk_shader_module(scene->vkb.ctx.device);
+	stage.module = shaders[9].create_vk_shader_module(scene->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
 	stages[AnyHit] = stage;
 
@@ -792,27 +950,46 @@ void PSSMLT::create_rt_pipelines() {
 									 0, sizeof(PushConstantRay) });
 	settings.desc_layouts = { desc_set_layout };
 	settings.stages = stages;
-	seed_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
-	preprocess_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
-	mutate_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
-	settings.shaders = { shaders[0], shaders[3], shaders[4], shaders[5], shaders[6] };
-	seed_pipeline->create_rt_pipeline(settings, { 1 });
+	seed_light_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
+	seed_eye_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
+	preprocess_light_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
+	preprocess_eye_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
+	mutate_light_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
+	mutate_eye_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
+	// TODO: Move shaders into sets during recompilation
+	settings.shaders = { shaders[0], shaders[6], shaders[7], shaders[8], shaders[9] };
+	seed_light_pipeline->create_rt_pipeline(settings, { 1 });
 	vkDestroyShaderModule(scene->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[1].create_vk_shader_module(scene->vkb.ctx.device);
+	settings.shaders[0] = shaders[1];
 	settings.stages = stages;
-	settings.shaders = { shaders[1], shaders[3], shaders[4], shaders[5], shaders[6] };
-	preprocess_pipeline->create_rt_pipeline(settings, { 0 });
+	seed_eye_pipeline->create_rt_pipeline(settings, { 1 });
 	vkDestroyShaderModule(scene->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[2].create_vk_shader_module(scene->vkb.ctx.device);
+	settings.shaders[0] = shaders[2];
 	settings.stages = stages;
-	settings.shaders = { shaders[2], shaders[3], shaders[4], shaders[5], shaders[6] };
-	mutate_pipeline->create_rt_pipeline(settings, { 0 });
+	preprocess_light_pipeline->create_rt_pipeline(settings, { 0 });
+	vkDestroyShaderModule(scene->vkb.ctx.device, stages[Raygen].module, nullptr);
+	stages[Raygen].module = shaders[3].create_vk_shader_module(scene->vkb.ctx.device);
+	settings.shaders[0] = shaders[3];
+	settings.stages = stages;
+	preprocess_eye_pipeline->create_rt_pipeline(settings, { 0 });
+	vkDestroyShaderModule(scene->vkb.ctx.device, stages[Raygen].module, nullptr);
+	stages[Raygen].module = shaders[4].create_vk_shader_module(scene->vkb.ctx.device);
+	settings.shaders[0] = shaders[4];
+	settings.stages = stages;
+	mutate_light_pipeline->create_rt_pipeline(settings, { 0 });
+	vkDestroyShaderModule(scene->vkb.ctx.device, stages[Raygen].module, nullptr);
+	stages[Raygen].module = shaders[5].create_vk_shader_module(scene->vkb.ctx.device);
+	settings.shaders[0] = shaders[5];
+	settings.stages = stages;
+	mutate_eye_pipeline->create_rt_pipeline(settings, { 0 });
 	for (auto& s : settings.stages) {
 		vkDestroyShaderModule(scene->vkb.ctx.device, s.module, nullptr);
 	}
 }
 
-void PSSMLT::create_compute_pipelines() {
+void SMLT::create_compute_pipelines() {
 	calc_cdf_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
 	select_seeds_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
 	composite_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
@@ -845,7 +1022,7 @@ void PSSMLT::create_compute_pipelines() {
 	uniform_add_pipeline->create_compute_pipeline(settings);
 }
 
-void PSSMLT::prefix_scan(int level, int num_elems, CommandBuffer& cmd) {
+void SMLT::prefix_scan(int level, int num_elems, CommandBuffer& cmd) {
 	const bool scan_sums = level > 0;
 	int num_wgs = std::max(1, (int)ceil(num_elems / (2 * 1024.0f)));
 	int num_grids = num_wgs - int((num_elems % 2048) != 0);
@@ -947,7 +1124,7 @@ void PSSMLT::prefix_scan(int level, int num_elems, CommandBuffer& cmd) {
 	}
 }
 
-void PSSMLT::destroy() {
+void SMLT::destroy() {
 	const auto device = scene->vkb.ctx.device;
 	Integrator::destroy();
 	std::vector<Buffer*> buffer_list = {
@@ -958,13 +1135,16 @@ void PSSMLT::destroy() {
 	  &mlt_samplers_buffer,
 	  &light_primary_samples_buffer,
 	  &cam_primary_samples_buffer,
-	  &connection_primary_samples_buffer,
 	  &mlt_col_buffer,
 	  &chain_stats_buffer,
 	  &splat_buffer,
 	  &past_splat_buffer,
 	  &light_path_buffer,
-	  &camera_path_buffer
+	  &connected_lights_buffer,
+	  &tmp_seeds_buffer,
+	  &tmp_lum_buffer,
+	  &prob_carryover_buffer,
+	  &light_path_cnt_buffer
 	};
 	for (auto b : buffer_list) {
 		b->destroy();
@@ -979,9 +1159,12 @@ void PSSMLT::destroy() {
 		cdf_cpu.destroy();
 	}
 	std::vector<Pipeline*> pipeline_list = {
-		seed_pipeline.get(),
-		preprocess_pipeline.get(),
-		mutate_pipeline.get(),
+		seed_light_pipeline.get(),
+		seed_eye_pipeline.get(),
+		preprocess_light_pipeline.get(),
+		preprocess_eye_pipeline.get(),
+		mutate_light_pipeline.get(),
+		mutate_eye_pipeline.get(),
 		calc_cdf_pipeline.get(),
 		select_seeds_pipeline.get(),
 		composite_pipeline.get(),
@@ -995,10 +1178,13 @@ void PSSMLT::destroy() {
 	vkDestroyDescriptorPool(device, desc_pool, nullptr);
 }
 
-void PSSMLT::reload() {
-	seed_pipeline->reload();
-	preprocess_pipeline->reload();
-	mutate_pipeline->reload();
+void SMLT::reload() {
+	seed_light_pipeline->reload();
+	seed_light_pipeline->reload();
+	preprocess_light_pipeline->reload();
+	preprocess_eye_pipeline->reload();
+	mutate_light_pipeline->reload();
+	mutate_eye_pipeline->reload();
 	calc_cdf_pipeline->reload();
 	select_seeds_pipeline->reload();
 	composite_pipeline->reload();

@@ -114,6 +114,7 @@
       <PrecompiledHeaderFile>LumenPCH.h</PrecompiledHeaderFile>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -154,6 +155,7 @@
       <PrecompiledHeaderFile>LumenPCH.h</PrecompiledHeaderFile>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -208,6 +210,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\RayTracer\Integrator.cpp" />
+    <ClCompile Include="src\RayTracer\SMLT.cpp" />
     <ClCompile Include="src\RayTracer\SPPM.cpp" />
     <ClCompile Include="src\RayTracer\VCM.cpp" />
     <ClCompile Include="src\Framework\LumenInstance.cpp" />
@@ -246,6 +249,7 @@
     <ClInclude Include="src\Framework\SBTWrapper.h" />
     <ClInclude Include="src\Framework\GltfScene.hpp" />
     <ClInclude Include="src\RayTracer\Integrator.h" />
+    <ClInclude Include="src\RayTracer\SMLT.h" />
     <ClInclude Include="src\RayTracer\SPPM.h" />
     <ClInclude Include="src\RayTracer\VCM.h" />
     <ClInclude Include="src\Framework\LumenInstance.h" />
