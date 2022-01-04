@@ -5,15 +5,15 @@ void Integrator::init() {
 	VkPhysicalDeviceProperties2 prop2{
 	VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
 	prop2.pNext = &rt_props;
-	vkGetPhysicalDeviceProperties2(scene->vkb.ctx.physical_device, &prop2);
+	vkGetPhysicalDeviceProperties2(instance->vkb.ctx.physical_device, &prop2);
 	constexpr int VERTEX_BINDING_ID = 0;
 	camera = std::unique_ptr<PerspectiveCamera>(new PerspectiveCamera(
-		45.0f, 0.01f, 1000.0f, (float)scene->width / scene->height,
+		45.0f, 0.01f, 1000.0f, (float)instance->width / instance->height,
 		glm::vec3(0.7, 0.5, 15.5)));
 	Camera* cam_ptr = camera.get();
-	LumenInstance* scene = this->scene;
-	Window* window = scene->window;
-	scene->window->add_mouse_click_callback(
+	LumenInstance* instance = this->instance;
+	Window* window = instance->window;
+	instance->window->add_mouse_click_callback(
 		[cam_ptr, this, window](MouseAction button, KeyAction action) {
 		if (updated && window->is_mouse_up(MouseAction::LEFT)) {
 			updated = true;
@@ -22,7 +22,7 @@ void Integrator::init() {
 			updated = true;
 		}
 	});
-	scene->window->add_mouse_move_callback(
+	instance->window->add_mouse_move_callback(
 		[window, cam_ptr, this](double delta_x, double delta_y) {
 		if (window->is_mouse_held(MouseAction::LEFT)) {
 			cam_ptr->rotate(0.05f * (float)delta_y, -0.05f * (float)delta_x,
@@ -31,7 +31,7 @@ void Integrator::init() {
 			updated = true;
 		}
 	});
-	lumen_scene.load_scene("scenes/", "cornell_box.json");
+	lumen_scene.load_scene("scenes/", config.filename);
 	auto vertex_buf_size = lumen_scene.positions.size() * sizeof(glm::vec3);
 	auto idx_buf_size = lumen_scene.indices.size() * sizeof(uint32_t);
 	std::vector<Material> materials;
@@ -55,7 +55,7 @@ void Integrator::init() {
 		idx++;
 	}
 	scene_ubo_buffer.create(
-		&scene->vkb.ctx,
+		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
 		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -63,14 +63,14 @@ void Integrator::init() {
 	update_uniform_buffers();
 
 	vertex_buffer.create(
-		&scene->vkb.ctx,
+		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		vertex_buf_size, lumen_scene.positions.data(), true);
 	index_buffer.create(
-		&scene->vkb.ctx,
+		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
@@ -78,27 +78,27 @@ void Integrator::init() {
 		idx_buf_size, lumen_scene.indices.data(), true);
 
 	normal_buffer.create(
-		&scene->vkb.ctx,
+		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		lumen_scene.normals.size() * sizeof(lumen_scene.normals[0]),
 		lumen_scene.normals.data(), true);
 	uv_buffer.create(
-		&scene->vkb.ctx,
+		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		lumen_scene.texcoords0.size() * sizeof(glm::vec2),
 		lumen_scene.texcoords0.data(), true);
 	materials_buffer.create(
-		&scene->vkb.ctx,
+		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		materials.size() * sizeof(Material), materials.data(), true);
 	prim_lookup_buffer.create(
-		&scene->vkb.ctx,
+		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
@@ -110,15 +110,15 @@ void Integrator::init() {
 	sampler_ci.magFilter = VK_FILTER_LINEAR;
 	sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	sampler_ci.maxLod = FLT_MAX;
-	vk::check(vkCreateSampler(scene->vkb.ctx.device, &sampler_ci, nullptr,
+	vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr,
 			  &texture_sampler),
 			  "Could not create image sampler");
 
-	auto add_default_texture = [this, scene]() {
+	auto add_default_texture = [this, instance]() {
 		std::array<uint8_t, 4> nil = { 0, 0, 0, 0 };
 		textures.resize(1);
 		auto ci = make_img2d_ci(VkExtent2D{ 1, 1 });
-		textures[0].load_from_data(&scene->vkb.ctx, nil.data(), 4, ci,
+		textures[0].load_from_data(&instance->vkb.ctx, nil.data(), 4, ci,
 								   texture_sampler);
 	};
 
@@ -156,5 +156,5 @@ void Integrator::destroy() {
 	for (auto& tex : textures) {
 		tex.destroy();
 	}
-	vkDestroySampler(scene->vkb.ctx.device, texture_sampler, nullptr);
+	vkDestroySampler(instance->vkb.ctx.device, texture_sampler, nullptr);
 }

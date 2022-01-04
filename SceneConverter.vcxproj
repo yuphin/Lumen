@@ -141,7 +141,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="SceneConverter\main.cpp" />
+    <ClCompile Include="src\SceneConverter\main.cpp" />
     <ClCompile Include="src\Framework\GltfScene.cpp" />
   </ItemGroup>
   <ItemGroup>

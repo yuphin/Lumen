@@ -12,7 +12,7 @@ void Path::init() {
 	desc.uv_addr = uv_buffer.get_device_address();
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
-	scene_desc_buffer.create(&scene->vkb.ctx,
+	scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 							 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -25,15 +25,15 @@ void Path::init() {
 	create_rt_pipelines();
 	pc_ray.total_light_area = 0;
 	pc_ray.frame_num = 0;
-	pc_ray.size_x = scene->width;
-	pc_ray.size_y = scene->height;
+	pc_ray.size_x = instance->width;
+	pc_ray.size_y = instance->height;
 }
 
 void Path::render() {
-	CommandBuffer cmd(&scene->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = { 0.25f, 0.25f, 0.25f, 1.0f };
 	VkClearValue clear_depth = { 1.0f, 0 };
-	VkViewport viewport = vk::viewport((float)scene->width, (float)scene->height, 0.0f, 1.0f);
+	VkViewport viewport = vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
 	VkClearValue clear_values[] = { clear_color, clear_depth };
 	pc_ray.light_pos = scene_ubo.light_pos;
 	pc_ray.light_type = 0;
@@ -54,7 +54,7 @@ void Path::render() {
 					   VK_SHADER_STAGE_MISS_BIT_KHR,
 					   0, sizeof(PushConstantRay), &pc_ray);
 	auto& regions = rt_pipeline->get_rt_regions();
-	vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3], scene->width, scene->height, 1);
+	vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3], instance->width, instance->height, 1);
 	cmd.submit();
 }
 
@@ -63,7 +63,7 @@ bool Path::update() {
 	glm::vec3 translation{};
 	float trans_speed = 0.01f;
 	glm::vec3 front;
-	if (scene->window->is_key_held(KeyInput::KEY_LEFT_SHIFT)) {
+	if (instance->window->is_key_held(KeyInput::KEY_LEFT_SHIFT)) {
 		trans_speed *= 4;
 	}
 
@@ -73,27 +73,27 @@ bool Path::update() {
 	front.z = cos(glm::radians(camera->rotation.x)) *
 		cos(glm::radians(camera->rotation.y));
 	front = glm::normalize(-front);
-	if (scene->window->is_key_held(KeyInput::KEY_W)) {
+	if (instance->window->is_key_held(KeyInput::KEY_W)) {
 		camera->position += front * trans_speed;
 		updated = true;
 	}
-	if (scene->window->is_key_held(KeyInput::KEY_A)) {
+	if (instance->window->is_key_held(KeyInput::KEY_A)) {
 		camera->position -=
 			glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) *
 			trans_speed;
 		updated = true;
 	}
-	if (scene->window->is_key_held(KeyInput::KEY_S)) {
+	if (instance->window->is_key_held(KeyInput::KEY_S)) {
 		camera->position -= front * trans_speed;
 		updated = true;
 	}
-	if (scene->window->is_key_held(KeyInput::KEY_D)) {
+	if (instance->window->is_key_held(KeyInput::KEY_D)) {
 		camera->position +=
 			glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) *
 			trans_speed;
 		updated = true;
 	}
-	if (scene->window->is_key_held(KeyInput::SPACE)) {
+	if (instance->window->is_key_held(KeyInput::SPACE)) {
 		// Right
 		auto right =
 			glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
@@ -101,7 +101,7 @@ bool Path::update() {
 		camera->position += up * trans_speed;
 		updated = true;
 	}
-	if (scene->window->is_key_held(KeyInput::KEY_LEFT_CONTROL)) {
+	if (instance->window->is_key_held(KeyInput::KEY_LEFT_CONTROL)) {
 		auto right =
 			glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
 		auto up = glm::cross(right, front);
@@ -124,11 +124,11 @@ void Path::create_offscreen_resources() {
 	settings.usage_flags =
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
 		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-	settings.base_extent = { (uint32_t)scene->width, (uint32_t)scene->height, 1 };
+	settings.base_extent = { (uint32_t)instance->width, (uint32_t)instance->height, 1 };
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	output_tex.create_empty_texture(&scene->vkb.ctx, settings,
+	output_tex.create_empty_texture(&instance->vkb.ctx, settings,
 									VK_IMAGE_LAYOUT_GENERAL);
-	CommandBuffer cmd(&scene->vkb.ctx, true);
+	CommandBuffer cmd(&instance->vkb.ctx, true);
 	transition_image_layout(cmd.handle, output_tex.img,
 							VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 	cmd.submit();
@@ -154,9 +154,9 @@ void Path::create_descriptors() {
 		vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1) };
 	auto descriptor_pool_ci =
 		vk::descriptor_pool_CI(pool_sizes.size(), pool_sizes.data(),
-							   scene->vkb.ctx.swapchain_images.size());
+							   instance->vkb.ctx.swapchain_images.size());
 
-	vk::check(vkCreateDescriptorPool(scene->vkb.ctx.device, &descriptor_pool_ci,
+	vk::check(vkCreateDescriptorPool(instance->vkb.ctx.device, &descriptor_pool_ci,
 			  nullptr, &desc_pool),
 			  "Failed to create descriptor pool");
 
@@ -203,7 +203,7 @@ void Path::create_descriptors() {
 	};
 	auto set_layout_ci = vk::descriptor_set_layout_CI(
 		set_layout_bindings.data(), set_layout_bindings.size());
-	vk::check(vkCreateDescriptorSetLayout(scene->vkb.ctx.device, &set_layout_ci,
+	vk::check(vkCreateDescriptorSetLayout(instance->vkb.ctx.device, &set_layout_ci,
 			  nullptr, &desc_set_layout),
 			  "Failed to create escriptor set layout");
 	VkDescriptorSetAllocateInfo set_allocate_info{
@@ -211,10 +211,10 @@ void Path::create_descriptors() {
 	set_allocate_info.descriptorPool = desc_pool;
 	set_allocate_info.descriptorSetCount = 1;
 	set_allocate_info.pSetLayouts = &desc_set_layout;
-	vkAllocateDescriptorSets(scene->vkb.ctx.device, &set_allocate_info, &desc_set);
+	vkAllocateDescriptorSets(instance->vkb.ctx.device, &set_allocate_info, &desc_set);
 
 	// Update descriptors
-	VkAccelerationStructureKHR tlas = scene->vkb.tlas.accel;
+	VkAccelerationStructureKHR tlas = instance->vkb.tlas.accel;
 	VkWriteDescriptorSetAccelerationStructureKHR desc_as_info{
 		VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR };
 	desc_as_info.accelerationStructureCount = 1;
@@ -250,7 +250,7 @@ void Path::create_descriptors() {
 			&mesh_lights_buffer.descriptor));
 	}
 	vkUpdateDescriptorSets(
-		scene->vkb.ctx.device, static_cast<uint32_t>(writes.size()),
+		instance->vkb.ctx.device, static_cast<uint32_t>(writes.size()),
 		writes.data(), 0, nullptr);
 };
 
@@ -258,13 +258,13 @@ void Path::create_descriptors() {
 void Path::create_blas() {
 	std::vector<BlasInput> blas_inputs;
 	auto vertex_address =
-		get_device_address(scene->vkb.ctx.device, vertex_buffer.handle);
-	auto idx_address = get_device_address(scene->vkb.ctx.device, index_buffer.handle);
+		get_device_address(instance->vkb.ctx.device, vertex_buffer.handle);
+	auto idx_address = get_device_address(instance->vkb.ctx.device, index_buffer.handle);
 	for (auto& prim_mesh : lumen_scene.prim_meshes) {
 		BlasInput geo = to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({ geo });
 	}
-	scene->vkb.build_blas(blas_inputs,
+	instance->vkb.build_blas(blas_inputs,
 						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
@@ -279,7 +279,7 @@ void Path::create_tlas() {
 		ray_inst.transform = to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
 		ray_inst.accelerationStructureReference =
-			scene->vkb.get_blas_device_address(pm.prim_idx);
+			instance->vkb.get_blas_device_address(pm.prim_idx);
 		ray_inst.flags =
 			VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		ray_inst.mask = 0xFF;
@@ -312,7 +312,7 @@ void Path::create_tlas() {
 
 	if (lights.size()) {
 		mesh_lights_buffer.create(
-			&scene->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+			&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 			lights.size() * sizeof(MeshLight), lights.data(), true);
 	}
@@ -321,7 +321,7 @@ void Path::create_tlas() {
 	if (light_triangle_cnt > 0) {
 		pc_ray.light_triangle_count = light_triangle_cnt;
 	}
-	scene->vkb.build_tlas(tlas,
+	instance->vkb.build_tlas(tlas,
 						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
@@ -344,7 +344,7 @@ void Path::create_rt_pipelines() {
 	for (auto& shader : settings.shaders) {
 		shader.compile();
 	}
-	settings.ctx = &scene->vkb.ctx;
+	settings.ctx = &instance->vkb.ctx;
 	settings.rt_props = rt_props;
 	// All stages
 
@@ -355,23 +355,23 @@ void Path::create_rt_pipelines() {
 		VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
 	stage.pName = "main";
 	// Raygen
-	stage.module = settings.shaders[Raygen].create_vk_shader_module(scene->vkb.ctx.device);
+	stage.module = settings.shaders[Raygen].create_vk_shader_module(instance->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 	stages[Raygen] = stage;
 	// Miss
-	stage.module = settings.shaders[CMiss].create_vk_shader_module(scene->vkb.ctx.device);
+	stage.module = settings.shaders[CMiss].create_vk_shader_module(instance->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
 	stages[CMiss] = stage;
 
-	stage.module = settings.shaders[AMiss].create_vk_shader_module(scene->vkb.ctx.device);
+	stage.module = settings.shaders[AMiss].create_vk_shader_module(instance->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
 	stages[AMiss] = stage;
 	// Hit Group - Closest Hit
-	stage.module = settings.shaders[ClosestHit].create_vk_shader_module(scene->vkb.ctx.device);
+	stage.module = settings.shaders[ClosestHit].create_vk_shader_module(instance->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 	stages[ClosestHit] = stage;
 	// Hit Group - Any hit
-	stage.module = settings.shaders[AnyHit].create_vk_shader_module(scene->vkb.ctx.device);
+	stage.module = settings.shaders[AnyHit].create_vk_shader_module(instance->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
 	stages[AnyHit] = stage;
 
@@ -416,15 +416,15 @@ void Path::create_rt_pipelines() {
 									 0, sizeof(PushConstantRay) });
 	settings.desc_layouts = { desc_set_layout };
 	settings.stages = stages;
-	rt_pipeline = std::make_unique<Pipeline>(scene->vkb.ctx.device);
+	rt_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	rt_pipeline->create_rt_pipeline(settings);
 	for (auto& s : settings.stages) {
-		vkDestroyShaderModule(scene->vkb.ctx.device, s.module, nullptr);
+		vkDestroyShaderModule(instance->vkb.ctx.device, s.module, nullptr);
 	}
 }
 
 void Path::destroy() {
-	const auto device = scene->vkb.ctx.device;
+	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
 	rt_pipeline->cleanup();
 	vkDestroyDescriptorSetLayout(device, desc_set_layout, nullptr);

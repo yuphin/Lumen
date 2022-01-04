@@ -2,7 +2,8 @@
 #include "Integrator.h"
 class BDPT : public Integrator {
 public:
-	BDPT(LumenInstance* scene) : Integrator(scene) {}
+	BDPT(LumenInstance* scene, const SceneConfig& config) : 
+		Integrator(scene, config) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;

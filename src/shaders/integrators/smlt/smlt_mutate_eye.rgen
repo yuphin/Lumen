@@ -61,6 +61,7 @@ void main() {
         }
         mlt_accept(large_step);
     } else {
+        //debugPrintfEXT("%f\n", accept);
         mlt_reject();
     }
     seeds_data.d[pixel_idx].chain_seed = chain_seed;

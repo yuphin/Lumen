@@ -379,7 +379,7 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
     }
     float mis_weight = 1.0;
     if (luminance(L) != 0.) {
-        mis_weight = calc_mis_weight(s, 1, sampled);
+        //mis_weight = calc_mis_weight(s, 1, sampled);
     }
     return mis_weight * L;
 #undef cam_vtx
@@ -643,7 +643,7 @@ float mlt_connect(int s, int t, bool large_step, inout uvec4 seed,
     lum = luminance(L);
     if (lum != 0.) {
         mis_weight = calc_mis_weight(s, t, s_fwd_pdf);
-        L *= mis_weight;
+        //L *= mis_weight;
         if (save_radiance) {
             const uint idx = cam_vtx(t - 1).coords;
             const uint splat_cnt = mlt_sampler.splat_cnt;

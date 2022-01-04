@@ -160,7 +160,7 @@ int bdpt_generate_camera_subpath(const vec2 d, const vec3 origin, int max_depth,
     float cos_theta = dot(camera_verts.d[bdpt_path_idx].dir,
                           camera_verts.d[bdpt_path_idx].shading_nrm);
     float pdf =
-        1 / (cam_area * screen_size * cos_theta * cos_theta * cos_theta);
+        1 / (cam_area * cos_theta * cos_theta * cos_theta);
     return bdpt_random_walk(max_depth - 1, vec3(1), pdf, 1) + 1;
 }
 
@@ -521,14 +521,14 @@ void main() {
     int num_light_paths = bdpt_generate_light_subpath(pc_ray.max_depth + 1);
     int num_cam_paths = bdpt_generate_camera_subpath(
         d, origin.xyz, pc_ray.max_depth + 1, cam_area);
-    for (int s = 2; s < num_light_paths; s++) {
-        ivec2 coords;
-        vec3 splat_col = bdpt_connect_cam(s, coords);
-        if (luminance(splat_col) > 0) {
-            uint idx = coords.x * gl_LaunchSizeEXT.y + coords.y;
-            tmp_col.d[idx] += splat_col;
-        }
-    }
+    // for (int s = 2; s < num_light_paths; s++) {
+    //     ivec2 coords;
+    //     vec3 splat_col = bdpt_connect_cam(s, coords);
+    //     if (luminance(splat_col) > 0) {
+    //         uint idx = coords.x * gl_LaunchSizeEXT.y + coords.y;
+    //         tmp_col.d[idx] += splat_col;
+    //     }
+    // }
     for (int t = 1; t < num_cam_paths; t++) {
         col += bdpt_connect(0, t);
     }
@@ -538,11 +538,13 @@ void main() {
             if (depth > pc_ray.max_depth) {
                 break;
             }
-            col += bdpt_connect(s, t);
+            if(s == 1){
+                col += bdpt_connect(s, t);
+            }
         }
     }
     vec3 splat_img = tmp_col.d[pixel_idx];
-    col += splat_img;
+    //col += splat_img;
     tmp_col.d[pixel_idx] = vec3(0);
 
     if (pc_ray.frame_num > 0) {

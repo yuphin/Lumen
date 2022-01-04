@@ -2,7 +2,8 @@
 #include "Integrator.h"
 class SMLT : public Integrator {
 public:
-	SMLT(LumenInstance* scene) : Integrator(scene) {}
+	SMLT(LumenInstance* scene, const SceneConfig& config) :
+		Integrator(scene, config) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -57,15 +58,13 @@ private:
 	Buffer prob_carryover_buffer;
 	Buffer light_path_cnt_buffer;
 
-
-	int max_depth = 6;
-	float mutations_per_pixel = 100.;
-	vec3 sky_col = vec3(0, 0, 0);
-	int num_mlt_threads = 200000;
-	int num_bootstrap_samples = 100000;
+	int max_depth;
+	float mutations_per_pixel;
+	vec3 sky_col;
+	int num_mlt_threads;
+	int num_bootstrap_samples;
 	int mutation_count;
-	int light_path_rand_count = 6 + 2 * max_depth;
-	int cam_path_rand_count = 3 + 6 * max_depth;
-
+	int light_path_rand_count;
+	int cam_path_rand_count;
 };
 

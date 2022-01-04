@@ -284,9 +284,12 @@ float mlt_fill_light_path(const vec4 origin, const float cam_area,
         light_state.d_vcm *= dist_sqr;
         light_state.d_vcm /= cos_theta_wo;
         light_state.d_vc /= cos_theta_wo;
-        if (!mat_specular && (pc_ray.use_vc == 1 || pc_ray.use_vm == 1)) {
+        if (!mat_specular) {
 
             // Copy to light vertex buffer
+            // if(vcm_light_path_idx + path_idx > 400000) {
+            //     debugPrintfEXT("%d - %d\n", vcm_light_path_idx + path_idx, screen_size);
+            // }
             light_vtx(path_idx).wi = light_state.wi;
             light_vtx(path_idx).shading_nrm = light_state.shading_nrm;
             light_vtx(path_idx).pos = light_state.pos;
@@ -303,7 +306,7 @@ float mlt_fill_light_path(const vec4 origin, const float cam_area,
         if (depth >= pc_ray.max_depth + 1) {
             break;
         }
-        if (!mat_specular && (pc_ray.use_vc == 1 && depth < pc_ray.max_depth)) {
+        if (!mat_specular) {
             // Connect to camera
             ivec2 coords;
             vec3 splat_col =
@@ -378,11 +381,8 @@ vec3 vcm_get_light_radiance(in const MaterialProps mat,
         1.0 / (payload.area * pc_ray.light_triangle_count);
     const float pdf_light_dir =
         abs(dot(payload.shading_nrm, -camera_state.wi)) / PI;
-    const float w_camera =
-        pdf_light_pos * camera_state.d_vcm +
-        (pc_ray.use_vc == 1 || pc_ray.use_vm == 1
-             ? (pdf_light_pos * pdf_light_dir) * camera_state.d_vc
-             : 0);
+    const float w_camera = pdf_light_pos * camera_state.d_vcm +
+                           (pdf_light_pos * pdf_light_dir) * camera_state.d_vc;
 
     const float mis_weight = 1. / (1. + w_camera);
     return mis_weight * mat.emissive_factor;
@@ -400,16 +400,15 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
     if (save_radiance && connected_lights.d[light_path_idx] == 1) {
         for (int i = 0; i < mlt_samplers.d[light_path_idx].splat_cnt; i++) {
             lum += luminance(splat_data.d[light_splat_idx + i].L);
-            if (save_radiance) {
-                const uint splat_cnt = mlt_sampler.splat_cnt;
-                mlt_sampler.splat_cnt++;
-                splat(splat_cnt).idx = splat_data.d[light_splat_idx + i].idx;
-                splat(splat_cnt).L = splat_data.d[light_splat_idx + i].L;
-            }
+            const uint splat_cnt = mlt_sampler.splat_cnt;
+            mlt_sampler.splat_cnt++;
+            splat(splat_cnt).idx = splat_data.d[light_splat_idx + i].idx;
+            splat(splat_cnt).L = splat_data.d[light_splat_idx + i].L;
         }
     } else if (connected_lights.d[light_path_idx] == 1) {
         lum += tmp_lum_data.d[light_path_idx];
     }
+    light_path_idx *= pc_ray.max_depth;
     VCMState camera_state;
     // Generate camera sample
     const vec2 dir_rnd =
@@ -422,8 +421,10 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
     camera_state.shading_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
     float cos_theta = abs(dot(camera_state.shading_nrm, direction));
     // Defer r^2 / cos term
+    // Temporary hack?
+    // TODO: Investigate
     camera_state.d_vcm =
-        cam_area * screen_size * cos_theta * cos_theta * cos_theta;
+        cam_area * (screen_size * 0.3) * cos_theta * cos_theta * cos_theta;
     camera_state.d_vc = 0;
     camera_state.d_vm = 0;
     vec3 col = vec3(0);
@@ -468,9 +469,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
         if (luminance(mat.emissive_factor) > 0) {
             col += camera_state.throughput *
                    vcm_get_light_radiance(mat, camera_state, d);
-            if (pc_ray.use_vc == 1 || pc_ray.use_vm == 1) {
-                // break;
-            }
+            // break;
         }
 
         // Connect to light
@@ -518,7 +517,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
                         pdf_pos_dir * abs(cos_x) / (pdf_light_w * cos_y) *
                         (camera_state.d_vcm + camera_state.d_vc * pdf_rev);
                     const float mis_weight =
-                        1. / (1. + w_light + (pc_ray.use_vc == 1 ? w_cam : 0));
+                        1. / (1. + w_light + w_cam);
                     if (mis_weight > 0) {
                         col += mis_weight * abs(cos_x) * f *
                                camera_state.throughput *
@@ -529,7 +528,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
             }
         }
 
-        if (!mat_specular && pc_ray.use_vc == 1) {
+        if (!mat_specular) {
             // Connect to light vertices
 #define light_vtx(i) light_verts.d[i]
             for (int i = 0; i < light_path_len; i++) {
@@ -643,6 +642,10 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
         splat(splat_cnt).L = col;
     }
 #undef splat
+    // if(lum == 0) {
+    //     debugPrintfEXT("%d\n", d);
+    // }
+
     return lum;
 }
 

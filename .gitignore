@@ -1,5 +1,10 @@
 .vs/
 bin/
+x64/
 cpp.hint
 .vscode/
+scenes/Sponza
 *.spv
+*.vcxproj.user
+*.vcxproj.filters
+imgui.ini

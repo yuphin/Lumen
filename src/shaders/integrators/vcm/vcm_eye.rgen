@@ -91,7 +91,7 @@ void main() {
     float cos_theta = abs(dot(camera_state.shading_nrm, direction));
     // Defer r^2 / cos term
     camera_state.d_vcm =
-        cam_area * screen_size * cos_theta * cos_theta * cos_theta;
+        cam_area * cos_theta * cos_theta * cos_theta;
     camera_state.d_vc = 0;
     camera_state.d_vm = 0;
     int depth;
@@ -252,9 +252,9 @@ void main() {
                                     len - EPS, 1);
                         const bool visible = any_hit_payload.hit == 0;
                         if (visible) {
-                            col += mis_weight * G * camera_state.throughput *
-                                   light_vtx(light_path_idx + i).throughput *
-                                   f_cam * f_light;
+                            // col += mis_weight * G * camera_state.throughput *
+                            //        light_vtx(light_path_idx + i).throughput *
+                            //        f_cam * f_light;
                         }
                     }
                 }
@@ -311,12 +311,12 @@ void main() {
                                     const float w_normalization =
                                         3.; // 1. / (1 - 2/(3*k)) where k =
                                             // 1
-                                    col += w * mis_weight *
-                                           photons.d[h].photon_count *
-                                           photons.d[h].throughput * f *
-                                           camera_state.throughput *
-                                           normalization_factor *
-                                           w_normalization;
+                                    // col += w * mis_weight *
+                                    //        photons.d[h].photon_count *
+                                    //        photons.d[h].throughput * f *
+                                    //        camera_state.throughput *
+                                    //        normalization_factor *
+                                    //        w_normalization;
                                 }
                             }
                         }
@@ -367,7 +367,7 @@ void main() {
         camera_state.area = payload.area;
     }
     vec3 splat_img = tmp_col.d[pixel_idx];
-    col += splat_img;
+    //col += splat_img;
     tmp_col.d[pixel_idx] = vec3(0);
 #undef light_vtx
     if (pc_ray.frame_num > 0) {

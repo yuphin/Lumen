@@ -2,7 +2,8 @@
 #include "Integrator.h"
 class PSSMLT : public Integrator {
 public:
-	PSSMLT(LumenInstance* scene) : Integrator(scene) {}
+	PSSMLT(LumenInstance* scene, const SceneConfig& config) :
+		Integrator(scene, config) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -53,7 +54,7 @@ private:
 	std::vector<Buffer> block_sums;
 
 	int max_depth = 6;
-	float mutations_per_pixel = 1;
+	float mutations_per_pixel = 100.0f;
 	vec3 sky_col = vec3(0, 0, 0);
 	int num_mlt_threads = 200000;
 	int num_bootstrap_samples = 100000;

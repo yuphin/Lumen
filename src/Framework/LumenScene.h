@@ -7,6 +7,10 @@ struct CameraConfiguration {
 	glm::vec3 pos;
 };
 
+struct SceneConfig {
+	std::string filename;
+};
+
 struct LumenPrimMesh {
 	std::string name;
 	uint32_t material_idx;
