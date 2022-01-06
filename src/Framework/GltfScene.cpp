@@ -699,11 +699,11 @@ glm::mat4 get_local_matrix(const tinygltf::Node& tnode) {
 	glm::quat mrotation;
 
 	if (!tnode.translation.empty())
-		glm::translate(mtranslation,
+		mtranslation = glm::translate(mtranslation,
 					   glm::vec3(tnode.translation[0], tnode.translation[1],
 					   tnode.translation[2]));
 	if (!tnode.scale.empty())
-		glm::scale(mscale,
+		mscale = glm::scale(mscale,
 				   glm::vec3(tnode.scale[0], tnode.scale[1], tnode.scale[2]));
 	if (!tnode.rotation.empty()) {
 		mrotation[0] = static_cast<float>(tnode.rotation[0]);
