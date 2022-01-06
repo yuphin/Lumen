@@ -34,14 +34,6 @@ void main() {
     if (accept > 0) {
         const float inv_proposed_luminance = 1. / proposed_luminance;
         for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
-            // if (proposed_luminance > 0) {
-            //     ivec2 coords = ivec2(splat(i).idx / pc_ray.size_y,
-            //                          splat(i).idx % pc_ray.size_y);
-            //     debugPrintfEXT("%v2i - %d\n", coords,
-            //     pc_ray.mutation_counter);
-            //     //debugPrintfEXT("%d - %v3f\n", splat(i).idx,
-            //     splat(i).L);
-            // }
             mlt_col.d[splat(i).idx] +=
                 splat(i).L * accept * inv_proposed_luminance;
         }
@@ -61,7 +53,6 @@ void main() {
         }
         mlt_accept(large_step);
     } else {
-        //debugPrintfEXT("%f\n", accept);
         mlt_reject();
     }
     seeds_data.d[pixel_idx].chain_seed = chain_seed;

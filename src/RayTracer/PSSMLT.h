@@ -54,10 +54,10 @@ private:
 	std::vector<Buffer> block_sums;
 
 	int max_depth = 6;
-	float mutations_per_pixel = 100.0f;
+	float mutations_per_pixel = 500.0f;
 	vec3 sky_col = vec3(0, 0, 0);
-	int num_mlt_threads = 200000;
-	int num_bootstrap_samples = 100000;
+	int num_mlt_threads = 1600 * 900 / 2;
+	int num_bootstrap_samples = 1600 * 900 /2;
 	int mutation_count;
 	int light_path_rand_count = 7 + 2 * max_depth;
 	int cam_path_rand_count = 2 + 2 * max_depth;

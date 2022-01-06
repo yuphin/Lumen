@@ -57,6 +57,8 @@ private:
 	Buffer tmp_lum_buffer;
 	Buffer prob_carryover_buffer;
 	Buffer light_path_cnt_buffer;
+	Buffer light_splats_buffer;
+	Buffer light_splat_cnts_buffer;
 
 	int max_depth;
 	float mutations_per_pixel;

@@ -222,6 +222,7 @@ struct MLTSampler {
 
 struct SeedData {
 	uvec4 chain_seed;
+	int depth;
 };
 
 struct ChainData {
@@ -287,6 +288,10 @@ struct SceneDesc {
 	uint64_t tmp_seeds_addr;
 	uint64_t tmp_lum_addr;
 	uint64_t prob_carryover_addr;
+	uint64_t light_splats_addr;
+	uint64_t light_splat_cnts_addr;
+
+
 };
 
 // Structure used for retrieving the primitive information in the closest hit

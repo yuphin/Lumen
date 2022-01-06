@@ -230,6 +230,23 @@ void PSSMLT::render() {
 	pc_ray.connection_rand_count = connect_path_rand_count;
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.num_bootstrap_samples = num_bootstrap_samples;
+	auto zero_buffers = [&]() {
+		vkCmdFillBuffer(cmd.handle, light_path_buffer.handle, 0, light_path_buffer.size, 0);
+		vkCmdFillBuffer(cmd.handle, camera_path_buffer.handle, 0, camera_path_buffer.size, 0);
+		std::array<VkBufferMemoryBarrier, 2> barriers = {
+				buffer_barrier(light_path_buffer.handle,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+				buffer_barrier(camera_path_buffer.handle,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+		};
+		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0,
+							 (uint32_t)barriers.size(),
+							 barriers.data(), 0, 0);
+	};
+	zero_buffers();
 	// Start bootstrap sampling
 	{
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
@@ -330,6 +347,7 @@ void PSSMLT::render() {
 							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
 							 &barrier, 0, 0);
 	}
+	zero_buffers();
 	// Fill in the samplers for mutations
 	{
 		vkCmdFillBuffer(cmd.handle, mlt_samplers_buffer.handle, 0, mlt_samplers_buffer.size, 0);
@@ -361,6 +379,7 @@ void PSSMLT::render() {
 	// Start mutations
 	{
 		auto mutate = [&](uint32_t i) {
+			zero_buffers();
 			pc_ray.random_num = rand() % UINT_MAX;
 			pc_ray.mutation_counter = i;
 			vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,

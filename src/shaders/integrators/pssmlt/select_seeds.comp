@@ -22,31 +22,42 @@ uvec4 seed =
     init_rng(gl_GlobalInvocationID.xy, gl_NumWorkGroups.xy *uvec2(32, 1),
              pc_ray.frame_num ^ pc_ray.random_num);
 uint binary_search_cdf(float random_float) {
-    uint l = 0;
+   uint l = 0;
     uint r = pc_ray.num_bootstrap_samples;
     uint lum_idx = -1;
     uint len = r - l;
-    while (l <= r) {
-        uint m = (r + l) / 2;
-        if (cdf_data.d[m] < random_float &&
-            m < pc_ray.num_bootstrap_samples - 1) {
-            l = m + 1;
+    // while (l <= r) {
+    //     uint m = (r + l) / 2;
+    //     if (cdf_data.d[m] < random_float &&
+    //         m < pc_ray.num_bootstrap_samples - 1) {
+    //         l = m + 1;
+    //     } else {
+    //         if (m == 0) {
+    //             lum_idx = 0;
+    //             break;
+    //         }
+    //         if (cdf_data.d[m - 1] <= random_float) {
+    //             lum_idx = m;
+    //             break;
+    //         }
+    //         r = m - 1;
+    //     }
+    // }
+    uint first = 0;
+    while(len > 0) {
+        uint hlf = len >> 1;
+        uint middle = first + hlf;
+        if(cdf_data.d[middle] <= random_float) {
+            first = middle + 1;
+            len -= hlf + 1;
         } else {
-            if (m == 0) {
-                lum_idx = 0;
-                break;
-            }
-            if (cdf_data.d[m - 1] <= random_float) {
-                lum_idx = m;
-                break;
-            }
-            r = m - 1;
+            len = hlf;
         }
     }
+    return clamp(first - 1, 0, pc_ray.num_bootstrap_samples -2);
     uint result = lum_idx;
     if (lum_idx > 0) {
-        while (result > 0 && cdf_data.d[result] ==
-                                 cdf_data.d[result - 1]) {
+        while (result > 0 && bootstrap_data.d[result].lum == 0) {
             result--;
         }
     }

@@ -2,7 +2,7 @@
 #define PSSMLT_UTILS
 #include "../../commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
-layout( constant_id = 0 ) const int SEEDING = 0;
+layout(constant_id = 0) const int SEEDING = 0;
 layout(buffer_reference, scalar) buffer BootstrapData { BootstrapSample d[]; };
 layout(buffer_reference, scalar) buffer SeedsData { SeedData d[]; };
 layout(buffer_reference, scalar) buffer PrimarySamples { PrimarySample d[]; };
@@ -100,7 +100,7 @@ void mlt_start_chain(uint type) {
 }
 
 float mlt_rand(inout uvec4 seed, bool large_step) {
-    if(SEEDING == 1) {
+    if (SEEDING == 1) {
         return rand(seed);
     }
 
@@ -379,7 +379,7 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
     }
     float mis_weight = 1.0;
     if (luminance(L) != 0.) {
-        //mis_weight = calc_mis_weight(s, 1, sampled);
+        mis_weight = calc_mis_weight(s, 1, sampled);
     }
     return mis_weight * L;
 #undef cam_vtx
@@ -539,14 +539,13 @@ int mlt_generate_camera_subpath(const vec3 origin, int max_depth,
            1;
 }
 
-float mlt_connect(int s, int t, bool large_step, inout uvec4 seed,
-                  bool save_radiance) {
+vec3 mlt_connect(int s, int t, bool large_step, inout uvec4 seed,
+                 bool save_radiance) {
 #define cam_vtx(i) camera_verts.d[bdpt_path_idx + i]
 #define light_vtx(i) light_verts.d[bdpt_path_idx + i]
 #define splat(i) splat_data.d[splat_idx + i]
 #define mlt_sampler mlt_samplers.d[mlt_sampler_idx]
     vec3 L = vec3(0);
-    float lum = 0;
     PathVertex s_fwd_pdf;
     if (s == 0) {
         // Pure camera path
@@ -640,19 +639,11 @@ float mlt_connect(int s, int t, bool large_step, inout uvec4 seed,
     }
 
     float mis_weight = 1.0f;
-    lum = luminance(L);
-    if (lum != 0.) {
+    if (luminance(L) != 0.) {
         mis_weight = calc_mis_weight(s, t, s_fwd_pdf);
-        //L *= mis_weight;
-        if (save_radiance) {
-            const uint idx = cam_vtx(t - 1).coords;
-            const uint splat_cnt = mlt_sampler.splat_cnt;
-            mlt_sampler.splat_cnt++;
-            splat(splat_cnt).idx = idx;
-            splat(splat_cnt).L = L;
-        }
+        L *= mis_weight;
     }
-    return lum;
+    return L;
 #undef cam_vtx
 #undef light_vtx
 #undef splat
@@ -677,7 +668,6 @@ float mlt_L(const vec4 origin, const float cam_area, bool large_step,
     if (save_radiance) {
         mlt_start_chain(2);
     }
-    // debugPrintfEXT("%d %d\n", num_light_paths, num_cam_paths);
     for (int s = 2; s < num_light_paths; s++) {
         ivec2 coords;
         vec3 splat_col = bdpt_connect_cam(s, coords);
@@ -688,31 +678,33 @@ float mlt_L(const vec4 origin, const float cam_area, bool large_step,
             mlt_sampler.splat_cnt++;
             splat(splat_cnt).idx = idx;
             splat(splat_cnt).L = splat_col;
-            // debugPrintfEXT("%d\n", mlt_sampler.splat_cnt);
         }
     }
-    for (int t = 1; t < num_cam_paths; t++) {
-        lum_sum += mlt_connect(0, t, large_step, seed, save_radiance);
-    }
+
+    vec3 L = mlt_connect(0, 2, large_step, seed, save_radiance);
+
     for (int t = 2; t < num_cam_paths; t++) {
         for (int s = 0; s < num_light_paths; s++) {
             int depth = s + t - 1;
             if (depth > pc_ray.max_depth) {
                 break;
             }
-            lum_sum += mlt_connect(s, t, large_step, seed, save_radiance);
+            if (t == 2 && s == 0)
+                continue;
+            L += mlt_connect(s, t, large_step, seed, save_radiance);
         }
     }
-// #define mlt_sampler mlt_samplers.d[mlt_sampler_idx]
-//     prim_samples[t].d[prim_sample_idxs[t] + i]
-//     if(col_idx == 50000 && p > 0) {
-//         debugPrintfEXT("%d %d %d %d\n", p, mlt_sampler.num_light_samples,
-//         mlt_sampler.num_cam_samples, mlt_sampler.num_connection_samples);
-//     }
-// #undef mlt_sampler
+    const float eye_lum = luminance(L);
+    if (save_radiance && eye_lum > 0) {
+        const uint idx = camera_verts.d[bdpt_path_idx].coords;
+        const uint splat_cnt = mlt_sampler.splat_cnt;
+        mlt_sampler.splat_cnt++;
+        splat(splat_cnt).idx = idx;
+        splat(splat_cnt).L = L;
+    }
 #undef mlt_sampler
 #undef splat
-    return lum_sum;
+    return lum_sum + eye_lum;
 }
 
 #endif

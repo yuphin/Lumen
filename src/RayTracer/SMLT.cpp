@@ -3,11 +3,11 @@
 
 void SMLT::init() {
 	Integrator::init();
-	max_depth = 6;
-	mutations_per_pixel = 10.0f;
+	max_depth = 5;
+	mutations_per_pixel = 100.0f;
 	sky_col = vec3(0, 0, 0);
-	num_mlt_threads = 200000;
-	num_bootstrap_samples = 200000;
+	num_mlt_threads = 1600 * 900 / 4;
+	num_bootstrap_samples = 1600 * 900 / 4;
 	mutation_count = int(instance->width * instance->height * mutations_per_pixel / float(num_mlt_threads));
 	light_path_rand_count = 6 + 2 * max_depth;
 	cam_path_rand_count = 3 + 6 * max_depth;
@@ -158,6 +158,23 @@ void SMLT::init() {
 		path_size * sizeof(float)
 	);
 
+	light_splats_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		path_size * (max_depth* (max_depth + 1)) * sizeof(Splat) 
+	);
+
+	light_splat_cnts_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		path_size * sizeof(float)
+	);
 	// ---- //
 	tmp_lum_buffer.create(
 		&instance->vkb.ctx,
@@ -224,7 +241,8 @@ void SMLT::init() {
 	desc.path_cnt_addr = light_path_cnt_buffer.get_device_address();
 	desc.tmp_lum_addr = tmp_lum_buffer.get_device_address();
 	desc.prob_carryover_addr = prob_carryover_buffer.get_device_address();
-
+	desc.light_splats_addr = light_splats_buffer.get_device_address();
+	desc.light_splat_cnts_addr = light_splat_cnts_buffer.get_device_address();
 
 	scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -438,10 +456,10 @@ void SMLT::render() {
 				buffer_barrier(light_path_cnt_buffer.handle,
 					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
-				buffer_barrier(splat_buffer.handle,
+				buffer_barrier(light_splats_buffer.handle,
 					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
-				buffer_barrier(mlt_samplers_buffer.handle,
+				buffer_barrier(light_splat_cnts_buffer.handle,
 					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 					VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
 				buffer_barrier(connected_lights_buffer.handle,
@@ -494,10 +512,10 @@ void SMLT::render() {
 				vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2],
 								  &regions[3], num_mlt_threads, 1, 1);
 				std::array<VkBufferMemoryBarrier, 6> mutation_barriers = {
-					buffer_barrier(splat_buffer.handle,
+					buffer_barrier(light_splats_buffer.handle,
 						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
-					buffer_barrier(mlt_samplers_buffer.handle,
+					buffer_barrier(light_splat_cnts_buffer.handle,
 						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
 					buffer_barrier(seeds_buffer.handle,
@@ -561,9 +579,12 @@ void SMLT::render() {
 		};
 		const uint32_t iter_cnt = 100;
 		const uint32_t freq = mutation_count / iter_cnt;
+		uint32_t cnt = 0;
 		for (uint32_t f = 0; f < freq; f++) {
+			LUMEN_TRACE("Mutation: {} / {}", cnt, mutation_count);
 			cmd.begin();
 			for (int i = 0; i < iter_cnt; i++) {
+				cnt++;
 				mutate(i);
 			}
 			cmd.submit();

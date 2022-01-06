@@ -17,11 +17,15 @@ layout(buffer_reference, scalar) buffer ConnectedLights { uint d[]; };
 layout(buffer_reference, scalar) buffer TmpSeeds { SeedData d[]; };
 layout(buffer_reference, scalar) buffer TmpLuminance { float d[]; };
 layout(buffer_reference, scalar) buffer ProbCarryover { uint d[]; };
+layout(buffer_reference, scalar) buffer LightSplats { Splat d[]; };
+layout(buffer_reference, scalar) buffer LightSplatCnts { uint d[]; };
 
 TmpSeeds tmp_seeds_data = TmpSeeds(scene_desc.tmp_seeds_addr);
 TmpLuminance tmp_lum_data = TmpLuminance(scene_desc.tmp_lum_addr);
 ProbCarryover prob_carryover_data =
     ProbCarryover(scene_desc.prob_carryover_addr);
+LightSplats light_splats = LightSplats(scene_desc.light_splats_addr);
+LightSplatCnts light_splat_cnts = LightSplatCnts(scene_desc.light_splat_cnts_addr);
 
 LightVertices light_verts = LightVertices(scene_desc.vcm_vertices_addr);
 // CameraVertices camera_verts = CameraVertices(scene_desc.vcm_vertices_addr);
@@ -62,6 +66,7 @@ uint cam_primary_sample_idx =
     pc_ray.cam_rand_count;
 uint prim_sample_idxs[2] =
     uint[](light_primary_sample_idx, cam_primary_sample_idx);
+
 PathCnt path_cnts = PathCnt(scene_desc.path_cnt_addr);
 
 #define mlt_sampler mlt_samplers.d[mlt_sampler_idx]
@@ -103,12 +108,8 @@ float mlt_rand(inout uvec4 seed, bool large_step) {
     if (SEEDING == 1) {
         return rand(seed);
     }
-
     const uint cnt = mlt_get_next();
     const float sigma = 0.01;
-    // if (cnt >= pc_ray.rand_count) {
-    //     debugPrintfEXT("Cnt is >=%d %d\n", pc_ray.rand_count, cnt);
-    // }
     if (primary_sample(cnt).last_modified < mlt_sampler.last_large_step) {
         primary_sample(cnt).val = rand(seed);
         primary_sample(cnt).last_modified = mlt_sampler.last_large_step;
@@ -178,7 +179,7 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
                         gl_RayFlagsSkipClosestHitShaderEXT,
                     0xFF, 1, 0, 1, ray_origin, 0, dir, len - EPS, 1);
         if (any_hit_payload.hit == 0) {
-            const float w_light = (cam_pdf_ratio / (screen_size)) *
+            const float w_light = (cam_pdf_ratio / screen_size) *
                                   (state.d_vcm + pdf_rev * state.d_vc);
             const float mis_weight = 1. / (1. + w_light);
             L = mis_weight * state.throughput * cam_pdf_ratio * f / screen_size;
@@ -237,10 +238,9 @@ float mlt_fill_light_path(const vec4 origin, const float cam_area,
                           bool large_step, inout uvec4 seed,
                           bool save_radiance) {
 #define light_vtx(i) light_verts.d[vcm_light_path_idx + i]
-#define splat(i) splat_data.d[splat_idx + i]
+#define splat(i) light_splats.d[splat_idx + i]
     VCMState light_state;
     connected_lights.d[pixel_idx] = 0;
-    mlt_sampler.splat_cnt = 0;
     float lum_sum = 0;
 
     if (!vcm_generate_light_sample(light_state, seed, large_step)) {
@@ -285,11 +285,7 @@ float mlt_fill_light_path(const vec4 origin, const float cam_area,
         light_state.d_vcm /= cos_theta_wo;
         light_state.d_vc /= cos_theta_wo;
         if (!mat_specular) {
-
             // Copy to light vertex buffer
-            // if(vcm_light_path_idx + path_idx > 400000) {
-            //     debugPrintfEXT("%d - %d\n", vcm_light_path_idx + path_idx, screen_size);
-            // }
             light_vtx(path_idx).wi = light_state.wi;
             light_vtx(path_idx).shading_nrm = light_state.shading_nrm;
             light_vtx(path_idx).pos = light_state.pos;
@@ -316,8 +312,8 @@ float mlt_fill_light_path(const vec4 origin, const float cam_area,
             if (save_radiance && lum > 0) {
                 connected_lights.d[pixel_idx] = 1;
                 uint idx = coords.x * pc_ray.size_y + coords.y;
-                const uint splat_cnt = mlt_sampler.splat_cnt;
-                mlt_sampler.splat_cnt++;
+                const uint splat_cnt = light_splat_cnts.d[pixel_idx];
+                light_splat_cnts.d[pixel_idx]++;
                 splat(splat_cnt).idx = idx;
                 splat(splat_cnt).L = splat_col;
             } else if (lum > 0) {
@@ -398,17 +394,20 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
     uint light_path_len = path_cnts.d[light_path_idx];
     mlt_sampler.splat_cnt = 0;
     if (save_radiance && connected_lights.d[light_path_idx] == 1) {
-        for (int i = 0; i < mlt_samplers.d[light_path_idx].splat_cnt; i++) {
-            lum += luminance(splat_data.d[light_splat_idx + i].L);
+        const uint light_splat_cnt = light_splat_cnts.d[light_path_idx];
+        for (int i = 0; i < light_splat_cnt; i++) {
+            const vec3 light_L = light_splats.d[light_splat_idx + i].L;
+            lum += luminance(light_L);
             const uint splat_cnt = mlt_sampler.splat_cnt;
             mlt_sampler.splat_cnt++;
-            splat(splat_cnt).idx = splat_data.d[light_splat_idx + i].idx;
-            splat(splat_cnt).L = splat_data.d[light_splat_idx + i].L;
+            splat(splat_cnt).idx = light_splats.d[light_splat_idx + i].idx;
+            splat(splat_cnt).L = light_L;
         }
     } else if (connected_lights.d[light_path_idx] == 1) {
         lum += tmp_lum_data.d[light_path_idx];
     }
     light_path_idx *= pc_ray.max_depth;
+    light_splat_cnts.d[pixel_idx] = 0;
     VCMState camera_state;
     // Generate camera sample
     const vec2 dir_rnd =
@@ -424,7 +423,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
     // Temporary hack?
     // TODO: Investigate
     camera_state.d_vcm =
-        cam_area * (screen_size * 0.3) * cos_theta * cos_theta * cos_theta;
+        cam_area * screen_size * cos_theta * cos_theta * cos_theta;
     camera_state.d_vc = 0;
     camera_state.d_vm = 0;
     vec3 col = vec3(0);
@@ -642,10 +641,6 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
         splat(splat_cnt).L = col;
     }
 #undef splat
-    // if(lum == 0) {
-    //     debugPrintfEXT("%d\n", d);
-    // }
-
     return lum;
 }
 

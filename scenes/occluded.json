@@ -73,9 +73,9 @@
                 1
             ],
             "emissive_factor": [
-                10,
-                10,
-                10
+                51,
+                36,
+                12
             ],
             "name": "Light",
             "refs": [
