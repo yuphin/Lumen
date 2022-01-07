@@ -70,6 +70,10 @@ struct PushConstantRay {
     float mutations_per_pixel;
 };
 
+struct PushConstantPost {
+    uint enable_tonemapping;
+};
+
 struct PushConstantCompute {
     uint num_elems;
     uint base_idx;

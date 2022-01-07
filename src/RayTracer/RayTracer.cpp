@@ -44,7 +44,7 @@ void RayTracer::init(Window* window) {
 	SceneConfig config;
 	config.filename = "cornell_box.json";
 	//config.filename = "occluded.json";
-	integrator = std::make_unique<SMLT>(this, config);
+	integrator = std::make_unique<Path>(this, config);
 	integrator->init();
 	create_post_descriptor();
 	update_post_desc_set();
@@ -78,6 +78,7 @@ void RayTracer::render(uint32_t i) {
 	post_rpi.framebuffer = vkb.ctx.swapchain_framebuffers[i];
 	post_rpi.renderArea = { {0, 0}, vkb.ctx.swapchain_extent };
 
+	pc_post_settings.enable_tonemapping = settings.enable_tonemapping;
 	vkCmdBeginRenderPass(cmdbuf, &post_rpi, VK_SUBPASS_CONTENTS_INLINE);
 	vkCmdSetViewport(cmdbuf, 0, 1, &viewport);
 	VkRect2D scissor = vk::rect2D(width, height, 0, 0);
@@ -87,6 +88,8 @@ void RayTracer::render(uint32_t i) {
 	vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
 							post_pipeline_layout, 0, 1, &post_desc_set, 0,
 							nullptr);
+	vkCmdPushConstants(cmdbuf, post_pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT,
+					   0, sizeof(PushConstantPost), &pc_post_settings);
 	vkCmdDraw(cmdbuf, 3, 1, 0, 0);
 	ImGui::Render();
 	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdbuf);
@@ -111,6 +114,8 @@ float RayTracer::draw_frame() {
 		integrator->reload();
 		integrator->updated = true;
 	}
+	integrator->updated ^=
+		ImGui::Checkbox("Enable ACES tonemapping", &settings.enable_tonemapping);
 	if (integrator->updated) {
 		ImGui::Render();
 		auto t_end = glfwGetTime() * 1000;
@@ -174,6 +179,11 @@ void RayTracer::create_post_pipeline() {
 
 	create_info.setLayoutCount = 1;
 	create_info.pSetLayouts = &post_desc_layout;
+	create_info.pushConstantRangeCount = 1;
+	VkPushConstantRange pc_range = {
+		VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstantPost)
+	};
+	create_info.pPushConstantRanges = &pc_range;
 	vkCreatePipelineLayout(vkb.ctx.device, &create_info, nullptr,
 						   &post_pipeline_layout);
 

@@ -17,6 +17,9 @@ public:
 	inline static RayTracer* get() { return instance; }
 	bool resized = false;
 private:
+	struct Settings {
+		bool enable_tonemapping = false;
+	};
 	void render(uint32_t idx);
 	float draw_frame();
 	void create_post_descriptor();
@@ -35,6 +38,9 @@ private:
 	VkPipelineLayout post_pipeline_layout = 0;
 	VkDescriptorSet post_desc_set = 0;
 	std::unique_ptr<Pipeline> post_pipeline;
+
+	PushConstantPost pc_post_settings;
+	Settings settings;
 
 };
 
