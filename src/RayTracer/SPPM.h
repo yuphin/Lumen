@@ -28,6 +28,8 @@ private:
 	std::unique_ptr<Pipeline> max_pipeline = nullptr;
 	std::unique_ptr<Pipeline> max_reduce_pipeline = nullptr;
 	std::unique_ptr<Pipeline> calc_bounds_pipeline = nullptr;
+	std::unique_ptr<Pipeline> gather_pipeline = nullptr;
+	std::unique_ptr<Pipeline> composite_pipeline = nullptr;
 
 	Buffer sppm_data_buffer;
 	Buffer atomic_data_buffer;
@@ -36,5 +38,6 @@ private:
 	Buffer counter_buffer;
 	Buffer hash_buffer;
 	Buffer atomic_data_cpu;
+	Buffer tmp_col_buffer;
 };
 

@@ -61,10 +61,10 @@ void main() {
         throughput = vec3(0);
     } else {
         throughput =
-            vec3(1.0) * abs_cos_light /
+            light_mat.emissive_factor * abs_cos_light /
             (pdf_dir * record.triangle_pdf / pc_ray.light_triangle_count);
     }
-    for (int d = 0; d < pc_ray.max_depth - 1; d++) {
+    for (int d = 0; d < pc_ray.max_depth; d++) {
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, o, tmin, wi, tmax, 0);
         bool found_isect = payload.material_idx != -1;
         if (!found_isect) {
@@ -79,15 +79,26 @@ void main() {
             shading_nrm = -shading_nrm;
             side = false;
         }
-
         MaterialProps hit_mat = load_material(payload.material_idx, payload.uv);
-        const vec3 old_wi = wi;
+        if (d > 0) {
+            // Ignore the first bounce
+            vec3 min_bnds = atomic_data.d.min_bnds;
+            vec3 max_bnds = atomic_data.d.max_bnds;
+            ivec3 grid_res = atomic_data.d.grid_res;
+            const ivec3 grid_idx =
+                get_grid_idx(payload.pos, min_bnds, max_bnds, grid_res);
+            const uint h = hash(grid_idx, screen_size);
+            photons.d[h].pos = payload.pos;
+            photons.d[h].wi = -wi;
+            photons.d[h].throughput = throughput;
+            photons.d[h].nrm = shading_nrm;
+            photons.d[h].path_len = d + 1;
+            atomicAdd(photons.d[h].photon_count, 1);
+        }
+        o = offset_ray(payload.pos, shading_nrm);
         float pdf_dir, cos_theta;
         const vec3 f = sample_bsdf(shading_nrm, wo, hit_mat, 0, side, wi,
                                    pdf_dir, cos_theta, seed);
-        if (pdf_dir == 0) {
-            break;
-        }
         throughput *= f * abs(cos_theta) / pdf_dir;
         if (d > RR_MIN_DEPTH) {
             float rr_prob = min(0.95f, luminance(throughput));
@@ -96,32 +107,5 @@ void main() {
             else
                 throughput /= rr_prob;
         }
-        const bool mat_diffuse = (hit_mat.bsdf_props & BSDF_LAMBERTIAN) != 0;
-        if (d >= 0 && mat_diffuse) {
-            // Ignore the first bounce
-            vec3 min_bnds;
-            vec3 max_bnds;
-            ivec3 grid_res;
-            if (pc_ray.frame_num == 0) {
-                min_bnds = pc_ray.min_bounds;
-                max_bnds = pc_ray.max_bounds;
-                grid_res = pc_ray.grid_res;
-            } else {
-                min_bnds = atomic_data.d.min_bnds;
-                max_bnds = atomic_data.d.max_bnds;
-                grid_res = atomic_data.d.grid_res;
-            }
-            const ivec3 grid_idx =
-                get_grid_idx(payload.pos, min_bnds, max_bnds, grid_res);
-            const uint h = hash(grid_idx, screen_size);
-            // float val = rand(seed);
-            photons.d[h].pos = payload.pos;
-            photons.d[h].wi = -old_wi;
-            photons.d[h].throughput = throughput;
-            photons.d[h].nrm = shading_nrm;
-            photons.d[h].path_len = d + 1;
-            atomicAdd(photons.d[h].photon_count, 1);
-        }
-        o = offset_ray(payload.pos, shading_nrm);
     }
 }

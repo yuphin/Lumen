@@ -9,7 +9,7 @@
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #include "../../commons.h"
 #include "../../utils.glsl"
-layout(local_size_x = 1024, local_size_y =1, local_size_z = 1) in;
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
@@ -23,25 +23,25 @@ void main() {
     uint idx = gl_GlobalInvocationID.x;
     vec3 val = vec3(0);
     float radius_val = 0;
-    if(idx < size){
-		val = sppm_data.d[idx].p + sppm_data.d[idx].radius;
+    if (idx < size) {
+        val = sppm_data.d[idx].p + sppm_data.d[idx].radius;
         radius_val = sppm_data.d[idx].radius;
-	}
-	val = subgroupMax(val);
+    }
+    val = subgroupMax(val);
     radius_val = subgroupMax(radius_val);
-	if (gl_SubgroupInvocationID == 0) {
+    if (gl_SubgroupInvocationID == 0) {
         data[gl_SubgroupID].xyz = val;
         data[gl_SubgroupID].w = radius_val;
     }
-	barrier();
-	if (gl_SubgroupID == 0) {
-    	val = data[gl_SubgroupInvocationID].xyz;
+    barrier();
+    if (gl_SubgroupID == 0) {
+        val = data[gl_SubgroupInvocationID].xyz;
         radius_val = data[gl_SubgroupInvocationID].w;
-		subgroupBarrier();
+        subgroupBarrier();
         val = subgroupMax(val);
         radius_val = subgroupMax(radius_val);
     }
-	if (gl_LocalInvocationID.x == 0) {
+    if (gl_LocalInvocationID.x == 0) {
         res_data.d[gl_WorkGroupID.x].xyz = val;
         res_data.d[gl_WorkGroupID.x].w = radius_val;
     }

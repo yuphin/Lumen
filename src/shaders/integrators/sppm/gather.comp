@@ -1,0 +1,121 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+#include "../../utils.glsl"
+
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
+layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
+layout(buffer_reference, scalar) buffer PhotonData_ { PhotonHash d[]; };
+layout(buffer_reference, scalar) readonly buffer Vertices { vec3 v[]; };
+layout(buffer_reference, scalar) readonly buffer Indices { uint i[]; };
+layout(buffer_reference, scalar) readonly buffer Normals { vec3 n[]; };
+layout(buffer_reference, scalar) readonly buffer TexCoords { vec2 t[]; };
+layout(buffer_reference, scalar) readonly buffer Materials { Material m[]; };
+uint size = pc_ray.size_x * pc_ray.size_y;
+Indices indices = Indices(scene_desc.index_addr);
+Vertices vertices = Vertices(scene_desc.vertex_addr);
+Normals normals = Normals(scene_desc.normal_addr);
+Materials materials = Materials(scene_desc.material_addr);
+SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
+AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
+PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
+
+uint screen_size = pc_ray.size_x * pc_ray.size_y;
+
+vec3 eval_bsdf(const MaterialProps mat, const vec3 wo, const vec3 wi) {
+    if ((mat.bsdf_props & BSDF_LAMBERTIAN) == BSDF_LAMBERTIAN) {
+        return mat.albedo / PI;
+    } else if ((mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR) {
+        return vec3(0);
+    }
+    return vec3(0);
+}
+
+vec3 normalize_grid(vec3 p, vec3 min_bnds, vec3 max_bnds) {
+    return (p - min_bnds) / (max_bnds - min_bnds);
+}
+
+ivec3 get_grid_idx(vec3 p, vec3 min_bnds, vec3 max_bnds, ivec3 grid_res) {
+    ivec3 res = ivec3(normalize_grid(p, min_bnds, max_bnds) * grid_res);
+    clamp(res, vec3(0), grid_res - vec3(1));
+    return res;
+}
+
+MaterialProps load_material(const uint material_idx, const vec2 uv) {
+    MaterialProps res;
+    const Material mat = materials.m[material_idx];
+    res.emissive_factor = mat.emissive_factor;
+    res.albedo = vec3(mat.base_color_factor);
+    res.bsdf_type = mat.bsdf_type;
+    res.bsdf_props = 0;
+    switch (res.bsdf_type) {
+    case BSDF_LAMBERTIAN:
+        res.bsdf_props |= BSDF_OPAQUE;
+        res.bsdf_props |= BSDF_LAMBERTIAN;
+        break;
+    case BSDF_GLASS:
+        res.bsdf_props |= BSDF_SPECULAR;
+        res.bsdf_props |= BSDF_TRANSMISSIVE;
+        break;
+    case BSDF_MIRROR:
+        res.bsdf_props |= BSDF_SPECULAR;
+        res.bsdf_props |= BSDF_REFLECTIVE;
+        break;
+    default:
+        break;
+    }
+    res.ior = mat.ior;
+    return res;
+}
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= size) {
+        return;
+    }
+    const vec3 p = sppm_data.d[idx].p;
+    float r = sppm_data.d[idx].radius;
+    if (r < EPS) {
+        r = EPS;
+    }
+    const float r_sqr = r * r;
+    ivec3 grid_min_bnds_idx =
+        get_grid_idx(p - r, atomic_data.d.min_bnds, atomic_data.d.max_bnds,
+                     atomic_data.d.grid_res);
+    ivec3 grid_max_bnds_idx =
+        get_grid_idx(p + r, atomic_data.d.min_bnds, atomic_data.d.max_bnds,
+                     atomic_data.d.grid_res);
+    for (int x = grid_min_bnds_idx.x; x <= grid_max_bnds_idx.x; x++) {
+        for (int y = grid_min_bnds_idx.y; y <= grid_max_bnds_idx.y; y++) {
+            for (int z = grid_min_bnds_idx.z; z <= grid_max_bnds_idx.z; z++) {
+                uint h = hash(ivec3(x, y, z), screen_size);
+                if (photons.d[h].photon_count > 0) {
+                    vec3 pp = p - photons.d[h].pos;
+                    const float dist_sqr = dot(pp, pp);
+                    if (dist_sqr > r_sqr) {
+                        continue;
+                    }
+                    const MaterialProps mat = load_material(
+                        sppm_data.d[idx].material_idx, sppm_data.d[idx].uv);
+                    vec3 f =
+                        eval_bsdf(mat, sppm_data.d[idx].wo, photons.d[h].wi);
+                    vec3 phi = photons.d[h].photon_count *
+                               photons.d[h].throughput * f *
+                               sppm_data.d[idx].throughput;
+                    sppm_data.d[idx].phi += phi;
+                    sppm_data.d[idx].M += 1;
+                }
+            }
+        }
+    }
+}

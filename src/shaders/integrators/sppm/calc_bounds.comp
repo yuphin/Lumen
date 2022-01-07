@@ -9,7 +9,7 @@
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #include "../../commons.h"
 #include "../../utils.glsl"
-layout(local_size_x = 1, local_size_y =1, local_size_z = 1) in;
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
 layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
@@ -18,13 +18,14 @@ SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
 AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
 uint size = pc_ray.size_x * pc_ray.size_y;
 void main() {
-   const float max_radius = atomic_data.d.max_radius;
-   vec3 data = atomic_data.d.max_bnds - atomic_data.d.min_bnds;
-   float max_comp = max(data.x, max(data.y, data.z));
-   int base_grid_res = int(max_comp / max_radius);
-   if(max_comp > 0. && max_radius > 0.) {
-      atomic_data.d.grid_res = max(ivec3(base_grid_res * data / max_comp), ivec3(1));
-   } else {
-      atomic_data.d.grid_res = ivec3(0,0,0);
-   }
+    const float max_radius = atomic_data.d.max_radius;
+    vec3 data = atomic_data.d.max_bnds - atomic_data.d.min_bnds;
+    float max_comp = max(data.x, max(data.y, data.z));
+    int base_grid_res = int(max_comp / max_radius);
+    if (max_comp > 0. && max_radius > 0.) {
+        atomic_data.d.grid_res =
+            max(ivec3(base_grid_res * data / max_comp), ivec3(1));
+    } else {
+        atomic_data.d.grid_res = ivec3(0, 0, 0);
+    }
 }

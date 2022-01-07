@@ -23,6 +23,14 @@ void SPPM::init() {
 		sizeof(AtomicData)
 	);
 
+	tmp_col_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		instance->width * instance->height * 3 * sizeof(float)
+	);
+
 	photon_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -79,6 +87,7 @@ void SPPM::init() {
 	desc.residual_addr = residual_buffer.get_device_address();
 	desc.counter_addr = counter_buffer.get_device_address();
 	desc.hash_addr = hash_buffer.get_device_address();
+	desc.tmp_col_addr = tmp_col_buffer.get_device_address();
 
 	scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -99,7 +108,7 @@ void SPPM::init() {
 }
 
 void SPPM::render() {
-	const float ppm_base_radius = 0.25f;
+	const float ppm_base_radius = 0.05f;
 	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = { 0.25f, 0.25f, 0.25f, 1.0f };
 	VkClearValue clear_depth = { 1.0f, 0 };
@@ -141,41 +150,28 @@ void SPPM::render() {
 								 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 		}
 	}
-	// Trace rays from light
+	// Trace rays from eye
 	{
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-						  sppm_light_pipeline->handle);
+						  sppm_eye_pipeline->handle);
 		vkCmdBindDescriptorSets(
-			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, sppm_light_pipeline->pipeline_layout,
+			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, sppm_eye_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
 		vkCmdPushConstants(cmd.handle, sppm_light_pipeline->pipeline_layout,
 						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
 						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
 						   VK_SHADER_STAGE_MISS_BIT_KHR,
 						   0, sizeof(PushConstantRay), &pc_ray);
-		auto& regions = sppm_light_pipeline->get_rt_regions();
-		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3], instance->width, instance->height, 1);
-	}
-	// Trace from eye
-	{
-		auto barrier = buffer_barrier(photon_buffer.handle,
+		auto& regions = sppm_eye_pipeline->get_rt_regions();
+		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2],
+						  &regions[3], instance->width, instance->height, 1);
+		auto barrier = buffer_barrier(sppm_data_buffer.handle,
 									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
-		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-						  sppm_eye_pipeline->handle);
-		vkCmdBindDescriptorSets(
-			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, sppm_eye_pipeline->pipeline_layout,
-			0, 1, &desc_set, 0, nullptr);
-		vkCmdPushConstants(cmd.handle, sppm_eye_pipeline->pipeline_layout,
-						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-						   VK_SHADER_STAGE_MISS_BIT_KHR,
-						   0, sizeof(PushConstantRay), &pc_ray);
-		auto& regions = sppm_eye_pipeline->get_rt_regions();
-		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3], instance->width, instance->height, 1);
 	}
+
 	// Calculate scene bbox given the calculated radius
 	{
 		auto wg_x = 1024;
@@ -232,6 +228,74 @@ void SPPM::render() {
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 		atomic_data_buffer.copy(atomic_data_cpu, cmd.handle);
+	}
+
+	// Trace from light
+	cmd.submit();
+	cmd.begin();
+	{
+		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+						  sppm_light_pipeline->handle);
+		vkCmdBindDescriptorSets(
+			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, sppm_light_pipeline->pipeline_layout,
+			0, 1, &desc_set, 0, nullptr);
+		vkCmdPushConstants(cmd.handle, sppm_light_pipeline->pipeline_layout,
+						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+						   VK_SHADER_STAGE_MISS_BIT_KHR,
+						   0, sizeof(PushConstantRay), &pc_ray);
+		auto& regions = sppm_light_pipeline->get_rt_regions();
+		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2],
+						  &regions[3], instance->width, instance->height, 1);
+		auto barrier = buffer_barrier(photon_buffer.handle,
+							 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+							 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
+	}
+	cmd.submit();
+	cmd.begin();
+	// Gather
+	{
+
+		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+						  gather_pipeline->handle);
+		vkCmdBindDescriptorSets(
+			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, gather_pipeline->pipeline_layout,
+			0, 1, &desc_set, 0, nullptr);
+		vkCmdPushConstants(cmd.handle, gather_pipeline->pipeline_layout,
+						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+						   VK_SHADER_STAGE_MISS_BIT_KHR,
+						   0, sizeof(PushConstantRay), &pc_ray);
+		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
+						  gather_pipeline->handle);
+		auto num_wg_x = (instance->width * instance->height + 1023) / 1024;
+		vkCmdDispatch(cmd.handle, num_wg_x, 1, 1);
+		auto barrier = buffer_barrier(sppm_data_buffer.handle,
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
+	}
+	cmd.submit();
+	cmd.begin();
+	// Composite
+	{
+		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+						  composite_pipeline->handle);
+		vkCmdBindDescriptorSets(
+			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, composite_pipeline->pipeline_layout,
+			0, 1, &desc_set, 0, nullptr);
+		vkCmdPushConstants(cmd.handle, composite_pipeline->pipeline_layout,
+						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+						   VK_SHADER_STAGE_MISS_BIT_KHR,
+						   0, sizeof(PushConstantRay), &pc_ray);
+		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
+						  composite_pipeline->handle);
+		auto num_wg_x = (instance->width * instance->height + 1023) / 1024;
+		vkCmdDispatch(cmd.handle, num_wg_x, 1, 1);
 	}
 	cmd.submit();
 }
@@ -443,7 +507,7 @@ void SPPM::create_blas() {
 		blas_inputs.push_back({ geo });
 	}
 	instance->vkb.build_blas(blas_inputs,
-						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+							 VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void SPPM::create_tlas() {
@@ -500,7 +564,7 @@ void SPPM::create_tlas() {
 		pc_ray.light_triangle_count = light_triangle_cnt;
 	}
 	instance->vkb.build_tlas(tlas,
-						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+							 VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void SPPM::create_rt_pipelines() {
@@ -615,12 +679,16 @@ void SPPM::create_compute_pipelines() {
 	max_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	max_reduce_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	calc_bounds_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	gather_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	composite_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	std::vector<Shader> shaders = {
 		{"src/shaders/integrators/sppm/max.comp"},
 		{"src/shaders/integrators/sppm/reduce_max.comp"},
 		{"src/shaders/integrators/sppm/min.comp"},
 		{"src/shaders/integrators/sppm/reduce_min.comp"},
 		{"src/shaders/integrators/sppm/calc_bounds.comp"},
+		{"src/shaders/integrators/sppm/gather.comp"},
+		{"src/shaders/integrators/sppm/composite.comp"},
 	};
 	for (auto& shader : shaders) {
 		shader.compile();
@@ -639,6 +707,10 @@ void SPPM::create_compute_pipelines() {
 	min_reduce_pipeline->create_compute_pipeline(settings);
 	settings.shader = shaders[4];
 	calc_bounds_pipeline->create_compute_pipeline(settings);
+	settings.shader = shaders[5];
+	gather_pipeline->create_compute_pipeline(settings);
+	settings.shader = shaders[6];
+	composite_pipeline->create_compute_pipeline(settings);
 }
 
 void SPPM::destroy() {
@@ -664,6 +736,8 @@ void SPPM::destroy() {
 		max_pipeline.get(),
 		max_reduce_pipeline.get(),
 		calc_bounds_pipeline.get(),
+		gather_pipeline.get(),
+		composite_pipeline.get()
 	};
 	for (auto p : pipeline_list) {
 		p->cleanup();
