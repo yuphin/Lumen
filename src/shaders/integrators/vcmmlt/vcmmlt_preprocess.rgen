@@ -1,0 +1,57 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+// Includes all the buffer addresses and indices
+#include "vcmmlt_commons.glsl"
+void main() {
+#define mlt_sampler_mux(c) mlt_samplers.d[mlt_sampler_idx + c]
+#define past_splat(i) past_splat_data.d[splat_idx + chain * depth_factor + i]
+#define splat(i) splat_data.d[splat_idx + chain * depth_factor + i]
+    vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
+    vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
+                                               2. / gl_LaunchSizeEXT.y, 0, 1));
+    area_int /= area_int.w;
+    const float cam_area = abs(area_int.x * area_int.y);
+    vec3 cam_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
+    uvec4 chain0_seed = seeds_data.d[pixel_idx].chain0_seed;
+    uvec4 chain1_seed = seeds_data.d[pixel_idx].chain1_seed;
+    // Fill in Chain 0
+    chain = 0;
+    mlt_start_chain();
+    mlt_sampler.luminance =
+        mlt_trace_light(origin.xyz, cam_nrm, cam_area, true, chain0_seed, true);
+    for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
+        past_splat(i).idx = splat(i).idx;
+        past_splat(i).L = splat(i).L;
+    }
+    mlt_sampler.past_splat_cnt = mlt_sampler.splat_cnt;
+    mlt_sampler.splat_cnt = 0;
+    // Fill in Chain 1
+    chain = 1;
+    mlt_start_chain();
+    mlt_sampler.luminance =
+        mlt_trace_light(origin.xyz, cam_nrm, cam_area, true, chain0_seed, true);
+    for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
+        past_splat(i).idx = splat(i).idx;
+        past_splat(i).L = splat(i).L;
+    }
+    mlt_sampler.past_splat_cnt = mlt_sampler.splat_cnt;
+    mlt_sampler.splat_cnt = 0;
+    seeds_data.d[pixel_idx].chain0_seed = chain0_seed;
+    seeds_data.d[pixel_idx].chain1_seed = chain1_seed;
+    
+    atomicAdd(chain_stats.d[0].lum_samples, 1);
+    atomicAdd(chain_stats.d[1].lum_samples, 1);
+    //atomicAdd(chain_stats.d[0].total_samples, 1);
+    //atomicAdd(chain_stats.d[1].total_samples, 1);
+    atomicAdd(chain_stats.d[0].total_luminance,
+              eval_target(mlt_sampler_mux(0).luminance, 0));
+    atomicAdd(chain_stats.d[1].total_luminance,
+              eval_target(mlt_sampler_mux(1).luminance, 1));
+}

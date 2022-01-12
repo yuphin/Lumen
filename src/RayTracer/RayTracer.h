@@ -7,6 +7,7 @@
 #include "VCM.h"
 #include "PSSMLT.h"
 #include "SMLT.h"
+#include "VCMMLT.h"
 class RayTracer : public LumenInstance {
 public:
 	RayTracer(int width, int height, bool debug);

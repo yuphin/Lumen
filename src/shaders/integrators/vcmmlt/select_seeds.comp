@@ -1,0 +1,50 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../commons.h"
+#include "../../utils.glsl"
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(buffer_reference, scalar) buffer BootstrapData { BootstrapSample d[]; };
+layout(buffer_reference, scalar) buffer SeedsData { VCMMLTSeedData d[]; };
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(buffer_reference, scalar) buffer CDF { float d[]; };
+BootstrapData bootstrap_data = BootstrapData(scene_desc.bootstrap_addr);
+SeedsData seeds_data = SeedsData(scene_desc.seeds_addr);
+CDF cdf_data = CDF(scene_desc.cdf_addr);
+uvec4 seed =
+    init_rng(gl_GlobalInvocationID.xy, gl_NumWorkGroups.xy *uvec2(32, 1),
+             pc_ray.frame_num ^ pc_ray.random_num);
+uint binary_search_cdf(float random_float) {
+   uint l = 0;
+    uint r = pc_ray.num_bootstrap_samples;
+    uint lum_idx = -1;
+    uint len = r - l;
+    uint first = 0;
+    while(len > 0) {
+        uint hlf = len >> 1;
+        uint middle = first + hlf;
+        if(cdf_data.d[middle] <= random_float) {
+            first = middle + 1;
+            len -= hlf + 1;
+        } else {
+            len = hlf;
+        }
+    }
+    return clamp(first - 1, 0, pc_ray.num_bootstrap_samples -2);
+}
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    float random_float = rand(seed);
+    uint lum_idx0 = binary_search_cdf(random_float);
+    random_float = rand(seed);
+    uint lum_idx1 = binary_search_cdf(random_float);
+    seeds_data.d[idx].chain0_seed = bootstrap_data.d[lum_idx0].seed;
+    seeds_data.d[idx].chain1_seed = bootstrap_data.d[lum_idx1].seed;
+}

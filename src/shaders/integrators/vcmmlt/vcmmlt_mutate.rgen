@@ -1,0 +1,101 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+// Includes all the buffer addresses and indices
+#include "vcmmlt_commons.glsl"
+
+void main() {
+#define past_splat(i) past_splat_data.d[splat_idx + chain * depth_factor + i]
+#define splat(i) splat_data.d[splat_idx + chain * depth_factor + i]
+#define mlt_sampler_mux(c) mlt_samplers.d[mlt_sampler_idx + c]
+    vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
+    vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
+                                               2. / gl_LaunchSizeEXT.y, 0, 1));
+    area_int /= area_int.w;
+    const float cam_area = abs(area_int.x * area_int.y);
+    vec3 cam_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
+    chain = pc_ray.mutation_counter % 2;
+    chain = (mlt_sampler.swap + chain) % 2;
+    const uvec4 chain0_seed = seeds_data.d[gl_LaunchIDEXT.x].chain0_seed;
+    const uvec4 chain1_seed = seeds_data.d[gl_LaunchIDEXT.x].chain1_seed;
+    uvec4 chain_seed = chain == 0 ? chain0_seed : chain1_seed;
+    const float large_step_prob = 0.3;
+    const bool large_step = chain == 0 && rand(seed) < large_step_prob;
+    mlt_start_iteration();
+    mlt_start_chain();
+    float proposed_luminance = mlt_trace_light(origin.xyz, cam_nrm, cam_area,
+                                               large_step, chain_seed, true);
+
+    if (isnan(proposed_luminance) || isinf(proposed_luminance)) {
+        debugPrintfEXT("Luminance is not a finite number\n");
+    }
+    float curr_target = eval_target(mlt_sampler.luminance, chain);
+    float proposed_target = eval_target(proposed_luminance, chain);
+
+     // Note large_step only occurs on chain 0
+    if (large_step) {
+        atomicAdd(chain_stats.d[0].lum_samples, 1);
+        atomicAdd(chain_stats.d[1].lum_samples, 1);
+        if (proposed_target > 0) {
+            atomicAdd(chain_stats.d[0].total_luminance,
+                      eval_target(proposed_luminance, 0));
+            atomicAdd(chain_stats.d[1].total_luminance,
+                      eval_target(proposed_luminance, 1));
+            // if (proposed_luminance / 100 > chain_stats.d[1].normalization) {
+            //     atomicAdd(chain_stats.d[1].total_luminance,
+            //               -eval_target(proposed_luminance, 1));
+            //     atomicAdd(chain_stats.d[1].lum_samples, -1);
+            // }
+        }
+    }
+
+    const float accept = min(1, proposed_target / curr_target);
+    if (accept > 0) {
+        const float inv_proposed_target = 1. / proposed_target;
+        const float mis = mlt_mis(proposed_luminance, proposed_target, chain);
+        for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
+            mlt_col.d[splat(i).idx] +=
+                splat(i).L * accept * mis * inv_proposed_target;
+        }
+    }
+    const float inv_curr_target = 1. / curr_target;
+    const float mis = mlt_mis(mlt_sampler.luminance, curr_target, chain);
+    for (int i = 0; i < mlt_sampler.past_splat_cnt; i++) {
+        mlt_col.d[past_splat(i).idx] +=
+            past_splat(i).L * (1 - accept) * mis * inv_curr_target;
+    }
+    if (rand(seed) < accept) {
+        mlt_sampler.past_splat_cnt = mlt_sampler.splat_cnt;
+        mlt_sampler.luminance = proposed_luminance;
+        for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
+            past_splat(i).idx = splat(i).idx;
+            past_splat(i).L = splat(i).L;
+        }
+        mlt_accept(large_step);
+        //atomicAdd(chain_stats.d[chain].total_samples, accept);
+    } else {
+        mlt_reject();
+        //atomicAdd(chain_stats.d[chain].total_samples, 1 - accept);
+    }
+
+    if (chain == 1) {
+        const float swap_prob =
+            min(1, mlt_sampler_mux(0).luminance / mlt_sampler_mux(1).luminance);
+        if (rand(seed) < swap_prob) {
+            mlt_sampler_mux(0).swap = (mlt_sampler_mux(0).swap + 1) % 2;
+            mlt_sampler_mux(1).swap = (mlt_sampler_mux(1).swap + 1) % 2;
+        }
+    }
+
+    if (chain == 0) {
+        seeds_data.d[pixel_idx].chain0_seed = chain_seed;
+    } else {
+        seeds_data.d[pixel_idx].chain1_seed = chain_seed;
+    }
+}

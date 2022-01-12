@@ -230,6 +230,7 @@
     <ClCompile Include="src\Framework\Window.cpp" />
     <ClCompile Include="src\Framework\ThreadPool.cpp" />
     <ClCompile Include="src\Framework\Texture.cpp" />
+    <ClCompile Include="src\RayTracer\VCMMLT.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="libs\extensions_vk.hpp" />
@@ -270,6 +271,7 @@
     <ClInclude Include="src\Framework\Window.h" />
     <ClInclude Include="src\Framework\ThreadPool.h" />
     <ClInclude Include="src\Framework\Texture.h" />
+    <ClInclude Include="src\RayTracer\VCMMLT.h" />
     <ClInclude Include="src\shaders\commons.h" />
   </ItemGroup>
   <ItemGroup>
@@ -299,12 +301,21 @@
     <None Include="src\shaders\integrators\ray.rmiss" />
     <None Include="src\shaders\integrators\ray_shadow.rmiss" />
     <None Include="src\shaders\integrators\sppm\calc_bounds.comp" />
+    <None Include="src\shaders\integrators\sppm\composite.comp" />
+    <None Include="src\shaders\integrators\sppm\gather.comp" />
     <None Include="src\shaders\integrators\sppm\max.comp" />
     <None Include="src\shaders\integrators\sppm\min.comp" />
     <None Include="src\shaders\integrators\sppm\reduce_max.comp" />
     <None Include="src\shaders\integrators\sppm\reduce_min.comp" />
     <None Include="src\shaders\integrators\sppm\sppm_eye.rgen" />
     <None Include="src\shaders\integrators\sppm\sppm_light.rgen" />
+    <None Include="src\shaders\integrators\vcmmlt\vcmmlt_commons.glsl" />
+    <None Include="src\shaders\integrators\vcmmlt\vcmmlt_composite.comp" />
+    <None Include="src\shaders\integrators\vcmmlt\vcmmlt_eye.rgen" />
+    <None Include="src\shaders\integrators\vcmmlt\vcmmlt_mutate.rgen" />
+    <None Include="src\shaders\integrators\vcmmlt\vcmmlt_normalize.comp" />
+    <None Include="src\shaders\integrators\vcmmlt\vcmmlt_preprocess.rgen" />
+    <None Include="src\shaders\integrators\vcmmlt\vcmmlt_seed.rgen" />
     <None Include="src\shaders\integrators\vcm\vcm_eye.rgen" />
     <None Include="src\shaders\integrators\vcm\vcm_light.rgen" />
     <None Include="src\shaders\pathtrace.rahit" />

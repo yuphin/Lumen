@@ -373,7 +373,16 @@ void VulkanBase::create_logical_device() {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
 	VkPhysicalDeviceAccelerationStructureFeaturesKHR accel_fts{
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+	VkPhysicalDeviceShaderAtomicFloatFeaturesEXT atomic_fts{
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT
+	};
+	atomic_fts.shaderBufferFloat32AtomicAdd = true;
+	atomic_fts.shaderBufferFloat32Atomics = true;
+	atomic_fts.shaderSharedFloat32AtomicAdd = true;
+	atomic_fts.shaderSharedFloat32Atomics = true;
+	atomic_fts.pNext = nullptr;
 	accel_fts.accelerationStructure = true;
+	accel_fts.pNext = &atomic_fts;
 	rt_fts.rayTracingPipeline = true;
 	rt_fts.pNext = &accel_fts;
 	features12.bufferDeviceAddress = true;

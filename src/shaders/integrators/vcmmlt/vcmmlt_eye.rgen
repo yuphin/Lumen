@@ -1,0 +1,20 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+// Includes all the buffer addresses and indices
+#include "vcmmlt_commons.glsl"
+
+void main() {
+    vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
+    vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
+                                               2. / gl_LaunchSizeEXT.y, 0, 1));
+    area_int /= area_int.w;
+    const float cam_area = abs(area_int.x * area_int.y);
+    mlt_fill_eye_path(origin, cam_area);
+}

@@ -26,6 +26,8 @@ void RayTracer::init(Window* window) {
 	vkb.add_device_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
 	vkb.add_device_extension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
 	vkb.add_device_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+	vkb.add_device_extension(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
+
 	vkb.create_instance();
 	if (vkb.enable_validation_layers) {
 		vkb.setup_debug_messenger();
@@ -44,7 +46,7 @@ void RayTracer::init(Window* window) {
 	SceneConfig config;
 	config.filename = "cornell_box.json";
 	//config.filename = "occluded.json";
-	integrator = std::make_unique<Path>(this, config);
+	integrator = std::make_unique<VCMMLT>(this, config);
 	integrator->init();
 	create_post_descriptor();
 	update_post_desc_set();
