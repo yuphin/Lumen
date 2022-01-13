@@ -1032,7 +1032,8 @@ void VCMMLT::destroy() {
 		select_seeds_pipeline.get(),
 		composite_pipeline.get(),
 		prefix_scan_pipeline.get(),
-		uniform_add_pipeline.get()
+		uniform_add_pipeline.get(),
+		normalize_pipeline.get()
 	};
 	for (auto p : pipeline_list) {
 		p->cleanup();
@@ -1051,4 +1052,5 @@ void VCMMLT::reload() {
 	composite_pipeline->reload();
 	prefix_scan_pipeline->reload();
 	uniform_add_pipeline->reload();
+	normalize_pipeline->reload();
 }

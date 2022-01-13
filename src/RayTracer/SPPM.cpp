@@ -248,8 +248,8 @@ void SPPM::render() {
 		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2],
 						  &regions[3], instance->width, instance->height, 1);
 		auto barrier = buffer_barrier(photon_buffer.handle,
-							 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-							 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 	}
@@ -258,15 +258,13 @@ void SPPM::render() {
 	// Gather
 	{
 
-		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
 						  gather_pipeline->handle);
 		vkCmdBindDescriptorSets(
-			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, gather_pipeline->pipeline_layout,
+			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, gather_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
 		vkCmdPushConstants(cmd.handle, gather_pipeline->pipeline_layout,
-						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-						   VK_SHADER_STAGE_MISS_BIT_KHR,
+						   VK_SHADER_STAGE_COMPUTE_BIT,
 						   0, sizeof(PushConstantRay), &pc_ray);
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
 						  gather_pipeline->handle);
@@ -282,15 +280,13 @@ void SPPM::render() {
 	cmd.begin();
 	// Composite
 	{
-		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
 						  composite_pipeline->handle);
 		vkCmdBindDescriptorSets(
-			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, composite_pipeline->pipeline_layout,
+			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, composite_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
 		vkCmdPushConstants(cmd.handle, composite_pipeline->pipeline_layout,
-						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-						   VK_SHADER_STAGE_MISS_BIT_KHR,
+						   VK_SHADER_STAGE_COMPUTE_BIT,
 						   0, sizeof(PushConstantRay), &pc_ray);
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
 						  composite_pipeline->handle);
@@ -723,7 +719,8 @@ void SPPM::destroy() {
 		&residual_buffer,
 		&counter_buffer,
 		&hash_buffer,
-		&atomic_data_cpu
+		&atomic_data_cpu,
+		&tmp_col_buffer
 	};
 	for (auto b : buffer_list) {
 		b->destroy();
