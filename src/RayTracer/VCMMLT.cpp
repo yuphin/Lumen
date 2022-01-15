@@ -205,6 +205,7 @@ void VCMMLT::init() {
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 	pc_ray.mutations_per_pixel = mutations_per_pixel;
+	pc_ray.num_mlt_threads = num_mlt_threads;
 }
 
 void VCMMLT::render() {

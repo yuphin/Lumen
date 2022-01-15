@@ -68,6 +68,7 @@ struct PushConstantRay {
     uint random_num;
     uint num_bootstrap_samples;
     float mutations_per_pixel;
+    uint num_mlt_threads;
 };
 
 struct PushConstantPost {

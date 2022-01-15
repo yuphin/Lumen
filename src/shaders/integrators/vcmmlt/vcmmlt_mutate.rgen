@@ -10,10 +10,12 @@
 // Includes all the buffer addresses and indices
 #include "vcmmlt_commons.glsl"
 
+// TODO: Atomic floats seem to be problematic, do a scan in the future
 void main() {
 #define past_splat(i) past_splat_data.d[splat_idx + chain * depth_factor + i]
 #define splat(i) splat_data.d[splat_idx + chain * depth_factor + i]
 #define mlt_sampler_mux(c) mlt_samplers.d[mlt_sampler_idx + c]
+    const uint chain_idx = pc_ray.mutation_counter % 2;
     vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
     vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
                                                2. / gl_LaunchSizeEXT.y, 0, 1));
@@ -26,7 +28,7 @@ void main() {
     const uvec4 chain1_seed = seeds_data.d[gl_LaunchIDEXT.x].chain1_seed;
     uvec4 chain_seed = chain == 0 ? chain0_seed : chain1_seed;
     const float large_step_prob = 0.3;
-    const bool large_step = chain == 0 && rand(seed) < large_step_prob;
+    const bool large_step = chain_idx == 0 && rand(seed) < large_step_prob;
     mlt_start_iteration();
     mlt_start_chain();
     float proposed_luminance = mlt_trace_light(origin.xyz, cam_nrm, cam_area,
@@ -35,10 +37,10 @@ void main() {
     if (isnan(proposed_luminance) || isinf(proposed_luminance)) {
         debugPrintfEXT("Luminance is not a finite number\n");
     }
-    float curr_target = eval_target(mlt_sampler.luminance, chain);
-    float proposed_target = eval_target(proposed_luminance, chain);
+    float curr_target = eval_target(mlt_sampler.luminance, chain_idx);
+    float proposed_target = eval_target(proposed_luminance, chain_idx);
 
-     // Note large_step only occurs on chain 0
+    // Note large_step only occurs on chain 0
     if (large_step) {
         atomicAdd(chain_stats.d[0].lum_samples, 1);
         atomicAdd(chain_stats.d[1].lum_samples, 1);
@@ -58,14 +60,14 @@ void main() {
     const float accept = min(1, proposed_target / curr_target);
     if (accept > 0) {
         const float inv_proposed_target = 1. / proposed_target;
-        const float mis = mlt_mis(proposed_luminance, proposed_target, chain);
+        const float mis = mlt_mis(proposed_luminance, proposed_target, chain_idx);
         for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
             mlt_col.d[splat(i).idx] +=
                 splat(i).L * accept * mis * inv_proposed_target;
         }
     }
     const float inv_curr_target = 1. / curr_target;
-    const float mis = mlt_mis(mlt_sampler.luminance, curr_target, chain);
+    const float mis = mlt_mis(mlt_sampler.luminance, curr_target, chain_idx);
     for (int i = 0; i < mlt_sampler.past_splat_cnt; i++) {
         mlt_col.d[past_splat(i).idx] +=
             past_splat(i).L * (1 - accept) * mis * inv_curr_target;
@@ -78,13 +80,13 @@ void main() {
             past_splat(i).L = splat(i).L;
         }
         mlt_accept(large_step);
-        //atomicAdd(chain_stats.d[chain].total_samples, accept);
+        // atomicAdd(chain_stats.d[chain].total_samples, accept);
     } else {
         mlt_reject();
-        //atomicAdd(chain_stats.d[chain].total_samples, 1 - accept);
+        // atomicAdd(chain_stats.d[chain].total_samples, 1 - accept);
     }
 
-    if (chain == 1) {
+    if (chain_idx == 1) {
         const float swap_prob =
             min(1, mlt_sampler_mux(0).luminance / mlt_sampler_mux(1).luminance);
         if (rand(seed) < swap_prob) {
