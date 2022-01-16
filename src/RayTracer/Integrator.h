@@ -18,6 +18,7 @@ public:
 		instance(instance), config(config) {}
 	virtual void init();
 	virtual void render() = 0;
+	virtual bool gui() { return false; };
 	virtual bool update() = 0;
 	virtual void reload() = 0;
 	virtual void destroy();

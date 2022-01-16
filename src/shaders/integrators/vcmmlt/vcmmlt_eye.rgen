@@ -9,6 +9,8 @@
 #extension GL_EXT_shader_atomic_float : require
 // Includes all the buffer addresses and indices
 #include "vcmmlt_commons.glsl"
+layout(constant_id = 1) const int LIGHT_FIRST = 0;
+
 
 void main() {
     vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
@@ -16,5 +18,9 @@ void main() {
                                                2. / gl_LaunchSizeEXT.y, 0, 1));
     area_int /= area_int.w;
     const float cam_area = abs(area_int.x * area_int.y);
-    mlt_fill_eye_path(origin, cam_area);
+    if (LIGHT_FIRST == 1) {
+        mlt_fill_light_path(origin, cam_area);
+    } else {
+        mlt_fill_eye_path(origin, cam_area);
+    }
 }

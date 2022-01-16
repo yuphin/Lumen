@@ -97,6 +97,7 @@ void RayTracer::render(uint32_t i) {
 	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdbuf);
 	vkCmdEndRenderPass(cmdbuf);
 	VkClearColorValue val = { 0,0,0,1 };
+	
 	VkImageSubresourceRange range;
 	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	range.baseMipLevel = 0;
@@ -108,20 +109,23 @@ void RayTracer::render(uint32_t i) {
 
 float RayTracer::draw_frame() {
 	auto t_begin = glfwGetTime() * 1000;
+	bool updated = false;
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time,
 				1000 / cpu_avg_time);
 	if (ImGui::Button("Reload shaders")) {
 		integrator->reload();
-		integrator->updated = true;
+		updated |= true;
 	}
-	integrator->updated ^=
+	bool gui_updated = integrator->gui();
+	updated |=
 		ImGui::Checkbox("Enable ACES tonemapping", &settings.enable_tonemapping);
-	if (integrator->updated) {
+	if (updated || gui_updated) {
 		ImGui::Render();
 		auto t_end = glfwGetTime() * 1000;
 		auto t_diff = t_end - t_begin;
+		integrator->updated = true;
 		return (float)t_diff;
 	}
 

@@ -6,6 +6,7 @@ public:
 		Integrator(scene, config) {}
 	virtual void init() override;
 	virtual void render() override;
+	virtual bool gui() override;
 	virtual bool update() override;
 	virtual void destroy() override;
 	virtual void reload() override;
@@ -23,9 +24,13 @@ private:
 	VkDescriptorSetLayout desc_set_layout;
 	VkDescriptorSet desc_set;
 	std::unique_ptr<Pipeline> eye_pipeline;
-	std::unique_ptr<Pipeline> seed_pipeline;
-	std::unique_ptr<Pipeline> preprocess_pipeline;
-	std::unique_ptr<Pipeline> mutate_pipeline;
+	std::unique_ptr<Pipeline> light_pipeline;
+	std::unique_ptr<Pipeline> seed1_pipeline;
+	std::unique_ptr<Pipeline> seed2_pipeline;
+	std::unique_ptr<Pipeline> preprocess1_pipeline;
+	std::unique_ptr<Pipeline> preprocess2_pipeline;
+	std::unique_ptr<Pipeline> mutate1_pipeline;
+	std::unique_ptr<Pipeline> mutate2_pipeline;
 	// Compute pipelines
 	std::unique_ptr<Pipeline> calc_cdf_pipeline = nullptr;
 	std::unique_ptr<Pipeline> select_seeds_pipeline = nullptr;
@@ -49,6 +54,7 @@ private:
 	Buffer bootstrap_cpu;
 	Buffer cdf_cpu;
 	Buffer tmp_col_buffer;
+	Buffer photon_buffer;
 	std::vector<Buffer> block_sums;
 
 	Buffer light_path_cnt_buffer;

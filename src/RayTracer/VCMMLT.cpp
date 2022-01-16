@@ -1,15 +1,17 @@
 #include "LumenPCH.h"
 #include "VCMMLT.h"
-
+static bool use_vm = false;
+static float vcm_radius_factor = 0.1f;
+static bool light_first = false;
 void VCMMLT::init() {
 	Integrator::init();
 	max_depth = 6;
 	mutations_per_pixel = 4.0f;
 	sky_col = vec3(0, 0, 0);
-	num_mlt_threads = 1600 * 900 / 2;
-	num_bootstrap_samples = 1600 * 900 / 2;
+	num_mlt_threads = 1600 * 900 / 8;
+	num_bootstrap_samples = 1600 * 900 / 8;
 	mutation_count = int(instance->width * instance->height * mutations_per_pixel / float(num_mlt_threads));
-	light_path_rand_count = 7 + 2 * max_depth;
+	light_path_rand_count = std::max(7 + 2 * max_depth, 3 + 6 * max_depth);
 
 	// MLTVCM buffers
 	bootstrap_buffer.create(
@@ -139,6 +141,15 @@ void VCMMLT::init() {
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		instance->width * instance->height * sizeof(float) * 3);
 
+	photon_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		10 * instance->width * instance->height * sizeof(PhotonHash)
+	);
+
 	int size = 0;
 	int arr_size = num_bootstrap_samples;
 	do {
@@ -187,6 +198,7 @@ void VCMMLT::init() {
 	desc.path_cnt_addr = light_path_cnt_buffer.get_device_address();
 
 	desc.color_storage_addr = tmp_col_buffer.get_device_address();
+	desc.photon_addr = photon_buffer.get_device_address();
 
 	scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -223,9 +235,19 @@ void VCMMLT::render() {
 	pc_ray.max_depth = max_depth;
 	pc_ray.sky_col = sky_col;
 	// VCMMLT related constants
+	pc_ray.use_vm = use_vm;
 	pc_ray.light_rand_count = light_path_rand_count;
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.num_bootstrap_samples = num_bootstrap_samples;
+	pc_ray.radius = lumen_scene.m_dimensions.radius * vcm_radius_factor / 100.f;
+	pc_ray.radius /= (float)pow((double)pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
+	pc_ray.min_bounds = lumen_scene.m_dimensions.min;
+	pc_ray.max_bounds = lumen_scene.m_dimensions.max;
+	pc_ray.ppm_base_radius = ppm_base_radius;
+	const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
+	const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
+	const int base_grid_res = int(max_comp / pc_ray.radius);
+	pc_ray.grid_res = glm::max(ivec3(diam * float(base_grid_res) / max_comp), ivec3(1));
 	vkCmdFillBuffer(cmd.handle, chain_stats_buffer.handle, 0, chain_stats_buffer.size, 0);
 	auto barrier = buffer_barrier(chain_stats_buffer.handle,
 								  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
@@ -233,35 +255,47 @@ void VCMMLT::render() {
 	vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 						 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
-	// Shoot camera rays
+	if (use_vm) {
+		vkCmdFillBuffer(cmd.handle, photon_buffer.handle, 0, photon_buffer.size, 0);
+		auto barrier = buffer_barrier(photon_buffer.handle,
+									  VK_ACCESS_TRANSFER_WRITE_BIT,
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
+	}
+	// Shoot rays
 	{
+		auto trace_pipeline = !light_first ? eye_pipeline.get() : light_pipeline.get();
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-						  eye_pipeline->handle);
+						  trace_pipeline->handle);
 		vkCmdBindDescriptorSets(
-			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, eye_pipeline->pipeline_layout,
+			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, trace_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
-		vkCmdPushConstants(cmd.handle, eye_pipeline->pipeline_layout,
+		vkCmdPushConstants(cmd.handle, trace_pipeline->pipeline_layout,
 						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
 						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
 						   VK_SHADER_STAGE_MISS_BIT_KHR,
 						   0, sizeof(PushConstantRay), &pc_ray);
-		auto& regions = eye_pipeline->get_rt_regions();
+		auto& regions = trace_pipeline->get_rt_regions();
 		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3],
 						  instance->width, instance->height, 1);
-		std::array<VkBufferMemoryBarrier, 2> barriers = {
+		std::array<VkBufferMemoryBarrier, 3> barriers = {
 									  buffer_barrier(light_path_buffer.handle,
 										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
 									  buffer_barrier(light_path_cnt_buffer.handle,
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+									  buffer_barrier(photon_buffer.handle,
 										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
 		};
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(), barriers.data(), 0, 0);
 	}
-
 	// Start bootstrap sampling
 	{
+		auto seed_pipeline = !light_first ? seed1_pipeline.get() : seed2_pipeline.get();
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
 						  seed_pipeline->handle);
 		vkCmdBindDescriptorSets(
@@ -328,6 +362,7 @@ void VCMMLT::render() {
 	}
 	// Fill in the samplers for mutations
 	{
+		auto preprocess_pipeline = !light_first ? preprocess1_pipeline.get() : preprocess2_pipeline.get();
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
 						  preprocess_pipeline->handle);
 		vkCmdBindDescriptorSets(
@@ -378,6 +413,7 @@ void VCMMLT::render() {
 			pc_ray.mutation_counter = i;
 			// Mutate
 			{
+				auto mutate_pipeline = !light_first ? mutate1_pipeline.get() : mutate2_pipeline.get();
 				vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
 								  mutate_pipeline->handle);
 				vkCmdBindDescriptorSets(
@@ -463,6 +499,15 @@ void VCMMLT::render() {
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 	}
 	cmd.submit();
+}
+
+bool VCMMLT::gui() {
+	bool result = false;
+	result |= ImGui::Checkbox("Enable Light-first ordering(default = eye)", &light_first);
+	if (light_first) {
+		result |= ImGui::Checkbox("Enable VM", &use_vm);
+	}
+	return result;
 }
 
 bool VCMMLT::update() {
@@ -827,27 +872,35 @@ void VCMMLT::create_rt_pipelines() {
 	settings.desc_layouts = { desc_set_layout };
 	settings.stages = stages;
 	eye_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
-	seed_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
-	preprocess_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
-	mutate_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	light_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	seed1_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	seed2_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	preprocess1_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	preprocess2_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	mutate1_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	mutate2_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	// TODO: Move shaders into sets during recompilation
 	settings.shaders = { shaders[0], shaders[4], shaders[5], shaders[6], shaders[7] };
-	eye_pipeline->create_rt_pipeline(settings, { 0 });
+	eye_pipeline->create_rt_pipeline(settings, { 0, 0 });
+	light_pipeline->create_rt_pipeline(settings, { 0, 1 });
 	vkDestroyShaderModule(instance->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[1].create_vk_shader_module(instance->vkb.ctx.device);
 	settings.shaders[0] = shaders[1];
 	settings.stages = stages;
-	seed_pipeline->create_rt_pipeline(settings, { 1 });
+	seed1_pipeline->create_rt_pipeline(settings, { 1, 0 });
+	seed2_pipeline->create_rt_pipeline(settings, { 1, 1 });
 	vkDestroyShaderModule(instance->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[2].create_vk_shader_module(instance->vkb.ctx.device);
 	settings.shaders[0] = shaders[2];
 	settings.stages = stages;
-	preprocess_pipeline->create_rt_pipeline(settings, { 0 });
+	preprocess1_pipeline->create_rt_pipeline(settings, { 0, 0 });
+	preprocess2_pipeline->create_rt_pipeline(settings, { 0, 1 });
 	vkDestroyShaderModule(instance->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[3].create_vk_shader_module(instance->vkb.ctx.device);
 	settings.shaders[0] = shaders[3];
 	settings.stages = stages;
-	mutate_pipeline->create_rt_pipeline(settings, { 0 });
+	mutate1_pipeline->create_rt_pipeline(settings, { 0, 0 });
+	mutate2_pipeline->create_rt_pipeline(settings, { 0, 1 });
 	for (auto& s : settings.stages) {
 		vkDestroyShaderModule(instance->vkb.ctx.device, s.module, nullptr);
 	}
@@ -1009,8 +1062,8 @@ void VCMMLT::destroy() {
 	  &past_splat_buffer,
 	  &light_path_buffer,
 	  &light_path_cnt_buffer,
-	  &tmp_col_buffer
-
+	  &tmp_col_buffer,
+	  &photon_buffer
 	};
 	for (auto b : buffer_list) {
 		b->destroy();
@@ -1026,9 +1079,12 @@ void VCMMLT::destroy() {
 	}
 	std::vector<Pipeline*> pipeline_list = {
 		eye_pipeline.get(),
-		seed_pipeline.get(),
-		preprocess_pipeline.get(),
-		mutate_pipeline.get(),
+		seed1_pipeline.get(),
+		seed2_pipeline.get(),
+		preprocess1_pipeline.get(),
+		preprocess2_pipeline.get(),
+		mutate1_pipeline.get(),
+		mutate2_pipeline.get(),
 		calc_cdf_pipeline.get(),
 		select_seeds_pipeline.get(),
 		composite_pipeline.get(),
@@ -1045,9 +1101,11 @@ void VCMMLT::destroy() {
 
 void VCMMLT::reload() {
 	eye_pipeline->reload();
-	eye_pipeline->reload();
-	preprocess_pipeline->reload();
-	mutate_pipeline->reload();
+	light_pipeline->reload();
+	preprocess1_pipeline->reload();
+	preprocess2_pipeline->reload();
+	mutate1_pipeline->reload();
+	mutate2_pipeline->reload();
 	calc_cdf_pipeline->reload();
 	select_seeds_pipeline->reload();
 	composite_pipeline->reload();

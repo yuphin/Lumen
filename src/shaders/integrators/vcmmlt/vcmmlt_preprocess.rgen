@@ -8,6 +8,8 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 // Includes all the buffer addresses and indices
+layout(constant_id = 1) const int LIGHT_FIRST = 0;
+
 #include "vcmmlt_commons.glsl"
 void main() {
 #define mlt_sampler_mux(c) mlt_samplers.d[mlt_sampler_idx + c]
@@ -24,8 +26,15 @@ void main() {
     // Fill in Chain 0
     chain = 0;
     mlt_start_chain();
-    mlt_sampler.luminance =
-        mlt_trace_light(origin.xyz, cam_nrm, cam_area, true, chain0_seed, true);
+
+    if (LIGHT_FIRST == 1) {
+        mlt_sampler.luminance =
+            mlt_trace_eye(origin, cam_area, true, chain0_seed, true);
+    } else {
+        mlt_sampler.luminance = mlt_trace_light(origin.xyz, cam_nrm, cam_area,
+                                                true, chain0_seed, true);
+    }
+
     for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
         past_splat(i).idx = splat(i).idx;
         past_splat(i).L = splat(i).L;
@@ -35,8 +44,16 @@ void main() {
     // Fill in Chain 1
     chain = 1;
     mlt_start_chain();
-    mlt_sampler.luminance =
-        mlt_trace_light(origin.xyz, cam_nrm, cam_area, true, chain0_seed, true);
+
+    if (LIGHT_FIRST == 1) {
+        mlt_sampler.luminance =
+            mlt_trace_eye(origin, cam_area, true, chain1_seed, true);
+    } else {
+        mlt_sampler.luminance =
+            mlt_trace_light(origin.xyz, cam_nrm, cam_area, true, chain1_seed,
+            true);
+    }
+
     for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
         past_splat(i).idx = splat(i).idx;
         past_splat(i).L = splat(i).L;
@@ -45,11 +62,11 @@ void main() {
     mlt_sampler.splat_cnt = 0;
     seeds_data.d[pixel_idx].chain0_seed = chain0_seed;
     seeds_data.d[pixel_idx].chain1_seed = chain1_seed;
-    
+
     atomicAdd(chain_stats.d[0].lum_samples, 1);
     atomicAdd(chain_stats.d[1].lum_samples, 1);
-    //atomicAdd(chain_stats.d[0].total_samples, 1);
-    //atomicAdd(chain_stats.d[1].total_samples, 1);
+    // atomicAdd(chain_stats.d[0].total_samples, 1);
+    // atomicAdd(chain_stats.d[1].total_samples, 1);
     atomicAdd(chain_stats.d[0].total_luminance,
               eval_target(mlt_sampler_mux(0).luminance, 0));
     atomicAdd(chain_stats.d[1].total_luminance,

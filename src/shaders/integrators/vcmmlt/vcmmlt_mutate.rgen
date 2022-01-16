@@ -9,6 +9,7 @@
 #extension GL_EXT_shader_atomic_float : require
 // Includes all the buffer addresses and indices
 #include "vcmmlt_commons.glsl"
+layout(constant_id = 1) const int LIGHT_FIRST = 0;
 
 // TODO: Atomic floats seem to be problematic, do a scan in the future
 void main() {
@@ -31,8 +32,14 @@ void main() {
     const bool large_step = chain_idx == 0 && rand(seed) < large_step_prob;
     mlt_start_iteration();
     mlt_start_chain();
-    float proposed_luminance = mlt_trace_light(origin.xyz, cam_nrm, cam_area,
-                                               large_step, chain_seed, true);
+    float proposed_luminance;
+    if (LIGHT_FIRST == 1) {
+        proposed_luminance =
+            mlt_trace_eye(origin, cam_area, large_step, chain_seed, true);
+    } else {
+        proposed_luminance = mlt_trace_light(origin.xyz, cam_nrm, cam_area,
+                                             large_step, chain_seed, true);
+    }
 
     if (isnan(proposed_luminance) || isinf(proposed_luminance)) {
         debugPrintfEXT("Luminance is not a finite number\n");
@@ -60,7 +67,8 @@ void main() {
     const float accept = min(1, proposed_target / curr_target);
     if (accept > 0) {
         const float inv_proposed_target = 1. / proposed_target;
-        const float mis = mlt_mis(proposed_luminance, proposed_target, chain_idx);
+        const float mis =
+            mlt_mis(proposed_luminance, proposed_target, chain_idx);
         for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
             mlt_col.d[splat(i).idx] +=
                 splat(i).L * accept * mis * inv_proposed_target;

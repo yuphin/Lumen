@@ -9,6 +9,8 @@
 #extension GL_EXT_shader_atomic_float : require
 // Includes all the buffer addresses and indices
 #include "vcmmlt_commons.glsl"
+layout(constant_id = 1) const int LIGHT_FIRST = 0;
+
 
 void main() {
     vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
@@ -18,6 +20,11 @@ void main() {
     const float cam_area = abs(area_int.x * area_int.y);
     vec3 cam_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
     bootstrap_data.d[pixel_idx].seed = seed;
-    bootstrap_data.d[pixel_idx].lum =
-        mlt_trace_light(origin.xyz, cam_nrm, cam_area, true, seed, false);
+    if (LIGHT_FIRST == 1) {
+        bootstrap_data.d[pixel_idx].lum =
+            mlt_trace_eye(origin, cam_area, true, seed, false);
+    } else {
+        bootstrap_data.d[pixel_idx].lum =
+            mlt_trace_light(origin.xyz, cam_nrm, cam_area, true, seed, false);
+    }
 }
