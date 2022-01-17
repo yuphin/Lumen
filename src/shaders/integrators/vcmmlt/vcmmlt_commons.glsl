@@ -16,6 +16,8 @@ layout(buffer_reference, scalar) buffer PathCnt { uint d[]; };
 layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
 layout(buffer_reference, scalar) buffer PhotonData_ { PhotonHash d[]; };
 
+layout(buffer_reference, scalar) buffer MLTSumData { vec3 d[]; };
+
 uint chain = 0;
 uint depth_factor = pc_ray.max_depth * (pc_ray.max_depth + 1);
 
@@ -35,6 +37,7 @@ PrimarySamples prim_samples[2] =
     PrimarySamples[](light_primary_samples, cam_primary_samples);
 ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
 PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
+MLTSumData sum_data = MLTSumData(scene_desc.mlt_atomicsum_addr);
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
@@ -681,7 +684,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
         if (luminance(mat.emissive_factor) > 0) {
             col += camera_state.throughput *
                    vcm_get_light_radiance(mat, camera_state, d);
-            // break;
+            break;
         }
 
         // Connect to light

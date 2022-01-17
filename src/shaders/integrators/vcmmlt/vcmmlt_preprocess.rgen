@@ -63,12 +63,10 @@ void main() {
     seeds_data.d[pixel_idx].chain0_seed = chain0_seed;
     seeds_data.d[pixel_idx].chain1_seed = chain1_seed;
 
-    atomicAdd(chain_stats.d[0].lum_samples, 1);
-    atomicAdd(chain_stats.d[1].lum_samples, 1);
-    // atomicAdd(chain_stats.d[0].total_samples, 1);
-    // atomicAdd(chain_stats.d[1].total_samples, 1);
-    atomicAdd(chain_stats.d[0].total_luminance,
-              eval_target(mlt_sampler_mux(0).luminance, 0));
-    atomicAdd(chain_stats.d[1].total_luminance,
-              eval_target(mlt_sampler_mux(1).luminance, 1));
+    sum_data.d[2 * pixel_idx].x = eval_target(mlt_sampler_mux(0).luminance, 0); // lum
+    sum_data.d[2 * pixel_idx].y = 1; // lum_samples
+    sum_data.d[2 * pixel_idx].z = 1; // total_samples
+    sum_data.d[2 * pixel_idx + 1].x = eval_target(mlt_sampler_mux(1).luminance, 1);
+    sum_data.d[2 * pixel_idx + 1].y = 1;
+    sum_data.d[2 * pixel_idx + 1].z = 1;
 }

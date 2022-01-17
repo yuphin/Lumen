@@ -49,18 +49,18 @@ void main() {
 
     // Note large_step only occurs on chain 0
     if (large_step) {
-        atomicAdd(chain_stats.d[0].lum_samples, 1);
-        atomicAdd(chain_stats.d[1].lum_samples, 1);
+        sum_data.d[2 * pixel_idx + 0].y++;
+        sum_data.d[2 * pixel_idx + 1].y++;
         if (proposed_target > 0) {
-            atomicAdd(chain_stats.d[0].total_luminance,
-                      eval_target(proposed_luminance, 0));
-            atomicAdd(chain_stats.d[1].total_luminance,
-                      eval_target(proposed_luminance, 1));
-            // if (proposed_luminance / 100 > chain_stats.d[1].normalization) {
-            //     atomicAdd(chain_stats.d[1].total_luminance,
-            //               -eval_target(proposed_luminance, 1));
-            //     atomicAdd(chain_stats.d[1].lum_samples, -1);
-            // }
+            sum_data.d[2 * pixel_idx].x += eval_target(proposed_luminance, 0);
+            sum_data.d[2 * pixel_idx + 1].x +=
+                eval_target(proposed_luminance, 1);
+            if (proposed_luminance / pc_ray.mutations_per_pixel >
+                chain_stats.d[1].normalization) {
+                sum_data.d[2 * pixel_idx + 1].x -=
+                    eval_target(proposed_luminance, 1);
+                sum_data.d[2 * pixel_idx + 1].y -= 1;
+            }
         }
     }
 
@@ -88,10 +88,10 @@ void main() {
             past_splat(i).L = splat(i).L;
         }
         mlt_accept(large_step);
-        // atomicAdd(chain_stats.d[chain].total_samples, accept);
+        sum_data.d[2 * pixel_idx + chain].z += accept;
     } else {
         mlt_reject();
-        // atomicAdd(chain_stats.d[chain].total_samples, 1 - accept);
+        sum_data.d[2 * pixel_idx + chain].z += (1 - accept);
     }
 
     if (chain_idx == 1) {

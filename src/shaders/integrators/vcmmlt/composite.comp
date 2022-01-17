@@ -26,13 +26,15 @@ void main() {
                          gl_GlobalInvocationID.x % pc_ray.size_y);
     vec3 col = vec3(0);
     for (int i = 0; i < 2; i++) {
-        // TODO: Figure out a dynamic update
         // float factor =
         //     0.5 * chain_stats.d[i].normalization /
         //     (pc_ray.mutations_per_pixel);
         // col += mlt_col.d[gl_GlobalInvocationID.x] * factor;
-        col += 2 * mlt_col.d[gl_GlobalInvocationID.x] * cdf_sum.d /
-               (pc_ray.mutations_per_pixel);
+        // col += 2 * mlt_col.d[gl_GlobalInvocationID.x] * cdf_sum.d /
+        //        (pc_ray.mutations_per_pixel);
+        col += 0.25 * mlt_col.d[gl_GlobalInvocationID.x] *
+               chain_stats.d[i].normalization * pc_ray.size_x * pc_ray.size_y /
+               (chain_stats.d[i].total_samples);
     }
     col += tmp_col.d[gl_GlobalInvocationID.x];
     mlt_col.d[gl_GlobalInvocationID.x] = vec3(0);

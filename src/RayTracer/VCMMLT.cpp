@@ -150,6 +150,34 @@ void VCMMLT::init() {
 		10 * instance->width * instance->height * sizeof(PhotonHash)
 	);
 
+	mlt_atomicsum_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		num_mlt_threads * sizeof(float) * 3 * 2
+	);
+
+	mlt_residual_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		num_mlt_threads * sizeof(float) * 3
+	);
+
+	counter_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		sizeof(int)
+	);
+
+
 	int size = 0;
 	int arr_size = num_bootstrap_samples;
 	do {
@@ -200,6 +228,10 @@ void VCMMLT::init() {
 	desc.color_storage_addr = tmp_col_buffer.get_device_address();
 	desc.photon_addr = photon_buffer.get_device_address();
 
+	desc.mlt_atomicsum_addr = mlt_atomicsum_buffer.get_device_address();
+	desc.residual_addr = mlt_residual_buffer.get_device_address();
+	desc.counter_addr = counter_buffer.get_device_address();
+
 	scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 							 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -249,12 +281,18 @@ void VCMMLT::render() {
 	const int base_grid_res = int(max_comp / pc_ray.radius);
 	pc_ray.grid_res = glm::max(ivec3(diam * float(base_grid_res) / max_comp), ivec3(1));
 	vkCmdFillBuffer(cmd.handle, chain_stats_buffer.handle, 0, chain_stats_buffer.size, 0);
-	auto barrier = buffer_barrier(chain_stats_buffer.handle,
+	vkCmdFillBuffer(cmd.handle, mlt_atomicsum_buffer.handle, 0, mlt_atomicsum_buffer.size, 0);
+	std::array<VkBufferMemoryBarrier, 2> barriers = {
+						buffer_barrier(chain_stats_buffer.handle,
 								  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-								  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+								  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+						buffer_barrier(mlt_atomicsum_buffer.handle,
+								  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+								  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+	};
 	vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 						 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
+						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(), barriers.data(), 0, 0);
 	if (use_vm) {
 		vkCmdFillBuffer(cmd.handle, photon_buffer.handle, 0, photon_buffer.size, 0);
 		auto barrier = buffer_barrier(photon_buffer.handle,
@@ -263,6 +301,52 @@ void VCMMLT::render() {
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 	}
+	auto sum_up_chain_data = [&] {
+		auto wg_x = 1024;
+		auto wg_y = 1;
+		const auto num_wg_x = (uint32_t)ceil(num_mlt_threads / float(wg_x));
+		const auto num_wg_y = 1;
+		vkCmdBindDescriptorSets(
+			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, sum0_pipeline->pipeline_layout,
+			0, 1, &desc_set, 0, nullptr);
+		vkCmdBindDescriptorSets(
+			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, sum1_pipeline->pipeline_layout,
+			0, 1, &desc_set, 0, nullptr);
+		vkCmdBindDescriptorSets(
+			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, sum_reduce0_pipeline->pipeline_layout,
+			0, 1, &desc_set, 0, nullptr);
+		vkCmdBindDescriptorSets(
+			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, sum_reduce1_pipeline->pipeline_layout,
+			0, 1, &desc_set, 0, nullptr);
+		vkCmdPushConstants(cmd.handle, sum0_pipeline->pipeline_layout,
+						   VK_SHADER_STAGE_COMPUTE_BIT,
+						   0, sizeof(PushConstantRay), &pc_ray);
+		vkCmdPushConstants(cmd.handle, sum1_pipeline->pipeline_layout,
+						   VK_SHADER_STAGE_COMPUTE_BIT,
+						   0, sizeof(PushConstantRay), &pc_ray);
+		vkCmdPushConstants(cmd.handle, sum_reduce0_pipeline->pipeline_layout,
+						   VK_SHADER_STAGE_COMPUTE_BIT,
+						   0, sizeof(PushConstantRay), &pc_ray);
+		vkCmdPushConstants(cmd.handle, sum_reduce1_pipeline->pipeline_layout,
+						   VK_SHADER_STAGE_COMPUTE_BIT,
+						   0, sizeof(PushConstantRay), &pc_ray);
+		reduce(cmd.handle, mlt_residual_buffer, counter_buffer, *sum0_pipeline, *sum_reduce0_pipeline,
+			   num_mlt_threads);
+		auto barrier = buffer_barrier(chain_stats_buffer.handle,
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
+							 &barrier, 0, 0);
+		reduce(cmd.handle, mlt_residual_buffer, counter_buffer, *sum1_pipeline, *sum_reduce1_pipeline,
+			   num_mlt_threads);
+		barrier = buffer_barrier(chain_stats_buffer.handle,
+								 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+								 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
+							 &barrier, 0, 0);
+	};
 	// Shoot rays
 	{
 		auto trace_pipeline = !light_first ? eye_pipeline.get() : light_pipeline.get();
@@ -362,6 +446,7 @@ void VCMMLT::render() {
 	}
 	// Fill in the samplers for mutations
 	{
+		// Fill
 		auto preprocess_pipeline = !light_first ? preprocess1_pipeline.get() : preprocess2_pipeline.get();
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
 						  preprocess_pipeline->handle);
@@ -383,7 +468,7 @@ void VCMMLT::render() {
 		buffer_barrier(mlt_samplers_buffer.handle,
 		VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 		VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
-		buffer_barrier(chain_stats_buffer.handle,
+		buffer_barrier(mlt_atomicsum_buffer.handle,
 		VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 		VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
 		};
@@ -391,7 +476,10 @@ void VCMMLT::render() {
 							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0,
 							 (uint32_t)preprocess_barriers.size(),
 							 preprocess_barriers.data(), 0, 0);
+		// Sum up chain stats
+		sum_up_chain_data();
 	}
+
 
 	// Calculate normalization factor
 	{
@@ -413,6 +501,13 @@ void VCMMLT::render() {
 			pc_ray.mutation_counter = i;
 			// Mutate
 			{
+				auto barrier = buffer_barrier(mlt_atomicsum_buffer.handle,
+											  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+											  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+				vkCmdFillBuffer(cmd.handle, mlt_atomicsum_buffer.handle, 0, mlt_atomicsum_buffer.size, 0);
+				vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+									 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+									 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 				auto mutate_pipeline = !light_first ? mutate1_pipeline.get() : mutate2_pipeline.get();
 				vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
 								  mutate_pipeline->handle);
@@ -443,7 +538,7 @@ void VCMMLT::render() {
 					buffer_barrier(mlt_col_buffer.handle,
 						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
-					buffer_barrier(chain_stats_buffer.handle,
+					buffer_barrier(mlt_atomicsum_buffer.handle,
 						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
 				};
@@ -451,7 +546,8 @@ void VCMMLT::render() {
 									 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0,
 									 (uint32_t)mutation_barriers.size(),
 									 mutation_barriers.data(), 0, 0);
-
+				// Sum up chain stats
+				sum_up_chain_data();
 			}
 			// Normalization
 			{
@@ -913,13 +1009,19 @@ void VCMMLT::create_compute_pipelines() {
 	prefix_scan_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	uniform_add_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	normalize_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	sum0_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	sum1_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	sum_reduce0_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	sum_reduce1_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	std::vector<Shader> shaders = {
 		{"src/shaders/integrators/pssmlt/calc_cdf.comp"},
 		{"src/shaders/integrators/vcmmlt/select_seeds.comp"},
 		{"src/shaders/integrators/vcmmlt/composite.comp"},
 		{"src/shaders/integrators/pssmlt/prefix_scan.comp"},
 		{"src/shaders/integrators/pssmlt/uniform_add.comp"},
-		{"src/shaders/integrators/vcmmlt/normalize.comp"}
+		{"src/shaders/integrators/vcmmlt/normalize.comp"},
+		{"src/shaders/integrators/vcmmlt/sum.comp"},
+		{"src/shaders/integrators/vcmmlt/reduce_sum.comp"},
 	};
 	for (auto& shader : shaders) {
 		shader.compile();
@@ -942,6 +1044,16 @@ void VCMMLT::create_compute_pipelines() {
 	settings.shader = shaders[5];
 	settings.push_const_size = sizeof(PushConstantRay);
 	normalize_pipeline->create_compute_pipeline(settings);
+	settings.shader = shaders[6];
+	settings.specialization_data = { 0 };
+	sum0_pipeline->create_compute_pipeline(settings);
+	settings.specialization_data = { 1 };
+	sum1_pipeline->create_compute_pipeline(settings);
+	settings.shader = shaders[7];
+	settings.specialization_data = { 0 };
+	sum_reduce0_pipeline->create_compute_pipeline(settings);
+	settings.specialization_data = { 1 };
+	sum_reduce1_pipeline->create_compute_pipeline(settings);
 }
 
 void VCMMLT::prefix_scan(int level, int num_elems, CommandBuffer& cmd) {
@@ -1063,7 +1175,10 @@ void VCMMLT::destroy() {
 	  &light_path_buffer,
 	  &light_path_cnt_buffer,
 	  &tmp_col_buffer,
-	  &photon_buffer
+	  &photon_buffer,
+	  &mlt_atomicsum_buffer,
+	  &mlt_residual_buffer,
+	  &counter_buffer
 	};
 	for (auto b : buffer_list) {
 		b->destroy();
@@ -1090,7 +1205,11 @@ void VCMMLT::destroy() {
 		composite_pipeline.get(),
 		prefix_scan_pipeline.get(),
 		uniform_add_pipeline.get(),
-		normalize_pipeline.get()
+		normalize_pipeline.get(),
+		sum0_pipeline.get(),
+		sum1_pipeline.get(),
+		sum_reduce0_pipeline.get(),
+		sum_reduce1_pipeline.get()
 	};
 	for (auto p : pipeline_list) {
 		p->cleanup();
@@ -1112,4 +1231,8 @@ void VCMMLT::reload() {
 	prefix_scan_pipeline->reload();
 	uniform_add_pipeline->reload();
 	normalize_pipeline->reload();
+	sum0_pipeline->reload();
+	sum1_pipeline->reload();
+	sum_reduce0_pipeline->reload();
+	sum_reduce1_pipeline->reload();
 }

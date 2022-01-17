@@ -256,7 +256,7 @@ struct VCMMLTSeedData {
 
 struct ChainData {
     float total_luminance;
-    uint lum_samples;
+    float lum_samples;
     float total_samples;
     float normalization;
 };
@@ -319,6 +319,8 @@ struct SceneDesc {
     uint64_t prob_carryover_addr;
     uint64_t light_splats_addr;
     uint64_t light_splat_cnts_addr;
+
+    uint64_t mlt_atomicsum_addr;
 };
 
 // Structure used for retrieving the primitive information in the closest hit

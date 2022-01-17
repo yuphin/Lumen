@@ -1,0 +1,41 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../commons.h"
+#include "../../utils.glsl"
+layout(constant_id = 0) const int MODE = 0;
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(buffer_reference, scalar) buffer MLTSumData { vec3 d[]; };
+layout(buffer_reference, scalar) buffer ResidualData { vec3 d[]; };
+uint size = pc_ray.num_mlt_threads;
+shared vec3 data[32];
+MLTSumData sum_data = MLTSumData(scene_desc.mlt_atomicsum_addr);
+ResidualData res_data = ResidualData(scene_desc.residual_addr);
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    vec3 val = vec3(0);
+    if (idx < size) {
+            val = sum_data.d[2 * idx + MODE];
+    }
+    val = subgroupAdd(val);
+    if (gl_SubgroupInvocationID == 0) {
+        data[gl_SubgroupID].xyz = val;
+    }
+    barrier();
+    if (gl_SubgroupID == 0) {
+        val = data[gl_SubgroupInvocationID];
+        subgroupBarrier();
+        val = subgroupAdd(val);
+    }
+    if (gl_LocalInvocationID.x == 0) {
+        res_data.d[gl_WorkGroupID.x] = val;
+    }
+}

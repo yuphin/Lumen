@@ -38,6 +38,10 @@ private:
 	std::unique_ptr<Pipeline> prefix_scan_pipeline = nullptr;
 	std::unique_ptr<Pipeline> uniform_add_pipeline = nullptr;
 	std::unique_ptr<Pipeline> normalize_pipeline = nullptr;
+	std::unique_ptr<Pipeline> sum0_pipeline = nullptr;
+	std::unique_ptr<Pipeline> sum1_pipeline = nullptr;
+	std::unique_ptr<Pipeline> sum_reduce0_pipeline = nullptr;
+	std::unique_ptr<Pipeline> sum_reduce1_pipeline = nullptr;
 
 	// SMLT buffers
 	Buffer bootstrap_buffer;
@@ -55,6 +59,9 @@ private:
 	Buffer cdf_cpu;
 	Buffer tmp_col_buffer;
 	Buffer photon_buffer;
+	Buffer mlt_atomicsum_buffer;
+	Buffer mlt_residual_buffer;
+	Buffer counter_buffer;
 	std::vector<Buffer> block_sums;
 
 	Buffer light_path_cnt_buffer;

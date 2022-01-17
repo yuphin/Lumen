@@ -1,0 +1,57 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../commons.h"
+#include "../../utils.glsl"
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(buffer_reference, scalar) buffer ResidualData { vec3 d[]; };
+layout(buffer_reference, scalar) buffer ChainStats { ChainData d[]; };
+layout(buffer_reference, scalar) buffer CounterData { int d; };
+layout(constant_id = 0) const int MODE = 0;
+uint size = pc_ray.num_mlt_threads;
+ResidualData res_data = ResidualData(scene_desc.residual_addr);
+CounterData cnt = CounterData(scene_desc.counter_addr);
+ChainStats chain_stats = ChainStats(scene_desc.chain_stats_addr);
+shared vec3 data[32];
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    vec3 val;
+    uint limit = cnt.d == 0 ? size : ((size + 1023) >> (10 * cnt.d));
+    if (idx >= limit) {
+        return;
+    }
+    val = res_data.d[idx].xyz;
+    memoryBarrier();
+    barrier();
+
+    val = subgroupAdd(val);
+    if (gl_SubgroupInvocationID == 0) {
+        data[gl_SubgroupID] = val;
+    }
+    barrier();
+
+    if (gl_SubgroupID == 0) {
+        val = data[gl_SubgroupInvocationID];
+        subgroupBarrier();
+        val = subgroupAdd(val);
+    }
+    if (gl_LocalInvocationID.x == 0) {
+        res_data.d[gl_WorkGroupID.x] = val;
+    }
+    if (idx == 0) {
+        cnt.d += 1;
+    }
+    if (limit < 1024 && idx == 0) {
+        chain_stats.d[MODE].total_luminance += val.x;
+        chain_stats.d[MODE].lum_samples += val.y;
+        chain_stats.d[MODE].total_samples += val.z;
+    }
+}
