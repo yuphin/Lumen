@@ -28,6 +28,8 @@ void main() {
     uint valu;
     uint limit = cnt.d == 0 ? size : ((size + 1023) >> (10 * cnt.d));
     if (idx >= limit) {
+        dataf[gl_SubgroupInvocationID] = vec2(0);
+        datau[gl_SubgroupInvocationID] = 0;
         return;
     }
     valf = vec2(res_data.d[idx].x, res_data.d[idx].z);
