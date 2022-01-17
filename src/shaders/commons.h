@@ -256,9 +256,15 @@ struct VCMMLTSeedData {
 
 struct ChainData {
     float total_luminance;
-    float lum_samples;
+    uint lum_samples;
     float total_samples;
     float normalization;
+};
+
+struct SumData {
+    float x;
+    uint y;
+    float z;
 };
 
 struct Splat {

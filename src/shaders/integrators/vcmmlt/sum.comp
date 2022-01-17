@@ -13,29 +13,38 @@ layout(constant_id = 0) const int MODE = 0;
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
-layout(buffer_reference, scalar) buffer MLTSumData { vec3 d[]; };
-layout(buffer_reference, scalar) buffer ResidualData { vec3 d[]; };
+layout(buffer_reference, scalar) buffer MLTSumData { SumData d[]; };
+layout(buffer_reference, scalar) buffer ResidualData { SumData d[]; };
 uint size = pc_ray.num_mlt_threads;
-shared vec3 data[32];
+shared vec2 dataf[32];
+shared uint datau[32];
 MLTSumData sum_data = MLTSumData(scene_desc.mlt_atomicsum_addr);
 ResidualData res_data = ResidualData(scene_desc.residual_addr);
 void main() {
     uint idx = gl_GlobalInvocationID.x;
-    vec3 val = vec3(0);
+    vec2 valf = vec2(0);
+    uint valu = 0;
     if (idx < size) {
-            val = sum_data.d[2 * idx + MODE];
+            valf = vec2(sum_data.d[2 * idx + MODE].x, sum_data.d[2 * idx + MODE].z);
+            valu = sum_data.d[2 * idx + MODE].y;
     }
-    val = subgroupAdd(val);
+    valf = subgroupAdd(valf);
+    valu = subgroupAdd(valu);
     if (gl_SubgroupInvocationID == 0) {
-        data[gl_SubgroupID].xyz = val;
+        dataf[gl_SubgroupID].xy = valf;
+        datau[gl_SubgroupID] = valu;
     }
     barrier();
     if (gl_SubgroupID == 0) {
-        val = data[gl_SubgroupInvocationID];
+        valf = dataf[gl_SubgroupInvocationID];
+        valu = datau[gl_SubgroupInvocationID];
         subgroupBarrier();
-        val = subgroupAdd(val);
+        valf = subgroupAdd(valf);
+        valu = subgroupAdd(valu);
     }
     if (gl_LocalInvocationID.x == 0) {
-        res_data.d[gl_WorkGroupID.x] = val;
+        res_data.d[gl_WorkGroupID.x].x = valf.x;
+        res_data.d[gl_WorkGroupID.x].y = valu;
+        res_data.d[gl_WorkGroupID.x].z = valf.y;
     }
 }

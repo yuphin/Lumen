@@ -12,7 +12,7 @@
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
-layout(buffer_reference, scalar) buffer ResidualData { vec3 d[]; };
+layout(buffer_reference, scalar) buffer ResidualData { SumData d[]; };
 layout(buffer_reference, scalar) buffer ChainStats { ChainData d[]; };
 layout(buffer_reference, scalar) buffer CounterData { int d; };
 layout(constant_id = 0) const int MODE = 0;
@@ -20,38 +20,47 @@ uint size = pc_ray.num_mlt_threads;
 ResidualData res_data = ResidualData(scene_desc.residual_addr);
 CounterData cnt = CounterData(scene_desc.counter_addr);
 ChainStats chain_stats = ChainStats(scene_desc.chain_stats_addr);
-shared vec3 data[32];
+shared vec2 dataf[32];
+shared uint datau[32];
 void main() {
     uint idx = gl_GlobalInvocationID.x;
-    vec3 val;
+    vec2 valf;
+    uint valu;
     uint limit = cnt.d == 0 ? size : ((size + 1023) >> (10 * cnt.d));
     if (idx >= limit) {
         return;
     }
-    val = res_data.d[idx].xyz;
+    valf = vec2(res_data.d[idx].x, res_data.d[idx].z);
+    valu = res_data.d[idx].y;
     memoryBarrier();
     barrier();
 
-    val = subgroupAdd(val);
+    valf = subgroupAdd(valf);
+    valu = subgroupAdd(valu);
     if (gl_SubgroupInvocationID == 0) {
-        data[gl_SubgroupID] = val;
+        dataf[gl_SubgroupID] = valf;
+        datau[gl_SubgroupID] = valu;
     }
     barrier();
 
     if (gl_SubgroupID == 0) {
-        val = data[gl_SubgroupInvocationID];
+        valf = dataf[gl_SubgroupInvocationID];
+        valu = datau[gl_SubgroupInvocationID];
         subgroupBarrier();
-        val = subgroupAdd(val);
+        valf = subgroupAdd(valf);
+        valu = subgroupAdd(valu);
     }
     if (gl_LocalInvocationID.x == 0) {
-        res_data.d[gl_WorkGroupID.x] = val;
+        res_data.d[gl_WorkGroupID.x].x = valf.x;
+        res_data.d[gl_WorkGroupID.x].y = valu;
+        res_data.d[gl_WorkGroupID.x].z = valf.y;
     }
     if (idx == 0) {
         cnt.d += 1;
     }
     if (limit < 1024 && idx == 0) {
-        chain_stats.d[MODE].total_luminance += val.x;
-        chain_stats.d[MODE].lum_samples += val.y;
-        chain_stats.d[MODE].total_samples += val.z;
+        chain_stats.d[MODE].total_luminance += valf.x;
+        chain_stats.d[MODE].lum_samples += valu;
+        chain_stats.d[MODE].total_samples += valf.y;
     }
 }

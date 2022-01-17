@@ -156,7 +156,7 @@ void VCMMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * sizeof(float) * 3 * 2
+		num_mlt_threads * sizeof(SumData) * 2
 	);
 
 	mlt_residual_buffer.create(
@@ -165,7 +165,7 @@ void VCMMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * sizeof(float) * 3
+		num_mlt_threads * sizeof(SumData)
 	);
 
 	counter_buffer.create(
@@ -1194,6 +1194,7 @@ void VCMMLT::destroy() {
 	}
 	std::vector<Pipeline*> pipeline_list = {
 		eye_pipeline.get(),
+		light_pipeline.get(),
 		seed1_pipeline.get(),
 		seed2_pipeline.get(),
 		preprocess1_pipeline.get(),

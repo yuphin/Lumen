@@ -16,7 +16,7 @@ layout(buffer_reference, scalar) buffer PathCnt { uint d[]; };
 layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
 layout(buffer_reference, scalar) buffer PhotonData_ { PhotonHash d[]; };
 
-layout(buffer_reference, scalar) buffer MLTSumData { vec3 d[]; };
+layout(buffer_reference, scalar) buffer MLTSumData { SumData d[]; };
 
 uint chain = 0;
 uint depth_factor = pc_ray.max_depth * (pc_ray.max_depth + 1);
@@ -684,7 +684,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
         if (luminance(mat.emissive_factor) > 0) {
             col += camera_state.throughput *
                    vcm_get_light_radiance(mat, camera_state, d);
-            break;
+            // break;
         }
 
         // Connect to light
