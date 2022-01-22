@@ -26,7 +26,7 @@ public:
 	std::unique_ptr<Camera> camera = nullptr;
 	bool updated = false;
 protected:
-	void update_uniform_buffers();
+	virtual void update_uniform_buffers();
 	SceneUBO scene_ubo{};
 	Buffer vertex_buffer;
 	Buffer normal_buffer;

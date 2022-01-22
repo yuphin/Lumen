@@ -69,6 +69,8 @@ struct PushConstantRay {
     uint num_bootstrap_samples;
     float mutations_per_pixel;
     uint num_mlt_threads;
+
+    uint do_spatiotemporal;
 };
 
 struct PushConstantPost {
@@ -94,6 +96,8 @@ struct SceneUBO {
     mat4 inv_projection;
     vec4 light_pos;
     vec4 view_pos;
+    mat4 prev_view;
+    mat4 prev_projection;
 };
 
 struct Vertex {
@@ -172,9 +176,9 @@ struct SPPMData {
     vec3 tau;
     vec3 col;
     vec3 phi;
-	vec3 throughput;
-	uint material_idx;
-	vec2 uv;
+    vec3 throughput;
+    uint material_idx;
+    vec2 uv;
     int M;
     float N;
     float radius;
@@ -250,8 +254,8 @@ struct SeedData {
 };
 
 struct VCMMLTSeedData {
- 	uvec4 chain0_seed;
-	uvec4 chain1_seed;
+    uvec4 chain0_seed;
+    uvec4 chain1_seed;
 };
 
 struct ChainData {
@@ -275,6 +279,24 @@ struct Splat {
 struct BootstrapSample {
     uvec4 seed;
     float lum;
+};
+
+struct ReservoirSample {
+    vec3 x_v;
+    vec3 n_v;
+    vec3 x_s;
+    vec3 n_s;
+    vec3 L_o;
+    vec3 f;
+    float p_q;
+    uint bsdf_props;
+};
+
+struct Reservoir {
+    float w_sum;
+    float W;
+    uint m;
+    ReservoirSample s;
 };
 
 // Scene buffer addresses
@@ -325,8 +347,11 @@ struct SceneDesc {
     uint64_t prob_carryover_addr;
     uint64_t light_splats_addr;
     uint64_t light_splat_cnts_addr;
-
     uint64_t mlt_atomicsum_addr;
+    // ReSTIR
+    uint64_t restir_samples_addr;
+    uint64_t temporal_reservoir_addr;
+    uint64_t spatial_reservoir_addr;
 };
 
 // Structure used for retrieving the primitive information in the closest hit

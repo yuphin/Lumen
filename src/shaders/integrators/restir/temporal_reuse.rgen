@@ -1,0 +1,135 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+
+#include "../../commons.glsl"
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(buffer_reference, scalar) buffer RestirSamples { ReservoirSample d[]; };
+layout(buffer_reference, scalar) buffer Reservoirs { Reservoir d[]; };
+const uint flags = gl_RayFlagsOpaqueEXT;
+const float tmin = 0.001;
+const float tmax = 10000.0;
+#define RR_MIN_DEPTH 3
+#define M_MAX 30
+uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
+
+RestirSamples samples = RestirSamples(scene_desc.restir_samples_addr);
+Reservoirs temp_reservoirs = Reservoirs(scene_desc.temporal_reservoir_addr);
+Reservoirs spatial_reservoirs = Reservoirs(scene_desc.spatial_reservoir_addr);
+void init_s(out ReservoirSample s) {
+    s.x_v = vec3(0);
+    s.n_v = vec3(0);
+    s.x_s = vec3(0);
+    s.n_s = vec3(0);
+    s.L_o = vec3(0);
+    s.f = vec3(0);
+    s.p_q = 0;
+}
+
+void init_reservoir(out Reservoir r) {
+    r.w_sum = 0;
+    r.W = 0;
+    r.m = 0;
+    init_s(r.s);
+}
+
+void update_reservoir(inout Reservoir r, const ReservoirSample s, float w_i) {
+    r.w_sum += w_i;
+    r.m++;
+    if (rand(seed) < w_i / r.w_sum) {
+        r.s = s;
+        float l1 = length(s.n_s);
+        if (l1 != 0 && abs(l1 - 1) > EPS) {
+            debugPrintfEXT("t1: %f\n", l1);
+        }
+    }
+}
+
+float p_hat(const vec3 f) { return length(f); }
+
+uint offset(const uint pingpong) {
+    return pingpong * pc_ray.size_x * pc_ray.size_y;
+}
+
+void main() {
+    const uint pingpong = (pc_ray.frame_num % 2);
+    const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+    const ReservoirSample s = samples.d[pixel_idx];
+    Reservoir r;
+    if (length(s.n_s) == 0) {
+        return;
+    }
+    if (pc_ray.do_spatiotemporal == 1) {
+        vec4 prev_pos = ubo.prev_view * vec4(s.x_v, 1);
+        prev_pos /= prev_pos.z;
+        prev_pos = -ubo.prev_projection * prev_pos;
+        ivec2 prev_coords =
+            ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
+        if (prev_coords.x < 0 || prev_coords.x >= gl_LaunchSizeEXT.x ||
+            prev_coords.y < 0 || prev_coords.y >= gl_LaunchSizeEXT.y) {
+            // Temporal projection failed, reset both reservoirs
+            // Temporal
+            init_reservoir(r);
+            // Spatial reset
+            spatial_reservoirs.d[offset(pingpong ^ 1) + pixel_idx] = r;
+        } else {
+            uint prev_coords_idx =
+                prev_coords.x * pc_ray.size_y + prev_coords.y;
+            if (prev_coords_idx != pixel_idx) {
+                debugPrintfEXT("t2: %d - %d - %v2i - %v2i - %v3f\n",
+                               prev_coords_idx, pixel_idx, prev_coords,
+                               ivec2(gl_LaunchIDEXT.xy), prev_pos.xyz);
+            }
+            r = temp_reservoirs.d[offset(pingpong) + prev_coords_idx];
+        }
+    } else {
+        init_reservoir(r);
+    }
+
+    Reservoir r_new;
+    r_new.w_sum = 0;
+    r_new.W = 0;
+    r_new.m = 0;
+    const float phat = p_hat(s.L_o);
+    const float w = phat / s.p_q;
+    update_reservoir(r_new, s, w);
+    r_new.W = phat == 0 ? 0 : r_new.w_sum / (r_new.m * phat);
+    
+    Reservoir r_t;
+    r_t.w_sum = 0;
+    r_t.W = 0;
+    r_t.m = 0;
+    // Combine new
+    update_reservoir(r_t, r_new.s, r_new.m * r_new.W * phat);
+    // Combine previous
+    update_reservoir(r_t, r.s, r.m * r.W * p_hat(r.s.L_o));
+    uint mval = r.m;
+    const float new_phat = p_hat(r_t.s.L_o);
+    if(new_phat > 0) {
+        mval++;
+    }
+    r_t.m = min(r.m+1, M_MAX);
+    r_t.W = new_phat * mval == 0 ? 0 : r_t.w_sum / (mval * new_phat);
+#define tr temp_reservoirs.d[offset(pingpong ^ 1) + pixel_idx]
+    tr.w_sum = r_t.w_sum;
+    tr.W = r_t.W;
+    tr.m = r_t.m;
+    tr.s = r_t.s;
+    // if(r_t.W > 10000 ){
+    //     debugPrintfEXT("%f / %f / %d / %f\n", r_t.W,  r_t.w_sum,  r_t.m,  phat);
+    // }
+    //   if (abs(l1 - 1) > EPS) {
+    //     debugPrintfEXT("t3:  %f - %v3f\n", l1, s.n_s);
+    // }
+
+    if (isnan(r_t.W)) {
+        debugPrintfEXT("t4: %d - %d\n", r_t.m, pc_ray.frame_num);
+    }
+}

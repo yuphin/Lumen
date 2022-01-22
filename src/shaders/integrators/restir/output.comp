@@ -1,0 +1,57 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+#include "../../utils.glsl"
+
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(set = 0, binding = 1, rgba32f) uniform image2D image;
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
+layout(buffer_reference, scalar) buffer RestirSamples { ReservoirSample d[]; };
+layout(buffer_reference, scalar) buffer Reservoirs { Reservoir d[]; };
+
+RestirSamples samples = RestirSamples(scene_desc.restir_samples_addr);
+ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
+Reservoirs temp_reservoirs = Reservoirs(scene_desc.temporal_reservoir_addr);
+Reservoirs spatial_reservoirs = Reservoirs(scene_desc.spatial_reservoir_addr);
+
+uint offset(const uint pingpong) {
+    return pingpong * pc_ray.size_x * pc_ray.size_y;
+}
+
+void main() {
+    ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc_ray.size_y,
+                         gl_GlobalInvocationID.x % pc_ray.size_y);
+    if (gl_GlobalInvocationID.x >= pc_ray.size_x * pc_ray.size_y) {
+        return;
+    }
+    const uint pingpong = (pc_ray.frame_num % 2);
+    vec3 col = vec3(0);
+    col += tmp_col.d[gl_GlobalInvocationID.x];
+    uint idx = gl_GlobalInvocationID.x;
+    tmp_col.d[gl_GlobalInvocationID.x] = vec3(0);
+    const Reservoir r =
+        spatial_reservoirs.d[offset(pingpong) + gl_GlobalInvocationID.x];
+    if (r.W > 0) {
+        const ReservoirSample s = r.s;
+        const vec3 wi = normalize(s.x_s - s.x_v);
+        col += s.f * abs(dot(wi, s.n_v)) * s.L_o * r.W;
+    }
+    //imageStore(image, ivec2(coords), vec4(col, 1.f));
+    if (pc_ray.frame_num > 0) {
+        float w = 1. / float(pc_ray.frame_num + 1);
+        vec3 old_col = imageLoad(image, ivec2(coords)).xyz;
+        imageStore(image, ivec2(coords), vec4(mix(old_col, col, w), 1.f));
+        //imageStore(image, ivec2(coords), vec4(col, 1.f));
+    } else {
+        imageStore(image, ivec2(coords), vec4(col, 1.f));
+    }
+}
