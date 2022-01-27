@@ -1,8 +1,8 @@
 #pragma once
 #include "Integrator.h"
-class ReSTIR : public Integrator {
+class ReSTIRGI : public Integrator {
 public:
-	ReSTIR(LumenInstance* scene, const SceneConfig& config) : 
+	ReSTIRGI(LumenInstance* scene, const SceneConfig& config) : 
 		Integrator(scene, config) {}
 	virtual void init() override;
 	virtual void render() override;
@@ -10,8 +10,7 @@ public:
 	virtual void destroy() override;
 	virtual void reload() override;
 private:
-	Buffer g_buffer;
-	Buffer passthrough_reservoir_buffer;
+	Buffer restir_samples_buffer;
 	Buffer temporal_reservoir_buffer;
 	Buffer spatial_reservoir_buffer;
 	Buffer tmp_col_buffer;
@@ -26,8 +25,9 @@ private:
 	VkDescriptorPool desc_pool;
 	VkDescriptorSetLayout desc_set_layout;
 	VkDescriptorSet desc_set;
-	std::unique_ptr<Pipeline> spatial_pass_pipeline;
-	std::unique_ptr<Pipeline> temporal_pass_pipeline;
+	std::unique_ptr<Pipeline> rt_pipeline;
+	std::unique_ptr<Pipeline> spatial_reuse_pipeline;
+	std::unique_ptr<Pipeline> temporal_reuse_pipeline;
 	std::unique_ptr<Pipeline> output_pipeline;
 	bool do_spatiotemporal = false;
 

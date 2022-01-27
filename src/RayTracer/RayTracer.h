@@ -9,6 +9,7 @@
 #include "SMLT.h"
 #include "VCMMLT.h"
 #include "ReSTIR.h"
+#include "ReSTIRGI.h"
 class RayTracer : public LumenInstance {
 public:
 	RayTracer(int width, int height, bool debug);

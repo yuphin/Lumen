@@ -299,6 +299,28 @@ struct Reservoir {
     ReservoirSample s;
 };
 
+struct GBufferData {
+    vec3 pos;
+    vec3 normal;
+    vec2 uv;
+    uint mat_idx;
+};
+
+struct RestirData {
+    uint light_idx;
+    uint light_mesh_idx;
+    uvec4 seed;
+};
+
+struct RestirReservoir {
+    float w_sum;
+    float W;
+    uint m;
+    RestirData s;
+    float p_hat;
+    float pdf;
+};
+
 // Scene buffer addresses
 struct SceneDesc {
     uint64_t vertex_addr;
@@ -350,7 +372,9 @@ struct SceneDesc {
     uint64_t mlt_atomicsum_addr;
     // ReSTIR
     uint64_t restir_samples_addr;
+    uint64_t g_buffer_addr;
     uint64_t temporal_reservoir_addr;
+    uint64_t passthrough_reservoir_addr;
     uint64_t spatial_reservoir_addr;
 };
 

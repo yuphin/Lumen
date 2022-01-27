@@ -8,7 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
-#include "../../commons.glsl"
+#include "../../../commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 layout(buffer_reference, scalar) buffer RestirSamples { ReservoirSample d[]; };
 layout(buffer_reference, scalar) buffer Reservoirs { Reservoir d[]; };
@@ -104,8 +104,8 @@ uint offset(const uint pingpong) {
 void main() {
     // TODO: Adaptively change this
     const uint pingpong = (pc_ray.frame_num % 2);
-    const float max_r = 0.001;
-    const float depth_threshold = 0.05;
+    const float max_r = 1;
+    const float depth_threshold = 0.01;
     const float angle_threshold = 25 * PI / 180;
     ReservoirSample q = samples.d[pixel_idx];
     Reservoir r_s;
@@ -118,7 +118,7 @@ void main() {
         init_reservoir(r_s);
     }
 
-    const uint max_iter = r_s.m < M_MAX / 2 ? 9 : 3;
+    const uint max_iter = r_s.m < M_MAX / 2 ? 18 : 6;
     uint Q[9] = uint[9](0, 0, 0, 0, 0, 0, 0, 0, 0);
     uint Q_h[9] = uint[9](0, 0, 0, 0, 0, 0, 0, 0, 0);
     uint q_cnt = 0;
@@ -140,9 +140,9 @@ void main() {
     for (int i = 0; i < max_iter; i++) {
         // Choose a neighbor pixel
         const float randa = rand(seed) * 2 * PI;
-        const float randr = rand(seed) * max_r;
+        const float randr = sqrt(rand(seed)) * max_r;
         ivec2 rand_offset =
-            ivec2(floor(cos(randa) * randr), floor(sin(randa * randr)));
+            ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
         const ivec2 coords = clamp(ivec2(gl_LaunchIDEXT.xy) + rand_offset,
                                    ivec2(0), ivec2(gl_LaunchSizeEXT.xy) - 1);
         const uint coords_idx = coords.x * pc_ray.size_y + coords.y;

@@ -9,7 +9,7 @@ void Integrator::init() {
 	constexpr int VERTEX_BINDING_ID = 0;
 	camera = std::unique_ptr<PerspectiveCamera>(new PerspectiveCamera(
 		45.0f, 0.01f, 1000.0f, (float)instance->width / instance->height,
-		glm::vec3(0.7, 0.5, 15.5)));
+		glm::vec3(0.7, -0.5, 15.5)));
 	Camera* cam_ptr = camera.get();
 	LumenInstance* instance = this->instance;
 	Window* window = instance->window;

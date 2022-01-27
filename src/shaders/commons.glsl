@@ -264,6 +264,27 @@ vec3 eval_albedo(const Material m) {
     return albedo;
 }
 
+TriangleRecord sample_area_light_with_idx(const vec4 rands,
+                                          const uint light_mesh_idx,
+                                          const uint triangle_idx,
+                                          out uint material_idx) {
+    const MeshLight light = area_lights[light_mesh_idx];
+    PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
+    material_idx = pinfo.material_index;
+    return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
+}
+
+TriangleRecord sample_area_light(const vec4 rands, const int num_mesh_lights,
+                                 out uint light_mesh_idx, out uint triangle_idx,
+                                 out uint material_idx) {
+    light_mesh_idx = uint(rands.x * num_mesh_lights);
+    MeshLight light = area_lights[light_mesh_idx];
+    PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
+    material_idx = pinfo.material_index;
+    triangle_idx = uint(rands.y * light.num_triangles);
+    return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
+}
+
 TriangleRecord sample_area_light(const vec4 rands, const int num_mesh_lights,
                                  out uint light_idx, out uint triangle_idx,
                                  out uint material_idx, out MeshLight light) {
@@ -280,8 +301,8 @@ TriangleRecord sample_area_light(out uint light_idx, out uint triangle_idx,
                                  out uint material_idx, out MeshLight light,
                                  inout uvec4 seed, const int num_mesh_lights) {
     const vec4 rands = vec4(rand(seed), rand(seed), rand(seed), rand(seed));
-     return sample_area_light(rands, num_mesh_lights, light_idx, triangle_idx, material_idx,
-                             light);
+    return sample_area_light(rands, num_mesh_lights, light_idx, triangle_idx,
+                             material_idx, light);
 }
 
 #endif

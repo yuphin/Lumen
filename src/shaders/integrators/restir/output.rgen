@@ -1,0 +1,80 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+
+#include "../../commons.glsl"
+
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
+layout(buffer_reference, scalar) buffer RestirReservoir_ {
+    RestirReservoir d[];
+};
+layout(buffer_reference, scalar) buffer GBuffer { GBufferData d[]; };
+ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
+RestirReservoir_ spatial_reservoirs =
+    RestirReservoir_(scene_desc.spatial_reservoir_addr);
+RestirReservoir_ temporal_reservoirs =
+    RestirReservoir_(scene_desc.temporal_reservoir_addr);
+GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
+uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
+vec3 pos = gbuffer.d[pixel_idx].pos;
+vec3 normal = gbuffer.d[pixel_idx].pos;
+vec2 uv = gbuffer.d[pixel_idx].uv;
+uint mat_idx = gbuffer.d[pixel_idx].mat_idx;
+vec3 origin = vec4(ubo.inv_view * vec4(0, 0, 0, 1)).xyz;
+
+vec3 calc_L(const RestirReservoir r) {
+    const MaterialProps hit_mat = load_material(mat_idx, uv);
+    const vec3 wo = origin - pos;
+    vec2 uv_unused;
+    uvec4 r_seed = r.s.seed;
+    const uint light_mesh_idx = r.s.light_mesh_idx;
+    const uint light_triangle_idx = r.s.light_idx;
+    const vec4 rands =
+        vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
+    uint light_material_idx;
+    const TriangleRecord record = sample_area_light_with_idx(
+        rands, light_mesh_idx, light_triangle_idx, light_material_idx);
+    vec3 wi = record.pos - pos;
+    const float wi_len = length(wi);
+    wi /= wi_len;
+    const MaterialProps light_mat =
+        load_material(light_material_idx, uv_unused);
+    const vec3 f = eval_bsdf(hit_mat, wo, wi);
+    const float cos_x = dot(normal, wi);
+    const float g = abs(dot(record.triangle_normal, -wi)) / (wi_len * wi_len);
+    return f * light_mat.emissive_factor * abs(cos_x) * g;
+}
+
+void main() {
+
+    vec3 col = vec3(0);
+    const RestirReservoir r = spatial_reservoirs.d[pixel_idx];
+    col += tmp_col.d[pixel_idx];
+      if (isnan(luminance(col))) {
+            debugPrintfEXT("nan\n");
+        }
+    if (r.W > 0) {
+        col += r.W * calc_L(r);
+        temporal_reservoirs.d[pixel_idx].w_sum = r.w_sum;
+        temporal_reservoirs.d[pixel_idx].W = r.W;
+        temporal_reservoirs.d[pixel_idx].m = r.m;
+        temporal_reservoirs.d[pixel_idx].s = r.s;
+    }
+    tmp_col.d[pixel_idx] = vec3(0);
+
+    if (pc_ray.frame_num > 0) {
+        float w = 1. / float(pc_ray.frame_num + 1);
+        vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+        imageStore(image, ivec2(gl_LaunchIDEXT.xy),
+                   vec4(mix(old_col, col, w), 1.f));
+    } else {
+        imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+    }
+}

@@ -1,18 +1,18 @@
 #include "LumenPCH.h"
-#include "ReSTIR.h"
+#include "ReSTIRGI.h"
 
 const int max_depth = 6;
 const vec3 sky_col(0, 0, 0);
-void ReSTIR::init() {
+void ReSTIRGI::init() {
 	Integrator::init();
 
-	g_buffer.create(
+	restir_samples_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height * sizeof(GBufferData)
+		instance->width * instance->height * sizeof(ReservoirSample)
 	);
 
 	temporal_reservoir_buffer.create(
@@ -21,16 +21,7 @@ void ReSTIR::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height * sizeof(RestirReservoir)
-	);
-
-	passthrough_reservoir_buffer.create(
-		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height * sizeof(RestirReservoir)
+		2 * instance->width * instance->height * sizeof(Reservoir)
 	);
 
 	spatial_reservoir_buffer.create(
@@ -39,7 +30,7 @@ void ReSTIR::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height * sizeof(RestirReservoir)
+		2 * instance->width * instance->height * sizeof(Reservoir)
 	);
 
 	tmp_col_buffer.create(
@@ -58,10 +49,9 @@ void ReSTIR::init() {
 	desc.uv_addr = uv_buffer.get_device_address();
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
-	desc.g_buffer_addr = g_buffer.get_device_address();
+	desc.restir_samples_addr = restir_samples_buffer.get_device_address();
 	desc.temporal_reservoir_addr = temporal_reservoir_buffer.get_device_address();
 	desc.spatial_reservoir_addr = spatial_reservoir_buffer.get_device_address();
-	desc.passthrough_reservoir_addr = passthrough_reservoir_buffer.get_device_address();
 	desc.color_storage_addr = tmp_col_buffer.get_device_address();
 	scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -82,7 +72,7 @@ void ReSTIR::init() {
 	pc_ray.size_y = instance->height;
 }
 
-void ReSTIR::render() {
+void ReSTIRGI::render() {
 	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = { 0.25f, 0.25f, 0.25f, 1.0f };
 	VkClearValue clear_depth = { 1.0f, 0 };
@@ -98,14 +88,14 @@ void ReSTIR::render() {
 	pc_ray.do_spatiotemporal = do_spatiotemporal;
 
 
-	vkCmdFillBuffer(cmd.handle, g_buffer.handle, 0, g_buffer.size, 0);
+	vkCmdFillBuffer(cmd.handle, restir_samples_buffer.handle, 0, restir_samples_buffer.size, 0);
 	if (!do_spatiotemporal) {
 		vkCmdFillBuffer(cmd.handle, temporal_reservoir_buffer.handle, 0, temporal_reservoir_buffer.size, 0);
 		vkCmdFillBuffer(cmd.handle, spatial_reservoir_buffer.handle, 0, spatial_reservoir_buffer.size, 0);
 
 	}
 	std::array<VkBufferMemoryBarrier, 3> barriers = {
-					buffer_barrier(g_buffer.handle,
+					buffer_barrier(restir_samples_buffer.handle,
 							  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 							  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
 					buffer_barrier(temporal_reservoir_buffer.handle,
@@ -119,26 +109,23 @@ void ReSTIR::render() {
 						 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(), barriers.data(), 0, 0);
 
-	// Temporal pass + path tracing
+	// Trace rays
 	{
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-						  temporal_pass_pipeline->handle);
+						  rt_pipeline->handle);
 		vkCmdBindDescriptorSets(
-			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, temporal_pass_pipeline->pipeline_layout,
+			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
-		vkCmdPushConstants(cmd.handle, temporal_pass_pipeline->pipeline_layout,
+		vkCmdPushConstants(cmd.handle, rt_pipeline->pipeline_layout,
 						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
 						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
 						   VK_SHADER_STAGE_MISS_BIT_KHR,
 						   0, sizeof(PushConstantRay), &pc_ray);
-		auto& regions = temporal_pass_pipeline->get_rt_regions();
+		auto& regions = rt_pipeline->get_rt_regions();
 		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3],
 						  instance->width, instance->height, 1);
-		std::array<VkBufferMemoryBarrier, 2> barriers = {
-				buffer_barrier(g_buffer.handle,
-						  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-						  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
-				buffer_barrier(passthrough_reservoir_buffer.handle,
+		std::array<VkBufferMemoryBarrier, 1> barriers = {
+				buffer_barrier(restir_samples_buffer.handle,
 						  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 						  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
 		};
@@ -147,26 +134,54 @@ void ReSTIR::render() {
 							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(), barriers.data(), 0, 0);
 	}
 
-	// Spatial pass
+	// Temporal reuse
 	{
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-						  spatial_pass_pipeline->handle);
+						  temporal_reuse_pipeline->handle);
 		vkCmdBindDescriptorSets(
 			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-			spatial_pass_pipeline->pipeline_layout,
+			temporal_reuse_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
-		vkCmdPushConstants(cmd.handle, spatial_pass_pipeline->pipeline_layout,
+		vkCmdPushConstants(cmd.handle, temporal_reuse_pipeline->pipeline_layout,
 						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
 						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
 						   VK_SHADER_STAGE_MISS_BIT_KHR,
 						   0, sizeof(PushConstantRay), &pc_ray);
-		auto& regions = spatial_pass_pipeline->get_rt_regions();
+		auto& regions = temporal_reuse_pipeline->get_rt_regions();
+		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3],
+						  instance->width, instance->height, 1);
+		std::array<VkBufferMemoryBarrier, 2> barriers = {
+					buffer_barrier(temporal_reservoir_buffer.handle,
+							  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+							  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+					buffer_barrier(spatial_reservoir_buffer.handle,
+							  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+							  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
+		};
+		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(), barriers.data(), 0, 0);
+	}
+	// Spatial reuse
+	{
+		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+						  spatial_reuse_pipeline->handle);
+		vkCmdBindDescriptorSets(
+			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+			spatial_reuse_pipeline->pipeline_layout,
+			0, 1, &desc_set, 0, nullptr);
+		vkCmdPushConstants(cmd.handle, spatial_reuse_pipeline->pipeline_layout,
+						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+						   VK_SHADER_STAGE_MISS_BIT_KHR,
+						   0, sizeof(PushConstantRay), &pc_ray);
+		auto& regions = spatial_reuse_pipeline->get_rt_regions();
 		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3],
 						  instance->width, instance->height, 1);
 		std::array<VkBufferMemoryBarrier, 1> barriers = {
-					buffer_barrier(spatial_reservoir_buffer.handle,
-							  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-							  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+				buffer_barrier(spatial_reservoir_buffer.handle,
+						  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+						  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
 		};
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
@@ -174,29 +189,23 @@ void ReSTIR::render() {
 	}
 	// Output
 	{
-		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-						  output_pipeline->handle);
 		vkCmdBindDescriptorSets(
-			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-			output_pipeline->pipeline_layout,
+			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, output_pipeline->pipeline_layout,
 			0, 1, &desc_set, 0, nullptr);
+		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
+						  output_pipeline->handle);
 		vkCmdPushConstants(cmd.handle, output_pipeline->pipeline_layout,
-						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-						   VK_SHADER_STAGE_MISS_BIT_KHR,
-						   0, sizeof(PushConstantRay), &pc_ray);
-		auto& regions = output_pipeline->get_rt_regions();
-		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3],
-						  instance->width, instance->height, 1);
+						   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantRay), &pc_ray);
+		int num_wgs = (instance->width * instance->height + 1023) / 1024;
+		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 	}
-
 	cmd.submit();
 	if (!do_spatiotemporal) {
 		do_spatiotemporal = true;
 	}
 }
 
-bool ReSTIR::update() {
+bool ReSTIRGI::update() {
 	pc_ray.frame_num++;
 	glm::vec3 translation{};
 	float trans_speed = 0.01f;
@@ -257,7 +266,7 @@ bool ReSTIR::update() {
 	return result;
 }
 
-void ReSTIR::create_offscreen_resources() {
+void ReSTIRGI::create_offscreen_resources() {
 	// Create offscreen image for output
 	TextureSettings settings;
 	settings.usage_flags =
@@ -273,7 +282,7 @@ void ReSTIR::create_offscreen_resources() {
 	cmd.submit();
 }
 
-void ReSTIR::create_descriptors() {
+void ReSTIRGI::create_descriptors() {
 	constexpr int TLAS_BINDING = 0;
 	constexpr int IMAGE_BINDING = 1;
 	constexpr int INSTANCE_BINDING = 2;
@@ -394,7 +403,7 @@ void ReSTIR::create_descriptors() {
 };
 
 
-void ReSTIR::create_blas() {
+void ReSTIRGI::create_blas() {
 	std::vector<BlasInput> blas_inputs;
 	auto vertex_address =
 		get_device_address(instance->vkb.ctx.device, vertex_buffer.handle);
@@ -407,7 +416,7 @@ void ReSTIR::create_blas() {
 							 VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
-void ReSTIR::create_tlas() {
+void ReSTIRGI::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
 	float total_light_triangle_area = 0.0f;
 	int light_triangle_cnt = 0;
@@ -464,7 +473,7 @@ void ReSTIR::create_tlas() {
 							 VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
-void ReSTIR::create_rt_pipelines() {
+void ReSTIRGI::create_rt_pipelines() {
 	enum StageIndices {
 		Raygen,
 		CMiss,
@@ -476,9 +485,9 @@ void ReSTIR::create_rt_pipelines() {
 	RTPipelineSettings settings;
 
 	std::vector<Shader> shaders = {
-		{"src/shaders/integrators/restir/temporal_pass.rgen"},
-		{"src/shaders/integrators/restir/spatial_pass.rgen"},
-		{"src/shaders/integrators/restir/output.rgen"},
+		{"src/shaders/integrators/restir/gi/restir.rgen"},
+		{"src/shaders/integrators/restir/gi/temporal_reuse.rgen"},
+		{"src/shaders/integrators/restir/gi/spatial_reuse.rgen"},
 		{"src/shaders/integrators/ray.rmiss"},
 		{"src/shaders/integrators/ray_shadow.rmiss"},
 		{"src/shaders/integrators/ray.rchit"},
@@ -559,32 +568,44 @@ void ReSTIR::create_rt_pipelines() {
 									 0, sizeof(PushConstantRay) });
 	settings.desc_layouts = { desc_set_layout };
 	settings.stages = stages;
-	temporal_pass_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
-	spatial_pass_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
-	output_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	rt_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	temporal_reuse_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	spatial_reuse_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	settings.shaders = { shaders[0], shaders[3], shaders[4], shaders[5], shaders[6] };
-	temporal_pass_pipeline->create_rt_pipeline(settings);
+	rt_pipeline->create_rt_pipeline(settings);
 	vkDestroyShaderModule(instance->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[1].create_vk_shader_module(instance->vkb.ctx.device);
 	settings.shaders[0] = shaders[1];
 	settings.stages = stages;
-	spatial_pass_pipeline->create_rt_pipeline(settings);
+	temporal_reuse_pipeline->create_rt_pipeline(settings);
 	vkDestroyShaderModule(instance->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[2].create_vk_shader_module(instance->vkb.ctx.device);
 	settings.shaders[0] = shaders[2];
 	settings.stages = stages;
-	output_pipeline->create_rt_pipeline(settings);
+	spatial_reuse_pipeline->create_rt_pipeline(settings);
 
 	for (auto& s : settings.stages) {
 		vkDestroyShaderModule(instance->vkb.ctx.device, s.module, nullptr);
 	}
 }
 
-void ReSTIR::create_compute_pipelines() {
-
+void ReSTIRGI::create_compute_pipelines() {
+	output_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	std::vector<Shader> shaders = {
+		{"src/shaders/integrators/restir/gi/output.comp"},
+	};
+	for (auto& shader : shaders) {
+		shader.compile();
+	}
+	ComputePipelineSettings settings;
+	settings.desc_sets = &desc_set_layout;
+	settings.desc_set_layout_cnt = 1;
+	settings.push_const_size = sizeof(PushConstantRay);
+	settings.shader = shaders[0];
+	output_pipeline->create_compute_pipeline(settings);
 }
 
-void ReSTIR::update_uniform_buffers() {
+void ReSTIRGI::update_uniform_buffers() {
 	camera->update_view_matrix();
 	scene_ubo.prev_view = scene_ubo.view;
 	scene_ubo.prev_projection = scene_ubo.projection;
@@ -598,11 +619,11 @@ void ReSTIR::update_uniform_buffers() {
 	memcpy(scene_ubo_buffer.data, &scene_ubo, sizeof(scene_ubo));
 }
 
-void ReSTIR::destroy() {
+void ReSTIRGI::destroy() {
 	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
 	std::vector<Buffer*> buffer_list = {
-		&g_buffer,
+		&restir_samples_buffer,
 		&temporal_reservoir_buffer,
 		&spatial_reservoir_buffer,
 		&tmp_col_buffer
@@ -611,8 +632,9 @@ void ReSTIR::destroy() {
 		b->destroy();
 	}
 	std::vector<Pipeline*> pipeline_list = {
-		temporal_pass_pipeline.get(),
-		spatial_pass_pipeline.get(),
+		rt_pipeline.get(),
+		temporal_reuse_pipeline.get(),
+		spatial_reuse_pipeline.get(),
 		output_pipeline.get()
 	};
 	for (auto p : pipeline_list) {
@@ -622,8 +644,6 @@ void ReSTIR::destroy() {
 	vkDestroyDescriptorPool(device, desc_pool, nullptr);
 }
 
-void ReSTIR::reload() {
-	spatial_pass_pipeline->reload();
-	temporal_pass_pipeline->reload();
-	output_pipeline->reload();
+void ReSTIRGI::reload() {
+	rt_pipeline->reload();
 }
