@@ -26,7 +26,8 @@ uint mat_idx;
 vec3 origin;
 
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
+                      pc_ray.frame_num ^ pc_ray.random_num);
 
 void load_g_buffer() {
     pos = gbuffer.d[pixel_idx].pos;
@@ -74,9 +75,39 @@ vec3 calc_L(const RestirReservoir r) {
     return f * light_mat.emissive_factor * abs(cos_x) * g;
 }
 
-float calc_p_hat(const RestirReservoir r_new) {
-    return length(calc_L(r_new));
+vec3 calc_L_with_visibility_check(const RestirReservoir r) {
+    const MaterialProps hit_mat = load_material(mat_idx, uv);
+    const vec3 wo = origin - pos;
+    vec2 uv_unused;
+    uvec4 r_seed = r.s.seed;
+    const uint light_mesh_idx = r.s.light_mesh_idx;
+    const uint light_triangle_idx = r.s.light_idx;
+    const vec4 rands =
+        vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
+    uint light_material_idx;
+    const TriangleRecord record = sample_area_light_with_idx(
+        rands, light_mesh_idx, light_triangle_idx, light_material_idx);
+    vec3 wi = record.pos - pos;
+    const float wi_len = length(wi);
+    wi /= wi_len;
+    const MaterialProps light_mat =
+        load_material(light_material_idx, uv_unused);
+    const vec3 f = eval_bsdf(hit_mat, wo, wi);
+    const float cos_x = dot(normal, wi);
+    const float g = abs(dot(record.triangle_normal, -wi)) / (wi_len * wi_len);
+    any_hit_payload.hit = 1;
+    traceRayEXT(tlas,
+                gl_RayFlagsTerminateOnFirstHitEXT |
+                    gl_RayFlagsSkipClosestHitShaderEXT,
+                0xFF, 1, 0, 1, offset_ray(pos, normal), 0, wi, wi_len - EPS, 1);
+    bool visible = any_hit_payload.hit == 0;
+    if (visible) {
+        return f * light_mat.emissive_factor * abs(cos_x) * g;
+    }
+    return vec3(0);
 }
+
+float calc_p_hat(const RestirReservoir r_new) { return length(calc_L(r_new)); }
 
 void combine_reservoir(inout RestirReservoir r1, const RestirReservoir r2) {
     float fac = r2.W * r2.m;

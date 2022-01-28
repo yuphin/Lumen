@@ -96,12 +96,13 @@ void ReSTIR::render() {
 	pc_ray.max_depth = max_depth;
 	pc_ray.sky_col = sky_col;
 	pc_ray.do_spatiotemporal = do_spatiotemporal;
+	pc_ray.random_num = rand() % UINT_MAX;
 
 
 	vkCmdFillBuffer(cmd.handle, g_buffer.handle, 0, g_buffer.size, 0);
+	vkCmdFillBuffer(cmd.handle, spatial_reservoir_buffer.handle, 0, spatial_reservoir_buffer.size, 0);
 	if (!do_spatiotemporal) {
 		vkCmdFillBuffer(cmd.handle, temporal_reservoir_buffer.handle, 0, temporal_reservoir_buffer.size, 0);
-		vkCmdFillBuffer(cmd.handle, spatial_reservoir_buffer.handle, 0, spatial_reservoir_buffer.size, 0);
 
 	}
 	std::array<VkBufferMemoryBarrier, 3> barriers = {
@@ -251,7 +252,6 @@ bool ReSTIR::update() {
 		result = true;
 		pc_ray.frame_num = 0;
 		updated = false;
-		do_spatiotemporal = false;
 	}
 	update_uniform_buffers();
 	return result;

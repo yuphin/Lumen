@@ -120,14 +120,15 @@ void main() {
         const uint M = 32;
         const uint light_samples = min(pc_ray.light_triangle_count, 32);
 
-        if (pc_ray.do_spatiotemporal == 1) {
+        if (pc_ray.do_spatiotemporal == 1 &&
+            (hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
             vec4 prev_pos = ubo.prev_view * vec4(pos, 1);
             prev_pos /= prev_pos.z;
             prev_pos = -ubo.prev_projection * prev_pos;
             ivec2 prev_coords =
                 ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
-            if (prev_coords.x < gl_LaunchSizeEXT.x || prev_coords.x >= 0 ||
-                prev_coords.y < gl_LaunchSizeEXT.y || prev_coords.y >= 0) {
+            if ((prev_coords.x < gl_LaunchSizeEXT.x && prev_coords.x >= 0) &&
+                (prev_coords.y < gl_LaunchSizeEXT.y && prev_coords.y >= 0)) {
                 r_prev = temporal_reservoirs.d[pixel_idx];
             }
         }
@@ -178,7 +179,7 @@ void main() {
             uint light_material_idx;
             const TriangleRecord record = sample_area_light_with_idx(
                 rands, light_mesh_idx, light_triangle_idx, light_material_idx);
-           
+
             vec3 wi = record.pos - payload.pos;
             const float wi_len = length(wi);
             wi /= wi_len;
@@ -205,7 +206,6 @@ void main() {
                 r_new.W = r_new.w_sum / (p_hat * r_new.m);
             }
         }
-
         // Temporal reuse
         combine_reservoir(r, r_new);
         uint num_samples = r_new.m;
@@ -215,7 +215,7 @@ void main() {
             num_samples += r_prev.m;
         }
         r.m = num_samples;
-        if (r_prev.W > 0 || r_new.W > 0) {
+        if (r_new.W > 0 || r_prev.W > 0) {
             const float phat = calc_p_hat(r) * r.m;
             r.W = phat == 0 ? 0 : r.w_sum / (phat);
         } else {
@@ -237,7 +237,7 @@ void main() {
         bool specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
         origin = offset_ray(pos, normal);
         // Do traditional path tracing
-        for (int depth = 1; ; depth++) {
+        for (int depth = 1;; depth++) {
             traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin, tmin, direction,
                         tmax, 0);
             const bool found_isect = payload.material_idx != -1;

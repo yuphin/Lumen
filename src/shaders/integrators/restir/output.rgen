@@ -15,11 +15,11 @@ void main() {
     vec3 col = vec3(0);
     const RestirReservoir r = spatial_reservoirs.d[pixel_idx];
     col += tmp_col.d[pixel_idx];
-      if (isnan(luminance(col))) {
-            debugPrintfEXT("nan\n");
-        }
+    if (isnan(luminance(col))) {
+        debugPrintfEXT("nan\n");
+    }
     if (r.W > 0) {
-        col += r.W * calc_L(r) * pc_ray.light_triangle_count;
+        col += r.W * calc_L_with_visibility_check(r) * pc_ray.light_triangle_count;
         temporal_reservoirs.d[pixel_idx].w_sum = r.w_sum;
         temporal_reservoirs.d[pixel_idx].W = r.W;
         temporal_reservoirs.d[pixel_idx].m = r.m;
