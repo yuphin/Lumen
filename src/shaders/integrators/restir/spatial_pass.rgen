@@ -7,88 +7,15 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
+#include "restir_commons.glsl"
 
-#include "../../commons.glsl"
-
-layout(buffer_reference, scalar) buffer RestirReservoir_ {
-    RestirReservoir d[];
-};
-layout(buffer_reference, scalar) buffer GBuffer { GBufferData d[]; };
-layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
-const uint flags = gl_RayFlagsOpaqueEXT;
-const float tmin = 0.001;
-const float tmax = 10000.0;
-#define RR_MIN_DEPTH 3
-uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
-
-RestirReservoir_ spatial_reservoirs =
-    RestirReservoir_(scene_desc.spatial_reservoir_addr);
-RestirReservoir_ temporal_reservoirs =
-    RestirReservoir_(scene_desc.temporal_reservoir_addr);
-RestirReservoir_ passthrough_reservoirs =
-    RestirReservoir_(scene_desc.passthrough_reservoir_addr);
-GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
-vec3 pos = gbuffer.d[pixel_idx].pos;
-vec3 normal = gbuffer.d[pixel_idx].normal;
-vec2 uv = gbuffer.d[pixel_idx].uv;
-uint mat_idx = gbuffer.d[pixel_idx].mat_idx;
-vec3 origin = vec4(ubo.inv_view * vec4(0, 0, 0, 1)).xyz;
-void init_reservoir(out RestirReservoir r) {
-    r.w_sum = 0;
-    r.W = 0;
-    r.m = 0;
-}
-
-void update_reservoir(inout RestirReservoir r, const RestirData s, float w_i) {
-    r.w_sum += w_i;
-    r.m++;
-    if (rand(seed) < w_i / r.w_sum) {
-        r.s = s;
-    }
-}
-
-float calc_p_hat(const RestirReservoir r) {
-    const MaterialProps hit_mat = load_material(mat_idx, uv);
-    const vec3 wo = origin - pos;
-    vec2 uv_unused;
-    uvec4 r_seed = r.s.seed;
-    const uint light_mesh_idx = r.s.light_mesh_idx;
-    const uint light_triangle_idx = r.s.light_idx;
-
-    const vec4 rands =
-        vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
-    uint light_material_idx;
-    const TriangleRecord record = sample_area_light_with_idx(
-        rands, light_mesh_idx, light_triangle_idx, light_material_idx);
-    vec3 wi = record.pos - pos;
-    const float wi_len = length(wi);
-    wi /= wi_len;
-    const MaterialProps light_mat =
-        load_material(light_material_idx, uv_unused);
-
-    const vec3 f = eval_bsdf(hit_mat, wo, wi);
-    const float cos_x = dot(normal, wi);
-    const float g = abs(dot(record.triangle_normal, -wi)) / (wi_len * wi_len);
-    const vec3 fac = f * light_mat.emissive_factor * abs(cos_x) * g;
-    return length(fac);
-}
-
-void combine_reservoir(inout RestirReservoir r1, const RestirReservoir r2) {
-    float fac = r2.W * r2.m;
-    if (fac > 0) {
-        fac *= calc_p_hat(r2);
-    }
-    update_reservoir(r1, r2.s, fac);
-}
 
 void main() {
-
     const float max_r = 10;
     const float depth_threshold = 0.01;
     const float angle_threshold = 25 * PI / 180;
     const float num_neighbor_samples = 5;
-
+    load_g_buffer();
     const RestirReservoir curr_reservoir = passthrough_reservoirs.d[pixel_idx];
     RestirReservoir r;
     init_reservoir(r);
