@@ -21,10 +21,14 @@ private:
 	VkDescriptorSet desc_set;
 	std::unique_ptr<Pipeline> vcm_light_pipeline;
 	std::unique_ptr<Pipeline> vcm_eye_pipeline;
+	std::unique_ptr<Pipeline> vcm_guide_pipeline;
 
 	Buffer photon_buffer;
 	Buffer vcm_light_vertices_buffer;
 	Buffer light_path_cnt_buffer;
 	Buffer color_storage_buffer;
+	Buffer vcm_reservoir_buffer;
+	Buffer selected_reservoirs_buffer;
+	bool do_spatiotemporal = false;
 };
 

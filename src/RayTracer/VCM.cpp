@@ -44,6 +44,23 @@ void VCM::init() {
 		instance->width * instance->height * 3 * sizeof(float)
 	);
 
+	vcm_reservoir_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		instance->width * instance->height * sizeof(VCMReservoir)
+	);
+
+	selected_reservoirs_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		instance->width * instance->height * sizeof(SelectedReservoirs)
+	);
+
 	SceneDesc desc;
 	desc.vertex_addr = vertex_buffer.get_device_address();
 	desc.index_addr = index_buffer.get_device_address();
@@ -56,6 +73,10 @@ void VCM::init() {
 	desc.vcm_vertices_addr = vcm_light_vertices_buffer.get_device_address();
 	desc.path_cnt_addr = light_path_cnt_buffer.get_device_address();
 	desc.color_storage_addr = color_storage_buffer.get_device_address();
+
+
+	desc.vcm_reservoir_addr = vcm_reservoir_buffer.get_device_address();
+	desc.selected_reservoirs_addr = selected_reservoirs_buffer.get_device_address();
 
 	scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -96,10 +117,23 @@ void VCM::render() {
 	pc_ray.ppm_base_radius = ppm_base_radius;
 	pc_ray.use_vm = use_vm;
 	pc_ray.use_vc = use_vc;
+	pc_ray.do_spatiotemporal = do_spatiotemporal;
+	pc_ray.random_num = rand() % UINT_MAX;
 	const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
 	const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
 	const int base_grid_res = int(max_comp / pc_ray.radius);
 	pc_ray.grid_res = glm::max(ivec3(diam * float(base_grid_res) / max_comp), ivec3(1));
+	if (!do_spatiotemporal) {
+		vkCmdFillBuffer(cmd.handle, vcm_reservoir_buffer.handle, 0, vcm_reservoir_buffer.size, 0);
+		std::array<VkBufferMemoryBarrier, 1> barriers = {
+						buffer_barrier(vcm_reservoir_buffer.handle,
+								  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+								  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+		};
+		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(), barriers.data(), 0, 0);
+	}
 
 	// Prepare
 	{
@@ -113,6 +147,36 @@ void VCM::render() {
 		}
 
 	}
+
+	// Guide
+	{
+		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+						  vcm_guide_pipeline->handle);
+		vkCmdBindDescriptorSets(
+			cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vcm_guide_pipeline->pipeline_layout,
+			0, 1, &desc_set, 0, nullptr);
+		vkCmdPushConstants(cmd.handle, vcm_guide_pipeline->pipeline_layout,
+						   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+						   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+						   VK_SHADER_STAGE_MISS_BIT_KHR,
+						   0, sizeof(PushConstantRay), &pc_ray);
+		auto& regions = vcm_guide_pipeline->get_rt_regions();
+		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2],
+						  &regions[3], instance->width, instance->height, 1);
+		std::array<VkBufferMemoryBarrier, 2> barriers = {
+				buffer_barrier(vcm_reservoir_buffer.handle,
+						  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+						  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+				buffer_barrier(selected_reservoirs_buffer.handle,
+						  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+						  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+		};
+		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(), barriers.data(), 0, 0);
+	}
+	pc_ray.random_num = rand() % UINT_MAX;
+
 	// Trace rays from light
 	{
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
@@ -126,9 +190,10 @@ void VCM::render() {
 						   VK_SHADER_STAGE_MISS_BIT_KHR,
 						   0, sizeof(PushConstantRay), &pc_ray);
 		auto& regions = vcm_light_pipeline->get_rt_regions();
-		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], 
+		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2],
 						  &regions[3], instance->width, instance->height, 1);
 	}
+	pc_ray.random_num = rand() % UINT_MAX;
 	// Trace rays from eye
 	{
 		if (use_vm) {
@@ -149,8 +214,11 @@ void VCM::render() {
 						   VK_SHADER_STAGE_MISS_BIT_KHR,
 						   0, sizeof(PushConstantRay), &pc_ray);
 		auto& regions = vcm_eye_pipeline->get_rt_regions();
-		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3], 
+		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3],
 						  instance->width, instance->height, 1);
+	}
+	if (!do_spatiotemporal) {
+		do_spatiotemporal = true;
 	}
 	cmd.submit();
 }
@@ -362,7 +430,7 @@ void VCM::create_blas() {
 		blas_inputs.push_back({ geo });
 	}
 	instance->vkb.build_blas(blas_inputs,
-						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+							 VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void VCM::create_tlas() {
@@ -419,7 +487,7 @@ void VCM::create_tlas() {
 		pc_ray.light_triangle_count = light_triangle_cnt;
 	}
 	instance->vkb.build_tlas(tlas,
-						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+							 VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void VCM::create_rt_pipelines() {
@@ -435,6 +503,7 @@ void VCM::create_rt_pipelines() {
 
 	std::vector<Shader> shaders{ {"src/shaders/integrators/vcm/vcm_light.rgen"},
 								{"src/shaders/integrators/vcm/vcm_eye.rgen"},
+								{"src/shaders/integrators/vcm/vcm_guide.rgen"},
 								{"src/shaders/integrators/ray.rmiss"},
 								{"src/shaders/integrators/ray_shadow.rmiss"},
 								{"src/shaders/integrators/ray.rchit"},
@@ -457,19 +526,19 @@ void VCM::create_rt_pipelines() {
 	stage.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 	stages[Raygen] = stage;
 	// Miss
-	stage.module = shaders[2].create_vk_shader_module(instance->vkb.ctx.device);
+	stage.module = shaders[3].create_vk_shader_module(instance->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
 	stages[CMiss] = stage;
 
-	stage.module = shaders[3].create_vk_shader_module(instance->vkb.ctx.device);
+	stage.module = shaders[4].create_vk_shader_module(instance->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
 	stages[AMiss] = stage;
 	// Hit Group - Closest Hit
-	stage.module = shaders[4].create_vk_shader_module(instance->vkb.ctx.device);
+	stage.module = shaders[5].create_vk_shader_module(instance->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 	stages[ClosestHit] = stage;
 	// Hit Group - Any hit
-	stage.module = shaders[5].create_vk_shader_module(instance->vkb.ctx.device);
+	stage.module = shaders[6].create_vk_shader_module(instance->vkb.ctx.device);
 	stage.stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
 	stages[AnyHit] = stage;
 
@@ -516,13 +585,19 @@ void VCM::create_rt_pipelines() {
 	settings.stages = stages;
 	vcm_light_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	vcm_eye_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
-	settings.shaders = { shaders[0], shaders[2], shaders[3], shaders[4], shaders[5] };
+	vcm_guide_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	settings.shaders = { shaders[0], shaders[3], shaders[4], shaders[5], shaders[6] };
 	vcm_light_pipeline->create_rt_pipeline(settings);
 	vkDestroyShaderModule(instance->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[1].create_vk_shader_module(instance->vkb.ctx.device);
 	settings.stages = stages;
-	settings.shaders = { shaders[1], shaders[2], shaders[3], shaders[4], shaders[5] };
+	settings.shaders = { shaders[1], shaders[3], shaders[4], shaders[5], shaders[6] };
 	vcm_eye_pipeline->create_rt_pipeline(settings);
+	vkDestroyShaderModule(instance->vkb.ctx.device, stages[Raygen].module, nullptr);
+	stages[Raygen].module = shaders[2].create_vk_shader_module(instance->vkb.ctx.device);
+	settings.stages = stages;
+	settings.shaders = { shaders[2], shaders[3], shaders[4], shaders[5], shaders[6] };
+	vcm_guide_pipeline->create_rt_pipeline(settings);
 	for (auto& s : settings.stages) {
 		vkDestroyShaderModule(instance->vkb.ctx.device, s.module, nullptr);
 	}
@@ -535,7 +610,8 @@ void VCM::destroy() {
 		&photon_buffer,
 		&vcm_light_vertices_buffer,
 		&light_path_cnt_buffer,
-		&color_storage_buffer
+		&color_storage_buffer,
+		&vcm_reservoir_buffer
 	};
 	for (auto b : buffer_list) {
 		b->destroy();

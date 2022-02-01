@@ -321,6 +321,31 @@ struct RestirReservoir {
     float pdf;
 };
 
+struct VCMRestirData {
+    uvec4 seed;
+    vec3 pos;
+    vec3 dir;
+    vec3 normal;
+    float p_hat;
+    float pdf_posdir;
+    float pdf_pos;
+    float triangle_pdf;
+    uint light_material_idx;
+};
+
+struct VCMReservoir {
+    float w_sum;
+    float W;
+    uint m;
+    VCMRestirData s;
+};
+
+struct SelectedReservoirs {
+    uint selected;
+    vec3 pos;
+    vec3 dir;
+};
+
 // Scene buffer addresses
 struct SceneDesc {
     uint64_t vertex_addr;
@@ -376,6 +401,10 @@ struct SceneDesc {
     uint64_t temporal_reservoir_addr;
     uint64_t passthrough_reservoir_addr;
     uint64_t spatial_reservoir_addr;
+
+    // VCM Reservoir
+    uint64_t vcm_reservoir_addr;
+    uint64_t selected_reservoirs_addr;
 };
 
 // Structure used for retrieving the primitive information in the closest hit

@@ -44,9 +44,9 @@ void RayTracer::init(Window* window) {
 	initialized = true;
 	// TODO: Parse this via the scene file
 	SceneConfig config;
-	config.filename = "cornell_box.json";
-	//config.filename = "occluded.json";
-	integrator = std::make_unique<ReSTIR>(this, config);
+	//config.filename = "cornell_box.json";
+	config.filename = "occluded.json";
+	integrator = std::make_unique<VCM>(this, config);
 	integrator->init();
 	create_post_descriptor();
 	update_post_desc_set();
