@@ -31,6 +31,8 @@ private:
 	Buffer selected_reservoirs_buffer;
 	Buffer light_triangle_bins_buffer;
 	Buffer sorted_bins_buffer;
+	Buffer light_samples_buffer;
 	bool do_spatiotemporal = false;
+	uint32_t total_frame_cnt = 0;
 };
 

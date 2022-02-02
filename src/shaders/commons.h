@@ -69,7 +69,7 @@ struct PushConstantRay {
     uint num_bootstrap_samples;
     float mutations_per_pixel;
     uint num_mlt_threads;
-
+    uint total_frame_num;
     uint do_spatiotemporal;
 };
 
@@ -407,6 +407,7 @@ struct SceneDesc {
     uint64_t selected_reservoirs_addr;
     uint64_t light_triangle_bins_addr;
     uint64_t sorted_bins_addr;
+    uint64_t light_samples_addr;
 };
 
 // Structure used for retrieving the primitive information in the closest hit

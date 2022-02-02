@@ -15,14 +15,11 @@ layout(buffer_reference, scalar) buffer PhotonData_ { PhotonHash d[]; };
 layout(buffer_reference, scalar) buffer VCMVertex_ { VCMVertex d[]; };
 layout(buffer_reference, scalar) buffer LightPathCnt { uint d[]; };
 layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
-layout(buffer_reference, scalar) buffer VCMReservoir_ { VCMReservoir d[]; };
 
 PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
 VCMVertex_ vcm_lights = VCMVertex_(scene_desc.vcm_vertices_addr);
 LightPathCnt light_path_cnts = LightPathCnt(scene_desc.path_cnt_addr);
 ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
-VCMReservoir_ temporal_reservoirs =
-    VCMReservoir_(scene_desc.vcm_reservoir_addr);
 
 uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 
@@ -31,7 +28,7 @@ const float tmin = 0.001;
 const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num ^ pc_ray.random_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
 uint vcm_light_path_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
     (pc_ray.max_depth);
@@ -240,7 +237,7 @@ void main() {
                             cam_pdf_fwd *
                             (eta_vm + light_vtx(light_path_idx + i).d_vcm +
                              light_pdf_rev *
-                                 light_vtx(light_path_idx + i).d_vc * temporal_reservoirs.d[light_path_idx].W);
+                                 light_vtx(light_path_idx + i).d_vc);
                         const float w_camera =
                             light_pdf_fwd * (eta_vm + camera_state.d_vcm +
                                              pdf_rev * camera_state.d_vc);
@@ -377,6 +374,7 @@ void main() {
         float w = 1. / float(pc_ray.frame_num + 1);
         vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
         // imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+        //imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
         imageStore(image, ivec2(gl_LaunchIDEXT.xy),
                    vec4(mix(old_col, col, w), 1.f));
     } else {

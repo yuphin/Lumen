@@ -548,6 +548,6 @@ void main() {
     temporal_reservoirs.d[pixel_idx].W = r.W;
     temporal_reservoirs.d[pixel_idx].m = r.m;
     temporal_reservoirs.d[pixel_idx].s = r.s;
-    atomicAdd(light_bins.d[light_triangle_idx], 1);
+    //atomicAdd(light_bins.d[light_triangle_idx], 1);
 #undef light_vtx
 }
