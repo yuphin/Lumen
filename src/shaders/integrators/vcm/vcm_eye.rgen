@@ -15,11 +15,14 @@ layout(buffer_reference, scalar) buffer PhotonData_ { PhotonHash d[]; };
 layout(buffer_reference, scalar) buffer VCMVertex_ { VCMVertex d[]; };
 layout(buffer_reference, scalar) buffer LightPathCnt { uint d[]; };
 layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
+layout(buffer_reference, scalar) buffer VCMReservoir_ { VCMReservoir d[]; };
 
 PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
 VCMVertex_ vcm_lights = VCMVertex_(scene_desc.vcm_vertices_addr);
 LightPathCnt light_path_cnts = LightPathCnt(scene_desc.path_cnt_addr);
 ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
+VCMReservoir_ temporal_reservoirs =
+    VCMReservoir_(scene_desc.vcm_reservoir_addr);
 
 uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 
@@ -237,7 +240,7 @@ void main() {
                             cam_pdf_fwd *
                             (eta_vm + light_vtx(light_path_idx + i).d_vcm +
                              light_pdf_rev *
-                                 light_vtx(light_path_idx + i).d_vc);
+                                 light_vtx(light_path_idx + i).d_vc * temporal_reservoirs.d[light_path_idx].W);
                         const float w_camera =
                             light_pdf_fwd * (eta_vm + camera_state.d_vcm +
                                              pdf_rev * camera_state.d_vc);

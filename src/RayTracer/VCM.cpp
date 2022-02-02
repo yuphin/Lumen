@@ -61,6 +61,23 @@ void VCM::init() {
 		instance->width * instance->height * sizeof(SelectedReservoirs)
 	);
 
+	// TODO: Triangle cnt is hardcoded for now, fix later
+	light_triangle_bins_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		instance->width * instance->height * sizeof(uint32_t) * 12
+	);
+
+	sorted_bins_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		instance->width * instance->height * sizeof(uint32_t)
+	);
+
 	SceneDesc desc;
 	desc.vertex_addr = vertex_buffer.get_device_address();
 	desc.index_addr = index_buffer.get_device_address();
@@ -77,6 +94,7 @@ void VCM::init() {
 
 	desc.vcm_reservoir_addr = vcm_reservoir_buffer.get_device_address();
 	desc.selected_reservoirs_addr = selected_reservoirs_buffer.get_device_address();
+	desc.light_triangle_bins_addr = light_triangle_bins_buffer.get_device_address();
 
 	scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |

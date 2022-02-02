@@ -16,14 +16,17 @@ layout(buffer_reference, scalar) buffer VCMVertex_ { VCMVertex d[]; };
 layout(buffer_reference, scalar) buffer LightPathCnt { uint d[]; };
 layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
 layout(buffer_reference, scalar) buffer VCMReservoir_ { VCMReservoir d[]; };
+layout(buffer_reference, scalar) buffer LightBins { uint d[]; };
 
 PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
 VCMVertex_ vcm_lights = VCMVertex_(scene_desc.vcm_vertices_addr);
 LightPathCnt light_path_cnts = LightPathCnt(scene_desc.path_cnt_addr);
 ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
+LightBins light_bins = LightBins(scene_desc.light_triangle_bins_addr);
 VCMReservoir_ temporal_reservoirs =
     VCMReservoir_(scene_desc.vcm_reservoir_addr);
 
+uint dl = pc_ray.max_depth;
 uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
@@ -64,10 +67,6 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
     if (cos_theta <= 0.) {
         return L;
     }
-
-    // pdf_rev / pdf_fwd
-    // in the case of light coming to camera
-    // simplifies to abs(cos(theta)) / (A * cos^3(theta) * len^2)
     float cos_3_theta = cos_theta * cos_theta * cos_theta;
     const float cam_pdf_ratio = abs(cos_y) / (cam_A * cos_3_theta * len * len);
     vec3 ray_origin = offset_ray(pos, nrm);
@@ -117,10 +116,6 @@ vec3 vcm_connect_cam_unshadowed(const vec3 cam_pos, const vec3 cam_nrm,
     if (cos_theta <= 0.) {
         return L;
     }
-
-    // pdf_rev / pdf_fwd
-    // in the case of light coming to camera
-    // simplifies to abs(cos(theta)) / (A * cos^3(theta) * len^2)
     float cos_3_theta = cos_theta * cos_theta * cos_theta;
     const float cam_pdf_ratio = abs(cos_y) / (cam_A * cos_3_theta * len * len);
     vec3 ray_origin = offset_ray(pos, nrm);
@@ -158,16 +153,11 @@ void update_reservoir(inout VCMReservoir r_new, const VCMRestirData s,
     }
 }
 
-void combine_reservoir(inout VCMReservoir r1, const VCMReservoir r2) {
-    float fac = r2.W * r2.m * r2.s.p_hat;
-    update_reservoir(r1, r2.s, fac);
-}
-
 bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
-                               out VCMRestirData s, out float pdf_o) {
+                               inout VCMRestirData s, out float pdf_o,
+                               out uint light_triangle_idx) {
     // Sample light
     uint light_idx;
-    uint light_triangle_idx;
     MeshLight light;
     uint light_material_idx;
     vec2 uv_unused;
@@ -191,64 +181,74 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
     light_state.wi = wi;
     light_state.throughput =
         light_mat.emissive_factor * cos_theta / (pdf_dir * pdf_pos);
-    // Partially evaluate pdfs (area formulation)
-    // At s = 0 this is p_rev / p_fwd, in the case of area lights:
-    // p_rev = p_connect = 1/area, p_fwd = cos_theta / (PI * area)
-    // Note that pdf_fwd is in area formulation, so cos_y / r^2 is missing
-    // currently.
     light_state.d_vcm = PI / cos_theta;
-    // g_prev / p_fwd
-    // Note that g_prev component in d_vc and d_vm lags by 1 iter
-    // So we initialize g_prev to cos_theta of the current iter
-    // Also note that 1/r^2 in the geometry term cancels for vc and vm
-    // By convention pdf_fwd sample the i'th vertex from i-1
-    // g_prev or pdf_prev samples from i'th vertex to i-1
-    // In that sense, cos_theta terms will be common in g_prev and pdf_pwd
     light_state.d_vc = cos_theta / (pdf_dir * pdf_pos);
-    // Similar argument, with the eta
     light_state.d_vm = light_state.d_vc * eta_vc;
     s.pdf_pos = pdf_pos;
     s.normal = record.triangle_normal;
     s.light_material_idx = light_material_idx;
     s.triangle_pdf = record.triangle_pdf;
-
-    //  if(luminance(light_state.pos) != 0) {
-    //     debugPrintfEXT("%v3f - %d\n", light_state.pos, pixel_idx);
-    // }
     return true;
 }
 
-void main() {
+bool vcm_generate_light_sample(uvec4 seed, float eta_vc,
+                               out VCMState light_state, out float pdf_o,
+                               out uint light_triangle_idx) {
+    // Sample light
+    uint light_idx;
+    MeshLight light;
+    uint light_material_idx;
+    vec2 uv_unused;
+    const TriangleRecord record =
+        sample_area_light(light_idx, light_triangle_idx, light_material_idx,
+                          light, seed, pc_ray.num_mesh_lights);
+    const MaterialProps light_mat =
+        load_material(light_material_idx, uv_unused);
+    vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
+                                    record.triangle_normal);
+    float pdf_pos = record.triangle_pdf * (1.0 / pc_ray.light_triangle_count);
+    float cos_theta = abs(dot(wi, record.triangle_normal));
+    float pdf_dir = cos_theta / PI;
+    if (pdf_dir <= EPS) {
+        return false;
+    }
+    pdf_o = pdf_dir * pdf_pos;
+    light_state.pos = record.pos;
+    light_state.shading_nrm = record.triangle_normal;
+    light_state.area = 1.0 / record.triangle_pdf;
+    light_state.wi = wi;
+    light_state.throughput =
+        light_mat.emissive_factor * cos_theta / (pdf_dir * pdf_pos);
+    light_state.d_vcm = PI / cos_theta;
+    light_state.d_vc = cos_theta / (pdf_dir * pdf_pos);
+    light_state.d_vm = light_state.d_vc * eta_vc;
+    return true;
+}
+
+vec3 calc_L_for_reservoir(const in VCMReservoir r) {
+    uvec4 seed = r.s.seed;
+    // debugPrintfEXT("%v4u\n", seed);
     const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
     const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
-    vec2 d = in_uv * 2.0 - 1.0;
     vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
-    vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
-    vec3 direction = vec3(sample_camera(d));
-    vec3 col = vec3(0);
     vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
                                                2. / gl_LaunchSizeEXT.y, 0, 1));
     area_int /= (area_int.w);
+    vec3 L = vec3(0);
     const float cam_area = abs(area_int.x * area_int.y);
-
-    float total_luminance = 0;
     const float radius = pc_ray.radius;
     const float radius_sqr = radius * radius;
     float eta_vcm = PI * radius_sqr * screen_size;
     float eta_vc = (pc_ray.use_vc == 1) ? 1.0 / eta_vcm : 0;
     float eta_vm = (pc_ray.use_vm == 1) ? PI * radius_sqr * screen_size : 0;
+    uint light_triangle_idx;
     VCMState light_state;
-    VCMRestirData s;
-
-    s.seed = seed;
+    const VCMRestirData s = r.s;
     float pdf_o;
-    if (!vcm_generate_light_sample(eta_vc, light_state, s, pdf_o)) {
-        return;
+    if (!vcm_generate_light_sample(seed, eta_vc, light_state, pdf_o,
+                                   light_triangle_idx)) {
+        return L;
     }
-
-    s.pos = light_state.pos;
-    s.dir = light_state.wi;
-
     const vec3 cam_pos = origin.xyz;
     const vec3 cam_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
     int depth;
@@ -291,12 +291,12 @@ void main() {
         light_state.d_vcm /= cos_theta_wo;
         light_state.d_vc /= cos_theta_wo;
         light_state.d_vm /= cos_theta_wo;
-        if (depth >= pc_ray.max_depth + 1) {
+        if (depth >= dl + 1) {
             break;
         }
         // Reverse pdf in solid angle form, since we have geometry term
         // at the outer paranthesis
-        if (!mat_specular && (pc_ray.use_vc == 1 && depth < pc_ray.max_depth)) {
+        if (!mat_specular && (pc_ray.use_vc == 1 && depth < dl)) {
             // Connect to camera
             ivec2 coords;
             vec3 splat_col = vcm_connect_cam(cam_pos, cam_nrm, shading_nrm,
@@ -304,8 +304,7 @@ void main() {
                                              eta_vm, wo, mat, coords);
             if (luminance(splat_col) > 0) {
                 uint idx = coords.x * gl_LaunchSizeEXT.y + coords.y;
-                tmp_col.d[idx] += splat_col;
-                total_luminance += luminance(splat_col);
+                L += splat_col;
             }
         }
         // Continue the walk
@@ -351,34 +350,193 @@ void main() {
         light_state.area = payload.area;
         light_state.material_idx = payload.material_idx;
     }
+    return L;
+}
 
+float calc_p_hat(const vec3 L) { return luminance(L); }
+
+void combine_reservoir(inout VCMReservoir r1, const VCMReservoir r2) {
+    float fac = r2.W * r2.m;
+    uint m_tot = r1.m;
+    if (fac > 0) {
+        fac *= calc_p_hat(calc_L_for_reservoir(r2));
+    }
+
+    if (fac > 0) {
+        m_tot += r2.m;
+    }
+    update_reservoir(r1, r2.s, fac);
+    r1.m = m_tot;
+}
+
+void combine_reservoir2(inout VCMReservoir r1, const VCMReservoir r2) {
+    float fac = r2.W * r2.m * r2.s.p_hat;
+    update_reservoir(r1, r2.s, fac);
+}
+
+void main() {
+    const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+    const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
+    vec2 d = in_uv * 2.0 - 1.0;
+    vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
+    vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
+    vec3 direction = vec3(sample_camera(d));
+    vec3 col = vec3(0);
+    vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
+                                               2. / gl_LaunchSizeEXT.y, 0, 1));
+    area_int /= (area_int.w);
+    const float cam_area = abs(area_int.x * area_int.y);
+
+    float total_luminance = 0;
+    const float radius = pc_ray.radius;
+    const float radius_sqr = radius * radius;
+    float eta_vcm = PI * radius_sqr * screen_size;
+    float eta_vc = (pc_ray.use_vc == 1) ? 1.0 / eta_vcm : 0;
+    float eta_vm = (pc_ray.use_vm == 1) ? PI * radius_sqr * screen_size : 0;
+    uint light_triangle_idx;
+    VCMState light_state;
+    VCMRestirData s;
+    s.seed = seed;
+    float pdf_o;
     VCMReservoir r_new, r, r_prev;
     init_reservoir(r_new);
     init_reservoir(r);
     init_reservoir(r_prev);
 
-    if (pc_ray.do_spatiotemporal == 1) {
+    if (vcm_generate_light_sample(eta_vc, light_state, s, pdf_o,
+                                  light_triangle_idx)) {
+        s.pos = light_state.pos;
+        s.dir = light_state.wi;
+
+        const vec3 cam_pos = origin.xyz;
+        const vec3 cam_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
+        int depth;
+        int path_idx = 0;
+        for (depth = 1;; depth++) {
+            traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, light_state.pos, tmin,
+                        light_state.wi, tmax, 0);
+            if (payload.material_idx == -1) {
+                break;
+            }
+            vec3 wo = light_state.pos - payload.pos;
+
+            vec3 shading_nrm = payload.shading_nrm;
+            float cos_wo = dot(wo, shading_nrm);
+            vec3 geometry_nrm = payload.geometry_nrm;
+            bool side = true;
+            if (dot(payload.geometry_nrm, wo) <= 0.)
+                geometry_nrm = -geometry_nrm;
+            if (cos_wo <= 0.) {
+                cos_wo = -cos_wo;
+                shading_nrm = -shading_nrm;
+                side = false;
+            }
+
+            if (dot(geometry_nrm, wo) * dot(shading_nrm, wo) <= 0) {
+                // We dont handle BTDF at the moment
+                break;
+            }
+            float dist = length(payload.pos - light_state.pos);
+            float dist_sqr = dist * dist;
+            wo /= dist;
+            const MaterialProps mat =
+                load_material(payload.material_idx, payload.uv);
+            const bool mat_specular =
+                (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
+            // Complete the missing geometry terms
+            float cos_theta_wo = abs(dot(wo, shading_nrm));
+            // Can't connect from specular to camera path, can't merge either
+            light_state.d_vcm *= dist_sqr;
+            light_state.d_vcm /= cos_theta_wo;
+            light_state.d_vc /= cos_theta_wo;
+            light_state.d_vm /= cos_theta_wo;
+            if (depth >= dl + 1) {
+                break;
+            }
+            // Reverse pdf in solid angle form, since we have geometry term
+            // at the outer paranthesis
+            if (!mat_specular && (pc_ray.use_vc == 1 && depth < dl)) {
+                // Connect to camera
+                ivec2 coords;
+                vec3 splat_col = vcm_connect_cam(
+                    cam_pos, cam_nrm, shading_nrm, cam_area, payload.pos,
+                    light_state, eta_vm, wo, mat, coords);
+                if (luminance(splat_col) > 0) {
+                    uint idx = coords.x * gl_LaunchSizeEXT.y + coords.y;
+                    col += splat_col;
+                    total_luminance += luminance(splat_col);
+                }
+            }
+            // Continue the walk
+            float pdf_dir;
+            float cos_theta;
+            const vec3 f =
+                sample_bsdf(shading_nrm, wo, mat, 0, side, light_state.wi,
+                            pdf_dir, cos_theta, seed);
+            const bool same_hemisphere =
+                same_hemisphere(light_state.wi, wo, shading_nrm);
+
+            const bool mat_transmissive =
+                (mat.bsdf_props & BSDF_TRANSMISSIVE) == BSDF_TRANSMISSIVE;
+            if (f == vec3(0) || pdf_dir == 0 ||
+                (!same_hemisphere && !mat_transmissive)) {
+                break;
+            }
+            float pdf_rev = pdf_dir;
+            if (!mat_specular) {
+                pdf_rev = bsdf_pdf(mat, shading_nrm, light_state.wi, wo);
+            }
+            const float abs_cos_theta = abs(cos_theta);
+
+            light_state.pos = offset_ray(payload.pos, shading_nrm);
+            // Note, same cancellations also occur here from now on
+            // see _vcm_generate_light_sample_
+            if (!mat_specular) {
+                light_state.d_vc =
+                    (abs_cos_theta / pdf_dir) *
+                    (eta_vm + light_state.d_vcm + pdf_rev * light_state.d_vc);
+                light_state.d_vm = (abs_cos_theta / pdf_dir) *
+                                   (1 + light_state.d_vcm * eta_vc +
+                                    pdf_rev * light_state.d_vm);
+                light_state.d_vcm = 1.0 / pdf_dir;
+            } else {
+                // Specular pdf has value = inf, so d_vcm = 0;
+                light_state.d_vcm = 0;
+                // pdf_fwd = pdf_rev = delta -> cancels
+                light_state.d_vc *= abs_cos_theta;
+                light_state.d_vm *= abs_cos_theta;
+            }
+            light_state.throughput *= f * abs_cos_theta / pdf_dir;
+            light_state.shading_nrm = shading_nrm;
+            light_state.area = payload.area;
+            light_state.material_idx = payload.material_idx;
+        }
+        total_luminance = luminance(col);
         r_prev = temporal_reservoirs.d[pixel_idx];
-    }
+        s.p_hat = total_luminance;
+        s.pdf_posdir = pdf_o;
+        update_reservoir(r_new, s, total_luminance / pdf_o);
+        r_new.W = total_luminance == 0 ? 0 : 1. / (pdf_o);
+        combine_reservoir2(r, r_new);
+        r.m = 1;
+        // Temporal reuse
+        if (r_prev.W > 0) {
+            r_prev.m = min(r_prev.m, 5);
+            combine_reservoir(r, r_prev);
+        }
 
-    s.p_hat = total_luminance;
-    s.pdf_posdir = pdf_o;
-    update_reservoir(r_new, s, total_luminance / pdf_o);
-    r_new.W = total_luminance == 0 ? 0 : r_new.w_sum / (total_luminance * r_new.m);
-    combine_reservoir(r, r_new);
-    r.m = 1;
-    if (r_prev.W > 0) {
-        r_prev.m = min(r_prev.m, 20);
-        combine_reservoir(r, r_prev);
-        r.m += r_prev.m;
+        const vec3 L_r = calc_L_for_reservoir(r);
+        const float fac = calc_p_hat(L_r);
+        const float phat = fac * r.m;
+        r.W = phat == 0 ? 0 : r.w_sum / phat;
+        if (pixel_idx == 500000) {
+            debugPrintfEXT("%f - %d - %f\n", r.W, r.m, fac);
+        }
     }
-   
-
-    r.W = r.s.p_hat == 0 ? 0 : r.w_sum / (r.s.p_hat * r.m * 22);
-     if (pixel_idx == 500000) {
-    //if (r_prev.W > 0) {
-        debugPrintfEXT("%d - %f\n", r.m, r.W);
-    }
+    // if (phat != 0) {
+    //     // if (r_prev.W > 0) {
+    //     debugPrintfEXT("%d - %f\n", r.m, r.W);
+    // }
     // if (r.W > 0) {
     //     debugPrintfEXT("A- %d - %f - %f - %f\n", r.m, r.W, r.w_sum,
     //                    total_luminance);
@@ -390,5 +548,6 @@ void main() {
     temporal_reservoirs.d[pixel_idx].W = r.W;
     temporal_reservoirs.d[pixel_idx].m = r.m;
     temporal_reservoirs.d[pixel_idx].s = r.s;
+    atomicAdd(light_bins.d[light_triangle_idx], 1);
 #undef light_vtx
 }

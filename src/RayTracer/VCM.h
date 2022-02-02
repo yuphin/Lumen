@@ -29,6 +29,8 @@ private:
 	Buffer color_storage_buffer;
 	Buffer vcm_reservoir_buffer;
 	Buffer selected_reservoirs_buffer;
+	Buffer light_triangle_bins_buffer;
+	Buffer sorted_bins_buffer;
 	bool do_spatiotemporal = false;
 };
 

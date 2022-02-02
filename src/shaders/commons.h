@@ -405,6 +405,8 @@ struct SceneDesc {
     // VCM Reservoir
     uint64_t vcm_reservoir_addr;
     uint64_t selected_reservoirs_addr;
+    uint64_t light_triangle_bins_addr;
+    uint64_t sorted_bins_addr;
 };
 
 // Structure used for retrieving the primitive information in the closest hit
