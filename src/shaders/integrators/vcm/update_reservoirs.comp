@@ -1,0 +1,119 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../commons.h"
+#include "../../utils.glsl"
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
+layout(buffer_reference, scalar) buffer LightSamples { VCMRestirData d[]; };
+layout(buffer_reference, scalar) buffer VCMReservoir_ { VCMReservoir d[]; };
+uvec4 seed =
+    init_rng(gl_GlobalInvocationID.xy, gl_NumWorkGroups.xy *uvec2(32, 1),
+             pc_ray.frame_num ^ pc_ray.random_num);
+uint size = pc_ray.size_x * pc_ray.size_y;
+
+LightSamples light_samples = LightSamples(scene_desc.light_samples_addr);
+VCMReservoir_ temporal_reservoirs =
+    VCMReservoir_(scene_desc.vcm_reservoir_addr);
+
+void update_reservoir(inout VCMReservoir r_new, const VCMRestirData s,
+                      float w_i) {
+    r_new.w_sum += w_i;
+    r_new.m++;
+    if (rand(seed) < w_i / r_new.w_sum) {
+        r_new.s = s;
+    }
+}
+
+void combine_reservoir(inout VCMReservoir r1, const VCMReservoir r2) {
+    float fac = r2.W * r2.m * r2.s.p_hat;
+    update_reservoir(r1, r2.s, fac);
+}
+
+void init_reservoir(out VCMReservoir r_new) {
+    r_new.w_sum = 0;
+    r_new.W = 0;
+    r_new.m = 0;
+    r_new.sample_idx = 31;
+}
+
+void main() {
+    const uint idx = gl_GlobalInvocationID.x;
+    if (idx >= size) {
+        return;
+    }
+    VCMReservoir r_prev = temporal_reservoirs.d[idx];
+    if (r_prev.sample_idx == -1) {
+        return;
+    }
+    VCMRestirData s = light_samples.d[r_prev.sample_idx];
+    if (s.valid == 0) {
+        return;
+    }
+    if (r_prev.factor == 0) {
+        debugPrintfEXT("no2! %d - %d - %d\n", r_prev.sample_idx,
+                       pc_ray.frame_num, s.frame_idx);
+    }
+    VCMReservoir r_new, r;
+    init_reservoir(r_new);
+    init_reservoir(r);
+    // s.p_hat *= temporal_reservoirs.d[idx].factor;
+    // s.p_hat *= 2.55;
+    update_reservoir(r_new, s, s.p_hat / s.pdf_dir);
+    // r_new.m = 1. / temporal_reservoirs.d[idx].factor;
+    // r_new.m /= temporal_reservoirs.d[idx].factor;
+    r_new.W = r_new.w_sum / (r_new.m * r_new.s.p_hat);
+    // debugPrintfEXT("%f - %f - %f - %f - %d\n", r_new.W, r_new.s.p_hat,
+    // s.p_hat,
+    //                s.pdf_dir, r_prev.sample_idx);
+
+    combine_reservoir(r, r_new);
+
+    uint m_total = 1;
+    if (r_prev.W > 0) {
+        // Clamp
+        r_prev.m = min(r_prev.m, 50);
+        combine_reservoir(r, r_prev);
+        m_total += (r_prev.m);
+    }
+    // if (idx == 27574) {
+    //     debugPrintfEXT("%d - %d -  %f - %f - %f - %f\n", idx,
+    //                    temporal_reservoirs.d[idx].factor, r_prev.W, r_prev.m,
+    //                    r.m, r_new.m);
+    // }
+    r.m = m_total;
+    r.W = r.w_sum / (r.s.p_hat * r.m);
+    if (isnan(r.W)) {
+        debugPrintfEXT("%f - %f - %f - %d - %d\n", r.s.p_hat, r.m, s.p_hat,
+                       r_prev.factor, pc_ray.frame_num);
+        // debugPrintfEXT("%d - %d\n", r_prev.factor, r_prev.sample_idx);
+    }
+    // debugPrintfEXT("%v3f\n", r.s.dir);
+
+    // debugPrintfEXT("%f\n", r_new.W);
+
+    // Disable the sample
+    //debugPrintfEXT("%d\n", r.factor);
+
+
+    temporal_reservoirs.d[idx].w_sum = r.w_sum;
+    temporal_reservoirs.d[idx].W = r.W;
+    temporal_reservoirs.d[idx].m = r.m;
+    temporal_reservoirs.d[idx].factor--;
+    temporal_reservoirs.d[idx].sample_idx = -1;
+    temporal_reservoirs.d[idx].s = r.s;
+
+    if (luminance(temporal_reservoirs.d[idx].s.dir) == 0) {
+        debugPrintfEXT("a\n");
+    }
+
+    light_samples.d[r_prev.sample_idx].valid = 0;
+}

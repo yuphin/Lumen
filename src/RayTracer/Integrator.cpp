@@ -43,7 +43,14 @@ void Integrator::init() {
 	uint32_t idx = 0;
 	uint32_t total_light_triangle_cnt = 0;
 	for (auto& pm : lumen_scene.prim_meshes) {
-		prim_lookup.push_back({ pm.first_idx, pm.vtx_offset, pm.material_idx });
+		PrimMeshInfo m_info;
+		m_info.index_offset = pm.first_idx;
+		m_info.vertex_offset = pm.vtx_offset;
+		m_info.material_index = pm.material_idx;
+		m_info.min_pos = glm::vec4(pm.min_pos, 0);
+		m_info.max_pos = glm::vec4(pm.max_pos, 0);
+		m_info.material_index = pm.material_idx;
+		prim_lookup.emplace_back(m_info);
 		auto& mef = materials[pm.material_idx].emissive_factor;
 		if (mef.x > 0 || mef.y > 0 || mef.z > 0) {
 			MeshLight light;

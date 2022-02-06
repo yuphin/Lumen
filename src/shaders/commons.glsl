@@ -218,8 +218,11 @@ float bsdf_pdf(const MaterialProps mat, const vec3 shading_nrm, const vec3 wo,
     return 0;
 }
 
+
+
 TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands,
-                               uint triangle_idx, in mat4 world_matrix) {
+                               uint triangle_idx, in mat4 world_matrix,
+                               out float o_u, out float o_v) {
     TriangleRecord result;
     uint index_offset = pinfo.index_offset + 3 * triangle_idx;
     uint vertex_offset = pinfo.vertex_offset;
@@ -253,7 +256,15 @@ TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands,
     result.triangle_normal = normalize(vec3(inv_tr_mat * nrm));
     result.triangle_pdf = 2. / length((cross(vec3(etmp0), vec3(etmp1))));
     result.pos = vec3(world_pos);
+    o_u = u;
+    o_v = v;
     return result;
+}
+
+TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands,
+                               uint triangle_idx, in mat4 world_matrix) {
+    float u,v;
+    return sample_triangle(pinfo, rands, triangle_idx, world_matrix, u, v);
 }
 
 vec3 eval_albedo(const Material m) {
@@ -272,6 +283,44 @@ TriangleRecord sample_area_light_with_idx(const vec4 rands,
     PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
     material_idx = pinfo.material_index;
     return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
+}
+
+TriangleRecord sample_area_light_with_idx(const vec2 rands,
+                                          const uint light_mesh_idx,
+                                          const uint triangle_idx,
+                                          out uint material_idx,
+                                          out vec3 min_pos,
+                                          out vec3 max_pos,
+                                          out float u,
+                                          out float v) {
+    const MeshLight light = area_lights[light_mesh_idx];
+    PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
+    material_idx = pinfo.material_index;
+    min_pos = pinfo.min_pos.xyz;
+    max_pos = pinfo.max_pos.xyz;
+    return sample_triangle(pinfo, rands.xy, triangle_idx, light.world_matrix, u, v);
+}
+
+TriangleRecord sample_area_light_with_idx(const vec2 rands,
+                                          const uint light_mesh_idx,
+                                          const uint triangle_idx,
+                                          out uint material_idx,
+                                          out float u,
+                                          out float v) {
+    const MeshLight light = area_lights[light_mesh_idx];
+    PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
+    material_idx = pinfo.material_index;
+    return sample_triangle(pinfo, rands.xy, triangle_idx, light.world_matrix, u, v);
+}
+
+TriangleRecord sample_area_light_with_idx(const vec2 rands,
+                                          const uint light_mesh_idx,
+                                          const uint triangle_idx,
+                                          out uint material_idx) {
+    const MeshLight light = area_lights[light_mesh_idx];
+    PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
+    material_idx = pinfo.material_index;
+    return sample_triangle(pinfo, rands.xy, triangle_idx, light.world_matrix);
 }
 
 TriangleRecord sample_area_light(const vec4 rands, const int num_mesh_lights,

@@ -324,19 +324,28 @@ struct RestirReservoir {
 struct VCMRestirData {
     uvec4 seed;
     vec3 pos;
-    vec3 dir;
-    vec3 normal;
     float p_hat;
+    vec3 dir;
     float pdf_posdir;
+    vec3 normal;
     float pdf_pos;
+    float pdf_dir;
     float triangle_pdf;
     uint light_material_idx;
+    uint hash_idx;
+    uint valid;
+    uint frame_idx;
+    uint pad1;
+    uint pad2;
 };
 
 struct VCMReservoir {
     float w_sum;
     float W;
     uint m;
+    uint sample_idx;
+    uint selected_idx;
+    uint factor;
     VCMRestirData s;
 };
 
@@ -344,6 +353,15 @@ struct SelectedReservoirs {
     uint selected;
     vec3 pos;
     vec3 dir;
+};
+
+struct LightState {
+    vec3 pos;
+    uint light_material_idx;
+    vec3 dir;
+    float triangle_pdf;
+    vec3 normal;
+    uint hash_idx;
 };
 
 // Scene buffer addresses
@@ -408,6 +426,8 @@ struct SceneDesc {
     uint64_t light_triangle_bins_addr;
     uint64_t sorted_bins_addr;
     uint64_t light_samples_addr;
+    uint64_t should_resample_addr;
+    uint64_t light_state_addr;
 };
 
 // Structure used for retrieving the primitive information in the closest hit
@@ -415,6 +435,9 @@ struct PrimMeshInfo {
     uint index_offset;
     uint vertex_offset;
     uint material_index;
+    uint pad;
+    vec4 min_pos;
+    vec4 max_pos;
 };
 
 #ifdef __cplusplus // Descriptor binding helper for C++ and GLSL

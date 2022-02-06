@@ -116,7 +116,8 @@ vec3 sample_cos_hemisphere(vec2 uv, vec3 n) {
     float phi = PI2 * uv.x;
     float cos_theta = 2.0 * uv.y - 1.0;
     return normalize(
-        n + vec3(sqrt(1.0 - cos_theta * cos_theta) * vec2(cos(phi), sin(phi)),
+        n + vec3(sqrt(1.0 - cos_theta * cos_theta) * vec2(cos(phi),
+        sin(phi)),
                  cos_theta));
 }
 

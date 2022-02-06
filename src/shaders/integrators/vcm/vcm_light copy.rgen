@@ -1,0 +1,542 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+
+#include "../../commons.glsl"
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+// VCM buffers
+layout(buffer_reference, scalar) buffer PhotonData_ { PhotonHash d[]; };
+layout(buffer_reference, scalar) buffer VCMVertex_ { VCMVertex d[]; };
+layout(buffer_reference, scalar) buffer LightPathCnt { uint d[]; };
+layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
+
+layout(buffer_reference, scalar) buffer VCMReservoir_ { VCMReservoir d[]; };
+
+layout(buffer_reference, scalar) buffer SelectedReservoirs_ {
+    SelectedReservoirs d[];
+};
+
+layout(buffer_reference, scalar) buffer LightSamples { VCMRestirData d[]; };
+
+PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
+VCMVertex_ vcm_lights = VCMVertex_(scene_desc.vcm_vertices_addr);
+LightPathCnt light_path_cnts = LightPathCnt(scene_desc.path_cnt_addr);
+ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
+LightSamples light_samples = LightSamples(scene_desc.light_samples_addr);
+
+VCMReservoir_ temporal_reservoirs =
+    VCMReservoir_(scene_desc.vcm_reservoir_addr);
+SelectedReservoirs_ selected_reservoirs =
+    SelectedReservoirs_(scene_desc.selected_reservoirs_addr);
+
+uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
+const uint flags = gl_RayFlagsOpaqueEXT;
+const float tmin = 0.001;
+const float tmax = 10000.0;
+#define RR_MIN_DEPTH 3
+uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
+                      pc_ray.total_frame_num ^ pc_ray.random_num);
+uint vcm_light_path_idx =
+    (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
+    (pc_ray.max_depth);
+
+const uint FRAME_INTERVAL = 10;
+
+uint restir_hash(ivec3 p, uint size) {
+    return uint((p.x * 73856093) ^ (p.y * 19349663) ^ p.z * 83492791) % size;
+}
+
+vec3 normalize_grid(vec3 p, vec3 min_bnds, vec3 max_bnds) {
+    return (p - min_bnds) / (max_bnds - min_bnds);
+}
+
+ivec3 get_grid_idx(vec3 p, vec3 min_bnds, vec3 max_bnds, ivec3 grid_res) {
+    ivec3 res = ivec3(normalize_grid(p, min_bnds, max_bnds) * grid_res);
+    clamp(res, vec3(0), grid_res - vec3(1));
+    return res;
+}
+
+void update_reservoir(inout VCMReservoir r_new, const VCMRestirData s,
+                      float w_i) {
+    r_new.w_sum += w_i;
+    r_new.m++;
+    if (rand(seed) < w_i / r_new.w_sum) {
+        r_new.s = s;
+    }
+}
+
+void combine_reservoir(inout VCMReservoir r1, const VCMReservoir r2) {
+    float fac = r2.W * r2.m * r2.s.p_hat;
+    update_reservoir(r1, r2.s, fac);
+}
+
+void init_reservoir(out VCMReservoir r_new) {
+    r_new.w_sum = 0;
+    r_new.W = 0;
+    r_new.m = 0;
+}
+
+vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
+                     const float cam_A, const vec3 pos, const in VCMState state,
+                     const float eta_vm, const vec3 wo, const MaterialProps mat,
+                     out ivec2 coords) {
+    vec3 L = vec3(0);
+    vec3 dir = cam_pos - pos;
+    float len = length(dir);
+    dir /= len;
+    float cos_y = dot(dir, nrm);
+    float cos_theta = dot(cam_nrm, -dir);
+    if (cos_theta <= 0.) {
+        return L;
+    }
+
+    // pdf_rev / pdf_fwd
+    // in the case of light coming to camera
+    // simplifies to abs(cos(theta)) / (A * cos^3(theta) * len^2)
+    float cos_3_theta = cos_theta * cos_theta * cos_theta;
+    const float cam_pdf_ratio = abs(cos_y) / (cam_A * cos_3_theta * len * len);
+    vec3 ray_origin = offset_ray(pos, nrm);
+    float pdf_rev, pdf_fwd;
+    const vec3 f = eval_bsdf(nrm, wo, mat, 0, dot(payload.shading_nrm, wo) > 0,
+                             dir, pdf_fwd, pdf_rev, cos_y);
+    if (f == vec3(0)) {
+        return L;
+    }
+    if (cam_pdf_ratio > 0.0) {
+        any_hit_payload.hit = 1;
+        traceRayEXT(tlas,
+                    gl_RayFlagsTerminateOnFirstHitEXT |
+                        gl_RayFlagsSkipClosestHitShaderEXT,
+                    0xFF, 1, 0, 1, ray_origin, 0, dir, len - EPS, 1);
+        if (any_hit_payload.hit == 0) {
+            const float w_light = (cam_pdf_ratio / (screen_size)) *
+                                  (eta_vm + state.d_vcm + pdf_rev * state.d_vc);
+            const float mis_weight = 1. / (1. + w_light);
+            // We / pdf_we * abs(cos_theta) = cam_pdf_ratio
+            L = mis_weight * state.throughput * cam_pdf_ratio * f / screen_size;
+        }
+    }
+    dir = -dir;
+    vec4 target = ubo.view * vec4(dir.x, dir.y, dir.z, 0);
+    target /= target.z;
+    target = -ubo.projection * target;
+    coords = ivec2(0.5 * (1 + target.xy) * gl_LaunchSizeEXT.xy - 0.5);
+    if (coords.x < 0 || coords.x >= gl_LaunchSizeEXT.x || coords.y < 0 ||
+        coords.y >= gl_LaunchSizeEXT.y || dot(dir, cam_nrm) < 0) {
+        return vec3(0);
+    }
+    return L;
+}
+
+TriangleRecord vcm_generate_pos(out float pdf_pos, out uint light_material_idx,
+                                out uint light_idx, out float u, out float v) {
+    light_idx = uint(rand(seed) * pc_ray.light_triangle_count);
+    vec2 uv_unused;
+    const vec2 rands = vec2(rand(seed), rand(seed));
+    const TriangleRecord record = sample_area_light_with_idx(
+        rands, 0, light_idx, light_material_idx, u, v);
+    pdf_pos = record.triangle_pdf / pc_ray.light_triangle_count;
+    return record;
+}
+
+void vcm_generate_pos_dir(inout VCMRestirData s, out float pdf_o) {
+    float pdf_pos;
+    uint light_material_idx, light_idx;
+    float u, v;
+    const TriangleRecord record =
+        vcm_generate_pos(pdf_pos, light_material_idx, light_idx, u, v);
+    vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
+                                    record.triangle_normal);
+    float cos_theta = abs(dot(wi, record.triangle_normal));
+    float pdf_dir = cos_theta / PI;
+    s.pos = record.pos;
+    s.dir = wi;
+    s.normal = record.triangle_normal;
+    s.light_material_idx = light_material_idx;
+    s.triangle_pdf = record.triangle_pdf;
+    pdf_o = pdf_dir;
+    s.pdf_dir = pdf_dir;
+}
+
+uint get_restir_hash_idx(uint light_idx, float u, float v) {
+    const int base_res =
+        int(sqrt(float(screen_size) / pc_ray.light_triangle_count));
+    ivec3 grid_res = ivec3(pc_ray.light_triangle_count, base_res, base_res);
+    ivec3 grid_idx =
+        get_grid_idx(vec3(light_idx, u, v), vec3(0, 0, 0),
+                     vec3(pc_ray.light_triangle_count, 1, 1), grid_res);
+
+    // if (pixel_idx == 500000) {
+    //     debugPrintfEXT("%v3i - %v3i - %f - %f\n", grid_idx, grid_res, u, v);
+    // }
+    return restir_hash(grid_idx, screen_size);
+}
+
+bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
+                               inout VCMRestirData s, out float pdf_o) {
+    // Sample light
+    uint light_idx = uint(rand(seed) * pc_ray.light_triangle_count);
+    uint light_triangle_idx;
+    MeshLight light;
+    uint light_material_idx;
+    vec2 uv_unused;
+    const vec2 rands = vec2(rand(seed), rand(seed));
+    vec3 light_min_pos;
+    vec3 light_max_pos;
+    float u, v;
+    const TriangleRecord record =
+        sample_area_light_with_idx(rands, 0, light_idx, light_material_idx,
+                                   light_min_pos, light_max_pos, u, v);
+    const MaterialProps light_mat =
+        load_material(light_material_idx, uv_unused);
+    vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
+                                    record.triangle_normal);
+    float pdf_pos = record.triangle_pdf / pc_ray.light_triangle_count;
+    float cos_theta = abs(dot(wi, record.triangle_normal));
+    float pdf_dir = cos_theta / PI;
+    if (pdf_dir <= EPS) {
+        return false;
+    }
+    light_state.pos = record.pos;
+    light_state.shading_nrm = record.triangle_normal;
+    light_state.area = 1.0 / record.triangle_pdf;
+    light_state.wi = wi;
+    light_state.throughput =
+        light_mat.emissive_factor * cos_theta / (pdf_dir * pdf_pos);
+    // Partially evaluate pdfs (area formulation)
+    // At s = 0 this is p_rev / p_fwd, in the case of area lights:
+    // p_rev = p_connect = 1/area, p_fwd = cos_theta / (PI * area)
+    // Note that pdf_fwd is in area formulation, so cos_y / r^2 is missing
+    // currently.
+    light_state.d_vcm = PI / cos_theta;
+    // g_prev / p_fwd
+    // Note that g_prev component in d_vc and d_vm lags by 1 iter
+    // So we initialize g_prev to cos_theta of the current iter
+    // Also note that 1/r^2 in the geometry term cancels for vc and vm
+    // By convention pdf_fwd sample the i'th vertex from i-1
+    // g_prev or pdf_prev samples from i'th vertex to i-1
+    // In that sense, cos_theta terms will be common in g_prev and pdf_pwd
+    light_state.d_vc = cos_theta / (pdf_dir * pdf_pos);
+    // Similar argument, with the eta
+    light_state.d_vm = light_state.d_vc * eta_vc;
+    s.pos = record.pos;
+    s.dir = wi;
+    s.normal = record.triangle_normal;
+    s.light_material_idx = light_material_idx;
+    s.triangle_pdf = record.triangle_pdf;
+    // const vec3 bbox = light_max_pos - light_min_pos;
+    // const float radius = length(bbox) * 0.01 / 100.0;
+
+    // const float max_comp = max(bbox.x, max(bbox.y, bbox.z));
+    // const int base_grid_res = int(max_comp / radius);
+    // ivec3 grid_res =
+    //     max(ivec3(bbox * float(base_grid_res) / max_comp), ivec3(1));
+    //  ivec3 grid_idx =
+    //     get_grid_idx(record.pos, light_min_pos, light_max_pos, grid_res);
+    s.hash_idx = get_restir_hash_idx(light_idx, u, v);
+    // if(s.hash_idx == 1400807) {
+    //     debugPrintfEXT("%d\n", s.hash_idx);
+    // }
+    s.pdf_dir = pdf_dir;
+    pdf_o = pdf_dir;
+    return true;
+}
+
+bool vcm_generate_light_sample_from_reservoir(float eta_vc,
+                                              VCMReservoir r,
+                                              const TriangleRecord record,
+                                              uint light_material_idx,
+                                              out VCMState light_state) {
+    vec2 uv_unused;
+    const MaterialProps light_mat =
+        load_material(light_material_idx, uv_unused);
+    vec3 wi = r.s.dir;
+    //  vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
+    //                                 record.triangle_normal);
+    
+    float pdf_pos = record.triangle_pdf / pc_ray.light_triangle_count;
+    //float cos_theta = PI / r.W;//abs(dot(wi, record.triangle_normal));
+    float cos_theta = abs(dot(wi, record.triangle_normal));
+    //debugPrintfEXT("%v3f\n", wi);
+    float pdf_dir = cos_theta / PI;
+    float pdf_dir2 = 1. / r.W;
+    //const float f = pdf_dir2 / (pdf_dir + pdf_dir2);
+    const float f = 1;
+    light_state.pos = record.pos;
+    light_state.shading_nrm = record.triangle_normal;
+    light_state.area = 1.0 / record.triangle_pdf;
+    light_state.wi = wi;
+    light_state.throughput = light_mat.emissive_factor * cos_theta * r.W * f/ (pdf_pos);
+    light_state.d_vcm = PI / cos_theta;
+    light_state.d_vc = cos_theta * f * r.W/ (pdf_pos);
+    light_state.d_vm = light_state.d_vc * eta_vc;
+    return true;
+}
+
+void main() {
+    const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+    const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
+    vec2 d = in_uv * 2.0 - 1.0;
+    vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
+    vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
+    vec3 direction = vec3(sample_camera(d));
+    vec3 col = vec3(0);
+    float max_lum = 0;
+    vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
+                                               2. / gl_LaunchSizeEXT.y, 0, 1));
+    area_int /= (area_int.w);
+    const float cam_area = abs(area_int.x * area_int.y);
+    VCMRestirData s;
+    float pdf_o;
+
+#define light_vtx(i) vcm_lights.d[vcm_light_path_idx + i]
+    const float radius = pc_ray.radius;
+    const float radius_sqr = radius * radius;
+    float eta_vcm = PI * radius_sqr * screen_size;
+    float eta_vc = (pc_ray.use_vc == 1) ? 1.0 / eta_vcm : 0;
+    float eta_vm = (pc_ray.use_vm == 1) ? PI * radius_sqr * screen_size : 0;
+    VCMState light_state;
+    bool result;
+    //bool generate_samples = pc_ray.total_frame_num % FRAME_INTERVAL == 0;
+    //bool generate_samples = pc_ray.do_spatiotemporal == 0;
+    bool generate_samples = true;
+    //bool generate_samples = pc_ray.do_spatiotemporal == 0;
+    if (generate_samples) {
+        // TODO: We might want to generate samples while processing a reservoir
+        result = vcm_generate_light_sample(eta_vc, light_state, s, pdf_o);
+        // if (pc_ray.do_spatiotemporal == 1 && r_prev.W > 0) {
+        //     vcm_generate_pos_dir(s, pdf_o);
+        //     result = vcm_generate_light_sample_from_reservoir(eta_vc, r_prev,
+        //                                                       light_state);
+        // } else {
+        //     result = vcm_generate_light_sample(eta_vc, light_state, s,
+        //     pdf_o);
+        // }
+    } else {
+        // Generate random position on light
+        float pdf_pos;
+        uint light_material_idx;
+        uint light_idx;
+        float u, v;
+        const TriangleRecord record =
+            vcm_generate_pos(pdf_pos, light_material_idx, light_idx, u, v);
+        // Get the hash idx and the reservoir
+        uint hash_idx = get_restir_hash_idx(light_idx, u, v);
+        const VCMReservoir r_prev = temporal_reservoirs.d[hash_idx];
+        // if(r_prev.W > 0) {
+        //     debugPrintfEXT("%f\n", r_prev.W);
+        // }
+        if (r_prev.W > 0 && sign(dot(r_prev.s.normal, record.triangle_normal)) > 0) {
+            //debugPrintfEXT("%f\n", r_prev);
+            result = vcm_generate_light_sample_from_reservoir(
+                eta_vc, r_prev, record, light_material_idx, light_state);
+        } else {
+            result = vcm_generate_light_sample(eta_vc, light_state, s, pdf_o);
+            if (r_prev.factor == 0) {
+                generate_samples = true;
+            }
+        }
+    }
+
+    if (!result) {
+        return;
+    }
+
+    {
+        const vec3 cam_pos = origin.xyz;
+        const vec3 cam_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
+        int depth;
+        int path_idx = 0;
+        for (depth = 1;; depth++) {
+            traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, light_state.pos, tmin,
+                        light_state.wi, tmax, 0);
+            if (payload.material_idx == -1) {
+                break;
+            }
+            vec3 wo = light_state.pos - payload.pos;
+
+            vec3 shading_nrm = payload.shading_nrm;
+            float cos_wo = dot(wo, shading_nrm);
+            vec3 geometry_nrm = payload.geometry_nrm;
+            bool side = true;
+            if (dot(payload.geometry_nrm, wo) <= 0.)
+                geometry_nrm = -geometry_nrm;
+            if (cos_wo <= 0.) {
+                cos_wo = -cos_wo;
+                shading_nrm = -shading_nrm;
+                side = false;
+            }
+
+            if (dot(geometry_nrm, wo) * dot(shading_nrm, wo) <= 0) {
+                // We dont handle BTDF at the moment
+                break;
+            }
+            float dist = length(payload.pos - light_state.pos);
+            float dist_sqr = dist * dist;
+            wo /= dist;
+            const MaterialProps mat =
+                load_material(payload.material_idx, payload.uv);
+            const bool mat_specular =
+                (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
+            // Complete the missing geometry terms
+            float cos_theta_wo = abs(dot(wo, shading_nrm));
+            // Can't connect from specular to camera path, can't merge either
+            light_state.d_vcm *= dist_sqr;
+            light_state.d_vcm /= cos_theta_wo;
+            light_state.d_vc /= cos_theta_wo;
+            light_state.d_vm /= cos_theta_wo;
+            if (!mat_specular && (pc_ray.use_vc == 1 || pc_ray.use_vm == 1)) {
+
+                // Copy to light vertex buffer
+                light_vtx(path_idx).wi = light_state.wi;
+                light_vtx(path_idx).shading_nrm = light_state.shading_nrm;
+                light_vtx(path_idx).pos = light_state.pos;
+                light_vtx(path_idx).uv = light_state.uv;
+                light_vtx(path_idx).throughput = light_state.throughput;
+                light_vtx(path_idx).material_idx = light_state.material_idx;
+                light_vtx(path_idx).area = light_state.area;
+                light_vtx(path_idx).d_vcm = light_state.d_vcm;
+                light_vtx(path_idx).d_vc = light_state.d_vc;
+                light_vtx(path_idx).d_vm = light_state.d_vm;
+                light_vtx(path_idx).path_len = depth;
+                light_vtx(path_idx).side = uint(side);
+                path_idx++;
+            }
+            if (depth >= pc_ray.max_depth + 1) {
+                break;
+            }
+
+            // Reverse pdf in solid angle form, since we have geometry term
+            // at the outer paranthesis
+            if (!mat_specular &&
+                (pc_ray.use_vc == 1 && depth < pc_ray.max_depth)) {
+                // Connect to camera
+                ivec2 coords;
+                vec3 splat_col = vcm_connect_cam(
+                    cam_pos, cam_nrm, shading_nrm, cam_area, payload.pos,
+                    light_state, eta_vm, wo, mat, coords);
+                if (luminance(splat_col) > 0) {
+                    uint idx = coords.x * gl_LaunchSizeEXT.y + coords.y;
+                    tmp_col.d[idx] += splat_col;
+                    col += splat_col;
+                    if(luminance(splat_col) > max_lum) {
+                        max_lum = luminance(splat_col);
+                    }
+                }
+            }
+
+            // Continue the walk
+            float pdf_dir;
+            float cos_theta;
+            const vec3 f =
+                sample_bsdf(shading_nrm, wo, mat, 0, side, light_state.wi,
+                            pdf_dir, cos_theta, seed);
+            const bool same_hemisphere =
+                same_hemisphere(light_state.wi, wo, shading_nrm);
+
+            const bool mat_transmissive =
+                (mat.bsdf_props & BSDF_TRANSMISSIVE) == BSDF_TRANSMISSIVE;
+            if (f == vec3(0) || pdf_dir == 0 ||
+                (!same_hemisphere && !mat_transmissive)) {
+                break;
+            }
+
+            float pdf_rev = pdf_dir;
+            if (!mat_specular) {
+                pdf_rev = bsdf_pdf(mat, shading_nrm, light_state.wi, wo);
+            }
+            const float abs_cos_theta = abs(cos_theta);
+
+            light_state.pos = offset_ray(payload.pos, shading_nrm);
+            // Note, same cancellations also occur here from now on
+            // see _vcm_generate_light_sample_
+            if (!mat_specular) {
+                light_state.d_vc =
+                    (abs_cos_theta / pdf_dir) *
+                    (eta_vm + light_state.d_vcm + pdf_rev * light_state.d_vc);
+                light_state.d_vm = (abs_cos_theta / pdf_dir) *
+                                   (1 + light_state.d_vcm * eta_vc +
+                                    pdf_rev * light_state.d_vm);
+                light_state.d_vcm = 1.0 / pdf_dir;
+            } else {
+                // Specular pdf has value = inf, so d_vcm = 0;
+                light_state.d_vcm = 0;
+                // pdf_fwd = pdf_rev = delta -> cancels
+                light_state.d_vc *= abs_cos_theta;
+                light_state.d_vm *= abs_cos_theta;
+            }
+
+            light_state.throughput *= f * abs_cos_theta / pdf_dir;
+            light_state.shading_nrm = shading_nrm;
+            light_state.area = payload.area;
+            light_state.material_idx = payload.material_idx;
+        }
+        light_path_cnts.d[pixel_idx] = path_idx;
+        // "Build" the hash grid
+        // TODO: Add sorting later
+        if (pc_ray.use_vm == 1) {
+            for (int i = 0; i < path_idx; i++) {
+                ivec3 grid_idx =
+                    get_grid_idx(light_vtx(i).pos, pc_ray.min_bounds,
+                                 pc_ray.max_bounds, pc_ray.grid_res);
+                uint h = hash(grid_idx, screen_size);
+                photons.d[h].pos = light_vtx(i).pos;
+                photons.d[h].wi = -light_vtx(i).wi;
+                photons.d[h].d_vm = light_vtx(i).d_vm;
+                photons.d[h].d_vcm = light_vtx(i).d_vcm;
+                photons.d[h].throughput = light_vtx(i).throughput;
+                photons.d[h].nrm = light_vtx(i).shading_nrm;
+                photons.d[h].path_len = light_vtx(i).path_len;
+                atomicAdd(photons.d[h].photon_count, 1);
+            }
+        }
+    }
+    // if (pc_ray.total_frame_num % FRAME_INTERVAL != 0) {
+    //if (pc_ray.do_spatiotemporal == 0) {
+    if (generate_samples) {
+        //const float p_hat = max_lum;//luminance(col);
+        const float p_hat = s.pdf_dir;
+        s.p_hat = p_hat;
+        atomicAdd(temporal_reservoirs.d[s.hash_idx].factor, 1);
+        // VCMReservoir r_new, r, r_prev;
+        // init_reservoir(r_new);
+        // init_reservoir(r);
+        // init_reservoir(r_prev);
+        // if (pc_ray.do_spatiotemporal == 1) {
+        //     r_prev = temporal_reservoirs.d[pixel_idx];
+        // }
+        // update_reservoir(r_new, s, p_hat / pdf_o);
+        // r_new.W = 1. / pdf_o;
+        // combine_reservoir(r, r_new);
+        // uint m_total = 1;
+        // // Temporal reuse
+        // if (r_prev.W > 0) {
+        //     r_prev.m = min(r_prev.m, FRAME_INTERVAL);
+        //     combine_reservoir(r, r_prev);
+        //     m_total += r_prev.m;
+        // }
+        // r.m = m_total;
+        // r.W = r.w_sum / (r.s.p_hat * r.m);
+        // temporal_reservoirs.d[pixel_idx].w_sum = r.w_sum;
+        // temporal_reservoirs.d[pixel_idx].W = r.W;
+        // temporal_reservoirs.d[pixel_idx].m = r.m;
+        // temporal_reservoirs.d[pixel_idx].s = r.s;
+
+        // debugPrintfEXT("%f\n", s.pdf_dir);
+        light_samples.d[pixel_idx] = s;
+        light_samples.d[pixel_idx].dir = s.dir;
+        //debugPrintfEXT("%v3f\n", light_samples.d[pixel_idx].dir);
+    }
+    // if (pixel_idx == 500000) {
+    //     debugPrintfEXT("%f\n", temporal_reservoirs.d[pixel_idx].W);
+    // }
+
+#undef light_vtx
+}
