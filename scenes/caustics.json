@@ -1,0 +1,116 @@
+{
+    "bsdfs": [
+        {
+            "ior": 1.52,
+            "name": "Glass",
+            "refs": [
+                "glass"
+            ],
+            "albedo": [
+                1,
+                1,
+                1
+            ],
+            "type": "glass"
+        },
+        {
+            "name": "Ring",
+            "refs": [
+                "ring"
+            ],
+            "albedo": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "metalness" : [
+                0.95,
+                0.92,
+                0.06
+            ],
+            "roughness": 0.1,
+            "type": "glossy"
+        },
+       
+        {
+            "albedo": [
+                0.725,
+                0.71,
+                0.68
+            ],
+            "name": "Other Walls",
+            "refs": [
+                "left_wall",
+                "right_wall",
+                "ceiling",
+                "back_wall"
+            ],
+            "type": "diffuse"
+        },
+
+        {
+            "albedo": [
+                0.64,
+                0.165,
+                0.165
+            ],
+            "name": "Table",
+            "refs": [
+               "table" 
+            ],
+            "type": "diffuse"
+        },
+
+        {
+            "albedo": [
+                0.725,
+                0.71,
+                0.68
+            ],
+            "name": "Floor",
+            "refs": [
+                "floor"
+            ],
+            "metalness" : [
+                1,
+                1,
+                1
+            ],
+            "roughness": 0.05,
+            "type": "glossy"
+        }
+       
+    ],
+
+    "lights" : [
+        {
+            "L": [
+                170,
+                120,
+                40
+            ],
+
+            "pos" : [
+                2.42,0,-2.432593
+            ],
+            "dir" : [
+                0.420776,-2.158489, 3
+            ],
+            "name": "Spotight",
+            "type": "spot"
+        }
+
+    ],
+    "camera": {
+        "fov": 45,
+        "position": [
+            2.7,
+            0.5,
+            3.1
+        ],
+        "dir" : [
+            -1.420776,-2.158489, 2
+        ]
+    },
+    "mesh_file": "caustics2.obj"
+}
