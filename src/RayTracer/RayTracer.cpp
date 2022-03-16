@@ -50,7 +50,7 @@ void RayTracer::init(Window* window) {
 	//config.filename = "occluded.json";
 	config.filename = "caustics.json";
 	//config.filename = "test.json";
-	integrator = std::make_unique<SPPM>(this, config);
+	integrator = std::make_unique<VCM>(this, config);
 	integrator->init();
 	create_post_descriptor();
 	update_post_desc_set();

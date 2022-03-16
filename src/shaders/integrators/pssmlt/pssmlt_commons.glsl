@@ -212,9 +212,17 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
             dir /= dir_len;
             const MaterialProps mat = load_material(
                 light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
-            vec3 unused;
-            cam_vtx(t - 1).pdf_rev =
-                bsdf_pdf(mat, light_vtx(s - 1).shading_nrm, unused, dir);
+            vec3 wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
+            float pdf_rev;
+            if (s >= 2) {
+                wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
+                pdf_rev = bsdf_pdf(mat, light_vtx(s - 1).shading_nrm, wo, dir);
+            }
+            if (s < 2) {
+                const Light light = lights[light_vtx(s - 1).light_idx];
+                pdf_rev = light_pdf(light, light_vtx(s - 1).shading_nrm, dir);
+            }
+            cam_vtx(t - 1).pdf_rev = pdf_rev;
             if (cam_vtx(t - 1).pdf_rev != 0) {
                 cam_vtx(t - 1).pdf_rev *=
                     abs(dot(dir, cam_vtx(t - 1).shading_nrm)) /
@@ -234,9 +242,9 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
         if (s > 0) {
             const MaterialProps mat =
                 load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
-            vec3 unused;
+            vec3 wo = normalize(light_vtx(s - 1).pos - cam_vtx(t - 1).pos);
             cam_vtx(t - 2).pdf_rev =
-                bsdf_pdf(mat, cam_vtx(t - 1).shading_nrm, unused, dir);
+                bsdf_pdf(mat, cam_vtx(t - 1).shading_nrm, wo, dir);
             if (cam_vtx(t - 2).pdf_rev != 0) {
                 cam_vtx(t - 2).pdf_rev *=
                     abs(dot(dir, cam_vtx(t - 2).shading_nrm)) /
@@ -364,8 +372,8 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
         offset_ray(light_vtx(s - 1).pos, light_vtx(s - 1).shading_nrm);
     const MaterialProps mat =
         load_material(light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
-    vec3 unused;
-    const vec3 f = eval_bsdf(mat, unused, dir);
+    const vec3 wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
+    const vec3 f = eval_bsdf(mat, wo, dir, light_vtx(s - 1).shading_nrm);
     if (cam_pdf_ratio > 0.0 && f != vec3(0)) {
         any_hit_payload.hit = 1;
         traceRayEXT(tlas,
@@ -490,28 +498,34 @@ int mlt_generate_light_subpath(int max_depth, bool large_step,
     uint light_material_idx;
     vec2 uv_unused;
     Light light;
+    TriangleRecord record;
+    MaterialProps light_mat;
+    float pdf_pos, pdf_dir;
+    vec3 wi;
     const vec4 rands_pos =
         vec4(mlt_rand(seed, large_step), mlt_rand(seed, large_step),
              mlt_rand(seed, large_step), mlt_rand(seed, large_step));
-    const TriangleRecord record =
-        sample_area_light(rands_pos, pc_ray.num_lights, light_idx,
-                          light_triangle_idx, light_material_idx, light);
-    const MaterialProps light_mat =
-        load_material(light_material_idx, uv_unused);
+    const vec2 rands_dir =
+        vec2(mlt_rand(seed, large_step), mlt_rand(seed, large_step));
+    // const TriangleRecord record =
+    //     sample_area_light(rands_pos, pc_ray.num_lights, light_idx,
+    //                       light_triangle_idx, light_material_idx, light);
+    // const MaterialProps light_mat =
+    //     load_material(light_material_idx, uv_unused);
+    const vec3 Le = sample_light_Le(
+        rands_pos, rands_dir, pc_ray.num_lights, pc_ray.light_triangle_count,
+        light_idx, light_triangle_idx, light_material_idx, light, record,
+        light_mat, pdf_pos, seed, wi, pdf_dir);
     light_verts.d[bdpt_path_idx].pos = record.pos;
     light_verts.d[bdpt_path_idx].shading_nrm = record.triangle_normal;
     light_verts.d[bdpt_path_idx].material_idx = light_material_idx;
+    light_verts.d[bdpt_path_idx].light_idx = light_idx;
     light_verts.d[bdpt_path_idx].area = 1.0 / record.triangle_pdf;
     light_verts.d[bdpt_path_idx].delta = 0;
-    vec3 wi = sample_cos_hemisphere(
-        vec2(mlt_rand(seed, large_step), mlt_rand(seed, large_step)),
-        record.triangle_normal);
     light_verts.d[bdpt_path_idx].dir = wi;
-    float pdf_dir = abs(dot(wi, record.triangle_normal)) / PI;
-    light_verts.d[bdpt_path_idx].pdf_fwd =
-        record.triangle_pdf * (1.0 / pc_ray.light_triangle_count);
-    vec3 throughput = light_mat.emissive_factor *
-                      abs(dot(record.triangle_normal, wi)) /
+    light_verts.d[bdpt_path_idx].pdf_fwd = pdf_pos;
+    light_verts.d[bdpt_path_idx].throughput = Le;
+    vec3 throughput = Le * abs(dot(record.triangle_normal, wi)) /
                       (pdf_dir * light_verts.d[bdpt_path_idx].pdf_fwd);
 
     return mlt_random_walk(max_depth - 1, throughput, pdf_dir, 0, large_step,
@@ -566,14 +580,20 @@ vec3 mlt_connect(int s, int t, bool large_step, inout uvec4 seed,
         uint light_material_idx;
         vec2 uv_unused;
         Light light;
+        TriangleRecord record;
+        MaterialProps light_mat;
         const vec4 rands_pos =
             vec4(mlt_rand(seed, large_step), mlt_rand(seed, large_step),
                  mlt_rand(seed, large_step), mlt_rand(seed, large_step));
-        const TriangleRecord record =
-            sample_area_light(rands_pos, pc_ray.num_lights, light_idx,
-                              light_triangle_idx, light_material_idx, light);
-        const MaterialProps light_mat =
-            load_material(light_material_idx, uv_unused);
+        // const TriangleRecord record =
+        //     sample_area_light(rands_pos, pc_ray.num_lights, light_idx,
+        //                       light_triangle_idx, light_material_idx, light);
+        // const MaterialProps light_mat =
+        //     load_material(light_material_idx, uv_unused);
+        const vec3 Le =
+            sample_light(cam_vtx(t - 1).pos, pc_ray.num_lights, light_idx,
+                         light_triangle_idx, light_material_idx, light, record,
+                         light_mat, seed);
         vec3 wi = record.pos - cam_vtx(t - 1).pos;
         float ray_len = length(wi);
         float ray_len_sqr = ray_len * ray_len;
@@ -582,11 +602,11 @@ vec3 mlt_connect(int s, int t, bool large_step, inout uvec4 seed,
         const vec3 ray_origin =
             offset_ray(cam_vtx(t - 1).pos, cam_vtx(t - 1).shading_nrm);
         any_hit_payload.hit = 1;
-        vec3 unused;
+        vec3 wo = normalize(cam_vtx(t - 2).pos - cam_vtx(t - 1).pos);
         // TODO
         const MaterialProps mat =
             load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
-        const vec3 f = eval_bsdf(mat, unused, wi);
+        const vec3 f = eval_bsdf(mat, wo, wi, cam_vtx(t - 1).shading_nrm);
         if (f != vec3(0)) {
             traceRayEXT(tlas,
                         gl_RayFlagsTerminateOnFirstHitEXT |
@@ -602,7 +622,7 @@ vec3 mlt_connect(int s, int t, bool large_step, inout uvec4 seed,
                 s_fwd_pdf.pdf_fwd = pdf_light;
                 s_fwd_pdf.pos = record.pos;
                 s_fwd_pdf.shading_nrm = record.triangle_normal;
-                vec3 throughput = light_mat.emissive_factor / pdf_light;
+                vec3 throughput = Le / pdf_light;
                 L = cam_vtx(t - 1).throughput * f * G * throughput;
             }
         }
@@ -614,16 +634,18 @@ vec3 mlt_connect(int s, int t, bool large_step, inout uvec4 seed,
         float len = length(d);
         d /= len;
         float G = (dot(n_s, -d)) * (dot(n_t, d)) / (len * len);
-
         if (G > 0) {
             const MaterialProps mat_1 =
                 load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
             const MaterialProps mat_2 = load_material(
                 light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
 
-            vec3 unused;
-            const vec3 brdf1 = eval_bsdf(mat_1, unused, d);
-            const vec3 brdf2 = eval_bsdf(mat_2, unused, -d);
+            vec3 wo_1 = normalize(cam_vtx(t - 2).pos - cam_vtx(t - 1).pos);
+            vec3 wo_2 = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
+            const vec3 brdf1 =
+                eval_bsdf(mat_1, wo_1, d, cam_vtx(t - 1).shading_nrm);
+            const vec3 brdf2 =
+                eval_bsdf(mat_2, wo_2, -d, light_vtx(t - 1).shading_nrm);
             if (brdf1 != vec3(0) && brdf2 != vec3(0)) {
                 vec3 ray_origin =
                     offset_ray(cam_vtx(t - 1).pos, cam_vtx(t - 1).shading_nrm);
@@ -677,7 +699,8 @@ float mlt_L(const vec4 origin, const float cam_area, bool large_step,
     for (int t = 1; t <= num_cam_paths; t++) {
         for (int s = 0; s <= num_light_paths; s++) {
             int depth = s + t - 2;
-            if (depth > (pc_ray.max_depth - 1) || depth < 0) {
+            if (depth > (pc_ray.max_depth - 1) || depth < 0 ||
+                (s == 1 && t == 1)) {
                 continue;
             }
             if (t == 1) {

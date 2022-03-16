@@ -102,17 +102,6 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
     return L;
 }
 
-TriangleRecord vcm_generate_pos(out float pdf_pos, out uint light_material_idx,
-                                out uint light_idx, out float u, out float v) {
-    light_idx = uint(rand(seed) * pc_ray.light_triangle_count);
-    vec2 uv_unused;
-    const vec2 rands = vec2(rand(seed), rand(seed));
-    const TriangleRecord record = sample_area_light_with_idx(
-        rands, 0, light_idx, light_material_idx, u, v);
-    pdf_pos = record.triangle_pdf / pc_ray.light_triangle_count;
-    return record;
-}
-
 uint get_restir_hash_idx(uint light_idx, float u, float v) {
     const int base_res =
         int(sqrt(float(screen_size) / pc_ray.light_triangle_count));
@@ -127,21 +116,35 @@ uint get_restir_hash_idx(uint light_idx, float u, float v) {
 bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
                                inout VCMRestirData s, out float pdf_o) {
     // Sample light
-    uint light_idx = uint(rand(seed) * pc_ray.light_triangle_count);
+    // uint light_idx = uint(rand(seed) * pc_ray.light_triangle_count);
+    // uint light_triangle_idx;
+    // Light light;
+    // uint light_material_idx;
+    // vec2 uv_unused;
+    // const vec2 rands = vec2(rand(seed), rand(seed));
+    // vec3 light_min_pos;
+    // vec3 light_max_pos;
+    // float u, v;
+    // const TriangleRecord record =
+    //     sample_area_light_with_idx(rands, 0, light_idx, light_material_idx,
+    //                                light_min_pos, light_max_pos, u, v);
+    // const MaterialProps light_mat =
+    //     load_material(light_material_idx, uv_unused);
+    // vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
+    // record.triangle_normal);
+    uint light_idx;
     uint light_triangle_idx;
-    Light light;
     uint light_material_idx;
     vec2 uv_unused;
-    const vec2 rands = vec2(rand(seed), rand(seed));
-    vec3 light_min_pos;
-    vec3 light_max_pos;
+    Light light;
+    TriangleRecord record;
+    MaterialProps light_mat;
     float u, v;
-    const TriangleRecord record =
-        sample_area_light_with_idx(rands, 0, light_idx, light_material_idx,
-                                   light_min_pos, light_max_pos, u, v);
-    const MaterialProps light_mat =
-        load_material(light_material_idx, uv_unused);
-    vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)), record.triangle_normal);
+    vec3 wi;
+    const vec3 Le =
+        sample_light_Le(pc_ray.num_lights, pc_ray.light_triangle_count,
+                        light_idx, light_triangle_idx, light_material_idx,
+                        light, record, light_mat, seed, wi, u, v);
     float pdf_pos = record.triangle_pdf / pc_ray.light_triangle_count;
     float cos_theta = abs(dot(wi, record.triangle_normal));
     float pdf_dir = cos_theta / PI;
@@ -153,7 +156,7 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
     light_state.area = 1.0 / record.triangle_pdf;
     light_state.wi = wi;
     light_state.throughput =
-        light_mat.emissive_factor * cos_theta / (pdf_dir * pdf_pos);
+        Le * cos_theta / (pdf_dir * pdf_pos);
     light_state.d_vcm = PI / cos_theta;
     light_state.d_vc = cos_theta / (pdf_dir * pdf_pos);
     light_state.d_vm = light_state.d_vc * eta_vc;
@@ -172,10 +175,10 @@ void main() {
     if (should_resample.d != 0) {
         return;
     }
-    if(pixel_idx == 0) {
-            debugPrintfEXT("resampling %d\n", pc_ray.total_frame_num);
-        }
-  
+    if (pixel_idx == 0) {
+        debugPrintfEXT("resampling %d\n", pc_ray.total_frame_num);
+    }
+
     const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
     const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
     vec2 d = in_uv * 2.0 - 1.0;
@@ -309,7 +312,7 @@ void main() {
         }
     }
     const float p_hat = total_lum;
-    //const float p_hat = s.pdf_dir;
+    // const float p_hat = s.pdf_dir;
     if (p_hat > 0) {
         s.p_hat = p_hat;
         s.valid = 1;

@@ -53,8 +53,8 @@ private:
 
 	std::vector<Buffer> block_sums;
 
-	int max_depth = 6;
-	float mutations_per_pixel = 50.0f;
+	int max_depth = 10;
+	float mutations_per_pixel = 300.0f;
 	vec3 sky_col = vec3(0, 0, 0);
 	int num_mlt_threads = 1600 * 900 / 2;
 	int num_bootstrap_samples = 1600 * 900 / 2;

@@ -1,7 +1,7 @@
 #include "LumenPCH.h"
 #include "SPPM.h"
 
-const int max_depth = 15;
+const int max_depth = 8;
 const vec3 sky_col(0, 0, 0);
 void SPPM::init() {
 	Integrator::init();

@@ -153,16 +153,25 @@ void main() {
         float pdf_rev;
         vec3 f;
         if (!mat_specular && depth < pc_ray.max_depth) {
+            // uint light_idx;
+            // uint light_triangle_idx;
+            // uint light_material_idx;
+            // vec2 uv_unused;
+            // Light light;
+            // const TriangleRecord record = sample_area_light(
+            //     light_idx, light_triangle_idx, light_material_idx, light,
+            //     seed, pc_ray.num_lights);
+            // const MaterialProps light_mat =
+            //     load_material(light_material_idx, uv_unused);
             uint light_idx;
             uint light_triangle_idx;
             uint light_material_idx;
-            vec2 uv_unused;
             Light light;
-            const TriangleRecord record = sample_area_light(
-                light_idx, light_triangle_idx, light_material_idx, light, seed,
-                pc_ray.num_lights);
-            const MaterialProps light_mat =
-                load_material(light_material_idx, uv_unused);
+            TriangleRecord record;
+            MaterialProps light_mat;
+            const vec3 Le = sample_light(
+                payload.pos, pc_ray.num_lights, light_idx, light_triangle_idx,
+                light_material_idx, light, record, light_mat, seed);
             vec3 wi = record.pos - payload.pos;
             float ray_len = length(wi);
             float ray_len_sqr = ray_len * ray_len;
@@ -196,7 +205,7 @@ void main() {
                     if (mis_weight > 0) {
                         col += mis_weight * abs(cos_x) * f *
                                camera_state.throughput *
-                               light_mat.emissive_factor /
+                               Le /
                                (pdf_light_w / pc_ray.light_triangle_count);
                     }
                 }

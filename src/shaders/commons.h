@@ -158,6 +158,7 @@ struct MLTPathVertex {
     vec2 uv;
     vec3 throughput;
     uint material_idx;
+    uint light_idx;
     uint delta;
     float area;
     float pdf_fwd;
@@ -371,11 +372,12 @@ struct SelectedReservoirs {
 
 struct LightState {
     vec3 pos;
-    uint light_material_idx;
-    vec3 dir;
     float triangle_pdf;
-    vec3 normal;
+    vec3 dir;
     uint hash_idx;
+    vec3 normal;
+    vec3 Le;
+    uint light_flags;
 };
 
 // Scene buffer addresses

@@ -63,25 +63,39 @@ uint get_restir_hash_idx(uint light_idx, float u, float v) {
 
 bool vcm_generate_light_sample(out LightState light_state) {
     // Sample light
-    uint light_idx = uint(rand(seed) * pc_ray.light_triangle_count);
+    // uint light_idx = uint(rand(seed) * pc_ray.light_triangle_count);
+    // uint light_triangle_idx;
+    // uint light_material_idx;
+    // vec2 uv_unused;
+    // const vec2 rands = vec2(rand(seed), rand(seed));
+    // vec3 light_min_pos;
+    // vec3 light_max_pos;
+    // float u, v;
+    // const TriangleRecord record =
+    //     sample_area_light_with_idx(rands, 0, light_idx, light_material_idx,
+    //                                light_min_pos, light_max_pos, u, v);
+    // vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
+    //                                 record.triangle_normal);
+    uint light_idx;
     uint light_triangle_idx;
     uint light_material_idx;
     vec2 uv_unused;
-    const vec2 rands = vec2(rand(seed), rand(seed));
-    vec3 light_min_pos;
-    vec3 light_max_pos;
-    float u, v;
-    const TriangleRecord record =
-        sample_area_light_with_idx(rands, 0, light_idx, light_material_idx,
-                                   light_min_pos, light_max_pos, u, v);
-    vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
-                                    record.triangle_normal);
+    Light light;
+    TriangleRecord record;
+    MaterialProps light_mat;
+    float u,v;
+    vec3 wi;
+    const vec3 Le =
+        sample_light_Le(pc_ray.num_lights, pc_ray.light_triangle_count,
+                        light_idx, light_triangle_idx, light_material_idx,
+                        light, record, light_mat, seed, wi, u, v);
     light_state.pos = record.pos;
     light_state.normal = record.triangle_normal;
     light_state.dir = wi;
-    light_state.light_material_idx = light_material_idx;
     light_state.triangle_pdf = record.triangle_pdf;
     light_state.hash_idx = get_restir_hash_idx(light_idx, u, v);
+    light_state.Le = Le;
+    light_state.light_flags = light.light_flags;
     return true;
 }
 

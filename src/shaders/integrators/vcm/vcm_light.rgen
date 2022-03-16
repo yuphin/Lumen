@@ -140,9 +140,9 @@ uint get_restir_hash_idx(uint light_idx, float u, float v) {
 void load_vcm_state(float eta_vc, const VCMReservoir r,
                     const LightState light_state, out VCMState state,
                     bool use_reservoir) {
-    vec2 uv_unused;
-    const MaterialProps light_mat =
-        load_material(light_state.light_material_idx, uv_unused);
+    // vec2 uv_unused;
+    // const MaterialProps light_mat =
+    //     load_material(light_state.light_material_idx, uv_unused);
     float pdf_pos = light_state.triangle_pdf / pc_ray.light_triangle_count;
     vec3 wi;
     float W;
@@ -156,16 +156,19 @@ void load_vcm_state(float eta_vc, const VCMReservoir r,
         cos_theta = abs(dot(wi, light_state.normal));
         W = r.W;
     } else {
-        wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
-                                   light_state.normal);
+        // const Light light = lights[light_state.light_idx];
+        // wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
+        //                            light_state.normal);
+        wi = light_state.dir;
+        const float pdf_dir = light_pdf(light_state.light_flags, light_state.normal, wi);
         cos_theta = abs(dot(wi, light_state.normal));
-        W = PI / cos_theta;
+        W = 1. / pdf_dir;
     }
     state.pos = light_state.pos;
     state.shading_nrm = light_state.normal;
     state.area = 1.0 / light_state.triangle_pdf;
     state.wi = wi;
-    state.throughput = light_mat.emissive_factor * cos_theta * W / (pdf_pos);
+    state.throughput = light_state.Le * cos_theta * W / (pdf_pos);
    
     // Partially evaluate pdfs (area formulation)
     // At s = 0 this is p_rev / p_fwd, in the case of area lights:
