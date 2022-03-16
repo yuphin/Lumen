@@ -17,7 +17,7 @@ layout(set = 0, binding = 1, rgba32f) uniform image2D image;
 layout(set = 0, binding = 2) readonly buffer InstanceInfo_ {
     PrimMeshInfo prim_info[];
 };
-layout(set = 0, binding = 3) readonly buffer Lights { MeshLight lights[]; };
+layout(set = 0, binding = 3) readonly buffer Lights { Light lights[]; };
 layout(set = 0, binding = 4, rgba32f) uniform image2D tmp_image;
 
 layout(set = 1, binding = 0) uniform SceneUBOBuffer { SceneUBO ubo; };
@@ -213,11 +213,11 @@ void main() {
         vec3 lambertian_brdf = eval_material_opaque(mat, payload.uv);
         origin.xyz = offset_ray(payload.pos, shading_normal);
 #if NEE == 1
-        if (pc_ray.num_mesh_lights == 0) {
+        if (pc_ray.num_lights == 0) {
             continue;
         }
-        uint mesh_light_idx = uint(rand(seed) * pc_ray.num_mesh_lights);
-        MeshLight light = lights[mesh_light_idx];
+        uint mesh_light_idx = uint(rand(seed) * pc_ray.num_lights);
+        Light light = lights[mesh_light_idx];
         uint ray_idx =
             (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
             light.num_triangles;

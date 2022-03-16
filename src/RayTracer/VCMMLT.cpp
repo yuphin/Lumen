@@ -2,11 +2,11 @@
 #include "VCMMLT.h"
 static bool use_vm = false;
 static float vcm_radius_factor = 0.1f;
-static bool light_first = false;
+static bool light_first = true;
 void VCMMLT::init() {
 	Integrator::init();
 	max_depth = 6;
-	mutations_per_pixel = 4.0f;
+	mutations_per_pixel = 64.0f;
 	sky_col = vec3(0, 0, 0);
 	num_mlt_threads = 1600 * 900 / 8;
 	num_bootstrap_samples = 1600 * 900 / 8;
@@ -123,7 +123,7 @@ void VCMMLT::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height * (max_depth) * sizeof(VCMVertex));
+		instance->width * instance->height * (max_depth + 1) * sizeof(VCMVertex));
 
 	light_path_cnt_buffer.create(
 		&instance->vkb.ctx,
@@ -262,7 +262,7 @@ void VCMMLT::render() {
 	pc_ray.light_pos = scene_ubo.light_pos;
 	pc_ray.light_type = 0;
 	pc_ray.light_intensity = 10;
-	pc_ray.num_mesh_lights = int(lights.size());
+	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = max_depth;
 	pc_ray.sky_col = sky_col;
@@ -862,7 +862,7 @@ void VCMMLT::create_tlas() {
 		mesh_lights_buffer.create(
 			&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-			lights.size() * sizeof(MeshLight), lights.data(), true);
+			lights.size() * sizeof(Light), lights.data(), true);
 	}
 
 	pc_ray.total_light_area += total_light_triangle_area;

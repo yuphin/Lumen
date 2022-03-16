@@ -18,10 +18,10 @@ vec3 uniform_sample_light(const MaterialProps mat, const vec3 pos,
     uint light_idx;
     uint light_triangle_idx;
     uint light_material_idx;
-    MeshLight light;
+    Light light;
     const TriangleRecord record =
         sample_area_light(light_idx, light_triangle_idx, light_material_idx,
-                          light, seed, pc_ray.num_mesh_lights);
+                          light, seed, pc_ray.num_lights);
     vec2 uv_unused;
     const MaterialProps light_mat =
         load_material(light_material_idx, uv_unused);
@@ -141,7 +141,7 @@ void main() {
             const vec4 rands =
                 vec4(rand(seed), rand(seed), rand(seed), rand(seed));
             const TriangleRecord record =
-                sample_area_light(rands, pc_ray.num_mesh_lights, light_mesh_idx,
+                sample_area_light(rands, pc_ray.num_lights, light_mesh_idx,
                                   light_triangle_idx, light_material_idx);
             vec2 uv_unused;
             const MaterialProps light_mat =
@@ -237,68 +237,68 @@ void main() {
         bool specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
         origin = offset_ray(pos, normal);
         // Do traditional path tracing
-        for (int depth = 1;; depth++) {
-            traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin, tmin, direction,
-                        tmax, 0);
-            const bool found_isect = payload.material_idx != -1;
-            if (depth >= pc_ray.max_depth - 1) {
-                break;
-            }
-            if (!found_isect) {
-                col += throughput * pc_ray.sky_col;
-                break;
-            }
-            const MaterialProps hit_mat =
-                load_material(payload.material_idx, payload.uv);
-            if (specular) {
-                col += throughput * hit_mat.emissive_factor;
-            }
-            const vec3 wo = -direction;
-            vec3 shading_nrm = payload.shading_nrm;
-            float cos_wo = dot(wo, shading_nrm);
-            bool side = true;
-#if 1
-            vec3 geometry_nrm = payload.geometry_nrm;
-            if (dot(payload.geometry_nrm, wo) < 0.)
-                geometry_nrm = -geometry_nrm;
-            if (cos_wo < 0.) {
-                cos_wo = -cos_wo;
-                shading_nrm = -shading_nrm;
-                side = false;
-            }
-#endif
-            const vec3 pos = offset_ray(payload.pos, shading_nrm);
-            if (hit_mat.bsdf_type == BSDF_LAMBERTIAN) {
-                const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
-                col += throughput *
-                       uniform_sample_light(hit_mat, pos, side, shading_nrm, wo,
-                                            specular) /
-                       light_pick_pdf;
-            }
-            // Sample direction & update throughput
-            float pdf, cos_theta;
-            const vec3 f = sample_bsdf(shading_nrm, wo, hit_mat,
-                                       1
-                                       /*radiance=cam*/,
-                                       side, direction, pdf, cos_theta, seed);
-            if (pdf == 0) {
-                break;
-            }
-            throughput *= f * abs(cos_theta) / pdf;
-            specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
-            origin = pos;
-            float rr_scale = 1.0;
-            if (hit_mat.bsdf_type == BSDF_GLASS) {
-                rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
-            }
-            if (depth > RR_MIN_DEPTH) {
-                float rr_prob = min(0.95f, luminance(throughput) * rr_scale);
-                if (rr_prob < rand(seed))
-                    break;
-                else
-                    throughput /= rr_prob;
-            }
-        }
+//         for (int depth = 1;; depth++) {
+//             traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin, tmin, direction,
+//                         tmax, 0);
+//             const bool found_isect = payload.material_idx != -1;
+//             if (depth >= pc_ray.max_depth - 1) {
+//                 break;
+//             }
+//             if (!found_isect) {
+//                 col += throughput * pc_ray.sky_col;
+//                 break;
+//             }
+//             const MaterialProps hit_mat =
+//                 load_material(payload.material_idx, payload.uv);
+//             if (specular) {
+//                 col += throughput * hit_mat.emissive_factor;
+//             }
+//             const vec3 wo = -direction;
+//             vec3 shading_nrm = payload.shading_nrm;
+//             float cos_wo = dot(wo, shading_nrm);
+//             bool side = true;
+// #if 1
+//             vec3 geometry_nrm = payload.geometry_nrm;
+//             if (dot(payload.geometry_nrm, wo) < 0.)
+//                 geometry_nrm = -geometry_nrm;
+//             if (cos_wo < 0.) {
+//                 cos_wo = -cos_wo;
+//                 shading_nrm = -shading_nrm;
+//                 side = false;
+//             }
+// #endif
+//             const vec3 pos = offset_ray(payload.pos, shading_nrm);
+//             if (hit_mat.bsdf_type == BSDF_LAMBERTIAN) {
+//                 const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+//                 col += throughput *
+//                        uniform_sample_light(hit_mat, pos, side, shading_nrm, wo,
+//                                             specular) /
+//                        light_pick_pdf;
+//             }
+//             // Sample direction & update throughput
+//             float pdf, cos_theta;
+//             const vec3 f = sample_bsdf(shading_nrm, wo, hit_mat,
+//                                        1
+//                                        /*radiance=cam*/,
+//                                        side, direction, pdf, cos_theta, seed);
+//             if (pdf == 0) {
+//                 break;
+//             }
+//             throughput *= f * abs(cos_theta) / pdf;
+//             specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
+//             origin = pos;
+//             float rr_scale = 1.0;
+//             if (hit_mat.bsdf_type == BSDF_GLASS) {
+//                 rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
+//             }
+//             if (depth > RR_MIN_DEPTH) {
+//                 float rr_prob = min(0.95f, luminance(throughput) * rr_scale);
+//                 if (rr_prob < rand(seed))
+//                     break;
+//                 else
+//                     throughput /= rr_prob;
+//             }
+//         }
         tmp_col.d[pixel_idx] = col;
     }
     // Save the reservoirs for spatial reuse

@@ -1,15 +1,17 @@
 #pragma once
 #include "LumenPCH.h"
-
+#include <glm/gtx/matrix_decompose.hpp>
+#include <glm/gtx/quaternion.hpp>
 class Camera {
 public:
 	enum class CameraType { FPS, LookAt };
 
 	explicit Camera(float cam_near, float cam_far)
 		: cam_near(cam_near), cam_far(cam_far) {
-		this->update_view_matrix();
+	
 	}
 	inline void set_position(const glm::vec3& pos) { this->position = pos; }
+	inline void set_direction(const glm::vec3& dir) { this->direction = dir; }
 	inline void set_rotation(const glm::vec3& rot) { this->rotation = rot; }
 	inline void translate(float dx, float dy, float dz) {
 		this->position.x += dx;
@@ -41,7 +43,7 @@ public:
 	glm::mat4 view{ 1.f };
 	float cam_near, cam_far;
 	CameraType type = CameraType::FPS;
-	glm::vec3 position{}, rotation{};
+	glm::vec3 position{}, rotation{}, direction{};
 
 protected:
 	virtual void make_projection_matrix(bool use_fov) = 0;
@@ -53,21 +55,45 @@ class PerspectiveCamera : public Camera {
 public:
 	explicit PerspectiveCamera(float fov, float cam_near, float cam_far,
 							   float aspect_ratio,
-							   const glm::vec3 pos = glm::vec3(0.0f))
+							   const glm::vec3& pos)
 		: fov(fov), aspect_ratio(aspect_ratio), Camera(cam_near, cam_far) {
 		left = right = top = bot = -1;
 		this->make_projection_matrix(true);
 		this->set_position(pos);
+		this->update_view_matrix();
 	}
 	explicit PerspectiveCamera(float left, float right, float top, float bot,
 							   float cam_near, float cam_far,
-							   const glm::vec3 pos = glm::vec3(0.0f))
+							   const glm::vec3& pos = glm::vec3(0.0f))
 		: left(left), right(right), top(top), bot(bot),
 		Camera(cam_near, cam_far) {
 		fov = aspect_ratio = -1;
 		this->make_projection_matrix();
 		this->set_position(pos);
+		this->update_view_matrix();
 	}
+
+	explicit PerspectiveCamera(float fov, float cam_near, float cam_far,
+							   float aspect_ratio, const glm::vec3& dir,
+							   const glm::vec3& pos)
+		: fov(fov), aspect_ratio(aspect_ratio), Camera(cam_near, cam_far) {
+		left = right = top = bot = -1;
+		this->make_projection_matrix(true);
+		this->set_position(pos);
+		this->set_direction(dir);
+		view = glm::lookAtLH(position, position + direction, glm::vec3(0, 1, 0));
+		glm::vec3 scale;
+		glm::quat q;
+		glm::vec3 translation;
+		glm::vec3 skew;
+		glm::vec4 perspective;
+		glm::decompose(view, scale, q, translation, skew, perspective);
+		glm::vec3 rot{};
+		glm::extractEulerAngleXYZ(glm::toMat4(q), rot.x, rot.y, rot.z);
+		rot *= 180. / glm::pi<float>();
+		rotation = rot;
+	}
+
 
 private:
 	void make_projection_matrix(bool use_fov = false) override {

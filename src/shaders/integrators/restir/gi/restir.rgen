@@ -29,10 +29,10 @@ vec3 uniform_sample_light(const MaterialProps mat, const vec3 pos,
     uint light_idx;
     uint light_triangle_idx;
     uint light_material_idx;
-    MeshLight light;
+    Light light;
     const TriangleRecord record =
         sample_area_light(light_idx, light_triangle_idx, light_material_idx,
-                          light, seed, pc_ray.num_mesh_lights);
+                          light, seed, pc_ray.num_lights);
     vec2 uv_unused;
     const MaterialProps light_mat =
         load_material(light_material_idx, uv_unused);
@@ -158,7 +158,7 @@ void main() {
             x_s = pos;
             n_s = shading_nrm;
         }
-        if (hit_mat.bsdf_type == BSDF_LAMBERTIAN) {
+        if (hit_mat.bsdf_type != BSDF_MIRROR) {
             const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
             const vec3 val = throughput *
                              uniform_sample_light(hit_mat, pos, side,

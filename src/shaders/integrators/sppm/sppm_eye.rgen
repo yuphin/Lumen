@@ -27,7 +27,8 @@ const float tmin = 0.001;
 const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
+                      pc_ray.frame_num ^ pc_ray.random_num);
 
 vec3 normalize_grid(vec3 p, vec3 min_bnds, vec3 max_bnds) {
     return (p - min_bnds) / (max_bnds - min_bnds);
@@ -47,21 +48,22 @@ vec3 uniform_sample_light(const MaterialProps mat, const vec3 pos,
     uint light_idx;
     uint light_triangle_idx;
     uint light_material_idx;
-    MeshLight light;
-    const TriangleRecord record =
-        sample_area_light(light_idx, light_triangle_idx, light_material_idx,
-                          light, seed, pc_ray.num_mesh_lights);
-    vec2 uv_unused;
-    const MaterialProps light_mat =
-        load_material(light_material_idx, uv_unused);
+    Light light;
+    TriangleRecord record;
+    MaterialProps light_mat;
+    const vec3 Le = sample_light(payload.pos, pc_ray.num_lights, light_idx,
+                                 light_triangle_idx, light_material_idx, light,
+                                 record, light_mat, seed);
+    // vec2 uv_unused;
+    // const MaterialProps light_mat =
+    //     load_material(light_material_idx, uv_unused);
     vec3 wi = record.pos - payload.pos;
     const float wi_len = length(wi);
     wi /= wi_len;
     float bsdf_pdf;
     float cos_x = dot(shading_nrm, wi);
     const uint props = is_specular ? BSDF_ALL : BSDF_ALL & ~BSDF_SPECULAR;
-    vec3 f = eval_bsdf_selective(shading_nrm, wo, mat, 0, side, props, wi,
-                                 bsdf_pdf, cos_x);
+    vec3 f = eval_bsdf(shading_nrm, wo, mat, 0, side, wi, bsdf_pdf, cos_x);
     float pdf_light;
     if (f != vec3(0)) {
         any_hit_payload.hit = 1;
@@ -80,29 +82,31 @@ vec3 uniform_sample_light(const MaterialProps mat, const vec3 pos,
         if (visible && pdf_light > 0) {
             const float mis_weight = 1 / (1 + bsdf_pdf / pdf_light);
             res += f * abs(cos_x) * mis_weight *
-                   (pc_ray.use_area_sampling == 1 ? g : 1) *
-                   light_mat.emissive_factor / pdf_light;
+                   (pc_ray.use_area_sampling == 1 ? g : 1) * Le / pdf_light;
         }
     }
 
-    // Sample BSDF
-    f = sample_bsdf_selective(shading_nrm, wo, mat, 0, side, props, wi,
-                              bsdf_pdf, cos_x, seed);
-    traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, pos, tmin, wi, tmax, 0);
-    if (payload.material_idx == light_idx &&
-        payload.triangle_idx == light_triangle_idx) {
-        const float wi_len = length(payload.pos - pos);
-        float g = abs(dot(payload.shading_nrm, -wi)) / (wi_len * wi_len);
-        if (pc_ray.use_area_sampling == 1) {
-            bsdf_pdf *= g;
+    if (light.light_flags == LIGHT_AREA) {
+        // Sample BSDF
+        f = sample_bsdf(shading_nrm, wo, mat, 0, side, wi, bsdf_pdf, cos_x,
+                        seed);
+        traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, pos, tmin, wi, tmax, 0);
+        if (payload.material_idx == light_material_idx &&
+            payload.triangle_idx == light_triangle_idx) {
+            const float wi_len = length(payload.pos - pos);
+            float g = abs(dot(payload.shading_nrm, -wi)) / (wi_len * wi_len);
+            if (pc_ray.use_area_sampling == 1) {
+                bsdf_pdf *= g;
 
-        } else {
-            pdf_light = record.triangle_pdf / g;
+            } else {
+                pdf_light = record.triangle_pdf / g;
+            }
+            const float mis_weight = 1. / (1 + pdf_light / bsdf_pdf);
+            res += f * abs(cos_x) * (pc_ray.use_area_sampling == 1 ? g : 1) *
+                   mis_weight * Le / bsdf_pdf;
         }
-        const float mis_weight = 1. / (1 + pdf_light / bsdf_pdf);
-        res += f * abs(cos_x) * (pc_ray.use_area_sampling == 1 ? g : 1) *
-               mis_weight * light_mat.emissive_factor / bsdf_pdf;
     }
+
     return res;
 }
 
@@ -122,6 +126,7 @@ void main() {
     vec3 phi_total = vec3(0);
     uint M = 0;
     bool specular = false;
+    bool glossy = false;
     for (int d = 0;; d++) {
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction,
                     tmax, 0);
@@ -152,7 +157,7 @@ void main() {
 #endif
         const vec3 pos = payload.pos;
         const vec3 pos_moved = offset_ray(pos, shading_nrm);
-        if (hit_mat.bsdf_type == BSDF_LAMBERTIAN) {
+        if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
             const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
             sppm_data.d[pixel_idx].col +=
                 throughput *
@@ -162,24 +167,30 @@ void main() {
         }
 
         specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
+        glossy = hit_mat.bsdf_type == BSDF_GLOSSY;
         origin.xyz = pos_moved;
 
-        const bool mat_diffuse = (hit_mat.bsdf_props & BSDF_LAMBERTIAN) != 0;
+        const bool mat_diffuse = (hit_mat.bsdf_type & BSDF_DIFFUSE) != 0;
         const bool mat_specular = specular;
-        if (mat_diffuse || (mat_specular && d >= pc_ray.max_depth - 1)) {
+        if (mat_diffuse ||
+            ((glossy || specular) && d == pc_ray.max_depth - 1)) {
+
             sppm_data.d[pixel_idx].wo = wo;
             sppm_data.d[pixel_idx].p = pos;
             sppm_data.d[pixel_idx].material_idx = mat_idx;
             sppm_data.d[pixel_idx].uv = mat_uv;
             sppm_data.d[pixel_idx].throughput = throughput;
-            if (pc_ray.frame_num == 0) {
-                sppm_data.d[pixel_idx].radius = pc_ray.ppm_base_radius;
-            }
+            sppm_data.d[pixel_idx].shading_nrm = shading_nrm;
+            sppm_data.d[pixel_idx].path_len = d;
+
             break;
         }
         float pdf, cos_theta;
         const vec3 f_sampled = sample_bsdf(shading_nrm, wo, hit_mat, 1, side,
                                            direction, pdf, cos_theta, seed);
+        if (pdf == 0 || f_sampled == vec3(0)) {
+            break;
+        }
         throughput *= f_sampled * abs(cos_theta) / pdf;
         if (d > RR_MIN_DEPTH) {
             float rr_prob = luminance(throughput);
@@ -188,5 +199,8 @@ void main() {
             else
                 throughput /= rr_prob;
         }
+    }
+    if (pc_ray.frame_num == 0) {
+        sppm_data.d[pixel_idx].radius = pc_ray.ppm_base_radius;
     }
 }

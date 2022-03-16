@@ -50,7 +50,7 @@ uint splat_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
                  2 * ((pc_ray.max_depth * (pc_ray.max_depth + 1)));
 uint vcm_light_path_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
-    (pc_ray.max_depth);
+    (pc_ray.max_depth + 1);
 uint mlt_sampler_idx = pixel_idx * 2;
 uint light_primary_sample_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
@@ -195,14 +195,14 @@ bool vcm_generate_light_sample(out VCMState light_state, inout uvec4 seed,
     // Sample light
     uint light_idx;
     uint light_triangle_idx;
-    MeshLight light;
+    Light light;
     uint light_material_idx;
     vec2 uv_unused;
     const vec4 rands_pos =
         vec4(mlt_rand(seed, large_step), mlt_rand(seed, large_step),
              mlt_rand(seed, large_step), mlt_rand(seed, large_step));
     const TriangleRecord record =
-        sample_area_light(rands_pos, pc_ray.num_mesh_lights, light_idx,
+        sample_area_light(rands_pos, pc_ray.num_lights, light_idx,
                           light_triangle_idx, light_material_idx, light);
     const MaterialProps light_mat =
         load_material(light_material_idx, uv_unused);
@@ -230,12 +230,12 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state) {
     // Sample light
     uint light_idx;
     uint light_triangle_idx;
-    MeshLight light;
+    Light light;
     uint light_material_idx;
     vec2 uv_unused;
     const TriangleRecord record =
         sample_area_light(light_idx, light_triangle_idx, light_material_idx,
-                          light, seed, pc_ray.num_mesh_lights);
+                          light, seed, pc_ray.num_lights);
     const MaterialProps light_mat =
         load_material(light_material_idx, uv_unused);
     vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
@@ -260,7 +260,7 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state) {
 
 vec3 vcm_get_light_radiance(in const MaterialProps mat,
                             in const VCMState camera_state, int d) {
-    if (d == 2) {
+    if (d == 1) {
         return mat.emissive_factor;
     }
     const float pdf_light_pos =
@@ -297,12 +297,10 @@ float mlt_fill_eye_path(const vec4 origin, const float cam_area) {
     int path_idx = 0;
     ivec2 coords = ivec2(0.5 * (1 + dir) * vec2(pc_ray.size_x, pc_ray.size_y));
     uint coords_idx = coords.x * pc_ray.size_y + coords.y;
-    for (d = 2;; d++) {
+    for (d = 1;; d++) {
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, camera_state.pos, tmin,
                     camera_state.wi, tmax, 0);
-        if (d >= pc_ray.max_depth + 1) {
-            break;
-        }
+
         if (payload.material_idx == -1) {
             // TODO:
             tmp_col.d[coords_idx] += camera_state.throughput * pc_ray.sky_col;
@@ -347,18 +345,19 @@ float mlt_fill_eye_path(const vec4 origin, const float cam_area) {
         }
 
         // Copy to camera vertex buffer
-        if (d > 2) {
-            cam_vtx(path_idx).wi = camera_state.wi;
-            cam_vtx(path_idx).shading_nrm = camera_state.shading_nrm;
-            cam_vtx(path_idx).pos = camera_state.pos;
-            cam_vtx(path_idx).uv = camera_state.uv;
+        if (d > 1) {
+            cam_vtx(path_idx).wi = wo;
+            cam_vtx(path_idx).shading_nrm = shading_nrm;
+            cam_vtx(path_idx).pos = offset_ray(payload.pos, shading_nrm);
+            cam_vtx(path_idx).uv = payload.uv;
+            cam_vtx(path_idx).material_idx = payload.material_idx;
+            ;
+            cam_vtx(path_idx).area = payload.area;
             cam_vtx(path_idx).throughput = camera_state.throughput;
-            cam_vtx(path_idx).material_idx = camera_state.material_idx;
-            cam_vtx(path_idx).area = camera_state.area;
             cam_vtx(path_idx).d_vcm = camera_state.d_vcm;
             cam_vtx(path_idx).d_vc = camera_state.d_vc;
             cam_vtx(path_idx).d_vm = camera_state.d_vm;
-            cam_vtx(path_idx).path_len = d;
+            cam_vtx(path_idx).path_len = d + 1;
             cam_vtx(path_idx).side = uint(side);
             cam_vtx(path_idx).coords = coords_idx;
             path_idx++;
@@ -372,10 +371,10 @@ float mlt_fill_eye_path(const vec4 origin, const float cam_area) {
             uint light_triangle_idx;
             uint light_material_idx;
             vec2 uv_unused;
-            MeshLight light;
+            Light light;
             const TriangleRecord record = sample_area_light(
                 light_idx, light_triangle_idx, light_material_idx, light, seed,
-                pc_ray.num_mesh_lights);
+                pc_ray.num_lights);
             const MaterialProps light_mat =
                 load_material(light_material_idx, uv_unused);
             vec3 wi = record.pos - payload.pos;
@@ -416,6 +415,9 @@ float mlt_fill_eye_path(const vec4 origin, const float cam_area) {
                     }
                 }
             }
+        }
+        if (d >= pc_ray.max_depth) {
+            break;
         }
         // Scattering
         float pdf_dir;
@@ -513,24 +515,35 @@ float mlt_fill_light_path(const vec4 origin, const float cam_area) {
         light_state.d_vm /= cos_theta_wo;
         if (!mat_specular) {
             // Copy to light vertex buffer
-            light_vtx(path_idx).wi = light_state.wi;
-            light_vtx(path_idx).shading_nrm = light_state.shading_nrm;
-            light_vtx(path_idx).pos = light_state.pos;
-            light_vtx(path_idx).uv = light_state.uv;
+            // light_vtx(path_idx).wi = light_state.wi;
+            // light_vtx(path_idx).shading_nrm = light_state.shading_nrm;
+            // light_vtx(path_idx).pos = light_state.pos;
+            // light_vtx(path_idx).uv = light_state.uv;
+            // light_vtx(path_idx).throughput = light_state.throughput;
+            // light_vtx(path_idx).material_idx = light_state.material_idx;
+            // light_vtx(path_idx).area = light_state.area;
+            // light_vtx(path_idx).d_vcm = light_state.d_vcm;
+            // light_vtx(path_idx).d_vc = light_state.d_vc;
+            // light_vtx(path_idx).d_vm = light_state.d_vm;
+            // light_vtx(path_idx).path_len = depth;
+            // light_vtx(path_idx).side = uint(side);
+            light_vtx(path_idx).wo = wo; //-vcm_state.wi;
+            light_vtx(path_idx).shading_nrm = shading_nrm;
+            light_vtx(path_idx).pos = offset_ray(payload.pos, shading_nrm);
+            light_vtx(path_idx).uv = payload.uv;
+            light_vtx(path_idx).material_idx = payload.material_idx;
+            light_vtx(path_idx).area = payload.area;
             light_vtx(path_idx).throughput = light_state.throughput;
-            light_vtx(path_idx).material_idx = light_state.material_idx;
-            light_vtx(path_idx).area = light_state.area;
             light_vtx(path_idx).d_vcm = light_state.d_vcm;
             light_vtx(path_idx).d_vc = light_state.d_vc;
-            light_vtx(path_idx).d_vm = light_state.d_vm;
-            light_vtx(path_idx).path_len = depth;
+            light_vtx(path_idx).path_len = depth + 1;
             light_vtx(path_idx).side = uint(side);
             path_idx++;
         }
-        if (depth >= pc_ray.max_depth + 1) {
+        if (depth >= pc_ray.max_depth) {
             break;
         }
-        if (!mat_specular) {
+        if (!mat_specular && depth < pc_ray.max_depth) {
             // Connect to camera
             ivec2 coords;
             vec3 splat_col = vcm_connect_cam(cam_pos, cam_nrm, shading_nrm,
@@ -623,7 +636,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
         light_path_idx * pc_ray.max_depth * (pc_ray.max_depth + 1);
     uint light_path_len = path_cnts.d[light_path_idx];
     mlt_sampler.splat_cnt = 0;
-    light_path_idx *= pc_ray.max_depth;
+    light_path_idx *= (pc_ray.max_depth + 1);
     VCMState camera_state;
     // Generate camera sample
     const vec2 dir_rnd =
@@ -644,12 +657,10 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
     camera_state.d_vm = 0;
     vec3 col = vec3(0);
     int d;
-    for (d = 2;; d++) {
+    for (d = 1;; d++) {
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, camera_state.pos, tmin,
                     camera_state.wi, tmax, 0);
-        if (d >= pc_ray.max_depth + 1) {
-            break;
-        }
+       
         if (payload.material_idx == -1) {
             // TODO:
             col += camera_state.throughput * pc_ray.sky_col;
@@ -695,12 +706,12 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
             uint light_triangle_idx;
             uint light_material_idx;
             vec2 uv_unused;
-            MeshLight light;
+            Light light;
             const vec4 rands_pos =
                 vec4(mlt_rand(seed, large_step), mlt_rand(seed, large_step),
                      mlt_rand(seed, large_step), mlt_rand(seed, large_step));
             const TriangleRecord record = sample_area_light(
-                rands_pos, pc_ray.num_mesh_lights, light_idx,
+                rands_pos, pc_ray.num_lights, light_idx,
                 light_triangle_idx, light_material_idx, light);
             const MaterialProps light_mat =
                 load_material(light_material_idx, uv_unused);
@@ -749,7 +760,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
             for (int i = 0; i < light_path_len; i++) {
                 uint s = light_vtx(light_path_idx + i).path_len;
                 uint depth = s + d - 1;
-                if (depth > pc_ray.max_depth) {
+                if (depth >= pc_ray.max_depth) {
                     break;
                 }
                 if (s == 1) {
@@ -762,23 +773,23 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
                 const float cos_cam = dot(shading_nrm, dir);
                 const float cos_light =
                     dot(light_vtx(light_path_idx + i).shading_nrm, -dir);
-                const float G = cos_cam * cos_light / len_sqr;
+                const float G = cos_light * cos_cam / len_sqr;
                 if (G > 0) {
                     float cam_pdf_fwd, light_pdf_fwd, light_pdf_rev;
                     const vec3 f_cam = eval_bsdf(shading_nrm, wo, mat, 1, side,
                                                  dir, cam_pdf_fwd, cos_cam);
-                    vec3 unused;
                     const MaterialProps light_mat = load_material(
                         light_vtx(light_path_idx + i).material_idx,
                         light_vtx(light_path_idx + i).uv);
                     // TODO: what about anisotropic BSDFS?
                     const vec3 f_light = eval_bsdf(
-                        light_vtx(light_path_idx + i).shading_nrm, unused,
-                        light_mat, 0, light_vtx(light_path_idx + i).side == 1,
-                        -dir, light_pdf_fwd, light_pdf_rev, cos_light);
+                        light_vtx(light_path_idx + i).shading_nrm,
+                        light_vtx(light_path_idx + i).wo, light_mat, 0,
+                        light_vtx(light_path_idx + i).side == 1, -dir,
+                        light_pdf_fwd, light_pdf_rev, cos_light);
                     if (f_light != vec3(0) && f_cam != vec3(0)) {
-                        cam_pdf_fwd = abs(cos_light) / len_sqr;
-                        light_pdf_fwd = abs(cos_cam) / len_sqr;
+                        cam_pdf_fwd *= abs(cos_light) / len_sqr;
+                        light_pdf_fwd *= abs(cos_cam) / len_sqr;
                         const float w_light =
                             cam_pdf_fwd *
                             (eta_vm + light_vtx(light_path_idx + i).d_vcm +
@@ -787,7 +798,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
                         const float w_camera =
                             light_pdf_fwd * (eta_vm + camera_state.d_vcm +
                                              pdf_rev * camera_state.d_vc);
-                        const float mis_weight = 1. / (1 + w_light + w_camera);
+                        const float mis_weight = 1. / (1 + w_camera + w_light);
                         const vec3 ray_origin =
                             offset_ray(payload.pos, shading_nrm);
                         any_hit_payload.hit = 1;
@@ -798,19 +809,19 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
                                     len - EPS, 1);
                         const bool visible = any_hit_payload.hit == 0;
                         if (visible) {
-                            col += mis_weight * G * camera_state.throughput *
-                                   light_vtx(light_path_idx + i).throughput *
-                                   f_cam * f_light;
+                            // col += mis_weight * G * camera_state.throughput *
+                            //        light_vtx(light_path_idx + i).throughput *
+                            //        f_cam * f_light;
                         }
                     }
                 }
             }
         }
 
-        // Vertex merging
+         // Vertex merging
         vec3 r = vec3(radius);
         float r_sqr = radius * radius;
-        if (pc_ray.use_vm == 1 && !mat_specular) {
+        if (!mat_specular && pc_ray.use_vm == 1) {
             ivec3 grid_min_bnds_idx =
                 get_grid_idx(payload.pos - vec3(radius), pc_ray.min_bounds,
                              pc_ray.max_bounds, pc_ray.grid_res);
@@ -822,7 +833,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
                      y++) {
                     for (int z = grid_min_bnds_idx.z; z <= grid_max_bnds_idx.z;
                          z++) {
-                        const uint h = hash(ivec3(x, y, z), num_light_paths);
+                        const uint h = hash(ivec3(x, y, z), screen_size);
                         if (photons.d[h].photon_count > 0) {
                             const vec3 pp = payload.pos - photons.d[h].pos;
                             const float dist_sqr = dot(pp, pp);
@@ -870,6 +881,9 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
                     }
                 }
             }
+        }
+          if (d >= pc_ray.max_depth) {
+            break;
         }
         // Scattering
         float pdf_dir;
@@ -1014,7 +1028,7 @@ float mlt_trace_light(const vec3 cam_pos, const vec3 cam_nrm,
             for (int i = 0; i < path_len; i++) {
                 uint t = cam_vtx(path_idx + i).path_len;
                 uint depth = t + d - 1;
-                if (depth > pc_ray.max_depth) {
+                if (depth >= pc_ray.max_depth) {
                     break;
                 }
                 vec3 dir = hit_pos - cam_vtx(path_idx + i).pos;
@@ -1033,15 +1047,15 @@ float mlt_trace_light(const vec3 cam_pos, const vec3 cam_nrm,
                         load_material(cam_vtx(path_idx + i).material_idx,
                                       cam_vtx(path_idx + i).uv);
                     const vec3 f_cam =
-                        eval_bsdf(cam_vtx(path_idx + i).shading_nrm, unused,
+                        eval_bsdf(cam_vtx(path_idx + i).shading_nrm, cam_vtx(path_idx + i).wo,
                                   cam_mat, 1, cam_vtx(path_idx + i).side == 1,
                                   dir, cam_pdf_fwd, cam_pdf_rev, cos_cam);
                     const vec3 f_light =
                         eval_bsdf(shading_nrm, wo, mat, 0, side, -dir,
                                   light_pdf_fwd, cos_light);
                     if (f_light != vec3(0) && f_cam != vec3(0)) {
-                        cam_pdf_fwd = abs(cos_light) / len_sqr;
-                        light_pdf_fwd = abs(cos_cam) / len_sqr;
+                        cam_pdf_fwd *= abs(cos_light) / len_sqr;
+                        light_pdf_fwd *= abs(cos_cam) / len_sqr;
                         const float w_light =
                             cam_pdf_fwd *
                             (light_state.d_vcm + pdf_rev * light_state.d_vc);

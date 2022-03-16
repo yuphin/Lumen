@@ -145,8 +145,11 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 
 	}
 	auto& bsdfs_arr = j["bsdfs"];
+	auto& lights_arr = j["lights"];
 	materials.resize(bsdfs_arr.size());
+	lights.resize(lights_arr.size());
 	int bsdf_idx = 0;
+	int light_idx = 0;
 	for (auto& bsdf : bsdfs_arr) {
 		auto& refs = bsdf["refs"];
 		if (!bsdf["albedo"].is_null()) {
@@ -161,13 +164,19 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 			materials[bsdf_idx].emissive_factor = glm::vec3({ f[0], f[1], f[2] });
 		}
 
-		if (bsdf["type"] == "lambertian") {
-			materials[bsdf_idx].bsdf_type = BSDF_LAMBERTIAN;
+		if (bsdf["type"] == "diffuse") {
+			materials[bsdf_idx].bsdf_type = BSDF_DIFFUSE;
 		} else if (bsdf["type"] == "mirror") {
 			materials[bsdf_idx].bsdf_type = BSDF_MIRROR;
 		} else if (bsdf["type"] == "glass") {
 			materials[bsdf_idx].bsdf_type = BSDF_GLASS;
 			materials[bsdf_idx].ior = bsdf["ior"];
+		} else if (bsdf["type"] == "glossy") {
+			materials[bsdf_idx].bsdf_type = BSDF_GLOSSY;
+			const auto& metalness = bsdf["metalness"];
+			materials[bsdf_idx].metalness = glm::vec3({ 
+				metalness[0], metalness[1], metalness[2] });
+			materials[bsdf_idx].roughness = bsdf["roughness"];
 		}
 
 		for (auto& ref : refs) {
@@ -179,9 +188,24 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 		}
 		bsdf_idx++;
 	}
+	for (auto& light : lights_arr) {
+		const auto& pos = light["pos"];
+		const auto& dir = light["dir"];
+		const auto& L = light["L"];
+		lights[light_idx].pos = glm::vec3({pos[0], pos[1], pos[2]});
+		lights[light_idx].to = glm::vec3({ dir[0], dir[1], dir[2] });
+		lights[light_idx].L = glm::vec3({ L[0], L[1], L[2] });
+		if (light["type"] == "spot") {
+			lights[light_idx].light_type = LIGHT_SPOT;
+		}
+		light_idx++;
+		
+	}
 	cam_config.fov = j["camera"]["fov"];
 	const auto& p = j["camera"]["position"];
+	const auto& d = j["camera"]["dir"];
 	cam_config.pos = { p[0], p[1], p[2] };
+	cam_config.dir = { d[0], d[1], d[2] };
 	compute_scene_dimensions();
 
 }

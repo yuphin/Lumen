@@ -184,7 +184,7 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
     // Sample light
     uint light_idx = uint(rand(seed) * pc_ray.light_triangle_count);
     uint light_triangle_idx;
-    MeshLight light;
+    Light light;
     uint light_material_idx;
     vec2 uv_unused;
     const vec2 rands = vec2(rand(seed), rand(seed));

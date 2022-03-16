@@ -158,12 +158,12 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
                                out uint light_triangle_idx) {
     // Sample light
     uint light_idx;
-    MeshLight light;
+    Light light;
     uint light_material_idx;
     vec2 uv_unused;
     const TriangleRecord record =
         sample_area_light(light_idx, light_triangle_idx, light_material_idx,
-                          light, seed, pc_ray.num_mesh_lights);
+                          light, seed, pc_ray.num_lights);
     const MaterialProps light_mat =
         load_material(light_material_idx, uv_unused);
     vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
@@ -196,12 +196,12 @@ bool vcm_generate_light_sample(uvec4 seed, float eta_vc,
                                out uint light_triangle_idx) {
     // Sample light
     uint light_idx;
-    MeshLight light;
+    Light light;
     uint light_material_idx;
     vec2 uv_unused;
     const TriangleRecord record =
         sample_area_light(light_idx, light_triangle_idx, light_material_idx,
-                          light, seed, pc_ray.num_mesh_lights);
+                          light, seed, pc_ray.num_lights);
     const MaterialProps light_mat =
         load_material(light_material_idx, uv_unused);
     vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),

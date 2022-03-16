@@ -7,12 +7,15 @@ void Integrator::init() {
 	prop2.pNext = &rt_props;
 	vkGetPhysicalDeviceProperties2(instance->vkb.ctx.physical_device, &prop2);
 	constexpr int VERTEX_BINDING_ID = 0;
-	camera = std::unique_ptr<PerspectiveCamera>(new PerspectiveCamera(
-		45.0f, 0.01f, 1000.0f, (float)instance->width / instance->height,
-		glm::vec3(0.7, -0.5, 15.5)));
-	Camera* cam_ptr = camera.get();
+	
+
 	LumenInstance* instance = this->instance;
 	Window* window = instance->window;
+	lumen_scene.load_scene("scenes/", config.filename);
+	camera = std::unique_ptr<PerspectiveCamera>(new PerspectiveCamera(
+		45.0f, 0.01f, 1000.0f, (float)instance->width / instance->height,
+		lumen_scene.cam_config.dir, lumen_scene.cam_config.pos));
+	Camera* cam_ptr = camera.get();
 	instance->window->add_mouse_click_callback(
 		[cam_ptr, this, window](MouseAction button, KeyAction action) {
 		if (updated && window->is_mouse_up(MouseAction::LEFT)) {
@@ -31,17 +34,16 @@ void Integrator::init() {
 			updated = true;
 		}
 	});
-	lumen_scene.load_scene("scenes/", config.filename);
+
 	auto vertex_buf_size = lumen_scene.positions.size() * sizeof(glm::vec3);
 	auto idx_buf_size = lumen_scene.indices.size() * sizeof(uint32_t);
 	std::vector<Material> materials;
 	std::vector<PrimMeshInfo> prim_lookup;
 	for (const auto& m : lumen_scene.materials) {
 		materials.push_back({ glm::vec4(m.albedo, 1.), m.emissive_factor, -1,
-							 m.bsdf_type, m.ior });
+							 m.bsdf_type, m.ior, m.metalness, m.roughness });
 	}
 	uint32_t idx = 0;
-	uint32_t total_light_triangle_cnt = 0;
 	for (auto& pm : lumen_scene.prim_meshes) {
 		PrimMeshInfo m_info;
 		m_info.index_offset = pm.first_idx;
@@ -53,14 +55,27 @@ void Integrator::init() {
 		prim_lookup.emplace_back(m_info);
 		auto& mef = materials[pm.material_idx].emissive_factor;
 		if (mef.x > 0 || mef.y > 0 || mef.z > 0) {
-			MeshLight light;
+			Light light;
 			light.num_triangles = pm.idx_count / 3;
 			light.prim_mesh_idx = idx;
+			light.light_flags = LIGHT_AREA;
 			lights.emplace_back(light);
 			total_light_triangle_cnt += light.num_triangles;
 		}
 		idx++;
 	}
+
+	for (auto& l : lumen_scene.lights) {
+		Light light;
+		light.L = l.L;
+		light.light_flags = l.light_type;
+		light.pos = l.pos;
+		light.to = l.to;
+		total_light_triangle_cnt++;
+		lights.emplace_back(light);
+	}
+
+
 	scene_ubo_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,

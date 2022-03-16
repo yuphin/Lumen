@@ -46,8 +46,11 @@ void RayTracer::init(Window* window) {
 	SceneConfig config;
 	
 	//config.filename = "cornell_box.json";
-	config.filename = "occluded.json";
-	integrator = std::make_unique<VCM>(this, config);
+	//config.filename = "occluded2.json";
+	//config.filename = "occluded.json";
+	config.filename = "caustics.json";
+	//config.filename = "test.json";
+	integrator = std::make_unique<SPPM>(this, config);
 	integrator->init();
 	create_post_descriptor();
 	update_post_desc_set();
@@ -94,8 +97,8 @@ void RayTracer::render(uint32_t i) {
 	vkCmdPushConstants(cmdbuf, post_pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT,
 					   0, sizeof(PushConstantPost), &pc_post_settings);
 	vkCmdDraw(cmdbuf, 3, 1, 0, 0);
-	ImGui::Render();
-	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdbuf);
+	//ImGui::Render();
+	//ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdbuf);
 	vkCmdEndRenderPass(cmdbuf);
 	VkClearColorValue val = { 0,0,0,1 };
 	
@@ -111,24 +114,24 @@ void RayTracer::render(uint32_t i) {
 float RayTracer::draw_frame() {
 	auto t_begin = glfwGetTime() * 1000;
 	bool updated = false;
-	ImGui_ImplGlfw_NewFrame();
-	ImGui::NewFrame();
-	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time,
-				1000 / cpu_avg_time);
-	if (ImGui::Button("Reload shaders")) {
-		integrator->reload();
-		updated |= true;
-	}
-	bool gui_updated = integrator->gui();
-	updated |=
-		ImGui::Checkbox("Enable ACES tonemapping", &settings.enable_tonemapping);
-	if (updated || gui_updated) {
-		ImGui::Render();
-		auto t_end = glfwGetTime() * 1000;
-		auto t_diff = t_end - t_begin;
-		integrator->updated = true;
-		return (float)t_diff;
-	}
+	//ImGui_ImplGlfw_NewFrame();
+	//ImGui::NewFrame();
+	//ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time,
+	//			1000 / cpu_avg_time);
+	//if (ImGui::Button("Reload shaders")) {
+	//	integrator->reload();
+	//	updated |= true;
+	//}
+	//bool gui_updated = integrator->gui();
+	//updated |=
+	//	ImGui::Checkbox("Enable ACES tonemapping", &settings.enable_tonemapping);
+	//if (updated || gui_updated) {
+	//	ImGui::Render();
+	//	auto t_end = glfwGetTime() * 1000;
+	//	auto t_diff = t_end - t_begin;
+	//	integrator->updated = true;
+	//	return (float)t_diff;
+	//}
 
 	uint32_t image_idx = vkb.prepare_frame();
 

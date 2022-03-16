@@ -44,16 +44,16 @@ void update_reservoir(inout Reservoir r, const ReservoirSample s, float w_i) {
     r.w_sum += w_i;
     r.m++;
     if (rand(seed) < w_i / r.w_sum) {
-     
+
         r.s = s;
-    } 
+    }
 }
 
 float p_hat(const vec3 f) { return length(f); }
 
 void combine_reservoir(inout Reservoir r1, const Reservoir r2,
-                        const ReservoirSample q, const ReservoirSample q_n,
-                        out bool gt) {
+                       const ReservoirSample q, const ReservoirSample q_n,
+                       out bool gt) {
 
     const uint r2_m = min(r2.m, M_MAX);
     float r2_hat = p_hat(r2.s.L_o);
@@ -63,16 +63,16 @@ void combine_reservoir(inout Reservoir r1, const Reservoir r2,
     const float wi_len = length(wi);
     wi /= wi_len;
     bool visible;
-    if((q.bsdf_props & BSDF_TRANSMISSIVE) == 0) {
-         traceRayEXT(tlas,
-                gl_RayFlagsTerminateOnFirstHitEXT |
-                    gl_RayFlagsSkipClosestHitShaderEXT,
-                0xFF, 1, 0, 1, q.x_v, 0, wi, wi_len, 1);
-    visible = any_hit_payload.hit == 0;
+    if ((q.bsdf_props & BSDF_TRANSMISSIVE) == 0) {
+        traceRayEXT(tlas,
+                    gl_RayFlagsTerminateOnFirstHitEXT |
+                        gl_RayFlagsSkipClosestHitShaderEXT,
+                    0xFF, 1, 0, 1, q.x_v, 0, wi, wi_len, 1);
+        visible = any_hit_payload.hit == 0;
     } else {
         visible = q.p_q > 0;
     }
-   
+
     if (!visible) {
         r2_hat = 0;
     } else {
@@ -118,13 +118,12 @@ void main() {
         init_reservoir(r_s);
     }
 
-    const uint max_iter = r_s.m < M_MAX / 2 ? 18 : 6;
-    uint Q[9] = uint[9](0, 0, 0, 0, 0, 0, 0, 0, 0);
+    const uint max_iter = r_s.m < M_MAX / 2 ? 9 : 3;
+    vec3 Q[9] = vec3[9](vec3(0), vec3(0), vec3(0), vec3(0), vec3(0), vec3(0),
+                        vec3(0), vec3(0), vec3(0));
     uint Q_h[9] = uint[9](0, 0, 0, 0, 0, 0, 0, 0, 0);
     uint q_cnt = 0;
-    // if (pixel_idx == 212406) {
-    //     debugPrintfEXT("%f\n",r_s.w_sum);
-    // }
+   
     Reservoir r;
     r.w_sum = 0;
     r.W = 0;
@@ -147,13 +146,9 @@ void main() {
                                    ivec2(0), ivec2(gl_LaunchSizeEXT.xy) - 1);
         const uint coords_idx = coords.x * pc_ray.size_y + coords.y;
 
-        // if (pixel_idx == 212406) {
-        //     ivec2 loc_idx = ivec2(gl_LaunchIDEXT.xy);
-        //     debugPrintfEXT("%v2i - %v2i\n", loc_idx, coords);
-        // }
+       
         q_n = samples.d[coords_idx];
         if (length(q_n.n_s) == 0) {
-            // debugPrintfEXT("wh\n");
             continue;
         }
         // Geometric similarity
@@ -166,21 +161,36 @@ void main() {
         Reservoir r_n = temp_reservoirs.d[offset(pingpong ^ 1) + coords_idx];
         bool gt;
         combine_reservoir(r, r_n, q, q_n, gt);
-        Q_h[q_cnt] = uint(gt);
-        Q[q_cnt++] = r_n.m;
+        Q_h[q_cnt] = r_n.m;
+        Q[q_cnt++] = q_n.x_s;
         sum += r_n.m;
     }
     const float phat_val = p_hat(r.s.L_o);
     if (phat_val > 0) {
         for (int i = 0; i < q_cnt; i++) {
-            Z += Q[i];
+
+            vec3 dir = Q[i] - r.s.x_v;
+            float len = length(dir);
+            dir /= len;
+            const vec3 o = offset_ray(r.s.x_v, r.s.n_v);
+            const bool mat_transmissive =
+                (r.s.bsdf_props & BSDF_TRANSMISSIVE) == BSDF_TRANSMISSIVE;
+            bool visible = true;
+            if (!mat_transmissive) {
+                any_hit_payload.hit = 1;
+                traceRayEXT(tlas,
+                            gl_RayFlagsTerminateOnFirstHitEXT |
+                                gl_RayFlagsSkipClosestHitShaderEXT,
+                            0xFF, 1, 0, 1, o, 0, dir, len - EPS, 1);
+                visible = any_hit_payload.hit == 0;
+            }
+            if (visible) {
+                Z += Q_h[i];
+            }
         }
     }
     r.m = min(sum, M_MAX);
     r.W = Z * phat_val == 0 ? 0 : r.w_sum / (Z * phat_val);
-    // if (pixel_idx == 212406) {
-    //     debugPrintfEXT("%f: %f - %d - %f\n", r.W, r.w_sum, Z ,phat_val);
-    // }
 
 #define sr spatial_reservoirs.d[offset(pingpong) + pixel_idx]
     sr.w_sum = r.w_sum;

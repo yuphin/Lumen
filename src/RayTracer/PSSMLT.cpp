@@ -130,14 +130,14 @@ void PSSMLT::init() {
 	light_path_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		path_size * (max_depth + 1) * sizeof(MLTPathVertex));
 
 	camera_path_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		path_size * (max_depth + 1) * sizeof(MLTPathVertex));
 
@@ -220,7 +220,7 @@ void PSSMLT::render() {
 	pc_ray.light_pos = scene_ubo.light_pos;
 	pc_ray.light_type = 0;
 	pc_ray.light_intensity = 10;
-	pc_ray.num_mesh_lights = int(lights.size());
+	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = max_depth;
 	pc_ray.sky_col = sky_col;
@@ -707,7 +707,7 @@ void PSSMLT::create_tlas() {
 		mesh_lights_buffer.create(
 			&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-			lights.size() * sizeof(MeshLight), lights.data(), true);
+			lights.size() * sizeof(Light), lights.data(), true);
 	}
 
 	pc_ray.total_light_area += total_light_triangle_area;

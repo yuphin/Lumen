@@ -4,7 +4,7 @@
 const int max_depth = 6;
 const vec3 sky_col(0, 0, 0);
 static float vcm_radius_factor = 0.1f;
-static bool use_vm = false;
+static bool use_vm = true;
 static bool use_vc = true;
 void VCM::init() {
 	Integrator::init();
@@ -124,7 +124,7 @@ void VCM::render() {
 	pc_ray.light_pos = scene_ubo.light_pos;
 	pc_ray.light_type = 0;
 	pc_ray.light_intensity = 10;
-	pc_ray.num_mesh_lights = int(lights.size());
+	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = max_depth;
 	pc_ray.sky_col = sky_col;
@@ -377,6 +377,7 @@ void VCM::render() {
 	if (!do_spatiotemporal) {
 		do_spatiotemporal = true;
 	}
+	//vkCmdFillBuffer(cmd.handle, light_state_buffer.handle, 0, light_state_buffer.size, 0);
 	cmd.submit();
 }
 
@@ -637,7 +638,7 @@ void VCM::create_tlas() {
 		mesh_lights_buffer.create(
 			&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-			lights.size() * sizeof(MeshLight), lights.data(), true);
+			lights.size() * sizeof(Light), lights.data(), true);
 	}
 
 	pc_ray.total_light_area += total_light_triangle_area;

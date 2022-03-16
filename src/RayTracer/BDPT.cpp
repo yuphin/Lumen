@@ -1,7 +1,7 @@
 #include "LumenPCH.h"
 #include "BDPT.h"
 
-const int max_depth = 6;
+const int max_depth = 15;
 const vec3 sky_col(0, 0, 0);
 void BDPT::init() {
 	Integrator::init();
@@ -64,10 +64,23 @@ void BDPT::render() {
 	pc_ray.light_pos = scene_ubo.light_pos;
 	pc_ray.light_type = 0;
 	pc_ray.light_intensity = 10;
-	pc_ray.num_mesh_lights = int(lights.size());
+	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = max_depth;
 	pc_ray.sky_col = sky_col;
+	vkCmdFillBuffer(cmd.handle, light_path_buffer.handle, 0, light_path_buffer.size, 0);
+	vkCmdFillBuffer(cmd.handle, camera_path_buffer.handle, 0, camera_path_buffer.size, 0);
+	std::array<VkBufferMemoryBarrier, 2> barriers = {
+						buffer_barrier(light_path_buffer.handle,
+								  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+								  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+						buffer_barrier(camera_path_buffer.handle,
+								  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+								  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+	};
+	vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+						 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(), barriers.data(), 0, 0);
 	// Trace rays
 	vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
 					  bdpt_pipeline->handle);
@@ -81,6 +94,7 @@ void BDPT::render() {
 					   0, sizeof(PushConstantRay), &pc_ray);
 	auto& regions = bdpt_pipeline->get_rt_regions();
 	vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3], instance->width, instance->height, 1);
+
 	cmd.submit();
 }
 
@@ -297,7 +311,6 @@ void BDPT::create_blas() {
 void BDPT::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
 	float total_light_triangle_area = 0.0f;
-	int light_triangle_cnt = 0;
 	const auto& indices = lumen_scene.indices;
 	const auto& vertices = lumen_scene.positions;
 	for (const auto& pm : lumen_scene.prim_meshes) {
@@ -315,37 +328,39 @@ void BDPT::create_tlas() {
 	}
 
 	for (auto& l : lights) {
-		const auto& pm = lumen_scene.prim_meshes[l.prim_mesh_idx];
-		l.world_matrix = pm.world_matrix;
-		auto& idx_base_offset = pm.first_idx;
-		auto& vtx_offset = pm.vtx_offset;
-		for (uint32_t i = 0; i < l.num_triangles; i++) {
-			auto idx_offset = idx_base_offset + 3 * i;
-			glm::ivec3 ind = { indices[idx_offset], indices[idx_offset + 1],
-							  indices[idx_offset + 2] };
-			ind += glm::vec3{ vtx_offset, vtx_offset, vtx_offset };
-			const vec3 v0 =
-				pm.world_matrix * glm::vec4(vertices[ind.x], 1.0);
-			const vec3 v1 =
-				pm.world_matrix * glm::vec4(vertices[ind.y], 1.0);
-			const vec3 v2 =
-				pm.world_matrix * glm::vec4(vertices[ind.z], 1.0);
-			float area = 0.5f * glm::length(glm::cross(v1 - v0, v2 - v0));
-			total_light_triangle_area += area;
+		if (l.light_flags == LIGHT_AREA) {
+			const auto& pm = lumen_scene.prim_meshes[l.prim_mesh_idx];
+			l.world_matrix = pm.world_matrix;
+			auto& idx_base_offset = pm.first_idx;
+			auto& vtx_offset = pm.vtx_offset;
+			for (uint32_t i = 0; i < l.num_triangles; i++) {
+				auto idx_offset = idx_base_offset + 3 * i;
+				glm::ivec3 ind = { indices[idx_offset], indices[idx_offset + 1],
+								  indices[idx_offset + 2] };
+				ind += glm::vec3{ vtx_offset, vtx_offset, vtx_offset };
+				const vec3 v0 =
+					pm.world_matrix * glm::vec4(vertices[ind.x], 1.0);
+				const vec3 v1 =
+					pm.world_matrix * glm::vec4(vertices[ind.y], 1.0);
+				const vec3 v2 =
+					pm.world_matrix * glm::vec4(vertices[ind.z], 1.0);
+				float area = 0.5f * glm::length(glm::cross(v1 - v0, v2 - v0));
+				total_light_triangle_area += area;
+			}
 		}
-		light_triangle_cnt += l.num_triangles;
+	
 	}
 
 	if (lights.size()) {
 		mesh_lights_buffer.create(
 			&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-			lights.size() * sizeof(MeshLight), lights.data(), true);
+			lights.size() * sizeof(Light), lights.data(), true);
 	}
 
 	pc_ray.total_light_area += total_light_triangle_area;
-	if (light_triangle_cnt > 0) {
-		pc_ray.light_triangle_count = light_triangle_cnt;
+	if (total_light_triangle_cnt > 0) {
+		pc_ray.light_triangle_count = total_light_triangle_cnt;
 	}
 	instance->vkb.build_tlas(tlas,
 						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);

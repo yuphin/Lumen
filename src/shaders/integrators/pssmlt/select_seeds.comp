@@ -68,10 +68,5 @@ void main() {
     uint idx = gl_GlobalInvocationID.x;
     float random_float = rand(seed);
     uint lum_idx = binary_search_cdf(random_float);
-    // if (lum_idx != 0 &&
-    //     bootstrap_data.d[lum_idx].lum == bootstrap_data.d[lum_idx - 1].lum) {
-    //     debugPrintfEXT("1- same %f %f %d\n", bootstrap_data.d[lum_idx - 1].lum,
-    //                    random_float, lum_idx);
-    // }
     seeds_data.d[idx].chain_seed = bootstrap_data.d[lum_idx].seed;
 }

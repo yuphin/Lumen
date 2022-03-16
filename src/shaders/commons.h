@@ -10,19 +10,25 @@
 #define INTERATOR_COUNT 6
 
 // BSDF Types
-#define BSDF_LAMBERTIAN 1 << 0
+#define BSDF_DIFFUSE 1 << 0
 #define BSDF_MIRROR 1 << 1
 #define BSDF_GLASS 1 << 2
+#define BSDF_GLOSSY 1 << 3
 #define BSDF_NONE -1
 
 // BSDF Props
-#define BSDF_SPECULAR 1 << 3
-#define BSDF_TRANSMISSIVE 1 << 4
-#define BSDF_REFLECTIVE 1 << 5
-#define BSDF_OPAQUE 1 << 6
+#define BSDF_LAMBERTIAN 1 << 4
+#define BSDF_SPECULAR 1 << 5
+#define BSDF_TRANSMISSIVE 1 << 6
+#define BSDF_REFLECTIVE 1 << 7
+#define BSDF_OPAQUE 1 << 8
 #define BSDF_ALL                                                               \
     BSDF_SPECULAR | BSDF_TRANSMISSIVE | BSDF_REFLECTIVE | BSDF_OPAQUE |        \
         BSDF_LAMBERTIAN
+
+// Light Type
+#define LIGHT_SPOT 1 << 0
+#define LIGHT_AREA 1 << 1
 
 #ifdef __cplusplus
 #include <glm/glm.hpp>
@@ -46,7 +52,7 @@ struct PushConstantRay {
     vec3 min_bounds;
     int light_type;
     vec3 max_bounds;
-    int num_mesh_lights;
+    int num_lights;
     ivec3 grid_res;
     int max_depth;
     vec3 sky_col;
@@ -106,12 +112,14 @@ struct Vertex {
     vec2 uv0;
 };
 
-struct MeshLight {
+struct Light {
     mat4 world_matrix;
+    vec3 pos;
     uint prim_mesh_idx;
+    vec3 to;
     uint num_triangles;
-    uint pad0;
-    uint pad1;
+    vec3 L;
+    uint light_flags;
 };
 
 struct LightVisibility {
@@ -125,6 +133,8 @@ struct Material {
     int texture_id;
     uint bsdf_type;
     float ior;
+    vec3 metalness;
+    float roughness;
 };
 
 struct PathVertex {
@@ -133,6 +143,7 @@ struct PathVertex {
     vec3 pos;
     vec2 uv;
     vec3 throughput;
+    uint light_idx;
     uint material_idx;
     uint delta;
     float area;
@@ -156,6 +167,7 @@ struct MLTPathVertex {
 
 struct VCMVertex {
     vec3 wi;
+    vec3 wo;
     vec3 shading_nrm;
     vec3 pos;
     vec2 uv;
@@ -179,9 +191,11 @@ struct SPPMData {
     vec3 throughput;
     uint material_idx;
     vec2 uv;
+    vec3 shading_nrm;
     int M;
     float N;
     float radius;
+    float path_len;
 };
 
 struct PhotonHash {

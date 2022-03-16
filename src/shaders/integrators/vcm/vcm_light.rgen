@@ -50,7 +50,7 @@ uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
                       pc_ray.total_frame_num ^ pc_ray.random_num);
 uint vcm_light_path_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
-    (pc_ray.max_depth);
+    (pc_ray.max_depth + 1);
 
 const uint FRAME_INTERVAL = 10;
 
@@ -106,6 +106,9 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
             const float mis_weight = 1. / (1. + w_light);
             // We / pdf_we * abs(cos_theta) = cam_pdf_ratio
             L = mis_weight * state.throughput * cam_pdf_ratio * f / screen_size;
+            //L = f;
+            //L = state.throughput / 100;
+            //L = 0.1 * vec3(mis_weight);
         }
     }
     dir = -dir;
@@ -144,7 +147,8 @@ void load_vcm_state(float eta_vc, const VCMReservoir r,
     vec3 wi;
     float W;
     float cos_theta;
-    if (use_reservoir && r.W > 0) {
+    //if (use_reservoir && r.W > 0) {
+    if (false) {
         wi = r.s.dir;
         if(luminance(wi) == 0) {
             debugPrintfEXT("%v3f - %d - %d\n", wi, light_state.hash_idx, pc_ray.frame_num);
@@ -152,7 +156,6 @@ void load_vcm_state(float eta_vc, const VCMReservoir r,
         cos_theta = abs(dot(wi, light_state.normal));
         W = r.W;
     } else {
-        return;
         wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
                                    light_state.normal);
         cos_theta = abs(dot(wi, light_state.normal));
@@ -182,7 +185,6 @@ void load_vcm_state(float eta_vc, const VCMReservoir r,
     state.d_vm = state.d_vc * eta_vc;
 }
 
-void load_vcm_state(const LightState light_state, out VCMState state) {}
 
 void main() {
     const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
@@ -217,12 +219,15 @@ void main() {
         r = temporal_reservoirs.d[light_state.hash_idx];
     }
     load_vcm_state(eta_vc, r, light_state, vcm_state, use_reservoir);
+    vec3 initial = vcm_state.throughput;
+    bool specular = false;
     // Trace light
     {
         const vec3 cam_pos = origin.xyz;
         const vec3 cam_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
         int depth;
         int path_idx = 0;
+        light_vtx(path_idx).path_len = 0;
         for (depth = 1;; depth++) {
             traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, vcm_state.pos, tmin,
                         vcm_state.wi, tmax, 0);
@@ -257,6 +262,7 @@ void main() {
             // Complete the missing geometry terms
             float cos_theta_wo = abs(dot(wo, shading_nrm));
             // Can't connect from specular to camera path, can't merge either
+         
             vcm_state.d_vcm *= dist_sqr;
             vcm_state.d_vcm /= cos_theta_wo;
             vcm_state.d_vc /= cos_theta_wo;
@@ -264,21 +270,26 @@ void main() {
             if (!mat_specular && (pc_ray.use_vc == 1 || pc_ray.use_vm == 1)) {
 
                 // Copy to light vertex buffer
-                light_vtx(path_idx).wi = vcm_state.wi;
-                light_vtx(path_idx).shading_nrm = vcm_state.shading_nrm;
-                light_vtx(path_idx).pos = vcm_state.pos;
-                light_vtx(path_idx).uv = vcm_state.uv;
+                //light_vtx(path_idx).wi = vcm_state.wi;
+                light_vtx(path_idx).wo = wo;//-vcm_state.wi;
+                light_vtx(path_idx).shading_nrm = shading_nrm;
+                light_vtx(path_idx).pos = offset_ray(payload.pos, shading_nrm);
+                light_vtx(path_idx).uv = payload.uv;
+                light_vtx(path_idx).material_idx = payload.material_idx;
+                light_vtx(path_idx).area = payload.area;
                 light_vtx(path_idx).throughput = vcm_state.throughput;
-                light_vtx(path_idx).material_idx = vcm_state.material_idx;
-                light_vtx(path_idx).area = vcm_state.area;
                 light_vtx(path_idx).d_vcm = vcm_state.d_vcm;
                 light_vtx(path_idx).d_vc = vcm_state.d_vc;
                 light_vtx(path_idx).d_vm = vcm_state.d_vm;
-                light_vtx(path_idx).path_len = depth;
+                light_vtx(path_idx).path_len = depth + 1;
                 light_vtx(path_idx).side = uint(side);
+                // if(depth > 1) {
+                //     debugPrintfEXT("%v3f - %v3f\n", initial, light_vtx(path_idx).throughput);
+                // }
                 path_idx++;
+              
             }
-            if (depth >= pc_ray.max_depth + 1) {
+            if (depth >= pc_ray.max_depth) {
                 break;
             }
 
@@ -335,9 +346,20 @@ void main() {
                 // pdf_fwd = pdf_rev = delta -> cancels
                 vcm_state.d_vc *= abs_cos_theta;
                 vcm_state.d_vm *= abs_cos_theta;
+                specular = true;
             }
 
+            //vcm_state.throughput *= f * abs_cos_theta / pdf_dir;
+            
             vcm_state.throughput *= f * abs_cos_theta / pdf_dir;
+            //vcm_state.throughput = vec3(0);
+            if(depth == 1) {
+                //vcm_state.throughput *= f;
+            }
+            if(depth > 1) {
+                //vcm_state.throughput *= f;
+
+            }
           
             vcm_state.shading_nrm = shading_nrm;
             vcm_state.area = payload.area;

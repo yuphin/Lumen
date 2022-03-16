@@ -5,6 +5,7 @@
 struct CameraConfiguration {
 	float fov;
 	glm::vec3 pos;
+	glm::vec3 dir;
 };
 
 struct SceneConfig {
@@ -28,8 +29,16 @@ struct LumenMaterial {
 	glm::vec3 albedo;
 	glm::vec3 emissive_factor;
 	float ior;
+	glm::vec3 metalness;
+	float roughness;
 	uint32_t bsdf_type;
+};
 
+struct LumenLight {
+	glm::vec3 pos;
+	glm::vec3 to;
+	glm::vec3 L;
+	uint32_t light_type;
 };
 class LumenScene {
 public:
@@ -45,6 +54,7 @@ public:
 	std::vector<glm::vec4> colors0;
 	std::vector<LumenPrimMesh> prim_meshes;
 	std::vector<LumenMaterial> materials;
+	std::vector<LumenLight> lights;
 	struct Dimensions {
 		glm::vec3 min = glm::vec3(std::numeric_limits<float>::max());
 		glm::vec3 max = glm::vec3(std::numeric_limits<float>::min());

@@ -41,10 +41,11 @@ protected:
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
 	LumenInstance* instance;
 	LumenScene lumen_scene;
-	std::vector<MeshLight> lights;
+	std::vector<Light> lights;
 	VkSampler texture_sampler;
 	std::vector<Texture2D> textures;
 	SceneConfig config;
+	uint32_t total_light_triangle_cnt = 0;
 private:
 };
 

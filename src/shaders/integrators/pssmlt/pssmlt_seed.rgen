@@ -18,4 +18,7 @@ void main() {
     const float cam_area = abs(area_int.x * area_int.y);
     bootstrap_data.d[pixel_idx].seed = seed;
     bootstrap_data.d[pixel_idx].lum = mlt_L(origin, cam_area, true, seed, false);
+    // if(bootstrap_data.d[pixel_idx].lum != 0) {
+    //     debugPrintfEXT("%f\n", bootstrap_data.d[pixel_idx].lum);
+    // }
 }
