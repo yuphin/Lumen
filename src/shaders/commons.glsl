@@ -195,18 +195,13 @@ vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
             float hl = dot(h, dir);
             float nl = dot(shading_nrm, dir);
             float nv = dot(shading_nrm, wo);
-            if (hl <= 0 || nl <= 0 || nv <= 0) {
-                f = vec3(0);
-                pdf_w = 0;
-            } else {
-                float beckmann_term = beckmann_d(mat.roughness, nh);
-                const vec3 f_specular = beckmann_term *
-                                        fresnel_schlick(mat.metalness, hl) /
-                                        (4 * abs(hl) * max(abs(nl), abs(nv)));
-                f = f_specular + f_diffuse;
-                pdf_w = 0.5 * (max(cos_theta / PI, 0) +
-                               beckmann_term * nh / (4 * hl));
-            }
+            float beckmann_term = beckmann_d(mat.roughness, nh);
+            const vec3 f_specular = beckmann_term *
+                                    fresnel_schlick(mat.metalness, hl) /
+                                    (4 * abs(hl) * max(abs(nl), abs(nv)));
+            f = f_specular + f_diffuse;
+            pdf_w =
+                0.5 * (max(cos_theta / PI, 0) + beckmann_term * nh / (4 * hl));
 #undef pow5
         }
 
@@ -249,16 +244,15 @@ vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
                                    (1 - pow5(1 - 0.5 * dot(dir, shading_nrm))) *
                                    (1 - pow5(1 - 0.5 * dot(wo, shading_nrm)));
             const vec3 h = normalize(wo + dir);
-            float nh = max(0.00001f, min(1.0f, dot(shading_nrm, h)));
-            float hl = max(0.00001f, min(1.0f, dot(h, dir)));
-            float nl = max(0.00001f, min(1.0f, dot(shading_nrm, dir)));
-            float nv = max(0.00001f, min(1.0f, dot(shading_nrm, wo)));
+            float nh = dot(shading_nrm, h);
+            float hl = dot(h, dir);
+            float nl = dot(shading_nrm, dir);
+            float nv = dot(shading_nrm, wo);
             float beckmann_term = beckmann_d(mat.roughness, nh);
             const vec3 f_specular = beckmann_term *
                                     fresnel_schlick(mat.metalness, hl) /
-                                    (4 * hl * max(nl, nv));
+                                    (4 * abs(hl) * max(abs(nl), abs(nv)));
             f = f_specular + f_diffuse;
-
             pdf_w =
                 0.5 * (max(cos_theta / PI, 0) + beckmann_term * nh / (4 * hl));
             pdf_rev_w = 0.5 * (max(dot(shading_nrm, wo) / PI, 0) +
@@ -298,9 +292,6 @@ vec3 eval_bsdf(const MaterialProps mat, const vec3 wo, const vec3 wi,
         float hl = dot(h, wi);
         float nl = dot(shading_nrm, wi);
         float nv = dot(shading_nrm, wo);
-        if (hl <= 0 || nl <= 0 || nv <= 0) {
-            return vec3(0);
-        }
         float beckmann_term = beckmann_d(mat.roughness, nh);
         const vec3 f_specular = beckmann_term *
                                 fresnel_schlick(mat.metalness, hl) /
