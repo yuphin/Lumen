@@ -68,7 +68,7 @@ ivec3 get_grid_idx(vec3 p, vec3 min_bnds, vec3 max_bnds, ivec3 grid_res) {
     return res;
 }
 
-vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
+vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, vec3 nrm,
                      const float cam_A, const vec3 pos, const in VCMState state,
                      const float eta_vm, const vec3 wo, const MaterialProps mat,
                      out ivec2 coords) {
@@ -82,6 +82,9 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
         return L;
     }
 
+    // if(dot(nrm, dir) < 0) {
+    //     nrm *= -1;
+    // }
     // pdf_rev / pdf_fwd
     // in the case of light coming to camera
     // simplifies to abs(cos(theta)) / (A * cos^3(theta) * len^2)
@@ -91,16 +94,16 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
     float pdf_rev, pdf_fwd;
     const vec3 f = eval_bsdf(nrm, wo, mat, 0, dot(payload.shading_nrm, wo) > 0,
                              dir, pdf_fwd, pdf_rev, cos_y);
-    if (f == vec3(0)) {
+    if (false) {
         return L;
     }
-    if (cam_pdf_ratio > 0.0) {
+    if (true) {
         any_hit_payload.hit = 1;
         traceRayEXT(tlas,
                     gl_RayFlagsTerminateOnFirstHitEXT |
                         gl_RayFlagsSkipClosestHitShaderEXT,
                     0xFF, 1, 0, 1, ray_origin, 0, dir, len - EPS, 1);
-        if (any_hit_payload.hit == 0) {
+        if (dot(nrm, dir ) <= 0 || any_hit_payload.hit == 0) {
             const float w_light = (cam_pdf_ratio / (screen_size)) *
                                   (eta_vm + state.d_vcm + pdf_rev * state.d_vc);
             const float mis_weight = 1. / (1. + w_light);
@@ -355,6 +358,7 @@ void main() {
             //vcm_state.throughput *= f * abs_cos_theta / pdf_dir;
             
             vcm_state.throughput *= f * abs_cos_theta / pdf_dir;
+            //vcm_state.throughput *= correct_shading_normal(payload.geometry_nrm, shading_nrm, vcm_state.wi, wo, 0);
             //vcm_state.throughput = vec3(0);
             if(depth == 1) {
                 //vcm_state.throughput *= f;

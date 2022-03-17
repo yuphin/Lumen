@@ -37,7 +37,7 @@ vec3 uniform_sample_light(const MaterialProps mat, const vec3 pos,
     float bsdf_pdf;
     float cos_x = dot(shading_nrm, wi);
     const uint props = is_specular ? BSDF_ALL : BSDF_ALL & ~BSDF_SPECULAR;
-    vec3 f = eval_bsdf(shading_nrm, wo, mat, 0, side, wi, bsdf_pdf, cos_x);
+    vec3 f = eval_bsdf(shading_nrm, wo, mat, 1, side, wi, bsdf_pdf, cos_x);
     float pdf_light;
     if (f != vec3(0)) {
 
@@ -80,9 +80,9 @@ vec3 uniform_sample_light(const MaterialProps mat, const vec3 pos,
                 }
 
                 const float mis_weight = 1. / (1 + pdf_light / bsdf_pdf);
-                res += f * abs(cos_x) *
-                       (pc_ray.use_area_sampling == 1 ? g : 1) * mis_weight *
-                       Le / bsdf_pdf;
+                // res += f * abs(cos_x) *
+                //        (pc_ray.use_area_sampling == 1 ? g : 1) * mis_weight *
+                //        Le / bsdf_pdf;
             }
         }
     }

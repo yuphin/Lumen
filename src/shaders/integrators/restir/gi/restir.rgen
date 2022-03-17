@@ -24,28 +24,28 @@ ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
 vec3 uniform_sample_light(const MaterialProps mat, const vec3 pos,
                           const bool side, const vec3 shading_nrm,
                           const vec3 wo, const bool is_specular) {
-    vec3 res = vec3(0);
+     vec3 res = vec3(0);
     // Sample light
     uint light_idx;
     uint light_triangle_idx;
     uint light_material_idx;
     Light light;
-    const TriangleRecord record =
-        sample_area_light(light_idx, light_triangle_idx, light_material_idx,
-                          light, seed, pc_ray.num_lights);
-    vec2 uv_unused;
-    const MaterialProps light_mat =
-        load_material(light_material_idx, uv_unused);
+    TriangleRecord record;
+    MaterialProps light_mat;
+    const vec3 Le = sample_light(payload.pos, pc_ray.num_lights, light_idx,
+                                 light_triangle_idx, light_material_idx, light,
+                                 record, light_mat, seed);
+  
     vec3 wi = record.pos - payload.pos;
     const float wi_len = length(wi);
     wi /= wi_len;
     float bsdf_pdf;
     float cos_x = dot(shading_nrm, wi);
     const uint props = is_specular ? BSDF_ALL : BSDF_ALL & ~BSDF_SPECULAR;
-    vec3 f = eval_bsdf_selective(shading_nrm, wo, mat, 0, side, props, wi,
-                                 bsdf_pdf, cos_x);
+    vec3 f = eval_bsdf(shading_nrm, wo, mat, 0, side, wi, bsdf_pdf, cos_x);
     float pdf_light;
     if (f != vec3(0)) {
+
         any_hit_payload.hit = 1;
         traceRayEXT(tlas,
                     gl_RayFlagsTerminateOnFirstHitEXT |
@@ -59,31 +59,37 @@ vec3 uniform_sample_light(const MaterialProps mat, const vec3 pos,
             bsdf_pdf *= g;
             pdf_light = record.triangle_pdf;
         }
+
         if (visible && pdf_light > 0) {
             const float mis_weight = 1 / (1 + bsdf_pdf / pdf_light);
             res += f * abs(cos_x) * mis_weight *
-                   (pc_ray.use_area_sampling == 1 ? g : 1) *
-                   light_mat.emissive_factor / pdf_light;
+                   (pc_ray.use_area_sampling == 1 ? g : 1) * Le / pdf_light;
         }
     }
+    if (light.light_flags == LIGHT_AREA) {
+        // Sample BSDF
+        f = sample_bsdf(shading_nrm, wo, mat, 1, side, wi, bsdf_pdf, cos_x,
+                        seed);
+        if (bsdf_pdf != 0) {
+            traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, pos, tmin, wi, tmax, 0);
+            if (payload.material_idx == light_material_idx &&
+                payload.triangle_idx == light_triangle_idx) {
+                const float wi_len = length(payload.pos - pos);
+                float g =
+                    abs(dot(payload.shading_nrm, -wi)) / (wi_len * wi_len);
+                if (pc_ray.use_area_sampling == 1) {
+                    bsdf_pdf *= g;
 
-    // Sample BSDF
-    f = sample_bsdf_selective(shading_nrm, wo, mat, 0, side, props, wi,
-                              bsdf_pdf, cos_x, seed);
-    traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, pos, tmin, wi, tmax, 0);
-    if (payload.material_idx == light_idx &&
-        payload.triangle_idx == light_triangle_idx) {
-        const float wi_len = length(payload.pos - pos);
-        float g = abs(dot(payload.shading_nrm, -wi)) / (wi_len * wi_len);
-        if (pc_ray.use_area_sampling == 1) {
-            bsdf_pdf *= g;
+                } else {
+                    pdf_light = record.triangle_pdf / g;
+                }
 
-        } else {
-            pdf_light = record.triangle_pdf / g;
+                const float mis_weight = 1. / (1 + pdf_light / bsdf_pdf);
+                res += f * abs(cos_x) *
+                       (pc_ray.use_area_sampling == 1 ? g : 1) * mis_weight *
+                       Le / bsdf_pdf;
+            }
         }
-        const float mis_weight = 1. / (1 + pdf_light / bsdf_pdf);
-        res += f * abs(cos_x) * (pc_ray.use_area_sampling == 1 ? g : 1) *
-               mis_weight * light_mat.emissive_factor / bsdf_pdf;
     }
     return res;
 }
@@ -158,7 +164,7 @@ void main() {
             x_s = pos;
             n_s = shading_nrm;
         }
-        if (hit_mat.bsdf_type != BSDF_MIRROR) {
+        if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
             const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
             const vec3 val = throughput *
                              uniform_sample_light(hit_mat, pos, side,
@@ -216,12 +222,12 @@ void main() {
     samples.d[pixel_idx].p_q = p_q;
     samples.d[pixel_idx].f = x_f;
     samples.d[pixel_idx].bsdf_props = bsdf_props;
-    if (p_q > 0) {
-        float l1 = length(samples.d[pixel_idx].n_s);
-        // if (abs(l1 - 1) > EPS) {
-        //     debugPrintfEXT("1 - %f\n", l1);
-        // }
-    }
+    // if (p_q > 0) {
+    //     float l1 = length(samples.d[pixel_idx].n_s);
+    //     // if (abs(l1 - 1) > EPS) {
+    //     //     debugPrintfEXT("1 - %f\n", l1);
+    //     // }
+    // }
     // if(pixel_idx == 1) {
     //     debugPrintfEXT("1\n");
 

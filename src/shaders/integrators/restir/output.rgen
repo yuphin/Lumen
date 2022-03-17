@@ -16,7 +16,8 @@ void main() {
     const RestirReservoir r = spatial_reservoirs.d[pixel_idx];
     col += tmp_col.d[pixel_idx];
     if (isnan(luminance(col))) {
-        debugPrintfEXT("nan\n");
+        //debugPrintfEXT("nan\n");
+        return;
     }
     if (r.W > 0) {
         col += r.W * calc_L_with_visibility_check(r) * pc_ray.light_triangle_count;
@@ -29,9 +30,9 @@ void main() {
     if (pc_ray.frame_num > 0) {
         float w = 1. / float(pc_ray.frame_num + 1);
         vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
-        // imageStore(image, ivec2(gl_LaunchIDEXT.xy),
-        //            vec4(mix(old_col, col, w), 1.f));
-        imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+        imageStore(image, ivec2(gl_LaunchIDEXT.xy),
+                   vec4(mix(old_col, col, w), 1.f));
+        // imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
     } else {
         imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
     }

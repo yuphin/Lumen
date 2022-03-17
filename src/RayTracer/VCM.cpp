@@ -1,10 +1,10 @@
 #include "LumenPCH.h"
 #include "VCM.h"
 
-const int max_depth = 10;
+const int max_depth = 12;
 const vec3 sky_col(0, 0, 0);
 static float vcm_radius_factor = 0.05f;
-static bool use_vm = false;
+static bool use_vm = true;
 static bool use_vc = true;
 void VCM::init() {
 	Integrator::init();
