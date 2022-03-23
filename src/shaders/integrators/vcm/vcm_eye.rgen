@@ -50,6 +50,8 @@ vec3 vcm_get_light_radiance(in const MaterialProps mat,
     }
     const float pdf_light_pos =
         1.0 / (payload.area * pc_ray.light_triangle_count);
+
+    // TODO: Fix
     const float pdf_light_dir =
         abs(dot(payload.shading_nrm, -camera_state.wi)) / PI;
     // debugPrintfEXT("%f\n",payload.area);

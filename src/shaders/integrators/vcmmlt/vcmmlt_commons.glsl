@@ -145,6 +145,7 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
                      const float cam_A, const vec3 pos, const in VCMState state,
                      const vec3 wo, const MaterialProps mat, out ivec2 coords,
                      float eta_vm) {
+    //uint size = pc_ray.size_x * pc_ray.size_y;
     vec3 L = vec3(0);
     vec3 dir = cam_pos - pos;
     float len = length(dir);
@@ -195,23 +196,23 @@ bool vcm_generate_light_sample(out VCMState light_state, inout uvec4 seed,
     // Sample light
     uint light_idx;
     uint light_triangle_idx;
-    Light light;
     uint light_material_idx;
     vec2 uv_unused;
+    Light light;
+    TriangleRecord record;
+    MaterialProps light_mat;
+    float pdf_pos, pdf_dir;
+    vec3 wi;
     const vec4 rands_pos =
         vec4(mlt_rand(seed, large_step), mlt_rand(seed, large_step),
              mlt_rand(seed, large_step), mlt_rand(seed, large_step));
-    const TriangleRecord record =
-        sample_area_light(rands_pos, pc_ray.num_lights, light_idx,
-                          light_triangle_idx, light_material_idx, light);
-    const MaterialProps light_mat =
-        load_material(light_material_idx, uv_unused);
-    vec3 wi = sample_cos_hemisphere(
-        vec2(mlt_rand(seed, large_step), mlt_rand(seed, large_step)),
-        record.triangle_normal);
-    float pdf_pos = record.triangle_pdf * (1.0 / pc_ray.light_triangle_count);
+    const vec2 rands_dir =
+        vec2(mlt_rand(seed, large_step), mlt_rand(seed, large_step));
+    const vec3 Le = sample_light_Le(
+        rands_pos, rands_dir, pc_ray.num_lights, pc_ray.light_triangle_count,
+        light_idx, light_triangle_idx, light_material_idx, light, record,
+        light_mat, pdf_pos, seed, wi, pdf_dir);
     float cos_theta = abs(dot(wi, record.triangle_normal));
-    float pdf_dir = cos_theta / PI;
     if (pdf_dir <= EPS) {
         return false;
     }
@@ -219,9 +220,8 @@ bool vcm_generate_light_sample(out VCMState light_state, inout uvec4 seed,
     light_state.shading_nrm = record.triangle_normal;
     light_state.area = 1.0 / record.triangle_pdf;
     light_state.wi = wi;
-    light_state.throughput =
-        light_mat.emissive_factor * cos_theta / (pdf_dir * pdf_pos);
-    light_state.d_vcm = PI / cos_theta;
+    light_state.throughput = Le * cos_theta / (pdf_dir * pdf_pos);
+    light_state.d_vcm = 1. / pdf_dir;
     light_state.d_vc = cos_theta / (pdf_dir * pdf_pos);
     return true;
 }
@@ -230,19 +230,20 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state) {
     // Sample light
     uint light_idx;
     uint light_triangle_idx;
-    Light light;
     uint light_material_idx;
     vec2 uv_unused;
-    const TriangleRecord record =
-        sample_area_light(light_idx, light_triangle_idx, light_material_idx,
-                          light, seed, pc_ray.num_lights);
-    const MaterialProps light_mat =
-        load_material(light_material_idx, uv_unused);
-    vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
-                                    record.triangle_normal);
+    Light light;
+    TriangleRecord record;
+    MaterialProps light_mat;
+    float u, v;
+    vec3 wi;
+    const vec3 Le =
+        sample_light_Le(pc_ray.num_lights, pc_ray.light_triangle_count,
+                        light_idx, light_triangle_idx, light_material_idx,
+                        light, record, light_mat, seed, wi, u, v);
     float pdf_pos = record.triangle_pdf * (1.0 / pc_ray.light_triangle_count);
+    float pdf_dir = light_pdf(light.light_flags, record.triangle_normal, wi);
     float cos_theta = abs(dot(wi, record.triangle_normal));
-    float pdf_dir = cos_theta / PI;
     if (pdf_dir <= EPS) {
         return false;
     }
@@ -250,9 +251,8 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state) {
     light_state.shading_nrm = record.triangle_normal;
     light_state.area = 1.0 / record.triangle_pdf;
     light_state.wi = wi;
-    light_state.throughput =
-        light_mat.emissive_factor * cos_theta / (pdf_dir * pdf_pos);
-    light_state.d_vcm = PI / cos_theta;
+    light_state.throughput = Le * cos_theta / (pdf_dir * pdf_pos);
+    light_state.d_vcm = 1. / pdf_dir;
     light_state.d_vc = cos_theta / (pdf_dir * pdf_pos);
     light_state.d_vm = light_state.d_vc * eta_vc;
     return true;
@@ -290,7 +290,7 @@ float mlt_fill_eye_path(const vec4 origin, const float cam_area) {
     float cos_theta = abs(dot(camera_state.shading_nrm, direction));
     // Defer r^2 / cos term
     camera_state.d_vcm =
-        cam_area * screen_size * cos_theta * cos_theta * cos_theta;
+        cam_area * pc_ray.size_x * pc_ray.size_y * cos_theta * cos_theta * cos_theta;
     camera_state.d_vc = 0;
     camera_state.d_vm = 0;
     int d;
@@ -345,13 +345,12 @@ float mlt_fill_eye_path(const vec4 origin, const float cam_area) {
         }
 
         // Copy to camera vertex buffer
-        if (d > 1) {
-            cam_vtx(path_idx).wi = wo;
+        if (!mat_specular) {
+            cam_vtx(path_idx).wo = wo;
             cam_vtx(path_idx).shading_nrm = shading_nrm;
             cam_vtx(path_idx).pos = offset_ray(payload.pos, shading_nrm);
             cam_vtx(path_idx).uv = payload.uv;
             cam_vtx(path_idx).material_idx = payload.material_idx;
-            ;
             cam_vtx(path_idx).area = payload.area;
             cam_vtx(path_idx).throughput = camera_state.throughput;
             cam_vtx(path_idx).d_vcm = camera_state.d_vcm;
@@ -370,13 +369,12 @@ float mlt_fill_eye_path(const vec4 origin, const float cam_area) {
             uint light_idx;
             uint light_triangle_idx;
             uint light_material_idx;
-            vec2 uv_unused;
             Light light;
-            const TriangleRecord record = sample_area_light(
-                light_idx, light_triangle_idx, light_material_idx, light, seed,
-                pc_ray.num_lights);
-            const MaterialProps light_mat =
-                load_material(light_material_idx, uv_unused);
+            TriangleRecord record;
+            MaterialProps light_mat;
+            const vec3 Le = sample_light(
+                payload.pos, pc_ray.num_lights, light_idx, light_triangle_idx,
+                light_material_idx, light, record, light_mat, seed);
             vec3 wi = record.pos - payload.pos;
             float ray_len = length(wi);
             float ray_len_sqr = ray_len * ray_len;
@@ -408,7 +406,7 @@ float mlt_fill_eye_path(const vec4 origin, const float cam_area) {
                     if (mis_weight > 0) {
                         vec3 L = mis_weight * abs(cos_x) * f *
                                  camera_state.throughput *
-                                 light_mat.emissive_factor /
+                                 Le /
                                  (pdf_light_w / pc_ray.light_triangle_count);
                         tmp_col.d[coords_idx] += L;
                         lum_sum += luminance(L);
@@ -623,7 +621,7 @@ float mlt_fill_light_path(const vec4 origin, const float cam_area) {
 float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
                     inout uvec4 seed, const bool save_radiance) {
 #define splat(i) splat_data.d[splat_idx + chain * depth_factor + i]
-    const uint num_light_paths = pc_ray.size_x * pc_ray.size_y;
+    const uint num_light_paths = screen_size;//pc_ray.size_x * pc_ray.size_y;
     const float radius = pc_ray.radius;
     const float radius_sqr = radius * radius;
     float eta_vcm = PI * radius_sqr * num_light_paths;
@@ -660,7 +658,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
     for (d = 1;; d++) {
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, camera_state.pos, tmin,
                     camera_state.wi, tmax, 0);
-       
+
         if (payload.material_idx == -1) {
             // TODO:
             col += camera_state.throughput * pc_ray.sky_col;
@@ -705,16 +703,16 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
             uint light_idx;
             uint light_triangle_idx;
             uint light_material_idx;
-            vec2 uv_unused;
             Light light;
+            TriangleRecord record;
+            MaterialProps light_mat;
             const vec4 rands_pos =
                 vec4(mlt_rand(seed, large_step), mlt_rand(seed, large_step),
                      mlt_rand(seed, large_step), mlt_rand(seed, large_step));
-            const TriangleRecord record = sample_area_light(
-                rands_pos, pc_ray.num_lights, light_idx,
-                light_triangle_idx, light_material_idx, light);
-            const MaterialProps light_mat =
-                load_material(light_material_idx, uv_unused);
+            const vec3 Le =
+                sample_light(rands_pos, payload.pos, pc_ray.num_lights,
+                             light_idx, light_triangle_idx, light_material_idx,
+                             light, record, light_mat, seed);
             vec3 wi = record.pos - payload.pos;
             float ray_len = length(wi);
             float ray_len_sqr = ray_len * ray_len;
@@ -739,15 +737,13 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
 
                     const float pdf_light_w = record.triangle_pdf / g;
                     const float w_light = pdf_fwd / (pdf_light_w);
-                    const float w_cam = pdf_pos_dir * abs(cos_x) /
-                                        (pdf_light_w * cos_y) *
-                                        (eta_vm + camera_state.d_vcm +
-                                         camera_state.d_vc * pdf_rev);
+                    const float w_cam =
+                        pdf_pos_dir * abs(cos_x) / (pdf_light_w * cos_y) *
+                        (camera_state.d_vcm + camera_state.d_vc * pdf_rev);
                     const float mis_weight = 1. / (1. + w_light + w_cam);
                     if (mis_weight > 0) {
                         col += mis_weight * abs(cos_x) * f *
-                               camera_state.throughput *
-                               light_mat.emissive_factor /
+                               camera_state.throughput * Le /
                                (pdf_light_w / pc_ray.light_triangle_count);
                     }
                 }
@@ -809,16 +805,16 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
                                     len - EPS, 1);
                         const bool visible = any_hit_payload.hit == 0;
                         if (visible) {
-                            // col += mis_weight * G * camera_state.throughput *
-                            //        light_vtx(light_path_idx + i).throughput *
-                            //        f_cam * f_light;
+                            col += mis_weight * G * camera_state.throughput *
+                                   light_vtx(light_path_idx + i).throughput *
+                                   f_cam * f_light;
                         }
                     }
                 }
             }
         }
 
-         // Vertex merging
+        // Vertex merging
         vec3 r = vec3(radius);
         float r_sqr = radius * radius;
         if (!mat_specular && pc_ray.use_vm == 1) {
@@ -882,7 +878,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
                 }
             }
         }
-          if (d >= pc_ray.max_depth) {
+        if (d >= pc_ray.max_depth) {
             break;
         }
         // Scattering
@@ -951,9 +947,9 @@ float mlt_trace_light(const vec3 cam_pos, const vec3 cam_nrm,
     float luminance_sum = 0;
     mlt_sampler.splat_cnt = 0;
     uint path_idx =
-        uint(mlt_rand(seed, large_step) * (pc_ray.size_x * pc_ray.size_y));
+        uint(mlt_rand(seed, large_step) * (pc_ray.num_mlt_threads));
     uint path_len = path_cnts.d[path_idx];
-    path_idx *= pc_ray.max_depth;
+    path_idx *= (pc_ray.max_depth + 1);
     // Trace from light
     VCMState light_state;
     if (!vcm_generate_light_sample(light_state, seed, large_step)) {
@@ -1047,9 +1043,10 @@ float mlt_trace_light(const vec3 cam_pos, const vec3 cam_nrm,
                         load_material(cam_vtx(path_idx + i).material_idx,
                                       cam_vtx(path_idx + i).uv);
                     const vec3 f_cam =
-                        eval_bsdf(cam_vtx(path_idx + i).shading_nrm, cam_vtx(path_idx + i).wo,
-                                  cam_mat, 1, cam_vtx(path_idx + i).side == 1,
-                                  dir, cam_pdf_fwd, cam_pdf_rev, cos_cam);
+                        eval_bsdf(cam_vtx(path_idx + i).shading_nrm,
+                                  cam_vtx(path_idx + i).wo, cam_mat, 1,
+                                  cam_vtx(path_idx + i).side == 1, dir,
+                                  cam_pdf_fwd, cam_pdf_rev, cos_cam);
                     const vec3 f_light =
                         eval_bsdf(shading_nrm, wo, mat, 0, side, -dir,
                                   light_pdf_fwd, cos_light);

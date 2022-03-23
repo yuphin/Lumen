@@ -77,6 +77,7 @@ struct PushConstantRay {
     uint num_mlt_threads;
     uint total_frame_num;
     uint do_spatiotemporal;
+    uint max_angle_samples;
 };
 
 struct PushConstantPost {
@@ -281,8 +282,8 @@ struct ChainData {
 };
 
 struct SumData {
-    float x;
-    uint y;
+    float x; // lum accum
+    uint y; // lum sample
     float z;
 };
 
@@ -350,8 +351,8 @@ struct VCMRestirData {
     uint hash_idx;
     uint valid;
     uint frame_idx;
-    uint pad1;
-    uint pad2;
+    float phi;
+    uint pad;
 };
 
 struct VCMReservoir {
@@ -378,6 +379,17 @@ struct LightState {
     vec3 normal;
     vec3 Le;
     uint light_flags;
+};
+
+struct AngleStruct {
+    float phi;
+    float theta;
+    int is_active;
+};
+
+struct AvgStruct {
+    float avg;
+    uint prev;
 };
 
 // Scene buffer addresses
@@ -444,6 +456,20 @@ struct SceneDesc {
     uint64_t light_samples_addr;
     uint64_t should_resample_addr;
     uint64_t light_state_addr;
+    uint64_t angle_struct_addr;
+    uint64_t avg_addr;
+
+};
+
+struct PostDesc {
+    uint64_t out_img_addr;
+    uint64_t gt_img_addr;
+    uint64_t residual_addr;
+    uint64_t counter_addr;
+};
+
+struct PostPC {
+    uint size;
 };
 
 // Structure used for retrieving the primitive information in the closest hit

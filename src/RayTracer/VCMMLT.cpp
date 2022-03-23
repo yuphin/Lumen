@@ -1,15 +1,15 @@
 #include "LumenPCH.h"
 #include "VCMMLT.h"
-static bool use_vm = false;
+static bool use_vm = true;
 static float vcm_radius_factor = 0.1f;
 static bool light_first = true;
 void VCMMLT::init() {
 	Integrator::init();
 	max_depth = 6;
-	mutations_per_pixel = 64.0f;
+	mutations_per_pixel = 200.0f;
 	sky_col = vec3(0, 0, 0);
-	num_mlt_threads = 1600 * 900 / 8;
-	num_bootstrap_samples = 1600 * 900 / 8;
+	num_mlt_threads = 1600 * 900 / 2;
+	num_bootstrap_samples = 1600 * 900 / 2;
 	mutation_count = int(instance->width * instance->height * mutations_per_pixel / float(num_mlt_threads));
 	light_path_rand_count = std::max(7 + 2 * max_depth, 3 + 6 * max_depth);
 
@@ -253,6 +253,7 @@ void VCMMLT::init() {
 }
 
 void VCMMLT::render() {
+	LUMEN_TRACE("Rendering sample {}...", sample_cnt);
 	const float ppm_base_radius = 0.25f;
 	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true);
 	VkClearValue clear_color = { 0.25f, 0.25f, 0.25f, 1.0f };
@@ -595,6 +596,8 @@ void VCMMLT::render() {
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 	}
 	cmd.submit();
+	//light_first ^= true;
+	sample_cnt++;
 }
 
 bool VCMMLT::gui() {
@@ -819,7 +822,6 @@ void VCMMLT::create_blas() {
 void VCMMLT::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
 	float total_light_triangle_area = 0.0f;
-	int light_triangle_cnt = 0;
 	const auto& indices = lumen_scene.indices;
 	const auto& vertices = lumen_scene.positions;
 	for (const auto& pm : lumen_scene.prim_meshes) {
@@ -837,25 +839,27 @@ void VCMMLT::create_tlas() {
 	}
 
 	for (auto& l : lights) {
-		const auto& pm = lumen_scene.prim_meshes[l.prim_mesh_idx];
-		l.world_matrix = pm.world_matrix;
-		auto& idx_base_offset = pm.first_idx;
-		auto& vtx_offset = pm.vtx_offset;
-		for (uint32_t i = 0; i < l.num_triangles; i++) {
-			auto idx_offset = idx_base_offset + 3 * i;
-			glm::ivec3 ind = { indices[idx_offset], indices[idx_offset + 1],
-							  indices[idx_offset + 2] };
-			ind += glm::vec3{ vtx_offset, vtx_offset, vtx_offset };
-			const vec3 v0 =
-				pm.world_matrix * glm::vec4(vertices[ind.x], 1.0);
-			const vec3 v1 =
-				pm.world_matrix * glm::vec4(vertices[ind.y], 1.0);
-			const vec3 v2 =
-				pm.world_matrix * glm::vec4(vertices[ind.z], 1.0);
-			float area = 0.5f * glm::length(glm::cross(v1 - v0, v2 - v0));
-			total_light_triangle_area += area;
+		if (l.light_flags == LIGHT_AREA) {
+			const auto& pm = lumen_scene.prim_meshes[l.prim_mesh_idx];
+			l.world_matrix = pm.world_matrix;
+			auto& idx_base_offset = pm.first_idx;
+			auto& vtx_offset = pm.vtx_offset;
+			for (uint32_t i = 0; i < l.num_triangles; i++) {
+				auto idx_offset = idx_base_offset + 3 * i;
+				glm::ivec3 ind = { indices[idx_offset], indices[idx_offset + 1],
+								  indices[idx_offset + 2] };
+				ind += glm::vec3{ vtx_offset, vtx_offset, vtx_offset };
+				const vec3 v0 =
+					pm.world_matrix * glm::vec4(vertices[ind.x], 1.0);
+				const vec3 v1 =
+					pm.world_matrix * glm::vec4(vertices[ind.y], 1.0);
+				const vec3 v2 =
+					pm.world_matrix * glm::vec4(vertices[ind.z], 1.0);
+				float area = 0.5f * glm::length(glm::cross(v1 - v0, v2 - v0));
+				total_light_triangle_area += area;
+			}
 		}
-		light_triangle_cnt += l.num_triangles;
+
 	}
 
 	if (lights.size()) {
@@ -866,8 +870,8 @@ void VCMMLT::create_tlas() {
 	}
 
 	pc_ray.total_light_area += total_light_triangle_area;
-	if (light_triangle_cnt > 0) {
-		pc_ray.light_triangle_count = light_triangle_cnt;
+	if (total_light_triangle_cnt > 0) {
+		pc_ray.light_triangle_count = total_light_triangle_cnt;
 	}
 	instance->vkb.build_tlas(tlas,
 							 VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);

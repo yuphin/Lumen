@@ -28,7 +28,10 @@ private:
 	void create_post_descriptor();
 	void update_post_desc_set();
 	void create_post_pipeline();
+	void create_compute_pipelines();
 	void init_imgui();
+	void init_resources();
+	void save_exr(const float* rgb, int width, int height, const char* outfilename);
 	bool initialized = false;
 	bool rt_initialized = false;
 	float cpu_avg_time = 0;
@@ -44,6 +47,17 @@ private:
 
 	PushConstantPost pc_post_settings;
 	Settings settings;
+	Buffer gt_img_buffer;
+	Buffer output_img_buffer;
+	Buffer output_img_buffer_cpu;
+	Buffer post_desc_buffer;
+	Buffer residual_buffer;
+	Buffer counter_buffer;
+	PostPC post_pc;
+	std::unique_ptr<Pipeline> calc_rmse_pipeline;
+	std::unique_ptr<Pipeline> reduce_rmse_pipeline;
+	std::unique_ptr<Pipeline> output_rmse_pipeline;
+	bool write_exr = false;
 
 };
 

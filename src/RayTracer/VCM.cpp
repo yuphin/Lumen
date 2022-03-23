@@ -1,11 +1,14 @@
 #include "LumenPCH.h"
 #include "VCM.h"
-
-const int max_depth = 12;
+#include <iostream>
+#include <fstream>
+const int max_depth = 6;
+const int max_samples = 50000;
 const vec3 sky_col(0, 0, 0);
-static float vcm_radius_factor = 0.05f;
-static bool use_vm = true;
+static float vcm_radius_factor = 0.06f;
+static bool use_vm = false;
 static bool use_vc = true;
+static bool written = false;
 void VCM::init() {
 	Integrator::init();
 
@@ -77,6 +80,31 @@ void VCM::init() {
 		instance->width * instance->height * sizeof(LightState)
 	);
 
+	angle_struct_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		max_samples * sizeof(AngleStruct)
+	);
+
+	angle_struct_cpu_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+		VK_SHARING_MODE_EXCLUSIVE,
+		max_samples * sizeof(AngleStruct)
+	);
+
+	avg_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		VK_SHARING_MODE_EXCLUSIVE,
+		sizeof(AvgStruct)
+	);
+
+
 	SceneDesc desc;
 	desc.vertex_addr = vertex_buffer.get_device_address();
 	desc.index_addr = index_buffer.get_device_address();
@@ -95,6 +123,8 @@ void VCM::init() {
 	desc.light_samples_addr = light_samples_buffer.get_device_address();
 	desc.should_resample_addr = should_resample_buffer.get_device_address();
 	desc.light_state_addr = light_state_buffer.get_device_address();
+	desc.angle_struct_addr = angle_struct_buffer.get_device_address();
+	desc.avg_addr = avg_buffer.get_device_address();
 
 	scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -138,6 +168,7 @@ void VCM::render() {
 	pc_ray.use_vc = use_vc;
 	pc_ray.do_spatiotemporal = do_spatiotemporal;
 	pc_ray.random_num = rand() % UINT_MAX;
+	pc_ray.max_angle_samples = max_samples;
 	const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
 	const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
 	const int base_grid_res = int(max_comp / pc_ray.radius);
@@ -378,7 +409,30 @@ void VCM::render() {
 		do_spatiotemporal = true;
 	}
 	//vkCmdFillBuffer(cmd.handle, light_state_buffer.handle, 0, light_state_buffer.size, 0);
+	//if (pc_ray.frame_num % 10 == 0) {
+	//	angle_struct_buffer.copy(angle_struct_cpu_buffer, cmd.handle);
+	//}
 	cmd.submit();
+	//if (pc_ray.frame_num % 10 == 0) {
+	//	std::vector<AngleStruct> angles;
+	//	angles.assign((AngleStruct*)angle_struct_cpu_buffer.data,
+	//				   (AngleStruct*)angle_struct_cpu_buffer.data + max_samples);
+	//	bool all_active = true;
+	//	for (const auto& angle : angles) {
+	//		all_active &= angle.is_active;
+	//	}
+	//	if ((all_active && pc_ray.frame_num > 200) && !written) {
+	//		// Write data to file
+	//		std::ofstream myfile;
+	//		myfile.open("data.csv");
+	//		for (const auto& angle : angles) {
+	//			myfile << angle.theta << "," << angle.phi << "\n";
+	//		}
+	//		myfile.close();
+	//		written = true;
+	//	}
+	//	
+	//}
 }
 
 bool VCM::update() {
@@ -633,7 +687,7 @@ void VCM::create_tlas() {
 				total_light_triangle_area += area;
 			}
 		}
-	
+
 		//light_triangle_cnt += l.num_triangles;
 	}
 

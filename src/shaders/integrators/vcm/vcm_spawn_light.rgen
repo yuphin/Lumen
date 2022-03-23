@@ -93,6 +93,9 @@ bool vcm_generate_light_sample(out LightState light_state) {
     light_state.normal = record.triangle_normal;
     light_state.dir = wi;
     light_state.triangle_pdf = record.triangle_pdf;
+    // if(pixel_idx == 30000) {
+    //     debugPrintfEXT("%v3f\n", light_state.normal);
+    // }
     light_state.hash_idx = get_restir_hash_idx(light_idx, u, v);
     light_state.Le = Le;
     light_state.light_flags = light.light_flags;

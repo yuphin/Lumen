@@ -37,6 +37,9 @@ private:
 	Buffer light_samples_buffer;
 	Buffer should_resample_buffer;
 	Buffer light_state_buffer;
+	Buffer angle_struct_buffer;
+	Buffer angle_struct_cpu_buffer;
+	Buffer avg_buffer;
 	bool do_spatiotemporal = false;
 	uint32_t total_frame_cnt = 0;
 };

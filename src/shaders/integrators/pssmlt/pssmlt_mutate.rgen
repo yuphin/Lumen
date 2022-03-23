@@ -11,6 +11,7 @@
 #include "pssmlt_commons.glsl"
 
 void main() {
+
 #define mlt_sampler mlt_samplers.d[mlt_sampler_idx]
 #define splat(i) splat_data.d[splat_idx + i]
 #define past_splat(i) past_splat_data.d[splat_idx + i]

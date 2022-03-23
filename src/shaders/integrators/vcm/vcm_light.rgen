@@ -25,6 +25,7 @@ layout(buffer_reference, scalar) buffer SelectedReservoirs_ {
 layout(buffer_reference, scalar) buffer LightSamples { VCMRestirData d[]; };
 layout(buffer_reference, scalar) buffer ShouldResample { uint d; };
 layout(buffer_reference, scalar) buffer LightStates { LightState d[]; };
+layout(buffer_reference, scalar) buffer Angles { AngleStruct d[]; };
 
 PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
 VCMVertex_ vcm_lights = VCMVertex_(scene_desc.vcm_vertices_addr);
@@ -34,6 +35,7 @@ LightSamples light_samples = LightSamples(scene_desc.light_samples_addr);
 ShouldResample should_resample =
     ShouldResample(scene_desc.should_resample_addr);
 LightStates light_states = LightStates(scene_desc.light_state_addr);
+Angles angles = Angles(scene_desc.angle_struct_addr);
 
 VCMReservoir_ temporal_reservoirs =
     VCMReservoir_(scene_desc.vcm_reservoir_addr);
@@ -94,16 +96,16 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, vec3 nrm,
     float pdf_rev, pdf_fwd;
     const vec3 f = eval_bsdf(nrm, wo, mat, 0, dot(payload.shading_nrm, wo) > 0,
                              dir, pdf_fwd, pdf_rev, cos_y);
-    if (false) {
+   if (f == vec3(0)) {
         return L;
     }
-    if (true) {
+     if (cam_pdf_ratio > 0.0) {
         any_hit_payload.hit = 1;
         traceRayEXT(tlas,
                     gl_RayFlagsTerminateOnFirstHitEXT |
                         gl_RayFlagsSkipClosestHitShaderEXT,
                     0xFF, 1, 0, 1, ray_origin, 0, dir, len - EPS, 1);
-        if (dot(nrm, dir ) <= 0 || any_hit_payload.hit == 0) {
+        if (any_hit_payload.hit == 0) {
             const float w_light = (cam_pdf_ratio / (screen_size)) *
                                   (eta_vm + state.d_vcm + pdf_rev * state.d_vc);
             const float mis_weight = 1. / (1. + w_light);
@@ -150,13 +152,23 @@ void load_vcm_state(float eta_vc, const VCMReservoir r,
     vec3 wi;
     float W;
     float cos_theta;
-    //if (use_reservoir && r.W > 0) {
-    if (false) {
+    if (use_reservoir && r.W > 0) {
+    //if (false) {
         wi = r.s.dir;
         if(luminance(wi) == 0) {
             debugPrintfEXT("%v3f - %d - %d\n", wi, light_state.hash_idx, pc_ray.frame_num);
         }
         cos_theta = abs(dot(wi, light_state.normal));
+
+        // float cos_deg = degrees(acos(cos_theta));
+        // if(true) {
+        // //if(light_state.hash_idx == 1231707) {
+        //     //debugPrintfEXT("hit\n");
+        //     angles.d[pixel_idx % pc_ray.max_angle_samples].is_active = 1;
+        //     angles.d[pixel_idx % pc_ray.max_angle_samples].theta = acos(cos_theta);
+        //     angles.d[pixel_idx % pc_ray.max_angle_samples].phi = r.s.phi;
+        // }
+      
         W = r.W;
     } else {
         // const Light light = lights[light_state.light_idx];
@@ -178,7 +190,7 @@ void load_vcm_state(float eta_vc, const VCMReservoir r,
     // p_rev = p_connect = 1/area, p_fwd = cos_theta / (PI * area)
     // Note that pdf_fwd is in area formulation, so cos_y / r^2 is missing
     // currently.
-    state.d_vcm = PI / cos_theta;
+    state.d_vcm = W;
     // g_prev / p_fwd
     // Note that g_prev component in d_vc and d_vm lags by 1 iter
     // So we initialize g_prev to cos_theta of the current iter

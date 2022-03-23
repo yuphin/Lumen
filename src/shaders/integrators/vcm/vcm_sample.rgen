@@ -15,12 +15,15 @@ layout(buffer_reference, scalar) buffer VCMReservoir_ { VCMReservoir d[]; };
 layout(buffer_reference, scalar) buffer ShouldResample { uint d; };
 
 layout(buffer_reference, scalar) buffer LightSamples { VCMRestirData d[]; };
+layout(buffer_reference, scalar) buffer SampleAvg { AvgStruct d; };
 LightSamples light_samples = LightSamples(scene_desc.light_samples_addr);
 ShouldResample should_resample =
     ShouldResample(scene_desc.should_resample_addr);
 
 VCMReservoir_ temporal_reservoirs =
     VCMReservoir_(scene_desc.vcm_reservoir_addr);
+
+SampleAvg avg = SampleAvg(scene_desc.avg_addr);
 
 uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 const uint flags = gl_RayFlagsOpaqueEXT;
@@ -139,15 +142,15 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
     Light light;
     TriangleRecord record;
     MaterialProps light_mat;
-    float u, v;
     vec3 wi;
+    float pdf_pos, pdf_dir, phi, u, v;
+  
+    
     const vec3 Le =
         sample_light_Le(pc_ray.num_lights, pc_ray.light_triangle_count,
                         light_idx, light_triangle_idx, light_material_idx,
-                        light, record, light_mat, seed, wi, u, v);
-    float pdf_pos = record.triangle_pdf / pc_ray.light_triangle_count;
+                        light, record, light_mat, pdf_pos, seed, wi, pdf_dir, phi, u, v);
     float cos_theta = abs(dot(wi, record.triangle_normal));
-    float pdf_dir = cos_theta / PI;
     if (pdf_dir <= EPS) {
         return false;
     }
@@ -157,7 +160,7 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
     light_state.wi = wi;
     light_state.throughput =
         Le * cos_theta / (pdf_dir * pdf_pos);
-    light_state.d_vcm = PI / cos_theta;
+    light_state.d_vcm = 1. / pdf_dir;
     light_state.d_vc = cos_theta / (pdf_dir * pdf_pos);
     light_state.d_vm = light_state.d_vc * eta_vc;
     s.pos = record.pos;
@@ -167,6 +170,7 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
     s.triangle_pdf = record.triangle_pdf;
     s.hash_idx = get_restir_hash_idx(light_idx, u, v);
     s.pdf_dir = pdf_dir;
+    s.phi = phi;
     pdf_o = pdf_dir;
     return true;
 }
@@ -176,7 +180,14 @@ void main() {
         return;
     }
     if (pixel_idx == 0) {
-        debugPrintfEXT("resampling %d\n", pc_ray.total_frame_num);
+        if(pc_ray.frame_num == 0) {
+            avg.d.avg = 0;
+            avg.d.prev = 0;
+        } else {
+            avg.d.avg = 0.6 * avg.d.avg + 0.4 * (pc_ray.frame_num - avg.d.prev);
+            avg.d.prev = pc_ray.frame_num;
+            debugPrintfEXT("resampling %d, avg: %f\n", pc_ray.total_frame_num, avg.d.avg);
+        }
     }
 
     const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
@@ -312,7 +323,7 @@ void main() {
         }
     }
     const float p_hat = total_lum;
-    // const float p_hat = s.pdf_dir;
+    //const float p_hat = s.pdf_dir;
     if (p_hat > 0) {
         s.p_hat = p_hat;
         s.valid = 1;

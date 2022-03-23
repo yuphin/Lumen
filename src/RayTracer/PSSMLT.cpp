@@ -419,11 +419,14 @@ void PSSMLT::render() {
 		};
 		const uint32_t iter_cnt = 100;
 		const uint32_t freq = mutation_count / iter_cnt;
+		int iter = 0;
 		for (uint32_t f = 0; f < freq; f++) {
 			cmd.begin();
 			for (int i = 0; i < iter_cnt; i++) {
 				mutate(i);
 			}
+			iter += 100;
+			printf("%d / %d\n", iter, mutation_count);
 			cmd.submit();
 		}
 		const uint32_t rem = mutation_count % iter_cnt;

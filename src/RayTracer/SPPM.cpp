@@ -1,7 +1,7 @@
 #include "LumenPCH.h"
 #include "SPPM.h"
 
-const int max_depth = 8;
+const int max_depth = 6;
 const vec3 sky_col(0, 0, 0);
 void SPPM::init() {
 	Integrator::init();
@@ -108,7 +108,7 @@ void SPPM::init() {
 }
 
 void SPPM::render() {
-	const float ppm_base_radius = 0.005f;
+	const float ppm_base_radius = 0.01f;
 	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = { 0.25f, 0.25f, 0.25f, 1.0f };
 	VkClearValue clear_depth = { 1.0f, 0 };

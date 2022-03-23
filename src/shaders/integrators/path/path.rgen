@@ -80,9 +80,9 @@ vec3 uniform_sample_light(const MaterialProps mat, const vec3 pos,
                 }
 
                 const float mis_weight = 1. / (1 + pdf_light / bsdf_pdf);
-                // res += f * abs(cos_x) *
-                //        (pc_ray.use_area_sampling == 1 ? g : 1) * mis_weight *
-                //        Le / bsdf_pdf;
+                res += f * abs(cos_x) *
+                       (pc_ray.use_area_sampling == 1 ? g : 1) * mis_weight *
+                       Le / bsdf_pdf;
             }
         }
     }

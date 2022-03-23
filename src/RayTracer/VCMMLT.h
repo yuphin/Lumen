@@ -72,5 +72,6 @@ private:
 	int num_bootstrap_samples;
 	int mutation_count;
 	int light_path_rand_count;
+	int sample_cnt = 0;
 };
 
