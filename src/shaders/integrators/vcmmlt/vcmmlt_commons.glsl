@@ -465,9 +465,9 @@ float mlt_fill_light_path(const vec4 origin, const float cam_area) {
     VCMState light_state;
     const float radius = pc_ray.radius;
     const float radius_sqr = radius * radius;
-    float eta_vcm = PI * radius_sqr * screen_size;
+    float eta_vcm = PI * radius_sqr * pc_ray.size_x * pc_ray.size_y;
     float eta_vc = 1.0 / eta_vcm;
-    float eta_vm = (pc_ray.use_vm == 1) ? PI * radius_sqr * screen_size : 0;
+    float eta_vm = (pc_ray.use_vm == 1) ? PI * radius_sqr * pc_ray.size_x * pc_ray.size_y : 0;
     float lum_sum = 0;
     if (!vcm_generate_light_sample(eta_vc, light_state)) {
         return 0;
@@ -550,7 +550,7 @@ float mlt_fill_light_path(const vec4 origin, const float cam_area) {
             const float lum = luminance(splat_col);
             if (lum > 0) {
                 lum_sum += lum;
-                uint idx = coords.x * gl_LaunchSizeEXT.y + coords.y;
+                uint idx = coords.x * pc_ray.size_y + coords.y;
                 tmp_col.d[idx] += splat_col;
             }
         }
@@ -621,7 +621,7 @@ float mlt_fill_light_path(const vec4 origin, const float cam_area) {
 float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
                     inout uvec4 seed, const bool save_radiance) {
 #define splat(i) splat_data.d[splat_idx + chain * depth_factor + i]
-    const uint num_light_paths = screen_size;//pc_ray.size_x * pc_ray.size_y;
+    const uint num_light_paths = pc_ray.size_x * pc_ray.size_y;
     const float radius = pc_ray.radius;
     const float radius_sqr = radius * radius;
     float eta_vcm = PI * radius_sqr * num_light_paths;
@@ -947,7 +947,7 @@ float mlt_trace_light(const vec3 cam_pos, const vec3 cam_nrm,
     float luminance_sum = 0;
     mlt_sampler.splat_cnt = 0;
     uint path_idx =
-        uint(mlt_rand(seed, large_step) * (pc_ray.num_mlt_threads));
+        uint(mlt_rand(seed, large_step) * (pc_ray.size_x * pc_ray.size_y));
     uint path_len = path_cnts.d[path_idx];
     path_idx *= (pc_ray.max_depth + 1);
     // Trace from light

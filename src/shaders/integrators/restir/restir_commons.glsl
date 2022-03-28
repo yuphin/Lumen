@@ -61,21 +61,16 @@ vec3 calc_L(const RestirReservoir r) {
     const uint light_idx = r.s.light_idx;
     uint light_material_idx;
     Light light;
-     TriangleRecord record;
+    TriangleRecord record;
     MaterialProps light_mat;
     const vec4 rands_pos =
         vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
-    // const TriangleRecord record = sample_area_light_with_idx(
-    //     rands, light_mesh_idx, light_triangle_idx, light_material_idx);
-    vec3 Le = sample_light_with_idx(rands_pos, pos, pc_ray.num_lights, light_idx,
-                                 light_triangle_idx, light_material_idx, light,
-                                 record, light_mat);
+    vec3 Le = sample_light_with_idx(
+        rands_pos, pos, pc_ray.num_lights, light_idx, light_triangle_idx,
+        light_material_idx, light, record, light_mat);
     vec3 wi = record.pos - pos;
     const float wi_len = length(wi);
     wi /= wi_len;
-    // const MaterialProps light_mat =
-    //     load_material(light_material_idx, uv_unused);
-   
     const vec3 f = eval_bsdf(hit_mat, wo, wi, normal);
     const float cos_x = dot(normal, wi);
     const float g = abs(dot(record.triangle_normal, -wi)) / (wi_len * wi_len);
@@ -91,25 +86,17 @@ vec3 calc_L_with_visibility_check(const RestirReservoir r) {
     const uint light_idx = r.s.light_idx;
     uint light_material_idx;
     Light light;
-     TriangleRecord record;
+    TriangleRecord record;
     MaterialProps light_mat;
     const vec4 rands_pos =
         vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
-    // const TriangleRecord record = sample_area_light_with_idx(
-    //     rands, light_mesh_idx, light_triangle_idx, light_material_idx);
-    vec3 Le = sample_light_with_idx(rands_pos, pos, pc_ray.num_lights, light_idx,
-                                 light_triangle_idx, light_material_idx, light,
-                                 record, light_mat);
+    vec3 Le = sample_light_with_idx(
+        rands_pos, pos, pc_ray.num_lights, light_idx, light_triangle_idx,
+        light_material_idx, light, record, light_mat);
     vec3 wi = record.pos - pos;
     const float wi_len = length(wi);
     wi /= wi_len;
-    // const MaterialProps light_mat =
-    //     load_material(light_material_idx, uv_unused);
     const vec3 f = eval_bsdf(hit_mat, wo, wi, normal);
-    // if(hit_mat.bsdf_type == BSDF_GLOSSY && luminance(f) > 1) {
-    //         debugPrintfEXT("%v3f - %f\n", f, hit_mat.roughness);
-
-    // }
     const float cos_x = dot(normal, wi);
     const float g = abs(dot(record.triangle_normal, -wi)) / (wi_len * wi_len);
     any_hit_payload.hit = 1;

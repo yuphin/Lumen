@@ -12,12 +12,14 @@ layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 layout(set = 0, binding = 1) readonly buffer PostDesc_ { PostDesc post_desc; };
 layout(buffer_reference, scalar) readonly buffer Img { vec4 d[]; };
 layout(buffer_reference, scalar) readonly buffer Residual { float d[]; };
+layout(buffer_reference, scalar) readonly buffer RmseVal { float d; };
 layout(push_constant) uniform PC { PostPC pc; };
 Img gt_img = Img(post_desc.gt_img_addr);
 Img out_img = Img(post_desc.out_img_addr);
 Residual res_data = Residual(post_desc.residual_addr);
+RmseVal rmse_val = RmseVal(post_desc.rmse_val_addr);
 
 void main() {
   float rmse = sqrt(res_data.d[0]) / (pc.size * 3);
-  debugPrintfEXT("RMSE: %f\n", rmse* 1e6);
+  rmse_val.d = rmse;
 }

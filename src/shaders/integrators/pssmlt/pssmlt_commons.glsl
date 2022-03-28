@@ -132,9 +132,6 @@ float mlt_rand(inout uvec4 seed, bool large_step) {
 
     const uint cnt = mlt_get_next();
     const float sigma = 0.01;
-    // if (cnt >= pc_ray.rand_count) {
-    //     debugPrintfEXT("Cnt is >=%d %d\n", pc_ray.rand_count, cnt);
-    // }
     if (primary_sample(cnt).last_modified < mlt_sampler.last_large_step) {
         primary_sample(cnt).val = rand(seed);
         primary_sample(cnt).last_modified = mlt_sampler.last_large_step;
@@ -146,21 +143,13 @@ float mlt_rand(inout uvec4 seed, bool large_step) {
     if (large_step) {
         primary_sample(cnt).val = rand(seed);
     } else {
-        // uint iter = primary_sample(cnt).last_modified;
-        // while(iter < mlt_sampler.iter) {
-        //     mutate(primary_sample(cnt).val, seed);
-        //     iter++;
-        // }
-        // mutate(primary_sample(cnt).val, seed);
         uint diff = mlt_sampler.iter - primary_sample(cnt).last_modified;
         float nrm_sample = sqrt2 * erf_inv(2 * rand(seed) - 1);
         float eff_sigma = sigma * sqrt(float(diff));
         float before = primary_sample(cnt).val;
         primary_sample(cnt).val += nrm_sample * eff_sigma;
         primary_sample(cnt).val -= floor(primary_sample(cnt).val);
-        // if((before - primary_sample(cnt).val) == 0.) {
-        //     debugPrintfEXT("%d - %f - %f\n", diff, nrm_sample, eff_sigma);
-        // }
+       
     }
     primary_sample(cnt).last_modified = mlt_sampler.iter;
     return primary_sample(cnt).val;
@@ -410,7 +399,7 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
     }
     float cos_3_theta = cos_theta * cos_theta * cos_theta;
     const float cam_pdf_ratio =
-        abs(cos_theta * cos_y) / (cam_vtx(0).area * cos_3_theta * len * len);
+        abs(cos_y) / (cam_vtx(0).area * cos_3_theta * len * len);
 
     vec3 ray_origin =
         offset_ray(light_vtx(s - 1).pos, light_vtx(s - 1).shading_nrm);
@@ -418,7 +407,10 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
         load_material(light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
     const vec3 wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
     const vec3 f = eval_bsdf(mat, wo, dir, light_vtx(s - 1).shading_nrm);
-    if (cam_pdf_ratio > 0.0 && f != vec3(0)) {
+     if (f == vec3(0)) {
+        return L;
+    }
+    if (cam_pdf_ratio > 0.0) {
         any_hit_payload.hit = 1;
         traceRayEXT(tlas,
                     gl_RayFlagsTerminateOnFirstHitEXT |
@@ -556,6 +548,9 @@ int mlt_generate_light_subpath(int max_depth, bool large_step,
     //                       light_triangle_idx, light_material_idx, light);
     // const MaterialProps light_mat =
     //     load_material(light_material_idx, uv_unused);
+     if (pdf_dir <= 0) {
+        return 0;
+    }
     const vec3 Le = sample_light_Le(
         rands_pos, rands_dir, pc_ray.num_lights, pc_ray.light_triangle_count,
         light_idx, light_triangle_idx, light_material_idx, light, record,
@@ -596,7 +591,6 @@ int mlt_generate_camera_subpath(const vec3 origin, int max_depth,
     float pdf =
         1 / (cam_area * screen_size * cos_theta * cos_theta * cos_theta);
     ivec2 coords = ivec2(0.5 * (1 + d) * vec2(pc_ray.size_x, pc_ray.size_y));
-    // debugPrintfEXT("%v2f - %v2i\n", d, coords);
     camera_verts.d[bdpt_path_idx].coords = coords.x * pc_ray.size_y + coords.y;
     return mlt_random_walk(max_depth - 1, vec3(1), pdf, 1, large_step, seed) +
            1;

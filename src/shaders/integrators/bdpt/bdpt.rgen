@@ -74,6 +74,9 @@ int bdpt_random_walk(const int max_depth, vec3 throughput, const float pdf,
         wo /= wo_len;
         vec3 shading_nrm = payload.shading_nrm;
         bool side = true;
+        vec3 geometry_nrm = payload.geometry_nrm;
+        if (dot(payload.geometry_nrm, wo) < 0.)
+            geometry_nrm = -geometry_nrm;
         if (dot(wo, shading_nrm) < 0) {
             shading_nrm *= -1;
             side = false;
@@ -137,6 +140,9 @@ int bdpt_generate_light_subpath(int max_depth) {
         sample_light_Le(pc_ray.num_lights, pc_ray.light_triangle_count,
                         light_idx, light_triangle_idx, light_material_idx,
                         light, record, light_mat, pdf_pos, seed, wi, pdf_dir);
+    if (pdf_dir <= 0) {
+        return 0;
+    }
     // const TriangleRecord record =
     //     sample_area_light(light_idx, light_triangle_idx, light_material_idx,
     //                       light, seed, pc_ray.num_lights);
@@ -147,12 +153,12 @@ int bdpt_generate_light_subpath(int max_depth) {
     light_verts.d[bdpt_path_idx + 0].material_idx = light_material_idx;
     light_verts.d[bdpt_path_idx + 0].light_idx = light_idx;
     light_verts.d[bdpt_path_idx + 0].area = 1.0 / record.triangle_pdf;
-    light_verts.d[bdpt_path_idx + 0].delta = int(light.light_flags == LIGHT_SPOT);
+    light_verts.d[bdpt_path_idx + 0].delta = 0;
 
     light_verts.d[bdpt_path_idx + 0].dir = wi;
     light_verts.d[bdpt_path_idx + 0].pdf_fwd = pdf_pos;
-    vec3 throughput =  Le *
-                      abs(dot(record.triangle_normal, wi)) /
+
+    vec3 throughput = Le * abs(dot(record.triangle_normal, wi)) /
                       (pdf_dir * light_verts.d[bdpt_path_idx + 0].pdf_fwd);
     light_verts.d[bdpt_path_idx + 0].throughput = Le;
 
@@ -226,15 +232,15 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
             dir /= dir_len;
             const MaterialProps mat = load_material(
                 light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
-            vec3 wo = normalize(light_vtx(s-2).pos - light_vtx(s-1).pos);
+            vec3 wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
             float pdf_rev;
-            if(s >= 2) {
-                wo = normalize(light_vtx(s-2).pos - light_vtx(s-1).pos);
+            if (s >= 2) {
+                wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
                 pdf_rev = bsdf_pdf(mat, light_vtx(s - 1).shading_nrm, wo, dir);
             }
-            if(s < 2) {
-                const Light light = lights[light_vtx(s-1).light_idx];
-                pdf_rev = light_pdf(light, light_vtx(s - 1).shading_nrm,  dir);
+            if (s < 2) {
+                const Light light = lights[light_vtx(s - 1).light_idx];
+                pdf_rev = light_pdf(light, light_vtx(s - 1).shading_nrm, dir);
             }
             cam_vtx(t - 1).pdf_rev = pdf_rev;
             if (cam_vtx(t - 1).pdf_rev != 0) {
@@ -256,7 +262,7 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
         if (s > 0) {
             const MaterialProps mat =
                 load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
-            vec3 wo = normalize(light_vtx(s-1).pos - cam_vtx(t-1).pos);
+            vec3 wo = normalize(light_vtx(s - 1).pos - cam_vtx(t - 1).pos);
             cam_vtx(t - 2).pdf_rev =
                 bsdf_pdf(mat, cam_vtx(t - 1).shading_nrm, wo, dir);
             if (cam_vtx(t - 2).pdf_rev != 0) {
@@ -419,8 +425,7 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
     if (luminance(L) != 0.) {
         mis_weight = calc_mis_weight(s, 1, sampled);
     }
-    // debugPrintfEXT("a - %v3f - %d - %d\n", light_vtx(s - 1).pos, pixel_idx,
-    // s);
+
     return mis_weight * L;
 #undef cam_vtx
 #undef light_vtx
@@ -447,11 +452,13 @@ vec3 bdpt_connect(int s, int t) {
         Light light;
         TriangleRecord record;
         MaterialProps light_mat;
-        const vec3 Le = sample_light(cam_vtx(t-1).pos, pc_ray.num_lights, light_idx,
-                                     light_triangle_idx, light_material_idx, light,
-                                     record, light_mat, seed);
+        const vec3 Le =
+            sample_light(cam_vtx(t - 1).pos, pc_ray.num_lights, light_idx,
+                         light_triangle_idx, light_material_idx, light, record,
+                         light_mat, seed);
         // const TriangleRecord record =
-        //     sample_area_light(light_idx, light_triangle_idx, light_material_idx,
+        //     sample_area_light(light_idx, light_triangle_idx,
+        //     light_material_idx,
         //                       light, seed, pc_ray.num_lights);
         // const MaterialProps light_mat =
         //     load_material(light_material_idx, uv_unused);
@@ -463,11 +470,11 @@ vec3 bdpt_connect(int s, int t) {
         const vec3 ray_origin =
             offset_ray(cam_vtx(t - 1).pos, cam_vtx(t - 1).shading_nrm);
         any_hit_payload.hit = 1;
-        vec3 wo = normalize(cam_vtx(t-2).pos - cam_vtx(t-1).pos);
+        vec3 wo = normalize(cam_vtx(t - 2).pos - cam_vtx(t - 1).pos);
         // TODO
         const MaterialProps mat =
             load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
-        const vec3 f = eval_bsdf(mat, wo, wi, cam_vtx(t-1).shading_nrm);
+        const vec3 f = eval_bsdf(mat, wo, wi, cam_vtx(t - 1).shading_nrm);
         if (f != vec3(0)) {
             traceRayEXT(tlas,
                         gl_RayFlagsTerminateOnFirstHitEXT |
@@ -477,7 +484,8 @@ vec3 bdpt_connect(int s, int t) {
             if (visible) {
                 float cos_y = abs(dot(-wi, record.triangle_normal));
                 float G = abs(cos_x * cos_y) / ray_len_sqr;
-                float pdf_light = record.triangle_pdf / pc_ray.light_triangle_count;
+                float pdf_light =
+                    record.triangle_pdf / pc_ray.light_triangle_count;
 
                 s_fwd_pdf.pdf_fwd = pdf_light;
                 s_fwd_pdf.pos = record.pos;
@@ -487,7 +495,7 @@ vec3 bdpt_connect(int s, int t) {
             }
         }
     } else {
-        //Eval G
+        // Eval G
         vec3 n_s = light_vtx(s - 1).shading_nrm;
         vec3 n_t = cam_vtx(t - 1).shading_nrm;
         vec3 d = light_vtx(s - 1).pos - cam_vtx(t - 1).pos;
@@ -500,10 +508,12 @@ vec3 bdpt_connect(int s, int t) {
             const MaterialProps mat_2 = load_material(
                 light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
 
-            vec3 wo_1 = normalize(cam_vtx(t-2).pos - cam_vtx(t-1).pos);
-            vec3 wo_2 = normalize(light_vtx(s-2).pos - light_vtx(s-1).pos);
-            const vec3 brdf1 = eval_bsdf(mat_1, wo_1, d, cam_vtx(t-1).shading_nrm);
-            const vec3 brdf2 = eval_bsdf(mat_2, wo_2, -d, light_vtx(t-1).shading_nrm);
+            vec3 wo_1 = normalize(cam_vtx(t - 2).pos - cam_vtx(t - 1).pos);
+            vec3 wo_2 = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
+            const vec3 brdf1 =
+                eval_bsdf(mat_1, wo_1, d, cam_vtx(t - 1).shading_nrm);
+            const vec3 brdf2 =
+                eval_bsdf(mat_2, wo_2, -d, light_vtx(t - 1).shading_nrm);
             if (brdf1 != vec3(0) && brdf2 != vec3(0)) {
                 vec3 ray_origin =
                     offset_ray(cam_vtx(t - 1).pos, cam_vtx(t - 1).shading_nrm);
@@ -573,7 +583,8 @@ void main() {
     for (int t = 1; t <= num_cam_paths; t++) {
         for (int s = 0; s <= num_light_paths; s++) {
             int depth = s + t - 2;
-            if (depth > (pc_ray.max_depth - 1) || depth < 0 || (s == 1 && t == 1)) {
+            if (depth > (pc_ray.max_depth - 1) || depth < 0 ||
+                (s == 1 && t == 1)) {
                 continue;
             }
             if (t == 1) {
@@ -591,7 +602,10 @@ void main() {
     vec3 splat_img = tmp_col.d[pixel_idx];
     col += splat_img;
     tmp_col.d[pixel_idx] = vec3(0);
-
+    if (isnan(luminance(col))) {
+        debugPrintfEXT("nan\n");
+        return;
+    }
     if (pc_ray.frame_num > 0) {
         float w = 1. / float(pc_ray.frame_num + 1);
         vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;

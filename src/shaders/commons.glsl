@@ -677,7 +677,7 @@ vec3 sample_light_Le(const vec4 rands_pos, const vec2 rands_dir,
         pdf_pos = record.triangle_pdf / total_light;
         L = light_mat.emissive_factor;
         wi = sample_cos_hemisphere(rands_dir, record.triangle_normal, phi);
-        pdf_dir = abs(dot(wi, record.triangle_normal)) / PI;
+        pdf_dir = (dot(wi, record.triangle_normal)) / PI;
     } else if (light.light_flags == LIGHT_SPOT) {
         const float cos_width = cos(30 * PI / 180);
         const float cos_faloff = cos(25 * PI / 180);

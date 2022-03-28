@@ -15,7 +15,6 @@ layout(buffer_reference, scalar) buffer VCMReservoir_ { VCMReservoir d[]; };
 layout(buffer_reference, scalar) buffer ShouldResample { uint d; };
 layout(buffer_reference, scalar) buffer LightStates { LightState d[]; };
 
-
 ShouldResample should_resample =
     ShouldResample(scene_desc.should_resample_addr);
 LightStates light_states = LightStates(scene_desc.light_state_addr);
@@ -83,19 +82,20 @@ bool vcm_generate_light_sample(out LightState light_state) {
     Light light;
     TriangleRecord record;
     MaterialProps light_mat;
-    float u,v;
+    float u, v;
     vec3 wi;
-    const vec3 Le =
-        sample_light_Le(pc_ray.num_lights, pc_ray.light_triangle_count,
-                        light_idx, light_triangle_idx, light_material_idx,
-                        light, record, light_mat, seed, wi, u, v);
+    float pdf_pos, pdf_dir, phi;
+    const vec3 Le = sample_light_Le(
+        pc_ray.num_lights, pc_ray.light_triangle_count, light_idx,
+        light_triangle_idx, light_material_idx, light, record, light_mat,
+        pdf_pos, seed, wi, pdf_dir, phi, u, v);
+    if (pdf_dir <= 0) {
+        return false;
+    }
     light_state.pos = record.pos;
     light_state.normal = record.triangle_normal;
     light_state.dir = wi;
     light_state.triangle_pdf = record.triangle_pdf;
-    // if(pixel_idx == 30000) {
-    //     debugPrintfEXT("%v3f\n", light_state.normal);
-    // }
     light_state.hash_idx = get_restir_hash_idx(light_idx, u, v);
     light_state.Le = Le;
     light_state.light_flags = light.light_flags;
@@ -105,9 +105,11 @@ bool vcm_generate_light_sample(out LightState light_state) {
 void main() {
     LightState light_state;
     bool generate_samples = true;
-    vcm_generate_light_sample(light_state);
-    if (should_resample.d == 0 && pc_ray.do_spatiotemporal == 1) {
-        temporal_reservoirs.d[light_state.hash_idx].selected_idx = pixel_idx;
+    if (vcm_generate_light_sample(light_state)) {
+        if (should_resample.d == 0 && pc_ray.do_spatiotemporal == 1) {
+            temporal_reservoirs.d[light_state.hash_idx].selected_idx =
+                pixel_idx;
+        }
+        light_states.d[pixel_idx] = light_state;
     }
-    light_states.d[pixel_idx] = light_state;
 }

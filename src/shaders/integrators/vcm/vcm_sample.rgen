@@ -322,17 +322,14 @@ void main() {
             light_state.material_idx = payload.material_idx;
         }
     }
-    const float p_hat = total_lum;
-    //const float p_hat = s.pdf_dir;
+    //const float p_hat = total_lum;
+    const float p_hat = s.pdf_dir;
     if (p_hat > 0) {
         s.p_hat = p_hat;
         s.valid = 1;
         s.frame_idx = pc_ray.total_frame_num;
         atomicAdd(temporal_reservoirs.d[s.hash_idx].factor, 1);
         light_samples.d[pixel_idx] = s;
-        // if (pixel_idx == 500000) {
-        //     debugPrintfEXT("%f\n", temporal_reservoirs.d[pixel_idx].W);
-        // }
     }
 #undef light_vtx
 }

@@ -30,7 +30,6 @@ void main() {
     if (isnan(proposed_luminance)) {
         mlt_sampler.splat_cnt = 0;
         seeds_data.d[pixel_idx].chain_seed = chain_seed;
-        debugPrintfEXT("Luminance is not a finite number\n");
         return;
     }
     const float accept = min(1, proposed_luminance / mlt_sampler.luminance);

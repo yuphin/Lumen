@@ -27,8 +27,8 @@ void main() {
     mlt_start_chain(1);
     float proposed_luminance = mlt_trace_eye(origin, cam_area, large_step, chain_seed, true);
     mlt_select_type(0);
-    if (isnan(proposed_luminance) || isinf(proposed_luminance)) {
-        debugPrintfEXT("Luminance is not a finite number\n");
+    if (isnan(proposed_luminance)) {
+        return;
     }
     const float accept = min(1, proposed_luminance / mlt_sampler.luminance);
     if (accept > 0) {

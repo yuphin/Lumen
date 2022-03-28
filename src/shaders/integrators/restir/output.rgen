@@ -16,7 +16,6 @@ void main() {
     const RestirReservoir r = spatial_reservoirs.d[pixel_idx];
     col += tmp_col.d[pixel_idx];
     if (isnan(luminance(col))) {
-        //debugPrintfEXT("nan\n");
         return;
     }
     if (r.W > 0) {

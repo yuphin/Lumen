@@ -222,16 +222,5 @@ void main() {
     samples.d[pixel_idx].p_q = p_q;
     samples.d[pixel_idx].f = x_f;
     samples.d[pixel_idx].bsdf_props = bsdf_props;
-    // if (p_q > 0) {
-    //     float l1 = length(samples.d[pixel_idx].n_s);
-    //     // if (abs(l1 - 1) > EPS) {
-    //     //     debugPrintfEXT("1 - %f\n", l1);
-    //     // }
-    // }
-    // if(pixel_idx == 1) {
-    //     debugPrintfEXT("1\n");
-
-    // }
-
     tmp_col.d[pixel_idx] += col;
 }

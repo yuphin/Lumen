@@ -65,7 +65,7 @@ void main() {
     float abs_cos_light = abs(dot(record.triangle_normal, wi));
     //const float pdf_dir = dot(wi, record.triangle_normal) / PI;
     vec3 throughput;
-    if (abs_cos_light == 0) {
+    if (abs_cos_light == 0 || pdf_dir <= 0) {
         throughput = vec3(0);
     } else {
         throughput =

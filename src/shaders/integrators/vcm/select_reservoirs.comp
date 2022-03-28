@@ -32,11 +32,5 @@ void main() {
     if(s.valid == 1) {
         const uint hidx = s.hash_idx;
         temporal_reservoirs.d[hidx].sample_idx = gl_GlobalInvocationID.x;
-        if(temporal_reservoirs.d[hidx].factor == 0) {
-             debugPrintfEXT("no1! %d - %d\n", gl_GlobalInvocationID.x, pc_ray.frame_num);
-        }
-         //debugPrintfEXT("%v3f\n", s.dir);
-        //debugPrintfEXT("%d\n", gl_GlobalInvocationID.x);
-        //debugPrintfEXT("%d - %d\n", temporal_reservoirs.d[hidx].factor, hidx);
     } 
 }

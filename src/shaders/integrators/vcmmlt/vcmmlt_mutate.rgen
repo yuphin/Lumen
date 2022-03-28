@@ -42,7 +42,7 @@ void main() {
     }
 
     if (isnan(proposed_luminance) || isinf(proposed_luminance)) {
-        debugPrintfEXT("Luminance is not a finite number\n");
+        return;
     }
     float curr_target = eval_target(mlt_sampler.luminance, chain_idx);
     float proposed_target = eval_target(proposed_luminance, chain_idx);

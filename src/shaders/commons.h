@@ -466,6 +466,7 @@ struct PostDesc {
     uint64_t gt_img_addr;
     uint64_t residual_addr;
     uint64_t counter_addr;
+    uint64_t rmse_val_addr;
 };
 
 struct PostPC {

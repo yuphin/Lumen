@@ -224,7 +224,6 @@ void main() {
                 const float p_hat =
                     length(f * Le * abs(cos_x) * g);
                 if (p_hat == 0) {
-                    debugPrintfEXT("p_hat is 0: %v3f - %f\n", f, cos_x);
                     r_new.W = 0;
                 } else {
                     r_new.W = r_new.w_sum / (p_hat * r_new.m);

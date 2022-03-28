@@ -46,9 +46,6 @@ void update_reservoir(inout Reservoir r, const ReservoirSample s, float w_i) {
     if (rand(seed) < w_i / r.w_sum) {
         r.s = s;
         float l1 = length(s.n_s);
-        if (l1 != 0 && abs(l1 - 1) > EPS) {
-            debugPrintfEXT("t1: %f\n", l1);
-        }
     }
 }
 
@@ -82,11 +79,6 @@ void main() {
         } else {
             uint prev_coords_idx =
                 prev_coords.x * pc_ray.size_y + prev_coords.y;
-            if (prev_coords_idx != pixel_idx) {
-                debugPrintfEXT("t2: %d - %d - %v2i - %v2i - %v3f\n",
-                               prev_coords_idx, pixel_idx, prev_coords,
-                               ivec2(gl_LaunchIDEXT.xy), prev_pos.xyz);
-            }
             r = temp_reservoirs.d[offset(pingpong) + prev_coords_idx];
         }
     } else {
@@ -122,14 +114,4 @@ void main() {
     tr.W = r_t.W;
     tr.m = r_t.m;
     tr.s = r_t.s;
-    // if(r_t.W > 10000 ){
-    //     debugPrintfEXT("%f / %f / %d / %f\n", r_t.W,  r_t.w_sum,  r_t.m,  phat);
-    // }
-    //   if (abs(l1 - 1) > EPS) {
-    //     debugPrintfEXT("t3:  %f - %v3f\n", l1, s.n_s);
-    // }
-
-    if (isnan(r_t.W)) {
-        debugPrintfEXT("t4: %d - %d\n", r_t.m, pc_ray.frame_num);
-    }
 }

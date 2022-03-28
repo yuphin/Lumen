@@ -38,7 +38,7 @@ void main() {
     if (gl_SubgroupID == 0) {
         val = data[gl_SubgroupInvocationID];
         subgroupBarrier();
-        val = subgroupMin(val);
+        val = subgroupAdd(val);
     }
     if (gl_LocalInvocationID.x == 0) {
         res_data.d[gl_WorkGroupID.x] = val;

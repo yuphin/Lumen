@@ -158,7 +158,7 @@ void main() {
         }
         if (depth > RR_MIN_DEPTH) {
             float rr_prob = min(0.95f, luminance(throughput) * rr_scale);
-            if (rr_prob < rand(seed))
+            if (rr_prob ==0 || rr_prob < rand(seed))
                 break;
             else
                 throughput /= rr_prob;

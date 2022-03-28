@@ -32,14 +32,6 @@ PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
 
 uint screen_size = pc_ray.size_x * pc_ray.size_y;
 
-// vec3 eval_bsdf(const MaterialProps mat, const vec3 wo, const vec3 wi) {
-//     if ((mat.bsdf_props & BSDF_LAMBERTIAN) == BSDF_LAMBERTIAN) {
-//         return mat.albedo / PI;
-//     } else if ((mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR) {
-//         return vec3(0);
-//     }
-//     return vec3(0);
-// }
 vec3 eval_bsdf(const MaterialProps mat, const vec3 wo, const vec3 wi,
                const vec3 shading_nrm) {
     switch (mat.bsdf_type) {
@@ -51,7 +43,6 @@ vec3 eval_bsdf(const MaterialProps mat, const vec3 wo, const vec3 wi,
         return vec3(0);
     } break;
     case BSDF_GLOSSY: {
-        debugPrintfEXT("asd\n");
         if (!same_hemisphere(wi, wo, shading_nrm)) {
             return vec3(0);
         }
@@ -61,14 +52,15 @@ vec3 eval_bsdf(const MaterialProps mat, const vec3 wo, const vec3 wi,
                                (1 - pow5(1 - 0.5 * dot(wi, shading_nrm))) *
                                (1 - pow5(1 - 0.5 * dot(wo, shading_nrm)));
         const vec3 h = normalize(wo + wi);
-        float nh = max(0.00001f, min(1.0f, dot(shading_nrm, h)));
-        float hl = max(0.00001f, min(1.0f, dot(h, wi)));
-        float nl = max(0.00001f, min(1.0f, dot(shading_nrm, wi)));
-        float nv = max(0.00001f, min(1.0f, dot(shading_nrm, wo)));
+        float nh = dot(shading_nrm, h);
+        float hl = dot(h, wi);
+        float nl = dot(shading_nrm, wi);
+        float nv = dot(shading_nrm, wo);
         float beckmann_term = beckmann_d(mat.roughness, nh);
         const vec3 f_specular = beckmann_term *
                                 fresnel_schlick(mat.metalness, hl) /
-                                (4 * hl * max(nl, nv));
+                                (4 * abs(hl) * max(abs(nl), abs(nv)));
+
         return f_specular + f_diffuse;
 #undef pow5
     } break;

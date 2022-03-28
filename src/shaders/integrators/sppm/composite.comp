@@ -47,9 +47,6 @@ void main() {
             pixel(idx).radius * sqrt(n_new / (pixel(idx).N + pixel(idx).M));
         pixel(idx).tau = (pixel(idx).tau + pixel(idx).phi) * r_new * r_new /
                          (pixel(idx).radius * pixel(idx).radius);
-        if(isnan(luminance(pixel(idx).tau))) {
-            debugPrintfEXT("%f - %f\n", r_new);
-        }
         pixel(idx).N = n_new;
         pixel(idx).radius = r_new;
         pixel(idx).M = 0;

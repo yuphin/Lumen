@@ -58,23 +58,12 @@ void main() {
     if (s.valid == 0) {
         return;
     }
-    if (r_prev.factor == 0) {
-        debugPrintfEXT("no2! %d - %d - %d\n", r_prev.sample_idx,
-                       pc_ray.frame_num, s.frame_idx);
-    }
+
     VCMReservoir r_new, r;
     init_reservoir(r_new);
     init_reservoir(r);
-    // s.p_hat *= temporal_reservoirs.d[idx].factor;
-    // s.p_hat *= 2.55;
     update_reservoir(r_new, s, s.p_hat / s.pdf_dir);
-    // r_new.m = 1. / temporal_reservoirs.d[idx].factor;
-    // r_new.m /= temporal_reservoirs.d[idx].factor;
     r_new.W = r_new.w_sum / (r_new.m * r_new.s.p_hat);
-    // debugPrintfEXT("%f - %f - %f - %f - %d\n", r_new.W, r_new.s.p_hat,
-    // s.p_hat,
-    //                s.pdf_dir, r_prev.sample_idx);
-
     combine_reservoir(r, r_new);
 
     uint m_total = 1;
@@ -84,36 +73,13 @@ void main() {
         combine_reservoir(r, r_prev);
         m_total += (r_prev.m);
     }
-    // if (idx == 27574) {
-    //     debugPrintfEXT("%d - %d -  %f - %f - %f - %f\n", idx,
-    //                    temporal_reservoirs.d[idx].factor, r_prev.W, r_prev.m,
-    //                    r.m, r_new.m);
-    // }
     r.m = m_total;
     r.W = r.w_sum / (r.s.p_hat * r.m);
-    if (isnan(r.W)) {
-        debugPrintfEXT("%f - %f - %f - %d - %d\n", r.s.p_hat, r.m, s.p_hat,
-                       r_prev.factor, pc_ray.frame_num);
-        // debugPrintfEXT("%d - %d\n", r_prev.factor, r_prev.sample_idx);
-    }
-    // debugPrintfEXT("%v3f\n", r.s.dir);
-
-    // debugPrintfEXT("%f\n", r_new.W);
-
-    // Disable the sample
-    //debugPrintfEXT("%d\n", r.factor);
-
-
     temporal_reservoirs.d[idx].w_sum = r.w_sum;
     temporal_reservoirs.d[idx].W = r.W;
     temporal_reservoirs.d[idx].m = r.m;
     temporal_reservoirs.d[idx].factor--;
     temporal_reservoirs.d[idx].sample_idx = -1;
     temporal_reservoirs.d[idx].s = r.s;
-
-    if (luminance(temporal_reservoirs.d[idx].s.dir) == 0) {
-        debugPrintfEXT("a\n");
-    }
-
     light_samples.d[r_prev.sample_idx].valid = 0;
 }

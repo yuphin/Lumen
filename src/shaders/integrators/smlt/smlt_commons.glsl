@@ -445,10 +445,6 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
     } else if (connected_lights.d[pixel_idx] > 0) {
         lum += tmp_lum_data.d[pixel_idx];
     }
-    // if(connected_lights.d[light_path_idx] > 0) {
-    //     //debugPrintfEXT("%d\n",connected_lights.d[light_path_idx]);
-    //     lum /= (connected_lights.d[light_path_idx]);
-    // }
     light_path_idx *= (pc_ray.max_depth + 1);
     light_splat_cnts.d[pixel_idx] = 0;
     VCMState camera_state;

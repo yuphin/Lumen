@@ -96,10 +96,10 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, vec3 nrm,
     float pdf_rev, pdf_fwd;
     const vec3 f = eval_bsdf(nrm, wo, mat, 0, dot(payload.shading_nrm, wo) > 0,
                              dir, pdf_fwd, pdf_rev, cos_y);
-   if (f == vec3(0)) {
+    if (f == vec3(0)) {
         return L;
     }
-     if (cam_pdf_ratio > 0.0) {
+    if (cam_pdf_ratio > 0.0) {
         any_hit_payload.hit = 1;
         traceRayEXT(tlas,
                     gl_RayFlagsTerminateOnFirstHitEXT |
@@ -111,9 +111,9 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, vec3 nrm,
             const float mis_weight = 1. / (1. + w_light);
             // We / pdf_we * abs(cos_theta) = cam_pdf_ratio
             L = mis_weight * state.throughput * cam_pdf_ratio * f / screen_size;
-            //L = f;
-            //L = state.throughput / 100;
-            //L = 0.1 * vec3(mis_weight);
+            // L = f;
+            // L = state.throughput / 100;
+            // L = 0.1 * vec3(mis_weight);
         }
     }
     dir = -dir;
@@ -136,18 +136,12 @@ uint get_restir_hash_idx(uint light_idx, float u, float v) {
         get_grid_idx(vec3(light_idx, u, v), vec3(0, 0, 0),
                      vec3(pc_ray.light_triangle_count, 1, 1), grid_res);
 
-    // if (pixel_idx == 500000) {
-    //     debugPrintfEXT("%v3i - %v3i - %f - %f\n", grid_idx, grid_res, u, v);
-    // }
     return restir_hash(grid_idx, screen_size);
 }
 
 void load_vcm_state(float eta_vc, const VCMReservoir r,
                     const LightState light_state, out VCMState state,
                     bool use_reservoir) {
-    // vec2 uv_unused;
-    // const MaterialProps light_mat =
-    //     load_material(light_state.light_material_idx, uv_unused);
     float pdf_pos = light_state.triangle_pdf / pc_ray.light_triangle_count;
     vec3 wi;
     float W;
@@ -155,27 +149,22 @@ void load_vcm_state(float eta_vc, const VCMReservoir r,
     if (use_reservoir && r.W > 0) {
     //if (false) {
         wi = r.s.dir;
-        if(luminance(wi) == 0) {
-            debugPrintfEXT("%v3f - %d - %d\n", wi, light_state.hash_idx, pc_ray.frame_num);
-        }
         cos_theta = abs(dot(wi, light_state.normal));
 
         // float cos_deg = degrees(acos(cos_theta));
         // if(true) {
         // //if(light_state.hash_idx == 1231707) {
-        //     //debugPrintfEXT("hit\n");
         //     angles.d[pixel_idx % pc_ray.max_angle_samples].is_active = 1;
-        //     angles.d[pixel_idx % pc_ray.max_angle_samples].theta = acos(cos_theta);
-        //     angles.d[pixel_idx % pc_ray.max_angle_samples].phi = r.s.phi;
+        //     angles.d[pixel_idx % pc_ray.max_angle_samples].theta =
+        //     acos(cos_theta); angles.d[pixel_idx %
+        //     pc_ray.max_angle_samples].phi = r.s.phi;
         // }
-      
+
         W = r.W;
     } else {
-        // const Light light = lights[light_state.light_idx];
-        // wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
-        //                            light_state.normal);
         wi = light_state.dir;
-        const float pdf_dir = light_pdf(light_state.light_flags, light_state.normal, wi);
+        const float pdf_dir =
+            light_pdf(light_state.light_flags, light_state.normal, wi);
         cos_theta = abs(dot(wi, light_state.normal));
         W = 1. / pdf_dir;
     }
@@ -184,7 +173,7 @@ void load_vcm_state(float eta_vc, const VCMReservoir r,
     state.area = 1.0 / light_state.triangle_pdf;
     state.wi = wi;
     state.throughput = light_state.Le * cos_theta * W / (pdf_pos);
-   
+    
     // Partially evaluate pdfs (area formulation)
     // At s = 0 this is p_rev / p_fwd, in the case of area lights:
     // p_rev = p_connect = 1/area, p_fwd = cos_theta / (PI * area)
@@ -202,7 +191,6 @@ void load_vcm_state(float eta_vc, const VCMReservoir r,
     // Similar argument, with the eta
     state.d_vm = state.d_vc * eta_vc;
 }
-
 
 void main() {
     const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
@@ -238,7 +226,9 @@ void main() {
     }
     load_vcm_state(eta_vc, r, light_state, vcm_state, use_reservoir);
     vec3 initial = vcm_state.throughput;
+   
     bool specular = false;
+   
     // Trace light
     {
         const vec3 cam_pos = origin.xyz;
@@ -280,16 +270,16 @@ void main() {
             // Complete the missing geometry terms
             float cos_theta_wo = abs(dot(wo, shading_nrm));
             // Can't connect from specular to camera path, can't merge either
-         
+
             vcm_state.d_vcm *= dist_sqr;
             vcm_state.d_vcm /= cos_theta_wo;
             vcm_state.d_vc /= cos_theta_wo;
             vcm_state.d_vm /= cos_theta_wo;
-            if (!mat_specular && (pc_ray.use_vc == 1 || pc_ray.use_vm == 1)) {
+            if ((!mat_specular && (pc_ray.use_vc == 1 || pc_ray.use_vm == 1))) {
 
                 // Copy to light vertex buffer
-                //light_vtx(path_idx).wi = vcm_state.wi;
-                light_vtx(path_idx).wo = wo;//-vcm_state.wi;
+                // light_vtx(path_idx).wi = vcm_state.wi;
+                light_vtx(path_idx).wo = wo; //-vcm_state.wi;
                 light_vtx(path_idx).shading_nrm = shading_nrm;
                 light_vtx(path_idx).pos = offset_ray(payload.pos, shading_nrm);
                 light_vtx(path_idx).uv = payload.uv;
@@ -301,11 +291,7 @@ void main() {
                 light_vtx(path_idx).d_vm = vcm_state.d_vm;
                 light_vtx(path_idx).path_len = depth + 1;
                 light_vtx(path_idx).side = uint(side);
-                // if(depth > 1) {
-                //     debugPrintfEXT("%v3f - %v3f\n", initial, light_vtx(path_idx).throughput);
-                // }
                 path_idx++;
-              
             }
             if (depth >= pc_ray.max_depth) {
                 break;
@@ -322,6 +308,7 @@ void main() {
                     vcm_state, eta_vm, wo, mat, coords);
                 if (luminance(splat_col) > 0) {
                     uint idx = coords.x * gl_LaunchSizeEXT.y + coords.y;
+
                     tmp_col.d[idx] += splat_col;
                 }
             }
@@ -366,20 +353,7 @@ void main() {
                 vcm_state.d_vm *= abs_cos_theta;
                 specular = true;
             }
-
-            //vcm_state.throughput *= f * abs_cos_theta / pdf_dir;
-            
             vcm_state.throughput *= f * abs_cos_theta / pdf_dir;
-            //vcm_state.throughput *= correct_shading_normal(payload.geometry_nrm, shading_nrm, vcm_state.wi, wo, 0);
-            //vcm_state.throughput = vec3(0);
-            if(depth == 1) {
-                //vcm_state.throughput *= f;
-            }
-            if(depth > 1) {
-                //vcm_state.throughput *= f;
-
-            }
-          
             vcm_state.shading_nrm = shading_nrm;
             vcm_state.area = payload.area;
             vcm_state.material_idx = payload.material_idx;
