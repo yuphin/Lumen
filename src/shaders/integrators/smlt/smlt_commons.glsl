@@ -540,10 +540,12 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
                             0xFF, 1, 0, 1, ray_origin, 0, wi, ray_len - EPS, 1);
                 const bool visible = any_hit_payload.hit == 0;
                 if (visible) {
+                    const float pdf_dir =
+                        light_pdf(light, record.triangle_normal, -wi);
                     float g =
                         abs(dot(record.triangle_normal, -wi)) / (ray_len_sqr);
                     const float cos_y = dot(-wi, record.triangle_normal);
-                    const float pdf_pos_dir = record.triangle_pdf * cos_y / PI;
+                    const float pdf_pos_dir = record.triangle_pdf * pdf_dir;
 
                     const float pdf_light_w = record.triangle_pdf / g;
                     const float w_light = pdf_fwd / (pdf_light_w);

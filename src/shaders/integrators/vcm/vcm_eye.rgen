@@ -51,7 +51,6 @@ vec3 vcm_get_light_radiance(in const MaterialProps mat,
     const float pdf_light_pos =
         1.0 / (payload.area * pc_ray.light_triangle_count);
 
-    // TODO: Fix
     const float pdf_light_dir =
         abs(dot(payload.shading_nrm, -camera_state.wi)) / PI;
     const float w_camera =
@@ -176,10 +175,11 @@ void main() {
                             0xFF, 1, 0, 1, ray_origin, 0, wi, ray_len - EPS, 1);
                 const bool visible = any_hit_payload.hit == 0;
                 if (visible) {
+                    const float pdf_dir = light_pdf(light, record.triangle_normal, -wi);
                     float g =
                         abs(dot(record.triangle_normal, -wi)) / (ray_len_sqr);
                     const float cos_y = dot(-wi, record.triangle_normal);
-                    const float pdf_pos_dir = record.triangle_pdf * cos_y / PI;
+                    const float pdf_pos_dir = record.triangle_pdf * pdf_dir;
 
                     const float pdf_light_w = record.triangle_pdf / (g);
                     const float w_light = pdf_fwd / (pdf_light_w / pc_ray.light_triangle_count);

@@ -145,7 +145,7 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
                      const float cam_A, const vec3 pos, const in VCMState state,
                      const vec3 wo, const MaterialProps mat, out ivec2 coords,
                      float eta_vm) {
-    //uint size = pc_ray.size_x * pc_ray.size_y;
+    // uint size = pc_ray.size_x * pc_ray.size_y;
     vec3 L = vec3(0);
     vec3 dir = cam_pos - pos;
     float len = length(dir);
@@ -289,8 +289,8 @@ float mlt_fill_eye_path(const vec4 origin, const float cam_area) {
     camera_state.shading_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
     float cos_theta = abs(dot(camera_state.shading_nrm, direction));
     // Defer r^2 / cos term
-    camera_state.d_vcm =
-        cam_area * pc_ray.size_x * pc_ray.size_y * cos_theta * cos_theta * cos_theta;
+    camera_state.d_vcm = cam_area * pc_ray.size_x * pc_ray.size_y * cos_theta *
+                         cos_theta * cos_theta;
     camera_state.d_vc = 0;
     camera_state.d_vm = 0;
     int d;
@@ -392,10 +392,12 @@ float mlt_fill_eye_path(const vec4 origin, const float cam_area) {
                             0xFF, 1, 0, 1, ray_origin, 0, wi, ray_len - EPS, 1);
                 const bool visible = any_hit_payload.hit == 0;
                 if (visible) {
+                    const float pdf_dir =
+                        light_pdf(light, record.triangle_normal, -wi);
                     float g =
                         abs(dot(record.triangle_normal, -wi)) / (ray_len_sqr);
                     const float cos_y = dot(-wi, record.triangle_normal);
-                    const float pdf_pos_dir = record.triangle_pdf * cos_y / PI;
+                    const float pdf_pos_dir = record.triangle_pdf * pdf_dir;
 
                     const float pdf_light_w = record.triangle_pdf / g;
                     const float w_light = pdf_fwd / (pdf_light_w);
@@ -405,8 +407,7 @@ float mlt_fill_eye_path(const vec4 origin, const float cam_area) {
                     const float mis_weight = 1. / (1. + w_light + w_cam);
                     if (mis_weight > 0) {
                         vec3 L = mis_weight * abs(cos_x) * f *
-                                 camera_state.throughput *
-                                 Le /
+                                 camera_state.throughput * Le /
                                  (pdf_light_w / pc_ray.light_triangle_count);
                         tmp_col.d[coords_idx] += L;
                         lum_sum += luminance(L);
@@ -467,7 +468,9 @@ float mlt_fill_light_path(const vec4 origin, const float cam_area) {
     const float radius_sqr = radius * radius;
     float eta_vcm = PI * radius_sqr * pc_ray.size_x * pc_ray.size_y;
     float eta_vc = 1.0 / eta_vcm;
-    float eta_vm = (pc_ray.use_vm == 1) ? PI * radius_sqr * pc_ray.size_x * pc_ray.size_y : 0;
+    float eta_vm = (pc_ray.use_vm == 1)
+                       ? PI * radius_sqr * pc_ray.size_x * pc_ray.size_y
+                       : 0;
     float lum_sum = 0;
     if (!vcm_generate_light_sample(eta_vc, light_state)) {
         return 0;
@@ -730,10 +733,12 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
                             0xFF, 1, 0, 1, ray_origin, 0, wi, ray_len - EPS, 1);
                 const bool visible = any_hit_payload.hit == 0;
                 if (visible) {
+                    const float pdf_dir =
+                        light_pdf(light, record.triangle_normal, -wi);
                     float g =
                         abs(dot(record.triangle_normal, -wi)) / (ray_len_sqr);
                     const float cos_y = dot(-wi, record.triangle_normal);
-                    const float pdf_pos_dir = record.triangle_pdf * cos_y / PI;
+                    const float pdf_pos_dir = record.triangle_pdf * pdf_dir;
 
                     const float pdf_light_w = record.triangle_pdf / g;
                     const float w_light = pdf_fwd / (pdf_light_w);

@@ -558,28 +558,6 @@ void main() {
     int num_light_paths = bdpt_generate_light_subpath(pc_ray.max_depth + 1);
     int num_cam_paths = bdpt_generate_camera_subpath(
         d, origin.xyz, pc_ray.max_depth + 1, cam_area);
-    // for (int s = 2; s <= num_light_paths; s++) {
-    //     int depth = s;
-    //     if (depth > pc_ray.max_depth) {
-    //         break;
-    //     }
-    //     ivec2 coords;
-    //     vec3 splat_col = bdpt_connect_cam(s, coords);
-    //     if (luminance(splat_col) > 0) {
-    //         uint idx = coords.x * gl_LaunchSizeEXT.y + coords.y;
-    //         tmp_col.d[idx] += splat_col;
-    //     }
-    // }
-    // for (int t = 2; t <= num_cam_paths; t++) {
-    //     col += bdpt_connect(0, t);
-    // }
-    // for (int t = 2; t <= num_cam_paths; t++) {
-    //     int depth = t;
-    //     if (depth > pc_ray.max_depth) {
-    //         break;
-    //     }
-    //     col += bdpt_connect(1, t);
-    // }
     for (int t = 1; t <= num_cam_paths; t++) {
         for (int s = 0; s <= num_light_paths; s++) {
             int depth = s + t - 2;
