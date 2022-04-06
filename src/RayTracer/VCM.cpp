@@ -2,7 +2,7 @@
 #include "VCM.h"
 #include <iostream>
 #include <fstream>
-const int max_depth = 8;
+const int max_depth = 6;
 const int max_samples = 50000;
 const vec3 sky_col(0, 0, 0);
 static float vcm_radius_factor = 0.1;

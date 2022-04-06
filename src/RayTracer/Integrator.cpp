@@ -87,6 +87,8 @@ void Integrator::init() {
 		light.pos = l.pos;
 		light.to = l.to;
 		total_light_triangle_cnt++;
+		light.world_radius = lumen_scene.m_dimensions.radius;
+		light.world_center = 0.5f * (lumen_scene.m_dimensions.max + lumen_scene.m_dimensions.min);
 		lights.emplace_back(light);
 	}
 

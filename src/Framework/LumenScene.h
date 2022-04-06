@@ -50,6 +50,7 @@ struct LumenLight {
 	glm::vec3 to;
 	glm::vec3 L;
 	uint32_t light_type;
+    float world_radius;
 };
 class LumenScene {
 public:

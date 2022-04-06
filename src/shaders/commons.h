@@ -30,6 +30,7 @@
 // Light Type
 #define LIGHT_SPOT 1 << 0
 #define LIGHT_AREA 1 << 1
+#define LIGHT_DIRECTIONAL 1 << 2
 
 #ifdef __cplusplus
 #include <glm/glm.hpp>
@@ -46,7 +47,7 @@ using uint = unsigned int;
 #define ALIGN16
 #endif
 
-#define ENABLE_DISNEY 1
+#define ENABLE_DISNEY 0
 
 struct PushConstantRay {
     vec4 clear_color;
@@ -124,6 +125,8 @@ struct Light {
     uint num_triangles;
     vec3 L;
     uint light_flags;
+    vec3 world_center;
+    float world_radius;
 };
 
 struct LightVisibility {

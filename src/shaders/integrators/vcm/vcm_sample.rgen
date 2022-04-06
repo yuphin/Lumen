@@ -186,7 +186,7 @@ void main() {
         } else {
             avg.d.avg = 0.6 * avg.d.avg + 0.4 * (pc_ray.frame_num - avg.d.prev);
             avg.d.prev = pc_ray.frame_num;
-            debugPrintfEXT("resampling %d, avg: %f\n", pc_ray.total_frame_num, avg.d.avg);
+            //debugPrintfEXT("resampling %d, avg: %f\n", pc_ray.total_frame_num, avg.d.avg);
         }
     }
 

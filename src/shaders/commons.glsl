@@ -3,7 +3,6 @@
 #include "commons.h"
 #include "utils.glsl"
 
-
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(set = 0, binding = 0) uniform accelerationStructureEXT tlas;
@@ -60,8 +59,7 @@ float glossy_pdf(float cos_theta, float hl, float nh, float beckmann_term) {
     return 0.5 * (max(cos_theta / PI, 0) + beckmann_term * nh / (4 * hl));
 }
 
-float disney_pdf(const vec3 n, const Material mat, const vec3 v,
-                 const vec3 l) {
+float disney_pdf(const vec3 n, const Material mat, const vec3 v, const vec3 l) {
     const vec3 h = normalize(l + v);
     // VNDF pdf
     const float pdf_diffuse_lobe = 0.5 * (1 - mat.metallic);
@@ -209,7 +207,7 @@ vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
                 rands_new.x /= ratio_gtr2;
                 const float alpha = max(0.01f, sqr(mat.roughness));
                 dir = sample_ggx_vndf(wo, alpha, alpha, rands_new.x,
-                                                rands_new.y, shading_nrm);
+                                      rands_new.y, shading_nrm);
                 if (!same_hemisphere(wo, dir, shading_nrm)) {
                     pdf_w = 0.;
                     f = vec3(0);
@@ -433,6 +431,9 @@ float light_pdf(const Light light, const vec3 shading_nrm, const vec3 wi) {
     case LIGHT_SPOT: {
         return uniform_cone_pdf(cos_width);
     } break;
+    case LIGHT_DIRECTIONAL: {
+        return 0;
+    } break;
     }
 }
 
@@ -444,6 +445,9 @@ float light_pdf(uint light_flags, const vec3 shading_nrm, const vec3 wi) {
     }
     case LIGHT_SPOT: {
         return uniform_cone_pdf(cos_width);
+    }
+    case LIGHT_DIRECTIONAL: {
+        return 0;
     }
     }
 }
@@ -567,6 +571,12 @@ vec3 sample_light(const vec4 rands_pos, const vec3 p, const int num_lights,
         record.triangle_pdf = 1.;
         record.triangle_normal = dir;
         L = light.L * faloff;
+    } else if (light.light_flags == LIGHT_DIRECTIONAL) {
+        vec3 dir = -normalize(light.to - light.pos);
+        record.pos = p + dir * (2 * light.world_radius);
+        record.triangle_pdf = 1.;
+        record.triangle_normal = -dir;
+        L = light.L;
     }
     return L;
 }
@@ -603,6 +613,12 @@ vec3 sample_light_with_idx(const vec4 rands_pos, const vec3 p,
         record.triangle_pdf = 1.;
         record.triangle_normal = dir;
         L = light.L * faloff;
+    } else if (light.light_flags == LIGHT_DIRECTIONAL) {
+        vec3 dir = -normalize(light.to - light.pos);
+        record.pos = p + dir * (2 * light.world_radius);
+        record.triangle_pdf = 1.;
+        record.triangle_normal = -dir;
+        L = light.L;
     }
     return L;
 }
@@ -666,6 +682,20 @@ vec3 sample_light_Le(const vec4 rands_pos, const vec2 rands_dir,
         L = light.L * faloff;
         pdf_pos = 1.;
         pdf_dir = uniform_cone_pdf(cos_width);
+        u = 0;
+        v = 0;
+    } else if (light.light_flags == LIGHT_DIRECTIONAL) {
+        vec3 dir = -normalize(light.to - light.pos);
+        vec3 v1, v2;
+        make_coord_system(dir, v1, v2);
+        vec2 uv = concentric_sample_disk(rands_dir);
+        vec3 pos = light.world_center + light.world_radius * (u * v1 + v * v2);
+        record.pos = pos + dir * light.world_radius;
+        record.triangle_normal = -dir;
+        L = light.L;
+        pdf_pos = 1. / (PI * light.world_radius * light.world_radius);
+        record.triangle_pdf = pdf_pos;
+        pdf_dir = 1.;
         u = 0;
         v = 0;
     }
@@ -780,6 +810,20 @@ vec3 sample_light_w(const int num_lights, const int total_light,
         record.triangle_pdf = 1.;
         record.triangle_normal = wi;
         L = light.L * faloff;
+        u = 0;
+        v = 0;
+    } else if (light.light_flags == LIGHT_DIRECTIONAL) {
+        vec3 dir = -normalize(light.to - light.pos);
+        vec3 v1, v2;
+        make_coord_system(dir, v1, v2);
+        const vec2 rands = vec2(rand(seed), rand(seed));
+        vec2 uv = concentric_sample_disk(rands);
+        vec3 pos = light.world_center + light.world_radius * (u * v1 + v * v2);
+        record.pos = pos + dir * light.world_radius;
+        record.triangle_normal = -dir;
+        L = light.L;
+        float pdf_pos = 1. / (PI * light.world_radius * light.world_radius);
+        record.triangle_pdf = pdf_pos;
         u = 0;
         v = 0;
     }

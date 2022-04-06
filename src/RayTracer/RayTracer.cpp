@@ -52,10 +52,10 @@ void RayTracer::init(Window* window) {
 	// TODO: Parse this via the scene file
 	SceneConfig config;
 
-	config.filename = "scene.xml";
-	//config.filename = "cornell_box_simple.json";
+	//config.filename = "scene.xml";
+	config.filename = "cornell_box_simple.json";
 	//config.filename = "cornell_box_disney.json";
-	//config.filename = "cornell_box.json";
+	//config.filename = "cornell_box.json ";
 	//config.filename = "occluded2.json";
 	//config.filename = "occluded.json";
 	//config.filename = "occluded3.json";

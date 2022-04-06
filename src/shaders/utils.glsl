@@ -252,8 +252,6 @@ vec3 sample_ggx_vndf(vec3 Ve, float alpha_x, float alpha_y, float U1, float U2,
     return normalize(rot_quat(invert_quat(local_quat), l));
 }
 
-
-
 vec3 sample_beckmann(vec2 uv, float alpha, vec3 n, const vec3 v) {
     // Transform into local space where the n = (0,0,1)
     vec4 local_quat = to_local_quat(n);
@@ -287,6 +285,31 @@ void correct_shading_normal(const vec3 wo, const vec3 wi,
     if (res1 != res2) {
         shading_nrm *= -1;
     }
+}
+
+void make_coord_system(const vec3 v1, out vec3 v2, out vec3 v3) {
+    if (abs(v1.x) > abs(v1.y)) {
+        v2 = normalize(vec3(-v1.z, 0, v1.x));
+    } else {
+        v2 = normalize(vec3(0, v1.z, -v1.y));
+    }
+    v3 = cross(v1, v2);
+}
+
+vec2 concentric_sample_disk(vec2 rands) {
+    vec2 offset = 2 * rands - 1;
+    if (offset.x == 0 && offset.y == 0) {
+        return vec2(0);
+    }
+    float theta, r;
+    if(abs(offset.x) > abs(offset.y)) {
+        r = offset.x;
+        theta = 0.25 * PI * offset.y / offset.x;
+    } else {
+        r = offset.y;
+        theta = PI * (0.5 - 0.25 * offset.x / offset.y);
+    }
+    return r * vec2(cos(theta), sin(theta));
 }
 
 // From PBRT

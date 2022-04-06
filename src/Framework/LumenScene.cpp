@@ -226,6 +226,13 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 			}
 			bsdf_idx++;
 		}
+		
+		cam_config.fov = j["camera"]["fov"];
+		const auto& p = j["camera"]["position"];
+		const auto& d = j["camera"]["dir"];
+		cam_config.pos = { p[0], p[1], p[2] };
+		cam_config.dir = { d[0], d[1], d[2] };
+		compute_scene_dimensions();
 		for (auto& light : lights_arr) {
 			const auto& pos = light["pos"];
 			const auto& dir = light["dir"];
@@ -235,16 +242,13 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 			lights[light_idx].L = glm::vec3({ L[0], L[1], L[2] });
 			if (light["type"] == "spot") {
 				lights[light_idx].light_type = LIGHT_SPOT;
+			} else if (light["type"] == "directional") {
+				lights[light_idx].light_type = LIGHT_DIRECTIONAL;
+
 			}
 			light_idx++;
 
 		}
-		cam_config.fov = j["camera"]["fov"];
-		const auto& p = j["camera"]["position"];
-		const auto& d = j["camera"]["dir"];
-		cam_config.pos = { p[0], p[1], p[2] };
-		cam_config.dir = { d[0], d[1], d[2] };
-		compute_scene_dimensions();
 	} else if (ends_with(path, ".xml")) {
 		MitsubaParser mitsuba_parser;
 		mitsuba_parser.parse(path);
