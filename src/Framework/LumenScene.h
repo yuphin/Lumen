@@ -65,6 +65,7 @@ public:
 	std::vector<glm::vec4> colors0;
 	std::vector<LumenPrimMesh> prim_meshes;
 	std::vector<Material> materials;
+	std::vector<std::string> textures;
 	std::vector<LumenLight> lights;
 	struct Dimensions {
 		glm::vec3 min = glm::vec3(std::numeric_limits<float>::max());

@@ -62,9 +62,9 @@ void main() {
     const vec3 n1 = normals.n[ind.y];
     const vec3 n2 = normals.n[ind.z];
 
-    // const vec2 uv0 = tex_coords.t[ind.x];
-    // const vec2 uv1 = tex_coords.t[ind.y];
-    // const vec2 uv2 = tex_coords.t[ind.z];
+    const vec2 uv0 = tex_coords.t[ind.x];
+    const vec2 uv1 = tex_coords.t[ind.y];
+    const vec2 uv2 = tex_coords.t[ind.z];
     const vec3 barycentrics =
         vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
     // Computing the coordinates of the hit position
@@ -78,8 +78,8 @@ void main() {
     // Note that this is the transpose of the inverse of gl_ObjectToWorldEXT
     const vec3 world_nrm = normalize(vec3(nrm * gl_WorldToObjectEXT));
 
-    // const vec2 uv =
-    //     uv0 * barycentrics.x + uv1 * barycentrics.y + uv2 * barycentrics.z;
+    const vec2 uv =
+        uv0 * barycentrics.x + uv1 * barycentrics.y + uv2 * barycentrics.z;
 
     const vec3 e0 = v2 - v0;
     const vec3 e1 = v1 - v0;
@@ -90,7 +90,7 @@ void main() {
     payload.geometry_nrm = normalize(vec3(cross(e0, e1) * gl_WorldToObjectEXT));
     payload.shading_nrm = world_nrm;
     payload.pos = world_pos;
-    // payload.uv = uv;
+    payload.uv = uv;
     payload.material_idx = material_index;
     payload.triangle_idx = gl_PrimitiveID;
     payload.area = 0.5 * length(cross(e0t, e1t));

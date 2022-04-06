@@ -144,7 +144,6 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 						texcoords0.push_back({ tx,ty });
 					}
 				}
-
 				index_offset += 3;
 			}
 			prim_meshes[s].min_pos = min_vtx;
@@ -169,13 +168,21 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 		};
 
 		for (auto& bsdf : bsdfs_arr) {
+			materials[bsdf_idx].texture_id = -1;
 			auto& refs = bsdf["refs"];
+
+			if (!bsdf["texture"].is_null()) {
+				textures.push_back(root + (std::string)bsdf["texture"]);
+				materials[bsdf_idx].texture_id = textures.size() - 1;
+			}
 			if (!bsdf["albedo"].is_null()) {
 				const auto& f = bsdf["albedo"];
 				float f0 = f[0];
 				float f1 = f[1];
 				float f2 = f[2];
 				materials[bsdf_idx].albedo = glm::vec3({ f[0], f[1], f[2] });
+			} else {
+				materials[bsdf_idx].albedo = glm::vec3(1, 1, 1);
 			}
 			if (!bsdf["emissive_factor"].is_null()) {
 				const auto& f = bsdf["emissive_factor"];
@@ -203,7 +210,7 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 #if ENABLE_DISNEY
 				Material& mat = materials[bsdf_idx];
 				mat.bsdf_type = BSDF_DISNEY;
-				mat.albedo = get_or_default_v(bsdf, "albedo", glm::vec3(0.5));
+				mat.albedo = get_or_default_v(bsdf, "albedo", glm::vec3(1));
 				mat.metallic = get_or_default_f(bsdf, "metallic", 0);
 				mat.roughness = get_or_default_f(bsdf, "roughness", 0.5);
 				mat.specular_tint = get_or_default_f(bsdf, "specular_tint", 0);
@@ -324,7 +331,7 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 #if ENABLE_DISNEY
 			m.bsdf_type = BSDF_DISNEY;
 			m.bsdf_props = BSDF_OPAQUE | BSDF_LAMBERTIAN | BSDF_REFLECTIVE;
-			m.albedo = vec3(0.5);
+			m.albedo = vec3(1.0);
 			m.metallic = 0;
 			m.roughness = 0.5;
 			m.specular_tint = 0;

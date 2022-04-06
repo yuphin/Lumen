@@ -45,7 +45,11 @@ float correct_shading_normal(const vec3 geometry_nrm, const vec3 shading_nrm,
 }
 
 Material load_material(const uint material_idx, const vec2 uv) {
-    return materials.m[material_idx];
+    Material m = materials.m[material_idx];
+    if(m.texture_id > -1) {
+        m.albedo *= texture(scene_textures[m.texture_id], uv).xyz;
+    }
+    return m;
 }
 
 float diffuse_pdf(const vec3 n, const vec3 l, out float cos_theta) {

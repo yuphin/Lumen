@@ -1,5 +1,6 @@
 #include "LumenPCH.h"
 #include "Integrator.h"
+#include <stb_image.h>
 
 void Integrator::init() {
 	VkPhysicalDeviceProperties2 prop2{
@@ -34,30 +35,9 @@ void Integrator::init() {
 			updated = true;
 		}
 	});
-
 	auto vertex_buf_size = lumen_scene.positions.size() * sizeof(glm::vec3);
 	auto idx_buf_size = lumen_scene.indices.size() * sizeof(uint32_t);
-	//std::vector<Material> materials;
 	std::vector<PrimMeshInfo> prim_lookup;
-	//for (const auto& m : lumen_scene.materials) {
-	//	Material mat;
-	//	mat.base_color_factor = glm::vec4(m.albedo, 1);
-	//	mat.emissive_factor = m.emissive_factor;
-	//	mat.texture_id = -1;
-	//	mat.ior = m.ior;
-	//	mat.bsdf_type = m.bsdf_type;
-	//	mat.metalness = m.metalness;
-	//	mat.roughness = m.roughness;
-	//	mat.metallic = m.metallic;
-	//	mat.specular_tint = m.specular_tint;
-	//	mat.sheen_tint = m.sheen_tint;
-	//	mat.specular = m.specular;
-	//	mat.clearcoat = m.clearcoat;
-	//	mat.clearcoat_gloss = m.clearcoat_gloss;
-	//	mat.sheen = m.sheen;
-	//	mat.subsurface = m.subsurface;
-	//	materials.emplace_back(mat);
-	//}
 	uint32_t idx = 0;
 	for (auto& pm : lumen_scene.prim_meshes) {
 		PrimMeshInfo m_info;
@@ -161,9 +141,25 @@ void Integrator::init() {
 								   texture_sampler);
 	};
 
-	// TODO: Add textures
-	if (1) {
+	if (!lumen_scene.textures.size()) {
 		add_default_texture();
+	} else {
+		textures.resize(lumen_scene.textures.size());
+		int i = 0;
+		for (const auto& texture_path : lumen_scene.textures) {
+			int x, y, n;
+			unsigned char* data = stbi_load(texture_path.c_str(), &x, &y, &n, 4);
+		
+			auto size = x * y * 4 ;
+			auto img_dims =
+				VkExtent2D{ (uint32_t)x, (uint32_t)y };
+			auto ci = make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB,
+									VK_IMAGE_USAGE_SAMPLED_BIT, false);
+			textures[i].load_from_data(&instance->vkb.ctx, data, size, ci,
+									   texture_sampler, false);
+			stbi_image_free(data);
+			i++;
+		}
 	}
 }
 
