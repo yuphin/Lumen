@@ -38,9 +38,13 @@ void MitsubaParser::parse(const std::string& path) {
 							prop.second.getColor().b
 						});
 					}
+					if (prop.first == "alpha") {
+						bsdf.roughness = std::sqrt(prop.second.getNumber());
+					}
 				}
 			}
 			bsdfs.push_back(bsdf);
+		// Meshes
 		} else if (obj->type() == OT_SHAPE) {
 			MitsubaMesh mesh;
 			for (const auto& prop : obj->properties()) {
@@ -69,6 +73,21 @@ void MitsubaParser::parse(const std::string& path) {
 				mesh.bsdf_ref = ref;
 			}
 			meshes.push_back(mesh);
+		} else if (obj->type() == OT_EMITTER) {
+			MitsubaLight light;
+			if (obj->pluginType() == "sunsky") {
+				light.type = "directional";
+			}
+			light.to = glm::vec3(0);
+			for (const auto& prop : obj->properties()) {
+				if (prop.first == "sun_direction") {
+					auto dir = prop.second.getVector();
+					light.from = glm::vec3({dir.x, dir.y, dir.z});
+				} else if (prop.first == "sun_scale") {
+					light.L = glm::vec3(1) * prop.second.getNumber();
+				}
+			}
+			lights.push_back(light);
 		}
 	}
 }

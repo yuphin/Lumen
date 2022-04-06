@@ -4,16 +4,20 @@
 
 struct MitsubaParser {
 
-	enum class M_BSDF {
-		DIFFUSE,
-		ROUGHCONDUCTOR,
-		ROUGHPLASTIC
-	};
 	struct MitsubaBSDF {
-		std::string name;
+		std::string name = "";
+		std::string type = "";
+		std::string texture = "";
+		glm::vec3 albedo = glm::vec3(1);
+		float roughness = 0;
+
+	};
+
+	struct MitsubaLight {
 		std::string type;
-		std::string texture;
-		glm::vec3 albedo;
+		glm::vec3 from;
+		glm::vec3 to;
+		glm::vec3 L;
 
 	};
 
@@ -28,6 +32,7 @@ struct MitsubaParser {
 
 	std::vector<MitsubaBSDF> bsdfs;
 	std::vector<MitsubaMesh> meshes;
+	std::vector<MitsubaLight> lights;
 	
 };
 

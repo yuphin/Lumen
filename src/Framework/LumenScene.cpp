@@ -260,7 +260,7 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 		MitsubaParser mitsuba_parser;
 		mitsuba_parser.parse(path);
 
-		materials.resize(mitsuba_parser.bsdfs.size());
+	
 		prim_meshes.resize(mitsuba_parser.meshes.size());
 		// Load objs
 		int i = 0;
@@ -325,7 +325,6 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 			prim_meshes[i].material_idx = mesh.bsdf_idx;
 			i++;
 		}
-		i = 0;
 
 		auto make_default_disney = [](Material& m) {
 #if ENABLE_DISNEY
@@ -343,7 +342,15 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 			m.sheen = 0;
 #endif
 		};
+		i = 0;
+		materials.resize(mitsuba_parser.bsdfs.size());
 		for (const auto& m_bsdf : mitsuba_parser.bsdfs) {
+			if (m_bsdf.texture != "") {
+				textures.push_back(root + m_bsdf.texture);
+				materials[i].texture_id = textures.size() - 1;
+			} else {
+				materials[i].texture_id = -1;
+			}
 #if ENABLE_DISNEY
 			make_default_disney(materials[i]);
 			// Assume Disney for other materials for now
@@ -356,10 +363,23 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 
 			} else if (m_bsdf.type == "roughplastic") {
 				materials[i].subsurface = 0.1;
-				materials[i].specular = 0.05;
-				materials[i].roughness = 0.05;
+				materials[i].specular = 0.1;
+				materials[i].albedo = m_bsdf.albedo;
 			}
 #endif
+			i++;
+		}
+		compute_scene_dimensions();
+		// Light
+		i = 0;
+		lights.resize(mitsuba_parser.lights.size());
+		for (auto& light : mitsuba_parser.lights) {
+			lights[i].L = light.L;
+			if (light.type == "directional") {
+				lights[i].pos = light.from;
+				lights[i].to = light.to;
+				lights[i].light_type = LIGHT_DIRECTIONAL;
+			}
 			i++;
 		}
 	}

@@ -47,7 +47,7 @@ using uint = unsigned int;
 #define ALIGN16
 #endif
 
-#define ENABLE_DISNEY 0
+#define ENABLE_DISNEY 1
 
 struct PushConstantRay {
     vec4 clear_color;
