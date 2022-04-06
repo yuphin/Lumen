@@ -2,6 +2,7 @@
 #include "LumenPCH.h"
 #include <tiny_obj_loader.h>
 #include "shaders/commons.h"
+#include "Framework/MitsubaParser.h"
 
 struct CameraConfiguration {
 	float fov;
@@ -53,7 +54,6 @@ struct LumenLight {
 class LumenScene {
 public:
 	void load_scene(const std::string& root, const std::string& filename);
-
 	CameraConfiguration cam_config;
 	std::vector<glm::vec3> positions;
 	std::vector<uint32_t> indices;

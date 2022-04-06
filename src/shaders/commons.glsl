@@ -48,43 +48,6 @@ float correct_shading_normal(const vec3 geometry_nrm, const vec3 shading_nrm,
 
 Material load_material(const uint material_idx, const vec2 uv) {
     return materials.m[material_idx];
-    // Material res;
-    // const Material mat = materials.m[material_idx];
-    // res.emissive_factor = mat.emissive_factor;
-    // res.albedo = mat.albedo;
-    // res.bsdf_type = mat.bsdf_type;
-    // res.bsdf_props = 0;
-    // switch (res.bsdf_type) {
-    // case BSDF_DIFFUSE:
-    //     res.bsdf_props |= BSDF_OPAQUE;
-    //     res.bsdf_props |= BSDF_LAMBERTIAN;
-    //     break;
-    // case BSDF_GLASS:
-    //     res.bsdf_props |= BSDF_SPECULAR;
-    //     res.bsdf_props |= BSDF_TRANSMISSIVE;
-    //     break;
-    // case BSDF_MIRROR:
-    //     res.bsdf_props |= BSDF_SPECULAR;
-    //     res.bsdf_props |= BSDF_REFLECTIVE;
-    //     break;
-    // case BSDF_GLOSSY:
-    //     res.bsdf_props |= BSDF_OPAQUE;
-    //     res.bsdf_props |= BSDF_LAMBERTIAN;
-    //     res.bsdf_props |= BSDF_REFLECTIVE;
-    //     break;
-    // case BSDF_DISNEY:
-    //     res.bsdf_props |= BSDF_OPAQUE;
-    //     res.bsdf_props |= BSDF_LAMBERTIAN;
-    //     res.bsdf_props |= BSDF_REFLECTIVE;
-        
-    //     break;
-    // default:
-    //     break;
-    // }
-    // res.ior = mat.ior;
-    // res.metalness = mat.metalness;
-    // res.roughness = mat.roughness;
-    // return res;
 }
 
 float diffuse_pdf(const vec3 n, const vec3 l, out float cos_theta) {
