@@ -3,7 +3,6 @@
 #include "commons.h"
 #include "utils.glsl"
 
-#define ENABLE_DISNEY 0
 
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;

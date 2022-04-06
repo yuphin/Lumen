@@ -19,7 +19,9 @@ struct MitsubaParser {
 
 	struct MitsubaMesh {
 		std::string file;
+		// In case
 		std::string bsdf_ref;
+		int bsdf_idx;
 		glm::mat4 transform;
 	};
 	void parse(const std::string& path);

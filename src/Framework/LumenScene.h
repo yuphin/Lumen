@@ -73,6 +73,7 @@ public:
 		float radius{ 0 };
 	} m_dimensions;
 private:
+	void load_obj(const std::string& path);
 	void compute_scene_dimensions();
 };
 

@@ -248,9 +248,115 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 	} else if (ends_with(path, ".xml")) {
 		MitsubaParser mitsuba_parser;
 		mitsuba_parser.parse(path);
+
+		materials.resize(mitsuba_parser.bsdfs.size());
+		prim_meshes.resize(mitsuba_parser.meshes.size());
+		// Load objs
+		int i = 0;
+		for (const auto& mesh : mitsuba_parser.meshes) {
+			const std::string mesh_file = root + mesh.file;
+			tinyobj::ObjReaderConfig reader_config;
+			//reader_config.mtl_search_path = "./"; // Path to material files
+
+			tinyobj::ObjReader reader;
+			if (!reader.ParseFromFile(mesh_file, reader_config)) {
+				if (!reader.Error().empty()) {
+					std::cerr << "TinyObjReader: " << reader.Error();
+				}
+				exit(1);
+			}
+
+			if (!reader.Warning().empty()) {
+				std::cout << "TinyObjReader: " << reader.Warning();
+			}
+
+			auto& attrib = reader.GetAttrib();
+			auto& shapes = reader.GetShapes();
+			assert(shapes.size() == 1);
+			prim_meshes[i].first_idx = (uint32_t)indices.size();
+			prim_meshes[i].vtx_offset = (uint32_t)positions.size();
+			prim_meshes[i].name = shapes[0].name;
+			prim_meshes[i].idx_count = (uint32_t)shapes[0].mesh.indices.size();
+			prim_meshes[i].vtx_count = (uint32_t)shapes[0].mesh.num_face_vertices.size();
+			prim_meshes[i].prim_idx = i;
+			glm::vec3 min_vtx = glm::vec3(FLT_MAX);
+			glm::vec3 max_vtx = glm::vec3(-FLT_MAX);
+			uint32_t index_offset = 0;
+			uint32_t idx_val = 0;
+			for (uint32_t f = 0; f < shapes[0].mesh.num_face_vertices.size(); f++) {
+				for (uint32_t v = 0; v < 3; v++) {
+					tinyobj::index_t idx = shapes[0].mesh.indices[index_offset + v];
+					indices.push_back(idx_val++);
+					tinyobj::real_t vx = attrib.vertices[3 * uint32_t(idx.vertex_index) + 0];
+					tinyobj::real_t vy = attrib.vertices[3 * uint32_t(idx.vertex_index) + 1];
+					tinyobj::real_t vz = attrib.vertices[3 * uint32_t(idx.vertex_index) + 2];
+					positions.push_back({ vx,vy,vz });
+					min_vtx = glm::min(positions[positions.size() - 1], min_vtx);
+					max_vtx = glm::max(positions[positions.size() - 1], max_vtx);
+					if (idx.normal_index >= 0) {
+						tinyobj::real_t nx = attrib.normals[3 * uint32_t(idx.normal_index) + 0];
+						tinyobj::real_t ny = attrib.normals[3 * uint32_t(idx.normal_index) + 1];
+						tinyobj::real_t nz = attrib.normals[3 * uint32_t(idx.normal_index) + 2];
+						normals.push_back({ nx,ny,nz });
+					}
+					if (idx.texcoord_index >= 0) {
+						tinyobj::real_t tx = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 0];
+						tinyobj::real_t ty = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 1];
+						texcoords0.push_back({ tx,ty });
+					}
+				}
+
+				index_offset += 3;
+			}
+			prim_meshes[i].min_pos = min_vtx;
+			prim_meshes[i].max_pos = max_vtx;
+			prim_meshes[i].world_matrix = mesh.transform;
+			prim_meshes[i].material_idx = mesh.bsdf_idx;
+			i++;
+		}
+		i = 0;
+
+		auto make_default_disney = [](Material& m) {
+#if ENABLE_DISNEY
+			m.bsdf_type = BSDF_DISNEY;
+			m.bsdf_props = BSDF_OPAQUE | BSDF_LAMBERTIAN | BSDF_REFLECTIVE;
+			m.albedo = vec3(0.5);
+			m.metallic = 0;
+			m.roughness = 0.5;
+			m.specular_tint = 0;
+			m.sheen_tint = 0.5;
+			m.clearcoat = 0;
+			m.clearcoat_gloss = 1;
+			m.subsurface = 0;
+			m.specular = 0.5;
+			m.sheen = 0;
+#endif
+		};
+		for (const auto& m_bsdf : mitsuba_parser.bsdfs) {
+#if ENABLE_DISNEY
+			make_default_disney(materials[i]);
+			// Assume Disney for other materials for now
+			if (m_bsdf.type == "diffuse") {
+				materials[i].albedo = m_bsdf.albedo;
+			} else if (m_bsdf.type == "roughconductor") {
+				make_default_disney(materials[i]);
+				materials[i].metallic = 1;
+				materials[i].albedo = m_bsdf.albedo;
+
+			} else if (m_bsdf.type == "roughplastic") {
+				materials[i].subsurface = 0.1;
+				materials[i].specular = 0.05;
+				materials[i].roughness = 0.05;
+			}
+#endif
+			i++;
+		}
 	}
 
 
+}
+
+void LumenScene::load_obj(const std::string& path) {
 
 }
 

@@ -26,7 +26,11 @@ void MitsubaParser::parse(const std::string& path) {
 					}
 				}
 				for (const auto& prop : p->properties()) {
+					// Get reflectance
 					if (prop.second.type() == PT_COLOR) {
+						if (prop.first.find("reflectance") == std::string::npos) {
+							continue;
+						}
 						// Assume RGB for the moment
 						bsdf.albedo = glm::vec3( {
 							prop.second.getColor().r,
@@ -57,9 +61,13 @@ void MitsubaParser::parse(const std::string& path) {
 			// Assume refs to BSDFs
 			for (const auto& mesh_child : obj->anonymousChildren()) {
 				auto ref = mesh_child.get()->id();
+				for (int i = 0; i < bsdfs.size(); i++) {
+					if (bsdfs[i].name == ref) {
+						mesh.bsdf_idx = i;
+					}
+				}
 				mesh.bsdf_ref = ref;
 			}
-
 			meshes.push_back(mesh);
 		}
 	}
