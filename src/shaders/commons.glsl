@@ -3,6 +3,8 @@
 #include "commons.h"
 #include "utils.glsl"
 
+#define ENABLE_DISNEY 0
+
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(set = 0, binding = 0) uniform accelerationStructureEXT tlas;
@@ -229,6 +231,7 @@ vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
     } break;
 
     case BSDF_DISNEY: {
+#if ENABLE_DISNEY
         const float diffuse_ratio = 0.5 * (1 - mat.metallic);
         if (rands.x < diffuse_ratio) {
             // Sample diffuse
@@ -266,6 +269,7 @@ vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
         f = disney_f(mat, wo, dir, shading_nrm);
         pdf_w = disney_pdf(shading_nrm, mat, wo, dir);
         cos_theta = dot(shading_nrm, dir);
+#endif
     } break;
     case BSDF_GLASS: {
         const float ior = side ? 1. / mat.ior : mat.ior;
@@ -335,8 +339,10 @@ vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
 
     } break;
     case BSDF_DISNEY: {
+#if ENABLE_DISNEY
         f = disney_f(mat, wo, dir, shading_nrm);
         pdf_w = disney_pdf(shading_nrm, mat, wo, dir);
+#endif
     } break;
     default: // Unknown
         break;
@@ -382,9 +388,11 @@ vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
         }
     } break;
     case BSDF_DISNEY: {
+#if ENABLE_DISNEY
         f = disney_f(mat, wo, dir, shading_nrm);
         pdf_w = disney_pdf(shading_nrm, mat, wo, dir);
         pdf_rev_w = disney_pdf(shading_nrm, mat, dir, wo);
+#endif
     } break;
     default: // Unknown
         break;
@@ -415,7 +423,9 @@ vec3 eval_bsdf(const Material mat, const vec3 wo, const vec3 wi,
         return glossy_f(mat, wo, wi, shading_nrm, hl, nl, nv, beckmann_term);
     } break;
     case BSDF_DISNEY: {
+#if ENABLE_DISNEY
         return disney_f(mat, wo, wi, shading_nrm);
+#endif
     } break;
     default: {
         break;
@@ -442,7 +452,9 @@ float bsdf_pdf(const Material mat, const vec3 shading_nrm, const vec3 wo,
         return glossy_pdf(cos_theta, hl, nh, beckmann_term);
     } break;
     case BSDF_DISNEY: {
+#if ENABLE_DISNEY
         return disney_pdf(shading_nrm, mat, wo, wi);
+#endif
     } break;
     }
     return 0;

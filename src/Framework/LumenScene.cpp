@@ -192,6 +192,7 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 				metalness[0], metalness[1], metalness[2] });
 			materials[bsdf_idx].roughness = bsdf["roughness"];
 		} else if (bsdf["type"] == "disney") {
+#if ENABLE_DISNEY
 			Material& mat = materials[bsdf_idx];
 			mat.bsdf_type = BSDF_DISNEY;
 			mat.albedo = get_or_default_v(bsdf, "albedo", glm::vec3(0.5));
@@ -204,7 +205,8 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 			mat.subsurface = get_or_default_f(bsdf, "subsurface", 0);
 			mat.specular = get_or_default_f(bsdf, "specular", 0.5);
 			mat.sheen = get_or_default_f(bsdf, "sheen", 0);
-			mat.bsdf_props = BSDF_OPAQUE | BSDF_LAMBERTIAN | BSDF_REFLECTIVE;
+			mat.bsdf_props =  BSDF_OPAQUE | BSDF_LAMBERTIAN | BSDF_REFLECTIVE;
+#endif
 		}
 
 		for (auto& ref : refs) {
