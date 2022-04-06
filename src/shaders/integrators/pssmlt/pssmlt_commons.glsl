@@ -243,7 +243,7 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
             vec3 dir = (cam_vtx(t - 1).pos - light_vtx(s - 1).pos);
             float dir_len = length(dir);
             dir /= dir_len;
-            const MaterialProps mat = load_material(
+            const Material mat = load_material(
                 light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
             vec3 wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
             float pdf_rev;
@@ -273,7 +273,7 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
         float dir_len = length(dir);
         dir /= dir_len;
         if (s > 0) {
-            const MaterialProps mat =
+            const Material mat =
                 load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
             vec3 wo = normalize(light_vtx(s - 1).pos - cam_vtx(t - 1).pos);
             cam_vtx(t - 2).pdf_rev =
@@ -309,7 +309,7 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
             light_vtx(s - 1).pdf_rev = pdf;
         } else {
             vec3 wo = normalize(cam_vtx(t - 2).pos - cam_vtx(t - 1).pos);
-            const MaterialProps mat =
+            const Material mat =
                 load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
             light_vtx(s - 1).pdf_rev =
                 bsdf_pdf(mat, cam_vtx(t - 1).shading_nrm, wo, dir);
@@ -327,7 +327,7 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
         vec3 wo = normalize(cam_vtx(t - 1).pos - light_vtx(s - 1).pos);
         float dir_len = length(dir);
         dir /= dir_len;
-        const MaterialProps mat =
+        const Material mat =
             load_material(light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
         light_vtx(s - 2).pdf_rev =
             bsdf_pdf(mat, light_vtx(s - 1).shading_nrm, wo, dir);
@@ -403,7 +403,7 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
 
     vec3 ray_origin =
         offset_ray(light_vtx(s - 1).pos, light_vtx(s - 1).shading_nrm);
-    const MaterialProps mat =
+    const Material mat =
         load_material(light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
     const vec3 wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
     const vec3 f = eval_bsdf(mat, wo, dir, light_vtx(s - 1).shading_nrm);
@@ -491,7 +491,7 @@ int mlt_random_walk(const int max_depth, in vec3 throughput, const float pdf,
         vtx_assign(b, uv, payload.uv);
         vtx_assign(b, material_idx, payload.material_idx);
         vtx_assign(b, throughput, throughput);
-        const MaterialProps mat =
+        const Material mat =
             load_material(payload.material_idx, payload.uv);
         const bool mat_specular =
             (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
@@ -535,7 +535,7 @@ int mlt_generate_light_subpath(int max_depth, bool large_step,
     vec2 uv_unused;
     Light light;
     TriangleRecord record;
-    MaterialProps light_mat;
+    Material light_mat;
     float pdf_pos, pdf_dir;
     vec3 wi;
     const vec4 rands_pos =
@@ -546,7 +546,7 @@ int mlt_generate_light_subpath(int max_depth, bool large_step,
     // const TriangleRecord record =
     //     sample_area_light(rands_pos, pc_ray.num_lights, light_idx,
     //                       light_triangle_idx, light_material_idx, light);
-    // const MaterialProps light_mat =
+    // const Material light_mat =
     //     load_material(light_material_idx, uv_unused);
      if (pdf_dir <= 0) {
         return 0;
@@ -619,14 +619,14 @@ vec3 mlt_connect(int s, int t, bool large_step, inout uvec4 seed,
         vec2 uv_unused;
         Light light;
         TriangleRecord record;
-        MaterialProps light_mat;
+        Material light_mat;
         const vec4 rands_pos =
             vec4(mlt_rand(seed, large_step), mlt_rand(seed, large_step),
                  mlt_rand(seed, large_step), mlt_rand(seed, large_step));
         // const TriangleRecord record =
         //     sample_area_light(rands_pos, pc_ray.num_lights, light_idx,
         //                       light_triangle_idx, light_material_idx, light);
-        // const MaterialProps light_mat =
+        // const Material light_mat =
         //     load_material(light_material_idx, uv_unused);
         const vec3 Le =
             sample_light(cam_vtx(t - 1).pos, pc_ray.num_lights, light_idx,
@@ -642,7 +642,7 @@ vec3 mlt_connect(int s, int t, bool large_step, inout uvec4 seed,
         any_hit_payload.hit = 1;
         vec3 wo = normalize(cam_vtx(t - 2).pos - cam_vtx(t - 1).pos);
         // TODO
-        const MaterialProps mat =
+        const Material mat =
             load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
         const vec3 f = eval_bsdf(mat, wo, wi, cam_vtx(t - 1).shading_nrm);
         if (f != vec3(0)) {
@@ -673,9 +673,9 @@ vec3 mlt_connect(int s, int t, bool large_step, inout uvec4 seed,
         d /= len;
         float G = (dot(n_s, -d)) * (dot(n_t, d)) / (len * len);
         if (G > 0) {
-            const MaterialProps mat_1 =
+            const Material mat_1 =
                 load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
-            const MaterialProps mat_2 = load_material(
+            const Material mat_2 = load_material(
                 light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
 
             vec3 wo_1 = normalize(cam_vtx(t - 2).pos - cam_vtx(t - 1).pos);

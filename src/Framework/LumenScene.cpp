@@ -6,6 +6,8 @@
 #include <tiny_obj_loader.h>
 #include "shaders/commons.h"
 
+
+
 struct Bbox {
 	Bbox() = default;
 	Bbox(glm::vec3 _min, glm::vec3 _max) : m_min(_min), m_max(_max) {}
@@ -150,6 +152,14 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 	lights.resize(lights_arr.size());
 	int bsdf_idx = 0;
 	int light_idx = 0;
+	auto get_or_default_f = [](json& json, const std::string& prop, float val) -> float {
+		return json[prop].is_null() ? val : (float)json[prop];
+	};
+
+	auto get_or_default_v = [](json& json, const std::string& prop, const glm::vec3& val) -> glm::vec3 {
+		return json[prop].is_null() ? val : glm::vec3{ json[prop][0], json[prop][1], json[prop][2] };
+	};
+
 	for (auto& bsdf : bsdfs_arr) {
 		auto& refs = bsdf["refs"];
 		if (!bsdf["albedo"].is_null()) {
@@ -166,17 +176,35 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 
 		if (bsdf["type"] == "diffuse") {
 			materials[bsdf_idx].bsdf_type = BSDF_DIFFUSE;
+			materials[bsdf_idx].bsdf_props = BSDF_OPAQUE | BSDF_LAMBERTIAN;
 		} else if (bsdf["type"] == "mirror") {
 			materials[bsdf_idx].bsdf_type = BSDF_MIRROR;
+			materials[bsdf_idx].bsdf_props = BSDF_SPECULAR | BSDF_REFLECTIVE;
 		} else if (bsdf["type"] == "glass") {
 			materials[bsdf_idx].bsdf_type = BSDF_GLASS;
+			materials[bsdf_idx].bsdf_props = BSDF_SPECULAR | BSDF_TRANSMISSIVE;
 			materials[bsdf_idx].ior = bsdf["ior"];
 		} else if (bsdf["type"] == "glossy") {
 			materials[bsdf_idx].bsdf_type = BSDF_GLOSSY;
+			materials[bsdf_idx].bsdf_props = BSDF_OPAQUE | BSDF_LAMBERTIAN | BSDF_REFLECTIVE;
 			const auto& metalness = bsdf["metalness"];
-			materials[bsdf_idx].metalness = glm::vec3({ 
+			materials[bsdf_idx].metalness = glm::vec3({
 				metalness[0], metalness[1], metalness[2] });
 			materials[bsdf_idx].roughness = bsdf["roughness"];
+		} else if (bsdf["type"] == "disney") {
+			Material& mat = materials[bsdf_idx];
+			mat.bsdf_type = BSDF_DISNEY;
+			mat.albedo = get_or_default_v(bsdf, "albedo", glm::vec3(0.5));
+			mat.metallic = get_or_default_f(bsdf, "metallic", 0);
+			mat.roughness = get_or_default_f(bsdf, "roughness", 0.5);
+			mat.specular_tint = get_or_default_f(bsdf, "specular_tint", 0);
+			mat.sheen_tint = get_or_default_f(bsdf, "sheen_tint", 0.5);
+			mat.clearcoat = get_or_default_f(bsdf, "clearcoat", 0);
+			mat.clearcoat_gloss = get_or_default_f(bsdf, "clearcoat_gloss", 1);
+			mat.subsurface = get_or_default_f(bsdf, "subsurface", 0);
+			mat.specular = get_or_default_f(bsdf, "specular", 0.5);
+			mat.sheen = get_or_default_f(bsdf, "sheen", 0);
+			mat.bsdf_props = BSDF_OPAQUE | BSDF_LAMBERTIAN | BSDF_REFLECTIVE;
 		}
 
 		for (auto& ref : refs) {
@@ -192,14 +220,14 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 		const auto& pos = light["pos"];
 		const auto& dir = light["dir"];
 		const auto& L = light["L"];
-		lights[light_idx].pos = glm::vec3({pos[0], pos[1], pos[2]});
+		lights[light_idx].pos = glm::vec3({ pos[0], pos[1], pos[2] });
 		lights[light_idx].to = glm::vec3({ dir[0], dir[1], dir[2] });
 		lights[light_idx].L = glm::vec3({ L[0], L[1], L[2] });
 		if (light["type"] == "spot") {
 			lights[light_idx].light_type = LIGHT_SPOT;
 		}
 		light_idx++;
-		
+
 	}
 	cam_config.fov = j["camera"]["fov"];
 	const auto& p = j["camera"]["position"];
@@ -229,3 +257,6 @@ void LumenScene::compute_scene_dimensions() {
 	m_dimensions.center = scene_bbox.center();
 	m_dimensions.radius = scene_bbox.radius();
 }
+
+
+

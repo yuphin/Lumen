@@ -14,6 +14,7 @@
 #define BSDF_MIRROR 1 << 1
 #define BSDF_GLASS 1 << 2
 #define BSDF_GLOSSY 1 << 3
+#define BSDF_DISNEY 1 << 4
 #define BSDF_NONE -1
 
 // BSDF Props
@@ -129,13 +130,23 @@ struct LightVisibility {
 };
 
 struct Material {
-    vec4 base_color_factor;
+    vec3 albedo;
     vec3 emissive_factor;
-    int texture_id;
-    uint bsdf_type;
     float ior;
+    uint bsdf_type;
+    uint bsdf_props;
+    int texture_id;
     vec3 metalness;
     float roughness;
+    // Disney BSDF
+    float metallic;
+    float specular_tint;
+    float sheen_tint;
+    float specular;
+    float clearcoat;
+    float clearcoat_gloss;
+    float sheen;
+    float subsurface;
 };
 
 struct PathVertex {

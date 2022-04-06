@@ -47,7 +47,7 @@ void main() {
     vec2 uv_unused;
     Light light;
     TriangleRecord record;
-    MaterialProps light_mat;
+    Material light_mat;
     float pdf_pos, pdf_dir;
     vec3 wi;
     const vec3 Le =
@@ -57,7 +57,7 @@ void main() {
     // const TriangleRecord record =
     //     sample_area_light(light_idx, light_triangle_idx, light_material_idx,
     //                       light, seed, pc_ray.num_lights);
-    // const MaterialProps light_mat =
+    // const Material light_mat =
     //     load_material(light_material_idx, uv_unused);
     // vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
     //                                 record.triangle_normal);
@@ -89,7 +89,7 @@ void main() {
             shading_nrm = -shading_nrm;
             side = false;
         }
-        MaterialProps hit_mat = load_material(payload.material_idx, payload.uv);
+        Material hit_mat = load_material(payload.material_idx, payload.uv);
         if (d > 0) {
             // Ignore the first bounce
             vec3 min_bnds = atomic_data.d.min_bnds;

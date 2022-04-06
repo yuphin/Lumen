@@ -43,7 +43,7 @@ ivec3 get_grid_idx(vec3 p, vec3 min_bnds, vec3 max_bnds, ivec3 grid_res) {
     return res;
 }
 
-vec3 vcm_get_light_radiance(in const MaterialProps mat,
+vec3 vcm_get_light_radiance(in const Material mat,
                             in const VCMState camera_state, int d) {
     if (d == 1) {
         return mat.emissive_factor;
@@ -127,7 +127,7 @@ void main() {
             side = false;
         }
 
-        const MaterialProps mat =
+        const Material mat =
             load_material(payload.material_idx, payload.uv);
         const bool mat_specular =
             (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
@@ -154,7 +154,7 @@ void main() {
             uint light_material_idx;
             Light light;
             TriangleRecord record;
-            MaterialProps light_mat;
+            Material light_mat;
             const vec3 Le = sample_light(
                 payload.pos, pc_ray.num_lights, light_idx, light_triangle_idx,
                 light_material_idx, light, record, light_mat, seed);
@@ -221,7 +221,7 @@ void main() {
                     float cam_pdf_fwd, light_pdf_fwd, light_pdf_rev;
                     const vec3 f_cam = eval_bsdf(shading_nrm, wo, mat, 1, side,
                                                  dir, cam_pdf_fwd, cos_cam);
-                    const MaterialProps light_mat = load_material(
+                    const Material light_mat = load_material(
                         light_vtx(light_path_idx + i).material_idx,
                         light_vtx(light_path_idx + i).uv);
                     // TODO: what about anisotropic BSDFS?

@@ -8,14 +8,16 @@ void BDPT::init() {
 	light_path_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		instance->width * instance->height * (max_depth + 1) * sizeof(PathVertex));
 
 	camera_path_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT|
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		instance->width * instance->height * (max_depth + 1) * sizeof(PathVertex));
 
@@ -101,7 +103,7 @@ void BDPT::render() {
 bool BDPT::update() {
 	pc_ray.frame_num++;
 	glm::vec3 translation{};
-	float trans_speed = 0.01f;
+	float trans_speed = 0.03f;
 	glm::vec3 front;
 	if (instance->window->is_key_held(KeyInput::KEY_LEFT_SHIFT)) {
 		trans_speed *= 4;
@@ -163,7 +165,8 @@ void BDPT::create_offscreen_resources() {
 	TextureSettings settings;
 	settings.usage_flags =
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+		VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	settings.base_extent = { (uint32_t)instance->width, (uint32_t)instance->height, 1 };
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	output_tex.create_empty_texture(&instance->vkb.ctx, settings,
@@ -305,7 +308,7 @@ void BDPT::create_blas() {
 		blas_inputs.push_back({ geo });
 	}
 	instance->vkb.build_blas(blas_inputs,
-						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+							 VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void BDPT::create_tlas() {
@@ -348,7 +351,7 @@ void BDPT::create_tlas() {
 				total_light_triangle_area += area;
 			}
 		}
-	
+
 	}
 
 	if (lights.size()) {
@@ -363,7 +366,7 @@ void BDPT::create_tlas() {
 		pc_ray.light_triangle_count = total_light_triangle_cnt;
 	}
 	instance->vkb.build_tlas(tlas,
-						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+							 VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void BDPT::create_rt_pipelines() {

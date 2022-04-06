@@ -1,6 +1,7 @@
 #pragma once
 #include "LumenPCH.h"
 #include <tiny_obj_loader.h>
+#include "shaders/commons.h"
 
 struct CameraConfiguration {
 	float fov;
@@ -25,14 +26,23 @@ struct LumenPrimMesh {
 	glm::vec3 max_pos;
 };
 
-struct LumenMaterial {
-	glm::vec3 albedo;
-	glm::vec3 emissive_factor;
-	float ior;
-	glm::vec3 metalness;
-	float roughness;
-	uint32_t bsdf_type;
-};
+//struct LumenMaterial {
+//	glm::vec3 albedo;
+//	glm::vec3 emissive_factor;
+//	float ior;
+//	glm::vec3 metalness;
+//	float roughness;
+//	uint32_t bsdf_type;
+//	// Disney BSDF
+//	float metallic;
+//	float specular_tint;
+//	float sheen_tint;
+//	float specular;
+//	float clearcoat;
+//	float clearcoat_gloss;
+//	float sheen;
+//	float subsurface;
+//};
 
 struct LumenLight {
 	glm::vec3 pos;
@@ -53,7 +63,7 @@ public:
 	std::vector<glm::vec2> texcoords1;
 	std::vector<glm::vec4> colors0;
 	std::vector<LumenPrimMesh> prim_meshes;
-	std::vector<LumenMaterial> materials;
+	std::vector<Material> materials;
 	std::vector<LumenLight> lights;
 	struct Dimensions {
 		glm::vec3 min = glm::vec3(std::numeric_limits<float>::max());

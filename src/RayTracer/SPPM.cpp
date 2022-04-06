@@ -1,7 +1,7 @@
 #include "LumenPCH.h"
 #include "SPPM.h"
 
-const int max_depth = 6;
+const int max_depth = 13;
 const vec3 sky_col(0, 0, 0);
 void SPPM::init() {
 	Integrator::init();
@@ -108,7 +108,7 @@ void SPPM::init() {
 }
 
 void SPPM::render() {
-	const float ppm_base_radius = 0.01f;
+	const float ppm_base_radius = 0.0025f;
 	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = { 0.25f, 0.25f, 0.25f, 1.0f };
 	VkClearValue clear_depth = { 1.0f, 0 };
@@ -362,7 +362,8 @@ void SPPM::create_offscreen_resources() {
 	TextureSettings settings;
 	settings.usage_flags =
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
+		VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	settings.base_extent = { (uint32_t)instance->width, (uint32_t)instance->height, 1 };
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	output_tex.create_empty_texture(&instance->vkb.ctx, settings,

@@ -1,15 +1,15 @@
 #include "LumenPCH.h"
 #include "VCMMLT.h"
 static bool use_vm = true;
-static float vcm_radius_factor = 0.1f;
-static bool light_first = true;
+static float vcm_radius_factor = 0.025f;
+static bool light_first = false;
 void VCMMLT::init() {
 	Integrator::init();
-	max_depth = 6;
-	mutations_per_pixel = 200.0f;
+	max_depth = 13;
+	mutations_per_pixel = 100.0f;
 	sky_col = vec3(0, 0, 0);
-	num_mlt_threads = 1600 * 900 / 2;
-	num_bootstrap_samples = 1600 * 900 / 2;
+	num_mlt_threads = 1600 * 900 / 32;
+	num_bootstrap_samples = 1600 * 900 / 32;
 	mutation_count = int(instance->width * instance->height * mutations_per_pixel / float(num_mlt_threads));
 	light_path_rand_count = std::max(7 + 2 * max_depth, 3 + 6 * max_depth);
 
@@ -363,7 +363,7 @@ void VCMMLT::render() {
 						   0, sizeof(PushConstantRay), &pc_ray);
 		auto& regions = trace_pipeline->get_rt_regions();
 		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3],
-						  instance->width, instance->height, 1);
+						  instance->width * instance->height, 1, 1);
 		std::array<VkBufferMemoryBarrier, 3> barriers = {
 									  buffer_barrier(light_path_buffer.handle,
 										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
@@ -596,7 +596,7 @@ void VCMMLT::render() {
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 	}
 	cmd.submit();
-	//light_first ^= true;
+	light_first ^= true;
 	sample_cnt++;
 }
 
@@ -674,7 +674,8 @@ void VCMMLT::create_offscreen_resources() {
 	TextureSettings settings;
 	settings.usage_flags =
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
+		VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	settings.base_extent = { (uint32_t)instance->width, (uint32_t)instance->height, 1 };
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	output_tex.create_empty_texture(&instance->vkb.ctx, settings,

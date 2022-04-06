@@ -32,7 +32,7 @@ PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
 
 uint screen_size = pc_ray.size_x * pc_ray.size_y;
 
-vec3 eval_bsdf(const MaterialProps mat, const vec3 wo, const vec3 wi,
+vec3 eval_bsdf(const Material mat, const vec3 wo, const vec3 wi,
                const vec3 shading_nrm) {
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
@@ -81,8 +81,8 @@ ivec3 get_grid_idx(vec3 p, vec3 min_bnds, vec3 max_bnds, ivec3 grid_res) {
     return res;
 }
 
-MaterialProps load_material(const uint material_idx, const vec2 uv) {
-    MaterialProps res;
+Material load_material(const uint material_idx, const vec2 uv) {
+    Material res;
     const Material mat = materials.m[material_idx];
     res.emissive_factor = mat.emissive_factor;
     res.albedo = vec3(mat.base_color_factor);
@@ -139,7 +139,7 @@ void main() {
                                             sppm_data.d[idx].path_len + 1)) {
                         continue;
                     }
-                    const MaterialProps mat = load_material(
+                    const Material mat = load_material(
                         sppm_data.d[idx].material_idx, sppm_data.d[idx].uv);
                     vec3 f =
                         eval_bsdf(mat, sppm_data.d[idx].wo, photons.d[h].wi,

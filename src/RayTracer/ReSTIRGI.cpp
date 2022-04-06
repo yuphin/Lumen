@@ -1,7 +1,7 @@
 #include "LumenPCH.h"
 #include "ReSTIRGI.h"
 
-const int max_depth = 6;
+const int max_depth = 13;
 const vec3 sky_col(0, 0, 0);
 void ReSTIRGI::init() {
 	Integrator::init();
@@ -268,7 +268,8 @@ void ReSTIRGI::create_offscreen_resources() {
 	TextureSettings settings;
 	settings.usage_flags =
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
+		VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	settings.base_extent = { (uint32_t)instance->width, (uint32_t)instance->height, 1 };
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	output_tex.create_empty_texture(&instance->vkb.ctx, settings,
@@ -416,7 +417,7 @@ void ReSTIRGI::create_blas() {
 void ReSTIRGI::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
 	float total_light_triangle_area = 0.0f;
-	int light_triangle_cnt = 0;
+	//int light_triangle_cnt = 0;
 	const auto& indices = lumen_scene.indices;
 	const auto& vertices = lumen_scene.positions;
 	for (const auto& pm : lumen_scene.prim_meshes) {
@@ -434,25 +435,28 @@ void ReSTIRGI::create_tlas() {
 	}
 
 	for (auto& l : lights) {
-		const auto& pm = lumen_scene.prim_meshes[l.prim_mesh_idx];
-		l.world_matrix = pm.world_matrix;
-		auto& idx_base_offset = pm.first_idx;
-		auto& vtx_offset = pm.vtx_offset;
-		for (uint32_t i = 0; i < l.num_triangles; i++) {
-			auto idx_offset = idx_base_offset + 3 * i;
-			glm::ivec3 ind = { indices[idx_offset], indices[idx_offset + 1],
-							  indices[idx_offset + 2] };
-			ind += glm::vec3{ vtx_offset, vtx_offset, vtx_offset };
-			const vec3 v0 =
-				pm.world_matrix * glm::vec4(vertices[ind.x], 1.0);
-			const vec3 v1 =
-				pm.world_matrix * glm::vec4(vertices[ind.y], 1.0);
-			const vec3 v2 =
-				pm.world_matrix * glm::vec4(vertices[ind.z], 1.0);
-			float area = 0.5f * glm::length(glm::cross(v1 - v0, v2 - v0));
-			total_light_triangle_area += area;
+		if (l.light_flags == LIGHT_AREA) {
+			const auto& pm = lumen_scene.prim_meshes[l.prim_mesh_idx];
+			l.world_matrix = pm.world_matrix;
+			auto& idx_base_offset = pm.first_idx;
+			auto& vtx_offset = pm.vtx_offset;
+			for (uint32_t i = 0; i < l.num_triangles; i++) {
+				auto idx_offset = idx_base_offset + 3 * i;
+				glm::ivec3 ind = { indices[idx_offset], indices[idx_offset + 1],
+								  indices[idx_offset + 2] };
+				ind += glm::vec3{ vtx_offset, vtx_offset, vtx_offset };
+				const vec3 v0 =
+					pm.world_matrix * glm::vec4(vertices[ind.x], 1.0);
+				const vec3 v1 =
+					pm.world_matrix * glm::vec4(vertices[ind.y], 1.0);
+				const vec3 v2 =
+					pm.world_matrix * glm::vec4(vertices[ind.z], 1.0);
+				float area = 0.5f * glm::length(glm::cross(v1 - v0, v2 - v0));
+				total_light_triangle_area += area;
+			}
 		}
-		light_triangle_cnt += l.num_triangles;
+
+		//light_triangle_cnt += l.num_triangles;
 	}
 
 	if (lights.size()) {
@@ -463,8 +467,8 @@ void ReSTIRGI::create_tlas() {
 	}
 
 	pc_ray.total_light_area += total_light_triangle_area;
-	if (light_triangle_cnt > 0) {
-		pc_ray.light_triangle_count = light_triangle_cnt;
+	if (total_light_triangle_cnt > 0) {
+		pc_ray.light_triangle_count = total_light_triangle_cnt;
 	}
 	instance->vkb.build_tlas(tlas,
 							 VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);

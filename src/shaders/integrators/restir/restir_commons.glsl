@@ -53,7 +53,7 @@ void update_reservoir(inout RestirReservoir r_new, const RestirData s,
 }
 
 vec3 calc_L(const RestirReservoir r) {
-    const MaterialProps hit_mat = load_material(mat_idx, uv);
+    const Material hit_mat = load_material(mat_idx, uv);
     const vec3 wo = normalize(origin - pos);
     vec2 uv_unused;
     uvec4 r_seed = r.s.seed;
@@ -62,7 +62,7 @@ vec3 calc_L(const RestirReservoir r) {
     uint light_material_idx;
     Light light;
     TriangleRecord record;
-    MaterialProps light_mat;
+    Material light_mat;
     const vec4 rands_pos =
         vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
     vec3 Le = sample_light_with_idx(
@@ -78,7 +78,7 @@ vec3 calc_L(const RestirReservoir r) {
 }
 
 vec3 calc_L_with_visibility_check(const RestirReservoir r) {
-    const MaterialProps hit_mat = load_material(mat_idx, uv);
+    const Material hit_mat = load_material(mat_idx, uv);
     const vec3 wo = normalize(origin - pos);
     vec2 uv_unused;
     uvec4 r_seed = r.s.seed;
@@ -87,7 +87,7 @@ vec3 calc_L_with_visibility_check(const RestirReservoir r) {
     uint light_material_idx;
     Light light;
     TriangleRecord record;
-    MaterialProps light_mat;
+    Material light_mat;
     const vec4 rands_pos =
         vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
     vec3 Le = sample_light_with_idx(

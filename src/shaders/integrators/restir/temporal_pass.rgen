@@ -10,7 +10,7 @@
 
 #include "restir_commons.glsl"
 
-vec3 uniform_sample_light(const MaterialProps mat, const vec3 pos,
+vec3 uniform_sample_light(const Material mat, const vec3 pos,
                           const bool side, const vec3 shading_nrm,
                           const vec3 wo, const bool is_specular) {
     vec3 res = vec3(0);
@@ -20,7 +20,7 @@ vec3 uniform_sample_light(const MaterialProps mat, const vec3 pos,
     uint light_material_idx;
     Light light;
     TriangleRecord record;
-    MaterialProps light_mat;
+    Material light_mat;
     const vec3 Le = sample_light(payload.pos, pc_ray.num_lights, light_idx,
                                  light_triangle_idx, light_material_idx, light,
                                  record, light_mat, seed);
@@ -119,7 +119,7 @@ void main() {
             side = false;
         }
 
-        const MaterialProps hit_mat = load_material(mat_idx, uv);
+        const Material hit_mat = load_material(mat_idx, uv);
 
         // Generate samples
 
@@ -146,7 +146,7 @@ void main() {
             uint light_material_idx;
             Light light;
             TriangleRecord record;
-            MaterialProps light_mat;
+            Material light_mat;
             const uvec4 light_seed = seed;
             const vec4 rands =
                 vec4(rand(seed), rand(seed), rand(seed), rand(seed));
@@ -158,7 +158,7 @@ void main() {
                              light_triangle_idx, light_material_idx, light,
                              record, light_mat, seed);
             // vec2 uv_unused;
-            // const MaterialProps light_mat =
+            // const Material light_mat =
             //     load_material(light_material_idx, uv_unused);
             vec3 wi = record.pos - payload.pos;
             const float wi_len = length(wi);
@@ -191,7 +191,7 @@ void main() {
             const uint light_idx = s.light_idx;
             Light light;
             TriangleRecord record;
-            MaterialProps light_mat;
+            Material light_mat;
             uint light_material_idx;
             const vec4 rands =
                 vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
@@ -206,7 +206,7 @@ void main() {
             vec3 wi = record.pos - payload.pos;
             const float wi_len = length(wi);
             wi /= wi_len;
-            // const MaterialProps light_mat =
+            // const Material light_mat =
             //     load_material(light_material_idx, uv_unused);
             any_hit_payload.hit = 1;
             traceRayEXT(tlas,
@@ -274,7 +274,7 @@ void main() {
                         col += throughput * pc_ray.sky_col;
                         break;
                     }
-                    const MaterialProps hit_mat =
+                    const Material hit_mat =
                         load_material(payload.material_idx, payload.uv);
                     if (specular) {
                         col += throughput * hit_mat.emissive_factor;

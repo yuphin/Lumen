@@ -7,13 +7,13 @@ void Integrator::init() {
 	prop2.pNext = &rt_props;
 	vkGetPhysicalDeviceProperties2(instance->vkb.ctx.physical_device, &prop2);
 	constexpr int VERTEX_BINDING_ID = 0;
-	
+
 
 	LumenInstance* instance = this->instance;
 	Window* window = instance->window;
 	lumen_scene.load_scene("scenes/", config.filename);
 	camera = std::unique_ptr<PerspectiveCamera>(new PerspectiveCamera(
-		45.0f, 0.01f, 1000.0f, (float)instance->width / instance->height,
+		lumen_scene.cam_config.fov, 0.01f, 1000.0f, (float)instance->width / instance->height,
 		lumen_scene.cam_config.dir, lumen_scene.cam_config.pos));
 	Camera* cam_ptr = camera.get();
 	instance->window->add_mouse_click_callback(
@@ -37,12 +37,27 @@ void Integrator::init() {
 
 	auto vertex_buf_size = lumen_scene.positions.size() * sizeof(glm::vec3);
 	auto idx_buf_size = lumen_scene.indices.size() * sizeof(uint32_t);
-	std::vector<Material> materials;
+	//std::vector<Material> materials;
 	std::vector<PrimMeshInfo> prim_lookup;
-	for (const auto& m : lumen_scene.materials) {
-		materials.push_back({ glm::vec4(m.albedo, 1.), m.emissive_factor, -1,
-							 m.bsdf_type, m.ior, m.metalness, m.roughness });
-	}
+	//for (const auto& m : lumen_scene.materials) {
+	//	Material mat;
+	//	mat.base_color_factor = glm::vec4(m.albedo, 1);
+	//	mat.emissive_factor = m.emissive_factor;
+	//	mat.texture_id = -1;
+	//	mat.ior = m.ior;
+	//	mat.bsdf_type = m.bsdf_type;
+	//	mat.metalness = m.metalness;
+	//	mat.roughness = m.roughness;
+	//	mat.metallic = m.metallic;
+	//	mat.specular_tint = m.specular_tint;
+	//	mat.sheen_tint = m.sheen_tint;
+	//	mat.specular = m.specular;
+	//	mat.clearcoat = m.clearcoat;
+	//	mat.clearcoat_gloss = m.clearcoat_gloss;
+	//	mat.sheen = m.sheen;
+	//	mat.subsurface = m.subsurface;
+	//	materials.emplace_back(mat);
+	//}
 	uint32_t idx = 0;
 	for (auto& pm : lumen_scene.prim_meshes) {
 		PrimMeshInfo m_info;
@@ -53,7 +68,7 @@ void Integrator::init() {
 		m_info.max_pos = glm::vec4(pm.max_pos, 0);
 		m_info.material_index = pm.material_idx;
 		prim_lookup.emplace_back(m_info);
-		auto& mef = materials[pm.material_idx].emissive_factor;
+		auto& mef = lumen_scene.materials[pm.material_idx].emissive_factor;
 		if (mef.x > 0 || mef.y > 0 || mef.z > 0) {
 			Light light;
 			light.num_triangles = pm.idx_count / 3;
@@ -118,7 +133,7 @@ void Integrator::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		materials.size() * sizeof(Material), materials.data(), true);
+		lumen_scene.materials.size() * sizeof(Material), lumen_scene.materials.data(), true);
 	prim_lookup_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |

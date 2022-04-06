@@ -10,6 +10,7 @@
 #include "RayTracer.h"
 
 RayTracer* RayTracer::instance = nullptr;
+static bool calc_rmse = false;
 
 static void fb_resize_callback(GLFWwindow* window, int width, int height) {
 	auto app = reinterpret_cast<RayTracer*>(glfwGetWindowUserPointer(window));
@@ -32,6 +33,7 @@ void RayTracer::init(Window* window) {
 	vkb.add_device_extension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
 	vkb.add_device_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 	vkb.add_device_extension(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
+	vkb.add_device_extension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
 
 	vkb.create_instance();
 	if (vkb.enable_validation_layers) {
@@ -51,10 +53,13 @@ void RayTracer::init(Window* window) {
 	SceneConfig config;
 
 	//config.filename = "cornell_box_simple.json";
-	config.filename = "cornell_box.json";
+	config.filename = "cornell_box_disney.json";
+	//config.filename = "cornell_box.json";
 	//config.filename = "occluded2.json";
 	//config.filename = "occluded.json";
+	//config.filename = "occluded3.json";
 	//config.filename = "caustics.json";
+	//config.filename = "caustics_zoomed.json";
 	//config.filename = "test.json";
 	integrator = std::make_unique<Path>(this, config);
 	integrator->init();
@@ -64,6 +69,13 @@ void RayTracer::init(Window* window) {
 	create_post_pipeline();
 	create_compute_pipelines();
 	init_imgui();
+	VkPhysicalDeviceMemoryProperties2 props = {};
+	props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
+	VkPhysicalDeviceMemoryBudgetPropertiesEXT budget_props = {};
+	budget_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT;
+	props.pNext = &budget_props;
+	vkGetPhysicalDeviceMemoryProperties2(vk_ctx.physical_device, &props);
+	printf("Memory usage %f MB\n", budget_props.heapUsage[0] * 1e-6);
 }
 
 void RayTracer::update() {
@@ -71,7 +83,7 @@ void RayTracer::update() {
 		write_exr = true;
 	}
 	float frame_time = draw_frame();
-	cpu_avg_time = 0.95f * cpu_avg_time + 0.05f * frame_time;
+	cpu_avg_time = (1. - 1./ (cnt)) * cpu_avg_time +  frame_time / (float)cnt;
 
 	integrator->update();
 }
@@ -103,63 +115,63 @@ void RayTracer::render(uint32_t i) {
 									VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 		}
 	}
-	// Calculate RMSE
-	{
-		VkBufferImageCopy region = {};
-		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		region.imageSubresource.mipLevel = 0;
-		region.imageSubresource.baseArrayLayer = 0;
-		region.imageSubresource.layerCount = 1;
-		region.imageExtent.width = instance->width;
-		region.imageExtent.height = instance->height;
-		region.imageExtent.depth = 1;
-		transition_image_layout(cmdbuf, integrator->output_tex.img,
-								VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-		vkCmdCopyImageToBuffer(cmdbuf, integrator->output_tex.img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-							   output_img_buffer.handle, 1, &region);
-
-		auto barrier = buffer_barrier(output_img_buffer.handle,
-									  VK_ACCESS_TRANSFER_WRITE_BIT,
-									  VK_ACCESS_SHADER_READ_BIT);
-		vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
-		// Calculate and reduce
+	if (calc_rmse && has_gt) {
+		// Calculate RMSE
 		{
-		
-			vkCmdBindDescriptorSets(
-				cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, calc_rmse_pipeline->pipeline_layout,
-				0, 1, &post_desc_set, 0, nullptr);
-			vkCmdBindDescriptorSets(
-				cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, reduce_rmse_pipeline->pipeline_layout,
-				0, 1, &post_desc_set, 0, nullptr);
-			vkCmdBindDescriptorSets(
-				cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, output_rmse_pipeline->pipeline_layout,
-				0, 1, &post_desc_set, 0, nullptr);
-			vkCmdPushConstants(cmdbuf, calc_rmse_pipeline->pipeline_layout,
-							   VK_SHADER_STAGE_COMPUTE_BIT,
-							   0, sizeof(PostPC), &post_pc);
-			vkCmdPushConstants(cmdbuf, reduce_rmse_pipeline->pipeline_layout,
-							   VK_SHADER_STAGE_COMPUTE_BIT,
-							   0, sizeof(PostPC), &post_pc);
-			vkCmdPushConstants(cmdbuf, output_rmse_pipeline->pipeline_layout,
-							   VK_SHADER_STAGE_COMPUTE_BIT,
-							   0, sizeof(PostPC), &post_pc);
-
-			reduce(cmdbuf, residual_buffer, counter_buffer, *calc_rmse_pipeline, *reduce_rmse_pipeline,
-				   instance->width * instance->height);
-			vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE,
-							  output_rmse_pipeline->handle);
-			auto num_wgs = 1;
-			vkCmdDispatch(cmdbuf, num_wgs, 1, 1);
+			VkBufferImageCopy region = {};
+			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			region.imageSubresource.mipLevel = 0;
+			region.imageSubresource.baseArrayLayer = 0;
+			region.imageSubresource.layerCount = 1;
+			region.imageExtent.width = instance->width;
+			region.imageExtent.height = instance->height;
+			region.imageExtent.depth = 1;
 			transition_image_layout(cmdbuf, integrator->output_tex.img,
-									VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+									VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+			vkCmdCopyImageToBuffer(cmdbuf, integrator->output_tex.img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+								   output_img_buffer.handle, 1, &region);
+
+			auto barrier = buffer_barrier(output_img_buffer.handle,
+										  VK_ACCESS_TRANSFER_WRITE_BIT,
+										  VK_ACCESS_SHADER_READ_BIT);
+			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+								 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
+			// Calculate and reduce
+			{
+
+				vkCmdBindDescriptorSets(
+					cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, calc_rmse_pipeline->pipeline_layout,
+					0, 1, &post_desc_set, 0, nullptr);
+				vkCmdBindDescriptorSets(
+					cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, reduce_rmse_pipeline->pipeline_layout,
+					0, 1, &post_desc_set, 0, nullptr);
+				vkCmdBindDescriptorSets(
+					cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, output_rmse_pipeline->pipeline_layout,
+					0, 1, &post_desc_set, 0, nullptr);
+				vkCmdPushConstants(cmdbuf, calc_rmse_pipeline->pipeline_layout,
+								   VK_SHADER_STAGE_COMPUTE_BIT,
+								   0, sizeof(PostPC), &post_pc);
+				vkCmdPushConstants(cmdbuf, reduce_rmse_pipeline->pipeline_layout,
+								   VK_SHADER_STAGE_COMPUTE_BIT,
+								   0, sizeof(PostPC), &post_pc);
+				vkCmdPushConstants(cmdbuf, output_rmse_pipeline->pipeline_layout,
+								   VK_SHADER_STAGE_COMPUTE_BIT,
+								   0, sizeof(PostPC), &post_pc);
+
+				reduce(cmdbuf, residual_buffer, counter_buffer, *calc_rmse_pipeline, *reduce_rmse_pipeline,
+					   instance->width * instance->height);
+				vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE,
+								  output_rmse_pipeline->handle);
+				auto num_wgs = 1;
+				vkCmdDispatch(cmdbuf, num_wgs, 1, 1);
+				transition_image_layout(cmdbuf, integrator->output_tex.img,
+										VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+			}
+
 		}
-	
 	}
 
 	// Apply Post FX and present
-
-
 	VkClearValue clear_color = { 0.25f, 0.25f, 0.25f, 1.0f };
 	VkClearValue clear_depth = { 1.0f, 0 };
 	VkViewport viewport = vk::viewport((float)width, (float)height, 0.0f, 1.0f);
@@ -185,8 +197,8 @@ void RayTracer::render(uint32_t i) {
 	vkCmdPushConstants(cmdbuf, post_pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT,
 					   0, sizeof(PushConstantPost), &pc_post_settings);
 	vkCmdDraw(cmdbuf, 3, 1, 0, 0);
-	//ImGui::Render();
-	//ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdbuf);
+	ImGui::Render();
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdbuf);
 	vkCmdEndRenderPass(cmdbuf);
 	VkClearColorValue val = { 0,0,0,1 };
 
@@ -200,26 +212,30 @@ void RayTracer::render(uint32_t i) {
 }
 
 float RayTracer::draw_frame() {
+
+	if (cnt == 0) {
+		start = clock();
+	}
 	auto t_begin = glfwGetTime() * 1000;
 	bool updated = false;
-	//ImGui_ImplGlfw_NewFrame();
-	//ImGui::NewFrame();
-	//ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time,
-	//			1000 / cpu_avg_time);
-	//if (ImGui::Button("Reload shaders")) {
-	//	integrator->reload();
-	//	updated |= true;
-	//}
-	//bool gui_updated = integrator->gui();
-	//updated |=
-	//	ImGui::Checkbox("Enable ACES tonemapping", &settings.enable_tonemapping);
-	//if (updated || gui_updated) {
-	//	ImGui::Render();
-	//	auto t_end = glfwGetTime() * 1000;
-	//	auto t_diff = t_end - t_begin;
-	//	integrator->updated = true;
-	//	return (float)t_diff;
-	//}
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time,
+				1000 / cpu_avg_time);
+	if (ImGui::Button("Reload shaders")) {
+		integrator->reload();
+		updated |= true;
+	}
+	bool gui_updated = integrator->gui();
+	updated |=
+		ImGui::Checkbox("Enable ACES tonemapping", &settings.enable_tonemapping);
+	if (updated || gui_updated) {
+		ImGui::Render();
+		auto t_end = glfwGetTime() * 1000;
+		auto t_diff = t_end - t_begin;
+		integrator->updated = true;
+		return (float)t_diff;
+	}
 
 	uint32_t image_idx = vkb.prepare_frame();
 
@@ -230,12 +246,33 @@ float RayTracer::draw_frame() {
 	}
 	render(image_idx);
 	vkb.submit_frame(image_idx, resized);
+	auto now = clock();
+	auto diff = ((float)now - start);
+
 	if (write_exr) {
 		write_exr = false;
-		save_exr((float*)output_img_buffer_cpu.data, instance->width, instance->height, "out.exr");
+		save_exr((float*)output_img_buffer_cpu.data, instance->width, instance->height, 
+				 "caustics_bdpt_b10.exr");
+	}
+	bool time_limit = (abs(diff / CLOCKS_PER_SEC - 5)) < 0.1;
+	//calc_rmse = cnt % 30 == 0 || time_limit;
+	//calc_rmse = time_limit;
+	//bool t2 = (abs(diff / CLOCKS_PER_SEC - 10.0)) < 0.1;
+	//if (t2) {
+	//	printf("Go!\n");
+	//	t2 = false;
+	//}
+	//printf("Time %f\n", diff / CLOCKS_PER_SEC);
+	//calc_rmse = true;
+	//write_exr = time_limit;
+	if (calc_rmse && has_gt) {
+	
+		float rmse = *(float*)rmse_val_buffer.data;
+		printf("%RMSE: %f - %f\n", rmse * 1e6, diff);
 	}
 	auto t_end = glfwGetTime() * 1000;
 	auto t_diff = t_end - t_begin;
+	cnt++;
 	return (float)t_diff;
 }
 
@@ -400,7 +437,7 @@ void RayTracer::init_resources() {
 	output_img_buffer_cpu.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		VK_SHARING_MODE_EXCLUSIVE,
 		instance->width * instance->height * 4 * 4
 	);
@@ -422,7 +459,17 @@ void RayTracer::init_resources() {
 		sizeof(int)
 	);
 
-	// Load the ground truth image
+	rmse_val_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+		VK_SHARING_MODE_EXCLUSIVE,
+		sizeof(float)
+	);
+
+	//// Load the ground truth image
 	const char* img_name = "out.exr";
 	float* data;
 	int width;
@@ -435,39 +482,45 @@ void RayTracer::init_resources() {
 			fprintf(stderr, "ERR : %s\n", err);
 			FreeEXRErrorMessage(err); // release memory of error message.
 		}
+	} else {
+		std::vector<vec4> pixels;
+		int img_res = width * height;
+		pixels.resize(img_res);
+		for (int i = 0; i < img_res; i++) {
+			pixels[i].x = data[4 * i + 0];
+			pixels[i].y = data[4 * i + 1];
+			pixels[i].z = data[4 * i + 2];
+			pixels[i].w = 1.;
+		}
+		auto gt_size = pixels.size() * 4 * 4;
+		gt_img_buffer.create(
+			&instance->vkb.ctx,
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+			gt_size,
+			pixels.data(),
+			true
+		);
+		desc.gt_img_addr = gt_img_buffer.get_device_address();
+		has_gt = true;
 	}
-	std::vector<vec4> pixels;
-	int img_res = width * height;
-	pixels.resize(img_res);
-	for (int i = 0; i < img_res; i++) {
-		pixels[i].x = data[4 * i + 0];
-		pixels[i].y = data[4 * i + 1];
-		pixels[i].z = data[4 * i + 2];
-		pixels[i].w = 1.;
-	}
-	auto gt_size = pixels.size() * 4 * 4;
-	gt_img_buffer.create(
-		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		gt_size,
-		pixels.data(),
-		true
-	);
-	desc.gt_img_addr = gt_img_buffer.get_device_address();
+
 	desc.out_img_addr = output_img_buffer.get_device_address();
 	desc.residual_addr = residual_buffer.get_device_address();
 	desc.counter_addr = counter_buffer.get_device_address();
+	desc.rmse_val_addr = rmse_val_buffer.get_device_address();
 	post_desc_buffer.create(&instance->vkb.ctx,
-							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-							 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-							 VK_SHARING_MODE_EXCLUSIVE, sizeof(PostDesc),
-							 &desc, true);
+							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+							VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+							VK_SHARING_MODE_EXCLUSIVE, sizeof(PostDesc),
+							&desc, true);
 
 	post_pc.size = instance->width * instance->height;
-	free(data);
+	if (has_gt) {
+		free(data);
+	}
 }
 
 void RayTracer::save_exr(const float* rgb, int width, int height, const char* outfilename) {

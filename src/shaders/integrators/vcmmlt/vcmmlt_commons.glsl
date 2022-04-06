@@ -143,7 +143,7 @@ float mlt_mis(float lum, float target, uint c) {
 
 vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
                      const float cam_A, const vec3 pos, const in VCMState state,
-                     const vec3 wo, const MaterialProps mat, out ivec2 coords,
+                     const vec3 wo, const Material mat, out ivec2 coords,
                      float eta_vm) {
     // uint size = pc_ray.size_x * pc_ray.size_y;
     vec3 L = vec3(0);
@@ -200,7 +200,7 @@ bool vcm_generate_light_sample(out VCMState light_state, inout uvec4 seed,
     vec2 uv_unused;
     Light light;
     TriangleRecord record;
-    MaterialProps light_mat;
+    Material light_mat;
     float pdf_pos, pdf_dir;
     vec3 wi;
     const vec4 rands_pos =
@@ -234,7 +234,7 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state) {
     vec2 uv_unused;
     Light light;
     TriangleRecord record;
-    MaterialProps light_mat;
+    Material light_mat;
     float u, v;
     vec3 wi;
     const vec3 Le =
@@ -258,7 +258,7 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state) {
     return true;
 }
 
-vec3 vcm_get_light_radiance(in const MaterialProps mat,
+vec3 vcm_get_light_radiance(in const Material mat,
                             in const VCMState camera_state, int d) {
     if (d == 1) {
         return mat.emissive_factor;
@@ -323,7 +323,7 @@ float mlt_fill_eye_path(const vec4 origin, const float cam_area) {
             side = false;
         }
 
-        const MaterialProps mat =
+        const Material mat =
             load_material(payload.material_idx, payload.uv);
         const bool mat_specular =
             (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
@@ -371,7 +371,7 @@ float mlt_fill_eye_path(const vec4 origin, const float cam_area) {
             uint light_material_idx;
             Light light;
             TriangleRecord record;
-            MaterialProps light_mat;
+            Material light_mat;
             const vec3 Le = sample_light(
                 payload.pos, pc_ray.num_lights, light_idx, light_triangle_idx,
                 light_material_idx, light, record, light_mat, seed);
@@ -505,7 +505,7 @@ float mlt_fill_light_path(const vec4 origin, const float cam_area) {
         float dist = length(payload.pos - light_state.pos);
         float dist_sqr = dist * dist;
         wo /= dist;
-        const MaterialProps mat =
+        const Material mat =
             load_material(payload.material_idx, payload.uv);
         const bool mat_specular =
             (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
@@ -683,7 +683,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
             side = false;
         }
 
-        const MaterialProps mat =
+        const Material mat =
             load_material(payload.material_idx, payload.uv);
         const bool mat_specular =
             (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
@@ -708,7 +708,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
             uint light_material_idx;
             Light light;
             TriangleRecord record;
-            MaterialProps light_mat;
+            Material light_mat;
             const vec4 rands_pos =
                 vec4(mlt_rand(seed, large_step), mlt_rand(seed, large_step),
                      mlt_rand(seed, large_step), mlt_rand(seed, large_step));
@@ -779,7 +779,7 @@ float mlt_trace_eye(const vec4 origin, const float cam_area, bool large_step,
                     float cam_pdf_fwd, light_pdf_fwd, light_pdf_rev;
                     const vec3 f_cam = eval_bsdf(shading_nrm, wo, mat, 1, side,
                                                  dir, cam_pdf_fwd, cos_cam);
-                    const MaterialProps light_mat = load_material(
+                    const Material light_mat = load_material(
                         light_vtx(light_path_idx + i).material_idx,
                         light_vtx(light_path_idx + i).uv);
                     // TODO: what about anisotropic BSDFS?
@@ -989,7 +989,7 @@ float mlt_trace_light(const vec3 cam_pos, const vec3 cam_nrm,
         float dist = length(payload.pos - light_state.pos);
         float dist_sqr = dist * dist;
         wo /= dist;
-        const MaterialProps mat =
+        const Material mat =
             load_material(payload.material_idx, payload.uv);
         const bool mat_specular =
             (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
@@ -1044,7 +1044,7 @@ float mlt_trace_light(const vec3 cam_pos, const vec3 cam_nrm,
                     float pdf_rev = bsdf_pdf(mat, shading_nrm, -dir, wo);
                     vec3 unused;
                     float cam_pdf_fwd, cam_pdf_rev, light_pdf_fwd;
-                    const MaterialProps cam_mat =
+                    const Material cam_mat =
                         load_material(cam_vtx(path_idx + i).material_idx,
                                       cam_vtx(path_idx + i).uv);
                     const vec3 f_cam =

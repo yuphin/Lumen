@@ -81,7 +81,7 @@ bool vcm_generate_light_sample(out LightState light_state) {
     vec2 uv_unused;
     Light light;
     TriangleRecord record;
-    MaterialProps light_mat;
+    Material light_mat;
     float u, v;
     vec3 wi;
     float pdf_pos, pdf_dir, phi;

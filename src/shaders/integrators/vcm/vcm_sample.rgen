@@ -55,7 +55,7 @@ ivec3 get_grid_idx(vec3 p, vec3 min_bnds, vec3 max_bnds, ivec3 grid_res) {
 
 vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
                      const float cam_A, const vec3 pos, const in VCMState state,
-                     const float eta_vm, const vec3 wo, const MaterialProps mat,
+                     const float eta_vm, const vec3 wo, const Material mat,
                      out ivec2 coords) {
     vec3 L = vec3(0);
     vec3 dir = cam_pos - pos;
@@ -131,7 +131,7 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
     // const TriangleRecord record =
     //     sample_area_light_with_idx(rands, 0, light_idx, light_material_idx,
     //                                light_min_pos, light_max_pos, u, v);
-    // const MaterialProps light_mat =
+    // const Material light_mat =
     //     load_material(light_material_idx, uv_unused);
     // vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
     // record.triangle_normal);
@@ -141,7 +141,7 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
     vec2 uv_unused;
     Light light;
     TriangleRecord record;
-    MaterialProps light_mat;
+    Material light_mat;
     vec3 wi;
     float pdf_pos, pdf_dir, phi, u, v;
   
@@ -247,7 +247,7 @@ void main() {
             float dist = length(payload.pos - light_state.pos);
             float dist_sqr = dist * dist;
             wo /= dist;
-            const MaterialProps mat =
+            const Material mat =
                 load_material(payload.material_idx, payload.uv);
             const bool mat_specular =
                 (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
@@ -322,8 +322,8 @@ void main() {
             light_state.material_idx = payload.material_idx;
         }
     }
-    //const float p_hat = total_lum;
-    const float p_hat = s.pdf_dir;
+    const float p_hat = total_lum;
+    //const float p_hat = s.pdf_dir;
     if (p_hat > 0) {
         s.p_hat = p_hat;
         s.valid = 1;

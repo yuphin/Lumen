@@ -2,6 +2,7 @@
 #define COMMONS_DEVICE
 #include "commons.h"
 #include "utils.glsl"
+
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(set = 0, binding = 0) uniform accelerationStructureEXT tlas;
@@ -43,50 +44,158 @@ float correct_shading_normal(const vec3 geometry_nrm, const vec3 shading_nrm,
     }
 }
 
-MaterialProps load_material(const uint material_idx, const vec2 uv) {
-    MaterialProps res;
-    const Material mat = materials.m[material_idx];
-    res.emissive_factor = mat.emissive_factor;
-    res.albedo = vec3(mat.base_color_factor);
-    res.bsdf_type = mat.bsdf_type;
-    res.bsdf_props = 0;
-    switch (res.bsdf_type) {
-    case BSDF_DIFFUSE:
-        res.bsdf_props |= BSDF_OPAQUE;
-        res.bsdf_props |= BSDF_LAMBERTIAN;
-        break;
-    case BSDF_GLASS:
-        res.bsdf_props |= BSDF_SPECULAR;
-        res.bsdf_props |= BSDF_TRANSMISSIVE;
-        break;
-    case BSDF_MIRROR:
-        res.bsdf_props |= BSDF_SPECULAR;
-        res.bsdf_props |= BSDF_REFLECTIVE;
-        break;
-    case BSDF_GLOSSY:
-        res.bsdf_props |= BSDF_OPAQUE;
-        res.bsdf_props |= BSDF_LAMBERTIAN;
-        res.bsdf_props |= BSDF_REFLECTIVE;
-        break;
-    default:
-        break;
-    }
-    res.ior = mat.ior;
-    res.metalness = mat.metalness;
-    res.roughness = mat.roughness;
-    return res;
+Material load_material(const uint material_idx, const vec2 uv) {
+    return materials.m[material_idx];
+    // Material res;
+    // const Material mat = materials.m[material_idx];
+    // res.emissive_factor = mat.emissive_factor;
+    // res.albedo = mat.albedo;
+    // res.bsdf_type = mat.bsdf_type;
+    // res.bsdf_props = 0;
+    // switch (res.bsdf_type) {
+    // case BSDF_DIFFUSE:
+    //     res.bsdf_props |= BSDF_OPAQUE;
+    //     res.bsdf_props |= BSDF_LAMBERTIAN;
+    //     break;
+    // case BSDF_GLASS:
+    //     res.bsdf_props |= BSDF_SPECULAR;
+    //     res.bsdf_props |= BSDF_TRANSMISSIVE;
+    //     break;
+    // case BSDF_MIRROR:
+    //     res.bsdf_props |= BSDF_SPECULAR;
+    //     res.bsdf_props |= BSDF_REFLECTIVE;
+    //     break;
+    // case BSDF_GLOSSY:
+    //     res.bsdf_props |= BSDF_OPAQUE;
+    //     res.bsdf_props |= BSDF_LAMBERTIAN;
+    //     res.bsdf_props |= BSDF_REFLECTIVE;
+    //     break;
+    // case BSDF_DISNEY:
+    //     res.bsdf_props |= BSDF_OPAQUE;
+    //     res.bsdf_props |= BSDF_LAMBERTIAN;
+    //     res.bsdf_props |= BSDF_REFLECTIVE;
+        
+    //     break;
+    // default:
+    //     break;
+    // }
+    // res.ior = mat.ior;
+    // res.metalness = mat.metalness;
+    // res.roughness = mat.roughness;
+    // return res;
 }
 
-vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
+float diffuse_pdf(const vec3 n, const vec3 l, out float cos_theta) {
+    cos_theta = dot(n, l);
+    return max(cos_theta / PI, 0);
+}
+
+float diffuse_pdf(const vec3 n, const vec3 l) { return max(dot(n, l) / PI, 0); }
+
+float glossy_pdf(float cos_theta, float hl, float nh, float beckmann_term) {
+    return 0.5 * (max(cos_theta / PI, 0) + beckmann_term * nh / (4 * hl));
+}
+
+float disney_pdf(const vec3 n, const Material mat, const vec3 v,
+                 const vec3 l) {
+    const vec3 h = normalize(l + v);
+    // VNDF pdf
+    const float pdf_diffuse_lobe = 0.5 * (1 - mat.metallic);
+    const float pdf_spec_lobe = 1. - pdf_diffuse_lobe;
+    const float pdf_gtr2_lobe = 1. / (1. + mat.clearcoat);
+    const float pdf_clearcoat_lobe = 1. - pdf_gtr2_lobe;
+    float abs_nl = abs(dot(n, l));
+    float abs_lh = abs(dot(h, l));
+    float abs_vh = abs(dot(h, v));
+    float abs_nh = abs(dot(n, h));
+    float abs_nv = abs(dot(n, v));
+    float alpha = max(0.00001, mat.roughness);
+    float D = GTR2(abs_nh, alpha);
+    float G = smithG_GGX(abs_nv, alpha);
+    // Specular lobe
+    // float pdf_specular = 0.25 * D * G * abs_lh / (abs_nl * abs_vh) ;
+    float pdf_specular = 0.25 * D * G / (abs_nl);
+    // Diffuse
+    float pdf_diffuse = abs_nl / PI;
+    // Clearcoat
+    float pdf_clearcoat = 0.25 *
+                          GTR1(abs_nh, mix(0.1, 0.001, mat.clearcoat_gloss)) *
+                          abs_nh / abs_vh;
+
+    pdf_clearcoat *= (pdf_spec_lobe * pdf_clearcoat_lobe);
+    pdf_diffuse *= pdf_diffuse_lobe;
+    pdf_specular *= (pdf_spec_lobe * pdf_gtr2_lobe);
+
+    return pdf_diffuse + pdf_specular + pdf_clearcoat;
+}
+
+vec3 diffuse_f(const Material mat) { return mat.albedo / PI; }
+
+vec3 glossy_f(const Material mat, const vec3 wo, const vec3 wi,
+              const vec3 shading_nrm, float hl, float nl, float nv,
+              float beckmann_term) {
+    const vec3 h = normalize(wo + wi);
+    const vec3 f_diffuse = (28. / (23 * PI)) * vec3(mat.albedo) *
+                           (1 - mat.metalness) *
+                           (1 - pow5(1 - 0.5 * dot(wi, shading_nrm))) *
+                           (1 - pow5(1 - 0.5 * dot(wo, shading_nrm)));
+    const vec3 f_specular = beckmann_term *
+                            fresnel_schlick(vec3(mat.metalness), hl) /
+                            (4 * hl * max(nl, nv));
+    return f_specular + f_diffuse;
+}
+
+vec3 disney_f(const Material mat, const vec3 wo, const vec3 wi,
+              const vec3 shading_nrm) {
+    const vec3 h = normalize(wo + wi);
+    const float nl = dot(shading_nrm, wi);
+    const float nv = dot(shading_nrm, wo);
+    const float lh = dot(wi, h);
+    const float nh = dot(shading_nrm, h);
+    const float lum = luminance(mat.albedo);
+    vec3 C_tint = lum > 0.0 ? mat.albedo / lum
+                            : vec3(1); // normalize lum. to isolate hue+sat
+    vec3 C_spec0 =
+        mix(mat.specular * 0.08 * mix(vec3(1), C_tint, mat.specular_tint),
+            mat.albedo, mat.metallic);
+    vec3 C_sheen = mix(vec3(1), C_tint, mat.sheen_tint);
+    // Diffuse (F_d)
+    float F_l = schlick_w(nl);
+    float F_v = schlick_w(nv);
+    float F_d90 = 0.5 + 2 * lh * lh * mat.roughness;
+    float F_d = mix(1.0, F_d90, F_l) * mix(1.0, F_d90, F_v);
+    // Isotropic BSSRDF
+    float F_ss90 = lh * lh * mat.roughness;
+    float F_ss = mix(1.0, F_ss90, F_l) * mix(1.0, F_ss90, F_v);
+    float ss = 1.25 * (F_ss * (1.0 / (nl + nv) - 0.5) + 0.5);
+    // Specular (f_s) (only isotropic for now)
+    float alpha = max(0.001, mat.roughness);
+    float D_s = GTR2(nh, alpha);
+    float fh = schlick_w(lh);
+    vec3 F_s = mix(C_spec0, vec3(1), fh);
+    float alpha_g = sqr(0.5 + 0.5 * alpha);
+    float G_s = smithG_GGX(nl, alpha_g) * smithG_GGX(nv, alpha_g);
+    // Sheen (f_sheen)
+    vec3 F_sheen = mat.sheen * C_sheen * fh;
+    // Clearcoat
+    float D_r = GTR1(nh, mix(0.1, 0.001, mat.clearcoat_gloss));
+    float F_r = mix(0.04, 1.0, fh);
+    float G_r = smithG_GGX(nl, .25) * smithG_GGX(nv, .25);
+    return ((1 / PI) * mix(F_d, ss, mat.subsurface) * mat.albedo + F_sheen) *
+               (1 - mat.metallic) +
+           0.25 * G_s * F_s * D_s / (nl * nv) +
+           0.25 * mat.clearcoat * G_r * F_r * D_r;
+}
+
+vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
                  const uint mode, const bool side, out vec3 dir,
-                 out float pdf_w, inout float cos_theta, const vec2 rands) {
+                 out float pdf_w, out float cos_theta, const vec2 rands) {
     vec3 f;
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
-        f = mat.albedo / PI;
         dir = sample_cos_hemisphere(rands, shading_nrm);
-        cos_theta = dot(shading_nrm, dir);
-        pdf_w = max(cos_theta / PI, 0);
+        f = diffuse_f(mat);
+        pdf_w = diffuse_pdf(shading_nrm, dir, cos_theta);
     } break;
     case BSDF_MIRROR: {
         dir = reflect(-wo, shading_nrm);
@@ -98,36 +207,65 @@ vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
         if (rands.x < .5) {
             const vec2 rands_new = vec2(2 * rands.x, rands.y);
             dir = sample_cos_hemisphere(rands_new, shading_nrm);
-            cos_theta = dot(shading_nrm, dir);
         } else {
             const vec2 rands_new = vec2(2 * (rands.x - 0.5), rands.y);
             const vec3 f0 = mix(mat.albedo, vec3(0.04), mat.metalness);
             dir = sample_beckmann(rands_new, mat.roughness, shading_nrm, wo);
-            cos_theta = dot(shading_nrm, dir);
             if (!same_hemisphere(wo, dir, shading_nrm)) {
                 pdf_w = 0.;
                 f = vec3(0);
                 return f;
             }
         }
-#define pow5(x) (x * x) * (x * x) * x
-        const vec3 f_diffuse = (28. / (23 * PI)) * vec3(mat.albedo) *
-                               (1 - mat.metalness) *
-                               (1 - pow5(1 - 0.5 * dot(dir, shading_nrm))) *
-                               (1 - pow5(1 - 0.5 * dot(wo, shading_nrm)));
+        cos_theta = dot(shading_nrm, dir);
         const vec3 h = normalize(wo + dir);
         float nh = max(0.00001f, min(1.0f, dot(shading_nrm, h)));
         float hl = max(0.00001f, min(1.0f, dot(h, dir)));
         float nl = max(0.00001f, min(1.0f, dot(shading_nrm, dir)));
         float nv = max(0.00001f, min(1.0f, dot(shading_nrm, wo)));
         float beckmann_term = beckmann_d(mat.roughness, nh);
-        const vec3 f_specular = beckmann_term *
-                                fresnel_schlick(vec3(mat.metalness), hl) /
-                                (4 * hl * max(nl, nv));
-        f = f_specular + f_diffuse;
-        pdf_w = 0.5 * (max(cos_theta / PI, 0) + beckmann_term * nh / (4 * hl));
+        f = glossy_f(mat, wo, dir, shading_nrm, hl, nl, nv, beckmann_term);
+        pdf_w = glossy_pdf(cos_theta, hl, nh, beckmann_term);
+    } break;
 
-#undef pow5
+    case BSDF_DISNEY: {
+        const float diffuse_ratio = 0.5 * (1 - mat.metallic);
+        if (rands.x < diffuse_ratio) {
+            // Sample diffuse
+            const vec2 rands_new = vec2(rands.x / diffuse_ratio, rands.y);
+            dir = sample_cos_hemisphere(rands_new, shading_nrm);
+        } else {
+            // Sample specular
+            vec2 rands_new =
+                vec2((rands.x - diffuse_ratio) / (1 - diffuse_ratio), rands.y);
+            const float ratio_gtr2 = 1. / (1. + mat.clearcoat);
+            if (rands_new.x < ratio_gtr2) {
+                // Sample specular lobe
+                rands_new.x /= ratio_gtr2;
+                const float alpha = max(0.01f, sqr(mat.roughness));
+                dir = sample_ggx_vndf(wo, alpha, alpha, rands_new.x,
+                                                rands_new.y, shading_nrm);
+                if (!same_hemisphere(wo, dir, shading_nrm)) {
+                    pdf_w = 0.;
+                    f = vec3(0);
+                    return f;
+                }
+            } else {
+                rands_new.x = (rands_new.x - ratio_gtr2) / (1 - ratio_gtr2);
+                // Sample clearcoat
+                const float alpha = mix(0.1, 0.001, mat.clearcoat_gloss);
+                const float alpha2 = alpha * alpha;
+                dir = sample_gtr1(rands_new, alpha2, shading_nrm, wo);
+                if (!same_hemisphere(wo, dir, shading_nrm)) {
+                    pdf_w = 0.;
+                    f = vec3(0);
+                    return f;
+                }
+            }
+        }
+        f = disney_f(mat, wo, dir, shading_nrm);
+        pdf_w = disney_pdf(shading_nrm, mat, wo, dir);
+        cos_theta = dot(shading_nrm, dir);
     } break;
     case BSDF_GLASS: {
         const float ior = side ? 1. / mat.ior : mat.ior;
@@ -155,7 +293,7 @@ vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
     return f;
 }
 
-vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
+vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
                  const uint mode, const bool side, out vec3 dir,
                  out float pdf_w, inout float cos_theta, inout uvec4 seed) {
     const vec2 rands = vec2(rand(seed), rand(seed));
@@ -163,14 +301,14 @@ vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
                        rands);
 }
 
-vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
+vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
                const uint mode, const bool side, const vec3 dir,
-               out float pdf_w, in float cos_theta) {
+               out float pdf_w, float cos_theta) {
     vec3 f;
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
-        f = mat.albedo / PI;
-        pdf_w = max(cos_theta / PI, 0);
+        f = diffuse_f(mat);
+        pdf_w = diffuse_pdf(shading_nrm, dir);
     } break;
     case BSDF_MIRROR: {
         f = vec3(0);
@@ -185,26 +323,20 @@ vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
             f = vec3(0);
             pdf_w = 0.;
         } else {
-#define pow5(x) (x * x) * (x * x) * x
-            const vec3 f_diffuse = (28. / (23 * PI)) * vec3(mat.albedo) *
-                                   (1 - mat.metalness) *
-                                   (1 - pow5(1 - 0.5 * dot(dir, shading_nrm))) *
-                                   (1 - pow5(1 - 0.5 * dot(wo, shading_nrm)));
             const vec3 h = normalize(wo + dir);
-            float nh = dot(shading_nrm, h);
-            float hl = dot(h, dir);
-            float nl = dot(shading_nrm, dir);
-            float nv = dot(shading_nrm, wo);
+            float nh = max(0.00001f, min(1.0f, dot(shading_nrm, h)));
+            float hl = max(0.00001f, min(1.0f, dot(h, dir)));
+            float nl = max(0.00001f, min(1.0f, dot(shading_nrm, dir)));
+            float nv = max(0.00001f, min(1.0f, dot(shading_nrm, wo)));
             float beckmann_term = beckmann_d(mat.roughness, nh);
-            const vec3 f_specular = beckmann_term *
-                                    fresnel_schlick(mat.metalness, hl) /
-                                    (4 * abs(hl) * max(abs(nl), abs(nv)));
-            f = f_specular + f_diffuse;
-            pdf_w =
-                0.5 * (max(cos_theta / PI, 0) + beckmann_term * nh / (4 * hl));
-#undef pow5
+            f = glossy_f(mat, wo, dir, shading_nrm, hl, nl, nv, beckmann_term);
+            pdf_w = glossy_pdf(cos_theta, hl, nh, beckmann_term);
         }
 
+    } break;
+    case BSDF_DISNEY: {
+        f = disney_f(mat, wo, dir, shading_nrm);
+        pdf_w = disney_pdf(shading_nrm, mat, wo, dir);
     } break;
     default: // Unknown
         break;
@@ -212,15 +344,15 @@ vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
     return f;
 }
 
-vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
+vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
                const uint mode, const bool side, const vec3 dir,
                out float pdf_w, out float pdf_rev_w, in float cos_theta) {
     vec3 f;
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
-        f = mat.albedo / PI;
-        pdf_w = max(cos_theta / PI, 0);
-        pdf_rev_w = max(dot(shading_nrm, wo) / PI, 0);
+        f = diffuse_f(mat);
+        pdf_w = diffuse_pdf(shading_nrm, dir);
+        pdf_rev_w = diffuse_pdf(shading_nrm, wo);
     } break;
     case BSDF_MIRROR: {
         f = vec3(0);
@@ -228,7 +360,6 @@ vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
         pdf_rev_w = 0.;
     } break;
     case BSDF_GLASS: {
-        const float ior = side ? 1. / mat.ior : mat.ior;
         f = vec3(0);
         pdf_w = 0.;
         pdf_rev_w = 0.;
@@ -238,41 +369,34 @@ vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const MaterialProps mat,
             f = vec3(0);
             pdf_w = 0.;
         } else {
-#define pow5(x) (x * x) * (x * x) * x
-            const vec3 f_diffuse = (28. / (23 * PI)) * vec3(mat.albedo) *
-                                   (1 - mat.metalness) *
-                                   (1 - pow5(1 - 0.5 * dot(dir, shading_nrm))) *
-                                   (1 - pow5(1 - 0.5 * dot(wo, shading_nrm)));
             const vec3 h = normalize(wo + dir);
-            float nh = dot(shading_nrm, h);
-            float hl = dot(h, dir);
-            float nl = dot(shading_nrm, dir);
-            float nv = dot(shading_nrm, wo);
+            float nh = max(0.00001f, min(1.0f, dot(shading_nrm, h)));
+            float hl = max(0.00001f, min(1.0f, dot(h, dir)));
+            float nl = max(0.00001f, min(1.0f, dot(shading_nrm, dir)));
+            float nv = max(0.00001f, min(1.0f, dot(shading_nrm, wo)));
             float beckmann_term = beckmann_d(mat.roughness, nh);
-            const vec3 f_specular = beckmann_term *
-                                    fresnel_schlick(mat.metalness, hl) /
-                                    (4 * abs(hl) * max(abs(nl), abs(nv)));
-            f = f_specular + f_diffuse;
-            pdf_w =
-                0.5 * (max(cos_theta / PI, 0) + beckmann_term * nh / (4 * hl));
-            pdf_rev_w = 0.5 * (max(dot(shading_nrm, wo) / PI, 0) +
-                               beckmann_term * nh / (4 * hl));
-
-#undef pow5
+            f = glossy_f(mat, wo, dir, shading_nrm, hl, nl, nv, beckmann_term);
+            pdf_w = glossy_pdf(cos_theta, hl, nh, beckmann_term);
+            float cos_theta_wo = dot(wo, shading_nrm);
+            pdf_rev_w = glossy_pdf(cos_theta_wo, hl, nh, beckmann_term);
         }
+    } break;
+    case BSDF_DISNEY: {
+        f = disney_f(mat, wo, dir, shading_nrm);
+        pdf_w = disney_pdf(shading_nrm, mat, wo, dir);
+        pdf_rev_w = disney_pdf(shading_nrm, mat, dir, wo);
     } break;
     default: // Unknown
         break;
     }
-
     return f;
 }
 
-vec3 eval_bsdf(const MaterialProps mat, const vec3 wo, const vec3 wi,
+vec3 eval_bsdf(const Material mat, const vec3 wo, const vec3 wi,
                const vec3 shading_nrm) {
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
-        return mat.albedo / PI;
+        return diffuse_f(mat);
     } break;
     case BSDF_MIRROR:
     case BSDF_GLASS: {
@@ -282,80 +406,30 @@ vec3 eval_bsdf(const MaterialProps mat, const vec3 wo, const vec3 wi,
         if (!same_hemisphere(wi, wo, shading_nrm)) {
             return vec3(0);
         }
-#define pow5(x) (x * x) * (x * x) * x
-        const vec3 f_diffuse = (28. / (23 * PI)) * vec3(mat.albedo) *
-                               (1 - mat.metalness) *
-                               (1 - pow5(1 - 0.5 * dot(wi, shading_nrm))) *
-                               (1 - pow5(1 - 0.5 * dot(wo, shading_nrm)));
         const vec3 h = normalize(wo + wi);
-        float nh = dot(shading_nrm, h);
-        float hl = dot(h, wi);
-        float nl = dot(shading_nrm, wi);
-        float nv = dot(shading_nrm, wo);
+        float nh = max(0.00001f, min(1.0f, dot(shading_nrm, h)));
+        float hl = max(0.00001f, min(1.0f, dot(h, wi)));
+        float nl = max(0.00001f, min(1.0f, dot(shading_nrm, wi)));
+        float nv = max(0.00001f, min(1.0f, dot(shading_nrm, wo)));
         float beckmann_term = beckmann_d(mat.roughness, nh);
-        const vec3 f_specular = beckmann_term *
-                                fresnel_schlick(mat.metalness, hl) /
-                                (4 * abs(hl) * max(abs(nl), abs(nv)));
-
-        return f_specular + f_diffuse;
-#undef pow5
+        return glossy_f(mat, wo, wi, shading_nrm, hl, nl, nv, beckmann_term);
+    } break;
+    case BSDF_DISNEY: {
+        return disney_f(mat, wo, wi, shading_nrm);
     } break;
     default: {
         break;
     }
     }
-    if ((mat.bsdf_props & BSDF_LAMBERTIAN) == BSDF_LAMBERTIAN) {
-        return mat.albedo / PI;
-    } else if ((mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR) {
-        return vec3(0);
-    }
     return vec3(0);
 }
 
-// vec3 eval_bsdf_selective(const vec3 shading_nrm, const vec3 wo,
-//                          const MaterialProps mat, const uint mode,
-//                          const bool side, const uint bsdf_props, const vec3
-//                          dir, out float pdf_w, in float cos_theta) {
-//     if ((bsdf_props & BSDF_ALL) != 0) {
-//         return eval_bsdf(shading_nrm, wo, mat, mode, side, dir, pdf_w,
-//                          cos_theta);
-//     } else if (bsdf_props == (BSDF_ALL & ~BSDF_SPECULAR)) {
-//         if (mat.bsdf_type == BSDF_DIFFUSE) {
-//             vec3 f = mat.albedo / PI;
-//             pdf_w = max(cos_theta / PI, 0);
-//             return f;
-//         }
-//     }
-//     return vec3(0);
-// }
-
-// vec3 sample_bsdf_selective(const vec3 shading_nrm, const vec3 wo,
-//                            const MaterialProps mat, const uint mode,
-//                            const bool side, const uint bsdf_props, out vec3
-//                            dir, out float pdf_w, out float cos_theta, inout
-//                            uvec4 seed) {
-//     if ((bsdf_props & BSDF_ALL) != 0) {
-//         return sample_bsdf(shading_nrm, wo, mat, mode, side, dir, pdf_w,
-//                            cos_theta, seed);
-//     } else if (bsdf_props == (BSDF_ALL & ~BSDF_SPECULAR)) {
-//         if (mat.bsdf_type == BSDF_DIFFUSE) {
-//             vec3 f = mat.albedo / PI;
-//             dir = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
-//                                         shading_nrm);
-//             cos_theta = dot(shading_nrm, dir);
-//             pdf_w = max(cos_theta / PI, 0);
-//             return f;
-//         }
-//     }
-//     return vec3(0);
-// }
-
-float bsdf_pdf(const MaterialProps mat, const vec3 shading_nrm, const vec3 wo,
+float bsdf_pdf(const Material mat, const vec3 shading_nrm, const vec3 wo,
                const vec3 wi) {
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
-        return max(dot(shading_nrm, wi) / PI, 0);
-    };
+        return diffuse_pdf(shading_nrm, wi);
+    } break;
     case BSDF_GLOSSY: {
         if (!same_hemisphere(wo, wi, shading_nrm)) {
             return 0;
@@ -364,18 +438,14 @@ float bsdf_pdf(const MaterialProps mat, const vec3 shading_nrm, const vec3 wo,
         float nh = max(0.00001f, min(1.0f, dot(shading_nrm, h)));
         float hl = max(0.00001f, min(1.0f, dot(h, wi)));
         float beckmann_term = beckmann_d(mat.roughness, nh);
-        float pdf = 0.5 * (max(dot(shading_nrm, wi) / PI, 0) +
-                           beckmann_term * nh / (4 * hl));
-        return pdf;
-    };
+        float cos_theta = dot(shading_nrm, wi);
+        return glossy_pdf(cos_theta, hl, nh, beckmann_term);
+    } break;
+    case BSDF_DISNEY: {
+        return disney_pdf(shading_nrm, mat, wo, wi);
+    } break;
     }
     return 0;
-    // if ((mat.bsdf_props & BSDF_LAMBERTIAN) == BSDF_LAMBERTIAN) {
-    //     return max(dot(shading_nrm, wi) / PI, 0);
-    // } else if ((mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR) {
-    //     return 0;
-    // }
-    // return 0;
 }
 
 float uniform_cone_pdf(float cos_max) { return 1. / (PI2 * (1 - cos_max)); }
@@ -385,10 +455,10 @@ float light_pdf(const Light light, const vec3 shading_nrm, const vec3 wi) {
     switch (light.light_flags) {
     case LIGHT_AREA: {
         return max(dot(shading_nrm, wi) / PI, 0);
-    }
+    } break;
     case LIGHT_SPOT: {
         return uniform_cone_pdf(cos_width);
-    }
+    } break;
     }
 }
 
@@ -452,82 +522,16 @@ TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands,
 }
 
 vec3 eval_albedo(const Material m) {
-    vec3 albedo = m.base_color_factor.xyz;
+    vec3 albedo = m.albedo;
     if (m.texture_id > -1) {
         albedo *= texture(scene_textures[m.texture_id], payload.uv).xyz;
     }
     return albedo;
 }
 
-// TriangleRecord sample_area_light_with_idx(const vec4 rands,
-//                                           const uint light_mesh_idx,
-//                                           const uint triangle_idx,
-//                                           out uint material_idx) {
-//     const Light light = lights[light_mesh_idx];
-//     PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
-//     material_idx = pinfo.material_index;
-//     return sample_triangle(pinfo, rands.zw, triangle_idx,
-//     light.world_matrix);
-// }
-
-// TriangleRecord sample_area_light_with_idx(const vec2 rands,
-//                                           const uint light_mesh_idx,
-//                                           const uint triangle_idx,
-//                                           out uint material_idx,
-//                                           out vec3 min_pos, out vec3 max_pos,
-//                                           out float u, out float v) {
-//     const Light light = lights[light_mesh_idx];
-//     PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
-//     material_idx = pinfo.material_index;
-//     min_pos = pinfo.min_pos.xyz;
-//     max_pos = pinfo.max_pos.xyz;
-//     return sample_triangle(pinfo, rands.xy, triangle_idx, light.world_matrix,
-//     u,
-//                            v);
-// }
-
-// TriangleRecord sample_area_light_with_idx(const vec2 rands,
-//                                           const uint light_mesh_idx,
-//                                           const uint triangle_idx,
-//                                           out uint material_idx, out float u,
-//                                           out float v) {
-//     const Light light = lights[light_mesh_idx];
-//     PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
-//     material_idx = pinfo.material_index;
-//     return sample_triangle(pinfo, rands.xy, triangle_idx, light.world_matrix,
-//     u,
-//                            v);
-// }
-
-// TriangleRecord sample_area_light_with_idx(const vec2 rands,
-//                                           const uint light_mesh_idx,
-//                                           const uint triangle_idx,
-//                                           out uint material_idx) {
-//     const Light light = lights[light_mesh_idx];
-//     PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
-//     material_idx = pinfo.material_index;
-//     return sample_triangle(pinfo, rands.xy, triangle_idx,
-//     light.world_matrix);
-// }
-
-// TriangleRecord sample_area_light(const vec4 rands, const int num_lights,
-//                                  out uint light_mesh_idx, out uint
-//                                  triangle_idx, out uint material_idx) {
-//     light_mesh_idx = uint(rands.x * num_lights);
-//     Light light = lights[light_mesh_idx];
-//     PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
-//     material_idx = pinfo.material_index;
-//     triangle_idx = uint(rands.y * light.num_triangles);
-//     return sample_triangle(pinfo, rands.zw, triangle_idx,
-//     light.world_matrix);
-// }
-
 TriangleRecord sample_area_light(const vec4 rands, const int num_lights,
                                  const Light light, out uint triangle_idx,
                                  out uint material_idx) {
-    // uint light_mesh_idx = uint(rands.x * num_lights);
-    // light = lights[light_mesh_idx];
-    // light_idx = light.prim_mesh_idx;
     PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
     material_idx = pinfo.material_index;
     triangle_idx = uint(rands.y * light.num_triangles);
@@ -538,12 +542,9 @@ TriangleRecord sample_area_light(const vec4 rands, const int num_lights,
                                  const Light light, out uint triangle_idx,
                                  out uint material_idx, out float u,
                                  out float v) {
-    // uint light_mesh_idx = uint(rands.x * num_lights);
-    // light = lights[light_mesh_idx];
-    // light_idx = light.prim_mesh_idx;
     PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
     material_idx = pinfo.material_index;
-    //triangle_idx = 6;
+    // triangle_idx = 6;
     triangle_idx = uint(rands.y * light.num_triangles);
     return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix, u,
                            v);
@@ -554,26 +555,15 @@ TriangleRecord sample_area_light_with_idx(const vec4 rands,
                                           const Light light,
                                           const uint triangle_idx,
                                           out uint material_idx) {
-    // uint light_mesh_idx = uint(rands.x * num_lights);
-    // light = lights[light_mesh_idx];
-    // light_idx = light.prim_mesh_idx;
     PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
     material_idx = pinfo.material_index;
     return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
 }
 
-// TriangleRecord sample_area_light(out uint light_idx, out uint triangle_idx,
-//                                  out uint material_idx, out Light light,
-//                                  inout uvec4 seed, const int num_lights) {
-//     const vec4 rands = vec4(rand(seed), rand(seed), rand(seed), rand(seed));
-//     return sample_area_light(rands, num_lights, light_idx, triangle_idx,
-//                              material_idx, light);
-// }
-
 vec3 sample_light(const vec4 rands_pos, const vec3 p, const int num_lights,
                   out uint light_idx, out uint triangle_idx,
                   out uint material_idx, out Light light,
-                  out TriangleRecord record, out MaterialProps light_mat,
+                  out TriangleRecord record, out Material light_mat,
                   inout uvec4 seed) {
     light_idx = uint(rands_pos.x * num_lights);
     light = lights[light_idx];
@@ -611,7 +601,7 @@ vec3 sample_light_with_idx(const vec4 rands_pos, const vec3 p,
                            const int num_lights, const uint light_idx,
                            const uint triangle_idx, out uint material_idx,
                            out Light light, out TriangleRecord record,
-                           out MaterialProps light_mat) {
+                           out Material light_mat) {
     light = lights[light_idx];
     vec3 L = vec3(0);
     if (light.light_flags == LIGHT_AREA) {
@@ -645,7 +635,7 @@ vec3 sample_light_with_idx(const vec4 rands_pos, const vec3 p,
 
 vec3 sample_light(const vec3 p, const int num_lights, out uint light_idx,
                   out uint triangle_idx, out uint material_idx, out Light light,
-                  out TriangleRecord record, out MaterialProps light_mat,
+                  out TriangleRecord record, out Material light_mat,
                   inout uvec4 seed) {
     const vec4 rands = vec4(rand(seed), rand(seed), rand(seed), rand(seed));
     return sample_light(rands, p, num_lights, light_idx, triangle_idx,
@@ -663,9 +653,10 @@ vec3 sample_light_Le(const vec4 rands_pos, const vec2 rands_dir,
                      const int num_lights, const int total_light,
                      out uint light_idx, out uint triangle_idx,
                      out uint material_idx, out Light light,
-                     out TriangleRecord record, out MaterialProps light_mat,
+                     out TriangleRecord record, out Material light_mat,
                      out float pdf_pos, inout uvec4 seed, out vec3 wi,
-                     out float pdf_dir, out float phi, out float u, out float v) {
+                     out float pdf_dir, out float phi, out float u,
+                     out float v) {
     light_idx = uint(rands_pos.x * num_lights);
     light = lights[light_idx];
     vec3 L = vec3(0);
@@ -710,7 +701,7 @@ vec3 sample_light_Le(const vec4 rands_pos, const vec2 rands_dir,
 vec3 sample_light_Le(const int num_lights, const int total_light,
                      out uint light_idx, out uint triangle_idx,
                      out uint material_idx, out Light light,
-                     out TriangleRecord record, out MaterialProps light_mat,
+                     out TriangleRecord record, out Material light_mat,
                      inout uvec4 seed, out vec3 wi, out float u, out float v) {
     const vec4 rands_pos = vec4(rand(seed), rand(seed), rand(seed), rand(seed));
     const vec2 rands_dir = vec2(rand(seed), rand(seed));
@@ -724,7 +715,7 @@ vec3 sample_light_Le(const vec4 rands_pos, const vec2 rands_dir,
                      const int num_lights, const int total_light,
                      out uint light_idx, out uint triangle_idx,
                      out uint material_idx, out Light light,
-                     out TriangleRecord record, out MaterialProps light_mat,
+                     out TriangleRecord record, out Material light_mat,
                      out float pdf_pos, inout uvec4 seed, out vec3 wi,
                      out float pdf_dir) {
     float phi, u, v;
@@ -736,7 +727,7 @@ vec3 sample_light_Le(const vec4 rands_pos, const vec2 rands_dir,
 vec3 sample_light_Le(const int num_lights, const int total_light,
                      out uint light_idx, out uint triangle_idx,
                      out uint material_idx, out Light light,
-                     out TriangleRecord record, out MaterialProps light_mat,
+                     out TriangleRecord record, out Material light_mat,
                      out float pdf_pos, inout uvec4 seed, out vec3 wi,
                      out float pdf_dir) {
     const vec4 rands_pos = vec4(rand(seed), rand(seed), rand(seed), rand(seed));
@@ -750,7 +741,7 @@ vec3 sample_light_Le(const int num_lights, const int total_light,
 vec3 sample_light_Le(const int num_lights, const int total_light,
                      out uint light_idx, out uint triangle_idx,
                      out uint material_idx, out Light light,
-                     out TriangleRecord record, out MaterialProps light_mat,
+                     out TriangleRecord record, out Material light_mat,
                      out float pdf_pos, inout uvec4 seed, out vec3 wi,
                      out float pdf_dir, out float phi) {
     const vec4 rands_pos = vec4(rand(seed), rand(seed), rand(seed), rand(seed));
@@ -764,9 +755,10 @@ vec3 sample_light_Le(const int num_lights, const int total_light,
 vec3 sample_light_Le(const int num_lights, const int total_light,
                      out uint light_idx, out uint triangle_idx,
                      out uint material_idx, out Light light,
-                     out TriangleRecord record, out MaterialProps light_mat,
+                     out TriangleRecord record, out Material light_mat,
                      out float pdf_pos, inout uvec4 seed, out vec3 wi,
-                     out float pdf_dir, out float phi, out float u, out float v) {
+                     out float pdf_dir, out float phi, out float u,
+                     out float v) {
     const vec4 rands_pos = vec4(rand(seed), rand(seed), rand(seed), rand(seed));
     const vec2 rands_dir = vec2(rand(seed), rand(seed));
     return sample_light_Le(rands_pos, rands_dir, num_lights, total_light,
@@ -777,7 +769,7 @@ vec3 sample_light_Le(const int num_lights, const int total_light,
 vec3 sample_light_w(const int num_lights, const int total_light,
                     out uint light_idx, out uint triangle_idx,
                     out uint material_idx, out Light light,
-                    out TriangleRecord record, out MaterialProps light_mat,
+                    out TriangleRecord record, out Material light_mat,
                     inout uvec4 seed, out vec3 wi, out float u, out float v) {
     const vec4 rands = vec4(rand(seed), rand(seed), rand(seed), rand(seed));
     light_idx = uint(rands.x * num_lights);

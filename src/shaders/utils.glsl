@@ -17,17 +17,6 @@ struct HitPayload {
     float area;
 };
 
-struct MaterialProps {
-    vec3 emissive_factor;
-    uint bsdf_type;
-    uint bsdf_props;
-    vec3 albedo;
-    float ior;
-    vec3 metalness;
-    float roughness;
-};
-
-
 struct VCMState {
     vec3 wi;
     vec3 shading_nrm;
@@ -41,7 +30,6 @@ struct VCMState {
     float d_vm;
 };
 
-
 struct AnyHitPayload {
     int hit;
 };
@@ -51,6 +39,9 @@ struct TriangleRecord {
     vec3 triangle_normal;
     float triangle_pdf;
 };
+
+#define pow5(x) (x * x) * (x * x) * x
+#define sqr(x) (x * x)
 
 uint hash(ivec3 p, uint size) {
     return uint((p.x * 73856093) ^ (p.y * 19349663) ^ p.z * 83492791) %
@@ -121,15 +112,12 @@ vec4 to_local_quat(vec3 v) {
 
 // Calculates the rotation quaternion w.r.t (0,0,1)
 vec4 in_local_quat(vec3 v) {
-      if (v.z < -0.99999f)
+    if (v.z < -0.99999f)
         return vec4(1, 0, 0, 0);
     return normalize(vec4(-v.y, v.x, 0.0f, 1.0f + v.z));
 }
 
-vec4 invert_quat(vec4 q)
-{
-	return vec4(-q.x, -q.y, -q.z, q.w);
-}
+vec4 invert_quat(vec4 q) { return vec4(-q.x, -q.y, -q.z, q.w); }
 
 vec3 rot_quat(vec4 q, vec3 v) {
     const vec3 q_axis = vec3(q.x, q.y, q.z);
@@ -137,7 +125,6 @@ vec3 rot_quat(vec4 q, vec3 v) {
            (q.w * q.w - dot(q_axis, q_axis)) * v +
            2.0f * q.w * cross(q_axis, v);
 }
-
 
 bool same_hemisphere(in vec3 wi, in vec3 wo, in vec3 n) {
     return dot(wi, n) * dot(wo, n) > 0;
@@ -164,7 +151,7 @@ vec3 fresnel_schlick(vec3 f0, float ns) {
 }
 
 float beckmann_alpha_to_s(float alpha) {
-	return 2.0f / min(0.9999f, max(0.0002f, (alpha * alpha))) - 2.0f;
+    return 2.0f / min(0.9999f, max(0.0002f, (alpha * alpha))) - 2.0f;
 }
 
 vec3 sample_phong(vec2 uv, const vec3 v, const vec3 n, float s) {
@@ -174,16 +161,14 @@ vec3 sample_phong(vec2 uv, const vec3 v, const vec3 n, float s) {
     float phi = PI2 * uv.x;
     float cos_theta = pow(1. - uv.x, 1. / (1. + s));
     float sin_theta = sqrt(1 - cos_theta * cos_theta);
-    vec3 local_phong_dir = vec3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
+    vec3 local_phong_dir =
+        vec3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
     vec3 reflected_local_dir = reflect(v_loc, vec3(0, 0, 1));
-    vec3 local_phong_dir_rotated = rot_quat(in_local_quat(reflected_local_dir), local_phong_dir);
-    return normalize(rot_quat(invert_quat(local_quat), local_phong_dir_rotated));
+    vec3 local_phong_dir_rotated =
+        rot_quat(in_local_quat(reflected_local_dir), local_phong_dir);
+    return normalize(
+        rot_quat(invert_quat(local_quat), local_phong_dir_rotated));
 }
-
-// vec3 shadowedf90(vec3 f0) {
-//     const float t = (1. / 0.04);
-//     return min(1., t * luminance(f0));
-// }
 
 float beckmann_d(float alpha, float nh) {
     nh = max(0.00001f, nh);
@@ -195,16 +180,103 @@ float beckmann_d(float alpha, float nh) {
     return num / denom;
 }
 
+float schlick_w(float u) {
+    float m = clamp(1 - u, 0, 1);
+    float m2 = m * m;
+    return m2 * m2 * m;
+}
+
+float GTR1(float nh, float a) {
+    if (a >= 1) {
+        return 1 / PI;
+    }
+    float a2 = a * a;
+    float t = 1 + (a2 - 1) * nh * nh;
+    return (a2 - 1) / (PI * log(a2) * t);
+}
+
+float GTR2(float nh, float a) {
+    float a2 = a * a;
+    float t = 1 + (a2 - 1) * nh * nh;
+    return a2 / (PI * t * t);
+}
+
+float GTR2_aniso(float nh, float hx, float hy, float ax, float ay) {
+    return 1 / (PI * ax * ay * sqr(sqr(hx / ax) + sqr(hy / ay) + nh * nh));
+}
+
+float smithG_GGX(float nv, float alpha_g) {
+    float a = alpha_g * alpha_g;
+    float b = nv * nv;
+    return 1 / (nv + sqrt(a + b - a * b));
+}
+
+float smithG_GGX_aniso(float nv, float vx, float vy, float ax, float ay) {
+    return 1 / (nv + sqrt(sqr(vx * ax) + sqr(vy * ay) + sqr(nv)));
+}
+
+// Input Ve: view direction
+// Input alpha_x, alpha_y: roughness parameters
+// Input U1, U2: uniform random numbers
+// Output Ne: normal sampled with PDF D_Ve(Ne) = G1(Ve) * max(0, dot(Ve, Ne)) *
+// D(Ne) / Ve.z
+vec3 sample_ggx_vndf(vec3 Ve, float alpha_x, float alpha_y, float U1, float U2,
+                     const vec3 n) {
+    // World to local
+    vec4 local_quat = to_local_quat(n);
+    Ve = rot_quat(local_quat, Ve);
+
+    // Section 3.2: transforming the view direction to the hemisphere
+    // configuration
+    vec3 Vh = normalize(vec3(alpha_x * Ve.x, alpha_y * Ve.y, Ve.z));
+    // Section 4.1: orthonormal basis (with special case if cross product is
+    // zero)
+    float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
+    vec3 T1 =
+        lensq > 0 ? vec3(-Vh.y, Vh.x, 0) * inversesqrt(lensq) : vec3(1, 0, 0);
+    vec3 T2 = cross(Vh, T1);
+    // Section 4.2: parameterization of the projected area
+    float r = sqrt(U1);
+    float phi = 2.0 * PI * U2;
+    float t1 = r * cos(phi);
+    float t2 = r * sin(phi);
+    float s = 0.5 * (1.0 + Vh.z);
+    t2 = (1.0 - s) * sqrt(1.0 - t1 * t1) + s * t2;
+    // Section 4.3: reprojection onto hemisphere
+    vec3 Nh = t1 * T1 + t2 * T2 + sqrt(max(0.0, 1.0 - t1 * t1 - t2 * t2)) * Vh;
+    // Section 3.4: transforming the normal back to the ellipsoid configuration
+    const vec3 h =
+        normalize(vec3(alpha_x * Nh.x, alpha_y * Nh.y, max(0.0, Nh.z)));
+    const vec3 l = reflect(-Ve, h);
+    // Local to world
+    return normalize(rot_quat(invert_quat(local_quat), l));
+}
+
+
+
 vec3 sample_beckmann(vec2 uv, float alpha, vec3 n, const vec3 v) {
-     // Transform into local space where the n = (0,0,1)
+    // Transform into local space where the n = (0,0,1)
     vec4 local_quat = to_local_quat(n);
     vec3 v_loc = rot_quat(local_quat, v);
     float tan2 = -(alpha * alpha) * log(1. - uv.x);
     float phi = PI2 * uv.y;
-    float cos_theta = 1./ (sqrt(1. + tan2));
+    float cos_theta = 1. / (sqrt(1. + tan2));
     float sin_theta = sqrt(1 - cos_theta * cos_theta);
-    const vec3 h = normalize(vec3(sin_theta * cos(phi), sin_theta * sin(phi), cos_theta));
+    const vec3 h =
+        normalize(vec3(sin_theta * cos(phi), sin_theta * sin(phi), cos_theta));
     const vec3 l = reflect(-v_loc, h);
+    return normalize(rot_quat(invert_quat(local_quat), l));
+}
+
+vec3 sample_gtr1(vec2 uv, float alpha2, const vec3 n, vec3 v) {
+    vec4 local_quat = to_local_quat(n);
+    v = rot_quat(local_quat, v);
+    const float cos_theta =
+        sqrt(max(0, (1. - pow(alpha2, 1.0 - uv.x)) / (1.0 - alpha2)));
+    const float sin_theta = sqrt(max(0, 1. - cos_theta * cos_theta));
+    const float phi = PI2 * uv.y;
+    const vec3 h = vec3(sin_theta * cos(phi), sin_theta * sin(phi), cos_theta);
+    const vec3 l = reflect(-v, h);
     return normalize(rot_quat(invert_quat(local_quat), l));
 }
 

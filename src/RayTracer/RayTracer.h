@@ -53,11 +53,14 @@ private:
 	Buffer post_desc_buffer;
 	Buffer residual_buffer;
 	Buffer counter_buffer;
+	Buffer rmse_val_buffer;
 	PostPC post_pc;
 	std::unique_ptr<Pipeline> calc_rmse_pipeline;
 	std::unique_ptr<Pipeline> reduce_rmse_pipeline;
 	std::unique_ptr<Pipeline> output_rmse_pipeline;
+	clock_t start;
 	bool write_exr = false;
+	bool has_gt = false;
 
 };
 
