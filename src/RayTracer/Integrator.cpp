@@ -13,9 +13,17 @@ void Integrator::init() {
 	LumenInstance* instance = this->instance;
 	Window* window = instance->window;
 	lumen_scene.load_scene("scenes/", config.filename);
-	camera = std::unique_ptr<PerspectiveCamera>(new PerspectiveCamera(
-		lumen_scene.cam_config.fov, 0.01f, 1000.0f, (float)instance->width / instance->height,
-		lumen_scene.cam_config.dir, lumen_scene.cam_config.pos));
+	if (lumen_scene.cam_config.pos != vec3(0)) {
+		camera = std::unique_ptr<PerspectiveCamera>(new PerspectiveCamera(
+			lumen_scene.cam_config.fov, 0.01f, 1000.0f, (float)instance->width / instance->height,
+			lumen_scene.cam_config.dir, lumen_scene.cam_config.pos));
+	} else {
+		// Assume the camera matrix is given
+		camera = std::unique_ptr<PerspectiveCamera>(new PerspectiveCamera(
+			lumen_scene.cam_config.fov, lumen_scene.cam_config.cam_matrix, 0.01f, 1000.0f, 
+			(float)instance->width / instance->height));
+	}
+
 	Camera* cam_ptr = camera.get();
 	instance->window->add_mouse_click_callback(
 		[cam_ptr, this, window](MouseAction button, KeyAction action) {

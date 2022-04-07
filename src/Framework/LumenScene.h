@@ -6,8 +6,9 @@
 
 struct CameraConfiguration {
 	float fov;
-	glm::vec3 pos;
-	glm::vec3 dir;
+	glm::vec3 pos = vec3(0);
+	glm::vec3 dir = vec3(0);
+	glm::mat4 cam_matrix;
 };
 
 struct SceneConfig {

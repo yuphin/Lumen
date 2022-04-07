@@ -2,7 +2,7 @@
 #include "Path.h"
 
 const int max_depth = 6;
-const vec3 sky_col(0, 0, 0);
+const vec3 sky_col(0.53, 0.8, 0.92);
 void Path::init() {
 	Integrator::init();
 	SceneDesc desc;

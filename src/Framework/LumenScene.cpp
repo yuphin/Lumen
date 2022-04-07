@@ -260,7 +260,9 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 		MitsubaParser mitsuba_parser;
 		mitsuba_parser.parse(path);
 
-	
+		// Camera	 
+		cam_config.fov = mitsuba_parser.camera.fov / 2;
+		cam_config.cam_matrix = mitsuba_parser.camera.cam_matrix;
 		prim_meshes.resize(mitsuba_parser.meshes.size());
 		// Load objs
 		int i = 0;
@@ -374,7 +376,7 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 		i = 0;
 		lights.resize(mitsuba_parser.lights.size());
 		for (auto& light : mitsuba_parser.lights) {
-			lights[i].L = light.L;
+			lights[i].L = 100.0f * light.L;
 			if (light.type == "directional") {
 				lights[i].pos = light.from;
 				lights[i].to = light.to;

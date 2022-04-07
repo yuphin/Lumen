@@ -94,6 +94,30 @@ public:
 		rotation = rot;
 	}
 
+	explicit PerspectiveCamera(float fov, const glm::mat4 cam_matrix, float cam_near, float cam_far, 
+							   float aspect_ratio)
+		: fov(fov), aspect_ratio(aspect_ratio), Camera(cam_near, cam_far) {
+		left = right = top = bot = -1;
+		this->make_projection_matrix(true);
+	
+		view = glm::inverse(cam_matrix);
+		glm::vec3 scale;
+		glm::quat q;
+		glm::vec3 translation;
+		glm::vec3 skew;
+		glm::vec4 perspective;
+		glm::decompose(view, scale, q, translation, skew, perspective);
+		glm::vec3 rot{};
+		glm::extractEulerAngleXYZ(glm::toMat4(q), rot.x, rot.y, rot.z);
+		rot *= 180. / glm::pi<float>();
+		rotation = rot;
+		glm::vec3 pos = glm::vec3({ cam_matrix[0][3], 
+								  cam_matrix[1][3],
+								  cam_matrix[2][3] }
+		);
+		this->set_position(pos);
+	}
+
 
 private:
 	void make_projection_matrix(bool use_fov = false) override {

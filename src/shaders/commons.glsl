@@ -80,7 +80,7 @@ float disney_pdf(const vec3 n, const Material mat, const vec3 v, const vec3 l) {
     float G = smithG_GGX(abs_nv, alpha);
     // Specular lobe
     // float pdf_specular = 0.25 * D * G * abs_lh / (abs_nl * abs_vh) ;
-    float pdf_specular = 0.25 * D * G / (abs_nl);
+    float pdf_specular = 0.25 * D * G / (abs_nv);
     // Diffuse
     float pdf_diffuse = abs_nl / PI;
     // Clearcoat

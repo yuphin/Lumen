@@ -28,11 +28,17 @@ struct MitsubaParser {
 		int bsdf_idx;
 		glm::mat4 transform;
 	};
+
+	struct MitsubaCamera {
+		float fov;
+		glm::mat4 cam_matrix;
+	};
 	void parse(const std::string& path);
 
 	std::vector<MitsubaBSDF> bsdfs;
 	std::vector<MitsubaMesh> meshes;
 	std::vector<MitsubaLight> lights;
+	MitsubaCamera camera;
 	
 };
 
