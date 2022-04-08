@@ -48,6 +48,11 @@ uint hash(ivec3 p, uint size) {
            (10 * size);
     // return uint(p.x + p.y * grid_res.x + p.z * grid_res.x * grid_res.y);
 }
+#define FLT_EPSILON 0.5 * 1.19209290E-07
+float gamma(int n) {
+#define MachineEpsilon 
+    return (n * FLT_EPSILON) / (1 - n * FLT_EPSILON);
+}
 
 // Ray Tracing Gems chapter 6
 vec3 offset_ray(const vec3 p, const vec3 n) {
@@ -65,6 +70,7 @@ vec3 offset_ray(const vec3 p, const vec3 n) {
                 abs(p.y) < origin ? p.y + float_scale * n.y : p_i.y,
                 abs(p.z) < origin ? p.z + float_scale * n.z : p_i.z);
 #else
+    //return p + n * 0.02;
     return vec3(p.x + float_scale * n.x, p.y + float_scale * n.y,
                 p.z + float_scale * n.z);
 #endif

@@ -90,8 +90,14 @@ vec3 uniform_sample_light(const Material mat, const vec3 pos,
 }
 
 void main() {
+#define JITTER 1
     const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
-    const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
+#if JITTER
+    vec2 rands = vec2(rand(seed), rand(seed)) - 0.5;
+    const vec2 in_uv = (pixel + rands) / vec2(gl_LaunchSizeEXT.xy);
+#else
+    const vec2 in_uv = (pixel) / vec2(gl_LaunchSizeEXT.xy);
+#endif
     vec2 d = in_uv * 2.0 - 1.0;
     vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
     vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);

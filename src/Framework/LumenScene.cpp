@@ -359,14 +359,14 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 			if (m_bsdf.type == "diffuse") {
 				materials[i].albedo = m_bsdf.albedo;
 			} else if (m_bsdf.type == "roughconductor") {
-				make_default_disney(materials[i]);
 				materials[i].metallic = 1;
+				materials[i].roughness = m_bsdf.roughness;
 				materials[i].albedo = m_bsdf.albedo;
 
 			} else if (m_bsdf.type == "roughplastic") {
 				materials[i].subsurface = 0.1;
-				materials[i].specular = 0.1;
 				materials[i].albedo = m_bsdf.albedo;
+				materials[i].roughness = m_bsdf.roughness;
 			}
 #endif
 			i++;

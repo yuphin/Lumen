@@ -46,7 +46,7 @@ float correct_shading_normal(const vec3 geometry_nrm, const vec3 shading_nrm,
 
 Material load_material(const uint material_idx, const vec2 uv) {
     Material m = materials.m[material_idx];
-    if(m.texture_id > -1) {
+    if (m.texture_id > -1) {
         m.albedo *= texture(scene_textures[m.texture_id], uv).xyz;
     }
     return m;
@@ -78,9 +78,10 @@ float disney_pdf(const vec3 n, const Material mat, const vec3 v, const vec3 l) {
     float alpha = max(0.00001, mat.roughness);
     float D = GTR2(abs_nh, alpha);
     float G = smithG_GGX(abs_nv, alpha);
+   
     // Specular lobe
     // float pdf_specular = 0.25 * D * G * abs_lh / (abs_nl * abs_vh) ;
-    float pdf_specular = 0.25 * D * G / (abs_nv);
+    float pdf_specular = 0.25 * D * G / abs_nv;
     // Diffuse
     float pdf_diffuse = abs_nl / PI;
     // Clearcoat
@@ -113,9 +114,16 @@ vec3 glossy_f(const Material mat, const vec3 wo, const vec3 wi,
 
 vec3 disney_f(const Material mat, const vec3 wo, const vec3 wi,
               const vec3 shading_nrm) {
-    const vec3 h = normalize(wo + wi);
-    const float nl = dot(shading_nrm, wi);
-    const float nv = dot(shading_nrm, wo);
+    vec3 h = wo + wi;
+    const float nl = abs(dot(shading_nrm, wi));
+    const float nv = abs(dot(shading_nrm, wo));
+    if(nl == 0 || nv == 0) {
+        return vec3(0);
+    }
+    if(h.x == 0 && h.y == 0 && h.z == 0) {
+        return vec3(0);
+    }
+    h = normalize(h);
     const float lh = dot(wi, h);
     const float nh = dot(shading_nrm, h);
     const float lum = luminance(mat.albedo);
@@ -304,8 +312,13 @@ vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
     } break;
     case BSDF_DISNEY: {
 #if ENABLE_DISNEY
-        f = disney_f(mat, wo, dir, shading_nrm);
-        pdf_w = disney_pdf(shading_nrm, mat, wo, dir);
+        if (!same_hemisphere(dir, wo, shading_nrm)) {
+            f = vec3(0);
+            pdf_w = 0.;
+        } else {
+            f = disney_f(mat, wo, dir, shading_nrm);
+            pdf_w = disney_pdf(shading_nrm, mat, wo, dir);
+        }
 #endif
     } break;
     default: // Unknown

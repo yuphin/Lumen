@@ -1,7 +1,7 @@
 #include "LumenPCH.h"
 #include "Path.h"
 
-const int max_depth = 6;
+const int max_depth = 17;
 const vec3 sky_col(0.53, 0.8, 0.92);
 void Path::init() {
 	Integrator::init();
