@@ -73,7 +73,7 @@ vec3 calc_L(const RestirReservoir r) {
     wi /= wi_len;
     const vec3 f = eval_bsdf(hit_mat, wo, wi, normal);
     const float cos_x = dot(normal, wi);
-    const float g = abs(dot(record.triangle_normal, -wi)) / (wi_len * wi_len);
+    const float g = abs(dot(record.n_s, -wi)) / (wi_len * wi_len);
     return f * Le * abs(cos_x) * g;
 }
 
@@ -98,7 +98,7 @@ vec3 calc_L_with_visibility_check(const RestirReservoir r) {
     wi /= wi_len;
     const vec3 f = eval_bsdf(hit_mat, wo, wi, normal);
     const float cos_x = dot(normal, wi);
-    const float g = abs(dot(record.triangle_normal, -wi)) / (wi_len * wi_len);
+    const float g = abs(dot(record.n_s, -wi)) / (wi_len * wi_len);
     any_hit_payload.hit = 1;
     traceRayEXT(tlas,
                 gl_RayFlagsTerminateOnFirstHitEXT |

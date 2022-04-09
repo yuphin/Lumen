@@ -60,10 +60,10 @@ void main() {
     // const Material light_mat =
     //     load_material(light_material_idx, uv_unused);
     // vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
-    //                                 record.triangle_normal);
+    //                                 record.n_s);
     vec3 o = record.pos;
-    float abs_cos_light = abs(dot(record.triangle_normal, wi));
-    //const float pdf_dir = dot(wi, record.triangle_normal) / PI;
+    float abs_cos_light = abs(dot(record.n_s, wi));
+    //const float pdf_dir = dot(wi, record.n_s) / PI;
     vec3 throughput;
     if (abs_cos_light == 0 || pdf_dir <= 0) {
         throughput = vec3(0);
@@ -80,13 +80,13 @@ void main() {
         if (!found_isect) {
             break;
         }
-        vec3 shading_nrm = payload.shading_nrm;
+        vec3 n_s = payload.n_s;
         const vec3 wo = -wi;
-        float cos_wo = dot(wo, shading_nrm);
+        float cos_wo = dot(wo, n_s);
         bool side = true;
         if (cos_wo < 0.) {
             cos_wo = -cos_wo;
-            shading_nrm = -shading_nrm;
+            n_s = -n_s;
             side = false;
         }
         Material hit_mat = load_material(payload.material_idx, payload.uv);
@@ -101,13 +101,13 @@ void main() {
             photons.d[h].pos = payload.pos;
             photons.d[h].wi = -wi;
             photons.d[h].throughput = throughput;
-            photons.d[h].nrm = shading_nrm;
+            photons.d[h].nrm = n_s;
             photons.d[h].path_len = d + 1;
             atomicAdd(photons.d[h].photon_count, 1);
         }
-        o = offset_ray(payload.pos, shading_nrm);
+        o = offset_ray(payload.pos, n_s);
         float pdf_dir, cos_theta;
-        const vec3 f = sample_bsdf(shading_nrm, wo, hit_mat, 0, side, wi,
+        const vec3 f = sample_bsdf(n_s, wo, hit_mat, 0, side, wi,
                                    pdf_dir, cos_theta, seed);
         throughput *= f * abs(cos_theta) / pdf_dir;
 

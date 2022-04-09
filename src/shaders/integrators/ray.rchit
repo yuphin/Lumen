@@ -87,8 +87,8 @@ void main() {
     const vec3 e1t = gl_ObjectToWorldEXT * vec4(e1,0);
 
 
-    payload.geometry_nrm = normalize(vec3(cross(e0, e1) * gl_WorldToObjectEXT));
-    payload.shading_nrm = world_nrm;
+    payload.n_g = normalize(vec3(cross(e0, e1) * gl_WorldToObjectEXT));
+    payload.n_s = world_nrm;
     payload.pos = world_pos;
     payload.uv = uv;
     payload.material_idx = material_index;

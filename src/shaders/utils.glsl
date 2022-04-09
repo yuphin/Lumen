@@ -5,11 +5,12 @@
 #define PI2 6.28318530718
 #define INF 1e10
 #define EPS 0.001
+#define SHADOW_EPS 2 / 65536.
 #define sqrt2 1.41421356237309504880
 
 struct HitPayload {
-    vec3 geometry_nrm;
-    vec3 shading_nrm;
+    vec3 n_g;
+    vec3 n_s;
     vec3 pos;
     vec2 uv;
     uint material_idx;
@@ -19,7 +20,7 @@ struct HitPayload {
 
 struct VCMState {
     vec3 wi;
-    vec3 shading_nrm;
+    vec3 n_s;
     vec3 pos;
     vec2 uv;
     vec3 throughput;
@@ -36,7 +37,7 @@ struct AnyHitPayload {
 
 struct TriangleRecord {
     vec3 pos;
-    vec3 triangle_normal;
+    vec3 n_s;
     float triangle_pdf;
 };
 
@@ -50,7 +51,7 @@ uint hash(ivec3 p, uint size) {
 }
 #define FLT_EPSILON 0.5 * 1.19209290E-07
 float gamma(int n) {
-#define MachineEpsilon 
+#define MachineEpsilon
     return (n * FLT_EPSILON) / (1 - n * FLT_EPSILON);
 }
 
@@ -64,15 +65,14 @@ vec3 offset_ray(const vec3 p, const vec3 n) {
         intBitsToFloat(floatBitsToInt(p.x) + ((p.x < 0) ? -of_i.x : of_i.x)),
         intBitsToFloat(floatBitsToInt(p.y) + ((p.y < 0) ? -of_i.y : of_i.y)),
         intBitsToFloat(floatBitsToInt(p.z) + ((p.z < 0) ? -of_i.z : of_i.z)));
-
-#if 1
     return vec3(abs(p.x) < origin ? p.x + float_scale * n.x : p_i.x,
                 abs(p.y) < origin ? p.y + float_scale * n.y : p_i.y,
                 abs(p.z) < origin ? p.z + float_scale * n.z : p_i.z);
-#else
-    return vec3(p.x + float_scale * n.x, p.y + float_scale * n.y,
-                p.z + float_scale * n.z);
-#endif
+}
+
+vec3 offset_ray2(const vec3 p, const vec3 n) {
+    const float float_scale = 1.0f / 65536.0f;
+    return p + float_scale * n;
 }
 
 float luminance(vec3 rgb) { return dot(rgb, vec3(0.2126f, 0.7152f, 0.0722f)); }
@@ -283,12 +283,12 @@ vec3 sample_gtr1(vec2 uv, float alpha2, const vec3 n, vec3 v) {
     return normalize(rot_quat(invert_quat(local_quat), l));
 }
 
-void correct_shading_normal(const vec3 wo, const vec3 wi,
-                            inout vec3 shading_nrm, inout vec3 geometry_nrm) {
-    float res1 = abs(dot(wo, shading_nrm)) * abs(dot(wi, geometry_nrm));
-    float res2 = abs(dot(wo, geometry_nrm)) * abs(dot(wi, shading_nrm));
+void correct_shading_normal(const vec3 wo, const vec3 wi, inout vec3 n_s,
+                            inout vec3 n_g) {
+    float res1 = abs(dot(wo, n_s)) * abs(dot(wi, n_g));
+    float res2 = abs(dot(wo, n_g)) * abs(dot(wi, n_s));
     if (res1 != res2) {
-        shading_nrm *= -1;
+        n_s *= -1;
     }
 }
 
@@ -307,7 +307,7 @@ vec2 concentric_sample_disk(vec2 rands) {
         return vec2(0);
     }
     float theta, r;
-    if(abs(offset.x) > abs(offset.y)) {
+    if (abs(offset.x) > abs(offset.y)) {
         r = offset.x;
         theta = 0.25 * PI * offset.y / offset.x;
     } else {

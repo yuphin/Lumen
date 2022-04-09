@@ -74,7 +74,7 @@ bool vcm_generate_light_sample(out LightState light_state) {
     //     sample_area_light_with_idx(rands, 0, light_idx, light_material_idx,
     //                                light_min_pos, light_max_pos, u, v);
     // vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
-    //                                 record.triangle_normal);
+    //                                 record.n_s);
     uint light_idx;
     uint light_triangle_idx;
     uint light_material_idx;
@@ -93,7 +93,7 @@ bool vcm_generate_light_sample(out LightState light_state) {
         return false;
     }
     light_state.pos = record.pos;
-    light_state.normal = record.triangle_normal;
+    light_state.normal = record.n_s;
     light_state.dir = wi;
     light_state.triangle_pdf = record.triangle_pdf;
     light_state.hash_idx = get_restir_hash_idx(light_idx, u, v);

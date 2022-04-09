@@ -47,7 +47,7 @@ using uint = unsigned int;
 #define ALIGN16
 #endif
 
-#define ENABLE_DISNEY 1
+#define ENABLE_DISNEY 0
 
 struct PushConstantRay {
     vec4 clear_color;
@@ -156,7 +156,7 @@ struct Material {
 
 struct PathVertex {
     vec3 dir;
-    vec3 shading_nrm;
+    vec3 n_s;
     vec3 pos;
     vec2 uv;
     vec3 throughput;
@@ -170,7 +170,7 @@ struct PathVertex {
 
 struct MLTPathVertex {
     vec3 dir;
-    vec3 shading_nrm;
+    vec3 n_s;
     vec3 pos;
     vec2 uv;
     vec3 throughput;
@@ -186,7 +186,7 @@ struct MLTPathVertex {
 struct VCMVertex {
     vec3 wi;
     vec3 wo;
-    vec3 shading_nrm;
+    vec3 n_s;
     vec3 pos;
     vec2 uv;
     vec3 throughput;
@@ -209,7 +209,7 @@ struct SPPMData {
     vec3 throughput;
     uint material_idx;
     vec2 uv;
-    vec3 shading_nrm;
+    vec3 n_s;
     int M;
     float N;
     float radius;

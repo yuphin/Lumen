@@ -31,11 +31,11 @@ vec4 sample_camera(in vec2 d) {
     return ubo.inv_view * vec4(normalize(target.xyz), 0); // direction
 }
 
-float correct_shading_normal(const vec3 geometry_nrm, const vec3 shading_nrm,
+float correct_shading_normal(const vec3 n_g, const vec3 n_s,
                              const vec3 wi, const vec3 wo, int mode) {
     if (mode == 0) {
-        float num = abs(dot(wo, shading_nrm) * abs(dot(wi, geometry_nrm)));
-        float denom = abs(dot(wo, geometry_nrm) * abs(dot(wi, shading_nrm)));
+        float num = abs(dot(wo, n_s) * abs(dot(wi, n_g)));
+        float denom = abs(dot(wo, n_g) * abs(dot(wi, n_s)));
         if (denom == 0)
             return 0.;
         return num / denom;
@@ -99,13 +99,13 @@ float disney_pdf(const vec3 n, const Material mat, const vec3 v, const vec3 l) {
 vec3 diffuse_f(const Material mat) { return mat.albedo / PI; }
 
 vec3 glossy_f(const Material mat, const vec3 wo, const vec3 wi,
-              const vec3 shading_nrm, float hl, float nl, float nv,
+              const vec3 n_s, float hl, float nl, float nv,
               float beckmann_term) {
     const vec3 h = normalize(wo + wi);
     const vec3 f_diffuse = (28. / (23 * PI)) * vec3(mat.albedo) *
                            (1 - mat.metalness) *
-                           (1 - pow5(1 - 0.5 * dot(wi, shading_nrm))) *
-                           (1 - pow5(1 - 0.5 * dot(wo, shading_nrm)));
+                           (1 - pow5(1 - 0.5 * dot(wi, n_s))) *
+                           (1 - pow5(1 - 0.5 * dot(wo, n_s)));
     const vec3 f_specular = beckmann_term *
                             fresnel_schlick(vec3(mat.metalness), hl) /
                             (4 * hl * max(nl, nv));
@@ -113,10 +113,10 @@ vec3 glossy_f(const Material mat, const vec3 wo, const vec3 wi,
 }
 
 vec3 disney_f(const Material mat, const vec3 wo, const vec3 wi,
-              const vec3 shading_nrm) {
+              const vec3 n_s) {
     vec3 h = wo + wi;
-    const float nl = abs(dot(shading_nrm, wi));
-    const float nv = abs(dot(shading_nrm, wo));
+    const float nl = abs(dot(n_s, wi));
+    const float nv = abs(dot(n_s, wo));
     if(nl == 0 || nv == 0) {
         return vec3(0);
     }
@@ -125,7 +125,7 @@ vec3 disney_f(const Material mat, const vec3 wo, const vec3 wi,
     }
     h = normalize(h);
     const float lh = dot(wi, h);
-    const float nh = dot(shading_nrm, h);
+    const float nh = dot(n_s, h);
     const float lum = luminance(mat.albedo);
     vec3 C_tint = lum > 0.0 ? mat.albedo / lum
                             : vec3(1); // normalize lum. to isolate hue+sat
@@ -161,44 +161,44 @@ vec3 disney_f(const Material mat, const vec3 wo, const vec3 wi,
            0.25 * mat.clearcoat * G_r * F_r * D_r;
 }
 
-vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
+vec3 sample_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
                  const uint mode, const bool side, out vec3 dir,
                  out float pdf_w, out float cos_theta, const vec2 rands) {
     vec3 f;
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
-        dir = sample_cos_hemisphere(rands, shading_nrm);
+        dir = sample_cos_hemisphere(rands, n_s);
         f = diffuse_f(mat);
-        pdf_w = diffuse_pdf(shading_nrm, dir, cos_theta);
+        pdf_w = diffuse_pdf(n_s, dir, cos_theta);
     } break;
     case BSDF_MIRROR: {
-        dir = reflect(-wo, shading_nrm);
-        cos_theta = dot(shading_nrm, dir);
+        dir = reflect(-wo, n_s);
+        cos_theta = dot(n_s, dir);
         f = vec3(1.) / abs(cos_theta);
         pdf_w = 1.;
     } break;
     case BSDF_GLOSSY: {
         if (rands.x < .5) {
             const vec2 rands_new = vec2(2 * rands.x, rands.y);
-            dir = sample_cos_hemisphere(rands_new, shading_nrm);
+            dir = sample_cos_hemisphere(rands_new, n_s);
         } else {
             const vec2 rands_new = vec2(2 * (rands.x - 0.5), rands.y);
             const vec3 f0 = mix(mat.albedo, vec3(0.04), mat.metalness);
-            dir = sample_beckmann(rands_new, mat.roughness, shading_nrm, wo);
-            if (!same_hemisphere(wo, dir, shading_nrm)) {
+            dir = sample_beckmann(rands_new, mat.roughness, n_s, wo);
+            if (!same_hemisphere(wo, dir, n_s)) {
                 pdf_w = 0.;
                 f = vec3(0);
                 return f;
             }
         }
-        cos_theta = dot(shading_nrm, dir);
+        cos_theta = dot(n_s, dir);
         const vec3 h = normalize(wo + dir);
-        float nh = max(0.00001f, min(1.0f, dot(shading_nrm, h)));
+        float nh = max(0.00001f, min(1.0f, dot(n_s, h)));
         float hl = max(0.00001f, min(1.0f, dot(h, dir)));
-        float nl = max(0.00001f, min(1.0f, dot(shading_nrm, dir)));
-        float nv = max(0.00001f, min(1.0f, dot(shading_nrm, wo)));
+        float nl = max(0.00001f, min(1.0f, dot(n_s, dir)));
+        float nv = max(0.00001f, min(1.0f, dot(n_s, wo)));
         float beckmann_term = beckmann_d(mat.roughness, nh);
-        f = glossy_f(mat, wo, dir, shading_nrm, hl, nl, nv, beckmann_term);
+        f = glossy_f(mat, wo, dir, n_s, hl, nl, nv, beckmann_term);
         pdf_w = glossy_pdf(cos_theta, hl, nh, beckmann_term);
     } break;
 
@@ -209,7 +209,7 @@ vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
         if (rands.x < diffuse_ratio) {
             // Sample diffuse
             const vec2 rands_new = vec2(rands.x / diffuse_ratio, rands.y);
-            dir = sample_cos_hemisphere(rands_new, shading_nrm);
+            dir = sample_cos_hemisphere(rands_new, n_s);
         } else {
             // Sample specular
             vec2 rands_new =
@@ -220,8 +220,8 @@ vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
                 rands_new.x /= ratio_gtr2;
                 const float alpha = max(0.01f, sqr(mat.roughness));
                 dir = sample_ggx_vndf(wo, alpha, alpha, rands_new.x,
-                                      rands_new.y, shading_nrm);
-                if (!same_hemisphere(wo, dir, shading_nrm)) {
+                                      rands_new.y, n_s);
+                if (!same_hemisphere(wo, dir, n_s)) {
                     pdf_w = 0.;
                     f = vec3(0);
                     return f;
@@ -231,32 +231,32 @@ vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
                 // Sample clearcoat
                 const float alpha = mix(0.1, 0.001, mat.clearcoat_gloss);
                 const float alpha2 = alpha * alpha;
-                dir = sample_gtr1(rands_new, alpha2, shading_nrm, wo);
-                if (!same_hemisphere(wo, dir, shading_nrm)) {
+                dir = sample_gtr1(rands_new, alpha2, n_s, wo);
+                if (!same_hemisphere(wo, dir, n_s)) {
                     pdf_w = 0.;
                     f = vec3(0);
                     return f;
                 }
             }
         }
-        f = disney_f(mat, wo, dir, shading_nrm);
-        pdf_w = disney_pdf(shading_nrm, mat, wo, dir);
-        cos_theta = dot(shading_nrm, dir);
+        f = disney_f(mat, wo, dir, n_s);
+        pdf_w = disney_pdf(n_s, mat, wo, dir);
+        cos_theta = dot(n_s, dir);
 #endif
     } break;
     case BSDF_GLASS: {
         const float ior = side ? 1. / mat.ior : mat.ior;
 
         // Refract
-        const float cos_i = dot(shading_nrm, wo);
+        const float cos_i = dot(n_s, wo);
         const float sin2_t = ior * ior * (1. - cos_i * cos_i);
         if (sin2_t >= 1.) {
-            dir = reflect(-wo, shading_nrm);
+            dir = reflect(-wo, n_s);
         } else {
             const float cos_t = sqrt(1 - sin2_t);
-            dir = -ior * wo + (ior * cos_i - cos_t) * shading_nrm;
+            dir = -ior * wo + (ior * cos_i - cos_t) * n_s;
         }
-        cos_theta = dot(shading_nrm, dir);
+        cos_theta = dot(n_s, dir);
         f = vec3(1.) / abs(cos_theta);
         if (mode == 1) {
             f *= ior * ior;
@@ -270,22 +270,22 @@ vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
     return f;
 }
 
-vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
+vec3 sample_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
                  const uint mode, const bool side, out vec3 dir,
                  out float pdf_w, inout float cos_theta, inout uvec4 seed) {
     const vec2 rands = vec2(rand(seed), rand(seed));
-    return sample_bsdf(shading_nrm, wo, mat, mode, side, dir, pdf_w, cos_theta,
+    return sample_bsdf(n_s, wo, mat, mode, side, dir, pdf_w, cos_theta,
                        rands);
 }
 
-vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
+vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
                const uint mode, const bool side, const vec3 dir,
                out float pdf_w, float cos_theta) {
     vec3 f;
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
         f = diffuse_f(mat);
-        pdf_w = diffuse_pdf(shading_nrm, dir);
+        pdf_w = diffuse_pdf(n_s, dir);
     } break;
     case BSDF_MIRROR: {
         f = vec3(0);
@@ -296,29 +296,29 @@ vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
         pdf_w = 0.;
     } break;
     case BSDF_GLOSSY: {
-        if (!same_hemisphere(dir, wo, shading_nrm)) {
+        if (!same_hemisphere(dir, wo, n_s)) {
             f = vec3(0);
             pdf_w = 0.;
         } else {
             const vec3 h = normalize(wo + dir);
-            float nh = max(0.00001f, min(1.0f, dot(shading_nrm, h)));
+            float nh = max(0.00001f, min(1.0f, dot(n_s, h)));
             float hl = max(0.00001f, min(1.0f, dot(h, dir)));
-            float nl = max(0.00001f, min(1.0f, dot(shading_nrm, dir)));
-            float nv = max(0.00001f, min(1.0f, dot(shading_nrm, wo)));
+            float nl = max(0.00001f, min(1.0f, dot(n_s, dir)));
+            float nv = max(0.00001f, min(1.0f, dot(n_s, wo)));
             float beckmann_term = beckmann_d(mat.roughness, nh);
-            f = glossy_f(mat, wo, dir, shading_nrm, hl, nl, nv, beckmann_term);
+            f = glossy_f(mat, wo, dir, n_s, hl, nl, nv, beckmann_term);
             pdf_w = glossy_pdf(cos_theta, hl, nh, beckmann_term);
         }
 
     } break;
     case BSDF_DISNEY: {
 #if ENABLE_DISNEY
-        if (!same_hemisphere(dir, wo, shading_nrm)) {
+        if (!same_hemisphere(dir, wo, n_s)) {
             f = vec3(0);
             pdf_w = 0.;
         } else {
-            f = disney_f(mat, wo, dir, shading_nrm);
-            pdf_w = disney_pdf(shading_nrm, mat, wo, dir);
+            f = disney_f(mat, wo, dir, n_s);
+            pdf_w = disney_pdf(n_s, mat, wo, dir);
         }
 #endif
     } break;
@@ -328,15 +328,15 @@ vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
     return f;
 }
 
-vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
+vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
                const uint mode, const bool side, const vec3 dir,
                out float pdf_w, out float pdf_rev_w, in float cos_theta) {
     vec3 f;
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
         f = diffuse_f(mat);
-        pdf_w = diffuse_pdf(shading_nrm, dir);
-        pdf_rev_w = diffuse_pdf(shading_nrm, wo);
+        pdf_w = diffuse_pdf(n_s, dir);
+        pdf_rev_w = diffuse_pdf(n_s, wo);
     } break;
     case BSDF_MIRROR: {
         f = vec3(0);
@@ -349,27 +349,27 @@ vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
         pdf_rev_w = 0.;
     } break;
     case BSDF_GLOSSY: {
-        if (!same_hemisphere(dir, wo, shading_nrm)) {
+        if (!same_hemisphere(dir, wo, n_s)) {
             f = vec3(0);
             pdf_w = 0.;
         } else {
             const vec3 h = normalize(wo + dir);
-            float nh = max(0.00001f, min(1.0f, dot(shading_nrm, h)));
+            float nh = max(0.00001f, min(1.0f, dot(n_s, h)));
             float hl = max(0.00001f, min(1.0f, dot(h, dir)));
-            float nl = max(0.00001f, min(1.0f, dot(shading_nrm, dir)));
-            float nv = max(0.00001f, min(1.0f, dot(shading_nrm, wo)));
+            float nl = max(0.00001f, min(1.0f, dot(n_s, dir)));
+            float nv = max(0.00001f, min(1.0f, dot(n_s, wo)));
             float beckmann_term = beckmann_d(mat.roughness, nh);
-            f = glossy_f(mat, wo, dir, shading_nrm, hl, nl, nv, beckmann_term);
+            f = glossy_f(mat, wo, dir, n_s, hl, nl, nv, beckmann_term);
             pdf_w = glossy_pdf(cos_theta, hl, nh, beckmann_term);
-            float cos_theta_wo = dot(wo, shading_nrm);
+            float cos_theta_wo = dot(wo, n_s);
             pdf_rev_w = glossy_pdf(cos_theta_wo, hl, nh, beckmann_term);
         }
     } break;
     case BSDF_DISNEY: {
 #if ENABLE_DISNEY
-        f = disney_f(mat, wo, dir, shading_nrm);
-        pdf_w = disney_pdf(shading_nrm, mat, wo, dir);
-        pdf_rev_w = disney_pdf(shading_nrm, mat, dir, wo);
+        f = disney_f(mat, wo, dir, n_s);
+        pdf_w = disney_pdf(n_s, mat, wo, dir);
+        pdf_rev_w = disney_pdf(n_s, mat, dir, wo);
 #endif
     } break;
     default: // Unknown
@@ -379,7 +379,7 @@ vec3 eval_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
 }
 
 vec3 eval_bsdf(const Material mat, const vec3 wo, const vec3 wi,
-               const vec3 shading_nrm) {
+               const vec3 n_s) {
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
         return diffuse_f(mat);
@@ -389,20 +389,20 @@ vec3 eval_bsdf(const Material mat, const vec3 wo, const vec3 wi,
         return vec3(0);
     } break;
     case BSDF_GLOSSY: {
-        if (!same_hemisphere(wi, wo, shading_nrm)) {
+        if (!same_hemisphere(wi, wo, n_s)) {
             return vec3(0);
         }
         const vec3 h = normalize(wo + wi);
-        float nh = max(0.00001f, min(1.0f, dot(shading_nrm, h)));
+        float nh = max(0.00001f, min(1.0f, dot(n_s, h)));
         float hl = max(0.00001f, min(1.0f, dot(h, wi)));
-        float nl = max(0.00001f, min(1.0f, dot(shading_nrm, wi)));
-        float nv = max(0.00001f, min(1.0f, dot(shading_nrm, wo)));
+        float nl = max(0.00001f, min(1.0f, dot(n_s, wi)));
+        float nv = max(0.00001f, min(1.0f, dot(n_s, wo)));
         float beckmann_term = beckmann_d(mat.roughness, nh);
-        return glossy_f(mat, wo, wi, shading_nrm, hl, nl, nv, beckmann_term);
+        return glossy_f(mat, wo, wi, n_s, hl, nl, nv, beckmann_term);
     } break;
     case BSDF_DISNEY: {
 #if ENABLE_DISNEY
-        return disney_f(mat, wo, wi, shading_nrm);
+        return disney_f(mat, wo, wi, n_s);
 #endif
     } break;
     default: {
@@ -412,26 +412,26 @@ vec3 eval_bsdf(const Material mat, const vec3 wo, const vec3 wi,
     return vec3(0);
 }
 
-float bsdf_pdf(const Material mat, const vec3 shading_nrm, const vec3 wo,
+float bsdf_pdf(const Material mat, const vec3 n_s, const vec3 wo,
                const vec3 wi) {
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
-        return diffuse_pdf(shading_nrm, wi);
+        return diffuse_pdf(n_s, wi);
     } break;
     case BSDF_GLOSSY: {
-        if (!same_hemisphere(wo, wi, shading_nrm)) {
+        if (!same_hemisphere(wo, wi, n_s)) {
             return 0;
         }
         const vec3 h = normalize(wo + wi);
-        float nh = max(0.00001f, min(1.0f, dot(shading_nrm, h)));
+        float nh = max(0.00001f, min(1.0f, dot(n_s, h)));
         float hl = max(0.00001f, min(1.0f, dot(h, wi)));
         float beckmann_term = beckmann_d(mat.roughness, nh);
-        float cos_theta = dot(shading_nrm, wi);
+        float cos_theta = dot(n_s, wi);
         return glossy_pdf(cos_theta, hl, nh, beckmann_term);
     } break;
     case BSDF_DISNEY: {
 #if ENABLE_DISNEY
-        return disney_pdf(shading_nrm, mat, wo, wi);
+        return disney_pdf(n_s, mat, wo, wi);
 #endif
     } break;
     }
@@ -440,11 +440,11 @@ float bsdf_pdf(const Material mat, const vec3 shading_nrm, const vec3 wo,
 
 float uniform_cone_pdf(float cos_max) { return 1. / (PI2 * (1 - cos_max)); }
 
-float light_pdf(const Light light, const vec3 shading_nrm, const vec3 wi) {
+float light_pdf(const Light light, const vec3 n_s, const vec3 wi) {
     const float cos_width = cos(30 * PI / 180);
     switch (light.light_flags) {
     case LIGHT_AREA: {
-        return max(dot(shading_nrm, wi) / PI, 0);
+        return max(dot(n_s, wi) / PI, 0);
     } break;
     case LIGHT_SPOT: {
         return uniform_cone_pdf(cos_width);
@@ -455,11 +455,11 @@ float light_pdf(const Light light, const vec3 shading_nrm, const vec3 wi) {
     }
 }
 
-float light_pdf(uint light_flags, const vec3 shading_nrm, const vec3 wi) {
+float light_pdf(uint light_flags, const vec3 n_s, const vec3 wi) {
     const float cos_width = cos(30 * PI / 180);
     switch (light_flags) {
     case LIGHT_AREA: {
-        return max(dot(shading_nrm, wi) / PI, 0);
+        return max(dot(n_s, wi) / PI, 0);
     }
     case LIGHT_SPOT: {
         return uniform_cone_pdf(cos_width);
@@ -502,8 +502,9 @@ TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands,
     const vec4 nrm = normalize(n0 * barycentrics.x + n1 * barycentrics.y +
                                n2 * barycentrics.z);
     const vec4 world_pos = world_matrix * pos;
-
-    result.triangle_normal = normalize(vec3(inv_tr_mat * nrm));
+    const vec3 e0 = vec3(v2 - v0);
+    const vec3 e1 = vec3(v1 - v0);
+    result.n_s = normalize(vec3(inv_tr_mat * nrm));
     result.triangle_pdf = 2. / length((cross(vec3(etmp0), vec3(etmp1))));
     result.pos = vec3(world_pos);
     o_u = u;
@@ -587,13 +588,13 @@ vec3 sample_light(const vec4 rands_pos, const vec3 p, const int num_lights,
         }
         record.pos = light.pos;
         record.triangle_pdf = 1.;
-        record.triangle_normal = dir;
+        record.n_s = dir;
         L = light.L * faloff;
     } else if (light.light_flags == LIGHT_DIRECTIONAL) {
         vec3 dir = -normalize(light.to - light.pos);
         record.pos = p + dir * (2 * light.world_radius);
         record.triangle_pdf = 1.;
-        record.triangle_normal = -dir;
+        record.n_s = -dir;
         L = light.L;
     }
     return L;
@@ -629,13 +630,13 @@ vec3 sample_light_with_idx(const vec4 rands_pos, const vec3 p,
         }
         record.pos = light.pos;
         record.triangle_pdf = 1.;
-        record.triangle_normal = dir;
+        record.n_s = dir;
         L = light.L * faloff;
     } else if (light.light_flags == LIGHT_DIRECTIONAL) {
         vec3 dir = -normalize(light.to - light.pos);
         record.pos = p + dir * (2 * light.world_radius);
         record.triangle_pdf = 1.;
-        record.triangle_normal = -dir;
+        record.n_s = -dir;
         L = light.L;
     }
     return L;
@@ -675,8 +676,8 @@ vec3 sample_light_Le(const vec4 rands_pos, const vec2 rands_dir,
         light_mat = load_material(material_idx, uv_unused);
         pdf_pos = record.triangle_pdf / total_light;
         L = light_mat.emissive_factor;
-        wi = sample_cos_hemisphere(rands_dir, record.triangle_normal, phi);
-        pdf_dir = (dot(wi, record.triangle_normal)) / PI;
+        wi = sample_cos_hemisphere(rands_dir, record.n_s, phi);
+        pdf_dir = (dot(wi, record.n_s)) / PI;
     } else if (light.light_flags == LIGHT_SPOT) {
         const float cos_width = cos(30 * PI / 180);
         const float cos_faloff = cos(25 * PI / 180);
@@ -696,7 +697,7 @@ vec3 sample_light_Le(const vec4 rands_pos, const vec2 rands_dir,
         }
         record.pos = light.pos;
         record.triangle_pdf = 1.;
-        record.triangle_normal = wi;
+        record.n_s = wi;
         L = light.L * faloff;
         pdf_pos = 1.;
         pdf_dir = uniform_cone_pdf(cos_width);
@@ -709,7 +710,7 @@ vec3 sample_light_Le(const vec4 rands_pos, const vec2 rands_dir,
         vec2 uv = concentric_sample_disk(rands_dir);
         vec3 pos = light.world_center + light.world_radius * (u * v1 + v * v2);
         record.pos = pos + dir * light.world_radius;
-        record.triangle_normal = -dir;
+        record.n_s = -dir;
         L = light.L;
         pdf_pos = 1. / (PI * light.world_radius * light.world_radius);
         record.triangle_pdf = pdf_pos;
@@ -805,7 +806,7 @@ vec3 sample_light_w(const int num_lights, const int total_light,
         L = light_mat.emissive_factor;
         const vec2 rands_dir = vec2(rand(seed), rand(seed));
         wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
-                                   record.triangle_normal);
+                                   record.n_s);
     } else if (light.light_flags == LIGHT_SPOT) {
         const float cos_width = cos(30 * PI / 180);
         const float cos_faloff = cos(25 * PI / 180);
@@ -826,7 +827,7 @@ vec3 sample_light_w(const int num_lights, const int total_light,
         }
         record.pos = light.pos;
         record.triangle_pdf = 1.;
-        record.triangle_normal = wi;
+        record.n_s = wi;
         L = light.L * faloff;
         u = 0;
         v = 0;
@@ -838,7 +839,7 @@ vec3 sample_light_w(const int num_lights, const int total_light,
         vec2 uv = concentric_sample_disk(rands);
         vec3 pos = light.world_center + light.world_radius * (u * v1 + v * v2);
         record.pos = pos + dir * light.world_radius;
-        record.triangle_normal = -dir;
+        record.n_s = -dir;
         L = light.L;
         float pdf_pos = 1. / (PI * light.world_radius * light.world_radius);
         record.triangle_pdf = pdf_pos;

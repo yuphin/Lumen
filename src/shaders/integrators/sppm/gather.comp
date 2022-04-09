@@ -33,7 +33,7 @@ PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
 uint screen_size = pc_ray.size_x * pc_ray.size_y;
 
 vec3 eval_bsdf(const Material mat, const vec3 wo, const vec3 wi,
-               const vec3 shading_nrm) {
+               const vec3 n_s) {
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
         return mat.albedo / PI;
@@ -43,19 +43,19 @@ vec3 eval_bsdf(const Material mat, const vec3 wo, const vec3 wi,
         return vec3(0);
     } break;
     case BSDF_GLOSSY: {
-        if (!same_hemisphere(wi, wo, shading_nrm)) {
+        if (!same_hemisphere(wi, wo, n_s)) {
             return vec3(0);
         }
 #define pow5(x) (x * x) * (x * x) * x
         const vec3 f_diffuse = (28. / (23 * PI)) * vec3(mat.albedo) *
                                (1 - mat.metalness) *
-                               (1 - pow5(1 - 0.5 * dot(wi, shading_nrm))) *
-                               (1 - pow5(1 - 0.5 * dot(wo, shading_nrm)));
+                               (1 - pow5(1 - 0.5 * dot(wi, n_s))) *
+                               (1 - pow5(1 - 0.5 * dot(wo, n_s)));
         const vec3 h = normalize(wo + wi);
-        float nh = dot(shading_nrm, h);
+        float nh = dot(n_s, h);
         float hl = dot(h, wi);
-        float nl = dot(shading_nrm, wi);
-        float nv = dot(shading_nrm, wo);
+        float nl = dot(n_s, wi);
+        float nv = dot(n_s, wo);
         float beckmann_term = beckmann_d(mat.roughness, nh);
         const vec3 f_specular = beckmann_term *
                                 fresnel_schlick(mat.metalness, hl) /
@@ -143,7 +143,7 @@ void main() {
                         sppm_data.d[idx].material_idx, sppm_data.d[idx].uv);
                     vec3 f =
                         eval_bsdf(mat, sppm_data.d[idx].wo, photons.d[h].wi,
-                                  sppm_data.d[idx].shading_nrm);
+                                  sppm_data.d[idx].n_s);
                     vec3 phi = photons.d[h].photon_count *
                                photons.d[h].throughput * f *
                                sppm_data.d[idx].throughput;

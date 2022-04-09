@@ -74,7 +74,7 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
     const float cam_pdf_ratio = abs(cos_y) / (cam_A * cos_3_theta * len * len);
     vec3 ray_origin = offset_ray(pos, nrm);
     float pdf_rev, pdf_fwd;
-    const vec3 f = eval_bsdf(nrm, wo, mat, 0, dot(payload.shading_nrm, wo) > 0,
+    const vec3 f = eval_bsdf(nrm, wo, mat, 0, dot(payload.n_s, wo) > 0,
                              dir, pdf_fwd, pdf_rev, cos_y);
     if (f == vec3(0)) {
         return L;
@@ -134,7 +134,7 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
     // const Material light_mat =
     //     load_material(light_material_idx, uv_unused);
     // vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
-    // record.triangle_normal);
+    // record.n_s);
     uint light_idx;
     uint light_triangle_idx;
     uint light_material_idx;
@@ -150,12 +150,12 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
         sample_light_Le(pc_ray.num_lights, pc_ray.light_triangle_count,
                         light_idx, light_triangle_idx, light_material_idx,
                         light, record, light_mat, pdf_pos, seed, wi, pdf_dir, phi, u, v);
-    float cos_theta = abs(dot(wi, record.triangle_normal));
+    float cos_theta = abs(dot(wi, record.n_s));
     if (pdf_dir <= EPS) {
         return false;
     }
     light_state.pos = record.pos;
-    light_state.shading_nrm = record.triangle_normal;
+    light_state.n_s = record.n_s;
     light_state.area = 1.0 / record.triangle_pdf;
     light_state.wi = wi;
     light_state.throughput =
@@ -165,7 +165,7 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
     light_state.d_vm = light_state.d_vc * eta_vc;
     s.pos = record.pos;
     s.dir = wi;
-    s.normal = record.triangle_normal;
+    s.normal = record.n_s;
     s.light_material_idx = light_material_idx;
     s.triangle_pdf = record.triangle_pdf;
     s.hash_idx = get_restir_hash_idx(light_idx, u, v);
@@ -228,19 +228,19 @@ void main() {
             }
             vec3 wo = light_state.pos - payload.pos;
 
-            vec3 shading_nrm = payload.shading_nrm;
-            float cos_wo = dot(wo, shading_nrm);
-            vec3 geometry_nrm = payload.geometry_nrm;
+            vec3 n_s = payload.n_s;
+            float cos_wo = dot(wo, n_s);
+            vec3 n_g = payload.n_g;
             bool side = true;
-            if (dot(payload.geometry_nrm, wo) <= 0.)
-                geometry_nrm = -geometry_nrm;
+            if (dot(payload.n_g, wo) <= 0.)
+                n_g = -n_g;
             if (cos_wo <= 0.) {
                 cos_wo = -cos_wo;
-                shading_nrm = -shading_nrm;
+                n_s = -n_s;
                 side = false;
             }
 
-            if (dot(geometry_nrm, wo) * dot(shading_nrm, wo) <= 0) {
+            if (dot(n_g, wo) * dot(n_s, wo) <= 0) {
                 // We dont handle BTDF at the moment
                 break;
             }
@@ -252,7 +252,7 @@ void main() {
             const bool mat_specular =
                 (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
             // Complete the missing geometry terms
-            float cos_theta_wo = abs(dot(wo, shading_nrm));
+            float cos_theta_wo = abs(dot(wo, n_s));
             // Can't connect from specular to camera path, can't merge either
             light_state.d_vcm *= dist_sqr;
             light_state.d_vcm /= cos_theta_wo;
@@ -268,7 +268,7 @@ void main() {
                 // Connect to camera
                 ivec2 coords;
                 vec3 splat_col = vcm_connect_cam(
-                    cam_pos, cam_nrm, shading_nrm, cam_area, payload.pos,
+                    cam_pos, cam_nrm, n_s, cam_area, payload.pos,
                     light_state, eta_vm, wo, mat, coords);
                 float lum = luminance(splat_col);
                 if (lum > 0) {
@@ -280,10 +280,10 @@ void main() {
             float pdf_dir;
             float cos_theta;
             const vec3 f =
-                sample_bsdf(shading_nrm, wo, mat, 0, side, light_state.wi,
+                sample_bsdf(n_s, wo, mat, 0, side, light_state.wi,
                             pdf_dir, cos_theta, seed);
             const bool same_hemisphere =
-                same_hemisphere(light_state.wi, wo, shading_nrm);
+                same_hemisphere(light_state.wi, wo, n_s);
 
             const bool mat_transmissive =
                 (mat.bsdf_props & BSDF_TRANSMISSIVE) == BSDF_TRANSMISSIVE;
@@ -293,11 +293,11 @@ void main() {
             }
             float pdf_rev = pdf_dir;
             if (!mat_specular) {
-                pdf_rev = bsdf_pdf(mat, shading_nrm, light_state.wi, wo);
+                pdf_rev = bsdf_pdf(mat, n_s, light_state.wi, wo);
             }
             const float abs_cos_theta = abs(cos_theta);
 
-            light_state.pos = offset_ray(payload.pos, shading_nrm);
+            light_state.pos = offset_ray(payload.pos, n_s);
             // Note, same cancellations also occur here from now on
             // see _vcm_generate_light_sample_
             if (!mat_specular) {
@@ -317,7 +317,7 @@ void main() {
             }
 
             light_state.throughput *= f * abs_cos_theta / pdf_dir;
-            light_state.shading_nrm = shading_nrm;
+            light_state.n_s = n_s;
             light_state.area = payload.area;
             light_state.material_idx = payload.material_idx;
         }
