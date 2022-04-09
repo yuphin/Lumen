@@ -17,7 +17,7 @@ const float tmax = 10000.0;
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
 vec3 uniform_sample_light(const Material mat, const vec3 pos,
-                          const bool side, const vec3 shading_nrm,
+                          const bool side, const vec3 shading_nrm, const vec3 geometry_nrm,
                           const vec3 wo, const bool is_specular) {
     vec3 res = vec3(0);
     // Sample light
@@ -38,14 +38,16 @@ vec3 uniform_sample_light(const Material mat, const vec3 pos,
     float cos_x = dot(shading_nrm, wi);
     const uint props = is_specular ? BSDF_ALL : BSDF_ALL & ~BSDF_SPECULAR;
     vec3 f = eval_bsdf(shading_nrm, wo, mat, 1, side, wi, bsdf_pdf, cos_x);
+    
     float pdf_light;
+    const vec3 p = offset_ray(pos, geometry_nrm);
     if (f != vec3(0)) {
 
         any_hit_payload.hit = 1;
         traceRayEXT(tlas,
                     gl_RayFlagsTerminateOnFirstHitEXT |
                         gl_RayFlagsSkipClosestHitShaderEXT,
-                    0xFF, 1, 0, 1, pos, 0, wi, wi_len - EPS, 1);
+                    0xFF, 1, 0, 1, p, 0, wi, wi_len, 1);
         bool visible = any_hit_payload.hit == 0;
         float g = abs(dot(record.triangle_normal, -wi)) / (wi_len * wi_len);
         if (pc_ray.use_area_sampling == 0) {
@@ -66,7 +68,7 @@ vec3 uniform_sample_light(const Material mat, const vec3 pos,
         f = sample_bsdf(shading_nrm, wo, mat, 1, side, wi, bsdf_pdf, cos_x,
                         seed);
         if (bsdf_pdf != 0) {
-            traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, pos, tmin, wi, tmax, 0);
+            traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, p, tmin, wi, tmax, 0);
             if (payload.material_idx == light_material_idx &&
                 payload.triangle_idx == light_triangle_idx) {
                 const float wi_len = length(payload.pos - pos);
@@ -128,23 +130,22 @@ void main() {
         }
         const vec3 wo = -direction;
         vec3 shading_nrm = payload.shading_nrm;
-        float cos_wo = dot(wo, shading_nrm);
         bool side = true;
 #if 1
         vec3 geometry_nrm = payload.geometry_nrm;
         if (dot(payload.geometry_nrm, wo) < 0.)
             geometry_nrm = -geometry_nrm;
-        if (cos_wo < 0.) {
-            cos_wo = -cos_wo;
+        if (dot(geometry_nrm, payload.shading_nrm) < 0) {
             shading_nrm = -shading_nrm;
             side = false;
         }
+        float cos_wo = dot(wo, shading_nrm);
 #endif
-        const vec3 pos = offset_ray(payload.pos, shading_nrm);
+        const vec3 pos = offset_ray(payload.pos, geometry_nrm);
         if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
             const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
             col += throughput *
-                   uniform_sample_light(hit_mat, pos, side, shading_nrm, wo,
+                   uniform_sample_light(hit_mat, pos, side, shading_nrm, geometry_nrm, wo,
                                         specular) /
                    light_pick_pdf;
         }
@@ -169,6 +170,9 @@ void main() {
             else
                 throughput /= rr_prob;
         }
+    }
+    if(isnan(luminance(col))) {
+        return;
     }
     if (pc_ray.frame_num > 0) {
         float w = 1. / float(pc_ray.frame_num + 1);

@@ -203,6 +203,7 @@ vec3 sample_bsdf(const vec3 shading_nrm, const vec3 wo, const Material mat,
     } break;
 
     case BSDF_DISNEY: {
+
 #if ENABLE_DISNEY
         const float diffuse_ratio = 0.5 * (1 - mat.metallic);
         if (rands.x < diffuse_ratio) {

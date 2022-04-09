@@ -37,5 +37,5 @@ void main() {
     if(pc.enable_tonemapping == 1) {
         img = vec4(aces(img.rgb), img.a);
     }
-    fragColor = img;
+    fragColor =  img;
 }
