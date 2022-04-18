@@ -248,9 +248,15 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 			lights[light_idx].to = glm::vec3({ dir[0], dir[1], dir[2] });
 			lights[light_idx].L = glm::vec3({ L[0], L[1], L[2] });
 			if (light["type"] == "spot") {
-				lights[light_idx].light_type = LIGHT_SPOT;
+				lights[light_idx].light_flags |= LIGHT_SPOT;
+				// Is finite 
+				lights[light_idx].light_flags |= 1 << 4;
+				// Is delta
+				lights[light_idx].light_flags |= 1 << 5;
 			} else if (light["type"] == "directional") {
-				lights[light_idx].light_type = LIGHT_DIRECTIONAL;
+				lights[light_idx].light_flags |= LIGHT_DIRECTIONAL;
+				// Is delta
+				lights[light_idx].light_flags |= 1 << 5;
 
 			}
 			light_idx++;
@@ -267,6 +273,9 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 		// Load objs
 		int i = 0;
 		for (const auto& mesh : mitsuba_parser.meshes) {
+			if (mesh.file == "") {
+				continue;
+			}
 			const std::string mesh_file = root + mesh.file;
 			tinyobj::ObjReaderConfig reader_config;
 			//reader_config.mtl_search_path = "./"; // Path to material files
@@ -367,6 +376,9 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 				materials[i].subsurface = 0.1;
 				materials[i].albedo = m_bsdf.albedo;
 				materials[i].roughness = m_bsdf.roughness;
+			} else if (m_bsdf.type == "conductor") {
+				materials[i].bsdf_type = BSDF_MIRROR;
+				materials[i].bsdf_props = BSDF_SPECULAR | BSDF_REFLECTIVE;
 			}
 #endif
 			i++;
@@ -380,7 +392,7 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 			if (light.type == "directional") {
 				lights[i].pos = light.from;
 				lights[i].to = light.to;
-				lights[i].light_type = LIGHT_DIRECTIONAL;
+				lights[i].light_flags = LIGHT_DIRECTIONAL;
 			}
 			i++;
 		}

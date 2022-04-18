@@ -1,7 +1,7 @@
 #include "LumenPCH.h"
 #include "MitsubaParser.h"
 #include <mitsuba_parser/tinyparser-mitsuba.h>
-using namespace TPM_NAMESPACE;
+
 
 void MitsubaParser::parse(const std::string& path) {
 	SceneLoader loader;
@@ -68,6 +68,11 @@ void MitsubaParser::parse(const std::string& path) {
 			case OT_SHAPE:
 			{
 				MitsubaMesh mesh;
+				if (obj->pluginType() == "obj") {
+
+				} else if (obj->pluginType() == "rectangle") {
+					int a = 4;
+				}
 				for (const auto& prop : obj->properties()) {
 					if (prop.first == "filename") {
 						mesh.file = prop.second.getString();
@@ -107,7 +112,8 @@ void MitsubaParser::parse(const std::string& path) {
 						auto dir = prop.second.getVector();
 						light.from = glm::vec3({ dir.x, dir.y, dir.z });
 					} else if (prop.first == "sun_scale") {
-						light.L = glm::vec3({ 0.99,0.368,0.325 }) * prop.second.getNumber();
+						//light.L = glm::vec3({ 0.99,0.368,0.325 }) * prop.second.getNumber();
+						light.L = glm::vec3(1) * prop.second.getNumber();
 					}
 				}
 				lights.push_back(light);

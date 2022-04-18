@@ -1,8 +1,9 @@
 #include "LumenPCH.h"
 #include "Path.h"
 
-const int max_depth = 17;
-const vec3 sky_col(0.53, 0.8, 0.92);
+const int max_depth = 4;
+//const vec3 sky_col(0.53, 0.8, 0.92);
+const vec3 sky_col(0,0,0);
 void Path::init() {
 	Integrator::init();
 	SceneDesc desc;

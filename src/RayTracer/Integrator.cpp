@@ -59,9 +59,13 @@ void Integrator::init() {
 		auto& mef = lumen_scene.materials[pm.material_idx].emissive_factor;
 		if (mef.x > 0 || mef.y > 0 || mef.z > 0) {
 			Light light;
+			light.world_matrix = pm.world_matrix;
 			light.num_triangles = pm.idx_count / 3;
 			light.prim_mesh_idx = idx;
 			light.light_flags = LIGHT_AREA;
+			// Is finite
+			light.light_flags |= 1 << 4;
+			auto a = ((light.light_flags >> 4) & 0x1) != 0;;
 			lights.emplace_back(light);
 			total_light_triangle_cnt += light.num_triangles;
 		}
@@ -71,7 +75,7 @@ void Integrator::init() {
 	for (auto& l : lumen_scene.lights) {
 		Light light;
 		light.L = l.L;
-		light.light_flags = l.light_type;
+		light.light_flags = l.light_flags;
 		light.pos = l.pos;
 		light.to = l.to;
 		total_light_triangle_cnt++;

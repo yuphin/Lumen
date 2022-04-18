@@ -28,9 +28,9 @@
         BSDF_LAMBERTIAN
 
 // Light Type
-#define LIGHT_SPOT 1 << 0
-#define LIGHT_AREA 1 << 1
-#define LIGHT_DIRECTIONAL 1 << 2
+#define LIGHT_SPOT 1
+#define LIGHT_AREA 2
+#define LIGHT_DIRECTIONAL 3
 
 #ifdef __cplusplus
 #include <glm/glm.hpp>
@@ -160,6 +160,7 @@ struct PathVertex {
     vec3 pos;
     vec2 uv;
     vec3 throughput;
+    uint light_flags;
     uint light_idx;
     uint material_idx;
     uint delta;

@@ -4,11 +4,12 @@
 #include <fstream>
 const int max_depth = 6;
 const int max_samples = 50000;
-const vec3 sky_col(0, 0, 0);
+const vec3 sky_col(0);
 static float vcm_radius_factor = 0.1;
 static bool use_vm = false;
 static bool use_vc = true;
 static bool written = false;
+const bool ray_guide = false;
 void VCM::init() {
 	Integrator::init();
 
@@ -806,7 +807,7 @@ void VCM::create_rt_pipelines() {
 	vcm_spawn_light_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	vcm_sample_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	settings.shaders = { shaders[0], shaders[4], shaders[5], shaders[6], shaders[7] };
-	vcm_light_pipeline->create_rt_pipeline(settings);
+	vcm_light_pipeline->create_rt_pipeline(settings, {(uint32_t)ray_guide});
 	vkDestroyShaderModule(instance->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[1].create_vk_shader_module(instance->vkb.ctx.device);
 	settings.stages = stages;

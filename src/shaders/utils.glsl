@@ -3,6 +3,7 @@
 #include "commons.h"
 #define PI 3.14159265359
 #define PI2 6.28318530718
+#define INV_PI (1. / PI)
 #define INF 1e10
 #define EPS 0.001
 #define SHADOW_EPS 2 / 65536.
@@ -39,6 +40,12 @@ struct TriangleRecord {
     vec3 pos;
     vec3 n_s;
     float triangle_pdf;
+};
+
+struct LightRecord {
+    uint material_idx;
+    uint triangle_idx; 
+    uint flags;
 };
 
 #define pow5(x) (x * x) * (x * x) * x

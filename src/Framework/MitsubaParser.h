@@ -1,7 +1,7 @@
 #pragma once
 #include "LumenPCH.h"
 #include <mitsuba_parser/tinyparser-mitsuba.h>
-
+using namespace TPM_NAMESPACE;
 struct MitsubaParser {
 
 	struct MitsubaBSDF {
@@ -9,8 +9,13 @@ struct MitsubaParser {
 		std::string type = "";
 		std::string texture = "";
 		glm::vec3 albedo = glm::vec3(1);
+		glm::vec3 emissive_factor = glm::vec3(0);
 		float roughness = 0;
 
+	};
+
+	enum class MitsubaShape {
+		Rectangle
 	};
 
 	struct MitsubaLight {
@@ -22,11 +27,12 @@ struct MitsubaParser {
 	};
 
 	struct MitsubaMesh {
-		std::string file;
+		std::string file = "";
 		// In case
-		std::string bsdf_ref;
-		int bsdf_idx;
-		glm::mat4 transform;
+		std::string bsdf_ref = "";
+		int bsdf_idx = -1;
+		MitsubaShape shape;
+		glm::mat4 transform = glm::mat4(1);
 	};
 
 	struct MitsubaCamera {
@@ -34,6 +40,7 @@ struct MitsubaParser {
 		glm::mat4 cam_matrix;
 	};
 	void parse(const std::string& path);
+
 
 	std::vector<MitsubaBSDF> bsdfs;
 	std::vector<MitsubaMesh> meshes;

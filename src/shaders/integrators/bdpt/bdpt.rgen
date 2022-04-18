@@ -27,6 +27,7 @@ uint bdpt_path_idx =
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
+float light_pdf_pos;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
@@ -47,14 +48,16 @@ int bdpt_random_walk(const int max_depth, vec3 throughput, const float pdf,
     int prev = 0;
     const uint flags = gl_RayFlagsOpaqueEXT;
     const float tmin = 0.001;
-    const float tmax = 10000.0;
+    const float tmax = 1e6;
     vec3 ray_pos = vtx(-1, pos);
     float pdf_fwd = pdf;
     float pdf_rev = 0.;
     vec3 wi = vtx(-1, dir);
+    bool finite_light = is_light_finite(vtx(-1, light_flags));
     while (true) {
         prev = b - 1;
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, ray_pos, tmin, wi, tmax, 0);
+
         if (payload.material_idx == -1) {
             if (type == 1) {
                 vtx_assign(b, throughput, throughput);
@@ -64,6 +67,7 @@ int bdpt_random_walk(const int max_depth, vec3 throughput, const float pdf,
 
             break;
         }
+
         vec3 wo = vtx(prev, pos) - payload.pos;
         float wo_len = length(wo);
         wo /= wo_len;
@@ -76,16 +80,14 @@ int bdpt_random_walk(const int max_depth, vec3 throughput, const float pdf,
             n_s *= -1;
             side = false;
         }
-        vtx_assign(b, pdf_fwd,
-                   pdf_fwd * abs(dot(wo, n_s)) / (wo_len * wo_len));
+        vtx_assign(b, pdf_fwd, pdf_fwd * abs(dot(wo, n_s)) / (wo_len * wo_len));
         vtx_assign(b, n_s, n_s);
         vtx_assign(b, area, payload.area);
         vtx_assign(b, pos, payload.pos);
         vtx_assign(b, uv, payload.uv);
         vtx_assign(b, material_idx, payload.material_idx);
         vtx_assign(b, throughput, throughput);
-        const Material mat =
-            load_material(payload.material_idx, payload.uv);
+        const Material mat = load_material(payload.material_idx, payload.uv);
         const bool mat_specular =
             (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
         const bool mat_transmissive =
@@ -97,8 +99,8 @@ int bdpt_random_walk(const int max_depth, vec3 throughput, const float pdf,
         }
 
         float cos_theta;
-        const vec3 f = sample_bsdf(n_s, wo, mat, type, side, wi,
-                                   pdf_fwd, cos_theta, seed);
+        const vec3 f =
+            sample_bsdf(n_s, wo, mat, type, side, wi, pdf_fwd, cos_theta, seed);
         const bool same_hem = same_hemisphere(wi, wo, n_s);
         if (f == vec3(0) || pdf_fwd == 0 || (!same_hem && !mat_transmissive)) {
             break;
@@ -109,7 +111,13 @@ int bdpt_random_walk(const int max_depth, vec3 throughput, const float pdf,
         if (!mat_specular) {
             pdf_rev = bsdf_pdf(mat, n_s, wi, wo);
         }
-        if (pdf_rev > 0.) {
+        bool g_term = false;
+        if (prev > -1) {
+            g_term = true;
+        } else if (type == 1 || (type == 0 && finite_light)) {
+            g_term = true;
+        }
+        if (g_term) {
             pdf_rev *= abs(dot(vtx(prev, n_s), wo)) / (wo_len * wo_len);
         }
         vtx_assign(prev, pdf_rev, pdf_rev);
@@ -121,38 +129,37 @@ int bdpt_random_walk(const int max_depth, vec3 throughput, const float pdf,
 }
 
 int bdpt_generate_light_subpath(int max_depth) {
-    uint light_idx;
-    uint light_triangle_idx;
-    uint light_material_idx;
-    vec2 uv_unused;
-    Light light;
-    TriangleRecord record;
-    Material light_mat;
+    LightRecord light_record;
+    vec3 wi, pos, n;
     float pdf_pos, pdf_dir;
-    vec3 wi;
+    float cos_theta;
     const vec3 Le =
-        sample_light_Le(pc_ray.num_lights, pc_ray.light_triangle_count,
-                        light_idx, light_triangle_idx, light_material_idx,
-                        light, record, light_mat, pdf_pos, seed, wi, pdf_dir);
+        sample_light_Le(seed, pc_ray.num_lights, pc_ray.light_triangle_count,
+                        cos_theta, light_record, pos, wi, n, pdf_pos, pdf_dir);
     if (pdf_dir <= 0) {
         return 0;
     }
+    light_pdf_pos = pdf_pos;
 
-    light_verts.d[bdpt_path_idx + 0].pos = record.pos;
-    light_verts.d[bdpt_path_idx + 0].n_s = record.n_s;
-    light_verts.d[bdpt_path_idx + 0].material_idx = light_material_idx;
-    light_verts.d[bdpt_path_idx + 0].light_idx = light_idx;
-    light_verts.d[bdpt_path_idx + 0].area = 1.0 / record.triangle_pdf;
-    light_verts.d[bdpt_path_idx + 0].delta = 0;
-
-    light_verts.d[bdpt_path_idx + 0].dir = wi;
-    light_verts.d[bdpt_path_idx + 0].pdf_fwd = pdf_pos;
-
-    vec3 throughput = Le * abs(dot(record.n_s, wi)) /
-                      (pdf_dir * light_verts.d[bdpt_path_idx + 0].pdf_fwd);
+    light_verts.d[bdpt_path_idx].pos = pos;
+    light_verts.d[bdpt_path_idx].light_flags = light_record.flags;
+    light_verts.d[bdpt_path_idx].delta = 0;
+    light_verts.d[bdpt_path_idx].dir = wi;
+    light_verts.d[bdpt_path_idx].pdf_fwd = pdf_pos;
+    light_verts.d[bdpt_path_idx].n_s = n;
+    vec3 throughput =
+        Le * cos_theta / (pdf_dir * light_verts.d[bdpt_path_idx + 0].pdf_fwd);
     light_verts.d[bdpt_path_idx + 0].throughput = Le;
-
-    return bdpt_random_walk(max_depth - 1, throughput, pdf_dir, 0) + 1;
+    int num_light_verts =
+        bdpt_random_walk(max_depth - 1, throughput, pdf_dir, 0) + 1;
+    if (!is_light_finite(light_record.flags)) {
+        light_verts.d[bdpt_path_idx + 1].pdf_fwd =
+            pdf_pos * abs(dot(wi, light_verts.d[bdpt_path_idx + 1].n_s));
+    }
+    if (is_light_delta(light_record.flags)) {
+        light_verts.d[bdpt_path_idx].pdf_fwd = 0;
+    }
+    return num_light_verts;
 }
 
 int bdpt_generate_camera_subpath(const vec2 d, const vec3 origin, int max_depth,
@@ -162,8 +169,7 @@ int bdpt_generate_camera_subpath(const vec2 d, const vec3 origin, int max_depth,
     camera_verts.d[bdpt_path_idx].area = cam_area;
     camera_verts.d[bdpt_path_idx].throughput = vec3(1.0);
     camera_verts.d[bdpt_path_idx].delta = 0;
-    camera_verts.d[bdpt_path_idx].n_s =
-        vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
+    camera_verts.d[bdpt_path_idx].n_s = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
     float cos_theta = dot(camera_verts.d[bdpt_path_idx].dir,
                           camera_verts.d[bdpt_path_idx].n_s);
     float pdf =
@@ -171,7 +177,7 @@ int bdpt_generate_camera_subpath(const vec2 d, const vec3 origin, int max_depth,
     return bdpt_random_walk(max_depth - 1, vec3(1), pdf, 1) + 1;
 }
 
-float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
+float calc_mis_weight(int s, int t, const in PathVertex sampled) {
 #define cam_vtx(i) camera_verts.d[bdpt_path_idx + i]
 #define light_vtx(i) light_verts.d[bdpt_path_idx + i]
 #define remap0(i) (i != 0. ? i : 1.)
@@ -193,52 +199,63 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
     if (s + t == 2) {
         return 1.0;
     }
+
     if (s == 1) {
         s_0_pdf = light_vtx(0).pdf_fwd;
         s_0_pdf_pos = light_vtx(0).pos;
         s_0_pdf_nrm = light_vtx(0).n_s;
-        light_vtx(0).pdf_fwd = s_fwd_pdf.pdf_fwd;
-        light_vtx(0).pos = s_fwd_pdf.pos;
-        light_vtx(0).n_s = s_fwd_pdf.n_s;
+        light_vtx(0).pdf_fwd = sampled.pdf_fwd;
+        light_vtx(0).pos = sampled.pos;
+        light_vtx(0).n_s = sampled.n_s;
         s_0_changed = true;
     }
     if (t == 1) {
         s_0_pdf = cam_vtx(0).pdf_fwd;
         s_0_pdf_pos = cam_vtx(0).pos;
         s_0_pdf_nrm = cam_vtx(0).n_s;
-        cam_vtx(0).pdf_fwd = s_fwd_pdf.pdf_fwd;
-        cam_vtx(0).pos = s_fwd_pdf.pos;
-        cam_vtx(0).n_s = s_fwd_pdf.n_s;
+        cam_vtx(0).pdf_fwd = sampled.pdf_fwd;
+        cam_vtx(0).pos = sampled.pos;
+        cam_vtx(0).n_s = sampled.n_s;
         t_0_changed = true;
     }
+    delta_t_old = cam_vtx(t - 1).delta;
+    cam_vtx(t - 1).delta = 0;
+    delta_s_old = light_vtx(s - 1).delta;
+    light_vtx(s - 1).delta = 0;
+
     if (t > 0) {
         idx_1_val = cam_vtx(t - 1).pdf_rev;
         idx_1 = t;
-        delta_t_old = cam_vtx(t - 1).delta;
-        cam_vtx(t - 1).delta = 0;
+
         if (s > 0) {
             vec3 dir = (cam_vtx(t - 1).pos - light_vtx(s - 1).pos);
             float dir_len = length(dir);
             dir /= dir_len;
-            const Material mat = load_material(
-                light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
+            const Material mat = load_material(light_vtx(s - 1).material_idx,
+                                               light_vtx(s - 1).uv);
             vec3 wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
             float pdf_rev;
             if (s >= 2) {
                 wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
                 pdf_rev = bsdf_pdf(mat, light_vtx(s - 1).n_s, wo, dir);
-            }
-            if (s < 2) {
-                const Light light = lights[light_vtx(s - 1).light_idx];
-                pdf_rev = light_pdf(light, light_vtx(s - 1).n_s, dir);
+                pdf_rev *=
+                    abs(dot(dir, cam_vtx(t - 1).n_s)) / (dir_len * dir_len);
+            } else if (s == 1) {
+                if (!is_light_finite(light_vtx(0).light_flags)) {
+                    // Note: All the infinite lights are of directional type
+                    pdf_rev = light_pdf_pos;
+                    pdf_rev *= abs(dot(dir, cam_vtx(t - 1).n_s));
+                } else {
+                    pdf_rev = light_pdf(light_vtx(0).light_flags,
+                                        light_vtx(0).n_s, dir);
+                    pdf_rev *=
+                        abs(dot(dir, cam_vtx(t - 1).n_s)) / (dir_len * dir_len);
+                }
             }
             cam_vtx(t - 1).pdf_rev = pdf_rev;
-            if (cam_vtx(t - 1).pdf_rev != 0) {
-                cam_vtx(t - 1).pdf_rev *=
-                    abs(dot(dir, cam_vtx(t - 1).n_s)) /
-                    (dir_len * dir_len);
-            }
         } else {
+            // s == 0, i.e the path is on a finite light source
+            // cam_vtx(t-1).area gives the area of the emitter that was hit
             cam_vtx(t - 1).pdf_rev =
                 1.0 / (pc_ray.light_triangle_count * cam_vtx(t - 1).area);
         }
@@ -253,12 +270,10 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
             const Material mat =
                 load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
             vec3 wo = normalize(light_vtx(s - 1).pos - cam_vtx(t - 1).pos);
-            cam_vtx(t - 2).pdf_rev =
-                bsdf_pdf(mat, cam_vtx(t - 1).n_s, wo, dir);
+            cam_vtx(t - 2).pdf_rev = bsdf_pdf(mat, cam_vtx(t - 1).n_s, wo, dir);
             if (cam_vtx(t - 2).pdf_rev != 0) {
                 cam_vtx(t - 2).pdf_rev *=
-                    abs(dot(dir, cam_vtx(t - 2).n_s)) /
-                    (dir_len * dir_len);
+                    abs(dot(dir, cam_vtx(t - 2).n_s)) / (dir_len * dir_len);
             }
         } else {
             // Assumption: All lights are finite
@@ -268,21 +283,20 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
                 abs(cos_x * cos_y) / (PI * dir_len * dir_len);
         }
     }
+
     if (s > 0) {
         // t is always > 0
         idx_3_val = light_vtx(s - 1).pdf_rev;
         idx_3 = s;
-        delta_s_old = light_vtx(s - 1).delta;
-        light_vtx(s - 1).delta = 0;
         vec3 dir = (light_vtx(s - 1).pos - cam_vtx(t - 1).pos);
         float dir_len = length(dir);
         dir /= dir_len;
         if (t == 1) {
+            // t == 1 implies s > 1
             float cos_theta = dot(cam_vtx(0).n_s, dir);
             float pdf = 1.0 / (cam_vtx(0).area * screen_size * cos_theta *
                                cos_theta * cos_theta);
-            pdf *= abs(dot(dir, light_vtx(s - 1).n_s)) /
-                   (dir_len * dir_len);
+            pdf *= abs(dot(dir, light_vtx(s - 1).n_s)) / (dir_len * dir_len);
             light_vtx(s - 1).pdf_rev = pdf;
         } else {
             vec3 wo = normalize(cam_vtx(t - 2).pos - cam_vtx(t - 1).pos);
@@ -290,10 +304,10 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
                 load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
             light_vtx(s - 1).pdf_rev =
                 bsdf_pdf(mat, cam_vtx(t - 1).n_s, wo, dir);
-            if (light_vtx(s - 1).pdf_rev != 0) {
+            if ((s == 1 && is_light_finite(light_vtx(0).light_flags)) ||
+                s > 1) {
                 light_vtx(s - 1).pdf_rev *=
-                    abs(dot(dir, light_vtx(s - 1).n_s)) /
-                    (dir_len * dir_len);
+                    abs(dot(dir, light_vtx(s - 1).n_s)) / (dir_len * dir_len);
             }
         }
     }
@@ -306,14 +320,15 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
         dir /= dir_len;
         const Material mat =
             load_material(light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
-        light_vtx(s - 2).pdf_rev =
-            bsdf_pdf(mat, light_vtx(s - 1).n_s, wo, dir);
-        if (light_vtx(s - 2).pdf_rev != 0) {
+        // t - 1 -> s-1 -> s-2
+        light_vtx(s - 2).pdf_rev = bsdf_pdf(mat, light_vtx(s - 1).n_s, wo, dir);
+        // g = 1 for infinite lights
+        if (s == 2 && is_light_finite(light_vtx(0).light_flags) || s > 2) {
             light_vtx(s - 2).pdf_rev *=
-                abs(dot(dir, light_vtx(s - 2).n_s)) /
-                (dir_len * dir_len);
+                abs(dot(dir, light_vtx(s - 2).n_s)) / (dir_len * dir_len);
         }
     }
+
     float sum_ri = 0.;
     float weight = 1.0;
     for (int i = t - 1; i > 0; i--) {
@@ -325,7 +340,8 @@ float calc_mis_weight(int s, int t, const in PathVertex s_fwd_pdf) {
     weight = 1.0;
     for (int i = s - 1; i >= 0; i--) {
         weight *= remap0(light_vtx(i).pdf_rev) / remap0(light_vtx(i).pdf_fwd);
-        bool delta_prev = i > 0 ? light_vtx(i - 1).delta == 1 : false;
+        bool delta_prev = i > 0 ? light_vtx(i - 1).delta == 1
+                                : is_light_delta(light_vtx(0).light_flags);
         if (light_vtx(i).delta == 0 && !delta_prev) {
             sum_ri += weight;
         }
@@ -378,8 +394,7 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
     const float cam_pdf_ratio =
         abs(cos_y) / (cam_vtx(0).area * cos_3_theta * len * len);
 
-    vec3 ray_origin =
-        offset_ray2(light_vtx(s - 1).pos, light_vtx(s - 1).n_s);
+    vec3 ray_origin = offset_ray2(light_vtx(s - 1).pos, light_vtx(s - 1).n_s);
     const Material mat =
         load_material(light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
     const vec3 wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
@@ -407,8 +422,7 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
     target = -ubo.projection * target;
     coords = ivec2(0.5 * (1 + target.xy) * gl_LaunchSizeEXT.xy - 0.5);
     if (coords.x < 0 || coords.x >= gl_LaunchSizeEXT.x || coords.y < 0 ||
-        coords.y >= gl_LaunchSizeEXT.y ||
-        dot(dir, cam_vtx(0).n_s) < 0) {
+        coords.y >= gl_LaunchSizeEXT.y || dot(dir, cam_vtx(0).n_s) < 0) {
         return vec3(0);
     }
     float mis_weight = 1.0;
@@ -425,7 +439,7 @@ vec3 bdpt_connect(int s, int t) {
 #define cam_vtx(i) camera_verts.d[bdpt_path_idx + i]
 #define light_vtx(i) light_verts.d[bdpt_path_idx + i]
     vec3 L = vec3(0);
-    PathVertex s_fwd_pdf;
+    PathVertex sampled;
     if (s == 0) {
         // Pure camera path
         uint mat_idx = cam_vtx(t - 1).material_idx;
@@ -434,28 +448,16 @@ vec3 bdpt_connect(int s, int t) {
             L = mat.emissive_factor * cam_vtx(t - 1).throughput;
         }
     } else if (s == 1) {
-        // Connect from camera path to light(aka NEE)
-        uint light_idx;
-        uint light_triangle_idx;
-        uint light_material_idx;
-        vec2 uv_unused;
-        Light light;
-        TriangleRecord record;
-        Material light_mat;
+        vec3 wi;
+        float wi_len;
+        float pdf_pos_a;
+        vec3 n;
+        vec3 pos;
+        LightRecord record;
+        float cos_y;
         const vec3 Le =
-            sample_light(cam_vtx(t - 1).pos, pc_ray.num_lights, light_idx,
-                         light_triangle_idx, light_material_idx, light, record,
-                         light_mat, seed);
-        // const TriangleRecord record =
-        //     sample_area_light(light_idx, light_triangle_idx,
-        //     light_material_idx,
-        //                       light, seed, pc_ray.num_lights);
-        // const Material light_mat =
-        //     load_material(light_material_idx, uv_unused);
-        vec3 wi = record.pos - cam_vtx(t - 1).pos;
-        float ray_len = length(wi);
-        float ray_len_sqr = ray_len * ray_len;
-        wi /= ray_len;
+            sample_light_Li(seed, cam_vtx(t - 1).pos, pc_ray.num_lights, wi,
+                            wi_len, n, pos, pdf_pos_a, cos_y, record);
         const float cos_x = abs(dot(wi, cam_vtx(t - 1).n_s));
         const vec3 ray_origin =
             offset_ray2(cam_vtx(t - 1).pos, cam_vtx(t - 1).n_s);
@@ -469,19 +471,19 @@ vec3 bdpt_connect(int s, int t) {
             traceRayEXT(tlas,
                         gl_RayFlagsTerminateOnFirstHitEXT |
                             gl_RayFlagsSkipClosestHitShaderEXT,
-                        0xFF, 1, 0, 1, ray_origin, 0, wi, ray_len - EPS, 1);
+                        0xFF, 1, 0, 1, ray_origin, 0, wi, wi_len - EPS, 1);
             const bool visible = any_hit_payload.hit == 0;
             if (visible) {
-                float cos_y = abs(dot(-wi, record.n_s));
-                float G = abs(cos_x * cos_y) / ray_len_sqr;
-                float pdf_light =
-                    record.triangle_pdf / pc_ray.light_triangle_count;
-
-                s_fwd_pdf.pdf_fwd = pdf_light;
-                s_fwd_pdf.pos = record.pos;
-                s_fwd_pdf.n_s = record.n_s;
-                vec3 throughput = Le / pdf_light;
-                L = cam_vtx(t - 1).throughput * f * G * throughput;
+                const float pdf_light_w =
+                    light_pdf_a_to_w(record.flags, pdf_pos_a, n,
+                                     wi_len * wi_len, cos_y) /
+                    pc_ray.light_triangle_count;
+                sampled.pdf_fwd = pdf_pos_a / pc_ray.light_triangle_count;
+                sampled.pos = pos;
+                sampled.n_s = n;
+                sampled.delta = uint(is_light_delta(record.flags));
+                L = cam_vtx(t - 1).throughput * f * abs(cos_x) * Le /
+                    pdf_light_w;
             }
         }
     } else {
@@ -495,15 +497,13 @@ vec3 bdpt_connect(int s, int t) {
         if (G > 0) {
             const Material mat_1 =
                 load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
-            const Material mat_2 = load_material(
-                light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
+            const Material mat_2 = load_material(light_vtx(s - 1).material_idx,
+                                                 light_vtx(s - 1).uv);
 
             vec3 wo_1 = normalize(cam_vtx(t - 2).pos - cam_vtx(t - 1).pos);
             vec3 wo_2 = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
-            const vec3 brdf1 =
-                eval_bsdf(mat_1, wo_1, d, cam_vtx(t - 1).n_s);
-            const vec3 brdf2 =
-                eval_bsdf(mat_2, wo_2, -d, light_vtx(t - 1).n_s);
+            const vec3 brdf1 = eval_bsdf(mat_1, wo_1, d, cam_vtx(t - 1).n_s);
+            const vec3 brdf2 = eval_bsdf(mat_2, wo_2, -d, light_vtx(s - 1).n_s);
             if (brdf1 != vec3(0) && brdf2 != vec3(0)) {
                 vec3 ray_origin =
                     offset_ray2(cam_vtx(t - 1).pos, cam_vtx(t - 1).n_s);
@@ -525,7 +525,8 @@ vec3 bdpt_connect(int s, int t) {
 #undef light_vtx
     float mis_weight = 1.0f;
     if (luminance(L) != 0.) {
-        mis_weight = calc_mis_weight(s, t, s_fwd_pdf);
+        mis_weight = calc_mis_weight(s, t, sampled);
+
         L *= mis_weight;
     }
     return vec3(L);
@@ -571,7 +572,6 @@ void main() {
     col += splat_img;
     tmp_col.d[pixel_idx] = vec3(0);
     if (isnan(luminance(col))) {
-        debugPrintfEXT("nan\n");
         return;
     }
     if (pc_ray.frame_num > 0) {
