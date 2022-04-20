@@ -33,7 +33,7 @@ void main() {
     if (gl_GlobalInvocationID.x >= pc_ray.size_x * pc_ray.size_y) {
         return;
     }
-    const uint pingpong = (pc_ray.frame_num % 2);
+    const uint pingpong = (pc_ray.total_frame_num % 2);
     vec3 col = vec3(0);
     col += tmp_col.d[gl_GlobalInvocationID.x];
     uint idx = gl_GlobalInvocationID.x;
@@ -45,12 +45,11 @@ void main() {
         const vec3 wi = normalize(s.x_s - s.x_v);
         col += s.f * abs(dot(wi, s.n_v)) * s.L_o * r.W;
     }
-    //imageStore(image, ivec2(coords), vec4(col, 1.f));
     if (pc_ray.frame_num > 0) {
-        float w = 1. / float(pc_ray.frame_num + 1);
+        float w = 1. / float(pc_ray.total_frame_num + 1);
         vec3 old_col = imageLoad(image, ivec2(coords)).xyz;
-        imageStore(image, ivec2(coords), vec4(mix(old_col, col, w), 1.f));
-        //imageStore(image, ivec2(coords), vec4(col, 1.f));
+        //imageStore(image, ivec2(coords), vec4(mix(old_col, col, w), 1.f));
+        imageStore(image, ivec2(coords), vec4(col, 1.f));
     } else {
         imageStore(image, ivec2(coords), vec4(col, 1.f));
     }

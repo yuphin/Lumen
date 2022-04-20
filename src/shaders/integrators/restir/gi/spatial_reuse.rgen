@@ -17,7 +17,8 @@ const float tmin = 0.001;
 const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
+uvec4 seed =
+    init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num);
 Reservoirs spatial_reservoirs = Reservoirs(scene_desc.spatial_reservoir_addr);
 Reservoirs temp_reservoirs = Reservoirs(scene_desc.temporal_reservoir_addr);
 RestirSamples samples = RestirSamples(scene_desc.restir_samples_addr);
@@ -103,9 +104,9 @@ uint offset(const uint pingpong) {
 
 void main() {
     // TODO: Adaptively change this
-    const uint pingpong = (pc_ray.frame_num % 2);
-    const float max_r = 1;
-    const float depth_threshold = 0.01;
+    const uint pingpong = (pc_ray.total_frame_num % 2);
+    const float max_r = 3;
+    const float dist_threshold = 0.01;
     const float angle_threshold = 25 * PI / 180;
     ReservoirSample q = samples.d[pixel_idx];
     Reservoir r_s;
@@ -123,7 +124,7 @@ void main() {
                         vec3(0), vec3(0), vec3(0));
     uint Q_h[9] = uint[9](0, 0, 0, 0, 0, 0, 0, 0, 0);
     uint q_cnt = 0;
-   
+
     Reservoir r;
     r.w_sum = 0;
     r.W = 0;
@@ -136,6 +137,7 @@ void main() {
     uint Z = r_s.m;
     uint sum = r_s.m;
     ReservoirSample q_n;
+
     for (int i = 0; i < max_iter; i++) {
         // Choose a neighbor pixel
         const float randa = rand(seed) * 2 * PI;
@@ -146,16 +148,14 @@ void main() {
                                    ivec2(0), ivec2(gl_LaunchSizeEXT.xy) - 1);
         const uint coords_idx = coords.x * pc_ray.size_y + coords.y;
 
-       
         q_n = samples.d[coords_idx];
         if (length(q_n.n_s) == 0) {
             continue;
         }
         // Geometric similarity
-        const float l2_q = dot(q_n.x_v - q.x_v, q_n.x_v - q.x_v);
-        const float l2_qn = dot(q.x_v, q.x_v);
-        if (l2_q > depth_threshold * l2_qn ||
-            ((dot(q_n.n_v, q.n_v)) < (cos(angle_threshold)))) {
+        float dist = dot(q_n.x_v - q.x_v, q_n.x_v - q.x_v);
+        if (dist > dist_threshold ||
+            (dot(q_n.n_v, q.n_v)) < cos(angle_threshold)) {
             continue;
         }
         Reservoir r_n = temp_reservoirs.d[offset(pingpong ^ 1) + coords_idx];
@@ -189,9 +189,9 @@ void main() {
             }
         }
     }
+
     r.m = min(sum, M_MAX);
     r.W = Z * phat_val == 0 ? 0 : r.w_sum / (Z * phat_val);
-
 #define sr spatial_reservoirs.d[offset(pingpong) + pixel_idx]
     sr.w_sum = r.w_sum;
     sr.W = r.W;

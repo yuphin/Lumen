@@ -16,7 +16,7 @@ const float tmin = 0.001;
 const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num ^  pc_ray.random_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num);
 layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
 RestirSamples samples = RestirSamples(scene_desc.restir_samples_addr);
 ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
@@ -84,6 +84,7 @@ void main() {
     float p_q = 0;
     vec3 L_o = vec3(0);
     vec3 x_f = vec3(0);
+    uint mat_idx = -1;
     uint bsdf_props = 0;
     vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
                                                2. / gl_LaunchSizeEXT.y, 0, 1));
@@ -123,7 +124,6 @@ void main() {
         const vec3 wo = -direction;
         vec3 shading_nrm = payload.n_s;
         bool side = true;
-#if 1
         vec3 geometry_nrm = payload.n_g;
         if (dot(payload.n_g, wo) < 0.)
             geometry_nrm = -geometry_nrm;
@@ -131,8 +131,6 @@ void main() {
             shading_nrm = -shading_nrm;
             side = false;
         }
-#endif
-
         const vec3 pos = offset_ray(payload.pos, geometry_nrm);
         if (depth == 1) {
             x_s = pos;
@@ -165,6 +163,7 @@ void main() {
             n_v = shading_nrm;
             p_q = pdf;
             x_f = f;
+            mat_idx = payload.material_idx;
             bsdf_props = hit_mat.bsdf_props;
         }
 
@@ -195,6 +194,7 @@ void main() {
     samples.d[pixel_idx].L_o = L_o;
     samples.d[pixel_idx].p_q = p_q;
     samples.d[pixel_idx].f = x_f;
+    samples.d[pixel_idx].mat_idx = mat_idx;
     samples.d[pixel_idx].bsdf_props = bsdf_props;
     tmp_col.d[pixel_idx] += col;
 }

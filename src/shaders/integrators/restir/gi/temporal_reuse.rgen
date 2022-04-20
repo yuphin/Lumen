@@ -18,9 +18,11 @@ const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 #define M_MAX 30
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
+uvec4 seed =
+    init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num);
 
 RestirSamples samples = RestirSamples(scene_desc.restir_samples_addr);
+RestirSamples old_samples = RestirSamples(scene_desc.restir_samples_old_addr);
 Reservoirs temp_reservoirs = Reservoirs(scene_desc.temporal_reservoir_addr);
 Reservoirs spatial_reservoirs = Reservoirs(scene_desc.spatial_reservoir_addr);
 void init_s(out ReservoirSample s) {
@@ -55,36 +57,57 @@ uint offset(const uint pingpong) {
     return pingpong * pc_ray.size_x * pc_ray.size_y;
 }
 
+bool similar(ReservoirSample q, ReservoirSample q_n) {
+    const float depth_threshold = 0.5;
+    const float angle_threshold = 25 * PI / 180;
+    if (q.mat_idx != q_n.mat_idx ||
+        dot(q_n.n_v, q.n_v) < cos(angle_threshold)) {
+        return false;
+    }
+    return true;
+}
+#define tr temp_reservoirs.d[offset(pingpong ^ 1) + pixel_idx]
 void main() {
-    const uint pingpong = (pc_ray.frame_num % 2);
+    const uint pingpong = (pc_ray.total_frame_num % 2);
     const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
     const ReservoirSample s = samples.d[pixel_idx];
     Reservoir r;
     if (length(s.n_s) == 0) {
+        init_reservoir(r);
+        tr.w_sum = r.w_sum;
+        tr.W = r.W;
+        tr.m = r.m;
+        tr.s = r.s;
+        spatial_reservoirs.d[offset(pingpong ^ 1) + pixel_idx] = r;
         return;
     }
-    if (pc_ray.do_spatiotemporal == 1) {
+    if (pc_ray.do_spatiotemporal == 0) {
+        init_reservoir(r);
+    } else {
         vec4 prev_pos = ubo.prev_view * vec4(s.x_v, 1);
         prev_pos /= prev_pos.z;
         prev_pos = -ubo.prev_projection * prev_pos;
-        ivec2 prev_coords =
-            ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
-        if (prev_coords.x < 0 || prev_coords.x >= gl_LaunchSizeEXT.x ||
-            prev_coords.y < 0 || prev_coords.y >= gl_LaunchSizeEXT.y) {
-            // Temporal projection failed, reset both reservoirs
+        const vec2 prev_ndc = prev_pos.xy;
+        ivec2 prev_coords = ivec2(0.5 * (1 + prev_ndc) * gl_LaunchSizeEXT.xy);
+        bool reprojection_failed = true;
+        uint prev_coords_idx;
+        if (prev_coords.x >= 0 && prev_coords.x < gl_LaunchSizeEXT.x &&
+            prev_coords.y >= 0 && prev_coords.y < gl_LaunchSizeEXT.y) {
+            prev_coords_idx = prev_coords.x * pc_ray.size_y + prev_coords.y;
+            if (similar(samples.d[prev_coords_idx], old_samples.d[pixel_idx])) {
+                reprojection_failed = false;
+            }
+        }
+        if (!reprojection_failed) {
+            r = temp_reservoirs.d[offset(pingpong) + prev_coords_idx];
+        } else {
+            // Reprojection failed, reset both reservoirs
             // Temporal
             init_reservoir(r);
-            // Spatial reset
+            // Spatial
             spatial_reservoirs.d[offset(pingpong ^ 1) + pixel_idx] = r;
-        } else {
-            uint prev_coords_idx =
-                prev_coords.x * pc_ray.size_y + prev_coords.y;
-            r = temp_reservoirs.d[offset(pingpong) + prev_coords_idx];
         }
-    } else {
-        init_reservoir(r);
     }
-
     Reservoir r_new;
     r_new.w_sum = 0;
     r_new.W = 0;
@@ -93,7 +116,7 @@ void main() {
     const float w = phat / s.p_q;
     update_reservoir(r_new, s, w);
     r_new.W = phat == 0 ? 0 : r_new.w_sum / (r_new.m * phat);
-    
+
     Reservoir r_t;
     r_t.w_sum = 0;
     r_t.W = 0;
@@ -104,12 +127,12 @@ void main() {
     update_reservoir(r_t, r.s, r.m * r.W * p_hat(r.s.L_o));
     uint mval = r.m;
     const float new_phat = p_hat(r_t.s.L_o);
-    if(new_phat > 0) {
+    if (new_phat > 0) {
         mval++;
     }
-    r_t.m = min(r.m+1, M_MAX);
+    r_t.m = min(r.m + 1, M_MAX);
     r_t.W = new_phat * mval == 0 ? 0 : r_t.w_sum / (mval * new_phat);
-#define tr temp_reservoirs.d[offset(pingpong ^ 1) + pixel_idx]
+
     tr.w_sum = r_t.w_sum;
     tr.W = r_t.W;
     tr.m = r_t.m;

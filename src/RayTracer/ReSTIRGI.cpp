@@ -1,12 +1,21 @@
 #include "LumenPCH.h"
 #include "ReSTIRGI.h"
 
-const int max_depth = 13;
+const int max_depth = 5;
 const vec3 sky_col(0, 0, 0);
 void ReSTIRGI::init() {
 	Integrator::init();
 
 	restir_samples_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		instance->width * instance->height * sizeof(ReservoirSample)
+	);
+
+	restir_samples_old_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
@@ -40,8 +49,6 @@ void ReSTIRGI::init() {
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 		instance->width * instance->height * sizeof(float) * 3);
 
-
-
 	SceneDesc desc;
 	desc.vertex_addr = vertex_buffer.get_device_address();
 	desc.index_addr = index_buffer.get_device_address();
@@ -50,6 +57,7 @@ void ReSTIRGI::init() {
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
 	desc.restir_samples_addr = restir_samples_buffer.get_device_address();
+	desc.restir_samples_old_addr = restir_samples_old_buffer.get_device_address();
 	desc.temporal_reservoir_addr = temporal_reservoir_buffer.get_device_address();
 	desc.spatial_reservoir_addr = spatial_reservoir_buffer.get_device_address();
 	desc.color_storage_addr = tmp_col_buffer.get_device_address();
@@ -68,8 +76,10 @@ void ReSTIRGI::init() {
 	create_compute_pipelines();
 	pc_ray.total_light_area = 0;
 	pc_ray.frame_num = 0;
+	pc_ray.total_frame_num = 0;
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
+	pc_ray.world_radius = lumen_scene.m_dimensions.radius;
 }
 
 void ReSTIRGI::render() {
@@ -82,7 +92,7 @@ void ReSTIRGI::render() {
 	pc_ray.light_type = 0;
 	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = (int)lights.size();
-	pc_ray.time = rand() % UINT_MAX;
+	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.max_depth = max_depth;
 	pc_ray.sky_col = sky_col;
 	pc_ray.do_spatiotemporal = do_spatiotemporal;
@@ -153,7 +163,7 @@ void ReSTIRGI::render() {
 							  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
 					buffer_barrier(spatial_reservoir_buffer.handle,
 							  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-							  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
+							  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
 		};
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
@@ -196,10 +206,20 @@ void ReSTIRGI::render() {
 		int num_wgs = (instance->width * instance->height + 1023) / 1024;
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 	}
+	// Copy samples to the old buffer
+	{
+		VkBufferCopy copy_region = {};
+
+		copy_region.size = restir_samples_buffer.size;
+		vkCmdCopyBuffer(cmd.handle, restir_samples_buffer.handle, restir_samples_old_buffer.handle, 1,
+						&copy_region);
+	}
+
 	cmd.submit();
 	if (!do_spatiotemporal) {
 		do_spatiotemporal = true;
 	}
+	pc_ray.total_frame_num++;
 }
 
 bool ReSTIRGI::update() {
@@ -257,7 +277,7 @@ bool ReSTIRGI::update() {
 		result = true;
 		pc_ray.frame_num = 0;
 		updated = false;
-		do_spatiotemporal = false;
+		//do_spatiotemporal = false;
 	}
 	update_uniform_buffers();
 	return result;

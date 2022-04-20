@@ -82,6 +82,7 @@ struct PushConstantRay {
     uint total_frame_num;
     uint do_spatiotemporal;
     uint max_angle_samples;
+    float world_radius;
 };
 
 struct PushConstantPost {
@@ -316,19 +317,21 @@ struct BootstrapSample {
 
 struct ReservoirSample {
     vec3 x_v;
+    float p_q;
     vec3 n_v;
+    uint bsdf_props;
     vec3 x_s;
+    uint mat_idx;
     vec3 n_s;
     vec3 L_o;
     vec3 f;
-    float p_q;
-    uint bsdf_props;
 };
 
 struct Reservoir {
     float w_sum;
     float W;
     uint m;
+    uint pad;
     ReservoirSample s;
 };
 
@@ -460,6 +463,7 @@ struct SceneDesc {
     uint64_t mlt_atomicsum_addr;
     // ReSTIR
     uint64_t restir_samples_addr;
+    uint64_t restir_samples_old_addr;
     uint64_t g_buffer_addr;
     uint64_t temporal_reservoir_addr;
     uint64_t passthrough_reservoir_addr;

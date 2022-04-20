@@ -11,6 +11,7 @@ public:
 	virtual void reload() override;
 private:
 	Buffer restir_samples_buffer;
+	Buffer restir_samples_old_buffer;
 	Buffer temporal_reservoir_buffer;
 	Buffer spatial_reservoir_buffer;
 	Buffer tmp_col_buffer;
