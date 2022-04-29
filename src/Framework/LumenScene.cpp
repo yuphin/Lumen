@@ -380,6 +380,38 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 				materials[i].bsdf_type = BSDF_MIRROR;
 				materials[i].bsdf_props = BSDF_SPECULAR | BSDF_REFLECTIVE;
 			}
+#elif DIFFUSE_ONLY
+			materials[i].albedo = m_bsdf.albedo;
+			materials[i].bsdf_type = BSDF_DIFFUSE;
+			materials[i].bsdf_props = BSDF_OPAQUE | BSDF_LAMBERTIAN;
+
+#elif DIFFUSE_AND_GLOSSY_ONLY
+			materials[i].albedo = m_bsdf.albedo;
+			materials[i].bsdf_type = BSDF_DIFFUSE;
+			materials[i].bsdf_props = BSDF_OPAQUE | BSDF_LAMBERTIAN;
+			if (m_bsdf.type == "conductor") {
+				materials[i].bsdf_type = BSDF_MIRROR;
+				materials[i].bsdf_props = BSDF_SPECULAR | BSDF_REFLECTIVE;
+			} 
+			else if (m_bsdf.type == "glass") {
+				materials[i].bsdf_type = BSDF_GLASS;
+				materials[i].bsdf_props = BSDF_SPECULAR | BSDF_TRANSMISSIVE;
+				materials[i].ior = m_bsdf.ior;
+			}
+			else if (m_bsdf.type == "roughconductor") {
+				materials[i].bsdf_type = BSDF_GLOSSY;
+				materials[i].bsdf_props = BSDF_OPAQUE | BSDF_LAMBERTIAN | BSDF_REFLECTIVE;
+				materials[i].metalness = m_bsdf.albedo;
+				materials[i].albedo = vec3(1);
+				materials[i].roughness = m_bsdf.roughness * m_bsdf.roughness;
+			} else if (m_bsdf.type == "roughplastic") {
+				materials[i].bsdf_type = BSDF_GLOSSY;
+				materials[i].bsdf_props = BSDF_OPAQUE | BSDF_LAMBERTIAN | BSDF_REFLECTIVE;
+				materials[i].albedo = glm::pi<float>()  * m_bsdf.albedo;
+				materials[i].metalness = vec3(0.1);
+				materials[i].roughness = m_bsdf.roughness * m_bsdf.roughness;
+			
+			}
 #endif
 			i++;
 		}
@@ -393,6 +425,8 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 				lights[i].pos = light.from;
 				lights[i].to = light.to;
 				lights[i].light_flags = LIGHT_DIRECTIONAL;
+				// Is delta
+				lights[i].light_flags |= 1 << 5;
 			}
 			i++;
 		}

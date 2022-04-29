@@ -48,6 +48,8 @@ using uint = unsigned int;
 #endif
 
 #define ENABLE_DISNEY 0
+#define DIFFUSE_ONLY 0
+#define DIFFUSE_AND_GLOSSY_ONLY 1
 
 struct PushConstantRay {
     vec4 clear_color;
@@ -172,17 +174,19 @@ struct PathVertex {
 
 struct MLTPathVertex {
     vec3 dir;
-    vec3 n_s;
-    vec3 pos;
-    vec2 uv;
-    vec3 throughput;
-    uint material_idx;
-    uint light_idx;
     uint delta;
+    vec3 n_s;
     float area;
-    float pdf_fwd;
+    vec3 pos;
+    uint light_idx;
+    vec2 uv;
+    uint light_flags;
+    uint material_idx;
+    vec3 throughput;
     float pdf_rev;
     uint coords;
+    float pdf_fwd;
+    vec2 pad;
 };
 
 struct VCMVertex {

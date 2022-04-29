@@ -1,7 +1,7 @@
 #include "LumenPCH.h"
 #include "ReSTIR.h"
 
-const int max_depth = 6;
+const int max_depth = 2;
 const vec3 sky_col(0, 0, 0);
 void ReSTIR::init() {
 	Integrator::init();

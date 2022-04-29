@@ -22,14 +22,19 @@ void main() {
     const float cam_area = abs(area_int.x * area_int.y);
     uvec4 chain_seed = seeds_data.d[pixel_idx].chain_seed;
     const float large_step_prob = 0.3;
-    const bool large_step = rand(seed) < large_step_prob;
+
+    large_step = rand(seed) < large_step_prob;
+    save_radiance = true;
+    mlt_seed = chain_seed;
+
+ 
     mlt_start_iteration();
     float proposed_luminance =
-        mlt_L(origin, cam_area, large_step, chain_seed, true);
+        mlt_L(origin, cam_area);
 
     if (isnan(proposed_luminance)) {
         mlt_sampler.splat_cnt = 0;
-        seeds_data.d[pixel_idx].chain_seed = chain_seed;
+        seeds_data.d[pixel_idx].chain_seed = mlt_seed;
         return;
     }
     const float accept = min(1, proposed_luminance / mlt_sampler.luminance);
@@ -59,5 +64,5 @@ void main() {
         mlt_reject();
     }
     mlt_sampler.splat_cnt = 0;
-    seeds_data.d[pixel_idx].chain_seed = chain_seed;
+    seeds_data.d[pixel_idx].chain_seed = mlt_seed;
 }

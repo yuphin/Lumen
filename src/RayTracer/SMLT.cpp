@@ -261,6 +261,8 @@ void SMLT::init() {
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 	pc_ray.mutations_per_pixel = mutations_per_pixel;
+	pc_ray.use_vc = 1;
+	pc_ray.use_vm = 0;
 }
 
 void SMLT::render() {

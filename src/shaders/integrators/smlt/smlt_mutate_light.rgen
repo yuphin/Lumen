@@ -21,11 +21,15 @@ void main() {
     const float cam_area = abs(area_int.x * area_int.y);
     uvec4 chain_seed = seeds_data.d[pixel_idx].chain_seed;
     const float large_step_prob = 0.3;
-    const bool large_step = rand(seed) < large_step_prob;
     mlt_start_iteration();
     mlt_start_chain(0);
-    mlt_fill_light_path(origin, cam_area, large_step, chain_seed, true);
-    seeds_data.d[pixel_idx].chain_seed = chain_seed;
+
+    large_step = rand(seed) < large_step_prob;
+    save_radiance = true;
+    mlt_seed = chain_seed;
+
+    mlt_L_light();
+    seeds_data.d[pixel_idx].chain_seed = mlt_seed;
     tmp_seeds_data.d[pixel_idx].chain_seed = seed;
     prob_carryover_data.d[pixel_idx] = uint(large_step);
 }

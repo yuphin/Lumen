@@ -21,11 +21,14 @@ void main() {
     const float cam_area = abs(area_int.x * area_int.y);
 
     uvec4 chain_seed = seeds_data.d[pixel_idx].chain_seed;
-    const bool large_step = prob_carryover_data.d[pixel_idx] == 1;
     uvec4 seed = tmp_seeds_data.d[pixel_idx].chain_seed;
-    
+
+    large_step = prob_carryover_data.d[pixel_idx] == 1;
+    save_radiance = true;
+    mlt_seed = chain_seed;
+
     mlt_start_chain(1);
-    float proposed_luminance = mlt_trace_eye(origin, cam_area, large_step, chain_seed, true);
+    float proposed_luminance = mlt_L_eye();
     mlt_select_type(0);
     if (isnan(proposed_luminance)) {
         return;
@@ -41,7 +44,6 @@ void main() {
 
     const float inv_past_luminance = 1. / mlt_sampler.luminance;
     for (int i = 0; i < mlt_sampler.past_splat_cnt; i++) {
-           
         mlt_col.d[past_splat(i).idx] +=
             past_splat(i).L * (1 - accept) * inv_past_luminance;
     }
@@ -56,5 +58,5 @@ void main() {
     } else {
         mlt_reject();
     }
-    seeds_data.d[pixel_idx].chain_seed = chain_seed;
+    seeds_data.d[pixel_idx].chain_seed = mlt_seed;
 }

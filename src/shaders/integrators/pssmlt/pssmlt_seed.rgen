@@ -17,5 +17,10 @@ void main() {
     area_int /= area_int.w;
     const float cam_area = abs(area_int.x * area_int.y);
     bootstrap_data.d[pixel_idx].seed = seed;
-    bootstrap_data.d[pixel_idx].lum = mlt_L(origin, cam_area, true, seed, false);
+
+    large_step = true;
+    save_radiance = false;
+    mlt_seed = seed;
+    
+    bootstrap_data.d[pixel_idx].lum = mlt_L(origin, cam_area);
 }

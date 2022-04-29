@@ -2,17 +2,18 @@
 #include "VCM.h"
 #include <iostream>
 #include <fstream>
-const int max_depth = 6;
+const int max_depth = 8;
 const int max_samples = 50000;
-const vec3 sky_col(0);
-static float vcm_radius_factor = 0.1;
-static bool use_vm = false;
+vec3 sky_col(0.53, 0.8, 0.92);
+//vec3 sky_col(0);
+static float vcm_radius_factor = 0.025;
+static bool use_vm = true;
 static bool use_vc = true;
 static bool written = false;
 const bool ray_guide = false;
 void VCM::init() {
 	Integrator::init();
-
+	sky_col = sky_col * vec3(0.1f);
 	photon_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |

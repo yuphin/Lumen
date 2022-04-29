@@ -19,12 +19,17 @@ void main() {
     area_int /= area_int.w;
     const float cam_area = abs(area_int.x * area_int.y);
     uvec4 chain_seed = seeds_data.d[pixel_idx].chain_seed;
-    mlt_sampler.luminance = mlt_L(origin, cam_area, true, chain_seed, true);
+
+    large_step = true;
+    save_radiance = true;
+    mlt_seed = chain_seed;
+
+    mlt_sampler.luminance = mlt_L(origin, cam_area);
     for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
         past_splat(i).idx = splat(i).idx;
         past_splat(i).L = splat(i).L;
     }
     mlt_sampler.past_splat_cnt = mlt_sampler.splat_cnt;
     mlt_sampler.splat_cnt = 0;
-    seeds_data.d[pixel_idx].chain_seed = chain_seed;
+    seeds_data.d[pixel_idx].chain_seed = mlt_seed;
 }

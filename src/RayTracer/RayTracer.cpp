@@ -11,6 +11,7 @@
 
 RayTracer* RayTracer::instance = nullptr;
 static bool calc_rmse = false;
+bool show_cam_stats = false;
 
 static void fb_resize_callback(GLFWwindow* window, int width, int height) {
 	auto app = reinterpret_cast<RayTracer*>(glfwGetWindowUserPointer(window));
@@ -51,11 +52,12 @@ void RayTracer::init(Window* window) {
 	initialized = true;
 	// TODO: Parse this via the scene file
 	SceneConfig config;
-
-	//config.filename = "scene.xml";
-	//config.filename = "cornell_box_simple.json";
+	//config.root = "scenes/classroom/";
+	config.root = "scenes/";
+	//config.filename = "torus_new.xml";
+	config.filename = "cornell_box_simple.json";
 	//config.filename = "cornell_box_dir.json";
-	config.filename = "cornell_box_dir_diff.json";
+	//config.filename = "cornell_box_dir_diff.json";
 	//config.filename = "cornell_box_disney.json";
 	//config.filename = "cornell_box.json ";
 	//config.filename = "occluded2.json";
@@ -64,7 +66,7 @@ void RayTracer::init(Window* window) {
 	//config.filename = "caustics.json";
 	//config.filename = "caustics_zoomed.json";
 	//config.filename = "test.json";
-	integrator = std::make_unique<ReSTIRGI>(this, config);
+	integrator = std::make_unique<VCM>(this, config);
 	integrator->init();
 	init_resources();
 	create_post_descriptor();
@@ -200,8 +202,8 @@ void RayTracer::render(uint32_t i) {
 	vkCmdPushConstants(cmdbuf, post_pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT,
 					   0, sizeof(PushConstantPost), &pc_post_settings);
 	vkCmdDraw(cmdbuf, 3, 1, 0, 0);
-	ImGui::Render();
-	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdbuf);
+	//ImGui::Render();
+	//ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdbuf);
 	vkCmdEndRenderPass(cmdbuf);
 	VkClearColorValue val = { 0,0,0,1 };
 
@@ -221,24 +223,37 @@ float RayTracer::draw_frame() {
 	}
 	auto t_begin = glfwGetTime() * 1000;
 	bool updated = false;
-	ImGui_ImplGlfw_NewFrame();
-	ImGui::NewFrame();
-	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time,
-				1000 / cpu_avg_time);
-	if (ImGui::Button("Reload shaders")) {
-		integrator->reload();
-		updated |= true;
-	}
-	bool gui_updated = integrator->gui();
-	updated |=
-		ImGui::Checkbox("Enable ACES tonemapping", &settings.enable_tonemapping);
-	if (updated || gui_updated) {
-		ImGui::Render();
-		auto t_end = glfwGetTime() * 1000;
-		auto t_diff = t_end - t_begin;
-		integrator->updated = true;
-		return (float)t_diff;
-	}
+	//ImGui_ImplGlfw_NewFrame();
+	//ImGui::NewFrame();
+	//ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time,
+	//			1000 / cpu_avg_time);
+	//if (ImGui::Button("Reload shaders")) {
+	//	integrator->reload();
+	//	updated |= true;
+	//}
+
+
+	//bool gui_updated = integrator->gui();
+	//updated |=
+	//	ImGui::Checkbox("Enable ACES tonemapping", &settings.enable_tonemapping);
+	//if (updated || gui_updated) {
+	//	ImGui::Render();
+	//	auto t_end = glfwGetTime() * 1000;
+	//	auto t_diff = t_end - t_begin;
+	//	integrator->updated = true;
+	//	return (float)t_diff;
+	//}
+
+	//ImGui::Checkbox("Show camera statistics", &show_cam_stats);
+
+	//if (show_cam_stats) {
+	//		ImGui::PushItemWidth(170);
+	//		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[0]), 0.05f);
+	//		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[1]), 0.05f);
+	//		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[2]), 0.05f);
+	//		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[3]), 0.05f);
+
+	//}
 
 	uint32_t image_idx = vkb.prepare_frame();
 

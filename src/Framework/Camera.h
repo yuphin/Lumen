@@ -38,9 +38,10 @@ public:
 		res = glm::rotate(res, glm::radians(rotation.x), RIGHT);
 		res = glm::rotate(res, glm::radians(rotation.z), FORWARD);
 		view = glm::inverse(res);
+		camera = res;
 	}
 	glm::mat4 projection{ 1.f };
-	glm::mat4 view{ 1.f };
+	glm::mat4 view{ 1.f }, camera{1.f};
 	float cam_near, cam_far;
 	CameraType type = CameraType::FPS;
 	glm::vec3 position{}, rotation{}, direction{};
@@ -99,7 +100,7 @@ public:
 		: fov(fov), aspect_ratio(aspect_ratio), Camera(cam_near, cam_far) {
 		left = right = top = bot = -1;
 		this->make_projection_matrix(true);
-	
+		camera = cam_matrix;
 		view = glm::inverse(cam_matrix);
 		glm::vec3 scale;
 		glm::quat q;

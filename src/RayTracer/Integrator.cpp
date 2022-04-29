@@ -12,7 +12,7 @@ void Integrator::init() {
 
 	LumenInstance* instance = this->instance;
 	Window* window = instance->window;
-	lumen_scene.load_scene("scenes/", config.filename);
+	lumen_scene.load_scene(config.root, config.filename);
 	if (lumen_scene.cam_config.pos != vec3(0)) {
 		camera = std::unique_ptr<PerspectiveCamera>(new PerspectiveCamera(
 			lumen_scene.cam_config.fov, 0.01f, 1000.0f, (float)instance->width / instance->height,

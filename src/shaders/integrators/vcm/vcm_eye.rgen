@@ -33,37 +33,18 @@ uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
 uint vcm_light_path_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
     (pc_ray.max_depth + 1);
-vec3 normalize_grid(vec3 p, vec3 min_bnds, vec3 max_bnds) {
-    return (p - min_bnds) / (max_bnds - min_bnds);
-}
 
-ivec3 get_grid_idx(vec3 p, vec3 min_bnds, vec3 max_bnds, ivec3 grid_res) {
-    ivec3 res = ivec3(normalize_grid(p, min_bnds, max_bnds) * grid_res);
-    clamp(res, vec3(0), grid_res - vec3(1));
-    return res;
-}
-
-vec3 vcm_get_light_radiance(in const Material mat,
-                            in const VCMState camera_state, int d) {
-    if (d == 1) {
-        return mat.emissive_factor;
-    }
-    const float pdf_light_pos =
-        1.0 / (payload.area * pc_ray.light_triangle_count);
-
-    const float pdf_light_dir = abs(dot(payload.n_s, -camera_state.wi)) / PI;
-    const float w_camera =
-        pdf_light_pos * camera_state.d_vcm +
-        (pc_ray.use_vc == 1 || pc_ray.use_vm == 1
-             ? (pdf_light_pos * pdf_light_dir) * camera_state.d_vc
-             : 0);
-    const float mis_weight = 1. / (1. + w_camera);
-    return mis_weight * mat.emissive_factor;
-}
-
+#include "../vcm_commons.glsl"
 void main() {
+#define JITTER 1
+
     const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
-    const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
+#if JITTER
+    vec2 rands = vec2(rand(seed), rand(seed)) - 0.5;
+    const vec2 in_uv = (pixel + rands) / vec2(gl_LaunchSizeEXT.xy);
+#else
+    const vec2 in_uv = (pixel) / vec2(gl_LaunchSizeEXT.xy);
+#endif
     vec2 d = in_uv * 2.0 - 1.0;
     vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
     vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
@@ -73,15 +54,11 @@ void main() {
                                                2. / gl_LaunchSizeEXT.y, 0, 1));
     area_int /= (area_int.w);
     const float cam_area = abs(area_int.x * area_int.y);
-
     const float radius = pc_ray.radius;
     const float radius_sqr = radius * radius;
     float eta_vcm = PI * radius_sqr * screen_size;
     float eta_vc = pc_ray.use_vc == 1 ? 1.0 / eta_vcm : 0;
     float eta_vm = pc_ray.use_vm == 1 ? PI * radius_sqr * screen_size : 0;
-    const float normalization_factor = 1. / (PI * radius_sqr * screen_size);
-    const float fov = ubo.projection[1][1];
-    const vec3 cam_pos = origin.xyz;
     VCMState camera_state;
     // Generate camera sample
     camera_state.wi = direction;
@@ -94,266 +71,8 @@ void main() {
         cam_area * screen_size * cos_theta * cos_theta * cos_theta;
     camera_state.d_vc = 0;
     camera_state.d_vm = 0;
-    float avg_len = 0;
-    uint cnt = 1;
-    int depth;
-    uint light_path_idx = uint(rand(seed) * screen_size);
-    uint light_path_len = light_path_cnts.d[light_path_idx];
 
-    light_path_idx *= (pc_ray.max_depth + 1);
-    for (depth = 1;; depth++) {
-        traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, camera_state.pos, tmin,
-                    camera_state.wi, tmax, 0);
-
-        if (payload.material_idx == -1) {
-            // TODO:
-            col += camera_state.throughput * pc_ray.sky_col;
-            break;
-        }
-        vec3 wo = camera_state.pos - payload.pos;
-        float dist = length(payload.pos - camera_state.pos);
-        float dist_sqr = dist * dist;
-        wo /= dist;
-        vec3 n_s = payload.n_s;
-        vec3 n_g = payload.n_g;
-        bool side = true;
-        if (dot(payload.n_g, wo) < 0.)
-            n_g = -n_g;
-        if (dot(n_g, n_s) < 0) {
-            n_s = -n_s;
-            side = false;
-        }
-        float cos_wo = dot(wo, n_s);
-
-        const Material mat = load_material(payload.material_idx, payload.uv);
-        const bool mat_specular =
-            (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
-        // Complete the missing geometry terms
-        camera_state.d_vcm *= dist_sqr;
-        camera_state.d_vcm /= cos_wo;
-        camera_state.d_vc /= cos_wo;
-        camera_state.d_vm /= cos_wo;
-        // Get the radiance
-        if (luminance(mat.emissive_factor) > 0) {
-            col += camera_state.throughput *
-                   vcm_get_light_radiance(mat, camera_state, depth);
-            if (pc_ray.use_vc == 1 || pc_ray.use_vm == 1) {
-                // break;
-            }
-        }
-        // Connect to light
-        float pdf_rev;
-        vec3 f;
-        if (!mat_specular && depth < pc_ray.max_depth) {
-            vec3 wi;
-            float wi_len;
-            float pdf_pos_w;
-            float pdf_pos_dir_w;
-            LightRecord record;
-            float cos_y;
-            const vec3 Le = sample_light_Li(
-                seed, payload.pos, pc_ray.num_lights, wi, wi_len, pdf_pos_w,
-                pdf_pos_dir_w, record, cos_y);
-            const float cos_x = dot(wi, n_s);
-            const vec3 ray_origin = offset_ray2(payload.pos, n_s);
-            any_hit_payload.hit = 1;
-            float pdf_fwd;
-            f = eval_bsdf(n_s, wo, mat, 1, side, wi, pdf_fwd, pdf_rev, cos_x);
-            if (f != vec3(0)) {
-                traceRayEXT(tlas,
-                            gl_RayFlagsTerminateOnFirstHitEXT |
-                                gl_RayFlagsSkipClosestHitShaderEXT,
-                            0xFF, 1, 0, 1, ray_origin, 0, wi, wi_len - EPS, 1);
-                const bool visible = any_hit_payload.hit == 0;
-                if (visible) {
-                    if (is_light_delta(record.flags)) {
-                        pdf_fwd = 0;
-                    }
-                    const float w_light =
-                        pdf_fwd / (pdf_pos_w / pc_ray.light_triangle_count);
-                    const float w_cam = pdf_pos_dir_w * abs(cos_x) /
-                                        (pdf_pos_w * cos_y) *
-                                        (eta_vm + camera_state.d_vcm +
-                                         camera_state.d_vc * pdf_rev);
-                    const float mis_weight = 1. / (1. + w_light + w_cam);
-                    if (mis_weight > 0) {
-                        col += mis_weight * abs(cos_x) * f *
-                               camera_state.throughput * Le /
-                               (pdf_pos_w / pc_ray.light_triangle_count);
-                    }
-                }
-            }
-        }
-
-        // if (depth == 1 && !mat_specular) {
-        if (!mat_specular) {
-            // Connect to light vertices
-#define light_vtx(i) vcm_lights.d[i]
-
-            for (int i = 0; i < light_path_len; i++) {
-                uint s = light_vtx(light_path_idx + i).path_len;
-                uint mdepth = s + depth - 1;
-                if (mdepth >= pc_ray.max_depth) {
-                    break;
-                }
-                vec3 dir = light_vtx(light_path_idx + i).pos - payload.pos;
-                const float len = length(dir);
-                const float len_sqr = len * len;
-                dir /= len;
-                const float cos_cam = dot(n_s, dir);
-                const float cos_light =
-                    dot(light_vtx(light_path_idx + i).n_s, -dir);
-                const float G = cos_light * cos_cam / len_sqr;
-                if (G > 0) {
-                    float cam_pdf_fwd, light_pdf_fwd, light_pdf_rev;
-                    const vec3 f_cam = eval_bsdf(n_s, wo, mat, 1, side, dir,
-                                                 cam_pdf_fwd, cos_cam);
-                    const Material light_mat = load_material(
-                        light_vtx(light_path_idx + i).material_idx,
-                        light_vtx(light_path_idx + i).uv);
-                    // TODO: what about anisotropic BSDFS?
-                    const vec3 f_light = eval_bsdf(
-                        light_vtx(light_path_idx + i).n_s,
-                        light_vtx(light_path_idx + i).wo, light_mat, 0,
-                        light_vtx(light_path_idx + i).side == 1, -dir,
-                        light_pdf_fwd, light_pdf_rev, cos_light);
-                    if (f_light != vec3(0) && f_cam != vec3(0)) {
-                        cam_pdf_fwd *= abs(cos_light) / len_sqr;
-                        light_pdf_fwd *= abs(cos_cam) / len_sqr;
-                        const float w_light =
-                            cam_pdf_fwd *
-                            (eta_vm + light_vtx(light_path_idx + i).d_vcm +
-                             light_pdf_rev *
-                                 light_vtx(light_path_idx + i).d_vc);
-                        const float w_camera =
-                            light_pdf_fwd * (eta_vm + camera_state.d_vcm +
-                                             pdf_rev * camera_state.d_vc);
-                        const float mis_weight = 1. / (1 + w_camera + w_light);
-                        const vec3 ray_origin = offset_ray2(payload.pos, n_s);
-                        any_hit_payload.hit = 1;
-                        traceRayEXT(tlas,
-                                    gl_RayFlagsTerminateOnFirstHitEXT |
-                                        gl_RayFlagsSkipClosestHitShaderEXT,
-                                    0xFF, 1, 0, 1, ray_origin, 0, dir,
-                                    len - EPS, 1);
-                        const bool visible = any_hit_payload.hit == 0;
-                        if (visible) {
-                            col += mis_weight * G * camera_state.throughput *
-                                   light_vtx(light_path_idx + i).throughput *
-                                   f_cam * f_light;
-                        }
-                    }
-                }
-            }
-        }
-        // Vertex merging
-        vec3 r = vec3(radius);
-        float r_sqr = radius * radius;
-        if (!mat_specular && pc_ray.use_vm == 1) {
-            ivec3 grid_min_bnds_idx =
-                get_grid_idx(payload.pos - vec3(radius), pc_ray.min_bounds,
-                             pc_ray.max_bounds, pc_ray.grid_res);
-            ivec3 grid_max_bnds_idx =
-                get_grid_idx(payload.pos + vec3(radius), pc_ray.min_bounds,
-                             pc_ray.max_bounds, pc_ray.grid_res);
-            for (int x = grid_min_bnds_idx.x; x <= grid_max_bnds_idx.x; x++) {
-                for (int y = grid_min_bnds_idx.y; y <= grid_max_bnds_idx.y;
-                     y++) {
-                    for (int z = grid_min_bnds_idx.z; z <= grid_max_bnds_idx.z;
-                         z++) {
-                        const uint h = hash(ivec3(x, y, z), screen_size);
-                        if (photons.d[h].photon_count > 0) {
-                            const vec3 pp = payload.pos - photons.d[h].pos;
-                            const float dist_sqr = dot(pp, pp);
-                            if (dist_sqr > r_sqr) {
-                                continue;
-                            }
-                            // Should we?
-                            uint depth = photons.d[h].path_len + depth - 1;
-                            if (depth > pc_ray.max_depth) {
-                                continue;
-                            }
-                            float cam_pdf_fwd, cam_pdf_rev;
-                            const float cos_theta = dot(photons.d[h].wi, n_s);
-                            f = eval_bsdf(n_s, wo, mat, 1, side,
-                                          photons.d[h].wi, cam_pdf_fwd,
-                                          cam_pdf_rev, cos_theta);
-
-                            if (f != vec3(0)) {
-                                const float w_light =
-                                    photons.d[h].d_vcm * eta_vc +
-                                    photons.d[h].d_vm * cam_pdf_fwd;
-                                const float w_cam =
-                                    camera_state.d_vcm * eta_vc +
-                                    camera_state.d_vm * cam_pdf_rev;
-
-                                const float mis_weight =
-                                    1. / (1 + w_light + w_cam);
-                                float cos_nrm = dot(photons.d[h].nrm, n_s);
-                                if (cos_nrm > EPS) {
-                                    const float w =
-                                        1. - sqrt(dist_sqr) / radius;
-                                    const float w_normalization =
-                                        3.; // 1. / (1 - 2/(3*k)) where k =
-                                            // 1
-                                    col += w * mis_weight *
-                                           photons.d[h].photon_count *
-                                           photons.d[h].throughput * f *
-                                           camera_state.throughput *
-                                           normalization_factor *
-                                           w_normalization;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if (depth >= pc_ray.max_depth) {
-            break;
-        }
-
-        // Scattering
-        float pdf_dir;
-        float cos_theta;
-        f = sample_bsdf(n_s, wo, mat, 1, side, camera_state.wi, pdf_dir,
-                        cos_theta, seed);
-
-        const bool mat_transmissive =
-            (mat.bsdf_props & BSDF_TRANSMISSIVE) == BSDF_TRANSMISSIVE;
-        const bool same_hemisphere = same_hemisphere(camera_state.wi, wo, n_s);
-        if (f == vec3(0) || pdf_dir == 0 ||
-            (!same_hemisphere && !mat_transmissive)) {
-            break;
-        }
-        pdf_rev = pdf_dir;
-        if (!mat_specular) {
-            pdf_rev = bsdf_pdf(mat, n_s, camera_state.wi, wo);
-        }
-        const float abs_cos_theta = abs(cos_theta);
-
-        camera_state.pos = offset_ray(payload.pos, n_g);
-        // Note, same cancellations also occur here from now on
-        // see _vcm_generate_light_sample_
-        if (!mat_specular) {
-            camera_state.d_vc =
-                ((abs_cos_theta) / pdf_dir) *
-                (eta_vm + camera_state.d_vcm + pdf_rev * camera_state.d_vc);
-            camera_state.d_vm =
-                ((abs_cos_theta) / pdf_dir) *
-                (1 + camera_state.d_vcm * eta_vc + pdf_rev * camera_state.d_vm);
-            camera_state.d_vcm = 1.0 / pdf_dir;
-        } else {
-            camera_state.d_vcm = 0;
-            camera_state.d_vc *= abs_cos_theta;
-            camera_state.d_vm *= abs_cos_theta;
-        }
-
-        camera_state.throughput *= f * abs_cos_theta / pdf_dir;
-        camera_state.n_s = n_s;
-        camera_state.area = payload.area;
-        cnt++;
-    }
+    col = vcm_trace_eye(camera_state, eta_vcm, eta_vc, eta_vm);
     if (isnan(luminance(col))) {
         debugPrintfEXT("nan\n");
         return;

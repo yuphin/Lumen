@@ -636,11 +636,11 @@ vec3 uniform_sample_cone(vec2 uv, float cos_max) {
     return vec3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
 }
 
-vec3 sample_light_Li(inout uvec4 seed, const vec3 p, const int num_lights,
+vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights,
                      out vec3 wi, out float wi_len, out vec3 n, out vec3 pos,
                      out float pdf_pos_a, out float cos_from_light,
                      out LightRecord light_record) {
-    const vec4 rands_pos = vec4(rand(seed), rand(seed), rand(seed), rand(seed));
+
     uint light_idx = uint(rands_pos.x * num_lights);
     Light light = lights[light_idx];
     uint light_type = get_light_type(light.light_flags);
@@ -705,6 +705,15 @@ vec3 sample_light_Li(inout uvec4 seed, const vec3 p, const int num_lights,
     }
     light_record.flags = light.light_flags;
     return L;
+}
+
+vec3 sample_light_Li(inout uvec4 seed, const vec3 p, const int num_lights,
+                     out vec3 wi, out float wi_len, out vec3 n, out vec3 pos,
+                     out float pdf_pos_a, out float cos_from_light,
+                     out LightRecord light_record) {
+    const vec4 rands_pos = vec4(rand(seed), rand(seed), rand(seed), rand(seed));
+    return sample_light_Li(rands_pos, p, num_lights, wi, wi_len, n, pos,
+                           pdf_pos_a, cos_from_light, light_record);
 }
 
 vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights,
@@ -1011,6 +1020,18 @@ vec3 sample_light_Le(inout uvec4 seed, const int num_lights,
                            pdf_dir_w, pdf_emit_w, pdf_direct_a, phi, u, v);
 }
 
+vec3 sample_light_Le(const vec4 rands_pos, const vec2 rands_dir, const int num_lights,
+                     const int total_light, out float cos_from_light,
+                     out LightRecord light_record, out vec3 pos, out vec3 wi,
+                     out float pdf_pos_a, out float pdf_dir_w,
+                     out float pdf_emit_w, out float pdf_direct_a) {
+    float phi, u, v;
+    vec3 n;
+    return sample_light_Le(rands_pos, rands_dir, num_lights, total_light,
+                           cos_from_light, light_record, pos, wi, n, pdf_pos_a,
+                           pdf_dir_w, pdf_emit_w, pdf_direct_a, phi, u, v);
+}
+
 vec3 sample_light_Le(inout uvec4 seed, const int num_lights,
                      const int total_light, out float cos_from_light,
                      out LightRecord light_record, out vec3 pos, out vec3 wi,
@@ -1033,6 +1054,18 @@ vec3 sample_light_Le(inout uvec4 seed, const int num_lights,
     const vec2 rands_dir = vec2(rand(seed), rand(seed));
     float phi, u, v;
     vec3 n;
+    float pdf_emit_w, pdf_direct_a;
+    return sample_light_Le(rands_pos, rands_dir, num_lights, total_light,
+                           cos_from_light, light_record, pos, wi, n, pdf_pos_a,
+                           pdf_dir_w, pdf_emit_w, pdf_direct_a, phi, u, v);
+}
+
+vec3 sample_light_Le(const int num_lights,
+                     const int total_light, out float cos_from_light,
+                     out LightRecord light_record, out vec3 pos, out vec3 wi,
+                     out vec3 n, out float pdf_pos_a, out float pdf_dir_w,
+                     const vec4 rands_pos, const vec2 rands_dir) {
+    float phi, u, v;
     float pdf_emit_w, pdf_direct_a;
     return sample_light_Le(rands_pos, rands_dir, num_lights, total_light,
                            cos_from_light, light_record, pos, wi, n, pdf_pos_a,

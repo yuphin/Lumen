@@ -1,8 +1,9 @@
 #include "LumenPCH.h"
 #include "ReSTIRGI.h"
 
-const int max_depth = 5;
-const vec3 sky_col(0, 0, 0);
+const int max_depth = 8;
+//const vec3 sky_col(0, 0, 0);
+const vec3 sky_col(0.53, 0.8, 0.92);
 void ReSTIRGI::init() {
 	Integrator::init();
 

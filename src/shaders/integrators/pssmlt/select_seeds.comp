@@ -26,23 +26,6 @@ uint binary_search_cdf(float random_float) {
     uint r = pc_ray.num_bootstrap_samples;
     uint lum_idx = -1;
     uint len = r - l;
-    // while (l <= r) {
-    //     uint m = (r + l) / 2;
-    //     if (cdf_data.d[m] < random_float &&
-    //         m < pc_ray.num_bootstrap_samples - 1) {
-    //         l = m + 1;
-    //     } else {
-    //         if (m == 0) {
-    //             lum_idx = 0;
-    //             break;
-    //         }
-    //         if (cdf_data.d[m - 1] <= random_float) {
-    //             lum_idx = m;
-    //             break;
-    //         }
-    //         r = m - 1;
-    //     }
-    // }
     uint first = 0;
     while(len > 0) {
         uint hlf = len >> 1;

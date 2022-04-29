@@ -32,6 +32,27 @@ void MitsubaParser::parse(const std::string& path) {
 			{
 				MitsubaBSDF bsdf;
 				bsdf.name = obj->id();
+				bsdf.type = obj->pluginType();
+				for (const auto& prop : obj->properties()) {
+					// Get reflectance
+					if (prop.second.type() == PT_COLOR) {
+						if (prop.first.find("reflectance") == std::string::npos) {
+							continue;
+						}
+						// Assume RGB for the moment
+						bsdf.albedo = glm::vec3({
+							prop.second.getColor().r,
+							prop.second.getColor().g,
+							prop.second.getColor().b
+												});
+					}
+					if (prop.first == "alpha") {
+						bsdf.roughness = std::sqrt(prop.second.getNumber());
+					}
+					if (prop.first == "int_ior") {
+						bsdf.ior = prop.second.getNumber();
+					}
+				}
 				for (const auto& bsdf_child : obj->anonymousChildren()) {
 					Object* p = bsdf_child.get();
 					bsdf.type = p->pluginType();
@@ -113,7 +134,8 @@ void MitsubaParser::parse(const std::string& path) {
 						light.from = glm::vec3({ dir.x, dir.y, dir.z });
 					} else if (prop.first == "sun_scale") {
 						//light.L = glm::vec3({ 0.99,0.368,0.325 }) * prop.second.getNumber();
-						light.L = glm::vec3(1) * prop.second.getNumber();
+						//light.L = glm::vec3(1) * prop.second.getNumber();
+						light.L = glm::vec3(0.98, 0.82, 0.30) * prop.second.getNumber();
 					}
 				}
 				lights.push_back(light);

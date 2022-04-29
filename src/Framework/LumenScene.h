@@ -12,6 +12,7 @@ struct CameraConfiguration {
 };
 
 struct SceneConfig {
+	std::string root;
 	std::string filename;
 };
 
