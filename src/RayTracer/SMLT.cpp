@@ -902,10 +902,10 @@ void SMLT::create_rt_pipelines() {
 								{"src/shaders/integrators/smlt/smlt_preprocess_eye.rgen"},
 								{"src/shaders/integrators/smlt/smlt_mutate_light.rgen"},
 								{"src/shaders/integrators/smlt/smlt_mutate_eye.rgen"},
-								{"src/shaders/integrators/ray.rmiss"},
-								{"src/shaders/integrators/ray_shadow.rmiss"},
-								{"src/shaders/integrators/ray.rchit"},
-								{"src/shaders/integrators/ray.rahit"} };
+								{"src/shaders/ray.rmiss"},
+								{"src/shaders/ray_shadow.rmiss"},
+								{"src/shaders/ray.rchit"},
+								{"src/shaders/ray.rahit"} };
 	for (auto& shader : shaders) {
 		shader.compile();
 	}

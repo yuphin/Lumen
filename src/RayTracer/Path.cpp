@@ -344,10 +344,10 @@ void Path::create_rt_pipelines() {
 	RTPipelineSettings settings;
 
 	settings.shaders = { {"src/shaders/integrators/path/path.rgen"},
-								{"src/shaders/integrators/ray.rmiss"},
-								{"src/shaders/integrators/ray_shadow.rmiss"},
-								{"src/shaders/integrators/ray.rchit"},
-								{"src/shaders/integrators/ray.rahit"} };
+								{"src/shaders/ray.rmiss"},
+								{"src/shaders/ray_shadow.rmiss"},
+								{"src/shaders/ray.rchit"},
+								{"src/shaders/ray.rahit"} };
 	for (auto& shader : settings.shaders) {
 		shader.compile();
 	}

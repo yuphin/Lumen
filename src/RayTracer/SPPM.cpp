@@ -581,10 +581,10 @@ void SPPM::create_rt_pipelines() {
 
 	std::vector<Shader> shaders{ {"src/shaders/integrators/sppm/sppm_light.rgen"},
 								{"src/shaders/integrators/sppm/sppm_eye.rgen"},
-								{"src/shaders/integrators/ray.rmiss"},
-								{"src/shaders/integrators/ray_shadow.rmiss"},
-								{"src/shaders/integrators/ray.rchit"},
-								{"src/shaders/integrators/ray.rahit"} };
+								{"src/shaders/ray.rmiss"},
+								{"src/shaders/ray_shadow.rmiss"},
+								{"src/shaders/ray.rchit"},
+								{"src/shaders/ray.rahit"} };
 	for (auto& shader : shaders) {
 		shader.compile();
 	}

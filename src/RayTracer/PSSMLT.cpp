@@ -739,10 +739,10 @@ void PSSMLT::create_rt_pipelines() {
 	std::vector<Shader> shaders{ {"src/shaders/integrators/pssmlt/pssmlt_seed.rgen"},
 								{"src/shaders/integrators/pssmlt/pssmlt_preprocess.rgen"},
 								{"src/shaders/integrators/pssmlt/pssmlt_mutate.rgen"},
-								{"src/shaders/integrators/ray.rmiss"},
-								{"src/shaders/integrators/ray_shadow.rmiss"},
-								{"src/shaders/integrators/ray.rchit"},
-								{"src/shaders/integrators/ray.rahit"} };
+								{"src/shaders/ray.rmiss"},
+								{"src/shaders/ray_shadow.rmiss"},
+								{"src/shaders/ray.rchit"},
+								{"src/shaders/ray.rahit"} };
 	for (auto& shader : shaders) {
 		shader.compile();
 	}

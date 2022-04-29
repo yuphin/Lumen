@@ -510,10 +510,10 @@ void ReSTIRGI::create_rt_pipelines() {
 		{"src/shaders/integrators/restir/gi/restir.rgen"},
 		{"src/shaders/integrators/restir/gi/temporal_reuse.rgen"},
 		{"src/shaders/integrators/restir/gi/spatial_reuse.rgen"},
-		{"src/shaders/integrators/ray.rmiss"},
-		{"src/shaders/integrators/ray_shadow.rmiss"},
-		{"src/shaders/integrators/ray.rchit"},
-		{"src/shaders/integrators/ray.rahit"}
+		{"src/shaders/ray.rmiss"},
+		{"src/shaders/ray_shadow.rmiss"},
+		{"src/shaders/ray.rchit"},
+		{"src/shaders/ray.rahit"}
 	};
 	for (auto& shader : shaders) {
 		shader.compile();

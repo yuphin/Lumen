@@ -724,10 +724,10 @@ void VCM::create_rt_pipelines() {
 								{"src/shaders/integrators/vcm/vcm_eye.rgen"},
 								{"src/shaders/integrators/vcm/vcm_spawn_light.rgen"},
 								{"src/shaders/integrators/vcm/vcm_sample.rgen"},
-								{"src/shaders/integrators/ray.rmiss"},
-								{"src/shaders/integrators/ray_shadow.rmiss"},
-								{"src/shaders/integrators/ray.rchit"},
-								{"src/shaders/integrators/ray.rahit"} };
+								{"src/shaders/ray.rmiss"},
+								{"src/shaders/ray_shadow.rmiss"},
+								{"src/shaders/ray.rchit"},
+								{"src/shaders/ray.rahit"} };
 	for (auto& shader : shaders) {
 		shader.compile();
 	}
