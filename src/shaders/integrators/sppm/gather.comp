@@ -12,6 +12,7 @@
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(set = 0, binding = 5) uniform sampler2D scene_textures[];
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
 layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
@@ -32,44 +33,7 @@ PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
 
 uint screen_size = pc_ray.size_x * pc_ray.size_y;
 
-vec3 eval_bsdf(const Material mat, const vec3 wo, const vec3 wi,
-               const vec3 n_s) {
-    switch (mat.bsdf_type) {
-    case BSDF_DIFFUSE: {
-        return mat.albedo / PI;
-    } break;
-    case BSDF_MIRROR:
-    case BSDF_GLASS: {
-        return vec3(0);
-    } break;
-    case BSDF_GLOSSY: {
-        if (!same_hemisphere(wi, wo, n_s)) {
-            return vec3(0);
-        }
-#define pow5(x) (x * x) * (x * x) * x
-        const vec3 f_diffuse = (28. / (23 * PI)) * vec3(mat.albedo) *
-                               (1 - mat.metalness) *
-                               (1 - pow5(1 - 0.5 * dot(wi, n_s))) *
-                               (1 - pow5(1 - 0.5 * dot(wo, n_s)));
-        const vec3 h = normalize(wo + wi);
-        float nh = dot(n_s, h);
-        float hl = dot(h, wi);
-        float nl = dot(n_s, wi);
-        float nv = dot(n_s, wo);
-        float beckmann_term = beckmann_d(mat.roughness, nh);
-        const vec3 f_specular = beckmann_term *
-                                fresnel_schlick(mat.metalness, hl) /
-                                (4 * abs(hl) * max(abs(nl), abs(nv)));
-
-        return f_specular + f_diffuse;
-#undef pow5
-    } break;
-    default: {
-        break;
-    }
-    }
-    return vec3(0);
-}
+#include "../../bsdf_commons.glsl"
 
 vec3 normalize_grid(vec3 p, vec3 min_bnds, vec3 max_bnds) {
     return (p - min_bnds) / (max_bnds - min_bnds);
@@ -78,33 +42,6 @@ vec3 normalize_grid(vec3 p, vec3 min_bnds, vec3 max_bnds) {
 ivec3 get_grid_idx(vec3 p, vec3 min_bnds, vec3 max_bnds, ivec3 grid_res) {
     ivec3 res = ivec3(normalize_grid(p, min_bnds, max_bnds) * grid_res);
     clamp(res, vec3(0), grid_res - vec3(1));
-    return res;
-}
-
-Material load_material(const uint material_idx, const vec2 uv) {
-    Material res;
-    const Material mat = materials.m[material_idx];
-    res.emissive_factor = mat.emissive_factor;
-    res.albedo = vec3(mat.base_color_factor);
-    res.bsdf_type = mat.bsdf_type;
-    res.bsdf_props = 0;
-    switch (res.bsdf_type) {
-    case BSDF_DIFFUSE:
-        res.bsdf_props |= BSDF_OPAQUE;
-        res.bsdf_props |= BSDF_LAMBERTIAN;
-        break;
-    case BSDF_GLASS:
-        res.bsdf_props |= BSDF_SPECULAR;
-        res.bsdf_props |= BSDF_TRANSMISSIVE;
-        break;
-    case BSDF_MIRROR:
-        res.bsdf_props |= BSDF_SPECULAR;
-        res.bsdf_props |= BSDF_REFLECTIVE;
-        break;
-    default:
-        break;
-    }
-    res.ior = mat.ior;
     return res;
 }
 

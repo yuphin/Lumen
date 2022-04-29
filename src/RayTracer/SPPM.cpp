@@ -1,7 +1,7 @@
 #include "LumenPCH.h"
 #include "SPPM.h"
 
-const int max_depth = 13;
+const int max_depth = 6;
 const vec3 sky_col(0, 0, 0);
 void SPPM::init() {
 	Integrator::init();
@@ -108,7 +108,7 @@ void SPPM::init() {
 }
 
 void SPPM::render() {
-	const float ppm_base_radius = 0.0025f;
+	const float ppm_base_radius = 0.03;
 	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = { 0.25f, 0.25f, 0.25f, 1.0f };
 	VkClearValue clear_depth = { 1.0f, 0 };
@@ -405,7 +405,7 @@ void SPPM::create_descriptors() {
 		vk::descriptor_set_layout_binding(
 			VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
 			VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-				VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+				VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_COMPUTE_BIT,
 			TLAS_BINDING),
 		vk::descriptor_set_layout_binding(
 			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
@@ -416,12 +416,12 @@ void SPPM::create_descriptors() {
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 			VK_SHADER_STAGE_RAYGEN_BIT_KHR |
 				VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-				VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
+				VK_SHADER_STAGE_ANY_HIT_BIT_KHR | VK_SHADER_STAGE_COMPUTE_BIT,
 			INSTANCE_BINDING),
 		vk::descriptor_set_layout_binding(
 			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			VK_SHADER_STAGE_VERTEX_BIT |
-				VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+				VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_COMPUTE_BIT,
 			UNIFORM_BUFFER_BINDING),
 		vk::descriptor_set_layout_binding(
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -434,11 +434,11 @@ void SPPM::create_descriptors() {
 			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 			VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_FRAGMENT_BIT |
 				VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-				VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
+				VK_SHADER_STAGE_ANY_HIT_BIT_KHR | VK_SHADER_STAGE_COMPUTE_BIT,
 			TEXTURES_BINDING, num_textures),
 		vk::descriptor_set_layout_binding(
 			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-			VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+			VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_COMPUTE_BIT,
 			LIGHTS_BINDING)
 	};
 	auto set_layout_ci = vk::descriptor_set_layout_CI(
