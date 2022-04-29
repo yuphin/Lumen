@@ -44,6 +44,7 @@ struct TriangleRecord {
 
 struct LightRecord {
     uint material_idx;
+    uint light_idx;
     uint triangle_idx; 
     uint flags;
 };

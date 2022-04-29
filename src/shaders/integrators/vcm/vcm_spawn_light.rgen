@@ -61,44 +61,22 @@ uint get_restir_hash_idx(uint light_idx, float u, float v) {
 }
 
 bool vcm_generate_light_sample(out LightState light_state) {
-    // Sample light
-    // uint light_idx = uint(rand(seed) * pc_ray.light_triangle_count);
-    // uint light_triangle_idx;
-    // uint light_material_idx;
-    // vec2 uv_unused;
-    // const vec2 rands = vec2(rand(seed), rand(seed));
-    // vec3 light_min_pos;
-    // vec3 light_max_pos;
-    // float u, v;
-    // const TriangleRecord record =
-    //     sample_area_light_with_idx(rands, 0, light_idx, light_material_idx,
-    //                                light_min_pos, light_max_pos, u, v);
-    // vec3 wi = sample_cos_hemisphere(vec2(rand(seed), rand(seed)),
-    //                                 record.n_s);
-    uint light_idx;
-    uint light_triangle_idx;
-    uint light_material_idx;
-    vec2 uv_unused;
-    Light light;
-    TriangleRecord record;
-    Material light_mat;
+    LightRecord light_record;
+    vec3 wi, pos;
+    float pdf_pos, pdf_dir, pdf_emit, pdf_direct, phi;
+    float cos_theta;
     float u, v;
-    vec3 wi;
-    float pdf_pos, pdf_dir, phi;
     const vec3 Le = sample_light_Le(
-        pc_ray.num_lights, pc_ray.light_triangle_count, light_idx,
-        light_triangle_idx, light_material_idx, light, record, light_mat,
-        pdf_pos, seed, wi, pdf_dir, phi, u, v);
+        seed, pc_ray.num_lights, pc_ray.light_triangle_count, cos_theta, light_record,
+        pos, wi, pdf_pos, pdf_dir, phi, u, v);
     if (pdf_dir <= 0) {
         return false;
     }
-    light_state.pos = record.pos;
-    light_state.normal = record.n_s;
+    light_state.pos = pos;
     light_state.dir = wi;
-    light_state.triangle_pdf = record.triangle_pdf;
-    light_state.hash_idx = get_restir_hash_idx(light_idx, u, v);
+    light_state.hash_idx = get_restir_hash_idx(light_record.light_idx, u, v);
     light_state.Le = Le;
-    light_state.light_flags = light.light_flags;
+    light_state.light_flags = light_record.flags;
     return true;
 }
 

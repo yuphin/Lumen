@@ -5,7 +5,7 @@ static float vcm_radius_factor = 0.025f;
 static bool light_first = false;
 void VCMMLT::init() {
 	Integrator::init();
-	max_depth = 13;
+	max_depth = 6;
 	mutations_per_pixel = 100.0f;
 	sky_col = vec3(0, 0, 0);
 	num_mlt_threads = 1600 * 900 / 32;
@@ -582,7 +582,7 @@ void VCMMLT::render() {
 			cmd.submit();
 		}
 	}
-	// Compositions
+	//Compositions
 	cmd.begin();
 	{
 		vkCmdBindDescriptorSets(
@@ -982,8 +982,8 @@ void VCMMLT::create_rt_pipelines() {
 	mutate2_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	// TODO: Move shaders into sets during recompilation
 	settings.shaders = { shaders[0], shaders[4], shaders[5], shaders[6], shaders[7] };
-	eye_pipeline->create_rt_pipeline(settings, { 0, 0 });
-	light_pipeline->create_rt_pipeline(settings, { 0, 1 });
+	eye_pipeline->create_rt_pipeline(settings, { 1, 0 });
+	light_pipeline->create_rt_pipeline(settings, { 1, 1 });
 	vkDestroyShaderModule(instance->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[1].create_vk_shader_module(instance->vkb.ctx.device);
 	settings.shaders[0] = shaders[1];

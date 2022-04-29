@@ -66,7 +66,7 @@ void RayTracer::init(Window* window) {
 	//config.filename = "caustics.json";
 	//config.filename = "caustics_zoomed.json";
 	//config.filename = "test.json";
-	integrator = std::make_unique<SPPM>(this, config);
+	integrator = std::make_unique<Path>(this, config);
 	integrator->init();
 	init_resources();
 	create_post_descriptor();

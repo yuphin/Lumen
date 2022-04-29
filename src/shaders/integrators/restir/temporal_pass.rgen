@@ -69,43 +69,29 @@ void main() {
         }
 
         for (int i = 0; i < light_samples; i++) {
-            uint light_idx;
-            uint light_triangle_idx;
-            uint light_material_idx;
-            Light light;
-            TriangleRecord record;
-            Material light_mat;
             const uvec4 light_seed = seed;
             const vec4 rands =
                 vec4(rand(seed), rand(seed), rand(seed), rand(seed));
-            // const TriangleRecord record =
-            //     sample_area_light(rands, pc_ray.num_lights, light_mesh_idx,
-            //                       light_triangle_idx, light_material_idx);
-            const vec3 Le =
-                sample_light(rands, payload.pos, pc_ray.num_lights, light_idx,
-                             light_triangle_idx, light_material_idx, light,
-                             record, light_mat, seed);
-            // vec2 uv_unused;
-            // const Material light_mat =
-            //     load_material(light_material_idx, uv_unused);
-            vec3 wi = record.pos - payload.pos;
-            const float wi_len = length(wi);
-            wi /= wi_len;
+            vec3 wi;
+            float wi_len;
+            float pdf_light;
+            LightRecord record;
+            float cos_from_light;
+            vec3 light_pos, light_n;
+            const vec3 Le = sample_light_Li(
+                rands, payload.pos, pc_ray.num_lights, wi, wi_len, light_n,
+                light_pos, pdf_light, cos_from_light, record);
+
             float bsdf_pdf;
             float cos_x = dot(normal, wi);
-            const float g = abs(dot(record.n_s, -wi)) / (wi_len * wi_len);
-
-            // const vec3 f = eval_bsdf(hit_mat, wo, wi, normal);
+            const float g = abs(cos_from_light) / (wi_len * wi_len);
             const vec3 f =
                 eval_bsdf(normal, wo, hit_mat, 1, side, wi, bsdf_pdf, cos_x);
-
-            const float pdf_light = record.triangle_pdf;
             // f * L * G / pdf
             RestirData s;
-            s.light_idx = light_idx;
-            s.light_mesh_idx = light_triangle_idx;
+            s.light_idx = record.light_idx;
+            s.light_mesh_idx = record.triangle_idx;
             s.seed = light_seed;
-
             const float p_hat = length(f * Le * abs(cos_x) * g);
             update_reservoir(r_new, s, p_hat / pdf_light);
         }
@@ -117,25 +103,18 @@ void main() {
             uvec4 r_seed = s.seed;
             const uint light_triangle_idx = s.light_mesh_idx;
             const uint light_idx = s.light_idx;
-            Light light;
-            TriangleRecord record;
-            Material light_mat;
-            uint light_material_idx;
+            vec3 light_pos, light_n;
             const vec4 rands =
                 vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
-            // const TriangleRecord record = sample_area_light_with_idx(
-            //     rands, light_mesh_idx, light_triangle_idx,
-            //     light_material_idx);
+
             vec3 Le = sample_light_with_idx(
                 rands, payload.pos, pc_ray.num_lights, light_idx,
-                light_triangle_idx, light_material_idx, light, record,
-                light_mat);
+                light_triangle_idx, light_pos, light_n);
 
-            vec3 wi = record.pos - payload.pos;
+            vec3 wi = light_pos - payload.pos;
             const float wi_len = length(wi);
             wi /= wi_len;
-            // const Material light_mat =
-            //     load_material(light_material_idx, uv_unused);
+
             any_hit_payload.hit = 1;
             traceRayEXT(tlas,
                         gl_RayFlagsTerminateOnFirstHitEXT |
@@ -144,7 +123,7 @@ void main() {
                         wi_len - EPS, 1);
             vec3 f = eval_bsdf(hit_mat, wo, wi, normal);
             const float cos_x = dot(normal, wi);
-            const float g = abs(dot(record.n_s, -wi)) / (wi_len * wi_len);
+            const float g = abs(dot(light_n, -wi)) / (wi_len * wi_len);
             bool visible = any_hit_payload.hit == 0 && f != vec3(0);
             r_new.W = 0;
             if (visible) {

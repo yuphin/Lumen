@@ -59,21 +59,18 @@ vec3 calc_L(const RestirReservoir r) {
     uvec4 r_seed = r.s.seed;
     const uint light_triangle_idx = r.s.light_mesh_idx;
     const uint light_idx = r.s.light_idx;
-    uint light_material_idx;
-    Light light;
-    TriangleRecord record;
-    Material light_mat;
+    vec3 light_pos, light_n;
     const vec4 rands_pos =
         vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
-    vec3 Le = sample_light_with_idx(
-        rands_pos, pos, pc_ray.num_lights, light_idx, light_triangle_idx,
-        light_material_idx, light, record, light_mat);
-    vec3 wi = record.pos - pos;
+    vec3 Le =
+        sample_light_with_idx(rands_pos, pos, pc_ray.num_lights, light_idx,
+                              light_triangle_idx, light_pos, light_n);
+    vec3 wi = light_pos - pos;
     const float wi_len = length(wi);
     wi /= wi_len;
     const vec3 f = eval_bsdf(hit_mat, wo, wi, normal);
     const float cos_x = dot(normal, wi);
-    const float g = abs(dot(record.n_s, -wi)) / (wi_len * wi_len);
+    const float g = abs(dot(light_n, -wi)) / (wi_len * wi_len);
     return f * Le * abs(cos_x) * g;
 }
 
@@ -84,21 +81,18 @@ vec3 calc_L_with_visibility_check(const RestirReservoir r) {
     uvec4 r_seed = r.s.seed;
     const uint light_triangle_idx = r.s.light_mesh_idx;
     const uint light_idx = r.s.light_idx;
-    uint light_material_idx;
-    Light light;
-    TriangleRecord record;
-    Material light_mat;
+    vec3 light_pos, light_n;
     const vec4 rands_pos =
         vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
     vec3 Le = sample_light_with_idx(
         rands_pos, pos, pc_ray.num_lights, light_idx, light_triangle_idx,
-        light_material_idx, light, record, light_mat);
-    vec3 wi = record.pos - pos;
+        light_pos, light_n);
+    vec3 wi = light_pos - pos;
     const float wi_len = length(wi);
     wi /= wi_len;
     const vec3 f = eval_bsdf(hit_mat, wo, wi, normal);
     const float cos_x = dot(normal, wi);
-    const float g = abs(dot(record.n_s, -wi)) / (wi_len * wi_len);
+    const float g = abs(dot(light_n, -wi)) / (wi_len * wi_len);
     any_hit_payload.hit = 1;
     traceRayEXT(tlas,
                 gl_RayFlagsTerminateOnFirstHitEXT |

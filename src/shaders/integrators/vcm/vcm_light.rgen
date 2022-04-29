@@ -76,44 +76,44 @@ uint get_restir_hash_idx(uint light_idx, float u, float v) {
 void load_vcm_state(float eta_vc, const VCMReservoir r,
                     const LightState light_state, out VCMState state,
                     bool use_reservoir) {
-    // float pdf_pos = light_state.triangle_pdf / pc_ray.light_triangle_count;
-    // vec3 wi;
-    // float W;
-    // float cos_theta;
-    // if (use_reservoir && r.W > 0) {
-    //     wi = r.s.dir;
-    //     cos_theta = abs(dot(wi, light_state.normal));
+    float pdf_pos = light_state.triangle_pdf / pc_ray.light_triangle_count;
+    vec3 wi;
+    float W;
+    float cos_theta;
+    if (use_reservoir && r.W > 0) {
+        wi = r.s.dir;
+        cos_theta = abs(dot(wi, light_state.normal));
 
-    //     // float cos_deg = degrees(acos(cos_theta));
-    //     // if(true) {
-    //     // //if(light_state.hash_idx == 1231707) {
-    //     //     angles.d[pixel_idx % pc_ray.max_angle_samples].is_active = 1;
-    //     //     angles.d[pixel_idx % pc_ray.max_angle_samples].theta =
-    //     //     acos(cos_theta); angles.d[pixel_idx %
-    //     //     pc_ray.max_angle_samples].phi = r.s.phi;
-    //     // }
-    //     W = r.W;
-    // } else {
-    //     wi = light_state.dir;
-    //     const float pdf_dir =
-    //         light_pdf_Le(light_state.light_flags, light_state.normal, wi);
-    //     cos_theta = abs(dot(wi, light_state.normal));
-    //     W = 1. / pdf_dir;
-    // }
-    // state.pos = light_state.pos;
-    // state.n_s = light_state.normal;
-    // state.area = 1.0 / light_state.triangle_pdf;
-    // state.wi = wi;
-    // state.throughput = light_state.Le * cos_theta * W / (pdf_pos);
-    // state.d_vcm = W;
-    // if (!is_light_delta(light_state.light_flags)) {
-    //     const float cos_factor =
-    //         is_light_finite(light_state.light_flags) ? cos_theta : 1;
-    //     state.d_vc = cos_factor * W / (pdf_pos);
-    // } else {
-    //     state.d_vc = 0;
-    // }
-    // state.d_vm = state.d_vc * eta_vc;
+        // float cos_deg = degrees(acos(cos_theta));
+        // if(true) {
+        // //if(light_state.hash_idx == 1231707) {
+        //     angles.d[pixel_idx % pc_ray.max_angle_samples].is_active = 1;
+        //     angles.d[pixel_idx % pc_ray.max_angle_samples].theta =
+        //     acos(cos_theta); angles.d[pixel_idx %
+        //     pc_ray.max_angle_samples].phi = r.s.phi;
+        // }
+        W = r.W;
+    } else {
+        wi = light_state.dir;
+        const float pdf_dir =
+            light_pdf_Le(light_state.light_flags, light_state.normal, wi);
+        cos_theta = abs(dot(wi, light_state.normal));
+        W = 1. / pdf_dir;
+    }
+    state.pos = light_state.pos;
+    state.n_s = light_state.normal;
+    state.area = 1.0 / light_state.triangle_pdf;
+    state.wi = wi;
+    state.throughput = light_state.Le * cos_theta * W / (pdf_pos);
+    state.d_vcm = W;
+    if (!is_light_delta(light_state.light_flags)) {
+        const float cos_factor =
+            is_light_finite(light_state.light_flags) ? cos_theta : 1;
+        state.d_vc = cos_factor * W / (pdf_pos);
+    } else {
+        state.d_vc = 0;
+    }
+    state.d_vm = state.d_vc * eta_vc;
 }
 
 void main() {
