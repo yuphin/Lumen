@@ -29,16 +29,18 @@ void main() {
     const uvec4 chain1_seed = seeds_data.d[gl_LaunchIDEXT.x].chain1_seed;
     uvec4 chain_seed = chain == 0 ? chain0_seed : chain1_seed;
     const float large_step_prob = 0.3;
-    const bool large_step = chain_idx == 0 && rand(seed) < large_step_prob;
     mlt_start_iteration();
     mlt_start_chain();
     float proposed_luminance;
+
+    large_step = chain_idx == 0 && rand(seed) < large_step_prob;
+    save_radiance = true;
+    mlt_seed = chain_seed;
+
     if (LIGHT_FIRST == 1) {
-        proposed_luminance =
-            mlt_trace_eye(origin, cam_area, large_step, chain_seed, true);
+        proposed_luminance = mlt_trace_eye();
     } else {
-        proposed_luminance = mlt_trace_light(origin.xyz, cam_nrm, cam_area,
-                                             large_step, chain_seed, true);
+        proposed_luminance = mlt_trace_light();
     }
 
     if (isnan(proposed_luminance) || isinf(proposed_luminance)) {
@@ -104,8 +106,8 @@ void main() {
     }
 
     if (chain == 0) {
-        seeds_data.d[pixel_idx].chain0_seed = chain_seed;
+        seeds_data.d[pixel_idx].chain0_seed = mlt_seed;
     } else {
-        seeds_data.d[pixel_idx].chain1_seed = chain_seed;
+        seeds_data.d[pixel_idx].chain1_seed = mlt_seed;
     }
 }

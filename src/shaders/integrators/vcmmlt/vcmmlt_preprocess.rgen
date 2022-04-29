@@ -27,12 +27,15 @@ void main() {
     chain = 0;
     mlt_start_chain();
 
+    large_step = true;
+    save_radiance = true;
+    
+    mlt_seed = chain0_seed;
+
     if (LIGHT_FIRST == 1) {
-        mlt_sampler.luminance =
-            mlt_trace_eye(origin, cam_area, true, chain0_seed, true);
+        mlt_sampler.luminance = mlt_trace_eye();
     } else {
-        mlt_sampler.luminance = mlt_trace_light(origin.xyz, cam_nrm, cam_area,
-                                                true, chain0_seed, true);
+        mlt_sampler.luminance = mlt_trace_light();
     }
 
     for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
@@ -45,13 +48,13 @@ void main() {
     chain = 1;
     mlt_start_chain();
 
+    uvec4 chain0_seed_used = mlt_seed;
+    mlt_seed = chain1_seed;
+
     if (LIGHT_FIRST == 1) {
-        mlt_sampler.luminance =
-            mlt_trace_eye(origin, cam_area, true, chain1_seed, true);
+        mlt_sampler.luminance = mlt_trace_eye();
     } else {
-        mlt_sampler.luminance =
-            mlt_trace_light(origin.xyz, cam_nrm, cam_area, true, chain1_seed,
-            true);
+        mlt_sampler.luminance = mlt_trace_light();
     }
 
     for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
@@ -60,13 +63,15 @@ void main() {
     }
     mlt_sampler.past_splat_cnt = mlt_sampler.splat_cnt;
     mlt_sampler.splat_cnt = 0;
-    seeds_data.d[pixel_idx].chain0_seed = chain0_seed;
-    seeds_data.d[pixel_idx].chain1_seed = chain1_seed;
+    seeds_data.d[pixel_idx].chain0_seed = chain0_seed_used;
+    seeds_data.d[pixel_idx].chain1_seed = mlt_seed;
 
-    sum_data.d[2 * pixel_idx].x = eval_target(mlt_sampler_mux(0).luminance, 0); // lum
-    sum_data.d[2 * pixel_idx].y = 1; // lum_samples
-    sum_data.d[2 * pixel_idx].z = 1; // total_samples
-    sum_data.d[2 * pixel_idx + 1].x = eval_target(mlt_sampler_mux(1).luminance, 1);
+    sum_data.d[2 * pixel_idx].x =
+        eval_target(mlt_sampler_mux(0).luminance, 0); // lum
+    sum_data.d[2 * pixel_idx].y = 1;                  // lum_samples
+    sum_data.d[2 * pixel_idx].z = 1;                  // total_samples
+    sum_data.d[2 * pixel_idx + 1].x =
+        eval_target(mlt_sampler_mux(1).luminance, 1);
     sum_data.d[2 * pixel_idx + 1].y = 1;
     sum_data.d[2 * pixel_idx + 1].z = 1;
 }

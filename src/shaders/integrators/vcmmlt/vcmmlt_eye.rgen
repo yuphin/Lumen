@@ -11,16 +11,29 @@
 #include "vcmmlt_commons.glsl"
 layout(constant_id = 1) const int LIGHT_FIRST = 0;
 
-
 void main() {
     vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
     vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
                                                2. / gl_LaunchSizeEXT.y, 0, 1));
     area_int /= area_int.w;
     const float cam_area = abs(area_int.x * area_int.y);
+
+    large_step = true;
+    save_radiance = true;
+    mlt_seed = seed;
+
     if (LIGHT_FIRST == 1) {
-        mlt_fill_light_path(origin, cam_area);
+        // mlt_fill_light_path(origin, cam_area);
+        vec3 origin = vec3(ubo.inv_view * vec4(0, 0, 0, 1));
+        VCMState light_state;
+        float lum_sum = 0;
+        float eta_vc = 0, eta_vm = 0;
+        bool finite;
+        if (!vcm_generate_light_sample(eta_vc, light_state, finite)) {
+            return;
+        }
+        vcm_fill_light(origin, light_state, finite, 0, eta_vc, eta_vm);
     } else {
-        mlt_fill_eye_path(origin, cam_area);
+        mlt_fill_eye();
     }
 }
