@@ -7,7 +7,7 @@ Window::Window(int width, int height, bool fullscreen)
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 	window_handle = glfwCreateWindow(
-		width, height, "Vulkan", fullscreen ? glfwGetPrimaryMonitor() : nullptr,
+		width, height, "Lumen", fullscreen ? glfwGetPrimaryMonitor() : nullptr,
 		nullptr);
 	LUMEN_ASSERT(window_handle, "Failed to create a window!");
 	glfwSetWindowUserPointer(window_handle, this);

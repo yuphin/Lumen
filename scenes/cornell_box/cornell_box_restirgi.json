@@ -9,7 +9,6 @@
  
     "bsdfs": [
         {
-            "ior": 1.52,
             "name": "Glass",
             "refs": [
                 "glass_sphere"
@@ -19,14 +18,19 @@
                 1,
                 1
             ],
-            "type": "glass"
+            "type": "diffuse"
         },
         {
+            "albedo": [
+                1,
+                1,
+                1
+            ],
             "name": "Mirror",
             "refs": [
                 "mirror_sphere"
             ],
-            "type": "mirror"
+            "type": "diffuse"
         },
         {
             "albedo": [

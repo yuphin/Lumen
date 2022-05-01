@@ -27,18 +27,21 @@
 
 ## Showcase
 ##### Caustics Glass (VCM)
-![0](/media/GlassVCM.png?raw=true "Japanese Classroom")
+![0](/media/GlassVCM.png?raw=true "Caustics Glass")
+
+##### Caustics Zoomed (VCM)
+![1](/media/CausticsZoomed.png?raw=true "Caustics Zoomed")
 
 ##### Mitsuba Torus (VCM)
-![1](/media/TorusVCM.png?raw=true "Japanese Classroom")
+![2](/media/TorusVCM.png?raw=true "Mitsuba Torus")
 
 ##### Japanese Classroom (Courtesy of [Benedikt Bitterli](https://benedikt-bitterli.me/resources/))
-![2](/media/ClassroomPath.png?raw=true "Japanese Classroom")
+![3](/media/ClassroomPath.png?raw=true "Japanese Classroom")
 
 ##### ReSTIR 1 sample per pixel ([Video comparison](https://drive.google.com/file/d/1H2OWNuinCjOEpfb5OWKAA_yl25t9_Hol/view?usp=sharing))
-![3](/media/ReSTIR1spp.png?raw=true "Japanese Classroom")
+![4](/media/ReSTIR1spp.png?raw=true "ReSTIR")
 ##### ReSTIR GI 1 sample per pixel ([Video comparison](https://drive.google.com/file/d/1UV1FpyMhtcX8cUo4CFIXFXhWI8UWr121/view?usp=sharing))
-![4](/media/ReSTIRGI1spp.PNG?raw=true "Japanese Classroom")
+![5](/media/ReSTIRGI1spp.PNG?raw=true "ReSTIR GI")
 ## Building
 
 To build Lumen, start cloning the repository with
