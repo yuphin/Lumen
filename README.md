@@ -38,7 +38,7 @@
 ##### ReSTIR 1 sample per pixel ([Video comparison](https://drive.google.com/file/d/1H2OWNuinCjOEpfb5OWKAA_yl25t9_Hol/view?usp=sharing))
 ![3](/media/ReSTIR1spp.png?raw=true "Japanese Classroom")
 ##### ReSTIR GI 1 sample per pixel ([Video comparison](https://drive.google.com/file/d/1UV1FpyMhtcX8cUo4CFIXFXhWI8UWr121/view?usp=sharing))
-![4](/media/ReSTIRGI1spp.PNG?raw=true "Japanese Classroom")
+![4](/media/ReSTIRGI1spp.png?raw=true "Japanese Classroom")
 ## Building
 
 To build Lumen, start cloning the repository with
@@ -46,16 +46,17 @@ To build Lumen, start cloning the repository with
 ```shell
 git clone --recursive https://github.com/yuphin/Lumen.git
 ```
-
-## Usage
-Some of the sample scenes can be found in the `scenes/` directory.
-Sample scene files with various integrators can be found in the `scenes/cornell_box/` directory.
-
 ### Requirements
 - Turing+ or RDNA2 GPU
 - VS2022 or VS2019
 
 Currently, Lumen only builds on Windows, however, there is no platform specific code in the codebase and it can be ported to Linux with ease.
+
+## Usage
+Some of the sample scenes can be found in the `scenes/` directory.
+Sample scene files with various integrators can be found in the `scenes/cornell_box/` directory.
+
+
 
 ## References
 
