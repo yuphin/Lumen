@@ -1,0 +1,894 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<scene version="0.5.0" >
+	<integrator type="path" >
+		<integer name="maxDepth" value="17" />
+		<boolean name="strictNormals" value="true" />
+	</integrator>
+	<sensor type="perspective" >
+		<float name="fov" value="60" />
+		<transform name="toWorld" >
+			<matrix value="-0.988479 -0.00428443 0.151294 -1.69049 -9.42177e-010 -0.999599 -0.0283071 1.27158 -0.151355 0.027981 -0.988083 5.88653 0 0 0 1"/>
+		</transform>
+		<sampler type="sobol" >
+			<integer name="sampleCount" value="64" />
+		</sampler>
+		<film type="ldrfilm" >
+			<integer name="width" value="1280" />
+			<integer name="height" value="720" />
+			<string name="fileFormat" value="png" />
+			<string name="pixelFormat" value="rgb" />
+			<float name="gamma" value="2.2" />
+			<boolean name="banner" value="false" />
+			<rfilter type="tent" />
+		</film>
+	</sensor>
+	<bsdf type="twosided" id="Walls" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.654071, 0.67408, 0.8"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Lectern" >
+		<bsdf type="diffuse" >
+			<texture name="reflectance" type="bitmap" >
+				<string name="filename" value="textures/wood1.jpg" />
+				<string name="filterType" value="trilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="FlagRed" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.8, 0.008214, 0"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="FlagWhite" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="1, 1, 1"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="FlagBase" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.779661, 0.653162, 0.349188"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="ChalkHolder" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.8, 0.644901, 0.412119"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="ProjectorScreen" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="1, 1, 1"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="StickyNote1" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.612066, 0.612066, 0.612066"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Whiteboard" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="1, 1, 1"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="StickyNote7" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.612066, 0.612066, 0.612066"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="StickyNote8" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.612066, 0.612066, 0.612066"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Bin2" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.8, 0.717509, 0.190456"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Boxes2" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.8, 0.791642, 0.388399"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Boxes1" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.64, 0.472188, 0.319233"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="StickyNote4" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.612066, 0.612066, 0.612066"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Whiteboard2" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.79311, 0.79311, 0.79311"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BluePencil" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0, 0.030764, 0.8"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="GreenPencil" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.145676, 0.64, 0"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="RedPencil" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.626651, 0, 0"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Bookshelf" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.491301, 0.305177, 0.8"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Hallway" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.784314, 0.784314, 0.784314"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="CeilingLight" >
+		<bsdf type="roughplastic" >
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="intIOR" value="1.5" />
+			<float name="extIOR" value="1" />
+			<boolean name="nonlinear" value="true" />
+			<rgb name="diffuseReflectance" value="0.647814, 0.647814, 0.647814"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Black" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.00631, 0.00631, 0.00631"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="BlackPlastic" >
+		<bsdf type="roughplastic" >
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="intIOR" value="1.5" />
+			<float name="extIOR" value="1" />
+			<boolean name="nonlinear" value="true" />
+			<rgb name="diffuseReflectance" value="0.00631, 0.00631, 0.00631"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Projector" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.00631, 0.00631, 0.00631"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="ScreenEnds" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.028991, 0.028991, 0.028991"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="FoamEraser" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.684615, 0.684615, 0.684615"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Whiteboard3" >
+		<bsdf type="roughplastic" >
+			<float name="alpha" value="0.05" />
+			<string name="distribution" value="ggx" />
+			<float name="intIOR" value="1.5" />
+			<float name="extIOR" value="1" />
+			<boolean name="nonlinear" value="true" />
+			<rgb name="diffuseReflectance" value="1, 1, 1"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="ChairWood" >
+		<bsdf type="roughplastic" >
+			<float name="alpha" value="0.05" />
+			<string name="distribution" value="ggx" />
+			<float name="intIOR" value="1.5" />
+			<float name="extIOR" value="1" />
+			<boolean name="nonlinear" value="true" />
+			<texture name="diffuseReflectance" type="bitmap" >
+				<string name="filename" value="textures/wood2.jpg" />
+				<string name="filterType" value="trilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="ChairFrame" >
+		<bsdf type="roughconductor" >
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="extEta" value="1" />
+			<rgb name="specularReflectance" value="0.751534, 0.751534, 0.751534"/>
+			<rgb name="eta" value="1.65746, 0.880369, 0.521229"/>
+			<rgb name="k" value="9.22387, 6.26952, 4.837"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="ChairStainless" >
+		<bsdf type="conductor" >
+			<float name="extEta" value="1" />
+			<rgb name="specularReflectance" value="1, 1, 1"/>
+			<rgb name="eta" value="1.65746, 0.880369, 0.521229"/>
+			<rgb name="k" value="9.22387, 6.26952, 4.837"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Floor" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.659224, 0.592438, 0.517401"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="WoodFrame" >
+		<bsdf type="diffuse" >
+			<texture name="reflectance" type="bitmap" >
+				<string name="filename" value="textures/blackboard.jpg" />
+				<string name="filterType" value="trilinear" />
+			</texture>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="WhiteboardFrame" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.056173, 0.056173, 0.056173"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="StickyNote3" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.612066, 0.612066, 0.612066"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="StickyNote5" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.612066, 0.612066, 0.612066"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="StickyNote6" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.612066, 0.612066, 0.612066"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Speakers" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.03598, 0.03598, 0.03598"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Wall" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.450837, 0.453663, 0.499605"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="WindowFrame" >
+		<bsdf type="roughconductor" >
+			<float name="alpha" value="0.1" />
+			<string name="distribution" value="ggx" />
+			<float name="extEta" value="1" />
+			<rgb name="specularReflectance" value="0.471008, 0.471008, 0.471008"/>
+			<rgb name="eta" value="1.65746, 0.880369, 0.521229"/>
+			<rgb name="k" value="9.22387, 6.26952, 4.837"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Bin1" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.327125, 0.578596, 0.280561"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="Rubber" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.687031, 0.715465, 0.560499"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="FluorescentTube" >
+		<bsdf type="plastic" >
+			<float name="intIOR" value="1.5" />
+			<float name="extIOR" value="1" />
+			<boolean name="nonlinear" value="true" />
+			<rgb name="diffuseReflectance" value="0.612066, 0.612066, 0.612066"/>
+		</bsdf>
+	</bsdf>
+	<bsdf type="twosided" id="StickyNote2" >
+		<bsdf type="diffuse" >
+			<rgb name="reflectance" value="0.612066, 0.612066, 0.612066"/>
+		</bsdf>
+	</bsdf>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh036.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Walls" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh048.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="FluorescentTube" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh062.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="CeilingLight" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh038.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="FluorescentTube" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh054.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Black" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh077.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Black" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh052.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="BlackPlastic" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh061.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Black" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh031.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Projector" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh030.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="Projector" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh057.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Black" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh023.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Walls" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh027.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Walls" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh047.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="Bin2" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh049.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 -0.0734223 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Boxes1" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh022.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Black" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh029.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Black" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh033.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Whiteboard" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh040.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Walls" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh028.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Black" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh076.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="ProjectorScreen" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh050.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="ScreenEnds" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh055.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="FlagBase" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh053.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="FoamEraser" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh058.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="ChalkHolder" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh060.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="ChairWood" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh063.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="ChairStainless" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh064.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="ChairFrame" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh037.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="ChairWood" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh067.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="ChairWood" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh073.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="ChairWood" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh024.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="ChairWood" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh041.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="ChairWood" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh026.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="Rubber" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh069.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="ChairWood" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh035.obj" />
+		<transform name="toWorld" >
+			<matrix value="11.6517 0 0 0 0 11.6517 0 0 0 0 11.6517 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Floor" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh043.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="WoodFrame" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh072.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Whiteboard2" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh045.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="StickyNote1" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh044.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="StickyNote2" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh074.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="RedPencil" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh070.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="BluePencil" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh078.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="GreenPencil" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh021.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Whiteboard3" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh018.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="WhiteboardFrame" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh017.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Lectern" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh066.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Lectern" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh056.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Lectern" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh016.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Lectern" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh015.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Lectern" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh014.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Hallway" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh025.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="WoodFrame" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh046.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Whiteboard2" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh012.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="BluePencil" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh011.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="GreenPencil" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh010.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="GreenPencil" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh009.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="GreenPencil" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh008.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="BluePencil" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh059.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="RedPencil" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh065.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="Bookshelf" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh032.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="StickyNote3" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh007.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="StickyNote4" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh075.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="StickyNote5" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh071.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="StickyNote6" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh039.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="StickyNote7" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh006.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="StickyNote8" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh051.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Black" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh013.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="FlagRed" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh005.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="FlagWhite" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh042.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Walls" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh003.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Speakers" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh020.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="FluorescentTube" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh002.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="CeilingLight" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh019.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Wall" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh068.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="WindowFrame" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh001.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<ref id="Bin1" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh004.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 -0.0734223 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Boxes1" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh034.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 -0.0734223 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Boxes2" />
+	</shape>
+	<shape type="obj" >
+		<string name="filename" value="models/Mesh000.obj" />
+		<transform name="toWorld" >
+			<matrix value="1 0 0 0 0 1 0 -0.0734223 0 0 1 0 0 0 0 1"/>
+		</transform>
+		<boolean name="faceNormals" value="true" />
+		<ref id="Boxes1" />
+	</shape>
+		<emitter type="sunsky" >
+		<vector name="sunDirection" x="-0.865804" y="0.916766" z="-0.276929" />
+		<vector name="sunColor" x="0.98" y="0.82" z="0.30" />
+		<vector name="skyColor" x="0.53" y="0.8" z="0.92" />
+		<float name="sunScale" value="0.1" />
+	</emitter>
+</scene>
