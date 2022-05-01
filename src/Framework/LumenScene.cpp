@@ -77,19 +77,78 @@ private:
 };
 
 using json = nlohmann::json;
-void LumenScene::load_scene(const std::string& root, const std::string& filename) {
+void LumenScene::load_scene(const std::string& path) {
 
 	auto ends_with = [](const std::string& str, const std::string& end) -> bool {
 		if (end.size() > end.size()) return false;
 		return std::equal(end.rbegin(), end.rend(), str.rbegin());
 	};
-	const std::string path = root + filename;
+
+
+	auto found = path.find_last_of("/");
+
+	auto root = path.substr(0, found + 1);
+
 
 	if (ends_with(path, ".json")) {
 		std::ifstream i(path);
 		json j;
 		i >> j;
 
+
+		auto& integrator = j["integrator"];
+		if (!integrator["path_length"].is_null()) {
+			config.path_length = integrator["path_length"];
+		}
+		if (!integrator["sky_col"].is_null()) {
+			auto sky = integrator["sky_col"];
+			config.sky_col = glm::vec3(sky[0], sky[1], sky[2]);
+
+		}
+		if (integrator["type"] == "path") {
+			config.integrator_type = IntegratorType::Path;
+		} else if (integrator["type"] == "bdpt") {
+			config.integrator_type = IntegratorType::BDPT;
+		}
+		else if (integrator["type"] == "sppm") {
+			config.integrator_type = IntegratorType::SPPM;
+			config.base_radius = integrator["base_radius"];
+		}
+		else if (integrator["type"] == "vcm") {
+			config.integrator_type = IntegratorType::VCM;
+			config.enable_vm = integrator["enable_vm"] == 1;
+			config.radius_factor = integrator["radius_factor"];
+		}
+		else if (integrator["type"] == "pssmlt") {
+			config.integrator_type = IntegratorType::PSSMLT;
+			config.integrator_type = IntegratorType::SMLT;
+			config.mutations_per_pixel = integrator["mutations_per_pixel"];
+			config.num_mlt_threads = integrator["num_mlt_threads"];
+			config.num_bootstrap_samples = integrator["num_bootstrap_samples"];
+		}
+		else if (integrator["type"] == "smlt") {
+			config.integrator_type = IntegratorType::SMLT;
+			config.mutations_per_pixel = integrator["mutations_per_pixel"];
+			config.num_mlt_threads = integrator["num_mlt_threads"];
+			config.num_bootstrap_samples = integrator["num_bootstrap_samples"];
+		}
+		else if (integrator["type"] == "vcmmlt") {
+			config.integrator_type = IntegratorType::VCMMLT;
+			config.mutations_per_pixel = integrator["mutations_per_pixel"];
+			config.num_mlt_threads = integrator["num_mlt_threads"];
+			config.num_bootstrap_samples = integrator["num_bootstrap_samples"];
+			config.radius_factor = integrator["radius_factor"];
+			config.enable_vm = integrator["enable_vm"] == 1;
+			config.alternate = integrator["alternate"] == 1;
+			config.light_first = integrator["light_first"] == 1;
+		}
+		else if (integrator["type"] == "restir") {
+			config.integrator_type = IntegratorType::ReSTIR;
+		}
+		else if (integrator["type"] == "restirgi") {
+			config.integrator_type = IntegratorType::ReSTIRGI;
+		}
+	
 		// Load obj file
 		const std::string mesh_file = root + std::string(j["mesh_file"]);
 		tinyobj::ObjReaderConfig reader_config;
@@ -234,11 +293,11 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 			bsdf_idx++;
 		}
 		
-		cam_config.fov = j["camera"]["fov"];
+		config.cam_settings.fov = j["camera"]["fov"];
 		const auto& p = j["camera"]["position"];
 		const auto& d = j["camera"]["dir"];
-		cam_config.pos = { p[0], p[1], p[2] };
-		cam_config.dir = { d[0], d[1], d[2] };
+		config.cam_settings.pos = { p[0], p[1], p[2] };
+		config.cam_settings.dir = { d[0], d[1], d[2] };
 		compute_scene_dimensions();
 		for (auto& light : lights_arr) {
 			const auto& pos = light["pos"];
@@ -267,8 +326,8 @@ void LumenScene::load_scene(const std::string& root, const std::string& filename
 		mitsuba_parser.parse(path);
 
 		// Camera	 
-		cam_config.fov = mitsuba_parser.camera.fov / 2;
-		cam_config.cam_matrix = mitsuba_parser.camera.cam_matrix;
+		config.cam_settings.fov = mitsuba_parser.camera.fov / 2;
+		config.cam_settings.cam_matrix = mitsuba_parser.camera.cam_matrix;
 		prim_meshes.resize(mitsuba_parser.meshes.size());
 		// Load objs
 		int i = 0;

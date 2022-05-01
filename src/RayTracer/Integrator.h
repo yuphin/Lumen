@@ -14,8 +14,8 @@
 #include "shaders/commons.h"
 class Integrator {
 public:
-	Integrator(LumenInstance* instance, const SceneConfig& config) : 
-		instance(instance), config(config) {}
+	Integrator(LumenInstance* instance, LumenScene* lumen_scene) : 
+		instance(instance), lumen_scene(lumen_scene) {}
 	virtual void init();
 	virtual void render() = 0;
 	virtual bool gui() { return false; };
@@ -40,12 +40,11 @@ protected:
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props{
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
 	LumenInstance* instance;
-	LumenScene lumen_scene;
 	std::vector<Light> lights;
 	VkSampler texture_sampler;
 	std::vector<Texture2D> textures;
-	SceneConfig config;
 	uint32_t total_light_triangle_cnt = 0;
+	LumenScene* lumen_scene;
 private:
 };
 

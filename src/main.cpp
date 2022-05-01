@@ -5,7 +5,7 @@
 
 void window_size_callback(GLFWwindow* window, int width, int height) {}
 
-int main() {
+int main(int argc, char* argv[]) {
 #ifdef NDEBUG
 	bool enable_debug = false;
 #else
@@ -19,7 +19,7 @@ int main() {
 	LUMEN_TRACE("Logger initialized");
 	Window window(width, height, fullscreen);
 	{
-		RayTracer app(width, height, enable_debug);
+		RayTracer app(width, height, enable_debug, argc, argv);
 		app.init(&window);
 		while (!window.should_close()) {
 			window.poll();

@@ -12,7 +12,7 @@
 #include "ReSTIRGI.h"
 class RayTracer : public LumenInstance {
 public:
-	RayTracer(int width, int height, bool debug);
+	RayTracer(int width, int height, bool debug, int, char* []);
 	void init(Window*) override;
 	void update() override;
 	void cleanup() override;
@@ -23,6 +23,7 @@ private:
 	struct Settings {
 		bool enable_tonemapping = false;
 	};
+
 	void render(uint32_t idx);
 	float draw_frame();
 	void create_post_descriptor();
@@ -31,6 +32,7 @@ private:
 	void create_compute_pipelines();
 	void init_imgui();
 	void init_resources();
+	void parse_args(int argc, char* argv[]);
 	void save_exr(const float* rgb, int width, int height, const char* outfilename);
 	bool initialized = false;
 	bool rt_initialized = false;
@@ -58,6 +60,11 @@ private:
 	std::unique_ptr<Pipeline> calc_rmse_pipeline;
 	std::unique_ptr<Pipeline> reduce_rmse_pipeline;
 	std::unique_ptr<Pipeline> output_rmse_pipeline;
+
+
+	std::string scene_name;
+	LumenScene scene;
+
 	clock_t start;
 	bool write_exr = false;
 	bool has_gt = false;

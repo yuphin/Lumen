@@ -1,10 +1,6 @@
 #include "LumenPCH.h"
 #include "Path.h"
 
-const int max_depth = 6;
-//const vec3 sky_col(0.53, 0.8, 0.92);
-//const vec3 sky_col(0.053, 0.08, 0.092);
-const vec3 sky_col(0, 0, 0);
 void Path::init() {
 	Integrator::init();
 	SceneDesc desc;
@@ -42,8 +38,8 @@ void Path::render() {
 	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = (int)lights.size();
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = max_depth;
-	pc_ray.sky_col = sky_col;
+	pc_ray.max_depth = lumen_scene->config.path_length;
+	pc_ray.sky_col = lumen_scene->config.sky_col;
 	// Trace rays
 	vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
 					  rt_pipeline->handle);
@@ -125,7 +121,7 @@ void Path::create_offscreen_resources() {
 	TextureSettings settings;
 	settings.usage_flags =
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
+		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
 		VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	settings.base_extent = { (uint32_t)instance->width, (uint32_t)instance->height, 1 };
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -263,21 +259,21 @@ void Path::create_blas() {
 	auto vertex_address =
 		get_device_address(instance->vkb.ctx.device, vertex_buffer.handle);
 	auto idx_address = get_device_address(instance->vkb.ctx.device, index_buffer.handle);
-	for (auto& prim_mesh : lumen_scene.prim_meshes) {
+	for (auto& prim_mesh : lumen_scene->prim_meshes) {
 		BlasInput geo = to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({ geo });
 	}
 	instance->vkb.build_blas(blas_inputs,
-						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+							 VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void Path::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
 	float total_light_triangle_area = 0.0f;
 	//int light_triangle_cnt = 0;
-	const auto& indices = lumen_scene.indices;
-	const auto& vertices = lumen_scene.positions;
-	for (const auto& pm : lumen_scene.prim_meshes) {
+	const auto& indices = lumen_scene->indices;
+	const auto& vertices = lumen_scene->positions;
+	for (const auto& pm : lumen_scene->prim_meshes) {
 		VkAccelerationStructureInstanceKHR ray_inst{};
 		ray_inst.transform = to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
@@ -294,7 +290,7 @@ void Path::create_tlas() {
 
 	for (auto& l : lights) {
 		if (l.light_flags == LIGHT_AREA) {
-			const auto& pm = lumen_scene.prim_meshes[l.prim_mesh_idx];
+			const auto& pm = lumen_scene->prim_meshes[l.prim_mesh_idx];
 			l.world_matrix = pm.world_matrix;
 			auto& idx_base_offset = pm.first_idx;
 			auto& vtx_offset = pm.vtx_offset;
@@ -314,7 +310,7 @@ void Path::create_tlas() {
 			}
 			//light_triangle_cnt += l.num_triangles;
 		}
-	
+
 	}
 
 	if (lights.size()) {
@@ -329,7 +325,7 @@ void Path::create_tlas() {
 		pc_ray.light_triangle_count = total_light_triangle_cnt;
 	}
 	instance->vkb.build_tlas(tlas,
-						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+							 VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void Path::create_rt_pipelines() {

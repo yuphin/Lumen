@@ -3,14 +3,12 @@
 
 void SMLT::init() {
 	Integrator::init();
-	max_depth = 6;
 	mutations_per_pixel = 100.0f;
-	sky_col = vec3(0, 0, 0);
 	num_mlt_threads = 1600 * 900 / 2;
 	num_bootstrap_samples = 1600 * 900 / 2;
 	mutation_count = int(instance->width * instance->height * mutations_per_pixel / float(num_mlt_threads));
-	light_path_rand_count = 6 + 2 * max_depth;
-	cam_path_rand_count = 3 + 6 * max_depth;
+	light_path_rand_count = 6 + 2 * lumen_scene->config.path_length;
+	cam_path_rand_count = 3 + 6 * lumen_scene->config.path_length;
 
 	// MLTVCM buffers
 	bootstrap_buffer.create(
@@ -115,7 +113,7 @@ void SMLT::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * (max_depth * (max_depth + 1)) * sizeof(Splat)
+		num_mlt_threads * (lumen_scene->config.path_length * (lumen_scene->config.path_length + 1)) * sizeof(Splat)
 	);
 
 	past_splat_buffer.create(
@@ -123,7 +121,7 @@ void SMLT::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * (max_depth * (max_depth + 1)) * sizeof(Splat)
+		num_mlt_threads * (lumen_scene->config.path_length * (lumen_scene->config.path_length + 1)) * sizeof(Splat)
 	);
 
 	auto path_size = std::max(num_mlt_threads, num_bootstrap_samples);
@@ -132,7 +130,7 @@ void SMLT::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		path_size * (max_depth + 1) * sizeof(VCMVertex));
+		path_size * (lumen_scene->config.path_length + 1) * sizeof(VCMVertex));
 
 	connected_lights_buffer.create(
 		&instance->vkb.ctx,
@@ -164,7 +162,7 @@ void SMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		path_size * (max_depth* (max_depth + 1)) * sizeof(Splat) 
+		path_size * (lumen_scene->config.path_length * (lumen_scene->config.path_length + 1)) * sizeof(Splat)
 	);
 
 	light_splat_cnts_buffer.create(
@@ -277,8 +275,8 @@ void SMLT::render() {
 	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = max_depth;
-	pc_ray.sky_col = sky_col;
+	pc_ray.max_depth = lumen_scene->config.path_length;
+	pc_ray.sky_col = lumen_scene->config.sky_col;
 	// SMLT related constants
 	pc_ray.light_rand_count = light_path_rand_count;
 	pc_ray.cam_rand_count = cam_path_rand_count;
@@ -397,7 +395,7 @@ void SMLT::render() {
 			assert(false);
 		}
 
-		}
+	}
 	sum = cdf1[num_bootstrap_samples - 1];
 	float sum2 = cdf2[num_bootstrap_samples - 1];
 	return;
@@ -539,7 +537,7 @@ void SMLT::render() {
 									 mutation_barriers.data(), 0, 0);
 
 			}
-			
+
 			// Eye
 			{
 				vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
@@ -614,7 +612,7 @@ void SMLT::render() {
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 	}
 	cmd.submit();
-	}
+}
 
 bool SMLT::update() {
 	pc_ray.frame_num++;
@@ -681,7 +679,7 @@ void SMLT::create_offscreen_resources() {
 	TextureSettings settings;
 	settings.usage_flags =
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
+		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
 		VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	settings.base_extent = { (uint32_t)instance->width, (uint32_t)instance->height, 1 };
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -819,20 +817,20 @@ void SMLT::create_blas() {
 	auto vertex_address =
 		get_device_address(instance->vkb.ctx.device, vertex_buffer.handle);
 	auto idx_address = get_device_address(instance->vkb.ctx.device, index_buffer.handle);
-	for (auto& prim_mesh : lumen_scene.prim_meshes) {
+	for (auto& prim_mesh : lumen_scene->prim_meshes) {
 		BlasInput geo = to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({ geo });
 	}
 	instance->vkb.build_blas(blas_inputs,
-						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+							 VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void SMLT::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
 	float total_light_triangle_area = 0.0f;
-	const auto& indices = lumen_scene.indices;
-	const auto& vertices = lumen_scene.positions;
-	for (const auto& pm : lumen_scene.prim_meshes) {
+	const auto& indices = lumen_scene->indices;
+	const auto& vertices = lumen_scene->positions;
+	for (const auto& pm : lumen_scene->prim_meshes) {
 		VkAccelerationStructureInstanceKHR ray_inst{};
 		ray_inst.transform = to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
@@ -848,7 +846,7 @@ void SMLT::create_tlas() {
 
 	for (auto& l : lights) {
 		if (l.light_flags == LIGHT_AREA) {
-			const auto& pm = lumen_scene.prim_meshes[l.prim_mesh_idx];
+			const auto& pm = lumen_scene->prim_meshes[l.prim_mesh_idx];
 			l.world_matrix = pm.world_matrix;
 			auto& idx_base_offset = pm.first_idx;
 			auto& vtx_offset = pm.vtx_offset;

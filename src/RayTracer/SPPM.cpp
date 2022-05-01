@@ -1,8 +1,6 @@
 #include "LumenPCH.h"
 #include "SPPM.h"
 
-const int max_depth = 6;
-const vec3 sky_col(0, 0, 0);
 void SPPM::init() {
 	Integrator::init();
 	sppm_data_buffer.create(
@@ -108,7 +106,6 @@ void SPPM::init() {
 }
 
 void SPPM::render() {
-	const float ppm_base_radius = 0.03;
 	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = { 0.25f, 0.25f, 0.25f, 1.0f };
 	VkClearValue clear_depth = { 1.0f, 0 };
@@ -119,14 +116,14 @@ void SPPM::render() {
 	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = max_depth;
-	pc_ray.sky_col = sky_col;
+	pc_ray.max_depth = lumen_scene->config.path_length;
+	pc_ray.sky_col = lumen_scene->config.sky_col;
 	pc_ray.random_num = rand() % UINT_MAX;
 	// PPM related constants
-	pc_ray.radius = ppm_base_radius;
-	pc_ray.min_bounds = lumen_scene.m_dimensions.min;
-	pc_ray.max_bounds = lumen_scene.m_dimensions.max;
-	pc_ray.ppm_base_radius = ppm_base_radius;
+	pc_ray.radius = lumen_scene->config.base_radius;
+	pc_ray.min_bounds = lumen_scene->m_dimensions.min;
+	pc_ray.max_bounds = lumen_scene->m_dimensions.max;
+	pc_ray.ppm_base_radius = lumen_scene->config.base_radius;
 	const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
 	const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
 	const int base_grid_res = int(max_comp / pc_ray.radius);
@@ -142,7 +139,7 @@ void SPPM::render() {
 							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 		if (pc_ray.frame_num == 0) {
 			AtomicData* data = (AtomicData*)atomic_data_cpu.data;
-			data->max_radius = ppm_base_radius;
+			data->max_radius = lumen_scene->config.base_radius;
 			vkCmdFillBuffer(cmd.handle, sppm_data_buffer.handle, 0, sppm_data_buffer.size, 0);
 			barrier = buffer_barrier(sppm_data_buffer.handle,
 									 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
@@ -362,7 +359,7 @@ void SPPM::create_offscreen_resources() {
 	TextureSettings settings;
 	settings.usage_flags =
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
+		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
 		VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	settings.base_extent = { (uint32_t)instance->width, (uint32_t)instance->height, 1 };
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -500,7 +497,7 @@ void SPPM::create_blas() {
 	auto vertex_address =
 		get_device_address(instance->vkb.ctx.device, vertex_buffer.handle);
 	auto idx_address = get_device_address(instance->vkb.ctx.device, index_buffer.handle);
-	for (auto& prim_mesh : lumen_scene.prim_meshes) {
+	for (auto& prim_mesh : lumen_scene->prim_meshes) {
 		BlasInput geo = to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({ geo });
 	}
@@ -512,9 +509,9 @@ void SPPM::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
 	float total_light_triangle_area = 0.0f;
 	//int light_triangle_cnt = 0;
-	const auto& indices = lumen_scene.indices;
-	const auto& vertices = lumen_scene.positions;
-	for (const auto& pm : lumen_scene.prim_meshes) {
+	const auto& indices = lumen_scene->indices;
+	const auto& vertices = lumen_scene->positions;
+	for (const auto& pm : lumen_scene->prim_meshes) {
 		VkAccelerationStructureInstanceKHR ray_inst{};
 		ray_inst.transform = to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
@@ -529,8 +526,8 @@ void SPPM::create_tlas() {
 	}
 
 	for (auto& l : lights) {
-		if(l.light_flags == LIGHT_AREA) {
-			const auto& pm = lumen_scene.prim_meshes[l.prim_mesh_idx];
+		if (l.light_flags == LIGHT_AREA) {
+			const auto& pm = lumen_scene->prim_meshes[l.prim_mesh_idx];
 			l.world_matrix = pm.world_matrix;
 			auto& idx_base_offset = pm.first_idx;
 			auto& vtx_offset = pm.vtx_offset;
@@ -549,7 +546,7 @@ void SPPM::create_tlas() {
 				total_light_triangle_area += area;
 			}
 		}
-	
+
 		//light_triangle_cnt += l.num_triangles;
 	}
 

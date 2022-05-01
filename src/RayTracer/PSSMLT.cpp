@@ -3,6 +3,9 @@
 
 void PSSMLT::init() {
 	Integrator::init();
+	light_path_rand_count = 7 + 2 * lumen_scene->config.path_length;
+	cam_path_rand_count = 2 + 2 * lumen_scene->config.path_length;
+	connect_path_rand_count = 4 * lumen_scene->config.path_length;
 
 	// MLTVCM buffers
 	bootstrap_buffer.create(
@@ -11,7 +14,7 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_bootstrap_samples * sizeof(BootstrapSample)
+		lumen_scene->config.num_bootstrap_samples * sizeof(BootstrapSample)
 	);
 
 	cdf_buffer.create(
@@ -20,7 +23,7 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_bootstrap_samples * sizeof(float)
+		lumen_scene->config.num_bootstrap_samples * sizeof(float)
 	);
 
 	bootstrap_cpu.create(
@@ -29,7 +32,7 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		VK_SHARING_MODE_EXCLUSIVE,
-		num_bootstrap_samples * sizeof(BootstrapSample)
+		lumen_scene->config.num_bootstrap_samples * sizeof(BootstrapSample)
 	);
 
 
@@ -39,7 +42,7 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		VK_SHARING_MODE_EXCLUSIVE,
-		num_bootstrap_samples * sizeof(float)
+		lumen_scene->config.num_bootstrap_samples * sizeof(float)
 	);
 
 	cdf_sum_buffer.create(
@@ -56,7 +59,7 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * sizeof(SeedData)
+		lumen_scene->config.num_mlt_threads * sizeof(SeedData)
 	);
 
 	light_primary_samples_buffer.create(
@@ -65,7 +68,7 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * light_path_rand_count * sizeof(PrimarySample)
+		lumen_scene->config.num_mlt_threads * light_path_rand_count * sizeof(PrimarySample)
 	);
 
 	cam_primary_samples_buffer.create(
@@ -74,7 +77,7 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * cam_path_rand_count * sizeof(PrimarySample)
+		lumen_scene->config.num_mlt_threads * cam_path_rand_count * sizeof(PrimarySample)
 	);
 
 	connection_primary_samples_buffer.create(
@@ -83,7 +86,7 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * connect_path_rand_count * sizeof(PrimarySample)
+		lumen_scene->config.num_mlt_threads * connect_path_rand_count * sizeof(PrimarySample)
 	);
 
 	mlt_samplers_buffer.create(
@@ -92,7 +95,7 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * sizeof(MLTSampler)
+		lumen_scene->config.num_mlt_threads * sizeof(MLTSampler)
 	);
 
 	mlt_col_buffer.create(
@@ -108,7 +111,7 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * sizeof(ChainData)
+		lumen_scene->config.num_mlt_threads * sizeof(ChainData)
 	);
 
 	splat_buffer.create(
@@ -116,7 +119,7 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * (max_depth * (max_depth + 1)) * sizeof(Splat)
+		lumen_scene->config.num_mlt_threads * (lumen_scene->config.path_length * (lumen_scene->config.path_length + 1)) * sizeof(Splat)
 	);
 
 	past_splat_buffer.create(
@@ -124,25 +127,25 @@ void PSSMLT::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * (max_depth * (max_depth + 1)) * sizeof(Splat)
+		lumen_scene->config.num_mlt_threads * (lumen_scene->config.path_length * (lumen_scene->config.path_length + 1)) * sizeof(Splat)
 	);
-	auto path_size = std::max(num_mlt_threads, num_bootstrap_samples);
+	auto path_size = std::max(lumen_scene->config.num_mlt_threads, lumen_scene->config.num_bootstrap_samples);
 	light_path_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		path_size * (max_depth + 1) * sizeof(MLTPathVertex));
+		path_size * (lumen_scene->config.path_length + 1) * sizeof(MLTPathVertex));
 
 	camera_path_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		path_size * (max_depth + 1) * sizeof(MLTPathVertex));
+		path_size * (lumen_scene->config.path_length + 1) * sizeof(MLTPathVertex));
 
 	int size = 0;
-	int arr_size = num_bootstrap_samples;
+	int arr_size = lumen_scene->config.num_bootstrap_samples;
 	do {
 		int num_blocks = std::max(1, (int)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
@@ -152,7 +155,7 @@ void PSSMLT::init() {
 	} while (arr_size > 1);
 	block_sums.resize(size);
 	int i = 0;
-	arr_size = num_bootstrap_samples;
+	arr_size = lumen_scene->config.num_bootstrap_samples;
 	do {
 		int num_blocks = std::max(1, (int)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
@@ -206,8 +209,8 @@ void PSSMLT::init() {
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 
-	mutation_count = int(instance->width * instance->height * mutations_per_pixel / float(num_mlt_threads));
-	pc_ray.mutations_per_pixel = mutations_per_pixel;
+	mutation_count = int(instance->width * instance->height * lumen_scene->config.mutations_per_pixel / float(lumen_scene->config.num_mlt_threads));
+	pc_ray.mutations_per_pixel = lumen_scene->config.mutations_per_pixel;
 }
 
 void PSSMLT::render() {
@@ -222,14 +225,14 @@ void PSSMLT::render() {
 	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = max_depth;
-	pc_ray.sky_col = sky_col;
+	pc_ray.max_depth = lumen_scene->config.path_length;
+	pc_ray.sky_col = lumen_scene->config.sky_col;
 	// PSSMLT related constants
 	pc_ray.light_rand_count = light_path_rand_count;
 	pc_ray.cam_rand_count = cam_path_rand_count;
 	pc_ray.connection_rand_count = connect_path_rand_count;
 	pc_ray.random_num = rand() % UINT_MAX;
-	pc_ray.num_bootstrap_samples = num_bootstrap_samples;
+	pc_ray.num_bootstrap_samples = lumen_scene->config.num_bootstrap_samples;
 	auto zero_buffers = [&]() {
 		vkCmdFillBuffer(cmd.handle, light_path_buffer.handle, 0, light_path_buffer.size, 0);
 		vkCmdFillBuffer(cmd.handle, camera_path_buffer.handle, 0, camera_path_buffer.size, 0);
@@ -261,7 +264,7 @@ void PSSMLT::render() {
 						   0, sizeof(PushConstantRay), &pc_ray);
 		auto& regions = seed_pipeline->get_rt_regions();
 		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3],
-						  num_bootstrap_samples, 1, 1);
+						  lumen_scene->config.num_bootstrap_samples, 1, 1);
 		auto barrier = buffer_barrier(bootstrap_buffer.handle,
 									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
@@ -269,7 +272,7 @@ void PSSMLT::render() {
 							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
 							 &barrier, 0, 0);
 	}
-	prefix_scan(0, num_bootstrap_samples, cmd);
+	prefix_scan(0, lumen_scene->config.num_bootstrap_samples, cmd);
 	// Calculate CDF
 	{
 		vkCmdBindDescriptorSets(
@@ -279,7 +282,7 @@ void PSSMLT::render() {
 						  calc_cdf_pipeline->handle);
 		vkCmdPushConstants(cmd.handle, calc_cdf_pipeline->pipeline_layout,
 						   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantRay), &pc_ray);
-		auto num_wgs = (num_bootstrap_samples + 1023) / 1024;
+		auto num_wgs = (lumen_scene->config.num_bootstrap_samples + 1023) / 1024;
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 		std::array<VkBufferMemoryBarrier, 2> barriers = {
 			buffer_barrier(cdf_sum_buffer.handle,
@@ -301,22 +304,22 @@ void PSSMLT::render() {
 	cmd.submit();
 	std::vector<BootstrapSample> samples;
 	samples.assign((BootstrapSample*)bootstrap_cpu.data,
-				   (BootstrapSample*)bootstrap_cpu.data + num_bootstrap_samples);
-	std::vector<float> cdf1(num_bootstrap_samples, 0);
-	std::vector<float> cdf2(num_bootstrap_samples, 0);
+				   (BootstrapSample*)bootstrap_cpu.data + lumen_scene->config.num_bootstrap_samples);
+	std::vector<float> cdf1(lumen_scene->config.num_bootstrap_samples, 0);
+	std::vector<float> cdf2(lumen_scene->config.num_bootstrap_samples, 0);
 
 	cdf1[0] = 0;
-	for (int i = 1; i < num_bootstrap_samples; i++) {
-		cdf1[i] = cdf1[i - 1] + samples[i - 1].lum / num_bootstrap_samples;
+	for (int i = 1; i < lumen_scene->config.num_bootstrap_samples; i++) {
+		cdf1[i] = cdf1[i - 1] + samples[i - 1].lum / lumen_scene->config.num_bootstrap_samples;
 	}
-	float sum = cdf1[num_bootstrap_samples - 1];
-	for (int i = 1; i < num_bootstrap_samples; i++) {
+	float sum = cdf1[lumen_scene->config.num_bootstrap_samples - 1];
+	for (int i = 1; i < lumen_scene->config.num_bootstrap_samples; i++) {
 		cdf1[i] *= 1. / sum;
 	}
 	cdf2.assign((float*)cdf_cpu.data,
-				(float*)cdf_cpu.data + num_bootstrap_samples);
+				(float*)cdf_cpu.data + lumen_scene->config.num_bootstrap_samples);
 	float EPS = 1e-3;
-	for (int i = 0; i < num_bootstrap_samples; i++) {
+	for (int i = 0; i < lumen_scene->config.num_bootstrap_samples; i++) {
 		float val1 = cdf1[i];
 		float val2 = cdf2[i];
 		float diff = abs(val1 - val2);
@@ -325,8 +328,8 @@ void PSSMLT::render() {
 		}
 
 	}
-	sum = cdf1[num_bootstrap_samples - 1];
-	float sum2 = cdf2[num_bootstrap_samples - 1];
+	sum = cdf1[lumen_scene->config.num_bootstrap_samples - 1];
+	float sum2 = cdf2[lumen_scene->config.num_bootstrap_samples - 1];
 	return;
 #endif
 	// Select seeds
@@ -338,7 +341,7 @@ void PSSMLT::render() {
 						  select_seeds_pipeline->handle);
 		vkCmdPushConstants(cmd.handle, select_seeds_pipeline->pipeline_layout,
 						   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantRay), &pc_ray);
-		uint32_t num_wgs = (num_mlt_threads + 1023) / 1024;
+		uint32_t num_wgs = (lumen_scene->config.num_mlt_threads + 1023) / 1024;
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 		auto barrier = buffer_barrier(seeds_buffer.handle,
 									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
@@ -372,7 +375,7 @@ void PSSMLT::render() {
 						   0, sizeof(PushConstantRay), &pc_ray);
 		auto& preprocess_regions = preprocess_pipeline->get_rt_regions();
 		vkCmdTraceRaysKHR(cmd.handle, &preprocess_regions[0], &preprocess_regions[1],
-						  &preprocess_regions[2], &preprocess_regions[3], num_mlt_threads, 1, 1);
+						  &preprocess_regions[2], &preprocess_regions[3], lumen_scene->config.num_mlt_threads, 1, 1);
 	}
 	cmd.submit();
 
@@ -394,7 +397,7 @@ void PSSMLT::render() {
 							   0, sizeof(PushConstantRay), &pc_ray);
 			auto& regions = mutate_pipeline->get_rt_regions();
 			vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2],
-							  &regions[3], num_mlt_threads, 1, 1);
+							  &regions[3], lumen_scene->config.num_mlt_threads, 1, 1);
 			const std::array<VkBufferMemoryBarrier, 5> mutation_barriers = {
 				buffer_barrier(splat_buffer.handle,
 				VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
@@ -519,7 +522,7 @@ void PSSMLT::create_offscreen_resources() {
 	TextureSettings settings;
 	settings.usage_flags =
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
+		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
 		VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	settings.base_extent = { (uint32_t)instance->width, (uint32_t)instance->height, 1 };
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -657,21 +660,21 @@ void PSSMLT::create_blas() {
 	auto vertex_address =
 		get_device_address(instance->vkb.ctx.device, vertex_buffer.handle);
 	auto idx_address = get_device_address(instance->vkb.ctx.device, index_buffer.handle);
-	for (auto& prim_mesh : lumen_scene.prim_meshes) {
+	for (auto& prim_mesh : lumen_scene->prim_meshes) {
 		BlasInput geo = to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({ geo });
 	}
 	instance->vkb.build_blas(blas_inputs,
-						  VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+							 VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void PSSMLT::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
 	float total_light_triangle_area = 0.0f;
 	//int light_triangle_cnt = 0;
-	const auto& indices = lumen_scene.indices;
-	const auto& vertices = lumen_scene.positions;
-	for (const auto& pm : lumen_scene.prim_meshes) {
+	const auto& indices = lumen_scene->indices;
+	const auto& vertices = lumen_scene->positions;
+	for (const auto& pm : lumen_scene->prim_meshes) {
 		VkAccelerationStructureInstanceKHR ray_inst{};
 		ray_inst.transform = to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
@@ -687,7 +690,7 @@ void PSSMLT::create_tlas() {
 
 	for (auto& l : lights) {
 		if (l.light_flags == LIGHT_AREA) {
-			const auto& pm = lumen_scene.prim_meshes[l.prim_mesh_idx];
+			const auto& pm = lumen_scene->prim_meshes[l.prim_mesh_idx];
 			l.world_matrix = pm.world_matrix;
 			auto& idx_base_offset = pm.first_idx;
 			auto& vtx_offset = pm.vtx_offset;

@@ -2,8 +2,8 @@
 #include "Integrator.h"
 class ReSTIR : public Integrator {
 public:
-	ReSTIR(LumenInstance* scene, const SceneConfig& config) : 
-		Integrator(scene, config) {}
+	ReSTIR(LumenInstance* scene, LumenScene* lumen_scene) :
+		Integrator(scene, lumen_scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;

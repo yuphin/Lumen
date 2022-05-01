@@ -2,18 +2,12 @@
 #include "VCM.h"
 #include <iostream>
 #include <fstream>
-const int max_depth = 8;
 const int max_samples = 50000;
-vec3 sky_col(0.53, 0.8, 0.92);
-//vec3 sky_col(0);
-static float vcm_radius_factor = 0.025;
-static bool use_vm = true;
 static bool use_vc = true;
 static bool written = false;
 const bool ray_guide = false;
 void VCM::init() {
 	Integrator::init();
-	sky_col = sky_col * vec3(0.1f);
 	photon_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -29,7 +23,7 @@ void VCM::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height * (max_depth + 1) * sizeof(VCMVertex)
+		instance->width * instance->height * (lumen_scene->config.path_length + 1) * sizeof(VCMVertex)
 	);
 
 	light_path_cnt_buffer.create(
@@ -92,16 +86,16 @@ void VCM::init() {
 
 	angle_struct_cpu_buffer.create(
 		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | 
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		VK_SHARING_MODE_EXCLUSIVE,
 		max_samples * sizeof(AngleStruct)
 	);
 
 	avg_buffer.create(
 		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | 
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		VK_SHARING_MODE_EXCLUSIVE,
@@ -160,15 +154,15 @@ void VCM::render() {
 	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = max_depth;
-	pc_ray.sky_col = sky_col;
+	pc_ray.max_depth = lumen_scene->config.path_length;
+	pc_ray.sky_col = lumen_scene->config.sky_col;
 	// VCM related constants
-	pc_ray.radius = lumen_scene.m_dimensions.radius * vcm_radius_factor / 100.f;
+	pc_ray.radius = lumen_scene->m_dimensions.radius * lumen_scene->config.radius_factor / 100.f;
 	pc_ray.radius /= (float)pow((double)pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
-	pc_ray.min_bounds = lumen_scene.m_dimensions.min;
-	pc_ray.max_bounds = lumen_scene.m_dimensions.max;
+	pc_ray.min_bounds = lumen_scene->m_dimensions.min;
+	pc_ray.max_bounds = lumen_scene->m_dimensions.max;
 	pc_ray.ppm_base_radius = ppm_base_radius;
-	pc_ray.use_vm = use_vm;
+	pc_ray.use_vm = lumen_scene->config.enable_vm;
 	pc_ray.use_vc = use_vc;
 	pc_ray.do_spatiotemporal = do_spatiotemporal;
 	pc_ray.random_num = rand() % UINT_MAX;
@@ -179,7 +173,7 @@ void VCM::render() {
 	pc_ray.grid_res = glm::max(ivec3(diam * float(base_grid_res) / max_comp), ivec3(1));
 	// Prepare
 	{
-		if (use_vm) {
+		if (lumen_scene->config.enable_vm) {
 			vkCmdFillBuffer(cmd.handle, photon_buffer.handle, 0, photon_buffer.size, 0);
 			auto barrier = buffer_barrier(photon_buffer.handle,
 										  VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -386,7 +380,7 @@ void VCM::render() {
 
 	// Trace rays from eye
 	{
-		if (use_vm) {
+		if (lumen_scene->config.enable_vm) {
 			auto barrier = buffer_barrier(photon_buffer.handle,
 										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 										  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
@@ -503,7 +497,7 @@ void VCM::create_offscreen_resources() {
 	TextureSettings settings;
 	settings.usage_flags =
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
+		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
 		VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	settings.base_extent = { (uint32_t)instance->width, (uint32_t)instance->height, 1 };
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -641,7 +635,7 @@ void VCM::create_blas() {
 	auto vertex_address =
 		get_device_address(instance->vkb.ctx.device, vertex_buffer.handle);
 	auto idx_address = get_device_address(instance->vkb.ctx.device, index_buffer.handle);
-	for (auto& prim_mesh : lumen_scene.prim_meshes) {
+	for (auto& prim_mesh : lumen_scene->prim_meshes) {
 		BlasInput geo = to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({ geo });
 	}
@@ -653,9 +647,9 @@ void VCM::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
 	float total_light_triangle_area = 0.0f;
 	//int light_triangle_cnt = 0;
-	const auto& indices = lumen_scene.indices;
-	const auto& vertices = lumen_scene.positions;
-	for (const auto& pm : lumen_scene.prim_meshes) {
+	const auto& indices = lumen_scene->indices;
+	const auto& vertices = lumen_scene->positions;
+	for (const auto& pm : lumen_scene->prim_meshes) {
 		VkAccelerationStructureInstanceKHR ray_inst{};
 		ray_inst.transform = to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
@@ -671,7 +665,7 @@ void VCM::create_tlas() {
 
 	for (auto& l : lights) {
 		if (l.light_flags == LIGHT_AREA) {
-			const auto& pm = lumen_scene.prim_meshes[l.prim_mesh_idx];
+			const auto& pm = lumen_scene->prim_meshes[l.prim_mesh_idx];
 			l.world_matrix = pm.world_matrix;
 			auto& idx_base_offset = pm.first_idx;
 			auto& vtx_offset = pm.vtx_offset;
@@ -808,7 +802,7 @@ void VCM::create_rt_pipelines() {
 	vcm_spawn_light_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	vcm_sample_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	settings.shaders = { shaders[0], shaders[4], shaders[5], shaders[6], shaders[7] };
-	vcm_light_pipeline->create_rt_pipeline(settings, {(uint32_t)ray_guide});
+	vcm_light_pipeline->create_rt_pipeline(settings, { (uint32_t)ray_guide });
 	vkDestroyShaderModule(instance->vkb.ctx.device, stages[Raygen].module, nullptr);
 	stages[Raygen].module = shaders[1].create_vk_shader_module(instance->vkb.ctx.device);
 	settings.stages = stages;

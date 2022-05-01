@@ -5,13 +5,8 @@ static float vcm_radius_factor = 0.025f;
 static bool light_first = false;
 void VCMMLT::init() {
 	Integrator::init();
-	max_depth = 6;
-	mutations_per_pixel = 100.0f;
-	sky_col = vec3(0, 0, 0);
-	num_mlt_threads = 1600 * 900 / 32;
-	num_bootstrap_samples = 1600 * 900 / 32;
-	mutation_count = int(instance->width * instance->height * mutations_per_pixel / float(num_mlt_threads));
-	light_path_rand_count = std::max(7 + 2 * max_depth, 3 + 6 * max_depth);
+	mutation_count = int(instance->width * instance->height * lumen_scene->config.mutations_per_pixel / float(lumen_scene->config.num_mlt_threads));
+	light_path_rand_count = std::max(7 + 2 * lumen_scene->config.path_length, 3 + 6 * lumen_scene->config.path_length);
 
 	// MLTVCM buffers
 	bootstrap_buffer.create(
@@ -20,7 +15,7 @@ void VCMMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_bootstrap_samples * sizeof(BootstrapSample)
+		lumen_scene->config.num_bootstrap_samples * sizeof(BootstrapSample)
 	);
 
 	cdf_buffer.create(
@@ -29,7 +24,7 @@ void VCMMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_bootstrap_samples * 4
+		lumen_scene->config.num_bootstrap_samples * 4
 	);
 
 	bootstrap_cpu.create(
@@ -38,7 +33,7 @@ void VCMMLT::init() {
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		VK_SHARING_MODE_EXCLUSIVE,
-		num_bootstrap_samples * sizeof(BootstrapSample)
+		lumen_scene->config.num_bootstrap_samples * sizeof(BootstrapSample)
 	);
 
 
@@ -48,7 +43,7 @@ void VCMMLT::init() {
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		VK_SHARING_MODE_EXCLUSIVE,
-		num_bootstrap_samples * 4
+		lumen_scene->config.num_bootstrap_samples * 4
 	);
 
 	cdf_sum_buffer.create(
@@ -65,7 +60,7 @@ void VCMMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * sizeof(VCMMLTSeedData)
+		lumen_scene->config.num_mlt_threads * sizeof(VCMMLTSeedData)
 	);
 
 	light_primary_samples_buffer.create(
@@ -74,7 +69,7 @@ void VCMMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * light_path_rand_count * sizeof(PrimarySample) * 2
+		lumen_scene->config.num_mlt_threads * light_path_rand_count * sizeof(PrimarySample) * 2
 	);
 
 	mlt_samplers_buffer.create(
@@ -83,7 +78,7 @@ void VCMMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * sizeof(VCMMLTSampler) * 2
+		lumen_scene->config.num_mlt_threads * sizeof(VCMMLTSampler) * 2
 	);
 
 	mlt_col_buffer.create(
@@ -107,7 +102,7 @@ void VCMMLT::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * (max_depth * (max_depth + 1)) * sizeof(Splat) * 2
+		lumen_scene->config.num_mlt_threads * (lumen_scene->config.path_length * (lumen_scene->config.path_length + 1)) * sizeof(Splat) * 2
 	);
 
 	past_splat_buffer.create(
@@ -115,7 +110,7 @@ void VCMMLT::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * (max_depth * (max_depth + 1)) * sizeof(Splat) * 2
+		lumen_scene->config.num_mlt_threads * (lumen_scene->config.path_length * (lumen_scene->config.path_length + 1)) * sizeof(Splat) * 2
 	);
 
 	light_path_buffer.create(
@@ -123,7 +118,7 @@ void VCMMLT::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height * (max_depth + 1) * sizeof(VCMVertex));
+		instance->width * instance->height * (lumen_scene->config.path_length + 1) * sizeof(VCMVertex));
 
 	light_path_cnt_buffer.create(
 		&instance->vkb.ctx,
@@ -156,7 +151,7 @@ void VCMMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * sizeof(SumData) * 2
+		lumen_scene->config.num_mlt_threads * sizeof(SumData) * 2
 	);
 
 	mlt_residual_buffer.create(
@@ -165,7 +160,7 @@ void VCMMLT::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * sizeof(SumData)
+		lumen_scene->config.num_mlt_threads * sizeof(SumData)
 	);
 
 	counter_buffer.create(
@@ -179,7 +174,7 @@ void VCMMLT::init() {
 
 
 	int size = 0;
-	int arr_size = num_bootstrap_samples;
+	int arr_size = lumen_scene->config.num_bootstrap_samples;
 	do {
 		int num_blocks = std::max(1, (int)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
@@ -189,7 +184,7 @@ void VCMMLT::init() {
 	} while (arr_size > 1);
 	block_sums.resize(size);
 	int i = 0;
-	arr_size = num_bootstrap_samples;
+	arr_size = lumen_scene->config.num_bootstrap_samples;
 	do {
 		int num_blocks = std::max(1, (int)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
@@ -248,8 +243,8 @@ void VCMMLT::init() {
 	pc_ray.frame_num = 0;
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
-	pc_ray.mutations_per_pixel = mutations_per_pixel;
-	pc_ray.num_mlt_threads = num_mlt_threads;
+	pc_ray.mutations_per_pixel = lumen_scene->config.mutations_per_pixel;
+	pc_ray.num_mlt_threads = lumen_scene->config.num_mlt_threads;
 }
 
 void VCMMLT::render() {
@@ -265,17 +260,17 @@ void VCMMLT::render() {
 	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = max_depth;
-	pc_ray.sky_col = sky_col;
+	pc_ray.max_depth = lumen_scene->config.path_length;
+	pc_ray.sky_col = lumen_scene->config.sky_col;
 	// VCMMLT related constants
 	pc_ray.use_vm = use_vm;
 	pc_ray.light_rand_count = light_path_rand_count;
 	pc_ray.random_num = rand() % UINT_MAX;
-	pc_ray.num_bootstrap_samples = num_bootstrap_samples;
-	pc_ray.radius = lumen_scene.m_dimensions.radius * vcm_radius_factor / 100.f;
+	pc_ray.num_bootstrap_samples = lumen_scene->config.num_bootstrap_samples;
+	pc_ray.radius = lumen_scene->m_dimensions.radius * vcm_radius_factor / 100.f;
 	pc_ray.radius /= (float)pow((double)pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
-	pc_ray.min_bounds = lumen_scene.m_dimensions.min;
-	pc_ray.max_bounds = lumen_scene.m_dimensions.max;
+	pc_ray.min_bounds = lumen_scene->m_dimensions.min;
+	pc_ray.max_bounds = lumen_scene->m_dimensions.max;
 	pc_ray.ppm_base_radius = ppm_base_radius;
 	const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
 	const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
@@ -305,7 +300,7 @@ void VCMMLT::render() {
 	auto sum_up_chain_data = [&] {
 		auto wg_x = 1024;
 		auto wg_y = 1;
-		const auto num_wg_x = (uint32_t)ceil(num_mlt_threads / float(wg_x));
+		const auto num_wg_x = (uint32_t)ceil(lumen_scene->config.num_mlt_threads / float(wg_x));
 		const auto num_wg_y = 1;
 		vkCmdBindDescriptorSets(
 			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, sum0_pipeline->pipeline_layout,
@@ -332,7 +327,7 @@ void VCMMLT::render() {
 						   VK_SHADER_STAGE_COMPUTE_BIT,
 						   0, sizeof(PushConstantRay), &pc_ray);
 		reduce(cmd.handle, mlt_residual_buffer, counter_buffer, *sum0_pipeline, *sum_reduce0_pipeline,
-			   num_mlt_threads);
+			   lumen_scene->config.num_mlt_threads);
 		auto barrier = buffer_barrier(chain_stats_buffer.handle,
 									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
@@ -340,7 +335,7 @@ void VCMMLT::render() {
 							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
 							 &barrier, 0, 0);
 		reduce(cmd.handle, mlt_residual_buffer, counter_buffer, *sum1_pipeline, *sum_reduce1_pipeline,
-			   num_mlt_threads);
+			   lumen_scene->config.num_mlt_threads);
 		barrier = buffer_barrier(chain_stats_buffer.handle,
 								 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 								 VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
@@ -393,7 +388,7 @@ void VCMMLT::render() {
 						   0, sizeof(PushConstantRay), &pc_ray);
 		auto& regions = seed_pipeline->get_rt_regions();
 		vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], &regions[3],
-						  num_bootstrap_samples, 1, 1);
+						  lumen_scene->config.num_bootstrap_samples, 1, 1);
 		auto barrier = buffer_barrier(bootstrap_buffer.handle,
 									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
@@ -401,7 +396,7 @@ void VCMMLT::render() {
 							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 1,
 							 &barrier, 0, 0);
 	}
-	prefix_scan(0, num_bootstrap_samples, cmd);
+	prefix_scan(0, lumen_scene->config.num_bootstrap_samples, cmd);
 
 	// Calculate CDF
 	{
@@ -412,7 +407,7 @@ void VCMMLT::render() {
 						  calc_cdf_pipeline->handle);
 		vkCmdPushConstants(cmd.handle, calc_cdf_pipeline->pipeline_layout,
 						   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantRay), &pc_ray);
-		auto num_wgs = (num_bootstrap_samples + 1023) / 1024;
+		auto num_wgs = (lumen_scene->config.num_bootstrap_samples + 1023) / 1024;
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 		std::array<VkBufferMemoryBarrier, 2> barriers = {
 			buffer_barrier(cdf_sum_buffer.handle,
@@ -436,7 +431,7 @@ void VCMMLT::render() {
 						  select_seeds_pipeline->handle);
 		vkCmdPushConstants(cmd.handle, select_seeds_pipeline->pipeline_layout,
 						   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantRay), &pc_ray);
-		uint32_t num_wgs = (num_mlt_threads + 1023) / 1024;
+		uint32_t num_wgs = (lumen_scene->config.num_mlt_threads + 1023) / 1024;
 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 		auto barrier = buffer_barrier(seeds_buffer.handle,
 									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
@@ -461,7 +456,7 @@ void VCMMLT::render() {
 						   0, sizeof(PushConstantRay), &pc_ray);
 		auto& preprocess_regions = preprocess_pipeline->get_rt_regions();
 		vkCmdTraceRaysKHR(cmd.handle, &preprocess_regions[0], &preprocess_regions[1],
-						  &preprocess_regions[2], &preprocess_regions[3], num_mlt_threads, 1, 1);
+						  &preprocess_regions[2], &preprocess_regions[3], lumen_scene->config.num_mlt_threads, 1, 1);
 		const std::array<VkBufferMemoryBarrier, 3> preprocess_barriers = {
 		 buffer_barrier(seeds_buffer.handle,
 		VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
@@ -522,7 +517,7 @@ void VCMMLT::render() {
 								   0, sizeof(PushConstantRay), &pc_ray);
 				auto& regions = mutate_pipeline->get_rt_regions();
 				vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2],
-								  &regions[3], num_mlt_threads, 1, 1);
+								  &regions[3], lumen_scene->config.num_mlt_threads, 1, 1);
 				std::array<VkBufferMemoryBarrier, 6> mutation_barriers = {
 					buffer_barrier(splat_buffer.handle,
 						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
@@ -674,7 +669,7 @@ void VCMMLT::create_offscreen_resources() {
 	TextureSettings settings;
 	settings.usage_flags =
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
+		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
 		VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	settings.base_extent = { (uint32_t)instance->width, (uint32_t)instance->height, 1 };
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -812,7 +807,7 @@ void VCMMLT::create_blas() {
 	auto vertex_address =
 		get_device_address(instance->vkb.ctx.device, vertex_buffer.handle);
 	auto idx_address = get_device_address(instance->vkb.ctx.device, index_buffer.handle);
-	for (auto& prim_mesh : lumen_scene.prim_meshes) {
+	for (auto& prim_mesh : lumen_scene->prim_meshes) {
 		BlasInput geo = to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({ geo });
 	}
@@ -823,9 +818,9 @@ void VCMMLT::create_blas() {
 void VCMMLT::create_tlas() {
 	std::vector<VkAccelerationStructureInstanceKHR> tlas;
 	float total_light_triangle_area = 0.0f;
-	const auto& indices = lumen_scene.indices;
-	const auto& vertices = lumen_scene.positions;
-	for (const auto& pm : lumen_scene.prim_meshes) {
+	const auto& indices = lumen_scene->indices;
+	const auto& vertices = lumen_scene->positions;
+	for (const auto& pm : lumen_scene->prim_meshes) {
 		VkAccelerationStructureInstanceKHR ray_inst{};
 		ray_inst.transform = to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
@@ -841,7 +836,7 @@ void VCMMLT::create_tlas() {
 
 	for (auto& l : lights) {
 		if (l.light_flags == LIGHT_AREA) {
-			const auto& pm = lumen_scene.prim_meshes[l.prim_mesh_idx];
+			const auto& pm = lumen_scene->prim_meshes[l.prim_mesh_idx];
 			l.world_matrix = pm.world_matrix;
 			auto& idx_base_offset = pm.first_idx;
 			auto& vtx_offset = pm.vtx_offset;

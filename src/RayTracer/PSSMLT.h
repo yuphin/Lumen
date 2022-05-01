@@ -2,8 +2,8 @@
 #include "Integrator.h"
 class PSSMLT : public Integrator {
 public:
-	PSSMLT(LumenInstance* scene, const SceneConfig& config) :
-		Integrator(scene, config) {}
+	PSSMLT(LumenInstance* scene, LumenScene* lumen_scene) :
+		Integrator(scene, lumen_scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -53,15 +53,10 @@ private:
 
 	std::vector<Buffer> block_sums;
 
-	int max_depth = 8;
-	float mutations_per_pixel = 100.0f;
-	vec3 sky_col = vec3(0, 0, 0);
-	int num_mlt_threads = 1600 * 900 / 4;
-	int num_bootstrap_samples = 1600 * 900 / 4;
 	int mutation_count;
-	int light_path_rand_count = 7 + 2 * max_depth;
-	int cam_path_rand_count = 2 + 2 * max_depth;
-	int connect_path_rand_count = 4 * max_depth;
+	int light_path_rand_count;
+	int cam_path_rand_count;
+	int connect_path_rand_count;
 
 };
 

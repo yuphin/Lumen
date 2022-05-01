@@ -12,15 +12,15 @@ void Integrator::init() {
 
 	LumenInstance* instance = this->instance;
 	Window* window = instance->window;
-	lumen_scene.load_scene(config.root, config.filename);
-	if (lumen_scene.cam_config.pos != vec3(0)) {
+	
+	if (lumen_scene->config.cam_settings.pos != vec3(0)) {
 		camera = std::unique_ptr<PerspectiveCamera>(new PerspectiveCamera(
-			lumen_scene.cam_config.fov, 0.01f, 1000.0f, (float)instance->width / instance->height,
-			lumen_scene.cam_config.dir, lumen_scene.cam_config.pos));
+			lumen_scene->config.cam_settings.fov, 0.01f, 1000.0f, (float)instance->width / instance->height,
+			lumen_scene->config.cam_settings.dir, lumen_scene->config.cam_settings.pos));
 	} else {
 		// Assume the camera matrix is given
 		camera = std::unique_ptr<PerspectiveCamera>(new PerspectiveCamera(
-			lumen_scene.cam_config.fov, lumen_scene.cam_config.cam_matrix, 0.01f, 1000.0f, 
+			lumen_scene->config.cam_settings.fov, lumen_scene->config.cam_settings.cam_matrix, 0.01f, 1000.0f,
 			(float)instance->width / instance->height));
 	}
 
@@ -43,11 +43,11 @@ void Integrator::init() {
 			updated = true;
 		}
 	});
-	auto vertex_buf_size = lumen_scene.positions.size() * sizeof(glm::vec3);
-	auto idx_buf_size = lumen_scene.indices.size() * sizeof(uint32_t);
+	auto vertex_buf_size = lumen_scene->positions.size() * sizeof(glm::vec3);
+	auto idx_buf_size = lumen_scene->indices.size() * sizeof(uint32_t);
 	std::vector<PrimMeshInfo> prim_lookup;
 	uint32_t idx = 0;
-	for (auto& pm : lumen_scene.prim_meshes) {
+	for (auto& pm : lumen_scene->prim_meshes) {
 		PrimMeshInfo m_info;
 		m_info.index_offset = pm.first_idx;
 		m_info.vertex_offset = pm.vtx_offset;
@@ -56,7 +56,7 @@ void Integrator::init() {
 		m_info.max_pos = glm::vec4(pm.max_pos, 0);
 		m_info.material_index = pm.material_idx;
 		prim_lookup.emplace_back(m_info);
-		auto& mef = lumen_scene.materials[pm.material_idx].emissive_factor;
+		auto& mef = lumen_scene->materials[pm.material_idx].emissive_factor;
 		if (mef.x > 0 || mef.y > 0 || mef.z > 0) {
 			Light light;
 			light.world_matrix = pm.world_matrix;
@@ -72,15 +72,15 @@ void Integrator::init() {
 		idx++;
 	}
 
-	for (auto& l : lumen_scene.lights) {
+	for (auto& l : lumen_scene->lights) {
 		Light light;
 		light.L = l.L;
 		light.light_flags = l.light_flags;
 		light.pos = l.pos;
 		light.to = l.to;
 		total_light_triangle_cnt++;
-		light.world_radius = lumen_scene.m_dimensions.radius;
-		light.world_center = 0.5f * (lumen_scene.m_dimensions.max + lumen_scene.m_dimensions.min);
+		light.world_radius = lumen_scene->m_dimensions.radius;
+		light.world_center = 0.5f * (lumen_scene->m_dimensions.max + lumen_scene->m_dimensions.min);
 		lights.emplace_back(light);
 	}
 
@@ -99,35 +99,35 @@ void Integrator::init() {
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		vertex_buf_size, lumen_scene.positions.data(), true);
+		vertex_buf_size, lumen_scene->positions.data(), true);
 	index_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		idx_buf_size, lumen_scene.indices.data(), true);
+		idx_buf_size, lumen_scene->indices.data(), true);
 
 	normal_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		lumen_scene.normals.size() * sizeof(lumen_scene.normals[0]),
-		lumen_scene.normals.data(), true);
+		lumen_scene->normals.size() * sizeof(lumen_scene->normals[0]),
+		lumen_scene->normals.data(), true);
 	uv_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		lumen_scene.texcoords0.size() * sizeof(glm::vec2),
-		lumen_scene.texcoords0.data(), true);
+		lumen_scene->texcoords0.size() * sizeof(glm::vec2),
+		lumen_scene->texcoords0.data(), true);
 	materials_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		lumen_scene.materials.size() * sizeof(Material), lumen_scene.materials.data(), true);
+		lumen_scene->materials.size() * sizeof(Material), lumen_scene->materials.data(), true);
 	prim_lookup_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -153,12 +153,12 @@ void Integrator::init() {
 								   texture_sampler);
 	};
 
-	if (!lumen_scene.textures.size()) {
+	if (!lumen_scene->textures.size()) {
 		add_default_texture();
 	} else {
-		textures.resize(lumen_scene.textures.size());
+		textures.resize(lumen_scene->textures.size());
 		int i = 0;
-		for (const auto& texture_path : lumen_scene.textures) {
+		for (const auto& texture_path : lumen_scene->textures) {
 			int x, y, n;
 			unsigned char* data = stbi_load(texture_path.c_str(), &x, &y, &n, 4);
 		

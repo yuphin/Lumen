@@ -4,16 +4,38 @@
 #include "shaders/commons.h"
 #include "Framework/MitsubaParser.h"
 
-struct CameraConfiguration {
+struct CameraSettings {
 	float fov;
 	glm::vec3 pos = vec3(0);
 	glm::vec3 dir = vec3(0);
 	glm::mat4 cam_matrix;
 };
 
+enum class IntegratorType {
+	Path,
+	BDPT,
+	SPPM,
+	VCM,
+	PSSMLT,
+	SMLT,
+	VCMMLT,
+	ReSTIR,
+	ReSTIRGI,
+};
+
 struct SceneConfig {
-	std::string root;
-	std::string filename;
+	IntegratorType integrator_type = IntegratorType::Path;
+	int path_length = 6;
+	vec3 sky_col = vec3(0, 0, 0);
+	CameraSettings cam_settings;
+	float base_radius = 0.03;
+	float radius_factor = 0.025;
+	float mutations_per_pixel = 100.0f;
+	int num_bootstrap_samples = 360000;
+	int num_mlt_threads = 360000;
+	bool enable_vm = false;
+	bool light_first = false;
+	bool alternate = true;
 };
 
 struct LumenPrimMesh {
@@ -29,24 +51,6 @@ struct LumenPrimMesh {
 	glm::vec3 max_pos;
 };
 
-//struct LumenMaterial {
-//	glm::vec3 albedo;
-//	glm::vec3 emissive_factor;
-//	float ior;
-//	glm::vec3 metalness;
-//	float roughness;
-//	uint32_t bsdf_type;
-//	// Disney BSDF
-//	float metallic;
-//	float specular_tint;
-//	float sheen_tint;
-//	float specular;
-//	float clearcoat;
-//	float clearcoat_gloss;
-//	float sheen;
-//	float subsurface;
-//};
-
 struct LumenLight {
 	glm::vec3 pos;
 	glm::vec3 to;
@@ -56,8 +60,7 @@ struct LumenLight {
 };
 class LumenScene {
 public:
-	void load_scene(const std::string& root, const std::string& filename);
-	CameraConfiguration cam_config;
+	void load_scene(const std::string& path);
 	std::vector<glm::vec3> positions;
 	std::vector<uint32_t> indices;
 	std::vector<glm::vec3> normals;
@@ -69,6 +72,7 @@ public:
 	std::vector<Material> materials;
 	std::vector<std::string> textures;
 	std::vector<LumenLight> lights;
+
 	struct Dimensions {
 		glm::vec3 min = glm::vec3(std::numeric_limits<float>::max());
 		glm::vec3 max = glm::vec3(std::numeric_limits<float>::min());
@@ -76,6 +80,7 @@ public:
 		glm::vec3 center{ 0.f };
 		float radius{ 0 };
 	} m_dimensions;
+	SceneConfig config;
 private:
 	void load_obj(const std::string& path);
 	void compute_scene_dimensions();

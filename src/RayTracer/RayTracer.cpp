@@ -1,4 +1,5 @@
 #include "LumenPCH.h"
+#include <regex>
 #include <stb_image.h>
 #define TINYEXR_IMPLEMENTATION
 #include <zlib.h>
@@ -18,9 +19,10 @@ static void fb_resize_callback(GLFWwindow* window, int width, int height) {
 	app->resized = true;
 }
 
-RayTracer::RayTracer(int width, int height, bool debug)
+RayTracer::RayTracer(int width, int height, bool debug, int argc, char* argv[])
 	: LumenInstance(width, height, debug) {
 	this->instance = this;
+	parse_args(argc, argv);
 }
 
 void RayTracer::init(Window* window) {
@@ -50,23 +52,57 @@ void RayTracer::init(Window* window) {
 	vkb.create_command_buffers();
 	vkb.create_sync_primitives();
 	initialized = true;
+
+	scene.load_scene(scene_name);
 	// TODO: Parse this via the scene file
-	SceneConfig config;
-	//config.root = "scenes/classroom/";
-	config.root = "scenes/";
-	//config.filename = "torus_new.xml";
-	config.filename = "cornell_box_simple.json";
-	//config.filename = "cornell_box_dir.json";
-	//config.filename = "cornell_box_dir_diff.json";
-	//config.filename = "cornell_box_disney.json";
-	//config.filename = "cornell_box.json ";
-	//config.filename = "occluded2.json";
-	//config.filename = "occluded.json";
-	//config.filename = "occluded3.json";
-	//config.filename = "caustics.json";
-	//config.filename = "caustics_zoomed.json";
-	//config.filename = "test.json";
-	integrator = std::make_unique<Path>(this, config);
+	//SceneConfig config;
+	////config.root = "scenes/classroom/";
+	////config.filename = "torus_new.xml";
+	////config.filepath = "scenes/cornell_box_simple.json";
+	//config.filepath = "scenes/classroom/scene.xml";
+	////config.filename = "cornell_box_dir.json";
+	////config.filename = "cornell_box_dir_diff.json";
+	////config.filename = "cornell_box_disney.json";
+	////config.filename = "cornell_box.json ";
+	////config.filename = "occluded2.json";
+	////config.filename = "occluded.json";
+	////config.filename = "occluded3.json";
+	////config.filename = "caustics.json";
+	////config.filename = "caustics_zoomed.json";
+	////config.filename = "test.json";
+
+	switch (scene.config.integrator_type) {
+		case IntegratorType::Path :
+			integrator = std::make_unique<Path>(this, &scene);
+			break;
+		case IntegratorType::BDPT:
+			integrator = std::make_unique<BDPT>(this, &scene);
+			break;
+		case IntegratorType::SPPM:
+			integrator = std::make_unique<SPPM>(this, &scene);
+			break;
+		case IntegratorType::VCM:
+			integrator = std::make_unique<VCM>(this, &scene);
+			break;
+		case IntegratorType::PSSMLT:
+			integrator = std::make_unique<PSSMLT>(this, &scene);
+			break;
+		case IntegratorType::SMLT:
+			integrator = std::make_unique<SMLT>(this, &scene);
+			break;
+		case IntegratorType::VCMMLT:
+			integrator = std::make_unique<VCMMLT>(this, &scene);
+			break;
+		case IntegratorType::ReSTIR:
+			integrator = std::make_unique<ReSTIR>(this, &scene);
+			break;
+		case IntegratorType::ReSTIRGI:
+			integrator = std::make_unique<ReSTIRGI>(this, &scene);
+			break;
+	
+		default:
+			break;
+	}
 	integrator->init();
 	init_resources();
 	create_post_descriptor();
@@ -202,8 +238,8 @@ void RayTracer::render(uint32_t i) {
 	vkCmdPushConstants(cmdbuf, post_pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT,
 					   0, sizeof(PushConstantPost), &pc_post_settings);
 	vkCmdDraw(cmdbuf, 3, 1, 0, 0);
-	//ImGui::Render();
-	//ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdbuf);
+	ImGui::Render();
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdbuf);
 	vkCmdEndRenderPass(cmdbuf);
 	VkClearColorValue val = { 0,0,0,1 };
 
@@ -223,37 +259,37 @@ float RayTracer::draw_frame() {
 	}
 	auto t_begin = glfwGetTime() * 1000;
 	bool updated = false;
-	//ImGui_ImplGlfw_NewFrame();
-	//ImGui::NewFrame();
-	//ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time,
-	//			1000 / cpu_avg_time);
-	//if (ImGui::Button("Reload shaders")) {
-	//	integrator->reload();
-	//	updated |= true;
-	//}
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time,
+				1000 / cpu_avg_time);
+	if (ImGui::Button("Reload shaders")) {
+		integrator->reload();
+		updated |= true;
+	}
 
 
-	//bool gui_updated = integrator->gui();
-	//updated |=
-	//	ImGui::Checkbox("Enable ACES tonemapping", &settings.enable_tonemapping);
-	//if (updated || gui_updated) {
-	//	ImGui::Render();
-	//	auto t_end = glfwGetTime() * 1000;
-	//	auto t_diff = t_end - t_begin;
-	//	integrator->updated = true;
-	//	return (float)t_diff;
-	//}
+	bool gui_updated = integrator->gui();
+	updated |=
+		ImGui::Checkbox("Enable ACES tonemapping", &settings.enable_tonemapping);
+	if (updated || gui_updated) {
+		ImGui::Render();
+		auto t_end = glfwGetTime() * 1000;
+		auto t_diff = t_end - t_begin;
+		integrator->updated = true;
+		return (float)t_diff;
+	}
 
-	//ImGui::Checkbox("Show camera statistics", &show_cam_stats);
+	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
 
-	//if (show_cam_stats) {
-	//		ImGui::PushItemWidth(170);
-	//		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[0]), 0.05f);
-	//		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[1]), 0.05f);
-	//		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[2]), 0.05f);
-	//		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[3]), 0.05f);
+	if (show_cam_stats) {
+			ImGui::PushItemWidth(170);
+			ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[0]), 0.05f);
+			ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[1]), 0.05f);
+			ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[2]), 0.05f);
+			ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[3]), 0.05f);
 
-	//}
+	}
 
 	uint32_t image_idx = vkb.prepare_frame();
 
@@ -539,6 +575,17 @@ void RayTracer::init_resources() {
 	if (has_gt) {
 		free(data);
 	}
+}
+
+void RayTracer::parse_args(int argc, char* argv[]){
+	scene_name = "";
+	std::regex fn("(.*).(.json|.xml)");
+	for (int i = 0; i < argc; i++) {
+		if (std::regex_match(argv[i], fn)) {
+			scene_name = argv[i];
+		}
+	}
+
 }
 
 void RayTracer::save_exr(const float* rgb, int width, int height, const char* outfilename) {

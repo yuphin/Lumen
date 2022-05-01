@@ -2,8 +2,8 @@
 #include "Integrator.h"
 class SMLT : public Integrator {
 public:
-	SMLT(LumenInstance* scene, const SceneConfig& config) :
-		Integrator(scene, config) {}
+	SMLT(LumenInstance* scene, LumenScene* lumen_scene) :
+		Integrator(scene, lumen_scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -60,9 +60,7 @@ private:
 	Buffer light_splats_buffer;
 	Buffer light_splat_cnts_buffer;
 
-	int max_depth;
 	float mutations_per_pixel;
-	vec3 sky_col;
 	int num_mlt_threads;
 	int num_bootstrap_samples;
 	int mutation_count;

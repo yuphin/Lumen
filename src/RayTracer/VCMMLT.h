@@ -2,8 +2,8 @@
 #include "Integrator.h"
 class VCMMLT : public Integrator {
 public:
-	VCMMLT(LumenInstance* scene, const SceneConfig& config) :
-		Integrator(scene, config) {}
+	VCMMLT(LumenInstance* scene, LumenScene* lumen_scene) :
+		Integrator(scene, lumen_scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool gui() override;
@@ -65,11 +65,6 @@ private:
 	std::vector<Buffer> block_sums;
 
 	Buffer light_path_cnt_buffer;
-	int max_depth;
-	float mutations_per_pixel;
-	vec3 sky_col;
-	int num_mlt_threads;
-	int num_bootstrap_samples;
 	int mutation_count;
 	int light_path_rand_count;
 	int sample_cnt = 0;
