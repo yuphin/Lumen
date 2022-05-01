@@ -38,7 +38,7 @@
 ##### ReSTIR 1 sample per pixel ([Video comparison](https://drive.google.com/file/d/1H2OWNuinCjOEpfb5OWKAA_yl25t9_Hol/view?usp=sharing))
 ![3](/media/ReSTIR1spp.png?raw=true "Japanese Classroom")
 ##### ReSTIR GI 1 sample per pixel ([Video comparison](https://drive.google.com/file/d/1UV1FpyMhtcX8cUo4CFIXFXhWI8UWr121/view?usp=sharing))
-![4](/media/ReSTIRGI1spp.png?raw=true "Japanese Classroom")
+![4](/media/ReSTIRGI1spp.PNG?raw=true "Japanese Classroom")
 ## Building
 
 To build Lumen, start cloning the repository with
