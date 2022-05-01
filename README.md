@@ -56,6 +56,11 @@ Currently, Lumen only builds on Windows, however, there is no platform specific 
 Some of the sample scenes can be found in the `scenes/` directory.
 Sample scene files with various integrators can be found in the `scenes/cornell_box/` directory.
 
+To load the scene file simply run
+```shell
+Lumen.exe <scene_file>
+```
+
 
 
 ## References
