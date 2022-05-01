@@ -3,7 +3,7 @@
         "type" : "restir",
         "path_length" : 6,
         "sky_col" : [
-            1,1,1
+            0,0,0
         ]
 
     },
