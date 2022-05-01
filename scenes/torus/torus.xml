@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- Automatically converted from Rhino 5.0 -->
+<scene version="0.5.0">
+	<integrator type="vcm">
+		<integer name="maxDepth" value="6"/>
+		<boolean name="enableVM" value="true"/>
+	</integrator>
+
+	<bsdf type="diffuse" id="mat_donut">
+		<rgb name="reflectance" value=".8,.8,.4"/>
+		<!-- Rhino object 'Donut' -->
+	</bsdf>
+
+	<bsdf type="conductor" id="mat_metal">
+		<float name="alpha" value="0.1"/>
+	</bsdf>
+
+	<bsdf type="glass" id="mat_glass">
+		<!-- Rhino object 'Glass' -->
+		<float name="intIOR" value="1.5"/>
+		<float name="extIOR" value="1.0"/>
+		<float name="alpha" value="0.05"/>
+	</bsdf>
+
+	<bsdf type="diffuse" id="mat_floor">
+		<!-- Rhino object 'Floor' -->
+		<rgb name="reflectance" value=".4,.4,.4"/>
+	</bsdf>
+
+	<bsdf type="diffuse" id="mat_lamp">
+		<!-- Rhino object 'Lamp' -->
+		<rgb name="reflectance" value=".4,.4,.4"/>
+	</bsdf>
+
+	<emitter type="sunsky" >
+		<vector name="sunDirection" x="-0.865804" y="0.916766" z="-0.276929" />
+		<vector name="sunColor" x="0.98" y="0.82" z="0.30" />
+		<vector name="skyColor" x="0.053" y="0.08" z="0.092" />
+		<float name="sunScale" value="0.01" />
+	</emitter>
+
+	<shape type="obj">
+		<string name="filename" value="mesh0.obj"/>
+		<ref id="mat_floor"/>
+	</shape>
+
+	<shape type="obj">
+		<string name="filename" value="mesh1.obj"/>
+		<ref id="mat_donut"/>
+	</shape>
+
+	<shape type="obj">
+		<string name="filename" value="mesh2.obj"/>
+		<ref id="mat_glass"/>
+	</shape>
+
+	<shape type="obj">
+		<string name="filename" value="mesh3.obj"/>
+
+		<ref id="mat_metal"/>
+	</shape>
+
+	<shape type="obj">
+		<string name="filename" value="mesh4.obj"/>
+		<ref id="mat_metal"/>
+	</shape>
+
+<!-- <sensor type="perspective">
+		<float name="farClip" value="1165.89"/>
+		<float name="focusDistance" value="51.7808"/>
+		<float name="fov" value="34.6222"/>
+		<string name="fovAxis" value="x"/>
+		<float name="nearClip" value="0.00582945"/>
+		<transform name="toWorld">
+
+			<lookat target="-23.7753, -37.4261, 29.4905" origin="-24.173, -38.184, 30.0076" up="0.261433, 0.446628, 0.855673"/>
+		</transform>
+
+		<sampler type="independent">
+			<integer name="sampleCount" value="256"/>
+		</sampler>
+
+		<film type="hdrfilm">
+			<integer name="height" value="768"/>
+			<integer name="width" value="1024"/>
+
+			<rfilter type="gaussian"/>
+		</film>
+	</sensor> -->
+	<sensor type="perspective" >
+		<float name="fov" value="60" />
+		<transform name="toWorld" >
+			<!-- <matrix value="-0.988479 -0.00428443 0.151294 -24.173 -9.42177e-010 -0.999599 -0.0283071 1.27158 -0.151355 0.027981 -0.988083 5.88653 0 0 0 1"/> -->
+			<matrix value="-0.69  -0.004 -0.72 33.25 -0.2 0.96 0.18 13 0.69 0.26 -0.66 -26.8 0 0 0 1"/>
+		</transform>
+		<sampler type="sobol" >
+			<integer name="sampleCount" value="64" />
+		</sampler>
+		<film type="ldrfilm" >
+			<integer name="width" value="1280" />
+			<integer name="height" value="720" />
+			<string name="fileFormat" value="png" />
+			<string name="pixelFormat" value="rgb" />
+			<float name="gamma" value="2.2" />
+			<boolean name="banner" value="false" />
+			<rfilter type="tent" />
+		</film>
+	</sensor>
+</scene>

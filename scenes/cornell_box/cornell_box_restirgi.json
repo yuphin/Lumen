@@ -1,4 +1,12 @@
 {
+    "integrator" : {
+        "type" : "restirgi",
+        "path_length" : 6,
+        "sky_col" : [
+            1,1,1
+        ]
+    },
+ 
     "bsdfs": [
         {
             "ior": 1.52,
@@ -18,11 +26,6 @@
             "refs": [
                 "mirror_sphere"
             ],
-            "albedo": [
-                1,
-                1,
-                1
-            ],
             "type": "mirror"
         },
         {
@@ -35,7 +38,7 @@
             "refs": [
                 "left_wall"
             ],
-            "type": "lambertian"
+            "type": "diffuse"
         },
         {
             "albedo": [
@@ -47,7 +50,7 @@
             "refs": [
                 "right_wall"
             ],
-            "type": "lambertian"
+            "type": "diffuse"
         },
         {
             "albedo": [
@@ -57,11 +60,23 @@
             ],
             "name": "Other Walls",
             "refs": [
-                "floor",
                 "ceiling",
                 "back_wall"
             ],
-            "type": "lambertian"
+            "type": "diffuse"
+        },
+
+        {
+            "albedo": [
+                0.725,
+                0.71,
+                0.68
+            ],
+            "name": "Floor",
+            "refs": [
+                "floor"
+            ],
+            "type": "diffuse"
         },
         {
             "emissive_factor": [
@@ -78,7 +93,7 @@
             "refs": [
                 "light"
             ],
-            "type": "lambertian"
+            "type": "diffuse"
         }
     ],
     "camera": {
@@ -86,7 +101,10 @@
         "position": [
             0.7,
             0.5,
-            15.5
+            17.5
+        ],
+        "dir" : [
+            0,0, 2
         ]
     },
     "mesh_file": "cornell_box.obj"

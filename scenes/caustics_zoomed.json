@@ -3,9 +3,9 @@
         "type" : "vcm",
         "enable_vm" : 1,
         "radius_factor" : 0.025,
-        "path_length" : 10,
+        "path_length" : 13,
         "sky_col" : [
-            0.1,0.1,0.1
+            0,0,0
         ]
 
     },
@@ -113,14 +113,14 @@
 
     ],
     "camera": {
-        "fov": 45,
+        "fov": 30,
         "position": [
-            2.7,
-            0.5,
-            3.1
+            2.2,
+            -0.7,
+            -1.5
         ],
         "dir" : [
-            -1.420776,-2.158489, 2
+            1.6, 2.158489, -3.1
         ]
     },
     "mesh_file": "caustics.obj"

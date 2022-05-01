@@ -1,14 +1,20 @@
 {
     "integrator" : {
-        "type" : "vcm",
-        "enable_vm" : 0,
+        "type" : "vcmmlt",
+        "mutations_per_pixel" : 100,
+        "num_mlt_threads" : 45000,
         "radius_factor" : 0.025,
+        "enable_vm" : 1,
+        "light_first" : 0,
+        "alternate" : 1,
+        "num_bootstrap_samples" : 45000,
         "path_length" : 6,
         "sky_col" : [
-            0,0,0
+            1,1,1
         ]
-    },
 
+    },
+ 
     "bsdfs": [
         {
             "ior": 1.52,
@@ -27,11 +33,6 @@
             "name": "Mirror",
             "refs": [
                 "mirror_sphere"
-            ],
-            "albedo": [
-                1,
-                1,
-                1
             ],
             "type": "mirror"
         },
@@ -67,25 +68,34 @@
             ],
             "name": "Other Walls",
             "refs": [
-                "floor",
                 "ceiling",
-                "back_wall",
-                "cube1",
-                "cube2",
-                "obstacle"
+                "back_wall"
+            ],
+            "type": "diffuse"
+        },
+
+        {
+            "albedo": [
+                0.725,
+                0.71,
+                0.68
+            ],
+            "name": "Floor",
+            "refs": [
+                "floor"
             ],
             "type": "diffuse"
         },
         {
+            "emissive_factor": [
+                17,
+                12,
+                4
+            ],
             "albedo": [
                 1,
                 1,
                 1
-            ],
-            "emissive_factor": [
-                51,
-                36,
-                12
             ],
             "name": "Light",
             "refs": [
@@ -99,11 +109,11 @@
         "position": [
             0.7,
             0.5,
-            15.5
+            17.5
         ],
         "dir" : [
             0,0, 2
         ]
     },
-    "mesh_file": "occluded.obj"
+    "mesh_file": "cornell_box.obj"
 }

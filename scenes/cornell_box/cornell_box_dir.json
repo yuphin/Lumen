@@ -1,13 +1,10 @@
 {
     "integrator" : {
-        "type" : "vcm",
-        "enable_vm" : 1,
-        "radius_factor" : 0.025,
-        "path_length" : 10,
+        "type" : "path",
+        "path_length" : 6,
         "sky_col" : [
-            0.1,0.1,0.1
+            0.5,0.5,0.5
         ]
-
     },
 
     "bsdfs": [
@@ -15,7 +12,7 @@
             "ior": 1.52,
             "name": "Glass",
             "refs": [
-                "glass"
+                "glass_sphere"
             ],
             "albedo": [
                 1,
@@ -25,24 +22,36 @@
             "type": "glass"
         },
         {
-            "name": "Ring",
+            "name": "Mirror",
             "refs": [
-                "ring"
+                "mirror_sphere"
             ],
-            "albedo": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "metalness" : [
-                0.95,
-                0.92,
-                0.06
-            ],
-            "roughness": 0.1,
-            "type": "glossy"
+            "type": "mirror"
         },
-       
+        {
+            "albedo": [
+                0.63,
+                0.065,
+                0.05
+            ],
+            "name": "Left Wall",
+            "refs": [
+                "left_wall"
+            ],
+            "type": "diffuse"
+        },
+        {
+            "albedo": [
+                0.14,
+                0.45,
+                0.091
+            ],
+            "name": "Right Wall",
+            "refs": [
+                "right_wall"
+            ],
+            "type": "diffuse"
+        },
         {
             "albedo": [
                 0.725,
@@ -51,23 +60,8 @@
             ],
             "name": "Other Walls",
             "refs": [
-                "left_wall",
-                "right_wall",
                 "ceiling",
                 "back_wall"
-            ],
-            "type": "diffuse"
-        },
-
-        {
-            "albedo": [
-                0.64,
-                0.165,
-                0.165
-            ],
-            "name": "Table",
-            "refs": [
-               "table" 
             ],
             "type": "diffuse"
         },
@@ -78,50 +72,57 @@
                 0.71,
                 0.68
             ],
+            "texture" : "wood1.jpg",
             "name": "Floor",
             "refs": [
                 "floor"
             ],
-            "metalness" : [
+            "type": "diffuse"
+        },
+        {
+           
+            "albedo": [
                 1,
                 1,
                 1
             ],
-            "roughness": 0.05,
-            "type": "glossy"
+            "name": "Light",
+            "refs": [
+                "light"
+            ],
+            "type": "diffuse"
         }
        
     ],
-
     "lights" : [
         {
             "L": [
-                170,
-                120,
-                40
+                5,
+                5,
+                5
             ],
 
             "pos" : [
-                2.42,0,-2.432593
+                2.42,0, 5.432593
             ],
             "dir" : [
-                0.420776,-2.158489, 3
+                0.420776,-2.158489, -3
             ],
-            "name": "Spotight",
-            "type": "spot"
+            "name": "Directional",
+            "type": "directional"
         }
 
     ],
     "camera": {
         "fov": 45,
         "position": [
-            2.7,
+            0.7,
             0.5,
-            3.1
+            15.5
         ],
         "dir" : [
-            -1.420776,-2.158489, 2
+            0,0, 2
         ]
     },
-    "mesh_file": "caustics.obj"
+    "mesh_file": "cornell_box.obj"
 }

@@ -1,4 +1,5 @@
 {
+
     "integrator" : {
         "type" : "vcm",
         "enable_vm" : 0,
@@ -26,7 +27,10 @@
         {
             "name": "Mirror",
             "refs": [
-                "mirror_sphere"
+                "mirror_sphere",
+                "mirror1",
+                "mirror2"
+
             ],
             "albedo": [
                 1,
@@ -105,5 +109,5 @@
             0,0, 2
         ]
     },
-    "mesh_file": "occluded.obj"
+    "mesh_file": "occluded2.obj"
 }

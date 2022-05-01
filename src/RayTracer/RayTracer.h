@@ -68,6 +68,9 @@ private:
 	clock_t start;
 	bool write_exr = false;
 	bool has_gt = false;
+	bool show_cam_stats = false;
+	bool load_exr = false;
+	bool calc_rmse = false;
 
 };
 

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- Automatically converted from Rhino 5.0 -->
+<scene version="0.5.0">
+	<integrator type="path" >
+		<integer name="maxDepth" value="6" />
+	</integrator>
+
+	<bsdf type="diffuse" id="mat_donut">
+		<rgb name="reflectance" value=".8,.8,.4"/>
+		<!-- Rhino object 'Donut' -->
+	</bsdf>
+
+	<bsdf type="conductor" id="mat_metal">
+		<string name="material" value="Al"/>
+	</bsdf>
+
+	<bsdf type="dielectric" id="mat_glass">
+		<!-- Rhino object 'Glass' -->
+		<float name="intIOR" value="1.5"/>
+		<float name="extIOR" value="1.0"/>
+	</bsdf>
+
+	<bsdf type="diffuse" id="mat_floor">
+		<!-- Rhino object 'Floor' -->
+	</bsdf>
+
+	<bsdf type="diffuse" id="mat_lamp">
+		<!-- Rhino object 'Lamp' -->
+	</bsdf>
+
+
+
+	<shape type="serialized">
+		<string name="filename" value="meshes.serialized"/>
+		<integer name="shapeIndex" value="1"/>
+		<transform name="toWorld">
+			<scale x=".5" y=".5"/>
+			<translate y="20"/>
+		</transform>
+
+		<ref id="mat_floor"/>
+	</shape>
+
+	<shape type="serialized">
+		<string name="filename" value="meshes.serialized"/>
+		<integer name="shapeIndex" value="2"/>
+
+		<ref id="mat_donut"/>
+	</shape>
+
+	<shape type="serialized">
+		<string name="filename" value="meshes.serialized"/>
+		<integer name="shapeIndex" value="3"/>
+
+		<ref id="mat_glass"/>
+	</shape>
+
+	<shape type="serialized">
+		<string name="filename" value="meshes.serialized"/>
+		<integer name="shapeIndex" value="4"/>
+
+		<ref id="mat_metal"/>
+	</shape>
+
+	<shape type="serialized">
+		<string name="filename" value="meshes.serialized"/>
+		<integer name="shapeIndex" value="5"/>
+
+		<ref id="mat_metal"/>
+	</shape>
+
+	<sensor type="perspective">
+		<float name="farClip" value="1165.89"/>
+		<float name="focusDistance" value="51.7808"/>
+		<float name="fov" value="34.6222"/>
+		<string name="fovAxis" value="x"/>
+		<float name="nearClip" value="0.00582945"/>
+		<transform name="toWorld">
+
+			<lookat target="-23.7753, -37.4261, 29.4905" origin="-24.173, -38.184, 30.0076" up="0.261433, 0.446628, 0.855673"/>
+		</transform>
+
+		<sampler type="independent">
+			<integer name="sampleCount" value="256"/>
+		</sampler>
+
+		<film type="hdrfilm">
+			<integer name="height" value="768"/>
+			<integer name="width" value="1024"/>
+
+			<rfilter type="gaussian"/>
+		</film>
+	</sensor>
+</scene>

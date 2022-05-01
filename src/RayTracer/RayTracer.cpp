@@ -11,9 +11,6 @@
 #include "RayTracer.h"
 
 RayTracer* RayTracer::instance = nullptr;
-static bool calc_rmse = false;
-bool show_cam_stats = false;
-
 static void fb_resize_callback(GLFWwindow* window, int width, int height) {
 	auto app = reinterpret_cast<RayTracer*>(glfwGetWindowUserPointer(window));
 	app->resized = true;
@@ -54,23 +51,6 @@ void RayTracer::init(Window* window) {
 	initialized = true;
 
 	scene.load_scene(scene_name);
-	// TODO: Parse this via the scene file
-	//SceneConfig config;
-	////config.root = "scenes/classroom/";
-	////config.filename = "torus_new.xml";
-	////config.filepath = "scenes/cornell_box_simple.json";
-	//config.filepath = "scenes/classroom/scene.xml";
-	////config.filename = "cornell_box_dir.json";
-	////config.filename = "cornell_box_dir_diff.json";
-	////config.filename = "cornell_box_disney.json";
-	////config.filename = "cornell_box.json ";
-	////config.filename = "occluded2.json";
-	////config.filename = "occluded.json";
-	////config.filename = "occluded3.json";
-	////config.filename = "caustics.json";
-	////config.filename = "caustics_zoomed.json";
-	////config.filename = "test.json";
-
 	switch (scene.config.integrator_type) {
 		case IntegratorType::Path :
 			integrator = std::make_unique<Path>(this, &scene);
@@ -306,7 +286,7 @@ float RayTracer::draw_frame() {
 	if (write_exr) {
 		write_exr = false;
 		save_exr((float*)output_img_buffer_cpu.data, instance->width, instance->height, 
-				 "caustics_bdpt_b10.exr");
+				 "out.exr");
 	}
 	bool time_limit = (abs(diff / CLOCKS_PER_SEC - 5)) < 0.1;
 	//calc_rmse = cnt % 30 == 0 || time_limit;
@@ -522,44 +502,47 @@ void RayTracer::init_resources() {
 		VK_SHARING_MODE_EXCLUSIVE,
 		sizeof(float)
 	);
+	if (load_exr) {
+		// Load the ground truth image
+		const char* img_name = "out.exr";
+		float* data;
+		int width;
+		int height;
+		const char* err = nullptr;
 
-	//// Load the ground truth image
-	const char* img_name = "out.exr";
-	float* data;
-	int width;
-	int height;
-	const char* err = nullptr;
-
-	int ret = LoadEXR(&data, &width, &height, img_name, &err);
-	if (ret != TINYEXR_SUCCESS) {
-		if (err) {
-			fprintf(stderr, "ERR : %s\n", err);
-			FreeEXRErrorMessage(err); // release memory of error message.
+		int ret = LoadEXR(&data, &width, &height, img_name, &err);
+		if (ret != TINYEXR_SUCCESS) {
+			if (err) {
+				fprintf(stderr, "ERR : %s\n", err);
+				FreeEXRErrorMessage(err); // release memory of error message.
+			}
+		} else {
+			std::vector<vec4> pixels;
+			int img_res = width * height;
+			pixels.resize(img_res);
+			for (int i = 0; i < img_res; i++) {
+				pixels[i].x = data[4 * i + 0];
+				pixels[i].y = data[4 * i + 1];
+				pixels[i].z = data[4 * i + 2];
+				pixels[i].w = 1.;
+			}
+			auto gt_size = pixels.size() * 4 * 4;
+			gt_img_buffer.create(
+				&instance->vkb.ctx,
+				VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+				VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+				gt_size,
+				pixels.data(),
+				true
+			);
+			desc.gt_img_addr = gt_img_buffer.get_device_address();
+			has_gt = true;
 		}
-	} else {
-		std::vector<vec4> pixels;
-		int img_res = width * height;
-		pixels.resize(img_res);
-		for (int i = 0; i < img_res; i++) {
-			pixels[i].x = data[4 * i + 0];
-			pixels[i].y = data[4 * i + 1];
-			pixels[i].z = data[4 * i + 2];
-			pixels[i].w = 1.;
+		if (has_gt) {
+			free(data);
 		}
-		auto gt_size = pixels.size() * 4 * 4;
-		gt_img_buffer.create(
-			&instance->vkb.ctx,
-			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-			gt_size,
-			pixels.data(),
-			true
-		);
-		desc.gt_img_addr = gt_img_buffer.get_device_address();
-		has_gt = true;
 	}
-
 	desc.out_img_addr = output_img_buffer.get_device_address();
 	desc.residual_addr = residual_buffer.get_device_address();
 	desc.counter_addr = counter_buffer.get_device_address();
@@ -572,9 +555,7 @@ void RayTracer::init_resources() {
 							&desc, true);
 
 	post_pc.size = instance->width * instance->height;
-	if (has_gt) {
-		free(data);
-	}
+
 }
 
 void RayTracer::parse_args(int argc, char* argv[]){
