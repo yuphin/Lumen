@@ -324,6 +324,29 @@ void LumenScene::load_scene(const std::string& path) {
 	} else if (ends_with(path, ".xml")) {
 		MitsubaParser mitsuba_parser;
 		mitsuba_parser.parse(path);
+		config.path_length = mitsuba_parser.integrator.depth;
+		config.sky_col = mitsuba_parser.integrator.sky_col;
+		// Integrator
+		if (mitsuba_parser.integrator.type == "path") {
+			config.integrator_type = IntegratorType::Path;
+		} else if (mitsuba_parser.integrator.type == "bdpt") {
+			config.integrator_type = IntegratorType::BDPT;
+		} else if (mitsuba_parser.integrator.type == "sppm") {
+			config.integrator_type = IntegratorType::SPPM;
+		} else if (mitsuba_parser.integrator.type == "vcm") {
+			config.integrator_type = IntegratorType::VCM;
+			config.enable_vm = mitsuba_parser.integrator.enable_vm;
+		} else if (mitsuba_parser.integrator.type == "pssmlt") {
+			config.integrator_type = IntegratorType::PSSMLT;
+		} else if (mitsuba_parser.integrator.type == "smlt") {
+			config.integrator_type = IntegratorType::SMLT;
+		} else if (mitsuba_parser.integrator.type == "vcmmlt") {
+			config.integrator_type = IntegratorType::VCMMLT;
+		} else if (mitsuba_parser.integrator.type == "restir") {
+			config.integrator_type = IntegratorType::ReSTIR;
+		} else if (mitsuba_parser.integrator.type == "restirgi") {
+			config.integrator_type = IntegratorType::ReSTIRGI;
+		}
 
 		// Camera	 
 		config.cam_settings.fov = mitsuba_parser.camera.fov / 2;
@@ -494,9 +517,6 @@ void LumenScene::load_scene(const std::string& path) {
 
 }
 
-void LumenScene::load_obj(const std::string& path) {
-
-}
 
 void LumenScene::compute_scene_dimensions() {
 	Bbox scene_bbox;

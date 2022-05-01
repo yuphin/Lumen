@@ -82,7 +82,6 @@ public:
 	} m_dimensions;
 	SceneConfig config;
 private:
-	void load_obj(const std::string& path);
 	void compute_scene_dimensions();
 };
 

@@ -10,6 +10,19 @@ void MitsubaParser::parse(const std::string& path) {
 	for (const auto& child : scene.anonymousChildren()) {
 		Object* obj = child.get();
 		switch (obj->type()) {
+			case OT_INTEGRATOR:
+			{
+				integrator.type = obj->pluginType();
+				for (const auto& prop : obj->properties()) {
+					if (prop.first == "max_depth") {
+						integrator.depth = prop.second.getInteger();
+					} 
+					if (prop.first == "enable_vm") {
+						integrator.enable_vm = prop.second.getBool();
+					}
+				}
+
+			} break;
 			case OT_SENSOR:
 			{
 				for (const auto& prop : obj->properties()) {
@@ -132,15 +145,19 @@ void MitsubaParser::parse(const std::string& path) {
 					if (prop.first == "sun_direction") {
 						auto dir = prop.second.getVector();
 						light.from = glm::vec3({ dir.x, dir.y, dir.z });
-					} else if (prop.first == "sun_scale") {
-						//light.L = glm::vec3({ 0.99,0.368,0.325 }) * prop.second.getNumber();
-						//light.L = glm::vec3(1) * prop.second.getNumber();
-						light.L = glm::vec3(0.98, 0.82, 0.30) * prop.second.getNumber();
+					} else if (prop.first == "sun_color") {
+						auto col = prop.second.getVector();
+						light.L = glm::vec3({ col.x, col.y, col.z });
+					}
+					else if (prop.first == "sun_scale") {
+						light.L *= prop.second.getNumber();
+					} else if (prop.first == "sky_color") {
+						auto col = prop.second.getVector();
+						integrator.sky_col = glm::vec3({ col.x, col.y, col.z });
 					}
 				}
 				lights.push_back(light);
 			} break;
-
 			default:
 				break;
 		}
