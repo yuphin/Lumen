@@ -63,8 +63,9 @@ public:
 						bool generate_mipmaps = true);
 	void
 		create_empty_texture(VulkanContext* ctx, const TextureSettings& settings,
-							 VkImageLayout img_layout,
+							 VkImageLayout img_layout, VkSampler = 0,
 							 VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT);
+	VkDescriptorImageInfo create_descriptor_info(VkSampler sampler, VkImageLayout layout);
 
 private:
 };

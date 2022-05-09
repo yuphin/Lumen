@@ -114,6 +114,21 @@ struct SceneUBO {
     mat4 prev_projection;
 };
 
+struct DDGIUniforms {
+    ivec3 probe_counts;
+    float hysteresis;
+    vec3 probe_start_position;
+    float probe_step;
+    int rays_per_probe;
+    float max_distance;
+    float depth_sharpness;
+    float normal_bias;
+    int irradiance_width;
+    int irradiance_height;
+    int depth_width;
+    int depth_height;
+};
+
 struct Vertex {
     vec3 pos;
     vec3 normal;
@@ -483,6 +498,9 @@ struct SceneDesc {
     uint64_t light_state_addr;
     uint64_t angle_struct_addr;
     uint64_t avg_addr;
+    // DDGI
+    uint64_t probe_radiance_addr;
+    uint64_t probe_dir_depth_addr;
 
 };
 

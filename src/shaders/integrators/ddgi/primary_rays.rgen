@@ -1,0 +1,67 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+
+#include "../../commons.glsl"
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(buffer_reference, scalar) buffer GBuffer { GBufferData d[]; };
+const uint flags = gl_RayFlagsOpaqueEXT;
+const float tmin = 0.001;
+const float tmax = 10000.0;
+#define RR_MIN_DEPTH 3
+uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
+#include "../pt_commons.glsl"
+
+GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
+void main() {
+    const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+    const vec2 in_uv = (pixel) / vec2(gl_LaunchSizeEXT.xy);
+    vec2 d = in_uv * 2.0 - 1.0;
+    vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
+    vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
+    vec3 direction = vec3(sample_camera(d));
+    vec3 throughput = vec3(1);
+    // Trace primary ray
+    traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax,
+                0);
+    const bool found_isect = payload.material_idx != -1;
+    vec3 col = vec3(0);
+    if (!found_isect) {
+        col += throughput * pc_ray.sky_col;
+    } else {
+        const Material hit_mat =
+            load_material(payload.material_idx, payload.uv);
+        const vec3 wo = -direction;
+        vec3 n_s = payload.n_s;
+        bool side = true;
+        vec3 n_g = payload.n_g;
+        if (dot(payload.n_g, wo) < 0.)
+            n_g = -n_g;
+        if (dot(n_g, payload.n_s) < 0) {
+            n_s = -n_s;
+            side = false;
+        }
+        col += throughput * hit_mat.emissive_factor;
+        // Save to G buffer
+        gbuffer.d[pixel_idx].pos = payload.pos;
+        gbuffer.d[pixel_idx].normal = payload.n_s;
+        gbuffer.d[pixel_idx].uv = payload.uv;
+        gbuffer.d[pixel_idx].mat_idx = payload.material_idx;
+        // Shade
+        if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
+            const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+            col += throughput *
+                   uniform_sample_light(hit_mat, payload.pos, side, n_s, wo,
+                                        false) /
+                   light_pick_pdf;
+        }
+    }
+    imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+}

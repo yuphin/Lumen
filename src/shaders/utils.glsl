@@ -79,7 +79,7 @@ vec3 offset_ray(const vec3 p, const vec3 n) {
 }
 
 vec3 offset_ray2(const vec3 p, const vec3 n) {
-    const float float_scale = 1.0f / 65536.0f;
+    const float float_scale = 2.0f / 65536.0f;
     return p + float_scale * n;
 }
 

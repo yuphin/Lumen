@@ -10,6 +10,7 @@
 #include "VCMMLT.h"
 #include "ReSTIR.h"
 #include "ReSTIRGI.h"
+#include "DDGI.h"
 class RayTracer : public LumenInstance {
 public:
 	RayTracer(int width, int height, bool debug, int, char* []);

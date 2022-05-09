@@ -21,6 +21,7 @@ enum class IntegratorType {
 	VCMMLT,
 	ReSTIR,
 	ReSTIRGI,
+	DDGI
 };
 
 struct SceneConfig {

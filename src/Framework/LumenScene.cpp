@@ -109,30 +109,25 @@ void LumenScene::load_scene(const std::string& path) {
 			config.integrator_type = IntegratorType::Path;
 		} else if (integrator["type"] == "bdpt") {
 			config.integrator_type = IntegratorType::BDPT;
-		}
-		else if (integrator["type"] == "sppm") {
+		} else if (integrator["type"] == "sppm") {
 			config.integrator_type = IntegratorType::SPPM;
 			config.base_radius = integrator["base_radius"];
-		}
-		else if (integrator["type"] == "vcm") {
+		} else if (integrator["type"] == "vcm") {
 			config.integrator_type = IntegratorType::VCM;
 			config.enable_vm = integrator["enable_vm"] == 1;
 			config.radius_factor = integrator["radius_factor"];
-		}
-		else if (integrator["type"] == "pssmlt") {
+		} else if (integrator["type"] == "pssmlt") {
 			config.integrator_type = IntegratorType::PSSMLT;
 			config.integrator_type = IntegratorType::SMLT;
 			config.mutations_per_pixel = integrator["mutations_per_pixel"];
 			config.num_mlt_threads = integrator["num_mlt_threads"];
 			config.num_bootstrap_samples = integrator["num_bootstrap_samples"];
-		}
-		else if (integrator["type"] == "smlt") {
+		} else if (integrator["type"] == "smlt") {
 			config.integrator_type = IntegratorType::SMLT;
 			config.mutations_per_pixel = integrator["mutations_per_pixel"];
 			config.num_mlt_threads = integrator["num_mlt_threads"];
 			config.num_bootstrap_samples = integrator["num_bootstrap_samples"];
-		}
-		else if (integrator["type"] == "vcmmlt") {
+		} else if (integrator["type"] == "vcmmlt") {
 			config.integrator_type = IntegratorType::VCMMLT;
 			config.mutations_per_pixel = integrator["mutations_per_pixel"];
 			config.num_mlt_threads = integrator["num_mlt_threads"];
@@ -141,14 +136,14 @@ void LumenScene::load_scene(const std::string& path) {
 			config.enable_vm = integrator["enable_vm"] == 1;
 			config.alternate = integrator["alternate"] == 1;
 			config.light_first = integrator["light_first"] == 1;
-		}
-		else if (integrator["type"] == "restir") {
+		} else if (integrator["type"] == "restir") {
 			config.integrator_type = IntegratorType::ReSTIR;
-		}
-		else if (integrator["type"] == "restirgi") {
+		} else if (integrator["type"] == "restirgi") {
 			config.integrator_type = IntegratorType::ReSTIRGI;
+		} else if (integrator["type"] == "ddgi") {
+			config.integrator_type = IntegratorType::DDGI;
 		}
-	
+
 		// Load obj file
 		const std::string mesh_file = root + std::string(j["mesh_file"]);
 		tinyobj::ObjReaderConfig reader_config;
@@ -292,7 +287,7 @@ void LumenScene::load_scene(const std::string& path) {
 			}
 			bsdf_idx++;
 		}
-		
+
 		config.cam_settings.fov = j["camera"]["fov"];
 		const auto& p = j["camera"]["position"];
 		const auto& d = j["camera"]["dir"];
@@ -346,6 +341,8 @@ void LumenScene::load_scene(const std::string& path) {
 			config.integrator_type = IntegratorType::ReSTIR;
 		} else if (mitsuba_parser.integrator.type == "restirgi") {
 			config.integrator_type = IntegratorType::ReSTIRGI;
+		} else if (mitsuba_parser.integrator.type == "ddgi") {
+			config.integrator_type = IntegratorType::DDGI;
 		}
 
 		// Camera	 
@@ -434,7 +431,7 @@ void LumenScene::load_scene(const std::string& path) {
 			m.specular = 0.5;
 			m.sheen = 0;
 #endif
-		};
+	};
 		i = 0;
 		materials.resize(mitsuba_parser.bsdfs.size());
 		for (const auto& m_bsdf : mitsuba_parser.bsdfs) {
@@ -474,13 +471,11 @@ void LumenScene::load_scene(const std::string& path) {
 			if (m_bsdf.type == "conductor") {
 				materials[i].bsdf_type = BSDF_MIRROR;
 				materials[i].bsdf_props = BSDF_SPECULAR | BSDF_REFLECTIVE;
-			} 
-			else if (m_bsdf.type == "glass") {
+			} else if (m_bsdf.type == "glass") {
 				materials[i].bsdf_type = BSDF_GLASS;
 				materials[i].bsdf_props = BSDF_SPECULAR | BSDF_TRANSMISSIVE;
 				materials[i].ior = m_bsdf.ior;
-			}
-			else if (m_bsdf.type == "roughconductor") {
+			} else if (m_bsdf.type == "roughconductor") {
 				materials[i].bsdf_type = BSDF_GLOSSY;
 				materials[i].bsdf_props = BSDF_OPAQUE | BSDF_LAMBERTIAN | BSDF_REFLECTIVE;
 				materials[i].metalness = m_bsdf.albedo;
@@ -489,14 +484,14 @@ void LumenScene::load_scene(const std::string& path) {
 			} else if (m_bsdf.type == "roughplastic") {
 				materials[i].bsdf_type = BSDF_GLOSSY;
 				materials[i].bsdf_props = BSDF_OPAQUE | BSDF_LAMBERTIAN | BSDF_REFLECTIVE;
-				materials[i].albedo = glm::pi<float>()  * m_bsdf.albedo;
+				materials[i].albedo = glm::pi<float>() * m_bsdf.albedo;
 				materials[i].metalness = vec3(0.1);
 				materials[i].roughness = m_bsdf.roughness * m_bsdf.roughness;
-			
+
 			}
 #endif
 			i++;
-		}
+			}
 		compute_scene_dimensions();
 		// Light
 		i = 0;
@@ -512,7 +507,7 @@ void LumenScene::load_scene(const std::string& path) {
 			}
 			i++;
 		}
-	}
+		}
 
 
 }

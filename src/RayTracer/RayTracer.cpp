@@ -79,7 +79,9 @@ void RayTracer::init(Window* window) {
 		case IntegratorType::ReSTIRGI:
 			integrator = std::make_unique<ReSTIRGI>(this, &scene);
 			break;
-	
+		case IntegratorType::DDGI:
+			integrator = std::make_unique<DDGI>(this, &scene);
+			break;	
 		default:
 			break;
 	}
@@ -105,6 +107,7 @@ void RayTracer::update() {
 	}
 	float frame_time = draw_frame();
 	cpu_avg_time = (1. - 1./ (cnt)) * cpu_avg_time +  frame_time / (float)cnt;
+	cpu_avg_time = 0.95 * cpu_avg_time + 0.05 * frame_time;
 
 	integrator->update();
 }

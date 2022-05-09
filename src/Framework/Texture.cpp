@@ -159,6 +159,14 @@ void Texture2D::load_from_img(const std::string& filename, VulkanContext* ctx,
 	}
 }
 
+VkDescriptorImageInfo Texture2D::create_descriptor_info(VkSampler sampler, VkImageLayout layout) {
+	VkDescriptorImageInfo rt_read_info;
+	rt_read_info.sampler = sampler;
+	rt_read_info.imageView = img_view;
+	rt_read_info.imageLayout = layout;
+	return rt_read_info;
+}
+
 void Texture2D::load_from_data(VulkanContext* ctx, void* data,
 							   VkDeviceSize size, const VkImageCreateInfo& info,
 							   VkSampler a_sampler, bool generate_mipmaps) {
@@ -225,7 +233,7 @@ void Texture2D::load_from_data(VulkanContext* ctx, void* data,
 
 void Texture2D::create_empty_texture(
 	VulkanContext* ctx, const TextureSettings& settings,
-	VkImageLayout img_layout,
+	VkImageLayout img_layout, VkSampler sampler /* 0*/,
 	VkImageAspectFlags flags /*=VK_IMAGE_ASPECT_COLOR_BIT*/) {
 	this->ctx = ctx;
 	auto image_CI = vk::image_create_info(settings.format, settings.usage_flags,
@@ -240,32 +248,38 @@ void Texture2D::create_empty_texture(
 	create_image(image_CI);
 	img_view = create_image_view(ctx->device, img, settings.format, flags);
 	// Create a default sampler
-	// TODO: Select sampler from a sampler pool
-	sampler_allocated = true;
-	VkSamplerCreateInfo sampler_CI = vk::sampler_create_info();
-	sampler_CI.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	sampler_CI.magFilter = VK_FILTER_LINEAR;
-	sampler_CI.minFilter = VK_FILTER_LINEAR;
-	sampler_CI.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	sampler_CI.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	sampler_CI.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	sampler_CI.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	sampler_CI.mipLodBias = 0.0f;
-	sampler_CI.compareOp = VK_COMPARE_OP_NEVER;
-	sampler_CI.minLod = 0.0f;
-	sampler_CI.maxLod = (float)settings.mip_levels;
-	sampler_CI.anisotropyEnable = ctx->supported_features.samplerAnisotropy;
-	sampler_CI.maxAnisotropy =
-		ctx->supported_features.samplerAnisotropy
-		? ctx->device_properties.limits.maxSamplerAnisotropy
-		: 1.0f;
-	sampler_CI.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-	vk::check(vkCreateSampler(ctx->device, &sampler_CI, nullptr, &sampler),
-			  "Could not create image sampler");
+	if (!sampler) {
+		sampler_allocated = true;
+		VkSamplerCreateInfo sampler_CI = vk::sampler_create_info();
+		sampler_CI.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		sampler_CI.magFilter = VK_FILTER_LINEAR;
+		sampler_CI.minFilter = VK_FILTER_LINEAR;
+		sampler_CI.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		sampler_CI.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		sampler_CI.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		sampler_CI.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		sampler_CI.mipLodBias = 0.0f;
+		sampler_CI.compareOp = VK_COMPARE_OP_NEVER;
+		sampler_CI.minLod = 0.0f;
+		sampler_CI.maxLod = (float)settings.mip_levels;
+		sampler_CI.anisotropyEnable = ctx->supported_features.samplerAnisotropy;
+		sampler_CI.maxAnisotropy =
+			ctx->supported_features.samplerAnisotropy
+			? ctx->device_properties.limits.maxSamplerAnisotropy
+			: 1.0f;
+		sampler_CI.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+		vk::check(vkCreateSampler(ctx->device, &sampler_CI, nullptr, &sampler),
+				  "Could not create image sampler");
+	} else {
+		this->sampler = sampler;
+	}
+	
 	descriptor_image_info.imageLayout = img_layout;
 	descriptor_image_info.imageView = img_view;
 	descriptor_image_info.sampler = sampler;
 	layout = img_layout;
+	base_extent = settings.base_extent;
+	format = settings.format;
 }
 
 Texture::Texture(VulkanContext* ctx) : ctx(ctx) {}
@@ -357,6 +371,8 @@ void Texture::cmd_generate_mipmaps(int mip_width, int mip_height,
 							subresource_range);
 }
 
+
+
 void Texture::destroy() {
 	if (sampler_allocated) {
 		vkDestroySampler(ctx->device, sampler, nullptr);
@@ -365,3 +381,4 @@ void Texture::destroy() {
 	vkDestroyImage(ctx->device, img, nullptr);
 	vkFreeMemory(ctx->device, img_mem, nullptr);
 }
+
