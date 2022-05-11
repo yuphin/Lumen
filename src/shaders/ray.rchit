@@ -94,4 +94,6 @@ void main() {
     payload.material_idx = material_index;
     payload.triangle_idx = gl_PrimitiveID;
     payload.area = 0.5 * length(cross(e0t, e1t));
+    payload.dist = gl_RayTminEXT + gl_HitTEXT;
+    payload.hit_kind = gl_HitKindEXT;
 }

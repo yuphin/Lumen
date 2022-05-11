@@ -1,0 +1,135 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+
+#include "../../utils.glsl"
+
+#define WG_SIZE 32
+layout(local_size_x = WG_SIZE, local_size_y = WG_SIZE, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, rgba16f) uniform image2D output_irr;
+layout(set = 0, binding = 1, rg16f) uniform image2D output_vis;
+
+layout(set = 1, binding = 0) uniform _DDGIUniforms {
+    DDGIUniforms ddgi_uniforms;
+};
+
+// https://jcgt.org/published/0010/02/01/paper-lowres.pdf
+
+// WG 0 -> 4 corners, (4 vis + 4  irr) probes ( = 32 threads)
+
+// WG 1-4 -> 4 x 8 irr edges, 4 irr probes ( = 128 threads)
+
+// WG 5-12 -> 4 x 16 vis edges, 4 vis probes ( = 256 threads)
+
+// -- 13 WGs process 4 probes
+// xy -> irr, zw- > vis
+const ivec2 copies_irr[4] =
+    ivec2[](ivec2(1, 1), ivec2(8, 1), ivec2(1, 8), ivec2(8, 8));
+const ivec2 copies_depth[4] =
+    ivec2[](ivec2(1, 1), ivec2(16, 1), ivec2(1, 16), ivec2(16, 16));
+
+ivec2 mod_helper(const ivec2 v) {
+    return ivec2((v.x & 1) == 1 ? v.x : 0, (v.y & 1) == 1 ? v.y : 0);
+}
+#define VIS_WITH_BORDER 18
+#define IRR_WITH_BORDER 10
+void main() {
+    int tid = int(gl_LocalInvocationID.x);
+    int wid = int(gl_WorkGroupID.x % 13);
+
+    int probes_to_process = 4;
+    const int gridxy =
+        ddgi_uniforms.probe_counts.x * ddgi_uniforms.probe_counts.y;
+    if (gl_WorkGroupID.x >= (gl_NumWorkGroups.x - 13)) {
+        int grid_size = gridxy * ddgi_uniforms.probe_counts.z;
+        int probes_to_process =
+            // 4 - (4 * int(gl_WorkGroupSize.x) / 13 - pc.grid_size);
+            4 - (4 * (int(gl_WorkGroupSize.x) / 13) - grid_size);
+        if (wid == 0 && ((tid % 16) >> 2) >= probes_to_process) {
+            return;
+        } else if (wid < 5 && (wid - 1) >= probes_to_process) {
+            return;
+        } else if ((wid - 5) >> 1 >= probes_to_process) {
+            return;
+        }
+    }
+
+    if (wid == 0) {
+        // Load 4 irr + vis probes (8 probes)
+        const int probe_idx = (tid % 16) >> 2;
+        const int global_probe_idx =
+            4 * (int(gl_WorkGroupID.x) / 13) + probe_idx;
+        const ivec2 global_offset =
+            ivec2(global_probe_idx % gridxy, global_probe_idx / gridxy);
+
+        if (tid >= 16) {
+            // const ivec4 src = corner_copies2[tid % 4];
+            const ivec2 src = copies_irr[tid % 4];
+            // Irr probes
+            const ivec2 offset =
+                ivec2(IRR_WITH_BORDER) * global_offset + ivec2(1);
+            imageStore(output_irr, offset + mod_helper(src.xy + 8),
+                       imageLoad(output_irr, offset + src.xy));
+        } else {
+            const ivec2 src = copies_depth[tid % 4];
+            // Vis probes
+            const ivec2 offset =
+                ivec2(VIS_WITH_BORDER) * global_offset + ivec2(1);
+
+            imageStore(output_vis, offset + mod_helper(src.xy + 16),
+                       imageLoad(output_vis, offset + src.xy));
+        }
+    } else if (wid < 5) {
+        // 4 Irradiance probes
+        const int edge_pair_idx = tid >> 3;
+        const int probe_idx = wid - 1;
+        const int global_probe_idx =
+            4 * (int(gl_WorkGroupID.x) / 13) + probe_idx;
+        const ivec2 global_offset =
+            ivec2(global_probe_idx % gridxy, global_probe_idx / gridxy);
+        const ivec2 offset = ivec2(IRR_WITH_BORDER) * global_offset + ivec2(1);
+
+        ivec4 src_dst;
+        const int tl = tid % 8;
+        if (edge_pair_idx < 2) {
+            // Top - bottom
+            src_dst = ivec4(1 + tl, 1 + 7 * (edge_pair_idx & 1), 8 - tl,
+                            9 * (edge_pair_idx & 1));
+        } else {
+            // Left - right
+            src_dst = ivec4(7 * (edge_pair_idx & 1) + 1, 1 + tl,
+                            9 * (edge_pair_idx & 1), 8 - tl);
+        }
+
+        imageStore(output_irr, offset + src_dst.zw,
+                   imageLoad(output_irr, offset + src_dst.xy));
+    } else {
+        // 4 Depth probes (2 WG per probe)
+        const int probe_idx = (wid - 5) >> 1;
+        const int edge_pairs = wid & 1; //  0 -> top-bottom : 1 -> left-right
+        const int odd = int(tid < 16);
+        const int global_probe_idx =
+            4 * (int(gl_WorkGroupID.x) / 13) + probe_idx;
+        const ivec2 global_offset =
+            ivec2(global_probe_idx % gridxy, global_probe_idx / gridxy);
+        const ivec2 offset = ivec2(VIS_WITH_BORDER) * global_offset + ivec2(1);
+
+        ivec4 src_dst;
+        const int tl = tid % 16;
+        if (edge_pairs == 0) {
+            // Top - bottom
+            src_dst = ivec4(1 + tl, 1 + 15 * odd, 16 - tl, 17 * odd);
+        } else {
+            // Left - right
+            src_dst = ivec4(15 * odd + 1, 1 + tl, 17 * odd, 16 - tl);
+        }
+        imageStore(output_vis, offset + src_dst.zw,
+                   imageLoad(output_vis, offset + src_dst.xy));
+    }
+}

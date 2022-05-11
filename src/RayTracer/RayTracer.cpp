@@ -403,7 +403,7 @@ void RayTracer::create_compute_pipelines() {
 		shader.compile();
 	}
 	ComputePipelineSettings settings;
-	settings.desc_sets = &post_desc_layout;
+	settings.desc_set_layouts = &post_desc_layout;
 	settings.desc_set_layout_cnt = 1;
 	settings.push_const_size = sizeof(PostPC);
 	settings.shader = shaders[0];

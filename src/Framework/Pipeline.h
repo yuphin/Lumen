@@ -45,7 +45,7 @@ struct RTPipelineSettings {
 struct ComputePipelineSettings {
 	Shader shader;
 	uint32_t desc_set_layout_cnt;
-	VkDescriptorSetLayout* desc_sets;
+	VkDescriptorSetLayout* desc_set_layouts;
 	std::vector<uint32_t> specialization_data = {};
 	uint32_t push_const_size = 0;
 	std::string name = "";

@@ -85,6 +85,9 @@ struct PushConstantRay {
     uint do_spatiotemporal;
     uint max_angle_samples;
     float world_radius;
+    float pad;
+    int first_frame;
+    mat4 probe_rotation;
 };
 
 struct PushConstantPost {
@@ -123,10 +126,12 @@ struct DDGIUniforms {
     float max_distance;
     float depth_sharpness;
     float normal_bias;
+    float view_bias;
     int irradiance_width;
     int irradiance_height;
     int depth_width;
     int depth_height;
+    vec3 pad;
 };
 
 struct Vertex {
@@ -356,9 +361,15 @@ struct Reservoir {
 
 struct GBufferData {
     vec3 pos;
-    vec3 normal;
-    vec2 uv;
     uint mat_idx;
+    vec3 normal;
+    uint pad;
+    vec2 uv;
+    vec2 pad2;
+    vec3 albedo;
+    uint pad3;
+    vec3 n_g;
+    uint pad4;
 };
 
 struct RestirData {
@@ -501,6 +512,7 @@ struct SceneDesc {
     // DDGI
     uint64_t probe_radiance_addr;
     uint64_t probe_dir_depth_addr;
+    uint64_t direct_lighting_addr;
 
 };
 

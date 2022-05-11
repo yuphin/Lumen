@@ -267,7 +267,7 @@ void Pipeline::create_compute_pipeline(const ComputePipelineSettings& settings) 
 
 	VkPipelineLayoutCreateInfo pipeline_layout_create_info = {};
 	pipeline_layout_create_info.setLayoutCount = compute_settings.desc_set_layout_cnt;
-	pipeline_layout_create_info.pSetLayouts = compute_settings.desc_sets;
+	pipeline_layout_create_info.pSetLayouts = compute_settings.desc_set_layouts;
 	if (compute_settings.push_const_size) {
 		pipeline_layout_create_info.pushConstantRangeCount = 1;
 		pipeline_layout_create_info.pPushConstantRanges = &push_constant_range;

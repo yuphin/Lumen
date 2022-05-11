@@ -167,6 +167,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\RayTracer\DDGI.cpp" />
     <ClCompile Include="libs\extensions_vk.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -238,6 +239,7 @@
     <ClCompile Include="src\RayTracer\VCMMLT.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\RayTracer\DDGI.h" />
     <ClInclude Include="libs\extensions_vk.hpp" />
     <ClInclude Include="libs\imgui\imconfig.h" />
     <ClInclude Include="libs\imgui\imgui.h" />

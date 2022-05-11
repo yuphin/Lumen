@@ -617,7 +617,7 @@ void ReSTIRGI::create_compute_pipelines() {
 		shader.compile();
 	}
 	ComputePipelineSettings settings;
-	settings.desc_sets = &desc_set_layout;
+	settings.desc_set_layouts = &desc_set_layout;
 	settings.desc_set_layout_cnt = 1;
 	settings.push_const_size = sizeof(PushConstantRay);
 	settings.shader = shaders[0];

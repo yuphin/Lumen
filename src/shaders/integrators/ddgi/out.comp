@@ -1,0 +1,44 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../commons.h"
+
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(set = 0, binding = 1, rgba32f) uniform image2D image;
+layout(set = 0, binding = 3) uniform _SceneUBO { SceneUBO ubo; };
+layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(set = 0, binding = 5) uniform sampler2D scene_textures[];
+layout(set = 1, binding = 0) uniform sampler2D irr_img;
+layout(buffer_reference, scalar) readonly buffer Materials { Material m[]; };
+layout(buffer_reference, scalar) buffer GBuffer { GBufferData d[]; };
+layout(buffer_reference, scalar) buffer DirLight { vec3 d[]; };
+GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
+DirLight direct_lighting = DirLight(scene_desc.direct_lighting_addr);
+Materials materials = Materials(scene_desc.material_addr);
+#include "../../utils.glsl"
+#include "../../bsdf_commons.glsl"
+
+void main() {
+    uvec2 dims = gl_GlobalInvocationID.xy;
+    if (dims.x >= pc_ray.size_x || dims.y >= pc_ray.size_y) {
+        return;
+    }
+    const ivec2 size = ivec2(pc_ray.size_x, pc_ray.size_y);
+    const vec2 pixel_center = vec2(dims) + vec2(0.5);
+    const vec2 tex_coord = pixel_center / vec2(size);
+    uint idx =
+        pc_ray.size_y * gl_GlobalInvocationID.x + gl_GlobalInvocationID.y;
+    // vec3 direct_lighting = imageLoad(image, ivec2(dims.xy)).xyz;
+    vec3 col = direct_lighting.d[idx];
+    // vec3 indirect = gbumat_idx = payload.material_idx;ffer.d[idx].normal;
+    col += gbuffer.d[idx].albedo / PI * texture(irr_img, tex_coord).xyz;
+
+    imageStore(image, ivec2(dims.xy), vec4(col, 1.f));
+}

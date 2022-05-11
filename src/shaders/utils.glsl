@@ -17,6 +17,8 @@ struct HitPayload {
     uint material_idx;
     uint triangle_idx;
     float area;
+    float dist;
+    uint hit_kind;
 };
 
 struct VCMState {
@@ -84,6 +86,31 @@ vec3 offset_ray2(const vec3 p, const vec3 n) {
 }
 
 float luminance(vec3 rgb) { return dot(rgb, vec3(0.2126f, 0.7152f, 0.0722f)); }
+
+
+
+float sign_not_zero(float k) { return (k >= 0.0) ? 1.0 : -1.0; }
+
+vec2 sign_not_zero(vec2 v) {
+    return vec2(sign_not_zero(v.x), sign_not_zero(v.y));
+
+}
+
+vec2 oct_encode(in vec3 v) {
+    float l1norm = abs(v.x) + abs(v.y) + abs(v.z);
+    vec2 result = v.xy * (1.0 / l1norm);
+    if (v.z < 0.0)
+        result = (1.0 - abs(result.yx)) * sign_not_zero(result.xy);
+    return result;
+}
+
+vec3 oct_decode(vec2 o) {
+    vec3 v = vec3(o.x, o.y, 1.0 - abs(o.x) - abs(o.y));
+    if (v.z < 0.0)
+        v.xy = (1.0 - abs(v.yx)) * sign_not_zero(v.xy);
+
+    return normalize(v);
+}
 
 // PCG random numbers generator
 // Source: "Hash Functions for GPU Rendering" by Jarzynski & Olano

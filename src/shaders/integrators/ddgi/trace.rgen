@@ -1,0 +1,106 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+
+#include "../../commons.glsl"
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(buffer_reference, scalar) buffer GBuffer { GBufferData d[]; };
+const uint flags = gl_RayFlagsOpaqueEXT;
+const float tmin = 0.001;
+const float tmax = 10000.0;
+#define RR_MIN_DEPTH 3
+uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y +
+                  gl_LaunchIDEXT.y); // X: Num rays, Y: Num probes
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
+#include "../pt_commons.glsl"
+layout(set = 1, binding = 0) uniform _DDGIUniforms { DDGIUniforms ddgi_ubo; };
+layout(set = 2, binding = 0, rgba16f) uniform image2D radiance_img;
+layout(set = 2, binding = 1, rgba16f) uniform image2D dir_dist_img;
+GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
+
+vec3 grid_coord_to_position(ivec3 c) {
+    return ddgi_ubo.probe_step * vec3(c) + ddgi_ubo.probe_start_position;
+}
+
+ivec3 probe_index_to_grid_coord(int index) {
+    ivec3 res;
+
+    res.x = index % ddgi_ubo.probe_counts.x;
+    res.y = (index % (ddgi_ubo.probe_counts.x * ddgi_ubo.probe_counts.y)) /
+            ddgi_ubo.probe_counts.x;
+    res.z = index / (ddgi_ubo.probe_counts.x * ddgi_ubo.probe_counts.y);
+
+    // Assumes probe_counts are PoT.
+    // res.x = index & (ddgi_ubo.probe_counts.x - 1);
+    // res.y =
+    //     (index &
+    //      ((ddgi_ubo.probe_counts.x * ddgi_ubo.probe_counts.y) - 1))
+    //      >>
+    //     findMSB(ddgi_ubo.probe_counts.x);
+    // res.z = index >> findMSB(ddgi_ubo.probe_counts.x *
+    //                          ddgi_ubo.probe_counts.y);
+    return res;
+}
+
+vec3 probe_location(int index) {
+    return grid_coord_to_position(probe_index_to_grid_coord(index));
+}
+
+vec3 spherical_fibonacci(float i, float n) {
+    const float PHI = sqrt(5.0) * 0.5 + 0.5;
+#define madfrac(A, B) ((A) * (B)-floor((A) * (B)))
+    float phi = PI2 * madfrac(i, PHI - 1);
+    float cos_theta = 1.0 - (2.0 * i + 1.0) * (1.0 / n);
+    float sin_theta = sqrt(clamp(1.0 - cos_theta * cos_theta, 0.0f, 1.0f));
+    return vec3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
+#undef madfrac
+}
+
+void main() {
+    int ray_id = int(gl_LaunchIDEXT.x);
+    int probe_id = int(gl_LaunchIDEXT.y);
+    vec3 o = probe_location(probe_id);
+    vec3 d = (mat3(pc_ray.probe_rotation) *
+              spherical_fibonacci(ray_id, ddgi_ubo.rays_per_probe));
+    payload.dist = tmax;
+    traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, o, tmin, d, tmax, 0);
+    const bool found_isect = payload.material_idx != -1;
+    vec3 col = vec3(0);
+    float dist;
+    if (!found_isect) {
+        col += pc_ray.sky_col;
+        dist = 1e10;
+    } else if(payload.hit_kind == gl_HitKindBackFacingTriangleEXT ) {
+        dist = -0.2 * payload.dist;
+        dist = 0.;
+    }else {
+        dist = payload.dist;
+        const Material hit_mat =
+            load_material(payload.material_idx, payload.uv);
+        const vec3 wo = -d;
+        vec3 n_s = payload.n_s;
+        bool side = true;
+        vec3 n_g = payload.n_g;
+        if (dot(payload.n_g, wo) < 0.)
+            n_g = -n_g;
+        if (dot(n_g, payload.n_s) < 0) {
+            n_s = -n_s;
+            side = false;
+        }
+       
+        if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
+            const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+            col += uniform_sample_light(hit_mat, payload.pos, side, n_s, wo,
+                                        false) /
+                   light_pick_pdf;
+        }
+    }
+    imageStore(radiance_img, ivec2(gl_LaunchIDEXT.xy), vec4(col, 0.0f));
+    imageStore(dir_dist_img, ivec2(gl_LaunchIDEXT.xy), vec4(d, dist));
+}

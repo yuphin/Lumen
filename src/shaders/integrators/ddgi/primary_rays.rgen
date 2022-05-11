@@ -11,6 +11,7 @@
 #include "../../commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 layout(buffer_reference, scalar) buffer GBuffer { GBufferData d[]; };
+layout(buffer_reference, scalar) buffer DirLight { vec3 d[]; };
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
@@ -20,6 +21,7 @@ uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
 #include "../pt_commons.glsl"
 
 GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
+DirLight direct_lighting = DirLight(scene_desc.direct_lighting_addr);
 void main() {
     const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
     const vec2 in_uv = (pixel) / vec2(gl_LaunchSizeEXT.xy);
@@ -51,9 +53,11 @@ void main() {
         col += throughput * hit_mat.emissive_factor;
         // Save to G buffer
         gbuffer.d[pixel_idx].pos = payload.pos;
-        gbuffer.d[pixel_idx].normal = payload.n_s;
+        gbuffer.d[pixel_idx].normal = n_s;
+        gbuffer.d[pixel_idx].n_g = n_g;
         gbuffer.d[pixel_idx].uv = payload.uv;
         gbuffer.d[pixel_idx].mat_idx = payload.material_idx;
+        gbuffer.d[pixel_idx].albedo = hit_mat.albedo;
         // Shade
         if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
             const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
@@ -63,5 +67,5 @@ void main() {
                    light_pick_pdf;
         }
     }
-    imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+    direct_lighting.d[pixel_idx] = col;
 }

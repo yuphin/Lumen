@@ -148,7 +148,7 @@ void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
 	switch (old_layout) {
 		case VK_IMAGE_LAYOUT_UNDEFINED:
 			image_memory_barrier.srcAccessMask = 0;
-			source_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+			source_stage = VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
 			break;
 
 		case VK_IMAGE_LAYOUT_PREINITIALIZED:
