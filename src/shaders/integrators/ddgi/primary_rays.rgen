@@ -26,7 +26,7 @@ void main() {
     const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
     const vec2 in_uv = (pixel) / vec2(gl_LaunchSizeEXT.xy);
     vec2 d = in_uv * 2.0 - 1.0;
-    vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
+    vec4 origin = ubo.view_pos;
     vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
     vec3 direction = vec3(sample_camera(d));
     vec3 throughput = vec3(1);
@@ -54,7 +54,7 @@ void main() {
         // Save to G buffer
         gbuffer.d[pixel_idx].pos = payload.pos;
         gbuffer.d[pixel_idx].normal = n_s;
-        gbuffer.d[pixel_idx].n_g = n_g;
+        gbuffer.d[pixel_idx].n_g = n_s;
         gbuffer.d[pixel_idx].uv = payload.uv;
         gbuffer.d[pixel_idx].mat_idx = payload.material_idx;
         gbuffer.d[pixel_idx].albedo = hit_mat.albedo;

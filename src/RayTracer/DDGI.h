@@ -21,6 +21,7 @@ private:
 	DDGIUniforms ddgi_ubo;
 	Buffer ddgi_ubo_buffer;
 	Buffer direct_lighting_buffer;
+	Buffer probe_offsets_buffer;
 
 	Buffer g_buffer;
 
@@ -59,11 +60,13 @@ private:
 	} ddgi_uniform;
 
 	float hysteresis = 0.98f;
-	int rays_per_probe = 300;
+	int rays_per_probe = 256;
 	float depth_sharpness = 50.0f;
 	float normal_bias = 0.1;
 	float view_bias = 0.1;
-	float probe_distance;
+	float backface_ratio = 0.1;
+	float probe_distance = 0.5f;
+	float min_frontface_dist = 0.1;
 	float max_distance;
 	glm::ivec3 probe_counts;
 	glm::vec3 probe_start_position;
@@ -79,8 +82,11 @@ private:
 	std::unique_ptr<Pipeline> depth_update_pipeline;
 	std::unique_ptr<Pipeline> irr_update_pipeline;
 	std::unique_ptr<Pipeline> border_update_pipeline;
+	std::unique_ptr<Pipeline> classify_pipeline;
 	std::unique_ptr<Pipeline> sample_pipeline;
+	std::unique_ptr<Pipeline> relocate_pipeline;
 	std::unique_ptr<Pipeline> out_pipeline;
 	bool first_frame = true;
 	uint32_t frame_idx = 0;
+	uint total_frame_idx = 0;
 };

@@ -1,0 +1,94 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+
+#include "../../utils.glsl"
+#define WG_SIZE 16
+layout(local_size_x = WG_SIZE, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 3) uniform _SceneUBO { SceneUBO ubo; };
+layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+
+layout(set = 1, binding = 0) uniform _DDGIUniforms { DDGIUniforms ddgi_ubo; };
+layout(set = 2, binding = 1) uniform sampler2D dir_dist_img;
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc; };
+layout(buffer_reference, scalar) buffer GBuffer { GBufferData d[]; };
+layout(buffer_reference, scalar) buffer ProbeOffset { vec4 d[]; };
+
+ProbeOffset probe_offsets = ProbeOffset(scene_desc.probe_offsets_addr);
+
+float pow2(float v) { return dot(v, v); }
+float pow2(vec3 v) { return dot(v, v); }
+
+// Invocation size x = probe_counts.x * probe_counts.y
+// Invocation size y = probe_counts.z
+void main() {
+    const int linear_probe_id = int(gl_GlobalInvocationID.x);
+    const int num_probes = ddgi_ubo.probe_counts.x * ddgi_ubo.probe_counts.y *
+                           ddgi_ubo.probe_counts.z;
+    if (linear_probe_id >= num_probes) {
+        return;
+    }
+    int backface_count = 0;
+    // Scaled by distances
+    vec3 closest_backface_vector;
+    vec3 farthest_frontface_vector;
+    vec3 closest_frontface_vector;
+    float closest_backface_dist = 1e10;
+    float farthest_frontface_dist = 0;
+    float closest_frontface_dist = 1e10;
+
+    vec3 current_offset = probe_offsets.d[linear_probe_id].xyz;
+
+    float offset_limit = pow2(ddgi_ubo.probe_step * 0.5);
+    for (int i = 0; i < ddgi_ubo.rays_per_probe; i++) {
+        ivec2 C = ivec2(i, linear_probe_id);
+        vec3 dir = texelFetch(dir_dist_img, C, 0).xyz;
+        float dist = texelFetch(dir_dist_img, C, 0).w;
+        if (dist == 65504) {
+            continue; // miss
+        }
+        if (dist < 0.0) {
+            backface_count++;
+            const float actual_hit_dist = -5 * dist;
+            if (actual_hit_dist < closest_backface_dist) {
+                closest_backface_dist = actual_hit_dist;
+                closest_backface_vector = dir * actual_hit_dist;
+            }
+        } else {
+            if (dist < closest_frontface_dist) {
+                closest_frontface_dist = dist;
+                closest_frontface_vector = dir * dist;
+            } else if (dist > farthest_frontface_dist) {
+                farthest_frontface_dist = dist;
+                farthest_frontface_vector = dir * dist;
+            }
+        }
+    }
+    vec3 full_offset = vec3(1e10);
+    if (backface_count / ddgi_ubo.rays_per_probe > ddgi_ubo.backface_ratio) {
+        float scale_factor = 2.0;
+        for (int i = 1; i <= 100; i++) {
+            if (pow2(full_offset) >= offset_limit) {
+                full_offset = current_offset + closest_backface_vector *
+                                                   (scale_factor - (i * 0.01));
+            }
+        }
+    } else if (closest_frontface_dist < ddgi_ubo.min_frontface_dist) {
+        if (dot(closest_frontface_vector, farthest_frontface_vector) <= 0.5) {
+            vec3 farthest_dir =
+                min(0.2, farthest_frontface_dist) * farthest_frontface_vector;
+            full_offset = current_offset + farthest_dir;
+        }
+    }
+
+    if (pow2(full_offset) < offset_limit) {
+        current_offset = full_offset;
+    }
+    probe_offsets.d[linear_probe_id].xyz = current_offset;
+}

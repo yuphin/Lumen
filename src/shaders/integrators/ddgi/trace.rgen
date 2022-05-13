@@ -9,8 +9,10 @@
 #extension GL_EXT_shader_atomic_float : require
 
 #include "../../commons.glsl"
+#include "ddgi_commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 layout(buffer_reference, scalar) buffer GBuffer { GBufferData d[]; };
+layout(buffer_reference, scalar) buffer ProbeOffset { vec4 d[]; };
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
@@ -23,6 +25,7 @@ layout(set = 1, binding = 0) uniform _DDGIUniforms { DDGIUniforms ddgi_ubo; };
 layout(set = 2, binding = 0, rgba16f) uniform image2D radiance_img;
 layout(set = 2, binding = 1, rgba16f) uniform image2D dir_dist_img;
 GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
+ProbeOffset probe_offsets = ProbeOffset(scene_desc.probe_offsets_addr);
 
 vec3 grid_coord_to_position(ivec3 c) {
     return ddgi_ubo.probe_step * vec3(c) + ddgi_ubo.probe_start_position;
@@ -49,7 +52,8 @@ ivec3 probe_index_to_grid_coord(int index) {
 }
 
 vec3 probe_location(int index) {
-    return grid_coord_to_position(probe_index_to_grid_coord(index));
+    vec3 offset = probe_offsets.d[index].xyz;
+    return offset + grid_coord_to_position(probe_index_to_grid_coord(index));
 }
 
 vec3 spherical_fibonacci(float i, float n) {
@@ -66,7 +70,7 @@ void main() {
     int ray_id = int(gl_LaunchIDEXT.x);
     int probe_id = int(gl_LaunchIDEXT.y);
     vec3 o = probe_location(probe_id);
-    vec3 d = (mat3(pc_ray.probe_rotation) *
+    vec3 d = normalize(mat3(pc_ray.probe_rotation) *
               spherical_fibonacci(ray_id, ddgi_ubo.rays_per_probe));
     payload.dist = tmax;
     traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, o, tmin, d, tmax, 0);
@@ -76,10 +80,9 @@ void main() {
     if (!found_isect) {
         col += pc_ray.sky_col;
         dist = 1e10;
-    } else if(payload.hit_kind == gl_HitKindBackFacingTriangleEXT ) {
+    } else if (payload.hit_kind == gl_HitKindBackFacingTriangleEXT) {
         dist = -0.2 * payload.dist;
-        dist = 0.;
-    }else {
+    } else {
         dist = payload.dist;
         const Material hit_mat =
             load_material(payload.material_idx, payload.uv);
@@ -93,7 +96,7 @@ void main() {
             n_s = -n_s;
             side = false;
         }
-       
+
         if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
             const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
             col += uniform_sample_light(hit_mat, payload.pos, side, n_s, wo,

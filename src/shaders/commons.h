@@ -127,11 +127,13 @@ struct DDGIUniforms {
     float depth_sharpness;
     float normal_bias;
     float view_bias;
+    float backface_ratio;
     int irradiance_width;
     int irradiance_height;
     int depth_width;
     int depth_height;
-    vec3 pad;
+    float min_frontface_dist;
+    float pad;
 };
 
 struct Vertex {
@@ -513,7 +515,7 @@ struct SceneDesc {
     uint64_t probe_radiance_addr;
     uint64_t probe_dir_depth_addr;
     uint64_t direct_lighting_addr;
-
+    uint64_t probe_offsets_addr;
 };
 
 struct PostDesc {

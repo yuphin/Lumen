@@ -1,0 +1,2 @@
+#define DDGI_PROBE_ACTIVE 0.0
+#define DDGI_PROBE_INACTIVE 1.0

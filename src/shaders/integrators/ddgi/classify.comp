@@ -1,0 +1,56 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+
+#include "../../utils.glsl"
+#include "ddgi_commons.glsl"
+#define WG_SIZE 16
+layout(local_size_x = WG_SIZE, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 3) uniform _SceneUBO { SceneUBO ubo; };
+layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+
+layout(set = 1, binding = 0) uniform _DDGIUniforms { DDGIUniforms ddgi_ubo; };
+layout(set = 2, binding = 0) uniform sampler2D radiance_img;
+layout(set = 2, binding = 1) uniform sampler2D dir_dist_img;
+layout(push_constant) uniform _PushConstantRay { PushConstantRay pc; };
+layout(buffer_reference, scalar) buffer GBuffer { GBufferData d[]; };
+layout(buffer_reference, scalar) buffer ProbeOffset { vec4 d[]; };
+
+ProbeOffset probe_offsets = ProbeOffset(scene_desc.probe_offsets_addr);
+
+float pow2(float v) { return dot(v, v); }
+float pow2(vec3 v) { return dot(v, v); }
+
+// Invocation size x = probe_counts.x * probe_counts.y
+// Invocation size y = probe_counts.z
+void main() {
+    const int linear_probe_id = int(gl_GlobalInvocationID.x);
+    const int num_probes = ddgi_ubo.probe_counts.x * ddgi_ubo.probe_counts.y *
+                           ddgi_ubo.probe_counts.z;
+    if (linear_probe_id >= num_probes) {
+        return;
+    }
+    int backface_count = 0;
+    float lum_sum = 0;
+
+    for (int i = 0; i < ddgi_ubo.rays_per_probe; i++) {
+        ivec2 C = ivec2(i, linear_probe_id);
+        vec3 dir = texelFetch(dir_dist_img, C, 0).xyz;
+        float dist = texelFetch(dir_dist_img, C, 0).w;
+        lum_sum += luminance(texelFetch(radiance_img, C, 0).xyz);
+        if (dist < 0.0) {
+            backface_count++;
+        }
+    }
+    if (
+        backface_count / ddgi_ubo.rays_per_probe > ddgi_ubo.backface_ratio) {
+        
+        probe_offsets.d[linear_probe_id].w = DDGI_PROBE_INACTIVE;
+    }
+}

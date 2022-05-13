@@ -6,25 +6,24 @@ constexpr int DEPTH_SIDE_LENGTH = 16;
 
 void DDGI::init() {
 	Integrator::init();
-
+	int num_probes;
 	// DDGI Resources
 	{
-		glm::vec3 min_pos = lumen_scene->m_dimensions.min;
-		glm::vec3 max_pos = lumen_scene->m_dimensions.max;
-		probe_distance = 0.75f;
+		glm::vec3 min_pos = lumen_scene->m_dimensions.min - vec3(0.1);
+		glm::vec3 max_pos = lumen_scene->m_dimensions.max + vec3(0.1);
 		glm::vec3 diag = (max_pos - min_pos) * 1.1f;
 		probe_counts = glm::ivec3(diag / probe_distance);
 		probe_start_position = min_pos;
 		glm::vec3 bbox_div_probes = diag / glm::vec3(probe_counts);
 		max_distance = bbox_div_probes.length() * 1.5f;
 
-		const int irradiance_width = (IRRADIANCE_SIDE_LENGTH + 2) * probe_counts.x * probe_counts.y + 2;
-		const int irradiance_height = (IRRADIANCE_SIDE_LENGTH + 2) * probe_counts.z + 2;
-
-		const int depth_width = (DEPTH_SIDE_LENGTH + 2) * probe_counts.x * probe_counts.y + 2;
-		const int depth_height = (DEPTH_SIDE_LENGTH + 2) * probe_counts.z + 2;
+		const int irradiance_width = (IRRADIANCE_SIDE_LENGTH + 2) * probe_counts.x * probe_counts.y;
+		const int irradiance_height = (IRRADIANCE_SIDE_LENGTH + 2) * probe_counts.z;
+		const int depth_width = (DEPTH_SIDE_LENGTH + 2) * probe_counts.x * probe_counts.y;
+		const int depth_height = (DEPTH_SIDE_LENGTH + 2) * probe_counts.z;
 		TextureSettings settings;
 		// Irradiance and depth
+		num_probes = probe_counts.x * probe_counts.y * probe_counts.z;
 		for (int i = 0; i < 2; i++) {
 			settings.base_extent = { (uint32_t)irradiance_width , (uint32_t)irradiance_height, 1 };
 			settings.format = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -39,7 +38,6 @@ void DDGI::init() {
 
 		// RT
 		{
-			auto num_probes = probe_counts.x * probe_counts.y * probe_counts.z;
 			TextureSettings settings;
 			settings.base_extent = { (uint32_t)rays_per_probe, (uint32_t)num_probes, 1 };
 			settings.format = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -80,6 +78,14 @@ void DDGI::init() {
 		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		VK_SHARING_MODE_EXCLUSIVE, sizeof(DDGIUniforms));
 
+	probe_offsets_buffer.create(
+		&instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | 
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		VK_SHARING_MODE_EXCLUSIVE, 
+		sizeof(vec4) * num_probes);
+
 	SceneDesc desc;
 	desc.vertex_addr = vertex_buffer.get_device_address();
 	desc.index_addr = index_buffer.get_device_address();
@@ -88,6 +94,7 @@ void DDGI::init() {
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
 	desc.direct_lighting_addr = direct_lighting_buffer.get_device_address();
+	desc.probe_offsets_addr = probe_offsets_buffer.get_device_address();
 
 
 
@@ -102,13 +109,24 @@ void DDGI::init() {
 	// Samplers
 	{
 		VkSamplerCreateInfo sampler_ci = vk::sampler_create_info();
-		sampler_ci.minFilter = VK_FILTER_LINEAR;
+		sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 		sampler_ci.magFilter = VK_FILTER_LINEAR;
-		sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		sampler_ci.minFilter = VK_FILTER_LINEAR;
+		sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		sampler_ci.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+		sampler_ci.compareEnable = VK_FALSE;
+		sampler_ci.compareOp = VK_COMPARE_OP_ALWAYS;
+		sampler_ci.minLod = 0.f;
 		sampler_ci.maxLod = FLT_MAX;
 		vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr,
 				  &bilinear_sampler),
 				  "Could not create image sampler");
+		sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 		sampler_ci.minFilter = VK_FILTER_NEAREST;
 		sampler_ci.magFilter = VK_FILTER_NEAREST;
 		vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr,
@@ -244,6 +262,36 @@ void DDGI::render() {
 							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, image_barriers.size(), image_barriers.data());
 	
 	}
+	// Classify
+	{
+		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, classify_pipeline->handle);
+		std::array<VkDescriptorSet, 3> descriptor_sets = {
+			scene_desc_set,
+			ddgi_uniform.desc_set,
+			rt.read_desc_set
+		};
+		vkCmdPushConstants(cmd.handle, classify_pipeline->pipeline_layout,
+						   VK_SHADER_STAGE_COMPUTE_BIT,
+						   0, sizeof(PushConstantRay), &pc_ray);
+		// 13 WGs process 4 probes (wg = 32 threads)
+		auto wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 31) / 32;
+
+		vkCmdBindDescriptorSets(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
+								classify_pipeline->pipeline_layout, 0, descriptor_sets.size(),
+								descriptor_sets.data(), 0, nullptr);
+		vkCmdDispatch(cmd.handle, wg_x, 1, 1);
+
+		std::array<VkBufferMemoryBarrier, 1> barriers = {
+						buffer_barrier(probe_offsets_buffer.handle,
+								  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+								  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+
+		};
+		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(), barriers.data(), 0, 0);
+	}
+
 	// Update probes & borders
 	{
 		auto update_probe = [&](bool is_irr) {
@@ -336,7 +384,10 @@ void DDGI::render() {
 								 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
 								 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, image_barriers.size(), image_barriers.data());
 		}
+	
 	}
+
+
 	// Sample probes & output into texture
 	{
 		std::array<VkImageMemoryBarrier, 1> image_barriers = {
@@ -376,6 +427,41 @@ void DDGI::render() {
 							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, image_barriers.size(), image_barriers.data());
 	}
 
+	// Relocate
+	if (total_frame_idx < 5) {
+		{
+			vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, relocate_pipeline->handle);
+			std::array<VkDescriptorSet, 3> descriptor_sets = {
+				scene_desc_set,
+				ddgi_uniform.desc_set,
+				rt.read_desc_set
+			};
+			vkCmdPushConstants(cmd.handle, relocate_pipeline->pipeline_layout,
+							   VK_SHADER_STAGE_COMPUTE_BIT,
+							   0, sizeof(PushConstantRay), &pc_ray);
+			// 13 WGs process 4 probes (wg = 32 threads)
+			auto wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 31) / 32;
+
+			vkCmdBindDescriptorSets(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
+									relocate_pipeline->pipeline_layout, 0, descriptor_sets.size(),
+									descriptor_sets.data(), 0, nullptr);
+			vkCmdDispatch(cmd.handle, wg_x, 1, 1);
+
+			std::array<VkBufferMemoryBarrier, 1> barriers = {
+							buffer_barrier(probe_offsets_buffer.handle,
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+									  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
+
+			};
+			vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+								 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(), barriers.data(), 0, 0);
+		}
+	}
+
+
+
+
 	// Output
 	{
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE, out_pipeline->handle);
@@ -397,6 +483,7 @@ void DDGI::render() {
 	vkCmdFillBuffer(cmd.handle, g_buffer.handle, 0, g_buffer.size, 0);
 	cmd.submit();
 	frame_idx++;
+	total_frame_idx++;
 	first_frame = false;
 }
 
@@ -1046,7 +1133,9 @@ void DDGI::create_compute_pipelines() {
 	depth_update_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	irr_update_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	border_update_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	classify_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	sample_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
+	relocate_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	out_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 	std::vector<Shader> shaders = {
 		{"src/shaders/integrators/ddgi/update_depth.comp"},
@@ -1054,6 +1143,8 @@ void DDGI::create_compute_pipelines() {
 		{"src/shaders/integrators/ddgi/update_borders.comp"},
 		{"src/shaders/integrators/ddgi/sample.comp"},
 		{"src/shaders/integrators/ddgi/out.comp"},
+		{"src/shaders/integrators/ddgi/relocate.comp"},
+		{"src/shaders/integrators/ddgi/classify.comp"},
 	};
 	for (auto& shader : shaders) {
 		shader.compile();
@@ -1081,6 +1172,8 @@ void DDGI::create_compute_pipelines() {
 	settings.desc_set_layouts = layouts.data();
 	settings.desc_set_layout_cnt = layouts.size();
 	border_update_pipeline->create_compute_pipeline(settings);
+
+
 	layouts = {
 		scene_desc_set_layout,
 		output.write_desc_layout,
@@ -1099,6 +1192,18 @@ void DDGI::create_compute_pipelines() {
 	settings.desc_set_layouts = layouts.data();
 	settings.desc_set_layout_cnt = layouts.size();
 	out_pipeline->create_compute_pipeline(settings);
+
+	layouts = {
+	scene_desc_set_layout,
+	ddgi_uniform.desc_layout,
+	rt.read_desc_layout,
+	};
+	settings.shader = shaders[5];
+	settings.desc_set_layouts = layouts.data();
+	settings.desc_set_layout_cnt = layouts.size();
+	relocate_pipeline->create_compute_pipeline(settings);
+	settings.shader = shaders[6];
+	classify_pipeline->create_compute_pipeline(settings);
 }
 
 void DDGI::update_ddgi_uniforms() {
@@ -1115,6 +1220,8 @@ void DDGI::update_ddgi_uniforms() {
 	ddgi_ubo.irradiance_height = irr_texes[0].base_extent.height;
 	ddgi_ubo.depth_width = depth_texes[0].base_extent.width;
 	ddgi_ubo.depth_height = depth_texes[0].base_extent.height;
+	ddgi_ubo.backface_ratio = backface_ratio;
+	ddgi_ubo.min_frontface_dist = min_frontface_dist;
 
 	memcpy(ddgi_ubo_buffer.data, &ddgi_ubo, sizeof(ddgi_ubo));
 }

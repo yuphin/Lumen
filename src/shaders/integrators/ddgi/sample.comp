@@ -3,11 +3,12 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_GOOGLE_include_directive : enable
-
+#extension GL_EXT_debug_printf : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 
 #include "../../utils.glsl"
+#include "ddgi_commons.glsl"
 
 #define WG_SIZE 32
 layout(local_size_x = WG_SIZE, local_size_y = WG_SIZE, local_size_z = 1) in;
@@ -25,8 +26,10 @@ layout(set = 3, binding = 0) uniform _DDGIUniforms {
 
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc; };
 layout(buffer_reference, scalar) buffer GBuffer { GBufferData d[]; };
+layout(buffer_reference, scalar) buffer ProbeOffset { vec4 d[]; };
 
 GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
+ProbeOffset probe_offsets = ProbeOffset(scene_desc.probe_offsets_addr);
 
 ivec3 probe_coord_from_pos(vec3 p) {
     return clamp(ivec3((p - ddgi_uniforms.probe_start_position) /
@@ -42,7 +45,7 @@ int probe_coord_to_idx(ivec3 probe_coords) {
 }
 
 vec3 probe_coord_to_pos(ivec3 probe_coord) {
-    return ddgi_uniforms.probe_step * probe_coord +
+    return ddgi_uniforms.probe_step * vec3(probe_coord) +
            ddgi_uniforms.probe_start_position;
 }
 
@@ -58,48 +61,28 @@ vec2 texture_coord_from_direction_irr(vec3 dir, int probe_index,
                                       int full_texture_width,
                                       int full_texture_height) {
     vec2 normalized_oct_coord = oct_encode(normalize(dir));
-    vec2 normalized_oct_coord_zero_one =
-        (normalized_oct_coord + vec2(1.0f)) * 0.5f;
-
-    vec2 oct_coord_normalized_to_texture_dimensions =
-        (normalized_oct_coord_zero_one * IRR_PROBE_SIDE_LENGTH) /
-        vec2(full_texture_width, full_texture_height);
     int probes_per_row =
         ddgi_uniforms.probe_counts.x * ddgi_uniforms.probe_counts.y;
-
-    vec2 probe_top_left_position =
+    vec2 probe_top_left_coords =
         vec2((probe_index % probes_per_row) * IRR_PROBE_WITH_BORDER,
-             (probe_index / probes_per_row) * IRR_PROBE_WITH_BORDER) +
-        vec2(2.0f, 2.0f);
-
-    vec2 normalized_probe_top_left_position =
-        probe_top_left_position / vec2(full_texture_width, full_texture_height);
-    return normalized_probe_top_left_position +
-           oct_coord_normalized_to_texture_dimensions;
+             (probe_index / probes_per_row) * IRR_PROBE_WITH_BORDER);
+    return (probe_top_left_coords + 0.5 * IRR_PROBE_WITH_BORDER +
+            0.5 * IRR_PROBE_SIDE_LENGTH * normalized_oct_coord) /
+           vec2(full_texture_width, full_texture_height);
 }
 
 vec2 texture_coord_from_direction_depth(vec3 dir, int probe_index,
                                         int full_texture_width,
                                         int full_texture_height) {
     vec2 normalized_oct_coord = oct_encode(normalize(dir));
-    vec2 normalized_oct_coord_zero_one =
-        (normalized_oct_coord + vec2(1.0f)) * 0.5f;
-
-    vec2 oct_coord_normalized_to_texture_dimensions =
-        (normalized_oct_coord_zero_one * DEPTH_PROBE_SIDE_LENGTH) /
-        vec2(full_texture_width, full_texture_height);
     int probes_per_row =
         ddgi_uniforms.probe_counts.x * ddgi_uniforms.probe_counts.y;
-
-    vec2 probe_top_left_position =
+    vec2 probe_top_left_coords =
         vec2((probe_index % probes_per_row) * DEPTH_PROBE_WITH_BORDER,
-             (probe_index / probes_per_row) * DEPTH_PROBE_WITH_BORDER) +
-        vec2(2.0f, 2.0f);
-
-    vec2 normalized_probe_top_left_position =
-        probe_top_left_position / vec2(full_texture_width, full_texture_height);
-    return normalized_probe_top_left_position +
-           oct_coord_normalized_to_texture_dimensions;
+             (probe_index / probes_per_row) * DEPTH_PROBE_WITH_BORDER);
+    return (probe_top_left_coords + 0.5 * DEPTH_PROBE_WITH_BORDER +
+            0.5 * DEPTH_PROBE_SIDE_LENGTH * normalized_oct_coord) /
+           vec2(full_texture_width, full_texture_height);
 }
 
 vec3 sample_irradiance(vec3 p, vec3 n, vec3 wo) {
@@ -108,9 +91,9 @@ vec3 sample_irradiance(vec3 p, vec3 n, vec3 wo) {
     // const vec3 bias_vec = (n * 0.2 + wo * 0.8) *
     //                       (0.75 * ddgi_uniforms.probe_step) *
     //                       ddgi_uniforms.normal_bias;
-    // const vec3 bias_vec = (n + 3.0 * wo) * ddgi_uniforms.normal_bias;
-    const vec3 bias_vec =
-        n * ddgi_uniforms.normal_bias + wo * ddgi_uniforms.view_bias;
+    const vec3 bias_vec = (n + 3.0 * wo) * ddgi_uniforms.normal_bias;
+    // const vec3 bias_vec =
+    //     n * ddgi_uniforms.normal_bias + wo * ddgi_uniforms.view_bias;
     p = p + bias_vec;
     ivec3 probe_coord = probe_coord_from_pos(p);
     vec3 probe_pos = probe_coord_to_pos(probe_coord);
@@ -124,7 +107,13 @@ vec3 sample_irradiance(vec3 p, vec3 n, vec3 wo) {
         ivec3 offseted_probe_coord =
             clamp(probe_coord + offset, ivec3(0),
                   ddgi_uniforms.probe_counts - ivec3(1));
-        vec3 offseted_probe_pos = probe_coord_to_pos(offseted_probe_coord);
+        int offseted_idx = probe_coord_to_idx(offseted_probe_coord);
+        float probe_state = probe_offsets.d[offseted_idx].w;
+        if(probe_state == DDGI_PROBE_INACTIVE) {
+            continue;
+        }
+        vec3 offseted_probe_pos = probe_offsets.d[offseted_idx].xyz +
+                                  probe_coord_to_pos(offseted_probe_coord);
 
         vec3 offseted_probe_to_p = p - offseted_probe_pos;
         vec3 dir = normalize(offseted_probe_to_p);
@@ -137,7 +126,6 @@ vec3 sample_irradiance(vec3 p, vec3 n, vec3 wo) {
             sqr(max(0.0001, (dot(true_dir_to_offseted_probe, n) + 1.0) * 0.5)) +
             0.2;
         // Moment visibility
-        int offseted_idx = probe_coord_to_idx(offseted_probe_coord);
 
         vec2 tex_coord = texture_coord_from_direction_depth(
             dir, offseted_idx, ddgi_uniforms.depth_width,
@@ -146,11 +134,11 @@ vec3 sample_irradiance(vec3 p, vec3 n, vec3 wo) {
         vec2 temp = textureLod(depth_img, tex_coord, 0.0f).rg;
         float mean = temp.x;
         float variance = abs(sqr(temp.x) - temp.y);
-
         float chebyshev_weight =
             variance / (variance + sqr(max(dist_to_probe - mean, 0.0)));
 
         chebyshev_weight = max(pow3(chebyshev_weight), 0.0);
+
         weight *= (dist_to_probe <= mean) ? 1.0 : chebyshev_weight;
         weight = max(0.000001, weight);
         // Get irradiance
@@ -183,6 +171,9 @@ void main() {
         int(gl_GlobalInvocationID.x * pc.size_y + gl_GlobalInvocationID.y);
     vec3 p = gbuffer.d[linear_idx].pos;
     vec3 n = gbuffer.d[linear_idx].n_g;
+    if(dot(n,n) == 0) {
+        return;
+    }
     vec3 wo = normalize((ubo.inv_view * vec4(0, 0, 0, 1)).xyz - p);
     vec3 irradiance = sample_irradiance(p, n, wo);
     imageStore(irr_output_img, coords, vec4(irradiance, 1.0f));

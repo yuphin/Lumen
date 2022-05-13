@@ -1,4 +1,6 @@
 
+#include "ddgi_commons.glsl"
+
 layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
 
 layout(set = 1, binding = 0, rgba16f) uniform image2D output_irradiance;
@@ -11,6 +13,8 @@ layout(set = 3, binding = 0) uniform _DDGIUniforms { DDGIUniforms ddgi_ubo; };
 layout(set = 4, binding = 0) uniform sampler2D radiance_img;
 layout(set = 4, binding = 1) uniform sampler2D dir_dist_img;
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc; };
+layout(buffer_reference, scalar) buffer ProbeOffset { vec4 d[]; };
+ProbeOffset probe_offsets = ProbeOffset(scene_desc.probe_offsets_addr);
 
 #define CACHE_SIZE 32
 
@@ -38,8 +42,7 @@ vec2 normalized_oct_coord() {
     // Local oct texture coords
     ivec2 oct_texture_coord = ivec2(gl_LocalInvocationID.xy);
     vec2 oct_frag_coord = ivec2(oct_texture_coord.x, oct_texture_coord.y);
-    return (vec2(oct_frag_coord) + vec2(0.5f)) *
-               (2.0f / float(PROBE_SIDE_LENGTH)) -
+    return (vec2(oct_frag_coord + 0.5)) * (2.0f / float(PROBE_SIDE_LENGTH)) -
            vec2(1.0f, 1.0f);
 }
 
@@ -55,6 +58,12 @@ void main() {
     uint remaining_rays = ddgi_ubo.rays_per_probe;
     uint offset = 0;
     vec4 result = vec4(0);
+    int num_backfaces = 0;
+    float probe_state = probe_offsets.d[linear_probe_id].w;
+    if (probe_state == DDGI_PROBE_INACTIVE) {
+        return;
+    }
+
     while (remaining_rays > 0) {
         uint num_rays = min(CACHE_SIZE, remaining_rays);
 
@@ -63,6 +72,7 @@ void main() {
             // Texel coords: X -> local offset, Y : global offset
             ivec2 C =
                 ivec2(offset + uint(gl_LocalInvocationIndex), linear_probe_id);
+
             ray_direction_depth[gl_LocalInvocationIndex] =
                 texelFetch(dir_dist_img, C, 0);
 #if defined(IRRADIANCE_UPDATE)
@@ -76,11 +86,16 @@ void main() {
             const vec3 ray_dir = ray_direction_depth[i].xyz;
             float ray_dist = ray_direction_depth[i].w;
 #if defined(IRRADIANCE_UPDATE)
-            if(ray_dist < 0) {
+            if (ray_dist < 0) {
+                num_backfaces++;
+                if (num_backfaces / ddgi_ubo.rays_per_probe >
+                    ddgi_ubo.backface_ratio) {
+                    return;
+                }
                 continue;
             }
             const vec3 radiance = ray_radiance[i];
-  
+
 #endif
             // Get normalized per thread oct coords for the current probe
             vec3 texel_dir = oct_decode(normalized_oct_coord());
@@ -109,7 +124,7 @@ void main() {
     }
     // Inner texture coords mapping
     const ivec2 tex_coord = ivec2(gl_GlobalInvocationID.xy) +
-                            (ivec2(gl_WorkGroupID.xy) * ivec2(2)) + ivec2(2);
+                            (ivec2(gl_WorkGroupID.xy) * ivec2(2)) + ivec2(1);
     // Temporal Accumulation
     vec3 prev_result;
 #if defined(IRRADIANCE_UPDATE)
