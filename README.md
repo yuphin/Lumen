@@ -42,6 +42,8 @@
 ![4](/media/ReSTIR1spp.png?raw=true "ReSTIR")
 ##### ReSTIR GI 1 sample per pixel ([Video comparison](https://drive.google.com/file/d/1UV1FpyMhtcX8cUo4CFIXFXhWI8UWr121/view?usp=sharing))
 ![5](/media/ReSTIRGI1spp.PNG?raw=true "ReSTIR GI")
+##### Real Time Diffuse Global Illumination (DDGI)
+![6](/media/CornellDDGI.png?raw=true "DDGI")
 ## Building
 
 To build Lumen, start cloning the repository with
@@ -74,3 +76,4 @@ Lumen.exe <scene_file>
  - [ReSTIR GI: Path Resampling for Real-Time Path Tracing](https://research.nvidia.com/publication/2021-06_restir-gi-path-resampling-real-time-path-tracing)
  - [Robust Monte Carlo Methods for Light Transport Simulation](https://dl.acm.org/doi/10.5555/927297)
  - [Robust Light Transport Simulation via Metropolised Bidirectional Estimators](https://dl.acm.org/doi/10.1145/2980179.2982411)
+ - [Dynamic Diffuse Global Illumination with Ray-Traced Irradiance Fields](https://jcgt.org/published/0008/02/01/)
