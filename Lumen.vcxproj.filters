@@ -1,0 +1,554 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="src\LumenPCH.cpp" />
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\Framework\VulkanBase.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\Window.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\Utils.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\Texture.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\ThreadPool.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\Shader.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\SBTWrapper.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\Pipeline.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\MitsubaParser.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\LumenScene.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\LumenInstance.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\Logger.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\GltfScene.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\Event.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\CommandBuffer.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\Buffer.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\DDGI.cpp">
+      <Filter>RayTracer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\Path.cpp">
+      <Filter>RayTracer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\PSSMLT.cpp">
+      <Filter>RayTracer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\RayTracer.cpp">
+      <Filter>RayTracer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\ReSTIR.cpp">
+      <Filter>RayTracer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\ReSTIRGI.cpp">
+      <Filter>RayTracer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\SMLT.cpp">
+      <Filter>RayTracer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\SPPM.cpp">
+      <Filter>RayTracer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\VCM.cpp">
+      <Filter>RayTracer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\VCMMLT.cpp">
+      <Filter>RayTracer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\BDPT.cpp">
+      <Filter>RayTracer</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\imgui\imgui.cpp">
+      <Filter>Libs</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\imgui\imgui_demo.cpp">
+      <Filter>Libs</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\imgui\imgui_draw.cpp">
+      <Filter>Libs</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\imgui\imgui_impl_glfw.cpp">
+      <Filter>Libs</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\imgui\imgui_impl_vulkan.cpp">
+      <Filter>Libs</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\imgui\imgui_tables.cpp">
+      <Filter>Libs</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\imgui\imgui_widgets.cpp">
+      <Filter>Libs</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\extensions_vk.cpp">
+      <Filter>Libs</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\mitsuba_parser\tinyparser-mitsuba.cpp">
+      <Filter>Libs</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\tinyxml2\tinyxml2.cpp">
+      <Filter>Libs</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RayTracer\Integrator.cpp">
+      <Filter>RayTracer</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\LumenPCH.h" />
+    <ClInclude Include="src\Framework\VulkanBase.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\VulkanStructs.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\Window.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\Texture.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\ThreadPool.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\Shader.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\SBTWrapper.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\Pipeline.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\MitsubaParser.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\LumenScene.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\LumenInstance.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\Logger.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\GLTFModel.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\GltfScene.hpp">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\Event.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\CommandBuffer.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\Camera.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\Buffer.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\shaders\commons.h">
+      <Filter>RayTracer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\DDGI.h">
+      <Filter>RayTracer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\Path.h">
+      <Filter>RayTracer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\PSSMLT.h">
+      <Filter>RayTracer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\RayTracer.h">
+      <Filter>RayTracer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\ReSTIR.h">
+      <Filter>RayTracer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\ReSTIRGI.h">
+      <Filter>RayTracer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\SMLT.h">
+      <Filter>RayTracer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\SPPM.h">
+      <Filter>RayTracer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\VCM.h">
+      <Filter>RayTracer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\VCMMLT.h">
+      <Filter>RayTracer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\BDPT.h">
+      <Filter>RayTracer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\Utils.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\imgui\imconfig.h">
+      <Filter>Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\imgui\imgui.h">
+      <Filter>Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\imgui\imgui_impl_glfw.h">
+      <Filter>Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\imgui\imgui_impl_vulkan.h">
+      <Filter>Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\imgui\imgui_internal.h">
+      <Filter>Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\imgui\imstb_rectpack.h">
+      <Filter>Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\imgui\imstb_textedit.h">
+      <Filter>Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\imgui\imstb_truetype.h">
+      <Filter>Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\extensions_vk.hpp">
+      <Filter>Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RayTracer\Integrator.h">
+      <Filter>RayTracer</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\shaders\integrators\bdpt\bdpt.rgen">
+      <Filter>Shaders\BDPT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\bdpt_commons.glsl">
+      <Filter>Shaders\BDPT</Filter>
+    </None>
+    <None Include="src\shaders\bsdf_commons.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\commons.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\gltf_simple.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\gltf_simple.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\post.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\post.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\ray.rahit">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\ray.rchit">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\ray.rmiss">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\ray_shadow.rmiss">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\path\path.rgen">
+      <Filter>Shaders\Path</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcm_commons.glsl">
+      <Filter>Shaders\VCM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcm\vcm_eye.rgen">
+      <Filter>Shaders\VCM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcm\vcm_light.rgen">
+      <Filter>Shaders\VCM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcm\vcm_sample.rgen">
+      <Filter>Shaders\VCM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcm\vcm_spawn_light.rgen">
+      <Filter>Shaders\VCM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\mlt_commons.glsl">
+      <Filter>Shaders\MLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\mlt2_commons.glsl">
+      <Filter>Shaders\MLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\smlt\smlt_commons.glsl">
+      <Filter>Shaders\MLT\SMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\smlt\smlt_mutate_eye.rgen">
+      <Filter>Shaders\MLT\SMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\smlt\smlt_mutate_light.rgen">
+      <Filter>Shaders\MLT\SMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\smlt\smlt_preprocess_eye.rgen">
+      <Filter>Shaders\MLT\SMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\smlt\smlt_preprocess_light.rgen">
+      <Filter>Shaders\MLT\SMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\smlt\smlt_seed_eye.rgen">
+      <Filter>Shaders\MLT\SMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\smlt\smlt_seed_light.rgen">
+      <Filter>Shaders\MLT\SMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\composite.comp">
+      <Filter>Shaders\SPPM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\calc_bounds.comp">
+      <Filter>Shaders\SPPM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcmmlt\vcmmlt_commons.glsl">
+      <Filter>Shaders\MLT\VCMMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcmmlt\vcmmlt_eye.rgen">
+      <Filter>Shaders\MLT\VCMMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcmmlt\vcmmlt_mutate.rgen">
+      <Filter>Shaders\MLT\VCMMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcmmlt\vcmmlt_preprocess.rgen">
+      <Filter>Shaders\MLT\VCMMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcmmlt\vcmmlt_seed.rgen">
+      <Filter>Shaders\MLT\VCMMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\ddgi\ddgi_commons.glsl">
+      <Filter>Shaders\DDGI</Filter>
+    </None>
+    <None Include="src\shaders\integrators\ddgi\relocate.comp">
+      <Filter>Shaders\DDGI</Filter>
+    </None>
+    <None Include="src\shaders\integrators\ddgi\trace.rgen">
+      <Filter>Shaders\DDGI</Filter>
+    </None>
+    <None Include="src\shaders\integrators\ddgi\primary_rays.rgen">
+      <Filter>Shaders\DDGI</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\calc_cdf.comp">
+      <Filter>Shaders\MLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\composite.comp">
+      <Filter>Shaders\MLT\PSSMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcmmlt\composite.comp">
+      <Filter>Shaders\MLT\VCMMLT</Filter>
+    </None>
+    <None Include="src\shaders\rmse\output_rmse.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\max.comp">
+      <Filter>Shaders\SPPM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\min.comp">
+      <Filter>Shaders\SPPM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\restir\restir_commons.glsl">
+      <Filter>Shaders\ReSTIR</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\reduce_max.comp">
+      <Filter>Shaders\SPPM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\reduce_min.comp">
+      <Filter>Shaders\SPPM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcm\select_reservoirs.comp">
+      <Filter>Shaders\VCM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\restir\gi\restir.rgen">
+      <Filter>Shaders\ReSTIR GI</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\select_seeds.comp">
+      <Filter>Shaders\MLT\PSSMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcmmlt\select_seeds.comp">
+      <Filter>Shaders\MLT\VCMMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcmmlt\normalize.comp">
+      <Filter>Shaders\MLT\VCMMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\ddgi\out.comp">
+      <Filter>Shaders\DDGI</Filter>
+    </None>
+    <None Include="src\shaders\integrators\restir\spatial_pass.rgen">
+      <Filter>Shaders\ReSTIR</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_commons.glsl">
+      <Filter>Shaders\MLT\PSSMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_mutate.rgen">
+      <Filter>Shaders\MLT\PSSMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_preprocess.rgen">
+      <Filter>Shaders\MLT\PSSMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\pssmlt_seed.rgen">
+      <Filter>Shaders\MLT\PSSMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\restir\gi\output.comp">
+      <Filter>Shaders\ReSTIR GI</Filter>
+    </None>
+    <None Include="src\shaders\integrators\restir\output.rgen">
+      <Filter>Shaders\ReSTIR</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcmmlt\reduce_sum.comp">
+      <Filter>Shaders\MLT\VCMMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcm\check_reservoirs.comp">
+      <Filter>Shaders\VCM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\prefix_scan.comp">
+      <Filter>Shaders\MLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\restir\gi\spatial_reuse.rgen">
+      <Filter>Shaders\ReSTIR GI</Filter>
+    </None>
+    <None Include="src\shaders\integrators\restir\gi\temporal_reuse.rgen">
+      <Filter>Shaders\ReSTIR GI</Filter>
+    </None>
+    <None Include="src\shaders\integrators\restir\temporal_pass.rgen">
+      <Filter>Shaders\ReSTIR</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\sppm_eye.rgen">
+      <Filter>Shaders\SPPM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\sppm_light.rgen">
+      <Filter>Shaders\SPPM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcmmlt\sum.comp">
+      <Filter>Shaders\MLT\VCMMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pt_commons.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\pt_unidir.rgen">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="src\shaders\rmse\calc_rmse.comp">
+      <Filter>Shaders\RMSE</Filter>
+    </None>
+    <None Include="src\shaders\rmse\reduce_rmse.comp">
+      <Filter>Shaders\RMSE</Filter>
+    </None>
+    <None Include="src\shaders\integrators\ddgi\update_borders.comp">
+      <Filter>Shaders\DDGI</Filter>
+    </None>
+    <None Include="src\shaders\integrators\ddgi\update_depth.comp">
+      <Filter>Shaders\DDGI</Filter>
+    </None>
+    <None Include="src\shaders\integrators\ddgi\update_irradiance.comp">
+      <Filter>Shaders\DDGI</Filter>
+    </None>
+    <None Include="src\shaders\integrators\pssmlt\uniform_add.comp">
+      <Filter>Shaders\MLT\PSSMLT</Filter>
+    </None>
+    <None Include="src\shaders\integrators\ddgi\classify.comp">
+      <Filter>Shaders\DDGI</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcm\clear_samples.comp">
+      <Filter>Shaders\VCM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\sppm\gather.comp">
+      <Filter>Shaders\SPPM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcm\init_reservoirs.comp">
+      <Filter>Shaders\VCM</Filter>
+    </None>
+    <None Include="src\shaders\integrators\ddgi\sample.comp">
+      <Filter>Shaders\DDGI</Filter>
+    </None>
+    <None Include="src\shaders\integrators\ddgi\update.glsl">
+      <Filter>Shaders\DDGI</Filter>
+    </None>
+    <None Include="src\shaders\integrators\vcm\update_reservoirs.comp">
+      <Filter>Shaders\VCM</Filter>
+    </None>
+    <None Include="src\shaders\utils.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Framework">
+      <UniqueIdentifier>{9e66bfe1-fa16-441f-a748-b3c4f01423e0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RayTracer">
+      <UniqueIdentifier>{9d5571e4-8db8-40af-92ca-807ef0a31210}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{7678282a-6248-48d8-bb0d-4d6b292e12a8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Path">
+      <UniqueIdentifier>{5dcc2e10-6260-474c-8908-14d3b7e7d706}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\BDPT">
+      <UniqueIdentifier>{5cbedc90-a1d1-42ee-b0e1-26981aaf7dd3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\SPPM">
+      <UniqueIdentifier>{d5b9ba31-d495-4f92-8daf-7b05d54fdf01}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\VCM">
+      <UniqueIdentifier>{6f1603f4-266d-4fc0-b342-acd5b1312874}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\ReSTIR">
+      <UniqueIdentifier>{652f0011-3cc4-43a7-ae40-421d4f1cc65b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\ReSTIR GI">
+      <UniqueIdentifier>{e2bdd4ec-d225-4347-9a84-b765ddddc095}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\DDGI">
+      <UniqueIdentifier>{07198dce-b46f-41a9-8ad6-8771b3ff05d7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libs">
+      <UniqueIdentifier>{2ebabbb7-302f-4cb5-9b3b-e92fc4120b70}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\MLT">
+      <UniqueIdentifier>{1759968f-0b5b-4bfa-a82a-135195bedb17}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\MLT\PSSMLT">
+      <UniqueIdentifier>{1cb36a01-7cac-4058-8d27-4480f5c090a8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\MLT\SMLT">
+      <UniqueIdentifier>{90a17b22-c688-4711-935d-de2a14a90073}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\MLT\VCMMLT">
+      <UniqueIdentifier>{044ecab2-2774-4f22-be03-220e0f6c12c2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\RMSE">
+      <UniqueIdentifier>{4ded08bd-52d4-4776-83f3-84ac25c2144d}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

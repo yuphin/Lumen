@@ -6,5 +6,4 @@ cpp.hint
 scenes/Sponza
 *.spv
 *.vcxproj.user
-*.vcxproj.filters
 imgui.ini
