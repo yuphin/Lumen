@@ -14,6 +14,7 @@
  - Combined VCM + MLT Integrator (VCMMLT)
  - ReSTIR
  - ReSTIR GI
+ - DDGI (Real time)
 
 ### Engine
  - Lambertian, mirror, glass, glossy and optionally Disney BSDF
@@ -42,7 +43,7 @@
 ![4](/media/ReSTIR1spp.png?raw=true "ReSTIR")
 ##### ReSTIR GI 1 sample per pixel ([Video comparison](https://drive.google.com/file/d/1UV1FpyMhtcX8cUo4CFIXFXhWI8UWr121/view?usp=sharing))
 ![5](/media/ReSTIRGI1spp.PNG?raw=true "ReSTIR GI")
-##### Real Time Diffuse Global Illumination (DDGI)
+##### Dynamic Diffuse Global Illumination (DDGI)
 ![6](/media/CornellDDGI.png?raw=true "DDGI")
 ## Building
 
