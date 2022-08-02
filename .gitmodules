@@ -4,6 +4,3 @@
 [submodule "libs/gli"]
 	path = libs/gli
 	url = https://github.com/g-truc/gli.git
-[submodule "libs/glslang"]
-	path = libs/glslang
-	url = https://github.com/KhronosGroup/glslang
