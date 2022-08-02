@@ -25,6 +25,7 @@ void DDGI::init() {
 		// Irradiance and depth
 		num_probes = probe_counts.x * probe_counts.y * probe_counts.z;
 		for (int i = 0; i < 2; i++) {
+
 			settings.base_extent = { (uint32_t)irradiance_width , (uint32_t)irradiance_height, 1 };
 			settings.format = VK_FORMAT_R16G16B16A16_SFLOAT;
 			settings.usage_flags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -863,8 +864,8 @@ void DDGI::create_descriptors() {
 		// RT Read
 		{
 			std::vector<VkDescriptorImageInfo> read_infos = {
-								rt.radiance_tex.create_descriptor_info(nearest_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-								rt.dir_depth_tex.create_descriptor_info(nearest_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+								rt.radiance_tex.get_descriptor_info(nearest_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+								rt.dir_depth_tex.get_descriptor_info(nearest_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
 			};
 			std::vector<VkWriteDescriptorSet> writes = {
 					vk::write_descriptor_set(
@@ -882,10 +883,10 @@ void DDGI::create_descriptors() {
 		{
 			std::vector<VkWriteDescriptorSet> writes;
 			std::vector<VkDescriptorImageInfo> infos = {
-				irr_texes[0].create_descriptor_info(0, VK_IMAGE_LAYOUT_GENERAL),
-				depth_texes[0].create_descriptor_info(0, VK_IMAGE_LAYOUT_GENERAL),
-				irr_texes[1].create_descriptor_info(0, VK_IMAGE_LAYOUT_GENERAL),
-				depth_texes[1].create_descriptor_info(0, VK_IMAGE_LAYOUT_GENERAL)
+				irr_texes[0].get_descriptor_info(0, VK_IMAGE_LAYOUT_GENERAL),
+				depth_texes[0].get_descriptor_info(0, VK_IMAGE_LAYOUT_GENERAL),
+				irr_texes[1].get_descriptor_info(0, VK_IMAGE_LAYOUT_GENERAL),
+				depth_texes[1].get_descriptor_info(0, VK_IMAGE_LAYOUT_GENERAL)
 			};
 			for (int i = 0; i < 2; i++) {
 				writes.push_back(
@@ -907,10 +908,10 @@ void DDGI::create_descriptors() {
 		// Probe Reads
 		{
 			std::vector<VkDescriptorImageInfo> infos = {
-						irr_texes[0].create_descriptor_info(bilinear_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-						depth_texes[0].create_descriptor_info(bilinear_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-						irr_texes[1].create_descriptor_info(bilinear_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-						depth_texes[1].create_descriptor_info(bilinear_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+						irr_texes[0].get_descriptor_info(bilinear_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+						depth_texes[0].get_descriptor_info(bilinear_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+						irr_texes[1].get_descriptor_info(bilinear_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+						depth_texes[1].get_descriptor_info(bilinear_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 			};
 			std::vector<VkWriteDescriptorSet> writes;
 			for (int i = 0; i < 2; i++) {
@@ -932,11 +933,11 @@ void DDGI::create_descriptors() {
 
 	}
 	// Output
-	auto wdi = output.tex.create_descriptor_info(0, VK_IMAGE_LAYOUT_GENERAL);
+	auto wdi = output.tex.get_descriptor_info(0, VK_IMAGE_LAYOUT_GENERAL);
 	VkWriteDescriptorSet write_data_w = vk::write_descriptor_set(
 		output.write_desc_set, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
 		0, &wdi);
-	auto rdi = output.tex.create_descriptor_info(
+	auto rdi = output.tex.get_descriptor_info(
 		bilinear_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	VkWriteDescriptorSet write_data_r = vk::write_descriptor_set(
 		output.read_desc_set, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,

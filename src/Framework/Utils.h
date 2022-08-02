@@ -9,28 +9,28 @@ uint32_t find_memory_type(VkPhysicalDevice* physical_device,
 
 void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
 							 VkImageLayout old_layout, VkImageLayout new_layout,
-							 VkImageSubresourceRange subresource_range);
-
-// In case the user wants to specify source and destination stages
-
-void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
-							 VkImageLayout old_layout, VkImageLayout new_layout,
-							 VkPipelineStageFlags source_stage,
-							 VkPipelineStageFlags destination_stage,
-							 VkImageSubresourceRange subresource_range);
-
-inline void transition_image_layout(
-	VkCommandBuffer copy_cmd, VkImage image, VkImageLayout old_layout,
-	VkImageLayout new_layout,
-	VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT) {
-	VkImageSubresourceRange range;
-	range.aspectMask = aspect_mask;
-	range.levelCount = VK_REMAINING_MIP_LEVELS;
-	range.layerCount = VK_REMAINING_ARRAY_LAYERS;
-	range.baseMipLevel = 0;
-	range.baseArrayLayer = 0;
-	transition_image_layout(copy_cmd, image, old_layout, new_layout, range);
-}
+							 VkImageSubresourceRange subresource_range, VkImageAspectFlags aspect_flags);
+//
+//// In case the user wants to specify source and destination stages
+//
+//void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
+//							 VkImageLayout old_layout, VkImageLayout new_layout,
+//							 VkPipelineStageFlags source_stage,
+//							 VkPipelineStageFlags destination_stage,
+//							 VkImageSubresourceRange subresource_range);
+//
+//inline void transition_image_layout(
+//	VkCommandBuffer copy_cmd, VkImage image, VkImageLayout old_layout,
+//	VkImageLayout new_layout,
+//	VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT) {
+//	VkImageSubresourceRange range;
+//	range.aspectMask = aspect_mask;
+//	range.levelCount = VK_REMAINING_MIP_LEVELS;
+//	range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+//	range.baseMipLevel = 0;
+//	range.baseArrayLayer = 0;
+//	transition_image_layout(copy_cmd, image, old_layout, new_layout, range);
+//}
 
 VkImageView
 create_image_view(VkDevice device, const VkImage& img, VkFormat format,
@@ -77,6 +77,24 @@ inline VkBufferMemoryBarrier buffer_barrier(VkBuffer buffer,
 	return result;
 }
 
+inline VkBufferMemoryBarrier2 buffer_barrier2(VkBuffer buffer,
+											  VkAccessFlags src_access,
+											  VkAccessFlags dst_access,
+											  VkPipelineStageFlags src_stage,
+											  VkPipelineStageFlags dst_stage) {
+	VkBufferMemoryBarrier2 result = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+	result.srcAccessMask = src_access;
+	result.dstAccessMask = dst_access;
+	result.srcStageMask = src_stage;
+	result.dstStageMask = dst_stage;
+	result.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	result.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	result.buffer = buffer;
+	result.offset = 0;
+	result.size = VK_WHOLE_SIZE;
+	return result;
+}
+
 inline VkImageMemoryBarrier image_barrier(VkImage image,
 										  VkAccessFlags src_accesss,
 										  VkAccessFlags dst_access,
@@ -96,6 +114,59 @@ inline VkImageMemoryBarrier image_barrier(VkImage image,
 	result.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
 	result.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
+	return result;
+}
+
+inline VkImageMemoryBarrier2 image_barrier2(VkImage image,
+										   VkAccessFlags src_accesss,
+										   VkAccessFlags dst_access,
+										   VkImageLayout old_layout,
+										   VkImageLayout new_layout,
+										   VkImageAspectFlags aspect_mask,
+										   VkPipelineStageFlags src_stage,
+										   VkPipelineStageFlags dst_stage) {
+	VkImageMemoryBarrier2 result = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
+
+
+	result.srcAccessMask = src_accesss;
+	result.dstAccessMask = dst_access;
+	result.oldLayout = old_layout;
+	result.newLayout = new_layout;
+	result.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	result.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	result.image = image;
+	result.subresourceRange.aspectMask = aspect_mask;
+	result.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+	result.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+	result.srcStageMask = src_stage;
+	result.dstStageMask = dst_stage;
+	return result;
+}
+
+inline VkImageMemoryBarrier2 image_barrier2(VkImage image,
+											VkAccessFlags src_accesss,
+											VkAccessFlags dst_access,
+											VkImageLayout old_layout,
+											VkImageLayout new_layout,
+											VkImageAspectFlags aspect_mask,
+											VkPipelineStageFlags src_stage,
+											VkPipelineStageFlags dst_stage,
+											uint32_t queue_idx) {
+	VkImageMemoryBarrier2 result = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
+
+
+	result.srcAccessMask = src_accesss;
+	result.dstAccessMask = dst_access;
+	result.oldLayout = old_layout;
+	result.newLayout = new_layout;
+	result.srcQueueFamilyIndex = queue_idx;
+	result.dstQueueFamilyIndex = queue_idx;
+	result.image = image;
+	result.subresourceRange.aspectMask = aspect_mask;
+	result.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+	result.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+	result.srcStageMask = src_stage;
+	result.dstStageMask = dst_stage;
 	return result;
 }
 
@@ -120,5 +191,14 @@ void reduce(VkCommandBuffer cmdbuf, Buffer& residual_buffer, Buffer& counter_buf
 			Pipeline& op_pipeline, Pipeline& reduce_pipeline,
 			int dim);
 
+//void reduce(RenderGraph& rg, VkCommandBuffer cmdbuf,
+//			   Buffer& data_buffer,
+//			   Buffer& residual_buffer, Buffer& counter_buffer,
+//			   Pipeline& op_pipeline, Pipeline& reduce_pipeline,
+//			   int dim);
+
 void dispatch_compute(const Pipeline& pipeline, VkCommandBuffer cmdbuf,
 					  int wg_x, int wg_y, int width, int height);
+
+
+uint32_t get_bindings(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types);

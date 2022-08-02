@@ -17,6 +17,14 @@
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebugInfo|Win32">
+      <Configuration>RelWithDebugInfo</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebugInfo|x64">
+      <Configuration>RelWithDebugInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -50,6 +58,12 @@
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='RelWithDebugInfo|Win32'">
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='RelWithDebugInfo|x64'">
+    <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -108,7 +122,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)libs\glm;$(SolutionDir)libs\glfw\include;$(VULKAN_SDK)\Include;$(SolutionDir)libs\spdlog\include;$(SolutionDir)src;$(SolutionDir)libs\stb_image;$(SolutionDir)libs\gli;$(SolutionDir)libs\tinygltf;$(SolutionDir)libs\imgui;$(SolutionDir)libs\nvvk;$(SolutionDir)libs</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)libs\glm;$(SolutionDir)libs\glfw\include;$(VULKAN_SDK)\Include;$(SolutionDir)libs\spdlog\include;$(SolutionDir)src;$(SolutionDir)libs\stb_image;$(SolutionDir)libs\gli;$(SolutionDir)libs\tinygltf;$(SolutionDir)libs\imgui;$(SolutionDir)libs\nvvk;$(SolutionDir)libs;C:\VulkanSDK\1.3.216.0\Include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>LumenPCH.h</PrecompiledHeaderFile>
@@ -119,7 +133,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;spirv-cross-c-shared.lib;shaderc_shared.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)libs\glfw\src\Debug;$(VULKAN_SDK)\Lib</AdditionalLibraryDirectories>
       <AdditionalOptions>/NODEFAULTLIB:library  /ignore:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>
@@ -148,7 +162,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)libs\glm;$(SolutionDir)libs\glfw\include;$(VULKAN_SDK)\Include;$(SolutionDir)libs\spdlog\include;$(SolutionDir)src;$(SolutionDir)libs\stb_image;$(SolutionDir)libs\gli;$(SolutionDir)libs\tinygltf;$(SolutionDir)libs\imgui;$(SolutionDir)libs\nvvk;$(SolutionDir)libs</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)libs\glm;$(SolutionDir)libs\glfw\include;$(VULKAN_SDK)\Include;$(SolutionDir)libs\spdlog\include;$(SolutionDir)src;$(SolutionDir)libs\stb_image;$(SolutionDir)libs\gli;$(SolutionDir)libs\tinygltf;$(SolutionDir)libs\imgui;$(SolutionDir)libs\nvvk;$(SolutionDir)libs;C:\VulkanSDK\1.3.216.0\Include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -161,13 +175,26 @@
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;spirv-cross-c-shared.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;shaderc_shared.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)libs\glfw\src\Release;$(VULKAN_SDK)\Lib</AdditionalLibraryDirectories>
-      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\RayTracer\DDGI.cpp" />
+    <ClCompile Include="src\Framework\EventPool.cpp" />
+    <ClCompile Include="libs\glslc\file_includer.cc">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="libs\libshaderc_util\file_finder.cc">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="libs\libshaderc_util\io_shaderc.cc">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\Framework\RenderGraph.cpp" />
     <ClCompile Include="libs\extensions_vk.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -203,8 +230,6 @@
     <ClCompile Include="libs\mitsuba_parser\tinyparser-mitsuba.cpp" />
     <ClCompile Include="libs\tinyxml2\tinyxml2.cpp" />
     <ClCompile Include="src\Framework\MitsubaParser.cpp" />
-    <ClCompile Include="src\RayTracer\BDPT.cpp" />
-    <ClCompile Include="src\RayTracer\PSSMLT.cpp" />
     <ClCompile Include="src\RayTracer\RayTracer.cpp" />
     <ClCompile Include="src\RayTracer\Path.cpp" />
     <ClCompile Include="src\Framework\LumenScene.cpp" />
@@ -214,11 +239,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\RayTracer\Integrator.cpp" />
-    <ClCompile Include="src\RayTracer\ReSTIR.cpp" />
-    <ClCompile Include="src\RayTracer\ReSTIRGI.cpp" />
-    <ClCompile Include="src\RayTracer\SMLT.cpp" />
-    <ClCompile Include="src\RayTracer\SPPM.cpp" />
-    <ClCompile Include="src\RayTracer\VCM.cpp" />
     <ClCompile Include="src\Framework\LumenInstance.cpp" />
     <ClCompile Include="src\Framework\CommandBuffer.cpp" />
     <ClCompile Include="src\Framework\Logger.cpp" />
@@ -236,10 +256,10 @@
     <ClCompile Include="src\Framework\Window.cpp" />
     <ClCompile Include="src\Framework\ThreadPool.cpp" />
     <ClCompile Include="src\Framework\Texture.cpp" />
-    <ClCompile Include="src\RayTracer\VCMMLT.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\RayTracer\DDGI.h" />
+    <ClInclude Include="src\Framework\EventPool.h" />
+    <ClInclude Include="src\Framework\RenderGraph.h" />
     <ClInclude Include="libs\extensions_vk.hpp" />
     <ClInclude Include="libs\imgui\imconfig.h" />
     <ClInclude Include="libs\imgui\imgui.h" />
@@ -250,19 +270,12 @@
     <ClInclude Include="libs\imgui\imstb_textedit.h" />
     <ClInclude Include="libs\imgui\imstb_truetype.h" />
     <ClInclude Include="src\Framework\MitsubaParser.h" />
-    <ClInclude Include="src\RayTracer\BDPT.h" />
-    <ClInclude Include="src\RayTracer\PSSMLT.h" />
     <ClInclude Include="src\RayTracer\RayTracer.h" />
     <ClInclude Include="src\RayTracer\Path.h" />
     <ClInclude Include="src\Framework\LumenScene.h" />
     <ClInclude Include="src\Framework\SBTWrapper.h" />
     <ClInclude Include="src\Framework\GltfScene.hpp" />
     <ClInclude Include="src\RayTracer\Integrator.h" />
-    <ClInclude Include="src\RayTracer\ReSTIR.h" />
-    <ClInclude Include="src\RayTracer\ReSTIRGI.h" />
-    <ClInclude Include="src\RayTracer\SMLT.h" />
-    <ClInclude Include="src\RayTracer\SPPM.h" />
-    <ClInclude Include="src\RayTracer\VCM.h" />
     <ClInclude Include="src\Framework\LumenInstance.h" />
     <ClInclude Include="src\Framework\CommandBuffer.h" />
     <ClInclude Include="src\Framework\Camera.h" />
@@ -279,7 +292,6 @@
     <ClInclude Include="src\Framework\Window.h" />
     <ClInclude Include="src\Framework\ThreadPool.h" />
     <ClInclude Include="src\Framework\Texture.h" />
-    <ClInclude Include="src\RayTracer\VCMMLT.h" />
     <ClInclude Include="src\shaders\commons.h" />
   </ItemGroup>
   <ItemGroup>

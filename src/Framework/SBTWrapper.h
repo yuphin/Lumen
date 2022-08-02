@@ -1,4 +1,21 @@
-// Note: this wrapper is taken from NVPro Samples and adapted appropiately
+/*
+ * Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-FileCopyrightText: Copyright (c) 2014-2021 NVIDIA CORPORATION
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #include "LumenPCH.h"
 #include "Framework/Buffer.h"
 #pragma once
@@ -13,37 +30,26 @@ public:
 	};
 
 	void setup(VulkanContext* ctx,
-			   uint32_t familyIndex,
-			   const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rtProperties);
+			   uint32_t family_idx,
+			   const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rt_props);
 	void destroy();
-
-	// To call after the ray tracer pipeline creation
-	// The rayPipelineInfo parameter is the structure used to define the pipeline,
-	// while librariesInfo describe the potential input pipeline libraries
 	void create(VkPipeline rtPipeline,
-				VkRayTracingPipelineCreateInfoKHR rayPipelineInfo = {},
-				const std::vector<VkRayTracingPipelineCreateInfoKHR>& librariesInfo = {});
+				VkRayTracingPipelineCreateInfoKHR pipeline_info = {},
+				const std::vector<VkRayTracingPipelineCreateInfoKHR>& create_infos = {});
 
-	// Optional, to be used in combination with addIndex. Leave create() `rayPipelineInfo`
-	// and 'librariesInfo' empty.  The rayPipelineInfo parameter is the structure used to
-	// define the pipeline, while librariesInfo describe the potential input pipeline libraries
-	void add_indices(VkRayTracingPipelineCreateInfoKHR                     rayPipelineInfo,
-					 const std::vector<VkRayTracingPipelineCreateInfoKHR>& libraries = {});
+	void add_indices(VkRayTracingPipelineCreateInfoKHR pipeline_info,
+					 const std::vector<VkRayTracingPipelineCreateInfoKHR>& create_infos = {});
 
-	// Pushing back a GroupType and the handle pipeline index to use
-	// i.e addIndex(eHit, 3) is pushing a Hit shader group using the 3rd entry in the pipeline
 	void add_index(GroupType t, uint32_t index) { m_index[t].push_back(index); }
 
-	// Adding 'Shader Record' data to the group index.
-	// i.e. addData(eHit, 0, myValue) is adding 'myValue' to the HIT group 0.
 	template <typename T>
 	void add_data(GroupType t, uint32_t groupIndex, T& data) {
 		add_data(t, groupIndex, (uint8_t*)&data, sizeof(T));
 	}
 
-	void add_data(GroupType t, uint32_t groupIndex, uint8_t* data, size_t dataSize) {
-		std::vector<uint8_t> dst(data, data + dataSize);
-		m_data[t][groupIndex] = dst;
+	void add_data(GroupType t, uint32_t group_idx, uint8_t* data, size_t data_size) {
+		std::vector<uint8_t> dst(data, data + data_size);
+		m_data[t][group_idx] = dst;
 	}
 
 	// Getters
@@ -53,7 +59,6 @@ public:
 	VkDeviceAddress get_address(GroupType t);
 	const VkStridedDeviceAddressRegionKHR get_region(GroupType t);
 	const std::array<VkStridedDeviceAddressRegionKHR, 4> get_regions();
-
 
 	VulkanContext* m_ctx = nullptr;
 private:

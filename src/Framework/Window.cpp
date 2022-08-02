@@ -5,7 +5,7 @@ Window::Window(int width, int height, bool fullscreen)
 	: height(height), width(width) {
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 	window_handle = glfwCreateWindow(
 		width, height, "Lumen", fullscreen ? glfwGetPrimaryMonitor() : nullptr,
 		nullptr);

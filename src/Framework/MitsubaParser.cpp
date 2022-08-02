@@ -15,7 +15,7 @@ void MitsubaParser::parse(const std::string& path) {
 				integrator.type = obj->pluginType();
 				for (const auto& prop : obj->properties()) {
 					if (prop.first == "max_depth") {
-						integrator.depth = prop.second.getInteger();
+						integrator.depth = (int)prop.second.getInteger();
 					} 
 					if (prop.first == "enable_vm") {
 						integrator.enable_vm = prop.second.getBool();

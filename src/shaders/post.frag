@@ -32,8 +32,7 @@ float aces(float x) {
 }
 
 void main() {
-    vec2 uv = in_uv;
-    vec4 img = texture(input_img, uv).rgba;
+    vec4 img = texture(input_img, in_uv).rgba;
     if(pc.enable_tonemapping == 1) {
         img = vec4(aces(img.rgb), img.a);
     }

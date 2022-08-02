@@ -20,7 +20,7 @@ private:
 };
 
 #define LUMEN_TRACE(...) Logger::get_logger()->trace(__VA_ARGS__)
-#ifdef DEBUG
+#ifdef _DEBUG
 #define LUMEN_INFO(...) Logger::get_logger()->info(__VA_ARGS__)
 #else
 #define VEX_INFO(...)
@@ -32,6 +32,7 @@ private:
         throw std::runtime_error("Error: " + std::string(__VA_ARGS__));        \
     }
 #define LUMEN_CRITICAL(...) Logger::get_logger()->critical(__VA_ARGS__)
+#ifdef _DEBUG
 #define LUMEN_ASSERT(x, ...)                                                   \
     {                                                                          \
         if (!(x)) {                                                            \
@@ -46,6 +47,11 @@ private:
             return nullptr;                                                    \
         }                                                                      \
     }
+#else
+#define LUMEN_ASSERT(x, ...)
+#define LUMEN_ASSERT(x)
+#define LUMEN_ASSERT_PTR(x, ...)
+#endif
 #define LUMEN_EXIT(x, ...)                                                     \
     {                                                                          \
         LUMEN_ERROR(x);                                                        \

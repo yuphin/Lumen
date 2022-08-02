@@ -13,7 +13,7 @@ public:
 		: width(width), height(height), debug(debug), vkb(debug) {};
 	VulkanBase vkb;
 	VulkanContext& vk_ctx = vkb.ctx;
-	int width, height, debug;
+	uint32_t width, height, debug;
 	virtual void init(Window*) = 0;
 	virtual void update() = 0;
 	virtual void cleanup() = 0;

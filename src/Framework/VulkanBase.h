@@ -2,11 +2,8 @@
 #include "LumenPCH.h"
 #include "Buffer.h"
 #include "Framework/Event.h"
-
-struct AccelKHR {
-	VkAccelerationStructureKHR accel = VK_NULL_HANDLE;
-	Buffer buffer;
-};
+#include "Framework/RenderGraph.h"
+class RenderGraph;
 
 struct BuildAccelerationStructure {
 	VkAccelerationStructureBuildGeometryInfoKHR build_info{
@@ -17,6 +14,7 @@ struct BuildAccelerationStructure {
 	AccelKHR as; // result acceleration structure
 	AccelKHR cleanup_as;
 };
+const int MAX_FRAMES_IN_FLIGHT = 3;
 
 class RTAccels {
 	std::vector<AccelKHR> blases;
@@ -42,10 +40,8 @@ struct VulkanBase {
 	void create_sync_primitives();
 	void create_command_buffers();
 	void create_command_pool();
-	void create_framebuffers(VkRenderPass render_pass);
 	void cleanup_swapchain();
-	void recreate_swap_chain(const std::function<void(VulkanContext&)>&,
-							 VulkanContext&);
+	void recreate_swap_chain(VulkanContext&);
 	void add_device_extension(const char* name) {
 		device_extensions.push_back(name);
 	}
@@ -80,7 +76,6 @@ struct VulkanBase {
 									   const VkAllocationCallbacks* pAllocator);
 
 	SwapChainSupportDetails query_swapchain_support(VkPhysicalDevice device);
-	const int MAX_FRAMES_IN_FLIGHT = 2;
 
 	const std::vector<const char*> validation_layers_lst = {
 		"VK_LAYER_KHRONOS_validation" };
@@ -96,8 +91,11 @@ struct VulkanBase {
 	std::vector<VkFence> images_in_flight;
 	std::vector<VkQueueFamilyProperties> queue_families;
 	VulkanContext ctx;
+	std::unique_ptr<RenderGraph> rg;
+
 
 	std::vector<AccelKHR> blases;
+	std::vector<Texture2D> swapchain_images;
 	AccelKHR tlas;
 
 	bool enable_validation_layers;
@@ -126,5 +124,3 @@ private:
 		bool update                                 // Update == animation
 	);
 };
-
-void create_default_render_pass(VulkanContext&);

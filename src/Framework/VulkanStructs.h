@@ -17,6 +17,21 @@ struct QueueFamilyIndices {
 	}
 };
 
+struct DescriptorInfo {
+	union {
+		VkDescriptorImageInfo image;
+		VkDescriptorBufferInfo buffer;
+	};
+	DescriptorInfo() {}
+	DescriptorInfo(const VkDescriptorImageInfo& image) {
+		this->image = image;
+	}
+
+	DescriptorInfo(const VkDescriptorBufferInfo& buffer) {
+		this->buffer = buffer;
+	}
+};
+
 struct VulkanContext {
 	GLFWwindow* window_ptr = nullptr;
 	VkInstance instance;
@@ -31,12 +46,13 @@ struct VulkanContext {
 	VkPipelineLayout pipeline_layout;
 	VkPipeline gfx_pipeline;
 	// Swapchain related stuff
-	VkFormat swapchain_image_format;
+	//VkFormat swapchain_image_format;
 	VkExtent2D swapchain_extent;
 	VkSwapchainKHR swapchain;
-	std::vector<VkImage> swapchain_images;
-	std::vector<VkImageView> swapchain_image_views;
-	std::vector<VkFramebuffer> swapchain_framebuffers;
+	//std::vector<VkImage> swapchain_images;
+	//std::vector<VkImageView> swapchain_image_views;
+	//std::vector<VkFramebuffer> swapchain_framebuffers;
+	//std::vector<Texture2D> swapchain_images;
 	std::vector<VkCommandPool> cmd_pools;
 	std::vector<VkQueue> queues;
 	QueueFamilyIndices indices;
@@ -45,6 +61,10 @@ struct VulkanContext {
 	VkPhysicalDeviceProperties device_properties;
 	VkPhysicalDeviceProperties2 device_properties2;
 	VkPhysicalDeviceMemoryProperties memory_properties;
+
+	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props{
+	VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR
+	};
 
 	VkImage depth_img;
 	VkDeviceMemory depth_img_memory;
@@ -70,7 +90,7 @@ namespace vk {
 	};
 	inline void check(VkResult result, const char* msg = 0) {
 		if (result != VK_SUCCESS && msg) {
-				LUMEN_ERROR(msg);
+			LUMEN_ERROR(msg);
 		}
 	}
 
@@ -493,8 +513,8 @@ namespace vk {
 
 	inline VkPipelineInputAssemblyStateCreateInfo
 		pipeline_vertex_input_assembly_state_CI(
-			VkPrimitiveTopology topology, VkPipelineInputAssemblyStateCreateFlags flags,
-			VkBool32 primitiveRestartEnable) {
+		VkPrimitiveTopology topology, VkPipelineInputAssemblyStateCreateFlags flags,
+		VkBool32 primitiveRestartEnable) {
 		VkPipelineInputAssemblyStateCreateInfo
 			pipelineInputAssemblyStateCreateInfo{};
 		pipelineInputAssemblyStateCreateInfo.sType =
@@ -695,8 +715,11 @@ namespace vk {
 				return VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 			case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
 				return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			case VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL:
 			case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
 				return VK_ACCESS_SHADER_READ_BIT;
+			case VK_IMAGE_LAYOUT_GENERAL:
+				return VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
 			default:
 				return VkAccessFlags();
 		}
@@ -726,5 +749,53 @@ namespace vk {
 				return VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 		}
 	}
+
+	inline VkDependencyInfo dependency_info(int cnt,
+											const VkBufferMemoryBarrier2* p_buffer_memory_barriers) {
+
+		VkDependencyInfo res = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+		res.dependencyFlags = 0;
+		res.bufferMemoryBarrierCount = cnt;
+		res.pBufferMemoryBarriers = p_buffer_memory_barriers;
+		return res;
+	}
+
+	inline VkDependencyInfo dependency_info(int cnt,
+											const VkImageMemoryBarrier2* p_img_memory_barriers) {
+
+		VkDependencyInfo res = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+		res.dependencyFlags = 0;
+		res.imageMemoryBarrierCount = cnt;
+		res.pImageMemoryBarriers = p_img_memory_barriers;
+		return res;
+	}
+
+	inline VkRenderingAttachmentInfo rendering_attachment_info(VkImageView image_view, VkImageLayout image_layout,
+									 VkAttachmentLoadOp load_op, VkAttachmentStoreOp store_op,
+									 VkClearValue clear_value) {
+		VkRenderingAttachmentInfo res = {};
+		res.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		res.imageView = image_view;
+		res.imageLayout = image_layout;
+		res.loadOp = load_op;
+		res.storeOp = store_op;
+		res.clearValue = clear_value;
+
+		return res;
+	}
+
+	inline VkRenderingAttachmentInfo rendering_attachment_info(VkImageLayout image_layout,
+															   VkAttachmentLoadOp load_op, VkAttachmentStoreOp store_op,
+															   VkClearValue clear_value) {
+		VkRenderingAttachmentInfo res = {};
+		res.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		res.imageLayout = image_layout;
+		res.loadOp = load_op;
+		res.storeOp = store_op;
+		res.clearValue = clear_value;
+
+		return res;
+	}
+
 
 } // namespace vk

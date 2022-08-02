@@ -85,7 +85,7 @@ void LumenScene::load_scene(const std::string& path) {
 	};
 
 
-	auto found = path.find_last_of("/");
+	auto found = path.find_last_of('/');
 
 	auto root = path.substr(0, found + 1);
 
@@ -142,6 +142,8 @@ void LumenScene::load_scene(const std::string& path) {
 			config.integrator_type = IntegratorType::ReSTIRGI;
 		} else if (integrator["type"] == "ddgi") {
 			config.integrator_type = IntegratorType::DDGI;
+		} else if (integrator["type"] == "restirpt") {
+			config.integrator_type = IntegratorType::ReSTIRPT;
 		}
 
 		// Load obj file
@@ -183,19 +185,19 @@ void LumenScene::load_scene(const std::string& path) {
 					tinyobj::real_t vx = attrib.vertices[3 * uint32_t(idx.vertex_index) + 0];
 					tinyobj::real_t vy = attrib.vertices[3 * uint32_t(idx.vertex_index) + 1];
 					tinyobj::real_t vz = attrib.vertices[3 * uint32_t(idx.vertex_index) + 2];
-					positions.push_back({ vx,vy,vz });
+					positions.emplace_back(vx,vy,vz);
 					min_vtx = glm::min(positions[positions.size() - 1], min_vtx);
 					max_vtx = glm::max(positions[positions.size() - 1], max_vtx);
 					if (idx.normal_index >= 0) {
 						tinyobj::real_t nx = attrib.normals[3 * uint32_t(idx.normal_index) + 0];
 						tinyobj::real_t ny = attrib.normals[3 * uint32_t(idx.normal_index) + 1];
 						tinyobj::real_t nz = attrib.normals[3 * uint32_t(idx.normal_index) + 2];
-						normals.push_back({ nx,ny,nz });
+						normals.emplace_back(nx,ny,nz);
 					}
 					if (idx.texcoord_index >= 0) {
 						tinyobj::real_t tx = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 0];
 						tinyobj::real_t ty = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 1];
-						texcoords0.push_back({ tx,ty });
+						texcoords0.emplace_back(tx,ty);
 					}
 				}
 				index_offset += 3;
@@ -227,7 +229,7 @@ void LumenScene::load_scene(const std::string& path) {
 
 			if (!bsdf["texture"].is_null()) {
 				textures.push_back(root + (std::string)bsdf["texture"]);
-				materials[bsdf_idx].texture_id = textures.size() - 1;
+				materials[bsdf_idx].texture_id = (int)textures.size() - 1;
 			}
 			if (!bsdf["albedo"].is_null()) {
 				const auto& f = bsdf["albedo"];
@@ -391,19 +393,19 @@ void LumenScene::load_scene(const std::string& path) {
 					tinyobj::real_t vx = attrib.vertices[3 * uint32_t(idx.vertex_index) + 0];
 					tinyobj::real_t vy = attrib.vertices[3 * uint32_t(idx.vertex_index) + 1];
 					tinyobj::real_t vz = attrib.vertices[3 * uint32_t(idx.vertex_index) + 2];
-					positions.push_back({ vx,vy,vz });
+					positions.emplace_back(vx,vy,vz);
 					min_vtx = glm::min(positions[positions.size() - 1], min_vtx);
 					max_vtx = glm::max(positions[positions.size() - 1], max_vtx);
 					if (idx.normal_index >= 0) {
 						tinyobj::real_t nx = attrib.normals[3 * uint32_t(idx.normal_index) + 0];
 						tinyobj::real_t ny = attrib.normals[3 * uint32_t(idx.normal_index) + 1];
 						tinyobj::real_t nz = attrib.normals[3 * uint32_t(idx.normal_index) + 2];
-						normals.push_back({ nx,ny,nz });
+						normals.emplace_back(nx,ny,nz);
 					}
 					if (idx.texcoord_index >= 0) {
 						tinyobj::real_t tx = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 0];
 						tinyobj::real_t ty = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 1];
-						texcoords0.push_back({ tx,ty });
+						texcoords0.emplace_back(tx,ty);
 					}
 				}
 
@@ -437,7 +439,7 @@ void LumenScene::load_scene(const std::string& path) {
 		for (const auto& m_bsdf : mitsuba_parser.bsdfs) {
 			if (m_bsdf.texture != "") {
 				textures.push_back(root + m_bsdf.texture);
-				materials[i].texture_id = textures.size() - 1;
+				materials[i].texture_id = (int)textures.size() - 1;
 			} else {
 				materials[i].texture_id = -1;
 			}
@@ -485,7 +487,7 @@ void LumenScene::load_scene(const std::string& path) {
 				materials[i].bsdf_type = BSDF_GLOSSY;
 				materials[i].bsdf_props = BSDF_OPAQUE | BSDF_LAMBERTIAN | BSDF_REFLECTIVE;
 				materials[i].albedo = glm::pi<float>() * m_bsdf.albedo;
-				materials[i].metalness = vec3(0.1);
+				materials[i].metalness = vec3(0.1f);
 				materials[i].roughness = m_bsdf.roughness * m_bsdf.roughness;
 
 			}

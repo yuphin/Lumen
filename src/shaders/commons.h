@@ -361,6 +361,19 @@ struct Reservoir {
     ReservoirSample s;
 };
 
+struct ReSTIRPTReservoir {
+    float m;
+    float W;
+    vec3 L;
+    uint path_flags;
+    uvec4 init_seed;
+    // Reconnection vertex data
+    uvec4 rc_seed;
+    vec3 rc_pos;
+    vec3 rc_postfix_L;
+
+};
+
 struct GBufferData {
     vec3 pos;
     uint mat_idx;
@@ -388,6 +401,8 @@ struct RestirReservoir {
     float p_hat;
     float pdf;
 };
+
+
 
 struct VCMRestirData {
     uvec4 seed;
@@ -443,6 +458,8 @@ struct AvgStruct {
     float avg;
     uint prev;
 };
+
+
 
 // Scene buffer addresses
 struct SceneDesc {

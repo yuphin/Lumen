@@ -201,8 +201,11 @@ void SPPM::render() {
 						   VK_SHADER_STAGE_COMPUTE_BIT,
 						   0, sizeof(PushConstantRay), &pc_ray);
 		// @Performance: Maybe we can have multiple residual buffers?
+		//RenderGraph rg(cmd.handle);
 		reduce(cmd.handle, residual_buffer, counter_buffer, *max_pipeline, *max_reduce_pipeline,
 			   instance->width * instance->height);
+	/*	reduce(rg, cmd.handle, sppm_data_buffer, residual_buffer, counter_buffer,
+				  *max_pipeline, *max_reduce_pipeline, instance->width * instance->height);*/
 		auto barrier = buffer_barrier(atomic_data_buffer.handle,
 									  VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -229,8 +232,6 @@ void SPPM::render() {
 	}
 
 	// Trace from light
-	cmd.submit();
-	cmd.begin();
 	{
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
 						  sppm_light_pipeline->handle);
@@ -251,8 +252,6 @@ void SPPM::render() {
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 	}
-	cmd.submit();
-	cmd.begin();
 	// Gather
 	{
 
@@ -274,8 +273,6 @@ void SPPM::render() {
 		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0, 0);
 	}
-	cmd.submit();
-	cmd.begin();
 	// Composite
 	{
 		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,

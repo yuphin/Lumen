@@ -98,7 +98,9 @@ void main() {
     if (isnan(luminance(col))) {
         return;
     }
+
     if (pc_ray.frame_num > 0) {
+
         float w = 1. / float(pc_ray.frame_num + 1);
         vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
         // imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));

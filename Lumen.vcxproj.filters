@@ -51,37 +51,10 @@
     <ClCompile Include="src\Framework\Buffer.cpp">
       <Filter>Framework</Filter>
     </ClCompile>
-    <ClCompile Include="src\RayTracer\DDGI.cpp">
-      <Filter>RayTracer</Filter>
-    </ClCompile>
     <ClCompile Include="src\RayTracer\Path.cpp">
       <Filter>RayTracer</Filter>
     </ClCompile>
-    <ClCompile Include="src\RayTracer\PSSMLT.cpp">
-      <Filter>RayTracer</Filter>
-    </ClCompile>
     <ClCompile Include="src\RayTracer\RayTracer.cpp">
-      <Filter>RayTracer</Filter>
-    </ClCompile>
-    <ClCompile Include="src\RayTracer\ReSTIR.cpp">
-      <Filter>RayTracer</Filter>
-    </ClCompile>
-    <ClCompile Include="src\RayTracer\ReSTIRGI.cpp">
-      <Filter>RayTracer</Filter>
-    </ClCompile>
-    <ClCompile Include="src\RayTracer\SMLT.cpp">
-      <Filter>RayTracer</Filter>
-    </ClCompile>
-    <ClCompile Include="src\RayTracer\SPPM.cpp">
-      <Filter>RayTracer</Filter>
-    </ClCompile>
-    <ClCompile Include="src\RayTracer\VCM.cpp">
-      <Filter>RayTracer</Filter>
-    </ClCompile>
-    <ClCompile Include="src\RayTracer\VCMMLT.cpp">
-      <Filter>RayTracer</Filter>
-    </ClCompile>
-    <ClCompile Include="src\RayTracer\BDPT.cpp">
       <Filter>RayTracer</Filter>
     </ClCompile>
     <ClCompile Include="libs\imgui\imgui.cpp">
@@ -117,6 +90,19 @@
     <ClCompile Include="src\RayTracer\Integrator.cpp">
       <Filter>RayTracer</Filter>
     </ClCompile>
+    <ClCompile Include="src\Framework\RenderGraph.cpp">
+      <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\libshaderc_util\file_finder.cc">
+      <Filter>Libs</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\glslc\file_includer.cc">
+      <Filter>Libs</Filter>
+    </ClCompile>
+    <ClCompile Include="libs\libshaderc_util\io_shaderc.cc">
+      <Filter>Libs</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Framework\EventPool.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\LumenPCH.h" />
@@ -177,37 +163,10 @@
     <ClInclude Include="src\shaders\commons.h">
       <Filter>RayTracer</Filter>
     </ClInclude>
-    <ClInclude Include="src\RayTracer\DDGI.h">
-      <Filter>RayTracer</Filter>
-    </ClInclude>
     <ClInclude Include="src\RayTracer\Path.h">
       <Filter>RayTracer</Filter>
     </ClInclude>
-    <ClInclude Include="src\RayTracer\PSSMLT.h">
-      <Filter>RayTracer</Filter>
-    </ClInclude>
     <ClInclude Include="src\RayTracer\RayTracer.h">
-      <Filter>RayTracer</Filter>
-    </ClInclude>
-    <ClInclude Include="src\RayTracer\ReSTIR.h">
-      <Filter>RayTracer</Filter>
-    </ClInclude>
-    <ClInclude Include="src\RayTracer\ReSTIRGI.h">
-      <Filter>RayTracer</Filter>
-    </ClInclude>
-    <ClInclude Include="src\RayTracer\SMLT.h">
-      <Filter>RayTracer</Filter>
-    </ClInclude>
-    <ClInclude Include="src\RayTracer\SPPM.h">
-      <Filter>RayTracer</Filter>
-    </ClInclude>
-    <ClInclude Include="src\RayTracer\VCM.h">
-      <Filter>RayTracer</Filter>
-    </ClInclude>
-    <ClInclude Include="src\RayTracer\VCMMLT.h">
-      <Filter>RayTracer</Filter>
-    </ClInclude>
-    <ClInclude Include="src\RayTracer\BDPT.h">
       <Filter>RayTracer</Filter>
     </ClInclude>
     <ClInclude Include="src\Framework\Utils.h">
@@ -243,6 +202,10 @@
     <ClInclude Include="src\RayTracer\Integrator.h">
       <Filter>RayTracer</Filter>
     </ClInclude>
+    <ClInclude Include="src\Framework\RenderGraph.h">
+      <Filter>Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Framework\EventPool.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\integrators\bdpt\bdpt.rgen">

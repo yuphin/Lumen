@@ -5,15 +5,16 @@
 
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
-layout(set = 0, binding = 0) uniform accelerationStructureEXT tlas;
-layout(set = 0, binding = 1, rgba32f) uniform image2D image;
-layout(set = 0, binding = 2) readonly buffer InstanceInfo_ {
+layout(binding = 0, rgba32f) uniform image2D image;
+layout(binding = 1) readonly buffer InstanceInfo_ {
     PrimMeshInfo prim_info[];
 };
-layout(set = 0, binding = 3) uniform SceneUBOBuffer { SceneUBO ubo; };
-layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
-layout(set = 0, binding = 5) uniform sampler2D scene_textures[];
-layout(set = 0, binding = 6, scalar) readonly buffer Lights { Light lights[]; };
+layout(binding = 2) uniform SceneUBOBuffer { SceneUBO ubo; };
+layout(binding = 3) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(binding = 4) uniform sampler2D scene_textures[];
+layout(binding = 5, scalar) readonly buffer Lights { Light lights[]; };
+
+layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
 
 layout(buffer_reference, scalar) readonly buffer Vertices { vec3 v[]; };
 layout(buffer_reference, scalar) readonly buffer Indices { uint i[]; };

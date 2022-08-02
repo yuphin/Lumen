@@ -1,6 +1,5 @@
 #pragma once
 #include "LumenPCH.h"
-#include "Framework/VulkanBase.h"
 
 class CommandBuffer {
 public:

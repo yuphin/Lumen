@@ -60,7 +60,7 @@ void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
 		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
 			image_memory_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 			break;
-
+		case VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL:
 		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
 			image_memory_barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
 			break;
@@ -90,6 +90,7 @@ void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
 				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			break;
 
+		case VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL:
 		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
 			if (image_memory_barrier.srcAccessMask == 0) {
 				image_memory_barrier.srcAccessMask =
@@ -105,6 +106,103 @@ void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
 	// Put barrier inside setup command buffer
 	vkCmdPipelineBarrier(copy_cmd, source_stage, destination_stage, 0, 0,
 						 nullptr, 0, nullptr, 1, &image_memory_barrier);
+}
+
+void transition_image_layout(VkCommandBuffer cmd, VkImage image,
+							 VkImageLayout old_layout, VkImageLayout new_layout,
+							 VkImageSubresourceRange subresource_range, VkImageAspectFlags aspect_flags) {
+
+	VkAccessFlags src_access_flags = 0;
+	VkAccessFlags dst_access_flags = 0;
+	VkPipelineStageFlags source_stage = 0;
+	VkPipelineStageFlags destination_stage = 0;
+	// Old layout
+	switch (old_layout) {
+		case VK_IMAGE_LAYOUT_UNDEFINED:
+			source_stage = VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_PREINITIALIZED:
+			// Used for linear images
+			src_access_flags = VK_ACCESS_HOST_WRITE_BIT;
+			source_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			src_access_flags =
+				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			source_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			src_access_flags =
+				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			source_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			src_access_flags = VK_ACCESS_TRANSFER_READ_BIT;
+			source_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			src_access_flags = VK_ACCESS_TRANSFER_WRITE_BIT;
+			source_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL:
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			src_access_flags = VK_ACCESS_SHADER_READ_BIT;
+			source_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+			break;
+		default:
+			source_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+			break;
+	}
+	// New layout
+	switch (new_layout) {
+		case VK_IMAGE_LAYOUT_GENERAL:
+			dst_access_flags = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+			destination_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			dst_access_flags = VK_ACCESS_TRANSFER_WRITE_BIT;
+			destination_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			dst_access_flags = VK_ACCESS_TRANSFER_READ_BIT;
+			destination_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			dst_access_flags =
+				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			destination_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			break;
+
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			dst_access_flags |=
+				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			destination_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL:
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			if (src_access_flags == 0) {
+				src_access_flags =
+					VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+			}
+			dst_access_flags = VK_ACCESS_SHADER_READ_BIT;
+			destination_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+			break;
+		default:
+			destination_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+			break;
+	}
+
+	auto img_barrier = image_barrier2(image, src_access_flags, dst_access_flags, old_layout, new_layout, aspect_flags,
+									  source_stage, destination_stage);
+	auto dependency_info = vk::dependency_info(1, &img_barrier);
+	vkCmdPipelineBarrier2(cmd, &dependency_info);
+
 }
 
 VkImageView create_image_view(VkDevice device, const VkImage& img,
@@ -128,111 +226,8 @@ VkImageView create_image_view(VkDevice device, const VkImage& img,
 	return image_view;
 }
 
-void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
-							 VkImageLayout old_layout, VkImageLayout new_layout,
-							 VkImageSubresourceRange subresource_range) {
 
-	// Create an image barrier object
-	VkImageMemoryBarrier image_memory_barrier = vk::image_memory_barrier();
-	image_memory_barrier.oldLayout = old_layout;
-	image_memory_barrier.newLayout = new_layout;
-	image_memory_barrier.image = image;
-	image_memory_barrier.subresourceRange = subresource_range;
 
-	// Source layouts (old)
-	// Source access mask controls actions that have to be finished on the old
-	// layout before it will be transitioned to the new layout
-
-	VkPipelineStageFlags source_stage = 0;
-	VkPipelineStageFlags destination_stage = 0;
-	switch (old_layout) {
-		case VK_IMAGE_LAYOUT_UNDEFINED:
-			image_memory_barrier.srcAccessMask = 0;
-			source_stage = VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
-			break;
-
-		case VK_IMAGE_LAYOUT_PREINITIALIZED:
-			// Used for linear images
-			image_memory_barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
-			source_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			break;
-
-		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-			image_memory_barrier.srcAccessMask =
-				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-			source_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			break;
-
-		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-			image_memory_barrier.srcAccessMask =
-				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			source_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			break;
-
-		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
-			image_memory_barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-			source_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-
-			break;
-
-		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-			image_memory_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-			source_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			break;
-
-		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-			image_memory_barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			source_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			break;
-		default:
-			image_memory_barrier.srcAccessMask = VkAccessFlags();
-			source_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-			// Other source layouts aren't handled (yet)
-			break;
-	}
-
-	// Target layouts (new)
-	// Destination access mask controls the dependency for the new image layout
-	switch (new_layout) {
-		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-			image_memory_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-			destination_stage = VK_ACCESS_TRANSFER_WRITE_BIT;
-			break;
-
-		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
-			image_memory_barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-			destination_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			break;
-
-		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-			image_memory_barrier.dstAccessMask =
-				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-			destination_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-			image_memory_barrier.dstAccessMask |=
-				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			destination_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			break;
-
-		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-			if (image_memory_barrier.srcAccessMask == 0) {
-				image_memory_barrier.srcAccessMask =
-					VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-			}
-			image_memory_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			destination_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			break;
-		default:
-			image_memory_barrier.dstAccessMask = VkAccessFlags();
-			destination_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-			break;
-	}
-
-	// Put barrier inside setup command buffer
-	vkCmdPipelineBarrier(copy_cmd, source_stage, destination_stage, 0, 0,
-						 nullptr, 0, nullptr, 1, &image_memory_barrier);
-}
 
 BlasInput to_vk_geometry(GltfPrimMesh& prim, VkDeviceAddress vertexAddress,
 						 VkDeviceAddress indexAddress) {
@@ -433,6 +428,10 @@ void dispatch_compute(const Pipeline& pipeline, VkCommandBuffer cmdbuf,
 	vkCmdDispatch(cmdbuf, num_wg_x, num_wg_y, 1);
 }
 
+glm::ivec2 get_num_wgs(int width, int height, int wg_x_size, int wg_y_size) {
+	return glm::ivec2{ ceil(width / float(wg_x_size)), ceil(height / float(wg_y_size)) };
+}
+
 void reduce(VkCommandBuffer cmdbuf, Buffer& residual_buffer, Buffer& counter_buffer, Pipeline& op_pipeline,
 			Pipeline& reduce_pipeline, int dim) {
 	vkCmdFillBuffer(cmdbuf, residual_buffer.handle, 0, residual_buffer.size, 0);
@@ -456,11 +455,50 @@ void reduce(VkCommandBuffer cmdbuf, Buffer& residual_buffer, Buffer& counter_buf
 	std::vector<VkBufferMemoryBarrier> barriers{ res_barrier, counter_barrier };
 	while (num_wgs != 1) {
 		dispatch_compute(reduce_pipeline, cmdbuf, 1024, 1, dim, 1);
-
 		num_wgs = (int)ceil(num_wgs / 1024.0f);
 		if (num_wgs > 1) {
 			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 								 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 2, barriers.data(), 0, 0);
 		}
 	}
+}
+
+//void reduce(RenderGraph& rg, VkCommandBuffer cmdbuf,
+//			   Buffer& data_buffer, Buffer& residual_buffer,
+//			   Buffer& counter_buffer, Pipeline& op_pipeline,
+//			   Pipeline& reduce_pipeline, int dim) {
+//	auto num_wgs = get_num_wgs(dim, 1, 1024, 1);
+//	int num_wgs_reduce = (int)ceil(dim / 1024.0f);
+//	rg.begin_compute_pass(op_pipeline, "Op")
+//		.zero(residual_buffer)
+//		.read(data_buffer)
+//		.write(residual_buffer)
+//		.dispatch(num_wgs.x, num_wgs.y, 1);
+//	int pass_counter = 1;
+//	while (num_wgs_reduce != 1) {
+//		rg.begin_compute_pass(reduce_pipeline, "Reduce " + pass_counter)
+//			.read_write(residual_buffer)
+//			.write(counter_buffer)
+//			.dispatch(num_wgs.x, num_wgs.y, 1);
+//		num_wgs_reduce = (int)ceil(num_wgs_reduce / 1024.0f);
+//		pass_counter++;
+//	}
+//}
+
+uint32_t get_bindings(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types) {
+	uint32_t binding_mask = 0;
+	for (const auto& shader : shaders) {
+		for (uint32_t i = 0; i < 32; ++i) {
+			if (shader.binding_mask & (1 << i)) {
+				if (binding_mask & (1 << i)) {
+					LUMEN_ASSERT(descriptor_types[i] == shader.descriptor_types[i],
+								 "Binding mask mismatch on shader {}", shader.filename.c_str());
+				} else {
+					descriptor_types[i] = shader.descriptor_types[i];
+					binding_mask |= 1 << i;
+				}
+			}
+		}
+	}
+	return binding_mask;
 }

@@ -25,6 +25,7 @@ public:
 	Texture2D output_tex;
 	std::unique_ptr<Camera> camera = nullptr;
 	bool updated = false;
+	VkSampler texture_sampler;
 protected:
 	virtual void update_uniform_buffers();
 	SceneUBO scene_ubo{};
@@ -41,8 +42,7 @@ protected:
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
 	LumenInstance* instance;
 	std::vector<Light> lights;
-	VkSampler texture_sampler;
-	std::vector<Texture2D> textures;
+	std::vector<Texture2D> diffuse_textures;
 	uint32_t total_light_triangle_cnt = 0;
 	LumenScene* lumen_scene;
 private:
