@@ -230,6 +230,7 @@
     <ClCompile Include="libs\mitsuba_parser\tinyparser-mitsuba.cpp" />
     <ClCompile Include="libs\tinyxml2\tinyxml2.cpp" />
     <ClCompile Include="src\Framework\MitsubaParser.cpp" />
+    <ClCompile Include="src\RayTracer\BDPT.cpp" />
     <ClCompile Include="src\RayTracer\RayTracer.cpp" />
     <ClCompile Include="src\RayTracer\Path.cpp" />
     <ClCompile Include="src\Framework\LumenScene.cpp" />
@@ -270,6 +271,7 @@
     <ClInclude Include="libs\imgui\imstb_textedit.h" />
     <ClInclude Include="libs\imgui\imstb_truetype.h" />
     <ClInclude Include="src\Framework\MitsubaParser.h" />
+    <ClInclude Include="src\RayTracer\BDPT.h" />
     <ClInclude Include="src\RayTracer\RayTracer.h" />
     <ClInclude Include="src\RayTracer\Path.h" />
     <ClInclude Include="src\Framework\LumenScene.h" />

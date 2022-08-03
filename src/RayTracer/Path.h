@@ -11,10 +11,8 @@ public:
 	virtual void reload() override;
 private:
 	void create_offscreen_resources();
-	void create_descriptors();
 	void create_blas();
 	void create_tlas();
-	void create_rt_pipelines();
 	PushConstantRay pc_ray{};
 	VkDescriptorPool desc_pool;
 	VkDescriptorSetLayout desc_set_layout;

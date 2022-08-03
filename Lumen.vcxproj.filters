@@ -103,6 +103,7 @@
       <Filter>Libs</Filter>
     </ClCompile>
     <ClCompile Include="src\Framework\EventPool.cpp" />
+    <ClCompile Include="src\RayTracer\BDPT.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\LumenPCH.h" />
@@ -206,6 +207,7 @@
       <Filter>Framework</Filter>
     </ClInclude>
     <ClInclude Include="src\Framework\EventPool.h" />
+    <ClInclude Include="src\RayTracer\BDPT.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\integrators\bdpt\bdpt.rgen">

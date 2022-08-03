@@ -111,6 +111,7 @@ public:
 	RenderPass& write(Texture2D& tex);
 	RenderPass& push_constants(void* data, uint32_t size);
 	RenderPass& read_write(Buffer& buffer);
+	RenderPass& zero(Buffer& buffer);
 	void finalize();
 	friend RenderGraph;
 private:
@@ -146,6 +147,13 @@ private:
 
 	std::vector<std::pair<Texture2D*, VkImageLayout>> layout_transitions;
 
+	struct BufferBarrier {
+		VkBuffer buffer;
+		VkAccessFlags src_access_flags = VK_ACCESS_SHADER_WRITE_BIT;
+		VkAccessFlags dst_access_flags = VK_ACCESS_SHADER_READ_BIT;
+	};
+	std::vector<Buffer*> buffer_zeros;
+	std::vector<BufferBarrier> buffer_barriers;
 	
 
 	/*

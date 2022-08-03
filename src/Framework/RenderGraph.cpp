@@ -36,19 +36,24 @@ void RenderPass::register_dependencies(Buffer& buffer, VkAccessFlags dst_access_
 	RenderPass& opposing_pass = rg->passes[rg->buffer_resource_map[buffer.handle]];
 	// Invariant : Pass with lower index should be the setter
 	// Set current pass dependencies
-	if (wait_signals_buffer.find(buffer.handle) == wait_signals_buffer.end()) {
-		wait_signals_buffer[buffer.handle] = BufferSyncDescriptor{
-		   .dst_access_flags = dst_access_flags,
-		   .opposing_pass_idx = opposing_pass.pass_idx,
-		};
+	if (opposing_pass.pass_idx < pass_idx) {
+		if (wait_signals_buffer.find(buffer.handle) == wait_signals_buffer.end()) {
+			wait_signals_buffer[buffer.handle] = BufferSyncDescriptor{
+			   .dst_access_flags = dst_access_flags,
+			   .opposing_pass_idx = opposing_pass.pass_idx,
+			};
+		}
+		// Set source pass dependencies (Signalling pass)
+		if (opposing_pass.set_signals_buffer.find(buffer.handle) == opposing_pass.set_signals_buffer.end()) {
+			opposing_pass.set_signals_buffer[buffer.handle] = BufferSyncDescriptor{
+				.dst_access_flags = dst_access_flags,
+				.opposing_pass_idx = pass_idx
+			};
+		}
+	} else {
+		buffer_barriers.push_back({ buffer.handle, VK_ACCESS_SHADER_READ_BIT, dst_access_flags });
 	}
-	// Set source pass dependencies (Signalling pass)
-	if (opposing_pass.set_signals_buffer.find(buffer.handle) == opposing_pass.set_signals_buffer.end()) {
-		opposing_pass.set_signals_buffer[buffer.handle] = BufferSyncDescriptor{
-			.dst_access_flags = dst_access_flags,
-			.opposing_pass_idx = pass_idx
-		};
-	}
+
 }
 
 void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout) {
@@ -224,6 +229,12 @@ RenderPass& RenderPass::read_write(Buffer& buffer) {
 	return *this;
 }
 
+RenderPass& RenderPass::zero(Buffer& buffer) {
+	buffer_zeros.push_back(&buffer);
+	write(buffer);
+	return *this;
+}
+
 void RenderPass::finalize() {
 	if (!rg->dirty) {
 		return;
@@ -281,6 +292,24 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	for (auto& [tex, dst_layout] : layout_transitions) {
 		tex->transition_without_state(cmd, dst_layout);
 	}
+	// Zero out buffers and textures
+	for (Buffer* buffer : buffer_zeros) {
+		vkCmdFillBuffer(cmd, buffer->handle, 0, buffer->size, 0);
+	}
+
+	// Buffer barriers
+	std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
+	buffer_memory_barriers.reserve(buffer_barriers.size());
+	for (auto& barrier : buffer_barriers) {
+		auto curr_stage = get_pipeline_stage(type);
+		buffer_memory_barriers.push_back(buffer_barrier2(barrier.buffer, barrier.src_access_flags, 
+											barrier.dst_access_flags,
+											curr_stage,
+											curr_stage));
+	}
+	auto dependency_info = vk::dependency_info(buffer_memory_barriers.size(), buffer_memory_barriers.data());
+	vkCmdPipelineBarrier2(cmd, &dependency_info);
+
 
 	std::vector<VkEvent> wait_events;
 	wait_events.resize(wait_signals_buffer.size());
@@ -501,6 +530,8 @@ void RenderGraph::reset(VkCommandBuffer cmd) {
 		passes[i].set_signals_img.clear();
 		passes[i].wait_signals_img.clear();
 		passes[i].layout_transitions.clear();
+		passes[i].buffer_zeros.clear();
+		passes[i].buffer_barriers.clear();
 
 	}
 	buffer_sync_resources.clear();

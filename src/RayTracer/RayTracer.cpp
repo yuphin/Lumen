@@ -55,10 +55,10 @@ void RayTracer::init(Window* window) {
 		case IntegratorType::Path:
 			integrator = std::make_unique<Path>(this, &scene);
 			break;
-			/*	case IntegratorType::BDPT:
-					integrator = std::make_unique<BDPT>(this, &scene);
-					break;
-				case IntegratorType::SPPM:
+		case IntegratorType::BDPT:
+			integrator = std::make_unique<BDPT>(this, &scene);
+			break;
+			/*	case IntegratorType::SPPM:
 					integrator = std::make_unique<SPPM>(this, &scene);
 					break;
 				case IntegratorType::VCM:
