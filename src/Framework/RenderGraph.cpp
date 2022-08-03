@@ -57,9 +57,8 @@ void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout)
 	}
 	if (tex.layout == VK_IMAGE_LAYOUT_UNDEFINED ||
 		rg->img_resource_map.find(tex.img) == rg->img_resource_map.end()) {
-		CommandBuffer cmd(rg->ctx, true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-		tex.transition(cmd.handle, dst_layout);
-		cmd.submit();
+		layout_transitions.push_back({ &tex, dst_layout });
+		tex.layout = dst_layout;
 	} else {
 		RenderPass& opposing_pass = rg->passes[rg->img_resource_map[tex.img]];
 		VkAccessFlags dst_access_flags = vk::access_flags_for_img_layout(dst_layout);
@@ -84,9 +83,8 @@ void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout)
 			}
 			tex.layout = dst_layout;
 		} else {
-			CommandBuffer cmd(rg->ctx, true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-			tex.transition(cmd.handle, dst_layout);
-			cmd.submit();
+			layout_transitions.push_back({ &tex, dst_layout });
+			tex.layout = dst_layout;
 		}
 	}
 }
@@ -278,8 +276,13 @@ void RenderPass::finalize() {
 }
 
 void RenderPass::run(VkCommandBuffer cmd) {
-	std::vector<VkEvent> wait_events;
 
+	// Transition layouts inside the pass
+	for (auto& [tex, dst_layout] : layout_transitions) {
+		tex->transition_without_state(cmd, dst_layout);
+	}
+
+	std::vector<VkEvent> wait_events;
 	wait_events.resize(wait_signals_buffer.size());
 	// Wait: Buffer
 	auto& buffer_sync = rg->buffer_sync_resources[pass_idx];
@@ -448,7 +451,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 	// Set: Buffer
 	for (const auto& [k, v] : set_signals_buffer) {
-		assert(v.event == nullptr, "VkEvent should be null in the setter");
+		LUMEN_ASSERT(v.event == nullptr, "VkEvent should be null in the setter");
 		VkBufferMemoryBarrier2 mem_barrier = buffer_barrier2(k, v.src_access_flags, v.dst_access_flags,
 															 get_pipeline_stage(type),
 															 get_pipeline_stage(rg->passes[v.opposing_pass_idx].type));
@@ -459,7 +462,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 	// Set: Images
 	for (const auto& [k, v] : set_signals_img) {
-		assert(v.event == nullptr, "VkEvent should be null in the setter");
+		LUMEN_ASSERT(v.event == nullptr, "VkEvent should be null in the setter");
 		auto mem_barrier = image_barrier2(k,
 										  vk::access_flags_for_img_layout(v.old_layout),
 										  vk::access_flags_for_img_layout(v.new_layout),
@@ -497,6 +500,7 @@ void RenderGraph::reset(VkCommandBuffer cmd) {
 		passes[i].wait_signals_buffer.clear();
 		passes[i].set_signals_img.clear();
 		passes[i].wait_signals_img.clear();
+		passes[i].layout_transitions.clear();
 
 	}
 	buffer_sync_resources.clear();

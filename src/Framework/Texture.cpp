@@ -35,6 +35,12 @@ void Texture2D::transition(VkCommandBuffer cmd, VkImageLayout new_layout) {
 
 }
 
+void Texture2D::transition_without_state(VkCommandBuffer cmd, VkImageLayout new_layout) {
+	auto old_layout = layout;
+	transition(cmd, new_layout);
+	layout = old_layout;
+}
+
 VkDescriptorImageInfo Texture2D::descriptor(VkSampler sampler, VkImageLayout layout) const {
 	VkDescriptorImageInfo desc_info;
 	desc_info.sampler = sampler;

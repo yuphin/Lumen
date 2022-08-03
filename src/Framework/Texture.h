@@ -70,6 +70,7 @@ public:
 							 VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT);
 
 	void transition(VkCommandBuffer cmd, VkImageLayout new_layout);
+	void transition_without_state(VkCommandBuffer cmd, VkImageLayout new_layout);
 	VkDescriptorImageInfo descriptor(VkSampler sampler, VkImageLayout layout) const;
 	VkDescriptorImageInfo descriptor(VkImageLayout layout) const;
 	VkDescriptorImageInfo descriptor(VkSampler sampler) const;

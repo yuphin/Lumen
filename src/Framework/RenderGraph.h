@@ -114,6 +114,7 @@ public:
 	void finalize();
 	friend RenderGraph;
 private:
+
 	void run(VkCommandBuffer cmd);
 	void register_dependencies(Buffer& buffer, VkAccessFlags dst_access_flags);
 	void register_dependencies(Texture2D& tex, VkImageLayout target_layout);
@@ -142,6 +143,10 @@ private:
 
 	std::vector<ResourceBinding> bound_resources;
 	DescriptorInfo descriptor_infos[32] = {};
+
+	std::vector<std::pair<Texture2D*, VkImageLayout>> layout_transitions;
+
+	
 
 	/*
 		Potentially 1 descriptor pool for a pass where we have to keep the
