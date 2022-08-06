@@ -41,6 +41,7 @@ public:
 	bool sampler_allocated = false;
 	bool present = false;
 	VkImageAspectFlags aspect_flags;
+	std::string name;
 
 protected:
 	void create_image(const VkImageCreateInfo& info);
@@ -55,7 +56,7 @@ public:
 	//Texture2D(VulkanContext*, VkFormat, VkImageTiling, VkImageUsageFlags,
 	//		  uint32_t mip_levels, uint32_t array_layers, VkSampleCountFlagBits,
 	//		  VkImageType);
-	Texture2D(VulkanContext* ctx, VkImage image, VkFormat format, VkImageUsageFlags flags, 
+	Texture2D(const std::string& name, VulkanContext* ctx, VkImage image, VkFormat format, VkImageUsageFlags flags, 
 			  VkImageAspectFlags aspect_flags, bool present = true);
 	void load_from_img(const std::string& filename, VulkanContext* ctx,
 					   VkSampler, VkSamplerCreateInfo* = nullptr,
@@ -65,9 +66,15 @@ public:
 						const VkImageCreateInfo& info, VkSampler a_sampler,
 						bool generate_mipmaps = true);
 	void
-		create_empty_texture(VulkanContext* ctx, const TextureSettings& settings,
+		create_empty_texture(const char* name, VulkanContext* ctx, const TextureSettings& settings,
 							 VkImageLayout img_layout, VkSampler = 0,
 							 VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT);
+	inline void
+		create_empty_texture(VulkanContext* ctx, const TextureSettings& settings,
+							 VkImageLayout img_layout, VkSampler sampler = 0,
+							 VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT) {
+		return create_empty_texture("", ctx, settings, img_layout, sampler, flags);
+	}
 
 	void transition(VkCommandBuffer cmd, VkImageLayout new_layout);
 	void transition_without_state(VkCommandBuffer cmd, VkImageLayout new_layout);

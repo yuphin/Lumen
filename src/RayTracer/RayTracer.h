@@ -3,7 +3,7 @@
 #include "Framework/LumenInstance.h"
 #include "Path.h"
 #include "BDPT.h"
-//#include "SPPM.h"
+#include "SPPM.h"
 //#include "VCM.h"
 //#include "PSSMLT.h"
 //#include "SMLT.h"

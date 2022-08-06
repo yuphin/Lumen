@@ -2,7 +2,7 @@
 #include "Pipeline.h"
 #include "Utils.h"
 
-Pipeline::Pipeline(VulkanContext* ctx, size_t pass_idx) : ctx(ctx), pass_idx(pass_idx) {}
+Pipeline::Pipeline(VulkanContext* ctx, size_t pass_idx, const std::string& name) : ctx(ctx), pass_idx(pass_idx), name(name) {}
 
 void Pipeline::reload() {}
 
@@ -11,7 +11,6 @@ void Pipeline::refresh() {
 		sbt_wrapper.destroy();
 	}
 }
-
 
 void Pipeline::create_gfx_pipeline(const GraphicsPipelineSettings& settings, 
 								   const std::vector<uint32_t>& descriptor_counts,
@@ -159,6 +158,9 @@ void Pipeline::create_gfx_pipeline(const GraphicsPipelineSettings& settings,
 	for (auto& stage : stages) {
 		vkDestroyShaderModule(ctx->device, stage.module, nullptr);
 	}
+	if (!name.empty()) {
+		DebugMarker::set_resource_name(ctx->device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
+	}
 }
 
 void Pipeline::create_rt_pipeline(const RTPipelineSettings& settings, const std::vector<uint32_t>& descriptor_counts) {
@@ -246,6 +248,9 @@ void Pipeline::create_rt_pipeline(const RTPipelineSettings& settings, const std:
 								   nullptr, &handle);
 	sbt_wrapper.setup(ctx, ctx->indices.gfx_family.value(), ctx->rt_props);
 	sbt_wrapper.create(handle, pipeline_CI);
+	if (!name.empty()) {
+		DebugMarker::set_resource_name(ctx->device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
+	}
 }
 
 void Pipeline::create_compute_pipeline(const ComputePipelineSettings& settings, const std::vector<uint32_t>& descriptor_counts) {
@@ -287,6 +292,9 @@ void Pipeline::create_compute_pipeline(const ComputePipelineSettings& settings, 
 	pipeline_CI.layout = pipeline_layout;
 	vk::check(vkCreateComputePipelines(ctx->device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle));
 	vkDestroyShaderModule(ctx->device, compute_shader_module, nullptr);
+	if (!name.empty()) {
+		DebugMarker::set_resource_name(ctx->device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
+	}
 }
 
 const std::array<VkStridedDeviceAddressRegionKHR, 4> Pipeline::get_rt_regions() {
@@ -486,25 +494,4 @@ void Pipeline::create_update_template(const std::vector<Shader>& shaders, const 
 	template_create_info.pipelineBindPoint = get_bind_point();
 	template_create_info.pipelineLayout = pipeline_layout;
 	vk::check(vkCreateDescriptorUpdateTemplate(ctx->device, &template_create_info, nullptr, &update_template));
-	// TODO
-	//if (type == PipelineType::RT) {
-	//	//assert(tlas_offset != -1);
-	//	//// Create a separate RT update template for the acceleration structure
-	//	//VkDescriptorUpdateTemplateCreateInfo template_create_info = { VK_STRUCTURE_TYPE_DESCRIPTOR_UPDATE_TEMPLATE_CREATE_INFO };
-	//	//VkDescriptorUpdateTemplateEntry entry = {};
-	//	//entry.dstBinding = tlas_idx;
-	//	//entry.dstArrayElement = 0;
-	//	//entry.descriptorCount = 1;
-	//	//entry.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-	//	//entry.offset = tlas_offset;
-	//	//entry.stride = sizeof(VkWriteDescriptorSetAccelerationStructureKHR);
-	//	//template_create_info.descriptorUpdateEntryCount = 1;
-	//	//template_create_info.pDescriptorUpdateEntries = &entry;
-	//	//template_create_info.templateType = VK_DESCRIPTOR_UPDATE_TEMPLATE_TYPE_PUSH_DESCRIPTORS_KHR;
-	//	//template_create_info.descriptorSetLayout = nullptr;
-	//	//template_create_info.pipelineBindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
-	//	//template_create_info.pipelineLayout = pipeline_layout;
-	//	//vk::check(vkCreateDescriptorUpdateTemplate(ctx->device, &template_create_info, nullptr, &rt_update_template));
-	//}
-
 }

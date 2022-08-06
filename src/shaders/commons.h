@@ -241,7 +241,7 @@ struct SPPMData {
     int M;
     float N;
     float radius;
-    float path_len;
+    int path_len;
 };
 
 struct PhotonHash {

@@ -399,6 +399,9 @@ void VulkanBase::create_logical_device() {
 	{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR };
 	VkPhysicalDeviceSynchronization2FeaturesKHR syncronization2_features =
 	{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR };
+	VkPhysicalDeviceMaintenance4FeaturesKHR maintenance4_fts = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES_KHR
+	};
 
 
 
@@ -417,7 +420,9 @@ void VulkanBase::create_logical_device() {
 	//features12.pNext = &features13;
 	dynamic_rendering_feature.dynamicRendering = true;
 	syncronization2_features.synchronization2 = true;
-	features12.pNext = &syncronization2_features;
+	maintenance4_fts.maintenance4 = true;
+	features12.pNext = &maintenance4_fts;
+	maintenance4_fts.pNext = &syncronization2_features;
 	syncronization2_features.pNext = &dynamic_rendering_feature;
 	dynamic_rendering_feature.pNext = &rt_fts;
 	//features13.pNext = &rt_fts;
@@ -573,7 +578,9 @@ void VulkanBase::create_swapchain() {
 	vkGetSwapchainImagesKHR(ctx.device, ctx.swapchain, &image_cnt,
 							images);
 	for (uint32_t i = 0; i < image_cnt; i++) {
-		swapchain_images.emplace_back(&ctx, images[i], surface_format.format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 
+		swapchain_images.emplace_back("Swapchain Image #" + std::to_string(i),
+									  &ctx, images[i], 
+									  surface_format.format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 									  VK_IMAGE_ASPECT_COLOR_BIT, true);
 	}
 	ctx.swapchain_extent = extent;

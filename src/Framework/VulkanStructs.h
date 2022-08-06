@@ -760,7 +760,7 @@ namespace vk {
 		return res;
 	}
 
-	inline VkDependencyInfo dependency_info(int cnt,
+	inline VkDependencyInfo dependency_info(uint32_t cnt,
 											const VkImageMemoryBarrier2* p_img_memory_barriers) {
 
 		VkDependencyInfo res = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };

@@ -226,9 +226,6 @@ VkImageView create_image_view(VkDevice device, const VkImage& img,
 	return image_view;
 }
 
-
-
-
 BlasInput to_vk_geometry(GltfPrimMesh& prim, VkDeviceAddress vertexAddress,
 						 VkDeviceAddress indexAddress) {
 	uint32_t maxPrimitiveCount = prim.idx_count / 3;
@@ -432,59 +429,6 @@ glm::ivec2 get_num_wgs(int width, int height, int wg_x_size, int wg_y_size) {
 	return glm::ivec2{ ceil(width / float(wg_x_size)), ceil(height / float(wg_y_size)) };
 }
 
-void reduce(VkCommandBuffer cmdbuf, Buffer& residual_buffer, Buffer& counter_buffer, Pipeline& op_pipeline,
-			Pipeline& reduce_pipeline, int dim) {
-	vkCmdFillBuffer(cmdbuf, residual_buffer.handle, 0, residual_buffer.size, 0);
-	VkBufferMemoryBarrier fill_barrier =
-		buffer_barrier(residual_buffer.handle, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT);
-	vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT,
-						 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1, &fill_barrier, 0, 0);
-	VkBufferMemoryBarrier res_barrier = buffer_barrier(residual_buffer.handle, VK_ACCESS_SHADER_WRITE_BIT,
-													   VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT);
-	dispatch_compute(op_pipeline, cmdbuf, 1024, 1, dim, 1);
-	vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-						 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1, &res_barrier, 0, 0);
-	int num_wgs = (int)ceil(dim / 1024.0f);
-	vkCmdFillBuffer(cmdbuf, counter_buffer.handle, 0, counter_buffer.size, 1);
-	fill_barrier = buffer_barrier(counter_buffer.handle, VK_ACCESS_TRANSFER_WRITE_BIT,
-								  VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT);
-	VkBufferMemoryBarrier counter_barrier = buffer_barrier(counter_buffer.handle, VK_ACCESS_SHADER_WRITE_BIT,
-														   VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT);
-	vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT,
-						 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1, &fill_barrier, 0, 0);
-	std::vector<VkBufferMemoryBarrier> barriers{ res_barrier, counter_barrier };
-	while (num_wgs != 1) {
-		dispatch_compute(reduce_pipeline, cmdbuf, 1024, 1, dim, 1);
-		num_wgs = (int)ceil(num_wgs / 1024.0f);
-		if (num_wgs > 1) {
-			vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-								 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 2, barriers.data(), 0, 0);
-		}
-	}
-}
-
-//void reduce(RenderGraph& rg, VkCommandBuffer cmdbuf,
-//			   Buffer& data_buffer, Buffer& residual_buffer,
-//			   Buffer& counter_buffer, Pipeline& op_pipeline,
-//			   Pipeline& reduce_pipeline, int dim) {
-//	auto num_wgs = get_num_wgs(dim, 1, 1024, 1);
-//	int num_wgs_reduce = (int)ceil(dim / 1024.0f);
-//	rg.begin_compute_pass(op_pipeline, "Op")
-//		.zero(residual_buffer)
-//		.read(data_buffer)
-//		.write(residual_buffer)
-//		.dispatch(num_wgs.x, num_wgs.y, 1);
-//	int pass_counter = 1;
-//	while (num_wgs_reduce != 1) {
-//		rg.begin_compute_pass(reduce_pipeline, "Reduce " + pass_counter)
-//			.read_write(residual_buffer)
-//			.write(counter_buffer)
-//			.dispatch(num_wgs.x, num_wgs.y, 1);
-//		num_wgs_reduce = (int)ceil(num_wgs_reduce / 1024.0f);
-//		pass_counter++;
-//	}
-//}
-
 uint32_t get_bindings(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types) {
 	uint32_t binding_mask = 0;
 	for (const auto& shader : shaders) {
@@ -501,4 +445,11 @@ uint32_t get_bindings(const std::vector<Shader>& shaders, VkDescriptorType* desc
 		}
 	}
 	return binding_mask;
+}
+
+VkImageLayout get_target_img_layout(const Texture2D& tex, VkAccessFlags access_flags) {
+	if ((tex.usage_flags & VK_IMAGE_USAGE_SAMPLED_BIT) && access_flags == VK_ACCESS_SHADER_READ_BIT) {
+		return VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+	}
+	return VK_IMAGE_LAYOUT_GENERAL;
 }

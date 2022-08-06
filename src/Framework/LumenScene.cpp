@@ -185,19 +185,19 @@ void LumenScene::load_scene(const std::string& path) {
 					tinyobj::real_t vx = attrib.vertices[3 * uint32_t(idx.vertex_index) + 0];
 					tinyobj::real_t vy = attrib.vertices[3 * uint32_t(idx.vertex_index) + 1];
 					tinyobj::real_t vz = attrib.vertices[3 * uint32_t(idx.vertex_index) + 2];
-					positions.emplace_back(vx,vy,vz);
+					positions.emplace_back(vx, vy, vz);
 					min_vtx = glm::min(positions[positions.size() - 1], min_vtx);
 					max_vtx = glm::max(positions[positions.size() - 1], max_vtx);
 					if (idx.normal_index >= 0) {
 						tinyobj::real_t nx = attrib.normals[3 * uint32_t(idx.normal_index) + 0];
 						tinyobj::real_t ny = attrib.normals[3 * uint32_t(idx.normal_index) + 1];
 						tinyobj::real_t nz = attrib.normals[3 * uint32_t(idx.normal_index) + 2];
-						normals.emplace_back(nx,ny,nz);
+						normals.emplace_back(nx, ny, nz);
 					}
 					if (idx.texcoord_index >= 0) {
 						tinyobj::real_t tx = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 0];
 						tinyobj::real_t ty = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 1];
-						texcoords0.emplace_back(tx,ty);
+						texcoords0.emplace_back(tx, ty);
 					}
 				}
 				index_offset += 3;
@@ -393,19 +393,19 @@ void LumenScene::load_scene(const std::string& path) {
 					tinyobj::real_t vx = attrib.vertices[3 * uint32_t(idx.vertex_index) + 0];
 					tinyobj::real_t vy = attrib.vertices[3 * uint32_t(idx.vertex_index) + 1];
 					tinyobj::real_t vz = attrib.vertices[3 * uint32_t(idx.vertex_index) + 2];
-					positions.emplace_back(vx,vy,vz);
+					positions.emplace_back(vx, vy, vz);
 					min_vtx = glm::min(positions[positions.size() - 1], min_vtx);
 					max_vtx = glm::max(positions[positions.size() - 1], max_vtx);
 					if (idx.normal_index >= 0) {
 						tinyobj::real_t nx = attrib.normals[3 * uint32_t(idx.normal_index) + 0];
 						tinyobj::real_t ny = attrib.normals[3 * uint32_t(idx.normal_index) + 1];
 						tinyobj::real_t nz = attrib.normals[3 * uint32_t(idx.normal_index) + 2];
-						normals.emplace_back(nx,ny,nz);
+						normals.emplace_back(nx, ny, nz);
 					}
 					if (idx.texcoord_index >= 0) {
 						tinyobj::real_t tx = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 0];
 						tinyobj::real_t ty = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 1];
-						texcoords0.emplace_back(tx,ty);
+						texcoords0.emplace_back(tx, ty);
 					}
 				}
 
@@ -433,7 +433,7 @@ void LumenScene::load_scene(const std::string& path) {
 			m.specular = 0.5;
 			m.sheen = 0;
 #endif
-	};
+		};
 		i = 0;
 		materials.resize(mitsuba_parser.bsdfs.size());
 		for (const auto& m_bsdf : mitsuba_parser.bsdfs) {
@@ -493,7 +493,7 @@ void LumenScene::load_scene(const std::string& path) {
 			}
 #endif
 			i++;
-			}
+		}
 		compute_scene_dimensions();
 		// Light
 		i = 0;
@@ -509,9 +509,7 @@ void LumenScene::load_scene(const std::string& path) {
 			}
 			i++;
 		}
-		}
-
-
+	}
 }
 
 

@@ -3,9 +3,10 @@
 #include "CommandBuffer.h"
 #include "Utils.h"
 
-void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage,
+void Buffer::create(const char* name, VulkanContext* ctx, VkBufferUsageFlags usage,
 					VkMemoryPropertyFlags mem_property_flags,
-					VkSharingMode sharing_mode, VkDeviceSize size, void* data,
+					VkSharingMode sharing_mode, VkDeviceSize size,
+					void* data,
 					bool use_staging) {
 	if (!this->ctx) {
 		this->ctx = ctx;
@@ -84,6 +85,10 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage,
 		// Initialize a default descriptor that covers the whole buffer size
 		this->prepare_descriptor();
 		this->bind();
+	}
+	if (name) {
+		DebugMarker::set_resource_name(ctx->device, (uint64_t)handle, name, VK_OBJECT_TYPE_BUFFER);
+		this->name = name;
 	}
 }
 void Buffer::flush(VkDeviceSize size, VkDeviceSize offset) {

@@ -104,6 +104,7 @@
     </ClCompile>
     <ClCompile Include="src\Framework\EventPool.cpp" />
     <ClCompile Include="src\RayTracer\BDPT.cpp" />
+    <ClCompile Include="src\RayTracer\SPPM.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\LumenPCH.h" />
@@ -208,6 +209,8 @@
     </ClInclude>
     <ClInclude Include="src\Framework\EventPool.h" />
     <ClInclude Include="src\RayTracer\BDPT.h" />
+    <ClInclude Include="src\RayTracer\SPPM.h" />
+    <ClInclude Include="src\Framework\DebugMarker.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\integrators\bdpt\bdpt.rgen">

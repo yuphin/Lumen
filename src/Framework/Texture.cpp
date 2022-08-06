@@ -7,7 +7,7 @@
 
 Texture2D::Texture2D(VulkanContext* ctx) : Texture(ctx) {}
 
-Texture2D::Texture2D(VulkanContext* ctx, VkImage image, VkFormat format, VkImageUsageFlags usage_flags, 
+Texture2D::Texture2D(const std::string& name, VulkanContext* ctx, VkImage image, VkFormat format, VkImageUsageFlags usage_flags, 
 					 VkImageAspectFlags aspect_flags, bool present) : Texture(ctx) {
 	img = image;
 	img_view = create_image_view(ctx->device, img, format);
@@ -15,6 +15,10 @@ Texture2D::Texture2D(VulkanContext* ctx, VkImage image, VkFormat format, VkImage
 	this->format = format;
 	this->aspect_flags = aspect_flags;
 	this->usage_flags = usage_flags;
+	if (!name.empty()) {
+		this->name = name;
+		DebugMarker::set_resource_name(ctx->device, (uint64_t)img, name.c_str(), VK_OBJECT_TYPE_IMAGE);
+	}
 }
 
 
@@ -137,7 +141,7 @@ void Texture2D::load_from_data(VulkanContext* ctx, void* data,
 }
 
 void Texture2D::create_empty_texture(
-	VulkanContext* ctx, const TextureSettings& settings,
+	const char* name, VulkanContext* ctx, const TextureSettings& settings,
 	VkImageLayout img_layout, VkSampler sampler /* 0*/,
 	VkImageAspectFlags flags /*=VK_IMAGE_ASPECT_COLOR_BIT*/) {
 	this->ctx = ctx;
@@ -180,13 +184,18 @@ void Texture2D::create_empty_texture(
 	}
 	
 	layout = VK_IMAGE_LAYOUT_UNDEFINED;
-	aspect_flags = flags;
-	usage_flags = settings.usage_flags;
-	present = settings.present;
-	CommandBuffer cmd(ctx, true);
-	transition(cmd.handle, img_layout);
-	cmd.submit();
-
+	if (img_layout != VK_IMAGE_LAYOUT_UNDEFINED) {
+		aspect_flags = flags;
+		usage_flags = settings.usage_flags;
+		present = settings.present;
+		CommandBuffer cmd(ctx, true);
+		transition(cmd.handle, img_layout);
+		cmd.submit();
+	}
+	if (name) {
+		DebugMarker::set_resource_name(ctx->device, (uint64_t)img, name, VK_OBJECT_TYPE_IMAGE);
+		this->name = name;
+	}
 }
 
 Texture::Texture(VulkanContext* ctx) : ctx(ctx) {}

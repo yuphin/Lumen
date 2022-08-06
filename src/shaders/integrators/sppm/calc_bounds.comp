@@ -10,13 +10,9 @@
 #include "../../commons.h"
 #include "../../utils.glsl"
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
-layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
-layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
+layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
-layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
-SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
 AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
-uint size = pc_ray.size_x * pc_ray.size_y;
 void main() {
     const float max_radius = atomic_data.d.max_radius;
     vec3 data = atomic_data.d.max_bnds - atomic_data.d.min_bnds;

@@ -257,8 +257,10 @@
     <ClCompile Include="src\Framework\Window.cpp" />
     <ClCompile Include="src\Framework\ThreadPool.cpp" />
     <ClCompile Include="src\Framework\Texture.cpp" />
+    <ClCompile Include="src\RayTracer\SPPM.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Framework\DebugMarker.h" />
     <ClInclude Include="src\Framework\EventPool.h" />
     <ClInclude Include="src\Framework\RenderGraph.h" />
     <ClInclude Include="libs\extensions_vk.hpp" />
@@ -294,6 +296,7 @@
     <ClInclude Include="src\Framework\Window.h" />
     <ClInclude Include="src\Framework\ThreadPool.h" />
     <ClInclude Include="src\Framework\Texture.h" />
+    <ClInclude Include="src\RayTracer\SPPM.h" />
     <ClInclude Include="src\shaders\commons.h" />
   </ItemGroup>
   <ItemGroup>

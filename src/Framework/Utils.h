@@ -187,18 +187,56 @@ VkImageCreateInfo make_img2d_ci(
 	const VkExtent2D& size, VkFormat format = VK_FORMAT_R8G8B8A8_UNORM,
 	VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT, bool mipmaps = false);
 
-void reduce(VkCommandBuffer cmdbuf, Buffer& residual_buffer, Buffer& counter_buffer,
-			Pipeline& op_pipeline, Pipeline& reduce_pipeline,
-			int dim);
-
-//void reduce(RenderGraph& rg, VkCommandBuffer cmdbuf,
-//			   Buffer& data_buffer,
-//			   Buffer& residual_buffer, Buffer& counter_buffer,
-//			   Pipeline& op_pipeline, Pipeline& reduce_pipeline,
-//			   int dim);
-
 void dispatch_compute(const Pipeline& pipeline, VkCommandBuffer cmdbuf,
 					  int wg_x, int wg_y, int width, int height);
 
 
 uint32_t get_bindings(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types);
+
+VkImageLayout get_target_img_layout(const Texture2D& tex, VkAccessFlags access_flags);
+
+
+namespace DebugMarker {
+	inline void set_resource_name(VkDevice device, uint64_t obj,
+								  const char* name, VkObjectType type) {
+		VkDebugUtilsObjectNameInfoEXT debug_utils_name{
+			VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+			nullptr, type, obj, name
+		};
+		vkSetDebugUtilsObjectNameEXT(device, &debug_utils_name);
+	}
+	inline void begin_region(VkDevice device, VkCommandBuffer cmd, const char* name, glm::vec4 color) {
+		auto pfnCmdDebugMarkerBegin =
+			reinterpret_cast<PFN_vkCmdDebugMarkerBeginEXT>
+			(vkGetDeviceProcAddr(device, "vkCmdDebugMarkerBeginEXT"));
+		if (pfnCmdDebugMarkerBegin) {
+			VkDebugMarkerMarkerInfoEXT info = {};
+			info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
+			memcpy(info.color, &color[0], sizeof(float) * 4);
+			info.pMarkerName = name;
+			pfnCmdDebugMarkerBegin(cmd, &info);
+		}
+	}
+
+	inline void end_region(VkDevice device, VkCommandBuffer cmd) {
+		auto pfnCmdDebugMarkerEnd =
+			reinterpret_cast<PFN_vkCmdDebugMarkerEndEXT>
+			(vkGetDeviceProcAddr(device, "vkCmdDebugMarkerEndEXT"));
+		if (pfnCmdDebugMarkerEnd) {
+			pfnCmdDebugMarkerEnd(cmd);
+		}
+	}
+	inline void insert(VkDevice device, VkCommandBuffer cmd, const char* name, glm::vec4 color) {
+		auto pfnCmdDebugMarkerInsert =
+			reinterpret_cast<PFN_vkCmdDebugMarkerInsertEXT>
+			(vkGetDeviceProcAddr(device, "vkCmdDebugMarkerInsertEXT"));
+		if (pfnCmdDebugMarkerInsert) {
+			VkDebugMarkerMarkerInfoEXT info = {};
+			info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
+			memcpy(info.color, &color[0], sizeof(float) * 4);
+			info.pMarkerName = name;
+			pfnCmdDebugMarkerInsert(cmd, &info);
+		}
+	}
+}
+

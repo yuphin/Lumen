@@ -19,8 +19,7 @@ public:
 	virtual void init();
 	virtual void render() = 0;
 	virtual bool gui() { return false; };
-	virtual bool update() = 0;
-	virtual void reload() = 0;
+	virtual bool update();
 	virtual void destroy();
 	Texture2D output_tex;
 	std::unique_ptr<Camera> camera = nullptr;
@@ -44,7 +43,10 @@ protected:
 	std::vector<Light> lights;
 	std::vector<Texture2D> diffuse_textures;
 	uint32_t total_light_triangle_cnt = 0;
+	float total_light_area = 0;
 	LumenScene* lumen_scene;
 private:
+	void create_blas();
+	void create_tlas();
 };
 

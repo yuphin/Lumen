@@ -58,35 +58,35 @@ void RayTracer::init(Window* window) {
 		case IntegratorType::BDPT:
 			integrator = std::make_unique<BDPT>(this, &scene);
 			break;
-			/*	case IntegratorType::SPPM:
-					integrator = std::make_unique<SPPM>(this, &scene);
-					break;
-				case IntegratorType::VCM:
-					integrator = std::make_unique<VCM>(this, &scene);
-					break;
-				case IntegratorType::PSSMLT:
-					integrator = std::make_unique<PSSMLT>(this, &scene);
-					break;
-				case IntegratorType::SMLT:
-					integrator = std::make_unique<SMLT>(this, &scene);
-					break;
-				case IntegratorType::VCMMLT:
-					integrator = std::make_unique<VCMMLT>(this, &scene);
-					break;
-				case IntegratorType::ReSTIR:
-					integrator = std::make_unique<ReSTIR>(this, &scene);
-					break;
-				case IntegratorType::ReSTIRGI:
-					integrator = std::make_unique<ReSTIRGI>(this, &scene);
-					break;
-				case IntegratorType::DDGI:
-					integrator = std::make_unique<DDGI>(this, &scene);
-					break;
-				case IntegratorType::ReSTIRPT:
-					integrator = std::make_unique<ReSTIRPT>(this, &scene);
-					break;*/
-		default:
+		case IntegratorType::SPPM:
+			integrator = std::make_unique<SPPM>(this, &scene);
 			break;
+	/*	case IntegratorType::VCM:
+			integrator = std::make_unique<VCM>(this, &scene);
+			break;
+		case IntegratorType::PSSMLT:
+			integrator = std::make_unique<PSSMLT>(this, &scene);
+			break;
+		case IntegratorType::SMLT:
+			integrator = std::make_unique<SMLT>(this, &scene);
+			break;
+		case IntegratorType::VCMMLT:
+			integrator = std::make_unique<VCMMLT>(this, &scene);
+			break;
+		case IntegratorType::ReSTIR:
+			integrator = std::make_unique<ReSTIR>(this, &scene);
+			break;
+		case IntegratorType::ReSTIRGI:
+			integrator = std::make_unique<ReSTIRGI>(this, &scene);
+			break;
+		case IntegratorType::DDGI:
+			integrator = std::make_unique<DDGI>(this, &scene);
+			break;
+		case IntegratorType::ReSTIRPT:
+			integrator = std::make_unique<ReSTIRPT>(this, &scene);
+			break;
+		default:
+			break;*/
 	}
 	integrator->init();
 	init_resources();
@@ -215,7 +215,7 @@ void RayTracer::render(uint32_t i) {
 							.push_consts_sizes = {sizeof(PushConstantPost)}
 					 },
 					 .color_outputs = {&vkb.swapchain_images[i]},
-					 .pass_func = [&](VkCommandBuffer cmd) {
+					 .pass_func = [](VkCommandBuffer cmd, const RenderPass& render_pass) {
 							vkCmdDraw(cmd, 3, 1, 0, 0);
 						/*	ImGui::Render();
 							ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);*/
@@ -278,9 +278,9 @@ float RayTracer::draw_frame() {
 		auto t_diff = t_end - t_begin;
 		return (float)t_diff;
 	}
-	vkb.rg->reset(vkb.ctx.command_buffers[image_idx]);
 	render(image_idx);
 	vkb.submit_frame(image_idx, resized);
+	vkb.rg->reset(vkb.ctx.command_buffers[image_idx]);
 
 	auto now = clock();
 	auto diff = ((float)now - start);

@@ -17,5 +17,5 @@ struct Shader {
 	Shader(const std::string& filename);
 	int compile();
 	VkShaderModule create_vk_shader_module(const VkDevice& device) const;
-	std::vector<std::pair<VkFormat, size_t>> vertex_inputs;
+	std::vector<std::pair<VkFormat, uint32_t>> vertex_inputs;
 };

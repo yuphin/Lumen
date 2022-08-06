@@ -7,19 +7,15 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
-layout(set = 0, binding = 1, rgba32f) uniform image2D image;
 #include "../../utils.glsl"
+layout(binding = 0, rgba32f) uniform image2D image;
+layout(binding = 1) buffer SceneDesc_ { SceneDesc scene_desc; };
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
-layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
-layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
-layout(buffer_reference, scalar) buffer PhotonData_ { PhotonHash d[]; };
 uint size = pc_ray.size_x * pc_ray.size_y;
 SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
-AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
-PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
 uint screen_size = pc_ray.size_x * pc_ray.size_y;
 vec3 normalize_grid(vec3 p, vec3 min_bnds, vec3 max_bnds) {
     return (p - min_bnds) / (max_bnds - min_bnds);

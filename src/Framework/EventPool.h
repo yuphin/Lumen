@@ -4,7 +4,7 @@ class EventPool {
 public:
 	struct Events {
 		std::vector<VkEvent> events;
-		size_t available_event_idx;
+		size_t available_event_idx = -1;
 	};
 	EventPool() = default;
 	VkEvent get_event(VkDevice device, VkCommandBuffer cmd);
