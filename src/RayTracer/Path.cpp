@@ -64,11 +64,11 @@ void Path::render() {
 }
 
 bool Path::update() {
+	pc_ray.frame_num++;
 	bool updated = Integrator::update();
 	if (updated) {
 		pc_ray.frame_num = 0;
 	}
-	pc_ray.frame_num++;
 	return updated;
 }
 
