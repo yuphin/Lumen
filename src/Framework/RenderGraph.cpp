@@ -117,8 +117,19 @@ RenderPass& RenderGraph::add_rt(const std::string& name, const RTPassSettings& s
 	}
 	passes.emplace_back(PassType::RT, pipeline, name, this, pass_idx, settings, cached);
 	auto& pass = passes.back();
+	std::vector<std::future<Shader*>> shader_tasks;
+	shader_tasks.reserve(pass.rt_settings->pipeline_settings.shaders.size());
 	for (auto& shader : pass.rt_settings->pipeline_settings.shaders) {
-		shader.compile();
+		if (shader_cache.find(shader.filename) != shader_cache.end()) {
+			shader = shader_cache[shader.filename];
+		} else {
+			shader_tasks.push_back(ThreadPool::submit([](Shader* shader) {shader->compile(); return shader; }, &shader));
+			shader_cache[shader.filename] = shader;
+		}
+	}
+	for (auto& task : shader_tasks) {
+		auto shader = task.get();
+		shader_cache[shader->filename] = *shader;
 	}
 	return pass;
 }
@@ -145,8 +156,19 @@ RenderPass& RenderGraph::add_gfx(const std::string& name, const GraphicsPassSett
 	}
 	passes.emplace_back(PassType::Graphics, pipeline, name, this, pass_idx, settings, cached);
 	auto& pass = passes.back();
+	std::vector<std::future<Shader*>> shader_tasks;
+	shader_tasks.reserve(pass.gfx_settings->pipeline_settings.shaders.size());
 	for (auto& shader : pass.gfx_settings->pipeline_settings.shaders) {
-		shader.compile();
+		if (shader_cache.find(shader.filename) != shader_cache.end()) {
+			shader = shader_cache[shader.filename];
+		} else {
+			shader_tasks.push_back(ThreadPool::submit([](Shader* shader) {shader->compile(); return shader; }, &shader));
+			shader_cache[shader.filename] = shader;
+		}
+	}
+	for (auto& task : shader_tasks) {
+		auto shader = task.get();
+		shader_cache[shader->filename] = *shader;
 	}
 	return pass;
 }
@@ -170,7 +192,13 @@ RenderPass& RenderGraph::add_compute(const std::string& name, const ComputePassS
 	}
 	passes.emplace_back(PassType::Compute, pipeline, name, this, pass_idx, settings, cached);
 	auto& pass = passes.back();
-	pass.compute_settings->pipeline_settings.shader.compile();
+	auto& shader = pass.compute_settings->pipeline_settings.shader;
+	if (shader_cache.find(shader.filename) != shader_cache.end()) {
+		shader = shader_cache[shader.filename];
+	} else {
+		shader.compile();
+		shader_cache[shader.filename] = shader;
+	}
 	return pass;
 }
 
@@ -328,34 +356,49 @@ void RenderPass::finalize() {
 		switch (type) {
 			case PassType::Graphics:
 			{
-				pipeline->create_gfx_pipeline(gfx_settings->pipeline_settings, descriptor_counts,
-											  gfx_settings->color_outputs, gfx_settings->depth_output);
+				auto func = [](RenderPass* pass) {
+					pass->pipeline->create_gfx_pipeline(pass->gfx_settings->pipeline_settings,
+														pass->descriptor_counts, pass->gfx_settings->color_outputs,
+														pass->gfx_settings->depth_output);
+				};
+				rg->pipeline_tasks.push_back({ func, pass_idx});
+			
 				break;
 			}
 			case PassType::RT:
 			{
-				pipeline->create_rt_pipeline(rt_settings->pipeline_settings, descriptor_counts);
-				// Create descriptor pool and sets
-				if (!tlas_descriptor_pool) {
-					auto pool_size = vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1);
-					auto descriptor_pool_ci = vk::descriptor_pool_CI(1, &pool_size, 1);
+				auto func = [](RenderPass* pass) {
+					pass->pipeline->create_rt_pipeline(pass->rt_settings->pipeline_settings,
+													   pass->descriptor_counts);
+					// Create descriptor pool and sets
+					if (!pass->tlas_descriptor_pool) {
+						auto pool_size = vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1);
+						auto descriptor_pool_ci = vk::descriptor_pool_CI(1, &pool_size, 1);
 
-					vk::check(vkCreateDescriptorPool(rg->ctx->device, &descriptor_pool_ci, nullptr, &tlas_descriptor_pool),
-							  "Failed to create descriptor pool");
-					VkDescriptorSetAllocateInfo set_allocate_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-					set_allocate_info.descriptorPool = tlas_descriptor_pool;
-					set_allocate_info.descriptorSetCount = 1;
-					set_allocate_info.pSetLayouts = &pipeline->tlas_layout;
-					vkAllocateDescriptorSets(rg->ctx->device, &set_allocate_info, &tlas_descriptor_set);
-				}
-				auto descriptor_write = vk::write_descriptor_set(tlas_descriptor_set, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
-																 0, &tlas_info);
-				vkUpdateDescriptorSets(rg->ctx->device, 1, &descriptor_write, 0, nullptr);
+						vk::check(vkCreateDescriptorPool(pass->rg->ctx->device, &descriptor_pool_ci, nullptr, &pass->tlas_descriptor_pool),
+								  "Failed to create descriptor pool");
+						VkDescriptorSetAllocateInfo set_allocate_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+						set_allocate_info.descriptorPool = pass->tlas_descriptor_pool;
+						set_allocate_info.descriptorSetCount = 1;
+						set_allocate_info.pSetLayouts = &pass->pipeline->tlas_layout;
+						vkAllocateDescriptorSets(pass->rg->ctx->device, &set_allocate_info, &pass->tlas_descriptor_set);
+					}
+					auto descriptor_write = vk::write_descriptor_set(pass->tlas_descriptor_set, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
+																	 0, &pass->tlas_info);
+					vkUpdateDescriptorSets(pass->rg->ctx->device, 1, &descriptor_write, 0, nullptr);
+				};
+
+				rg->pipeline_tasks.push_back({ func, pass_idx });
+			
 				break;
 			}
 			case PassType::Compute:
 			{
-				pipeline->create_compute_pipeline(compute_settings->pipeline_settings, descriptor_counts);
+				auto func = [](RenderPass* pass) {
+					pass->pipeline->create_compute_pipeline(pass->compute_settings->pipeline_settings,
+															pass->descriptor_counts);
+				};
+				rg->pipeline_tasks.push_back({ func, pass_idx });
 				break;
 			}
 			default:
@@ -613,6 +656,17 @@ void RenderPass::run(VkCommandBuffer cmd) {
 void RenderGraph::run(VkCommandBuffer cmd) {
 	buffer_sync_resources.resize(passes.size());
 	img_sync_resources.resize(passes.size());
+
+	if (pipeline_tasks.size()) {
+		std::vector<std::future<void>> futures;
+		futures.reserve(pipeline_tasks.size());
+		for (auto& [task, idx] : pipeline_tasks) {
+			futures.push_back(ThreadPool::submit(task, &passes[idx]));
+		}
+		for (auto& future : futures) {
+			future.wait();
+		}
+	}
 	for (int i = 0; i < passes.size(); i++) {
 		buffer_sync_resources[i].buffer_bariers.resize(passes[i].wait_signals_buffer.size());
 		buffer_sync_resources[i].dependency_infos.resize(passes[i].wait_signals_buffer.size());
@@ -643,6 +697,9 @@ void RenderGraph::reset(VkCommandBuffer cmd) {
 		for (auto& [k, v] : pipeline_cache) {
 			v.offset_idx = 0;
 		}
+	}
+	if (pipeline_tasks.size()) {
+		pipeline_tasks.clear();
 	}
 	buffer_sync_resources.clear();
 	img_sync_resources.clear();

@@ -417,15 +417,18 @@ void VulkanBase::create_logical_device() {
 	features12.bufferDeviceAddress = true;
 	features12.runtimeDescriptorArray = true;
 	features12.shaderSampledImageArrayNonUniformIndexing = true;
-	//features12.pNext = &features13;
-	dynamic_rendering_feature.dynamicRendering = true;
-	syncronization2_features.synchronization2 = true;
-	maintenance4_fts.maintenance4 = true;
-	features12.pNext = &maintenance4_fts;
-	maintenance4_fts.pNext = &syncronization2_features;
-	syncronization2_features.pNext = &dynamic_rendering_feature;
-	dynamic_rendering_feature.pNext = &rt_fts;
-	//features13.pNext = &rt_fts;
+	if (1) {
+		dynamic_rendering_feature.dynamicRendering = true;
+		syncronization2_features.synchronization2 = true;
+		maintenance4_fts.maintenance4 = true;
+		features12.pNext = &maintenance4_fts;
+		maintenance4_fts.pNext = &syncronization2_features;
+		syncronization2_features.pNext = &dynamic_rendering_feature;
+		dynamic_rendering_feature.pNext = &rt_fts;
+	} else {
+		features12.pNext = &features13;
+		features13.pNext = &rt_fts;
+	}
 
 
 	device_features2.features.samplerAnisotropy = true;

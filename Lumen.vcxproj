@@ -260,7 +260,6 @@
     <ClCompile Include="src\RayTracer\SPPM.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\Framework\DebugMarker.h" />
     <ClInclude Include="src\Framework\EventPool.h" />
     <ClInclude Include="src\Framework\RenderGraph.h" />
     <ClInclude Include="libs\extensions_vk.hpp" />

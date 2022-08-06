@@ -176,7 +176,7 @@ private:
 class RenderGraph {
 
 public:
-	RenderGraph(VulkanContext* ctx) : ctx(ctx) {}
+	RenderGraph(VulkanContext* ctx) : ctx(ctx) { pipeline_tasks.reserve(32); }
 	RenderPass& current_pass() { return passes.back(); }
 
 	RenderPass& add_rt(const std::string& name, const RTPassSettings& settings);
@@ -206,6 +206,8 @@ private:
 	VulkanContext* ctx = nullptr;
 	std::vector<RenderPass> passes;
 	std::unordered_map<std::string, PipelineStorage> pipeline_cache;
+	std::unordered_map<std::string, Shader> shader_cache;
+	std::vector<std::pair<std::function<void(RenderPass*)>, uint32_t>> pipeline_tasks;
 	// Sync related data
 	std::vector<BufferSyncResources> buffer_sync_resources;
 	std::vector<ImageSyncResources> img_sync_resources;
