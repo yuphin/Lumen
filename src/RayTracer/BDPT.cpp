@@ -62,16 +62,14 @@ void BDPT::render() {
 	instance->vkb.rg->
 		add_rt("BDPT",
 			   {
-				   .pipeline_settings = {
-					  .shaders = {
-				   {"src/shaders/integrators/bdpt/bdpt.rgen"},
-				   {"src/shaders/ray.rmiss"},
-				   {"src/shaders/ray_shadow.rmiss"},
-				   {"src/shaders/ray.rchit"},
-				   {"src/shaders/ray.rahit"}
+
+			  .shaders = {
+			   {"src/shaders/integrators/bdpt/bdpt.rgen"},
+			   {"src/shaders/ray.rmiss"},
+			   {"src/shaders/ray_shadow.rmiss"},
+			   {"src/shaders/ray.rchit"},
+			   {"src/shaders/ray.rahit"}
 			   },
-			   .push_consts_sizes = {sizeof(PushConstantRay)},
-			},
 			.dims = {instance->width, instance->height},
 			.accel = instance->vkb.tlas.accel
 			   }
@@ -80,7 +78,7 @@ void BDPT::render() {
 		.zero(camera_path_buffer)
 		.read(light_path_buffer)
 		.read(camera_path_buffer)
-		.push_constants(&pc_ray, sizeof(PushConstantRay))
+		.push_constants(&pc_ray)
 		.write(output_tex)
 		.bind({
 				output_tex,

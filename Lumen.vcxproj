@@ -258,6 +258,7 @@
     <ClCompile Include="src\Framework\ThreadPool.cpp" />
     <ClCompile Include="src\Framework\Texture.cpp" />
     <ClCompile Include="src\RayTracer\SPPM.cpp" />
+    <ClCompile Include="src\RayTracer\VCM.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Framework\EventPool.h" />
@@ -272,6 +273,7 @@
     <ClInclude Include="libs\imgui\imstb_textedit.h" />
     <ClInclude Include="libs\imgui\imstb_truetype.h" />
     <ClInclude Include="src\Framework\MitsubaParser.h" />
+    <ClInclude Include="src\Framework\RenderGraphTypes.h" />
     <ClInclude Include="src\RayTracer\BDPT.h" />
     <ClInclude Include="src\RayTracer\RayTracer.h" />
     <ClInclude Include="src\RayTracer\Path.h" />
@@ -296,6 +298,7 @@
     <ClInclude Include="src\Framework\ThreadPool.h" />
     <ClInclude Include="src\Framework\Texture.h" />
     <ClInclude Include="src\RayTracer\SPPM.h" />
+    <ClInclude Include="src\RayTracer\VCM.h" />
     <ClInclude Include="src\shaders\commons.h" />
   </ItemGroup>
   <ItemGroup>

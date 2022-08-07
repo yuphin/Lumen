@@ -5,6 +5,7 @@
 #include "Framework/Buffer.h"
 #include "Framework/Texture.h"
 #include "Framework/SBTWrapper.h"
+#include "Framework/RenderGraphTypes.h"
 struct Pipeline;
 
 struct PipelineTrace {
@@ -12,35 +13,34 @@ struct PipelineTrace {
 	Pipeline* ref;
 };
 
-struct GraphicsPipelineSettings {
-	std::vector<Shader> shaders;
-	VkCullModeFlags cull_mode = VK_CULL_MODE_FRONT_BIT;
-	std::vector<Buffer*> vertex_buffers = {};
-	Buffer* index_buffer = nullptr;
-	std::vector<uint32_t> push_consts_sizes = {};
-	std::vector<uint32_t> specialization_data = {};
-	std::vector<bool> blend_enables = {};
-	VkFrontFace front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
-	VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
-	VkIndexType index_type = VK_INDEX_TYPE_UINT32;
-	float line_width = 1.0;
-};
+//struct GraphicsPipelineSettings {
+//	std::vector<Shader> shaders;
+//	VkCullModeFlags cull_mode = VK_CULL_MODE_FRONT_BIT;
+//	std::vector<Buffer*> vertex_buffers = {};
+//	Buffer* index_buffer = nullptr;
+//	std::vector<uint32_t> specialization_data = {};
+//	std::vector<bool> blend_enables = {};
+//	VkFrontFace front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+//	VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+//	VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
+//	VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
+//	VkIndexType index_type = VK_INDEX_TYPE_UINT32;
+//	float line_width = 1.0;
+//};
+//
+//struct RTPipelineSettings {
+//	std::vector<Shader> shaders;
+//	uint32_t recursion_depth = 1;
+//	std::vector<uint32_t> specialization_data = {};
+//};
+//
+//
+//struct ComputePipelineSettings {
+//	Shader shader;
+//	std::vector<uint32_t> specialization_data = {};
+//};
 
-struct RTPipelineSettings {
-	std::vector<Shader> shaders;
-	uint32_t recursion_depth = 1;
-	std::vector<uint32_t> push_consts_sizes = {};
-	std::vector<uint32_t> specialization_data = {};
-};
 
-
-struct ComputePipelineSettings {
-	Shader shader;
-	std::vector<uint32_t> specialization_data = {};
-	std::vector<uint32_t> push_consts_sizes = {};
-};
 
 struct Pipeline {
 public:
@@ -52,12 +52,12 @@ public:
 	Pipeline(VulkanContext* ctx, size_t pass_idx, const std::string& name);
 	void reload();
 	void cleanup();
-	void create_gfx_pipeline(const GraphicsPipelineSettings& settings,
+	void create_gfx_pipeline(const GraphicsPassSettings& settings,
 							 const std::vector<uint32_t>& descriptor_counts,
 							 std::vector<Texture2D*> color_outputs,
 							 Texture2D* depth_output);
-	void create_rt_pipeline(const RTPipelineSettings& settings, const std::vector<uint32_t>& descriptor_counts);
-	void create_compute_pipeline(const ComputePipelineSettings& settings, const std::vector<uint32_t>& descriptor_counts);
+	void create_rt_pipeline(const RTPassSettings& settings, const std::vector<uint32_t>& descriptor_counts);
+	void create_compute_pipeline(const ComputePassSettings& settings, const std::vector<uint32_t>& descriptor_counts);
 	const std::array<VkStridedDeviceAddressRegionKHR, 4> get_rt_regions();
 	//void track_for_changes();
 	// Manually called after the pipeline is reloaded
@@ -77,9 +77,9 @@ public:
 	} gfx_cis;
 	std::unordered_map<std::string, std::filesystem::file_time_type> paths;
 
-	GraphicsPipelineSettings gfx_settings;
-	RTPipelineSettings rt_settings;
-	ComputePipelineSettings compute_settings;
+	//GraphicsPipelineSettings gfx_settings;
+	//RTPipelineSettings rt_settings;
+	//ComputePipelineSettings compute_settings;
 	VkPipeline handle = VK_NULL_HANDLE;
 	VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
 	VkDescriptorSetLayout set_layout, tlas_layout;
@@ -90,6 +90,7 @@ public:
 	VkDescriptorUpdateTemplate update_template;
 	VkShaderStageFlags pc_stages = 0;
 	std::string name;
+	uint32_t push_constant_size = 0;
 
 private:
 	void create_set_layout(const std::vector<Shader>& shaders, const std::vector<uint32_t>& descriptor_counts);

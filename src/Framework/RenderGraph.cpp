@@ -118,8 +118,8 @@ RenderPass& RenderGraph::add_rt(const std::string& name, const RTPassSettings& s
 	passes.emplace_back(PassType::RT, pipeline, name, this, pass_idx, settings, cached);
 	auto& pass = passes.back();
 	std::vector<std::future<Shader*>> shader_tasks;
-	shader_tasks.reserve(pass.rt_settings->pipeline_settings.shaders.size());
-	for (auto& shader : pass.rt_settings->pipeline_settings.shaders) {
+	shader_tasks.reserve(pass.rt_settings->shaders.size());
+	for (auto& shader : pass.rt_settings->shaders) {
 		if (shader_cache.find(shader.filename) != shader_cache.end()) {
 			shader = shader_cache[shader.filename];
 		} else {
@@ -157,8 +157,8 @@ RenderPass& RenderGraph::add_gfx(const std::string& name, const GraphicsPassSett
 	passes.emplace_back(PassType::Graphics, pipeline, name, this, pass_idx, settings, cached);
 	auto& pass = passes.back();
 	std::vector<std::future<Shader*>> shader_tasks;
-	shader_tasks.reserve(pass.gfx_settings->pipeline_settings.shaders.size());
-	for (auto& shader : pass.gfx_settings->pipeline_settings.shaders) {
+	shader_tasks.reserve(pass.gfx_settings->shaders.size());
+	for (auto& shader : pass.gfx_settings->shaders) {
 		if (shader_cache.find(shader.filename) != shader_cache.end()) {
 			shader = shader_cache[shader.filename];
 		} else {
@@ -192,7 +192,7 @@ RenderPass& RenderGraph::add_compute(const std::string& name, const ComputePassS
 	}
 	passes.emplace_back(PassType::Compute, pipeline, name, this, pass_idx, settings, cached);
 	auto& pass = passes.back();
-	auto& shader = pass.compute_settings->pipeline_settings.shader;
+	auto& shader = pass.compute_settings->shader;
 	if (shader_cache.find(shader.filename) != shader_cache.end()) {
 		shader = shader_cache[shader.filename];
 	} else {
@@ -216,7 +216,7 @@ RenderPass& RenderPass::bind(const ResourceBinding& binding) {
 
 }
 
-RenderPass& RenderPass::bind(const std::vector<ResourceBinding>& bindings) {
+RenderPass& RenderPass::bind(std::initializer_list<ResourceBinding> bindings) {
 	DIRTY_CHECK(rg->recording);
 	bound_resources.insert(bound_resources.end(), bindings.begin(), bindings.end());
 	for (size_t i = 0; i < bindings.size(); i++) {
@@ -234,18 +234,18 @@ RenderPass& RenderPass::bind(const Texture2D& tex, VkSampler sampler) {
 }
 
 RenderPass& RenderPass::bind_texture_array(const std::vector<Texture2D>& textures) {
-	DIRTY_CHECK(rg->recording)
-		for (const auto& texture : textures) {
-			bound_resources.emplace_back(texture);
-		}
+	DIRTY_CHECK(rg->recording);
+	for (const auto& texture : textures) {
+		bound_resources.emplace_back(texture);
+	}
 	descriptor_counts.push_back((uint32_t)textures.size());
 	return *this;
 }
 
 RenderPass& RenderPass::bind_buffer_array(const std::vector<Buffer>& buffers) {
 	DIRTY_CHECK(rg->recording);
-	for (size_t i = 0; i < buffers.size(); i++) {
-		bound_resources.emplace_back(buffers[i]);
+	for (const auto& buffer : buffers) {
+		bound_resources.emplace_back(buffer);
 	}
 	descriptor_counts.push_back((uint32_t)buffers.size());
 	return *this;
@@ -274,16 +274,16 @@ RenderPass& RenderPass::read(Texture2D& tex) {
 	return *this;
 }
 
-RenderPass& RenderPass::read(const std::vector<Texture2D*>& texes) {
-	for (Texture2D* tex : texes) {
-		read(*tex);
+RenderPass& RenderPass::read(std::initializer_list<std::reference_wrapper<Texture2D>> texes) {
+	for (Texture2D& tex : texes) {
+		read(tex);
 	}
 	return *this;
 }
 
-RenderPass& RenderPass::read(const std::vector<Buffer*>& buffers) {
-	for (Buffer* buff : buffers) {
-		read(*buff);
+RenderPass& RenderPass::read(std::initializer_list<std::reference_wrapper<Buffer>> buffers) {
+	for (Buffer& buff : buffers) {
+		read(buff);
 	}
 	return *this;
 }
@@ -299,19 +299,24 @@ RenderPass& RenderPass::write(Texture2D& tex) {
 	return *this;
 }
 
-RenderPass& RenderPass::write(const std::vector<Buffer*>& buffers) {
-	for (Buffer* buff : buffers) {
-		write(*buff);
+RenderPass& RenderPass::write(std::initializer_list<std::reference_wrapper<Buffer>> buffers) {
+	for (Buffer& buff : buffers) {
+		write(buff);
 	}
 	return *this;
 }
 
-RenderPass& RenderPass::write(const std::vector<Texture2D*>& texes) {
-	for (Texture2D* tex : texes) {
-		write(*tex);
+RenderPass& RenderPass::write(std::initializer_list<std::reference_wrapper<Texture2D>> texes) {
+	for (Texture2D& tex : texes) {
+		write(tex);
 	}
 	return *this;
 
+}
+
+RenderPass& RenderPass::skip_execution() {
+	disable_execution = true;
+	return *this;
 }
 
 RenderPass& RenderPass::write(Buffer& buffer, VkAccessFlags access_flags) {
@@ -320,8 +325,8 @@ RenderPass& RenderPass::write(Buffer& buffer, VkAccessFlags access_flags) {
 	return *this;
 }
 
-RenderPass& RenderPass::push_constants(void* data, uint32_t size) {
-	push_constant = { data, size };
+RenderPass& RenderPass::push_constants(void* data) {
+	push_constant_data = data;
 	return *this;
 }
 
@@ -340,9 +345,9 @@ RenderPass& RenderPass::zero(Buffer& buffer, bool cond) {
 
 }
 
-RenderPass& RenderPass::zero(const std::vector<Buffer*>& buffers) {
-	for (Buffer* buf : buffers) {
-		zero(*buf);
+RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<Buffer>> buffers) {
+	for (Buffer& buf : buffers) {
+		zero(buf);
 	}
 	return *this;
 }
@@ -357,18 +362,18 @@ void RenderPass::finalize() {
 			case PassType::Graphics:
 			{
 				auto func = [](RenderPass* pass) {
-					pass->pipeline->create_gfx_pipeline(pass->gfx_settings->pipeline_settings,
+					pass->pipeline->create_gfx_pipeline(*pass->gfx_settings,
 														pass->descriptor_counts, pass->gfx_settings->color_outputs,
 														pass->gfx_settings->depth_output);
 				};
-				rg->pipeline_tasks.push_back({ func, pass_idx});
-			
+				rg->pipeline_tasks.push_back({ func, pass_idx });
+
 				break;
 			}
 			case PassType::RT:
 			{
 				auto func = [](RenderPass* pass) {
-					pass->pipeline->create_rt_pipeline(pass->rt_settings->pipeline_settings,
+					pass->pipeline->create_rt_pipeline(*pass->rt_settings,
 													   pass->descriptor_counts);
 					// Create descriptor pool and sets
 					if (!pass->tlas_descriptor_pool) {
@@ -389,13 +394,13 @@ void RenderPass::finalize() {
 				};
 
 				rg->pipeline_tasks.push_back({ func, pass_idx });
-			
+
 				break;
 			}
 			case PassType::Compute:
 			{
 				auto func = [](RenderPass* pass) {
-					pass->pipeline->create_compute_pipeline(pass->compute_settings->pipeline_settings,
+					pass->pipeline->create_compute_pipeline(*pass->compute_settings,
 															pass->descriptor_counts);
 				};
 				rg->pipeline_tasks.push_back({ func, pass_idx });
@@ -501,123 +506,126 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		vkCmdPushDescriptorSetWithTemplateKHR(cmd, pipeline->update_template, pipeline->pipeline_layout, 0, descriptor_infos);
 	}
 	// Push constants
-	if (push_constant.size) {
-		vkCmdPushConstants(cmd, pipeline->pipeline_layout, pipeline->pc_stages, 0, push_constant.size, push_constant.data);
+	if (pipeline->push_constant_size) {
+		vkCmdPushConstants(cmd, pipeline->pipeline_layout, pipeline->pc_stages, 0, pipeline->push_constant_size, push_constant_data);
 	}
 	// Run
-	switch (type) {
-		case PassType::RT:
-		{
-
-			LUMEN_ASSERT(tlas_descriptor_set, "TLAS descriptor set cannot be NULL!");
-			// This doesnt work because we can't push TLAS descriptor with template...
-			 //vkCmdPushDescriptorSetWithTemplateKHR(cmd, pipeline->rt_update_template, pipeline->pipeline_layout, 0, &tlas_buffer.descriptor);
-			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-									pipeline->pipeline_layout, 1, 1, &tlas_descriptor_set, 0, nullptr);
-
-
-			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->handle);
-
-			if (rt_settings->pass_func) {
-				rt_settings->pass_func(cmd, *this);
-			} else {
-				auto& regions = pipeline->get_rt_regions();
-				auto& dims = rt_settings->dims;
-				vkCmdTraceRaysKHR(cmd, &regions[0], &regions[1], &regions[2], &regions[3], dims.x, dims.y, dims.z);
-			}
-			break;
-		}
-		case PassType::Compute:
-		{
-			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->handle);
-
-			if (compute_settings->pass_func) {
-				compute_settings->pass_func(cmd, *this);
-			} else {
-				auto& dims = compute_settings->dims;
-				vkCmdDispatch(cmd, dims.x, dims.y, dims.z);
-			}
-			break;
-
-		}
-		case PassType::Graphics:
-		{
-			auto& color_outputs = gfx_settings->color_outputs;
-			auto& depth_output = gfx_settings->depth_output;
-			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle);
-
-			auto& width = gfx_settings->width;
-			auto& height = gfx_settings->height;
-			VkViewport viewport = vk::viewport((float)width, (float)height, 0.0f, 1.0f);
-			VkRect2D scissor = vk::rect2D(width, height, 0, 0);
-			vkCmdSetViewport(cmd, 0, 1, &viewport);
-			vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-			if (gfx_settings->pipeline_settings.vertex_buffers.size()) {
-				std::vector<VkDeviceSize> offsets(gfx_settings->pipeline_settings.vertex_buffers.size(), 0);
-				std::vector<VkBuffer> vert_buffers(gfx_settings->pipeline_settings.vertex_buffers.size(), 0);
-				for (auto& buf : gfx_settings->pipeline_settings.vertex_buffers) {
-					vert_buffers[i] = buf->handle;
-				}
-				vkCmdBindVertexBuffers(cmd, 0, (uint32_t)vert_buffers.size(),
-									   vert_buffers.data(), offsets.data());
-			}
-
-			if (gfx_settings->pipeline_settings.index_buffer) {
-				vkCmdBindIndexBuffer(cmd, gfx_settings->pipeline_settings.index_buffer->handle, 0,
-									 gfx_settings->pipeline_settings.index_type);
-			}
-			std::vector<VkRenderingAttachmentInfo> rendering_attachments;
-			rendering_attachments.reserve(color_outputs.size());
-			for (Texture2D* color_output : color_outputs) {
-				color_output->transition(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-				rendering_attachments.push_back(
-					vk::rendering_attachment_info(
-					color_output->img_view,
-					VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ATTACHMENT_LOAD_OP_CLEAR,
-					VK_ATTACHMENT_STORE_OP_STORE, gfx_settings->clear_color)
-				);
-			}
-			VkRenderingAttachmentInfo depth_stencil_attachment;
-			if (depth_output) {
-				depth_output->transition(cmd, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-				depth_stencil_attachment =
-					vk::rendering_attachment_info(
-					depth_output->img_view,
-					VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-					VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE,
-					gfx_settings->clear_depth_stencil);
-			}
-
-			// Render
+	if (!disable_execution) {
+		switch (type) {
+			case PassType::RT:
 			{
-				VkRenderingInfo render_info{
-							.sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-							.renderArea = {0, 0, gfx_settings->width, gfx_settings->height},
-							.layerCount = 1,
-							.colorAttachmentCount = (uint32_t)color_outputs.size(),
-							.pColorAttachments = rendering_attachments.data(),
-							.pDepthAttachment = depth_output ? &depth_stencil_attachment : nullptr
-				};
-				vkCmdBeginRendering(cmd, &render_info);
-				gfx_settings->pass_func(cmd, *this);
-				vkCmdEndRendering(cmd);
-			}
 
-			// Present
-			for (Texture2D* color_output : color_outputs) {
-				if (color_output->present) {
-					color_output->transition(cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+				LUMEN_ASSERT(tlas_descriptor_set, "TLAS descriptor set cannot be NULL!");
+				// This doesnt work because we can't push TLAS descriptor with template...
+				 //vkCmdPushDescriptorSetWithTemplateKHR(cmd, pipeline->rt_update_template, pipeline->pipeline_layout, 0, &tlas_buffer.descriptor);
+				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+										pipeline->pipeline_layout, 1, 1, &tlas_descriptor_set, 0, nullptr);
+
+
+				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->handle);
+
+				if (rt_settings->pass_func) {
+					rt_settings->pass_func(cmd, *this);
+				} else {
+					auto& regions = pipeline->get_rt_regions();
+					auto& dims = rt_settings->dims;
+					vkCmdTraceRaysKHR(cmd, &regions[0], &regions[1], &regions[2], &regions[3], dims.x, dims.y, dims.z);
 				}
+				break;
 			}
-			if (depth_output && depth_output->present) {
-				depth_output->transition(cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+			case PassType::Compute:
+			{
+				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->handle);
+
+				if (compute_settings->pass_func) {
+					compute_settings->pass_func(cmd, *this);
+				} else {
+					auto& dims = compute_settings->dims;
+					vkCmdDispatch(cmd, dims.x, dims.y, dims.z);
+				}
+				break;
+
 			}
-			break;
+			case PassType::Graphics:
+			{
+				auto& color_outputs = gfx_settings->color_outputs;
+				auto& depth_output = gfx_settings->depth_output;
+				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle);
+
+				auto& width = gfx_settings->width;
+				auto& height = gfx_settings->height;
+				VkViewport viewport = vk::viewport((float)width, (float)height, 0.0f, 1.0f);
+				VkRect2D scissor = vk::rect2D(width, height, 0, 0);
+				vkCmdSetViewport(cmd, 0, 1, &viewport);
+				vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+				if (gfx_settings->vertex_buffers.size()) {
+					std::vector<VkDeviceSize> offsets(gfx_settings->vertex_buffers.size(), 0);
+					std::vector<VkBuffer> vert_buffers(gfx_settings->vertex_buffers.size(), 0);
+					for (auto& buf : gfx_settings->vertex_buffers) {
+						vert_buffers[i] = buf->handle;
+					}
+					vkCmdBindVertexBuffers(cmd, 0, (uint32_t)vert_buffers.size(),
+										   vert_buffers.data(), offsets.data());
+				}
+
+				if (gfx_settings->index_buffer) {
+					vkCmdBindIndexBuffer(cmd, gfx_settings->index_buffer->handle, 0,
+										 gfx_settings->index_type);
+				}
+				std::vector<VkRenderingAttachmentInfo> rendering_attachments;
+				rendering_attachments.reserve(color_outputs.size());
+				for (Texture2D* color_output : color_outputs) {
+					color_output->transition(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+					rendering_attachments.push_back(
+						vk::rendering_attachment_info(
+						color_output->img_view,
+						VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ATTACHMENT_LOAD_OP_CLEAR,
+						VK_ATTACHMENT_STORE_OP_STORE, gfx_settings->clear_color)
+					);
+				}
+				VkRenderingAttachmentInfo depth_stencil_attachment;
+				if (depth_output) {
+					depth_output->transition(cmd, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+					depth_stencil_attachment =
+						vk::rendering_attachment_info(
+						depth_output->img_view,
+						VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+						VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE,
+						gfx_settings->clear_depth_stencil);
+				}
+
+				// Render
+				{
+					VkRenderingInfo render_info{
+								.sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+								.renderArea = {0, 0, gfx_settings->width, gfx_settings->height},
+								.layerCount = 1,
+								.colorAttachmentCount = (uint32_t)color_outputs.size(),
+								.pColorAttachments = rendering_attachments.data(),
+								.pDepthAttachment = depth_output ? &depth_stencil_attachment : nullptr
+					};
+					vkCmdBeginRendering(cmd, &render_info);
+					gfx_settings->pass_func(cmd, *this);
+					vkCmdEndRendering(cmd);
+				}
+
+				// Present
+				for (Texture2D* color_output : color_outputs) {
+					if (color_output->present) {
+						color_output->transition(cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+					}
+				}
+				if (depth_output && depth_output->present) {
+					depth_output->transition(cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+				}
+				break;
+			}
+			default:
+				break;
 		}
-		default:
-			break;
 	}
+
 
 	// Set: Buffer
 	for (const auto& [k, v] : set_signals_buffer) {
@@ -686,6 +694,7 @@ void RenderGraph::reset(VkCommandBuffer cmd) {
 		passes[i].layout_transitions.clear();
 		passes[i].buffer_zeros.clear();
 		passes[i].buffer_barriers.clear();
+		passes[i].disable_execution = false;
 	}
 	if (recording) {
 		for (auto& pass : passes) {

@@ -12,7 +12,7 @@ void Pipeline::refresh() {
 	}
 }
 
-void Pipeline::create_gfx_pipeline(const GraphicsPipelineSettings& settings, 
+void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings,
 								   const std::vector<uint32_t>& descriptor_counts,
 								   std::vector<Texture2D*> color_outputs,
 								   Texture2D* depth_output) {
@@ -21,7 +21,15 @@ void Pipeline::create_gfx_pipeline(const GraphicsPipelineSettings& settings,
 	type = PipelineType::GFX;
 	binding_mask = get_bindings(settings.shaders, descriptor_types);
 	create_set_layout(settings.shaders, descriptor_counts);
-	create_pipeline_layout(settings.shaders, settings.push_consts_sizes);
+	for (const auto& shader : settings.shaders) {
+		if (push_constant_size && shader.push_constant_size) {
+			LUMEN_ASSERT(push_constant_size == shader.push_constant_size, "Currently all shaders only support 1 push constant!");
+		}
+		if (shader.push_constant_size) {
+			push_constant_size = shader.push_constant_size;
+		}
+	}
+	create_pipeline_layout(settings.shaders, { push_constant_size });
 	create_update_template(settings.shaders, descriptor_counts);
 
 	VkSpecializationInfo specialization_info = {};
@@ -52,7 +60,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPipelineSettings& settings,
 	VkPipelineInputAssemblyStateCreateInfo input_asssembly_CI = vk::pipeline_vertex_input_assembly_state_CI(
 		settings.topology, 0, VK_FALSE);
 	VkPipelineViewportStateCreateInfo viewport_state = vk::pipeline_viewport_state_CI(1, 1, 0);
-	VkPipelineRasterizationStateCreateInfo rasterizer = 
+	VkPipelineRasterizationStateCreateInfo rasterizer =
 		vk::pipeline_rasterization_state_CI(settings.polygon_mode, settings.cull_mode, settings.front_face);
 	rasterizer.lineWidth = 1.0f;
 	rasterizer.depthClampEnable = VK_FALSE;
@@ -163,11 +171,19 @@ void Pipeline::create_gfx_pipeline(const GraphicsPipelineSettings& settings,
 	}
 }
 
-void Pipeline::create_rt_pipeline(const RTPipelineSettings& settings, const std::vector<uint32_t>& descriptor_counts) {
+void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vector<uint32_t>& descriptor_counts) {
 	type = PipelineType::RT;
 	binding_mask = get_bindings(settings.shaders, descriptor_types);
 	create_set_layout(settings.shaders, descriptor_counts);
-	create_pipeline_layout(settings.shaders, settings.push_consts_sizes);
+	for (const auto& shader : settings.shaders) {
+		if (push_constant_size && shader.push_constant_size) {
+			LUMEN_ASSERT(push_constant_size == shader.push_constant_size, "Currently all shaders only support 1 push constant!");
+		}
+		if (shader.push_constant_size) {
+			push_constant_size = shader.push_constant_size;
+		}
+	}
+	create_pipeline_layout(settings.shaders, { push_constant_size });
 	create_update_template(settings.shaders, descriptor_counts);
 
 
@@ -253,12 +269,13 @@ void Pipeline::create_rt_pipeline(const RTPipelineSettings& settings, const std:
 	}
 }
 
-void Pipeline::create_compute_pipeline(const ComputePipelineSettings& settings, const std::vector<uint32_t>& descriptor_counts) {
+void Pipeline::create_compute_pipeline(const ComputePassSettings& settings, const std::vector<uint32_t>& descriptor_counts) {
 	type = PipelineType::COMPUTE;
 	binding_mask = get_bindings({ settings.shader }, descriptor_types);
 	create_set_layout({ settings.shader }, descriptor_counts);
-	if (settings.push_consts_sizes.size() > 0) {
-		create_pipeline_layout({ settings.shader }, settings.push_consts_sizes);
+	if (settings.shader.push_constant_size > 0) {
+		push_constant_size = settings.shader.push_constant_size;
+		create_pipeline_layout({ settings.shader }, { push_constant_size });
 	} else {
 		create_pipeline_layout({ settings.shader }, {});
 	}
@@ -358,7 +375,7 @@ void Pipeline::create_set_layout(const std::vector<Shader>& shaders, const std::
 		binding.pImmutableSamplers = nullptr;
 		binding.stageFlags = 0;
 		for (const Shader& shader : shaders) {
-				binding.stageFlags |= shader.stage;
+			binding.stageFlags |= shader.stage;
 		}
 		set_create_info.flags = 0;
 		set_create_info.bindingCount = 1;
@@ -370,7 +387,7 @@ void Pipeline::create_set_layout(const std::vector<Shader>& shaders, const std::
 void Pipeline::create_pipeline_layout(const std::vector<Shader>& shaders, const std::vector<uint32_t> push_const_sizes) {
 
 	VkPipelineLayoutCreateInfo create_info = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-	VkDescriptorSetLayout set_layouts[] = {set_layout, tlas_layout};
+	VkDescriptorSetLayout set_layouts[] = { set_layout, tlas_layout };
 	create_info.setLayoutCount = type == PipelineType::RT ? 2 : 1;
 	create_info.pSetLayouts = set_layouts;
 

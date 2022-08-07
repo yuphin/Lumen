@@ -35,21 +35,18 @@ void Path::render() {
 	instance->vkb.rg->
 		add_rt("Path",
 			   {
-				   .pipeline_settings = {
-					  .shaders = {
+					.shaders = {
 						  {"src/shaders/integrators/path/path.rgen"},
 						  {"src/shaders/ray.rmiss"},
 						  {"src/shaders/ray_shadow.rmiss"},
 						  {"src/shaders/ray.rchit"},
 						  {"src/shaders/ray.rahit"}
 					  },
-					  .push_consts_sizes = {sizeof(PushConstantRay)},
-				   },
 				   .dims = {instance->width, instance->height},
 				   .accel = instance->vkb.tlas.accel
 			   }
 		)
-		.push_constants(&pc_ray, sizeof(PushConstantRay))
+		.push_constants(&pc_ray)
 		.write(output_tex)
 		.bind({ 
 				output_tex,

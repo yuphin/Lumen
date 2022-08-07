@@ -13,6 +13,7 @@ struct Shader {
 	int local_size_y = 1;
 	int local_size_z = 1;
 	bool uses_push_constants = false;
+	uint32_t push_constant_size = 0;
 	Shader();
 	Shader(const std::string& filename);
 	int compile();

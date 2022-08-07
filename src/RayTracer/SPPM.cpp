@@ -103,39 +103,35 @@ void SPPM::render() {
 	if (pc_ray.radius < 1e-7f) {
 		pc_ray.radius = 1e-7f;
 	}
-
 	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name,
 						 const std::string& reduce_name, const std::string& reduce_shader_name) {
+		uint32_t num_wgs = (uint32_t)(instance->width * instance->height + 1023) / 1024.0f;
 		instance->vkb.rg->add_compute(
 			op_name,
-			{ .pipeline_settings = {.shader = Shader(op_shader_name),
-								   .push_consts_sizes = {sizeof(PushConstantRay)}
-								   },
-			  .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}
+			{			
+				.shader = Shader(op_shader_name),
+				.dims = {num_wgs, 1, 1}
 			}
 		)
-		.push_constants(&pc_ray, sizeof(PushConstantRay))
+		.push_constants(&pc_ray)
 		.bind(scene_desc_buffer)
 		.read(sppm_data_buffer)
-		.zero({ &residual_buffer, &counter_buffer })
+		.zero({residual_buffer,counter_buffer})
 		.write(residual_buffer)
 		.finalize();
-
-		uint32_t num_wgs = (uint32_t)std::ceil(instance->width * instance->height / 1024.0f);
 		while (num_wgs != 1) {
 			instance->vkb.rg->add_compute(
 				reduce_name,
-				{ .pipeline_settings = {.shader = Shader(reduce_shader_name),
-									   .push_consts_sizes = {sizeof(PushConstantRay)}
-									   },
-				  .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024)), 1, 1}
+				{
+					.shader = Shader(reduce_shader_name),
+					.dims = {num_wgs, 1, 1}
 				}
 			)
-			.push_constants(&pc_ray, sizeof(PushConstantRay))
+			.push_constants(&pc_ray)
 			.bind(scene_desc_buffer)
-			.write({ &counter_buffer, &atomic_data_buffer, &residual_buffer })
+			.write({counter_buffer,atomic_data_buffer,residual_buffer })
 			.finalize();
-			num_wgs = (uint32_t)std::ceil(num_wgs / 1024.0f);
+			num_wgs = (uint32_t)(num_wgs + 1023) / 1024.0f;
 		}
 	};
 
@@ -143,18 +139,15 @@ void SPPM::render() {
 	instance->vkb.rg
 		->add_rt(
 		"SPPM - Eye",
-		{ .pipeline_settings =
-			 {
-				 .shaders = {{"src/shaders/integrators/sppm/sppm_eye.rgen"},
+		{ 
+			.shaders = {{"src/shaders/integrators/sppm/sppm_eye.rgen"},
 							 {"src/shaders/ray.rmiss"},
 							 {"src/shaders/ray_shadow.rmiss"},
 							 {"src/shaders/ray.rchit"},
 							 {"src/shaders/ray.rahit"}},
-				 .push_consts_sizes = {sizeof(PushConstantRay)},
-			 },
-		 .dims = {instance->width, instance->height},
-		 .accel = instance->vkb.tlas.accel })
-		 .push_constants(&pc_ray, sizeof(PushConstantRay))
+			 .dims = {instance->width, instance->height},
+			 .accel = instance->vkb.tlas.accel })
+		.push_constants(&pc_ray)
 		.zero(photon_buffer)
 		.zero(sppm_data_buffer, /*cond=*/pc_ray.frame_num == 0)
 		.write(sppm_data_buffer)
@@ -175,8 +168,9 @@ void SPPM::render() {
 			  "OpReduce: Reduce Min", "src/shaders/integrators/sppm/reduce_min.comp");
 	instance->vkb.rg->add_compute(
 		"Bounds Calculation",
-		{ .pipeline_settings = {.shader = Shader("src/shaders/integrators/sppm/calc_bounds.comp")},
-		  .dims = {1, 1, 1}
+		{ 
+			.shader = Shader("src/shaders/integrators/sppm/calc_bounds.comp"),
+			.dims = {1, 1, 1}
 		}
 	)
 		.bind(scene_desc_buffer)
@@ -186,18 +180,15 @@ void SPPM::render() {
 	instance->vkb.rg
 		->add_rt(
 		"SPPM - Light",
-		{ .pipeline_settings =
-			 {
-				 .shaders = {{"src/shaders/integrators/sppm/sppm_light.rgen"},
+		{
+			.shaders = {{"src/shaders/integrators/sppm/sppm_light.rgen"},
 							 {"src/shaders/ray.rmiss"},
 							 {"src/shaders/ray_shadow.rmiss"},
 							 {"src/shaders/ray.rchit"},
 							 {"src/shaders/ray.rahit"}},
-				 .push_consts_sizes = {sizeof(PushConstantRay)},
-			 },
-		 .dims = {instance->width, instance->height},
-		 .accel = instance->vkb.tlas.accel })
-		 .push_constants(&pc_ray, sizeof(PushConstantRay))
+			 .dims = {instance->width, instance->height},
+			 .accel = instance->vkb.tlas.accel })
+	.push_constants(&pc_ray)
 	.read(atomic_data_buffer)
 	.write(photon_buffer)
 	.bind({
@@ -213,13 +204,12 @@ void SPPM::render() {
 	// Gather
 	instance->vkb.rg->add_compute(
 		"Gather",
-		{ .pipeline_settings = {.shader = Shader("src/shaders/integrators/sppm/gather.comp"),
-							   .push_consts_sizes = {sizeof(PushConstantRay)}
-							   },
-		  .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}
+		{ 
+			.shader = Shader("src/shaders/integrators/sppm/gather.comp"),
+			.dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}
 		}
 	)
-	.push_constants(&pc_ray, sizeof(PushConstantRay))
+	.push_constants(&pc_ray)
 	.bind(scene_desc_buffer)
 	.bind_texture_array(diffuse_textures)
 	.read(photon_buffer)
@@ -229,13 +219,12 @@ void SPPM::render() {
 	// Composite
 	instance->vkb.rg->add_compute(
 		"Composite",
-		{ .pipeline_settings = {.shader = Shader("src/shaders/integrators/sppm/composite.comp"),
-							   .push_consts_sizes = {sizeof(PushConstantRay)}
-							   },
-		  .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}
+		{ 
+			.shader = Shader("src/shaders/integrators/sppm/composite.comp"),
+			.dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}
 		}
 	)
-	.push_constants(&pc_ray, sizeof(PushConstantRay))
+	.push_constants(&pc_ray)
 	.bind({ output_tex, scene_desc_buffer })
 	.read(sppm_data_buffer)
 	.write(output_tex)

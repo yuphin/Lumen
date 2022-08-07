@@ -2,6 +2,7 @@
 #include "Shader.h"
 
 #include <spirv_cross/spirv_cross_c.h>
+#include <spirv_cross/spirv_cross.hpp>
 #define USE_SHADERC 1
 
 static std::unordered_map< spvc_resource_type, VkDescriptorType> descriptor_Type_map = {
@@ -76,6 +77,46 @@ static VkShaderStageFlagBits get_shader_stage(SpvExecutionModel executionModel) 
 			assert(!"Unsupported execution model");
 			return VkShaderStageFlagBits(0);
 	}
+}
+
+static uint32_t get_pc_size(spvc_compiler compiler, spvc_type type) {
+	uint32_t num_types = spvc_type_get_num_member_types(type);
+	uint32_t pc_size = 0;
+	for (uint32_t i = 0; i < num_types; i++) {
+		auto member_type_id = spvc_type_get_member_type(type, i);
+		auto member_type_handle = spvc_compiler_get_type_handle(compiler, member_type_id);
+		auto member_base_type = spvc_type_get_basetype(member_type_handle);
+		if (member_base_type != SPVC_BASETYPE_STRUCT) {
+			auto vec_size = spvc_type_get_vector_size(member_type_handle);
+			auto num_cols = spvc_type_get_columns(member_type_handle);
+			switch (member_base_type) {
+				case SPVC_BASETYPE_INT8:
+				case SPVC_BASETYPE_UINT8:
+					pc_size += num_cols * vec_size * 1;
+					break;
+				case SPVC_BASETYPE_INT16:
+				case SPVC_BASETYPE_UINT16:
+				case SPVC_BASETYPE_FP16:
+					pc_size += num_cols * vec_size * 2;
+					break;
+				case SPVC_BASETYPE_INT32:
+				case SPVC_BASETYPE_UINT32:
+				case SPVC_BASETYPE_FP32:
+					pc_size += num_cols * vec_size * 4;
+					break;
+				case SPVC_BASETYPE_INT64:
+				case SPVC_BASETYPE_UINT64:
+				case SPVC_BASETYPE_FP64:
+					pc_size += num_cols * vec_size * 8;
+					break;
+				default:
+					LUMEN_ERROR("Unexpected push constant type!");
+			}
+		} else {
+			pc_size += get_pc_size(compiler, member_type_handle);
+		}
+	}
+	return pc_size;
 }
 
 static void spvc_err(void* data, const char* error) {
@@ -185,6 +226,15 @@ static void parse_shader(Shader& shader, const uint32_t* code, size_t code_size)
 				shader.vertex_inputs.push_back(vertex_input_map[{base_type, vec_size}]);
 			}
 		}
+	}
+	// Get push constant size
+	resource_type = SPVC_RESOURCE_TYPE_PUSH_CONSTANT;
+	spvc_resources_get_resource_list_for_type(resources, resource_type, &list, &count);
+	if (count > 0) {
+		LUMEN_ASSERT(count <= 1, "Only 1 push constant is supported per shader at the moment!");
+		spvc_type type = spvc_compiler_get_type_handle(compiler_glsl, list[0].type_id);
+		uint32_t pc_size = get_pc_size(compiler_glsl, type);
+		shader.push_constant_size = pc_size;
 	}
 
 	//// Modify options.

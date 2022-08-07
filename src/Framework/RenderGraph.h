@@ -5,6 +5,7 @@
 #include "Framework/Shader.h"
 #include "Framework/Texture.h"
 #include "Framework/EventPool.h"
+#include "Framework/RenderGraphTypes.h"
 
 struct AccelKHR {
 	VkAccelerationStructureKHR accel = VK_NULL_HANDLE;
@@ -20,11 +21,6 @@ enum class PassType {
 	Graphics
 };
 
-struct dim3 {
-	uint32_t x = 1;
-	uint32_t y = 1;
-	uint32_t z = 1;
-};
 
 struct ResourceBinding {
 	const Buffer* buf = nullptr;
@@ -36,29 +32,7 @@ struct ResourceBinding {
 
 };
 
-struct GraphicsPassSettings {
-	uint32_t width;
-	uint32_t height;
-	VkClearValue clear_color;
-	VkClearValue clear_depth_stencil;
-	GraphicsPipelineSettings pipeline_settings;
-	std::vector<Texture2D*> color_outputs = {};
-	Texture2D* depth_output = nullptr;
-	std::function<void(VkCommandBuffer cmd, const RenderPass& pass)> pass_func;
-};
 
-struct RTPassSettings {
-	RTPipelineSettings pipeline_settings;
-	dim3 dims;
-	VkAccelerationStructureKHR accel;
-	std::function<void(VkCommandBuffer cmd, const RenderPass& pass)> pass_func;
-};
-
-struct ComputePassSettings {
-	ComputePipelineSettings pipeline_settings;
-	dim3 dims;
-	std::function<void(VkCommandBuffer cmd, const RenderPass& pass)> pass_func;
-};
 
 struct BufferSyncDescriptor {
 	// Read-after-write is the default dependency implicitly
@@ -98,24 +72,24 @@ public:
 
 	RenderPass& bind(const ResourceBinding& binding);
 	RenderPass& bind(const Texture2D& tex, VkSampler sampler);
-	RenderPass& bind(const std::vector<ResourceBinding>& bindings);
-	RenderPass& bind_texture_array(const std::vector<Texture2D>& textures);
+	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
+	RenderPass& bind_texture_array(const std::vector<Texture2D>& texes);
 	RenderPass& bind_buffer_array(const std::vector<Buffer>& buffers);
 	RenderPass& bind_tlas(const AccelKHR& tlas);
 	RenderPass& read(Buffer& buffer);
 	RenderPass& read(Texture2D& tex);
-	RenderPass& read(const std::vector<Buffer*>& buffers);
-	RenderPass& read(const std::vector<Texture2D*>& texes);
+	RenderPass& read(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
+	RenderPass& read(std::initializer_list<std::reference_wrapper<Texture2D>> texes);
 	RenderPass& write(Texture2D& tex);
 	RenderPass& write(Buffer& buffer);
 	RenderPass& write(Buffer& buffer, VkAccessFlags access_flags);
-	RenderPass& write(const std::vector<Buffer*>& buffers);
-	RenderPass& write(const std::vector<Texture2D*>& texes);
+	RenderPass& write(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
+	RenderPass& write(std::initializer_list<std::reference_wrapper<Texture2D>> texes);
 
-
-	RenderPass& push_constants(void* data, uint32_t size);
+	RenderPass& skip_execution();
+	RenderPass& push_constants(void* data);
 	RenderPass& zero(Buffer& buffer);
-	RenderPass& zero(const std::vector<Buffer*>& buffers);
+	RenderPass& zero(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
 	RenderPass& zero(Buffer& buffer, bool cond);
 	void finalize();
 	friend RenderGraph;
@@ -131,10 +105,11 @@ private:
 	Pipeline* pipeline;
 	uint32_t pass_idx;
 	std::vector<uint32_t> descriptor_counts;
-	struct {
-		void* data = nullptr;
-		uint32_t size = 0;
-	} push_constant;
+	void* push_constant_data = nullptr;
+	//struct {
+	//	void* data = nullptr;
+	//	uint32_t size = 0;
+	//} push_constant;
 	bool cached;
 
 	/*
@@ -171,6 +146,8 @@ private:
 	std::unique_ptr<GraphicsPassSettings> gfx_settings = nullptr;
 	std::unique_ptr<RTPassSettings> rt_settings = nullptr;
 	std::unique_ptr<ComputePassSettings> compute_settings = nullptr;
+
+	bool disable_execution = false;
 };
 
 class RenderGraph {
