@@ -13,35 +13,6 @@ struct PipelineTrace {
 	Pipeline* ref;
 };
 
-//struct GraphicsPipelineSettings {
-//	std::vector<Shader> shaders;
-//	VkCullModeFlags cull_mode = VK_CULL_MODE_FRONT_BIT;
-//	std::vector<Buffer*> vertex_buffers = {};
-//	Buffer* index_buffer = nullptr;
-//	std::vector<uint32_t> specialization_data = {};
-//	std::vector<bool> blend_enables = {};
-//	VkFrontFace front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-//	VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-//	VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
-//	VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
-//	VkIndexType index_type = VK_INDEX_TYPE_UINT32;
-//	float line_width = 1.0;
-//};
-//
-//struct RTPipelineSettings {
-//	std::vector<Shader> shaders;
-//	uint32_t recursion_depth = 1;
-//	std::vector<uint32_t> specialization_data = {};
-//};
-//
-//
-//struct ComputePipelineSettings {
-//	Shader shader;
-//	std::vector<uint32_t> specialization_data = {};
-//};
-
-
-
 struct Pipeline {
 public:
 	enum class PipelineType {
@@ -76,10 +47,6 @@ public:
 		VkGraphicsPipelineCreateInfo pipeline_CI;
 	} gfx_cis;
 	std::unordered_map<std::string, std::filesystem::file_time_type> paths;
-
-	//GraphicsPipelineSettings gfx_settings;
-	//RTPipelineSettings rt_settings;
-	//ComputePipelineSettings compute_settings;
 	VkPipeline handle = VK_NULL_HANDLE;
 	VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
 	VkDescriptorSetLayout set_layout, tlas_layout;

@@ -202,27 +202,24 @@ void RayTracer::render(uint32_t i) {
 	instance->vkb.rg->
 		add_gfx("Post FX",
 				{
-					 .width = instance->width,
-					 .height = instance->height,
-					 .clear_color = { 0.25f, 0.25f, 0.25f, 1.0f },
-					 .clear_depth_stencil = {1.0f, 0 },
-					 .pipeline_settings = {
-							.shaders = {
+					.width = instance->width,
+					.height = instance->height,
+					.clear_color = { 0.25f, 0.25f, 0.25f, 1.0f },
+					.clear_depth_stencil = {1.0f, 0 },
+					.shaders = {
 								{"src/shaders/post.vert"},
 								{"src/shaders/post.frag"}
 							},
-							.cull_mode = VK_CULL_MODE_NONE,
-							.push_consts_sizes = {sizeof(PushConstantPost)}
-					 },
-					 .color_outputs = {&vkb.swapchain_images[i]},
-					 .pass_func = [](VkCommandBuffer cmd, const RenderPass& render_pass) {
+					.cull_mode = VK_CULL_MODE_NONE,
+					.color_outputs = {&vkb.swapchain_images[i]},
+					.pass_func = [](VkCommandBuffer cmd, const RenderPass& render_pass) {
 							vkCmdDraw(cmd, 3, 1, 0, 0);
 						/*	ImGui::Render();
 							ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);*/
 					 }
 				}
 		)
-		.push_constants(&pc_post_settings, sizeof(PushConstantPost))
+		.push_constants(&pc_post_settings)
 						 .bind(integrator->output_tex, integrator->texture_sampler)
 						 .read(integrator->output_tex)
 						 .finalize();

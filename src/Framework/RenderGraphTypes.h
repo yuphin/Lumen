@@ -32,14 +32,12 @@ struct GraphicsPassSettings {
 	VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
 	VkIndexType index_type = VK_INDEX_TYPE_UINT32;
 	float line_width = 1.0;
-	//GraphicsPipelineSettings pipeline_settings;
 	std::vector<Texture2D*> color_outputs = {};
 	Texture2D* depth_output = nullptr;
 	std::function<void(VkCommandBuffer cmd, const RenderPass& pass)> pass_func;
 };
 
 struct RTPassSettings {
-	//RTPipelineSettings pipeline_settings;
 	std::vector<Shader> shaders;
 	uint32_t recursion_depth = 1;
 	std::vector<uint32_t> specialization_data = {};
@@ -49,7 +47,6 @@ struct RTPassSettings {
 };
 
 struct ComputePassSettings {
-	//ComputePipelineSettings pipeline_settings;
 	Shader shader;
 	std::vector<uint32_t> specialization_data = {};
 	dim3 dims;

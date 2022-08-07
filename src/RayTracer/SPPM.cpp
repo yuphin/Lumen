@@ -105,7 +105,7 @@ void SPPM::render() {
 	}
 	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name,
 						 const std::string& reduce_name, const std::string& reduce_shader_name) {
-		uint32_t num_wgs = (uint32_t)(instance->width * instance->height + 1023) / 1024.0f;
+		uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
 		instance->vkb.rg->add_compute(
 			op_name,
 			{			
