@@ -58,6 +58,7 @@
 #include <map>
 #include <string>
 #include <unordered_map>
+#include <robin-hood/robin_hood.h>
 #include <vector>
 
 #define KHR_LIGHTS_PUNCTUAL_EXTENSION_NAME "KHR_lights_punctual"
@@ -291,12 +292,12 @@ private:
 					  GltfAttributes attributes, const std::string& name);
 
 	// Temporary data
-	std::unordered_map<int, std::vector<uint32_t>> mesh_to_prim_meshes;
+	robin_hood::unordered_map<int, std::vector<uint32_t>> mesh_to_prim_meshes;
 	std::vector<uint32_t> primitive_indices_32u;
 	std::vector<uint16_t> primitive_indices_16u;
 	std::vector<uint8_t> primitive_indices_8u;
 
-	std::unordered_map<std::string, GltfPrimMesh> cache_prim_mesh;
+	robin_hood::unordered_map<std::string, GltfPrimMesh> cache_prim_mesh;
 
 	void compute_camera();
 	void check_required_extensions(const tinygltf::Model& tmodel);

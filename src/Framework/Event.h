@@ -7,7 +7,7 @@ enum class LumenEvent { SHADER_RELOAD };
 struct PipelineTrace;
 
 struct EventHandler {
-	static std::unordered_map<LumenEvent, bool> event_table;
+	static robin_hood::unordered_map<LumenEvent, bool> event_table;
 	static std::vector<uint32_t> event_histogram;
 	static std::vector<PipelineTrace> obsolete_pipelines;
 	static const int event_count = 1;

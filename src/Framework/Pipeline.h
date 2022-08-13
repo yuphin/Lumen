@@ -46,7 +46,7 @@ public:
 		VkPipelineDynamicStateCreateInfo dynamic_state_CI;
 		VkGraphicsPipelineCreateInfo pipeline_CI;
 	} gfx_cis;
-	std::unordered_map<std::string, std::filesystem::file_time_type> paths;
+	robin_hood::unordered_map<std::string, std::filesystem::file_time_type> paths;
 	VkPipeline handle = VK_NULL_HANDLE;
 	VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
 	VkDescriptorSetLayout set_layout, tlas_layout;

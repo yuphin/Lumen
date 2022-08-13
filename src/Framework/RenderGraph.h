@@ -74,7 +74,7 @@ public:
 	std::vector<ResourceBinding> bound_resources;
 
 
-	std::unordered_map<Buffer*, BufferStatus> affected_buffer_pointers;
+	robin_hood::unordered_map<Buffer*, BufferStatus> affected_buffer_pointers;
 	RenderGraph* rg;
 private:
 
@@ -94,11 +94,11 @@ private:
 		The assumption is that a SyncDescriptor is unique to a pass (either via Buffer or Image).
 		Which is reasonable because each pass is comprised of a single shader dispatch
 	*/
-	std::unordered_map<VkBuffer, BufferSyncDescriptor> set_signals_buffer;
-	std::unordered_map<VkBuffer, BufferSyncDescriptor> wait_signals_buffer;
+	robin_hood::unordered_map<VkBuffer, BufferSyncDescriptor> set_signals_buffer;
+	robin_hood::unordered_map<VkBuffer, BufferSyncDescriptor> wait_signals_buffer;
 
-	std::unordered_map<VkImage, ImageSyncDescriptor> set_signals_img;
-	std::unordered_map<VkImage, ImageSyncDescriptor> wait_signals_img;
+	robin_hood::unordered_map<VkImage, ImageSyncDescriptor> set_signals_img;
+	robin_hood::unordered_map<VkImage, ImageSyncDescriptor> wait_signals_img;
 
 	DescriptorInfo descriptor_infos[32] = {};
 
@@ -143,7 +143,7 @@ public:
 
 
 
-	std::unordered_map<std::string, Buffer*> registered_buffer_pointers;
+	robin_hood::unordered_map<std::string, Buffer*> registered_buffer_pointers;
 private:
 
 	struct BufferSyncResources {
@@ -162,12 +162,12 @@ private:
 	};
 	VulkanContext* ctx = nullptr;
 	std::vector<RenderPass> passes;
-	std::unordered_map<std::string, PipelineStorage> pipeline_cache;
-	std::unordered_map<std::string, Shader> shader_cache;
+	robin_hood::unordered_map<std::string, PipelineStorage> pipeline_cache;
+	robin_hood::unordered_map<std::string, Shader> shader_cache;
 	std::vector<std::pair<std::function<void(RenderPass*)>, uint32_t>> pipeline_tasks;
 	// Sync related data
 	std::vector<BufferSyncResources> buffer_sync_resources;
 	std::vector<ImageSyncResources> img_sync_resources;
-	std::unordered_map<VkBuffer, std::pair<uint32_t, VkAccessFlags>> buffer_resource_map; // Buffer handle - { Write Pass Idx, Access Type }
-	std::unordered_map<VkImage, uint32_t> img_resource_map; // Tex2D handle - Pass Idx
+	robin_hood::unordered_map<VkBuffer, std::pair<uint32_t, VkAccessFlags>> buffer_resource_map; // Buffer handle - { Write Pass Idx, Access Type }
+	robin_hood::unordered_map<VkImage, uint32_t> img_resource_map; // Tex2D handle - Pass Idx
 };

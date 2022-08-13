@@ -2,7 +2,7 @@
 #include "LumenPCH.h"
 #include "Event.h"
 
-std::unordered_map<LumenEvent, bool> EventHandler::event_table = {};
+robin_hood::unordered_map<LumenEvent, bool> EventHandler::event_table = {};
 std::vector<PipelineTrace> EventHandler::obsolete_pipelines = {};
 std::vector<uint32_t> EventHandler::event_histogram = {};
 

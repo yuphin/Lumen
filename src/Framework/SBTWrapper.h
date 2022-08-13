@@ -62,7 +62,7 @@ public:
 
 	VulkanContext* m_ctx = nullptr;
 private:
-	using entry = std::unordered_map<uint32_t, std::vector<uint8_t>>;
+	using entry = robin_hood::unordered_map<uint32_t, std::vector<uint8_t>>;
 	std::array<std::vector<uint32_t>, 4> m_index;
 	std::array<Buffer, 4> m_buffer;
 	std::array<uint32_t, 4> m_stride{ 0, 0, 0, 0 };

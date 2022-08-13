@@ -13,7 +13,7 @@ enum class ResourceType {
 	AccelarationStructure
 };
 
-static std::unordered_map< ResourceType, VkDescriptorType> descriptor_Type_map = {
+static robin_hood::unordered_map< ResourceType, VkDescriptorType> descriptor_Type_map = {
 	{ResourceType::UniformBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
 	{ResourceType::StorageBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
 	{ResourceType::StorageImage, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
@@ -30,7 +30,7 @@ struct input_map_hash {
 	}
 };
 
-static std::unordered_map <std::pair<spirv_cross::SPIRType::BaseType, uint32_t>,
+static robin_hood::unordered_map <std::pair<spirv_cross::SPIRType::BaseType, uint32_t>,
 	std::pair<VkFormat, uint32_t>, input_map_hash> vertex_input_map = {
 	{{spirv_cross::SPIRType::BaseType::Int, 1u}, {VK_FORMAT_R32_SINT, (uint32_t)sizeof(int)}},
 	{{spirv_cross::SPIRType::BaseType::Int, 2u}, {VK_FORMAT_R32G32_SINT, 2 * (uint32_t)sizeof(int)}},
@@ -175,11 +175,11 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 	};
 
 	std::unordered_map<uint32_t, AccessChain> access_chain_map;
-	std::unordered_map<uint32_t, Variable> variable_map;
-	std::unordered_map<uint32_t, uint32_t> load_map; // Dst Id - Ptr Id
-	std::unordered_map<uint32_t, uint32_t> store_access_map; //  Ptr Data from load_map
-	std::unordered_map<uint32_t, uint32_t> constant_map;
-	std::unordered_map<uint32_t, std::string> buffer_ptr_hash_map;
+	robin_hood::unordered_map<uint32_t, Variable> variable_map;
+	robin_hood::unordered_map<uint32_t, uint32_t> load_map; // Dst Id - Ptr Id
+	robin_hood::unordered_map<uint32_t, uint32_t> store_access_map; //  Ptr Data from load_map
+	robin_hood::unordered_map<uint32_t, uint32_t> constant_map;
+	robin_hood::unordered_map<uint32_t, std::string> buffer_ptr_hash_map;
 
 	// TODO: Support for bindless images
 	while (insn != code + code_size) {
@@ -450,7 +450,7 @@ static void parse_shader(Shader& shader, const uint32_t* code, size_t code_size,
 #include <libshaderc_util/file_finder.h>
 #include <glslc/file_includer.h>
 
-static std::unordered_map<std::string, shaderc_shader_kind> mstages = {
+static robin_hood::unordered_map<std::string, shaderc_shader_kind> mstages = {
 	{"vert", shaderc_vertex_shader},
 	{"frag", shaderc_fragment_shader},
 	{"comp", shaderc_compute_shader},
