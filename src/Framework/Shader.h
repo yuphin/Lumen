@@ -1,5 +1,10 @@
 #pragma once
 #include "LumenPCH.h"
+#include "CommonTypes.h"
+#include "Buffer.h"
+
+class RenderPass;
+
 
 struct Shader {
 	std::vector<uint32_t> binary;
@@ -16,7 +21,8 @@ struct Shader {
 	uint32_t push_constant_size = 0;
 	Shader();
 	Shader(const std::string& filename);
-	int compile();
+	int compile(RenderPass* pass);
 	VkShaderModule create_vk_shader_module(const VkDevice& device) const;
 	std::vector<std::pair<VkFormat, uint32_t>> vertex_inputs;
+	std::unordered_map<Buffer*, BufferStatus> buffer_status_map;
 };

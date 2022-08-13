@@ -47,7 +47,6 @@ void Path::render() {
 			   }
 		)
 		.push_constants(&pc_ray)
-		.write(output_tex)
 		.bind({ 
 				output_tex,
 				prim_lookup_buffer,
@@ -57,6 +56,7 @@ void Path::render() {
 		.bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
 		.bind_tlas(instance->vkb.tlas)
+		//.write(output_tex)
 		.finalize();
 }
 

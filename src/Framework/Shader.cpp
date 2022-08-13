@@ -1,16 +1,24 @@
 #include "LumenPCH.h"
 #include "Shader.h"
-
-#include <spirv_cross/spirv_cross_c.h>
-#include <spirv_cross/spirv_cross.hpp>
+#include <spirv_cross/spirv_glsl.hpp>
+#include <spirv_cross/spirv.h>
+#include "RenderGraph.h"
 #define USE_SHADERC 1
 
-static std::unordered_map< spvc_resource_type, VkDescriptorType> descriptor_Type_map = {
-	{SPVC_RESOURCE_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
-	{SPVC_RESOURCE_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
-	{SPVC_RESOURCE_TYPE_STORAGE_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
-	{SPVC_RESOURCE_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
-	{SPVC_RESOURCE_TYPE_ACCELERATION_STRUCTURE, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR},
+enum class ResourceType {
+	UniformBuffer,
+	StorageBuffer,
+	StorageImage,
+	SampledImage,
+	AccelarationStructure
+};
+
+static std::unordered_map< ResourceType, VkDescriptorType> descriptor_Type_map = {
+	{ResourceType::UniformBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+	{ResourceType::StorageBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+	{ResourceType::StorageImage, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE},
+	{ResourceType::SampledImage, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+	{ResourceType::AccelarationStructure, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR},
 };
 
 struct input_map_hash {
@@ -22,56 +30,56 @@ struct input_map_hash {
 	}
 };
 
-static std::unordered_map <std::pair<spvc_basetype, uint32_t>, 
+static std::unordered_map <std::pair<spirv_cross::SPIRType::BaseType, uint32_t>,
 	std::pair<VkFormat, uint32_t>, input_map_hash> vertex_input_map = {
-	{{SPVC_BASETYPE_INT32, 1u}, {VK_FORMAT_R32_SINT, (uint32_t)sizeof(int)}},
-	{{SPVC_BASETYPE_INT32, 2u}, {VK_FORMAT_R32G32_SINT, 2 * (uint32_t)sizeof(int)}},
-	{{SPVC_BASETYPE_INT32, 3u}, {VK_FORMAT_R32G32B32_SINT, 3 * (uint32_t)sizeof(int)}},
-	{{SPVC_BASETYPE_INT32, 4u}, {VK_FORMAT_R32G32B32A32_SINT, 4 * (uint32_t)sizeof(int)}},
-	{{SPVC_BASETYPE_UINT32, 1u}, {VK_FORMAT_R32_UINT, (uint32_t)sizeof(int)}},
-	{{SPVC_BASETYPE_UINT32, 2u}, {VK_FORMAT_R32G32_UINT, 2 * (uint32_t)sizeof(int)}},
-	{{SPVC_BASETYPE_UINT32, 3u}, {VK_FORMAT_R32G32B32_UINT, 3 * (uint32_t)sizeof(int)}},
-	{{SPVC_BASETYPE_UINT32, 4u}, {VK_FORMAT_R32G32B32A32_UINT, 4 * (uint32_t)sizeof(int)}},
-	{{SPVC_BASETYPE_INT16, 1u}, {VK_FORMAT_R16_SINT, (uint32_t)sizeof(int) / 2}},
-	{{SPVC_BASETYPE_INT16, 2u}, {VK_FORMAT_R16G16_SINT, 2 * (uint32_t)sizeof(int) / 2}},
-	{{SPVC_BASETYPE_INT16, 3u}, {VK_FORMAT_R16G16B16_SINT, 3 * (uint32_t)sizeof(int) / 2}},
-	{{SPVC_BASETYPE_INT16, 4u}, {VK_FORMAT_R16G16B16A16_SINT, 4 * (uint32_t)sizeof(int) / 2}},
-	{{SPVC_BASETYPE_UINT16, 1u}, {VK_FORMAT_R16_UINT, (uint32_t)sizeof(int) / 2}},
-	{{SPVC_BASETYPE_UINT16, 2u}, {VK_FORMAT_R16G16_UINT, 2 * (uint32_t)sizeof(int) / 2}},
-	{{SPVC_BASETYPE_UINT16, 3u}, {VK_FORMAT_R16G16B16_UINT, 3 * (uint32_t)sizeof(int) / 2}},
-	{{SPVC_BASETYPE_UINT16, 4u}, {VK_FORMAT_R16G16B16A16_UINT, 4 * (uint32_t)sizeof(int) / 2}},
-	{{SPVC_BASETYPE_FP32, 1u},	{VK_FORMAT_R32_SFLOAT, (uint32_t)sizeof(float)}},
-	{{SPVC_BASETYPE_FP32, 2u}, {VK_FORMAT_R32G32_SFLOAT, 2 * (uint32_t)sizeof(float)}},
-	{{SPVC_BASETYPE_FP32, 3u}, {VK_FORMAT_R32G32B32_SFLOAT, 3 * (uint32_t)sizeof(float)}},
-	{{SPVC_BASETYPE_FP32, 4u}, {VK_FORMAT_R32G32B32A32_SFLOAT, 4 * (uint32_t)sizeof(float)}},
-	{{SPVC_BASETYPE_FP16, 1u},	{VK_FORMAT_R16_SFLOAT, (uint32_t)sizeof(float) / 2}},
-	{{SPVC_BASETYPE_FP16, 2u}, {VK_FORMAT_R16G16_SFLOAT, 2 * (uint32_t)sizeof(float) / 2}},
-	{{SPVC_BASETYPE_FP16, 3u}, {VK_FORMAT_R16G16B16_SFLOAT, 3 * (uint32_t)sizeof(float) / 2}},
-	{{SPVC_BASETYPE_FP16, 4u}, {VK_FORMAT_R16G16B16A16_SFLOAT, 4 * (uint32_t)sizeof(float) / 2}},
+	{{spirv_cross::SPIRType::BaseType::Int, 1u}, {VK_FORMAT_R32_SINT, (uint32_t)sizeof(int)}},
+	{{spirv_cross::SPIRType::BaseType::Int, 2u}, {VK_FORMAT_R32G32_SINT, 2 * (uint32_t)sizeof(int)}},
+	{{spirv_cross::SPIRType::BaseType::Int, 3u}, {VK_FORMAT_R32G32B32_SINT, 3 * (uint32_t)sizeof(int)}},
+	{{spirv_cross::SPIRType::BaseType::Int, 4u}, {VK_FORMAT_R32G32B32A32_SINT, 4 * (uint32_t)sizeof(int)}},
+	{{spirv_cross::SPIRType::BaseType::Int, 1u}, {VK_FORMAT_R32_UINT, (uint32_t)sizeof(int)}},
+	{{spirv_cross::SPIRType::BaseType::UInt, 2u}, {VK_FORMAT_R32G32_UINT, 2 * (uint32_t)sizeof(int)}},
+	{{spirv_cross::SPIRType::BaseType::UInt, 3u}, {VK_FORMAT_R32G32B32_UINT, 3 * (uint32_t)sizeof(int)}},
+	{{spirv_cross::SPIRType::BaseType::UInt, 4u}, {VK_FORMAT_R32G32B32A32_UINT, 4 * (uint32_t)sizeof(int)}},
+	{{spirv_cross::SPIRType::BaseType::Short, 1u}, {VK_FORMAT_R16_SINT, (uint32_t)sizeof(int) / 2}},
+	{{spirv_cross::SPIRType::BaseType::Short, 2u}, {VK_FORMAT_R16G16_SINT, 2 * (uint32_t)sizeof(int) / 2}},
+	{{spirv_cross::SPIRType::BaseType::Short, 3u}, {VK_FORMAT_R16G16B16_SINT, 3 * (uint32_t)sizeof(int) / 2}},
+	{{spirv_cross::SPIRType::BaseType::Short, 4u}, {VK_FORMAT_R16G16B16A16_SINT, 4 * (uint32_t)sizeof(int) / 2}},
+	{{spirv_cross::SPIRType::BaseType::UShort, 1u}, {VK_FORMAT_R16_UINT, (uint32_t)sizeof(int) / 2}},
+	{{spirv_cross::SPIRType::BaseType::UShort, 2u}, {VK_FORMAT_R16G16_UINT, 2 * (uint32_t)sizeof(int) / 2}},
+	{{spirv_cross::SPIRType::BaseType::UShort, 3u}, {VK_FORMAT_R16G16B16_UINT, 3 * (uint32_t)sizeof(int) / 2}},
+	{{spirv_cross::SPIRType::BaseType::UShort, 4u}, {VK_FORMAT_R16G16B16A16_UINT, 4 * (uint32_t)sizeof(int) / 2}},
+	{{spirv_cross::SPIRType::BaseType::Float, 1u},	{VK_FORMAT_R32_SFLOAT, (uint32_t)sizeof(float)}},
+	{{spirv_cross::SPIRType::BaseType::Float, 2u}, {VK_FORMAT_R32G32_SFLOAT, 2 * (uint32_t)sizeof(float)}},
+	{{spirv_cross::SPIRType::BaseType::Float, 3u}, {VK_FORMAT_R32G32B32_SFLOAT, 3 * (uint32_t)sizeof(float)}},
+	{{spirv_cross::SPIRType::BaseType::Float, 4u}, {VK_FORMAT_R32G32B32A32_SFLOAT, 4 * (uint32_t)sizeof(float)}},
+	{{spirv_cross::SPIRType::BaseType::Half, 1u},	{VK_FORMAT_R16_SFLOAT, (uint32_t)sizeof(float) / 2}},
+	{{spirv_cross::SPIRType::BaseType::Half, 2u}, {VK_FORMAT_R16G16_SFLOAT, 2 * (uint32_t)sizeof(float) / 2}},
+	{{spirv_cross::SPIRType::BaseType::Half, 3u}, {VK_FORMAT_R16G16B16_SFLOAT, 3 * (uint32_t)sizeof(float) / 2}},
+	{{spirv_cross::SPIRType::BaseType::Half, 4u}, {VK_FORMAT_R16G16B16A16_SFLOAT, 4 * (uint32_t)sizeof(float) / 2}},
 };
 
 
-static VkShaderStageFlagBits get_shader_stage(SpvExecutionModel executionModel) {
+static VkShaderStageFlagBits get_shader_stage(spv::ExecutionModel executionModel) {
 	switch (executionModel) {
-		case SpvExecutionModelVertex:
+		case spv::ExecutionModelVertex:
 			return VK_SHADER_STAGE_VERTEX_BIT;
-		case SpvExecutionModelFragment:
+		case spv::ExecutionModelFragment:
 			return VK_SHADER_STAGE_FRAGMENT_BIT;
-		case SpvExecutionModelGLCompute:
+		case spv::ExecutionModelGLCompute:
 			return VK_SHADER_STAGE_COMPUTE_BIT;
-		case SpvExecutionModelTaskNV:
+		case spv::ExecutionModelTaskNV:
 			return VK_SHADER_STAGE_TASK_BIT_NV;
-		case SpvExecutionModelMeshNV:
+		case spv::ExecutionModelMeshNV:
 			return VK_SHADER_STAGE_MESH_BIT_NV;
-		case SpvExecutionModelRayGenerationKHR:
+		case spv::ExecutionModelRayGenerationKHR:
 			return VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-		case SpvExecutionModelIntersectionKHR:
+		case spv::ExecutionModelIntersectionKHR:
 			return VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
-		case SpvExecutionModelAnyHitKHR:
+		case spv::ExecutionModelAnyHitKHR:
 			return VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-		case SpvExecutionModelClosestHitKHR:
+		case spv::ExecutionModelClosestHitKHR:
 			return VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-		case SpvExecutionModelMissKHR:
+		case spv::ExecutionModelMissKHR:
 			return VK_SHADER_STAGE_MISS_BIT_KHR;
 		default:
 			assert(!"Unsupported execution model");
@@ -79,179 +87,363 @@ static VkShaderStageFlagBits get_shader_stage(SpvExecutionModel executionModel) 
 	}
 }
 
-static uint32_t get_pc_size(spvc_compiler compiler, spvc_type type) {
-	uint32_t num_types = spvc_type_get_num_member_types(type);
+static uint32_t get_pc_size(spirv_cross::CompilerGLSL& glsl, const spirv_cross::SPIRType& type) {
+	uint32_t num_types = (uint32_t)type.member_types.size();
 	uint32_t pc_size = 0;
 	for (uint32_t i = 0; i < num_types; i++) {
-		auto member_type_id = spvc_type_get_member_type(type, i);
-		auto member_type_handle = spvc_compiler_get_type_handle(compiler, member_type_id);
-		auto member_base_type = spvc_type_get_basetype(member_type_handle);
-		if (member_base_type != SPVC_BASETYPE_STRUCT) {
-			auto vec_size = spvc_type_get_vector_size(member_type_handle);
-			auto num_cols = spvc_type_get_columns(member_type_handle);
+		auto member_type_id = type.member_types[i];
+		auto member_type_handle = glsl.get_type(member_type_id);
+		auto member_base_type = member_type_handle.basetype;
+		if (member_base_type != spirv_cross::SPIRType::BaseType::Struct) {
+			auto vec_size = member_type_handle.vecsize;
+			auto num_cols = member_type_handle.columns;
 			switch (member_base_type) {
-				case SPVC_BASETYPE_INT8:
-				case SPVC_BASETYPE_UINT8:
+				case spirv_cross::SPIRType::BaseType::SByte:
+				case spirv_cross::SPIRType::BaseType::UByte:
 					pc_size += num_cols * vec_size * 1;
 					break;
-				case SPVC_BASETYPE_INT16:
-				case SPVC_BASETYPE_UINT16:
-				case SPVC_BASETYPE_FP16:
+				case spirv_cross::SPIRType::BaseType::Short:
+				case spirv_cross::SPIRType::BaseType::UShort:
+				case spirv_cross::SPIRType::BaseType::Half:
 					pc_size += num_cols * vec_size * 2;
 					break;
-				case SPVC_BASETYPE_INT32:
-				case SPVC_BASETYPE_UINT32:
-				case SPVC_BASETYPE_FP32:
+				case spirv_cross::SPIRType::BaseType::Int:
+				case spirv_cross::SPIRType::BaseType::UInt:
+				case spirv_cross::SPIRType::BaseType::Float:
 					pc_size += num_cols * vec_size * 4;
 					break;
-				case SPVC_BASETYPE_INT64:
-				case SPVC_BASETYPE_UINT64:
-				case SPVC_BASETYPE_FP64:
+				case spirv_cross::SPIRType::BaseType::Double:
+				case spirv_cross::SPIRType::BaseType::Int64:
+				case spirv_cross::SPIRType::BaseType::UInt64:
 					pc_size += num_cols * vec_size * 8;
 					break;
 				default:
 					LUMEN_ERROR("Unexpected push constant type!");
 			}
 		} else {
-			pc_size += get_pc_size(compiler, member_type_handle);
+			pc_size += get_pc_size(glsl, member_type_handle);
 		}
 	}
 	return pc_size;
 }
 
-static void spvc_err(void* data, const char* error) {
-	LUMEN_ERROR("{}", error);
+static bool is_bound_buffer(uint32_t storage_class) {
+	if (storage_class == spv::StorageClassStorageBuffer) {
+		return true;
+	}
+	return false;
 }
 
-static void parse_shader(Shader& shader, const uint32_t* code, size_t code_size) {
+static bool is_buffer(uint32_t storage_class) {
+	if (storage_class == spv::StorageClassStorageBuffer || storage_class == spv::StorageClassPhysicalStorageBuffer) {
+		return true;
+	}
+	return false;
+}
 
-
-	const SpvId* spirv = code;
-	size_t word_count = code_size;
-
-	spvc_context context = nullptr;
-	spvc_parsed_ir ir = nullptr;
-	spvc_compiler compiler_glsl = nullptr;
-	spvc_resources resources = nullptr;
-	const spvc_reflected_resource* list = nullptr;
-
-	auto reflect = [&shader, &compiler_glsl](const spvc_reflected_resource* list, size_t count, VkDescriptorType type) {
-
-		for (int i = 0; i < count; i++) {
-			/*	printf("ID: %u, BaseTypeID: %u, TypeID: %u, Name: %s\n", list[i].id, list[i].base_type_id, list[i].type_id,
-					   list[i].name);*/
-			auto set = spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationDescriptorSet);
-			auto binding = spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationBinding);
-			//printf("  Set: %u, Binding: %u\n", set, binding);
-			shader.binding_mask |= 1 << binding;
-			shader.descriptor_types[binding] = type;
+static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::ShaderResources& resources, 
+						Shader& shader, const uint32_t* code, size_t code_size, RenderPass* pass) {
+	// Update the resource status of image types
+	// Storage Image -> Write
+	// Sampled Image -> Read
+	auto active_vars = glsl.get_active_interface_variables();
+	for (auto& var : active_vars) {
+		auto binding = glsl.get_decoration(var, spv::DecorationBinding);
+		auto type = glsl.get_type_from_variable(var);
+		if (type.basetype == spirv_cross::SPIRType::SampledImage) {
+			pass->bound_resources[binding].read = true;
+		} else if (type.basetype == spirv_cross::SPIRType::Image) {
+			pass->bound_resources[binding].write = true;
 		}
+	}
+
+	assert(code[0] == SpvMagicNumber);
+
+	uint32_t num_ids = code[3];
+
+
+	const uint32_t* insn = code + 5;
+
+	struct Variable {
+		uint32_t storage_class;
+	};
+
+	struct AccessChain {
+		uint32_t base_ptr_id;
+		uint32_t base_idx;
+		uint32_t offset_idx;
+	};
+
+	std::unordered_map<uint32_t, AccessChain> access_chain_map;
+	std::unordered_map<uint32_t, Variable> variable_map;
+	std::unordered_map<uint32_t, uint32_t> load_map; // Dst Id - Ptr Id
+	std::unordered_map<uint32_t, uint32_t> store_access_map; //  Ptr Data from load_map
+	std::unordered_map<uint32_t, uint32_t> constant_map;
+	std::unordered_map<uint32_t, std::string> buffer_ptr_hash_map;
+
+	// TODO: Support for bindless images
+	while (insn != code + code_size) {
+		uint16_t opcode = uint16_t(insn[0]);
+		uint16_t word_count = uint16_t(insn[0] >> 16);
+
+		switch (opcode) {
+			case SpvOpConstant:
+			{
+				constant_map[insn[2]] = 1;
+			} break;
+
+			case SpvOpVariable:
+			{
+				assert(word_count >= 4);
+				uint32_t storage_class = insn[3];
+				auto type = glsl.get_type_from_variable(insn[2]);
+				if (storage_class != spv::StorageClassInput) {
+					variable_map[insn[2]] = Variable{ .storage_class = storage_class };
+				}
+			} break;
+			case SpvOpAccessChain:
+			{
+				assert(word_count >= 4);
+				uint32_t result_id = insn[2];
+				uint32_t base_ptr_id = insn[3];
+				auto base_idx = insn[4];
+				auto idx = insn[5];
+				access_chain_map[result_id] = {
+					base_ptr_id,
+					base_idx,
+					idx
+				};
+			} break;
+			case SpvOpConvertUToPtr:
+			{
+				// Assumption: OpConvertUToPtr comes with OpAccessChain instruction
+				assert(word_count == 4);
+				assert(access_chain_map.find(insn[3]) != access_chain_map.end());
+				auto nh = access_chain_map.extract(insn[3]);
+				nh.key() = insn[2];
+				access_chain_map.insert(std::move(nh));
+			} break;
+
+			case SpvOpLoad:
+			{
+				assert(word_count >= 3);
+				uint32_t ptr_var_id = insn[3];
+				auto result_type = glsl.get_type(insn[1]);
+
+				if (result_type.basetype == spirv_cross::SPIRType::UInt64) {
+					// We are loading a pointer, update register map
+					// Previous assumption also holds
+					uint32_t id = insn[3];
+					if (access_chain_map.find(id) != access_chain_map.end()) {
+						const AccessChain& access_chain = access_chain_map[id];
+						auto storage_class = glsl.get_storage_class(access_chain.base_ptr_id);
+						if (is_bound_buffer(storage_class)) {
+							auto binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
+							pass->bound_resources[binding].read = true;
+						}
+						auto nh = access_chain_map.extract(id);
+						nh.key() = insn[2];
+						access_chain_map.insert(std::move(nh));
+					}
+				} else if (result_type.pointer) {
+					// We are not loading a pointer but dereferencing it
+					load_map[insn[2]] = insn[3];
+				} else {
+					// Result type is not a pointer, get binding
+					if (access_chain_map.find(insn[3]) != access_chain_map.end()) {
+						std::string container_name;
+						std::string ptr_name;
+						const AccessChain& access_chain = access_chain_map[insn[3]];
+
+						if (variable_map.find(access_chain.base_ptr_id) != variable_map.end()) {
+							// Load was made through a variable
+							const auto variable_storage_class = variable_map[access_chain.base_ptr_id].storage_class;
+							if (is_bound_buffer(variable_storage_class)) {
+								auto binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
+								pass->bound_resources[binding].read = true;
+							} else {
+								// Variable + buffer pointer?
+							}
+						} else if (load_map.find(access_chain.base_ptr_id) != load_map.end()) {
+							// Load was made through an access chain + load
+							if (buffer_ptr_hash_map.find(load_map[access_chain.base_ptr_id]) != buffer_ptr_hash_map.end()) {
+								// TODO: Distinguish buffer and image pointers when we add bindless images in the future
+								const auto& res = buffer_ptr_hash_map[load_map[access_chain.base_ptr_id]];
+								if (pass->rg->registered_buffer_pointers.find(res) != pass->rg->registered_buffer_pointers.end()) {
+									shader.buffer_status_map[pass->rg->registered_buffer_pointers[res]].read = true;
+								}
+							}
+
+						}
+					}
+				}
+				if (buffer_ptr_hash_map.find(ptr_var_id) != buffer_ptr_hash_map.end()) {
+					// TODO: Distinguish buffer and image pointers when we add bindless images in the future
+					const auto& res = buffer_ptr_hash_map[ptr_var_id];
+					if (pass->rg->registered_buffer_pointers.find(res) != pass->rg->registered_buffer_pointers.end()) {
+						shader.buffer_status_map[pass->rg->registered_buffer_pointers[res]].read = true;
+					}
+				}
+
+				if(variable_map.find(ptr_var_id) != variable_map.end()) {
+					if (is_bound_buffer(variable_map[ptr_var_id].storage_class)) {
+						auto binding = glsl.get_decoration(ptr_var_id, spv::DecorationBinding);
+						pass->bound_resources[binding].read = true;
+					}
+				}
+
+			} break;
+
+			case SpvOpStore:
+			{
+				assert(word_count >= 3);
+				uint32_t store_id = insn[1];
+
+				if (access_chain_map.find(insn[1]) != access_chain_map.end()) {
+					const auto& access_chain = access_chain_map[insn[1]];
+					if (variable_map.find(access_chain.base_ptr_id) != variable_map.end()) {
+						// Access chain has variable
+						const auto variable_storage_class = variable_map[access_chain.base_ptr_id].storage_class;
+						// TODO: Check if buffer
+						if (is_bound_buffer(variable_storage_class)) {
+							// Bound resource
+							auto binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
+							pass->bound_resources[binding].write = true;
+						} else if (is_buffer(variable_storage_class)) {
+							// Via pointer
+							auto ptr_var_id = load_map[access_chain.base_ptr_id];//; store_access_map[insn[1]];
+							auto var_name = glsl.get_name(ptr_var_id);
+							auto var_type = glsl.get_type_from_variable(ptr_var_id);
+							assert(buffer_ptr_hash_map.find(ptr_var_id) != buffer_ptr_hash_map.end());
+							const auto& res = buffer_ptr_hash_map[ptr_var_id];
+							if (pass->rg->registered_buffer_pointers.find(res) != pass->rg->registered_buffer_pointers.end()) {
+								shader.buffer_status_map[pass->rg->registered_buffer_pointers[res]].write = true;
+							}
+						}
+					} else if (load_map.find(access_chain.base_ptr_id) != load_map.end()) {
+						// Access chain has loads
+						// If it has loads, it should be a buffer pointer
+						const auto& res = buffer_ptr_hash_map[load_map[access_chain.base_ptr_id]];
+						if (pass->rg->registered_buffer_pointers.find(res) != pass->rg->registered_buffer_pointers.end()) {
+							shader.buffer_status_map[pass->rg->registered_buffer_pointers[res]].write = true;
+						}
+					}
+				
+				}
+
+				// Store pointers for the first time, create the hash map
+				if (access_chain_map.find(insn[2]) != access_chain_map.end()) {
+					const auto& access_chain = access_chain_map[insn[2]];
+					std::string container_name;
+					std::string ptr_name;
+					std::string pointee_type_name;
+					const uint32_t ptr_id = insn[1];
+					auto var_name = glsl.get_name(ptr_id);
+					auto ptr_type = glsl.get_type_from_variable(ptr_id);
+					/*	for (auto mem_type_id : ptr_type.member_types) {
+							auto mem_type = glsl.get_type(mem_type_id);
+						}*/
+					if (constant_map.find(access_chain.offset_idx) != constant_map.end()) {
+						auto parent_type_id = glsl.get_type_from_variable(access_chain.base_ptr_id).parent_type;
+						auto ptr_struct_type = glsl.get_type(parent_type_id);
+						auto ptr_struct_name = glsl.get_name(parent_type_id);
+						assert(ptr_struct_type.member_types.size());
+						for (auto mem_type_id : ptr_struct_type.member_types) {
+							container_name = glsl.get_name(mem_type_id);
+							ptr_name = glsl.get_member_name(mem_type_id, glsl.get_constant(access_chain.offset_idx).scalar());
+						}
+						buffer_ptr_hash_map[ptr_id] = container_name + '_' + ptr_name; //+ '_' + pointee_type_name;	
+					}
+				}
+				// Theoretical case where _%a_ in _OpStore %a %b_ is already a declared pointer variable 
+				// In this case the resource should be bound, as it implies 0 offset
+				// Fortunately, glslang or shaderc don't do this as of SPIR-V 1.6
+				if (variable_map.find(insn[1]) != variable_map.end()) {
+					if (is_bound_buffer(variable_map[insn[1]].storage_class)) {
+						auto binding = glsl.get_decoration(insn[1], spv::DecorationBinding);
+						pass->bound_resources[binding].write = true;
+					
+					}
+				}
+			} break;
+		}
+		assert(insn + word_count <= code + code_size);
+		insn += word_count;
+	}
+}
+
+static void parse_shader(Shader& shader, const uint32_t* code, size_t code_size, RenderPass* pass) {
+	spirv_cross::CompilerGLSL glsl(code, code_size);
+	spirv_cross::ShaderResources resources = glsl.get_shader_resources();
+
+	auto reflect = [&shader, &glsl](const spirv_cross::Resource& resource, VkDescriptorType type) {
+		unsigned set = glsl.get_decoration(resource.id, spv::DecorationDescriptorSet);
+		unsigned binding = glsl.get_decoration(resource.id, spv::DecorationBinding);
+		shader.binding_mask |= 1 << binding;
+		shader.descriptor_types[binding] = type;
+	
 	};
 
 	auto max = [](unsigned a, unsigned b) {
 		return a > b ? a : b;
 	};
 
-	// Create context.
-	spvc_context_create(&context);
-	// Set debug callback.
-	spvc_context_set_error_callback(context, spvc_err, nullptr);
-	// Parse the SPIR-V.
-	spvc_context_parse_spirv(context, spirv, word_count, &ir);
-	// Hand it off to a compiler instance and give it ownership of the IR.
-	spvc_context_create_compiler(context, SPVC_BACKEND_GLSL, ir, SPVC_CAPTURE_MODE_TAKE_OWNERSHIP, &compiler_glsl);
-
 	// Get entry point
-	const spvc_entry_point* entry_points;
-	size_t num_entry_points;
-	spvc_compiler_get_entry_points(compiler_glsl, &entry_points, &num_entry_points);
-	LUMEN_ASSERT(num_entry_points == 1, "No entry point found in the shader");
-	shader.stage = get_shader_stage(entry_points[0].execution_model);
+	shader.stage = get_shader_stage(glsl.get_execution_model());
 	// Record execution sizes
-	shader.local_size_x = max(1u, spvc_compiler_get_execution_mode_argument_by_index(compiler_glsl, SpvExecutionModeLocalSize, 0));
-	shader.local_size_y = max(1u, spvc_compiler_get_execution_mode_argument_by_index(compiler_glsl, SpvExecutionModeLocalSize, 1));
-	shader.local_size_z = max(1u, spvc_compiler_get_execution_mode_argument_by_index(compiler_glsl, SpvExecutionModeLocalSize, 2));
-	// Check push constant
-	auto resource_type = SPVC_RESOURCE_TYPE_PUSH_CONSTANT;
-	size_t count;
+	shader.local_size_x = max(1u, glsl.get_execution_mode_argument(spv::ExecutionModeLocalSize, 0));
+	shader.local_size_y = max(1u, glsl.get_execution_mode_argument(spv::ExecutionModeLocalSize, 1));
+	shader.local_size_z = max(1u, glsl.get_execution_mode_argument(spv::ExecutionModeLocalSize, 2));
 
 	// Do reflection
-	spvc_compiler_create_shader_resources(compiler_glsl, &resources);
-	spvc_resources_get_resource_list_for_type(resources, resource_type, &list, &count);
-	if (count >= 1) {
+	if (resources.push_constant_buffers.size() >= 1) {
 		shader.uses_push_constants = true;
 	}
-
 	// Uniform buffer
-	resource_type = SPVC_RESOURCE_TYPE_UNIFORM_BUFFER;
-	spvc_resources_get_resource_list_for_type(resources, resource_type, &list, &count);
-	reflect(list, count, descriptor_Type_map[resource_type]);
+	for (const auto& resource : resources.uniform_buffers) {
+		reflect(resource, descriptor_Type_map[ResourceType::UniformBuffer]);
+	}
+
 	// Storage buffer
-	resource_type = SPVC_RESOURCE_TYPE_STORAGE_BUFFER;
-	spvc_resources_get_resource_list_for_type(resources, resource_type, &list, &count);
-	reflect(list, count, descriptor_Type_map[resource_type]);
+	for (const auto& resource : resources.storage_buffers) {
+		reflect(resource, descriptor_Type_map[ResourceType::StorageBuffer]);
+	}
 	// Storage image
-	resource_type = SPVC_RESOURCE_TYPE_STORAGE_IMAGE;
-	spvc_resources_get_resource_list_for_type(resources, resource_type, &list, &count);
-	reflect(list, count, descriptor_Type_map[resource_type]);
-	//// Combined image sampler
-	//const spvc_combined_image_sampler* samplers;
-	//size_t num_samplers;
-	//spvc_compiler_get_combined_image_samplers(compiler_glsl, &samplers, &num_samplers);
-	// Sampled image
-	resource_type = SPVC_RESOURCE_TYPE_SAMPLED_IMAGE;
-	spvc_resources_get_resource_list_for_type(resources, resource_type, &list, &count);
-	reflect(list, count, descriptor_Type_map[resource_type]);
+	for (const auto& resource : resources.storage_images) {
+		reflect(resource, descriptor_Type_map[ResourceType::StorageImage]);
+	}
+	// Combined image sampler
+	for (const auto& resource : resources.sampled_images) {
+		reflect(resource, descriptor_Type_map[ResourceType::SampledImage]);
+	}
 	// Acceleration structure
-	resource_type = SPVC_RESOURCE_TYPE_ACCELERATION_STRUCTURE;
-	spvc_resources_get_resource_list_for_type(resources, resource_type, &list, &count);
-	if (count > 0) {
-		auto set = spvc_compiler_get_decoration(compiler_glsl, list[0].id, SpvDecorationDescriptorSet);
-		auto binding = spvc_compiler_get_decoration(compiler_glsl, list[0].id, SpvDecorationBinding);
+	if (resources.acceleration_structures.size()) {
+		resources.acceleration_structures[0];
+		auto set = glsl.get_decoration(resources.acceleration_structures[0].id, spv::DecorationDescriptorSet);
+		auto binding = glsl.get_decoration(resources.acceleration_structures[0].id, spv::DecorationBinding);
 		LUMEN_ASSERT(set == 1 && binding == 0, "Make sure the TLAS is bound to set 1, binding 0");
 	}
 
-	//reflect(list, count, descriptor_Type_map[resource_type]);
-
 	// Input attachments for vertex shader
 	if (shader.stage == VK_SHADER_STAGE_VERTEX_BIT) {
-		resource_type = SPVC_RESOURCE_TYPE_STAGE_INPUT;
-		spvc_resources_get_resource_list_for_type(resources, resource_type, &list, &count);
-		for (size_t i = 0; i < count; i++) {
-			auto attachment_idx = spvc_compiler_get_decoration(compiler_glsl, list[i].id, SpvDecorationLocation);
-			auto type = spvc_compiler_get_type_handle(compiler_glsl, list[i].type_id);
-			auto base_type = spvc_type_get_basetype(type);
-			auto vec_size = spvc_type_get_vector_size(type);
-			if (vertex_input_map.find({ base_type, vec_size }) != vertex_input_map.end()) {
-				shader.vertex_inputs.push_back(vertex_input_map[{base_type, vec_size}]);
+		for (const auto& resource : resources.stage_inputs) {
+			auto attachment_idx = glsl.get_decoration(resource.id, spv::DecorationLocation);
+			auto type = glsl.get_type(resource.type_id);
+			auto base_type = glsl.get_type(resource.base_type_id);
+			auto vec_size = type.vecsize;
+			if (vertex_input_map.find({ base_type.basetype, vec_size }) != vertex_input_map.end()) {
+				shader.vertex_inputs.push_back(vertex_input_map[{base_type.basetype, vec_size}]);
 			}
 		}
 	}
-	// Get push constant size
-	resource_type = SPVC_RESOURCE_TYPE_PUSH_CONSTANT;
-	spvc_resources_get_resource_list_for_type(resources, resource_type, &list, &count);
-	if (count > 0) {
-		LUMEN_ASSERT(count <= 1, "Only 1 push constant is supported per shader at the moment!");
-		spvc_type type = spvc_compiler_get_type_handle(compiler_glsl, list[0].type_id);
-		uint32_t pc_size = get_pc_size(compiler_glsl, type);
+	LUMEN_ASSERT(resources.push_constant_buffers.size() <= 1, "Only 1 push constant is supported per shader at the moment!");
+	if (resources.push_constant_buffers.size()) {
+		auto type = glsl.get_type(resources.push_constant_buffers[0].type_id);
+		uint32_t pc_size = get_pc_size(glsl, type);
 		shader.push_constant_size = pc_size;
 	}
-
-	//// Modify options.
-	//const char* result = NULL;
-	//spvc_compiler_options options = NULL;
-	//spvc_compiler_create_compiler_options(compiler_glsl, &options);
-	//spvc_compiler_options_set_uint(options, SPVC_COMPILER_OPTION_GLSL_VERSION, 460);
-	//spvc_compiler_options_set_bool(options, SPVC_COMPILER_OPTION_GLSL_VULKAN_SEMANTICS, SPVC_TRUE);
-	//spvc_compiler_install_compiler_options(compiler_glsl, options);
-
-	//spvc_compiler_compile(compiler_glsl, &result);
-	//printf("Cross-compiled source: %s\n", result);
-
-	// Frees all memory we allocated so far.
-	spvc_context_destroy(context);
+	parse_spirv(glsl, resources, shader, code, code_size, pass);
 }
-
 
 #if USE_SHADERC
 #include <shaderc/shaderc.hpp>
@@ -267,7 +459,6 @@ static std::unordered_map<std::string, shaderc_shader_kind> mstages = {
 	{"rchit", shaderc_closesthit_shader},
 	{"rmiss", shaderc_miss_shader},
 };
-
 
 std::string preprocess_shader(const std::string& source_name,
 							  shaderc_shader_kind kind,
@@ -293,8 +484,6 @@ std::string preprocess_shader(const std::string& source_name,
 	return { result.cbegin(), result.cend() };
 }
 
-// Compiles a shader to SPIR-V assembly. Returns the assembly text
-// as a string.
 std::string compile_file_to_assembly(const std::string& source_name,
 									 shaderc_shader_kind kind,
 									 const std::string& source,
@@ -324,8 +513,6 @@ std::string compile_file_to_assembly(const std::string& source_name,
 	return { result.cbegin(), result.cend() };
 }
 
-// Compiles a shader to a SPIR-V binary. Returns the binary as
-// a vector of 32-bit words.
 std::vector<uint32_t> compile_file(const std::string& source_name,
 								   shaderc_shader_kind kind,
 								   const std::string& source,
@@ -360,7 +547,7 @@ std::vector<uint32_t> compile_file(const std::string& source_name,
 
 Shader::Shader() {}
 Shader::Shader(const std::string& filename) : filename(filename) {}
-int Shader::compile() {
+int Shader::compile(RenderPass* pass) {
 	LUMEN_TRACE("Compiling shader: {0}", filename);
 #if USE_SHADERC
 	std::ifstream fin(filename);
@@ -396,7 +583,7 @@ int Shader::compile() {
 		/*   std::cout << "Compiled to a binary module with " << binary.size()
 			   << " words." << std::endl;*/
 	}
-	parse_shader(*this, binary.data(), binary.size());
+	parse_shader(*this, binary.data(), binary.size(), pass);
 	return 0;
 #else
 	std::string file_path = filename + ".spv";

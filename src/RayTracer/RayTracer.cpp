@@ -102,6 +102,11 @@ void RayTracer::init(Window* window) {
 	props.pNext = &budget_props;
 	vkGetPhysicalDeviceMemoryProperties2(vk_ctx.physical_device, &props);
 	printf("Memory usage %f MB\n", budget_props.heapUsage[0] * 1e-6);
+	//Shader shader("src/shaders/integrators/sppm/calc_bounds.comp");
+	//Shader shader("src/shaders/ray.rchit");
+	//Shader shader("src/shaders/integrators/path/path.rgen");
+	//shader.compile();
+	//abort();
 }
 
 void RayTracer::update() {
@@ -221,7 +226,7 @@ void RayTracer::render(uint32_t i) {
 		)
 		.push_constants(&pc_post_settings)
 						 .bind(integrator->output_tex, integrator->texture_sampler)
-						 .read(integrator->output_tex)
+						 //.read(integrator->output_tex)
 						 .finalize();
 
 	vkb.rg->run(cmdbuf);

@@ -1,0 +1,35 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../commons.h"
+#include "../utils.glsl"
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(binding = 1) uniform sampler2D input_img;
+layout(binding = 2) buffer TestBuffer_ { uint test[]; };
+layout(binding = 3) buffer TestBuffer2_ { float test2; };
+layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
+AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
+void main() {
+    const float max_radius = atomic_data.d.max_radius;
+    vec3 data = atomic_data.d.max_bnds - atomic_data.d.min_bnds;
+    float max_comp = max(data.x, max(data.y, data.z));
+    int base_grid_res = int(max_comp / max_radius);
+
+    vec4 img = texture(input_img, vec2(0,0)).rgba;
+    if (max_comp > 0. && max_radius > 0.) {
+        atomic_data.d.grid_res =
+            max(ivec3(base_grid_res * data / max_comp), ivec3(1));
+    } else {
+        atomic_data.d.grid_res = ivec3(0, 0, 0);
+    }
+
+    test[4] = 5;
+    // test2 = float(test[3]) + 6.0;
+}

@@ -213,6 +213,7 @@
     <ClInclude Include="src\RayTracer\SPPM.h" />
     <ClInclude Include="src\RayTracer\VCM.h" />
     <ClInclude Include="src\Framework\RenderGraphTypes.h" />
+    <ClInclude Include="src\Framework\CommonTypes.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\integrators\bdpt\bdpt.rgen">

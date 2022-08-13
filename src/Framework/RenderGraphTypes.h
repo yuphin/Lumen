@@ -6,11 +6,7 @@
 #include "Framework/Shader.h"
 #include "Framework/Buffer.h"
 #include "Framework/Texture.h"
-struct dim3 {
-	uint32_t x = 1;
-	uint32_t y = 1;
-	uint32_t z = 1;
-};
+#include "CommonTypes.h"
 
 class RenderGraph;
 class RenderPass;
@@ -51,4 +47,42 @@ struct ComputePassSettings {
 	std::vector<uint32_t> specialization_data = {};
 	dim3 dims;
 	std::function<void(VkCommandBuffer cmd, const RenderPass& pass)> pass_func;
+};
+
+enum class PassType {
+	Compute,
+	RT,
+	Graphics
+};
+
+struct ResourceBinding {
+	struct ResourceStatus {
+		bool read = false;
+		bool write = false;
+	};
+	Buffer* buf = nullptr;
+	Texture2D* tex = nullptr;
+	VkSampler sampler = nullptr;
+	bool read = false;
+	bool write = false;
+
+	ResourceBinding(Buffer& buf) : buf(&buf) {}
+	ResourceBinding(Texture2D& tex) : tex(&tex) {}
+	ResourceBinding(Texture2D& tex, VkSampler sampler) : tex(&tex), sampler(sampler) {}
+};
+
+struct BufferSyncDescriptor {
+	// Read-after-write is the default dependency implicitly
+	VkAccessFlags src_access_flags = VK_ACCESS_SHADER_WRITE_BIT;
+	VkAccessFlags dst_access_flags = VK_ACCESS_SHADER_READ_BIT;
+	uint32_t opposing_pass_idx;
+	VkEvent event = nullptr;
+};
+
+struct ImageSyncDescriptor {
+	VkImageLayout old_layout;
+	VkImageLayout new_layout;
+	uint32_t opposing_pass_idx;
+	VkImageAspectFlags image_aspect;
+	VkEvent event = nullptr;
 };

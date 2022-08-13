@@ -84,6 +84,7 @@ void Texture2D::load_from_data(VulkanContext* ctx, void* data,
 							   VkSampler a_sampler, bool generate_mipmaps) {
 	this->ctx = ctx;
 	aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT;
+	usage_flags = VK_IMAGE_USAGE_SAMPLED_BIT;
 	Buffer staging_buffer;
 	staging_buffer.create(ctx, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |

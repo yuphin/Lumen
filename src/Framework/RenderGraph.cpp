@@ -116,22 +116,7 @@ RenderPass& RenderGraph::add_rt(const std::string& name, const RTPassSettings& s
 		pipeline = pipeline_cache[name].pipeline.get();
 	}
 	passes.emplace_back(PassType::RT, pipeline, name, this, pass_idx, settings, cached);
-	auto& pass = passes.back();
-	std::vector<std::future<Shader*>> shader_tasks;
-	shader_tasks.reserve(pass.rt_settings->shaders.size());
-	for (auto& shader : pass.rt_settings->shaders) {
-		if (shader_cache.find(shader.filename) != shader_cache.end()) {
-			shader = shader_cache[shader.filename];
-		} else {
-			shader_tasks.push_back(ThreadPool::submit([](Shader* shader) {shader->compile(); return shader; }, &shader));
-			shader_cache[shader.filename] = shader;
-		}
-	}
-	for (auto& task : shader_tasks) {
-		auto shader = task.get();
-		shader_cache[shader->filename] = *shader;
-	}
-	return pass;
+	return passes.back();
 }
 
 RenderPass& RenderGraph::add_gfx(const std::string& name, const GraphicsPassSettings& settings) {
@@ -155,22 +140,7 @@ RenderPass& RenderGraph::add_gfx(const std::string& name, const GraphicsPassSett
 		pipeline = pipeline_cache[name].pipeline.get();
 	}
 	passes.emplace_back(PassType::Graphics, pipeline, name, this, pass_idx, settings, cached);
-	auto& pass = passes.back();
-	std::vector<std::future<Shader*>> shader_tasks;
-	shader_tasks.reserve(pass.gfx_settings->shaders.size());
-	for (auto& shader : pass.gfx_settings->shaders) {
-		if (shader_cache.find(shader.filename) != shader_cache.end()) {
-			shader = shader_cache[shader.filename];
-		} else {
-			shader_tasks.push_back(ThreadPool::submit([](Shader* shader) {shader->compile(); return shader; }, &shader));
-			shader_cache[shader.filename] = shader;
-		}
-	}
-	for (auto& task : shader_tasks) {
-		auto shader = task.get();
-		shader_cache[shader->filename] = *shader;
-	}
-	return pass;
+	return passes.back();
 }
 
 RenderPass& RenderGraph::add_compute(const std::string& name, const ComputePassSettings& settings) {
@@ -191,15 +161,7 @@ RenderPass& RenderGraph::add_compute(const std::string& name, const ComputePassS
 		pipeline = pipeline_cache[name].pipeline.get();
 	}
 	passes.emplace_back(PassType::Compute, pipeline, name, this, pass_idx, settings, cached);
-	auto& pass = passes.back();
-	auto& shader = pass.compute_settings->shader;
-	if (shader_cache.find(shader.filename) != shader_cache.end()) {
-		shader = shader_cache[shader.filename];
-	} else {
-		shader.compile();
-		shader_cache[shader.filename] = shader;
-	}
-	return pass;
+	return passes.back();
 }
 
 RenderPass& RenderGraph::get_current_pass() {
@@ -226,25 +188,25 @@ RenderPass& RenderPass::bind(std::initializer_list<ResourceBinding> bindings) {
 
 }
 
-RenderPass& RenderPass::bind(const Texture2D& tex, VkSampler sampler) {
+RenderPass& RenderPass::bind(Texture2D& tex, VkSampler sampler) {
 	DIRTY_CHECK(rg->recording);
 	bound_resources.emplace_back(tex, sampler);
 	descriptor_counts.push_back(1);
 	return *this;
 }
 
-RenderPass& RenderPass::bind_texture_array(const std::vector<Texture2D>& textures) {
+RenderPass& RenderPass::bind_texture_array(std::vector<Texture2D>& textures) {
 	DIRTY_CHECK(rg->recording);
-	for (const auto& texture : textures) {
+	for (auto& texture : textures) {
 		bound_resources.emplace_back(texture);
 	}
 	descriptor_counts.push_back((uint32_t)textures.size());
 	return *this;
 }
 
-RenderPass& RenderPass::bind_buffer_array(const std::vector<Buffer>& buffers) {
+RenderPass& RenderPass::bind_buffer_array(std::vector<Buffer>& buffers) {
 	DIRTY_CHECK(rg->recording);
-	for (const auto& buffer : buffers) {
+	for (auto& buffer : buffers) {
 		bound_resources.emplace_back(buffer);
 	}
 	descriptor_counts.push_back((uint32_t)buffers.size());
@@ -267,7 +229,6 @@ RenderPass& RenderPass::read(Buffer& buffer) {
 }
 
 RenderPass& RenderPass::read(Texture2D& tex) {
-
 	VkImageLayout target_layout = get_target_img_layout(tex, VK_ACCESS_SHADER_READ_BIT);
 	register_dependencies(tex, target_layout);
 	rg->img_resource_map[tex.img] = pass_idx;
@@ -284,6 +245,15 @@ RenderPass& RenderPass::read(std::initializer_list<std::reference_wrapper<Textur
 RenderPass& RenderPass::read(std::initializer_list<std::reference_wrapper<Buffer>> buffers) {
 	for (Buffer& buff : buffers) {
 		read(buff);
+	}
+	return *this;
+}
+
+RenderPass& RenderPass::read(ResourceBinding& resource) {
+	if (resource.tex) {
+		read(*resource.tex);
+	} else {
+		read(*resource.buf);
 	}
 	return *this;
 }
@@ -309,6 +279,16 @@ RenderPass& RenderPass::write(std::initializer_list<std::reference_wrapper<Buffe
 RenderPass& RenderPass::write(std::initializer_list<std::reference_wrapper<Texture2D>> texes) {
 	for (Texture2D& tex : texes) {
 		write(tex);
+	}
+	return *this;
+
+}
+
+RenderPass& RenderPass::write(ResourceBinding& resource) {
+	if (resource.tex) {
+		write(*resource.tex);
+	} else {
+		write(*resource.buf);
 	}
 	return *this;
 
@@ -353,25 +333,76 @@ RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<Buffer
 }
 
 void RenderPass::finalize() {
+	auto transition_resources = [this]() {
+		for (auto& bound_resource : bound_resources) {
+			if (bound_resource.write) {
+				write(bound_resource);
+			} else if (bound_resource.read) {
+				read(bound_resource);
+			}
+		}
+		for (auto [buffer, status] : affected_buffer_pointers) {
+			if (status.write) {
+				write(*buffer);
+			} else if (status.read) {
+				read(*buffer);
+			}
+		}
+	};
+
+	auto process_resources = [this](const Shader& shader) {
+		for (auto& [k, v] : shader.buffer_status_map) {
+			if (v.read) {
+				affected_buffer_pointers[k].read = v.read;
+			}
+			if (v.write) {
+				affected_buffer_pointers[k].write = v.write;
+			}
+		}
+	};
+
 	if (!rg->recording) {
+		// Handle resource transitions
+		transition_resources();
 		return;
 	}
+	
+
 	// Create pipelines/push descriptor templates
-	if (!cached) {
-		switch (type) {
-			case PassType::Graphics:
-			{
+	switch (type) {
+		case PassType::Graphics:
+		{
+			if (!is_pipeline_cached) {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline->create_gfx_pipeline(*pass->gfx_settings,
 														pass->descriptor_counts, pass->gfx_settings->color_outputs,
 														pass->gfx_settings->depth_output);
 				};
 				rg->pipeline_tasks.push_back({ func, pass_idx });
-
-				break;
 			}
-			case PassType::RT:
-			{
+
+			std::vector<std::future<Shader*>> shader_tasks;
+			shader_tasks.reserve(gfx_settings->shaders.size());
+			for (auto& shader : gfx_settings->shaders) {
+				if (rg->shader_cache.find(shader.filename) != rg->shader_cache.end()) {
+					shader = rg->shader_cache[shader.filename];
+				} else {
+					shader_tasks.push_back(ThreadPool::submit([this](Shader* shader) {shader->compile(this); return shader; }, &shader));
+				}
+			}
+			for (auto& task : shader_tasks) {
+				auto shader = task.get();
+				rg->shader_cache[shader->filename] = *shader;
+			}
+			for (const auto& shader : gfx_settings->shaders) {
+				process_resources(shader);
+			}
+
+			break;
+		}
+		case PassType::RT:
+		{
+			if (!is_pipeline_cached) {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline->create_rt_pipeline(*pass->rt_settings,
 													   pass->descriptor_counts);
@@ -392,24 +423,53 @@ void RenderPass::finalize() {
 																	 0, &pass->tlas_info);
 					vkUpdateDescriptorSets(pass->rg->ctx->device, 1, &descriptor_write, 0, nullptr);
 				};
-
 				rg->pipeline_tasks.push_back({ func, pass_idx });
-
-				break;
 			}
-			case PassType::Compute:
-			{
+		
+			std::vector<std::future<Shader*>> shader_tasks;
+			shader_tasks.reserve(rt_settings->shaders.size());
+			for (auto& shader : rt_settings->shaders) {
+				if (rg->shader_cache.find(shader.filename) != rg->shader_cache.end()) {
+					shader = rg->shader_cache[shader.filename];
+				} else {
+					shader_tasks.push_back(ThreadPool::submit([this](Shader* shader) {shader->compile(this); return shader; }, &shader));
+					//shader.compile(this);
+					rg->shader_cache[shader.filename] = shader;
+				}
+			}
+			for (auto& task : shader_tasks) {
+				auto shader = task.get();
+				rg->shader_cache[shader->filename] = *shader;
+			}
+			for (const auto& shader : rt_settings->shaders) {
+				process_resources(shader);
+			}
+
+			break;
+		}
+		case PassType::Compute:
+		{
+			if (!is_pipeline_cached) {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline->create_compute_pipeline(*pass->compute_settings,
 															pass->descriptor_counts);
 				};
 				rg->pipeline_tasks.push_back({ func, pass_idx });
-				break;
 			}
-			default:
-				break;
+			auto& shader = compute_settings->shader;
+			if (rg->shader_cache.find(shader.filename) != rg->shader_cache.end()) {
+				shader = rg->shader_cache[shader.filename];
+			} else {
+				shader.compile(this);
+				rg->shader_cache[shader.filename] = shader;
+			}
+			affected_buffer_pointers = shader.buffer_status_map;
+			break;
 		}
+		default:
+			break;
 	}
+	transition_resources();
 	// Fill in descriptor infos
 	for (int i = 0; i < bound_resources.size(); i++) {
 		descriptor_infos[i] = bound_resources[i].buf ?

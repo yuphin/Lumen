@@ -70,6 +70,13 @@ void SPPM::init() {
 	pc_ray.frame_num = 0;
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
+
+
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, sppm_data_addr, &sppm_data_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, atomic_data_addr, &atomic_data_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, &photon_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
 }
 
 void SPPM::render() {
@@ -115,9 +122,9 @@ void SPPM::render() {
 		)
 		.push_constants(&pc_ray)
 		.bind(scene_desc_buffer)
-		.read(sppm_data_buffer)
+		//.read(sppm_data_buffer)
 		.zero({residual_buffer,counter_buffer})
-		.write(residual_buffer)
+		//.write(residual_buffer)
 		.finalize();
 		while (num_wgs != 1) {
 			instance->vkb.rg->add_compute(
@@ -129,7 +136,7 @@ void SPPM::render() {
 			)
 			.push_constants(&pc_ray)
 			.bind(scene_desc_buffer)
-			.write({counter_buffer,atomic_data_buffer,residual_buffer })
+			//.write({counter_buffer,atomic_data_buffer,residual_buffer })
 			.finalize();
 			num_wgs = (uint32_t)(num_wgs + 1023) / 1024.0f;
 		}
@@ -150,7 +157,7 @@ void SPPM::render() {
 		.push_constants(&pc_ray)
 		.zero(photon_buffer)
 		.zero(sppm_data_buffer, /*cond=*/pc_ray.frame_num == 0)
-		.write(sppm_data_buffer)
+		//.write(sppm_data_buffer)
 		.bind({
 			output_tex,
 			prim_lookup_buffer,
@@ -174,7 +181,7 @@ void SPPM::render() {
 		}
 	)
 		.bind(scene_desc_buffer)
-		.write(atomic_data_buffer)
+		//.write(atomic_data_buffer)
 		.finalize();
 	// Trace from light
 	instance->vkb.rg
@@ -189,8 +196,8 @@ void SPPM::render() {
 			 .dims = {instance->width, instance->height},
 			 .accel = instance->vkb.tlas.accel })
 	.push_constants(&pc_ray)
-	.read(atomic_data_buffer)
-	.write(photon_buffer)
+	//.read(atomic_data_buffer)
+	//.write(photon_buffer)
 	.bind({
 		output_tex,
 		prim_lookup_buffer,
@@ -212,9 +219,9 @@ void SPPM::render() {
 	.push_constants(&pc_ray)
 	.bind(scene_desc_buffer)
 	.bind_texture_array(diffuse_textures)
-	.read(photon_buffer)
-	.read(atomic_data_buffer)
-	.write(sppm_data_buffer)
+	//.read(photon_buffer)
+	//.read(atomic_data_buffer)
+	//.write(sppm_data_buffer)
 	.finalize();
 	// Composite
 	instance->vkb.rg->add_compute(
@@ -226,8 +233,8 @@ void SPPM::render() {
 	)
 	.push_constants(&pc_ray)
 	.bind({ output_tex, scene_desc_buffer })
-	.read(sppm_data_buffer)
-	.write(output_tex)
+	//.read(sppm_data_buffer)
+	//.write(output_tex)
 	.finalize();
 }
 

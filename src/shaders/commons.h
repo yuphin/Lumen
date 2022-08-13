@@ -535,6 +535,11 @@ struct SceneDesc {
     uint64_t probe_offsets_addr;
 };
 
+struct Desc2 {
+    uint64_t test_addr;
+
+};
+
 struct PostDesc {
     uint64_t out_img_addr;
     uint64_t gt_img_addr;

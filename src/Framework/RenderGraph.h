@@ -7,6 +7,17 @@
 #include "Framework/EventPool.h"
 #include "Framework/RenderGraphTypes.h"
 
+
+#define TO_STR(V) (#V)
+
+#define REGISTER_BUFFER_WITH_ADDRESS(struct_type, struct_name, field_name, buffer_ptr, rg) do {\
+			auto key = std::string(#struct_type) + '_' + std::string(#field_name); \
+			rg->registered_buffer_pointers[key] = buffer_ptr; \
+           } while(0)
+#define REGISTER_BUFFER(X, Y)  ((X) < (Y) ? (X) : (Y))
+#define REGISTER_IMAGE(X, Y)  ((X) < (Y) ? (X) : (Y))
+
+
 struct AccelKHR {
 	VkAccelerationStructureKHR accel = VK_NULL_HANDLE;
 	Buffer buffer;
@@ -15,74 +26,41 @@ struct AccelKHR {
 class RenderGraph;
 class RenderPass;
 
-enum class PassType {
-	Compute,
-	RT,
-	Graphics
-};
-
-
-struct ResourceBinding {
-	const Buffer* buf = nullptr;
-	const Texture2D* tex = nullptr;
-	VkSampler sampler = nullptr;
-	ResourceBinding(const Buffer& buf) : buf(&buf) {}
-	ResourceBinding(const Texture2D& tex) : tex(&tex) {}
-	ResourceBinding(const Texture2D& tex, VkSampler sampler) : tex(&tex), sampler(sampler) {}
-
-};
-
-
-
-struct BufferSyncDescriptor {
-	// Read-after-write is the default dependency implicitly
-	VkAccessFlags src_access_flags = VK_ACCESS_SHADER_WRITE_BIT;
-	VkAccessFlags dst_access_flags = VK_ACCESS_SHADER_READ_BIT;
-	uint32_t opposing_pass_idx;
-	VkEvent event = nullptr;
-};
-
-struct ImageSyncDescriptor {
-	VkImageLayout old_layout;
-	VkImageLayout new_layout;
-	uint32_t opposing_pass_idx;
-	VkImageAspectFlags image_aspect;
-	VkEvent event = nullptr;
-};
-
 class RenderPass {
 public:
-	RenderPass(PassType type, Pipeline* pipeline, 
-			   const std::string& name, RenderGraph* rg, uint32_t pass_idx, 
+	RenderPass(PassType type, Pipeline* pipeline,
+			   const std::string& name, RenderGraph* rg, uint32_t pass_idx,
 			   const GraphicsPassSettings& gfx_settings, bool cached = false) :
 		type(type), pipeline(pipeline), name(name), rg(rg), pass_idx(pass_idx),
-		gfx_settings(std::make_unique<GraphicsPassSettings>(gfx_settings)), cached(cached) {}
+		gfx_settings(std::make_unique<GraphicsPassSettings>(gfx_settings)), is_pipeline_cached(cached) {}
 
 	RenderPass(PassType type, Pipeline* pipeline,
 			   const std::string& name, RenderGraph* rg, uint32_t pass_idx,
 			   const RTPassSettings& rt_settings, bool cached = false) :
 		type(type), pipeline(pipeline), name(name), rg(rg), pass_idx(pass_idx),
-		rt_settings(std::make_unique<RTPassSettings>(rt_settings)), cached(cached) {}
+		rt_settings(std::make_unique<RTPassSettings>(rt_settings)), is_pipeline_cached(cached) {}
 
 	RenderPass(PassType type, Pipeline* pipeline,
 			   const std::string& name, RenderGraph* rg, uint32_t pass_idx,
 			   const ComputePassSettings& compute_settings, bool cached = false) :
 		type(type), pipeline(pipeline), name(name), rg(rg), pass_idx(pass_idx),
-		compute_settings(std::make_unique<ComputePassSettings>(compute_settings)), cached(cached) {}
+		compute_settings(std::make_unique<ComputePassSettings>(compute_settings)), is_pipeline_cached(cached) {}
 
 	RenderPass& bind(const ResourceBinding& binding);
-	RenderPass& bind(const Texture2D& tex, VkSampler sampler);
+	RenderPass& bind(Texture2D& tex, VkSampler sampler);
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
-	RenderPass& bind_texture_array(const std::vector<Texture2D>& texes);
-	RenderPass& bind_buffer_array(const std::vector<Buffer>& buffers);
+	RenderPass& bind_texture_array(std::vector<Texture2D>& texes);
+	RenderPass& bind_buffer_array(std::vector<Buffer>& buffers);
 	RenderPass& bind_tlas(const AccelKHR& tlas);
 	RenderPass& read(Buffer& buffer);
 	RenderPass& read(Texture2D& tex);
+	RenderPass& read(ResourceBinding& resource);
 	RenderPass& read(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
 	RenderPass& read(std::initializer_list<std::reference_wrapper<Texture2D>> texes);
 	RenderPass& write(Texture2D& tex);
 	RenderPass& write(Buffer& buffer);
 	RenderPass& write(Buffer& buffer, VkAccessFlags access_flags);
+	RenderPass& write(ResourceBinding& resource);
 	RenderPass& write(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
 	RenderPass& write(std::initializer_list<std::reference_wrapper<Texture2D>> texes);
 
@@ -93,6 +71,11 @@ public:
 	RenderPass& zero(Buffer& buffer, bool cond);
 	void finalize();
 	friend RenderGraph;
+	std::vector<ResourceBinding> bound_resources;
+
+
+	std::unordered_map<Buffer*, BufferStatus> affected_buffer_pointers;
+	RenderGraph* rg;
 private:
 
 	void run(VkCommandBuffer cmd);
@@ -100,18 +83,12 @@ private:
 	void register_dependencies(Texture2D& tex, VkImageLayout target_layout);
 
 	std::string name;
-	RenderGraph* rg;
 	PassType type;
 	Pipeline* pipeline;
 	uint32_t pass_idx;
 	std::vector<uint32_t> descriptor_counts;
 	void* push_constant_data = nullptr;
-	//struct {
-	//	void* data = nullptr;
-	//	uint32_t size = 0;
-	//} push_constant;
-	bool cached;
-
+	bool is_pipeline_cached;
 	/*
 		Note:
 		The assumption is that a SyncDescriptor is unique to a pass (either via Buffer or Image).
@@ -123,7 +100,6 @@ private:
 	std::unordered_map<VkImage, ImageSyncDescriptor> set_signals_img;
 	std::unordered_map<VkImage, ImageSyncDescriptor> wait_signals_img;
 
-	std::vector<ResourceBinding> bound_resources;
 	DescriptorInfo descriptor_infos[32] = {};
 
 	std::vector<std::pair<Texture2D*, VkImageLayout>> layout_transitions;
@@ -146,7 +122,6 @@ private:
 	std::unique_ptr<GraphicsPassSettings> gfx_settings = nullptr;
 	std::unique_ptr<RTPassSettings> rt_settings = nullptr;
 	std::unique_ptr<ComputePassSettings> compute_settings = nullptr;
-
 	bool disable_execution = false;
 };
 
@@ -165,7 +140,12 @@ public:
 	friend RenderPass;
 	bool recording = true;
 	EventPool event_pool;
+
+
+
+	std::unordered_map<std::string, Buffer*> registered_buffer_pointers;
 private:
+
 	struct BufferSyncResources {
 		std::vector<VkBufferMemoryBarrier2> buffer_bariers;
 		std::vector<VkDependencyInfo> dependency_infos;
