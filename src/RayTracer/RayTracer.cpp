@@ -50,6 +50,7 @@ void RayTracer::init(Window* window) {
 	initialized = true;
 
 	scene.load_scene(scene_name);
+	vkb.rg->settings.shader_inference = true;
 	switch (scene.config.integrator_type) {
 		case IntegratorType::Path:
 			integrator = std::make_unique<Path>(this, &scene);
@@ -101,7 +102,6 @@ void RayTracer::init(Window* window) {
 	props.pNext = &budget_props;
 	vkGetPhysicalDeviceMemoryProperties2(vk_ctx.physical_device, &props);
 	printf("Memory usage %f MB\n", budget_props.heapUsage[0] * 1e-6);
-	vkb.rg->settings.shader_inference = true;
 }
 
 void RayTracer::update() {
