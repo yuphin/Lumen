@@ -1,15 +1,16 @@
 #pragma once
 #include "Integrator.h"
 class ReSTIR : public Integrator {
-public:
-	ReSTIR(LumenInstance* scene, LumenScene* lumen_scene) :
-		Integrator(scene, lumen_scene) {}
+   public:
+	ReSTIR(LumenInstance* scene, LumenScene* lumen_scene)
+		: Integrator(scene, lumen_scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
 	virtual void destroy() override;
 	virtual void reload() override;
-private:
+
+   private:
 	Buffer g_buffer;
 	Buffer passthrough_reservoir_buffer;
 	Buffer temporal_reservoir_buffer;
@@ -30,6 +31,4 @@ private:
 	std::unique_ptr<Pipeline> temporal_pass_pipeline;
 	std::unique_ptr<Pipeline> output_pipeline;
 	bool do_spatiotemporal = false;
-
 };
-

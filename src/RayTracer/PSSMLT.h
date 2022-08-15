@@ -1,15 +1,16 @@
 #pragma once
 #include "Integrator.h"
 class PSSMLT : public Integrator {
-public:
-	PSSMLT(LumenInstance* scene, LumenScene* lumen_scene) :
-		Integrator(scene, lumen_scene) {}
+   public:
+	PSSMLT(LumenInstance* scene, LumenScene* lumen_scene)
+		: Integrator(scene, lumen_scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
 	virtual void destroy() override;
 	virtual void reload() override;
-private:
+
+   private:
 	void create_offscreen_resources();
 	void create_descriptors();
 	void create_blas();
@@ -57,6 +58,4 @@ private:
 	int light_path_rand_count;
 	int cam_path_rand_count;
 	int connect_path_rand_count;
-
 };
-

@@ -9,17 +9,18 @@ uint32_t find_memory_type(VkPhysicalDevice* physical_device,
 
 void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
 							 VkImageLayout old_layout, VkImageLayout new_layout,
-							 VkImageSubresourceRange subresource_range, VkImageAspectFlags aspect_flags);
+							 VkImageSubresourceRange subresource_range,
+							 VkImageAspectFlags aspect_flags);
 //
 //// In case the user wants to specify source and destination stages
 //
-//void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
+// void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
 //							 VkImageLayout old_layout, VkImageLayout new_layout,
 //							 VkPipelineStageFlags source_stage,
 //							 VkPipelineStageFlags destination_stage,
 //							 VkImageSubresourceRange subresource_range);
 //
-//inline void transition_image_layout(
+// inline void transition_image_layout(
 //	VkCommandBuffer copy_cmd, VkImage image, VkImageLayout old_layout,
 //	VkImageLayout new_layout,
 //	VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT) {
@@ -32,9 +33,9 @@ void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
 //	transition_image_layout(copy_cmd, image, old_layout, new_layout, range);
 //}
 
-VkImageView
-create_image_view(VkDevice device, const VkImage& img, VkFormat format,
-				  VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT);
+VkImageView create_image_view(
+	VkDevice device, const VkImage& img, VkFormat format,
+	VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT);
 
 BlasInput to_vk_geometry(GltfPrimMesh& prim, VkDeviceAddress vertex_address,
 						 VkDeviceAddress index_address);
@@ -59,14 +60,15 @@ inline VkTransformMatrixKHR to_vk_matrix(const glm::mat4& mat) {
 	return out_matrix;
 }
 
-template <class T> constexpr T align_up(T x, size_t a) noexcept {
+template <class T>
+constexpr T align_up(T x, size_t a) noexcept {
 	return T((x + (T(a) - 1)) & ~T(a - 1));
 }
 
 inline VkBufferMemoryBarrier buffer_barrier(VkBuffer buffer,
 											VkAccessFlags src_accesss,
 											VkAccessFlags dst_access) {
-	VkBufferMemoryBarrier result = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
+	VkBufferMemoryBarrier result = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
 	result.srcAccessMask = src_accesss;
 	result.dstAccessMask = dst_access;
 	result.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -82,7 +84,7 @@ inline VkBufferMemoryBarrier2 buffer_barrier2(VkBuffer buffer,
 											  VkAccessFlags dst_access,
 											  VkPipelineStageFlags src_stage,
 											  VkPipelineStageFlags dst_stage) {
-	VkBufferMemoryBarrier2 result = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+	VkBufferMemoryBarrier2 result = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2};
 	result.srcAccessMask = src_access;
 	result.dstAccessMask = dst_access;
 	result.srcStageMask = src_stage;
@@ -101,7 +103,7 @@ inline VkImageMemoryBarrier image_barrier(VkImage image,
 										  VkImageLayout old_layout,
 										  VkImageLayout new_layout,
 										  VkImageAspectFlags aspect_mask) {
-	VkImageMemoryBarrier result = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+	VkImageMemoryBarrier result = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
 
 	result.srcAccessMask = src_accesss;
 	result.dstAccessMask = dst_access;
@@ -117,16 +119,12 @@ inline VkImageMemoryBarrier image_barrier(VkImage image,
 	return result;
 }
 
-inline VkImageMemoryBarrier2 image_barrier2(VkImage image,
-										   VkAccessFlags src_accesss,
-										   VkAccessFlags dst_access,
-										   VkImageLayout old_layout,
-										   VkImageLayout new_layout,
-										   VkImageAspectFlags aspect_mask,
-										   VkPipelineStageFlags src_stage,
-										   VkPipelineStageFlags dst_stage) {
-	VkImageMemoryBarrier2 result = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
-
+inline VkImageMemoryBarrier2 image_barrier2(
+	VkImage image, VkAccessFlags src_accesss, VkAccessFlags dst_access,
+	VkImageLayout old_layout, VkImageLayout new_layout,
+	VkImageAspectFlags aspect_mask, VkPipelineStageFlags src_stage,
+	VkPipelineStageFlags dst_stage) {
+	VkImageMemoryBarrier2 result = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
 
 	result.srcAccessMask = src_accesss;
 	result.dstAccessMask = dst_access;
@@ -143,17 +141,12 @@ inline VkImageMemoryBarrier2 image_barrier2(VkImage image,
 	return result;
 }
 
-inline VkImageMemoryBarrier2 image_barrier2(VkImage image,
-											VkAccessFlags src_accesss,
-											VkAccessFlags dst_access,
-											VkImageLayout old_layout,
-											VkImageLayout new_layout,
-											VkImageAspectFlags aspect_mask,
-											VkPipelineStageFlags src_stage,
-											VkPipelineStageFlags dst_stage,
-											uint32_t queue_idx) {
-	VkImageMemoryBarrier2 result = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
-
+inline VkImageMemoryBarrier2 image_barrier2(
+	VkImage image, VkAccessFlags src_accesss, VkAccessFlags dst_access,
+	VkImageLayout old_layout, VkImageLayout new_layout,
+	VkImageAspectFlags aspect_mask, VkPipelineStageFlags src_stage,
+	VkPipelineStageFlags dst_stage, uint32_t queue_idx) {
+	VkImageMemoryBarrier2 result = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
 
 	result.srcAccessMask = src_accesss;
 	result.dstAccessMask = dst_access;
@@ -172,15 +165,15 @@ inline VkImageMemoryBarrier2 image_barrier2(VkImage image,
 
 inline VkDeviceAddress get_device_address(VkDevice device, VkBuffer handle) {
 	VkBufferDeviceAddressInfo info = {
-		VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
+		VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
 	info.buffer = handle;
 	return vkGetBufferDeviceAddress(device, &info);
 }
 
 inline uint32_t calc_mip_levels(VkExtent2D extent) {
 	return static_cast<uint32_t>(
-		std::floor(std::log2(std::max(extent.width, extent.height)))) +
-		1;
+			   std::floor(std::log2(std::max(extent.width, extent.height)))) +
+		   1;
 }
 
 VkImageCreateInfo make_img2d_ci(
@@ -190,55 +183,54 @@ VkImageCreateInfo make_img2d_ci(
 void dispatch_compute(const Pipeline& pipeline, VkCommandBuffer cmdbuf,
 					  int wg_x, int wg_y, int width, int height);
 
+uint32_t get_bindings(const std::vector<Shader>& shaders,
+					  VkDescriptorType* descriptor_types);
 
-uint32_t get_bindings(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types);
-
-VkImageLayout get_target_img_layout(const Texture2D& tex, VkAccessFlags access_flags);
-
+VkImageLayout get_target_img_layout(const Texture2D& tex,
+									VkAccessFlags access_flags);
 
 namespace DebugMarker {
-	inline void set_resource_name(VkDevice device, uint64_t obj,
-								  const char* name, VkObjectType type) {
+inline void set_resource_name(VkDevice device, uint64_t obj, const char* name,
+							  VkObjectType type) {
 #if _DEBUG
-		VkDebugUtilsObjectNameInfoEXT debug_utils_name{
-			VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
-			nullptr, type, obj, name
-		};
-		vkSetDebugUtilsObjectNameEXT(device, &debug_utils_name);
+	VkDebugUtilsObjectNameInfoEXT debug_utils_name{
+		VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT, nullptr, type, obj,
+		name};
+	vkSetDebugUtilsObjectNameEXT(device, &debug_utils_name);
 #endif
-	}
-	inline void begin_region(VkDevice device, VkCommandBuffer cmd, const char* name, glm::vec4 color) {
-		auto pfnCmdDebugMarkerBegin =
-			reinterpret_cast<PFN_vkCmdDebugMarkerBeginEXT>
-			(vkGetDeviceProcAddr(device, "vkCmdDebugMarkerBeginEXT"));
-		if (pfnCmdDebugMarkerBegin) {
-			VkDebugMarkerMarkerInfoEXT info = {};
-			info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
-			memcpy(info.color, &color[0], sizeof(float) * 4);
-			info.pMarkerName = name;
-			pfnCmdDebugMarkerBegin(cmd, &info);
-		}
-	}
-
-	inline void end_region(VkDevice device, VkCommandBuffer cmd) {
-		auto pfnCmdDebugMarkerEnd =
-			reinterpret_cast<PFN_vkCmdDebugMarkerEndEXT>
-			(vkGetDeviceProcAddr(device, "vkCmdDebugMarkerEndEXT"));
-		if (pfnCmdDebugMarkerEnd) {
-			pfnCmdDebugMarkerEnd(cmd);
-		}
-	}
-	inline void insert(VkDevice device, VkCommandBuffer cmd, const char* name, glm::vec4 color) {
-		auto pfnCmdDebugMarkerInsert =
-			reinterpret_cast<PFN_vkCmdDebugMarkerInsertEXT>
-			(vkGetDeviceProcAddr(device, "vkCmdDebugMarkerInsertEXT"));
-		if (pfnCmdDebugMarkerInsert) {
-			VkDebugMarkerMarkerInfoEXT info = {};
-			info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
-			memcpy(info.color, &color[0], sizeof(float) * 4);
-			info.pMarkerName = name;
-			pfnCmdDebugMarkerInsert(cmd, &info);
-		}
+}
+inline void begin_region(VkDevice device, VkCommandBuffer cmd, const char* name,
+						 glm::vec4 color) {
+	auto pfnCmdDebugMarkerBegin =
+		reinterpret_cast<PFN_vkCmdDebugMarkerBeginEXT>(
+			vkGetDeviceProcAddr(device, "vkCmdDebugMarkerBeginEXT"));
+	if (pfnCmdDebugMarkerBegin) {
+		VkDebugMarkerMarkerInfoEXT info = {};
+		info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
+		memcpy(info.color, &color[0], sizeof(float) * 4);
+		info.pMarkerName = name;
+		pfnCmdDebugMarkerBegin(cmd, &info);
 	}
 }
 
+inline void end_region(VkDevice device, VkCommandBuffer cmd) {
+	auto pfnCmdDebugMarkerEnd = reinterpret_cast<PFN_vkCmdDebugMarkerEndEXT>(
+		vkGetDeviceProcAddr(device, "vkCmdDebugMarkerEndEXT"));
+	if (pfnCmdDebugMarkerEnd) {
+		pfnCmdDebugMarkerEnd(cmd);
+	}
+}
+inline void insert(VkDevice device, VkCommandBuffer cmd, const char* name,
+				   glm::vec4 color) {
+	auto pfnCmdDebugMarkerInsert =
+		reinterpret_cast<PFN_vkCmdDebugMarkerInsertEXT>(
+			vkGetDeviceProcAddr(device, "vkCmdDebugMarkerInsertEXT"));
+	if (pfnCmdDebugMarkerInsert) {
+		VkDebugMarkerMarkerInfoEXT info = {};
+		info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
+		memcpy(info.color, &color[0], sizeof(float) * 4);
+		info.pMarkerName = name;
+		pfnCmdDebugMarkerInsert(cmd, &info);
+	}
+}
+}  // namespace DebugMarker

@@ -7,46 +7,60 @@
 #include "Framework/EventPool.h"
 #include "Framework/RenderGraphTypes.h"
 
-
 #define TO_STR(V) (#V)
 
-#define REGISTER_BUFFER_WITH_ADDRESS(struct_type, struct_name, field_name, buffer_ptr, rg) do {\
-			auto key = std::string(#struct_type) + '_' + std::string(#field_name); \
-			rg->registered_buffer_pointers[key] = buffer_ptr; \
-           } while(0)
-#define REGISTER_BUFFER(X, Y)  ((X) < (Y) ? (X) : (Y))
-#define REGISTER_IMAGE(X, Y)  ((X) < (Y) ? (X) : (Y))
-
+#define REGISTER_BUFFER_WITH_ADDRESS(struct_type, struct_name, field_name,     \
+									 buffer_ptr, rg)                           \
+	do {                                                                       \
+		auto key = std::string(#struct_type) + '_' + std::string(#field_name); \
+		rg->registered_buffer_pointers[key] = buffer_ptr;                      \
+	} while (0)
+#define REGISTER_BUFFER(X, Y) ((X) < (Y) ? (X) : (Y))
+#define REGISTER_IMAGE(X, Y) ((X) < (Y) ? (X) : (Y))
 
 struct AccelKHR {
 	VkAccelerationStructureKHR accel = VK_NULL_HANDLE;
 	Buffer buffer;
 };
 
-
-
 class RenderGraph;
 class RenderPass;
 
 class RenderPass {
-public:
-	RenderPass(PassType type, Pipeline* pipeline,
-			   const std::string& name, RenderGraph* rg, uint32_t pass_idx,
-			   const GraphicsPassSettings& gfx_settings, bool cached = false) :
-		type(type), pipeline(pipeline), name(name), rg(rg), pass_idx(pass_idx),
-		gfx_settings(std::make_unique<GraphicsPassSettings>(gfx_settings)), is_pipeline_cached(cached) {}
+   public:
+	RenderPass(PassType type, Pipeline* pipeline, const std::string& name,
+			   RenderGraph* rg, uint32_t pass_idx,
+			   const GraphicsPassSettings& gfx_settings, bool cached = false)
+		: type(type),
+		  pipeline(pipeline),
+		  name(name),
+		  rg(rg),
+		  pass_idx(pass_idx),
+		  gfx_settings(std::make_unique<GraphicsPassSettings>(gfx_settings)),
+		  is_pipeline_cached(cached) {}
 
-	RenderPass(PassType type, Pipeline* pipeline,
-			   const std::string& name, RenderGraph* rg, uint32_t pass_idx,
-			   const RTPassSettings& rt_settings, bool cached = false) :
-		type(type), pipeline(pipeline), name(name), rg(rg), pass_idx(pass_idx),
-		rt_settings(std::make_unique<RTPassSettings>(rt_settings)), is_pipeline_cached(cached) {}
+	RenderPass(PassType type, Pipeline* pipeline, const std::string& name,
+			   RenderGraph* rg, uint32_t pass_idx,
+			   const RTPassSettings& rt_settings, bool cached = false)
+		: type(type),
+		  pipeline(pipeline),
+		  name(name),
+		  rg(rg),
+		  pass_idx(pass_idx),
+		  rt_settings(std::make_unique<RTPassSettings>(rt_settings)),
+		  is_pipeline_cached(cached) {}
 
-	RenderPass(PassType type, Pipeline* pipeline,
-			   const std::string& name, RenderGraph* rg, uint32_t pass_idx,
-			   const ComputePassSettings& compute_settings, bool cached = false) :
-		type(type), pipeline(pipeline), name(name), rg(rg), pass_idx(pass_idx),
-		compute_settings(std::make_unique<ComputePassSettings>(compute_settings)), is_pipeline_cached(cached) {}
+	RenderPass(PassType type, Pipeline* pipeline, const std::string& name,
+			   RenderGraph* rg, uint32_t pass_idx,
+			   const ComputePassSettings& compute_settings, bool cached = false)
+		: type(type),
+		  pipeline(pipeline),
+		  name(name),
+		  rg(rg),
+		  pass_idx(pass_idx),
+		  compute_settings(
+			  std::make_unique<ComputePassSettings>(compute_settings)),
+		  is_pipeline_cached(cached) {}
 
 	RenderPass& bind(const ResourceBinding& binding);
 	RenderPass& bind(Texture2D& tex, VkSampler sampler);
@@ -60,21 +74,25 @@ public:
 	RenderPass& read(Texture2D& tex);
 	RenderPass& read(Buffer& buffer);
 	RenderPass& read(ResourceBinding& resource);
-	RenderPass& read(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
-	RenderPass& read(std::initializer_list<std::reference_wrapper<Texture2D>> texes);
+	RenderPass& read(
+		std::initializer_list<std::reference_wrapper<Buffer>> buffers);
+	RenderPass& read(
+		std::initializer_list<std::reference_wrapper<Texture2D>> texes);
 	RenderPass& write(ResourceBinding& resource);
-	RenderPass& write(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
-	RenderPass& write(std::initializer_list<std::reference_wrapper<Texture2D>> texes);
+	RenderPass& write(
+		std::initializer_list<std::reference_wrapper<Buffer>> buffers);
+	RenderPass& write(
+		std::initializer_list<std::reference_wrapper<Texture2D>> texes);
 
 	RenderPass& skip_execution();
 	RenderPass& push_constants(void* data);
 	RenderPass& zero(Buffer& buffer);
-	RenderPass& zero(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
+	RenderPass& zero(
+		std::initializer_list<std::reference_wrapper<Buffer>> buffers);
 	RenderPass& zero(Buffer& buffer, bool cond);
 	void finalize();
 	friend RenderGraph;
 	std::vector<ResourceBinding> bound_resources;
-
 
 	std::unordered_map<Buffer*, BufferStatus> affected_buffer_pointers;
 	RenderGraph* rg;
@@ -82,13 +100,13 @@ public:
 	std::unique_ptr<RTPassSettings> rt_settings = nullptr;
 	std::unique_ptr<ComputePassSettings> compute_settings = nullptr;
 	PassType type;
-private:
+
+   private:
 	// When the automatic inference isn't used
 	std::vector<Buffer*> explicit_buffer_writes;
 	std::vector<Buffer*> explicit_buffer_reads;
 	std::vector<Texture2D*> explicit_tex_writes;
 	std::vector<Texture2D*> explicit_tex_reads;
-
 
 	void write_impl(Buffer& buffer, VkAccessFlags access_flags);
 	void write_impl(Texture2D& tex);
@@ -108,8 +126,9 @@ private:
 	bool is_pipeline_cached;
 	/*
 		Note:
-		The assumption is that a SyncDescriptor is unique to a pass (either via Buffer or Image).
-		Which is reasonable because each pass is comprised of a single shader dispatch
+		The assumption is that a SyncDescriptor is unique to a pass (either via
+	   Buffer or Image). Which is reasonable because each pass is comprised of a
+	   single shader dispatch
 	*/
 	std::unordered_map<VkBuffer, BufferSyncDescriptor> set_signals_buffer;
 	std::unordered_map<VkBuffer, BufferSyncDescriptor> wait_signals_buffer;
@@ -130,26 +149,26 @@ private:
 	std::vector<BufferBarrier> buffer_barriers;
 	/*
 		Potentially 1 descriptor pool for a pass where we have to keep the
-		TLAS descriptor, because we can't push its descriptor with a template as of Vulkan 1.3
+		TLAS descriptor, because we can't push its descriptor with a template as
+	   of Vulkan 1.3
 	*/
 	VkDescriptorPool tlas_descriptor_pool = nullptr;
 	VkDescriptorSet tlas_descriptor_set = nullptr;
 	VkWriteDescriptorSetAccelerationStructureKHR tlas_info = {};
 
-
 	bool disable_execution = false;
-
 };
 
 class RenderGraph {
-
-public:
+   public:
 	RenderGraph(VulkanContext* ctx) : ctx(ctx) { pipeline_tasks.reserve(32); }
 	RenderPass& current_pass() { return passes.back(); }
 
 	RenderPass& add_rt(const std::string& name, const RTPassSettings& settings);
-	RenderPass& add_gfx(const std::string& name, const GraphicsPassSettings& settings);
-	RenderPass& add_compute(const std::string& name, const ComputePassSettings& settings);
+	RenderPass& add_gfx(const std::string& name,
+						const GraphicsPassSettings& settings);
+	RenderPass& add_compute(const std::string& name,
+							const ComputePassSettings& settings);
 	RenderPass& get_current_pass();
 	void run(VkCommandBuffer cmd);
 	void reset(VkCommandBuffer cmd);
@@ -159,7 +178,8 @@ public:
 	std::unordered_map<std::string, Buffer*> registered_buffer_pointers;
 	std::unordered_map<std::string, Shader> shader_cache;
 	RenderGraphSettings settings;
-private:
+
+   private:
 	struct BufferSyncResources {
 		std::vector<VkBufferMemoryBarrier2> buffer_bariers;
 		std::vector<VkDependencyInfo> dependency_infos;
@@ -171,17 +191,21 @@ private:
 
 	struct PipelineStorage {
 		std::unique_ptr<Pipeline> pipeline;
-		uint32_t offset_idx; // Offset index relative to the pass_idx the pipeline holds
+		uint32_t offset_idx;  // Offset index relative to the pass_idx the
+							  // pipeline holds
 		std::vector<uint32_t> pass_idxs;
 	};
 	VulkanContext* ctx = nullptr;
 	std::vector<RenderPass> passes;
 	std::unordered_map<std::string, PipelineStorage> pipeline_cache;
-	std::vector<std::pair<std::function<void(RenderPass*)>, uint32_t>> pipeline_tasks;
-	std::vector <std::function<void(RenderPass*)>> shader_tasks;
+	std::vector<std::pair<std::function<void(RenderPass*)>, uint32_t>>
+		pipeline_tasks;
+	std::vector<std::function<void(RenderPass*)>> shader_tasks;
 	// Sync related data
 	std::vector<BufferSyncResources> buffer_sync_resources;
 	std::vector<ImageSyncResources> img_sync_resources;
-	std::unordered_map<VkBuffer, std::pair<uint32_t, VkAccessFlags>> buffer_resource_map; // Buffer handle - { Write Pass Idx, Access Type }
-	std::unordered_map<VkImage, uint32_t> img_resource_map; // Tex2D handle - Pass Idx
+	std::unordered_map<VkBuffer, std::pair<uint32_t, VkAccessFlags>>
+		buffer_resource_map;  // Buffer handle - { Write Pass Idx, Access Type }
+	std::unordered_map<VkImage, uint32_t>
+		img_resource_map;  // Tex2D handle - Pass Idx
 };

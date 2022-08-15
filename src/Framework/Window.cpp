@@ -106,8 +106,7 @@ void Window::mouse_move_callback(GLFWwindow* window, double x, double y) {
 void Window::scroll_callback(GLFWwindow* window, double x, double y) {
 	const auto window_ptr =
 		reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
-	for (auto& cb : window_ptr->mouse_scroll_callbacks)
-		cb(x, y);
+	for (auto& cb : window_ptr->mouse_scroll_callbacks) cb(x, y);
 }
 
 void Window::add_mouse_click_callback(MouseClickCallback callback) {

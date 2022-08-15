@@ -4,7 +4,6 @@
 using namespace TPM_NAMESPACE;
 
 struct MitsubaParser {
-
 	struct MitsubaBSDF {
 		std::string name = "";
 		std::string type = "";
@@ -13,7 +12,6 @@ struct MitsubaParser {
 		glm::vec3 emissive_factor = glm::vec3(0);
 		float roughness = 0;
 		float ior;
-
 	};
 
 	struct MitsubaIntegrator {
@@ -23,16 +21,13 @@ struct MitsubaParser {
 		glm::vec3 sky_col;
 	};
 
-	enum class MitsubaShape {
-		Rectangle
-	};
+	enum class MitsubaShape { Rectangle };
 
 	struct MitsubaLight {
 		std::string type;
 		glm::vec3 from;
 		glm::vec3 to;
 		glm::vec3 L;
-
 	};
 
 	struct MitsubaMesh {
@@ -50,13 +45,9 @@ struct MitsubaParser {
 	};
 	void parse(const std::string& path);
 
-
 	std::vector<MitsubaBSDF> bsdfs;
 	std::vector<MitsubaMesh> meshes;
 	std::vector<MitsubaLight> lights;
 	MitsubaIntegrator integrator;
 	MitsubaCamera camera;
-	
-	
 };
-

@@ -13,15 +13,16 @@
 //#include "DDGI.h"
 //#include "ReSTIRPT.h"
 class RayTracer : public LumenInstance {
-public:
-	RayTracer(int width, int height, bool debug, int, char* []);
+   public:
+	RayTracer(int width, int height, bool debug, int, char*[]);
 	void init(Window*) override;
 	void update() override;
 	void cleanup() override;
 	static RayTracer* instance;
 	inline static RayTracer* get() { return instance; }
 	bool resized = false;
-private:
+
+   private:
 	struct Settings {
 		bool enable_tonemapping = false;
 	};
@@ -35,7 +36,8 @@ private:
 	void init_imgui();
 	void init_resources();
 	void parse_args(int argc, char* argv[]);
-	void save_exr(const float* rgb, int width, int height, const char* outfilename);
+	void save_exr(const float* rgb, int width, int height,
+				  const char* outfilename);
 	bool initialized = false;
 	bool rt_initialized = false;
 	float cpu_avg_time = 0;
@@ -63,7 +65,6 @@ private:
 	std::unique_ptr<Pipeline> reduce_rmse_pipeline;
 	std::unique_ptr<Pipeline> output_rmse_pipeline;
 
-
 	std::string scene_name;
 	LumenScene scene;
 
@@ -73,6 +74,4 @@ private:
 	bool show_cam_stats = false;
 	bool load_exr = false;
 	bool calc_rmse = false;
-
 };
-

@@ -1,20 +1,21 @@
 #pragma once
 #include "Integrator.h"
 class VCM : public Integrator {
-public:
-	VCM(LumenInstance* scene, LumenScene* lumen_scene) :
-		Integrator(scene, lumen_scene) {}
+   public:
+	VCM(LumenInstance* scene, LumenScene* lumen_scene)
+		: Integrator(scene, lumen_scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
 	virtual void destroy() override;
-private:
+
+   private:
 	void create_offscreen_resources();
 	void create_descriptors();
 	void create_blas();
 	void create_tlas();
-	//void create_rt_pipelines();
-	//void create_compute_pipelines();
+	// void create_rt_pipelines();
+	// void create_compute_pipelines();
 	PushConstantRay pc_ray{};
 	VkDescriptorPool desc_pool;
 	VkDescriptorSetLayout desc_set_layout;
@@ -42,4 +43,3 @@ private:
 	bool do_spatiotemporal = false;
 	uint32_t total_frame_cnt = 0;
 };
-

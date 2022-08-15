@@ -22,7 +22,6 @@ void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
 							 VkPipelineStageFlags source_stage,
 							 VkPipelineStageFlags destination_stage,
 							 VkImageSubresourceRange subresource_range) {
-
 	// Create an image barrier object
 	VkImageMemoryBarrier image_memory_barrier = vk::image_memory_barrier();
 	image_memory_barrier.oldLayout = old_layout;
@@ -110,8 +109,8 @@ void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
 
 void transition_image_layout(VkCommandBuffer cmd, VkImage image,
 							 VkImageLayout old_layout, VkImageLayout new_layout,
-							 VkImageSubresourceRange subresource_range, VkImageAspectFlags aspect_flags) {
-
+							 VkImageSubresourceRange subresource_range,
+							 VkImageAspectFlags aspect_flags) {
 	VkAccessFlags src_access_flags = 0;
 	VkAccessFlags dst_access_flags = 0;
 	VkPipelineStageFlags source_stage = 0;
@@ -119,7 +118,8 @@ void transition_image_layout(VkCommandBuffer cmd, VkImage image,
 	// Old layout
 	switch (old_layout) {
 		case VK_IMAGE_LAYOUT_UNDEFINED:
-			source_stage = VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
+			source_stage =
+				VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_PREINITIALIZED:
 			// Used for linear images
@@ -128,14 +128,12 @@ void transition_image_layout(VkCommandBuffer cmd, VkImage image,
 			break;
 
 		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-			src_access_flags =
-				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			src_access_flags = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 			source_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 			break;
 
 		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-			src_access_flags =
-				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			src_access_flags = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			source_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 			break;
 
@@ -160,7 +158,8 @@ void transition_image_layout(VkCommandBuffer cmd, VkImage image,
 	// New layout
 	switch (new_layout) {
 		case VK_IMAGE_LAYOUT_GENERAL:
-			dst_access_flags = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+			dst_access_flags =
+				VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
 			destination_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
@@ -174,14 +173,12 @@ void transition_image_layout(VkCommandBuffer cmd, VkImage image,
 			break;
 
 		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-			dst_access_flags =
-				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			dst_access_flags = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 			destination_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 			break;
 
 		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-			dst_access_flags |=
-				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			dst_access_flags |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			destination_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL:
@@ -198,11 +195,11 @@ void transition_image_layout(VkCommandBuffer cmd, VkImage image,
 			break;
 	}
 
-	auto img_barrier = image_barrier2(image, src_access_flags, dst_access_flags, old_layout, new_layout, aspect_flags,
+	auto img_barrier = image_barrier2(image, src_access_flags, dst_access_flags,
+									  old_layout, new_layout, aspect_flags,
 									  source_stage, destination_stage);
 	auto dependency_info = vk::dependency_info(1, &img_barrier);
 	vkCmdPipelineBarrier2(cmd, &dependency_info);
-
 }
 
 VkImageView create_image_view(VkDevice device, const VkImage& img,
@@ -232,9 +229,9 @@ BlasInput to_vk_geometry(GltfPrimMesh& prim, VkDeviceAddress vertexAddress,
 
 	// Describe buffer as array of VertexObj.
 	VkAccelerationStructureGeometryTrianglesDataKHR triangles{
-		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR };
+		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR};
 	triangles.vertexFormat =
-		VK_FORMAT_R32G32B32_SFLOAT; // vec3 vertex position data.
+		VK_FORMAT_R32G32B32_SFLOAT;	 // vec3 vertex position data.
 	triangles.vertexData.deviceAddress = vertexAddress;
 	triangles.vertexStride = sizeof(glm::vec3);
 	// Describe index data (32-bit unsigned int)
@@ -247,10 +244,10 @@ BlasInput to_vk_geometry(GltfPrimMesh& prim, VkDeviceAddress vertexAddress,
 
 	// Identify the above data as containing opaque triangles.
 	VkAccelerationStructureGeometryKHR asGeom{
-		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
+		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
 	asGeom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
 	asGeom.flags =
-		VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR; // For AnyHit
+		VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;  // For AnyHit
 	asGeom.geometry.triangles = triangles;
 
 	VkAccelerationStructureBuildRangeInfoKHR offset;
@@ -268,14 +265,15 @@ BlasInput to_vk_geometry(GltfPrimMesh& prim, VkDeviceAddress vertexAddress,
 	return input;
 }
 
-BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertex_address, VkDeviceAddress index_address) {
+BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertex_address,
+						 VkDeviceAddress index_address) {
 	uint32_t maxPrimitiveCount = prim.idx_count / 3;
 
 	// Describe buffer as array of VertexObj.
 	VkAccelerationStructureGeometryTrianglesDataKHR triangles{
-		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR };
+		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR};
 	triangles.vertexFormat =
-		VK_FORMAT_R32G32B32_SFLOAT; // vec3 vertex position data.
+		VK_FORMAT_R32G32B32_SFLOAT;	 // vec3 vertex position data.
 	triangles.vertexData.deviceAddress = vertex_address;
 	triangles.vertexStride = sizeof(glm::vec3);
 	// Describe index data (32-bit unsigned int)
@@ -288,10 +286,10 @@ BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertex_address, Vk
 
 	// Identify the above data as containing opaque triangles.
 	VkAccelerationStructureGeometryKHR asGeom{
-		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
+		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
 	asGeom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
 	asGeom.flags =
-		VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR; // For AnyHit
+		VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;  // For AnyHit
 	asGeom.geometry.triangles = triangles;
 
 	VkAccelerationStructureBuildRangeInfoKHR offset;
@@ -326,9 +324,9 @@ VkRenderPass create_render_pass(
 		color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
 		color_attachment.loadOp =
 			clear_color ? VK_ATTACHMENT_LOAD_OP_CLEAR
-			: ((initial_layout == VK_IMAGE_LAYOUT_UNDEFINED)
-			   ? VK_ATTACHMENT_LOAD_OP_DONT_CARE
-			   : VK_ATTACHMENT_LOAD_OP_LOAD);
+						: ((initial_layout == VK_IMAGE_LAYOUT_UNDEFINED)
+							   ? VK_ATTACHMENT_LOAD_OP_DONT_CARE
+							   : VK_ATTACHMENT_LOAD_OP_LOAD);
 		color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -350,7 +348,7 @@ VkRenderPass create_render_pass(
 		depth_attachment.format = depth_attachment_format;
 		depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
 		depth_attachment.loadOp = clear_depth ? VK_ATTACHMENT_LOAD_OP_CLEAR
-			: VK_ATTACHMENT_LOAD_OP_LOAD;
+											  : VK_ATTACHMENT_LOAD_OP_LOAD;
 
 		depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -389,7 +387,7 @@ VkRenderPass create_render_pass(
 		subpass_dependencies.push_back(dependency);
 	}
 
-	VkRenderPassCreateInfo rpi{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
+	VkRenderPassCreateInfo rpi{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
 	rpi.attachmentCount = static_cast<uint32_t>(all_attachments.size());
 	rpi.pAttachments = all_attachments.data();
 	rpi.subpassCount = static_cast<uint32_t>(subpasses.size());
@@ -403,7 +401,7 @@ VkRenderPass create_render_pass(
 
 VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format,
 								VkImageUsageFlags usage, bool mipmaps) {
-	VkImageCreateInfo ici = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+	VkImageCreateInfo ici = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
 	ici.imageType = VK_IMAGE_TYPE_2D;
 	ici.format = format;
 	ici.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -413,7 +411,7 @@ VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format,
 	ici.extent.height = size.height;
 	ici.extent.depth = 1;
 	ici.usage = usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+				VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 	return ici;
 }
 
@@ -426,17 +424,21 @@ void dispatch_compute(const Pipeline& pipeline, VkCommandBuffer cmdbuf,
 }
 
 glm::ivec2 get_num_wgs(int width, int height, int wg_x_size, int wg_y_size) {
-	return glm::ivec2{ ceil(width / float(wg_x_size)), ceil(height / float(wg_y_size)) };
+	return glm::ivec2{ceil(width / float(wg_x_size)),
+					  ceil(height / float(wg_y_size))};
 }
 
-uint32_t get_bindings(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types) {
+uint32_t get_bindings(const std::vector<Shader>& shaders,
+					  VkDescriptorType* descriptor_types) {
 	uint32_t binding_mask = 0;
 	for (const auto& shader : shaders) {
 		for (uint32_t i = 0; i < 32; ++i) {
 			if (shader.binding_mask & (1 << i)) {
 				if (binding_mask & (1 << i)) {
-					LUMEN_ASSERT(descriptor_types[i] == shader.descriptor_types[i],
-								 "Binding mask mismatch on shader {}", shader.filename.c_str());
+					LUMEN_ASSERT(
+						descriptor_types[i] == shader.descriptor_types[i],
+						"Binding mask mismatch on shader {}",
+						shader.filename.c_str());
 				} else {
 					descriptor_types[i] = shader.descriptor_types[i];
 					binding_mask |= 1 << i;
@@ -447,8 +449,10 @@ uint32_t get_bindings(const std::vector<Shader>& shaders, VkDescriptorType* desc
 	return binding_mask;
 }
 
-VkImageLayout get_target_img_layout(const Texture2D& tex, VkAccessFlags access_flags) {
-	if ((tex.usage_flags & VK_IMAGE_USAGE_SAMPLED_BIT) && access_flags == VK_ACCESS_SHADER_READ_BIT) {
+VkImageLayout get_target_img_layout(const Texture2D& tex,
+									VkAccessFlags access_flags) {
+	if ((tex.usage_flags & VK_IMAGE_USAGE_SAMPLED_BIT) &&
+		access_flags == VK_ACCESS_SHADER_READ_BIT) {
 		return VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
 	}
 	return VK_IMAGE_LAYOUT_GENERAL;

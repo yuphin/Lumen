@@ -1,7 +1,7 @@
 #pragma once
 #include "LumenPCH.h"
 class EventPool {
-public:
+   public:
 	struct Events {
 		std::vector<VkEvent> events;
 		size_t available_event_idx = -1;
@@ -10,7 +10,6 @@ public:
 	VkEvent get_event(VkDevice device, VkCommandBuffer cmd);
 	void reset_events(VkDevice device, VkCommandBuffer cmd);
 
-private:
+   private:
 	std::unordered_map<VkCommandBuffer, Events> events_map;
 };
-

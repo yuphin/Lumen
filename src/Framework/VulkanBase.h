@@ -7,11 +7,11 @@ class RenderGraph;
 
 struct BuildAccelerationStructure {
 	VkAccelerationStructureBuildGeometryInfoKHR build_info{
-		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
+		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR};
 	VkAccelerationStructureBuildSizesInfoKHR size_info{
-		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR };
+		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR};
 	const VkAccelerationStructureBuildRangeInfoKHR* range_info;
-	AccelKHR as; // result acceleration structure
+	AccelKHR as;  // result acceleration structure
 	AccelKHR cleanup_as;
 };
 const int MAX_FRAMES_IN_FLIGHT = 3;
@@ -47,17 +47,16 @@ struct VulkanBase {
 	}
 	void build_blas(const std::vector<BlasInput>& input,
 					VkBuildAccelerationStructureFlagsKHR flags);
-	void
-		build_tlas(std::vector<VkAccelerationStructureInstanceKHR>& instances,
-				   VkBuildAccelerationStructureFlagsKHR flags =
-				   VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
-				   bool update = false);
+	void build_tlas(
+		std::vector<VkAccelerationStructureInstanceKHR>& instances,
+		VkBuildAccelerationStructureFlagsKHR flags =
+			VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
+		bool update = false);
 	VkDeviceAddress get_blas_device_address(uint32_t blas_idx);
 	uint32_t prepare_frame();
 	VkResult submit_frame(uint32_t image_idx, bool& resized);
 
 	struct SwapChainSupportDetails {
-
 		VkSurfaceCapabilitiesKHR capabilities = {};
 		std::vector<VkSurfaceFormatKHR> formats;
 		std::vector<VkPresentModeKHR> present_modes;
@@ -78,10 +77,10 @@ struct VulkanBase {
 	SwapChainSupportDetails query_swapchain_support(VkPhysicalDevice device);
 
 	const std::vector<const char*> validation_layers_lst = {
-		"VK_LAYER_KHRONOS_validation" };
+		"VK_LAYER_KHRONOS_validation"};
 
 	std::vector<const char*> device_extensions = {
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
 	size_t current_frame = 0;
 	// Sync primitives
@@ -92,7 +91,6 @@ struct VulkanBase {
 	std::vector<VkQueueFamilyProperties> queue_families;
 	VulkanContext ctx;
 	std::unique_ptr<RenderGraph> rg;
-
 
 	std::vector<AccelKHR> blases;
 	std::vector<Texture2D> swapchain_images;
@@ -106,7 +104,7 @@ struct VulkanBase {
 	VkShaderModule create_shader(const std::vector<char>& code);
 	void cleanup();
 
-private:
+   private:
 	AccelKHR create_acceleration(VkAccelerationStructureCreateInfoKHR& accel);
 	void cmd_compact_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> indices,
 						  std::vector<BuildAccelerationStructure>& buildAs,
@@ -116,11 +114,11 @@ private:
 						 VkDeviceAddress scratchAddress, VkQueryPool queryPool);
 
 	void cmd_create_tlas(
-		VkCommandBuffer cmdBuf, // Command buffer
-		uint32_t countInstance, // number of instances
+		VkCommandBuffer cmdBuf,	 // Command buffer
+		uint32_t countInstance,	 // number of instances
 		Buffer& scratchBuffer,
-		VkDeviceAddress instBufferAddr, // Buffer address of instances
-		VkBuildAccelerationStructureFlagsKHR flags, // Build creation flag
-		bool update                                 // Update == animation
+		VkDeviceAddress instBufferAddr,	 // Buffer address of instances
+		VkBuildAccelerationStructureFlagsKHR flags,	 // Build creation flag
+		bool update									 // Update == animation
 	);
 };

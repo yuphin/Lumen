@@ -1,15 +1,16 @@
 #pragma once
 #include "Integrator.h"
 class DDGI : public Integrator {
-public:
-	DDGI(LumenInstance* scene, LumenScene* lumen_scene) :
-		Integrator(scene, lumen_scene) {}
+   public:
+	DDGI(LumenInstance* scene, LumenScene* lumen_scene)
+		: Integrator(scene, lumen_scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
 	virtual void destroy() override;
 	virtual void reload() override;
-private:
+
+   private:
 	void create_offscreen_resources();
 	void create_descriptors();
 	void create_blas();
@@ -24,7 +25,6 @@ private:
 	Buffer probe_offsets_buffer;
 
 	Buffer g_buffer;
-
 
 	Texture2D irr_texes[2];
 	Texture2D depth_texes[2];

@@ -1,16 +1,17 @@
 #pragma once
 #include "Integrator.h"
 class VCMMLT : public Integrator {
-public:
-	VCMMLT(LumenInstance* scene, LumenScene* lumen_scene) :
-		Integrator(scene, lumen_scene) {}
+   public:
+	VCMMLT(LumenInstance* scene, LumenScene* lumen_scene)
+		: Integrator(scene, lumen_scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool gui() override;
 	virtual bool update() override;
 	virtual void destroy() override;
 	virtual void reload() override;
-private:
+
+   private:
 	void create_offscreen_resources();
 	void create_descriptors();
 	void create_blas();
@@ -69,4 +70,3 @@ private:
 	int light_path_rand_count;
 	int sample_cnt = 0;
 };
-

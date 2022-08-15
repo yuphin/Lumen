@@ -20,10 +20,10 @@ struct Bbox {
 	}
 
 	void insert(const glm::vec3& v) {
-		m_min = { std::min(m_min.x, v.x), std::min(m_min.y, v.y),
-				 std::min(m_min.z, v.z) };
-		m_max = { std::max(m_max.x, v.x), std::max(m_max.y, v.y),
-				 std::max(m_max.z, v.z) };
+		m_min = {std::min(m_min.x, v.x), std::min(m_min.y, v.y),
+				 std::min(m_min.z, v.z)};
+		m_max = {std::max(m_max.x, v.x), std::max(m_max.y, v.y),
+				 std::max(m_max.z, v.z)};
 	}
 
 	void insert(const Bbox& b) {
@@ -38,11 +38,11 @@ struct Bbox {
 	}
 
 	inline bool is_empty() const {
-		return m_min == glm::vec3{ std::numeric_limits<float>::max() } ||
-			m_max == glm::vec3{ std::numeric_limits<float>::lowest() };
+		return m_min == glm::vec3{std::numeric_limits<float>::max()} ||
+			   m_max == glm::vec3{std::numeric_limits<float>::lowest()};
 	}
 	inline uint32_t rank() const {
-		uint32_t result{ 0 };
+		uint32_t result{0};
 		result += m_min.x < m_max.x;
 		result += m_min.y < m_max.y;
 		result += m_min.z < m_max.z;
@@ -73,9 +73,9 @@ struct Bbox {
 		return result;
 	}
 
-private:
-	glm::vec3 m_min{ std::numeric_limits<float>::max() };
-	glm::vec3 m_max{ std::numeric_limits<float>::lowest() };
+   private:
+	glm::vec3 m_min{std::numeric_limits<float>::max()};
+	glm::vec3 m_max{std::numeric_limits<float>::lowest()};
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -114,14 +114,14 @@ void GltfScene::import_materials(const tinygltf::Model& tmodel) {
 
 		// KHR_materials_pbrSpecularGlossiness
 		if (tmat.extensions.find(
-			KHR_MATERIALS_PBRSPECULARGLOSSINESS_EXTENSION_NAME) !=
+				KHR_MATERIALS_PBRSPECULARGLOSSINESS_EXTENSION_NAME) !=
 			tmat.extensions.end()) {
 			gmat.shadingModel = 1;
 
 			const auto& ext =
 				tmat.extensions
-				.find(KHR_MATERIALS_PBRSPECULARGLOSSINESS_EXTENSION_NAME)
-				->second;
+					.find(KHR_MATERIALS_PBRSPECULARGLOSSINESS_EXTENSION_NAME)
+					->second;
 			get_vec4(ext, "diffuseFactor",
 					 gmat.specular_glossiness.diffuseFactor);
 			get_float(ext, "glossinessFactor",
@@ -136,11 +136,11 @@ void GltfScene::import_materials(const tinygltf::Model& tmodel) {
 
 		// KHR_texture_transform
 		if (tpbr.baseColorTexture.extensions.find(
-			KHR_TEXTURE_TRANSFORM_EXTENSION_NAME) !=
+				KHR_TEXTURE_TRANSFORM_EXTENSION_NAME) !=
 			tpbr.baseColorTexture.extensions.end()) {
 			const auto& ext = tpbr.baseColorTexture.extensions
-				.find(KHR_TEXTURE_TRANSFORM_EXTENSION_NAME)
-				->second;
+								  .find(KHR_TEXTURE_TRANSFORM_EXTENSION_NAME)
+								  ->second;
 			auto& tt = gmat.texture_transform;
 			get_vec2(ext, "offset", tt.offset);
 			get_vec2(ext, "scale", tt.scale);
@@ -168,7 +168,7 @@ void GltfScene::import_materials(const tinygltf::Model& tmodel) {
 			tmat.extensions.end()) {
 			const auto& ext =
 				tmat.extensions.find(KHR_MATERIALS_ANISOTROPY_EXTENSION_NAME)
-				->second;
+					->second;
 			get_float(ext, "anisotropy", gmat.anisotropy.factor);
 			get_vec3(ext, "anisotropyDirection", gmat.anisotropy.direction);
 			get_tex_id(ext, "anisotropyTexture", gmat.anisotropy.texture);
@@ -179,7 +179,7 @@ void GltfScene::import_materials(const tinygltf::Model& tmodel) {
 			tmat.extensions.end()) {
 			const auto& ext =
 				tmat.extensions.find(KHR_MATERIALS_CLEARCOAT_EXTENSION_NAME)
-				->second;
+					->second;
 			get_float(ext, "clearcoatFactor", gmat.clearcoat.factor);
 			get_tex_id(ext, "clearcoatTexture", gmat.clearcoat.texture);
 			get_float(ext, "clearcoatRoughnessFactor",
@@ -195,7 +195,7 @@ void GltfScene::import_materials(const tinygltf::Model& tmodel) {
 			tmat.extensions.end()) {
 			const auto& ext =
 				tmat.extensions.find(KHR_MATERIALS_SHEEN_EXTENSION_NAME)
-				->second;
+					->second;
 			get_vec3(ext, "sheenColorFactor", gmat.sheen.colorFactor);
 			get_tex_id(ext, "sheenColorTexture", gmat.sheen.colorTexture);
 			get_float(ext, "sheenRoughnessFactor", gmat.sheen.roughnessFactor);
@@ -208,7 +208,7 @@ void GltfScene::import_materials(const tinygltf::Model& tmodel) {
 			tmat.extensions.end()) {
 			const auto& ext =
 				tmat.extensions.find(KHR_MATERIALS_TRANSMISSION_EXTENSION_NAME)
-				->second;
+					->second;
 			get_float(ext, "transmissionFactor", gmat.transmission.factor);
 			get_tex_id(ext, "transmissionTexture", gmat.transmission.texture);
 		}
@@ -226,7 +226,7 @@ void GltfScene::import_materials(const tinygltf::Model& tmodel) {
 			tmat.extensions.end()) {
 			const auto& ext =
 				tmat.extensions.find(KHR_MATERIALS_VOLUME_EXTENSION_NAME)
-				->second;
+					->second;
 			get_float(ext, "thicknessFactor", gmat.volume.thickness_factor);
 			get_tex_id(ext, "thicknessTexture", gmat.volume.thickness_texture);
 			get_float(ext, "attenuationDistance",
@@ -254,13 +254,13 @@ void GltfScene::import_drawable_nodes(const tinygltf::Model& tmodel,
 
 	// Find the number of vertex(attributes) and index
 	// uint32_t nbVert{0};
-	uint32_t nbIndex{ 0 };
-	uint32_t meshCnt{ 0 }; // use for mesh to new meshes
-	uint32_t primCnt{ 0 }; //  "   "  "  "
+	uint32_t nbIndex{0};
+	uint32_t meshCnt{0};  // use for mesh to new meshes
+	uint32_t primCnt{0};  //  "   "  "  "
 	for (const auto& mesh : tmodel.meshes) {
 		std::vector<uint32_t> vprim;
 		for (const auto& primitive : mesh.primitives) {
-			if (primitive.mode != 4) // Triangle
+			if (primitive.mode != 4)  // Triangle
 				continue;
 			const auto& posAccessor =
 				tmodel.accessors[primitive.attributes.find("POSITION")->second];
@@ -274,7 +274,7 @@ void GltfScene::import_drawable_nodes(const tinygltf::Model& tmodel,
 			vprim.emplace_back(primCnt++);
 		}
 		mesh_to_prim_meshes[meshCnt++] =
-			std::move(vprim); // mesh-id = { prim0, prim1, ... }
+			std::move(vprim);  // mesh-id = { prim0, prim1, ... }
 	}
 
 	// Reserving memory
@@ -315,8 +315,8 @@ void GltfScene::process_node(const tinygltf::Model& tmodel, int& nodeIdx,
 
 	if (tnode.mesh > -1) {
 		const auto& meshes =
-			mesh_to_prim_meshes[tnode.mesh]; // A mesh could have many
-											 // primitives
+			mesh_to_prim_meshes[tnode.mesh];  // A mesh could have many
+											  // primitives
 		for (const auto& mesh : meshes) {
 			GltfNode node;
 			node.prim_mesh = mesh;
@@ -339,11 +339,11 @@ void GltfScene::process_node(const tinygltf::Model& tmodel, int& nodeIdx,
 				if (att_value.IsArray()) {
 					auto vec = get_vector<float>(att_value);
 					if (att_name == "iview:position")
-						camera.eye = { vec[0], vec[1], vec[2] };
+						camera.eye = {vec[0], vec[1], vec[2]};
 					else if (att_name == "iview:interest")
-						camera.center = { vec[0], vec[1], vec[2] };
+						camera.center = {vec[0], vec[1], vec[2]};
 					else if (att_name == "iview:up")
-						camera.up = { vec[0], vec[1], vec[2] };
+						camera.up = {vec[0], vec[1], vec[2]};
 				}
 			}
 		}
@@ -376,8 +376,7 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel,
 	// Only triangles are supported
 	// 0:point, 1:lines, 2:line_loop, 3:line_strip, 4:triangles,
 	// 5:triangle_strip, 6:triangle_fan
-	if (tmesh.mode != 4)
-		return;
+	if (tmesh.mode != 4) return;
 
 	GltfPrimMesh result_mesh;
 	result_mesh.name = name;
@@ -415,56 +414,52 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel,
 		result_mesh.idx_count = static_cast<uint32_t>(index_accessor.count);
 
 		switch (index_accessor.componentType) {
-			case TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT:
-			{
+			case TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT: {
 				primitive_indices_32u.resize(index_accessor.count);
 				memcpy(primitive_indices_32u.data(),
 					   &buffer.data[index_accessor.byteOffset +
-					   buffer_view.byteOffset],
+									buffer_view.byteOffset],
 					   index_accessor.count * sizeof(uint32_t));
 				indices.insert(indices.end(), primitive_indices_32u.begin(),
 							   primitive_indices_32u.end());
 				break;
 			}
-			case TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT:
-			{
+			case TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT: {
 				primitive_indices_16u.resize(index_accessor.count);
 				memcpy(primitive_indices_16u.data(),
 					   &buffer.data[index_accessor.byteOffset +
-					   buffer_view.byteOffset],
+									buffer_view.byteOffset],
 					   index_accessor.count * sizeof(uint16_t));
 				indices.insert(indices.end(), primitive_indices_16u.begin(),
 							   primitive_indices_16u.end());
 				break;
 			}
-			case TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE:
-			{
+			case TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE: {
 				primitive_indices_8u.resize(index_accessor.count);
 				memcpy(primitive_indices_8u.data(),
 					   &buffer.data[index_accessor.byteOffset +
-					   buffer_view.byteOffset],
+									buffer_view.byteOffset],
 					   index_accessor.count * sizeof(uint8_t));
 				indices.insert(indices.end(), primitive_indices_8u.begin(),
 							   primitive_indices_8u.end());
 				break;
 			}
 			default:
-				std::cerr << "Index component type " << index_accessor.componentType
-					<< " not supported!" << std::endl;
+				std::cerr << "Index component type "
+						  << index_accessor.componentType << " not supported!"
+						  << std::endl;
 				return;
 		}
 	} else {
 		// Primitive without indices, creating them
 		const auto& accessor =
 			tmodel.accessors[tmesh.attributes.find("POSITION")->second];
-		for (auto i = 0; i < accessor.count; i++)
-			indices.push_back(i);
+		for (auto i = 0; i < accessor.count; i++) indices.push_back(i);
 		result_mesh.idx_count = static_cast<uint32_t>(accessor.count);
 	}
 
-	if (prim_mesh_cached == false) // Need to add this primitive
+	if (prim_mesh_cached == false)	// Need to add this primitive
 	{
-
 		// POSITION
 		{
 			bool result =
@@ -477,12 +472,12 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel,
 			result_mesh.vtx_count = static_cast<uint32_t>(accessor.count);
 			if (!accessor.minValues.empty())
 				result_mesh.pos_min =
-				glm::vec3(accessor.minValues[0], accessor.minValues[1],
-						  accessor.minValues[2]);
+					glm::vec3(accessor.minValues[0], accessor.minValues[1],
+							  accessor.minValues[2]);
 			if (!accessor.maxValues.empty())
 				result_mesh.pos_max =
-				glm::vec3(accessor.maxValues[0], accessor.maxValues[1],
-						  accessor.maxValues[2]);
+					glm::vec3(accessor.maxValues[0], accessor.maxValues[1],
+							  accessor.maxValues[2]);
 		}
 
 		// NORMAL
@@ -498,18 +493,17 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel,
 					const auto& pos1 = positions[ind1 + result_mesh.vtx_offset];
 					const auto& pos2 = positions[ind2 + result_mesh.vtx_offset];
 					const auto v1 = glm::normalize(
-						pos1 - pos0); // Many normalize, but when objects are
-									  // really small the
+						pos1 - pos0);  // Many normalize, but when objects are
+									   // really small the
 					const auto v2 = glm::normalize(
-						pos2 - pos0); // cross will go below nv_eps and the
-									  // normal will be (0,0,0)
+						pos2 - pos0);  // cross will go below nv_eps and the
+									   // normal will be (0,0,0)
 					const auto n = glm::cross(v2, v1);
 					geonormal[ind0] += n;
 					geonormal[ind1] += n;
 					geonormal[ind2] += n;
 				}
-				for (auto& n : geonormal)
-					n = glm::normalize(n);
+				for (auto& n : geonormal) n = glm::normalize(n);
 				normals.insert(normals.end(), geonormal.begin(),
 							   geonormal.end());
 			}
@@ -519,7 +513,7 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel,
 		if ((attributes & GltfAttributes::Texcoord_0) ==
 			GltfAttributes::Texcoord_0) {
 			if (!get_attribute<glm::vec2>(tmodel, tmesh, texcoords0,
-				"TEXCOORD_0")) {
+										  "TEXCOORD_0")) {
 				// Set them all to zero
 				//      m_texcoords0.insert(m_texcoords0.end(),
 				//      resultMesh.vertexCount, nvmath::vec2f(0, 0));
@@ -636,7 +630,7 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel,
 
 					float r = 1.0F;
 					float a = duvE1.x * duvE2.y - duvE2.x * duvE1.y;
-					if (fabs(a) > 0) // Catch degenerated UV
+					if (fabs(a) > 0)  // Catch degenerated UV
 					{
 						r = 1.0f / a;
 					}
@@ -692,19 +686,19 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel,
 // Return the matrix of the node
 //
 glm::mat4 get_local_matrix(const tinygltf::Node& tnode) {
-	glm::mat4 mtranslation{ 1 };
-	glm::mat4 mscale{ 1 };
-	glm::mat4 mrot{ 1 };
-	glm::mat4 matrix{ 1 };
+	glm::mat4 mtranslation{1};
+	glm::mat4 mscale{1};
+	glm::mat4 mrot{1};
+	glm::mat4 matrix{1};
 	glm::quat mrotation;
 
 	if (!tnode.translation.empty())
-		mtranslation = glm::translate(mtranslation,
-					   glm::vec3(tnode.translation[0], tnode.translation[1],
-					   tnode.translation[2]));
+		mtranslation = glm::translate(
+			mtranslation, glm::vec3(tnode.translation[0], tnode.translation[1],
+									tnode.translation[2]));
 	if (!tnode.scale.empty())
-		mscale = glm::scale(mscale,
-				   glm::vec3(tnode.scale[0], tnode.scale[1], tnode.scale[2]));
+		mscale = glm::scale(
+			mscale, glm::vec3(tnode.scale[0], tnode.scale[1], tnode.scale[2]));
 	if (!tnode.rotation.empty()) {
 		mrotation[0] = static_cast<float>(tnode.rotation[0]);
 		mrotation[1] = static_cast<float>(tnode.rotation[1]);
@@ -756,10 +750,11 @@ void GltfScene::compute_scene_dimensions() {
 	}
 
 	if (scnBbox.is_empty() || !scnBbox.isVolume()) {
-		printf("glTF: Scene bounding box invalid, Setting to: [-1,-1,-1], "
-			   "[1,1,1]");
-		scnBbox.insert({ -1.0f, -1.0f, -1.0f });
-		scnBbox.insert({ 1.0f, 1.0f, 1.0f });
+		printf(
+			"glTF: Scene bounding box invalid, Setting to: [-1,-1,-1], "
+			"[1,1,1]");
+		scnBbox.insert({-1.0f, -1.0f, -1.0f});
+		scnBbox.insert({1.0f, 1.0f, 1.0f});
 	}
 
 	m_dimensions.min = scnBbox.min();
@@ -769,17 +764,16 @@ void GltfScene::compute_scene_dimensions() {
 	m_dimensions.radius = scnBbox.radius();
 }
 
-static uint32_t
-recursive_triangle_count(const tinygltf::Model& model, int node_idx,
-						 const std::vector<uint32_t>& mesh_triangle) {
+static uint32_t recursive_triangle_count(
+	const tinygltf::Model& model, int node_idx,
+	const std::vector<uint32_t>& mesh_triangle) {
 	auto& node = model.nodes[node_idx];
-	uint32_t nb_triangles{ 0 };
+	uint32_t nb_triangles{0};
 	for (const auto child : node.children) {
 		nb_triangles += recursive_triangle_count(model, child, mesh_triangle);
 	}
 
-	if (node.mesh >= 0)
-		nb_triangles += mesh_triangle[node.mesh];
+	if (node.mesh >= 0) nb_triangles += mesh_triangle[node.mesh];
 
 	return nb_triangles;
 }
@@ -807,7 +801,7 @@ GltfStats GltfScene::get_statistics(const tinygltf::Model& tinyModel) {
 
 	// Computing the number of triangles
 	std::vector<uint32_t> mesh_triangle(tinyModel.meshes.size());
-	uint32_t meshIdx{ 0 };
+	uint32_t meshIdx{0};
 	for (const auto& mesh : tinyModel.meshes) {
 		for (const auto& primitive : mesh.primitives) {
 			if (primitive.indices > -1) {
@@ -818,7 +812,7 @@ GltfStats GltfScene::get_statistics(const tinygltf::Model& tinyModel) {
 			} else {
 				const auto& pos_accessor =
 					tinyModel.accessors[primitive.attributes.find("POSITION")
-					->second];
+											->second];
 				mesh_triangle[meshIdx] +=
 					static_cast<uint32_t>(pos_accessor.count) / 3;
 			}
@@ -850,9 +844,8 @@ GltfStats GltfScene::get_statistics(const tinygltf::Model& tinyModel) {
 void GltfScene::compute_camera() {
 	for (auto& camera : cameras) {
 		if (camera.eye ==
-			camera.center) // Applying the rule only for uninitialized camera.
+			camera.center)	// Applying the rule only for uninitialized camera.
 		{
-
 			glm::vec3 scale;
 			glm::quat rotation;
 			glm::vec3 translation;
@@ -862,9 +855,9 @@ void GltfScene::compute_camera() {
 						   skew, perspective);
 			camera.eye = translation;
 			float distance = glm::length(m_dimensions.center - camera.eye);
-			camera.center = { 0, 0, -distance };
+			camera.center = {0, 0, -distance};
 			camera.center = camera.eye + (rotation * camera.center);
-			camera.up = { 0, 1, 0 };
+			camera.up = {0, 1, 0};
 		}
 	}
 }
@@ -883,9 +876,10 @@ void GltfScene::check_required_extensions(const tinygltf::Model& tmodel) {
 
 	for (auto& e : tmodel.extensionsRequired) {
 		if (supportedExtensions.find(e) == supportedExtensions.end()) {
-			printf("\n---------------------------------------\n"
-				   "The extension %s is REQUIRED and not supported \n",
-				   e.c_str());
+			printf(
+				"\n---------------------------------------\n"
+				"The extension %s is REQUIRED and not supported \n",
+				e.c_str());
 		}
 	}
 }

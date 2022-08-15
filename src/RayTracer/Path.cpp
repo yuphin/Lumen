@@ -12,7 +12,7 @@ void Path::init() {
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
 	scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-							 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+								 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							 VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc),
 							 &desc, true);
@@ -32,28 +32,23 @@ void Path::render() {
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
 
-	instance->vkb.rg->
-		add_rt("Path",
-			   {
-					.shaders = {
-						  {"src/shaders/integrators/path/path.rgen"},
-						  {"src/shaders/ray.rmiss"},
-						  {"src/shaders/ray_shadow.rmiss"},
-						  {"src/shaders/ray.rchit"},
-						  {"src/shaders/ray.rahit"}
-					  },
-				   .dims = {instance->width, instance->height},
-				   .accel = instance->vkb.tlas.accel
-			   }
-		)
+	instance->vkb.rg
+		->add_rt("Path",
+				 {.shaders = {{"src/shaders/integrators/path/path.rgen"},
+							  {"src/shaders/ray.rmiss"},
+							  {"src/shaders/ray_shadow.rmiss"},
+							  {"src/shaders/ray.rchit"},
+							  {"src/shaders/ray.rahit"}},
+				  .dims = {instance->width, instance->height},
+				  .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
 		.bind({
-				output_tex,
-				prim_lookup_buffer,
-				scene_ubo_buffer,
-				scene_desc_buffer,
-			  })
-			  .bind_texture_array(diffuse_textures)
+			output_tex,
+			prim_lookup_buffer,
+			scene_ubo_buffer,
+			scene_desc_buffer,
+		})
+		.bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
 		//.write(output_tex) // Needed if the automatic shader inference is off
 		.bind_tlas(instance->vkb.tlas);
@@ -68,6 +63,4 @@ bool Path::update() {
 	return updated;
 }
 
-void Path::destroy() {
-	Integrator::destroy();
-}
+void Path::destroy() { Integrator::destroy(); }

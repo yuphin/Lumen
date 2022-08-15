@@ -2,7 +2,7 @@
 #include "LumenPCH.h"
 
 class CommandBuffer {
-public:
+   public:
 	CommandBuffer(VulkanContext* ctx, bool begin = false,
 				  VkCommandBufferUsageFlags begin_flags = 0,
 				  QueueType type = QueueType::GFX,
@@ -13,7 +13,7 @@ public:
 
 	VkCommandBuffer handle = VK_NULL_HANDLE;
 
-private:
+   private:
 	enum class CommandBufferState { RECORDING, STOPPED };
 	VulkanContext* ctx;
 	CommandBufferState state = CommandBufferState::STOPPED;

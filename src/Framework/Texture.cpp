@@ -7,8 +7,10 @@
 
 Texture2D::Texture2D(VulkanContext* ctx) : Texture(ctx) {}
 
-Texture2D::Texture2D(const std::string& name, VulkanContext* ctx, VkImage image, VkFormat format, VkImageUsageFlags usage_flags, 
-					 VkImageAspectFlags aspect_flags, bool present) : Texture(ctx) {
+Texture2D::Texture2D(const std::string& name, VulkanContext* ctx, VkImage image,
+					 VkFormat format, VkImageUsageFlags usage_flags,
+					 VkImageAspectFlags aspect_flags, bool present)
+	: Texture(ctx) {
 	img = image;
 	img_view = create_image_view(ctx->device, img, format);
 	this->present = present;
@@ -17,10 +19,10 @@ Texture2D::Texture2D(const std::string& name, VulkanContext* ctx, VkImage image,
 	this->usage_flags = usage_flags;
 	if (!name.empty()) {
 		this->name = name;
-		DebugMarker::set_resource_name(ctx->device, (uint64_t)img, name.c_str(), VK_OBJECT_TYPE_IMAGE);
+		DebugMarker::set_resource_name(ctx->device, (uint64_t)img, name.c_str(),
+									   VK_OBJECT_TYPE_IMAGE);
 	}
 }
-
 
 void Texture2D::transition(VkCommandBuffer cmd, VkImageLayout new_layout) {
 	if (layout == new_layout) {
@@ -32,20 +34,20 @@ void Texture2D::transition(VkCommandBuffer cmd, VkImageLayout new_layout) {
 	subresource_range.layerCount = 1;
 	subresource_range.baseMipLevel = 0;
 	subresource_range.levelCount = mip_levels;
-	transition_image_layout(cmd, img, layout,
-							new_layout,
-							subresource_range, aspect_flags);
+	transition_image_layout(cmd, img, layout, new_layout, subresource_range,
+							aspect_flags);
 	layout = new_layout;
-
 }
 
-void Texture2D::transition_without_state(VkCommandBuffer cmd, VkImageLayout new_layout) {
+void Texture2D::transition_without_state(VkCommandBuffer cmd,
+										 VkImageLayout new_layout) {
 	auto old_layout = layout;
 	transition(cmd, new_layout);
 	layout = old_layout;
 }
 
-VkDescriptorImageInfo Texture2D::descriptor(VkSampler sampler, VkImageLayout layout) const {
+VkDescriptorImageInfo Texture2D::descriptor(VkSampler sampler,
+											VkImageLayout layout) const {
 	VkDescriptorImageInfo desc_info;
 	desc_info.sampler = sampler;
 	desc_info.imageView = img_view;
@@ -71,7 +73,7 @@ VkDescriptorImageInfo Texture2D::descriptor(VkSampler sampler) const {
 }
 
 VkDescriptorImageInfo Texture2D::descriptor() const {
-	//LUMEN_ASSERT(!present && sampler, "Sampler not found");
+	// LUMEN_ASSERT(!present && sampler, "Sampler not found");
 	VkDescriptorImageInfo desc_info;
 	desc_info.sampler = sampler;
 	desc_info.imageView = img_view;
@@ -88,7 +90,7 @@ void Texture2D::load_from_data(VulkanContext* ctx, void* data,
 	Buffer staging_buffer;
 	staging_buffer.create(ctx, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-						  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+							  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 						  VK_SHARING_MODE_EXCLUSIVE, size, data);
 
 	// Need to do this check pre image creation
@@ -129,9 +131,10 @@ void Texture2D::load_from_data(VulkanContext* ctx, void* data,
 	if (generate_mipmaps) {
 		cmd_generate_mipmaps(info, copy_cmd.handle);
 	} else {
-		transition_image_layout(
-			copy_cmd.handle, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresource_range, aspect_flags);
+		transition_image_layout(copy_cmd.handle, img,
+								VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+								VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+								subresource_range, aspect_flags);
 	}
 	copy_cmd.submit();
 	staging_buffer.destroy();
@@ -175,15 +178,15 @@ void Texture2D::create_empty_texture(
 		sampler_CI.anisotropyEnable = ctx->supported_features.samplerAnisotropy;
 		sampler_CI.maxAnisotropy =
 			ctx->supported_features.samplerAnisotropy
-			? ctx->device_properties.limits.maxSamplerAnisotropy
-			: 1.0f;
+				? ctx->device_properties.limits.maxSamplerAnisotropy
+				: 1.0f;
 		sampler_CI.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 		vk::check(vkCreateSampler(ctx->device, &sampler_CI, nullptr, &sampler),
 				  "Could not create image sampler");
 	} else {
 		this->sampler = sampler;
 	}
-	
+
 	layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	if (img_layout != VK_IMAGE_LAYOUT_UNDEFINED) {
 		aspect_flags = flags;
@@ -194,7 +197,8 @@ void Texture2D::create_empty_texture(
 		cmd.submit();
 	}
 	if (name) {
-		DebugMarker::set_resource_name(ctx->device, (uint64_t)img, name, VK_OBJECT_TYPE_IMAGE);
+		DebugMarker::set_resource_name(ctx->device, (uint64_t)img, name,
+									   VK_OBJECT_TYPE_IMAGE);
 		this->name = name;
 	}
 }
@@ -224,7 +228,7 @@ void Texture::cmd_generate_mipmaps(const VkImageCreateInfo& info,
 	vkGetPhysicalDeviceFormatProperties(ctx->physical_device, info.format,
 										&format_properties);
 	LUMEN_ASSERT((format_properties.optimalTilingFeatures &
-				 VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT),
+				  VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT),
 				 "Texture image format doesn't support linear blitting");
 
 	VkImageSubresourceRange subresource_range = {};
@@ -240,15 +244,15 @@ void Texture::cmd_generate_mipmaps(const VkImageCreateInfo& info,
 								VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 								subresource_range, aspect_flags);
 		VkImageBlit blit{};
-		blit.srcOffsets[0] = { 0, 0, 0 };
-		blit.srcOffsets[1] = { mip_width, mip_height, 1 };
+		blit.srcOffsets[0] = {0, 0, 0};
+		blit.srcOffsets[1] = {mip_width, mip_height, 1};
 		blit.srcSubresource.aspectMask = aspect_flags;
 		blit.srcSubresource.mipLevel = i - 1;
 		blit.srcSubresource.baseArrayLayer = 0;
 		blit.srcSubresource.layerCount = 1;
-		blit.dstOffsets[0] = { 0, 0, 0 };
-		blit.dstOffsets[1] = { mip_width > 1 ? mip_width >> 1 : 1,
-							  mip_height > 1 ? mip_height >> 1 : 1, 1 };
+		blit.dstOffsets[0] = {0, 0, 0};
+		blit.dstOffsets[1] = {mip_width > 1 ? mip_width >> 1 : 1,
+							  mip_height > 1 ? mip_height >> 1 : 1, 1};
 		blit.dstSubresource.aspectMask = aspect_flags;
 		blit.dstSubresource.mipLevel = i;
 		blit.dstSubresource.baseArrayLayer = 0;
@@ -261,10 +265,8 @@ void Texture::cmd_generate_mipmaps(const VkImageCreateInfo& info,
 								VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 								subresource_range, aspect_flags);
 
-		if (mip_width > 1)
-			mip_width >>= 1;
-		if (mip_height > 1)
-			mip_height >>= 1;
+		if (mip_width > 1) mip_width >>= 1;
+		if (mip_height > 1) mip_height >>= 1;
 	}
 	subresource_range.baseMipLevel = mip_levels - 1;
 	transition_image_layout(cmd, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -282,4 +284,3 @@ void Texture::destroy() {
 		vkFreeMemory(ctx->device, img_mem, nullptr);
 	}
 }
-

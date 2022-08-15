@@ -2,8 +2,7 @@
 #include "CommandBuffer.h"
 CommandBuffer::CommandBuffer(VulkanContext* ctx, bool begin,
 							 VkCommandBufferUsageFlags begin_flags,
-							 QueueType type,
-							 VkCommandBufferLevel level) {
+							 QueueType type, VkCommandBufferLevel level) {
 	this->ctx = ctx;
 	this->type = type;
 	auto cmd_buf_allocate_info =
@@ -19,9 +18,9 @@ CommandBuffer::CommandBuffer(VulkanContext* ctx, bool begin,
 	}
 }
 
-
 void CommandBuffer::begin(VkCommandBufferUsageFlags begin_flags) {
-	LUMEN_ASSERT(state != CommandBufferState::RECORDING, "Command buffer is already recording");
+	LUMEN_ASSERT(state != CommandBufferState::RECORDING,
+				 "Command buffer is already recording");
 	auto begin_info = vk::command_buffer_begin_info(begin_flags);
 	vk::check(vkBeginCommandBuffer(handle, &begin_info),
 			  "Could not begin the command buffer");
@@ -47,13 +46,12 @@ void CommandBuffer::submit(bool wait_fences, bool queue_wait_idle) {
 		vkDestroyFence(ctx->device, fence, nullptr);
 	} else {
 		vk::check(vkQueueSubmit(ctx->queues[(int)type], 1, &submit_info,
-				  VK_NULL_HANDLE),
+								VK_NULL_HANDLE),
 				  "Queue submission error");
 	}
 	if (queue_wait_idle) {
 		vk::check(vkQueueWaitIdle(ctx->queues[(int)type]),
 				  "Queue wait error! Check previous submissions");
-
 	}
 }
 

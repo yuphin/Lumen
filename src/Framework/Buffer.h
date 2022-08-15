@@ -13,10 +13,8 @@ struct Buffer {
 	std::string name;
 
 	inline void destroy() {
-		if (handle)
-			vkDestroyBuffer(ctx->device, handle, nullptr);
-		if (buffer_memory)
-			vkFreeMemory(ctx->device, buffer_memory, nullptr);
+		if (handle) vkDestroyBuffer(ctx->device, handle, nullptr);
+		if (buffer_memory) vkFreeMemory(ctx->device, buffer_memory, nullptr);
 	}
 
 	inline void bind(VkDeviceSize offset = 0) {
@@ -36,21 +34,21 @@ struct Buffer {
 
 	inline VkDeviceAddress get_device_address() {
 		VkBufferDeviceAddressInfo info = {
-			VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
+			VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
 		info.buffer = handle;
 		return vkGetBufferDeviceAddress(ctx->device, &info);
 	}
 
-	void create(const char* name, VulkanContext*, VkBufferUsageFlags, VkMemoryPropertyFlags,
-				VkSharingMode, VkDeviceSize,
-				void* data = nullptr,
-				bool use_staging = false);
+	void create(const char* name, VulkanContext*, VkBufferUsageFlags,
+				VkMemoryPropertyFlags, VkSharingMode, VkDeviceSize,
+				void* data = nullptr, bool use_staging = false);
 
-	inline void create(VulkanContext* ctx, VkBufferUsageFlags flags, VkMemoryPropertyFlags mem_property_flags,
-				VkSharingMode sharing_mode, VkDeviceSize size,
-				void* data = nullptr,
-				bool use_staging = false) {
-		return create("", ctx, flags, mem_property_flags, sharing_mode, size, data, use_staging);
+	inline void create(VulkanContext* ctx, VkBufferUsageFlags flags,
+					   VkMemoryPropertyFlags mem_property_flags,
+					   VkSharingMode sharing_mode, VkDeviceSize size,
+					   void* data = nullptr, bool use_staging = false) {
+		return create("", ctx, flags, mem_property_flags, sharing_mode, size,
+					  data, use_staging);
 	}
 	void flush(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
 	void invalidate(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);

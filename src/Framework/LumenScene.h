@@ -58,10 +58,10 @@ struct LumenLight {
 	glm::vec3 to;
 	glm::vec3 L;
 	uint32_t light_flags;
-    float world_radius;
+	float world_radius;
 };
 class LumenScene {
-public:
+   public:
 	void load_scene(const std::string& path);
 	std::vector<glm::vec3> positions;
 	std::vector<uint32_t> indices;
@@ -78,12 +78,12 @@ public:
 	struct Dimensions {
 		glm::vec3 min = glm::vec3(std::numeric_limits<float>::max());
 		glm::vec3 max = glm::vec3(std::numeric_limits<float>::min());
-		glm::vec3 size{ 0.f };
-		glm::vec3 center{ 0.f };
-		float radius{ 0 };
+		glm::vec3 size{0.f};
+		glm::vec3 center{0.f};
+		float radius{0};
 	} m_dimensions;
 	SceneConfig config;
-private:
+
+   private:
 	void compute_scene_dimensions();
 };
-
