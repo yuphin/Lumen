@@ -1,6 +1,7 @@
 #include "LumenPCH.h"
 #include "RenderGraph.h"
 #include "Utils.h"
+#include <unordered_set>
 
 #define DIRTY_CHECK(x) if(!x) {return *this;}
 static 	VkPipelineStageFlags get_pipeline_stage(PassType pass_type, VkAccessFlags access_flags) {
@@ -98,6 +99,80 @@ void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout)
 	}
 }
 
+static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_shaders) {
+	//todo: make resource processing in order
+	auto process_resources = [pass](const Shader& shader) {
+		for (auto& [k, v] : shader.buffer_status_map) {
+			if (v.read) {
+				pass->affected_buffer_pointers[k].read = v.read;
+			}
+			if (v.write) {
+				pass->affected_buffer_pointers[k].write = v.write;
+			}
+		}
+	};
+	switch (pass->type) {
+		case PassType::Graphics:
+		{
+			std::vector<std::future<Shader*>> shader_tasks;
+			shader_tasks.reserve(pass->gfx_settings->shaders.size());
+			for (auto& shader : active_shaders) {
+				if (pass->rg->shader_cache.find(shader->filename) != pass->rg->shader_cache.end()) {
+					*shader = pass->rg->shader_cache[shader->filename];
+				} else {
+					shader_tasks.push_back(ThreadPool::submit([pass](Shader* shader) {shader->compile(pass); return shader; }, shader));
+				}
+			}
+			for (auto& task : shader_tasks) {
+				auto shader = task.get();
+				pass->rg->shader_cache[shader->filename] = *shader;
+			}
+			for (auto& shader : active_shaders) {
+				process_resources(*shader);
+			}
+		}
+		break;
+		case PassType::RT:
+		{
+			std::vector<std::future<Shader*>> shader_tasks;
+			shader_tasks.reserve(pass->rt_settings->shaders.size());
+			for (auto& shader : active_shaders) {
+				if (pass->rg->shader_cache.find(shader->filename) != pass->rg->shader_cache.end()) {
+					*shader = pass->rg->shader_cache[shader->filename];
+				} else {
+					shader_tasks.push_back(ThreadPool::submit([pass](Shader* shader) {shader->compile(pass); return shader; }, shader));
+					//shader.compile(this);
+					pass->rg->shader_cache[shader->filename] = *shader;
+				}
+			}
+			for (auto& task : shader_tasks) {
+				auto shader = task.get();
+				pass->rg->shader_cache[shader->filename] = *shader;
+			}
+			for (auto& shader : active_shaders) {
+				process_resources(*shader);
+			}
+
+		}
+		break;
+		case PassType::Compute:
+		{
+			for (auto& shader : active_shaders) {
+				if (pass->rg->shader_cache.find(shader->filename) != pass->rg->shader_cache.end()) {
+					*shader = pass->rg->shader_cache[shader->filename];
+				} else {
+					shader->compile(pass);
+					pass->rg->shader_cache[shader->filename] = *shader;
+				}
+				pass->affected_buffer_pointers = shader->buffer_status_map;
+			}
+		}
+		break;
+		default:
+			break;
+	}
+}
+
 RenderPass& RenderGraph::add_rt(const std::string& name, const RTPassSettings& settings) {
 	Pipeline* pipeline;
 	uint32_t pass_idx = (uint32_t)passes.size();
@@ -180,9 +255,9 @@ RenderPass& RenderPass::bind(const ResourceBinding& binding) {
 
 RenderPass& RenderPass::bind(std::initializer_list<ResourceBinding> bindings) {
 	DIRTY_CHECK(rg->recording);
-	bound_resources.insert(bound_resources.end(), bindings.begin(), bindings.end());
-	for (size_t i = 0; i < bindings.size(); i++) {
+	for (auto& binding : bindings) {
 		descriptor_counts.push_back(1);
+		bound_resources.push_back(binding);
 	}
 	return *this;
 
@@ -221,17 +296,13 @@ RenderPass& RenderPass::bind_tlas(const AccelKHR& tlas) {
 	return *this;
 }
 
-
 RenderPass& RenderPass::read(Buffer& buffer) {
-	register_dependencies(buffer, VK_ACCESS_SHADER_READ_BIT);
-	rg->buffer_resource_map[buffer.handle] = { pass_idx, VK_ACCESS_SHADER_READ_BIT };
+	explicit_buffer_reads.push_back(&buffer);
 	return *this;
 }
 
 RenderPass& RenderPass::read(Texture2D& tex) {
-	VkImageLayout target_layout = get_target_img_layout(tex, VK_ACCESS_SHADER_READ_BIT);
-	register_dependencies(tex, target_layout);
-	rg->img_resource_map[tex.img] = pass_idx;
+	explicit_tex_reads.push_back(&tex);
 	return *this;
 }
 
@@ -259,13 +330,12 @@ RenderPass& RenderPass::read(ResourceBinding& resource) {
 }
 
 RenderPass& RenderPass::write(Buffer& buffer) {
-	return write(buffer, VK_ACCESS_SHADER_WRITE_BIT);
+	explicit_buffer_writes.push_back(&buffer);
+	return *this;
 }
 
 RenderPass& RenderPass::write(Texture2D& tex) {
-	VkImageLayout target_layout = get_target_img_layout(tex, VK_ACCESS_SHADER_WRITE_BIT);
-	register_dependencies(tex, target_layout);
-	rg->img_resource_map[tex.img] = pass_idx;
+	explicit_tex_writes.push_back(&tex);
 	return *this;
 }
 
@@ -299,21 +369,13 @@ RenderPass& RenderPass::skip_execution() {
 	return *this;
 }
 
-RenderPass& RenderPass::write(Buffer& buffer, VkAccessFlags access_flags) {
-	register_dependencies(buffer, access_flags);
-	rg->buffer_resource_map[buffer.handle] = { pass_idx, access_flags };
-	return *this;
-}
-
 RenderPass& RenderPass::push_constants(void* data) {
 	push_constant_data = data;
 	return *this;
 }
 
-
 RenderPass& RenderPass::zero(Buffer& buffer) {
 	buffer_zeros.push_back(&buffer);
-	write(buffer, VK_ACCESS_TRANSFER_WRITE_BIT);
 	return *this;
 }
 
@@ -334,19 +396,48 @@ RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<Buffer
 
 void RenderPass::finalize() {
 	auto transition_resources = [this]() {
-		for (auto& bound_resource : bound_resources) {
-			if (bound_resource.write) {
-				write(bound_resource);
-			} else if (bound_resource.read) {
-				read(bound_resource);
+		if (rg->settings.shader_inference) {
+			for (auto& bound_resource : bound_resources) {
+				if (bound_resource.write) {
+					if (bound_resource.buf) {
+						write_impl(*bound_resource.buf, VK_ACCESS_SHADER_WRITE_BIT);
+					} else {
+						write_impl(*bound_resource.tex);
+					}
+				} else if (bound_resource.read) {
+					if (bound_resource.buf) {
+						read_impl(*bound_resource.buf);
+					} else {
+						read_impl(*bound_resource.tex);
+					}
+					//read(bound_resource);
+				}
+			}
+			for (auto [buffer, status] : affected_buffer_pointers) {
+				if (status.write) {
+					write_impl(*buffer, VK_ACCESS_SHADER_WRITE_BIT);
+				} else if (status.read) {
+					read_impl(*buffer);
+				}
+			}
+		} else {
+			for (auto& buf : explicit_buffer_reads) {
+				read_impl(*buf);
+			}
+			for (auto& buf : explicit_buffer_writes) {
+				write_impl(*buf, VK_ACCESS_SHADER_WRITE_BIT);
+			}
+			for (auto& tex : explicit_tex_reads) {
+				read_impl(*tex);
+			}
+			for (auto& tex: explicit_tex_writes) {
+				write_impl(*tex);
 			}
 		}
-		for (auto [buffer, status] : affected_buffer_pointers) {
-			if (status.write) {
-				write(*buffer);
-			} else if (status.read) {
-				read(*buffer);
-			}
+	
+
+		for (Buffer* buffer : buffer_zeros) {
+			write_impl(*buffer, VK_ACCESS_TRANSFER_WRITE_BIT);
 		}
 	};
 
@@ -366,43 +457,22 @@ void RenderPass::finalize() {
 		transition_resources();
 		return;
 	}
-	
 
 	// Create pipelines/push descriptor templates
-	switch (type) {
-		case PassType::Graphics:
-		{
-			if (!is_pipeline_cached) {
+	if (!is_pipeline_cached) {
+		switch (type) {
+			case PassType::Graphics:
+			{
 				auto func = [](RenderPass* pass) {
 					pass->pipeline->create_gfx_pipeline(*pass->gfx_settings,
 														pass->descriptor_counts, pass->gfx_settings->color_outputs,
 														pass->gfx_settings->depth_output);
 				};
 				rg->pipeline_tasks.push_back({ func, pass_idx });
+				break;
 			}
-
-			std::vector<std::future<Shader*>> shader_tasks;
-			shader_tasks.reserve(gfx_settings->shaders.size());
-			for (auto& shader : gfx_settings->shaders) {
-				if (rg->shader_cache.find(shader.filename) != rg->shader_cache.end()) {
-					shader = rg->shader_cache[shader.filename];
-				} else {
-					shader_tasks.push_back(ThreadPool::submit([this](Shader* shader) {shader->compile(this); return shader; }, &shader));
-				}
-			}
-			for (auto& task : shader_tasks) {
-				auto shader = task.get();
-				rg->shader_cache[shader->filename] = *shader;
-			}
-			for (const auto& shader : gfx_settings->shaders) {
-				process_resources(shader);
-			}
-
-			break;
-		}
-		case PassType::RT:
-		{
-			if (!is_pipeline_cached) {
+			case PassType::RT:
+			{
 				auto func = [](RenderPass* pass) {
 					pass->pipeline->create_rt_pipeline(*pass->rt_settings,
 													   pass->descriptor_counts);
@@ -424,51 +494,22 @@ void RenderPass::finalize() {
 					vkUpdateDescriptorSets(pass->rg->ctx->device, 1, &descriptor_write, 0, nullptr);
 				};
 				rg->pipeline_tasks.push_back({ func, pass_idx });
+				break;
 			}
-		
-			std::vector<std::future<Shader*>> shader_tasks;
-			shader_tasks.reserve(rt_settings->shaders.size());
-			for (auto& shader : rt_settings->shaders) {
-				if (rg->shader_cache.find(shader.filename) != rg->shader_cache.end()) {
-					shader = rg->shader_cache[shader.filename];
-				} else {
-					shader_tasks.push_back(ThreadPool::submit([this](Shader* shader) {shader->compile(this); return shader; }, &shader));
-					//shader.compile(this);
-					rg->shader_cache[shader.filename] = shader;
-				}
-			}
-			for (auto& task : shader_tasks) {
-				auto shader = task.get();
-				rg->shader_cache[shader->filename] = *shader;
-			}
-			for (const auto& shader : rt_settings->shaders) {
-				process_resources(shader);
-			}
-
-			break;
-		}
-		case PassType::Compute:
-		{
-			if (!is_pipeline_cached) {
+			case PassType::Compute:
+			{
 				auto func = [](RenderPass* pass) {
 					pass->pipeline->create_compute_pipeline(*pass->compute_settings,
 															pass->descriptor_counts);
 				};
 				rg->pipeline_tasks.push_back({ func, pass_idx });
+				break;
 			}
-			auto& shader = compute_settings->shader;
-			if (rg->shader_cache.find(shader.filename) != rg->shader_cache.end()) {
-				shader = rg->shader_cache[shader.filename];
-			} else {
-				shader.compile(this);
-				rg->shader_cache[shader.filename] = shader;
-			}
-			affected_buffer_pointers = shader.buffer_status_map;
-			break;
+			default:
+				break;
 		}
-		default:
-			break;
 	}
+
 	transition_resources();
 	// Fill in descriptor infos
 	for (int i = 0; i < bound_resources.size(); i++) {
@@ -478,6 +519,28 @@ void RenderPass::finalize() {
 			 DescriptorInfo(bound_resources[i].tex->descriptor(bound_resources[i].sampler)) :
 			 DescriptorInfo(bound_resources[i].tex->descriptor()));
 	}
+}
+
+void RenderPass::write_impl(Buffer& buffer, VkAccessFlags access_flags) {
+	register_dependencies(buffer, access_flags);
+	rg->buffer_resource_map[buffer.handle] = { pass_idx, access_flags };
+}
+
+void RenderPass::write_impl(Texture2D& tex) {
+	VkImageLayout target_layout = get_target_img_layout(tex, VK_ACCESS_SHADER_WRITE_BIT);
+	register_dependencies(tex, target_layout);
+	rg->img_resource_map[tex.img] = pass_idx;
+}
+
+void RenderPass::read_impl(Buffer& buffer) {
+	register_dependencies(buffer, VK_ACCESS_SHADER_READ_BIT);
+	rg->buffer_resource_map[buffer.handle] = { pass_idx, VK_ACCESS_SHADER_READ_BIT };
+}
+
+void RenderPass::read_impl(Texture2D& tex) {
+	VkImageLayout target_layout = get_target_img_layout(tex, VK_ACCESS_SHADER_READ_BIT);
+	register_dependencies(tex, target_layout);
+	rg->img_resource_map[tex.img] = pass_idx;
 }
 
 void RenderPass::run(VkCommandBuffer cmd) {
@@ -725,6 +788,59 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	buffer_sync_resources.resize(passes.size());
 	img_sync_resources.resize(passes.size());
 
+	// Compile shaders and process resources
+	if (recording) {
+		auto cmp = [](const std::pair<Shader*, RenderPass*>& a,
+					  const std::pair<Shader*, RenderPass*>& b) {
+			return a.first->filename < b.first->filename;
+		};
+		std::set<std::pair<Shader*, RenderPass*>, decltype(cmp)> unique_shaders_set;
+		std::unordered_map<RenderPass*, std::vector<Shader*>> unique_shaders;
+		std::unordered_map<RenderPass*, std::vector<Shader*>> existing_shaders;
+		for (auto& pass : passes) {
+			if (pass.gfx_settings) {
+				for (auto& shader : pass.gfx_settings->shaders) {
+					if (!unique_shaders_set.insert({ &shader, &pass }).second) {
+						existing_shaders[&pass].push_back(&shader);
+					}
+				}
+			} else if (pass.rt_settings) {
+				for (auto& shader : pass.rt_settings->shaders) {
+					if (!unique_shaders_set.insert({ &shader, &pass }).second) {
+						existing_shaders[&pass].push_back(&shader);
+					}
+				}
+			} else {
+				if (!unique_shaders_set.insert({ &pass.compute_settings->shader, &pass }).second) {
+					existing_shaders[&pass].push_back(&pass.compute_settings->shader);
+				}
+			}
+		}
+		std::vector<std::future<void>> futures;
+		for (auto& [shader, rp] : unique_shaders_set) {
+			unique_shaders[rp].push_back(shader);
+		}
+		// Compile and process resources for unique shaders
+		for (auto& [pass, shaders] : unique_shaders) {
+			futures.push_back(ThreadPool::submit(std::bind(&build_shaders, pass, shaders)));
+		}
+		for (auto& future : futures) {
+			future.wait();
+		}
+		futures.clear();
+		// Process resources for duplicate shaders
+		for (auto& [pass, shaders] : existing_shaders) {
+			futures.push_back(ThreadPool::submit(std::bind(&build_shaders, pass, shaders)));
+		}
+		for (auto& future : futures) {
+			future.wait();
+		}
+	}
+	for (auto& pass : passes) {
+		pass.finalize();
+	}
+
+
 	if (pipeline_tasks.size()) {
 		std::vector<std::future<void>> futures;
 		futures.reserve(pipeline_tasks.size());
@@ -755,6 +871,12 @@ void RenderGraph::reset(VkCommandBuffer cmd) {
 		passes[i].buffer_zeros.clear();
 		passes[i].buffer_barriers.clear();
 		passes[i].disable_execution = false;
+		if (!settings.shader_inference) {
+			passes[i].explicit_buffer_reads.clear();
+			passes[i].explicit_buffer_writes.clear();
+			passes[i].explicit_tex_reads.clear();
+			passes[i].explicit_tex_writes.clear();
+		}
 	}
 	if (recording) {
 		for (auto& pass : passes) {

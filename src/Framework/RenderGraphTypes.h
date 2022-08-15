@@ -11,6 +11,10 @@
 class RenderGraph;
 class RenderPass;
 
+struct RenderGraphSettings {
+	bool shader_inference = false;
+};
+
 struct GraphicsPassSettings {
 	uint32_t width;
 	uint32_t height;

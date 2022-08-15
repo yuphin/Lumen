@@ -292,12 +292,12 @@ private:
 					  GltfAttributes attributes, const std::string& name);
 
 	// Temporary data
-	robin_hood::unordered_map<int, std::vector<uint32_t>> mesh_to_prim_meshes;
+	std::unordered_map<int, std::vector<uint32_t>> mesh_to_prim_meshes;
 	std::vector<uint32_t> primitive_indices_32u;
 	std::vector<uint16_t> primitive_indices_16u;
 	std::vector<uint8_t> primitive_indices_8u;
 
-	robin_hood::unordered_map<std::string, GltfPrimMesh> cache_prim_mesh;
+	std::unordered_map<std::string, GltfPrimMesh> cache_prim_mesh;
 
 	void compute_camera();
 	void check_required_extensions(const tinygltf::Model& tmodel);

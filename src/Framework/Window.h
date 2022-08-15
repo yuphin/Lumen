@@ -176,8 +176,8 @@ private:
 									 int mods);
 	static void mouse_move_callback(GLFWwindow* window, double x, double y);
 	static void scroll_callback(GLFWwindow* window, double x, double y);
-	robin_hood::unordered_map<KeyInput, KeyAction> key_map{};
-	robin_hood::unordered_map<MouseAction, KeyAction> mouse_map{};
+	std::unordered_map<KeyInput, KeyAction> key_map{};
+	std::unordered_map<MouseAction, KeyAction> mouse_map{};
 	std::vector<MouseClickCallback> mouse_click_callbacks;
 	std::vector<MouseMoveCallback> mouse_move_callbacks;
 	std::vector<MouseScrollCallback> mouse_scroll_callbacks;

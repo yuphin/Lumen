@@ -50,6 +50,7 @@ void BDPT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_path_addr, &light_path_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, camera_path_addr, &camera_path_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, &color_storage_buffer, instance->vkb.rg);
+
 }
 
 void BDPT::render() {
@@ -79,10 +80,10 @@ void BDPT::render() {
 		)
 		.zero(light_path_buffer)
 		.zero(camera_path_buffer)
-	/*	.read(light_path_buffer)
-		.read(camera_path_buffer)*/
+		.read(light_path_buffer)
+		.read(camera_path_buffer)
 		.push_constants(&pc_ray)
-		//.write(output_tex)
+		.write(output_tex)
 		.bind({
 				output_tex,
 				prim_lookup_buffer,
@@ -91,8 +92,8 @@ void BDPT::render() {
 			  })
 			  .bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
-		.bind_tlas(instance->vkb.tlas)
-		.finalize();
+		.bind_tlas(instance->vkb.tlas);
+		//.finalize();
 }
 
 bool BDPT::update() {

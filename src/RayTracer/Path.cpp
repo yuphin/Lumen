@@ -47,17 +47,16 @@ void Path::render() {
 			   }
 		)
 		.push_constants(&pc_ray)
-		.bind({ 
+		.bind({
 				output_tex,
 				prim_lookup_buffer,
 				scene_ubo_buffer,
-				scene_desc_buffer,  
+				scene_desc_buffer,
 			  })
-		.bind_texture_array(diffuse_textures)
+			  .bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
-		.bind_tlas(instance->vkb.tlas)
-		//.write(output_tex)
-		.finalize();
+		//.write(output_tex) // Needed if the automatic shader inference is off
+		.bind_tlas(instance->vkb.tlas);
 }
 
 bool Path::update() {

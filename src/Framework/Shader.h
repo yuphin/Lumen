@@ -24,5 +24,5 @@ struct Shader {
 	int compile(RenderPass* pass);
 	VkShaderModule create_vk_shader_module(const VkDevice& device) const;
 	std::vector<std::pair<VkFormat, uint32_t>> vertex_inputs;
-	robin_hood::unordered_map<Buffer*, BufferStatus> buffer_status_map;
+	std::unordered_map<Buffer*, BufferStatus> buffer_status_map;
 };

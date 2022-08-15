@@ -23,6 +23,8 @@ struct AccelKHR {
 	Buffer buffer;
 };
 
+
+
 class RenderGraph;
 class RenderPass;
 
@@ -52,14 +54,14 @@ public:
 	RenderPass& bind_texture_array(std::vector<Texture2D>& texes);
 	RenderPass& bind_buffer_array(std::vector<Buffer>& buffers);
 	RenderPass& bind_tlas(const AccelKHR& tlas);
-	RenderPass& read(Buffer& buffer);
+
+	RenderPass& write(Texture2D& tex);
+	RenderPass& write(Buffer& buffer);
 	RenderPass& read(Texture2D& tex);
+	RenderPass& read(Buffer& buffer);
 	RenderPass& read(ResourceBinding& resource);
 	RenderPass& read(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
 	RenderPass& read(std::initializer_list<std::reference_wrapper<Texture2D>> texes);
-	RenderPass& write(Texture2D& tex);
-	RenderPass& write(Buffer& buffer);
-	RenderPass& write(Buffer& buffer, VkAccessFlags access_flags);
 	RenderPass& write(ResourceBinding& resource);
 	RenderPass& write(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
 	RenderPass& write(std::initializer_list<std::reference_wrapper<Texture2D>> texes);
@@ -74,16 +76,31 @@ public:
 	std::vector<ResourceBinding> bound_resources;
 
 
-	robin_hood::unordered_map<Buffer*, BufferStatus> affected_buffer_pointers;
+	std::unordered_map<Buffer*, BufferStatus> affected_buffer_pointers;
 	RenderGraph* rg;
+	std::unique_ptr<GraphicsPassSettings> gfx_settings = nullptr;
+	std::unique_ptr<RTPassSettings> rt_settings = nullptr;
+	std::unique_ptr<ComputePassSettings> compute_settings = nullptr;
+	PassType type;
 private:
+	// When the automatic inference isn't used
+	std::vector<Buffer*> explicit_buffer_writes;
+	std::vector<Buffer*> explicit_buffer_reads;
+	std::vector<Texture2D*> explicit_tex_writes;
+	std::vector<Texture2D*> explicit_tex_reads;
+
+
+	void write_impl(Buffer& buffer, VkAccessFlags access_flags);
+	void write_impl(Texture2D& tex);
+	void read_impl(Buffer& buffer);
+	void read_impl(Texture2D& tex);
 
 	void run(VkCommandBuffer cmd);
 	void register_dependencies(Buffer& buffer, VkAccessFlags dst_access_flags);
 	void register_dependencies(Texture2D& tex, VkImageLayout target_layout);
+	void build_shaders(const std::vector<Shader*>& active_shaders);
 
 	std::string name;
-	PassType type;
 	Pipeline* pipeline;
 	uint32_t pass_idx;
 	std::vector<uint32_t> descriptor_counts;
@@ -94,11 +111,11 @@ private:
 		The assumption is that a SyncDescriptor is unique to a pass (either via Buffer or Image).
 		Which is reasonable because each pass is comprised of a single shader dispatch
 	*/
-	robin_hood::unordered_map<VkBuffer, BufferSyncDescriptor> set_signals_buffer;
-	robin_hood::unordered_map<VkBuffer, BufferSyncDescriptor> wait_signals_buffer;
+	std::unordered_map<VkBuffer, BufferSyncDescriptor> set_signals_buffer;
+	std::unordered_map<VkBuffer, BufferSyncDescriptor> wait_signals_buffer;
 
-	robin_hood::unordered_map<VkImage, ImageSyncDescriptor> set_signals_img;
-	robin_hood::unordered_map<VkImage, ImageSyncDescriptor> wait_signals_img;
+	std::unordered_map<VkImage, ImageSyncDescriptor> set_signals_img;
+	std::unordered_map<VkImage, ImageSyncDescriptor> wait_signals_img;
 
 	DescriptorInfo descriptor_infos[32] = {};
 
@@ -119,10 +136,9 @@ private:
 	VkDescriptorSet tlas_descriptor_set = nullptr;
 	VkWriteDescriptorSetAccelerationStructureKHR tlas_info = {};
 
-	std::unique_ptr<GraphicsPassSettings> gfx_settings = nullptr;
-	std::unique_ptr<RTPassSettings> rt_settings = nullptr;
-	std::unique_ptr<ComputePassSettings> compute_settings = nullptr;
+
 	bool disable_execution = false;
+
 };
 
 class RenderGraph {
@@ -140,12 +156,10 @@ public:
 	friend RenderPass;
 	bool recording = true;
 	EventPool event_pool;
-
-
-
-	robin_hood::unordered_map<std::string, Buffer*> registered_buffer_pointers;
+	std::unordered_map<std::string, Buffer*> registered_buffer_pointers;
+	std::unordered_map<std::string, Shader> shader_cache;
+	RenderGraphSettings settings;
 private:
-
 	struct BufferSyncResources {
 		std::vector<VkBufferMemoryBarrier2> buffer_bariers;
 		std::vector<VkDependencyInfo> dependency_infos;
@@ -162,12 +176,12 @@ private:
 	};
 	VulkanContext* ctx = nullptr;
 	std::vector<RenderPass> passes;
-	robin_hood::unordered_map<std::string, PipelineStorage> pipeline_cache;
-	robin_hood::unordered_map<std::string, Shader> shader_cache;
+	std::unordered_map<std::string, PipelineStorage> pipeline_cache;
 	std::vector<std::pair<std::function<void(RenderPass*)>, uint32_t>> pipeline_tasks;
+	std::vector <std::function<void(RenderPass*)>> shader_tasks;
 	// Sync related data
 	std::vector<BufferSyncResources> buffer_sync_resources;
 	std::vector<ImageSyncResources> img_sync_resources;
-	robin_hood::unordered_map<VkBuffer, std::pair<uint32_t, VkAccessFlags>> buffer_resource_map; // Buffer handle - { Write Pass Idx, Access Type }
-	robin_hood::unordered_map<VkImage, uint32_t> img_resource_map; // Tex2D handle - Pass Idx
+	std::unordered_map<VkBuffer, std::pair<uint32_t, VkAccessFlags>> buffer_resource_map; // Buffer handle - { Write Pass Idx, Access Type }
+	std::unordered_map<VkImage, uint32_t> img_resource_map; // Tex2D handle - Pass Idx
 };

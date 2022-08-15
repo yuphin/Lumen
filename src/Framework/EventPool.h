@@ -11,6 +11,6 @@ public:
 	void reset_events(VkDevice device, VkCommandBuffer cmd);
 
 private:
-	robin_hood::unordered_map<VkCommandBuffer, Events> events_map;
+	std::unordered_map<VkCommandBuffer, Events> events_map;
 };
 
