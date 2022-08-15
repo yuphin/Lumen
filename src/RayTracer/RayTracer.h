@@ -36,8 +36,7 @@ class RayTracer : public LumenInstance {
 	void init_imgui();
 	void init_resources();
 	void parse_args(int argc, char* argv[]);
-	void save_exr(const float* rgb, int width, int height,
-				  const char* outfilename);
+	void save_exr(const float* rgb, int width, int height, const char* outfilename);
 	bool initialized = false;
 	bool rt_initialized = false;
 	float cpu_avg_time = 0;

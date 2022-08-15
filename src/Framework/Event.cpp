@@ -21,6 +21,4 @@ bool EventHandler::consume_event(LumenEvent event) {
 	return false;
 }
 
-bool EventHandler::signaled(LumenEvent event) {
-	return event_histogram[(int)event] > 0;
-}
+bool EventHandler::signaled(LumenEvent event) { return event_histogram[(int)event] > 0; }

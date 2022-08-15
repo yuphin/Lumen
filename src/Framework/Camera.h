@@ -6,8 +6,7 @@ class Camera {
    public:
 	enum class CameraType { FPS, LookAt };
 
-	explicit Camera(float cam_near, float cam_far)
-		: cam_near(cam_near), cam_far(cam_far) {}
+	explicit Camera(float cam_near, float cam_far) : cam_near(cam_near), cam_far(cam_far) {}
 	inline void set_position(const glm::vec3& pos) { this->position = pos; }
 	inline void set_direction(const glm::vec3& dir) { this->direction = dir; }
 	inline void set_rotation(const glm::vec3& rot) { this->rotation = rot; }
@@ -52,38 +51,30 @@ class Camera {
 
 class PerspectiveCamera : public Camera {
    public:
-	explicit PerspectiveCamera(float fov, float cam_near, float cam_far,
-							   float aspect_ratio, const glm::vec3& pos)
+	explicit PerspectiveCamera(float fov, float cam_near, float cam_far, float aspect_ratio, const glm::vec3& pos)
 		: fov(fov), aspect_ratio(aspect_ratio), Camera(cam_near, cam_far) {
 		left = right = top = bot = -1;
 		this->make_projection_matrix(true);
 		this->set_position(pos);
 		this->update_view_matrix();
 	}
-	explicit PerspectiveCamera(float left, float right, float top, float bot,
-							   float cam_near, float cam_far,
+	explicit PerspectiveCamera(float left, float right, float top, float bot, float cam_near, float cam_far,
 							   const glm::vec3& pos = glm::vec3(0.0f))
-		: left(left),
-		  right(right),
-		  top(top),
-		  bot(bot),
-		  Camera(cam_near, cam_far) {
+		: left(left), right(right), top(top), bot(bot), Camera(cam_near, cam_far) {
 		fov = aspect_ratio = -1;
 		this->make_projection_matrix();
 		this->set_position(pos);
 		this->update_view_matrix();
 	}
 
-	explicit PerspectiveCamera(float fov, float cam_near, float cam_far,
-							   float aspect_ratio, const glm::vec3& dir,
+	explicit PerspectiveCamera(float fov, float cam_near, float cam_far, float aspect_ratio, const glm::vec3& dir,
 							   const glm::vec3& pos)
 		: fov(fov), aspect_ratio(aspect_ratio), Camera(cam_near, cam_far) {
 		left = right = top = bot = -1;
 		this->make_projection_matrix(true);
 		this->set_position(pos);
 		this->set_direction(dir);
-		view =
-			glm::lookAtLH(position, position + direction, glm::vec3(0, 1, 0));
+		view = glm::lookAtLH(position, position + direction, glm::vec3(0, 1, 0));
 		glm::vec3 scale;
 		glm::quat q;
 		glm::vec3 translation;
@@ -96,9 +87,7 @@ class PerspectiveCamera : public Camera {
 		rotation = rot;
 	}
 
-	explicit PerspectiveCamera(float fov, const glm::mat4 cam_matrix,
-							   float cam_near, float cam_far,
-							   float aspect_ratio)
+	explicit PerspectiveCamera(float fov, const glm::mat4 cam_matrix, float cam_near, float cam_far, float aspect_ratio)
 		: fov(fov), aspect_ratio(aspect_ratio), Camera(cam_near, cam_far) {
 		left = right = top = bot = -1;
 		this->make_projection_matrix(true);
@@ -114,8 +103,7 @@ class PerspectiveCamera : public Camera {
 		glm::extractEulerAngleXYZ(glm::toMat4(q), rot.x, rot.y, rot.z);
 		rot *= 180. / glm::pi<float>();
 		rotation = rot;
-		glm::vec3 pos =
-			glm::vec3({cam_matrix[0][3], cam_matrix[1][3], cam_matrix[2][3]});
+		glm::vec3 pos = glm::vec3({cam_matrix[0][3], cam_matrix[1][3], cam_matrix[2][3]});
 		this->set_position(pos);
 	}
 

@@ -27,14 +27,11 @@ class SBTWrapper {
 	void setup(VulkanContext* ctx, uint32_t family_idx,
 			   const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rt_props);
 	void destroy();
-	void create(VkPipeline rtPipeline,
-				VkRayTracingPipelineCreateInfoKHR pipeline_info = {},
-				const std::vector<VkRayTracingPipelineCreateInfoKHR>&
-					create_infos = {});
+	void create(VkPipeline rtPipeline, VkRayTracingPipelineCreateInfoKHR pipeline_info = {},
+				const std::vector<VkRayTracingPipelineCreateInfoKHR>& create_infos = {});
 
 	void add_indices(VkRayTracingPipelineCreateInfoKHR pipeline_info,
-					 const std::vector<VkRayTracingPipelineCreateInfoKHR>&
-						 create_infos = {});
+					 const std::vector<VkRayTracingPipelineCreateInfoKHR>& create_infos = {});
 
 	void add_index(GroupType t, uint32_t index) { m_index[t].push_back(index); }
 
@@ -43,16 +40,13 @@ class SBTWrapper {
 		add_data(t, groupIndex, (uint8_t*)&data, sizeof(T));
 	}
 
-	void add_data(GroupType t, uint32_t group_idx, uint8_t* data,
-				  size_t data_size) {
+	void add_data(GroupType t, uint32_t group_idx, uint8_t* data, size_t data_size) {
 		std::vector<uint8_t> dst(data, data + data_size);
 		m_data[t][group_idx] = dst;
 	}
 
 	// Getters
-	uint32_t index_count(GroupType t) {
-		return static_cast<uint32_t>(m_index[t].size());
-	}
+	uint32_t index_count(GroupType t) { return static_cast<uint32_t>(m_index[t].size()); }
 	uint32_t get_stride(GroupType t) { return m_stride[t]; }
 	uint32_t get_size(GroupType t) { return get_stride(t) * index_count(t); }
 	VkDeviceAddress get_address(GroupType t);

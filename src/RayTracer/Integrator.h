@@ -14,8 +14,7 @@
 #include "shaders/commons.h"
 class Integrator {
    public:
-	Integrator(LumenInstance* instance, LumenScene* lumen_scene)
-		: instance(instance), lumen_scene(lumen_scene) {}
+	Integrator(LumenInstance* instance, LumenScene* lumen_scene) : instance(instance), lumen_scene(lumen_scene) {}
 	virtual void init();
 	virtual void render() = 0;
 	virtual bool gui() { return false; };

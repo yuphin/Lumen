@@ -2,8 +2,7 @@
 #include "Integrator.h"
 class SMLT : public Integrator {
    public:
-	SMLT(LumenInstance* scene, LumenScene* lumen_scene)
-		: Integrator(scene, lumen_scene) {}
+	SMLT(LumenInstance* scene, LumenScene* lumen_scene) : Integrator(scene, lumen_scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;

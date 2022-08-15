@@ -11,9 +11,7 @@ class Logger {
 	static void init();
 	static void set_printer_mode();
 	static void set_default_mode();
-	inline static std::shared_ptr<spdlog::logger>& get_logger() {
-		return s_logger;
-	}
+	inline static std::shared_ptr<spdlog::logger>& get_logger() { return s_logger; }
 
    private:
 	static std::shared_ptr<spdlog::logger> s_logger;

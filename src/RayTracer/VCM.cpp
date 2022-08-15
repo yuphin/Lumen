@@ -8,91 +8,69 @@ static bool written = false;
 const bool ray_guide = false;
 void VCM::init() {
 	Integrator::init();
-	photon_buffer.create(
-		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		10 * instance->width * instance->height * sizeof(PhotonHash));
+	photon_buffer.create(&instance->vkb.ctx,
+						 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+							 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+						 10 * instance->width * instance->height * sizeof(PhotonHash));
 
 	vcm_light_vertices_buffer.create(
 		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height *
-			(lumen_scene->config.path_length + 1) * sizeof(VCMVertex));
+		instance->width * instance->height * (lumen_scene->config.path_length + 1) * sizeof(VCMVertex));
 
-	light_path_cnt_buffer.create(
-		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height * sizeof(float));
+	light_path_cnt_buffer.create(&instance->vkb.ctx,
+								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+									 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								 instance->width * instance->height * sizeof(float));
 
-	color_storage_buffer.create(
-		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height * 3 * sizeof(float));
+	color_storage_buffer.create(&instance->vkb.ctx,
+								VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								instance->width * instance->height * 3 * sizeof(float));
 
-	vcm_reservoir_buffer.create(
-		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height * sizeof(VCMReservoir));
+	vcm_reservoir_buffer.create(&instance->vkb.ctx,
+								VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+									VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								instance->width * instance->height * sizeof(VCMReservoir));
 
-	light_samples_buffer.create(
-		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height * sizeof(VCMRestirData));
+	light_samples_buffer.create(&instance->vkb.ctx,
+								VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+									VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								instance->width * instance->height * sizeof(VCMRestirData));
 
-	should_resample_buffer.create(
-		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, 4);
+	should_resample_buffer.create(&instance->vkb.ctx,
+								  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+									  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, 4);
 
-	light_state_buffer.create(
-		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height * sizeof(LightState));
+	light_state_buffer.create(&instance->vkb.ctx,
+							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+							  instance->width * instance->height * sizeof(LightState));
 
 	angle_struct_buffer.create(&instance->vkb.ctx,
-							   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-								   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+							   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								   VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-							   VK_SHARING_MODE_EXCLUSIVE,
+							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 							   max_samples * sizeof(AngleStruct));
 
-	angle_struct_cpu_buffer.create(
-		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		VK_SHARING_MODE_EXCLUSIVE, max_samples * sizeof(AngleStruct));
+	angle_struct_cpu_buffer.create(&instance->vkb.ctx,
+								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+									   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+								   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+								   VK_SHARING_MODE_EXCLUSIVE, max_samples * sizeof(AngleStruct));
 
 	avg_buffer.create(&instance->vkb.ctx,
-					  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-						  VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+					  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 						  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-					  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-						  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+					  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 					  VK_SHARING_MODE_EXCLUSIVE, sizeof(AvgStruct));
 
 	SceneDesc desc;
@@ -115,12 +93,9 @@ void VCM::init() {
 	desc.angle_struct_addr = angle_struct_buffer.get_device_address();
 	desc.avg_addr = avg_buffer.get_device_address();
 
-	scene_desc_buffer.create(&instance->vkb.ctx,
-							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-								 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-							 VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc),
-							 &desc, true);
+	scene_desc_buffer.create(
+		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
 	create_blas();
 	create_tlas();
 	create_offscreen_resources();
@@ -168,11 +143,11 @@ void VCM::render() {
 	// auto& prepare_pass = instance->vkb.rg->add_compute(
 	//	"Init Reservoirs",
 	//	{ .pipeline_settings = {.shader =
-	//Shader("src/shaders/integrators/vcm/init_reservoirs.comp"),
+	// Shader("src/shaders/integrators/vcm/init_reservoirs.comp"),
 	//						   .push_consts_sizes = {sizeof(PushConstantRay)}
 	//						   },
 	//	  .dims = {(uint32_t)std::ceil(instance->width * instance->height /
-	//float(1024.0f)), 1, 1}
+	// float(1024.0f)), 1, 1}
 	//	}
 	//)
 	//	.push_constants(&pc_ray, sizeof(PushConstantRay))
@@ -225,11 +200,11 @@ void VCM::render() {
 	// instance->vkb.rg->add_compute(
 	//	"Check Reservoirs",
 	//	{ .pipeline_settings = {.shader =
-	//Shader("src/shaders/integrators/vcm/check_reservoirs.comp"),
+	// Shader("src/shaders/integrators/vcm/check_reservoirs.comp"),
 	//						   .push_consts_sizes = {sizeof(PushConstantRay)}
 	//						   },
 	//	  .dims = {(uint32_t)std::ceil(instance->width * instance->height /
-	//float(1024.0f)), 1, 1}
+	// float(1024.0f)), 1, 1}
 	//	}
 	//)
 	//	.push_constants(&pc_ray, sizeof(PushConstantRay))
@@ -275,43 +250,43 @@ void VCM::render() {
 	//{
 	//	if (lumen_scene->config.enable_vm) {
 	//		vkCmdFillBuffer(cmd.handle, photon_buffer.handle, 0,
-	//photon_buffer.size, 0); 		auto barrier =
-	//buffer_barrier(photon_buffer.handle, 									  VK_ACCESS_TRANSFER_WRITE_BIT,
+	// photon_buffer.size, 0); 		auto barrier =
+	// buffer_barrier(photon_buffer.handle, 									  VK_ACCESS_TRANSFER_WRITE_BIT,
 	//									  VK_ACCESS_SHADER_READ_BIT |
-	//VK_ACCESS_SHADER_WRITE_BIT); 		vkCmdPipelineBarrier(cmd.handle,
-	//VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+	// VK_ACCESS_SHADER_WRITE_BIT); 		vkCmdPipelineBarrier(cmd.handle,
+	// VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	//							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0,
-	//0);
+	// 0);
 	//	}
 	//	if (!do_spatiotemporal) {
 	//		vkCmdBindDescriptorSets(
 	//			cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
-	//init_reservoirs_pipeline->pipeline_layout, 			0, 1, &desc_set, 0, nullptr);
+	// init_reservoirs_pipeline->pipeline_layout, 			0, 1, &desc_set, 0, nullptr);
 	//		vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
 	//						  init_reservoirs_pipeline->handle);
 	//		vkCmdPushConstants(cmd.handle,
-	//init_reservoirs_pipeline->pipeline_layout, 						   VK_SHADER_STAGE_COMPUTE_BIT, 0,
-	//sizeof(PushConstantRay), &pc_ray); 		auto num_wgs = (instance->width *
-	//instance->height + 1023) / 1024; 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
+	// init_reservoirs_pipeline->pipeline_layout, 						   VK_SHADER_STAGE_COMPUTE_BIT, 0,
+	// sizeof(PushConstantRay), &pc_ray); 		auto num_wgs = (instance->width *
+	// instance->height + 1023) / 1024; 		vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 	//		vkCmdFillBuffer(cmd.handle, light_samples_buffer.handle, 0,
-	//light_samples_buffer.size, 0); 		vkCmdFillBuffer(cmd.handle,
-	//should_resample_buffer.handle, 0, should_resample_buffer.size, 0);
+	// light_samples_buffer.size, 0); 		vkCmdFillBuffer(cmd.handle,
+	// should_resample_buffer.handle, 0, should_resample_buffer.size, 0);
 	//		std::array<VkBufferMemoryBarrier, 3> barriers = {
 	//						buffer_barrier(vcm_reservoir_buffer.handle,
 	//								  VK_ACCESS_SHADER_READ_BIT |
-	//VK_ACCESS_SHADER_WRITE_BIT, 								  VK_ACCESS_SHADER_READ_BIT |
-	//VK_ACCESS_SHADER_WRITE_BIT), 						buffer_barrier(light_samples_buffer.handle,
+	// VK_ACCESS_SHADER_WRITE_BIT, 								  VK_ACCESS_SHADER_READ_BIT |
+	// VK_ACCESS_SHADER_WRITE_BIT), 						buffer_barrier(light_samples_buffer.handle,
 	//								  VK_ACCESS_SHADER_READ_BIT |
-	//VK_ACCESS_SHADER_WRITE_BIT, 								  VK_ACCESS_SHADER_READ_BIT |
-	//VK_ACCESS_SHADER_WRITE_BIT), 						buffer_barrier(should_resample_buffer.handle,
+	// VK_ACCESS_SHADER_WRITE_BIT, 								  VK_ACCESS_SHADER_READ_BIT |
+	// VK_ACCESS_SHADER_WRITE_BIT), 						buffer_barrier(should_resample_buffer.handle,
 	//								  VK_ACCESS_SHADER_READ_BIT |
-	//VK_ACCESS_SHADER_WRITE_BIT, 								  VK_ACCESS_SHADER_READ_BIT |
-	//VK_ACCESS_SHADER_WRITE_BIT),
+	// VK_ACCESS_SHADER_WRITE_BIT, 								  VK_ACCESS_SHADER_READ_BIT |
+	// VK_ACCESS_SHADER_WRITE_BIT),
 	//		};
 	//		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	//							 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	//							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(),
-	//barriers.data(), 0, 0);
+	// barriers.data(), 0, 0);
 	//	}
 	//}
 
@@ -322,7 +297,7 @@ void VCM::render() {
 	//					  vcm_sample_pipeline->handle);
 	//	vkCmdBindDescriptorSets(
 	//		cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-	//vcm_sample_pipeline->pipeline_layout, 		0, 1, &desc_set, 0, nullptr);
+	// vcm_sample_pipeline->pipeline_layout, 		0, 1, &desc_set, 0, nullptr);
 	//	vkCmdPushConstants(cmd.handle, vcm_sample_pipeline->pipeline_layout,
 	//					   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
 	//					   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
@@ -342,7 +317,7 @@ void VCM::render() {
 	//	vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	//						 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	//						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(),
-	//barriers.data(), 0, 0);
+	// barriers.data(), 0, 0);
 	//}
 
 	//// Check if we're in resampling stage, set the flag if so
@@ -353,48 +328,47 @@ void VCM::render() {
 	//		  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT)
 	//	};
 	//	vkCmdFillBuffer(cmd.handle, should_resample_buffer.handle, 0,
-	//should_resample_buffer.size, 0); 	vkCmdPipelineBarrier(cmd.handle,
-	//VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 						 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+	// should_resample_buffer.size, 0); 	vkCmdPipelineBarrier(cmd.handle,
+	// VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 						 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	//						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(),
-	//barriers.data(), 0, 0); 	vkCmdBindDescriptorSets( 		cmd.handle,
-	//VK_PIPELINE_BIND_POINT_COMPUTE,
-	//check_reservoirs_pipeline->pipeline_layout, 		0, 1, &desc_set, 0, nullptr);
+	// barriers.data(), 0, 0); 	vkCmdBindDescriptorSets( 		cmd.handle,
+	// VK_PIPELINE_BIND_POINT_COMPUTE,
+	// check_reservoirs_pipeline->pipeline_layout, 		0, 1, &desc_set, 0, nullptr);
 	//	vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
 	//					  check_reservoirs_pipeline->handle);
 	//	vkCmdPushConstants(cmd.handle,
-	//check_reservoirs_pipeline->pipeline_layout, 					   VK_SHADER_STAGE_COMPUTE_BIT,
-	//0, sizeof(PushConstantRay), &pc_ray); 	auto num_wgs = (instance->width *
-	//instance->height + 1023) / 1024; 	vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
+	// check_reservoirs_pipeline->pipeline_layout, 					   VK_SHADER_STAGE_COMPUTE_BIT,
+	// 0, sizeof(PushConstantRay), &pc_ray); 	auto num_wgs = (instance->width *
+	// instance->height + 1023) / 1024; 	vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 	//	vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	//						 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	//						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(),
-	//barriers.data(), 0, 0);
+	// barriers.data(), 0, 0);
 	//}
 
 	// pc_ray.random_num = rand() % UINT_MAX;
 	//// Spawn light rays from either reservoirs or randomly
 	//{
 	//	vkCmdFillBuffer(cmd.handle, light_state_buffer.handle, 0,
-	//light_state_buffer.size, 0); 	auto ls_barrier =
-	//buffer_barrier(light_state_buffer.handle, 									 VK_ACCESS_SHADER_READ_BIT |
-	//VK_ACCESS_SHADER_WRITE_BIT, 									 VK_ACCESS_SHADER_READ_BIT |
-	//VK_ACCESS_SHADER_WRITE_BIT); 	vkCmdPipelineBarrier(cmd.handle,
-	//VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 						 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+	// light_state_buffer.size, 0); 	auto ls_barrier =
+	// buffer_barrier(light_state_buffer.handle, 									 VK_ACCESS_SHADER_READ_BIT |
+	// VK_ACCESS_SHADER_WRITE_BIT, 									 VK_ACCESS_SHADER_READ_BIT |
+	// VK_ACCESS_SHADER_WRITE_BIT); 	vkCmdPipelineBarrier(cmd.handle,
+	// VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 						 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	//						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &ls_barrier, 0,
-	//0);
+	// 0);
 
 	//	vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
 	//					  vcm_spawn_light_pipeline->handle);
 	//	vkCmdBindDescriptorSets(
 	//		cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-	//vcm_spawn_light_pipeline->pipeline_layout, 		0, 1, &desc_set, 0, nullptr);
+	// vcm_spawn_light_pipeline->pipeline_layout, 		0, 1, &desc_set, 0, nullptr);
 	//	vkCmdPushConstants(cmd.handle,
-	//vcm_spawn_light_pipeline->pipeline_layout, 					   VK_SHADER_STAGE_RAYGEN_BIT_KHR
-	//| 					   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | 					   VK_SHADER_STAGE_MISS_BIT_KHR, 					   0,
-	//sizeof(PushConstantRay), &pc_ray); 	auto& regions =
-	//vcm_spawn_light_pipeline->get_rt_regions(); 	vkCmdTraceRaysKHR(cmd.handle,
-	//&regions[0], &regions[1], &regions[2], 					  &regions[3], instance->width,
-	//instance->height, 1); 	std::array<VkBufferMemoryBarrier, 2> barriers = {
+	// vcm_spawn_light_pipeline->pipeline_layout, 					   VK_SHADER_STAGE_RAYGEN_BIT_KHR
+	//| 					   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | 					   VK_SHADER_STAGE_MISS_BIT_KHR,
+	//0, sizeof(PushConstantRay), &pc_ray); 	auto& regions = vcm_spawn_light_pipeline->get_rt_regions();
+	// vkCmdTraceRaysKHR(cmd.handle, &regions[0], &regions[1], &regions[2], 					  &regions[3],
+	//instance->width, instance->height, 1); 	std::array<VkBufferMemoryBarrier, 2> barriers = {
 	//	buffer_barrier(light_state_buffer.handle,
 	//			  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 	//			  VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT),
@@ -405,7 +379,7 @@ void VCM::render() {
 	//	vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	//						 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	//						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(),
-	//barriers.data(), 0, 0);
+	// barriers.data(), 0, 0);
 	//}
 	// pc_ray.random_num = rand() % UINT_MAX;
 	//// Trace spawned rays
@@ -414,7 +388,7 @@ void VCM::render() {
 	//					  vcm_light_pipeline->handle);
 	//	vkCmdBindDescriptorSets(
 	//		cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-	//vcm_light_pipeline->pipeline_layout, 		0, 1, &desc_set, 0, nullptr);
+	// vcm_light_pipeline->pipeline_layout, 		0, 1, &desc_set, 0, nullptr);
 	//	vkCmdPushConstants(cmd.handle, vcm_light_pipeline->pipeline_layout,
 	//					   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
 	//					   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
@@ -434,20 +408,20 @@ void VCM::render() {
 	//	vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	//						 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	//						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, barriers.size(),
-	//barriers.data(), 0, 0);
+	// barriers.data(), 0, 0);
 	//}
 	// pc_ray.random_num = rand() % UINT_MAX;
 	//// Select a reservoir sample
 	//{
 	//	vkCmdBindDescriptorSets(
 	//		cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
-	//select_reservoirs_pipeline->pipeline_layout, 		0, 1, &desc_set, 0, nullptr);
+	// select_reservoirs_pipeline->pipeline_layout, 		0, 1, &desc_set, 0, nullptr);
 	//	vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
 	//					  select_reservoirs_pipeline->handle);
 	//	vkCmdPushConstants(cmd.handle,
-	//select_reservoirs_pipeline->pipeline_layout, 					   VK_SHADER_STAGE_COMPUTE_BIT,
-	//0, sizeof(PushConstantRay), &pc_ray); 	auto num_wgs = (instance->width *
-	//instance->height + 1023) / 1024; 	vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
+	// select_reservoirs_pipeline->pipeline_layout, 					   VK_SHADER_STAGE_COMPUTE_BIT,
+	// 0, sizeof(PushConstantRay), &pc_ray); 	auto num_wgs = (instance->width *
+	// instance->height + 1023) / 1024; 	vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 	//	std::array<VkBufferMemoryBarrier, 1> barriers = {
 	//		buffer_barrier(vcm_reservoir_buffer.handle,
 	//			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
@@ -463,13 +437,13 @@ void VCM::render() {
 	//{
 	//	vkCmdBindDescriptorSets(
 	//		cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
-	//update_reservoirs_pipeline->pipeline_layout, 		0, 1, &desc_set, 0, nullptr);
+	// update_reservoirs_pipeline->pipeline_layout, 		0, 1, &desc_set, 0, nullptr);
 	//	vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_COMPUTE,
 	//					  update_reservoirs_pipeline->handle);
 	//	vkCmdPushConstants(cmd.handle,
-	//update_reservoirs_pipeline->pipeline_layout, 					   VK_SHADER_STAGE_COMPUTE_BIT,
-	//0, sizeof(PushConstantRay), &pc_ray); 	auto num_wgs = (instance->width *
-	//instance->height + 1023) / 1024; 	vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
+	// update_reservoirs_pipeline->pipeline_layout, 					   VK_SHADER_STAGE_COMPUTE_BIT,
+	// 0, sizeof(PushConstantRay), &pc_ray); 	auto num_wgs = (instance->width *
+	// instance->height + 1023) / 1024; 	vkCmdDispatch(cmd.handle, num_wgs, 1, 1);
 	//	std::array<VkBufferMemoryBarrier, 2> barriers = {
 	//		buffer_barrier(vcm_reservoir_buffer.handle,
 	//			VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
@@ -491,17 +465,17 @@ void VCM::render() {
 	//	if (lumen_scene->config.enable_vm) {
 	//		auto barrier = buffer_barrier(photon_buffer.handle,
 	//									  VK_ACCESS_SHADER_READ_BIT |
-	//VK_ACCESS_SHADER_WRITE_BIT, 									  VK_ACCESS_SHADER_READ_BIT |
-	//VK_ACCESS_SHADER_WRITE_BIT); 		vkCmdPipelineBarrier(cmd.handle,
-	//VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+	// VK_ACCESS_SHADER_WRITE_BIT, 									  VK_ACCESS_SHADER_READ_BIT |
+	// VK_ACCESS_SHADER_WRITE_BIT); 		vkCmdPipelineBarrier(cmd.handle,
+	// VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	//							 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &barrier, 0,
-	//0);
+	// 0);
 	//	}
 	//	vkCmdBindPipeline(cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
 	//					  vcm_eye_pipeline->handle);
 	//	vkCmdBindDescriptorSets(
 	//		cmd.handle, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-	//vcm_eye_pipeline->pipeline_layout, 		0, 1, &desc_set, 0, nullptr);
+	// vcm_eye_pipeline->pipeline_layout, 		0, 1, &desc_set, 0, nullptr);
 	//	vkCmdPushConstants(cmd.handle, vcm_eye_pipeline->pipeline_layout,
 	//					   VK_SHADER_STAGE_RAYGEN_BIT_KHR |
 	//					   VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
@@ -515,19 +489,19 @@ void VCM::render() {
 	//	do_spatiotemporal = true;
 	//}
 	////vkCmdFillBuffer(cmd.handle, light_state_buffer.handle, 0,
-	///light_state_buffer.size, 0); /if (pc_ray.frame_num % 10 == 0) { /
-	///angle_struct_buffer.copy(angle_struct_cpu_buffer, cmd.handle);
+	/// light_state_buffer.size, 0); /if (pc_ray.frame_num % 10 == 0) { /
+	/// angle_struct_buffer.copy(angle_struct_cpu_buffer, cmd.handle);
 	////}
 	// cmd.submit();
 	////if (pc_ray.frame_num % 10 == 0) {
 	////	std::vector<AngleStruct> angles;
 	////	angles.assign((AngleStruct*)angle_struct_cpu_buffer.data,
 	////				   (AngleStruct*)angle_struct_cpu_buffer.data +
-	///max_samples); /	bool all_active = true; /	for (const auto& angle :
-	///angles) { /		all_active &= angle.is_active; /	} /	if ((all_active
+	/// max_samples); /	bool all_active = true; /	for (const auto& angle :
+	/// angles) { /		all_active &= angle.is_active; /	} /	if ((all_active
 	///&& pc_ray.frame_num > 200) && !written) { /		// Write data to file /
-	///std::ofstream myfile; /		myfile.open("data.csv"); /		for (const
-	///auto& angle : angles) {
+	/// std::ofstream myfile; /		myfile.open("data.csv"); /		for (const
+	/// auto& angle : angles) {
 	////			myfile << angle.theta << "," << angle.phi << "\n";
 	////		}
 	////		myfile.close();
@@ -547,20 +521,16 @@ bool VCM::update() {
 		trans_speed *= 4;
 	}
 
-	front.x = cos(glm::radians(camera->rotation.x)) *
-			  sin(glm::radians(camera->rotation.y));
+	front.x = cos(glm::radians(camera->rotation.x)) * sin(glm::radians(camera->rotation.y));
 	front.y = sin(glm::radians(camera->rotation.x));
-	front.z = cos(glm::radians(camera->rotation.x)) *
-			  cos(glm::radians(camera->rotation.y));
+	front.z = cos(glm::radians(camera->rotation.x)) * cos(glm::radians(camera->rotation.y));
 	front = glm::normalize(-front);
 	if (instance->window->is_key_held(KeyInput::KEY_W)) {
 		camera->position += front * trans_speed;
 		updated = true;
 	}
 	if (instance->window->is_key_held(KeyInput::KEY_A)) {
-		camera->position -=
-			glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) *
-			trans_speed;
+		camera->position -= glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * trans_speed;
 		updated = true;
 	}
 	if (instance->window->is_key_held(KeyInput::KEY_S)) {
@@ -568,22 +538,18 @@ bool VCM::update() {
 		updated = true;
 	}
 	if (instance->window->is_key_held(KeyInput::KEY_D)) {
-		camera->position +=
-			glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) *
-			trans_speed;
+		camera->position += glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * trans_speed;
 		updated = true;
 	}
 	if (instance->window->is_key_held(KeyInput::SPACE)) {
 		// Right
-		auto right =
-			glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
+		auto right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
 		auto up = glm::cross(right, front);
 		camera->position += up * trans_speed;
 		updated = true;
 	}
 	if (instance->window->is_key_held(KeyInput::KEY_LEFT_CONTROL)) {
-		auto right =
-			glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
+		auto right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
 		auto up = glm::cross(right, front);
 		camera->position -= up * trans_speed;
 		updated = true;
@@ -730,7 +696,7 @@ void VCM::create_descriptors(){
 	//}
 	// writes.push_back(vk::write_descriptor_set(desc_set,
 	//				 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-	//TEXTURES_BINDING,
+	// TEXTURES_BINDING,
 	//				 image_infos.data(), (uint32_t)image_infos.size()));
 	// if (lights.size()) {
 	//	writes.push_back(vk::write_descriptor_set(
@@ -744,16 +710,13 @@ void VCM::create_descriptors(){
 
 void VCM::create_blas() {
 	std::vector<BlasInput> blas_inputs;
-	auto vertex_address =
-		get_device_address(instance->vkb.ctx.device, vertex_buffer.handle);
-	auto idx_address =
-		get_device_address(instance->vkb.ctx.device, index_buffer.handle);
+	auto vertex_address = get_device_address(instance->vkb.ctx.device, vertex_buffer.handle);
+	auto idx_address = get_device_address(instance->vkb.ctx.device, index_buffer.handle);
 	for (auto& prim_mesh : lumen_scene->prim_meshes) {
 		BlasInput geo = to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({geo});
 	}
-	instance->vkb.build_blas(
-		blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+	instance->vkb.build_blas(blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void VCM::create_tlas() {
@@ -766,13 +729,10 @@ void VCM::create_tlas() {
 		VkAccelerationStructureInstanceKHR ray_inst{};
 		ray_inst.transform = to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
-		ray_inst.accelerationStructureReference =
-			instance->vkb.get_blas_device_address(pm.prim_idx);
-		ray_inst.flags =
-			VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+		ray_inst.accelerationStructureReference = instance->vkb.get_blas_device_address(pm.prim_idx);
+		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		ray_inst.mask = 0xFF;
-		ray_inst.instanceShaderBindingTableRecordOffset =
-			0;	// We will use the same hit group for all objects
+		ray_inst.instanceShaderBindingTableRecordOffset = 0;  // We will use the same hit group for all objects
 		tlas.emplace_back(ray_inst);
 	}
 
@@ -784,15 +744,11 @@ void VCM::create_tlas() {
 			auto& vtx_offset = pm.vtx_offset;
 			for (uint32_t i = 0; i < l.num_triangles; i++) {
 				auto idx_offset = idx_base_offset + 3 * i;
-				glm::ivec3 ind = {indices[idx_offset], indices[idx_offset + 1],
-								  indices[idx_offset + 2]};
+				glm::ivec3 ind = {indices[idx_offset], indices[idx_offset + 1], indices[idx_offset + 2]};
 				ind += glm::vec3{vtx_offset, vtx_offset, vtx_offset};
-				const vec3 v0 =
-					pm.world_matrix * glm::vec4(vertices[ind.x], 1.0);
-				const vec3 v1 =
-					pm.world_matrix * glm::vec4(vertices[ind.y], 1.0);
-				const vec3 v2 =
-					pm.world_matrix * glm::vec4(vertices[ind.z], 1.0);
+				const vec3 v0 = pm.world_matrix * glm::vec4(vertices[ind.x], 1.0);
+				const vec3 v1 = pm.world_matrix * glm::vec4(vertices[ind.y], 1.0);
+				const vec3 v2 = pm.world_matrix * glm::vec4(vertices[ind.z], 1.0);
 				float area = 0.5f * glm::length(glm::cross(v1 - v0, v2 - v0));
 				total_light_triangle_area += area;
 			}
@@ -802,18 +758,16 @@ void VCM::create_tlas() {
 	}
 
 	if (lights.size()) {
-		mesh_lights_buffer.create(
-			&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-			lights.size() * sizeof(Light), lights.data(), true);
+		mesh_lights_buffer.create(&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								  lights.size() * sizeof(Light), lights.data(), true);
 	}
 
 	pc_ray.total_light_area += total_light_triangle_area;
 	if (total_light_triangle_cnt > 0) {
 		pc_ray.light_triangle_count = total_light_triangle_cnt;
 	}
-	instance->vkb.build_tlas(
-		tlas, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+	instance->vkb.build_tlas(tlas, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 // void VCM::create_rt_pipelines() {
@@ -913,39 +867,39 @@ void VCM::create_tlas() {
 //	vcm_light_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 //	vcm_eye_pipeline = std::make_unique<Pipeline>(instance->vkb.ctx.device);
 //	vcm_spawn_light_pipeline =
-//std::make_unique<Pipeline>(instance->vkb.ctx.device); 	vcm_sample_pipeline =
-//std::make_unique<Pipeline>(instance->vkb.ctx.device); 	settings.shaders = {
-//shaders[0], shaders[4], shaders[5], shaders[6], shaders[7] };
+// std::make_unique<Pipeline>(instance->vkb.ctx.device); 	vcm_sample_pipeline =
+// std::make_unique<Pipeline>(instance->vkb.ctx.device); 	settings.shaders = {
+// shaders[0], shaders[4], shaders[5], shaders[6], shaders[7] };
 //	vcm_light_pipeline->create_rt_pipeline(settings, { (uint32_t)ray_guide });
 //	vkDestroyShaderModule(instance->vkb.ctx.device, stages[Raygen].module,
-//nullptr); 	stages[Raygen].module =
-//shaders[1].create_vk_shader_module(instance->vkb.ctx.device); 	settings.stages
+// nullptr); 	stages[Raygen].module =
+// shaders[1].create_vk_shader_module(instance->vkb.ctx.device); 	settings.stages
 //= stages; 	settings.shaders = { shaders[1], shaders[4], shaders[5], shaders[6],
-//shaders[7] }; 	vcm_eye_pipeline->create_rt_pipeline(settings);
+// shaders[7] }; 	vcm_eye_pipeline->create_rt_pipeline(settings);
 //	vkDestroyShaderModule(instance->vkb.ctx.device, stages[Raygen].module,
-//nullptr); 	stages[Raygen].module =
-//shaders[2].create_vk_shader_module(instance->vkb.ctx.device); 	settings.stages
+// nullptr); 	stages[Raygen].module =
+// shaders[2].create_vk_shader_module(instance->vkb.ctx.device); 	settings.stages
 //= stages; 	settings.shaders = { shaders[2], shaders[4], shaders[5], shaders[6],
-//shaders[7] }; 	vcm_spawn_light_pipeline->create_rt_pipeline(settings);
+// shaders[7] }; 	vcm_spawn_light_pipeline->create_rt_pipeline(settings);
 //	vkDestroyShaderModule(instance->vkb.ctx.device, stages[Raygen].module,
-//nullptr); 	stages[Raygen].module =
-//shaders[3].create_vk_shader_module(instance->vkb.ctx.device); 	settings.stages
+// nullptr); 	stages[Raygen].module =
+// shaders[3].create_vk_shader_module(instance->vkb.ctx.device); 	settings.stages
 //= stages; 	settings.shaders = { shaders[3], shaders[4], shaders[5], shaders[6],
-//shaders[7] }; 	vcm_sample_pipeline->create_rt_pipeline(settings); 	for (auto& s
+// shaders[7] }; 	vcm_sample_pipeline->create_rt_pipeline(settings); 	for (auto& s
 //: settings.stages) { 		vkDestroyShaderModule(instance->vkb.ctx.device, s.module,
-//nullptr);
+// nullptr);
 //	}
-// }
+//  }
 //
-// void VCM::create_compute_pipelines() {
+//  void VCM::create_compute_pipelines() {
 //	select_reservoirs_pipeline =
-//std::make_unique<Pipeline>(instance->vkb.ctx.device); 	init_reservoirs_pipeline
+// std::make_unique<Pipeline>(instance->vkb.ctx.device); 	init_reservoirs_pipeline
 //= std::make_unique<Pipeline>(instance->vkb.ctx.device);
 //	update_reservoirs_pipeline =
-//std::make_unique<Pipeline>(instance->vkb.ctx.device);
+// std::make_unique<Pipeline>(instance->vkb.ctx.device);
 //	check_reservoirs_pipeline =
-//std::make_unique<Pipeline>(instance->vkb.ctx.device); 	std::vector<Shader>
-//shaders = {
+// std::make_unique<Pipeline>(instance->vkb.ctx.device); 	std::vector<Shader>
+// shaders = {
 //		{"src/shaders/integrators/vcm/init_reservoirs.comp"},
 //		{"src/shaders/integrators/vcm/select_reservoirs.comp"},
 //		{"src/shaders/integrators/vcm/update_reservoirs.comp"},
@@ -966,19 +920,17 @@ void VCM::create_tlas() {
 //	update_reservoirs_pipeline->create_compute_pipeline(settings);
 //	settings.shader = shaders[3];
 //	check_reservoirs_pipeline->create_compute_pipeline(settings);
-// }
+//  }
 
 void VCM::destroy() {
 	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
-	std::vector<Buffer*> buffer_list = {
-		&photon_buffer, &vcm_light_vertices_buffer, &light_path_cnt_buffer,
-		&color_storage_buffer, &vcm_reservoir_buffer};
+	std::vector<Buffer*> buffer_list = {&photon_buffer, &vcm_light_vertices_buffer, &light_path_cnt_buffer,
+										&color_storage_buffer, &vcm_reservoir_buffer};
 	for (auto b : buffer_list) {
 		b->destroy();
 	}
-	std::vector<Pipeline*> pipeline_list = {vcm_light_pipeline.get(),
-											vcm_eye_pipeline.get()};
+	std::vector<Pipeline*> pipeline_list = {vcm_light_pipeline.get(), vcm_eye_pipeline.get()};
 	for (auto p : pipeline_list) {
 		p->cleanup();
 	}

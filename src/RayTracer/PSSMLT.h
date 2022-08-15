@@ -2,8 +2,7 @@
 #include "Integrator.h"
 class PSSMLT : public Integrator {
    public:
-	PSSMLT(LumenInstance* scene, LumenScene* lumen_scene)
-		: Integrator(scene, lumen_scene) {}
+	PSSMLT(LumenInstance* scene, LumenScene* lumen_scene) : Integrator(scene, lumen_scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;

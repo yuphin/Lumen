@@ -2,8 +2,7 @@
 #include "Integrator.h"
 class SPPM : public Integrator {
    public:
-	SPPM(LumenInstance* scene, LumenScene* lumen_scene)
-		: Integrator(scene, lumen_scene) {}
+	SPPM(LumenInstance* scene, LumenScene* lumen_scene) : Integrator(scene, lumen_scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;

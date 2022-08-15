@@ -11,19 +11,7 @@ struct CameraSettings {
 	glm::mat4 cam_matrix = glm::mat4();
 };
 
-enum class IntegratorType {
-	Path,
-	BDPT,
-	SPPM,
-	VCM,
-	PSSMLT,
-	SMLT,
-	VCMMLT,
-	ReSTIR,
-	ReSTIRGI,
-	DDGI,
-	ReSTIRPT
-};
+enum class IntegratorType { Path, BDPT, SPPM, VCM, PSSMLT, SMLT, VCMMLT, ReSTIR, ReSTIRGI, DDGI, ReSTIRPT };
 
 struct SceneConfig {
 	IntegratorType integrator_type = IntegratorType::Path;

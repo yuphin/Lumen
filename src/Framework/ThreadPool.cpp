@@ -16,8 +16,7 @@ void ThreadPool::init() {
 					std::function<void()> task;
 					{
 						std::unique_lock<std::mutex> lock(queue_mutex);
-						cv.wait(lock,
-								[] { return !work_queue.empty() || done; });
+						cv.wait(lock, [] { return !work_queue.empty() || done; });
 						if (done && work_queue.empty()) {
 							break;
 						}

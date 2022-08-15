@@ -19,15 +19,10 @@ struct Pipeline {
 	Pipeline(VulkanContext* ctx, size_t pass_idx, const std::string& name);
 	void reload();
 	void cleanup();
-	void create_gfx_pipeline(const GraphicsPassSettings& settings,
-							 const std::vector<uint32_t>& descriptor_counts,
-							 std::vector<Texture2D*> color_outputs,
-							 Texture2D* depth_output);
-	void create_rt_pipeline(const RTPassSettings& settings,
-							const std::vector<uint32_t>& descriptor_counts);
-	void create_compute_pipeline(
-		const ComputePassSettings& settings,
-		const std::vector<uint32_t>& descriptor_counts);
+	void create_gfx_pipeline(const GraphicsPassSettings& settings, const std::vector<uint32_t>& descriptor_counts,
+							 std::vector<Texture2D*> color_outputs, Texture2D* depth_output);
+	void create_rt_pipeline(const RTPassSettings& settings, const std::vector<uint32_t>& descriptor_counts);
+	void create_compute_pipeline(const ComputePassSettings& settings, const std::vector<uint32_t>& descriptor_counts);
 	const std::array<VkStridedDeviceAddressRegionKHR, 4> get_rt_regions();
 	// void track_for_changes();
 	//  Manually called after the pipeline is reloaded
@@ -59,12 +54,9 @@ struct Pipeline {
 	uint32_t push_constant_size = 0;
 
    private:
-	void create_set_layout(const std::vector<Shader>& shaders,
-						   const std::vector<uint32_t>& descriptor_counts);
-	void create_pipeline_layout(const std::vector<Shader>& shaders,
-								const std::vector<uint32_t> push_const_sizes);
-	void create_update_template(const std::vector<Shader>& shaders,
-								const std::vector<uint32_t>& descriptor_counts);
+	void create_set_layout(const std::vector<Shader>& shaders, const std::vector<uint32_t>& descriptor_counts);
+	void create_pipeline_layout(const std::vector<Shader>& shaders, const std::vector<uint32_t> push_const_sizes);
+	void create_update_template(const std::vector<Shader>& shaders, const std::vector<uint32_t>& descriptor_counts);
 	bool tracking_stopped = true;
 	std::mutex mut;
 	std::condition_variable cv;

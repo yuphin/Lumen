@@ -2,8 +2,7 @@
 #include "Integrator.h"
 class VCM : public Integrator {
    public:
-	VCM(LumenInstance* scene, LumenScene* lumen_scene)
-		: Integrator(scene, lumen_scene) {}
+	VCM(LumenInstance* scene, LumenScene* lumen_scene) : Integrator(scene, lumen_scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;

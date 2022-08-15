@@ -64,8 +64,7 @@
 #define KHR_LIGHTS_PUNCTUAL_EXTENSION_NAME "KHR_lights_punctual"
 
 // https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_pbrSpecularGlossiness/README.md
-#define KHR_MATERIALS_PBRSPECULARGLOSSINESS_EXTENSION_NAME \
-	"KHR_materials_pbrSpecularGlossiness"
+#define KHR_MATERIALS_PBRSPECULARGLOSSINESS_EXTENSION_NAME "KHR_materials_pbrSpecularGlossiness"
 struct KHR_materials_pbrSpecularGlossiness {
 	glm::vec4 diffuseFactor{1.f, 1.f, 1.f, 1.f};
 	int diffuseTexture{-1};
@@ -233,13 +232,11 @@ enum class GltfAttributes : uint8_t {
 using GltfAttributes_t = std::underlying_type_t<GltfAttributes>;
 
 inline GltfAttributes operator|(GltfAttributes lhs, GltfAttributes rhs) {
-	return static_cast<GltfAttributes>(static_cast<GltfAttributes_t>(lhs) |
-									   static_cast<GltfAttributes_t>(rhs));
+	return static_cast<GltfAttributes>(static_cast<GltfAttributes_t>(lhs) | static_cast<GltfAttributes_t>(rhs));
 }
 
 inline GltfAttributes operator&(GltfAttributes lhs, GltfAttributes rhs) {
-	return static_cast<GltfAttributes>(static_cast<GltfAttributes_t>(lhs) &
-									   static_cast<GltfAttributes_t>(rhs));
+	return static_cast<GltfAttributes>(static_cast<GltfAttributes_t>(lhs) & static_cast<GltfAttributes_t>(rhs));
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -247,8 +244,7 @@ inline GltfAttributes operator&(GltfAttributes lhs, GltfAttributes rhs) {
 //
 struct GltfScene {
 	void import_materials(const tinygltf::Model& tmodel);
-	void import_drawable_nodes(const tinygltf::Model& tmodel,
-							   GltfAttributes attributes);
+	void import_drawable_nodes(const tinygltf::Model& tmodel, GltfAttributes attributes);
 	void compute_scene_dimensions();
 	void destroy();
 
@@ -285,11 +281,9 @@ struct GltfScene {
 	} m_dimensions;
 
    private:
-	void process_node(const tinygltf::Model& tmodel, int& nodeIdx,
-					  const glm::mat4& parentMatrix);
-	void process_mesh(const tinygltf::Model& tmodel,
-					  const tinygltf::Primitive& tmesh,
-					  GltfAttributes attributes, const std::string& name);
+	void process_node(const tinygltf::Model& tmodel, int& nodeIdx, const glm::mat4& parentMatrix);
+	void process_mesh(const tinygltf::Model& tmodel, const tinygltf::Primitive& tmesh, GltfAttributes attributes,
+					  const std::string& name);
 
 	// Temporary data
 	std::unordered_map<int, std::vector<uint32_t>> mesh_to_prim_meshes;
@@ -312,53 +306,45 @@ static inline std::vector<T> get_vector(const tinygltf::Value& value) {
 	if (!value.IsArray()) return result;
 	result.resize(value.ArrayLen());
 	for (int i = 0; i < value.ArrayLen(); i++) {
-		result[i] =
-			static_cast<T>(value.Get(i).IsNumber() ? value.Get(i).Get<double>()
-												   : value.Get(i).Get<int>());
+		result[i] = static_cast<T>(value.Get(i).IsNumber() ? value.Get(i).Get<double>() : value.Get(i).Get<int>());
 	}
 	return result;
 }
 
-static inline void get_float(const tinygltf::Value& value,
-							 const std::string& name, float& val) {
+static inline void get_float(const tinygltf::Value& value, const std::string& name, float& val) {
 	if (value.Has(name)) {
 		val = static_cast<float>(value.Get(name).Get<double>());
 	}
 }
 
-static inline void get_int(const tinygltf::Value& value,
-						   const std::string& name, int& val) {
+static inline void get_int(const tinygltf::Value& value, const std::string& name, int& val) {
 	if (value.Has(name)) {
 		val = value.Get(name).Get<int>();
 	}
 }
 
-static inline void get_vec2(const tinygltf::Value& value,
-							const std::string& name, glm::vec2& val) {
+static inline void get_vec2(const tinygltf::Value& value, const std::string& name, glm::vec2& val) {
 	if (value.Has(name)) {
 		auto s = get_vector<float>(value.Get(name));
 		val = glm::vec2{s[0], s[1]};
 	}
 }
 
-static inline void get_vec3(const tinygltf::Value& value,
-							const std::string& name, glm::vec3& val) {
+static inline void get_vec3(const tinygltf::Value& value, const std::string& name, glm::vec3& val) {
 	if (value.Has(name)) {
 		auto s = get_vector<float>(value.Get(name));
 		val = glm::vec3{s[0], s[1], s[2]};
 	}
 }
 
-static inline void get_vec4(const tinygltf::Value& value,
-							const std::string& name, glm::vec4& val) {
+static inline void get_vec4(const tinygltf::Value& value, const std::string& name, glm::vec4& val) {
 	if (value.Has(name)) {
 		auto s = get_vector<float>(value.Get(name));
 		val = glm::vec4{s[0], s[1], s[2], s[3]};
 	}
 }
 
-static inline void get_tex_id(const tinygltf::Value& value,
-							  const std::string& name, int& val) {
+static inline void get_tex_id(const tinygltf::Value& value, const std::string& name, int& val) {
 	if (value.Has(name)) {
 		val = value.Get(name).Get("index").Get<int>();
 	}
@@ -367,20 +353,15 @@ static inline void get_tex_id(const tinygltf::Value& value,
 // Appending to \p attribVec, all the values of \p attribName
 // Return false if the attribute is missing
 template <typename T>
-static bool get_attribute(const tinygltf::Model& tmodel,
-						  const tinygltf::Primitive& primitive,
-						  std::vector<T>& attrib_vec,
-						  const std::string& attrib_name) {
-	if (primitive.attributes.find(attrib_name) == primitive.attributes.end())
-		return false;
+static bool get_attribute(const tinygltf::Model& tmodel, const tinygltf::Primitive& primitive,
+						  std::vector<T>& attrib_vec, const std::string& attrib_name) {
+	if (primitive.attributes.find(attrib_name) == primitive.attributes.end()) return false;
 
 	// Retrieving the data of the attribute
-	const auto& accessor =
-		tmodel.accessors[primitive.attributes.find(attrib_name)->second];
+	const auto& accessor = tmodel.accessors[primitive.attributes.find(attrib_name)->second];
 	const auto& buf_view = tmodel.bufferViews[accessor.bufferView];
 	const auto& buffer = tmodel.buffers[buf_view.buffer];
-	const auto buf_data = reinterpret_cast<const T*>(
-		&(buffer.data[accessor.byteOffset + buf_view.byteOffset]));
+	const auto buf_data = reinterpret_cast<const T*>(&(buffer.data[accessor.byteOffset + buf_view.byteOffset]));
 	const auto nb_elems = accessor.count;
 
 	// Supporting KHR_mesh_quantization
@@ -402,17 +383,11 @@ static bool get_attribute(const tinygltf::Model& tmodel,
 		// The component is smaller than float and need to be converted
 
 		// VEC3 or VEC4
-		int nb_components = accessor.type == TINYGLTF_TYPE_VEC2		? 2
-							: (accessor.type == TINYGLTF_TYPE_VEC3) ? 3
-																	: 4;
+		int nb_components = accessor.type == TINYGLTF_TYPE_VEC2 ? 2 : (accessor.type == TINYGLTF_TYPE_VEC3) ? 3 : 4;
 		// UNSIGNED_BYTE or UNSIGNED_SHORT
-		size_t stride_component =
-			accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE ? 1
-																			: 2;
+		size_t stride_component = accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE ? 1 : 2;
 
-		size_t byte_stride = buf_view.byteStride > 0
-								 ? buf_view.byteStride
-								 : size_t(nb_components) * stride_component;
+		size_t byte_stride = buf_view.byteStride > 0 ? buf_view.byteStride : size_t(nb_components) * stride_component;
 		auto buffer_byte = reinterpret_cast<const uint8_t*>(buf_data);
 		for (size_t i = 0; i < nb_elems; i++) {
 			T vec_value;
@@ -446,7 +421,6 @@ static bool get_attribute(const tinygltf::Model& tmodel,
 	return true;
 }
 
-inline bool has_extension(const tinygltf::ExtensionMap& extensions,
-						  const std::string& name) {
+inline bool has_extension(const tinygltf::ExtensionMap& extensions, const std::string& name) {
 	return extensions.find(name) != extensions.end();
 }

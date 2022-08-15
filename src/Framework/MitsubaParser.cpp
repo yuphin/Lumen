@@ -26,8 +26,7 @@ void MitsubaParser::parse(const std::string& path) {
 					if (prop.first == "fov") {
 						camera.fov = prop.second.getNumber();
 					} else if (prop.first == "to_world") {
-						float* p_dst =
-							(float*)glm::value_ptr(camera.cam_matrix);
+						float* p_dst = (float*)glm::value_ptr(camera.cam_matrix);
 						const auto& src = prop.second.getTransform();
 						for (int i = 0; i < 4; i++) {
 							for (int j = 0; j < 4; j++) {
@@ -45,14 +44,12 @@ void MitsubaParser::parse(const std::string& path) {
 				for (const auto& prop : obj->properties()) {
 					// Get reflectance
 					if (prop.second.type() == PT_COLOR) {
-						if (prop.first.find("reflectance") ==
-							std::string::npos) {
+						if (prop.first.find("reflectance") == std::string::npos) {
 							continue;
 						}
 						// Assume RGB for the moment
-						bsdf.albedo = glm::vec3({prop.second.getColor().r,
-												 prop.second.getColor().g,
-												 prop.second.getColor().b});
+						bsdf.albedo =
+							glm::vec3({prop.second.getColor().r, prop.second.getColor().g, prop.second.getColor().b});
 					}
 					if (prop.first == "alpha") {
 						bsdf.roughness = std::sqrt(prop.second.getNumber());
@@ -66,11 +63,9 @@ void MitsubaParser::parse(const std::string& path) {
 					bsdf.type = p->pluginType();
 					for (const auto& named_child : p->namedChildren()) {
 						if (named_child.second.get()->type() == OT_TEXTURE) {
-							for (const auto& texture_prop :
-								 named_child.second.get()->properties()) {
+							for (const auto& texture_prop : named_child.second.get()->properties()) {
 								if (texture_prop.first == "filename") {
-									bsdf.texture =
-										texture_prop.second.getString();
+									bsdf.texture = texture_prop.second.getString();
 								}
 							}
 						}
@@ -78,14 +73,12 @@ void MitsubaParser::parse(const std::string& path) {
 					for (const auto& prop : p->properties()) {
 						// Get reflectance
 						if (prop.second.type() == PT_COLOR) {
-							if (prop.first.find("reflectance") ==
-								std::string::npos) {
+							if (prop.first.find("reflectance") == std::string::npos) {
 								continue;
 							}
 							// Assume RGB for the moment
-							bsdf.albedo = glm::vec3({prop.second.getColor().r,
-													 prop.second.getColor().g,
-													 prop.second.getColor().b});
+							bsdf.albedo = glm::vec3(
+								{prop.second.getColor().r, prop.second.getColor().g, prop.second.getColor().b});
 						}
 						if (prop.first == "alpha") {
 							bsdf.roughness = std::sqrt(prop.second.getNumber());

@@ -9,8 +9,7 @@
 #include <glm/glm.hpp>
 class LumenInstance {
    public:
-	LumenInstance(int width, int height, int debug)
-		: width(width), height(height), debug(debug), vkb(debug){};
+	LumenInstance(int width, int height, int debug) : width(width), height(height), debug(debug), vkb(debug){};
 	VulkanBase vkb;
 	VulkanContext& vk_ctx = vkb.ctx;
 	uint32_t width, height, debug;

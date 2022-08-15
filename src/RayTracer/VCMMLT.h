@@ -2,8 +2,7 @@
 #include "Integrator.h"
 class VCMMLT : public Integrator {
    public:
-	VCMMLT(LumenInstance* scene, LumenScene* lumen_scene)
-		: Integrator(scene, lumen_scene) {}
+	VCMMLT(LumenInstance* scene, LumenScene* lumen_scene) : Integrator(scene, lumen_scene) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool gui() override;

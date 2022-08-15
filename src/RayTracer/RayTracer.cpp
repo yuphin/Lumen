@@ -16,8 +16,7 @@ static void fb_resize_callback(GLFWwindow* window, int width, int height) {
 	app->resized = true;
 }
 
-RayTracer::RayTracer(int width, int height, bool debug, int argc, char* argv[])
-	: LumenInstance(width, height, debug) {
+RayTracer::RayTracer(int width, int height, bool debug, int argc, char* argv[]) : LumenInstance(width, height, debug) {
 	this->instance = this;
 	parse_args(argc, argv);
 }
@@ -98,8 +97,7 @@ void RayTracer::init(Window* window) {
 	VkPhysicalDeviceMemoryProperties2 props = {};
 	props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
 	VkPhysicalDeviceMemoryBudgetPropertiesEXT budget_props = {};
-	budget_props.sType =
-		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT;
+	budget_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT;
 	props.pNext = &budget_props;
 	vkGetPhysicalDeviceMemoryProperties2(vk_ctx.physical_device, &props);
 	printf("Memory usage %f MB\n", budget_props.heapUsage[0] * 1e-6);
@@ -111,8 +109,7 @@ void RayTracer::update() {
 		write_exr = true;
 	}
 	float frame_time = draw_frame();
-	cpu_avg_time =
-		(1.0f - 1.0f / (cnt)) * cpu_avg_time + frame_time / (float)cnt;
+	cpu_avg_time = (1.0f - 1.0f / (cnt)) * cpu_avg_time + frame_time / (float)cnt;
 	cpu_avg_time = 0.95f * cpu_avg_time + 0.05f * frame_time;
 
 	integrator->update();
@@ -123,8 +120,7 @@ void RayTracer::render(uint32_t i) {
 
 	integrator->render();
 	auto cmdbuf = vkb.ctx.command_buffers[i];
-	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(
-		VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
 	// if (write_exr) {
 	//	// Copy to host visible storage buffer
@@ -177,12 +173,12 @@ void RayTracer::render(uint32_t i) {
 	//				cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE,
 	// calc_rmse_pipeline->pipeline_layout, 				0, 1, &post_desc_set, 0,
 	// nullptr); 			vkCmdBindDescriptorSets( 				cmdbuf,
-	//VK_PIPELINE_BIND_POINT_COMPUTE, reduce_rmse_pipeline->pipeline_layout,
+	// VK_PIPELINE_BIND_POINT_COMPUTE, reduce_rmse_pipeline->pipeline_layout,
 	// 0, 1, &post_desc_set, 0, nullptr); 			vkCmdBindDescriptorSets( 				cmdbuf,
-	//VK_PIPELINE_BIND_POINT_COMPUTE, output_rmse_pipeline->pipeline_layout,
+	// VK_PIPELINE_BIND_POINT_COMPUTE, output_rmse_pipeline->pipeline_layout,
 	// 0, 1, &post_desc_set, 0, nullptr); 			vkCmdPushConstants(cmdbuf,
-	//calc_rmse_pipeline->pipeline_layout, 							   VK_SHADER_STAGE_COMPUTE_BIT, 							   0,
-	//sizeof(PostPC), &post_pc); 			vkCmdPushConstants(cmdbuf,
+	// calc_rmse_pipeline->pipeline_layout, 							   VK_SHADER_STAGE_COMPUTE_BIT,
+	// 0, sizeof(PostPC), &post_pc); 			vkCmdPushConstants(cmdbuf,
 	// reduce_rmse_pipeline->pipeline_layout,
 	// VK_SHADER_STAGE_COMPUTE_BIT, 							   0,
 	// sizeof(PostPC), &post_pc); 			vkCmdPushConstants(cmdbuf,
@@ -193,9 +189,9 @@ void RayTracer::render(uint32_t i) {
 	//			reduce(cmdbuf, residual_buffer, counter_buffer,
 	//*calc_rmse_pipeline,
 	//*reduce_rmse_pipeline, 				   instance->width *
-	//instance->height); 			vkCmdBindPipeline(cmdbuf,
-	//VK_PIPELINE_BIND_POINT_COMPUTE, 							  output_rmse_pipeline->handle); 			auto
-	//num_wgs = 1; 			vkCmdDispatch(cmdbuf, num_wgs, 1, 1);
+	// instance->height); 			vkCmdBindPipeline(cmdbuf,
+	// VK_PIPELINE_BIND_POINT_COMPUTE, 							  output_rmse_pipeline->handle); 			auto
+	// num_wgs = 1; 			vkCmdDispatch(cmdbuf, num_wgs, 1, 1);
 	//			transition_image_layout(cmdbuf, integrator->output_tex.img,
 	//									VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 	// VK_IMAGE_LAYOUT_GENERAL);
@@ -206,22 +202,20 @@ void RayTracer::render(uint32_t i) {
 
 	pc_post_settings.enable_tonemapping = settings.enable_tonemapping;
 	instance->vkb.rg
-		->add_gfx(
-			"Post FX",
-			{.width = instance->width,
-			 .height = instance->height,
-			 .clear_color = {0.25f, 0.25f, 0.25f, 1.0f},
-			 .clear_depth_stencil = {1.0f, 0},
-			 .shaders = {{"src/shaders/post.vert"}, {"src/shaders/post.frag"}},
-			 .cull_mode = VK_CULL_MODE_NONE,
-			 .color_outputs = {&vkb.swapchain_images[i]},
-			 .pass_func =
-				 [](VkCommandBuffer cmd, const RenderPass& render_pass) {
-					 vkCmdDraw(cmd, 3, 1, 0, 0);
-					 /*	ImGui::Render();
-						 ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
-						cmd);*/
-				 }})
+		->add_gfx("Post FX", {.width = instance->width,
+							  .height = instance->height,
+							  .clear_color = {0.25f, 0.25f, 0.25f, 1.0f},
+							  .clear_depth_stencil = {1.0f, 0},
+							  .shaders = {{"src/shaders/post.vert"}, {"src/shaders/post.frag"}},
+							  .cull_mode = VK_CULL_MODE_NONE,
+							  .color_outputs = {&vkb.swapchain_images[i]},
+							  .pass_func =
+								  [](VkCommandBuffer cmd, const RenderPass& render_pass) {
+									  vkCmdDraw(cmd, 3, 1, 0, 0);
+									  /*	ImGui::Render();
+										  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
+										 cmd);*/
+								  }})
 		.push_constants(&pc_post_settings)
 		//.read(integrator->output_tex) // Needed if shader inference is off
 		.bind(integrator->output_tex, integrator->texture_sampler);
@@ -287,8 +281,7 @@ float RayTracer::draw_frame() {
 
 	if (write_exr) {
 		write_exr = false;
-		save_exr((float*)output_img_buffer_cpu.data, instance->width,
-				 instance->height, "out.exr");
+		save_exr((float*)output_img_buffer_cpu.data, instance->width, instance->height, "out.exr");
 	}
 	bool time_limit = (abs(diff / CLOCKS_PER_SEC - 5)) < 0.1;
 	// calc_rmse = cnt % 30 == 0 || time_limit;
@@ -418,18 +411,17 @@ void RayTracer::create_compute_pipelines() {
 }
 
 void RayTracer::init_imgui() {
-	VkDescriptorPoolSize pool_sizes[] = {
-		{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
-		{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
-		{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
-		{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
-		{VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
-		{VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
-		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
-		{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
-		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
-		{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
-		{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
+	VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
+										 {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
+										 {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
+										 {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
+										 {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
 
 	VkDescriptorPoolCreateInfo pool_info = {};
 	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -437,8 +429,7 @@ void RayTracer::init_imgui() {
 	pool_info.maxSets = 1000;
 	pool_info.poolSizeCount = (uint32_t)std::size(pool_sizes);
 	pool_info.pPoolSizes = pool_sizes;
-	vk::check(vkCreateDescriptorPool(vkb.ctx.device, &pool_info, nullptr,
-									 &imgui_pool));
+	vk::check(vkCreateDescriptorPool(vkb.ctx.device, &pool_info, nullptr, &imgui_pool));
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	// Setup Platform/Renderer backends
@@ -466,40 +457,30 @@ void RayTracer::init_imgui() {
 void RayTracer::init_resources() {
 	PostDesc desc;
 	output_img_buffer.create(&instance->vkb.ctx,
-							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-								 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-							 VK_SHARING_MODE_EXCLUSIVE,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 							 instance->width * instance->height * 4 * 4);
 
-	output_img_buffer_cpu.create(
-		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		VK_SHARING_MODE_EXCLUSIVE, instance->width * instance->height * 4 * 4);
+	output_img_buffer_cpu.create(&instance->vkb.ctx,
+								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+								 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+								 VK_SHARING_MODE_EXCLUSIVE, instance->width * instance->height * 4 * 4);
 	residual_buffer.create(&instance->vkb.ctx,
-						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-							   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-						   VK_SHARING_MODE_EXCLUSIVE,
+						   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 						   instance->width * instance->height * 4);
 
 	counter_buffer.create(&instance->vkb.ctx,
-						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-							  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-						  VK_SHARING_MODE_EXCLUSIVE, sizeof(int));
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(int));
 
 	rmse_val_buffer.create(&instance->vkb.ctx,
-						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-							   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-							   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+						   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 						   VK_SHARING_MODE_EXCLUSIVE, sizeof(float));
 	if (load_exr) {
 		// Load the ground truth image
@@ -526,12 +507,9 @@ void RayTracer::init_resources() {
 				pixels[i].w = 1.;
 			}
 			auto gt_size = pixels.size() * 4 * 4;
-			gt_img_buffer.create(&instance->vkb.ctx,
-								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-									 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-								 VK_SHARING_MODE_EXCLUSIVE, gt_size,
-								 pixels.data(), true);
+			gt_img_buffer.create(
+				&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, gt_size, pixels.data(), true);
 			desc.gt_img_addr = gt_img_buffer.get_device_address();
 			has_gt = true;
 		}
@@ -543,12 +521,9 @@ void RayTracer::init_resources() {
 	desc.residual_addr = residual_buffer.get_device_address();
 	desc.counter_addr = counter_buffer.get_device_address();
 	desc.rmse_val_addr = rmse_val_buffer.get_device_address();
-	post_desc_buffer.create(&instance->vkb.ctx,
-							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-								VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-							VK_SHARING_MODE_EXCLUSIVE, sizeof(PostDesc), &desc,
-							true);
+	post_desc_buffer.create(
+		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(PostDesc), &desc, true);
 
 	post_pc.size = instance->width * instance->height;
 }
@@ -563,8 +538,7 @@ void RayTracer::parse_args(int argc, char* argv[]) {
 	}
 }
 
-void RayTracer::save_exr(const float* rgb, int width, int height,
-						 const char* outfilename) {
+void RayTracer::save_exr(const float* rgb, int width, int height, const char* outfilename) {
 	EXRHeader header;
 	InitEXRHeader(&header);
 
@@ -595,8 +569,7 @@ void RayTracer::save_exr(const float* rgb, int width, int height,
 	image.height = height;
 
 	header.num_channels = 3;
-	header.channels =
-		(EXRChannelInfo*)malloc(sizeof(EXRChannelInfo) * header.num_channels);
+	header.channels = (EXRChannelInfo*)malloc(sizeof(EXRChannelInfo) * header.num_channels);
 	// Must be (A)BGR order, since most of EXR viewers expect this channel
 	// order.
 	strncpy_s(header.channels[0].name, "B", 255);
@@ -607,14 +580,11 @@ void RayTracer::save_exr(const float* rgb, int width, int height,
 	header.channels[2].name[strlen("R")] = '\0';
 
 	header.pixel_types = (int*)malloc(sizeof(int) * header.num_channels);
-	header.requested_pixel_types =
-		(int*)malloc(sizeof(int) * header.num_channels);
+	header.requested_pixel_types = (int*)malloc(sizeof(int) * header.num_channels);
 	for (int i = 0; i < header.num_channels; i++) {
-		header.pixel_types[i] =
-			TINYEXR_PIXELTYPE_FLOAT;  // pixel type of input image
-		header.requested_pixel_types[i] =
-			TINYEXR_PIXELTYPE_HALF;	 // pixel type of output image to be stored
-									 // in .EXR
+		header.pixel_types[i] = TINYEXR_PIXELTYPE_FLOAT;		   // pixel type of input image
+		header.requested_pixel_types[i] = TINYEXR_PIXELTYPE_HALF;  // pixel type of output image to be stored
+																   // in .EXR
 	}
 
 	const char* err = NULL;	 // or nullptr in C++11 or later.

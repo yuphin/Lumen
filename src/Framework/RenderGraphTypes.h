@@ -68,8 +68,7 @@ struct ResourceBinding {
 
 	ResourceBinding(Buffer& buf) : buf(&buf) {}
 	ResourceBinding(Texture2D& tex) : tex(&tex) {}
-	ResourceBinding(Texture2D& tex, VkSampler sampler)
-		: tex(&tex), sampler(sampler) {}
+	ResourceBinding(Texture2D& tex, VkSampler sampler) : tex(&tex), sampler(sampler) {}
 };
 
 struct BufferSyncDescriptor {
