@@ -174,6 +174,50 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 	std::unordered_map<uint32_t, uint32_t> constant_map;
 	std::unordered_map<uint32_t, std::string> buffer_ptr_hash_map;
 
+	auto store_helper = [&](uint32_t store_id) {
+		if (access_chain_map.find(store_id) != access_chain_map.end()) {
+			const auto& access_chain = access_chain_map[store_id];
+			if (variable_map.find(access_chain.base_ptr_id) != variable_map.end()) {
+				// Access chain has variable
+				const auto variable_storage_class = variable_map[access_chain.base_ptr_id].storage_class;
+				// TODO: Check if buffer
+				if (is_bound_buffer(variable_storage_class)) {
+					// Bound resource
+					auto binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
+					pass->bound_resources[binding].write = true;
+				} else if (is_buffer(variable_storage_class)) {
+					// Via pointer
+					auto ptr_var_id = load_map[access_chain.base_ptr_id];  //;
+																		   // store_access_map[store_id];
+					auto var_name = glsl.get_name(ptr_var_id);
+					auto var_type = glsl.get_type_from_variable(ptr_var_id);
+					assert(buffer_ptr_hash_map.find(ptr_var_id) != buffer_ptr_hash_map.end());
+					const auto& res = buffer_ptr_hash_map[ptr_var_id];
+					if (pass->rg->registered_buffer_pointers.find(res) != pass->rg->registered_buffer_pointers.end()) {
+						shader.buffer_status_map[pass->rg->registered_buffer_pointers[res]].write = true;
+					}
+				}
+			} else if (load_map.find(access_chain.base_ptr_id) != load_map.end()) {
+				// Access chain has loads
+				// If it has loads, it should be a buffer pointer
+				const auto& res = buffer_ptr_hash_map[load_map[access_chain.base_ptr_id]];
+				if (pass->rg->registered_buffer_pointers.find(res) != pass->rg->registered_buffer_pointers.end()) {
+					shader.buffer_status_map[pass->rg->registered_buffer_pointers[res]].write = true;
+				}
+			}
+		}
+		// Theoretical case where _%a_ in _OpStore %a %b_ is already a
+		// declared pointer variable In this case the resource should be
+		// bound, as it implies 0 offset Fortunately, glslang or shaderc
+		// don't do this as of SPIR-V 1.6
+		if (variable_map.find(store_id) != variable_map.end()) {
+			if (is_bound_buffer(variable_map[store_id].storage_class)) {
+				auto binding = glsl.get_decoration(store_id, spv::DecorationBinding);
+				pass->bound_resources[binding].write = true;
+			}
+		}
+	};
+
 	// TODO: Support for bindless images
 	while (insn != code + code_size) {
 		uint16_t opcode = uint16_t(insn[0]);
@@ -281,44 +325,26 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 				}
 
 			} break;
+			case SpvOpAtomicIIncrement:
+			case SpvOpAtomicIDecrement:
+			case SpvOpAtomicISub:
+			case SpvOpAtomicSMin:
+			case SpvOpAtomicUMin:
+			case SpvOpAtomicSMax:
+			case SpvOpAtomicUMax:
+			case SpvOpAtomicAnd:
+			case SpvOpAtomicOr:
+			case SpvOpAtomicXor:
+			case SpvOpAtomicIAdd: {
+				uint32_t store_id = insn[3];
+				store_helper(store_id);
+			} break;
 
 			case SpvOpStore: {
 				assert(word_count >= 3);
 				uint32_t store_id = insn[1];
 
-				if (access_chain_map.find(insn[1]) != access_chain_map.end()) {
-					const auto& access_chain = access_chain_map[insn[1]];
-					if (variable_map.find(access_chain.base_ptr_id) != variable_map.end()) {
-						// Access chain has variable
-						const auto variable_storage_class = variable_map[access_chain.base_ptr_id].storage_class;
-						// TODO: Check if buffer
-						if (is_bound_buffer(variable_storage_class)) {
-							// Bound resource
-							auto binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
-							pass->bound_resources[binding].write = true;
-						} else if (is_buffer(variable_storage_class)) {
-							// Via pointer
-							auto ptr_var_id = load_map[access_chain.base_ptr_id];  //;
-																				   // store_access_map[insn[1]];
-							auto var_name = glsl.get_name(ptr_var_id);
-							auto var_type = glsl.get_type_from_variable(ptr_var_id);
-							assert(buffer_ptr_hash_map.find(ptr_var_id) != buffer_ptr_hash_map.end());
-							const auto& res = buffer_ptr_hash_map[ptr_var_id];
-							if (pass->rg->registered_buffer_pointers.find(res) !=
-								pass->rg->registered_buffer_pointers.end()) {
-								shader.buffer_status_map[pass->rg->registered_buffer_pointers[res]].write = true;
-							}
-						}
-					} else if (load_map.find(access_chain.base_ptr_id) != load_map.end()) {
-						// Access chain has loads
-						// If it has loads, it should be a buffer pointer
-						const auto& res = buffer_ptr_hash_map[load_map[access_chain.base_ptr_id]];
-						if (pass->rg->registered_buffer_pointers.find(res) !=
-							pass->rg->registered_buffer_pointers.end()) {
-							shader.buffer_status_map[pass->rg->registered_buffer_pointers[res]].write = true;
-						}
-					}
-				}
+				store_helper(store_id);
 
 				// Store pointers for the first time, create the hash map
 				if (access_chain_map.find(insn[2]) != access_chain_map.end()) {
@@ -345,16 +371,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 						buffer_ptr_hash_map[ptr_id] = container_name + '_' + ptr_name;	//+ '_' + pointee_type_name;
 					}
 				}
-				// Theoretical case where _%a_ in _OpStore %a %b_ is already a
-				// declared pointer variable In this case the resource should be
-				// bound, as it implies 0 offset Fortunately, glslang or shaderc
-				// don't do this as of SPIR-V 1.6
-				if (variable_map.find(insn[1]) != variable_map.end()) {
-					if (is_bound_buffer(variable_map[insn[1]].storage_class)) {
-						auto binding = glsl.get_decoration(insn[1], spv::DecorationBinding);
-						pass->bound_resources[binding].write = true;
-					}
-				}
+			
 			} break;
 		}
 		assert(insn + word_count <= code + code_size);
@@ -586,7 +603,7 @@ int Shader::compile(RenderPass* pass) {
 	binary.resize(file_size / 4);
 	bin.read((char*)binary.data(), file_size);
 	bin.close();
-	parse_shader(*this, binary.data(), file_size / 4);
+	parse_shader(*this, binary.data(), file_size / 4, pass);
 	return ret_val;
 #endif
 }

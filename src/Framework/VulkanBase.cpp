@@ -979,7 +979,6 @@ VkResult VulkanBase::submit_frame(uint32_t image_idx, bool& resized) {
 void VulkanBase::build_tlas(std::vector<VkAccelerationStructureInstanceKHR>& instances,
 							VkBuildAccelerationStructureFlagsKHR flags, bool update) {
 	// Cannot call buildTlas twice except to update.
-	assert(tlas.accel == VK_NULL_HANDLE || update);
 	uint32_t count_instance = static_cast<uint32_t>(instances.size());
 
 	// Command buffer to create the TLAS

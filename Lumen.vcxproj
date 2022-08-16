@@ -132,7 +132,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <AdditionalDependencies>vulkan-1.lib;glfw3.lib;spirv-cross-cored.lib;spirv-cross-glsld.lib;shaderc_shared.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)libs\glfw\src\Debug;$(VULKAN_SDK)\Lib</AdditionalLibraryDirectories>
       <AdditionalOptions>/NODEFAULTLIB:library  /ignore:4099 %(AdditionalOptions)</AdditionalOptions>

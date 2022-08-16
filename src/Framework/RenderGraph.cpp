@@ -3,6 +3,10 @@
 #include "Utils.h"
 #include <unordered_set>
 
+// TODO: "Handle" the stupid bug where the multithreaded pipeline compilation
+// doesn't show any output from the debugPrintf...
+// Possible solution: Make compilation with debugPrintf shaders synchronous?
+
 #define DIRTY_CHECK(x) \
 	if (!x) {          \
 		return *this;  \
@@ -98,6 +102,9 @@ void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout)
 static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_shaders) {
 	// todo: make resource processing in order
 	auto process_resources = [pass](const Shader& shader) {
+		if (!pass->rg->settings.shader_inference) {
+			return;
+		}
 		for (auto& [k, v] : shader.buffer_status_map) {
 			if (v.read) {
 				pass->affected_buffer_pointers[k].read = v.read;

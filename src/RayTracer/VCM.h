@@ -9,12 +9,6 @@ class VCM : public Integrator {
 	virtual void destroy() override;
 
    private:
-	void create_offscreen_resources();
-	void create_descriptors();
-	void create_blas();
-	void create_tlas();
-	// void create_rt_pipelines();
-	// void create_compute_pipelines();
 	PushConstantRay pc_ray{};
 	VkDescriptorPool desc_pool;
 	VkDescriptorSetLayout desc_set_layout;

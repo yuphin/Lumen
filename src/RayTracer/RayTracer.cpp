@@ -61,10 +61,10 @@ void RayTracer::init(Window* window) {
 		case IntegratorType::SPPM:
 			integrator = std::make_unique<SPPM>(this, &scene);
 			break;
-			/*	case IntegratorType::VCM:
-					integrator = std::make_unique<VCM>(this, &scene);
-					break;
-				case IntegratorType::PSSMLT:
+		case IntegratorType::VCM:
+			integrator = std::make_unique<VCM>(this, &scene);
+			break;
+			/*	case IntegratorType::PSSMLT:
 					integrator = std::make_unique<PSSMLT>(this, &scene);
 					break;
 				case IntegratorType::SMLT:
@@ -84,9 +84,9 @@ void RayTracer::init(Window* window) {
 					break;
 				case IntegratorType::ReSTIRPT:
 					integrator = std::make_unique<ReSTIRPT>(this, &scene);
-					break;
-				default:
 					break;*/
+		default:
+			break;
 	}
 	integrator->init();
 	init_resources();
