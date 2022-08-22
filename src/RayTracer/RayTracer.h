@@ -8,8 +8,8 @@
 //#include "PSSMLT.h"
 //#include "SMLT.h"
 //#include "VCMMLT.h"
-//#include "ReSTIR.h"
-//#include "ReSTIRGI.h"
+#include "ReSTIR.h"
+#include "ReSTIRGI.h"
 //#include "DDGI.h"
 //#include "ReSTIRPT.h"
 class RayTracer : public LumenInstance {

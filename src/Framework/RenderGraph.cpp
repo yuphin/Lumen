@@ -75,7 +75,6 @@ void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout)
 		tex.layout = dst_layout;
 	} else {
 		RenderPass& opposing_pass = rg->passes[rg->img_resource_map[tex.img]];
-		VkAccessFlags dst_access_flags = vk::access_flags_for_img_layout(dst_layout);
 		if (opposing_pass.pass_idx < pass_idx) {
 			// Set current pass dependencies (Waiting pass)
 			if (wait_signals_img.find(tex.img) == wait_signals_img.end()) {
@@ -441,17 +440,6 @@ void RenderPass::finalize() {
 		}
 	};
 
-	auto process_resources = [this](const Shader& shader) {
-		for (auto& [k, v] : shader.buffer_status_map) {
-			if (v.read) {
-				affected_buffer_pointers[k].read = v.read;
-			}
-			if (v.write) {
-				affected_buffer_pointers[k].write = v.write;
-			}
-		}
-	};
-
 	if (!rg->recording) {
 		// Handle resource transitions
 		transition_resources();
@@ -698,7 +686,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				// Render
 				{
 					VkRenderingInfo render_info{.sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-												.renderArea = {0, 0, gfx_settings->width, gfx_settings->height},
+												.renderArea = {{0, 0}, {gfx_settings->width, gfx_settings->height}},
 												.layerCount = 1,
 												.colorAttachmentCount = (uint32_t)color_outputs.size(),
 												.pColorAttachments = rendering_attachments.data(),

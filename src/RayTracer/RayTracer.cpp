@@ -64,6 +64,12 @@ void RayTracer::init(Window* window) {
 		case IntegratorType::VCM:
 			integrator = std::make_unique<VCM>(this, &scene);
 			break;
+		case IntegratorType::ReSTIR:
+			integrator = std::make_unique<ReSTIR>(this, &scene);
+			break;
+		case IntegratorType::ReSTIRGI:
+			integrator = std::make_unique<ReSTIRGI>(this, &scene);
+			break;
 			/*	case IntegratorType::PSSMLT:
 					integrator = std::make_unique<PSSMLT>(this, &scene);
 					break;
@@ -72,12 +78,6 @@ void RayTracer::init(Window* window) {
 					break;
 				case IntegratorType::VCMMLT:
 					integrator = std::make_unique<VCMMLT>(this, &scene);
-					break;
-				case IntegratorType::ReSTIR:
-					integrator = std::make_unique<ReSTIR>(this, &scene);
-					break;
-				case IntegratorType::ReSTIRGI:
-					integrator = std::make_unique<ReSTIRGI>(this, &scene);
 					break;
 				case IntegratorType::DDGI:
 					integrator = std::make_unique<DDGI>(this, &scene);

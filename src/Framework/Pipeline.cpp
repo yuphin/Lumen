@@ -218,6 +218,20 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 				group.anyHitShader = stage_idx;
 				break;
 			}
+			case VK_SHADER_STAGE_VERTEX_BIT:
+			case VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT:
+			case VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT:
+			case VK_SHADER_STAGE_GEOMETRY_BIT:
+			case VK_SHADER_STAGE_FRAGMENT_BIT:
+			case VK_SHADER_STAGE_COMPUTE_BIT:
+			case VK_SHADER_STAGE_ALL_GRAPHICS:
+			case VK_SHADER_STAGE_ALL:
+			case VK_SHADER_STAGE_INTERSECTION_BIT_KHR:
+			case VK_SHADER_STAGE_CALLABLE_BIT_KHR:
+			case VK_SHADER_STAGE_TASK_BIT_NV:
+			case VK_SHADER_STAGE_MESH_BIT_NV:
+			case VK_SHADER_STAGE_SUBPASS_SHADING_BIT_HUAWEI:
+				break;
 		}
 		groups.push_back(group);
 		stages.push_back(stage);
