@@ -527,17 +527,16 @@ void VulkanBase::create_swapchain() {
 	ctx.depth_img_view = create_image_view(ctx.device, ctx.depth_img, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
-void VulkanBase::create_command_pool() {
+void VulkanBase::create_command_pools() {
 	QueueFamilyIndices queue_family_idxs = find_queue_families(ctx.physical_device);
-
 	VkCommandPoolCreateInfo pool_info = vk::command_pool_CI(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 	pool_info.queueFamilyIndex = queue_family_idxs.gfx_family.value();
-	ctx.cmd_pools.resize(2);
-	vk::check(vkCreateCommandPool(ctx.device, &pool_info, nullptr, &ctx.cmd_pools[0]),
-			  "Failed to create command pool!");
-	pool_info.queueFamilyIndex = queue_family_idxs.compute_family.value();
-	vk::check(vkCreateCommandPool(ctx.device, &pool_info, nullptr, &ctx.cmd_pools[1]),
-			  "Failed to create command pool!");
+	const auto processor_count = std::thread::hardware_concurrency();
+	ctx.cmd_pools.resize(processor_count);
+	for (auto i = 0; i < processor_count; i++) {
+		vk::check(vkCreateCommandPool(ctx.device, &pool_info, nullptr, &ctx.cmd_pools[i]),
+				  "Failed to create command pool!");
+	}
 }
 
 // void VulkanBase::create_framebuffers(VkRenderPass render_pass) {
@@ -564,11 +563,10 @@ void VulkanBase::create_command_pool() {
 
 void VulkanBase::create_command_buffers() {
 	ctx.command_buffers.resize(swapchain_images.size());
-
 	// TODO: Factor
+	// 0 is for the main thread
 	VkCommandBufferAllocateInfo alloc_info = vk::command_buffer_allocate_info(
 		ctx.cmd_pools[0], VK_COMMAND_BUFFER_LEVEL_PRIMARY, (uint32_t)ctx.command_buffers.size());
-
 	vk::check(vkAllocateCommandBuffers(ctx.device, &alloc_info, ctx.command_buffers.data()),
 			  "Failed to allocate command buffers!");
 }

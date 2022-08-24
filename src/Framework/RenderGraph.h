@@ -25,6 +25,56 @@ struct AccelKHR {
 class RenderGraph;
 class RenderPass;
 
+
+
+class RenderGraph {
+public:
+	RenderGraph(VulkanContext* ctx) : ctx(ctx) { pipeline_tasks.reserve(32); }
+	RenderPass& current_pass() { return passes.back(); }
+
+	RenderPass& add_rt(const std::string& name, const RTPassSettings& settings);
+	RenderPass& add_gfx(const std::string& name, const GraphicsPassSettings& settings);
+	RenderPass& add_compute(const std::string& name, const ComputePassSettings& settings);
+	RenderPass& get_current_pass();
+	void run(VkCommandBuffer cmd);
+	void reset(VkCommandBuffer cmd);
+	friend RenderPass;
+	bool recording = true;
+	EventPool event_pool;
+	std::unordered_map<std::string, Buffer*> registered_buffer_pointers;
+	std::unordered_map<std::string, Shader> shader_cache;
+	RenderGraphSettings settings;
+	std::mutex shader_map_mutex;
+
+private:
+	struct BufferSyncResources {
+		std::vector<VkBufferMemoryBarrier2> buffer_bariers;
+		std::vector<VkDependencyInfo> dependency_infos;
+	};
+	struct ImageSyncResources {
+		std::vector<VkImageMemoryBarrier2> img_barriers;
+		std::vector<VkDependencyInfo> dependency_infos;
+	};
+
+	struct PipelineStorage {
+		std::unique_ptr<Pipeline> pipeline;
+		uint32_t offset_idx;  // Offset index relative to the pass_idx the
+							  // pipeline holds
+		std::vector<uint32_t> pass_idxs;
+	};
+	VulkanContext* ctx = nullptr;
+	std::vector<RenderPass> passes;
+	std::unordered_map<std::string, PipelineStorage> pipeline_cache;
+	std::vector<std::pair<std::function<void(RenderPass*)>, uint32_t>> pipeline_tasks;
+	std::vector<std::function<void(RenderPass*)>> shader_tasks;
+	// Sync related data
+	std::vector<BufferSyncResources> buffer_sync_resources;
+	std::vector<ImageSyncResources> img_sync_resources;
+	std::unordered_map<VkBuffer, std::pair<uint32_t, VkAccessFlags>>
+		buffer_resource_map;								 // Buffer handle - { Write Pass Idx, Access Type }
+	std::unordered_map<VkImage, uint32_t> img_resource_map;	 // Tex2D handle - Pass Idx
+};
+
 class RenderPass {
    public:
 	RenderPass(PassType type, Pipeline* pipeline, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
@@ -76,7 +126,18 @@ class RenderPass {
 	RenderPass& write(std::initializer_list<std::reference_wrapper<Texture2D>> texes);
 
 	RenderPass& skip_execution();
-	RenderPass& push_constants(void* data);
+	template <typename T>
+	RenderPass& push_constants(T* data) {
+		void* new_ptr = nullptr;
+		if (rg->recording) {
+			new_ptr = malloc(sizeof(T));
+		} else {
+			new_ptr = push_constant_data;
+		}
+		memcpy(new_ptr, data, sizeof(T));
+		push_constant_data = new_ptr;
+		return *this;
+	}
 	RenderPass& zero(Buffer& buffer);
 	RenderPass& zero(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
 	RenderPass& zero(Buffer& buffer, bool cond);
@@ -106,7 +167,6 @@ class RenderPass {
 	void run(VkCommandBuffer cmd);
 	void register_dependencies(Buffer& buffer, VkAccessFlags dst_access_flags);
 	void register_dependencies(Texture2D& tex, VkImageLayout target_layout);
-	void build_shaders(const std::vector<Shader*>& active_shaders);
 
 	std::string name;
 	Pipeline* pipeline;
@@ -114,6 +174,7 @@ class RenderPass {
 	std::vector<uint32_t> descriptor_counts;
 	void* push_constant_data = nullptr;
 	bool is_pipeline_cached;
+	bool ran = false;
 	/*
 		Note:
 		The assumption is that a SyncDescriptor is unique to a pass (either via
@@ -149,49 +210,3 @@ class RenderPass {
 	bool disable_execution = false;
 };
 
-class RenderGraph {
-   public:
-	RenderGraph(VulkanContext* ctx) : ctx(ctx) { pipeline_tasks.reserve(32); }
-	RenderPass& current_pass() { return passes.back(); }
-
-	RenderPass& add_rt(const std::string& name, const RTPassSettings& settings);
-	RenderPass& add_gfx(const std::string& name, const GraphicsPassSettings& settings);
-	RenderPass& add_compute(const std::string& name, const ComputePassSettings& settings);
-	RenderPass& get_current_pass();
-	void run(VkCommandBuffer cmd);
-	void reset(VkCommandBuffer cmd);
-	friend RenderPass;
-	bool recording = true;
-	EventPool event_pool;
-	std::unordered_map<std::string, Buffer*> registered_buffer_pointers;
-	std::unordered_map<std::string, Shader> shader_cache;
-	RenderGraphSettings settings;
-
-   private:
-	struct BufferSyncResources {
-		std::vector<VkBufferMemoryBarrier2> buffer_bariers;
-		std::vector<VkDependencyInfo> dependency_infos;
-	};
-	struct ImageSyncResources {
-		std::vector<VkImageMemoryBarrier2> img_barriers;
-		std::vector<VkDependencyInfo> dependency_infos;
-	};
-
-	struct PipelineStorage {
-		std::unique_ptr<Pipeline> pipeline;
-		uint32_t offset_idx;  // Offset index relative to the pass_idx the
-							  // pipeline holds
-		std::vector<uint32_t> pass_idxs;
-	};
-	VulkanContext* ctx = nullptr;
-	std::vector<RenderPass> passes;
-	std::unordered_map<std::string, PipelineStorage> pipeline_cache;
-	std::vector<std::pair<std::function<void(RenderPass*)>, uint32_t>> pipeline_tasks;
-	std::vector<std::function<void(RenderPass*)>> shader_tasks;
-	// Sync related data
-	std::vector<BufferSyncResources> buffer_sync_resources;
-	std::vector<ImageSyncResources> img_sync_resources;
-	std::unordered_map<VkBuffer, std::pair<uint32_t, VkAccessFlags>>
-		buffer_resource_map;								 // Buffer handle - { Write Pass Idx, Access Type }
-	std::unordered_map<VkImage, uint32_t> img_resource_map;	 // Tex2D handle - Pass Idx
-};

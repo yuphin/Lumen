@@ -131,7 +131,10 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 			}
 			for (auto& task : shader_tasks) {
 				auto shader = task.get();
-				pass->rg->shader_cache[shader->filename] = *shader;
+				{
+					std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
+					pass->rg->shader_cache[shader->filename] = *shader;
+				}
 			}
 			for (auto& shader : active_shaders) {
 				process_resources(*shader);
@@ -156,7 +159,10 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 			}
 			for (auto& task : shader_tasks) {
 				auto shader = task.get();
-				pass->rg->shader_cache[shader->filename] = *shader;
+				{
+					std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
+					pass->rg->shader_cache[shader->filename] = *shader;
+				}
 			}
 			for (auto& shader : active_shaders) {
 				process_resources(*shader);
@@ -169,7 +175,10 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 					*shader = pass->rg->shader_cache[shader->filename];
 				} else {
 					shader->compile(pass);
-					pass->rg->shader_cache[shader->filename] = *shader;
+					{
+						std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
+						pass->rg->shader_cache[shader->filename] = *shader;
+					}
 				}
 				pass->affected_buffer_pointers = shader->buffer_status_map;
 			}
@@ -370,11 +379,6 @@ RenderPass& RenderPass::skip_execution() {
 	return *this;
 }
 
-RenderPass& RenderPass::push_constants(void* data) {
-	push_constant_data = data;
-	return *this;
-}
-
 RenderPass& RenderPass::zero(Buffer& buffer) {
 	buffer_zeros.push_back(&buffer);
 	return *this;
@@ -479,6 +483,8 @@ void RenderPass::finalize() {
 						pass->tlas_descriptor_set, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0, &pass->tlas_info);
 					vkUpdateDescriptorSets(pass->rg->ctx->device, 1, &descriptor_write, 0, nullptr);
 				};
+				// TODO: Fix multithreaded pipeline building for RT
+				//func(this);
 				rg->pipeline_tasks.push_back({func, pass_idx});
 				break;
 			}
@@ -486,6 +492,7 @@ void RenderPass::finalize() {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline->create_compute_pipeline(*pass->compute_settings, pass->descriptor_counts);
 				};
+				//func(this);
 				rg->pipeline_tasks.push_back({func, pass_idx});
 				break;
 			}
@@ -755,6 +762,9 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		std::unordered_map<RenderPass*, std::vector<Shader*>> unique_shaders;
 		std::unordered_map<RenderPass*, std::vector<Shader*>> existing_shaders;
 		for (auto& pass : passes) {
+			if (pass.ran) {
+				continue;
+			}
 			if (pass.gfx_settings) {
 				for (auto& shader : pass.gfx_settings->shaders) {
 					if (!unique_shaders_set.insert({&shader, &pass}).second) {
@@ -794,7 +804,9 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		}
 	}
 	for (auto& pass : passes) {
-		pass.finalize();
+		if (!pass.ran) {
+			pass.finalize();
+		}
 	}
 
 	if (pipeline_tasks.size()) {
@@ -808,11 +820,15 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		}
 	}
 	for (int i = 0; i < passes.size(); i++) {
+		if (passes[i].ran) {
+			continue;
+		}
 		buffer_sync_resources[i].buffer_bariers.resize(passes[i].wait_signals_buffer.size());
 		buffer_sync_resources[i].dependency_infos.resize(passes[i].wait_signals_buffer.size());
 		img_sync_resources[i].img_barriers.resize(passes[i].wait_signals_img.size());
 		img_sync_resources[i].dependency_infos.resize(passes[i].wait_signals_img.size());
 		passes[i].run(cmd);
+		passes[i].ran = true;
 	}
 }
 
@@ -833,6 +849,7 @@ void RenderGraph::reset(VkCommandBuffer cmd) {
 			passes[i].explicit_tex_reads.clear();
 			passes[i].explicit_tex_writes.clear();
 		}
+		passes[i].ran = false;
 	}
 	if (recording) {
 		for (auto& pass : passes) {

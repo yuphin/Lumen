@@ -109,7 +109,6 @@ void LumenScene::load_scene(const std::string& path) {
 			config.radius_factor = integrator["radius_factor"];
 		} else if (integrator["type"] == "pssmlt") {
 			config.integrator_type = IntegratorType::PSSMLT;
-			config.integrator_type = IntegratorType::SMLT;
 			config.mutations_per_pixel = integrator["mutations_per_pixel"];
 			config.num_mlt_threads = integrator["num_mlt_threads"];
 			config.num_bootstrap_samples = integrator["num_bootstrap_samples"];

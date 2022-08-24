@@ -59,11 +59,6 @@ void SPPM::init() {
 }
 
 void SPPM::render() {
-	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	VkClearValue clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
-	VkClearValue clear_depth = {1.0f, 0};
-	VkViewport viewport = vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
-	VkClearValue clear_values[] = {clear_color, clear_depth};
 	pc_ray.light_pos = scene_ubo.light_pos;
 	pc_ray.light_type = 0;
 	pc_ray.light_intensity = 10;

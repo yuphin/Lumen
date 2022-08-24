@@ -44,7 +44,7 @@ void RayTracer::init(Window* window) {
 	vkb.pick_physical_device();
 	vkb.create_logical_device();
 	vkb.create_swapchain();
-	vkb.create_command_pool();
+	vkb.create_command_pools();
 	vkb.create_command_buffers();
 	vkb.create_sync_primitives();
 	initialized = true;
@@ -70,10 +70,10 @@ void RayTracer::init(Window* window) {
 		case IntegratorType::ReSTIRGI:
 			integrator = std::make_unique<ReSTIRGI>(this, &scene);
 			break;
-			/*	case IntegratorType::PSSMLT:
-					integrator = std::make_unique<PSSMLT>(this, &scene);
-					break;
-				case IntegratorType::SMLT:
+		case IntegratorType::PSSMLT:
+			integrator = std::make_unique<PSSMLT>(this, &scene);
+			break;
+			/*	case IntegratorType::SMLT:
 					integrator = std::make_unique<SMLT>(this, &scene);
 					break;
 				case IntegratorType::VCMMLT:

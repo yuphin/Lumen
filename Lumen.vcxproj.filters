@@ -106,6 +106,10 @@
     <ClCompile Include="src\RayTracer\BDPT.cpp" />
     <ClCompile Include="src\RayTracer\SPPM.cpp" />
     <ClCompile Include="src\RayTracer\VCM.cpp" />
+    <ClCompile Include="src\RayTracer\ReSTIR.cpp" />
+    <ClCompile Include="src\RayTracer\ReSTIRGI.cpp" />
+    <ClCompile Include="src\RayTracer\PSSMLT.cpp" />
+    <ClCompile Include="src\Framework\VulkanSyncronization.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\LumenPCH.h" />
@@ -214,6 +218,10 @@
     <ClInclude Include="src\RayTracer\VCM.h" />
     <ClInclude Include="src\Framework\RenderGraphTypes.h" />
     <ClInclude Include="src\Framework\CommonTypes.h" />
+    <ClInclude Include="src\RayTracer\ReSTIR.h" />
+    <ClInclude Include="src\RayTracer\ReSTIRGI.h" />
+    <ClInclude Include="src\RayTracer\PSSMLT.h" />
+    <ClInclude Include="src\Framework\VulkanSyncronization.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\integrators\bdpt\bdpt.rgen">

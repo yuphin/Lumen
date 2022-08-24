@@ -16,4 +16,5 @@ class CommandBuffer {
 	VulkanContext* ctx;
 	CommandBufferState state = CommandBufferState::STOPPED;
 	QueueType type;
+	uint32_t curr_tid;
 };
