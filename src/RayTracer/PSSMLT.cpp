@@ -300,14 +300,14 @@ void PSSMLT::render() {
 		.bind_tlas(instance->vkb.tlas);
 
 	instance->vkb.rg->run(cmd.handle);
-	cmd.submit();
+	instance->vkb.rg->submit(cmd);
 	// Start mutations
 	{
 		auto mutate = [&](uint32_t i) {
 			pc_ray.random_num = rand() % UINT_MAX;
 			pc_ray.mutation_counter = i;
 			instance->vkb.rg
-				->add_rt("PSSMLT - Mutate " + std::to_string(i),
+				->add_rt("PSSMLT - Mutate",
 						 {.shaders = {{"src/shaders/integrators/pssmlt/pssmlt_mutate.rgen"},
 									  {"src/shaders/ray.rmiss"},
 									  {"src/shaders/ray_shadow.rmiss"},
@@ -331,9 +331,9 @@ void PSSMLT::render() {
 				mutate(i);
 			}
 			iter += 100;
-			printf("%d / %d\n", iter, mutation_count);
 			instance->vkb.rg->run(cmd.handle);
-			cmd.submit();
+			printf("%d / %d\n", iter, mutation_count);
+			instance->vkb.rg->submit(cmd);
 		}
 		const uint32_t rem = mutation_count % iter_cnt;
 		if (rem) {
@@ -342,7 +342,7 @@ void PSSMLT::render() {
 				mutate(i);
 			}
 			instance->vkb.rg->run(cmd.handle);
-			cmd.submit();
+			instance->vkb.rg->submit(cmd);
 		}
 	}
 	// Compositions
@@ -371,7 +371,7 @@ void PSSMLT::prefix_scan(int level, int num_elems, int& counter, RenderGraph* rg
 	auto scan = [&](int num_wgs, int idx) {
 		++counter;
 		rg->add_compute(
-			  "PrefixScan - Scan " + std::to_string(counter),
+			  "PrefixScan - Scan",
 			  {.shader = Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"), .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(scene_desc_buffer);
@@ -379,7 +379,7 @@ void PSSMLT::prefix_scan(int level, int num_elems, int& counter, RenderGraph* rg
 	auto uniform_add = [&](int num_wgs, int output_idx) {
 		++counter;
 		rg->add_compute(
-			  "PrefixScan - Uniform Add " + std::to_string(counter),
+			  "PrefixScan - Uniform Add",
 			  {.shader = Shader("src/shaders/integrators/pssmlt/uniform_add.comp"), .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(scene_desc_buffer);

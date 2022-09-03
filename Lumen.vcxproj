@@ -120,7 +120,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_SILENCE_CXX20_CISO646_REMOVED_WARNING</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)libs\glm;$(SolutionDir)libs\glfw\include;$(VULKAN_SDK)\Include;$(SolutionDir)libs\spdlog\include;$(SolutionDir)src;$(SolutionDir)libs\stb_image;$(SolutionDir)libs\gli;$(SolutionDir)libs\tinygltf;$(SolutionDir)libs\imgui;$(SolutionDir)libs\nvvk;$(SolutionDir)libs;C:\VulkanSDK\1.3.216.0\Include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
@@ -160,7 +160,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_SILENCE_CXX20_CISO646_REMOVED_WARNING</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)libs\glm;$(SolutionDir)libs\glfw\include;$(VULKAN_SDK)\Include;$(SolutionDir)libs\spdlog\include;$(SolutionDir)src;$(SolutionDir)libs\stb_image;$(SolutionDir)libs\gli;$(SolutionDir)libs\tinygltf;$(SolutionDir)libs\imgui;$(SolutionDir)libs\nvvk;$(SolutionDir)libs;C:\VulkanSDK\1.3.216.0\Include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
@@ -179,6 +179,11 @@
       <AdditionalLibraryDirectories>$(SolutionDir)libs\glfw\src\Release;$(VULKAN_SDK)\Lib</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebugInfo|x64'">
+    <ClCompile>
+      <PreprocessorDefinitions>;_SILENCE_CXX20_CISO646_REMOVED_WARNING</PreprocessorDefinitions>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\Framework\EventPool.cpp" />

@@ -44,6 +44,14 @@ struct Pipeline {
 	VkPipeline handle = VK_NULL_HANDLE;
 	VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
 	VkDescriptorSetLayout set_layout, tlas_layout;
+	/*
+	Potentially 1 descriptor pool for a pass where we have to keep the
+	TLAS descriptor, because we can't push its descriptor with a template as
+   of Vulkan 1.3
+	*/
+	VkDescriptorPool tlas_descriptor_pool = nullptr;
+	VkDescriptorSet tlas_descriptor_set = nullptr;
+	VkWriteDescriptorSetAccelerationStructureKHR tlas_info = {};
 	SBTWrapper sbt_wrapper;
 	PipelineType type;
 	size_t pass_idx;

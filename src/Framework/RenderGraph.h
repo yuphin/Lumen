@@ -38,6 +38,7 @@ public:
 	RenderPass& get_current_pass();
 	void run(VkCommandBuffer cmd);
 	void reset(VkCommandBuffer cmd);
+	void submit(CommandBuffer& cmd);
 	friend RenderPass;
 	bool recording = true;
 	EventPool event_pool;
@@ -73,6 +74,8 @@ private:
 	std::unordered_map<VkBuffer, std::pair<uint32_t, VkAccessFlags>>
 		buffer_resource_map;								 // Buffer handle - { Write Pass Idx, Access Type }
 	std::unordered_map<VkImage, uint32_t> img_resource_map;	 // Tex2D handle - Pass Idx
+	uint32_t beginning_pass_idx = 0;
+	uint32_t ending_pass_idx = 0;
 };
 
 class RenderPass {
@@ -174,7 +177,7 @@ class RenderPass {
 	std::vector<uint32_t> descriptor_counts;
 	void* push_constant_data = nullptr;
 	bool is_pipeline_cached;
-	bool ran = false;
+	bool submitted = false;
 	/*
 		Note:
 		The assumption is that a SyncDescriptor is unique to a pass (either via
@@ -198,14 +201,7 @@ class RenderPass {
 	};
 	std::vector<Buffer*> buffer_zeros;
 	std::vector<BufferBarrier> buffer_barriers;
-	/*
-		Potentially 1 descriptor pool for a pass where we have to keep the
-		TLAS descriptor, because we can't push its descriptor with a template as
-	   of Vulkan 1.3
-	*/
-	VkDescriptorPool tlas_descriptor_pool = nullptr;
-	VkDescriptorSet tlas_descriptor_set = nullptr;
-	VkWriteDescriptorSetAccelerationStructureKHR tlas_info = {};
+
 
 	bool disable_execution = false;
 };
