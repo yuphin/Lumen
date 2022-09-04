@@ -25,8 +25,6 @@ struct AccelKHR {
 class RenderGraph;
 class RenderPass;
 
-
-
 class RenderGraph {
 public:
 	RenderGraph(VulkanContext* ctx) : ctx(ctx) { pipeline_tasks.reserve(32); }

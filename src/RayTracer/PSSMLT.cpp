@@ -307,14 +307,13 @@ void PSSMLT::render() {
 			pc_ray.random_num = rand() % UINT_MAX;
 			pc_ray.mutation_counter = i;
 			instance->vkb.rg
-				->add_rt("PSSMLT - Mutate",
-						 {.shaders = {{"src/shaders/integrators/pssmlt/pssmlt_mutate.rgen"},
-									  {"src/shaders/ray.rmiss"},
-									  {"src/shaders/ray_shadow.rmiss"},
-									  {"src/shaders/ray.rchit"},
-									  {"src/shaders/ray.rahit"}},
-						  .dims = {(uint32_t)lumen_scene->config.num_mlt_threads},
-						  .accel = instance->vkb.tlas.accel})
+				->add_rt("PSSMLT - Mutate", {.shaders = {{"src/shaders/integrators/pssmlt/pssmlt_mutate.rgen"},
+														 {"src/shaders/ray.rmiss"},
+														 {"src/shaders/ray_shadow.rmiss"},
+														 {"src/shaders/ray.rchit"},
+														 {"src/shaders/ray.rahit"}},
+											 .dims = {(uint32_t)lumen_scene->config.num_mlt_threads},
+											 .accel = instance->vkb.tlas.accel})
 				.push_constants(&pc_ray)
 				.zero({light_path_buffer, camera_path_buffer})
 				.bind(rt_bindings)
@@ -370,9 +369,8 @@ void PSSMLT::prefix_scan(int level, int num_elems, int& counter, RenderGraph* rg
 	pc_compute.num_elems = num_elems;
 	auto scan = [&](int num_wgs, int idx) {
 		++counter;
-		rg->add_compute(
-			  "PrefixScan - Scan",
-			  {.shader = Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"), .dims = {(uint32_t)num_wgs, 1, 1}})
+		rg->add_compute("PrefixScan - Scan", {.shader = Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
+											  .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(scene_desc_buffer);
 	};

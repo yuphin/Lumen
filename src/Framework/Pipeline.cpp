@@ -32,7 +32,6 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 	create_update_template(settings.shaders, descriptor_counts);
 
 	VkSpecializationInfo specialization_info = {};
-
 	std::vector<VkSpecializationMapEntry> entries(settings.specialization_data.size());
 	for (int i = 0; i < entries.size(); i++) {
 		entries[i].constantID = i;
@@ -238,8 +237,8 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 		stage_idx++;
 	}
 
+	VkSpecializationInfo specialization_info = {};
 	if (!settings.specialization_data.empty()) {
-		VkSpecializationInfo specialization_info{};
 		specialization_info.dataSize = settings.specialization_data.size() * sizeof(uint32_t);
 		specialization_info.mapEntryCount = (uint32_t)settings.specialization_data.size();
 		specialization_info.pMapEntries = entries.data();
@@ -282,15 +281,15 @@ void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
 	shader_stage_ci.pName = "main";
 	shader_stage_ci.stage = VK_SHADER_STAGE_COMPUTE_BIT;
 	shader_stage_ci.module = compute_shader_module;
-
+	VkSpecializationInfo specialization_info = {};
+	std::vector<VkSpecializationMapEntry> entries;
 	if (settings.specialization_data.size()) {
-		std::vector<VkSpecializationMapEntry> entries(settings.specialization_data.size());
+		entries.resize(settings.specialization_data.size());
 		for (int i = 0; i < entries.size(); i++) {
 			entries[i].constantID = i;
 			entries[i].size = sizeof(uint32_t);
 			entries[i].offset = i * sizeof(uint32_t);
 		}
-		VkSpecializationInfo specialization_info = {};
 		specialization_info.dataSize = settings.specialization_data.size() * sizeof(uint32_t);
 		specialization_info.mapEntryCount = (uint32_t)settings.specialization_data.size();
 		specialization_info.pMapEntries = entries.data();

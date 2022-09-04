@@ -11,7 +11,7 @@
 #include "../../utils.glsl"
 layout(constant_id = 0) const int MODE = 0;
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
-layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 layout(buffer_reference, scalar) buffer MLTSumData { SumData d[]; };
 layout(buffer_reference, scalar) buffer ResidualData { SumData d[]; };
