@@ -79,9 +79,9 @@ void RayTracer::init(Window* window) {
 		case IntegratorType::VCMMLT:
 			integrator = std::make_unique<VCMMLT>(this, &scene);
 			break;
-		//case IntegratorType::DDGI:
-		//	integrator = std::make_unique<DDGI>(this, &scene);
-		//	break;
+		case IntegratorType::DDGI:
+			integrator = std::make_unique<DDGI>(this, &scene);
+			break;
 		default:
 			break;
 	}

@@ -34,7 +34,7 @@ class Texture {
 	uint32_t mip_levels = 1;
 	// uint32_t array_layers = 1;
 	// VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
-	// VkExtent3D base_extent = { 0, 0, 0 };
+	 VkExtent3D base_extent = { 0, 0, 0 };
 	// VkImageType image_type = VK_IMAGE_TYPE_2D;
 	VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	bool sampler_allocated = false;
@@ -70,6 +70,7 @@ class Texture2D : public Texture {
 	}
 
 	void transition(VkCommandBuffer cmd, VkImageLayout new_layout);
+	void force_transition(VkCommandBuffer cmd, VkImageLayout old_layout, VkImageLayout new_layout);
 	void transition_without_state(VkCommandBuffer cmd, VkImageLayout new_layout);
 	VkDescriptorImageInfo descriptor(VkSampler sampler, VkImageLayout layout) const;
 	VkDescriptorImageInfo descriptor(VkImageLayout layout) const;

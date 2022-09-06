@@ -7,6 +7,8 @@
 // doesn't show any output from the debugPrintf...
 // Possible solution: Make compilation with debugPrintf shaders synchronous?
 
+// TODO: Handle explicit buffer writes
+
 #define DIRTY_CHECK(x) \
 	if (!x) {          \
 		return *this;  \
@@ -74,7 +76,7 @@ void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout)
 		return;
 	}
 	if (tex.layout == VK_IMAGE_LAYOUT_UNDEFINED || rg->img_resource_map.find(tex.img) == rg->img_resource_map.end()) {
-		layout_transitions.push_back({&tex, dst_layout});
+		layout_transitions.push_back({&tex, tex.layout, dst_layout});
 		tex.layout = dst_layout;
 	} else {
 		RenderPass& opposing_pass = rg->passes[rg->img_resource_map[tex.img]];
@@ -98,7 +100,7 @@ void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout)
 			}
 			tex.layout = dst_layout;
 		} else {
-			layout_transitions.push_back({&tex, dst_layout});
+			layout_transitions.push_back({&tex, tex.layout, dst_layout});
 			tex.layout = dst_layout;
 		}
 	}
@@ -204,6 +206,7 @@ RenderPass& RenderGraph::add_rt(const std::string& name, const RTPassSettings& s
 		if (!recording && storage.pass_idxs.size()) {
 			auto idx = storage.pass_idxs[storage.offset_idx];
 			++storage.offset_idx;
+			passes[idx].active = true;
 			return passes[idx];
 		}
 		pipeline = pipeline_cache[name].pipeline.get();
@@ -229,6 +232,7 @@ RenderPass& RenderGraph::add_gfx(const std::string& name, const GraphicsPassSett
 			auto& curr_pass = passes[idx];
 			curr_pass.gfx_settings->color_outputs = settings.color_outputs;
 			curr_pass.gfx_settings->depth_output = settings.depth_output;
+			curr_pass.active = true;
 			return curr_pass;
 		}
 		pipeline = pipeline_cache[name].pipeline.get();
@@ -250,6 +254,7 @@ RenderPass& RenderGraph::add_compute(const std::string& name, const ComputePassS
 		auto& storage = pipeline_cache[name];
 		if (!recording && storage.pass_idxs.size()) {
 			auto idx = storage.pass_idxs[storage.offset_idx];
+			passes[idx].active = true;
 			++storage.offset_idx;
 			return passes[idx];
 		}
@@ -425,6 +430,7 @@ void RenderPass::finalize() {
 					}
 					// read(bound_resource);
 				}
+				int a = 4;
 			}
 			for (auto [buffer, status] : affected_buffer_pointers) {
 				if (status.write) {
@@ -493,16 +499,16 @@ void RenderPass::finalize() {
 					vkUpdateDescriptorSets(pass->rg->ctx->device, 1, &descriptor_write, 0, nullptr);
 				};
 				// TODO: Fix multithreaded pipeline building for RT
-				// func(this);
-				rg->pipeline_tasks.push_back({func, pass_idx});
+				 func(this);
+				//rg->pipeline_tasks.push_back({func, pass_idx});
 				break;
 			}
 			case PassType::Compute: {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline->create_compute_pipeline(*pass->compute_settings, pass->descriptor_counts);
 				};
-				// func(this);
-				rg->pipeline_tasks.push_back({func, pass_idx});
+				 func(this);
+				//rg->pipeline_tasks.push_back({func, pass_idx});
 				break;
 			}
 			default:
@@ -610,8 +616,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	}
 
 	// Transition layouts inside the pass
-	for (auto& [tex, dst_layout] : layout_transitions) {
-		tex->transition_without_state(cmd, dst_layout);
+	for (auto& [tex, old_layout, dst_layout] : layout_transitions) {
+		tex->force_transition(cmd, old_layout, dst_layout);
 	}
 
 	// Push descriptors
@@ -770,6 +776,8 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		std::set<std::pair<Shader*, RenderPass*>, decltype(cmp)> unique_shaders_set;
 		std::unordered_map<RenderPass*, std::vector<Shader*>> unique_shaders;
 		std::unordered_map<RenderPass*, std::vector<Shader*>> existing_shaders;
+		
+		// Recording -> The pass is active by default
 		for (auto i = beginning_pass_idx; i < ending_pass_idx; i++) {
 			if (passes[i].gfx_settings) {
 				for (auto& shader : passes[i].gfx_settings->shaders) {
@@ -809,8 +817,14 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 			future.wait();
 		}
 	}
-	for (auto i = beginning_pass_idx; i < ending_pass_idx; i++) {
-		passes[i].finalize();
+	uint32_t i = beginning_pass_idx;
+	uint32_t rem_passes = ending_pass_idx - beginning_pass_idx;
+	while (rem_passes > 0) {
+		if (passes[i].active) {
+			passes[i].finalize();
+			rem_passes--;
+		}
+		i++;
 	}
 
 	if (pipeline_tasks.size()) {
@@ -824,12 +838,20 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		}
 		pipeline_tasks.clear();
 	}
-	for (int i = beginning_pass_idx; i < ending_pass_idx; i++) {
+	i = beginning_pass_idx;
+	rem_passes = ending_pass_idx - beginning_pass_idx;
+	while (rem_passes > 0) {
+		if (!passes[i].active) {
+			i++;
+			continue;
+		}
 		buffer_sync_resources[i].buffer_bariers.resize(passes[i].wait_signals_buffer.size());
 		buffer_sync_resources[i].dependency_infos.resize(passes[i].wait_signals_buffer.size());
 		img_sync_resources[i].img_barriers.resize(passes[i].wait_signals_img.size());
 		img_sync_resources[i].dependency_infos.resize(passes[i].wait_signals_img.size());
 		passes[i].run(cmd);
+		rem_passes--;
+		i++;
 	}
 }
 
@@ -844,6 +866,7 @@ void RenderGraph::reset(VkCommandBuffer cmd) {
 		passes[i].buffer_zeros.clear();
 		passes[i].buffer_barriers.clear();
 		passes[i].disable_execution = false;
+		passes[i].active = false;
 		if (!settings.shader_inference) {
 			passes[i].explicit_buffer_reads.clear();
 			passes[i].explicit_buffer_writes.clear();
@@ -873,8 +896,14 @@ void RenderGraph::reset(VkCommandBuffer cmd) {
 
 void RenderGraph::submit(CommandBuffer& cmd) {
 	cmd.submit();
-	for (int i = beginning_pass_idx; i < ending_pass_idx; i++) {
-		passes[i].submitted = true;
+	uint32_t i = beginning_pass_idx;
+	uint32_t rem_passes = ending_pass_idx - beginning_pass_idx;
+	while (rem_passes > 0) {
+		if (passes[i].active) {
+			passes[i].submitted = true;
+			rem_passes--;
+		}
+		i++;
 	}
 	beginning_pass_idx = ending_pass_idx;
 }

@@ -106,6 +106,10 @@ void transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout o
 	VkPipelineStageFlags destination_stage = 0;
 	// Old layout
 	switch (old_layout) {
+		case VK_IMAGE_LAYOUT_GENERAL:
+			src_access_flags = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+			source_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+			break;
 		case VK_IMAGE_LAYOUT_UNDEFINED:
 			source_stage = VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
 			break;

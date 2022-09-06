@@ -11,11 +11,10 @@
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
-layout(set = 0, binding = 1, rgba32f) uniform image2D image;
-layout(set = 0, binding = 3) uniform _SceneUBO { SceneUBO ubo; };
-layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
-layout(set = 0, binding = 5) uniform sampler2D scene_textures[];
-layout(set = 1, binding = 0) uniform sampler2D irr_img;
+layout(binding = 0, rgba32f) uniform image2D image;
+layout(binding = 1) uniform _SceneUBO { SceneUBO ubo; };
+layout(binding = 2) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(binding = 3) uniform sampler2D irr_img;
 layout(buffer_reference, scalar) readonly buffer Materials { Material m[]; };
 layout(buffer_reference, scalar) buffer GBuffer { GBufferData d[]; };
 layout(buffer_reference, scalar) buffer DirLight { vec3 d[]; };
@@ -23,7 +22,6 @@ GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
 DirLight direct_lighting = DirLight(scene_desc.direct_lighting_addr);
 Materials materials = Materials(scene_desc.material_addr);
 #include "../../utils.glsl"
-#include "../../bsdf_commons.glsl"
 
 void main() {
     uvec2 dims = gl_GlobalInvocationID.xy;

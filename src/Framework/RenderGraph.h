@@ -152,6 +152,7 @@ class RenderPass {
 	std::unique_ptr<RTPassSettings> rt_settings = nullptr;
 	std::unique_ptr<ComputePassSettings> compute_settings = nullptr;
 	PassType type;
+	bool active = true;
 
    private:
 	// When the automatic inference isn't used
@@ -190,7 +191,7 @@ class RenderPass {
 
 	DescriptorInfo descriptor_infos[32] = {};
 
-	std::vector<std::pair<Texture2D*, VkImageLayout>> layout_transitions;
+	std::vector<std::tuple<Texture2D*, VkImageLayout, VkImageLayout>> layout_transitions;
 
 	struct BufferBarrier {
 		VkBuffer buffer;

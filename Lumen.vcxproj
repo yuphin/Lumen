@@ -236,6 +236,7 @@
     <ClCompile Include="libs\tinyxml2\tinyxml2.cpp" />
     <ClCompile Include="src\Framework\MitsubaParser.cpp" />
     <ClCompile Include="src\RayTracer\BDPT.cpp" />
+    <ClCompile Include="src\RayTracer\DDGI.cpp" />
     <ClCompile Include="src\RayTracer\PSSMLT.cpp" />
     <ClCompile Include="src\RayTracer\RayTracer.cpp" />
     <ClCompile Include="src\RayTracer\Path.cpp" />
@@ -265,9 +266,11 @@
     <ClCompile Include="src\Framework\Texture.cpp" />
     <ClCompile Include="src\RayTracer\ReSTIR.cpp" />
     <ClCompile Include="src\RayTracer\ReSTIRGI.cpp" />
+    <ClCompile Include="src\RayTracer\SMLT.cpp" />
     <ClCompile Include="src\RayTracer\SPPM.cpp" />
     <ClCompile Include="src\RayTracer\VCM.cpp" />
     <ClCompile Include="src\Framework\VulkanSyncronization.cpp" />
+    <ClCompile Include="src\RayTracer\VCMMLT.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Framework\CommonTypes.h" />
@@ -285,6 +288,7 @@
     <ClInclude Include="src\Framework\MitsubaParser.h" />
     <ClInclude Include="src\Framework\RenderGraphTypes.h" />
     <ClInclude Include="src\RayTracer\BDPT.h" />
+    <ClInclude Include="src\RayTracer\DDGI.h" />
     <ClInclude Include="src\RayTracer\PSSMLT.h" />
     <ClInclude Include="src\RayTracer\RayTracer.h" />
     <ClInclude Include="src\RayTracer\Path.h" />
@@ -310,8 +314,10 @@
     <ClInclude Include="src\Framework\Texture.h" />
     <ClInclude Include="src\RayTracer\ReSTIR.h" />
     <ClInclude Include="src\RayTracer\ReSTIRGI.h" />
+    <ClInclude Include="src\RayTracer\SMLT.h" />
     <ClInclude Include="src\RayTracer\SPPM.h" />
     <ClInclude Include="src\RayTracer\VCM.h" />
+    <ClInclude Include="src\RayTracer\VCMMLT.h" />
     <ClInclude Include="src\shaders\commons.h" />
     <ClInclude Include="src\Framework\VulkanSyncronization.h" />
   </ItemGroup>

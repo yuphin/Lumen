@@ -36,10 +36,20 @@ void Texture2D::transition(VkCommandBuffer cmd, VkImageLayout new_layout) {
 	layout = new_layout;
 }
 
+void Texture2D::force_transition(VkCommandBuffer cmd, VkImageLayout old_layout, VkImageLayout new_layout)
+{
+	VkImageSubresourceRange subresource_range = {};
+	subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	subresource_range.baseArrayLayer = 0;
+	subresource_range.layerCount = 1;
+	subresource_range.baseMipLevel = 0;
+	subresource_range.levelCount = mip_levels;
+	transition_image_layout(cmd, img, old_layout, new_layout, subresource_range, aspect_flags);
+}
+
 void Texture2D::transition_without_state(VkCommandBuffer cmd, VkImageLayout new_layout) {
 	auto old_layout = layout;
 	transition(cmd, new_layout);
-	layout = old_layout;
 }
 
 VkDescriptorImageInfo Texture2D::descriptor(VkSampler sampler, VkImageLayout layout) const {
@@ -132,6 +142,7 @@ void Texture2D::load_from_data(VulkanContext* ctx, void* data, VkDeviceSize size
 	this->sampler = a_sampler;
 
 	layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	base_extent = info.extent;
 }
 
 void Texture2D::create_empty_texture(const char* name, VulkanContext* ctx, const TextureSettings& settings,
@@ -185,6 +196,7 @@ void Texture2D::create_empty_texture(const char* name, VulkanContext* ctx, const
 		DebugMarker::set_resource_name(ctx->device, (uint64_t)img, name, VK_OBJECT_TYPE_IMAGE);
 		this->name = name;
 	}
+	base_extent = settings.base_extent;
 }
 
 Texture::Texture(VulkanContext* ctx) : ctx(ctx) {}
