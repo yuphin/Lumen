@@ -69,6 +69,18 @@ struct ResourceBinding {
 	ResourceBinding(Buffer& buf) : buf(&buf) {}
 	ResourceBinding(Texture2D& tex) : tex(&tex) {}
 	ResourceBinding(Texture2D& tex, VkSampler sampler) : tex(&tex), sampler(sampler) {}
+	inline void replace(const ResourceBinding& binding) {
+		if (binding.buf) {
+			this->buf = binding.buf;
+		} else {
+			this->tex = binding.tex;
+		}
+	}
+
+	inline void replace(Texture2D& tex, VkSampler sampler) {
+		this->tex = &tex;
+		this->sampler = sampler;
+	}
 };
 
 struct BufferSyncDescriptor {

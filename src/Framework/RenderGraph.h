@@ -173,6 +173,7 @@ class RenderPass {
 	std::string name;
 	Pipeline* pipeline;
 	uint32_t pass_idx;
+	int next_binding_idx = 0;
 	std::vector<uint32_t> descriptor_counts;
 	void* push_constant_data = nullptr;
 	bool is_pipeline_cached;

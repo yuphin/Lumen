@@ -9,6 +9,8 @@
 
 // TODO: Handle explicit buffer writes
 
+// TODO: Refresh bindings
+
 #define DIRTY_CHECK(x) \
 	if (!x) {          \
 		return *this;  \
@@ -274,29 +276,36 @@ RenderPass& RenderGraph::get_current_pass() {
 }
 
 RenderPass& RenderPass::bind(const ResourceBinding& binding) {
-	DIRTY_CHECK(rg->recording);
-	bound_resources.push_back(binding);
-	descriptor_counts.push_back(1);
+	if(next_binding_idx >= bound_resources.size()) {
+		bound_resources.push_back(binding);
+		descriptor_counts.push_back(1);
+	} else {
+		bound_resources[next_binding_idx].replace(binding);
+	}
+	next_binding_idx++;
 	return *this;
 }
 
 RenderPass& RenderPass::bind(std::initializer_list<ResourceBinding> bindings) {
-	DIRTY_CHECK(rg->recording);
 	for (auto& binding : bindings) {
-		descriptor_counts.push_back(1);
-		bound_resources.push_back(binding);
+		bind(binding);
 	}
 	return *this;
 }
 
 RenderPass& RenderPass::bind(Texture2D& tex, VkSampler sampler) {
-	DIRTY_CHECK(rg->recording);
-	bound_resources.emplace_back(tex, sampler);
-	descriptor_counts.push_back(1);
+	if (next_binding_idx <= bound_resources.size()) {
+		bound_resources.emplace_back(tex, sampler);
+		descriptor_counts.push_back(1);
+	} else {
+		bound_resources[next_binding_idx].replace(tex, sampler);
+	}
+	next_binding_idx++;
 	return *this;
 }
 
 RenderPass& RenderPass::bind_texture_array(std::vector<Texture2D>& textures) {
+	next_binding_idx++;
 	DIRTY_CHECK(rg->recording);
 	for (auto& texture : textures) {
 		bound_resources.emplace_back(texture);
@@ -306,6 +315,7 @@ RenderPass& RenderPass::bind_texture_array(std::vector<Texture2D>& textures) {
 }
 
 RenderPass& RenderPass::bind_buffer_array(std::vector<Buffer>& buffers) {
+	next_binding_idx++;
 	DIRTY_CHECK(rg->recording);
 	for (auto& buffer : buffers) {
 		bound_resources.emplace_back(buffer);
@@ -867,6 +877,7 @@ void RenderGraph::reset(VkCommandBuffer cmd) {
 		passes[i].buffer_barriers.clear();
 		passes[i].disable_execution = false;
 		passes[i].active = false;
+		passes[i].next_binding_idx = 0;
 		if (!settings.shader_inference) {
 			passes[i].explicit_buffer_reads.clear();
 			passes[i].explicit_buffer_writes.clear();
