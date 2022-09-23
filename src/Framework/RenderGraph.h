@@ -169,6 +169,7 @@ class RenderPass {
 	void run(VkCommandBuffer cmd);
 	void register_dependencies(Buffer& buffer, VkAccessFlags dst_access_flags);
 	void register_dependencies(Texture2D& tex, VkImageLayout target_layout);
+	void transition_resources();
 
 	std::string name;
 	Pipeline* pipeline;

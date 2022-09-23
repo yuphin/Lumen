@@ -9,8 +9,6 @@
 
 // TODO: Handle explicit buffer writes
 
-// TODO: Refresh bindings
-
 #define DIRTY_CHECK(x) \
 	if (!x) {          \
 		return *this;  \
@@ -35,6 +33,18 @@ static VkPipelineStageFlags get_pipeline_stage(PassType pass_type, VkAccessFlags
 		res |= VK_PIPELINE_STAGE_TRANSFER_BIT;
 	}
 	return res;
+}
+
+inline static VkImageLayout get_image_layout(VkDescriptorType type) {
+	switch (type) {
+		case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+		case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+			return VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+		case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+			return VK_IMAGE_LAYOUT_GENERAL;
+		default:
+			break;
+	}
 }
 
 void RenderPass::register_dependencies(Buffer& buffer, VkAccessFlags dst_access_flags) {
@@ -106,6 +116,64 @@ void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout)
 			tex.layout = dst_layout;
 		}
 	}
+}
+
+void RenderPass::transition_resources() {
+	if (rg->settings.shader_inference) {
+		for (auto i = 0; i < bound_resources.size(); i++) {
+			auto& bound_resource = bound_resources[i];
+			if (!bound_resource.active) {
+				if (bound_resource.tex) {
+					descriptor_infos[i] =
+						bound_resource.tex->descriptor(get_image_layout(pipeline->descriptor_types[i]));
+				} else {
+					descriptor_infos[i] = bound_resources[i].get_descriptor_info();
+				}
+				continue;
+			}
+			if (bound_resource.write) {
+				if (bound_resource.buf) {
+					write_impl(*bound_resource.buf, VK_ACCESS_SHADER_WRITE_BIT);
+				} else {
+					write_impl(*bound_resource.tex);
+				}
+			} else if (bound_resource.read) {
+				if (bound_resource.buf) {
+					read_impl(*bound_resource.buf);
+				} else {
+					read_impl(*bound_resource.tex);
+				}
+			}
+			descriptor_infos[i] = bound_resources[i].get_descriptor_info();
+		}
+		for (auto [buffer, status] : affected_buffer_pointers) {
+			if (status.write) {
+				write_impl(*buffer, VK_ACCESS_SHADER_WRITE_BIT);
+			} else if (status.read) {
+				read_impl(*buffer);
+			}
+		}
+	} else {
+		for (auto& buf : explicit_buffer_reads) {
+			read_impl(*buf);
+		}
+		for (auto& buf : explicit_buffer_writes) {
+			write_impl(*buf, VK_ACCESS_SHADER_WRITE_BIT);
+		}
+		for (auto& tex : explicit_tex_reads) {
+			read_impl(*tex);
+		}
+		for (auto& tex : explicit_tex_writes) {
+			write_impl(*tex);
+		}
+		for (int i = 0; i < bound_resources.size(); i++) {
+			descriptor_infos[i] = bound_resources[i].get_descriptor_info();
+		}
+	}
+	for (Buffer* buffer : buffer_zeros) {
+		write_impl(*buffer, VK_ACCESS_TRANSFER_WRITE_BIT);
+	}
+
 }
 
 static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_shaders) {
@@ -294,7 +362,7 @@ RenderPass& RenderPass::bind(std::initializer_list<ResourceBinding> bindings) {
 }
 
 RenderPass& RenderPass::bind(Texture2D& tex, VkSampler sampler) {
-	if (next_binding_idx <= bound_resources.size()) {
+	if (next_binding_idx >= bound_resources.size()) {
 		bound_resources.emplace_back(tex, sampler);
 		descriptor_counts.push_back(1);
 	} else {
@@ -423,52 +491,6 @@ RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<Buffer
 }
 
 void RenderPass::finalize() {
-	auto transition_resources = [this]() {
-		if (rg->settings.shader_inference) {
-			for (auto& bound_resource : bound_resources) {
-				if (bound_resource.write) {
-					if (bound_resource.buf) {
-						write_impl(*bound_resource.buf, VK_ACCESS_SHADER_WRITE_BIT);
-					} else {
-						write_impl(*bound_resource.tex);
-					}
-				} else if (bound_resource.read) {
-					if (bound_resource.buf) {
-						read_impl(*bound_resource.buf);
-					} else {
-						read_impl(*bound_resource.tex);
-					}
-					// read(bound_resource);
-				}
-				int a = 4;
-			}
-			for (auto [buffer, status] : affected_buffer_pointers) {
-				if (status.write) {
-					write_impl(*buffer, VK_ACCESS_SHADER_WRITE_BIT);
-				} else if (status.read) {
-					read_impl(*buffer);
-				}
-			}
-		} else {
-			for (auto& buf : explicit_buffer_reads) {
-				read_impl(*buf);
-			}
-			for (auto& buf : explicit_buffer_writes) {
-				write_impl(*buf, VK_ACCESS_SHADER_WRITE_BIT);
-			}
-			for (auto& tex : explicit_tex_reads) {
-				read_impl(*tex);
-			}
-			for (auto& tex : explicit_tex_writes) {
-				write_impl(*tex);
-			}
-		}
-
-		for (Buffer* buffer : buffer_zeros) {
-			write_impl(*buffer, VK_ACCESS_TRANSFER_WRITE_BIT);
-		}
-	};
-
 	if (!rg->recording) {
 		// Handle resource transitions
 		transition_resources();
@@ -525,17 +547,7 @@ void RenderPass::finalize() {
 				break;
 		}
 	}
-
 	transition_resources();
-	// Fill in descriptor infos
-	for (int i = 0; i < bound_resources.size(); i++) {
-		descriptor_infos[i] =
-			bound_resources[i].buf
-				? DescriptorInfo(bound_resources[i].buf->descriptor)
-				: (bound_resources[i].sampler
-					   ? DescriptorInfo(bound_resources[i].tex->descriptor(bound_resources[i].sampler))
-					   : DescriptorInfo(bound_resources[i].tex->descriptor()));
-	}
 }
 
 void RenderPass::write_impl(Buffer& buffer, VkAccessFlags access_flags) {

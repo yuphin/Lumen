@@ -161,7 +161,7 @@ void Integrator::init() {
 						   VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	settings.base_extent = {(uint32_t)instance->width, (uint32_t)instance->height, 1};
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	output_tex.create_empty_texture(&instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL);
+	output_tex.create_empty_texture("Color Output", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void Integrator::create_blas() {

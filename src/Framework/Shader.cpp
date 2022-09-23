@@ -141,15 +141,32 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 	// Storage Image -> Write
 	// Sampled Image -> Read
 	auto active_vars = glsl.get_active_interface_variables();
-	for (auto& var : active_vars) {
+	auto active_resources = glsl.get_shader_resources(active_vars);
+	for (auto& sampled_img : active_resources.sampled_images) {
+		auto binding = glsl.get_decoration(sampled_img.id, spv::DecorationBinding);
+		pass->bound_resources[binding].read = true;
+		pass->bound_resources[binding].active = true;
+	}
+	for (auto& storage_img : active_resources.storage_images) {
+		auto binding = glsl.get_decoration(storage_img.id, spv::DecorationBinding);
+		pass->bound_resources[binding].write = true;
+		pass->bound_resources[binding].active = true;
+	}
+	for (auto& storage_buffer : active_resources.storage_buffers) {
+		auto binding = glsl.get_decoration(storage_buffer.id, spv::DecorationBinding);
+		pass->bound_resources[binding].active = true;
+	}
+	/*for (auto& var : active_vars) {
 		auto binding = glsl.get_decoration(var, spv::DecorationBinding);
 		auto type = glsl.get_type_from_variable(var);
 		if (type.basetype == spirv_cross::SPIRType::SampledImage) {
 			pass->bound_resources[binding].read = true;
+			pass->bound_resources[binding].active = true;
 		} else if (type.basetype == spirv_cross::SPIRType::Image) {
 			pass->bound_resources[binding].write = true;
-		}
-	}
+			pass->bound_resources[binding].active = true;
+		} 
+	}*/
 
 	assert(code[0] == SpvMagicNumber);
 

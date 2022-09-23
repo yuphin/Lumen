@@ -61,7 +61,7 @@ VkDescriptorImageInfo Texture2D::descriptor(VkSampler sampler, VkImageLayout lay
 }
 
 VkDescriptorImageInfo Texture2D::descriptor(VkImageLayout layout) const {
-	LUMEN_ASSERT(!present && sampler, "Sampler not found");
+	//LUMEN_ASSERT(!present && sampler, "Sampler not found");
 	VkDescriptorImageInfo desc_info;
 	desc_info.sampler = sampler;
 	desc_info.imageView = img_view;

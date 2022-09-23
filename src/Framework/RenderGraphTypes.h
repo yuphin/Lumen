@@ -65,6 +65,7 @@ struct ResourceBinding {
 	VkSampler sampler = nullptr;
 	bool read = false;
 	bool write = false;
+	bool active = false;
 
 	ResourceBinding(Buffer& buf) : buf(&buf) {}
 	ResourceBinding(Texture2D& tex) : tex(&tex) {}
@@ -80,6 +81,16 @@ struct ResourceBinding {
 	inline void replace(Texture2D& tex, VkSampler sampler) {
 		this->tex = &tex;
 		this->sampler = sampler;
+	}
+
+	inline DescriptorInfo get_descriptor_info() {
+		if (tex) {
+			if (sampler) {
+				return DescriptorInfo(tex->descriptor(sampler));
+			}
+			return DescriptorInfo(tex->descriptor());
+		}
+		return DescriptorInfo(buf->descriptor);
 	}
 };
 

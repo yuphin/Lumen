@@ -60,6 +60,7 @@ struct Pipeline {
 	VkShaderStageFlags pc_stages = 0;
 	std::string name;
 	uint32_t push_constant_size = 0;
+	VkDescriptorType descriptor_types[32] = {};
 
    private:
 	void create_set_layout(const std::vector<Shader>& shaders, const std::vector<uint32_t>& descriptor_counts);
@@ -69,6 +70,5 @@ struct Pipeline {
 	std::mutex mut;
 	std::condition_variable cv;
 	uint32_t binding_mask;
-	VkDescriptorType descriptor_types[32] = {};
 	VulkanContext* ctx;
 };
