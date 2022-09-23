@@ -531,23 +531,24 @@ void RenderPass::finalize() {
 					vkUpdateDescriptorSets(pass->rg->ctx->device, 1, &descriptor_write, 0, nullptr);
 				};
 				// TODO: Fix multithreaded pipeline building for RT
-				 func(this);
-				//rg->pipeline_tasks.push_back({func, pass_idx});
+				 //func(this);
+				rg->pipeline_tasks.push_back({func, pass_idx});
 				break;
 			}
 			case PassType::Compute: {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline->create_compute_pipeline(*pass->compute_settings, pass->descriptor_counts);
 				};
-				 func(this);
-				//rg->pipeline_tasks.push_back({func, pass_idx});
+				 //func(this);
+				rg->pipeline_tasks.push_back({func, pass_idx});
 				break;
 			}
 			default:
 				break;
 		}
+	} else {
+		transition_resources();
 	}
-	transition_resources();
 }
 
 void RenderPass::write_impl(Buffer& buffer, VkAccessFlags access_flags) {
@@ -858,7 +859,11 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		for (auto& future : futures) {
 			future.wait();
 		}
+		for (auto& [_, idx] : pipeline_tasks) {
+			passes[idx].transition_resources();
+		}
 		pipeline_tasks.clear();
+
 	}
 	i = beginning_pass_idx;
 	rem_passes = ending_pass_idx - beginning_pass_idx;
