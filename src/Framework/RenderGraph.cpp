@@ -7,8 +7,6 @@
 // doesn't show any output from the debugPrintf...
 // Possible solution: Make compilation with debugPrintf shaders synchronous?
 
-// TODO: Handle explicit buffer writes
-
 #define DIRTY_CHECK(x) \
 	if (!x) {          \
 		return *this;  \
@@ -989,4 +987,11 @@ void RenderGraph::submit(CommandBuffer& cmd) {
 		i++;
 	}
 	beginning_pass_idx = ending_pass_idx;
+}
+
+void RenderGraph::destroy() {
+	event_pool.cleanup(ctx->device);
+	for (const auto& [k, v] : pipeline_cache) {
+		v.pipeline->cleanup();
+	}
 }

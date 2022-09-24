@@ -40,7 +40,7 @@ class Texture {
 	bool sampler_allocated = false;
 	bool present = false;
 	VkImageAspectFlags aspect_flags;
-	std::string name;
+	std::string name = "";
 
    protected:
 	void create_image(const VkImageCreateInfo& info);

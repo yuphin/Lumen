@@ -159,7 +159,7 @@ void RayTracer::render(uint32_t i) {
 		op_reduce("OpReduce: RMSE", "src/shaders/rmse/calc_rmse.comp", "OpReduce: Reduce RMSE",
 				  "src/shaders/rmse/reduce_rmse.comp");
 		instance->vkb.rg
-			->add_compute("Calculate RMSE", { .shader = Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1} })
+			->add_compute("Calculate RMSE", {.shader = Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1}})
 			.push_constants(&post_pc)
 			.bind(post_desc_buffer);
 	}
@@ -349,10 +349,9 @@ void RayTracer::init_resources() {
 	desc.residual_addr = residual_buffer.get_device_address();
 	desc.counter_addr = counter_buffer.get_device_address();
 	desc.rmse_val_addr = rmse_val_buffer.get_device_address();
-	post_desc_buffer.create("Post Desc", &instance->vkb.ctx,
-							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(PostDesc), &desc,
-							true);
+	post_desc_buffer.create(
+		"Post Desc", &instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(PostDesc), &desc, true);
 	post_pc.size = instance->width * instance->height;
 	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, out_img_addr, &output_img_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);
@@ -437,8 +436,16 @@ void RayTracer::cleanup() {
 		ImGui_ImplVulkan_Shutdown();
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
-		gt_img_buffer.destroy();
-		output_img_buffer.destroy();
+		vkDestroyDescriptorPool(device, imgui_pool, nullptr);
+
+		std::vector<Buffer*> buffer_list = {&output_img_buffer, &output_img_buffer_cpu, &residual_buffer,
+											&counter_buffer,	&rmse_val_buffer,		&post_desc_buffer};
+		if (load_exr) {
+			buffer_list.push_back(&gt_img_buffer);
+		}
+		for (auto b : buffer_list) {
+			b->destroy();
+		}
 		integrator->destroy();
 		vkb.cleanup();
 	}

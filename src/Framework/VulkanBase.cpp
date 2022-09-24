@@ -181,6 +181,7 @@ void VulkanBase::cleanup_swapchain() {
 
 void VulkanBase::cleanup() {
 	// TODO: Move up
+	rg->destroy();
 	if (!blases.empty()) {
 		for (auto& b : blases) {
 			b.buffer.destroy();

@@ -43,7 +43,8 @@ struct Pipeline {
 	std::unordered_map<std::string, std::filesystem::file_time_type> paths;
 	VkPipeline handle = VK_NULL_HANDLE;
 	VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
-	VkDescriptorSetLayout set_layout, tlas_layout;
+	VkDescriptorSetLayout set_layout = VK_NULL_HANDLE;
+	VkDescriptorSetLayout tlas_layout = VK_NULL_HANDLE;
 	/*
 	Potentially 1 descriptor pool for a pass where we have to keep the
 	TLAS descriptor, because we can't push its descriptor with a template as
@@ -56,7 +57,7 @@ struct Pipeline {
 	PipelineType type;
 	size_t pass_idx;
 	bool running = true;
-	VkDescriptorUpdateTemplate update_template;
+	VkDescriptorUpdateTemplate update_template = nullptr;
 	VkShaderStageFlags pc_stages = 0;
 	std::string name;
 	uint32_t push_constant_size = 0;

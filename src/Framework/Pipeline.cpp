@@ -261,6 +261,9 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 	if (!name.empty()) {
 		DebugMarker::set_resource_name(ctx->device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
 	}
+	for (auto& stage : stages) {
+		vkDestroyShaderModule(ctx->device, stage.module, nullptr);
+	}
 }
 
 void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
@@ -310,17 +313,33 @@ void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
 const std::array<VkStridedDeviceAddressRegionKHR, 4> Pipeline::get_rt_regions() { return sbt_wrapper.get_regions(); }
 
 void Pipeline::cleanup() {
-	if (handle != VK_NULL_HANDLE) {
+	if (handle) {
 		vkDestroyPipeline(ctx->device, handle, nullptr);
 	}
 	// Note: pipeline layout is usually given externally, but in the case
 	// of compute shaders, it's allocated internally
-	if (pipeline_layout != VK_NULL_HANDLE) {
+	if (pipeline_layout) {
 		vkDestroyPipelineLayout(ctx->device, pipeline_layout, nullptr);
+	}
+
+	if (set_layout) {
+		vkDestroyDescriptorSetLayout(ctx->device, set_layout, nullptr);
+	}
+
+	if (tlas_layout) {
+		vkDestroyDescriptorSetLayout(ctx->device, tlas_layout, nullptr);
 	}
 
 	if (sbt_wrapper.m_ctx) {
 		sbt_wrapper.destroy();
+	}
+
+	if (tlas_descriptor_pool) {
+		vkDestroyDescriptorPool(ctx->device, tlas_descriptor_pool, nullptr);
+	}
+
+	if (update_template) {
+		vkDestroyDescriptorUpdateTemplate(ctx->device, update_template, nullptr);
 	}
 
 	running = false;

@@ -146,7 +146,7 @@ void Texture2D::load_from_data(VulkanContext* ctx, void* data, VkDeviceSize size
 }
 
 void Texture2D::create_empty_texture(const char* name, VulkanContext* ctx, const TextureSettings& settings,
-									 VkImageLayout img_layout, VkSampler sampler /* 0*/,
+									 VkImageLayout img_layout, VkSampler in_sampler /* 0*/,
 									 VkImageAspectFlags flags /*=VK_IMAGE_ASPECT_COLOR_BIT*/) {
 	this->ctx = ctx;
 	auto image_CI = vk::image_create_info(settings.format, settings.usage_flags, settings.base_extent);
@@ -159,8 +159,12 @@ void Texture2D::create_empty_texture(const char* name, VulkanContext* ctx, const
 	image_CI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	create_image(image_CI);
 	img_view = create_image_view(ctx->device, img, settings.format, flags);
+	if (name) {
+		DebugMarker::set_resource_name(ctx->device, (uint64_t)img, name, VK_OBJECT_TYPE_IMAGE);
+		this->name = name;
+	}
 	// Create a default sampler
-	if (!sampler) {
+	if (!in_sampler) {
 		sampler_allocated = true;
 		VkSamplerCreateInfo sampler_CI = vk::sampler_create_info();
 		sampler_CI.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -179,8 +183,12 @@ void Texture2D::create_empty_texture(const char* name, VulkanContext* ctx, const
 			ctx->supported_features.samplerAnisotropy ? ctx->device_properties.limits.maxSamplerAnisotropy : 1.0f;
 		sampler_CI.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 		vk::check(vkCreateSampler(ctx->device, &sampler_CI, nullptr, &sampler), "Could not create image sampler");
+		if (name) {
+			std::string sampler_name = std::string("Sampler: ") + std::string(name);
+			DebugMarker::set_resource_name(ctx->device, (uint64_t)sampler, sampler_name.c_str(), VK_OBJECT_TYPE_SAMPLER);
+		}
 	} else {
-		this->sampler = sampler;
+		sampler = in_sampler;
 	}
 
 	layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -192,10 +200,7 @@ void Texture2D::create_empty_texture(const char* name, VulkanContext* ctx, const
 		transition(cmd.handle, img_layout);
 		cmd.submit();
 	}
-	if (name) {
-		DebugMarker::set_resource_name(ctx->device, (uint64_t)img, name, VK_OBJECT_TYPE_IMAGE);
-		this->name = name;
-	}
+
 	base_extent = settings.base_extent;
 }
 

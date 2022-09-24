@@ -27,3 +27,12 @@ void EventPool::reset_events(VkDevice device, VkCommandBuffer cmd) {
 	auto& event = events_map[cmd];
 	event.available_event_idx = 0;
 }
+
+void EventPool::cleanup(VkDevice device) {
+	for (const auto& [k,v] : events_map) {
+		for (VkEvent event : v.events) {
+			vkDestroyEvent(device, event, nullptr);
+		}
+	}
+
+}

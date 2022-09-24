@@ -36,6 +36,7 @@ public:
 	void run(VkCommandBuffer cmd);
 	void reset(VkCommandBuffer cmd);
 	void submit(CommandBuffer& cmd);
+	void destroy();
 	friend RenderPass;
 	bool recording = true;
 	EventPool event_pool;
@@ -204,8 +205,6 @@ class RenderPass {
 	std::vector<Resource> resource_zeros;
 	std::vector<std::pair<Resource, Resource>> resource_copies;
 	std::vector<BufferBarrier> buffer_barriers;
-
-
 	bool disable_execution = false;
 };
 
