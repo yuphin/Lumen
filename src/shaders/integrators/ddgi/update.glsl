@@ -1,17 +1,17 @@
 
 #include "ddgi_commons.glsl"
 
-layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 
-layout(set = 1, binding = 0, rgba16f) uniform image2D output_irradiance;
-layout(set = 1, binding = 1, rg16f) uniform image2D output_depth;
+layout(binding = 1, rgba16f) uniform image2D output_irradiance;
+layout(binding = 2, rg16f) uniform image2D output_depth;
 
-layout(set = 2, binding = 0) uniform sampler2D input_irradiance;
-layout(set = 2, binding = 1) uniform sampler2D input_depth;
+layout(binding = 3) uniform sampler2D input_irradiance;
+layout(binding = 4) uniform sampler2D input_depth;
 
-layout(set = 3, binding = 0) uniform _DDGIUniforms { DDGIUniforms ddgi_ubo; };
-layout(set = 4, binding = 0) uniform sampler2D radiance_img;
-layout(set = 4, binding = 1) uniform sampler2D dir_dist_img;
+layout(binding = 5) uniform _DDGIUniforms { DDGIUniforms ddgi_ubo; };
+layout(binding = 6) uniform sampler2D radiance_img;
+layout(binding = 7) uniform sampler2D dir_dist_img;
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc; };
 layout(buffer_reference, scalar) buffer ProbeOffset { vec4 d[]; };
 ProbeOffset probe_offsets = ProbeOffset(scene_desc.probe_offsets_addr);

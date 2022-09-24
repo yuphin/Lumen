@@ -6,9 +6,7 @@ std::unordered_map<LumenEvent, bool> EventHandler::event_table = {};
 std::vector<PipelineTrace> EventHandler::obsolete_pipelines = {};
 std::vector<uint32_t> EventHandler::event_histogram = {};
 
-void EventHandler::begin() {
-	event_histogram.resize(event_count);
-}
+void EventHandler::begin() { event_histogram.resize(event_count); }
 
 void EventHandler::set(LumenEvent event) { event_table[event] = true; }
 
@@ -23,7 +21,4 @@ bool EventHandler::consume_event(LumenEvent event) {
 	return false;
 }
 
-bool EventHandler::signaled(LumenEvent event) {
-	return event_histogram[(int)event] > 0;
-}
-
+bool EventHandler::signaled(LumenEvent event) { return event_histogram[(int)event] > 0; }

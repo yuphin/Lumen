@@ -2,7 +2,6 @@
 #include "MitsubaParser.h"
 #include <mitsuba_parser/tinyparser-mitsuba.h>
 
-
 void MitsubaParser::parse(const std::string& path) {
 	SceneLoader loader;
 	auto scene = loader.loadFromFile(path);
@@ -10,21 +9,19 @@ void MitsubaParser::parse(const std::string& path) {
 	for (const auto& child : scene.anonymousChildren()) {
 		Object* obj = child.get();
 		switch (obj->type()) {
-			case OT_INTEGRATOR:
-			{
+			case OT_INTEGRATOR: {
 				integrator.type = obj->pluginType();
 				for (const auto& prop : obj->properties()) {
 					if (prop.first == "max_depth") {
-						integrator.depth = prop.second.getInteger();
-					} 
+						integrator.depth = (int)prop.second.getInteger();
+					}
 					if (prop.first == "enable_vm") {
 						integrator.enable_vm = prop.second.getBool();
 					}
 				}
 
 			} break;
-			case OT_SENSOR:
-			{
+			case OT_SENSOR: {
 				for (const auto& prop : obj->properties()) {
 					if (prop.first == "fov") {
 						camera.fov = prop.second.getNumber();
@@ -37,12 +34,10 @@ void MitsubaParser::parse(const std::string& path) {
 							}
 						}
 					}
-
 				}
 
 			} break;
-			case OT_BSDF:
-			{
+			case OT_BSDF: {
 				MitsubaBSDF bsdf;
 				bsdf.name = obj->id();
 				bsdf.type = obj->pluginType();
@@ -53,11 +48,8 @@ void MitsubaParser::parse(const std::string& path) {
 							continue;
 						}
 						// Assume RGB for the moment
-						bsdf.albedo = glm::vec3({
-							prop.second.getColor().r,
-							prop.second.getColor().g,
-							prop.second.getColor().b
-												});
+						bsdf.albedo =
+							glm::vec3({prop.second.getColor().r, prop.second.getColor().g, prop.second.getColor().b});
 					}
 					if (prop.first == "alpha") {
 						bsdf.roughness = std::sqrt(prop.second.getNumber());
@@ -76,7 +68,6 @@ void MitsubaParser::parse(const std::string& path) {
 									bsdf.texture = texture_prop.second.getString();
 								}
 							}
-
 						}
 					}
 					for (const auto& prop : p->properties()) {
@@ -86,11 +77,8 @@ void MitsubaParser::parse(const std::string& path) {
 								continue;
 							}
 							// Assume RGB for the moment
-							bsdf.albedo = glm::vec3({
-								prop.second.getColor().r,
-								prop.second.getColor().g,
-								prop.second.getColor().b
-													});
+							bsdf.albedo = glm::vec3(
+								{prop.second.getColor().r, prop.second.getColor().g, prop.second.getColor().b});
 						}
 						if (prop.first == "alpha") {
 							bsdf.roughness = std::sqrt(prop.second.getNumber());
@@ -99,11 +87,9 @@ void MitsubaParser::parse(const std::string& path) {
 				}
 				bsdfs.push_back(bsdf);
 			} break;
-			case OT_SHAPE:
-			{
+			case OT_SHAPE: {
 				MitsubaMesh mesh;
 				if (obj->pluginType() == "obj") {
-
 				} else if (obj->pluginType() == "rectangle") {
 					int a = 4;
 				}
@@ -134,8 +120,7 @@ void MitsubaParser::parse(const std::string& path) {
 				}
 				meshes.push_back(mesh);
 			} break;
-			case OT_EMITTER:
-			{
+			case OT_EMITTER: {
 				MitsubaLight light;
 				if (obj->pluginType() == "sunsky") {
 					light.type = "directional";
@@ -144,16 +129,15 @@ void MitsubaParser::parse(const std::string& path) {
 				for (const auto& prop : obj->properties()) {
 					if (prop.first == "sun_direction") {
 						auto dir = prop.second.getVector();
-						light.from = glm::vec3({ dir.x, dir.y, dir.z });
+						light.from = glm::vec3({dir.x, dir.y, dir.z});
 					} else if (prop.first == "sun_color") {
 						auto col = prop.second.getVector();
-						light.L = glm::vec3({ col.x, col.y, col.z });
-					}
-					else if (prop.first == "sun_scale") {
+						light.L = glm::vec3({col.x, col.y, col.z});
+					} else if (prop.first == "sun_scale") {
 						light.L *= prop.second.getNumber();
 					} else if (prop.first == "sky_color") {
 						auto col = prop.second.getVector();
-						integrator.sky_col = glm::vec3({ col.x, col.y, col.z });
+						integrator.sky_col = glm::vec3({col.x, col.y, col.z});
 					}
 				}
 				lights.push_back(light);

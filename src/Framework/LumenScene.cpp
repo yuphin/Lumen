@@ -1,12 +1,10 @@
 #include "LumenPCH.h"
 #include "LumenScene.h"
-#pragma warning(push,0)
+#pragma warning(push, 0)
 #include <json.hpp>
 #pragma warning(pop)
 #include <tiny_obj_loader.h>
 #include "shaders/commons.h"
-
-
 
 struct Bbox {
 	Bbox() = default;
@@ -18,10 +16,8 @@ struct Bbox {
 	}
 
 	void insert(const glm::vec3& v) {
-		m_min = { std::min(m_min.x, v.x), std::min(m_min.y, v.y),
-				 std::min(m_min.z, v.z) };
-		m_max = { std::max(m_max.x, v.x), std::max(m_max.y, v.y),
-				 std::max(m_max.z, v.z) };
+		m_min = {std::min(m_min.x, v.x), std::min(m_min.y, v.y), std::min(m_min.z, v.z)};
+		m_max = {std::max(m_max.x, v.x), std::max(m_max.y, v.y), std::max(m_max.z, v.z)};
 	}
 
 	void insert(const Bbox& b) {
@@ -36,11 +32,11 @@ struct Bbox {
 	}
 
 	inline bool is_empty() const {
-		return m_min == glm::vec3{ std::numeric_limits<float>::max() } ||
-			m_max == glm::vec3{ std::numeric_limits<float>::lowest() };
+		return m_min == glm::vec3{std::numeric_limits<float>::max()} ||
+			   m_max == glm::vec3{std::numeric_limits<float>::lowest()};
 	}
 	inline uint32_t rank() const {
-		uint32_t result{ 0 };
+		uint32_t result{0};
 		result += m_min.x < m_max.x;
 		result += m_min.y < m_max.y;
 		result += m_min.z < m_max.z;
@@ -71,30 +67,26 @@ struct Bbox {
 		return result;
 	}
 
-private:
-	glm::vec3 m_min{ std::numeric_limits<float>::max() };
-	glm::vec3 m_max{ std::numeric_limits<float>::lowest() };
+   private:
+	glm::vec3 m_min{std::numeric_limits<float>::max()};
+	glm::vec3 m_max{std::numeric_limits<float>::lowest()};
 };
 
 using json = nlohmann::json;
 void LumenScene::load_scene(const std::string& path) {
-
 	auto ends_with = [](const std::string& str, const std::string& end) -> bool {
 		if (end.size() > end.size()) return false;
 		return std::equal(end.rbegin(), end.rend(), str.rbegin());
 	};
 
-
-	auto found = path.find_last_of("/");
+	auto found = path.find_last_of('/');
 
 	auto root = path.substr(0, found + 1);
-
 
 	if (ends_with(path, ".json")) {
 		std::ifstream i(path);
 		json j;
 		i >> j;
-
 
 		auto& integrator = j["integrator"];
 		if (!integrator["path_length"].is_null()) {
@@ -103,7 +95,6 @@ void LumenScene::load_scene(const std::string& path) {
 		if (!integrator["sky_col"].is_null()) {
 			auto sky = integrator["sky_col"];
 			config.sky_col = glm::vec3(sky[0], sky[1], sky[2]);
-
 		}
 		if (integrator["type"] == "path") {
 			config.integrator_type = IntegratorType::Path;
@@ -118,7 +109,6 @@ void LumenScene::load_scene(const std::string& path) {
 			config.radius_factor = integrator["radius_factor"];
 		} else if (integrator["type"] == "pssmlt") {
 			config.integrator_type = IntegratorType::PSSMLT;
-			config.integrator_type = IntegratorType::SMLT;
 			config.mutations_per_pixel = integrator["mutations_per_pixel"];
 			config.num_mlt_threads = integrator["num_mlt_threads"];
 			config.num_bootstrap_samples = integrator["num_bootstrap_samples"];
@@ -142,12 +132,14 @@ void LumenScene::load_scene(const std::string& path) {
 			config.integrator_type = IntegratorType::ReSTIRGI;
 		} else if (integrator["type"] == "ddgi") {
 			config.integrator_type = IntegratorType::DDGI;
+		} else if (integrator["type"] == "restirpt") {
+			config.integrator_type = IntegratorType::ReSTIRPT;
 		}
 
 		// Load obj file
 		const std::string mesh_file = root + std::string(j["mesh_file"]);
 		tinyobj::ObjReaderConfig reader_config;
-		//reader_config.mtl_search_path = "./"; // Path to material files
+		// reader_config.mtl_search_path = "./"; // Path to material files
 
 		tinyobj::ObjReader reader;
 		if (!reader.ParseFromFile(mesh_file, reader_config)) {
@@ -183,19 +175,19 @@ void LumenScene::load_scene(const std::string& path) {
 					tinyobj::real_t vx = attrib.vertices[3 * uint32_t(idx.vertex_index) + 0];
 					tinyobj::real_t vy = attrib.vertices[3 * uint32_t(idx.vertex_index) + 1];
 					tinyobj::real_t vz = attrib.vertices[3 * uint32_t(idx.vertex_index) + 2];
-					positions.push_back({ vx,vy,vz });
+					positions.emplace_back(vx, vy, vz);
 					min_vtx = glm::min(positions[positions.size() - 1], min_vtx);
 					max_vtx = glm::max(positions[positions.size() - 1], max_vtx);
 					if (idx.normal_index >= 0) {
 						tinyobj::real_t nx = attrib.normals[3 * uint32_t(idx.normal_index) + 0];
 						tinyobj::real_t ny = attrib.normals[3 * uint32_t(idx.normal_index) + 1];
 						tinyobj::real_t nz = attrib.normals[3 * uint32_t(idx.normal_index) + 2];
-						normals.push_back({ nx,ny,nz });
+						normals.emplace_back(nx, ny, nz);
 					}
 					if (idx.texcoord_index >= 0) {
 						tinyobj::real_t tx = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 0];
 						tinyobj::real_t ty = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 1];
-						texcoords0.push_back({ tx,ty });
+						texcoords0.emplace_back(tx, ty);
 					}
 				}
 				index_offset += 3;
@@ -204,8 +196,6 @@ void LumenScene::load_scene(const std::string& path) {
 			prim_meshes[s].max_pos = max_vtx;
 			prim_meshes[s].world_matrix = glm::mat4(1);
 			// TODO: Implement world transforms
-
-
 		}
 		auto& bsdfs_arr = j["bsdfs"];
 		auto& lights_arr = j["lights"];
@@ -218,7 +208,7 @@ void LumenScene::load_scene(const std::string& path) {
 		};
 
 		auto get_or_default_v = [](json& json, const std::string& prop, const glm::vec3& val) -> glm::vec3 {
-			return json[prop].is_null() ? val : glm::vec3{ json[prop][0], json[prop][1], json[prop][2] };
+			return json[prop].is_null() ? val : glm::vec3{json[prop][0], json[prop][1], json[prop][2]};
 		};
 
 		for (auto& bsdf : bsdfs_arr) {
@@ -227,20 +217,20 @@ void LumenScene::load_scene(const std::string& path) {
 
 			if (!bsdf["texture"].is_null()) {
 				textures.push_back(root + (std::string)bsdf["texture"]);
-				materials[bsdf_idx].texture_id = textures.size() - 1;
+				materials[bsdf_idx].texture_id = (int)textures.size() - 1;
 			}
 			if (!bsdf["albedo"].is_null()) {
 				const auto& f = bsdf["albedo"];
 				float f0 = f[0];
 				float f1 = f[1];
 				float f2 = f[2];
-				materials[bsdf_idx].albedo = glm::vec3({ f[0], f[1], f[2] });
+				materials[bsdf_idx].albedo = glm::vec3({f[0], f[1], f[2]});
 			} else {
 				materials[bsdf_idx].albedo = glm::vec3(1, 1, 1);
 			}
 			if (!bsdf["emissive_factor"].is_null()) {
 				const auto& f = bsdf["emissive_factor"];
-				materials[bsdf_idx].emissive_factor = glm::vec3({ f[0], f[1], f[2] });
+				materials[bsdf_idx].emissive_factor = glm::vec3({f[0], f[1], f[2]});
 			}
 
 			if (bsdf["type"] == "diffuse") {
@@ -257,8 +247,7 @@ void LumenScene::load_scene(const std::string& path) {
 				materials[bsdf_idx].bsdf_type = BSDF_GLOSSY;
 				materials[bsdf_idx].bsdf_props = BSDF_OPAQUE | BSDF_LAMBERTIAN | BSDF_REFLECTIVE;
 				const auto& metalness = bsdf["metalness"];
-				materials[bsdf_idx].metalness = glm::vec3({
-					metalness[0], metalness[1], metalness[2] });
+				materials[bsdf_idx].metalness = glm::vec3({metalness[0], metalness[1], metalness[2]});
 				materials[bsdf_idx].roughness = bsdf["roughness"];
 			} else if (bsdf["type"] == "disney") {
 #if ENABLE_DISNEY
@@ -291,19 +280,19 @@ void LumenScene::load_scene(const std::string& path) {
 		config.cam_settings.fov = j["camera"]["fov"];
 		const auto& p = j["camera"]["position"];
 		const auto& d = j["camera"]["dir"];
-		config.cam_settings.pos = { p[0], p[1], p[2] };
-		config.cam_settings.dir = { d[0], d[1], d[2] };
+		config.cam_settings.pos = {p[0], p[1], p[2]};
+		config.cam_settings.dir = {d[0], d[1], d[2]};
 		compute_scene_dimensions();
 		for (auto& light : lights_arr) {
 			const auto& pos = light["pos"];
 			const auto& dir = light["dir"];
 			const auto& L = light["L"];
-			lights[light_idx].pos = glm::vec3({ pos[0], pos[1], pos[2] });
-			lights[light_idx].to = glm::vec3({ dir[0], dir[1], dir[2] });
-			lights[light_idx].L = glm::vec3({ L[0], L[1], L[2] });
+			lights[light_idx].pos = glm::vec3({pos[0], pos[1], pos[2]});
+			lights[light_idx].to = glm::vec3({dir[0], dir[1], dir[2]});
+			lights[light_idx].L = glm::vec3({L[0], L[1], L[2]});
 			if (light["type"] == "spot") {
 				lights[light_idx].light_flags |= LIGHT_SPOT;
-				// Is finite 
+				// Is finite
 				lights[light_idx].light_flags |= 1 << 4;
 				// Is delta
 				lights[light_idx].light_flags |= 1 << 5;
@@ -311,10 +300,8 @@ void LumenScene::load_scene(const std::string& path) {
 				lights[light_idx].light_flags |= LIGHT_DIRECTIONAL;
 				// Is delta
 				lights[light_idx].light_flags |= 1 << 5;
-
 			}
 			light_idx++;
-
 		}
 	} else if (ends_with(path, ".xml")) {
 		MitsubaParser mitsuba_parser;
@@ -345,7 +332,7 @@ void LumenScene::load_scene(const std::string& path) {
 			config.integrator_type = IntegratorType::DDGI;
 		}
 
-		// Camera	 
+		// Camera
 		config.cam_settings.fov = mitsuba_parser.camera.fov / 2;
 		config.cam_settings.cam_matrix = mitsuba_parser.camera.cam_matrix;
 		prim_meshes.resize(mitsuba_parser.meshes.size());
@@ -357,7 +344,7 @@ void LumenScene::load_scene(const std::string& path) {
 			}
 			const std::string mesh_file = root + mesh.file;
 			tinyobj::ObjReaderConfig reader_config;
-			//reader_config.mtl_search_path = "./"; // Path to material files
+			// reader_config.mtl_search_path = "./"; // Path to material files
 
 			tinyobj::ObjReader reader;
 			if (!reader.ParseFromFile(mesh_file, reader_config)) {
@@ -391,19 +378,19 @@ void LumenScene::load_scene(const std::string& path) {
 					tinyobj::real_t vx = attrib.vertices[3 * uint32_t(idx.vertex_index) + 0];
 					tinyobj::real_t vy = attrib.vertices[3 * uint32_t(idx.vertex_index) + 1];
 					tinyobj::real_t vz = attrib.vertices[3 * uint32_t(idx.vertex_index) + 2];
-					positions.push_back({ vx,vy,vz });
+					positions.emplace_back(vx, vy, vz);
 					min_vtx = glm::min(positions[positions.size() - 1], min_vtx);
 					max_vtx = glm::max(positions[positions.size() - 1], max_vtx);
 					if (idx.normal_index >= 0) {
 						tinyobj::real_t nx = attrib.normals[3 * uint32_t(idx.normal_index) + 0];
 						tinyobj::real_t ny = attrib.normals[3 * uint32_t(idx.normal_index) + 1];
 						tinyobj::real_t nz = attrib.normals[3 * uint32_t(idx.normal_index) + 2];
-						normals.push_back({ nx,ny,nz });
+						normals.emplace_back(nx, ny, nz);
 					}
 					if (idx.texcoord_index >= 0) {
 						tinyobj::real_t tx = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 0];
 						tinyobj::real_t ty = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 1];
-						texcoords0.push_back({ tx,ty });
+						texcoords0.emplace_back(tx, ty);
 					}
 				}
 
@@ -431,13 +418,13 @@ void LumenScene::load_scene(const std::string& path) {
 			m.specular = 0.5;
 			m.sheen = 0;
 #endif
-	};
+		};
 		i = 0;
 		materials.resize(mitsuba_parser.bsdfs.size());
 		for (const auto& m_bsdf : mitsuba_parser.bsdfs) {
 			if (m_bsdf.texture != "") {
 				textures.push_back(root + m_bsdf.texture);
-				materials[i].texture_id = textures.size() - 1;
+				materials[i].texture_id = (int)textures.size() - 1;
 			} else {
 				materials[i].texture_id = -1;
 			}
@@ -485,13 +472,12 @@ void LumenScene::load_scene(const std::string& path) {
 				materials[i].bsdf_type = BSDF_GLOSSY;
 				materials[i].bsdf_props = BSDF_OPAQUE | BSDF_LAMBERTIAN | BSDF_REFLECTIVE;
 				materials[i].albedo = glm::pi<float>() * m_bsdf.albedo;
-				materials[i].metalness = vec3(0.1);
+				materials[i].metalness = vec3(0.1f);
 				materials[i].roughness = m_bsdf.roughness * m_bsdf.roughness;
-
 			}
 #endif
 			i++;
-			}
+		}
 		compute_scene_dimensions();
 		// Light
 		i = 0;
@@ -507,11 +493,8 @@ void LumenScene::load_scene(const std::string& path) {
 			}
 			i++;
 		}
-		}
-
-
+	}
 }
-
 
 void LumenScene::compute_scene_dimensions() {
 	Bbox scene_bbox;
@@ -521,10 +504,11 @@ void LumenScene::compute_scene_dimensions() {
 		scene_bbox.insert(bbox);
 	}
 	if (scene_bbox.is_empty() || !scene_bbox.isVolume()) {
-		LUMEN_WARN("glTF: Scene bounding box invalid, Setting to: [-1,-1,-1], "
-				   "[1,1,1]");
-		scene_bbox.insert({ -1.0f, -1.0f, -1.0f });
-		scene_bbox.insert({ 1.0f, 1.0f, 1.0f });
+		LUMEN_WARN(
+			"glTF: Scene bounding box invalid, Setting to: [-1,-1,-1], "
+			"[1,1,1]");
+		scene_bbox.insert({-1.0f, -1.0f, -1.0f});
+		scene_bbox.insert({1.0f, 1.0f, 1.0f});
 	}
 	m_dimensions.min = scene_bbox.min();
 	m_dimensions.max = scene_bbox.max();
@@ -532,6 +516,3 @@ void LumenScene::compute_scene_dimensions() {
 	m_dimensions.center = scene_bbox.center();
 	m_dimensions.radius = scene_bbox.radius();
 }
-
-
-

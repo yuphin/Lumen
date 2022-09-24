@@ -2,13 +2,13 @@
 #include "LumenPCH.h"
 
 class ThreadPool {
-public:
+   public:
 	template <typename FunctionType, typename... Args>
-	static auto submit(FunctionType&& f, Args &&...args);
+	static auto submit(FunctionType&& f, Args&&... args);
 	static void init();
 	static void destroy();
 
-private:
+   private:
 	static std::atomic_bool done;
 	static std::queue<std::function<void()>> work_queue;
 	static std::mutex queue_mutex;
@@ -17,7 +17,7 @@ private:
 };
 
 template <typename FunctionType, typename... Args>
-auto ThreadPool::submit(FunctionType&& f, Args &&...args) {
+auto ThreadPool::submit(FunctionType&& f, Args&&... args) {
 	using result_type = std::invoke_result_t<FunctionType, Args...>;
 	auto task = std::make_shared<std::packaged_task<result_type()>>(
 		std::bind(std::forward<FunctionType>(f), std::forward<Args>(args)...));

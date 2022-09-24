@@ -12,14 +12,8 @@
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 // SPPM buffers
 layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
-layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
-layout(buffer_reference, scalar) buffer HashData_ { HashData d[]; };
-layout(buffer_reference, scalar) buffer PhotonData_ { PhotonHash d[]; };
 
 SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
-AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
-HashData_ hash_data = HashData_(scene_desc.hash_addr);
-PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
 
 uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 const uint flags = gl_RayFlagsOpaqueEXT;

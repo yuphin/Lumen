@@ -3,7 +3,8 @@
 #include "CommandBuffer.h"
 #include "Utils.h"
 
-void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage,
+void Buffer::create(const char* name, VulkanContext* ctx,
+					VkBufferUsageFlags usage,
 					VkMemoryPropertyFlags mem_property_flags,
 					VkSharingMode sharing_mode, VkDeviceSize size, void* data,
 					bool use_staging) {
@@ -20,7 +21,7 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage,
 					 "Buffer creation error");
 		staging_buffer.create(ctx, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 							  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
-							  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+								  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 							  VK_SHARING_MODE_EXCLUSIVE, size, data);
 
 		staging_buffer.unmap();
@@ -54,13 +55,13 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage,
 			&ctx->physical_device, mem_reqs.memoryTypeBits, mem_property_flags);
 
 		VkMemoryAllocateFlagsInfo flags_info{
-			VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO };
+			VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
 		if (usage_flags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
 			flags_info.flags |= VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
 			mem_alloc_info.pNext = &flags_info;
 		}
 		vk::check(vkAllocateMemory(ctx->device, &mem_alloc_info, nullptr,
-				  &this->buffer_memory),
+								   &this->buffer_memory),
 				  "Failed to allocate buffer memory!");
 
 		alignment = mem_reqs.alignment;
@@ -84,6 +85,11 @@ void Buffer::create(VulkanContext* ctx, VkBufferUsageFlags usage,
 		// Initialize a default descriptor that covers the whole buffer size
 		this->prepare_descriptor();
 		this->bind();
+	}
+	if (name) {
+		DebugMarker::set_resource_name(ctx->device, (uint64_t)handle, name,
+									   VK_OBJECT_TYPE_BUFFER);
+		this->name = name;
 	}
 }
 void Buffer::flush(VkDeviceSize size, VkDeviceSize offset) {
@@ -119,8 +125,10 @@ void Buffer::copy(Buffer& dst_buffer, VkCommandBuffer cmdbuf) {
 	copy_region.size = dst_buffer.size;
 	vkCmdCopyBuffer(cmdbuf, handle, dst_buffer.handle, 1, &copy_region);
 	VkBufferMemoryBarrier copy_barrier =
-		buffer_barrier(dst_buffer.handle, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+		buffer_barrier(dst_buffer.handle, VK_ACCESS_TRANSFER_WRITE_BIT,
+					   VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
 	vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT,
-						 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0,
+						 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0,
 						 0);
 }

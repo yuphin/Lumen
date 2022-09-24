@@ -4,12 +4,20 @@
 #include "RayTracer/RayTracer.h"
 
 void window_size_callback(GLFWwindow* window, int width, int height) {}
+//
+//int main(int argc, char* argv[]) {
+//	Logger::init();
+//	Shader s("src/shaders/test/test.comp");
+//	s.compile(0);
+//
+//	return 0;
+//}
 
 int main(int argc, char* argv[]) {
-#ifdef NDEBUG
-	bool enable_debug = false;
-#else
+#ifdef _DEBUG
 	bool enable_debug = true;
+#else
+	bool enable_debug = false;
 #endif
 	bool fullscreen = false;
 	int width = 1600;

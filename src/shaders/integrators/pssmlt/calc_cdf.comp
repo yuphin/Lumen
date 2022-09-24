@@ -12,7 +12,7 @@
 // TODO
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
-layout(set = 0, binding = 4) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(buffer_reference, scalar) buffer BootstrapData { BootstrapSample d[]; };
 layout(buffer_reference, scalar) buffer CDFSum { float d; };
 layout(buffer_reference, scalar) buffer CDF { float d[]; };

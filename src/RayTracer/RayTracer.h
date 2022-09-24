@@ -12,25 +12,22 @@
 #include "ReSTIRGI.h"
 #include "DDGI.h"
 class RayTracer : public LumenInstance {
-public:
-	RayTracer(int width, int height, bool debug, int, char* []);
+   public:
+	RayTracer(int width, int height, bool debug, int, char*[]);
 	void init(Window*) override;
 	void update() override;
 	void cleanup() override;
 	static RayTracer* instance;
 	inline static RayTracer* get() { return instance; }
 	bool resized = false;
-private:
+
+   private:
 	struct Settings {
 		bool enable_tonemapping = false;
 	};
 
 	void render(uint32_t idx);
 	float draw_frame();
-	void create_post_descriptor();
-	void update_post_desc_set();
-	void create_post_pipeline();
-	void create_compute_pipelines();
 	void init_imgui();
 	void init_resources();
 	void parse_args(int argc, char* argv[]);
@@ -40,14 +37,7 @@ private:
 	float cpu_avg_time = 0;
 	int cnt = 0;
 	std::unique_ptr<Integrator> integrator;
-
-	VkDescriptorSetLayout post_desc_layout = 0;
-	VkDescriptorPool post_desc_pool = 0;
 	VkDescriptorPool imgui_pool = 0;
-	VkPipelineLayout post_pipeline_layout = 0;
-	VkDescriptorSet post_desc_set = 0;
-	std::unique_ptr<Pipeline> post_pipeline;
-
 	PushConstantPost pc_post_settings;
 	Settings settings;
 	Buffer gt_img_buffer;
@@ -58,11 +48,6 @@ private:
 	Buffer counter_buffer;
 	Buffer rmse_val_buffer;
 	PostPC post_pc;
-	std::unique_ptr<Pipeline> calc_rmse_pipeline;
-	std::unique_ptr<Pipeline> reduce_rmse_pipeline;
-	std::unique_ptr<Pipeline> output_rmse_pipeline;
-
-
 	std::string scene_name;
 	LumenScene scene;
 
@@ -70,8 +55,5 @@ private:
 	bool write_exr = false;
 	bool has_gt = false;
 	bool show_cam_stats = false;
-	bool load_exr = false;
-	bool calc_rmse = false;
 
 };
-

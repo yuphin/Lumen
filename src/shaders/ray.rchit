@@ -15,14 +15,14 @@ hitAttributeEXT vec2 attribs;
 
 layout(location = 0) rayPayloadInEXT HitPayload payload;
 
-layout(set = 0, binding = 0) uniform accelerationStructureEXT tlas;
-layout(set = 0, binding = 2) readonly buffer InstanceInfo_ {
+layout(set = 0, binding = 1) readonly buffer InstanceInfo_ {
     PrimMeshInfo prim_info[];
 };
-layout(set = 0, binding = 4, scalar) buffer SceneDesc_ {
+layout(set = 0, binding = 3, scalar) buffer SceneDesc_ {
     SceneDesc scene_desc;
 };
-layout(set = 0, binding = 5) uniform sampler2D textures[];
+layout(set = 0, binding = 4) uniform sampler2D textures[];
+layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
 layout(buffer_reference, scalar) readonly buffer Vertices { vec3 v[]; };
 layout(buffer_reference, scalar) readonly buffer Indices { uint i[]; };
 layout(buffer_reference, scalar) readonly buffer Normals { vec3 n[]; };

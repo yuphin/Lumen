@@ -46,12 +46,12 @@ enum class KeyInput {
 	KEY_X = 88,
 	KEY_Y = 89,
 	KEY_Z = 90,
-	KEY_LEFT_BRACKET = 91,  /* [ */
-	KEY_BACKSLASH = 92,     /* \ */
+	KEY_LEFT_BRACKET = 91,	/* [ */
+	KEY_BACKSLASH = 92,		/* \ */
 	KEY_RIGHT_BRACKET = 93, /* ] */
-	KEY_GRAVE_ACCENT = 96,  /* ` */
-	KEY_WORLD_1 = 161,      /* non-US #1 */
-	KEY_WORLD_2 = 162,      /* non-US #2 */
+	KEY_GRAVE_ACCENT = 96,	/* ` */
+	KEY_WORLD_1 = 161,		/* non-US #1 */
+	KEY_WORLD_2 = 162,		/* non-US #2 */
 	KEY_ESCAPE = 256,
 	KEY_ENTER = 257,
 	KEY_TAB = 258,
@@ -128,35 +128,24 @@ enum class KeyInput {
 enum class KeyAction { RELEASE, PRESS, REPEAT, UNKNOWN };
 
 enum class MouseAction { LEFT, RIGHT, MIDDLE, UNKNOWN };
-using MouseClickCallback =
-std::function<void(MouseAction button, KeyAction action)>;
+using MouseClickCallback = std::function<void(MouseAction button, KeyAction action)>;
 using MouseMoveCallback = std::function<void(double x, double y)>;
 using MouseScrollCallback = std::function<void(double x, double y)>;
 class Window {
-public:
+   public:
 	Window(int width, int height, bool fullscreen);
 	void poll();
 	inline bool should_close() { return glfwWindowShouldClose(window_handle); }
-	inline bool is_key_down(KeyInput input) {
-		return key_map[input] == KeyAction::PRESS;
-	}
-	inline bool is_key_up(KeyInput input) {
-		return key_map[input] == KeyAction::RELEASE;
-	}
+	inline bool is_key_down(KeyInput input) { return key_map[input] == KeyAction::PRESS; }
+	inline bool is_key_up(KeyInput input) { return key_map[input] == KeyAction::RELEASE; }
 	inline bool is_key_held(KeyInput input) {
-		return key_map[input] == KeyAction::REPEAT ||
-			key_map[input] == KeyAction::PRESS;
+		return key_map[input] == KeyAction::REPEAT || key_map[input] == KeyAction::PRESS;
 	}
 	inline bool is_mouse_held(MouseAction mb) {
-		return mouse_map[mb] == KeyAction::PRESS ||
-			mouse_map[mb] == KeyAction::REPEAT;
+		return mouse_map[mb] == KeyAction::PRESS || mouse_map[mb] == KeyAction::REPEAT;
 	}
-	inline bool is_mouse_down(MouseAction mb) {
-		return mouse_map[mb] == KeyAction::PRESS;
-	}
-	inline bool is_mouse_up(MouseAction mb) {
-		return mouse_map[mb] == KeyAction::RELEASE;
-	}
+	inline bool is_mouse_down(MouseAction mb) { return mouse_map[mb] == KeyAction::PRESS; }
+	inline bool is_mouse_up(MouseAction mb) { return mouse_map[mb] == KeyAction::RELEASE; }
 	~Window();
 	inline GLFWwindow* get_window_ptr() { return window_handle; }
 	inline bool window_resized() { return resized; }
@@ -165,15 +154,13 @@ public:
 	void add_mouse_move_callback(MouseMoveCallback callback);
 	void add_scroll_callback(MouseScrollCallback callback);
 
-private:
+   private:
 	GLFWwindow* window_handle;
 	int width{}, height{};
-	static void key_callback(GLFWwindow* window, int key, int scancode,
-							 int action, int mods);
+	static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 	static void window_size_callback(GLFWwindow* window, int width, int height);
 	static void char_callback(GLFWwindow* window, uint32_t codepoint);
-	static void mouse_click_callback(GLFWwindow* window, int button, int action,
-									 int mods);
+	static void mouse_click_callback(GLFWwindow* window, int button, int action, int mods);
 	static void mouse_move_callback(GLFWwindow* window, double x, double y);
 	static void scroll_callback(GLFWwindow* window, double x, double y);
 	std::unordered_map<KeyInput, KeyAction> key_map{};
