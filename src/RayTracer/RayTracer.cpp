@@ -11,6 +11,8 @@
 #include "RayTracer.h"
 
 RayTracer* RayTracer::instance = nullptr;
+bool load_exr = false;
+bool calc_rmse = false;
 static void fb_resize_callback(GLFWwindow* window, int width, int height) {
 	auto app = reinterpret_cast<RayTracer*>(glfwGetWindowUserPointer(window));
 	app->resized = true;
@@ -87,10 +89,6 @@ void RayTracer::init(Window* window) {
 	}
 	integrator->init();
 	init_resources();
-	create_post_descriptor();
-	update_post_desc_set();
-	create_post_pipeline();
-	create_compute_pipelines();
 	init_imgui();
 	VkPhysicalDeviceMemoryProperties2 props = {};
 	props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
@@ -114,89 +112,10 @@ void RayTracer::update() {
 
 void RayTracer::render(uint32_t i) {
 	// Render image
-
 	integrator->render();
 	auto cmdbuf = vkb.ctx.command_buffers[i];
 	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
-	// if (write_exr) {
-	//	// Copy to host visible storage buffer
-	//	{
-	//		VkBufferImageCopy region = {};
-	//		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	//		region.imageSubresource.mipLevel = 0;
-	//		region.imageSubresource.baseArrayLayer = 0;
-	//		region.imageSubresource.layerCount = 1;
-	//		region.imageExtent.width = instance->width;
-	//		region.imageExtent.height = instance->height;
-	//		region.imageExtent.depth = 1;
-	//		transition_image_layout(cmdbuf, integrator->output_tex.img,
-	//								VK_IMAGE_LAYOUT_GENERAL,
-	// VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL); vkCmdCopyImageToBuffer(cmdbuf,
-	// integrator->output_tex.img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-	//							   output_img_buffer_cpu.handle, 1, &region);
-	//		transition_image_layout(cmdbuf, integrator->output_tex.img,
-	//								VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-	// VK_IMAGE_LAYOUT_GENERAL);
-	//	}
-	// }
-	// if (calc_rmse && has_gt) {
-	//	// Calculate RMSE
-	//	{
-	//		VkBufferImageCopy region = {};
-	//		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	//		region.imageSubresource.mipLevel = 0;
-	//		region.imageSubresource.baseArrayLayer = 0;
-	//		region.imageSubresource.layerCount = 1;
-	//		region.imageExtent.width = instance->width;
-	//		region.imageExtent.height = instance->height;
-	//		region.imageExtent.depth = 1;
-	//		transition_image_layout(cmdbuf, integrator->output_tex.img,
-	//								VK_IMAGE_LAYOUT_GENERAL,
-	// VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL); vkCmdCopyImageToBuffer(cmdbuf,
-	// integrator->output_tex.img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-	//							   output_img_buffer.handle, 1, &region);
-
-	//		auto barrier = buffer_barrier(output_img_buffer.handle,
-	//									  VK_ACCESS_TRANSFER_WRITE_BIT,
-	//									  VK_ACCESS_SHADER_READ_BIT);
-	//		vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT,
-	// VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 							 VK_DEPENDENCY_BY_REGION_BIT,
-	// 0, 0, 1, &barrier, 0, 0);
-	//		// Calculate and reduce
-	//		{
-
-	//			vkCmdBindDescriptorSets(
-	//				cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE,
-	// calc_rmse_pipeline->pipeline_layout, 				0, 1, &post_desc_set, 0,
-	// nullptr); 			vkCmdBindDescriptorSets( 				cmdbuf,
-	// VK_PIPELINE_BIND_POINT_COMPUTE, reduce_rmse_pipeline->pipeline_layout,
-	// 0, 1, &post_desc_set, 0, nullptr); 			vkCmdBindDescriptorSets( 				cmdbuf,
-	// VK_PIPELINE_BIND_POINT_COMPUTE, output_rmse_pipeline->pipeline_layout,
-	// 0, 1, &post_desc_set, 0, nullptr); 			vkCmdPushConstants(cmdbuf,
-	// calc_rmse_pipeline->pipeline_layout, 							   VK_SHADER_STAGE_COMPUTE_BIT,
-	// 0, sizeof(PostPC), &post_pc); 			vkCmdPushConstants(cmdbuf,
-	// reduce_rmse_pipeline->pipeline_layout,
-	// VK_SHADER_STAGE_COMPUTE_BIT, 							   0,
-	// sizeof(PostPC), &post_pc); 			vkCmdPushConstants(cmdbuf,
-	// output_rmse_pipeline->pipeline_layout,
-	// VK_SHADER_STAGE_COMPUTE_BIT, 							   0,
-	// sizeof(PostPC), &post_pc);
-
-	//			reduce(cmdbuf, residual_buffer, counter_buffer,
-	//*calc_rmse_pipeline,
-	//*reduce_rmse_pipeline, 				   instance->width *
-	// instance->height); 			vkCmdBindPipeline(cmdbuf,
-	// VK_PIPELINE_BIND_POINT_COMPUTE, 							  output_rmse_pipeline->handle); 			auto
-	// num_wgs = 1; 			vkCmdDispatch(cmdbuf, num_wgs, 1, 1);
-	//			transition_image_layout(cmdbuf, integrator->output_tex.img,
-	//									VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-	// VK_IMAGE_LAYOUT_GENERAL);
-	//		}
-
-	//	}
-	//}
-
 	pc_post_settings.enable_tonemapping = settings.enable_tonemapping;
 	instance->vkb.rg
 		->add_gfx("Post FX", {.width = instance->width,
@@ -210,12 +129,40 @@ void RayTracer::render(uint32_t i) {
 								  [](VkCommandBuffer cmd, const RenderPass& render_pass) {
 									  vkCmdDraw(cmd, 3, 1, 0, 0);
 									  ImGui::Render();
-									  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
-										 cmd);
+									  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 								  }})
 		.push_constants(&pc_post_settings)
 		//.read(integrator->output_tex) // Needed if shader inference is off
 		.bind(integrator->output_tex, integrator->texture_sampler);
+
+	if (write_exr) {
+		instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer_cpu);
+	}
+	if (calc_rmse && has_gt) {
+		auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name,
+							 const std::string& reduce_name, const std::string& reduce_shader_name) {
+			uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
+			instance->vkb.rg->add_compute(op_name, {.shader = Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
+				.push_constants(&post_pc)
+				.bind(post_desc_buffer)
+				.zero({residual_buffer, counter_buffer});
+			while (num_wgs != 1) {
+				instance->vkb.rg
+					->add_compute(reduce_name, {.shader = Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
+					.push_constants(&post_pc)
+					.bind(post_desc_buffer);
+				num_wgs = (uint32_t)(num_wgs + 1023) / 1024.0f;
+			}
+		};
+		instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer);
+		// Calculate RMSE
+		op_reduce("OpReduce: RMSE", "src/shaders/rmse/calc_rmse.comp", "OpReduce: Reduce RMSE",
+				  "src/shaders/rmse/reduce_rmse.comp");
+		instance->vkb.rg
+			->add_compute("Calculate RMSE", { .shader = Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1} })
+			.push_constants(&post_pc)
+			.bind(post_desc_buffer);
+	}
 
 	vkb.rg->run(cmdbuf);
 
@@ -231,35 +178,29 @@ float RayTracer::draw_frame() {
 	ImGui_ImplVulkan_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
-	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time,
-			1000 / cpu_avg_time);
-	// if (ImGui::Button("Reload shaders")) {
-	//	integrator->reload();
-	//	updated |= true;
-	// }
+	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time, 1000 / cpu_avg_time);
+	if (ImGui::Button("Reload shaders")) {
+		// TODO
+		updated |= true;
+	}
 
 	bool gui_updated = integrator->gui();
-	 updated |=
-		ImGui::Checkbox("Enable ACES tonemapping",
-	&settings.enable_tonemapping);
+	updated |= ImGui::Checkbox("Enable ACES tonemapping", &settings.enable_tonemapping);
 	if (updated || gui_updated) {
-		 ImGui::Render();
+		ImGui::Render();
 		auto t_end = glfwGetTime() * 1000;
 		auto t_diff = t_end - t_begin;
 		integrator->updated = true;
 		return (float)t_diff;
 	}
 
-	 ImGui::Checkbox("Show camera statistics", &show_cam_stats);
-	 if (show_cam_stats) {
-			ImGui::PushItemWidth(170);
-			ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[0]),
-	 0.05f); 		ImGui::DragFloat4("",
-	 glm::value_ptr(integrator->camera->camera[1]), 0.05f);
-			ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[2]),
-	 0.05f); 		ImGui::DragFloat4("",
-	 glm::value_ptr(integrator->camera->camera[3]), 0.05f);
-
+	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
+	if (show_cam_stats) {
+		ImGui::PushItemWidth(170);
+		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[0]), 0.05f);
+		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[1]), 0.05f);
+		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[2]), 0.05f);
+		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[3]), 0.05f);
 	}
 
 	uint32_t image_idx = vkb.prepare_frame();
@@ -281,132 +222,18 @@ float RayTracer::draw_frame() {
 		save_exr((float*)output_img_buffer_cpu.data, instance->width, instance->height, "out.exr");
 	}
 	bool time_limit = (abs(diff / CLOCKS_PER_SEC - 5)) < 0.1;
-	// calc_rmse = cnt % 30 == 0 || time_limit;
-	// calc_rmse = time_limit;
-	// bool t2 = (abs(diff / CLOCKS_PER_SEC - 10.0)) < 0.1;
-	// if (t2) {
-	//	printf("Go!\n");
-	//	t2 = false;
-	// }
-	// printf("Time %f\n", diff / CLOCKS_PER_SEC);
-	// calc_rmse = true;
-	// write_exr = time_limit;
+	calc_rmse = time_limit;
+
 	if (calc_rmse && has_gt) {
 		float rmse = *(float*)rmse_val_buffer.data;
-		printf("RMSE %f - Diff %f\n", rmse * 1e6, diff);
+		LUMEN_TRACE("RMSE {}", rmse * 1e6);
+		start = now;
 	}
 	auto t_end = glfwGetTime() * 1000;
 	auto t_diff = t_end - t_begin;
 	cnt++;
 	return (float)t_diff;
 }
-
-void RayTracer::create_post_descriptor() {
-	// constexpr int OUTPUT_COLOR_BINDING = 0;
-	// constexpr int POST_DESC_BINDING = 1;
-	// std::vector<VkDescriptorPoolSize> pool_sizes = {
-	//	vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1),
-	//	vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1), };
-	// auto descriptor_pool_ci =
-	//	vk::descriptor_pool_CI(pool_sizes.size(), pool_sizes.data(), 1);
-	// vk::check(vkCreateDescriptorPool(vkb.ctx.device, &descriptor_pool_ci,
-	//		  nullptr, &post_desc_pool),
-	//		  "Failed to create descriptor pool");
-
-	// std::vector<VkDescriptorSetLayoutBinding> set_layout_bindings = {
-	//	vk::descriptor_set_layout_binding(
-	//		VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-	//		VK_SHADER_STAGE_FRAGMENT_BIT, OUTPUT_COLOR_BINDING),
-	//	vk::descriptor_set_layout_binding(
-	//		VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-	//		VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT,
-	// POST_DESC_BINDING),
-	// };
-	// auto set_layout_ci = vk::descriptor_set_layout_CI(
-	//	set_layout_bindings.data(), set_layout_bindings.size());
-	// vk::check(vkCreateDescriptorSetLayout(vkb.ctx.device, &set_layout_ci,
-	//		  nullptr, &post_desc_layout),
-	//		  "Failed to create descriptor set layout");
-
-	// auto set_allocate_info =
-	//	vk::descriptor_set_allocate_info(post_desc_pool, &post_desc_layout, 1);
-	// vk::check(vkAllocateDescriptorSets(vkb.ctx.device, &set_allocate_info,
-	//		  &post_desc_set),
-	//		  "Failed to allocate descriptor sets");
-}
-
-void RayTracer::update_post_desc_set() {
-	// std::array<VkWriteDescriptorSet, 2> sets = {
-	//	vk::write_descriptor_set(
-	//		post_desc_set, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0,
-	//		&integrator->output_tex.descriptor_image_info),
-	//	vk::write_descriptor_set(
-	//		post_desc_set, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
-	//		&post_desc_buffer.descriptor)
-	// };
-	// vkUpdateDescriptorSets(vkb.ctx.device, sets.size(), sets.data(), 0,
-	// nullptr);
-}
-
-void RayTracer::create_post_pipeline() {
-	// GraphicsPipelineSettings post_settings;
-	// VkPipelineLayoutCreateInfo create_info{
-	//	VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-
-	// create_info.setLayoutCount = 1;
-	// create_info.pSetLayouts = &post_desc_layout;
-	// create_info.pushConstantRangeCount = 1;
-	// VkPushConstantRange pc_range = {
-	//	VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstantPost)
-	// };
-	// create_info.pPushConstantRanges = &pc_range;
-	// vkCreatePipelineLayout(vkb.ctx.device, &create_info, nullptr,
-	//					   &post_pipeline_layout);
-
-	// post_settings.pipeline_layout = post_pipeline_layout;
-	// post_settings.render_pass = vkb.ctx.default_render_pass;
-	// post_settings.shaders = { {"src/shaders/post.vert"},
-	//						 {"src/shaders/post.frag"} };
-	// for (auto& shader : post_settings.shaders) {
-	//	if (shader.compile()) {
-	//		LUMEN_ERROR("Shader compilation failed");
-	//	}
-	// }
-	// post_settings.cull_mode = VK_CULL_MODE_NONE;
-	// post_settings.enable_tracking = false;
-	// post_settings.dynamic_state_enables = { VK_DYNAMIC_STATE_VIEWPORT,
-	//									   VK_DYNAMIC_STATE_SCISSOR };
-	// post_pipeline = std::make_unique<Pipeline>(vkb.ctx.device);
-	// post_pipeline->create_gfx_pipeline(post_settings);
-}
-
-void RayTracer::create_compute_pipelines() {
-	// calc_rmse_pipeline =
-	// std::make_unique<Pipeline>(instance->vkb.ctx.device);
-	// reduce_rmse_pipeline =
-	// std::make_unique<Pipeline>(instance->vkb.ctx.device);
-	// output_rmse_pipeline =
-	// std::make_unique<Pipeline>(instance->vkb.ctx.device); std::vector<Shader>
-	// shaders = {
-	//	{"src/shaders/rmse/calc_rmse.comp"},
-	//	{"src/shaders/rmse/reduce_rmse.comp"},
-	//	{"src/shaders/rmse/output_rmse.comp"}
-	// };
-	// for (auto& shader : shaders) {
-	//	shader.compile();
-	// }
-	// ComputePipelineSettings settings;
-	// settings.desc_set_layouts = &post_desc_layout;
-	// settings.desc_set_layout_cnt = 1;
-	// settings.push_const_size = sizeof(PostPC);
-	// settings.shader = shaders[0];
-	// calc_rmse_pipeline->create_compute_pipeline(settings);
-	// settings.shader = shaders[1];
-	// reduce_rmse_pipeline->create_compute_pipeline(settings);
-	// settings.shader = shaders[2];
-	// output_rmse_pipeline->create_compute_pipeline(settings);
-}
-
 void RayTracer::init_imgui() {
 	VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
 										 {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
@@ -431,10 +258,7 @@ void RayTracer::init_imgui() {
 	ImGui::CreateContext();
 	// Setup Platform/Renderer backends
 	ImGui::StyleColorsDark();
-
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
-
 	ImGui_ImplGlfw_InitForVulkan(window->get_window_ptr(), true);
 
 	ImGui_ImplVulkan_InitInfo init_info = {};
@@ -459,28 +283,28 @@ void RayTracer::init_imgui() {
 
 void RayTracer::init_resources() {
 	PostDesc desc;
-	output_img_buffer.create(&instance->vkb.ctx,
+	output_img_buffer.create("Output Image Buffer", &instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 							 instance->width * instance->height * 4 * 4);
 
-	output_img_buffer_cpu.create(&instance->vkb.ctx,
+	output_img_buffer_cpu.create("Output Image CPU", &instance->vkb.ctx,
 								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 								 VK_SHARING_MODE_EXCLUSIVE, instance->width * instance->height * 4 * 4);
-	residual_buffer.create(&instance->vkb.ctx,
+	residual_buffer.create("RMSE Residual", &instance->vkb.ctx,
 						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 						   instance->width * instance->height * 4);
 
-	counter_buffer.create(&instance->vkb.ctx,
+	counter_buffer.create("RMSE Counter", &instance->vkb.ctx,
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(int));
 
-	rmse_val_buffer.create(&instance->vkb.ctx,
+	rmse_val_buffer.create("RMSE Value", &instance->vkb.ctx,
 						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -510,9 +334,10 @@ void RayTracer::init_resources() {
 				pixels[i].w = 1.;
 			}
 			auto gt_size = pixels.size() * 4 * 4;
-			gt_img_buffer.create(
-				&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, gt_size, pixels.data(), true);
+			gt_img_buffer.create("Ground Truth Image", &instance->vkb.ctx,
+								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, gt_size, pixels.data(),
+								 true);
 			desc.gt_img_addr = gt_img_buffer.get_device_address();
 			has_gt = true;
 		}
@@ -524,11 +349,15 @@ void RayTracer::init_resources() {
 	desc.residual_addr = residual_buffer.get_device_address();
 	desc.counter_addr = counter_buffer.get_device_address();
 	desc.rmse_val_addr = rmse_val_buffer.get_device_address();
-	post_desc_buffer.create(
-		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(PostDesc), &desc, true);
-
+	post_desc_buffer.create("Post Desc", &instance->vkb.ctx,
+							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(PostDesc), &desc,
+							true);
 	post_pc.size = instance->width * instance->height;
+	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, out_img_addr, &output_img_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, rmse_val_addr, &rmse_val_buffer, instance->vkb.rg);
 }
 
 void RayTracer::parse_args(int argc, char* argv[]) {
@@ -544,10 +373,8 @@ void RayTracer::parse_args(int argc, char* argv[]) {
 void RayTracer::save_exr(const float* rgb, int width, int height, const char* outfilename) {
 	EXRHeader header;
 	InitEXRHeader(&header);
-
 	EXRImage image;
 	InitEXRImage(&image);
-
 	image.num_channels = 3;
 
 	std::vector<float> images[3];
@@ -607,17 +434,12 @@ void RayTracer::cleanup() {
 	const auto device = vkb.ctx.device;
 	vkDeviceWaitIdle(device);
 	if (initialized) {
-		vkDestroyDescriptorSetLayout(device, post_desc_layout, nullptr);
-		vkDestroyDescriptorPool(device, post_desc_pool, nullptr);
-		vkDestroyDescriptorPool(device, imgui_pool, nullptr);
-		vkDestroyPipelineLayout(device, post_pipeline_layout, nullptr);
 		ImGui_ImplVulkan_Shutdown();
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
 		gt_img_buffer.destroy();
 		output_img_buffer.destroy();
 		integrator->destroy();
-		post_pipeline->cleanup();
 		vkb.cleanup();
 	}
 }

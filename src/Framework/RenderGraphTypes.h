@@ -94,6 +94,14 @@ struct ResourceBinding {
 	}
 };
 
+struct Resource
+{
+	Buffer* buf = nullptr;
+	Texture2D* tex = nullptr;
+	Resource(Buffer& buf) : buf(&buf) {}
+	Resource(Texture2D& tex) : tex(&tex) {}
+};
+
 struct BufferSyncDescriptor {
 	// Read-after-write is the default dependency implicitly
 	VkAccessFlags src_access_flags = VK_ACCESS_SHADER_WRITE_BIT;

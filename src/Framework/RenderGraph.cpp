@@ -45,6 +45,8 @@ inline static VkImageLayout get_image_layout(VkDescriptorType type) {
 		default:
 			break;
 	}
+	LUMEN_ERROR("Unhandled image layout case");
+	return VK_IMAGE_LAYOUT_GENERAL;
 }
 
 void RenderPass::register_dependencies(Buffer& buffer, VkAccessFlags dst_access_flags) {
@@ -170,8 +172,20 @@ void RenderPass::transition_resources() {
 			descriptor_infos[i] = bound_resources[i].get_descriptor_info();
 		}
 	}
-	for (Buffer* buffer : buffer_zeros) {
-		write_impl(*buffer, VK_ACCESS_TRANSFER_WRITE_BIT);
+	for (const Resource& resource : resource_zeros) {
+		if (resource.buf) {
+			write_impl(*resource.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
+		} else {
+			write_impl(*resource.tex);
+		}
+	}
+
+	for (const auto& [src, dst] : resource_copies) {
+		if (src.tex) {
+			if (dst.buf) {
+				write_impl(*dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
+			}
+		}
 	}
 
 }
@@ -338,11 +352,6 @@ RenderPass& RenderGraph::add_compute(const std::string& name, const ComputePassS
 	return passes.back();
 }
 
-RenderPass& RenderGraph::get_current_pass() {
-	LUMEN_ASSERT(passes.size(), "Make sure there are passes in the render graph");
-	return passes.back();
-}
-
 RenderPass& RenderPass::bind(const ResourceBinding& binding) {
 	if(next_binding_idx >= bound_resources.size()) {
 		bound_resources.push_back(binding);
@@ -471,14 +480,17 @@ RenderPass& RenderPass::skip_execution() {
 	return *this;
 }
 
-RenderPass& RenderPass::zero(Buffer& buffer) {
-	buffer_zeros.push_back(&buffer);
+RenderPass& RenderPass::zero(const Resource& resource) {
+	if (resource.tex) {
+		LUMEN_ERROR("Unimplemented: Immage zeroing")
+	}
+	resource_zeros.push_back(resource);
 	return *this;
 }
 
-RenderPass& RenderPass::zero(Buffer& buffer, bool cond) {
+RenderPass& RenderPass::zero(const Resource& resource, bool cond) {
 	if (cond) {
-		return zero(buffer);
+		return zero(resource);
 	}
 	return *this;
 }
@@ -487,6 +499,26 @@ RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<Buffer
 	for (Buffer& buf : buffers) {
 		zero(buf);
 	}
+	return *this;
+}
+
+RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<Texture2D>> textures) {
+	for (Texture2D& tex : textures) {
+		zero(tex);
+	}
+	return *this;
+}
+
+RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
+	// TODO: Extend this if check upon extending this function
+	if (src.tex && dst.buf) {
+		if (dst.buf) {
+			resource_copies.push_back({ src,dst });
+		}
+	} else {
+		LUMEN_ERROR("Unimplemented copy operation")
+	}
+
 	return *this;
 }
 
@@ -556,6 +588,7 @@ void RenderPass::write_impl(Buffer& buffer, VkAccessFlags access_flags) {
 	rg->buffer_resource_map[buffer.handle] = {pass_idx, access_flags};
 }
 
+
 void RenderPass::write_impl(Texture2D& tex) {
 	VkImageLayout target_layout = get_target_img_layout(tex, VK_ACCESS_SHADER_WRITE_BIT);
 	register_dependencies(tex, target_layout);
@@ -599,8 +632,10 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	}
 
 	// Zero out resources
-	for (Buffer* buffer : buffer_zeros) {
-		vkCmdFillBuffer(cmd, buffer->handle, 0, buffer->size, 0);
+	for (const Resource& resource : resource_zeros) {
+		if (resource.buf) {
+			vkCmdFillBuffer(cmd, resource.buf->handle, 0, resource.buf->size, 0);
+		}
 	}
 
 	// Buffer barriers
@@ -757,6 +792,25 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		}
 	}
 
+	for (const auto& [src, dst] : resource_copies) {
+		if (src.tex) {
+			if (dst.buf) {
+				// Assumption: The copy(...) is called in the pass that produced the src or earlier
+				VkBufferImageCopy region = {};
+				region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				region.imageSubresource.mipLevel = 0;
+				region.imageSubresource.baseArrayLayer = 0;
+				region.imageSubresource.layerCount = 1;
+				region.imageExtent = src.tex->base_extent;
+				VkImageLayout old_layout = src.tex->layout;
+				src.tex->transition(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+				vkCmdCopyImageToBuffer(cmd, src.tex->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+									   dst.buf->handle, 1, &region);
+				src.tex->transition(cmd, old_layout);
+			}
+		}
+	}
+
 	// Set: Buffer
 	for (const auto& [k, v] : set_signals_buffer) {
 		LUMEN_ASSERT(v.event == nullptr, "VkEvent should be null in the setter");
@@ -890,7 +944,8 @@ void RenderGraph::reset(VkCommandBuffer cmd) {
 		passes[i].set_signals_img.clear();
 		passes[i].wait_signals_img.clear();
 		passes[i].layout_transitions.clear();
-		passes[i].buffer_zeros.clear();
+		passes[i].resource_zeros.clear();
+		passes[i].resource_copies.clear();
 		passes[i].buffer_barriers.clear();
 		passes[i].disable_execution = false;
 		passes[i].active = false;

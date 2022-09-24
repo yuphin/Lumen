@@ -213,6 +213,7 @@ void Texture::create_image(const VkImageCreateInfo& info) {
 
 	vk::check(vkAllocateMemory(ctx->device, &alloc_info, nullptr, &img_mem), "Failed to allocate image memory");
 	vkBindImageMemory(ctx->device, img, img_mem, 0);
+	base_extent = info.extent;
 }
 
 void Texture::cmd_generate_mipmaps(const VkImageCreateInfo& info, VkCommandBuffer cmd) {

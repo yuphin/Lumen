@@ -33,7 +33,6 @@ public:
 	RenderPass& add_rt(const std::string& name, const RTPassSettings& settings);
 	RenderPass& add_gfx(const std::string& name, const GraphicsPassSettings& settings);
 	RenderPass& add_compute(const std::string& name, const ComputePassSettings& settings);
-	RenderPass& get_current_pass();
 	void run(VkCommandBuffer cmd);
 	void reset(VkCommandBuffer cmd);
 	void submit(CommandBuffer& cmd);
@@ -139,9 +138,11 @@ class RenderPass {
 		push_constant_data = new_ptr;
 		return *this;
 	}
-	RenderPass& zero(Buffer& buffer);
+	RenderPass& zero(const Resource& resource);
 	RenderPass& zero(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
-	RenderPass& zero(Buffer& buffer, bool cond);
+	RenderPass& zero(std::initializer_list<std::reference_wrapper<Texture2D>> textures);
+	RenderPass& zero(const Resource& resource, bool cond);
+	RenderPass& copy(const Resource& src, const Resource& dst);
 	void finalize();
 	friend RenderGraph;
 	std::vector<ResourceBinding> bound_resources;
@@ -200,7 +201,8 @@ class RenderPass {
 		VkAccessFlags src_access_flags = VK_ACCESS_SHADER_WRITE_BIT;
 		VkAccessFlags dst_access_flags = VK_ACCESS_SHADER_READ_BIT;
 	};
-	std::vector<Buffer*> buffer_zeros;
+	std::vector<Resource> resource_zeros;
+	std::vector<std::pair<Resource, Resource>> resource_copies;
 	std::vector<BufferBarrier> buffer_barriers;
 
 
