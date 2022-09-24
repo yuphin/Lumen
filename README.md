@@ -32,8 +32,8 @@
 
  ### About experimental features
  With the recently integrated render graph, Lumen uses some of the more experimental Vulkan features. These are namely,
-    - Templated push descriptors (may be problematic with AMD)
-    - Syncronization2 features (available from Vulkan 1.3)
+  - Templated push descriptors (may be problematic with AMD)
+  - Syncronization2 features (available from Vulkan 1.3)
 
 ## Showcase
 ##### Caustics Glass (VCM)
