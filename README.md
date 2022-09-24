@@ -24,7 +24,16 @@
  - A lightweight Vulkan abstraction layer from scratch
  - EXR output (F10)
  - On-the-fly RMSE computation
+ - SPIRV reflection
+ - Render graph support with experimental Vulkan features
+   - Automatic resource and synchronization management
+   - Binding inference based on shader reflection results
+   - Simple builder pattern
 
+ ### About experimental features
+ With the recently integrated render graph, Lumen uses some of the more experimental Vulkan features. These are namely,
+    - Templated push descriptors (may be problematic with AMD)
+    - Syncronization2 features (available from Vulkan 1.3)
 
 ## Showcase
 ##### Caustics Glass (VCM)
@@ -66,6 +75,9 @@ To load a scene file simply run:
 ```shell
 Lumen.exe <scene_file>
 ```
+
+## Getting started with Lumen
+The best way to get started is to take a look at the unidirectional path tracer implemented in [src/Raytracer/Path.cpp](https://github.com/yuphin/Lumen/blob/master/src/RayTracer/Path.cpp) and gradually explore the other integrators. From there, you can focus on the related shaders that are located in the `src/shaders` folder.
 
 
 
