@@ -3,6 +3,7 @@
 #include "Buffer.h"
 #include "Framework/Event.h"
 #include "Framework/RenderGraph.h"
+
 class RenderGraph;
 
 struct BuildAccelerationStructure {
@@ -80,6 +81,7 @@ struct VulkanBase {
 	std::vector<VkQueueFamilyProperties> queue_families;
 	VulkanContext ctx;
 	std::unique_ptr<RenderGraph> rg;
+	VkFormat swapchain_format;
 
 	std::vector<AccelKHR> blases;
 	std::vector<Texture2D> swapchain_images;

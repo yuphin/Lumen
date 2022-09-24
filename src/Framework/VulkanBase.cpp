@@ -5,6 +5,7 @@
 #include <extensions_vk.hpp>
 #include <numeric>
 
+
 uint32_t VertexLayout::stride() {
 	uint32_t res = 0;
 	for (auto& component : components) {
@@ -479,6 +480,8 @@ void VulkanBase::create_swapchain() {
 	swapchain_CI.imageExtent = extent;
 	swapchain_CI.imageArrayLayers = 1;
 	swapchain_CI.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+	this->swapchain_format = surface_format.format;
 
 	QueueFamilyIndices indices = find_queue_families(ctx.physical_device);
 	uint32_t queue_family_indices_arr[] = {indices.gfx_family.value(), indices.present_family.value()};

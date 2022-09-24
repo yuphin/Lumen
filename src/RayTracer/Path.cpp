@@ -47,7 +47,7 @@ void Path::render() {
 		})
 		.bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
-		//.write(output_tex) // Needed if the automatic shader inference is off
+		//.write(output_tex) // Needed if the automatic shader inference is disabled
 		.bind_tlas(instance->vkb.tlas);
 }
 

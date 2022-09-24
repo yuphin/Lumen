@@ -91,7 +91,7 @@ void RayTracer::init(Window* window) {
 	update_post_desc_set();
 	create_post_pipeline();
 	create_compute_pipelines();
-	// init_imgui();
+	init_imgui();
 	VkPhysicalDeviceMemoryProperties2 props = {};
 	props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
 	VkPhysicalDeviceMemoryBudgetPropertiesEXT budget_props = {};
@@ -209,9 +209,9 @@ void RayTracer::render(uint32_t i) {
 							  .pass_func =
 								  [](VkCommandBuffer cmd, const RenderPass& render_pass) {
 									  vkCmdDraw(cmd, 3, 1, 0, 0);
-									  /*	ImGui::Render();
-										  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
-										 cmd);*/
+									  ImGui::Render();
+									  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
+										 cmd);
 								  }})
 		.push_constants(&pc_post_settings)
 		//.read(integrator->output_tex) // Needed if shader inference is off
@@ -228,39 +228,39 @@ float RayTracer::draw_frame() {
 	}
 	auto t_begin = glfwGetTime() * 1000;
 	bool updated = false;
-	// ImGui_ImplGlfw_NewFrame();
-	// ImGui::NewFrame();
-	// ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time,
-	//			1000 / cpu_avg_time);
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time,
+			1000 / cpu_avg_time);
 	// if (ImGui::Button("Reload shaders")) {
 	//	integrator->reload();
 	//	updated |= true;
 	// }
 
 	bool gui_updated = integrator->gui();
-	// updated |=
-	//	ImGui::Checkbox("Enable ACES tonemapping",
-	//&settings.enable_tonemapping);
+	 updated |=
+		ImGui::Checkbox("Enable ACES tonemapping",
+	&settings.enable_tonemapping);
 	if (updated || gui_updated) {
-		// ImGui::Render();
+		 ImGui::Render();
 		auto t_end = glfwGetTime() * 1000;
 		auto t_diff = t_end - t_begin;
 		integrator->updated = true;
 		return (float)t_diff;
 	}
 
-	// ImGui::Checkbox("Show camera statistics", &show_cam_stats);
+	 ImGui::Checkbox("Show camera statistics", &show_cam_stats);
+	 if (show_cam_stats) {
+			ImGui::PushItemWidth(170);
+			ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[0]),
+	 0.05f); 		ImGui::DragFloat4("",
+	 glm::value_ptr(integrator->camera->camera[1]), 0.05f);
+			ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[2]),
+	 0.05f); 		ImGui::DragFloat4("",
+	 glm::value_ptr(integrator->camera->camera[3]), 0.05f);
 
-	// if (show_cam_stats) {
-	//		ImGui::PushItemWidth(170);
-	//		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[0]),
-	// 0.05f); 		ImGui::DragFloat4("",
-	// glm::value_ptr(integrator->camera->camera[1]), 0.05f);
-	//		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[2]),
-	// 0.05f); 		ImGui::DragFloat4("",
-	// glm::value_ptr(integrator->camera->camera[3]), 0.05f);
-
-	//}
+	}
 
 	uint32_t image_idx = vkb.prepare_frame();
 
@@ -431,6 +431,10 @@ void RayTracer::init_imgui() {
 	ImGui::CreateContext();
 	// Setup Platform/Renderer backends
 	ImGui::StyleColorsDark();
+
+	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+
 	ImGui_ImplGlfw_InitForVulkan(window->get_window_ptr(), true);
 
 	ImGui_ImplVulkan_InitInfo init_info = {};
@@ -439,11 +443,13 @@ void RayTracer::init_imgui() {
 	init_info.Device = vkb.ctx.device;
 	init_info.Queue = vkb.ctx.queues[(int)QueueType::GFX];
 	init_info.DescriptorPool = imgui_pool;
-	init_info.MinImageCount = 2;
-	init_info.ImageCount = 2;
+	init_info.MinImageCount = 3;
+	init_info.ImageCount = 3;
 	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+	init_info.UseDynamicRendering = true;
+	init_info.ColorAttachmentFormat = vkb.swapchain_format;
 
-	ImGui_ImplVulkan_Init(&init_info, vkb.ctx.default_render_pass);
+	ImGui_ImplVulkan_Init(&init_info, nullptr);
 
 	CommandBuffer cmd(&vkb.ctx, true);
 	ImGui_ImplVulkan_CreateFontsTexture(cmd.handle);

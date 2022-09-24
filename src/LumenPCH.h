@@ -56,10 +56,10 @@
 #define GLFW_INCLUDE_VULKAN
 #pragma warning(push,0)
 #include "Framework/VulkanStructs.h"
+#include <GLFW/glfw3.h>
+#include <imgui.h>
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
-#include <imgui.h>
-#include <GLFW/glfw3.h>
 #pragma warning(pop)
 #include <algorithm>
 #include <chrono>
