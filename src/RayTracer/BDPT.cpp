@@ -38,6 +38,7 @@ void BDPT::init() {
 	pc_ray.frame_num = 0;
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
+	assert(instance->vkb.rg->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_path_addr, &light_path_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, camera_path_addr, &camera_path_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, &color_storage_buffer, instance->vkb.rg);
@@ -66,10 +67,10 @@ void BDPT::render() {
 					 .accel = instance->vkb.tlas.accel})
 		.zero(light_path_buffer)
 		.zero(camera_path_buffer)
-		.read(light_path_buffer)
-		.read(camera_path_buffer)
+		//.read(light_path_buffer) // Needed if shader inference is disabled
+		//.read(camera_path_buffer)
 		.push_constants(&pc_ray)
-		.write(output_tex)
+		//.write(output_tex)
 		.bind({
 			output_tex,
 			prim_lookup_buffer,
