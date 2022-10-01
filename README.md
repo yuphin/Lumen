@@ -35,6 +35,8 @@
   - Templated push descriptors (may be problematic with AMD)
   - Syncronization2 features (available from Vulkan 1.3)
 
+### NOTE: As of 01.10.2022, there may be bugs with Vulkan syncronization2 API coupled with Vulkan Ray Tracing in the latest Nvidia GameReady drivers. If you encounter any issues, make sure to use the Vulkan beta drivers. If you encounter any issue in AMD cards (provided you have the requirements), make sure to also use the latest drivers. If issues related to the [render graph integration](https://github.com/yuphin/Lumen/pull/2) still persist, you can try out the commit in the [release](https://github.com/yuphin/Lumen/releases/tag/v1.0.0).
+
 ## Showcase
 ##### Caustics Glass (VCM)
 ![0](/media/GlassVCM.png?raw=true "Caustics Glass")
@@ -66,6 +68,9 @@ git clone --recursive https://github.com/yuphin/Lumen.git
 - VS2022 or VS2019
 
 Currently, Lumen only builds on Windows, however, there is no platform specific code in the codebase and it can be ported to Linux with ease.
+
+
+
 
 ## Usage
 Some of the sample scenes can be found in the `scenes/` directory.
