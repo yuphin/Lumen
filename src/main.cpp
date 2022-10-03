@@ -4,14 +4,6 @@
 #include "RayTracer/RayTracer.h"
 
 void window_size_callback(GLFWwindow* window, int width, int height) {}
-//
-//int main(int argc, char* argv[]) {
-//	Logger::init();
-//	Shader s("src/shaders/test/test.comp");
-//	s.compile(0);
-//
-//	return 0;
-//}
 
 int main(int argc, char* argv[]) {
 #ifdef _DEBUG
@@ -24,7 +16,6 @@ int main(int argc, char* argv[]) {
 	int height = 900;
 	Logger::init();
 	ThreadPool::init();
-	LUMEN_TRACE("Logger initialized");
 	Window window(width, height, fullscreen);
 	{
 		RayTracer app(width, height, enable_debug, argc, argv);

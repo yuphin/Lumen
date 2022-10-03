@@ -6,7 +6,7 @@
 #include "Framework/LumenInstance.h"
 #include "Framework/Shader.h"
 #include "Framework/Texture.h"
-#include "Framework/Utils.h"
+#include "Framework/VkUtils.h"
 #include "Framework/VulkanBase.h"
 #include "Framework/Window.h"
 #include "Framework/GltfScene.hpp"

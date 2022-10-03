@@ -9,27 +9,6 @@ uint32_t find_memory_type(VkPhysicalDevice* physical_device, uint32_t type_filte
 void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image, VkImageLayout old_layout,
 							 VkImageLayout new_layout, VkImageSubresourceRange subresource_range,
 							 VkImageAspectFlags aspect_flags);
-//
-//// In case the user wants to specify source and destination stages
-//
-// void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image,
-//							 VkImageLayout old_layout, VkImageLayout new_layout,
-//							 VkPipelineStageFlags source_stage,
-//							 VkPipelineStageFlags destination_stage,
-//							 VkImageSubresourceRange subresource_range);
-//
-// inline void transition_image_layout(
-//	VkCommandBuffer copy_cmd, VkImage image, VkImageLayout old_layout,
-//	VkImageLayout new_layout,
-//	VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT) {
-//	VkImageSubresourceRange range;
-//	range.aspectMask = aspect_mask;
-//	range.levelCount = VK_REMAINING_MIP_LEVELS;
-//	range.layerCount = VK_REMAINING_ARRAY_LAYERS;
-//	range.baseMipLevel = 0;
-//	range.baseArrayLayer = 0;
-//	transition_image_layout(copy_cmd, image, old_layout, new_layout, range);
-//}
 
 VkImageView create_image_view(VkDevice device, const VkImage& img, VkFormat format,
 							  VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT);
@@ -148,6 +127,16 @@ inline VkDeviceAddress get_device_address(VkDevice device, VkBuffer handle) {
 	VkBufferDeviceAddressInfo info = {VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
 	info.buffer = handle;
 	return vkGetBufferDeviceAddress(device, &info);
+}
+
+inline VkDeviceSize get_memory_usage(VkPhysicalDevice physical_device) {
+	VkPhysicalDeviceMemoryProperties2 props = {};
+	props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
+	VkPhysicalDeviceMemoryBudgetPropertiesEXT budget_props = {};
+	budget_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT;
+	props.pNext = &budget_props;
+	vkGetPhysicalDeviceMemoryProperties2(physical_device, &props);
+	return budget_props.heapUsage[0];
 }
 
 inline uint32_t calc_mip_levels(VkExtent2D extent) {

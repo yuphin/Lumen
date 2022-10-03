@@ -1,6 +1,6 @@
 #include "LumenPCH.h"
 #include "SBTWrapper.h"
-#include "Framework/Utils.h"
+#include "Framework/VkUtils.h"
 #include "Framework/CommandBuffer.h"
 
 void SBTWrapper::setup(VulkanContext* ctx, uint32_t family_idx,

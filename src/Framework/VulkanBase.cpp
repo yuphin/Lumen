@@ -1,7 +1,7 @@
 #include "LumenPCH.h"
 #include "VulkanBase.h"
 #include "CommandBuffer.h"
-#include "Utils.h"
+#include "VkUtils.h"
 #include <extensions_vk.hpp>
 #include <numeric>
 
@@ -537,7 +537,7 @@ void VulkanBase::create_command_pools() {
 	pool_info.queueFamilyIndex = queue_family_idxs.gfx_family.value();
 	const auto processor_count = std::thread::hardware_concurrency();
 	ctx.cmd_pools.resize(processor_count);
-	for (auto i = 0; i < processor_count; i++) {
+	for (unsigned int i = 0; i < processor_count; i++) {
 		vk::check(vkCreateCommandPool(ctx.device, &pool_info, nullptr, &ctx.cmd_pools[i]),
 				  "Failed to create command pool!");
 	}

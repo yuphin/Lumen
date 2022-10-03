@@ -93,7 +93,7 @@ void SPPM::render() {
 			instance->vkb.rg->add_compute(reduce_name, {.shader = Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
 				.push_constants(&pc_ray)
 				.bind(scene_desc_buffer);
-			num_wgs = (uint32_t)(num_wgs + 1023) / 1024.0f;
+			num_wgs = (uint32_t)(num_wgs + 1023) / 1024;
 		}
 	};
 

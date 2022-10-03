@@ -260,7 +260,7 @@ void VCMMLT::render() {
 					{.shader = Shader(reduce_shader_name), .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
 				.push_constants(&pc_ray)
 				.bind(scene_desc_buffer);
-			num_wgs = (uint32_t)(num_wgs + 1023) / 1024.0f;
+			num_wgs = (uint32_t)(num_wgs + 1023) / 1024;
 		}
 	};
 	auto sum_up_chain_data = [&] {

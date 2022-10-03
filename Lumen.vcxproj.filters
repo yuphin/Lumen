@@ -9,7 +9,7 @@
     <ClCompile Include="src\Framework\Window.cpp">
       <Filter>Framework</Filter>
     </ClCompile>
-    <ClCompile Include="src\Framework\Utils.cpp">
+    <ClCompile Include="src\Framework\VkUtils.cpp">
       <Filter>Framework</Filter>
     </ClCompile>
     <ClCompile Include="src\Framework\Texture.cpp">
@@ -204,7 +204,7 @@
     <ClInclude Include="src\RayTracer\RayTracer.h">
       <Filter>RayTracer</Filter>
     </ClInclude>
-    <ClInclude Include="src\Framework\Utils.h">
+    <ClInclude Include="src\Framework\VkUtils.h">
       <Filter>Framework</Filter>
     </ClInclude>
     <ClInclude Include="libs\imgui\imconfig.h">

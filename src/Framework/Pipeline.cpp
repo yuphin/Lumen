@@ -1,6 +1,6 @@
 #include "LumenPCH.h"
 #include "Pipeline.h"
-#include "Utils.h"
+#include "VkUtils.h"
 
 Pipeline::Pipeline(VulkanContext* ctx, size_t pass_idx, const std::string& name)
 	: ctx(ctx), pass_idx(pass_idx), name(name) {}

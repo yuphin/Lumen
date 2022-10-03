@@ -258,7 +258,7 @@
     <ClCompile Include="src\Framework\Shader.cpp" />
     <ClCompile Include="src\Framework\Buffer.cpp" />
     <ClCompile Include="src\Framework\Pipeline.cpp" />
-    <ClCompile Include="src\Framework\Utils.cpp" />
+    <ClCompile Include="src\Framework\VkUtils.cpp" />
     <ClCompile Include="src\LumenPCH.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
@@ -308,7 +308,7 @@
     <ClInclude Include="src\Framework\Shader.h" />
     <ClInclude Include="src\Framework\Buffer.h" />
     <ClInclude Include="src\Framework\Pipeline.h" />
-    <ClInclude Include="src\Framework\Utils.h" />
+    <ClInclude Include="src\Framework\VkUtils.h" />
     <ClInclude Include="src\LumenPCH.h" />
     <ClInclude Include="src\Framework\GLTFModel.h" />
     <ClInclude Include="src\Framework\VulkanBase.h" />

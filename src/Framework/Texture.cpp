@@ -1,7 +1,7 @@
 #include "LumenPCH.h"
 #include "Texture.h"
 #include "Framework/CommandBuffer.h"
-#include "Framework/Utils.h"
+#include "Framework/VkUtils.h"
 #include <gli/gli.hpp>
 #include <stb_image.h>
 

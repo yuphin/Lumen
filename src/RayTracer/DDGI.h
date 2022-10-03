@@ -34,11 +34,11 @@ class DDGI : public Integrator {
 	float hysteresis = 0.98f;
 	int rays_per_probe = 256;
 	float depth_sharpness = 50.0f;
-	float normal_bias = 0.1;
-	float view_bias = 0.1;
-	float backface_ratio = 0.1;
+	float normal_bias = 0.1f;
+	float view_bias = 0.1f;
+	float backface_ratio = 0.1f;
 	float probe_distance = 0.5f;
-	float min_frontface_dist = 0.1;
+	float min_frontface_dist = 0.1f;
 	float max_distance;
 	glm::ivec3 probe_counts;
 	glm::vec3 probe_start_position;

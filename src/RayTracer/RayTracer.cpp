@@ -89,13 +89,7 @@ void RayTracer::init(Window* window) {
 	integrator->init();
 	init_resources();
 	init_imgui();
-	VkPhysicalDeviceMemoryProperties2 props = {};
-	props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
-	VkPhysicalDeviceMemoryBudgetPropertiesEXT budget_props = {};
-	budget_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT;
-	props.pNext = &budget_props;
-	vkGetPhysicalDeviceMemoryProperties2(vk_ctx.physical_device, &props);
-	printf("Memory usage %f MB\n", budget_props.heapUsage[0] * 1e-6);
+	printf("Memory usage %f MB\n", get_memory_usage(vk_ctx.physical_device) * 1e-6);
 }
 
 void RayTracer::update() {
@@ -150,7 +144,7 @@ void RayTracer::render(uint32_t i) {
 					->add_compute(reduce_name, {.shader = Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
 					.push_constants(&post_pc)
 					.bind(post_desc_buffer);
-				num_wgs = (uint32_t)(num_wgs + 1023) / 1024.0f;
+				num_wgs = (num_wgs + 1023) / 1024;
 			}
 		};
 		instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer);
@@ -178,6 +172,7 @@ float RayTracer::draw_frame() {
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time, 1000 / cpu_avg_time);
+	ImGui::Text("Memory Usage: %f MB", get_memory_usage(vk_ctx.physical_device) * 1e-6);
 	if (ImGui::Button("Reload shaders")) {
 		// TODO
 		updated |= true;

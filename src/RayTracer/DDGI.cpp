@@ -9,8 +9,8 @@ void DDGI::init() {
 	int num_probes;
 	// DDGI Resources
 	{
-		glm::vec3 min_pos = lumen_scene->m_dimensions.min - vec3(0.1);
-		glm::vec3 max_pos = lumen_scene->m_dimensions.max + vec3(0.1);
+		glm::vec3 min_pos = lumen_scene->m_dimensions.min - vec3(0.1f);
+		glm::vec3 max_pos = lumen_scene->m_dimensions.max + vec3(0.1f);
 		glm::vec3 diag = (max_pos - min_pos) * 1.1f;
 		probe_counts = glm::ivec3(diag / probe_distance);
 		probe_start_position = min_pos;

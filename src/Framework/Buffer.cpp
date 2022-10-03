@@ -1,7 +1,7 @@
 #include "LumenPCH.h"
 #include "Buffer.h"
 #include "CommandBuffer.h"
-#include "Utils.h"
+#include "VkUtils.h"
 
 void Buffer::create(const char* name, VulkanContext* ctx,
 					VkBufferUsageFlags usage,
