@@ -36,6 +36,7 @@ public:
 	void run(VkCommandBuffer cmd);
 	void reset(VkCommandBuffer cmd);
 	void submit(CommandBuffer& cmd);
+	void run_and_submit(CommandBuffer& cmd);
 	void destroy();
 	friend RenderPass;
 	bool recording = true;

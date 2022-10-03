@@ -206,7 +206,7 @@ void VCMMLT::init() {
 void VCMMLT::render() {
 	LUMEN_TRACE("Rendering sample {}...", sample_cnt);
 	const float ppm_base_radius = 0.25f;
-	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true);
+	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
 	VkClearValue clear_depth = {1.0f, 0};
 	VkViewport viewport = vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
@@ -359,8 +359,7 @@ void VCMMLT::render() {
 					  {.shader = Shader("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(scene_desc_buffer);
-	instance->vkb.rg->run(cmd.handle);
-	instance->vkb.rg->submit(cmd);
+	instance->vkb.rg->run_and_submit(cmd);
 	// Start mutations
 	{
 		std::string pipeline_name = "VCMMLT - Mutate " + pipeline_postfix;

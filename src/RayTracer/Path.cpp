@@ -20,6 +20,7 @@ void Path::init() {
 }
 
 void Path::render() {
+	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.light_pos = scene_ubo.light_pos;
 	pc_ray.light_type = 0;
 	pc_ray.light_intensity = 10;
@@ -29,7 +30,6 @@ void Path::render() {
 	pc_ray.sky_col = lumen_scene->config.sky_col;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
-
 	instance->vkb.rg
 		->add_rt("Path", {.shaders = {{"src/shaders/integrators/path/path.rgen"},
 									  {"src/shaders/ray.rmiss"},
@@ -49,6 +49,7 @@ void Path::render() {
 		.bind(mesh_lights_buffer)
 		//.write(output_tex) // Needed if the automatic shader inference is disabled
 		.bind_tlas(instance->vkb.tlas);
+	instance->vkb.rg->run_and_submit(cmd);
 }
 
 bool Path::update() {

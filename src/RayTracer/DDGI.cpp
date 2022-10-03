@@ -131,11 +131,6 @@ void DDGI::init() {
 }
 
 void DDGI::render() {
-	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	VkClearValue clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
-	VkClearValue clear_depth = {1.0f, 0};
-	VkViewport viewport = vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
-	VkClearValue clear_values[] = {clear_color, clear_depth};
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = lumen_scene->config.path_length;
 	pc_ray.sky_col = lumen_scene->config.sky_col;

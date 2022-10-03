@@ -13,15 +13,6 @@ class VCM : public Integrator {
 	VkDescriptorPool desc_pool;
 	VkDescriptorSetLayout desc_set_layout;
 	VkDescriptorSet desc_set;
-	std::unique_ptr<Pipeline> vcm_light_pipeline;
-	std::unique_ptr<Pipeline> vcm_eye_pipeline;
-	std::unique_ptr<Pipeline> vcm_spawn_light_pipeline;
-	std::unique_ptr<Pipeline> vcm_sample_pipeline;
-	std::unique_ptr<Pipeline> init_reservoirs_pipeline;
-	std::unique_ptr<Pipeline> select_reservoirs_pipeline;
-	std::unique_ptr<Pipeline> update_reservoirs_pipeline;
-	std::unique_ptr<Pipeline> check_reservoirs_pipeline;
-
 	Buffer photon_buffer;
 	Buffer vcm_light_vertices_buffer;
 	Buffer light_path_cnt_buffer;

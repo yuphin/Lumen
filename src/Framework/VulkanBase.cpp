@@ -543,27 +543,6 @@ void VulkanBase::create_command_pools() {
 	}
 }
 
-// void VulkanBase::create_framebuffers(VkRenderPass render_pass) {
-//	ctx.swapchain_framebuffers.resize(ctx.swapchain_image_views.size());
-//
-//	for (size_t i = 0; i < ctx.swapchain_image_views.size(); i++) {
-//		VkImageView attachments[2] = { ctx.swapchain_image_views[i],
-//									  ctx.depth_img_view };
-//
-//		VkFramebufferCreateInfo frame_buffer_info =
-//			vk::framebuffer_create_info();
-//		frame_buffer_info.renderPass = render_pass;
-//		frame_buffer_info.attachmentCount = 2;
-//		frame_buffer_info.pAttachments = attachments;
-//		frame_buffer_info.width = ctx.swapchain_extent.width;
-//		frame_buffer_info.height = ctx.swapchain_extent.height;
-//		frame_buffer_info.layers = 1;
-//
-//		vk::check(vkCreateFramebuffer(ctx.device, &frame_buffer_info, nullptr,
-//				  &ctx.swapchain_framebuffers[i]),
-//				  "Failed to create framebuffer");
-//	}
-// }
 
 void VulkanBase::create_command_buffers() {
 	ctx.command_buffers.resize(swapchain_images.size());

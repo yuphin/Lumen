@@ -213,7 +213,7 @@ void SMLT::init() {
 
 void SMLT::render() {
 	const float ppm_base_radius = 0.25f;
-	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true);
+	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
 	VkClearValue clear_depth = {1.0f, 0};
 	VkViewport viewport = vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
@@ -358,8 +358,7 @@ void SMLT::render() {
 			.bind(mesh_lights_buffer)
 			.bind_tlas(instance->vkb.tlas);
 	}
-	instance->vkb.rg->run(cmd.handle);
-	instance->vkb.rg->submit(cmd);
+	instance->vkb.rg->run_and_submit(cmd);
 	// Start mutations
 	{
 		auto mutate = [&](uint32_t i) {

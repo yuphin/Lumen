@@ -59,6 +59,7 @@ void SPPM::init() {
 }
 
 void SPPM::render() {
+	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.light_pos = scene_ubo.light_pos;
 	pc_ray.light_type = 0;
 	pc_ray.light_intensity = 10;
@@ -160,6 +161,7 @@ void SPPM::render() {
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, scene_desc_buffer});
+	instance->vkb.rg->run_and_submit(cmd);
 }
 
 bool SPPM::update() {

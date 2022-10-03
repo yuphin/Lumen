@@ -115,12 +115,8 @@ void VCM::init() {
 }
 
 void VCM::render() {
+	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	const float ppm_base_radius = 0.25f;
-	// CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	// VkClearValue clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
-	// VkClearValue clear_depth = {1.0f, 0};
-	// VkViewport viewport = vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
-	// VkClearValue clear_values[] = {clear_color, clear_depth};
 	pc_ray.light_pos = scene_ubo.light_pos;
 	pc_ray.light_type = 0;
 	pc_ray.light_intensity = 10;
@@ -267,6 +263,7 @@ void VCM::render() {
 	if (!do_spatiotemporal) {
 		do_spatiotemporal = true;
 	}
+	instance->vkb.rg->run_and_submit(cmd);
 }
 
 bool VCM::update() {
@@ -280,14 +277,19 @@ bool VCM::update() {
 void VCM::destroy() {
 	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
-	std::vector<Buffer*> buffer_list = {&photon_buffer, &vcm_light_vertices_buffer, &light_path_cnt_buffer,
-										&color_storage_buffer, &vcm_reservoir_buffer};
+	std::vector<Buffer*> buffer_list = {&photon_buffer,
+										&vcm_light_vertices_buffer,
+										&light_path_cnt_buffer,
+										&color_storage_buffer,
+										&vcm_reservoir_buffer,
+										&light_samples_buffer,
+										&light_state_buffer,
+										&should_resample_buffer,
+										&angle_struct_buffer,
+										&angle_struct_cpu_buffer,
+										&avg_buffer};
 	for (auto b : buffer_list) {
 		b->destroy();
-	}
-	std::vector<Pipeline*> pipeline_list = {vcm_light_pipeline.get(), vcm_eye_pipeline.get()};
-	for (auto p : pipeline_list) {
-		p->cleanup();
 	}
 	vkDestroyDescriptorSetLayout(device, desc_set_layout, nullptr);
 	vkDestroyDescriptorPool(device, desc_pool, nullptr);

@@ -989,6 +989,11 @@ void RenderGraph::submit(CommandBuffer& cmd) {
 	beginning_pass_idx = ending_pass_idx;
 }
 
+void RenderGraph::run_and_submit(CommandBuffer& cmd) {
+	run(cmd.handle);
+	submit(cmd);
+}
+
 void RenderGraph::destroy() {
 	event_pool.cleanup(ctx->device);
 	for (const auto& [k, v] : pipeline_cache) {

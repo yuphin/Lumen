@@ -67,6 +67,7 @@ void ReSTIRGI::init() {
 }
 
 void ReSTIRGI::render() {
+	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.light_pos = scene_ubo.light_pos;
 	pc_ray.light_type = 0;
 	pc_ray.light_intensity = 10;
@@ -151,6 +152,7 @@ void ReSTIRGI::render() {
 		do_spatiotemporal = true;
 	}
 	pc_ray.total_frame_num++;
+	instance->vkb.rg->run_and_submit(cmd);
 }
 
 bool ReSTIRGI::update() {
@@ -165,8 +167,8 @@ bool ReSTIRGI::update() {
 void ReSTIRGI::destroy() {
 	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
-	std::vector<Buffer*> buffer_list = {&restir_samples_buffer, &temporal_reservoir_buffer, &spatial_reservoir_buffer,
-										&tmp_col_buffer};
+	std::vector<Buffer*> buffer_list = {&restir_samples_buffer, &restir_samples_old_buffer, &temporal_reservoir_buffer,
+										&spatial_reservoir_buffer, &tmp_col_buffer};
 	for (auto b : buffer_list) {
 		b->destroy();
 	}

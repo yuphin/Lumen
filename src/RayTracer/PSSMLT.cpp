@@ -211,7 +211,7 @@ void PSSMLT::render() {
 		scene_ubo_buffer,
 		scene_desc_buffer,
 	};
-	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true);
+	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	// Start bootstrap sampling
 	instance->vkb.rg
 		->add_rt("PSSMLT - Bootstrap Sampling", {.shaders = {{"src/shaders/integrators/pssmlt/pssmlt_seed.rgen"},
@@ -299,8 +299,7 @@ void PSSMLT::render() {
 		.bind(mesh_lights_buffer)
 		.bind_tlas(instance->vkb.tlas);
 
-	instance->vkb.rg->run(cmd.handle);
-	instance->vkb.rg->submit(cmd);
+	instance->vkb.rg->run_and_submit(cmd);
 	// Start mutations
 	{
 		auto mutate = [&](uint32_t i) {

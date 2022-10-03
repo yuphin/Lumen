@@ -45,6 +45,7 @@ void BDPT::init() {
 }
 
 void BDPT::render() {
+	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.light_pos = scene_ubo.light_pos;
 	pc_ray.light_type = 0;
 	pc_ray.light_intensity = 10;
@@ -81,6 +82,8 @@ void BDPT::render() {
 		.bind(mesh_lights_buffer)
 		.bind_tlas(instance->vkb.tlas);
 	//.finalize();
+
+	instance->vkb.rg->run_and_submit(cmd);
 }
 
 bool BDPT::update() {
