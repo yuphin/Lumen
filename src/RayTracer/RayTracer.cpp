@@ -2,7 +2,6 @@
 #include <regex>
 #include <stb_image.h>
 #define TINYEXR_IMPLEMENTATION
-#include <zlib.h>
 #include <tinyexr.h>
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
