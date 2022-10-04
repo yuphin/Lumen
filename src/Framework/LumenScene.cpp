@@ -98,25 +98,31 @@ void LumenScene::load_scene(const std::string& path) {
 		}
 		if (integrator["type"] == "path") {
 			config.integrator_type = IntegratorType::Path;
+			config.integrator_name = "Path";
 		} else if (integrator["type"] == "bdpt") {
 			config.integrator_type = IntegratorType::BDPT;
+			config.integrator_name = "BDPT";
 		} else if (integrator["type"] == "sppm") {
 			config.integrator_type = IntegratorType::SPPM;
 			config.base_radius = integrator["base_radius"];
+			config.integrator_name = "SPPM";
 		} else if (integrator["type"] == "vcm") {
 			config.integrator_type = IntegratorType::VCM;
 			config.enable_vm = integrator["enable_vm"] == 1;
 			config.radius_factor = integrator["radius_factor"];
+			config.integrator_name = "VCM";
 		} else if (integrator["type"] == "pssmlt") {
 			config.integrator_type = IntegratorType::PSSMLT;
 			config.mutations_per_pixel = integrator["mutations_per_pixel"];
 			config.num_mlt_threads = integrator["num_mlt_threads"];
 			config.num_bootstrap_samples = integrator["num_bootstrap_samples"];
+			config.integrator_name = "PSSMLT";
 		} else if (integrator["type"] == "smlt") {
 			config.integrator_type = IntegratorType::SMLT;
 			config.mutations_per_pixel = integrator["mutations_per_pixel"];
 			config.num_mlt_threads = integrator["num_mlt_threads"];
 			config.num_bootstrap_samples = integrator["num_bootstrap_samples"];
+			config.integrator_name = "SMLT (SBDPT + PSSMLT)";
 		} else if (integrator["type"] == "vcmmlt") {
 			config.integrator_type = IntegratorType::VCMMLT;
 			config.mutations_per_pixel = integrator["mutations_per_pixel"];
@@ -126,16 +132,17 @@ void LumenScene::load_scene(const std::string& path) {
 			config.enable_vm = integrator["enable_vm"] == 1;
 			config.alternate = integrator["alternate"] == 1;
 			config.light_first = integrator["light_first"] == 1;
+			config.integrator_name = "VCMMLT (VCM + PSSMLT)";
 		} else if (integrator["type"] == "restir") {
 			config.integrator_type = IntegratorType::ReSTIR;
+			config.integrator_name = "ReSTIR";
 		} else if (integrator["type"] == "restirgi") {
 			config.integrator_type = IntegratorType::ReSTIRGI;
+			config.integrator_name = "ReSTIR GI";
 		} else if (integrator["type"] == "ddgi") {
 			config.integrator_type = IntegratorType::DDGI;
-		} else if (integrator["type"] == "restirpt") {
-			config.integrator_type = IntegratorType::ReSTIRPT;
-		}
-
+			config.integrator_name = "DDGI";
+		} 
 		// Load obj file
 		const std::string mesh_file = root + std::string(j["mesh_file"]);
 		tinyobj::ObjReaderConfig reader_config;

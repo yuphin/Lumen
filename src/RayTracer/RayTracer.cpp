@@ -173,10 +173,6 @@ float RayTracer::draw_frame() {
 	ImGui::NewFrame();
 	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time, 1000 / cpu_avg_time);
 	ImGui::Text("Memory Usage: %f MB", get_memory_usage(vk_ctx.physical_device) * 1e-6);
-	if (ImGui::Button("Reload shaders")) {
-		// TODO
-		updated |= true;
-	}
 
 	bool gui_updated = integrator->gui();
 	updated |= ImGui::Checkbox("Enable ACES tonemapping", &settings.enable_tonemapping);
@@ -187,7 +183,6 @@ float RayTracer::draw_frame() {
 		integrator->updated = true;
 		return (float)t_diff;
 	}
-
 	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
 	if (show_cam_stats) {
 		ImGui::PushItemWidth(170);
@@ -196,6 +191,11 @@ float RayTracer::draw_frame() {
 		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[2]), 0.05f);
 		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[3]), 0.05f);
 	}
+	if (ImGui::Button("Reload shaders")) {
+		// TODO
+		updated |= true;
+	}
+
 
 	uint32_t image_idx = vkb.prepare_frame();
 

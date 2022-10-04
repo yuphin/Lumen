@@ -164,6 +164,12 @@ void Integrator::init() {
 	output_tex.create_empty_texture("Color Output", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL);
 }
 
+bool Integrator::gui() {
+	ImGui::Text("Path length: %d", lumen_scene->config.path_length);
+	ImGui::Text("Integrator: %s", lumen_scene->config.integrator_name.c_str());
+	return false;
+}
+
 void Integrator::create_blas() {
 	std::vector<BlasInput> blas_inputs;
 	auto vertex_address = get_device_address(instance->vkb.ctx.device, vertex_buffer.handle);
@@ -261,14 +267,14 @@ bool Integrator::update() {
 		camera->position += glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * trans_speed;
 		updated = true;
 	}
-	if (instance->window->is_key_held(KeyInput::SPACE)) {
+	if (instance->window->is_key_held(KeyInput::SPACE) || instance->window->is_key_held(KeyInput::KEY_E)) {
 		// Right
 		auto right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
 		auto up = glm::cross(right, front);
 		camera->position += up * trans_speed;
 		updated = true;
 	}
-	if (instance->window->is_key_held(KeyInput::KEY_LEFT_CONTROL)) {
+	if (instance->window->is_key_held(KeyInput::KEY_LEFT_CONTROL) || instance->window->is_key_held(KeyInput::KEY_Q)) {
 		auto right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
 		auto up = glm::cross(right, front);
 		camera->position -= up * trans_speed;
