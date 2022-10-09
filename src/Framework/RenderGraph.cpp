@@ -183,6 +183,11 @@ void RenderPass::transition_resources() {
 			if (dst.buf) {
 				write_impl(*dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
 			}
+		} else { // buffer
+			read_impl(*src.buf, VK_ACCESS_TRANSFER_READ_BIT);
+			if (dst.buf) {
+				write_impl(*dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
+			}
 		}
 	}
 
@@ -509,7 +514,7 @@ RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<Textur
 
 RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 	// TODO: Extend this if check upon extending this function
-	if (src.tex && dst.buf) {
+	if ((src.tex || src.buf) && dst.buf) {
 		if (dst.buf) {
 			resource_copies.push_back({ src,dst });
 		}
@@ -594,8 +599,12 @@ void RenderPass::write_impl(Texture2D& tex) {
 }
 
 void RenderPass::read_impl(Buffer& buffer) {
-	register_dependencies(buffer, VK_ACCESS_SHADER_READ_BIT);
-	rg->buffer_resource_map[buffer.handle] = {pass_idx, VK_ACCESS_SHADER_READ_BIT};
+	read_impl(buffer, VK_ACCESS_SHADER_READ_BIT);
+}
+
+void RenderPass::read_impl(Buffer& buffer, VkAccessFlags access_flags) {
+	register_dependencies(buffer, access_flags);
+	rg->buffer_resource_map[buffer.handle] = {pass_idx, access_flags };
 }
 
 void RenderPass::read_impl(Texture2D& tex) {
@@ -793,7 +802,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	for (const auto& [src, dst] : resource_copies) {
 		if (src.tex) {
 			if (dst.buf) {
-				// Assumption: The copy(...) is called in the pass that produced the src or earlier
+				// Assumption: The copy(...) is called in the pass after the src is produced
 				VkBufferImageCopy region = {};
 				region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 				region.imageSubresource.mipLevel = 0;
@@ -805,6 +814,11 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				vkCmdCopyImageToBuffer(cmd, src.tex->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 									   dst.buf->handle, 1, &region);
 				src.tex->transition(cmd, old_layout);
+			}
+		} else { // buffer
+			if (dst.buf) {
+				VkBufferCopy copy_region = {.size = src.buf->size};
+				vkCmdCopyBuffer(cmd, src.buf->handle, dst.buf->handle, 1, &copy_region);
 			}
 		}
 	}

@@ -167,6 +167,7 @@ class RenderPass {
 	void write_impl(Buffer& buffer, VkAccessFlags access_flags);
 	void write_impl(Texture2D& tex);
 	void read_impl(Buffer& buffer);
+	void read_impl(Buffer& buffer, VkAccessFlags access_flags);
 	void read_impl(Texture2D& tex);
 
 	void run(VkCommandBuffer cmd);

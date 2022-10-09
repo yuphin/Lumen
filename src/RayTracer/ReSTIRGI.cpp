@@ -81,13 +81,13 @@ void ReSTIRGI::render() {
 
 	// Trace rays
 	instance->vkb.rg
-		->add_rt("ReSTIRGI - Generate Samples", {.shaders = {{"src/shaders/integrators/restir/gi/restir.rgen"},
+		->add_rt("ReSTIRGI - Generate Samples", { .shaders = {{"src/shaders/integrators/restir/gi/restir.rgen"},
 															 {"src/shaders/ray.rmiss"},
 															 {"src/shaders/ray_shadow.rmiss"},
 															 {"src/shaders/ray.rchit"},
 															 {"src/shaders/ray.rahit"}},
 												 .dims = {instance->width, instance->height},
-												 .accel = instance->vkb.tlas.accel})
+												 .accel = instance->vkb.tlas.accel })
 		.push_constants(&pc_ray)
 		.zero(restir_samples_buffer)
 		.zero(temporal_reservoir_buffer, !do_spatiotemporal)
@@ -97,10 +97,11 @@ void ReSTIRGI::render() {
 			prim_lookup_buffer,
 			scene_ubo_buffer,
 			scene_desc_buffer,
-		})
-		.bind_texture_array(diffuse_textures)
+			  })
+			  .bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
-		.bind_tlas(instance->vkb.tlas);
+		.bind_tlas(instance->vkb.tlas)
+		.copy(restir_samples_buffer, restir_samples_old_buffer);
 
 	// Temporal reuse
 	instance->vkb.rg
@@ -144,10 +145,10 @@ void ReSTIRGI::render() {
 	// Output
 	instance->vkb.rg
 		->add_compute("Output",
-					  {.shader = Shader("src/shaders/integrators/restir/gi/output.comp"),
-					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
+					  { .shader = Shader("src/shaders/integrators/restir/gi/output.comp"),
+					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1} })
 		.push_constants(&pc_ray)
-		.bind({output_tex, scene_desc_buffer});
+		.bind({ output_tex, scene_desc_buffer });
 	if (!do_spatiotemporal) {
 		do_spatiotemporal = true;
 	}
