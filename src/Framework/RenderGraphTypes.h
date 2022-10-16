@@ -13,6 +13,7 @@ class RenderPass;
 
 struct RenderGraphSettings {
 	bool shader_inference = false;
+	bool use_events = false;
 };
 
 struct GraphicsPassSettings {

@@ -51,7 +51,15 @@ void RayTracer::init(Window* window) {
 	initialized = true;
 
 	scene.load_scene(scene_name);
+
+	// Enable shader reflections for the render graph
 	vkb.rg->settings.shader_inference = true;
+	// Disable event based synchronization
+	// Currently the event API that comes with Vulkan 1.3 is buggy on NVIDIA drivers
+	// so this is turned off and pipeline barriers are used instead
+	vkb.rg->settings.use_events = false;
+
+
 	switch (scene.config.integrator_type) {
 		case IntegratorType::Path:
 			integrator = std::make_unique<Path>(this, &scene);

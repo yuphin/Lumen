@@ -33,9 +33,9 @@
  ### About experimental features
  With the recently integrated render graph, Lumen uses some of the more experimental Vulkan features. These are namely,
   - Templated push descriptors (may be problematic with AMD)
-  - Syncronization2 features (available from Vulkan 1.3)
-
-### NOTE: As of 01.10.2022, there may be bugs with Vulkan syncronization2 API coupled with Vulkan Ray Tracing in the latest Nvidia GameReady drivers. If you encounter any issues, make sure to use the Vulkan beta drivers. If you encounter any issue in AMD cards (provided you have the requirements), make sure to also use the latest drivers. If issues related to the [render graph integration](https://github.com/yuphin/Lumen/pull/2) still persist, you can try out the commit in the [release](https://github.com/yuphin/Lumen/releases/tag/v1.0.0).
+  - Event-based syncronization (via syncronization2 API, available from Vulkan 1.3)
+    - Experimental feature, may not work depending on your driver (May need Vulkan beta drivers on Nvidia)
+    - Enabled via `use_events` flag in the Render Graph settings. (See `RenderGraphSettings` in `RenderGraphTypes.h` and `RayTracer.cpp`)
 
 ## Showcase
 ##### Caustics Glass (VCM)

@@ -615,26 +615,37 @@ void RenderPass::read_impl(Texture2D& tex) {
 
 void RenderPass::run(VkCommandBuffer cmd) {
 	std::vector<VkEvent> wait_events;
-	wait_events.reserve(wait_signals_buffer.size());
+	const bool use_events = rg->settings.use_events;
+	if (use_events) {
+		wait_events.reserve(wait_signals_buffer.size());
+	}
 	DebugMarker::begin_region(rg->ctx->device, cmd, name.c_str(), glm::vec4(1.0f, 0.78f, 0.05f, 1.0f));
 	// Wait: Buffer
 	auto& buffer_sync = rg->buffer_sync_resources[pass_idx];
 	auto& img_sync = rg->img_sync_resources[pass_idx];
 	int i = 0;
 	for (const auto& [k, v] : wait_signals_buffer) {
-		LUMEN_ASSERT(rg->passes[v.opposing_pass_idx].set_signals_buffer[k].event, "Event can't be null");
+		if (use_events) {
+			LUMEN_ASSERT(rg->passes[v.opposing_pass_idx].set_signals_buffer[k].event, "Event can't be null");
+		}
 		buffer_sync.buffer_bariers[i] =
 			buffer_barrier2(k, v.src_access_flags, v.dst_access_flags,
 							get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, v.src_access_flags),
 							get_pipeline_stage(type, v.dst_access_flags));
 		buffer_sync.dependency_infos[i] = vk::dependency_info(1, &buffer_sync.buffer_bariers[i]);
-		wait_events.push_back(rg->passes[v.opposing_pass_idx].set_signals_buffer[k].event);
+		if (use_events) {
+			wait_events.push_back(rg->passes[v.opposing_pass_idx].set_signals_buffer[k].event);
+		}
 		i++;
 	}
 	if (wait_events.size()) {
 		vkCmdWaitEvents2(cmd, (uint32_t)wait_events.size(), wait_events.data(), buffer_sync.dependency_infos.data());
 		for (int i = 0; i < wait_events.size(); i++) {
 			vkCmdResetEvent2(cmd, wait_events[i], buffer_sync.buffer_bariers[i].dstStageMask);
+		}
+	} else if (!use_events) {
+		for (const auto& info : buffer_sync.dependency_infos) {
+			vkCmdPipelineBarrier2(cmd, &info);
 		}
 	}
 
@@ -661,7 +672,9 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	wait_events.clear();
 	i = 0;
 	for (const auto& [k, v] : wait_signals_img) {
-		LUMEN_ASSERT(rg->passes[v.opposing_pass_idx].set_signals_img[k].event, "Event can't be null");
+		if (use_events) {
+			LUMEN_ASSERT(rg->passes[v.opposing_pass_idx].set_signals_img[k].event, "Event can't be null");
+		}
 		auto src_access_flags = vk::access_flags_for_img_layout(v.old_layout);
 		auto dst_access_flags = vk::access_flags_for_img_layout(v.new_layout);
 		auto src_stage = get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, src_access_flags);
@@ -670,13 +683,20 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			image_barrier2(k, src_access_flags, dst_access_flags, v.old_layout, v.new_layout, v.image_aspect, src_stage,
 						   dst_stage, rg->ctx->indices.gfx_family.value());
 		img_sync.dependency_infos[i] = vk::dependency_info(1, &img_sync.img_barriers[i]);
-		wait_events.push_back(rg->passes[v.opposing_pass_idx].set_signals_img[k].event);
+		if (use_events) {
+			wait_events.push_back(rg->passes[v.opposing_pass_idx].set_signals_img[k].event);
+		}
 		i++;
 	}
+
 	if (wait_events.size()) {
 		vkCmdWaitEvents2(cmd, (uint32_t)wait_events.size(), wait_events.data(), img_sync.dependency_infos.data());
 		for (int i = 0; i < wait_events.size(); i++) {
 			vkCmdResetEvent2(cmd, wait_events[i], img_sync.img_barriers[i].dstStageMask);
+		}
+	} else if (!use_events) {
+		for (const auto& info : img_sync.dependency_infos) {
+			vkCmdPipelineBarrier2(cmd, &info);
 		}
 	}
 
@@ -830,9 +850,11 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			buffer_barrier2(k, v.src_access_flags, v.dst_access_flags, get_pipeline_stage(type, v.src_access_flags),
 							get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, v.dst_access_flags));
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);
-		set_signals_buffer[k].event = rg->event_pool.get_event(rg->ctx->device, cmd);
 
-		vkCmdSetEvent2(cmd, set_signals_buffer[k].event, &dependency_info);
+		if (use_events) {
+			set_signals_buffer[k].event = rg->event_pool.get_event(rg->ctx->device, cmd);
+			vkCmdSetEvent2(cmd, set_signals_buffer[k].event, &dependency_info);
+		}
 	}
 
 	// Set: Images
@@ -847,8 +869,10 @@ void RenderPass::run(VkCommandBuffer cmd) {
 										  rg->ctx->indices.gfx_family.value());
 
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);
-		set_signals_img[k].event = rg->event_pool.get_event(rg->ctx->device, cmd);
-		vkCmdSetEvent2(cmd, set_signals_img[k].event, &dependency_info);
+		if (use_events) {
+			set_signals_img[k].event = rg->event_pool.get_event(rg->ctx->device, cmd);
+			vkCmdSetEvent2(cmd, set_signals_img[k].event, &dependency_info);
+		}
 	}
 	DebugMarker::end_region(rg->ctx->device, cmd);
 }
