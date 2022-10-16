@@ -1034,6 +1034,11 @@ void RenderGraph::run_and_submit(CommandBuffer& cmd) {
 
 void RenderGraph::destroy() {
 	event_pool.cleanup(ctx->device);
+	for (auto& pass : passes) {
+		if (pass.push_constant_data) {
+			free(pass.push_constant_data);
+		}
+	}
 	for (const auto& [k, v] : pipeline_cache) {
 		v.pipeline->cleanup();
 	}
