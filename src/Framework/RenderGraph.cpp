@@ -582,7 +582,7 @@ void RenderPass::finalize() {
 				break;
 		}
 	} else {
-		transition_resources();
+		rg->pipeline_tasks.push_back({ nullptr , pass_idx});
 	}
 }
 
@@ -933,6 +933,9 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	uint32_t i = beginning_pass_idx;
 	uint32_t rem_passes = ending_pass_idx - beginning_pass_idx;
 	while (rem_passes > 0) {
+		if (i == 11) {
+			int a = 4;
+		}
 		if (passes[i].active) {
 			passes[i].finalize();
 			rem_passes--;
@@ -944,7 +947,9 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		std::vector<std::future<void>> futures;
 		futures.reserve(pipeline_tasks.size());
 		for (auto& [task, idx] : pipeline_tasks) {
-			futures.push_back(ThreadPool::submit(task, &passes[idx]));
+			if (task) {
+				futures.push_back(ThreadPool::submit(task, &passes[idx]));
+			}
 		}
 		for (auto& future : futures) {
 			future.wait();

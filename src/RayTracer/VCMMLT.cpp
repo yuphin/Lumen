@@ -1,6 +1,6 @@
 #include "LumenPCH.h"
 #include "VCMMLT.h"
-static bool use_vm = true;
+static bool use_vm = false;
 static float vcm_radius_factor = 0.025f;
 static bool light_first = false;
 void VCMMLT::init() {
@@ -204,7 +204,7 @@ void VCMMLT::init() {
 }
 
 void VCMMLT::render() {
-	LUMEN_TRACE("Rendering sample {}...", sample_cnt);
+	LUMEN_TRACE("Rendering sample {}...", sample_cnt++);
 	const float ppm_base_radius = 0.25f;
 	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = {0.25f, 0.25f, 0.25f, 1.0f};

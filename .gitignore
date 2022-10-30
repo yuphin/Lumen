@@ -8,3 +8,4 @@ scenes/Sponza
 *.vcxproj.user
 *.as
 imgui.ini
+.*/
