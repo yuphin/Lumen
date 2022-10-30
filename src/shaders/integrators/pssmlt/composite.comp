@@ -18,7 +18,6 @@ layout(buffer_reference, scalar) buffer ChainStats { ChainData d[]; };
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 layout(buffer_reference, scalar) buffer CDFSum { float d; };
 ChainStats chain_stats = ChainStats(scene_desc.chain_stats_addr);
-ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
 MLTColor mlt_col = MLTColor(scene_desc.mlt_col_addr);
 CDFSum cdf_sum = CDFSum(scene_desc.cdf_sum_addr);
 void main() {
@@ -26,9 +25,7 @@ void main() {
                          gl_GlobalInvocationID.x % pc_ray.size_y);
     vec3 col = vec3(0);
     col += mlt_col.d[gl_GlobalInvocationID.x] * cdf_sum.d / pc_ray.mutations_per_pixel;
-    col += tmp_col.d[gl_GlobalInvocationID.x];
     mlt_col.d[gl_GlobalInvocationID.x] = vec3(0);
-    tmp_col.d[gl_GlobalInvocationID.x] = vec3(0);
     if (pc_ray.frame_num > 0) {
         float w = 1. / float(pc_ray.frame_num + 1);
 

@@ -933,9 +933,6 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	uint32_t i = beginning_pass_idx;
 	uint32_t rem_passes = ending_pass_idx - beginning_pass_idx;
 	while (rem_passes > 0) {
-		if (i == 11) {
-			int a = 4;
-		}
 		if (passes[i].active) {
 			passes[i].finalize();
 			rem_passes--;
