@@ -284,97 +284,15 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 }
 
 RenderPass& RenderGraph::add_rt(const std::string& name, const RTPassSettings& settings) {
-	Pipeline* pipeline;
-	uint32_t pass_idx = (uint32_t)passes.size();
-	bool cached = false;
-	ending_pass_idx++;
-	if (pipeline_cache.find(name) != pipeline_cache.end()) {
-		auto& storage = pipeline_cache[name];
-		if (!recording && storage.pass_idxs.size()) {
-			auto idx = storage.pass_idxs[storage.offset_idx];
-			passes[idx].active = true;
-			if (reload_shaders) {
-				if (storage.offset_idx == 0) {
-					pipeline_cache[name].pipeline->cleanup();
-					pipeline_cache[name].pipeline = std::make_unique<Pipeline>(ctx, name);
-				}
-				passes[idx].pipeline = pipeline_cache[name].pipeline.get();
-			}
-			++storage.offset_idx;
-			return passes[idx];
-		}
-
-		pipeline = pipeline_cache[name].pipeline.get();
-		cached = true;
-	} else {
-		pipeline_cache[name] = {std::make_unique<Pipeline>(ctx, name)};
-		pipeline = pipeline_cache[name].pipeline.get();
-	}
-	passes.emplace_back(PassType::RT, pipeline, name, this, pass_idx, settings, cached);
-	return passes.back();
+	return add_pass_impl(name, settings);
 }
 
 RenderPass& RenderGraph::add_gfx(const std::string& name, const GraphicsPassSettings& settings) {
-	Pipeline* pipeline;
-	uint32_t pass_idx = (uint32_t)passes.size();
-	bool cached = false;
-	ending_pass_idx++;
-	if (pipeline_cache.find(name) != pipeline_cache.end()) {
-		auto& storage = pipeline_cache[name];
-		if (!recording && storage.pass_idxs.size()) {
-			auto idx = storage.pass_idxs[storage.offset_idx];
-			auto& curr_pass = passes[idx];
-			curr_pass.gfx_settings->color_outputs = settings.color_outputs;
-			curr_pass.gfx_settings->depth_output = settings.depth_output;
-			curr_pass.active = true;
-			if (reload_shaders) {
-				if (storage.offset_idx == 0) {
-					pipeline_cache[name].pipeline->cleanup();
-					pipeline_cache[name].pipeline = std::make_unique<Pipeline>(ctx, name);
-				}
-				passes[idx].pipeline = pipeline_cache[name].pipeline.get();
-			}
-			++storage.offset_idx;
-			return curr_pass;
-		}
-		pipeline = pipeline_cache[name].pipeline.get();
-		cached = true;
-	} else {
-		pipeline_cache[name] = {std::make_unique<Pipeline>(ctx, name)};
-		pipeline = pipeline_cache[name].pipeline.get();
-	}
-	passes.emplace_back(PassType::Graphics, pipeline, name, this, pass_idx, settings, cached);
-	return passes.back();
+	return add_pass_impl(name, settings);
 }
 
 RenderPass& RenderGraph::add_compute(const std::string& name, const ComputePassSettings& settings) {
-	Pipeline* pipeline;
-	uint32_t pass_idx = (uint32_t)passes.size();
-	bool cached = false;
-	ending_pass_idx++;
-	if (pipeline_cache.find(name) != pipeline_cache.end()) {
-		auto& storage = pipeline_cache[name];
-		if (!recording && storage.pass_idxs.size()) {
-			auto idx = storage.pass_idxs[storage.offset_idx];
-			passes[idx].active = true;
-			if (reload_shaders) {
-				if (storage.offset_idx == 0) {
-					pipeline_cache[name].pipeline->cleanup();
-					pipeline_cache[name].pipeline = std::make_unique<Pipeline>(ctx, name);
-				}
-				passes[idx].pipeline = pipeline_cache[name].pipeline.get();
-			}
-			++storage.offset_idx;
-			return passes[idx];
-		}
-		pipeline = pipeline_cache[name].pipeline.get();
-		cached = true;
-	} else {
-		pipeline_cache[name] = {std::make_unique<Pipeline>(ctx, name)};
-		pipeline = pipeline_cache[name].pipeline.get();
-	}
-	passes.emplace_back(PassType::Compute, pipeline, name, this, pass_idx, settings, cached);
-	return passes.back();
+	return add_pass_impl(name, settings);
 }
 
 RenderPass& RenderPass::bind(const ResourceBinding& binding) {

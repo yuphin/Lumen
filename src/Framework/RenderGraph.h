@@ -75,6 +75,9 @@ private:
 	std::unordered_map<VkImage, uint32_t> img_resource_map;	 // Tex2D handle - Pass Idx
 	uint32_t beginning_pass_idx = 0;
 	uint32_t ending_pass_idx = 0;
+
+	template <typename Settings>
+	RenderPass& add_pass_impl(const std::string& name, const Settings& settings);
 };
 
 class RenderPass {
@@ -129,17 +132,7 @@ class RenderPass {
 
 	RenderPass& skip_execution();
 	template <typename T>
-	RenderPass& push_constants(T* data) {
-		void* new_ptr = nullptr;
-		if (rg->recording) {
-			new_ptr = malloc(sizeof(T));
-		} else {
-			new_ptr = push_constant_data;
-		}
-		memcpy(new_ptr, data, sizeof(T));
-		push_constant_data = new_ptr;
-		return *this;
-	}
+	RenderPass& push_constants(T* data);
 	RenderPass& zero(const Resource& resource);
 	RenderPass& zero(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
 	RenderPass& zero(std::initializer_list<std::reference_wrapper<Texture2D>> textures);
@@ -170,6 +163,7 @@ class RenderPass {
 	void read_impl(Buffer& buffer, VkAccessFlags access_flags);
 	void read_impl(Texture2D& tex);
 
+
 	void run(VkCommandBuffer cmd);
 	void register_dependencies(Buffer& buffer, VkAccessFlags dst_access_flags);
 	void register_dependencies(Texture2D& tex, VkImageLayout target_layout);
@@ -186,8 +180,8 @@ class RenderPass {
 	/*
 		Note:
 		The assumption is that a SyncDescriptor is unique to a pass (either via
-	   Buffer or Image). Which is reasonable because each pass is comprised of a
-	   single shader dispatch
+		Buffer or Image). Which is reasonable because each pass is comprised of a
+		single shader dispatch
 	*/
 	std::unordered_map<VkBuffer, BufferSyncDescriptor> set_signals_buffer;
 	std::unordered_map<VkBuffer, BufferSyncDescriptor> wait_signals_buffer;
@@ -210,3 +204,59 @@ class RenderPass {
 	bool disable_execution = false;
 };
 
+template<typename Settings>
+inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Settings& settings) {
+	Pipeline* pipeline;
+	uint32_t pass_idx = (uint32_t)passes.size();
+	bool cached = false;
+	ending_pass_idx++;
+	if (pipeline_cache.find(name) != pipeline_cache.end()) {
+		auto& storage = pipeline_cache[name];
+		if (!recording && storage.pass_idxs.size()) {
+			auto idx = storage.pass_idxs[storage.offset_idx];
+			if constexpr (std::is_same_v<GraphicsPassSettings, Settings>) {
+				auto& curr_pass = passes[idx];
+				curr_pass.gfx_settings->color_outputs = settings.color_outputs;
+				curr_pass.gfx_settings->depth_output = settings.depth_output;
+			}
+			passes[idx].active = true;
+			if (reload_shaders) {
+				if (storage.offset_idx == 0) {
+					pipeline_cache[name].pipeline->cleanup();
+					pipeline_cache[name].pipeline = std::make_unique<Pipeline>(ctx, name);
+				}
+				passes[idx].pipeline = pipeline_cache[name].pipeline.get();
+			}
+			++storage.offset_idx;
+			return passes[idx];
+		}
+		pipeline = pipeline_cache[name].pipeline.get();
+		cached = true;
+	} else {
+		pipeline_cache[name] = {std::make_unique<Pipeline>(ctx, name)};
+		pipeline = pipeline_cache[name].pipeline.get();
+	}
+	PassType type;
+	if constexpr (std::is_same_v<ComputePassSettings, Settings>) {
+		type = PassType::Compute;
+	} else if constexpr (std::is_same_v<GraphicsPassSettings, Settings>) {
+		type = PassType::Graphics;
+	} else {
+		type = PassType::RT;
+	}
+	passes.emplace_back(type, pipeline, name, this, pass_idx, settings, cached);
+	return passes.back();
+}
+
+template<typename T>
+inline RenderPass& RenderPass::push_constants(T* data) {
+	void* new_ptr = nullptr;
+	if (rg->recording) {
+		new_ptr = malloc(sizeof(T));
+	} else {
+		new_ptr = push_constant_data;
+	}
+	memcpy(new_ptr, data, sizeof(T));
+	push_constant_data = new_ptr;
+	return *this;
+}

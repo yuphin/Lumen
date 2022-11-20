@@ -95,8 +95,7 @@ struct ResourceBinding {
 	}
 };
 
-struct Resource
-{
+struct Resource {
 	Buffer* buf = nullptr;
 	Texture2D* tex = nullptr;
 	Resource(Buffer& buf) : buf(&buf) {}
