@@ -11,41 +11,6 @@
 	if (!(x)) {          \
 		return *this;  \
 	}
-static VkPipelineStageFlags get_pipeline_stage(PassType pass_type, VkAccessFlags access_flags) {
-	VkPipelineStageFlags res = 0;
-	switch (pass_type) {
-		case PassType::Compute:
-			res = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-			break;
-		case PassType::Graphics:
-			res = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-			break;
-		case PassType::RT:
-			res = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
-			break;
-		default:
-			res = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-			break;
-	}
-	if ((access_flags & VK_ACCESS_TRANSFER_READ_BIT) || (access_flags & VK_ACCESS_TRANSFER_WRITE_BIT)) {
-		res |= VK_PIPELINE_STAGE_TRANSFER_BIT;
-	}
-	return res;
-}
-
-inline static VkImageLayout get_image_layout(VkDescriptorType type) {
-	switch (type) {
-		case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-		case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-			return VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
-		case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-			return VK_IMAGE_LAYOUT_GENERAL;
-		default:
-			break;
-	}
-	LUMEN_ERROR("Unhandled image layout case");
-	return VK_IMAGE_LAYOUT_GENERAL;
-}
 
 void RenderPass::register_dependencies(Buffer& buffer, VkAccessFlags dst_access_flags) {
 	const bool found = rg->buffer_resource_map.find(buffer.handle) != rg->buffer_resource_map.end();

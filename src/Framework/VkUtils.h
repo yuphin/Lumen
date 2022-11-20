@@ -16,11 +16,6 @@ VkImageView create_image_view(VkDevice device, const VkImage& img, VkFormat form
 BlasInput to_vk_geometry(GltfPrimMesh& prim, VkDeviceAddress vertex_address, VkDeviceAddress index_address);
 BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertex_address, VkDeviceAddress index_address);
 
-VkRenderPass create_render_pass(VkDevice device, const std::vector<VkFormat>& color_attachment_formats,
-								VkFormat depth_format, uint32_t subpass_count = 1, bool clear_color = true,
-								bool clear_depth = true, VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
-								VkImageLayout final_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-
 inline bool has_extension(std::string_view filename, std::string_view ext) { return filename.ends_with(ext); }
 
 inline VkTransformMatrixKHR to_vk_matrix(const glm::mat4& mat) {
@@ -29,6 +24,9 @@ inline VkTransformMatrixKHR to_vk_matrix(const glm::mat4& mat) {
 	memcpy(&out_matrix, &temp, sizeof(VkTransformMatrixKHR));
 	return out_matrix;
 }
+
+VkPipelineStageFlags get_pipeline_stage(PassType pass_type, VkAccessFlags access_flags);
+VkImageLayout get_image_layout(VkDescriptorType type);
 
 template <class T>
 constexpr T align_up(T x, size_t a) noexcept {
