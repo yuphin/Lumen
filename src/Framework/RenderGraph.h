@@ -40,6 +40,7 @@ public:
 	void destroy();
 	friend RenderPass;
 	bool recording = true;
+	bool reload_shaders = false;
 	EventPool event_pool;
 	std::unordered_map<std::string, Buffer*> registered_buffer_pointers;
 	std::unordered_map<std::string, Shader> shader_cache;
@@ -58,8 +59,7 @@ private:
 
 	struct PipelineStorage {
 		std::unique_ptr<Pipeline> pipeline;
-		uint32_t offset_idx;  // Offset index relative to the pass_idx the
-							  // pipeline holds
+		uint32_t offset_idx;
 		std::vector<uint32_t> pass_idxs;
 	};
 	VulkanContext* ctx = nullptr;

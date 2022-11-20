@@ -2,8 +2,8 @@
 #include "Pipeline.h"
 #include "VkUtils.h"
 
-Pipeline::Pipeline(VulkanContext* ctx, size_t pass_idx, const std::string& name)
-	: ctx(ctx), pass_idx(pass_idx), name(name) {}
+Pipeline::Pipeline(VulkanContext* ctx, const std::string& name)
+	: ctx(ctx),name(name) {}
 
 void Pipeline::reload() {}
 

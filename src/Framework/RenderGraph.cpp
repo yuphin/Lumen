@@ -8,7 +8,7 @@
 // Possible solution: Make compilation with debugPrintf shaders synchronous?
 
 #define DIRTY_CHECK(x) \
-	if (!x) {          \
+	if (!(x)) {          \
 		return *this;  \
 	}
 static VkPipelineStageFlags get_pipeline_stage(PassType pass_type, VkAccessFlags access_flags) {
@@ -292,14 +292,22 @@ RenderPass& RenderGraph::add_rt(const std::string& name, const RTPassSettings& s
 		auto& storage = pipeline_cache[name];
 		if (!recording && storage.pass_idxs.size()) {
 			auto idx = storage.pass_idxs[storage.offset_idx];
-			++storage.offset_idx;
 			passes[idx].active = true;
+			if (reload_shaders) {
+				if (storage.offset_idx == 0) {
+					pipeline_cache[name].pipeline->cleanup();
+					pipeline_cache[name].pipeline = std::make_unique<Pipeline>(ctx, name);
+				}
+				passes[idx].pipeline = pipeline_cache[name].pipeline.get();
+			}
+			++storage.offset_idx;
 			return passes[idx];
 		}
+
 		pipeline = pipeline_cache[name].pipeline.get();
 		cached = true;
 	} else {
-		pipeline_cache[name] = {std::make_unique<Pipeline>(ctx, pass_idx, name)};
+		pipeline_cache[name] = {std::make_unique<Pipeline>(ctx, name)};
 		pipeline = pipeline_cache[name].pipeline.get();
 	}
 	passes.emplace_back(PassType::RT, pipeline, name, this, pass_idx, settings, cached);
@@ -315,17 +323,24 @@ RenderPass& RenderGraph::add_gfx(const std::string& name, const GraphicsPassSett
 		auto& storage = pipeline_cache[name];
 		if (!recording && storage.pass_idxs.size()) {
 			auto idx = storage.pass_idxs[storage.offset_idx];
-			++storage.offset_idx;
 			auto& curr_pass = passes[idx];
 			curr_pass.gfx_settings->color_outputs = settings.color_outputs;
 			curr_pass.gfx_settings->depth_output = settings.depth_output;
 			curr_pass.active = true;
+			if (reload_shaders) {
+				if (storage.offset_idx == 0) {
+					pipeline_cache[name].pipeline->cleanup();
+					pipeline_cache[name].pipeline = std::make_unique<Pipeline>(ctx, name);
+				}
+				passes[idx].pipeline = pipeline_cache[name].pipeline.get();
+			}
+			++storage.offset_idx;
 			return curr_pass;
 		}
 		pipeline = pipeline_cache[name].pipeline.get();
 		cached = true;
 	} else {
-		pipeline_cache[name] = {std::make_unique<Pipeline>(ctx, pass_idx, name)};
+		pipeline_cache[name] = {std::make_unique<Pipeline>(ctx, name)};
 		pipeline = pipeline_cache[name].pipeline.get();
 	}
 	passes.emplace_back(PassType::Graphics, pipeline, name, this, pass_idx, settings, cached);
@@ -342,13 +357,20 @@ RenderPass& RenderGraph::add_compute(const std::string& name, const ComputePassS
 		if (!recording && storage.pass_idxs.size()) {
 			auto idx = storage.pass_idxs[storage.offset_idx];
 			passes[idx].active = true;
+			if (reload_shaders) {
+				if (storage.offset_idx == 0) {
+					pipeline_cache[name].pipeline->cleanup();
+					pipeline_cache[name].pipeline = std::make_unique<Pipeline>(ctx, name);
+				}
+				passes[idx].pipeline = pipeline_cache[name].pipeline.get();
+			}
 			++storage.offset_idx;
 			return passes[idx];
 		}
 		pipeline = pipeline_cache[name].pipeline.get();
 		cached = true;
 	} else {
-		pipeline_cache[name] = {std::make_unique<Pipeline>(ctx, pass_idx, name)};
+		pipeline_cache[name] = {std::make_unique<Pipeline>(ctx, name)};
 		pipeline = pipeline_cache[name].pipeline.get();
 	}
 	passes.emplace_back(PassType::Compute, pipeline, name, this, pass_idx, settings, cached);
@@ -405,7 +427,7 @@ RenderPass& RenderPass::bind_buffer_array(std::vector<Buffer>& buffers) {
 }
 
 RenderPass& RenderPass::bind_tlas(const AccelKHR& tlas) {
-	DIRTY_CHECK(rg->recording);
+	DIRTY_CHECK(rg->recording || rg->reload_shaders);
 	pipeline->tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
 	pipeline->tlas_info.accelerationStructureCount = 1;
 	pipeline->tlas_info.pAccelerationStructures = &tlas.accel;
@@ -526,7 +548,7 @@ RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 }
 
 void RenderPass::finalize() {
-	if (!rg->recording) {
+	if (!rg->recording && !rg->reload_shaders) {
 		// Handle resource transitions
 		transition_resources();
 		return;
@@ -882,7 +904,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	img_sync_resources.resize(passes.size());
 
 	// Compile shaders and process resources
-	if (recording) {
+	if (recording || reload_shaders) {
 		auto cmp = [](const std::pair<Shader*, RenderPass*>& a, const std::pair<Shader*, RenderPass*>& b) {
 			return a.first->filename < b.first->filename;
 		};
@@ -890,7 +912,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		std::unordered_map<RenderPass*, std::vector<Shader*>> unique_shaders;
 		std::unordered_map<RenderPass*, std::vector<Shader*>> existing_shaders;
 		
-		// Recording -> The pass is active by default
+		// Recording or reload -> The pass is active by default
 		for (auto i = beginning_pass_idx; i < ending_pass_idx; i++) {
 			if (passes[i].gfx_settings) {
 				for (auto& shader : passes[i].gfx_settings->shaders) {
@@ -1013,6 +1035,7 @@ void RenderGraph::reset(VkCommandBuffer cmd) {
 	buffer_sync_resources.clear();
 	img_sync_resources.clear();
 	beginning_pass_idx = ending_pass_idx = 0;
+	reload_shaders = false;
 }
 
 void RenderGraph::submit(CommandBuffer& cmd) {

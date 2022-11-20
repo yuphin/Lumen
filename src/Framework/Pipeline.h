@@ -16,7 +16,7 @@ struct PipelineTrace {
 struct Pipeline {
    public:
 	enum class PipelineType { GFX = 0, RT = 1, COMPUTE = 2 };
-	Pipeline(VulkanContext* ctx, size_t pass_idx, const std::string& name);
+	Pipeline(VulkanContext* ctx, const std::string& name);
 	void reload();
 	void cleanup();
 	void create_gfx_pipeline(const GraphicsPassSettings& settings, const std::vector<uint32_t>& descriptor_counts,
@@ -55,7 +55,6 @@ struct Pipeline {
 	VkWriteDescriptorSetAccelerationStructureKHR tlas_info = {};
 	SBTWrapper sbt_wrapper;
 	PipelineType type;
-	size_t pass_idx;
 	bool running = true;
 	VkDescriptorUpdateTemplate update_template = nullptr;
 	VkShaderStageFlags pc_stages = 0;

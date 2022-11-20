@@ -184,13 +184,7 @@ float RayTracer::draw_frame() {
 
 	bool gui_updated = integrator->gui();
 	updated |= ImGui::Checkbox("Enable ACES tonemapping", &settings.enable_tonemapping);
-	if (updated || gui_updated) {
-		ImGui::Render();
-		auto t_end = glfwGetTime() * 1000;
-		auto t_diff = t_end - t_begin;
-		integrator->updated = true;
-		return (float)t_diff;
-	}
+
 	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
 	if (show_cam_stats) {
 		ImGui::PushItemWidth(170);
@@ -201,7 +195,17 @@ float RayTracer::draw_frame() {
 	}
 	if (ImGui::Button("Reload shaders")) {
 		// TODO
+		vkb.rg->reload_shaders = true;
+		vkb.rg->shader_cache.clear();
 		updated |= true;
+	}
+
+	if (updated || gui_updated) {
+		ImGui::Render();
+		auto t_end = glfwGetTime() * 1000;
+		auto t_diff = t_end - t_begin;
+		integrator->updated = true;
+		return (float)t_diff;
 	}
 
 
