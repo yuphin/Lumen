@@ -21,7 +21,6 @@ layout(set = 0, binding = 1) readonly buffer InstanceInfo_ {
 layout(set = 0, binding = 3, scalar) buffer SceneDesc_ {
     SceneDesc scene_desc;
 };
-layout(set = 0, binding = 4) uniform sampler2D textures[];
 layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
 layout(buffer_reference, scalar) readonly buffer Vertices { vec3 v[]; };
 layout(buffer_reference, scalar) readonly buffer Indices { uint i[]; };

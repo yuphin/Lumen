@@ -8,6 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
+#define SCENE_TEX_IDX 8
 #include "../../commons.glsl"
 #include "ddgi_commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
@@ -21,9 +22,9 @@ uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y +
                   gl_LaunchIDEXT.y); // X: Num rays, Y: Num probes
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
 #include "../pt_commons.glsl"
-layout(binding = 6) uniform _DDGIUniforms { DDGIUniforms ddgi_ubo; };
-layout(binding = 7, rgba16f) uniform image2D radiance_img;
-layout(binding = 8, rgba16f) uniform image2D dir_dist_img;
+layout(binding = 5) uniform _DDGIUniforms { DDGIUniforms ddgi_ubo; };
+layout(binding = 6, rgba16f) uniform image2D radiance_img;
+layout(binding = 7, rgba16f) uniform image2D dir_dist_img;
 GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
 ProbeOffset probe_offsets = ProbeOffset(scene_desc.probe_offsets_addr);
 

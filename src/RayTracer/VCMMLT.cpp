@@ -297,8 +297,8 @@ void VCMMLT::render() {
 		.zero({chain_stats_buffer, mlt_atomicsum_buffer})
 		.zero(photon_buffer, use_vm)
 		.bind(rt_bindings)
-		.bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	// Start bootstrap sampling
 	pipeline_name = "VCMMLT - Bootstrap " + pipeline_postfix;
@@ -313,8 +313,8 @@ void VCMMLT::render() {
 								 .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
-		.bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	int counter = 0;
 	prefix_scan(0, lumen_scene->config.num_bootstrap_samples, counter, instance->vkb.rg.get());
@@ -347,8 +347,8 @@ void VCMMLT::render() {
 									 .accel = instance->vkb.tlas.accel})
 			.push_constants(&pc_ray)
 			.bind(rt_bindings)
-			.bind_texture_array(diffuse_textures)
 			.bind(mesh_lights_buffer)
+			.bind_texture_array(scene_textures)
 			.bind_tlas(instance->vkb.tlas);
 		// Sum up chain stats
 		sum_up_chain_data();
@@ -378,8 +378,8 @@ void VCMMLT::render() {
 				.push_constants(&pc_ray)
 				.zero(mlt_atomicsum_buffer)
 				.bind(rt_bindings)
-				.bind_texture_array(diffuse_textures)
 				.bind(mesh_lights_buffer)
+				.bind_texture_array(scene_textures)
 				.bind_tlas(instance->vkb.tlas);
 			sum_up_chain_data();
 			// Normalization

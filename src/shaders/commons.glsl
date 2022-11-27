@@ -3,6 +3,10 @@
 #include "commons.h"
 #include "utils.glsl"
 
+#ifndef SCENE_TEX_IDX
+#define SCENE_TEX_IDX 5
+#endif
+
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(binding = 0, rgba32f) uniform image2D image;
@@ -11,8 +15,9 @@ layout(binding = 1) readonly buffer InstanceInfo_ {
 };
 layout(binding = 2) uniform SceneUBOBuffer { SceneUBO ubo; };
 layout(binding = 3) buffer SceneDesc_ { SceneDesc scene_desc; };
-layout(binding = 4) uniform sampler2D scene_textures[];
-layout(binding = 5, scalar) readonly buffer Lights { Light lights[]; };
+layout(binding = 4, scalar) readonly buffer Lights { Light lights[]; };
+layout(binding = SCENE_TEX_IDX) uniform sampler2D scene_textures[];
+
 
 layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
 

@@ -98,8 +98,8 @@ void ReSTIRGI::render() {
 			scene_ubo_buffer,
 			scene_desc_buffer,
 			  })
-			  .bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas)
 		.copy(restir_samples_buffer, restir_samples_old_buffer);
 
@@ -119,8 +119,8 @@ void ReSTIRGI::render() {
 			scene_ubo_buffer,
 			scene_desc_buffer,
 		})
-		.bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 
 	// Spatial reuse
@@ -139,8 +139,8 @@ void ReSTIRGI::render() {
 			scene_ubo_buffer,
 			scene_desc_buffer,
 		})
-		.bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	// Output
 	instance->vkb.rg

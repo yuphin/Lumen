@@ -45,8 +45,8 @@ void Path::render() {
 			scene_ubo_buffer,
 			scene_desc_buffer,
 		})
-		.bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
 		//.write(output_tex) // Needed if the automatic shader inference is disabled
 		.bind_tlas(instance->vkb.tlas);
 	instance->vkb.rg->run_and_submit(cmd);

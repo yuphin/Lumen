@@ -78,8 +78,8 @@ void BDPT::render() {
 			scene_ubo_buffer,
 			scene_desc_buffer,
 		})
-		.bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	//.finalize();
 

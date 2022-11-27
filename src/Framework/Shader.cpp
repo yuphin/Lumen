@@ -589,6 +589,9 @@ int Shader::compile(RenderPass* pass) {
 		  std::cout << "SPIR-V assembly:" << std::endl << assembly <<
 		  std::endl;*/
 		binary = compile_file(filename, mstages[get_ext(filename)], str);
+		if (filename == "src/shaders/integrators/path/path.rgen") {
+			int a = 4;
+		}
 		/*   std::cout << "Compiled to a binary module with " << binary.size()
 			   << " words." << std::endl;*/
 	}

@@ -166,8 +166,8 @@ void DDGI::render() {
 		.push_constants(&pc_ray)
 		.zero(g_buffer)
 		.bind(rt_bindings)
-		.bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	// Trace rays from probes
 	uint32_t grid_size = probe_counts.x * probe_counts.y * probe_counts.z;
@@ -182,8 +182,8 @@ void DDGI::render() {
 										.accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
-		.bind_texture_array(diffuse_textures)
 		.bind({mesh_lights_buffer, ddgi_ubo_buffer, rt.radiance_tex, rt.dir_depth_tex})
+		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	// Classify
 	uint32_t wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 31) / 32;
@@ -282,8 +282,34 @@ void DDGI::destroy() {
 	Integrator::destroy();
 	std::vector<Buffer*> buffer_list = {
 		&g_buffer,
+		&direct_lighting_buffer,
+		&ddgi_ubo_buffer,
+		&probe_offsets_buffer
 	};
+
+	std::vector<Texture*> tex_list = {
+		&rt.radiance_tex,
+		&rt.dir_depth_tex,
+		&output.tex
+	};
+
 	for (auto b : buffer_list) {
 		b->destroy();
 	}
+
+	for (auto t : tex_list) {
+		t->destroy();
+	}
+
+	vkDestroySampler(instance->vkb.ctx.device, bilinear_sampler, nullptr);
+	vkDestroySampler(instance->vkb.ctx.device, nearest_sampler, nullptr);
+
+	for (auto& irr_tex : irr_texes) {
+		irr_tex.destroy();
+	}
+
+	for (auto& depth_tex : depth_texes) {
+		depth_tex.destroy();
+	}
+
 }

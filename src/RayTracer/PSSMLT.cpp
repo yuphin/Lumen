@@ -225,8 +225,8 @@ void PSSMLT::render() {
 		.push_constants(&pc_ray)
 		.zero({light_path_buffer, camera_path_buffer})
 		.bind(rt_bindings)
-		.bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 
 	int counter = 0;
@@ -295,8 +295,8 @@ void PSSMLT::render() {
 		.push_constants(&pc_ray)
 		.zero({light_path_buffer, camera_path_buffer})
 		.bind(rt_bindings)
-		.bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 
 	instance->vkb.rg->run_and_submit(cmd);
@@ -316,8 +316,8 @@ void PSSMLT::render() {
 				.push_constants(&pc_ray)
 				.zero({light_path_buffer, camera_path_buffer})
 				.bind(rt_bindings)
-				.bind_texture_array(diffuse_textures)
 				.bind(mesh_lights_buffer)
+				.bind_texture_array(scene_textures)
 				.bind_tlas(instance->vkb.tlas);
 		};
 		const uint32_t iter_cnt = 100;

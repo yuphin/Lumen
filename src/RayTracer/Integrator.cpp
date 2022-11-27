@@ -129,15 +129,15 @@ void Integrator::init() {
 
 	auto add_default_texture = [this, instance]() {
 		std::array<uint8_t, 4> nil = {0, 0, 0, 0};
-		diffuse_textures.resize(1);
+		scene_textures.resize(1);
 		auto ci = make_img2d_ci(VkExtent2D{1, 1});
-		diffuse_textures[0].load_from_data(&instance->vkb.ctx, nil.data(), 4, ci, texture_sampler);
+		scene_textures[0].load_from_data(&instance->vkb.ctx, nil.data(), 4, ci, texture_sampler);
 	};
 
 	if (!lumen_scene->textures.size()) {
 		add_default_texture();
 	} else {
-		diffuse_textures.resize(lumen_scene->textures.size());
+		scene_textures.resize(lumen_scene->textures.size());
 		int i = 0;
 		for (const auto& texture_path : lumen_scene->textures) {
 			int x, y, n;
@@ -146,7 +146,7 @@ void Integrator::init() {
 			auto size = x * y * 4;
 			auto img_dims = VkExtent2D{(uint32_t)x, (uint32_t)y};
 			auto ci = make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-			diffuse_textures[i].load_from_data(&instance->vkb.ctx, data, size, ci, texture_sampler, false);
+			scene_textures[i].load_from_data(&instance->vkb.ctx, data, size, ci, texture_sampler, false);
 			stbi_image_free(data);
 			i++;
 		}
@@ -299,7 +299,7 @@ void Integrator::destroy() {
 		b->destroy();
 	}
 	output_tex.destroy();
-	for (auto& tex : diffuse_textures) {
+	for (auto& tex : scene_textures) {
 		tex.destroy();
 	}
 	vkDestroySampler(instance->vkb.ctx.device, texture_sampler, nullptr);

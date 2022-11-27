@@ -41,7 +41,7 @@ class Integrator {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
 	LumenInstance* instance;
 	std::vector<Light> lights;
-	std::vector<Texture2D> diffuse_textures;
+	std::vector<Texture2D> scene_textures;
 	uint32_t total_light_triangle_cnt = 0;
 	float total_light_area = 0;
 	LumenScene* lumen_scene;

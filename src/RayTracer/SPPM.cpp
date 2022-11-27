@@ -115,8 +115,8 @@ void SPPM::render() {
 			scene_ubo_buffer,
 			scene_desc_buffer,
 		})
-		.bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	// Calculate scene bbox given the calculated radius
 	op_reduce("OpReduce: Max", "src/shaders/integrators/sppm/max.comp", "OpReduce: Reduce Max",
@@ -143,8 +143,8 @@ void SPPM::render() {
 			scene_ubo_buffer,
 			scene_desc_buffer,
 		})
-		.bind_texture_array(diffuse_textures)
 		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	// Gather
 	instance->vkb.rg
@@ -153,7 +153,7 @@ void SPPM::render() {
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(scene_desc_buffer)
-		.bind_texture_array(diffuse_textures);
+		.bind_texture_array(scene_textures);
 	// Composite
 	instance->vkb.rg
 		->add_compute("Composite",
