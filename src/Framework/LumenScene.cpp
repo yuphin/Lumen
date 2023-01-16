@@ -446,7 +446,7 @@ void LumenScene::load_scene(const std::string& path) {
 				materials[i].albedo = m_bsdf.albedo;
 
 			} else if (m_bsdf.type == "roughplastic") {
-				materials[i].subsurface = 0.1;
+				materials[i].subsurface = 0.1f;
 				materials[i].albedo = m_bsdf.albedo;
 				materials[i].roughness = m_bsdf.roughness;
 			} else if (m_bsdf.type == "conductor") {
