@@ -133,8 +133,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;spirv-cross-cored.lib;spirv-cross-glsld.lib;shaderc_shared.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)libs\glfw\src\Debug;$(VULKAN_SDK)\Lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;spirv-cross-cored.lib;spirv-cross-glsld.lib;spirv-cross-cppd.lib;spirv-cross-utild.lib;spirv-cross-cd.lib;shaderc_shared.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)libs\glfw\src\Debug;$(VULKAN_SDK)\Lib;D:\Projects\VSProjects\SPIRV-Cross\build\Debug</AdditionalLibraryDirectories>
       <AdditionalOptions>/NODEFAULTLIB:library  /ignore:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
@@ -194,6 +194,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="src\RayTracer\SER.cpp" />
     <ClCompile Include="src\Framework\EventPool.cpp" />
     <ClCompile Include="libs\glslc\file_includer.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
@@ -277,6 +278,7 @@
     <ClCompile Include="src\RayTracer\VCMMLT.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\RayTracer\SER.h" />
     <ClInclude Include="src\Framework\CommonTypes.h" />
     <ClInclude Include="src\Framework\EventPool.h" />
     <ClInclude Include="src\Framework\RenderGraph.h" />

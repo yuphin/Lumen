@@ -213,7 +213,6 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 							return shader;
 						},
 						shader));
-					// shader.compile(this);
 					pass->rg->shader_cache[shader->filename] = *shader;
 				}
 			}
@@ -821,6 +820,14 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		}
 		// Compile and process resources for unique shaders
 		for (auto& [pass, shaders] : unique_shaders) {
+		/*	for (auto& shader : shaders) {
+				if (pass->rg->shader_cache.find(shader->filename) != pass->rg->shader_cache.end()) {
+					*shader = pass->rg->shader_cache[shader->filename];
+				} else {
+					shader->compile(pass);
+					pass->rg->shader_cache[shader->filename] = *shader;
+				}
+			}*/
 			futures.push_back(ThreadPool::submit(std::bind(&build_shaders, pass, shaders)));
 		}
 		for (auto& future : futures) {

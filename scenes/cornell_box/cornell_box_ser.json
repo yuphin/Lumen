@@ -1,0 +1,111 @@
+{
+    "integrator" : {
+        "type" : "ser",
+        "path_length" : 6,
+        "sky_col" : [
+            0,0,0
+        ]
+    },
+ 
+    "bsdfs": [
+        {
+            "ior": 1.52,
+            "name": "Glass",
+            "refs": [
+                "glass_sphere"
+            ],
+            "albedo": [
+                1,
+                1,
+                1
+            ],
+            "type": "glass"
+        },
+        {
+            "name": "Mirror",
+            "refs": [
+                "mirror_sphere"
+            ],
+            "type": "mirror"
+        },
+        {
+            "albedo": [
+                0.63,
+                0.065,
+                0.05
+            ],
+            "name": "Left Wall",
+            "refs": [
+                "left_wall"
+            ],
+            "type": "diffuse"
+        },
+        {
+            "albedo": [
+                0.14,
+                0.45,
+                0.091
+            ],
+            "name": "Right Wall",
+            "refs": [
+                "right_wall"
+            ],
+            "type": "diffuse"
+        },
+        {
+            "albedo": [
+                0.725,
+                0.71,
+                0.68
+            ],
+            "name": "Other Walls",
+            "refs": [
+                "ceiling",
+                "back_wall"
+            ],
+            "type": "diffuse"
+        },
+
+        {
+            "albedo": [
+                0.725,
+                0.71,
+                0.68
+            ],
+            "name": "Floor",
+            "refs": [
+                "floor"
+            ],
+            "type": "diffuse"
+        },
+        {
+            "emissive_factor": [
+                17,
+                12,
+                4
+            ],
+            "albedo": [
+                1,
+                1,
+                1
+            ],
+            "name": "Light",
+            "refs": [
+                "light"
+            ],
+            "type": "diffuse"
+        }
+    ],
+    "camera": {
+        "fov": 45,
+        "position": [
+            0.7,
+            0.5,
+            17.5
+        ],
+        "dir" : [
+            0,0, 2
+        ]
+    },
+    "mesh_file": "cornell_box.obj"
+}

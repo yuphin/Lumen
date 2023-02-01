@@ -1,9 +1,9 @@
 #include "LumenPCH.h"
 #include "Shader.h"
-#include <spirv_cross/spirv_glsl.hpp>
-#include <spirv_cross/spirv.h>
+#include "spirv_cross2/spirv_glsl.hpp"
+#include "spirv_cross2/spirv.h"
 #include "RenderGraph.h"
-#define USE_SHADERC 1
+#define USE_SHADERC 0
 
 enum class ResourceType { UniformBuffer, StorageBuffer, StorageImage, SampledImage, AccelarationStructure };
 
@@ -140,6 +140,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 	// Update the resource status of image types
 	// Storage Image -> Write
 	// Sampled Image -> Read
+
 	auto active_vars = glsl.get_active_interface_variables();
 	auto active_resources = glsl.get_shader_resources(active_vars);
 	for (auto& sampled_img : active_resources.sampled_images) {
@@ -382,6 +383,9 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 }
 
 static void parse_shader(Shader& shader, const uint32_t* code, size_t code_size, RenderPass* pass) {
+	if (shader.filename == "src/shaders/ray.rchit") {
+		int a = 4;
+	}
 	spirv_cross::CompilerGLSL glsl(code, code_size);
 	spirv_cross::ShaderResources resources = glsl.get_shader_resources();
 
@@ -567,7 +571,7 @@ int Shader::compile(RenderPass* pass) {
 #else
 	std::string file_path = filename + ".spv";
 #ifdef _DEBUG
-	auto str = std::string("glslangValidator.exe --target-env vulkan1.3 " + filename + " -V " + " -g " + " -o " +
+	auto str = std::string("D:\\Projects\\VSProjects\\glslang\\out\\build\\x64-Release\\StandAlone\\glslangValidator.exe --target-env vulkan1.3 " + filename + " -V " + " -g " + " -o " +
 						   filename + ".spv");
 
 #else

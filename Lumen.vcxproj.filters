@@ -138,6 +138,7 @@
     <ClCompile Include="src\RayTracer\ReSTIR.cpp">
       <Filter>RayTracer</Filter>
     </ClCompile>
+    <ClCompile Include="src\RayTracer\SER.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\LumenPCH.h" />
@@ -279,6 +280,7 @@
     <ClInclude Include="src\RayTracer\ReSTIR.h">
       <Filter>RayTracer</Filter>
     </ClInclude>
+    <ClInclude Include="src\RayTracer\SER.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\integrators\bdpt\bdpt.rgen">

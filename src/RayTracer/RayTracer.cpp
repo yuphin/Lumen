@@ -36,6 +36,7 @@ void RayTracer::init(Window* window) {
 	vkb.add_device_extension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
 	vkb.add_device_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
 	vkb.add_device_extension(VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_EXTENSION_NAME);
+	vkb.add_device_extension(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME);
 
 	vkb.create_instance();
 	if (vkb.enable_validation_layers) {
@@ -63,6 +64,9 @@ void RayTracer::init(Window* window) {
 	switch (scene.config.integrator_type) {
 		case IntegratorType::Path:
 			integrator = std::make_unique<Path>(this, &scene);
+			break;
+		case IntegratorType::SER:
+			integrator = std::make_unique<SER>(this, &scene);
 			break;
 		case IntegratorType::BDPT:
 			integrator = std::make_unique<BDPT>(this, &scene);

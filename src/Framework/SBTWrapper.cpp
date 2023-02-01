@@ -117,7 +117,7 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 	copy_handles(stage[eHit], m_index[eHit], m_stride[eHit], m_data[eHit]);
 	copy_handles(stage[eCallable], m_index[eCallable], m_stride[eCallable], m_data[eCallable]);
 
-	auto usage_flags = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+	auto usage_flags = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
 	auto mem_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	for (uint32_t i = 0; i < 4; i++) {
 		if (!stage[i].empty()) {

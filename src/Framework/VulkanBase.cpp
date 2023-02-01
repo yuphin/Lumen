@@ -312,8 +312,10 @@ void VulkanBase::pick_physical_device() {
 		LUMEN_ERROR("Failed to find a suitable GPU");
 	}
 	VkPhysicalDeviceProperties2 prop2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+	ctx.rt_props.pNext = &ctx.ser_props;
 	prop2.pNext = &ctx.rt_props;
 	vkGetPhysicalDeviceProperties2(ctx.physical_device, &prop2);
+	int a = 4;
 }
 
 void VulkanBase::create_logical_device() {
@@ -356,11 +358,14 @@ void VulkanBase::create_logical_device() {
 	VkPhysicalDeviceMaintenance4FeaturesKHR maintenance4_fts = {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES_KHR};
 
+	VkPhysicalDeviceRayTracingInvocationReorderFeaturesNV ser_features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_INVOCATION_REORDER_FEATURES_NV };
+	ser_features.rayTracingInvocationReorder = true;
+
 	atomic_fts.shaderBufferFloat32AtomicAdd = true;
 	atomic_fts.shaderBufferFloat32Atomics = true;
 	atomic_fts.shaderSharedFloat32AtomicAdd = true;
 	atomic_fts.shaderSharedFloat32Atomics = true;
-	atomic_fts.pNext = nullptr;
+	atomic_fts.pNext = &ser_features;
 	accel_fts.accelerationStructure = true;
 	accel_fts.pNext = &atomic_fts;
 	rt_fts.rayTracingPipeline = true;

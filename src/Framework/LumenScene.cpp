@@ -99,6 +99,9 @@ void LumenScene::load_scene(const std::string& path) {
 		if (integrator["type"] == "path") {
 			config.integrator_type = IntegratorType::Path;
 			config.integrator_name = "Path";
+		}else if (integrator["type"] == "ser") {
+			config.integrator_type = IntegratorType::SER;
+			config.integrator_name = "SER";
 		} else if (integrator["type"] == "bdpt") {
 			config.integrator_type = IntegratorType::BDPT;
 			config.integrator_name = "BDPT";
