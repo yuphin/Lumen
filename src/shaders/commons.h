@@ -47,7 +47,7 @@ using uint = unsigned int;
 #define ALIGN16
 #endif
 
-#define ENABLE_DISNEY 0
+#define ENABLE_DISNEY 1
 #define DIFFUSE_ONLY 0
 #define DIFFUSE_AND_GLOSSY_ONLY 1
 
