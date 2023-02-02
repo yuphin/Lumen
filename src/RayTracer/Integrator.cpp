@@ -1,6 +1,6 @@
 #include "LumenPCH.h"
 #include "Integrator.h"
-#include <stb_image.h>
+#include <tinygltf/stb_image.h>
 
 void Integrator::init() {
 	VkPhysicalDeviceProperties2 prop2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};

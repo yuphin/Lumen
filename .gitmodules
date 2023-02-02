@@ -1,3 +1,9 @@
 [submodule "libs/gli"]
 	path = libs/gli
 	url = https://github.com/g-truc/gli.git
+[submodule "libs/SPIRV-Cross"]
+	path = libs/SPIRV-Cross
+	url = git@github.com:KhronosGroup/SPIRV-Cross.git
+[submodule "libs/shaderc"]
+	path = libs/shaderc
+	url = git@github.com:google/shaderc.git

@@ -459,7 +459,7 @@ void Pipeline::create_update_template(const std::vector<Shader>& shaders,
 
 			default:
 				LUMEN_ERROR("Unimplemented descriptor type!");
-				return (unsigned long long)0;
+				return (size_t)0;
 		}
 	};
 

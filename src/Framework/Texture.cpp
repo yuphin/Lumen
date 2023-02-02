@@ -3,7 +3,7 @@
 #include "CommandBuffer.h"
 #include "VkUtils.h"
 #include <gli/gli.hpp>
-#include <stb_image.h>
+#include <tinygltf/stb_image.h>
 
 Texture2D::Texture2D(VulkanContext* ctx) : Texture(ctx) {}
 
