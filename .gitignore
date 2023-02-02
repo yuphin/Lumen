@@ -9,3 +9,4 @@ scenes/Sponza
 *.as
 imgui.ini
 .*/
+build/
