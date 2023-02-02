@@ -1,5 +1,5 @@
 #pragma once
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 
 struct TextureSettings {
 	VkFormat format = VK_FORMAT_R32G32B32A32_SFLOAT;

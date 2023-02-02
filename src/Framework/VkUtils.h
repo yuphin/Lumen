@@ -1,6 +1,6 @@
 #pragma once
-#include "LumenPCH.h"
-#include "gltfscene.hpp"
+#include "../LumenPCH.h"
+#include "GltfScene.hpp"
 #include "LumenScene.h"
 #include "Buffer.h"
 #include "Pipeline.h"

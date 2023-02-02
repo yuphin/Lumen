@@ -1,5 +1,5 @@
 #pragma once
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 struct Buffer {
 	VkBuffer handle{};
 	VkDeviceMemory buffer_memory = VK_NULL_HANDLE;

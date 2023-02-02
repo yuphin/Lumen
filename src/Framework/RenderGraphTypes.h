@@ -3,9 +3,9 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <functional>
-#include "Framework/Shader.h"
-#include "Framework/Buffer.h"
-#include "Framework/Texture.h"
+#include "Shader.h"
+#include "Buffer.h"
+#include "Texture.h"
 #include "CommonTypes.h"
 
 class RenderGraph;

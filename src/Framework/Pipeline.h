@@ -1,11 +1,11 @@
 #pragma once
-#include "LumenPCH.h"
-#include "Framework/Event.h"
-#include "Framework/Shader.h"
-#include "Framework/Buffer.h"
-#include "Framework/Texture.h"
-#include "Framework/SBTWrapper.h"
-#include "Framework/RenderGraphTypes.h"
+#include "../LumenPCH.h"
+#include "Event.h"
+#include "Shader.h"
+#include "Buffer.h"
+#include "Texture.h"
+#include "SBTWrapper.h"
+#include "RenderGraphTypes.h"
 struct Pipeline;
 
 struct PipelineTrace {

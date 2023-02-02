@@ -1,5 +1,3 @@
-#pragma once
-#include "LumenPCH.h"
 #include "Event.h"
 
 std::unordered_map<LumenEvent, bool> EventHandler::event_table = {};

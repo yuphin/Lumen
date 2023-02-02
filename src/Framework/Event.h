@@ -1,6 +1,6 @@
 #pragma once
-#include "LumenPCH.h"
-#include "Framework/Pipeline.h"
+#include "../LumenPCH.h"
+#include "Pipeline.h"
 
 enum class LumenEvent { SHADER_RELOAD };
 

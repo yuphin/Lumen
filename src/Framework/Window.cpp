@@ -1,4 +1,4 @@
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 #include "Window.h"
 
 Window::Window(int width, int height, bool fullscreen) : height(height), width(width) {
