@@ -17,7 +17,7 @@ find_package(spirv_cross_cpp REQUIRED)
 
 include_directories("libs/" "libs/gli" "libs/shaderc/libshaderc_util/include" "src/" ${Vulkan_INCLUDE_DIR})
 add_executable(Lumen ${Lumen_SRC})
-target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw spirv-cross-cpp)
+target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw spirv-cross-cpp shaderc)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
