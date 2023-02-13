@@ -6,6 +6,9 @@ enable_testing()
 
 set(CMAKE_CXX_STANDARD 20)
 add_compile_definitions(TINYGLTF_NO_STB_IMAGE_WRITE TINYEXR_USE_MINIZ)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_definitions(_DEBUG)
+endif()
 
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)

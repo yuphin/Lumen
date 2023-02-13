@@ -8,7 +8,7 @@ file(GLOB SRC
 )
 set(Lumen_SRC ${Lumen_SRC} ${SRC} PARENT_SCOPE)
 
-add_compile_options(-Wno-deprecated-enum-enum-conversion)
+add_compile_options(-Wno-deprecated-enum-enum-conversion -Wvolatile)
 add_subdirectory(SPIRV-Cross)
 add_subdirectory(SPIRV-Headers)
 add_subdirectory(SPIRV-Tools)
