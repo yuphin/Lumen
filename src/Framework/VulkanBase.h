@@ -1,5 +1,6 @@
 #pragma once
 #include "LumenPCH.h"
+#include <volk/volk.h>
 #include "Buffer.h"
 #include "Framework/Event.h"
 #include "Framework/RenderGraph.h"

@@ -1,10 +1,9 @@
 #include "LumenPCH.h"
+#define VOLK_IMPLEMENTATION
 #include "VulkanBase.h"
 #include "CommandBuffer.h"
 #include "VkUtils.h"
-#include <extensions_vk.hpp>
 #include <numeric>
-
 
 uint32_t VertexLayout::stride() {
 	uint32_t res = 0;
@@ -219,9 +218,7 @@ void VulkanBase::cleanup() {
 }
 
 void VulkanBase::create_instance() {
-	if (enable_validation_layers && !check_validation_layer_support()) {
-		LUMEN_ERROR("Validation layers requested, but not available!");
-	}
+
 	VkApplicationInfo app_info{};
 	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	app_info.pApplicationName = "Lumen";
@@ -247,8 +244,12 @@ void VulkanBase::create_instance() {
 		instance_CI.enabledLayerCount = 0;
 		instance_CI.pNext = nullptr;
 	}
-
+	vk::check(volkInitialize(), "Failed to initialize volk");
 	vk::check(vkCreateInstance(&instance_CI, nullptr, &ctx.instance), "Failed to create instance");
+	volkLoadInstance(ctx.instance);
+	if (enable_validation_layers && !check_validation_layer_support()) {
+		LUMEN_ERROR("Validation layers requested, but not available!");
+	}
 	rg = std::make_unique<RenderGraph>(&ctx);
 }
 
@@ -411,7 +412,7 @@ void VulkanBase::create_logical_device() {
 	vk::check(vkCreateDevice(ctx.physical_device, &logical_device_CI, nullptr, &ctx.device),
 			  "Failed to create logical device");
 
-	load_VK_EXTENSIONS(ctx.instance, vkGetInstanceProcAddr, ctx.device, vkGetDeviceProcAddr);
+	//load_VK_EXTENSIONS(ctx.instance, vkGetInstanceProcAddr, ctx.device, vkGetDeviceProcAddr);
 	vkGetDeviceQueue(ctx.device, ctx.indices.gfx_family.value(), 0, &ctx.queues[(int)QueueType::GFX]);
 	vkGetDeviceQueue(ctx.device, ctx.indices.compute_family.value(), 0, &ctx.queues[(int)QueueType::COMPUTE]);
 	vkGetDeviceQueue(ctx.device, ctx.indices.present_family.value(), 0, &ctx.queues[(int)QueueType::PRESENT]);

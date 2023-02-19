@@ -75,9 +75,6 @@
     <ClCompile Include="libs\imgui\imgui_widgets.cpp">
       <Filter>Libs</Filter>
     </ClCompile>
-    <ClCompile Include="libs\extensions_vk.cpp">
-      <Filter>Libs</Filter>
-    </ClCompile>
     <ClCompile Include="libs\mitsuba_parser\tinyparser-mitsuba.cpp">
       <Filter>Libs</Filter>
     </ClCompile>

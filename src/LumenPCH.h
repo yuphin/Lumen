@@ -46,14 +46,6 @@
 #include <unordered_map>
 #include <robin-hood/robin_hood.h>
 
-//#ifdef min
-//#undef min
-//#endif
-//
-//#ifdef max
-//#undef max
-//#endif
-#define GLFW_INCLUDE_VULKAN
 #pragma warning(push,0)
 #include "Framework/VulkanStructs.h"
 #include <GLFW/glfw3.h>
