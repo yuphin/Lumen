@@ -1,3 +1,6 @@
 [submodule "libs/gli"]
 	path = libs/gli
 	url = https://github.com/g-truc/gli.git
+[submodule "libs/volk"]
+	path = libs/volk
+	url = https://github.com/zeux/volk.git
