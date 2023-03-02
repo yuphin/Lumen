@@ -57,6 +57,7 @@ void ReSTIRGI::init() {
 	pc_ray.size_y = instance->height;
 	pc_ray.world_radius = lumen_scene->m_dimensions.radius;
 	assert(instance->vkb.rg->settings.shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, restir_samples_addr, &restir_samples_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, restir_samples_old_addr, &restir_samples_old_buffer,
 								 instance->vkb.rg);
@@ -78,6 +79,12 @@ void ReSTIRGI::render() {
 	pc_ray.do_spatiotemporal = do_spatiotemporal;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	
+	const std::initializer_list<ResourceBinding> rt_bindings = {
+		output_tex,
+		scene_ubo_buffer,
+		scene_desc_buffer,
+	};
 
 	// Trace rays
 	instance->vkb.rg
@@ -92,12 +99,7 @@ void ReSTIRGI::render() {
 		.zero(restir_samples_buffer)
 		.zero(temporal_reservoir_buffer, !do_spatiotemporal)
 		.zero(spatial_reservoir_buffer, !do_spatiotemporal)
-		.bind({
-			output_tex,
-			prim_lookup_buffer,
-			scene_ubo_buffer,
-			scene_desc_buffer,
-			  })
+		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas)
@@ -113,12 +115,7 @@ void ReSTIRGI::render() {
 											   .dims = {instance->width, instance->height},
 											   .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
-		.bind({
-			output_tex,
-			prim_lookup_buffer,
-			scene_ubo_buffer,
-			scene_desc_buffer,
-		})
+		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
@@ -133,12 +130,7 @@ void ReSTIRGI::render() {
 											  .dims = {instance->width, instance->height},
 											  .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
-		.bind({
-			output_tex,
-			prim_lookup_buffer,
-			scene_ubo_buffer,
-			scene_desc_buffer,
-		})
+		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);

@@ -147,9 +147,8 @@ void DDGI::render() {
 		pc_ray.probe_rotation = glm::mat4_cast(
 			glm::angleAxis(2.0f * glm::pi<float>() * rands.x, glm::normalize(glm::vec3(rands.y, rands.z, rands.w))));
 	}
-	std::initializer_list<ResourceBinding> rt_bindings = {
+	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
-		prim_lookup_buffer,
 		scene_ubo_buffer,
 		scene_desc_buffer,
 	};

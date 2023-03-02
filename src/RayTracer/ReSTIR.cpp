@@ -55,6 +55,7 @@ void ReSTIR::init() {
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 	assert(instance->vkb.rg->settings.shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, &g_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, temporal_reservoir_addr, &temporal_reservoir_buffer,
 								 instance->vkb.rg);
@@ -78,6 +79,12 @@ void ReSTIR::render() {
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
 
+	const std::initializer_list<ResourceBinding> rt_bindings = {
+		output_tex,
+		scene_ubo_buffer,
+		scene_desc_buffer,
+	};
+
 	// Temporal pass + path tracing
 	instance->vkb.rg
 		->add_rt("ReSTIR - Temporal Pass", {.shaders = {{"src/shaders/integrators/restir/temporal_pass.rgen"},
@@ -91,12 +98,7 @@ void ReSTIR::render() {
 		.zero(g_buffer)
 		.zero(spatial_reservoir_buffer)
 		.zero(temporal_reservoir_buffer, !do_spatiotemporal)
-		.bind({
-			output_tex,
-			prim_lookup_buffer,
-			scene_ubo_buffer,
-			scene_desc_buffer,
-		})
+		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
@@ -110,12 +112,7 @@ void ReSTIR::render() {
 										   .dims = {instance->width, instance->height},
 										   .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
-		.bind({
-			output_tex,
-			prim_lookup_buffer,
-			scene_ubo_buffer,
-			scene_desc_buffer,
-		})
+		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
@@ -130,12 +127,7 @@ void ReSTIR::render() {
 									 .dims = {instance->width, instance->height},
 									 .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
-		.bind({
-			output_tex,
-			prim_lookup_buffer,
-			scene_ubo_buffer,
-			scene_desc_buffer,
-		})
+		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);

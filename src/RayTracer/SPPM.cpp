@@ -51,6 +51,7 @@ void SPPM::init() {
 	pc_ray.size_y = instance->height;
 
 	assert(instance->vkb.rg->settings.shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, sppm_data_addr, &sppm_data_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, atomic_data_addr, &atomic_data_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, &photon_buffer, instance->vkb.rg);
@@ -97,6 +98,12 @@ void SPPM::render() {
 		}
 	};
 
+	const std::initializer_list<ResourceBinding> rt_bindings = {
+		output_tex,
+		scene_ubo_buffer,
+		scene_desc_buffer,
+	};
+
 	// Trace rays from eye
 	instance->vkb.rg
 		->add_rt("SPPM - Eye", {.shaders = {{"src/shaders/integrators/sppm/sppm_eye.rgen"},
@@ -109,12 +116,7 @@ void SPPM::render() {
 		.push_constants(&pc_ray)
 		.zero(photon_buffer)
 		.zero(sppm_data_buffer, /*cond=*/pc_ray.frame_num == 0)
-		.bind({
-			output_tex,
-			prim_lookup_buffer,
-			scene_ubo_buffer,
-			scene_desc_buffer,
-		})
+		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
@@ -137,12 +139,7 @@ void SPPM::render() {
 								  .dims = {instance->width, instance->height},
 								  .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
-		.bind({
-			output_tex,
-			prim_lookup_buffer,
-			scene_ubo_buffer,
-			scene_desc_buffer,
-		})
+		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);

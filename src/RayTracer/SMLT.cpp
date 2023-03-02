@@ -176,6 +176,7 @@ void SMLT::init() {
 	desc.light_splat_cnts_addr = light_splat_cnts_buffer.get_device_address();
 
 	assert(instance->vkb.rg->settings.shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, &bootstrap_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, &cdf_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, &cdf_sum_buffer, instance->vkb.rg);
@@ -233,9 +234,8 @@ void SMLT::render() {
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
 
-	std::initializer_list<ResourceBinding> rt_bindings = {
+	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
-		prim_lookup_buffer,
 		scene_ubo_buffer,
 		scene_desc_buffer,
 	};

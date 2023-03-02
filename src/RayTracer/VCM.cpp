@@ -102,6 +102,7 @@ void VCM::init() {
 	pc_ray.size_y = instance->height;
 
 	assert(instance->vkb.rg->settings.shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, &photon_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_vertices_addr, &vcm_light_vertices_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, path_cnt_addr, &light_path_cnt_buffer, instance->vkb.rg);
@@ -136,6 +137,11 @@ void VCM::render() {
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.max_angle_samples = max_samples;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	const std::initializer_list<ResourceBinding> rt_bindings = {
+		output_tex,
+		scene_ubo_buffer,
+		scene_desc_buffer,
+	};
 	const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
 	const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
 	const int base_grid_res = int(max_comp / pc_ray.radius);
@@ -166,12 +172,7 @@ void VCM::render() {
 							  .dims = {instance->width, instance->height},
 							  .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
-		.bind({
-			output_tex,
-			prim_lookup_buffer,
-			scene_ubo_buffer,
-			scene_desc_buffer,
-		})
+		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
@@ -196,12 +197,7 @@ void VCM::render() {
 									   .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
 		.zero(light_state_buffer)
-		.bind({
-			output_tex,
-			prim_lookup_buffer,
-			scene_ubo_buffer,
-			scene_desc_buffer,
-		})
+		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
@@ -216,12 +212,7 @@ void VCM::render() {
 									   .dims = {instance->width, instance->height},
 									   .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
-		.bind({
-			output_tex,
-			prim_lookup_buffer,
-			scene_ubo_buffer,
-			scene_desc_buffer,
-		})
+		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
@@ -250,12 +241,7 @@ void VCM::render() {
 									 .dims = {instance->width, instance->height},
 									 .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
-		.bind({
-			output_tex,
-			prim_lookup_buffer,
-			scene_ubo_buffer,
-			scene_desc_buffer,
-		})
+		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);

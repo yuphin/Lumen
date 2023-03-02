@@ -4,23 +4,22 @@
 #include "utils.glsl"
 
 #ifndef SCENE_TEX_IDX
-#define SCENE_TEX_IDX 5
+#define SCENE_TEX_IDX 4
 #endif
 
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(binding = 0, rgba32f) uniform image2D image;
-layout(binding = 1) readonly buffer InstanceInfo_ {
-    PrimMeshInfo prim_info[];
-};
-layout(binding = 2) uniform SceneUBOBuffer { SceneUBO ubo; };
-layout(binding = 3) buffer SceneDesc_ { SceneDesc scene_desc; };
-layout(binding = 4, scalar) readonly buffer Lights { Light lights[]; };
+layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
+layout(binding = 2) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(binding = 3, scalar) readonly buffer Lights { Light lights[]; };
 layout(binding = SCENE_TEX_IDX) uniform sampler2D scene_textures[];
 
 
 layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
-
+layout(buffer_reference, scalar) readonly buffer InstanceInfo {
+    PrimMeshInfo prim_info[];
+};
 layout(buffer_reference, scalar) readonly buffer Vertices { vec3 v[]; };
 layout(buffer_reference, scalar) readonly buffer Indices { uint i[]; };
 layout(buffer_reference, scalar) readonly buffer Normals { vec3 n[]; };
@@ -31,6 +30,7 @@ Indices indices = Indices(scene_desc.index_addr);
 Vertices vertices = Vertices(scene_desc.vertex_addr);
 Normals normals = Normals(scene_desc.normal_addr);
 Materials materials = Materials(scene_desc.material_addr);
+InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
 
 #include "bsdf_commons.glsl"
 
@@ -192,7 +192,7 @@ vec3 eval_albedo(const Material m) {
 TriangleRecord sample_area_light(const vec4 rands, const int num_lights,
                                  const Light light, out uint triangle_idx,
                                  out uint material_idx) {
-    PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
+    PrimMeshInfo pinfo = prim_infos.prim_info[light.prim_mesh_idx];
     material_idx = pinfo.material_index;
     triangle_idx = uint(rands.y * light.num_triangles);
     return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
@@ -202,7 +202,7 @@ TriangleRecord sample_area_light(const vec4 rands, const int num_lights,
                                  const Light light, out uint triangle_idx,
                                  out uint material_idx, out float u,
                                  out float v) {
-    PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
+    PrimMeshInfo pinfo = prim_infos.prim_info[light.prim_mesh_idx];
     material_idx = pinfo.material_index;
     // triangle_idx = 6;
     triangle_idx = uint(rands.y * light.num_triangles);
@@ -215,7 +215,7 @@ TriangleRecord sample_area_light_with_idx(const vec4 rands,
                                           const Light light,
                                           const uint triangle_idx,
                                           out uint material_idx) {
-    PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
+    PrimMeshInfo pinfo = prim_infos.prim_info[light.prim_mesh_idx];
     material_idx = pinfo.material_index;
     return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
 }
@@ -223,7 +223,7 @@ TriangleRecord sample_area_light_with_idx(const vec4 rands,
 TriangleRecord sample_area_light(const vec4 rands, const Light light,
                                  out uint material_idx, out uint triangle_idx,
                                  out float u, out float v) {
-    PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
+    PrimMeshInfo pinfo = prim_infos.prim_info[light.prim_mesh_idx];
     material_idx = pinfo.material_index;
     triangle_idx = uint(rands.y * light.num_triangles);
     return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix, u,
@@ -232,14 +232,14 @@ TriangleRecord sample_area_light(const vec4 rands, const Light light,
 
 TriangleRecord sample_area_light(const vec4 rands, const Light light,
                                  out uint material_idx, out uint triangle_idx) {
-    PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
+    PrimMeshInfo pinfo = prim_infos.prim_info[light.prim_mesh_idx];
     material_idx = pinfo.material_index;
     triangle_idx = uint(rands.y * light.num_triangles);
     return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
 }
 
 TriangleRecord sample_area_light(const vec4 rands, const Light light) {
-    PrimMeshInfo pinfo = prim_info[light.prim_mesh_idx];
+    PrimMeshInfo pinfo = prim_infos.prim_info[light.prim_mesh_idx];
     uint triangle_idx = uint(rands.y * light.num_triangles);
     return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
 }

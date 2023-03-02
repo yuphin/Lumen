@@ -12,17 +12,6 @@
 
 hitAttributeEXT vec2 attribs;
 
-layout(location = 1) rayPayloadInEXT AnyHitPayload payload;
-
-layout(binding = 1) readonly buffer InstanceInfo_ {
-    PrimMeshInfo prim_info[];
-};
-layout(binding = 3, scalar) buffer SceneDesc_ {
-    SceneDesc scene_desc;
-};
 layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
-layout(buffer_reference, scalar) readonly buffer Vertices { vec3 v[]; };
-layout(buffer_reference, scalar) readonly buffer Indices { uint i[]; };
-layout(buffer_reference, scalar) readonly buffer Normals { vec3 n[]; };
 #extension GL_EXT_debug_printf : enable
 void main() { terminateRayEXT; }
