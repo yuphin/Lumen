@@ -8,10 +8,43 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "RayTracer.h"
+#include <complex>
 
+
+constexpr uint32_t FFT_SIZE = 1024;
 RayTracer* RayTracer::instance = nullptr;
 bool load_exr = false;
 bool calc_rmse = false;
+
+static glm::vec2 complex_mul(const glm::vec2& a, const glm::vec2& b) {
+	return glm::vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}
+
+static void fft(int n, glm::vec2* x, glm::vec2* y) {
+	const int m = n / 2;
+	for (int stride = 1; stride < n; stride *= 2) {
+		for (int j = 0; j < m; j++) {
+			auto stride_factor = stride * (j / stride);
+			const auto angle = 2 * glm::pi<float>() * stride_factor / n;
+			auto wp = glm::vec2(std::cos(angle), -std::sin(angle));
+			auto& a = x[j];
+			auto& b = x[j + m];
+			auto fixed_idx = j % stride + 2 * stride_factor;
+			y[fixed_idx] = a + b;
+			y[fixed_idx + stride] = complex_mul(a - b, wp);
+		}
+		std::swap(x, y);
+	}
+}
+
+static void do_fft(std::vector<glm::vec2>& x, std::vector<glm::vec2>& y) {
+	fft(x.size(), x.data(), y.data());
+	uint32_t num_passes = floor(log2(x.size()));
+	if (num_passes % 2) {
+		std::swap(x, y);
+	}
+}
+
 static void fb_resize_callback(GLFWwindow* window, int width, int height) {
 	auto app = reinterpret_cast<RayTracer*>(glfwGetWindowUserPointer(window));
 	app->resized = true;
@@ -58,7 +91,6 @@ void RayTracer::init(Window* window) {
 	// Currently the event API that comes with Vulkan 1.3 is buggy on NVIDIA drivers
 	// so this is turned off and pipeline barriers are used instead
 	vkb.rg->settings.use_events = false;
-
 
 	switch (scene.config.integrator_type) {
 		case IntegratorType::Path:
@@ -112,8 +144,41 @@ void RayTracer::update() {
 }
 
 void RayTracer::render(uint32_t i) {
-	// Render image
-	integrator->render();
+	if (cnt == 0) {
+		CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+		int num_iters = log2(fft_arr.size());
+		for (int i = 0; i < num_iters; i++) {
+			bool pingpong = i % 2;
+			fft_pc.idx = i;
+			fft_pc.n = fft_arr.size();
+			auto dim_x = (uint32_t)(fft_arr.size() / 2 + 31) / 32;
+			instance->vkb.rg
+				->add_compute("FFT", {.shader = Shader("src/shaders/fft/fft.comp"),
+									  .dims = {dim_x, 1, 1}})
+				.bind({post_desc_buffer, fft_buffers[pingpong], fft_buffers[!pingpong]})
+				.push_constants(&fft_pc);
+		}
+
+		instance->vkb.rg->current_pass()
+			.copy(fft_buffers[0], fft_cpu_buffers[0])
+			.copy(fft_buffers[1], fft_cpu_buffers[1]);
+		instance->vkb.rg->run_and_submit(cmd);
+
+		std::vector<glm::vec2> fft_ping, fft_pong;
+		fft_ping.assign((glm::vec2*)fft_cpu_buffers[0].data,
+						(glm::vec2*)fft_cpu_buffers[0].data + fft_cpu_buffers[0].size / sizeof(glm::vec2));
+		fft_pong.assign((glm::vec2*)fft_cpu_buffers[1].data,
+						(glm::vec2*)fft_cpu_buffers[1].data + fft_cpu_buffers[1].size / sizeof(glm::vec2));
+
+		std::vector<glm::vec2>& res = num_iters % 2 ? fft_pong : fft_ping;
+		for (int i = 0; i < res.size(); i++) {
+			auto diff = res[i] - fft_arr[i];
+			if (glm::dot(diff, diff) > 1e-3) {
+				LUMEN_ERROR("Error");
+				assert(false);
+			}
+		}
+	}
 	auto cmdbuf = vkb.ctx.command_buffers[i];
 	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
@@ -133,41 +198,65 @@ void RayTracer::render(uint32_t i) {
 									  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 								  }})
 		.push_constants(&pc_post_settings)
-		//.read(integrator->output_tex) // Needed if shader inference is off
 		.bind(integrator->output_tex, integrator->texture_sampler);
-
-	if (write_exr) {
-		instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer_cpu);
-	}
-	if (calc_rmse && has_gt) {
-		auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name,
-							 const std::string& reduce_name, const std::string& reduce_shader_name) {
-			uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
-			instance->vkb.rg->add_compute(op_name, {.shader = Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
-				.push_constants(&post_pc)
-				.bind(post_desc_buffer)
-				.zero({residual_buffer, counter_buffer});
-			while (num_wgs != 1) {
-				instance->vkb.rg
-					->add_compute(reduce_name, {.shader = Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
-					.push_constants(&post_pc)
-					.bind(post_desc_buffer);
-				num_wgs = (num_wgs + 1023) / 1024;
-			}
-		};
-		instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer);
-		// Calculate RMSE
-		op_reduce("OpReduce: RMSE", "src/shaders/rmse/calc_rmse.comp", "OpReduce: Reduce RMSE",
-				  "src/shaders/rmse/reduce_rmse.comp");
-		instance->vkb.rg
-			->add_compute("Calculate RMSE", {.shader = Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1}})
-			.push_constants(&post_pc)
-			.bind(post_desc_buffer);
-	}
-
 	vkb.rg->run(cmdbuf);
-
 	vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
+	// Render image
+	// integrator->render();
+	// auto cmdbuf = vkb.ctx.command_buffers[i];
+	// VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	// vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
+	// pc_post_settings.enable_tonemapping = settings.enable_tonemapping;
+	// instance->vkb.rg
+	//	->add_gfx("Post FX", {.width = instance->width,
+	//						  .height = instance->height,
+	//						  .clear_color = {0.25f, 0.25f, 0.25f, 1.0f},
+	//						  .clear_depth_stencil = {1.0f, 0},
+	//						  .shaders = {{"src/shaders/post.vert"}, {"src/shaders/post.frag"}},
+	//						  .cull_mode = VK_CULL_MODE_NONE,
+	//						  .color_outputs = {&vkb.swapchain_images[i]},
+	//						  .pass_func =
+	//							  [](VkCommandBuffer cmd, const RenderPass& render_pass) {
+	//								  vkCmdDraw(cmd, 3, 1, 0, 0);
+	//								  ImGui::Render();
+	//								  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+	//							  }})
+	//	.push_constants(&pc_post_settings)
+	//	//.read(integrator->output_tex) // Needed if shader inference is off
+	//	.bind(integrator->output_tex, integrator->texture_sampler);
+
+	// if (write_exr) {
+	//	instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer_cpu);
+	// }
+	// if (calc_rmse && has_gt) {
+	//	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name,
+	//						 const std::string& reduce_name, const std::string& reduce_shader_name) {
+	//		uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
+	//		instance->vkb.rg->add_compute(op_name, {.shader = Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
+	//			.push_constants(&post_pc)
+	//			.bind(post_desc_buffer)
+	//			.zero({residual_buffer, counter_buffer});
+	//		while (num_wgs != 1) {
+	//			instance->vkb.rg
+	//				->add_compute(reduce_name, {.shader = Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
+	//				.push_constants(&post_pc)
+	//				.bind(post_desc_buffer);
+	//			num_wgs = (num_wgs + 1023) / 1024;
+	//		}
+	//	};
+	//	instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer);
+	//	// Calculate RMSE
+	//	op_reduce("OpReduce: RMSE", "src/shaders/rmse/calc_rmse.comp", "OpReduce: Reduce RMSE",
+	//			  "src/shaders/rmse/reduce_rmse.comp");
+	//	instance->vkb.rg
+	//		->add_compute("Calculate RMSE", {.shader = Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1}})
+	//		.push_constants(&post_pc)
+	//		.bind(post_desc_buffer);
+	// }
+
+	// vkb.rg->run(cmdbuf);
+
+	// vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
 }
 
 float RayTracer::draw_frame() {
@@ -207,7 +296,6 @@ float RayTracer::draw_frame() {
 		integrator->updated = true;
 		return (float)t_diff;
 	}
-
 
 	uint32_t image_idx = vkb.prepare_frame();
 
@@ -315,6 +403,37 @@ void RayTracer::init_resources() {
 							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 						   VK_SHARING_MODE_EXCLUSIVE, sizeof(float));
+
+	fft_arr.resize(FFT_SIZE);
+	std::vector<glm::vec2> y(fft_arr.size());
+	for (int i = 0; i < fft_arr.size(); i++) {
+		const float r1 = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+		const float r2 = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+		fft_arr[i] = {r1, r2};
+	}
+	fft_buffers[0].create("FFT Ping", &instance->vkb.ctx,
+						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+							  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+						  2 * fft_arr.size() * sizeof(float), fft_arr.data(), true);
+
+	fft_buffers[1].create("FFT Pong", &instance->vkb.ctx,
+						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+							  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+						  2 * fft_arr.size() * sizeof(float));
+
+	fft_cpu_buffers[0].create("FFT Ping CPU", &instance->vkb.ctx,
+							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+							  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+							  VK_SHARING_MODE_EXCLUSIVE, 2 * fft_arr.size() * sizeof(float));
+
+	fft_cpu_buffers[1].create("FFT Pong CPU", &instance->vkb.ctx,
+							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+							  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+							  VK_SHARING_MODE_EXCLUSIVE, 2 * fft_arr.size() * sizeof(float));
+
+	do_fft(fft_arr, y);
 	if (load_exr) {
 		// Load the ground truth image
 		const char* img_name = "out.exr";

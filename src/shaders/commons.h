@@ -552,6 +552,11 @@ struct PostPC {
     uint size;
 };
 
+struct FFTPC {
+	uint idx;
+    uint n;
+};
+
 // Structure used for retrieving the primitive information in the closest hit
 struct PrimMeshInfo {
     uint index_offset;

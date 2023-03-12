@@ -48,9 +48,15 @@ class RayTracer : public LumenInstance {
 	Buffer residual_buffer;
 	Buffer counter_buffer;
 	Buffer rmse_val_buffer;
+
+	Buffer fft_buffers[2];
+	Buffer fft_cpu_buffers[2];
 	PostPC post_pc;
+	FFTPC fft_pc;
 	std::string scene_name;
 	LumenScene scene;
+
+	std::vector<glm::vec2> fft_arr;
 
 	clock_t start;
 	bool write_exr = false;
