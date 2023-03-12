@@ -27,12 +27,12 @@ class RayTracer : public LumenInstance {
 		bool enable_tonemapping = false;
 	};
 
-	void render(uint32_t idx);
-	float draw_frame();
-	void init_imgui();
 	void init_resources();
+	void init_imgui();
 	void parse_args(int argc, char* argv[]);
 	void save_exr(const float* rgb, int width, int height, const char* outfilename);
+	float draw_frame();
+	void render(uint32_t idx);
 	bool initialized = false;
 	bool rt_initialized = false;
 	float cpu_avg_time = 0;

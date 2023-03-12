@@ -132,6 +132,162 @@ void RayTracer::init(Window* window) {
 	printf("Memory usage %f MB\n", get_memory_usage(vk_ctx.physical_device) * 1e-6);
 }
 
+void RayTracer::init_resources() {
+	PostDesc desc;
+	output_img_buffer.create("Output Image Buffer", &instance->vkb.ctx,
+							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+							 instance->width * instance->height * 4 * 4);
+
+	output_img_buffer_cpu.create("Output Image CPU", &instance->vkb.ctx,
+								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+								 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+								 VK_SHARING_MODE_EXCLUSIVE, instance->width * instance->height * 4 * 4);
+	residual_buffer.create("RMSE Residual", &instance->vkb.ctx,
+						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+						   instance->width * instance->height * 4);
+
+	counter_buffer.create("RMSE Counter", &instance->vkb.ctx,
+						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(int));
+
+	rmse_val_buffer.create("RMSE Value", &instance->vkb.ctx,
+						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+						   VK_SHARING_MODE_EXCLUSIVE, sizeof(float));
+
+	fft_arr.resize(FFT_SIZE);
+	std::vector<glm::vec2> y(fft_arr.size());
+	for (int i = 0; i < fft_arr.size(); i++) {
+		const float r1 = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+		const float r2 = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+		fft_arr[i] = {r1, r2};
+	}
+	fft_buffers[0].create("FFT Ping", &instance->vkb.ctx,
+						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+							  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+						  2 * fft_arr.size() * sizeof(float), fft_arr.data(), true);
+
+	fft_buffers[1].create("FFT Pong", &instance->vkb.ctx,
+						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+							  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+						  2 * fft_arr.size() * sizeof(float));
+
+	fft_cpu_buffers[0].create("FFT Ping CPU", &instance->vkb.ctx,
+							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+							  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+							  VK_SHARING_MODE_EXCLUSIVE, 2 * fft_arr.size() * sizeof(float));
+
+	fft_cpu_buffers[1].create("FFT Pong CPU", &instance->vkb.ctx,
+							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+							  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+							  VK_SHARING_MODE_EXCLUSIVE, 2 * fft_arr.size() * sizeof(float));
+
+	do_fft(fft_arr, y);
+	if (load_exr) {
+		// Load the ground truth image
+		const char* img_name = "out.exr";
+		float* data;
+		int width;
+		int height;
+		const char* err = nullptr;
+
+		int ret = LoadEXR(&data, &width, &height, img_name, &err);
+		if (ret != TINYEXR_SUCCESS) {
+			if (err) {
+				fprintf(stderr, "ERR : %s\n", err);
+				FreeEXRErrorMessage(err);  // release memory of error message.
+			}
+		} else {
+			std::vector<vec4> pixels;
+			int img_res = width * height;
+			pixels.resize(img_res);
+			for (int i = 0; i < img_res; i++) {
+				pixels[i].x = data[4 * i + 0];
+				pixels[i].y = data[4 * i + 1];
+				pixels[i].z = data[4 * i + 2];
+				pixels[i].w = 1.;
+			}
+			auto gt_size = pixels.size() * 4 * 4;
+			gt_img_buffer.create("Ground Truth Image", &instance->vkb.ctx,
+								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, gt_size, pixels.data(),
+								 true);
+			desc.gt_img_addr = gt_img_buffer.get_device_address();
+			has_gt = true;
+		}
+		if (has_gt) {
+			free(data);
+		}
+	}
+	desc.out_img_addr = output_img_buffer.get_device_address();
+	desc.residual_addr = residual_buffer.get_device_address();
+	desc.counter_addr = counter_buffer.get_device_address();
+	desc.rmse_val_addr = rmse_val_buffer.get_device_address();
+	post_desc_buffer.create(
+		"Post Desc", &instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(PostDesc), &desc, true);
+	post_pc.size = instance->width * instance->height;
+	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, out_img_addr, &output_img_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, rmse_val_addr, &rmse_val_buffer, instance->vkb.rg);
+}
+
+void RayTracer::init_imgui() {
+	VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
+										 {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
+										 {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
+										 {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
+										 {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
+
+	VkDescriptorPoolCreateInfo pool_info = {};
+	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	pool_info.maxSets = 1000;
+	pool_info.poolSizeCount = (uint32_t)std::size(pool_sizes);
+	pool_info.pPoolSizes = pool_sizes;
+	vk::check(vkCreateDescriptorPool(vkb.ctx.device, &pool_info, nullptr, &imgui_pool));
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	// Setup Platform/Renderer backends
+	ImGui::StyleColorsDark();
+	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	ImGui_ImplGlfw_InitForVulkan(window->get_window_ptr(), true);
+
+	ImGui_ImplVulkan_InitInfo init_info = {};
+	init_info.Instance = vkb.ctx.instance;
+	init_info.PhysicalDevice = vkb.ctx.physical_device;
+	init_info.Device = vkb.ctx.device;
+	init_info.Queue = vkb.ctx.queues[(int)QueueType::GFX];
+	init_info.DescriptorPool = imgui_pool;
+	init_info.MinImageCount = 3;
+	init_info.ImageCount = 3;
+	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+	init_info.UseDynamicRendering = true;
+	init_info.ColorAttachmentFormat = vkb.swapchain_format;
+
+	ImGui_ImplVulkan_Init(&init_info, nullptr);
+
+	CommandBuffer cmd(&vkb.ctx, true);
+	ImGui_ImplVulkan_CreateFontsTexture(cmd.handle);
+	cmd.submit(vkb.ctx.queues[(int)QueueType::GFX]);
+	ImGui_ImplVulkan_DestroyFontUploadObjects();
+}
+
 void RayTracer::update() {
 	if (instance->window->is_key_down(KeyInput::KEY_F10)) {
 		write_exr = true;
@@ -327,161 +483,6 @@ float RayTracer::draw_frame() {
 	auto t_diff = t_end - t_begin;
 	cnt++;
 	return (float)t_diff;
-}
-void RayTracer::init_imgui() {
-	VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
-										 {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
-										 {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
-										 {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
-										 {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
-										 {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
-										 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
-										 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
-										 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
-										 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
-										 {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
-
-	VkDescriptorPoolCreateInfo pool_info = {};
-	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-	pool_info.maxSets = 1000;
-	pool_info.poolSizeCount = (uint32_t)std::size(pool_sizes);
-	pool_info.pPoolSizes = pool_sizes;
-	vk::check(vkCreateDescriptorPool(vkb.ctx.device, &pool_info, nullptr, &imgui_pool));
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	// Setup Platform/Renderer backends
-	ImGui::StyleColorsDark();
-	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-	ImGui_ImplGlfw_InitForVulkan(window->get_window_ptr(), true);
-
-	ImGui_ImplVulkan_InitInfo init_info = {};
-	init_info.Instance = vkb.ctx.instance;
-	init_info.PhysicalDevice = vkb.ctx.physical_device;
-	init_info.Device = vkb.ctx.device;
-	init_info.Queue = vkb.ctx.queues[(int)QueueType::GFX];
-	init_info.DescriptorPool = imgui_pool;
-	init_info.MinImageCount = 3;
-	init_info.ImageCount = 3;
-	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-	init_info.UseDynamicRendering = true;
-	init_info.ColorAttachmentFormat = vkb.swapchain_format;
-
-	ImGui_ImplVulkan_Init(&init_info, nullptr);
-
-	CommandBuffer cmd(&vkb.ctx, true);
-	ImGui_ImplVulkan_CreateFontsTexture(cmd.handle);
-	cmd.submit(vkb.ctx.queues[(int)QueueType::GFX]);
-	ImGui_ImplVulkan_DestroyFontUploadObjects();
-}
-
-void RayTracer::init_resources() {
-	PostDesc desc;
-	output_img_buffer.create("Output Image Buffer", &instance->vkb.ctx,
-							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-							 instance->width * instance->height * 4 * 4);
-
-	output_img_buffer_cpu.create("Output Image CPU", &instance->vkb.ctx,
-								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-								 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-								 VK_SHARING_MODE_EXCLUSIVE, instance->width * instance->height * 4 * 4);
-	residual_buffer.create("RMSE Residual", &instance->vkb.ctx,
-						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						   instance->width * instance->height * 4);
-
-	counter_buffer.create("RMSE Counter", &instance->vkb.ctx,
-						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(int));
-
-	rmse_val_buffer.create("RMSE Value", &instance->vkb.ctx,
-						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-						   VK_SHARING_MODE_EXCLUSIVE, sizeof(float));
-
-	fft_arr.resize(FFT_SIZE);
-	std::vector<glm::vec2> y(fft_arr.size());
-	for (int i = 0; i < fft_arr.size(); i++) {
-		const float r1 = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-		const float r2 = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-		fft_arr[i] = {r1, r2};
-	}
-	fft_buffers[0].create("FFT Ping", &instance->vkb.ctx,
-						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						  2 * fft_arr.size() * sizeof(float), fft_arr.data(), true);
-
-	fft_buffers[1].create("FFT Pong", &instance->vkb.ctx,
-						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						  2 * fft_arr.size() * sizeof(float));
-
-	fft_cpu_buffers[0].create("FFT Ping CPU", &instance->vkb.ctx,
-							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-							  VK_SHARING_MODE_EXCLUSIVE, 2 * fft_arr.size() * sizeof(float));
-
-	fft_cpu_buffers[1].create("FFT Pong CPU", &instance->vkb.ctx,
-							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-							  VK_SHARING_MODE_EXCLUSIVE, 2 * fft_arr.size() * sizeof(float));
-
-	do_fft(fft_arr, y);
-	if (load_exr) {
-		// Load the ground truth image
-		const char* img_name = "out.exr";
-		float* data;
-		int width;
-		int height;
-		const char* err = nullptr;
-
-		int ret = LoadEXR(&data, &width, &height, img_name, &err);
-		if (ret != TINYEXR_SUCCESS) {
-			if (err) {
-				fprintf(stderr, "ERR : %s\n", err);
-				FreeEXRErrorMessage(err);  // release memory of error message.
-			}
-		} else {
-			std::vector<vec4> pixels;
-			int img_res = width * height;
-			pixels.resize(img_res);
-			for (int i = 0; i < img_res; i++) {
-				pixels[i].x = data[4 * i + 0];
-				pixels[i].y = data[4 * i + 1];
-				pixels[i].z = data[4 * i + 2];
-				pixels[i].w = 1.;
-			}
-			auto gt_size = pixels.size() * 4 * 4;
-			gt_img_buffer.create("Ground Truth Image", &instance->vkb.ctx,
-								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, gt_size, pixels.data(),
-								 true);
-			desc.gt_img_addr = gt_img_buffer.get_device_address();
-			has_gt = true;
-		}
-		if (has_gt) {
-			free(data);
-		}
-	}
-	desc.out_img_addr = output_img_buffer.get_device_address();
-	desc.residual_addr = residual_buffer.get_device_address();
-	desc.counter_addr = counter_buffer.get_device_address();
-	desc.rmse_val_addr = rmse_val_buffer.get_device_address();
-	post_desc_buffer.create(
-		"Post Desc", &instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(PostDesc), &desc, true);
-	post_pc.size = instance->width * instance->height;
-	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, out_img_addr, &output_img_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, rmse_val_addr, &rmse_val_buffer, instance->vkb.rg);
 }
 
 void RayTracer::parse_args(int argc, char* argv[]) {
