@@ -3,6 +3,7 @@
 #include <spirv_cross/spirv_glsl.hpp>
 #include <spirv_cross/spirv.h>
 #include "RenderGraph.h"
+#include "RenderGraphTypes.h"
 #define USE_SHADERC 1
 
 enum class ResourceType { UniformBuffer, StorageBuffer, StorageImage, SampledImage, AccelarationStructure };
@@ -144,17 +145,17 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 	auto active_resources = glsl.get_shader_resources(active_vars);
 	for (auto& sampled_img : active_resources.sampled_images) {
 		auto binding = glsl.get_decoration(sampled_img.id, spv::DecorationBinding);
-		pass->bound_resources[binding].read = true;
-		pass->bound_resources[binding].active = true;
+		shader.resource_binding_map[binding].read = true;
+		shader.resource_binding_map[binding].active = true;
 	}
 	for (auto& storage_img : active_resources.storage_images) {
 		auto binding = glsl.get_decoration(storage_img.id, spv::DecorationBinding);
-		pass->bound_resources[binding].write = true;
-		pass->bound_resources[binding].active = true;
+		shader.resource_binding_map[binding].write = true;
+		shader.resource_binding_map[binding].active = true;
 	}
 	for (auto& storage_buffer : active_resources.storage_buffers) {
 		auto binding = glsl.get_decoration(storage_buffer.id, spv::DecorationBinding);
-		pass->bound_resources[binding].active = true;
+		shader.resource_binding_map[binding].active = true;
 	}
 	assert(code[0] == SpvMagicNumber);
 
@@ -189,11 +190,10 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 				if (is_bound_buffer(variable_storage_class)) {
 					// Bound resource
 					auto binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
-					pass->bound_resources[binding].write = true;
+					shader.resource_binding_map[binding].write = true;
 				} else if (is_buffer(variable_storage_class)) {
 					// Via pointer
-					auto ptr_var_id = load_map[access_chain.base_ptr_id];  //;
-																		   // store_access_map[store_id];
+					auto ptr_var_id = load_map[access_chain.base_ptr_id];
 					auto var_name = glsl.get_name(ptr_var_id);
 					auto var_type = glsl.get_type_from_variable(ptr_var_id);
 					assert(buffer_ptr_hash_map.find(ptr_var_id) != buffer_ptr_hash_map.end());
@@ -218,7 +218,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 		if (variable_map.find(store_id) != variable_map.end()) {
 			if (is_bound_buffer(variable_map[store_id].storage_class)) {
 				auto binding = glsl.get_decoration(store_id, spv::DecorationBinding);
-				pass->bound_resources[binding].write = true;
+				shader.resource_binding_map[binding].write = true;
 			}
 		}
 	};
@@ -250,7 +250,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 				access_chain_map[result_id] = {base_ptr_id, base_idx, idx};
 			} break;
 			case SpvOpConvertUToPtr: {
-				// Assumption: OpConvertUToPtr comes with OpAccessChain
+				// Assumption: OpConvertUToPtr comes with OpAccessChain through OpLoad
 				// instruction
 				assert(word_count == 4);
 				assert(access_chain_map.find(insn[3]) != access_chain_map.end());
@@ -273,7 +273,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 						auto storage_class = glsl.get_storage_class(access_chain.base_ptr_id);
 						if (is_bound_buffer(storage_class)) {
 							auto binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
-							pass->bound_resources[binding].read = true;
+							shader.resource_binding_map[binding].read = true;
 						}
 						auto nh = access_chain_map.extract(id);
 						nh.key() = insn[2];
@@ -294,7 +294,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 							const auto variable_storage_class = variable_map[access_chain.base_ptr_id].storage_class;
 							if (is_bound_buffer(variable_storage_class)) {
 								auto binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
-								pass->bound_resources[binding].read = true;
+								shader.resource_binding_map[binding].read = true;
 							} else {
 								// Variable + buffer pointer?
 							}
@@ -325,7 +325,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 				if (variable_map.find(ptr_var_id) != variable_map.end()) {
 					if (is_bound_buffer(variable_map[ptr_var_id].storage_class)) {
 						auto binding = glsl.get_decoration(ptr_var_id, spv::DecorationBinding);
-						pass->bound_resources[binding].read = true;
+						shader.resource_binding_map[binding].read = true;
 					}
 				}
 

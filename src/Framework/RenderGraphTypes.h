@@ -57,10 +57,6 @@ struct ComputePassSettings {
 enum class PassType { Compute, RT, Graphics };
 
 struct ResourceBinding {
-	struct ResourceStatus {
-		bool read = false;
-		bool write = false;
-	};
 	Buffer* buf = nullptr;
 	Texture2D* tex = nullptr;
 	VkSampler sampler = nullptr;

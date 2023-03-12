@@ -75,6 +75,7 @@ private:
 	std::unordered_map<VkImage, uint32_t> img_resource_map;	 // Tex2D handle - Pass Idx
 	uint32_t beginning_pass_idx = 0;
 	uint32_t ending_pass_idx = 0;
+	const bool multithreaded_pipeline_compilation = true;
 
 	template <typename Settings>
 	RenderPass& add_pass_impl(const std::string& name, const Settings& settings);
@@ -162,6 +163,7 @@ class RenderPass {
 	void read_impl(Buffer& buffer);
 	void read_impl(Buffer& buffer, VkAccessFlags access_flags);
 	void read_impl(Texture2D& tex);
+	void post_execution_barrier(Buffer& buffer, VkAccessFlags access_flags);
 
 
 	void run(VkCommandBuffer cmd);
@@ -201,6 +203,7 @@ class RenderPass {
 	std::vector<Resource> resource_zeros;
 	std::vector<std::pair<Resource, Resource>> resource_copies;
 	std::vector<BufferBarrier> buffer_barriers;
+	std::vector<BufferBarrier> post_execution_buffer_barriers;
 	bool disable_execution = false;
 };
 

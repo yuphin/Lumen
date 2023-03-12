@@ -149,6 +149,7 @@ void RenderPass::transition_resources() {
 				write_impl(*dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
 			}
 		} else { // buffer
+			VkAccessFlags src_access_flags = VK_ACCESS_NONE_KHR;
 			read_impl(*src.buf, VK_ACCESS_TRANSFER_READ_BIT);
 			if (dst.buf) {
 				write_impl(*dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
@@ -160,7 +161,7 @@ void RenderPass::transition_resources() {
 
 static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_shaders) {
 	// todo: make resource processing in order
-	auto process_resources = [pass](const Shader& shader) {
+	auto process_bindless_resources = [pass](const Shader& shader) {
 		if (!pass->rg->settings.shader_inference) {
 			return;
 		}
@@ -171,6 +172,14 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 			if (v.write) {
 				pass->affected_buffer_pointers[k].write = v.write;
 			}
+		}
+	};
+	auto process_bindings = [pass](const Shader& shader) {
+		for (auto& [k, v] : shader.resource_binding_map) {
+			assert(k < pass->bound_resources.size());
+			pass->bound_resources[k].active = v.active;
+			pass->bound_resources[k].read = v.read;
+			pass->bound_resources[k].write = v.write;
 		}
 	};
 	switch (pass->type) {
@@ -197,7 +206,8 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 				}
 			}
 			for (auto& shader : active_shaders) {
-				process_resources(*shader);
+				process_bindless_resources(*shader);
+				process_bindings(*shader);
 			}
 		} break;
 		case PassType::RT: {
@@ -213,7 +223,7 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 							return shader;
 						},
 						shader));
-					// shader.compile(this);
+					 //shader->compile(pass);
 					pass->rg->shader_cache[shader->filename] = *shader;
 				}
 			}
@@ -225,7 +235,8 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 				}
 			}
 			for (auto& shader : active_shaders) {
-				process_resources(*shader);
+				process_bindless_resources(*shader);
+				process_bindings(*shader);
 			}
 
 		} break;
@@ -241,6 +252,7 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 					}
 				}
 				pass->affected_buffer_pointers = shader->buffer_status_map;
+				process_bindings(*shader);
 			}
 		} break;
 		default:
@@ -419,10 +431,8 @@ RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<Textur
 
 RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 	// TODO: Extend this if check upon extending this function
-	if ((src.tex || src.buf) && dst.buf) {
-		if (dst.buf) {
+	if (dst.buf) {
 			resource_copies.push_back({ src,dst });
-		}
 	} else {
 		LUMEN_ERROR("Unimplemented copy operation")
 	}
@@ -446,7 +456,11 @@ void RenderPass::finalize() {
 														pass->gfx_settings->color_outputs,
 														pass->gfx_settings->depth_output);
 				};
-				rg->pipeline_tasks.push_back({func, pass_idx});
+				if (rg->multithreaded_pipeline_compilation) {
+					rg->pipeline_tasks.push_back({func, pass_idx});
+				} else {
+					func(this);
+				}
 				break;
 			}
 			case PassType::RT: {
@@ -470,21 +484,29 @@ void RenderPass::finalize() {
 						pass->pipeline->tlas_descriptor_set, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0, &pass->pipeline->tlas_info);
 					vkUpdateDescriptorSets(pass->rg->ctx->device, 1, &descriptor_write, 0, nullptr);
 				};
-				// TODO: Fix multithreaded pipeline building for RT
-				 //func(this);
-				rg->pipeline_tasks.push_back({func, pass_idx});
+				if (rg->multithreaded_pipeline_compilation) {
+					rg->pipeline_tasks.push_back({func, pass_idx});
+				} else {
+					func(this);
+				}
 				break;
 			}
 			case PassType::Compute: {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline->create_compute_pipeline(*pass->compute_settings, pass->descriptor_counts);
 				};
-				 //func(this);
-				rg->pipeline_tasks.push_back({func, pass_idx});
+				if (rg->multithreaded_pipeline_compilation) {
+					rg->pipeline_tasks.push_back({func, pass_idx});
+				} else {
+					func(this);
+				}
 				break;
 			}
 			default:
 				break;
+		}
+		if (!rg->multithreaded_pipeline_compilation) {
+			transition_resources();
 		}
 	} else {
 		rg->pipeline_tasks.push_back({ nullptr , pass_idx});
@@ -516,6 +538,11 @@ void RenderPass::read_impl(Texture2D& tex) {
 	VkImageLayout target_layout = get_target_img_layout(tex, VK_ACCESS_SHADER_READ_BIT);
 	register_dependencies(tex, target_layout);
 	rg->img_resource_map[tex.img] = pass_idx;
+}
+
+void RenderPass::post_execution_barrier(Buffer& buffer, VkAccessFlags access_flags) {
+	auto src_access_flags = rg->buffer_resource_map[buffer.handle].second;
+	post_execution_buffer_barriers.push_back({buffer.handle, src_access_flags, access_flags});
 }
 
 void RenderPass::run(VkCommandBuffer cmd) {
@@ -562,16 +589,19 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	}
 
 	// Buffer barriers
-	std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
-	buffer_memory_barriers.reserve(buffer_barriers.size());
-	for (auto& barrier : buffer_barriers) {
-		auto curr_stage = get_pipeline_stage(type, barrier.src_access_flags);
-		auto dst_stage = get_pipeline_stage(type, barrier.dst_access_flags);
-		buffer_memory_barriers.push_back(
-			buffer_barrier2(barrier.buffer, barrier.src_access_flags, barrier.dst_access_flags, curr_stage, dst_stage));
+	{
+		std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
+		buffer_memory_barriers.reserve(buffer_barriers.size());
+		for (auto& barrier : buffer_barriers) {
+			auto curr_stage = get_pipeline_stage(type, barrier.src_access_flags);
+			auto dst_stage = get_pipeline_stage(type, barrier.dst_access_flags);
+			buffer_memory_barriers.push_back(buffer_barrier2(barrier.buffer, barrier.src_access_flags,
+															 barrier.dst_access_flags, curr_stage, dst_stage));
+		}
+		auto dependency_info =
+			vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
+		vkCmdPipelineBarrier2(cmd, &dependency_info);
 	}
-	auto dependency_info = vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
-	vkCmdPipelineBarrier2(cmd, &dependency_info);
 
 	// Wait: Images
 	wait_events.clear();
@@ -625,31 +655,33 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		switch (type) {
 			case PassType::RT: {
 				LUMEN_ASSERT(pipeline->tlas_descriptor_set, "TLAS descriptor set cannot be NULL!");
-				// This doesnt work because we can't push TLAS descriptor with
-				// template...
-				// vkCmdPushDescriptorSetWithTemplateKHR(cmd,
-				// pipeline->rt_update_template, pipeline->pipeline_layout, 0,
-				// &tlas_buffer.descriptor);
-				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->pipeline_layout, 1, 1,
-										&pipeline->tlas_descriptor_set, 0, nullptr);
+// This doesnt work because we can't push TLAS descriptor with
+// template...
+// vkCmdPushDescriptorSetWithTemplateKHR(cmd,
+// pipeline->rt_update_template, pipeline->pipeline_layout, 0,
+// &tlas_buffer.descriptor);
+vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->pipeline_layout, 1, 1,
+	&pipeline->tlas_descriptor_set, 0, nullptr);
 
-				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->handle);
+vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->handle);
 
-				if (rt_settings->pass_func) {
-					rt_settings->pass_func(cmd, *this);
-				} else {
-					auto& regions = pipeline->get_rt_regions();
-					auto& dims = rt_settings->dims;
-					vkCmdTraceRaysKHR(cmd, &regions[0], &regions[1], &regions[2], &regions[3], dims.x, dims.y, dims.z);
-				}
-				break;
+if (rt_settings->pass_func) {
+	rt_settings->pass_func(cmd, *this);
+}
+else {
+	auto& regions = pipeline->get_rt_regions();
+	auto& dims = rt_settings->dims;
+	vkCmdTraceRaysKHR(cmd, &regions[0], &regions[1], &regions[2], &regions[3], dims.x, dims.y, dims.z);
+}
+break;
 			}
 			case PassType::Compute: {
 				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->handle);
 
 				if (compute_settings->pass_func) {
 					compute_settings->pass_func(cmd, *this);
-				} else {
+				}
+				else {
 					auto& dims = compute_settings->dims;
 					vkCmdDispatch(cmd, dims.x, dims.y, dims.z);
 				}
@@ -697,12 +729,12 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 				// Render
 				{
-					VkRenderingInfo render_info{.sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+					VkRenderingInfo render_info{ .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
 												.renderArea = {{0, 0}, {gfx_settings->width, gfx_settings->height}},
 												.layerCount = 1,
 												.colorAttachmentCount = (uint32_t)color_outputs.size(),
 												.pColorAttachments = rendering_attachments.data(),
-												.pDepthAttachment = depth_output ? &depth_stencil_attachment : nullptr};
+												.pDepthAttachment = depth_output ? &depth_stencil_attachment : nullptr };
 					vkCmdBeginRendering(cmd, &render_info);
 					gfx_settings->pass_func(cmd, *this);
 					vkCmdEndRendering(cmd);
@@ -723,6 +755,22 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				break;
 		}
 	}
+
+	// Post execution buffer barriers
+	{
+		std::vector<VkBufferMemoryBarrier2> post_execution_buffer_memory_barriers;
+		post_execution_buffer_memory_barriers.reserve(buffer_barriers.size());
+		for (auto& barrier : buffer_barriers) {
+			auto curr_stage = get_pipeline_stage(type, barrier.src_access_flags);
+			auto dst_stage = get_pipeline_stage(type, barrier.dst_access_flags);
+			post_execution_buffer_memory_barriers.push_back(buffer_barrier2(
+				barrier.buffer, barrier.src_access_flags, barrier.dst_access_flags, curr_stage, dst_stage));
+		}
+		auto dependency_info = vk::dependency_info((uint32_t)post_execution_buffer_memory_barriers.size(),
+												   post_execution_buffer_memory_barriers.data());
+		vkCmdPipelineBarrier2(cmd, &dependency_info);
+	}
+
 
 	for (const auto& [src, dst] : resource_copies) {
 		if (src.tex) {
@@ -890,6 +938,7 @@ void RenderGraph::reset(VkCommandBuffer cmd) {
 		passes[i].resource_zeros.clear();
 		passes[i].resource_copies.clear();
 		passes[i].buffer_barriers.clear();
+		passes[i].post_execution_buffer_barriers.clear();
 		passes[i].disable_execution = false;
 		passes[i].active = false;
 		passes[i].next_binding_idx = 0;
