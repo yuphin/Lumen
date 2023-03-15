@@ -11,7 +11,7 @@
 #include <complex>
 
 
-constexpr uint32_t FFT_SIZE = 1024;
+constexpr uint32_t FFT_SIZE = 32;
 RayTracer* RayTracer::instance = nullptr;
 bool load_exr = false;
 bool calc_rmse = false;
@@ -56,7 +56,8 @@ RayTracer::RayTracer(int width, int height, bool debug, int argc, char* argv[]) 
 }
 
 void RayTracer::init(Window* window) {
-	srand((uint32_t)time(NULL));
+	//srand((uint32_t)time(NULL));
+	srand(42);
 	this->window = window;
 	vkb.ctx.window_ptr = window->get_window_ptr();
 	glfwSetFramebufferSizeCallback(vkb.ctx.window_ptr, fb_resize_callback);
@@ -307,7 +308,7 @@ void RayTracer::render(uint32_t i) {
 			bool pingpong = i % 2;
 			fft_pc.idx = i;
 			fft_pc.n = fft_arr.size();
-			auto dim_x = (uint32_t)(fft_arr.size() / 2 + 31) / 32;
+			auto dim_x = (uint32_t)(fft_arr.size() / 2 + 15) / 16;
 			instance->vkb.rg
 				->add_compute("FFT", {.shader = Shader("src/shaders/fft/fft.comp"),
 									  .dims = {dim_x, 1, 1}})
