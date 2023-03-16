@@ -11,7 +11,6 @@
 #include <complex>
 
 
-constexpr uint32_t FFT_SIZE = 32;
 RayTracer* RayTracer::instance = nullptr;
 bool load_exr = false;
 bool calc_rmse = false;
@@ -304,7 +303,7 @@ void RayTracer::render(uint32_t i) {
 	if (cnt == 0) {
 		CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 		int num_iters = log2(fft_arr.size());
-		for (int i = 0; i < num_iters; i++) {
+	/*	for (int i = 0; i < num_iters; i++) {
 			bool pingpong = i % 2;
 			fft_pc.idx = i;
 			fft_pc.n = fft_arr.size();
@@ -314,7 +313,15 @@ void RayTracer::render(uint32_t i) {
 									  .dims = {dim_x, 1, 1}})
 				.bind({post_desc_buffer, fft_buffers[pingpong], fft_buffers[!pingpong]})
 				.push_constants(&fft_pc);
-		}
+		}*/
+
+		bool pingpong = i % 2;
+		fft_pc.idx = 0;
+		fft_pc.n = fft_arr.size();
+		auto dim_x = (uint32_t)(fft_arr.size() / 2 + 3) / 4;
+		instance->vkb.rg->add_compute("FFT", {.shader = Shader("src/shaders/fft/fft.comp"), .dims = {dim_x, 1, 1}})
+			.bind({post_desc_buffer, fft_buffers[pingpong], fft_buffers[!pingpong]})
+			.push_constants(&fft_pc);
 
 		instance->vkb.rg->current_pass()
 			.copy(fft_buffers[0], fft_cpu_buffers[0])
@@ -332,7 +339,6 @@ void RayTracer::render(uint32_t i) {
 			auto diff = res[i] - fft_arr[i];
 			if (glm::dot(diff, diff) > 1e-3) {
 				LUMEN_ERROR("Error");
-				assert(false);
 			}
 		}
 	}

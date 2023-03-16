@@ -8,7 +8,7 @@
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #include "../commons.h"
-layout(local_size_x = 16, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
 
 layout(binding = 0) readonly buffer PostDesc_ { PostDesc post_desc; };
 layout(binding = 1, scalar) buffer FFT_Read { vec2 fft_read[]; };
@@ -20,14 +20,22 @@ shared float s_data_real[64];
 shared float s_data_imag[64];
 
 #define COALESCED_LOG 0
-#define COALESCE 0
+#define GLOBAL 0
+#define COALESCED 1
+#define SHARED 2
+
+#define MODE 2
 
 vec2 complex_mul(vec2 a, vec2 b) {
     return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
 
+void fft_2(vec2 a, vec2 b, vec2 wp, out vec2 even, out vec2 odd) {
+    even = a + b;
+    odd = complex_mul(wp, a - b);
+}
 
-void exchange(uint fixed_idx, uint stride, vec2 a, vec2 b, out vec2 a_reordered, out vec2 b_reordered) {
+void exchange(uint fixed_idx, uint stride, uint T, vec2 a, vec2 b, out vec2 a_reordered, out vec2 b_reordered) {
     s_data_real[fixed_idx] = a.x;
     s_data_imag[fixed_idx] = a.y;
 
@@ -40,16 +48,12 @@ void exchange(uint fixed_idx, uint stride, vec2 a, vec2 b, out vec2 a_reordered,
     a_reordered.x = s_data_real[gl_LocalInvocationID.x];
     a_reordered.y = s_data_imag[gl_LocalInvocationID.x];
 
-    b_reordered.x = s_data_real[gl_LocalInvocationID.x + 16];
-    b_reordered.y = s_data_imag[gl_LocalInvocationID.x + 16];
-}
-
-void fft_2(vec2 a, vec2 b, vec2 wp, out vec2 even, out vec2 odd) {
-    even = a + b;
-    odd = complex_mul(wp, a - b);
+    b_reordered.x = s_data_real[gl_LocalInvocationID.x + T];
+    b_reordered.y = s_data_imag[gl_LocalInvocationID.x + T];
 }
 
 void main() {
+#if MODE != SHARED
     const uint j = gl_GlobalInvocationID.x;
     const uint stride = 1 << pc.idx;
     const uint m = pc.n >> 1;
@@ -66,15 +70,15 @@ void main() {
     vec2 even, odd;
     fft_2(a, b, wp, even, odd);
     const uint fixed_idx = j % stride + (stride_factor << 1);
-#if COALESCE
+#if MODE == COALESCED
     vec2 even_reordered, odd_reordered;
-    exchange(fixed_idx, stride, even, odd, even_reordered, odd_reordered);
+    exchange(fixed_idx, stride, gl_WorkGroupSize.x, even, odd, even_reordered, odd_reordered);
 
 #if COALESCED_LOG
     if(j == 0) {
         debugPrintfEXT("--- Original ---\n");
     }
-    debugPrintfEXT("Thread : %d / %v2f - %d /  %v2f - %d\n", j, a, fixed_idx, b, fixed_idx + stride );
+    debugPrintfEXT("Thread : %d / %v2f - %d /  %v2f - %d\n", j, a, fixed_idx, b, fixed_idx + stride, a, b );
     memoryBarrierShared();
     barrier();
     if(j == 0) {
@@ -84,9 +88,35 @@ void main() {
 #endif
     fft_write[j] = even_reordered;
     fft_write[j + 16] = odd_reordered;
-#else
+#elif MODE == GLOBAL
     fft_write[fixed_idx] = even;
     fft_write[fixed_idx + stride] = odd;
+#endif
+
+#else
+    const uint j = gl_GlobalInvocationID.x;
+
+    vec2 a = fft_read[j];
+    vec2 b = fft_read[j + gl_WorkGroupSize.x];
+
+    const uint N = 2 * gl_WorkGroupSize.x;
+    for(uint stride = 1; stride < N; stride *= 2) {
+        uint stride_factor = stride * uint(j / stride);
+        const float angle = 2 * PI * stride_factor / N;
+        vec2 wp = vec2(cos(angle), -sin(angle));
+        vec2 even, odd;
+        fft_2(a, b, wp, even, odd);
+
+        const uint fixed_idx = j % stride + (stride_factor << 1);
+
+        memoryBarrierShared();
+        barrier();
+        exchange(fixed_idx, stride, gl_WorkGroupSize.x, even, odd, a, b);
+    }
+    fft_write[j] = a;
+    fft_write[j + gl_WorkGroupSize.x] = b;
+    
+
 #endif
     
 }
