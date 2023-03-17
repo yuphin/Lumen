@@ -113,6 +113,9 @@ class RenderPass {
 		  compute_settings(std::make_unique<ComputePassSettings>(compute_settings)),
 		  is_pipeline_cached(cached) {}
 
+	RenderPass& macro(const std::string& macro_name);
+	RenderPass& macro(const std::string& macro_name, int value);
+
 	RenderPass& bind(const ResourceBinding& binding);
 	RenderPass& bind(Texture2D& tex, VkSampler sampler);
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
@@ -143,8 +146,9 @@ class RenderPass {
 	friend RenderGraph;
 	std::vector<ResourceBinding> bound_resources;
 
-	std::unordered_map<Buffer*, BufferStatus> affected_buffer_pointers;
 	RenderGraph* rg;
+	std::unordered_map<std::string, int> macro_defines;
+	std::unordered_map<Buffer*, BufferStatus> affected_buffer_pointers;
 	std::unique_ptr<GraphicsPassSettings> gfx_settings = nullptr;
 	std::unique_ptr<RTPassSettings> rt_settings = nullptr;
 	std::unique_ptr<ComputePassSettings> compute_settings = nullptr;
@@ -190,6 +194,7 @@ class RenderPass {
 
 	std::unordered_map<VkImage, ImageSyncDescriptor> set_signals_img;
 	std::unordered_map<VkImage, ImageSyncDescriptor> wait_signals_img;
+
 
 	DescriptorInfo descriptor_infos[32] = {};
 

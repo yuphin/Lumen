@@ -465,61 +465,17 @@ static std::unordered_map<std::string, shaderc_shader_kind> mstages = {
 	{"rmiss", shaderc_miss_shader},
 };
 
-std::string preprocess_shader(const std::string& source_name, shaderc_shader_kind kind, const std::string& source) {
+static std::vector<uint32_t> compile_file(const std::string& source_name, shaderc_shader_kind kind, const std::string& source, 
+										  RenderPass* pass, bool optimize = false) {
 	shaderc::Compiler compiler;
 	shaderc::CompileOptions options;
-	shaderc_util::FileFinder fileFinder;
-	options.SetIncluder(std::make_unique<glslc::FileIncluder>(&fileFinder));
-	options.SetTargetSpirv(shaderc_spirv_version_1_6);
-	options.SetTargetEnvironment(shaderc_target_env_vulkan, 2);
 
-	// Like -DMY_DEFINE=1
-	options.AddMacroDefinition("MY_DEFINE", "1");
-
-	shaderc::PreprocessedSourceCompilationResult result =
-		compiler.PreprocessGlsl(source, kind, source_name.c_str(), options);
-
-	if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
-		std::cerr << result.GetErrorMessage();
-		return "";
+	for (const auto& [k, v] : pass->macro_defines) {
+		options.AddMacroDefinition(k, std::to_string(v));
 	}
-
-	return {result.cbegin(), result.cend()};
-}
-
-std::string compile_file_to_assembly(const std::string& source_name, shaderc_shader_kind kind,
-									 const std::string& source, bool optimize = false) {
-	shaderc::Compiler compiler;
-	shaderc::CompileOptions options;
-
-	// Like -DMY_DEFINE=1
-	options.AddMacroDefinition("MY_DEFINE", "1");
-	if (optimize) options.SetOptimizationLevel(shaderc_optimization_level_size);
-
-	shaderc_util::FileFinder fileFinder;
-	options.SetIncluder(std::make_unique<glslc::FileIncluder>(&fileFinder));
-	options.SetTargetSpirv(shaderc_spirv_version_1_6);
-	options.SetTargetEnvironment(shaderc_target_env_vulkan, 2);
-
-	shaderc::AssemblyCompilationResult result =
-		compiler.CompileGlslToSpvAssembly(source, kind, source_name.c_str(), options);
-
-	if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
-		std::cerr << result.GetErrorMessage();
-		return "";
+	if (optimize) {
+		options.SetOptimizationLevel(shaderc_optimization_level_size);
 	}
-
-	return {result.cbegin(), result.cend()};
-}
-
-std::vector<uint32_t> compile_file(const std::string& source_name, shaderc_shader_kind kind, const std::string& source,
-								   bool optimize = false) {
-	shaderc::Compiler compiler;
-	shaderc::CompileOptions options;
-
-	// Like -DMY_DEFINE=1
-	options.AddMacroDefinition("MY_DEFINE", "1");
-	if (optimize) options.SetOptimizationLevel(shaderc_optimization_level_size);
 
 	shaderc_util::FileFinder fileFinder;
 	options.SetIncluder(std::make_unique<glslc::FileIncluder>(&fileFinder));
@@ -561,7 +517,7 @@ int Shader::compile(RenderPass* pass) {
 	};
 	const auto& str = buffer.str();
 	 // Compiling
-	binary = compile_file(filename, mstages[get_ext(filename)], str);
+	binary = compile_file(filename, mstages[get_ext(filename)], str, pass);
 	parse_shader(*this, binary.data(), binary.size(), pass);
 	return 0;
 #else
