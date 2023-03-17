@@ -8,7 +8,8 @@
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #include "../commons.h"
-layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;
+layout(constant_id = 0) const int WG_SIZE = 1024;
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
 
 layout(binding = 0) readonly buffer PostDesc_ { PostDesc post_desc; };
 layout(binding = 1, scalar) buffer FFT_Read { vec2 fft_read[]; };
@@ -16,8 +17,8 @@ layout(binding = 2, scalar) buffer FFT_Write { vec2 fft_write[]; };
 layout(push_constant) uniform PC { FFTPC pc; };
 #define PI 3.14159265359
 
-shared float s_data_real[64];
-shared float s_data_imag[64];
+shared float s_data_real[WG_SIZE * 2];
+shared float s_data_imag[WG_SIZE * 2];
 
 #define COALESCED_LOG 0
 #define GLOBAL 0
@@ -115,6 +116,8 @@ void main() {
     }
     fft_write[j] = a;
     fft_write[j + gl_WorkGroupSize.x] = b;
+
+    debugPrintfEXT("%d %d\n", WG_SIZE, gl_WorkGroupSize.x);
     
 
 #endif

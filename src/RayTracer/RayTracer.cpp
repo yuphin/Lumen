@@ -319,7 +319,12 @@ void RayTracer::render(uint32_t i) {
 		fft_pc.idx = 0;
 		fft_pc.n = fft_arr.size();
 		auto dim_x = (uint32_t)(fft_arr.size() / 2 + 3) / 4;
-		instance->vkb.rg->add_compute("FFT", {.shader = Shader("src/shaders/fft/fft.comp"), .dims = {dim_x, 1, 1}})
+		const uint32_t WG_SIZE_X = 4;
+		instance->vkb.rg->add_compute("FFT", {
+			.shader = Shader("src/shaders/fft/fft.comp"), 
+			.specialization_data = {WG_SIZE_X},
+			.dims = {dim_x, 1, 1}
+			})
 			.bind({post_desc_buffer, fft_buffers[pingpong], fft_buffers[!pingpong]})
 			.push_constants(&fft_pc);
 
