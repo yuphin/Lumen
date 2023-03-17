@@ -303,7 +303,7 @@ void RayTracer::render(uint32_t i) {
 		CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 		int num_iters = log2(fft_arr.size());
 
-		const bool FFT_SHARED_MEM = true;
+		const bool FFT_SHARED_MEM = false;
 
 		fft_pc.n = fft_arr.size();
 		if (FFT_SHARED_MEM) {
@@ -311,10 +311,9 @@ void RayTracer::render(uint32_t i) {
 			auto dim_x = (uint32_t)(fft_arr.size() / 2 + WG_SIZE_X - 1) / WG_SIZE_X;
 			instance->vkb.rg
 				->add_compute("FFT", {.shader = Shader("src/shaders/fft/fft.comp"),
-									  .specialization_data = {WG_SIZE_X},
+									  .specialization_data = {WG_SIZE_X, uint32_t(FFT_SHARED_MEM)},
 									  .dims = {dim_x, 1, 1}})
 				.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
-				.macro("FFT_SHARED_MEM")
 				.push_constants(&fft_pc);
 		} else {
 			const uint32_t WG_SIZE_X = 4;
@@ -325,14 +324,14 @@ void RayTracer::render(uint32_t i) {
 				fft_pc.n = fft_arr.size();
 				instance->vkb.rg
 					->add_compute("FFT", {.shader = Shader("src/shaders/fft/fft.comp"),
-										  .specialization_data = {WG_SIZE_X},
+										  .specialization_data = {WG_SIZE_X, uint32_t(FFT_SHARED_MEM)},
 										  .dims = {dim_x, 1, 1}})
 					.bind({post_desc_buffer, fft_buffers[pingpong], fft_buffers[!pingpong]})
 					.push_constants(&fft_pc);
 			}
 		}
 
-#if 0
+#if 1
 		instance->vkb.rg->current_pass()
 			.copy(fft_buffers[0], fft_cpu_buffers[0])
 			.copy(fft_buffers[1], fft_cpu_buffers[1]);
