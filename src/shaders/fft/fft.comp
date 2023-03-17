@@ -20,13 +20,6 @@ layout(push_constant) uniform PC { FFTPC pc; };
 shared float s_data_real[WG_SIZE * 2];
 shared float s_data_imag[WG_SIZE * 2];
 
-#define COALESCED_LOG 0
-#define GLOBAL 0
-#define COALESCED 1
-#define SHARED 2
-
-#define MODE 2
-
 vec2 complex_mul(vec2 a, vec2 b) {
     return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
@@ -54,7 +47,7 @@ void exchange(uint fixed_idx, uint stride, uint T, vec2 a, vec2 b, out vec2 a_re
 }
 
 void main() {
-#if MODE != SHARED
+#if !defined(FFT_SHARED_MEM)
     const uint j = gl_GlobalInvocationID.x;
     const uint stride = 1 << pc.idx;
     const uint m = pc.n >> 1;
@@ -71,29 +64,8 @@ void main() {
     vec2 even, odd;
     fft_2(a, b, wp, even, odd);
     const uint fixed_idx = j % stride + (stride_factor << 1);
-#if MODE == COALESCED
-    vec2 even_reordered, odd_reordered;
-    exchange(fixed_idx, stride, gl_WorkGroupSize.x, even, odd, even_reordered, odd_reordered);
-
-#if COALESCED_LOG
-    if(j == 0) {
-        debugPrintfEXT("--- Original ---\n");
-    }
-    debugPrintfEXT("Thread : %d / %v2f - %d /  %v2f - %d\n", j, a, fixed_idx, b, fixed_idx + stride, a, b );
-    memoryBarrierShared();
-    barrier();
-    if(j == 0) {
-        debugPrintfEXT("--- Reordered ---\n");
-    }
-    debugPrintfEXT("Thread : %d / %v2f - %d /  %v2f - %d\n", j, even_reordered, j, odd_reordered, j + 16 );
-#endif
-    fft_write[j] = even_reordered;
-    fft_write[j + 16] = odd_reordered;
-#elif MODE == GLOBAL
     fft_write[fixed_idx] = even;
     fft_write[fixed_idx + stride] = odd;
-#endif
-
 #else
     const uint j = gl_GlobalInvocationID.x;
 
@@ -116,9 +88,6 @@ void main() {
     }
     fft_write[j] = a;
     fft_write[j + gl_WorkGroupSize.x] = b;
-
-    debugPrintfEXT("%d %d\n", WG_SIZE, gl_WorkGroupSize.x);
-    
 
 #endif
     
