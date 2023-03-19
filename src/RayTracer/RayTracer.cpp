@@ -14,6 +14,8 @@ RayTracer* RayTracer::instance = nullptr;
 bool load_exr = false;
 bool calc_rmse = false;
 
+#define FFT_DEBUG 0
+
 static glm::vec2 complex_mul(const glm::vec2& a, const glm::vec2& b) {
 	return glm::vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
@@ -89,7 +91,7 @@ void RayTracer::init(Window* window) {
 	// Disable event based synchronization
 	// Currently the event API that comes with Vulkan 1.3 is buggy on NVIDIA drivers
 	// so this is turned off and pipeline barriers are used instead
-	vkb.rg->settings.use_events = false;
+	vkb.rg->settings.use_events = true;
 
 	switch (scene.config.integrator_type) {
 		case IntegratorType::Path:
@@ -238,8 +240,8 @@ void RayTracer::init_resources() {
 		sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 		vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &lena_sampler),
 				  "Could not create image sampler");
-		//const char* img_name = "lena_gray.png";
-		const char* img_name = "lena256.png";
+		const char* img_name = "lena_gray.png";
+		//const char* img_name = "lena256.png";
 		int x, y, n;
 		unsigned char* data = stbi_load(img_name, &x, &y, &n, 4);
 
@@ -330,38 +332,9 @@ void RayTracer::update() {
 }
 
 void RayTracer::render(uint32_t i) {
+#if FFT_DEBUG
 	//if (cnt == 0) {
 	if (1) {
-		{
-			lena_ping.destroy();
-			lena_pong.destroy();
-			VkSamplerCreateInfo sampler_ci = vk::sampler_create_info();
-			sampler_ci.minFilter = VK_FILTER_NEAREST;
-			sampler_ci.magFilter = VK_FILTER_NEAREST;
-			sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-			sampler_ci.maxLod = FLT_MAX;
-
-			sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-			sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-			vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &lena_sampler),
-					  "Could not create image sampler");
-			const char* img_name = "lena_gray.png";
-			int x, y, n;
-			unsigned char* data = stbi_load(img_name, &x, &y, &n, 4);
-
-			auto size = x * y * 4;
-			auto img_dims = VkExtent2D{(uint32_t)x, (uint32_t)y};
-			auto ci = make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-			lena_ping.load_from_data(&instance->vkb.ctx, data, size, ci, lena_sampler, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-								false);
-			TextureSettings settings;
-			settings.base_extent = lena_ping.base_extent;
-			settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-			settings.usage_flags = lena_ping.usage_flags;
-			lena_pong.create_empty_texture("Lena - Pong", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL,
-										   lena_sampler);
-			stbi_image_free(data);
-	}
 		int num_iters = log2(fft_arr.size());
 
 		const bool FFT_SHARED_MEM = true;
@@ -443,18 +416,23 @@ void RayTracer::render(uint32_t i) {
 		}
 #endif
 	}
-	auto cmdbuf = vkb.ctx.command_buffers[i];
-	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
-	pc_post_settings.enable_tonemapping = settings.enable_tonemapping;
-	instance->vkb.rg
+#endif
+#if !FFT_DEBUG
+	// Render image
+	 integrator->render();
+#endif
+	 auto cmdbuf = vkb.ctx.command_buffers[i];
+	 VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	 vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
+	 pc_post_settings.enable_tonemapping = settings.enable_tonemapping;
+	 instance->vkb.rg
 		->add_gfx("Post FX", {.width = instance->width,
 							  .height = instance->height,
 							  .clear_color = {0.25f, 0.25f, 0.25f, 1.0f},
 							  .clear_depth_stencil = {1.0f, 0},
 							  .shaders = {{"src/shaders/post.vert"}, {"src/shaders/post.frag"}},
 							  .cull_mode = VK_CULL_MODE_NONE,
-							  .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
+				  			  .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 							  .color_outputs = {&vkb.swapchain_images[i]},
 							  .pass_func =
 								  [](VkCommandBuffer cmd, const RenderPass& render_pass) {
@@ -463,66 +441,42 @@ void RayTracer::render(uint32_t i) {
 									  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 								  }})
 		.push_constants(&pc_post_settings)
+		//.read(integrator->output_tex) // Needed if shader inference is off
 		.bind(integrator->output_tex, integrator->texture_sampler)
 		.bind(lena_pong, lena_sampler);
-	vkb.rg->run(cmdbuf);
-	vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
-	// Render image
-	// integrator->render();
-	// auto cmdbuf = vkb.ctx.command_buffers[i];
-	// VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	// vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
-	// pc_post_settings.enable_tonemapping = settings.enable_tonemapping;
-	// instance->vkb.rg
-	//	->add_gfx("Post FX", {.width = instance->width,
-	//						  .height = instance->height,
-	//						  .clear_color = {0.25f, 0.25f, 0.25f, 1.0f},
-	//						  .clear_depth_stencil = {1.0f, 0},
-	//						  .shaders = {{"src/shaders/post.vert"}, {"src/shaders/post.frag"}},
-	//						  .cull_mode = VK_CULL_MODE_NONE,
-	//						  .color_outputs = {&vkb.swapchain_images[i]},
-	//						  .pass_func =
-	//							  [](VkCommandBuffer cmd, const RenderPass& render_pass) {
-	//								  vkCmdDraw(cmd, 3, 1, 0, 0);
-	//								  ImGui::Render();
-	//								  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
-	//							  }})
-	//	.push_constants(&pc_post_settings)
-	//	//.read(integrator->output_tex) // Needed if shader inference is off
-	//	.bind(integrator->output_tex, integrator->texture_sampler);
 
-	// if (write_exr) {
-	//	instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer_cpu);
-	// }
-	// if (calc_rmse && has_gt) {
-	//	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name,
-	//						 const std::string& reduce_name, const std::string& reduce_shader_name) {
-	//		uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
-	//		instance->vkb.rg->add_compute(op_name, {.shader = Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
-	//			.push_constants(&post_pc)
-	//			.bind(post_desc_buffer)
-	//			.zero({residual_buffer, counter_buffer});
-	//		while (num_wgs != 1) {
-	//			instance->vkb.rg
-	//				->add_compute(reduce_name, {.shader = Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
-	//				.push_constants(&post_pc)
-	//				.bind(post_desc_buffer);
-	//			num_wgs = (num_wgs + 1023) / 1024;
-	//		}
-	//	};
-	//	instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer);
-	//	// Calculate RMSE
-	//	op_reduce("OpReduce: RMSE", "src/shaders/rmse/calc_rmse.comp", "OpReduce: Reduce RMSE",
-	//			  "src/shaders/rmse/reduce_rmse.comp");
-	//	instance->vkb.rg
-	//		->add_compute("Calculate RMSE", {.shader = Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1}})
-	//		.push_constants(&post_pc)
-	//		.bind(post_desc_buffer);
-	// }
+	 if (write_exr) {
+		instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer_cpu);
+	 }
+	 if (calc_rmse && has_gt) {
+		auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name,
+							 const std::string& reduce_name, const std::string& reduce_shader_name) {
+			uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
+			instance->vkb.rg->add_compute(op_name, {.shader = Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
+				.push_constants(&post_pc)
+				.bind(post_desc_buffer)
+				.zero({residual_buffer, counter_buffer});
+			while (num_wgs != 1) {
+				instance->vkb.rg
+					->add_compute(reduce_name, {.shader = Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
+					.push_constants(&post_pc)
+					.bind(post_desc_buffer);
+				num_wgs = (num_wgs + 1023) / 1024;
+			}
+		};
+		instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer);
+		// Calculate RMSE
+		op_reduce("OpReduce: RMSE", "src/shaders/rmse/calc_rmse.comp", "OpReduce: Reduce RMSE",
+				  "src/shaders/rmse/reduce_rmse.comp");
+		instance->vkb.rg
+			->add_compute("Calculate RMSE", {.shader = Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1}})
+			.push_constants(&post_pc)
+			.bind(post_desc_buffer);
+	 }
 
-	// vkb.rg->run(cmdbuf);
+	 vkb.rg->run(cmdbuf);
 
-	// vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
+	 vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
 }
 
 float RayTracer::draw_frame() {
