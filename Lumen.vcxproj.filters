@@ -533,6 +533,7 @@
     <None Include="src\shaders\utils.glsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="src\shaders\fft\fft.comp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Framework">

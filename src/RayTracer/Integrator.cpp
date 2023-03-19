@@ -131,7 +131,7 @@ void Integrator::init() {
 		std::array<uint8_t, 4> nil = {0, 0, 0, 0};
 		scene_textures.resize(1);
 		auto ci = make_img2d_ci(VkExtent2D{1, 1});
-		scene_textures[0].load_from_data(&instance->vkb.ctx, nil.data(), 4, ci, texture_sampler);
+		scene_textures[0].load_from_data(&instance->vkb.ctx, nil.data(), 4, ci, texture_sampler, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 	};
 
 	if (!lumen_scene->textures.size()) {
@@ -146,7 +146,7 @@ void Integrator::init() {
 			auto size = x * y * 4;
 			auto img_dims = VkExtent2D{(uint32_t)x, (uint32_t)y};
 			auto ci = make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-			scene_textures[i].load_from_data(&instance->vkb.ctx, data, size, ci, texture_sampler, false);
+			scene_textures[i].load_from_data(&instance->vkb.ctx, data, size, ci, texture_sampler, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 			stbi_image_free(data);
 			i++;
 		}

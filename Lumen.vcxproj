@@ -324,6 +324,7 @@
   <ItemGroup>
     <None Include="src\shaders\bsdf_commons.glsl" />
     <None Include="src\shaders\commons.glsl" />
+    <None Include="src\shaders\fft\fft.comp" />
     <None Include="src\shaders\gltf_simple.frag" />
     <None Include="src\shaders\gltf_simple.vert" />
     <None Include="src\shaders\integrators\bdpt\bdpt.rgen" />

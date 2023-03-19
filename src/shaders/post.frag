@@ -11,6 +11,7 @@
 layout(location = 0) in vec2 in_uv;
 layout(location = 0) out vec4 fragColor;
 layout(set = 0, binding = 0) uniform sampler2D input_img;
+layout(set = 0, binding = 1) uniform sampler2D lena;
 layout(push_constant) uniform PCPost {  PushConstantPost pc; };
 
 vec3 aces(vec3 x) {
@@ -32,7 +33,10 @@ float aces(float x) {
 }
 
 void main() {
-    vec4 img = texture(input_img, in_uv).rgba;
+    // vec4 img = texture(input_img, in_uv).rgba;
+    vec4 img = abs(texture(lena, in_uv).rgba);
+    
+    img.a = 1;
     if(pc.enable_tonemapping == 1) {
         img = vec4(aces(img.rgb), img.a);
     }

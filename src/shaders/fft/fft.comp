@@ -10,11 +10,15 @@
 #include "../commons.h"
 layout(constant_id = 0) const int WG_SIZE = 1024;
 layout(constant_id = 1) const int FFT_SHARED_MEM = 0;
+layout(constant_id = 2) const int VERTICAL = 0;
+layout(constant_id = 3) const int INVERSE = 0;
 layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
 
 layout(binding = 0) readonly buffer PostDesc_ { PostDesc post_desc; };
 layout(binding = 1, scalar) readonly buffer FFT_Read { vec2 fft_read[]; };
 layout(binding = 2, scalar) writeonly buffer FFT_Write { vec2 fft_write[]; };
+layout(set = 0, binding = 3) uniform sampler2D lena;
+layout(rgba32f, set = 0, binding = 4) uniform image2D lena_pong;
 layout(push_constant) uniform PC { FFTPC pc; };
 #define PI 3.14159265359
 
@@ -67,7 +71,7 @@ void fft_shared() {
     const uint j = gl_GlobalInvocationID.x;
     const uint N = 2 * gl_WorkGroupSize.x;
     const uint N_DIV_2 = gl_WorkGroupSize.x;
-
+    
     vec2 a = fft_read[j];
     vec2 b = fft_read[j + N_DIV_2];
 
@@ -85,10 +89,71 @@ void fft_shared() {
     fft_write[j + N_DIV_2] = b;
 }
 
-void main() {
-    if(FFT_SHARED_MEM == 0) {
-        fft_global();
+vec4 fft_shared_img(bool is_rg, vec4 rg, ivec2 coords, ivec2 coords_strided) {
+    const uint N = 2 * gl_WorkGroupSize.x;
+    const uint N_DIV_2 = gl_WorkGroupSize.x;
+   
+    const uint j = gl_LocalInvocationID.x;
+    vec2 a, b;
+    if(INVERSE == 1 || VERTICAL == 1) {
+        if(is_rg) {
+            a = imageLoad(lena_pong, coords).rg;
+            b = imageLoad(lena_pong, coords_strided).rg;
+        } else {
+            a = imageLoad(lena_pong, coords).ba;
+            b = imageLoad(lena_pong, coords_strided).ba;
+        }
     } else {
-        fft_shared();
+        if(is_rg) {
+            a = texelFetch(lena, coords, 0).rg;
+            b = texelFetch(lena, coords_strided, 0).rg;
+        } else {
+            a = texelFetch(lena, coords, 0).ba;
+            b = texelFetch(lena, coords_strided, 0).ba;
+        }
     }
+ 
+    for(uint stride = 1; stride < N; stride *= 2) {
+        const uint stride_factor = stride * uint(j / stride);
+        float angle = 2 * PI * stride_factor / N;
+        if(INVERSE == 1) {
+            angle *= -1;
+        }
+        const vec2 wp = vec2(cos(angle), -sin(angle));
+        const vec4 butterfly = fft_2(a, b, wp);
+        const uint fixed_idx = j % stride + (stride_factor << 1);
+        memoryBarrierShared();
+        barrier();
+        exchange(fixed_idx, stride, N_DIV_2, butterfly.xy, butterfly.zw, a, b);
+    }
+    if(INVERSE == 1) {
+        a /= N;
+        b /= N;
+    }
+    
+    return vec4(a,b);
+}
+
+void main() {
+
+//    if(FFT_SHARED_MEM == 0) {
+//        fft_global();
+//    } else {
+//        fft_shared();
+//    }
+    ivec2 coords;
+    ivec2 coords_strided;
+      const uint N_DIV_2 = gl_WorkGroupSize.x;
+    if(VERTICAL == 1) {
+        coords = ivec2(gl_GlobalInvocationID.x / N_DIV_2, gl_GlobalInvocationID.x % N_DIV_2);
+        coords_strided = coords + ivec2(0, N_DIV_2);
+    } else {
+        coords = ivec2(gl_GlobalInvocationID.x % N_DIV_2, gl_GlobalInvocationID.x / N_DIV_2);
+        coords_strided = coords + ivec2(N_DIV_2, 0);
+    }
+    vec4 rg, ba;
+    rg = fft_shared_img(true, rg, coords, coords_strided);
+    ba = fft_shared_img(false, rg, coords, coords_strided);
+    imageStore(lena_pong, coords, vec4(rg.xy, ba.xy));
+    imageStore(lena_pong, coords_strided, vec4(rg.zw, ba.zw));
 }

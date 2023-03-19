@@ -89,7 +89,7 @@ void RayTracer::init(Window* window) {
 	// Disable event based synchronization
 	// Currently the event API that comes with Vulkan 1.3 is buggy on NVIDIA drivers
 	// so this is turned off and pipeline barriers are used instead
-	vkb.rg->settings.use_events = false;
+	vkb.rg->settings.use_events = true;
 
 	switch (scene.config.integrator_type) {
 		case IntegratorType::Path:
@@ -226,6 +226,37 @@ void RayTracer::init_resources() {
 			free(data);
 		}
 	}
+	// Lena
+	{
+		VkSamplerCreateInfo sampler_ci = vk::sampler_create_info();
+		sampler_ci.minFilter = VK_FILTER_NEAREST;
+		sampler_ci.magFilter = VK_FILTER_NEAREST;
+		sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		sampler_ci.maxLod = FLT_MAX;
+
+		sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+		sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+		vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &lena_sampler),
+				  "Could not create image sampler");
+		//const char* img_name = "lena_gray.png";
+		const char* img_name = "lena256.png";
+		int x, y, n;
+		unsigned char* data = stbi_load(img_name, &x, &y, &n, 4);
+
+		auto size = x * y * 4;
+		auto img_dims = VkExtent2D{(uint32_t)x, (uint32_t)y};
+		auto ci = make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+		lena_ping.load_from_data(&instance->vkb.ctx, data, size, ci, lena_sampler, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+							false);
+		TextureSettings settings;
+		settings.base_extent = lena_ping.base_extent;
+		settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		settings.usage_flags = lena_ping.usage_flags;
+		lena_pong.create_empty_texture("Lena - Pong", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL,
+									   lena_sampler);
+		stbi_image_free(data);
+	}
+
 	desc.out_img_addr = output_img_buffer.get_device_address();
 	desc.residual_addr = residual_buffer.get_device_address();
 	desc.counter_addr = counter_buffer.get_device_address();
@@ -299,22 +330,90 @@ void RayTracer::update() {
 }
 
 void RayTracer::render(uint32_t i) {
-	if (cnt == 0) {
+	//if (cnt == 0) {
+	if (1) {
+		{
+			lena_ping.destroy();
+			lena_pong.destroy();
+			VkSamplerCreateInfo sampler_ci = vk::sampler_create_info();
+			sampler_ci.minFilter = VK_FILTER_NEAREST;
+			sampler_ci.magFilter = VK_FILTER_NEAREST;
+			sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			sampler_ci.maxLod = FLT_MAX;
+
+			sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+			sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+			vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &lena_sampler),
+					  "Could not create image sampler");
+			const char* img_name = "circle16.jpg";
+			int x, y, n;
+			unsigned char* data = stbi_load(img_name, &x, &y, &n, 4);
+
+			auto size = x * y * 4;
+			auto img_dims = VkExtent2D{(uint32_t)x, (uint32_t)y};
+			auto ci = make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+			lena_ping.load_from_data(&instance->vkb.ctx, data, size, ci, lena_sampler, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+								false);
+			TextureSettings settings;
+			settings.base_extent = lena_ping.base_extent;
+			settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+			settings.usage_flags = lena_ping.usage_flags;
+			lena_pong.create_empty_texture("Lena - Pong", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL,
+										   lena_sampler);
+			stbi_image_free(data);
+	}
 		CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+		CommandBuffer cmd2(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+		CommandBuffer cmd3(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+		CommandBuffer cmd4(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 		int num_iters = log2(fft_arr.size());
 
-		const bool FFT_SHARED_MEM = false;
+		const bool FFT_SHARED_MEM = true;
 
 		fft_pc.n = fft_arr.size();
 		if (FFT_SHARED_MEM) {
-			const uint32_t WG_SIZE_X = fft_arr.size() / 2;
-			auto dim_x = (uint32_t)(fft_arr.size() / 2 + WG_SIZE_X - 1) / WG_SIZE_X;
+			const uint32_t WG_SIZE_X = lena_ping.base_extent.width;
+			auto dim_x = (uint32_t)(lena_ping.base_extent.width * lena_ping.base_extent.height + WG_SIZE_X - 1) / WG_SIZE_X;
+			bool vertical = false;
 			instance->vkb.rg
-				->add_compute("FFT", {.shader = Shader("src/shaders/fft/fft.comp"),
-									  .specialization_data = {WG_SIZE_X, uint32_t(FFT_SHARED_MEM)},
+				->add_compute("FFT - Horizontal", {.shader = Shader("src/shaders/fft/fft.comp"),
+									  .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM),  uint32_t(vertical), 0},
 									  .dims = {dim_x, 1, 1}})
 				.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
+				.bind(lena_ping, lena_sampler)
+				.bind(lena_pong)
 				.push_constants(&fft_pc);
+			vertical = true;
+			instance->vkb.rg->run_and_submit(cmd);
+			instance->vkb.rg
+				->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/fft/fft.comp"),
+							   .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0 },
+									  .dims = {dim_x, 1, 1}})
+				.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
+				.bind(lena_ping, lena_sampler)
+				.bind(lena_pong)
+				.push_constants(&fft_pc);
+			instance->vkb.rg->run_and_submit(cmd2);
+			
+			instance->vkb.rg
+				->add_compute("FFT - Vertical - I", {.shader = Shader("src/shaders/fft/fft.comp"),
+									  .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM),  uint32_t(vertical), 1},
+									  .dims = {dim_x, 1, 1}})
+				.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
+				.bind(lena_ping, lena_sampler)
+				.bind(lena_pong)
+				.push_constants(&fft_pc);
+			instance->vkb.rg->run_and_submit(cmd3);
+			vertical = false;
+			instance->vkb.rg
+				->add_compute("FFT - Horizontal - I", {.shader = Shader("src/shaders/fft/fft.comp"),
+							   .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1 },
+									  .dims = {dim_x, 1, 1}})
+				.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
+				.bind(lena_ping, lena_sampler)
+				.bind(lena_pong)
+				.push_constants(&fft_pc);
+			instance->vkb.rg->run_and_submit(cmd4);
 		} else {
 			const uint32_t WG_SIZE_X = 4;
 			auto dim_x = (uint32_t)(fft_arr.size() / 2 + WG_SIZE_X - 1) / WG_SIZE_X;
@@ -331,7 +430,7 @@ void RayTracer::render(uint32_t i) {
 			}
 		}
 
-#if 1
+#if 0
 		instance->vkb.rg->current_pass()
 			.copy(fft_buffers[0], fft_cpu_buffers[0])
 			.copy(fft_buffers[1], fft_cpu_buffers[1]);
@@ -371,7 +470,8 @@ void RayTracer::render(uint32_t i) {
 									  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 								  }})
 		.push_constants(&pc_post_settings)
-		.bind(integrator->output_tex, integrator->texture_sampler);
+		.bind(integrator->output_tex, integrator->texture_sampler)
+		.bind(lena_pong, lena_sampler);
 	vkb.rg->run(cmdbuf);
 	vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
 	// Render image

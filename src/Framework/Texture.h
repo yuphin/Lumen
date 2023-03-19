@@ -51,16 +51,11 @@ class Texture2D : public Texture {
    public:
 	Texture2D() = default;
 	Texture2D(VulkanContext*);
-	// Texture2D(VulkanContext*, VkFormat, VkImageTiling, VkImageUsageFlags,
-	//		  uint32_t mip_levels, uint32_t array_layers, VkSampleCountFlagBits,
-	//		  VkImageType);
+
 	Texture2D(const std::string& name, VulkanContext* ctx, VkImage image, VkFormat format, VkImageUsageFlags flags,
 			  VkImageAspectFlags aspect_flags, bool present = true);
-	void load_from_img(const std::string& filename, VulkanContext* ctx, VkSampler, VkSamplerCreateInfo* = nullptr,
-					   bool generate_mipmaps = true);
-
 	void load_from_data(VulkanContext* ctx, void* data, VkDeviceSize size, const VkImageCreateInfo& info,
-						VkSampler a_sampler, bool generate_mipmaps = true);
+						VkSampler a_sampler, VkImageUsageFlags flags, bool generate_mipmaps = false);
 	void create_empty_texture(const char* name, VulkanContext* ctx, const TextureSettings& settings,
 							  VkImageLayout img_layout, VkSampler = 0,
 							  VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT);
