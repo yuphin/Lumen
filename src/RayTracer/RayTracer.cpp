@@ -362,10 +362,6 @@ void RayTracer::render(uint32_t i) {
 										   lena_sampler);
 			stbi_image_free(data);
 	}
-		CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-		CommandBuffer cmd2(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-		CommandBuffer cmd3(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-		CommandBuffer cmd4(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 		int num_iters = log2(fft_arr.size());
 
 		const bool FFT_SHARED_MEM = true;
@@ -384,7 +380,6 @@ void RayTracer::render(uint32_t i) {
 				.bind(lena_pong)
 				.push_constants(&fft_pc);
 			vertical = true;
-			//instance->vkb.rg->run_and_submit(cmd);
 			instance->vkb.rg
 				->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/fft/fft.comp"),
 							   .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0 },
@@ -393,7 +388,6 @@ void RayTracer::render(uint32_t i) {
 				.bind(lena_ping, lena_sampler)
 				.bind(lena_pong)
 				.push_constants(&fft_pc);
-			instance->vkb.rg->run_and_submit(cmd2);
 			
 			instance->vkb.rg
 				->add_compute("FFT - Vertical - I", {.shader = Shader("src/shaders/fft/fft.comp"),
@@ -403,7 +397,6 @@ void RayTracer::render(uint32_t i) {
 				.bind(lena_ping, lena_sampler)
 				.bind(lena_pong)
 				.push_constants(&fft_pc);
-			instance->vkb.rg->run_and_submit(cmd3);
 			vertical = false;
 			instance->vkb.rg
 				->add_compute("FFT - Horizontal - I", {.shader = Shader("src/shaders/fft/fft.comp"),
@@ -413,7 +406,6 @@ void RayTracer::render(uint32_t i) {
 				.bind(lena_ping, lena_sampler)
 				.bind(lena_pong)
 				.push_constants(&fft_pc);
-			instance->vkb.rg->run_and_submit(cmd4);
 		} else {
 			const uint32_t WG_SIZE_X = 4;
 			auto dim_x = (uint32_t)(fft_arr.size() / 2 + WG_SIZE_X - 1) / WG_SIZE_X;
