@@ -89,7 +89,7 @@ void fft_shared() {
     fft_write[j + N_DIV_2] = b;
 }
 
-vec4 fft_shared_img(bool is_rg, vec4 rg, ivec2 coords, ivec2 coords_strided) {
+vec4 fft_shared_img(bool is_rg, ivec2 coords, ivec2 coords_strided) {
     const uint N = 2 * gl_WorkGroupSize.x;
     const uint N_DIV_2 = gl_WorkGroupSize.x;
    
@@ -152,8 +152,8 @@ void main() {
         coords_strided = coords + ivec2(N_DIV_2, 0);
     }
     vec4 rg, ba;
-    rg = fft_shared_img(true, rg, coords, coords_strided);
-    ba = fft_shared_img(false, rg, coords, coords_strided);
+    rg = fft_shared_img(true, coords, coords_strided);
+    ba = fft_shared_img(false, coords, coords_strided);
     imageStore(lena_pong, coords, vec4(rg.xy, ba.xy));
     imageStore(lena_pong, coords_strided, vec4(rg.zw, ba.zw));
 }

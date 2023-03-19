@@ -345,7 +345,7 @@ void RayTracer::render(uint32_t i) {
 			sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 			vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &lena_sampler),
 					  "Could not create image sampler");
-			const char* img_name = "circle16.jpg";
+			const char* img_name = "lena_gray.png";
 			int x, y, n;
 			unsigned char* data = stbi_load(img_name, &x, &y, &n, 4);
 
@@ -390,7 +390,7 @@ void RayTracer::render(uint32_t i) {
 				.push_constants(&fft_pc);
 			
 			instance->vkb.rg
-				->add_compute("FFT - Vertical - I", {.shader = Shader("src/shaders/fft/fft.comp"),
+				->add_compute("FFT - Vertical - Inverse", {.shader = Shader("src/shaders/fft/fft.comp"),
 									  .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM),  uint32_t(vertical), 1},
 									  .dims = {dim_x, 1, 1}})
 				.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
@@ -399,7 +399,7 @@ void RayTracer::render(uint32_t i) {
 				.push_constants(&fft_pc);
 			vertical = false;
 			instance->vkb.rg
-				->add_compute("FFT - Horizontal - I", {.shader = Shader("src/shaders/fft/fft.comp"),
+				->add_compute("FFT - Horizontal - Inverse", {.shader = Shader("src/shaders/fft/fft.comp"),
 							   .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1 },
 									  .dims = {dim_x, 1, 1}})
 				.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
@@ -454,10 +454,11 @@ void RayTracer::render(uint32_t i) {
 							  .clear_depth_stencil = {1.0f, 0},
 							  .shaders = {{"src/shaders/post.vert"}, {"src/shaders/post.frag"}},
 							  .cull_mode = VK_CULL_MODE_NONE,
+							  .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 							  .color_outputs = {&vkb.swapchain_images[i]},
 							  .pass_func =
 								  [](VkCommandBuffer cmd, const RenderPass& render_pass) {
-									  vkCmdDraw(cmd, 3, 1, 0, 0);
+									  vkCmdDraw(cmd, 4, 1, 0, 0);
 									  ImGui::Render();
 									  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 								  }})
