@@ -49,14 +49,20 @@ void RenderPass::register_dependencies(Buffer& buffer, VkAccessFlags dst_access_
 }
 
 void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout) {
-	if (tex.layout == dst_layout) {
+	const bool has_storage_bit = (tex.usage_flags & VK_IMAGE_USAGE_STORAGE_BIT) == VK_IMAGE_USAGE_STORAGE_BIT;
+	if (!has_storage_bit && tex.layout == dst_layout) {
 		return;
 	}
-	if (tex.layout == VK_IMAGE_LAYOUT_UNDEFINED || rg->img_resource_map.find(tex.img) == rg->img_resource_map.end()) {
+	auto img_resource = rg->img_resource_map.find(tex.img);
+	const bool resource_exists = img_resource != rg->img_resource_map.end();
+	if (has_storage_bit && tex.layout == dst_layout && !resource_exists) {
+		return;
+	}
+	if (tex.layout == VK_IMAGE_LAYOUT_UNDEFINED || !resource_exists) {
 		layout_transitions.push_back({&tex, tex.layout, dst_layout});
 		tex.layout = dst_layout;
 	} else {
-		RenderPass& opposing_pass = rg->passes[rg->img_resource_map[tex.img]];
+		RenderPass& opposing_pass = rg->passes[img_resource->second];
 		if (opposing_pass.submitted) {
 			return;
 		}

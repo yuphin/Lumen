@@ -89,7 +89,7 @@ void RayTracer::init(Window* window) {
 	// Disable event based synchronization
 	// Currently the event API that comes with Vulkan 1.3 is buggy on NVIDIA drivers
 	// so this is turned off and pipeline barriers are used instead
-	vkb.rg->settings.use_events = true;
+	vkb.rg->settings.use_events = false;
 
 	switch (scene.config.integrator_type) {
 		case IntegratorType::Path:
@@ -384,7 +384,7 @@ void RayTracer::render(uint32_t i) {
 				.bind(lena_pong)
 				.push_constants(&fft_pc);
 			vertical = true;
-			instance->vkb.rg->run_and_submit(cmd);
+			//instance->vkb.rg->run_and_submit(cmd);
 			instance->vkb.rg
 				->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/fft/fft.comp"),
 							   .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0 },
