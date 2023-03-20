@@ -67,6 +67,8 @@ class RayTracer : public LumenInstance {
 
 	Texture2D lena_ping;
 	Texture2D lena_pong;
+	Texture2D kernel_ping;
+	Texture2D kernel_pong;
 	VkSampler lena_sampler;
 
 };

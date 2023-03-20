@@ -14,7 +14,7 @@ RayTracer* RayTracer::instance = nullptr;
 bool load_exr = false;
 bool calc_rmse = false;
 
-#define FFT_DEBUG 0
+#define FFT_DEBUG 1
 
 static glm::vec2 complex_mul(const glm::vec2& a, const glm::vec2& b) {
 	return glm::vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
@@ -240,22 +240,62 @@ void RayTracer::init_resources() {
 		sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 		vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &lena_sampler),
 				  "Could not create image sampler");
-		const char* img_name = "lena_gray.png";
-		//const char* img_name = "lena256.png";
+		const char* img_name_kernel = "gaussian.exr";
+		const char* img_name = "test256.png";
 		int x, y, n;
 		unsigned char* data = stbi_load(img_name, &x, &y, &n, 4);
 
 		auto size = x * y * 4;
 		auto img_dims = VkExtent2D{(uint32_t)x, (uint32_t)y};
 		auto ci = make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-		lena_ping.load_from_data(&instance->vkb.ctx, data, size, ci, lena_sampler, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-							false);
+		lena_ping.load_from_data(&instance->vkb.ctx, data, size, ci, lena_sampler,
+								 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, false);
+		auto max = glm::ivec4(-1);
+
+		ci.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+
+		{
+			bool exr_loaded = false;
+			// Load the ground truth image
+			float* data;
+			int width;
+			int height;
+			const char* err = nullptr;
+
+			int ret = LoadEXR(&data, &width, &height, img_name_kernel, &err);
+			if (ret != TINYEXR_SUCCESS) {
+				if (err) {
+					fprintf(stderr, "ERR : %s\n", err);
+					FreeEXRErrorMessage(err);  // release memory of error message.
+				}
+			} else {
+				std::vector<vec4> pixels;
+				int img_res = width * height;
+				pixels.resize(img_res);
+				for (int i = 0; i < img_res; i++) {
+					pixels[i].x = data[4 * i + 0];
+					pixels[i].y = data[4 * i + 1];
+					pixels[i].z = data[4 * i + 2];
+					pixels[i].w = 1.;
+				}
+				auto kernel_size = pixels.size() * 4 * 4;
+				kernel_ping.load_from_data(&instance->vkb.ctx, pixels.data(), kernel_size, ci, lena_sampler,
+										   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, false);
+				exr_loaded = true;
+			}
+			if (exr_loaded) {
+				free(data);
+			}
+		}
 		TextureSettings settings;
 		settings.base_extent = lena_ping.base_extent;
 		settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 		settings.usage_flags = lena_ping.usage_flags;
 		lena_pong.create_empty_texture("Lena - Pong", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL,
 									   lena_sampler);
+		kernel_pong.create_empty_texture("Kernel - Pong", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL,
+										 lena_sampler);
+
 		stbi_image_free(data);
 	}
 
@@ -271,6 +311,32 @@ void RayTracer::init_resources() {
 	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, rmse_val_addr, &rmse_val_buffer, instance->vkb.rg);
+
+	const bool FFT_SHARED_MEM = true;
+	const uint32_t WG_SIZE_X = kernel_ping.base_extent.width;
+	auto dim_x = (uint32_t)(kernel_ping.base_extent.width * kernel_ping.base_extent.height + WG_SIZE_X - 1) / WG_SIZE_X;
+	bool vertical = false;
+	instance->vkb.rg
+		->add_compute("FFT - Horizontal - Kernel",
+					  {.shader = Shader("src/shaders/fft/fft.comp"),
+					   .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0, 1, 1},
+					   .dims = {dim_x, 1, 1}})
+		.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
+		.bind(kernel_ping, lena_sampler)
+		.bind(kernel_pong)
+		.bind(kernel_pong, lena_sampler)
+		.push_constants(&fft_pc);
+	vertical = true;
+	instance->vkb.rg
+		->add_compute("FFT - Vertical - Kernel",
+					  {.shader = Shader("src/shaders/fft/fft.comp"),
+					   .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0, 1, 1},
+					   .dims = {dim_x, 1, 1}})
+		.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
+		.bind(kernel_ping, lena_sampler)
+		.bind(kernel_pong)
+		.bind(kernel_pong, lena_sampler)
+		.push_constants(&fft_pc);
 }
 
 void RayTracer::init_imgui() {
@@ -333,7 +399,7 @@ void RayTracer::update() {
 
 void RayTracer::render(uint32_t i) {
 #if FFT_DEBUG
-	//if (cnt == 0) {
+	// if (cnt == 0) {
 	if (1) {
 		int num_iters = log2(fft_arr.size());
 
@@ -342,42 +408,52 @@ void RayTracer::render(uint32_t i) {
 		fft_pc.n = fft_arr.size();
 		if (FFT_SHARED_MEM) {
 			const uint32_t WG_SIZE_X = lena_ping.base_extent.width;
-			auto dim_x = (uint32_t)(lena_ping.base_extent.width * lena_ping.base_extent.height + WG_SIZE_X - 1) / WG_SIZE_X;
+			auto dim_x =
+				(uint32_t)(lena_ping.base_extent.width * lena_ping.base_extent.height + WG_SIZE_X - 1) / WG_SIZE_X;
 			bool vertical = false;
 			instance->vkb.rg
 				->add_compute("FFT - Horizontal", {.shader = Shader("src/shaders/fft/fft.comp"),
-									  .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM),  uint32_t(vertical), 0},
-									  .dims = {dim_x, 1, 1}})
+												   .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM),
+																		   uint32_t(vertical), 0, 1},
+												   .dims = {dim_x, 1, 1}})
 				.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
 				.bind(lena_ping, lena_sampler)
 				.bind(lena_pong)
+				.bind(kernel_pong, lena_sampler)
 				.push_constants(&fft_pc);
 			vertical = true;
 			instance->vkb.rg
 				->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/fft/fft.comp"),
-							   .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0 },
-									  .dims = {dim_x, 1, 1}})
+												 .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM),
+																		 uint32_t(vertical), 0, 0},
+												 .dims = {dim_x, 1, 1}})
 				.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
 				.bind(lena_ping, lena_sampler)
 				.bind(lena_pong)
+				.bind(kernel_pong, lena_sampler)
 				.push_constants(&fft_pc);
-			
 			instance->vkb.rg
-				->add_compute("FFT - Vertical - Inverse", {.shader = Shader("src/shaders/fft/fft.comp"),
-									  .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM),  uint32_t(vertical), 1},
-									  .dims = {dim_x, 1, 1}})
+				->add_compute(
+					"FFT - Vertical - Inverse",
+					{.shader = Shader("src/shaders/fft/fft.comp"),
+					 .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1, 1},
+					 .dims = {dim_x, 1, 1}})
 				.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
 				.bind(lena_ping, lena_sampler)
 				.bind(lena_pong)
+				.bind(kernel_pong, lena_sampler)
 				.push_constants(&fft_pc);
 			vertical = false;
 			instance->vkb.rg
-				->add_compute("FFT - Horizontal - Inverse", {.shader = Shader("src/shaders/fft/fft.comp"),
-							   .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1 },
-									  .dims = {dim_x, 1, 1}})
+				->add_compute(
+					"FFT - Horizontal - Inverse",
+					{.shader = Shader("src/shaders/fft/fft.comp"),
+					 .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1, 1},
+					 .dims = {dim_x, 1, 1}})
 				.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
 				.bind(lena_ping, lena_sampler)
 				.bind(lena_pong)
+				.bind(kernel_pong, lena_sampler)
 				.push_constants(&fft_pc);
 		} else {
 			const uint32_t WG_SIZE_X = 4;
@@ -419,20 +495,20 @@ void RayTracer::render(uint32_t i) {
 #endif
 #if !FFT_DEBUG
 	// Render image
-	 integrator->render();
+	integrator->render();
 #endif
-	 auto cmdbuf = vkb.ctx.command_buffers[i];
-	 VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	 vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
-	 pc_post_settings.enable_tonemapping = settings.enable_tonemapping;
-	 instance->vkb.rg
+	auto cmdbuf = vkb.ctx.command_buffers[i];
+	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
+	pc_post_settings.enable_tonemapping = settings.enable_tonemapping;
+	instance->vkb.rg
 		->add_gfx("Post FX", {.width = instance->width,
 							  .height = instance->height,
 							  .clear_color = {0.25f, 0.25f, 0.25f, 1.0f},
 							  .clear_depth_stencil = {1.0f, 0},
 							  .shaders = {{"src/shaders/post.vert"}, {"src/shaders/post.frag"}},
 							  .cull_mode = VK_CULL_MODE_NONE,
-				  			  .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
+							  .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 							  .color_outputs = {&vkb.swapchain_images[i]},
 							  .pass_func =
 								  [](VkCommandBuffer cmd, const RenderPass& render_pass) {
@@ -443,12 +519,13 @@ void RayTracer::render(uint32_t i) {
 		.push_constants(&pc_post_settings)
 		//.read(integrator->output_tex) // Needed if shader inference is off
 		.bind(integrator->output_tex, integrator->texture_sampler)
-		.bind(lena_pong, lena_sampler);
+		.bind(lena_pong, lena_sampler)
+		.bind(kernel_pong, lena_sampler);
 
-	 if (write_exr) {
+	if (write_exr) {
 		instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer_cpu);
-	 }
-	 if (calc_rmse && has_gt) {
+	}
+	if (calc_rmse && has_gt) {
 		auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name,
 							 const std::string& reduce_name, const std::string& reduce_shader_name) {
 			uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
@@ -472,11 +549,11 @@ void RayTracer::render(uint32_t i) {
 			->add_compute("Calculate RMSE", {.shader = Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1}})
 			.push_constants(&post_pc)
 			.bind(post_desc_buffer);
-	 }
+	}
 
-	 vkb.rg->run(cmdbuf);
+	vkb.rg->run(cmdbuf);
 
-	 vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
+	vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
 }
 
 float RayTracer::draw_frame() {
