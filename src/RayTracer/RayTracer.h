@@ -1,6 +1,7 @@
 #pragma once
 #include "LumenPCH.h"
 #include "Framework/LumenInstance.h"
+#include "Framework/ImageUtils.h"
 #include "Path.h"
 #include "BDPT.h"
 #include "SPPM.h"
@@ -28,9 +29,7 @@ class RayTracer : public LumenInstance {
 	};
 
 	void init_resources();
-	void init_imgui();
 	void parse_args(int argc, char* argv[]);
-	void save_exr(const float* rgb, int width, int height, const char* outfilename);
 	float draw_frame();
 	void render(uint32_t idx);
 	bool initialized = false;
@@ -38,7 +37,7 @@ class RayTracer : public LumenInstance {
 	float cpu_avg_time = 0;
 	int cnt = 0;
 	std::unique_ptr<Integrator> integrator;
-	VkDescriptorPool imgui_pool = 0;
+
 	PushConstantPost pc_post_settings;
 	Settings settings;
 	Buffer gt_img_buffer;
@@ -63,7 +62,6 @@ class RayTracer : public LumenInstance {
 	bool has_gt = false;
 	bool show_cam_stats = false;
 	const uint32_t FFT_SIZE = 2048;
-
 
 	Texture2D lena_ping;
 	Texture2D lena_pong;

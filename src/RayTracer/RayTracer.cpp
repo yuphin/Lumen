@@ -1,17 +1,16 @@
 #include "LumenPCH.h"
 #include <regex>
 #include <stb_image.h>
-#define TINYEXR_IMPLEMENTATION
-#include <tinyexr.h>
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "RayTracer.h"
 #include <complex>
+#include <tinyexr.h>
 
 RayTracer* RayTracer::instance = nullptr;
-bool load_exr = false;
+bool load_reference = false;
 bool calc_rmse = false;
 
 #define FFT_DEBUG 1
@@ -82,6 +81,7 @@ void RayTracer::init(Window* window) {
 	vkb.create_command_pools();
 	vkb.create_command_buffers();
 	vkb.create_sync_primitives();
+	vkb.init_imgui();
 	initialized = true;
 
 	scene.load_scene(scene_name);
@@ -129,7 +129,6 @@ void RayTracer::init(Window* window) {
 	}
 	integrator->init();
 	init_resources();
-	init_imgui();
 	printf("Memory usage %f MB\n", get_memory_usage(vk_ctx.physical_device) * 1e-6);
 }
 
@@ -192,41 +191,19 @@ void RayTracer::init_resources() {
 							  VK_SHARING_MODE_EXCLUSIVE, 2 * fft_arr.size() * sizeof(float));
 
 	do_fft(fft_arr, y);
-	if (load_exr) {
+	if (load_reference) {
 		// Load the ground truth image
-		const char* img_name = "out.exr";
-		float* data;
-		int width;
-		int height;
-		const char* err = nullptr;
-
-		int ret = LoadEXR(&data, &width, &height, img_name, &err);
-		if (ret != TINYEXR_SUCCESS) {
-			if (err) {
-				fprintf(stderr, "ERR : %s\n", err);
-				FreeEXRErrorMessage(err);  // release memory of error message.
-			}
-		} else {
-			std::vector<vec4> pixels;
-			int img_res = width * height;
-			pixels.resize(img_res);
-			for (int i = 0; i < img_res; i++) {
-				pixels[i].x = data[4 * i + 0];
-				pixels[i].y = data[4 * i + 1];
-				pixels[i].z = data[4 * i + 2];
-				pixels[i].w = 1.;
-			}
-			auto gt_size = pixels.size() * 4 * 4;
-			gt_img_buffer.create("Ground Truth Image", &instance->vkb.ctx,
-								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, gt_size, pixels.data(),
-								 true);
-			desc.gt_img_addr = gt_img_buffer.get_device_address();
-			has_gt = true;
+		int width, height;
+		float* data = load_exr("out.exr", width, height);
+		if (!data) {
+			LUMEN_ERROR("Could not load the reference image");
 		}
-		if (has_gt) {
-			free(data);
-		}
+		auto gt_size = width * height * 4 * sizeof(float);
+		gt_img_buffer.create("Ground Truth Image", &instance->vkb.ctx,
+							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, gt_size, data, true);
+		desc.gt_img_addr = gt_img_buffer.get_device_address();
+		free(data);
 	}
 	// Lena
 	{
@@ -241,51 +218,24 @@ void RayTracer::init_resources() {
 		vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &lena_sampler),
 				  "Could not create image sampler");
 		const char* img_name_kernel = "gaussian.exr";
-		const char* img_name = "test256.png";
+		const char* img_name = "test512.png";
 		int x, y, n;
-		unsigned char* data = stbi_load(img_name, &x, &y, &n, 4);
+		unsigned char* img_data = stbi_load(img_name, &x, &y, &n, 4);
 
 		auto size = x * y * 4;
 		auto img_dims = VkExtent2D{(uint32_t)x, (uint32_t)y};
 		auto ci = make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-		lena_ping.load_from_data(&instance->vkb.ctx, data, size, ci, lena_sampler,
+		lena_ping.load_from_data(&instance->vkb.ctx, img_data, size, ci, lena_sampler,
 								 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, false);
-		auto max = glm::ivec4(-1);
+		stbi_image_free(img_data);
 
 		ci.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-
-		{
-			bool exr_loaded = false;
-			// Load the ground truth image
-			float* data;
-			int width;
-			int height;
-			const char* err = nullptr;
-
-			int ret = LoadEXR(&data, &width, &height, img_name_kernel, &err);
-			if (ret != TINYEXR_SUCCESS) {
-				if (err) {
-					fprintf(stderr, "ERR : %s\n", err);
-					FreeEXRErrorMessage(err);  // release memory of error message.
-				}
-			} else {
-				std::vector<vec4> pixels;
-				int img_res = width * height;
-				pixels.resize(img_res);
-				for (int i = 0; i < img_res; i++) {
-					pixels[i].x = data[4 * i + 0];
-					pixels[i].y = data[4 * i + 1];
-					pixels[i].z = data[4 * i + 2];
-					pixels[i].w = 1.;
-				}
-				auto kernel_size = pixels.size() * 4 * 4;
-				kernel_ping.load_from_data(&instance->vkb.ctx, pixels.data(), kernel_size, ci, lena_sampler,
-										   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, false);
-				exr_loaded = true;
-			}
-			if (exr_loaded) {
-				free(data);
-			}
+		int width, height;
+		float* data = load_exr(img_name_kernel, width, height);
+		kernel_ping.load_from_data(&instance->vkb.ctx, data, width * height * 4 * sizeof(float), ci, lena_sampler,
+								   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, false);
+		if (data) {
+			free(data);
 		}
 		TextureSettings settings;
 		settings.base_extent = lena_ping.base_extent;
@@ -295,8 +245,6 @@ void RayTracer::init_resources() {
 									   lena_sampler);
 		kernel_pong.create_empty_texture("Kernel - Pong", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL,
 										 lena_sampler);
-
-		stbi_image_free(data);
 	}
 
 	desc.out_img_addr = output_img_buffer.get_device_address();
@@ -316,6 +264,8 @@ void RayTracer::init_resources() {
 	const uint32_t WG_SIZE_X = kernel_ping.base_extent.width;
 	auto dim_x = (uint32_t)(kernel_ping.base_extent.width * kernel_ping.base_extent.height + WG_SIZE_X - 1) / WG_SIZE_X;
 	bool vertical = false;
+
+	CommandBuffer cmd(&vkb.ctx, true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	instance->vkb.rg
 		->add_compute("FFT - Horizontal - Kernel",
 					  {.shader = Shader("src/shaders/fft/fft.comp"),
@@ -324,7 +274,7 @@ void RayTracer::init_resources() {
 		.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
 		.bind(kernel_ping, lena_sampler)
 		.bind(kernel_pong)
-		.bind(kernel_pong, lena_sampler)
+		.bind(kernel_ping, lena_sampler)
 		.push_constants(&fft_pc);
 	vertical = true;
 	instance->vkb.rg
@@ -335,55 +285,9 @@ void RayTracer::init_resources() {
 		.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
 		.bind(kernel_ping, lena_sampler)
 		.bind(kernel_pong)
-		.bind(kernel_pong, lena_sampler)
+		.bind(kernel_ping, lena_sampler)
 		.push_constants(&fft_pc);
-}
-
-void RayTracer::init_imgui() {
-	VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
-										 {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
-										 {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
-										 {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
-										 {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
-										 {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
-										 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
-										 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
-										 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
-										 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
-										 {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
-
-	VkDescriptorPoolCreateInfo pool_info = {};
-	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-	pool_info.maxSets = 1000;
-	pool_info.poolSizeCount = (uint32_t)std::size(pool_sizes);
-	pool_info.pPoolSizes = pool_sizes;
-	vk::check(vkCreateDescriptorPool(vkb.ctx.device, &pool_info, nullptr, &imgui_pool));
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	// Setup Platform/Renderer backends
-	ImGui::StyleColorsDark();
-	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-	ImGui_ImplGlfw_InitForVulkan(window->get_window_ptr(), true);
-
-	ImGui_ImplVulkan_InitInfo init_info = {};
-	init_info.Instance = vkb.ctx.instance;
-	init_info.PhysicalDevice = vkb.ctx.physical_device;
-	init_info.Device = vkb.ctx.device;
-	init_info.Queue = vkb.ctx.queues[(int)QueueType::GFX];
-	init_info.DescriptorPool = imgui_pool;
-	init_info.MinImageCount = 3;
-	init_info.ImageCount = 3;
-	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-	init_info.UseDynamicRendering = true;
-	init_info.ColorAttachmentFormat = vkb.swapchain_format;
-
-	ImGui_ImplVulkan_Init(&init_info, nullptr);
-
-	CommandBuffer cmd(&vkb.ctx, true);
-	ImGui_ImplVulkan_CreateFontsTexture(cmd.handle);
-	cmd.submit(vkb.ctx.queues[(int)QueueType::GFX]);
-	ImGui_ImplVulkan_DestroyFontUploadObjects();
+	vkb.rg->run_and_submit(cmd);
 }
 
 void RayTracer::update() {
@@ -399,8 +303,8 @@ void RayTracer::update() {
 
 void RayTracer::render(uint32_t i) {
 #if FFT_DEBUG
-	// if (cnt == 0) {
-	if (1) {
+	if (cnt == 0) {
+		// if (1) {
 		int num_iters = log2(fft_arr.size());
 
 		const bool FFT_SHARED_MEM = true;
@@ -635,67 +539,6 @@ void RayTracer::parse_args(int argc, char* argv[]) {
 		}
 	}
 }
-
-void RayTracer::save_exr(const float* rgb, int width, int height, const char* outfilename) {
-	EXRHeader header;
-	InitEXRHeader(&header);
-	EXRImage image;
-	InitEXRImage(&image);
-	image.num_channels = 3;
-
-	std::vector<float> images[3];
-	images[0].resize(width * height);
-	images[1].resize(width * height);
-	images[2].resize(width * height);
-
-	// Split RGBRGBRGB... into R, G and B layer
-	for (int i = 0; i < width * height; i++) {
-		images[0][i] = rgb[4 * i + 0];
-		images[1][i] = rgb[4 * i + 1];
-		images[2][i] = rgb[4 * i + 2];
-	}
-
-	float* image_ptr[3];
-	image_ptr[0] = &(images[2].at(0));	// B
-	image_ptr[1] = &(images[1].at(0));	// G
-	image_ptr[2] = &(images[0].at(0));	// R
-
-	image.images = (unsigned char**)image_ptr;
-	image.width = width;
-	image.height = height;
-
-	header.num_channels = 3;
-	header.channels = (EXRChannelInfo*)malloc(sizeof(EXRChannelInfo) * header.num_channels);
-	// Must be (A)BGR order, since most of EXR viewers expect this channel
-	// order.
-	strncpy_s(header.channels[0].name, "B", 255);
-	header.channels[0].name[strlen("B")] = '\0';
-	strncpy_s(header.channels[1].name, "G", 255);
-	header.channels[1].name[strlen("G")] = '\0';
-	strncpy_s(header.channels[2].name, "R", 255);
-	header.channels[2].name[strlen("R")] = '\0';
-
-	header.pixel_types = (int*)malloc(sizeof(int) * header.num_channels);
-	header.requested_pixel_types = (int*)malloc(sizeof(int) * header.num_channels);
-	for (int i = 0; i < header.num_channels; i++) {
-		header.pixel_types[i] = TINYEXR_PIXELTYPE_FLOAT;		   // pixel type of input image
-		header.requested_pixel_types[i] = TINYEXR_PIXELTYPE_HALF;  // pixel type of output image to be stored
-																   // in .EXR
-	}
-
-	const char* err = NULL;	 // or nullptr in C++11 or later.
-	int ret = SaveEXRImageToFile(&image, &header, outfilename, &err);
-	if (ret != TINYEXR_SUCCESS) {
-		fprintf(stderr, "Save EXR err: %s\n", err);
-		FreeEXRErrorMessage(err);  // free's buffer for an error message
-	}
-	printf("Saved exr file. [ %s ] \n", outfilename);
-
-	free(header.channels);
-	free(header.pixel_types);
-	free(header.requested_pixel_types);
-}
-
 void RayTracer::cleanup() {
 	const auto device = vkb.ctx.device;
 	vkDeviceWaitIdle(device);
@@ -703,11 +546,9 @@ void RayTracer::cleanup() {
 		ImGui_ImplVulkan_Shutdown();
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
-		vkDestroyDescriptorPool(device, imgui_pool, nullptr);
-
 		std::vector<Buffer*> buffer_list = {&output_img_buffer, &output_img_buffer_cpu, &residual_buffer,
 											&counter_buffer,	&rmse_val_buffer,		&post_desc_buffer};
-		if (load_exr) {
+		if (load_reference) {
 			buffer_list.push_back(&gt_img_buffer);
 		}
 		for (auto b : buffer_list) {
