@@ -9,7 +9,6 @@
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #include "../commons.h"
 layout(constant_id = 0) const int WG_SIZE = 1024;
-layout(constant_id = 1) const int FFT_SHARED_MEM = 0;
 layout(constant_id = 2) const int VERTICAL = 0;
 layout(constant_id = 3) const int INVERSE = 0;
 layout(constant_id = 4) const int SKIP_WRITE = 0;
@@ -51,45 +50,6 @@ void exchange(uint fixed_idx, uint stride, uint T, vec2 a, vec2 b, out vec2 even
 
     odd_reordered.x = s_data_real[gl_LocalInvocationID.x + T];
     odd_reordered.y = s_data_imag[gl_LocalInvocationID.x + T];
-}
-
-void fft_global() {
-    const uint j = gl_GlobalInvocationID.x;
-    const uint stride = 1 << pc.idx;
-    const uint m = pc.n >> 1;
-    if(j >= m) {
-        return;
-    }
-    const uint stride_factor = stride * uint(j / stride);
-    const float angle = 2 * PI * stride_factor / pc.n;
-    const vec2 wp = vec2(cos(angle), -sin(angle));
-
-    const vec4 butterfly = fft_2(fft_read[j], fft_read[j + m], wp);
-    const uint fixed_idx = j % stride + (stride_factor << 1);
-    fft_write[fixed_idx] = butterfly.xy;
-    fft_write[fixed_idx + stride] = butterfly.zw;
-}
-
-void fft_shared() {
-    const uint j = gl_GlobalInvocationID.x;
-    const uint N = 2 * gl_WorkGroupSize.x;
-    const uint N_DIV_2 = gl_WorkGroupSize.x;
-    
-    vec2 a = fft_read[j];
-    vec2 b = fft_read[j + N_DIV_2];
-
-    for(uint stride = 1; stride < N; stride *= 2) {
-        const uint stride_factor = stride * uint(j / stride);
-        const float angle = 2 * PI * stride_factor / N;
-        const vec2 wp = vec2(cos(angle), -sin(angle));
-        const vec4 butterfly = fft_2(a, b, wp);
-        const uint fixed_idx = j % stride + (stride_factor << 1);
-        memoryBarrierShared();
-        barrier();
-        exchange(fixed_idx, stride, N_DIV_2, butterfly.xy, butterfly.zw, a, b);
-    }
-    fft_write[j] = a;
-    fft_write[j + N_DIV_2] = b;
 }
 
 vec4 fft_shared_img(bool is_rg, ivec2 coords, ivec2 coords_strided) {
@@ -138,12 +98,6 @@ vec4 fft_shared_img(bool is_rg, ivec2 coords, ivec2 coords_strided) {
 }
 
 void main() {
-
-//    if(FFT_SHARED_MEM == 0) {
-//        fft_global();
-//    } else {
-//        fft_shared();
-//    }
     ivec2 coords;
     ivec2 coords_strided;
     ivec2 coords_old;

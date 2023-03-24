@@ -1,0 +1,90 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../commons.h"
+
+layout(constant_id = 0) const int WG_SIZE = 1024;
+layout(constant_id = 1) const int FFT_SHARED_MEM = 0;
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) readonly buffer PostDesc_ { PostDesc post_desc; };
+layout(binding = 1, scalar) readonly buffer FFT_Read { vec2 fft_read[]; };
+layout(binding = 2, scalar) writeonly buffer FFT_Write { vec2 fft_write[]; };
+layout(push_constant) uniform PC { FFTPC pc; };
+#define PI 3.14159265359
+
+shared float s_data_real[WG_SIZE * 2];
+shared float s_data_imag[WG_SIZE * 2];
+
+vec2 complex_mul(vec2 a, vec2 b) { return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x); }
+
+vec4 fft_2(vec2 a, vec2 b, vec2 wp) { return vec4(a + b, complex_mul(wp, a - b)); }
+
+void exchange(uint fixed_idx, uint stride, uint T, vec2 a, vec2 b, out vec2 even_reordered, out vec2 odd_reordered) {
+	s_data_real[fixed_idx] = a.x;
+	s_data_imag[fixed_idx] = a.y;
+
+	s_data_real[fixed_idx + stride] = b.x;
+	s_data_imag[fixed_idx + stride] = b.y;
+
+	memoryBarrierShared();
+	barrier();
+
+	even_reordered.x = s_data_real[gl_LocalInvocationID.x];
+	even_reordered.y = s_data_imag[gl_LocalInvocationID.x];
+
+	odd_reordered.x = s_data_real[gl_LocalInvocationID.x + T];
+	odd_reordered.y = s_data_imag[gl_LocalInvocationID.x + T];
+}
+
+void fft_global() {
+	const uint j = gl_GlobalInvocationID.x;
+	const uint stride = 1 << pc.idx;
+	const uint m = pc.n >> 1;
+	if (j >= m) {
+		return;
+	}
+	const uint stride_factor = stride * uint(j / stride);
+	const float angle = 2 * PI * stride_factor / pc.n;
+	const vec2 wp = vec2(cos(angle), -sin(angle));
+
+	const vec4 butterfly = fft_2(fft_read[j], fft_read[j + m], wp);
+	const uint fixed_idx = j % stride + (stride_factor << 1);
+	fft_write[fixed_idx] = butterfly.xy;
+	fft_write[fixed_idx + stride] = butterfly.zw;
+}
+
+void fft_shared() {
+	const uint j = gl_GlobalInvocationID.x;
+	const uint N = 2 * gl_WorkGroupSize.x;
+	const uint N_DIV_2 = gl_WorkGroupSize.x;
+
+	vec2 a = fft_read[j];
+	vec2 b = fft_read[j + N_DIV_2];
+
+	for (uint stride = 1; stride < N; stride *= 2) {
+		const uint stride_factor = stride * uint(j / stride);
+		const float angle = 2 * PI * stride_factor / N;
+		const vec2 wp = vec2(cos(angle), -sin(angle));
+		const vec4 butterfly = fft_2(a, b, wp);
+		const uint fixed_idx = j % stride + (stride_factor << 1);
+		memoryBarrierShared();
+		barrier();
+		exchange(fixed_idx, stride, N_DIV_2, butterfly.xy, butterfly.zw, a, b);
+	}
+	fft_write[j] = a;
+	fft_write[j + N_DIV_2] = b;
+}
+
+void main() {
+	if (FFT_SHARED_MEM == 0) {
+		fft_global();
+	} else {
+		fft_shared();
+	}
+}
