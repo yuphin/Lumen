@@ -278,16 +278,6 @@ RenderPass& RenderGraph::add_compute(const std::string& name, const ComputePassS
 	return add_pass_impl(name, settings);
 }
 
-RenderPass& RenderPass::macro(const std::string& macro_name) {
-	macro_defines[macro_name] = 0;
-	return *this;
-}
-
-RenderPass& RenderPass::macro(const std::string& macro_name, int value) {
-	macro_defines[macro_name] = value;
-	return *this;
-}
-
 RenderPass& RenderPass::bind(const ResourceBinding& binding) {
 	if(next_binding_idx >= bound_resources.size()) {
 		bound_resources.push_back(binding);

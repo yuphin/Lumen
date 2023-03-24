@@ -102,7 +102,7 @@ void main() {
     ivec2 coords_strided;
     ivec2 coords_old;
     ivec2 coords_old_strided;
-      const uint N_DIV_2 = gl_WorkGroupSize.x;
+    const uint N_DIV_2 = gl_WorkGroupSize.x;
     if(VERTICAL == 1) {
         coords = ivec2(gl_GlobalInvocationID.x / N_DIV_2, gl_GlobalInvocationID.x % N_DIV_2);
         coords_strided = coords + ivec2(0, N_DIV_2);

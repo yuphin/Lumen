@@ -406,11 +406,11 @@ void RayTracer::render(uint32_t i) {
 	vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
 	pc_post_settings.enable_tonemapping = settings.enable_tonemapping;
 	instance->vkb.rg
-		->add_gfx("Post FX", {.width = instance->width,
+		->add_gfx("Post FX", {.shaders = {{"src/shaders/post.vert"}, {"src/shaders/post.frag"}},
+							  .width = instance->width,
 							  .height = instance->height,
 							  .clear_color = {0.25f, 0.25f, 0.25f, 1.0f},
 							  .clear_depth_stencil = {1.0f, 0},
-							  .shaders = {{"src/shaders/post.vert"}, {"src/shaders/post.frag"}},
 							  .cull_mode = VK_CULL_MODE_NONE,
 							  .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 							  .color_outputs = {&vkb.swapchain_images[i]},
