@@ -8,6 +8,7 @@ class RenderPass;
 struct Shader {
 	std::vector<uint32_t> binary;
 	std::string filename;
+	std::string name_with_macros;
 
 	VkShaderStageFlagBits stage = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
 	VkDescriptorType descriptor_types[32] = {};

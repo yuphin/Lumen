@@ -267,8 +267,9 @@ void RayTracer::init_resources() {
 
 	CommandBuffer cmd(&vkb.ctx, true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	instance->vkb.rg
-		->add_compute("FFT - Horizontal - Kernel",
+		->add_compute("FFT - Horizontal",
 					  {.shader = Shader("src/shaders/fft/fft.comp"),
+					   .macros = {{"KERNEL_GENERATION"}},
 					   .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0, 1, 1},
 					   .dims = {dim_x, 1, 1}})
 		.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})
@@ -278,8 +279,9 @@ void RayTracer::init_resources() {
 		.push_constants(&fft_pc);
 	vertical = true;
 	instance->vkb.rg
-		->add_compute("FFT - Vertical - Kernel",
+		->add_compute("FFT - Vertical",
 					  {.shader = Shader("src/shaders/fft/fft.comp"),
+					   .macros = {{"KERNEL_GENERATION"}},
 					   .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0, 1, 1},
 					   .dims = {dim_x, 1, 1}})
 		.bind({post_desc_buffer, fft_buffers[0], fft_buffers[1]})

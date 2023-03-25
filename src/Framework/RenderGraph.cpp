@@ -193,8 +193,8 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 			std::vector<std::future<Shader*>> shader_tasks;
 			shader_tasks.reserve(pass->gfx_settings->shaders.size());
 			for (auto& shader : active_shaders) {
-				if (pass->rg->shader_cache.find(shader->filename) != pass->rg->shader_cache.end()) {
-					*shader = pass->rg->shader_cache[shader->filename];
+				if (pass->rg->shader_cache.find(shader->name_with_macros) != pass->rg->shader_cache.end()) {
+					*shader = pass->rg->shader_cache[shader->name_with_macros];
 				} else {
 					shader_tasks.push_back(ThreadPool::submit(
 						[pass](Shader* shader) {
@@ -208,7 +208,7 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 				auto shader = task.get();
 				{
 					std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
-					pass->rg->shader_cache[shader->filename] = *shader;
+					pass->rg->shader_cache[shader->name_with_macros] = *shader;
 				}
 			}
 			for (auto& shader : active_shaders) {
@@ -220,8 +220,8 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 			std::vector<std::future<Shader*>> shader_tasks;
 			shader_tasks.reserve(pass->rt_settings->shaders.size());
 			for (auto& shader : active_shaders) {
-				if (pass->rg->shader_cache.find(shader->filename) != pass->rg->shader_cache.end()) {
-					*shader = pass->rg->shader_cache[shader->filename];
+				if (pass->rg->shader_cache.find(shader->name_with_macros) != pass->rg->shader_cache.end()) {
+					*shader = pass->rg->shader_cache[shader->name_with_macros];
 				} else {
 					shader_tasks.push_back(ThreadPool::submit(
 						[pass](Shader* shader) {
@@ -230,14 +230,14 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 						},
 						shader));
 					 //shader->compile(pass);
-					pass->rg->shader_cache[shader->filename] = *shader;
+					pass->rg->shader_cache[shader->name_with_macros] = *shader;
 				}
 			}
 			for (auto& task : shader_tasks) {
 				auto shader = task.get();
 				{
 					std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
-					pass->rg->shader_cache[shader->filename] = *shader;
+					pass->rg->shader_cache[shader->name_with_macros] = *shader;
 				}
 			}
 			for (auto& shader : active_shaders) {
@@ -248,13 +248,13 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 		} break;
 		case PassType::Compute: {
 			for (auto& shader : active_shaders) {
-				if (pass->rg->shader_cache.find(shader->filename) != pass->rg->shader_cache.end()) {
-					*shader = pass->rg->shader_cache[shader->filename];
+				if (pass->rg->shader_cache.find(shader->name_with_macros) != pass->rg->shader_cache.end()) {
+					*shader = pass->rg->shader_cache[shader->name_with_macros];
 				} else {
 					shader->compile(pass);
 					{
 						std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
-						pass->rg->shader_cache[shader->filename] = *shader;
+						pass->rg->shader_cache[shader->name_with_macros] = *shader;
 					}
 				}
 				pass->affected_buffer_pointers = shader->buffer_status_map;

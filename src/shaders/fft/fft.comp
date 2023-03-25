@@ -100,29 +100,23 @@ vec4 fft_shared_img(bool is_rg, ivec2 coords, ivec2 coords_strided) {
 void main() {
     ivec2 coords;
     ivec2 coords_strided;
+#ifdef KERNEL_GENERATION
     ivec2 coords_old;
     ivec2 coords_old_strided;
+#endif
     const uint N_DIV_2 = gl_WorkGroupSize.x;
     if(VERTICAL == 1) {
         coords = ivec2(gl_GlobalInvocationID.x / N_DIV_2, gl_GlobalInvocationID.x % N_DIV_2);
         coords_strided = coords + ivec2(0, N_DIV_2);
+    } else {
+        coords = ivec2(gl_GlobalInvocationID.x % N_DIV_2, gl_GlobalInvocationID.x / N_DIV_2);
+        coords_strided = coords + ivec2(N_DIV_2, 0);
+#ifdef KERNEL_GENERATION
         coords_old = coords;
         coords_old_strided = coords_strided;
-    } else {
-        if(IS_KERNEL_GEN == 1 && VERTICAL == 0) {
-            coords = ivec2(gl_GlobalInvocationID.x % N_DIV_2, gl_GlobalInvocationID.x / N_DIV_2);
-            coords_strided = coords + ivec2(N_DIV_2, 0);
-            coords_old = coords;
-            coords_old_strided = coords_strided;
-            coords = (coords - ivec2(N_DIV_2 - 1) + ivec2(2 * gl_WorkGroupSize.x - 1)) % ivec2(2 * gl_WorkGroupSize.x);
-            coords_strided = (coords_strided - ivec2(N_DIV_2 - 1) + ivec2(2 * gl_WorkGroupSize.x - 1)) % ivec2(2 * gl_WorkGroupSize.x);
-        } else {
-            coords = ivec2(gl_GlobalInvocationID.x % N_DIV_2, gl_GlobalInvocationID.x / N_DIV_2);
-            coords_strided = coords + ivec2(N_DIV_2, 0);
-            coords_old = coords;
-            coords_old_strided = coords_strided;
-        }
-     
+        coords = (coords - ivec2(N_DIV_2 - 1) + ivec2(2 * gl_WorkGroupSize.x - 1)) % ivec2(2 * gl_WorkGroupSize.x);
+        coords_strided = (coords_strided - ivec2(N_DIV_2 - 1) + ivec2(2 * gl_WorkGroupSize.x - 1)) % ivec2(2 * gl_WorkGroupSize.x);
+#endif
     }
     vec4 rg, ba;
     rg = fft_shared_img(true, coords, coords_strided);
@@ -146,19 +140,19 @@ void main() {
             ba.zw *= kernel_val_strided.b;
         }
     }
-    if(IS_KERNEL_GEN == 1 && VERTICAL == 1) {
+#ifdef KERNEL_GENERATION
+    if(VERTICAL == 0) {
+        imageStore(lena_pong, coords_old, vec4(rg.xy, ba.xy));
+        imageStore(lena_pong, coords_old_strided, vec4(rg.zw, ba.zw));
+        return;
+    } else {
         //Set imaginary parts to 0
         rg.y = 0;
         rg.w = 0;
         ba.g = 0;
         ba.w = 0;
     }
-    if(IS_KERNEL_GEN == 1 && VERTICAL == 0) {
-        imageStore(lena_pong, coords_old, vec4(rg.xy, ba.xy));
-        imageStore(lena_pong, coords_old_strided, vec4(rg.zw, ba.zw));
-    } else {
-        imageStore(lena_pong, coords, vec4(rg.xy, ba.xy));
-        imageStore(lena_pong, coords_strided, vec4(rg.zw, ba.zw));
-
-    }
+#endif
+    imageStore(lena_pong, coords, vec4(rg.xy, ba.xy));
+    imageStore(lena_pong, coords_strided, vec4(rg.zw, ba.zw));
 }
