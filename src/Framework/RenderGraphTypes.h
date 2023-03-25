@@ -14,7 +14,7 @@ class RenderPass;
 
 struct ShaderMacro {
 	ShaderMacro(const std::string name, int val) : name(name), val(val), has_val(true) {}
-	ShaderMacro(const std::string name) : name(name), val(val) {}
+	ShaderMacro(const std::string name) : name(name) {}
 	std::string name;
 	int val = 0;
 	bool has_val = false;
