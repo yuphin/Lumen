@@ -11,16 +11,14 @@
 layout(constant_id = 0) const int WG_SIZE = 1024;
 layout(constant_id = 2) const int VERTICAL = 0;
 layout(constant_id = 3) const int INVERSE = 0;
-layout(constant_id = 4) const int SKIP_WRITE = 0;
-layout(constant_id = 5) const int IS_KERNEL_GEN = 0;
 layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
 
 layout(binding = 0) readonly buffer PostDesc_ { PostDesc post_desc; };
-layout(binding = 1, scalar) readonly buffer FFT_Read { vec2 fft_read[]; };
-layout(binding = 2, scalar) writeonly buffer FFT_Write { vec2 fft_write[]; };
-layout(set = 0, binding = 3) uniform sampler2D lena;
-layout(rgba32f, set = 0, binding = 4) uniform image2D lena_pong;
-layout(set = 0, binding = 5) uniform sampler2D kernel;
+layout(binding = 1) uniform sampler2D input_img;
+layout(rgba32f, binding = 2) uniform image2D fft_img;
+#ifndef KERNEL_GENERATION
+layout(binding = 3) uniform sampler2D kernel;
+#endif
 layout(push_constant) uniform PC { FFTPC pc; };
 #define PI 3.14159265359
 
@@ -60,19 +58,19 @@ vec4 fft_shared_img(bool is_rg, ivec2 coords, ivec2 coords_strided) {
     vec2 a, b;
     if(INVERSE == 1 || VERTICAL == 1) {
         if(is_rg) {
-            a = imageLoad(lena_pong, coords).rg;
-            b = imageLoad(lena_pong, coords_strided).rg;
+            a = imageLoad(fft_img, coords).rg;
+            b = imageLoad(fft_img, coords_strided).rg;
         } else {
-            a = imageLoad(lena_pong, coords).ba;
-            b = imageLoad(lena_pong, coords_strided).ba;
+            a = imageLoad(fft_img, coords).ba;
+            b = imageLoad(fft_img, coords_strided).ba;
         }
     } else {
         if(is_rg) {
-            a = texelFetch(lena, coords, 0).rg;
-            b = texelFetch(lena, coords_strided, 0).rg;
+            a = texelFetch(input_img, coords, 0).rg;
+            b = texelFetch(input_img, coords_strided, 0).rg;
         } else {
-            a = texelFetch(lena, coords, 0).ba;
-            b = texelFetch(lena, coords_strided, 0).ba;
+            a = texelFetch(input_img, coords, 0).ba;
+            b = texelFetch(input_img, coords_strided, 0).ba;
         }
     }
  
@@ -121,29 +119,10 @@ void main() {
     vec4 rg, ba;
     rg = fft_shared_img(true, coords, coords_strided);
     ba = fft_shared_img(false, coords, coords_strided);
-    if(SKIP_WRITE == 0) {
-        if(VERTICAL == 1 && INVERSE == 0) {
-            vec4 kernel_val = texelFetch(kernel, coords, 0).rgba;
-            vec4 kernel_val_strided = texelFetch(kernel, coords_strided, 0).rgba;
-         
-            // Not necessary since we're applying 2 in 1 trick
-            // rg.xy = complex_mul(rg.xy, kernel_val.rg);
-            // rg.zw = complex_mul(rg.zw, kernel_val_strided.rg);
-
-            // ba.xy = complex_mul(ba.xy, kernel_val.ba);
-            // ba.zw = complex_mul(ba.zw, kernel_val_strided.ba);
-
-            rg.xy *= kernel_val.r;
-            rg.zw *= kernel_val_strided.r;
-
-            ba.xy *= kernel_val.b;
-            ba.zw *= kernel_val_strided.b;
-        }
-    }
 #ifdef KERNEL_GENERATION
     if(VERTICAL == 0) {
-        imageStore(lena_pong, coords_old, vec4(rg.xy, ba.xy));
-        imageStore(lena_pong, coords_old_strided, vec4(rg.zw, ba.zw));
+        imageStore(fft_img, coords_old, vec4(rg.xy, ba.xy));
+        imageStore(fft_img, coords_old_strided, vec4(rg.zw, ba.zw));
         return;
     } else {
         //Set imaginary parts to 0
@@ -152,7 +131,25 @@ void main() {
         ba.g = 0;
         ba.w = 0;
     }
+#else
+    if(VERTICAL == 1 && INVERSE == 0) {
+        vec4 kernel_val = texelFetch(kernel, coords, 0).rgba;
+        vec4 kernel_val_strided = texelFetch(kernel, coords_strided, 0).rgba;
+        
+        // Not necessary since we're applying 2 in 1 trick
+        // rg.xy = complex_mul(rg.xy, kernel_val.rg);
+        // rg.zw = complex_mul(rg.zw, kernel_val_strided.rg);
+
+        // ba.xy = complex_mul(ba.xy, kernel_val.ba);
+        // ba.zw = complex_mul(ba.zw, kernel_val_strided.ba);
+
+        rg.xy *= kernel_val.r;
+        rg.zw *= kernel_val_strided.r;
+
+        ba.xy *= kernel_val.b;
+        ba.zw *= kernel_val_strided.b;
+    }
 #endif
-    imageStore(lena_pong, coords, vec4(rg.xy, ba.xy));
-    imageStore(lena_pong, coords_strided, vec4(rg.zw, ba.zw));
+    imageStore(fft_img, coords, vec4(rg.xy, ba.xy));
+    imageStore(fft_img, coords_strided, vec4(rg.zw, ba.zw));
 }
