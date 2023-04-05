@@ -217,8 +217,8 @@ void RayTracer::init_resources() {
 		sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 		vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &img_sampler),
 				  "Could not create image sampler");
-		const char* img_name_kernel = "gaussian.exr";
-		const char* img_name = "test512.png";
+		const char* img_name_kernel = "gaussian256.exr";
+		const char* img_name = "test256.png";
 		int x, y, n;
 		unsigned char* img_data = stbi_load(img_name, &x, &y, &n, 4);
 
@@ -304,7 +304,7 @@ void RayTracer::update() {
 void RayTracer::render(uint32_t i) {
 #if FFT_DEBUG
 	if (cnt == 0) {
-		// if (1) {
+		 //if (1) {
 		int num_iters = log2(fft_arr.size());
 
 		const bool FFT_SHARED_MEM = true;
@@ -316,8 +316,8 @@ void RayTracer::render(uint32_t i) {
 				(uint32_t)(input_img.base_extent.width * input_img.base_extent.height + WG_SIZE_X - 1) / WG_SIZE_X;
 			bool vertical = false;
 			instance->vkb.rg
-				->add_compute("FFT - Horizontal", {.shader = Shader("src/shaders/fft/fft.comp"),
-												   .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM),
+				->add_compute("FFT - Horizontal", {.shader = Shader("src/shaders/fft/fft4.comp"),
+												   .specialization_data = {WG_SIZE_X >> 2, uint32_t(FFT_SHARED_MEM),
 																		   uint32_t(vertical), 0},
 												   .dims = {dim_x, 1, 1}})
 				.bind(post_desc_buffer)
@@ -327,8 +327,8 @@ void RayTracer::render(uint32_t i) {
 				.push_constants(&fft_pc);
 			vertical = true;
 			instance->vkb.rg
-				->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/fft/fft.comp"),
-												 .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM),
+				->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/fft/fft4.comp"),
+												 .specialization_data = {WG_SIZE_X >> 2, uint32_t(FFT_SHARED_MEM),
 																		 uint32_t(vertical), 0},
 												 .dims = {dim_x, 1, 1}})
 				.bind(post_desc_buffer)
@@ -339,8 +339,8 @@ void RayTracer::render(uint32_t i) {
 			instance->vkb.rg
 				->add_compute(
 					"FFT - Vertical - Inverse",
-					{.shader = Shader("src/shaders/fft/fft.comp"),
-					 .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1},
+					{.shader = Shader("src/shaders/fft/fft4.comp"),
+					 .specialization_data = {WG_SIZE_X >> 2, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1},
 					 .dims = {dim_x, 1, 1}})
 				.bind(post_desc_buffer)
 				.bind(input_img, img_sampler)
@@ -351,8 +351,8 @@ void RayTracer::render(uint32_t i) {
 			instance->vkb.rg
 				->add_compute(
 					"FFT - Horizontal - Inverse",
-					{.shader = Shader("src/shaders/fft/fft.comp"),
-					 .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1},
+					{.shader = Shader("src/shaders/fft/fft4.comp"),
+					 .specialization_data = {WG_SIZE_X >> 2, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1},
 					 .dims = {dim_x, 1, 1}})
 				.bind(post_desc_buffer)
 				.bind(input_img, img_sampler)
