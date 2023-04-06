@@ -62,7 +62,6 @@ class RayTracer : public LumenInstance {
 	bool has_gt = false;
 	bool show_cam_stats = false;
 	const uint32_t FFT_SIZE = 2048;
-	const uint32_t FFT_RADIX = 2;
 
 	Texture2D input_img;
 	Texture2D fft_img;
