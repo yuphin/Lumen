@@ -266,11 +266,12 @@ void RayTracer::init_resources() {
 	bool vertical = false;
 
 	CommandBuffer cmd(&vkb.ctx, true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	const uint32_t KERNEL_RADIX = 2;
 	instance->vkb.rg
 		->add_compute("FFT - Horizontal",
 					  {.shader = Shader("src/shaders/fft/fft.comp"),
-					   .macros = {{"KERNEL_GENERATION"}},
-					   .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0},
+					   .macros = {{"KERNEL_GENERATION"}, {"RADIX", KERNEL_RADIX}},
+					   .specialization_data = {WG_SIZE_X / KERNEL_RADIX, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0},
 					   .dims = {dim_x, 1, 1}})
 		.bind(post_desc_buffer)
 		.bind(kernel_ping, img_sampler)
@@ -280,8 +281,8 @@ void RayTracer::init_resources() {
 	instance->vkb.rg
 		->add_compute("FFT - Vertical",
 					  {.shader = Shader("src/shaders/fft/fft.comp"),
-					   .macros = {{"KERNEL_GENERATION"}},
-					   .specialization_data = {WG_SIZE_X >> 1, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0},
+					   .macros = {{"KERNEL_GENERATION"}, {"RADIX", KERNEL_RADIX}},
+					   .specialization_data = {WG_SIZE_X / KERNEL_RADIX, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0},
 					   .dims = {dim_x, 1, 1}})
 		.bind(post_desc_buffer)
 		.bind(kernel_ping, img_sampler)
@@ -316,8 +317,8 @@ void RayTracer::render(uint32_t i) {
 				(uint32_t)(input_img.base_extent.width * input_img.base_extent.height + WG_SIZE_X - 1) / WG_SIZE_X;
 			bool vertical = false;
 			instance->vkb.rg
-				->add_compute("FFT - Horizontal", {.shader = Shader("src/shaders/fft/fft4.comp"),
-												   .specialization_data = {WG_SIZE_X >> 2, uint32_t(FFT_SHARED_MEM),
+				->add_compute("FFT - Horizontal", {.shader = Shader("src/shaders/fft/fft.comp"),
+												   .specialization_data = {WG_SIZE_X / FFT_RADIX, uint32_t(FFT_SHARED_MEM),
 																		   uint32_t(vertical), 0},
 												   .dims = {dim_x, 1, 1}})
 				.bind(post_desc_buffer)
@@ -327,8 +328,8 @@ void RayTracer::render(uint32_t i) {
 				.push_constants(&fft_pc);
 			vertical = true;
 			instance->vkb.rg
-				->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/fft/fft4.comp"),
-												 .specialization_data = {WG_SIZE_X >> 2, uint32_t(FFT_SHARED_MEM),
+				->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/fft/fft.comp"),
+												 .specialization_data = {WG_SIZE_X / FFT_RADIX, uint32_t(FFT_SHARED_MEM),
 																		 uint32_t(vertical), 0},
 												 .dims = {dim_x, 1, 1}})
 				.bind(post_desc_buffer)
@@ -339,8 +340,8 @@ void RayTracer::render(uint32_t i) {
 			instance->vkb.rg
 				->add_compute(
 					"FFT - Vertical - Inverse",
-					{.shader = Shader("src/shaders/fft/fft4.comp"),
-					 .specialization_data = {WG_SIZE_X >> 2, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1},
+					{.shader = Shader("src/shaders/fft/fft.comp"),
+					 .specialization_data = {WG_SIZE_X / FFT_RADIX, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1},
 					 .dims = {dim_x, 1, 1}})
 				.bind(post_desc_buffer)
 				.bind(input_img, img_sampler)
@@ -351,8 +352,8 @@ void RayTracer::render(uint32_t i) {
 			instance->vkb.rg
 				->add_compute(
 					"FFT - Horizontal - Inverse",
-					{.shader = Shader("src/shaders/fft/fft4.comp"),
-					 .specialization_data = {WG_SIZE_X >> 2, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1},
+					{.shader = Shader("src/shaders/fft/fft.comp"),
+					 .specialization_data = {WG_SIZE_X / FFT_RADIX, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1},
 					 .dims = {dim_x, 1, 1}})
 				.bind(post_desc_buffer)
 				.bind(input_img, img_sampler)
