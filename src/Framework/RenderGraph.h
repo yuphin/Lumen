@@ -234,7 +234,7 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	}
 	for (size_t i = 0; i < settings.macros.size(); i++) {
 		if (i > 0) {
-			macro_string += ', ';
+			macro_string += ',';
 		}
 		macro_string += settings.macros[i].name;
 		if (settings.macros[i].has_val) {
