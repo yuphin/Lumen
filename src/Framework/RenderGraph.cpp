@@ -843,7 +843,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	// Compile shaders and process resources
 	if (recording || reload_shaders) {
 		auto cmp = [](const std::pair<Shader*, RenderPass*>& a, const std::pair<Shader*, RenderPass*>& b) {
-			return a.first->filename < b.first->filename;
+			return a.first->name_with_macros < b.first->name_with_macros;
 		};
 		std::set<std::pair<Shader*, RenderPass*>, decltype(cmp)> unique_shaders_set;
 		std::unordered_map<RenderPass*, std::vector<Shader*>> unique_shaders;
