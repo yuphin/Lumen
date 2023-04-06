@@ -217,8 +217,8 @@ void RayTracer::init_resources() {
 		sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 		vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &img_sampler),
 				  "Could not create image sampler");
-		const char* img_name_kernel = "gaussian256.exr";
-		const char* img_name = "test256.png";
+		const char* img_name_kernel = "gaussian256x512.exr";
+		const char* img_name = "test256x512.png";
 		int x, y, n;
 		unsigned char* img_data = stbi_load(img_name, &x, &y, &n, 4);
 
@@ -241,8 +241,7 @@ void RayTracer::init_resources() {
 		settings.base_extent = input_img.base_extent;
 		settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 		settings.usage_flags = input_img.usage_flags;
-		fft_img.create_empty_texture("Lena - Pong", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL,
-									   img_sampler);
+		fft_img.create_empty_texture("Lena - Pong", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL, img_sampler);
 		kernel_pong.create_empty_texture("Kernel - Pong", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL,
 										 img_sampler);
 	}
@@ -261,8 +260,10 @@ void RayTracer::init_resources() {
 	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, rmse_val_addr, &rmse_val_buffer, instance->vkb.rg);
 
 	const bool FFT_SHARED_MEM = true;
-	const uint32_t WG_SIZE_X = kernel_ping.base_extent.width;
-	auto dim_x = (uint32_t)(kernel_ping.base_extent.width * kernel_ping.base_extent.height + WG_SIZE_X - 1) / WG_SIZE_X;
+	uint32_t wg_size_x = input_img.base_extent.width;
+	uint32_t wg_size_y = input_img.base_extent.height;
+	auto dim_y = (uint32_t)(input_img.base_extent.width * input_img.base_extent.height + wg_size_x - 1) / wg_size_x;
+	auto dim_x = (uint32_t)(input_img.base_extent.width * input_img.base_extent.height + wg_size_y - 1) / wg_size_y;
 	bool vertical = false;
 
 	CommandBuffer cmd(&vkb.ctx, true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -270,9 +271,9 @@ void RayTracer::init_resources() {
 	instance->vkb.rg
 		->add_compute("FFT - Horizontal",
 					  {.shader = Shader("src/shaders/fft/fft.comp"),
-					   .macros = {{"KERNEL_GENERATION"}, {"RADIX", KERNEL_RADIX}},
-					   .specialization_data = {WG_SIZE_X / KERNEL_RADIX, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0},
-					   .dims = {dim_x, 1, 1}})
+					   .macros = {{"KERNEL_GENERATION"}},
+					   .specialization_data = {wg_size_x / KERNEL_RADIX, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0},
+					   .dims = {dim_y, 1, 1}})
 		.bind(post_desc_buffer)
 		.bind(kernel_ping, img_sampler)
 		.bind(kernel_pong)
@@ -282,7 +283,7 @@ void RayTracer::init_resources() {
 		->add_compute("FFT - Vertical",
 					  {.shader = Shader("src/shaders/fft/fft.comp"),
 					   .macros = {{"KERNEL_GENERATION"}, {"RADIX", KERNEL_RADIX}},
-					   .specialization_data = {WG_SIZE_X / KERNEL_RADIX, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0},
+					   .specialization_data = {wg_size_y / KERNEL_RADIX, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0},
 					   .dims = {dim_x, 1, 1}})
 		.bind(post_desc_buffer)
 		.bind(kernel_ping, img_sampler)
@@ -304,23 +305,27 @@ void RayTracer::update() {
 
 void RayTracer::render(uint32_t i) {
 #if FFT_DEBUG
-	if (cnt == 0) {
-		 //if (1) {
+	// if (cnt == 0) {
+	if (1) {
 		int num_iters = log2(fft_arr.size());
 
 		const bool FFT_SHARED_MEM = true;
 
 		fft_pc.n = fft_arr.size();
 		if (FFT_SHARED_MEM) {
-			const uint32_t WG_SIZE_X = input_img.base_extent.width;
+			uint32_t wg_size_x = input_img.base_extent.width;
+			uint32_t wg_size_y = input_img.base_extent.height;
+			auto dim_y =
+				(uint32_t)(input_img.base_extent.width * input_img.base_extent.height + wg_size_x - 1) / wg_size_x;
 			auto dim_x =
-				(uint32_t)(input_img.base_extent.width * input_img.base_extent.height + WG_SIZE_X - 1) / WG_SIZE_X;
+				(uint32_t)(input_img.base_extent.width * input_img.base_extent.height + wg_size_y - 1) / wg_size_y;
 			bool vertical = false;
 			instance->vkb.rg
-				->add_compute("FFT - Horizontal", {.shader = Shader("src/shaders/fft/fft.comp"),
-												   .specialization_data = {WG_SIZE_X / FFT_RADIX, uint32_t(FFT_SHARED_MEM),
-																		   uint32_t(vertical), 0},
-												   .dims = {dim_x, 1, 1}})
+				->add_compute(
+					"FFT - Horizontal",
+					{.shader = Shader("src/shaders/fft/fft.comp"),
+					 .specialization_data = {wg_size_x / FFT_RADIX, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0},
+					 .dims = {dim_y, 1, 1}})
 				.bind(post_desc_buffer)
 				.bind(input_img, img_sampler)
 				.bind(fft_img)
@@ -328,10 +333,11 @@ void RayTracer::render(uint32_t i) {
 				.push_constants(&fft_pc);
 			vertical = true;
 			instance->vkb.rg
-				->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/fft/fft.comp"),
-												 .specialization_data = {WG_SIZE_X / FFT_RADIX, uint32_t(FFT_SHARED_MEM),
-																		 uint32_t(vertical), 0},
-												 .dims = {dim_x, 1, 1}})
+				->add_compute(
+					"FFT - Vertical",
+					{.shader = Shader("src/shaders/fft/fft.comp"),
+					 .specialization_data = {wg_size_y / FFT_RADIX, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0},
+					 .dims = {dim_x, 1, 1}})
 				.bind(post_desc_buffer)
 				.bind(input_img, img_sampler)
 				.bind(fft_img)
@@ -341,7 +347,7 @@ void RayTracer::render(uint32_t i) {
 				->add_compute(
 					"FFT - Vertical - Inverse",
 					{.shader = Shader("src/shaders/fft/fft.comp"),
-					 .specialization_data = {WG_SIZE_X / FFT_RADIX, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1},
+					 .specialization_data = {wg_size_y / FFT_RADIX, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1},
 					 .dims = {dim_x, 1, 1}})
 				.bind(post_desc_buffer)
 				.bind(input_img, img_sampler)
@@ -353,8 +359,8 @@ void RayTracer::render(uint32_t i) {
 				->add_compute(
 					"FFT - Horizontal - Inverse",
 					{.shader = Shader("src/shaders/fft/fft.comp"),
-					 .specialization_data = {WG_SIZE_X / FFT_RADIX, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1},
-					 .dims = {dim_x, 1, 1}})
+					 .specialization_data = {wg_size_x / FFT_RADIX, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1},
+					 .dims = {dim_y, 1, 1}})
 				.bind(post_desc_buffer)
 				.bind(input_img, img_sampler)
 				.bind(fft_img)

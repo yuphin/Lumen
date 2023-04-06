@@ -10,7 +10,7 @@
 #include "../commons.h"
 
 #ifndef RADIX
-#define RADIX 4
+#define RADIX 2
 #endif
 
 layout(constant_id = 0) const int WG_SIZE = 1024;
@@ -137,13 +137,16 @@ void main() {
 #endif
 	const uint N_DIV_RADIX = gl_WorkGroupSize.x;
 	const uint N = RADIX * gl_WorkGroupSize.x;
-	const uint N_DIV_2 = N / 2;
+	ivec2 IMG_DIMS;
+
 	if (VERTICAL == 1) {
+		IMG_DIMS = ivec2(gl_NumWorkGroups.x , N);
 		for (int r = 0; r < RADIX; r++) {
 			coords[r] =
 				ivec2(gl_GlobalInvocationID.x / N_DIV_RADIX, gl_GlobalInvocationID.x % N_DIV_RADIX + r * N_DIV_RADIX);
 		}
 	} else {
+		IMG_DIMS = ivec2(N, gl_NumWorkGroups.x);
 		for (int r = 0; r < RADIX; r++) {
 			coords[r] =
 				ivec2(gl_GlobalInvocationID.x % N_DIV_RADIX + r * N_DIV_RADIX, gl_GlobalInvocationID.x / N_DIV_RADIX);
@@ -151,7 +154,7 @@ void main() {
 #ifdef KERNEL_GENERATION
 		coords_old = coords;
 		for (int r = 0; r < RADIX; r++) {
-			coords[r] = (coords[r] - ivec2(N_DIV_2 - 1) + ivec2(N - 1)) % ivec2(N);
+			coords[r] = (coords[r] - ivec2(IMG_DIMS / 2 - 1) + ivec2(IMG_DIMS - 1)) % IMG_DIMS;
 		}
 #endif
 	}
