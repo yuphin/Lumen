@@ -225,10 +225,12 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	Pipeline* pipeline;
 	uint32_t pass_idx = (uint32_t)passes.size();
 	bool cached = false;
-	ending_pass_idx++;
 
 	std::string name_with_macros = name;
 	std::string macro_string;
+
+	ending_pass_idx++;
+
 	if (!settings.macros.empty()) {
 		macro_string += '(';
 	}
@@ -264,6 +266,11 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 				passes[idx].pipeline = pipeline_cache[name_with_macros].pipeline.get();
 			}
 			++storage.offset_idx;
+			// If this is a cached pipeline and the cached pipeline index is not 0, make this the starting pass index
+			if (idx != 0 && beginning_pass_idx == 0) {
+				beginning_pass_idx = idx;
+				ending_pass_idx = idx + 1;
+			}
 			return passes[idx];
 		}
 		pipeline = pipeline_cache[name_with_macros].pipeline.get();
