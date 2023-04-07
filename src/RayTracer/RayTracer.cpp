@@ -218,7 +218,7 @@ void RayTracer::init_resources() {
 		vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &img_sampler),
 				  "Could not create image sampler");
 		const char* img_name_kernel = "gaussian256.exr";
-		const char* img_name = "test128.png";
+		const char* img_name = "rubic.jpg";
 		int x, y, n;
 		unsigned char* img_data = stbi_load(img_name, &x, &y, &n, 4);
 
