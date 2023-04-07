@@ -15,6 +15,7 @@
  - ReSTIR
  - ReSTIR GI
  - DDGI (Real time)
+ - FFT Convolution Bloom
 
 ### Engine
  - Lambertian, mirror, glass, glossy and optionally Disney BSDF
