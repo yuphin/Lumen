@@ -16,7 +16,7 @@ void PostFX::init(LumenInstance& instance) {
 	vk::check(vkCreateSampler(instance.vkb.ctx.device, &sampler_ci, nullptr, &img_sampler),
 			  "Could not create image sampler");
 	// Load the kernel
-const char* img_name_kernel = "assets/Octagonal512.exr";
+const char* img_name_kernel = "assets/kernels/Pupil512.exr";
 	int width, height;
 	float* data = load_exr(img_name_kernel, width, height);
 	auto img_dims = VkExtent2D{(uint32_t)width, (uint32_t)height};
