@@ -40,6 +40,7 @@ struct VulkanBase {
 	void create_sync_primitives();
 	void create_command_buffers();
 	void create_command_pools();
+	void init_imgui();
 	void cleanup_swapchain();
 	void recreate_swap_chain(VulkanContext&);
 	void add_device_extension(const char* name) { device_extensions.push_back(name); }
@@ -111,4 +112,5 @@ struct VulkanBase {
 						 VkBuildAccelerationStructureFlagsKHR flags,  // Build creation flag
 						 bool update								  // Update == animation
 	);
+	VkDescriptorPool imgui_pool = 0;
 };

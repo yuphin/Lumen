@@ -470,8 +470,13 @@ static std::vector<uint32_t> compile_file(const std::string& source_name, shader
 	shaderc::Compiler compiler;
 	shaderc::CompileOptions options;
 
-	for (const auto& [k, v] : pass->macro_defines) {
-		options.AddMacroDefinition(k, std::to_string(v));
+	for (const auto& macro : pass->macro_defines) {
+		if (macro.has_val) {
+			options.AddMacroDefinition(macro.name, std::to_string(macro.val));
+			
+		} else {
+			options.AddMacroDefinition(macro.name);
+		}
 	}
 	if (optimize) {
 		options.SetOptimizationLevel(shaderc_optimization_level_size);
@@ -499,7 +504,7 @@ static std::vector<uint32_t> compile_file(const std::string& source_name, shader
 Shader::Shader() {}
 Shader::Shader(const std::string& filename) : filename(filename) {}
 int Shader::compile(RenderPass* pass) {
-	LUMEN_TRACE("Compiling shader: {0}", filename);
+	LUMEN_TRACE("Compiling shader: {0}", name_with_macros);
 #if USE_SHADERC
 	std::ifstream fin(filename);
 	std::stringstream buffer;

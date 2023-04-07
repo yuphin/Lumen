@@ -49,14 +49,20 @@ void RenderPass::register_dependencies(Buffer& buffer, VkAccessFlags dst_access_
 }
 
 void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout) {
-	if (tex.layout == dst_layout) {
+	const bool has_storage_bit = (tex.usage_flags & VK_IMAGE_USAGE_STORAGE_BIT) == VK_IMAGE_USAGE_STORAGE_BIT;
+	if (!has_storage_bit && tex.layout == dst_layout) {
 		return;
 	}
-	if (tex.layout == VK_IMAGE_LAYOUT_UNDEFINED || rg->img_resource_map.find(tex.img) == rg->img_resource_map.end()) {
+	auto img_resource = rg->img_resource_map.find(tex.img);
+	const bool resource_exists = img_resource != rg->img_resource_map.end();
+	if (has_storage_bit && tex.layout == dst_layout && !resource_exists) {
+		return;
+	}
+	if (tex.layout == VK_IMAGE_LAYOUT_UNDEFINED || !resource_exists) {
 		layout_transitions.push_back({&tex, tex.layout, dst_layout});
 		tex.layout = dst_layout;
 	} else {
-		RenderPass& opposing_pass = rg->passes[rg->img_resource_map[tex.img]];
+		RenderPass& opposing_pass = rg->passes[img_resource->second];
 		if (opposing_pass.submitted) {
 			return;
 		}
@@ -187,8 +193,8 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 			std::vector<std::future<Shader*>> shader_tasks;
 			shader_tasks.reserve(pass->gfx_settings->shaders.size());
 			for (auto& shader : active_shaders) {
-				if (pass->rg->shader_cache.find(shader->filename) != pass->rg->shader_cache.end()) {
-					*shader = pass->rg->shader_cache[shader->filename];
+				if (pass->rg->shader_cache.find(shader->name_with_macros) != pass->rg->shader_cache.end()) {
+					*shader = pass->rg->shader_cache[shader->name_with_macros];
 				} else {
 					shader_tasks.push_back(ThreadPool::submit(
 						[pass](Shader* shader) {
@@ -202,7 +208,7 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 				auto shader = task.get();
 				{
 					std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
-					pass->rg->shader_cache[shader->filename] = *shader;
+					pass->rg->shader_cache[shader->name_with_macros] = *shader;
 				}
 			}
 			for (auto& shader : active_shaders) {
@@ -214,8 +220,8 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 			std::vector<std::future<Shader*>> shader_tasks;
 			shader_tasks.reserve(pass->rt_settings->shaders.size());
 			for (auto& shader : active_shaders) {
-				if (pass->rg->shader_cache.find(shader->filename) != pass->rg->shader_cache.end()) {
-					*shader = pass->rg->shader_cache[shader->filename];
+				if (pass->rg->shader_cache.find(shader->name_with_macros) != pass->rg->shader_cache.end()) {
+					*shader = pass->rg->shader_cache[shader->name_with_macros];
 				} else {
 					shader_tasks.push_back(ThreadPool::submit(
 						[pass](Shader* shader) {
@@ -224,14 +230,14 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 						},
 						shader));
 					 //shader->compile(pass);
-					pass->rg->shader_cache[shader->filename] = *shader;
+					pass->rg->shader_cache[shader->name_with_macros] = *shader;
 				}
 			}
 			for (auto& task : shader_tasks) {
 				auto shader = task.get();
 				{
 					std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
-					pass->rg->shader_cache[shader->filename] = *shader;
+					pass->rg->shader_cache[shader->name_with_macros] = *shader;
 				}
 			}
 			for (auto& shader : active_shaders) {
@@ -242,13 +248,13 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 		} break;
 		case PassType::Compute: {
 			for (auto& shader : active_shaders) {
-				if (pass->rg->shader_cache.find(shader->filename) != pass->rg->shader_cache.end()) {
-					*shader = pass->rg->shader_cache[shader->filename];
+				if (pass->rg->shader_cache.find(shader->name_with_macros) != pass->rg->shader_cache.end()) {
+					*shader = pass->rg->shader_cache[shader->name_with_macros];
 				} else {
 					shader->compile(pass);
 					{
 						std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
-						pass->rg->shader_cache[shader->filename] = *shader;
+						pass->rg->shader_cache[shader->name_with_macros] = *shader;
 					}
 				}
 				pass->affected_buffer_pointers = shader->buffer_status_map;
@@ -270,16 +276,6 @@ RenderPass& RenderGraph::add_gfx(const std::string& name, const GraphicsPassSett
 
 RenderPass& RenderGraph::add_compute(const std::string& name, const ComputePassSettings& settings) {
 	return add_pass_impl(name, settings);
-}
-
-RenderPass& RenderPass::macro(const std::string& macro_name) {
-	macro_defines[macro_name] = 0;
-	return *this;
-}
-
-RenderPass& RenderPass::macro(const std::string& macro_name, int value) {
-	macro_defines[macro_name] = value;
-	return *this;
 }
 
 RenderPass& RenderPass::bind(const ResourceBinding& binding) {
@@ -847,7 +843,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	// Compile shaders and process resources
 	if (recording || reload_shaders) {
 		auto cmp = [](const std::pair<Shader*, RenderPass*>& a, const std::pair<Shader*, RenderPass*>& b) {
-			return a.first->filename < b.first->filename;
+			return a.first->name_with_macros < b.first->name_with_macros;
 		};
 		std::set<std::pair<Shader*, RenderPass*>, decltype(cmp)> unique_shaders_set;
 		std::unordered_map<RenderPass*, std::vector<Shader*>> unique_shaders;

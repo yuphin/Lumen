@@ -1,0 +1,155 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../commons.h"
+layout(constant_id = 0) const int WG_SIZE = 1024;
+layout(constant_id = 2) const int VERTICAL = 0;
+layout(constant_id = 3) const int INVERSE = 0;
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+
+layout(binding = 0) readonly buffer PostDesc_ { PostDesc post_desc; };
+layout(binding = 1) uniform sampler2D input_img;
+layout(rgba32f, binding = 2) uniform image2D fft_img;
+#ifndef KERNEL_GENERATION
+layout(binding = 3) uniform sampler2D kernel;
+#endif
+layout(push_constant) uniform PC { FFTPC pc; };
+#define PI 3.14159265359
+
+shared float s_data_real[WG_SIZE * 2];
+shared float s_data_imag[WG_SIZE * 2];
+
+vec2 complex_mul(vec2 a, vec2 b) {
+    return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}
+
+vec4 fft_2(vec2 a, vec2 b, vec2 wp) {
+    return vec4(a + b, complex_mul(wp, a - b));
+}
+
+void exchange(uint fixed_idx, uint stride, uint T, vec2 a, vec2 b, out vec2 even_reordered, out vec2 odd_reordered) {
+    s_data_real[fixed_idx] = a.x;
+    s_data_imag[fixed_idx] = a.y;
+
+    s_data_real[fixed_idx + stride] = b.x;
+    s_data_imag[fixed_idx + stride] = b.y;
+
+    memoryBarrierShared();
+    barrier();
+
+    even_reordered.x = s_data_real[gl_LocalInvocationID.x];
+    even_reordered.y = s_data_imag[gl_LocalInvocationID.x];
+
+    odd_reordered.x = s_data_real[gl_LocalInvocationID.x + T];
+    odd_reordered.y = s_data_imag[gl_LocalInvocationID.x + T];
+}
+
+vec4 fft_shared_img(bool is_rg, ivec2 coords, ivec2 coords_strided) {
+    const uint N = 2 * gl_WorkGroupSize.x;
+    const uint N_DIV_2 = gl_WorkGroupSize.x;
+   
+    const uint j = gl_LocalInvocationID.x;
+    vec2 a, b;
+    if(INVERSE == 1 || VERTICAL == 1) {
+        if(is_rg) {
+            a = imageLoad(fft_img, coords).rg;
+            b = imageLoad(fft_img, coords_strided).rg;
+        } else {
+            a = imageLoad(fft_img, coords).ba;
+            b = imageLoad(fft_img, coords_strided).ba;
+        }
+    } else {
+        if(is_rg) {
+            a = texelFetch(input_img, coords, 0).rg;
+            b = texelFetch(input_img, coords_strided, 0).rg;
+        } else {
+            a = texelFetch(input_img, coords, 0).ba;
+            b = texelFetch(input_img, coords_strided, 0).ba;
+        }
+    }
+ 
+    for(uint stride = 1; stride < N; stride *= 2) {
+        const uint stride_factor = stride * uint(j / stride);
+        float angle = 2 * PI * stride_factor / N;
+        if(INVERSE == 1) {
+            angle *= -1;
+        }
+        const vec2 wp = vec2(cos(angle), -sin(angle));
+        const vec4 butterfly = fft_2(a, b, wp);
+        const uint fixed_idx = j % stride + (stride_factor << 1);
+        memoryBarrierShared();
+        barrier();
+        exchange(fixed_idx, stride, N_DIV_2, butterfly.xy, butterfly.zw, a, b);
+    }
+    if(INVERSE == 1) {
+        a /= N;
+        b /= N;
+    }
+    
+    return vec4(a,b);
+}
+
+void main() {
+    ivec2 coords;
+    ivec2 coords_strided;
+#ifdef KERNEL_GENERATION
+    ivec2 coords_old;
+    ivec2 coords_old_strided;
+#endif
+    const uint N_DIV_2 = gl_WorkGroupSize.x;
+    if(VERTICAL == 1) {
+        coords = ivec2(gl_GlobalInvocationID.x / N_DIV_2, gl_GlobalInvocationID.x % N_DIV_2);
+        coords_strided = coords + ivec2(0, N_DIV_2);
+    } else {
+        coords = ivec2(gl_GlobalInvocationID.x % N_DIV_2, gl_GlobalInvocationID.x / N_DIV_2);
+        coords_strided = coords + ivec2(N_DIV_2, 0);
+#ifdef KERNEL_GENERATION
+        coords_old = coords;
+        coords_old_strided = coords_strided;
+        coords = (coords - ivec2(N_DIV_2 - 1) + ivec2(2 * gl_WorkGroupSize.x - 1)) % ivec2(2 * gl_WorkGroupSize.x);
+        coords_strided = (coords_strided - ivec2(N_DIV_2 - 1) + ivec2(2 * gl_WorkGroupSize.x - 1)) % ivec2(2 * gl_WorkGroupSize.x);
+#endif
+    }
+    vec4 rg, ba;
+    rg = fft_shared_img(true, coords, coords_strided);
+    ba = fft_shared_img(false, coords, coords_strided);
+#ifdef KERNEL_GENERATION
+    if(VERTICAL == 0) {
+        imageStore(fft_img, coords_old, vec4(rg.xy, ba.xy));
+        imageStore(fft_img, coords_old_strided, vec4(rg.zw, ba.zw));
+        return;
+    } else {
+        //Set imaginary parts to 0
+        rg.y = 0;
+        rg.w = 0;
+        ba.g = 0;
+        ba.w = 0;
+    }
+#else
+    if(VERTICAL == 1 && INVERSE == 0) {
+        vec4 kernel_val = texelFetch(kernel, coords, 0).rgba;
+        vec4 kernel_val_strided = texelFetch(kernel, coords_strided, 0).rgba;
+        
+        // Not necessary since we're applying 2 in 1 trick
+        // rg.xy = complex_mul(rg.xy, kernel_val.rg);
+        // rg.zw = complex_mul(rg.zw, kernel_val_strided.rg);
+
+        // ba.xy = complex_mul(ba.xy, kernel_val.ba);
+        // ba.zw = complex_mul(ba.zw, kernel_val_strided.ba);
+
+        rg.xy *= kernel_val.r;
+        rg.zw *= kernel_val_strided.r;
+
+        ba.xy *= kernel_val.b;
+        ba.zw *= kernel_val_strided.b;
+    }
+#endif
+    imageStore(fft_img, coords, vec4(rg.xy, ba.xy));
+    imageStore(fft_img, coords_strided, vec4(rg.zw, ba.zw));
+}

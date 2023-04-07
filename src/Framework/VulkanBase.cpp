@@ -167,6 +167,7 @@ void VulkanBase::cleanup_swapchain() {
 	// for (auto framebuffer : ctx.swapchain_framebuffers) {
 	//	vkDestroyFramebuffer(ctx.device, framebuffer, nullptr);
 	//}
+	vkDestroyDescriptorPool(ctx.device, imgui_pool, nullptr);
 	vkFreeCommandBuffers(ctx.device, ctx.cmd_pools[0], static_cast<uint32_t>(ctx.command_buffers.size()),
 						 ctx.command_buffers.data());
 	vkDestroyPipeline(ctx.device, ctx.gfx_pipeline, nullptr);
@@ -511,7 +512,7 @@ void VulkanBase::create_swapchain() {
 	vkGetSwapchainImagesKHR(ctx.device, ctx.swapchain, &image_cnt, images);
 	for (uint32_t i = 0; i < image_cnt; i++) {
 		swapchain_images.emplace_back("Swapchain Image #" + std::to_string(i), &ctx, images[i], surface_format.format,
-									  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_ASPECT_COLOR_BIT, true);
+									  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_ASPECT_COLOR_BIT, extent, true);
 	}
 	ctx.swapchain_extent = extent;
 
@@ -542,6 +543,53 @@ void VulkanBase::create_command_pools() {
 		vk::check(vkCreateCommandPool(ctx.device, &pool_info, nullptr, &ctx.cmd_pools[i]),
 				  "Failed to create command pool!");
 	}
+}
+
+void VulkanBase::init_imgui() {
+	VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
+										 {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
+										 {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
+										 {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
+										 {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
+
+	VkDescriptorPoolCreateInfo pool_info = {};
+	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	pool_info.maxSets = 1000;
+	pool_info.poolSizeCount = (uint32_t)std::size(pool_sizes);
+	pool_info.pPoolSizes = pool_sizes;
+	vk::check(vkCreateDescriptorPool(ctx.device, &pool_info, nullptr, &imgui_pool));
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	// Setup Platform/Renderer backends
+	ImGui::StyleColorsDark();
+	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	ImGui_ImplGlfw_InitForVulkan(ctx.window_ptr, true);
+
+	ImGui_ImplVulkan_InitInfo init_info = {};
+	init_info.Instance = ctx.instance;
+	init_info.PhysicalDevice = ctx.physical_device;
+	init_info.Device = ctx.device;
+	init_info.Queue = ctx.queues[(int)QueueType::GFX];
+	init_info.DescriptorPool = imgui_pool;
+	init_info.MinImageCount = 3;
+	init_info.ImageCount = 3;
+	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+	init_info.UseDynamicRendering = true;
+	init_info.ColorAttachmentFormat = swapchain_format;
+
+	ImGui_ImplVulkan_Init(&init_info, nullptr);
+
+	CommandBuffer cmd(&ctx, true);
+	ImGui_ImplVulkan_CreateFontsTexture(cmd.handle);
+	cmd.submit(ctx.queues[(int)QueueType::GFX]);
+	ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
 
