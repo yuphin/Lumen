@@ -63,8 +63,10 @@ class RayTracer : public LumenInstance {
 	bool show_cam_stats = false;
 	const uint32_t FFT_SIZE = 2048;
 
-	Texture2D input_img;
-	Texture2D fft_img;
+	Texture2D input_img_org;
+	Texture2D fft_ping_padded;
+	Texture2D fft_pong_padded;
+	Texture2D kernel_org;
 	Texture2D kernel_ping;
 	Texture2D kernel_pong;
 	VkSampler img_sampler;

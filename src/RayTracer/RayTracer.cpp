@@ -205,7 +205,7 @@ void RayTracer::init_resources() {
 		desc.gt_img_addr = gt_img_buffer.get_device_address();
 		free(data);
 	}
-	// Lena
+	// FFT Img
 	{
 		VkSamplerCreateInfo sampler_ci = vk::sampler_create_info();
 		sampler_ci.minFilter = VK_FILTER_NEAREST;
@@ -217,31 +217,46 @@ void RayTracer::init_resources() {
 		sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 		vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &img_sampler),
 				  "Could not create image sampler");
-		const char* img_name_kernel = "gaussian256x512.exr";
-		const char* img_name = "test256x512.png";
+		const char* img_name_kernel = "gaussian256.exr";
+		const char* img_name = "test128.png";
 		int x, y, n;
 		unsigned char* img_data = stbi_load(img_name, &x, &y, &n, 4);
 
 		auto size = x * y * 4;
 		auto img_dims = VkExtent2D{(uint32_t)x, (uint32_t)y};
 		auto ci = make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-		input_img.load_from_data(&instance->vkb.ctx, img_data, size, ci, img_sampler,
-								 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, false);
+		input_img_org.load_from_data(&instance->vkb.ctx, img_data, size, ci, img_sampler,
+									 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, false);
 		stbi_image_free(img_data);
 
-		ci.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 		int width, height;
 		float* data = load_exr(img_name_kernel, width, height);
-		kernel_ping.load_from_data(&instance->vkb.ctx, data, width * height * 4 * sizeof(float), ci, img_sampler,
-								   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, false);
+		img_dims =  VkExtent2D{(uint32_t)width, (uint32_t)height};
+		ci =  make_img2d_ci(img_dims, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+		kernel_org.load_from_data(&instance->vkb.ctx, data, width * height * 4 * sizeof(float), ci, img_sampler,
+								  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, false);
 		if (data) {
 			free(data);
 		}
+
+		// Compute padded sizes
+		auto padded_width =
+			1 << uint32_t(ceil(log2(double(input_img_org.base_extent.width + kernel_org.base_extent.width))));
+		auto padded_height =
+			1 << uint32_t(ceil(log2(double(input_img_org.base_extent.height + kernel_org.base_extent.height))));
+
 		TextureSettings settings;
-		settings.base_extent = input_img.base_extent;
+		settings.base_extent.width = padded_width;
+		settings.base_extent.height = padded_height;
+
 		settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		settings.usage_flags = input_img.usage_flags;
-		fft_img.create_empty_texture("Lena - Pong", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL, img_sampler);
+		settings.usage_flags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+		fft_ping_padded.create_empty_texture("FFT - Ping", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL,
+											 img_sampler);
+		fft_pong_padded.create_empty_texture("FFT - Pong", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL,
+											 img_sampler);
+		kernel_ping.create_empty_texture("Kernel - Ping", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL,
+										 img_sampler);
 		kernel_pong.create_empty_texture("Kernel - Pong", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL,
 										 img_sampler);
 	}
@@ -259,16 +274,27 @@ void RayTracer::init_resources() {
 	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(PostDesc, desc, rmse_val_addr, &rmse_val_buffer, instance->vkb.rg);
 
+	CommandBuffer cmd(&vkb.ctx, true);
+
+	// Copy the original kernel image to the padded texture
+	uint32_t pad_width = (kernel_org.base_extent.width + 31) / 32;
+	uint32_t pad_height = (kernel_org.base_extent.height + 31) / 32;
+	instance->vkb.rg
+		->add_compute("Pad Kernel", {.shader = Shader("src/shaders/fft/pad.comp"), .dims = {pad_width, pad_height, 1}})
+		.bind(kernel_org, img_sampler)
+		.bind(kernel_ping);
+
 	const bool FFT_SHARED_MEM = true;
-	uint32_t wg_size_x = input_img.base_extent.width;
-	uint32_t wg_size_y = input_img.base_extent.height;
-	auto dim_y = (uint32_t)(input_img.base_extent.width * input_img.base_extent.height + wg_size_x - 1) / wg_size_x;
-	auto dim_x = (uint32_t)(input_img.base_extent.width * input_img.base_extent.height + wg_size_y - 1) / wg_size_y;
+	uint32_t wg_size_x = fft_ping_padded.base_extent.width;
+	uint32_t wg_size_y = fft_ping_padded.base_extent.height;
+	auto dim_y =
+		(uint32_t)(fft_ping_padded.base_extent.width * fft_ping_padded.base_extent.height + wg_size_x - 1) / wg_size_x;
+	auto dim_x =
+		(uint32_t)(fft_ping_padded.base_extent.width * fft_ping_padded.base_extent.height + wg_size_y - 1) / wg_size_y;
 	bool vertical = false;
 
-	CommandBuffer cmd(&vkb.ctx, true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	const int RADIX_X = (31 - std::countl_zero(input_img.base_extent.width)) % 2 ? 2 : 4;
-	const int RADIX_Y = (31 - std::countl_zero(input_img.base_extent.height)) % 2 ? 2 : 4;
+	const int RADIX_X = (31 - std::countl_zero(fft_ping_padded.base_extent.width)) % 2 ? 2 : 4;
+	const int RADIX_Y = (31 - std::countl_zero(fft_ping_padded.base_extent.height)) % 2 ? 2 : 4;
 	instance->vkb.rg
 		->add_compute("FFT - Horizontal",
 					  {.shader = Shader("src/shaders/fft/fft.comp"),
@@ -308,21 +334,32 @@ void RayTracer::render(uint32_t i) {
 #if FFT_DEBUG
 	// if (cnt == 0) {
 	if (1) {
+		// Copy the original image to the padded texture
+		uint32_t pad_width = (input_img_org.base_extent.width + 31) / 32;
+		uint32_t pad_height = (input_img_org.base_extent.height + 31) / 32;
+		instance->vkb.rg
+			->add_compute("Pad Image",
+						  {.shader = Shader("src/shaders/fft/pad.comp"), .dims = {pad_width, pad_height, 1}})
+			.bind(input_img_org, img_sampler)
+			.bind(fft_ping_padded);
+
 		int num_iters = log2(fft_arr.size());
 
 		const bool FFT_SHARED_MEM = true;
 
 		fft_pc.n = fft_arr.size();
 		if (FFT_SHARED_MEM) {
-			uint32_t wg_size_x = input_img.base_extent.width;
-			uint32_t wg_size_y = input_img.base_extent.height;
+			uint32_t wg_size_x = fft_ping_padded.base_extent.width;
+			uint32_t wg_size_y = fft_ping_padded.base_extent.height;
 			auto dim_y =
-				(uint32_t)(input_img.base_extent.width * input_img.base_extent.height + wg_size_x - 1) / wg_size_x;
+				(uint32_t)(fft_ping_padded.base_extent.width * fft_ping_padded.base_extent.height + wg_size_x - 1) /
+				wg_size_x;
 			auto dim_x =
-				(uint32_t)(input_img.base_extent.width * input_img.base_extent.height + wg_size_y - 1) / wg_size_y;
+				(uint32_t)(fft_ping_padded.base_extent.width * fft_ping_padded.base_extent.height + wg_size_y - 1) /
+				wg_size_y;
 			bool vertical = false;
-			const int RADIX_X = (31 - std::countl_zero(input_img.base_extent.width)) % 2 ? 2 : 4;
-			const int RADIX_Y = (31 - std::countl_zero(input_img.base_extent.height)) % 2 ? 2 : 4;
+			const int RADIX_X = (31 - std::countl_zero(fft_ping_padded.base_extent.width)) % 2 ? 2 : 4;
+			const int RADIX_Y = (31 - std::countl_zero(fft_ping_padded.base_extent.height)) % 2 ? 2 : 4;
 			const std::vector<ShaderMacro> macros_x =
 				RADIX_X == 2 ? std::vector<ShaderMacro>{} : std::vector<ShaderMacro>{{"RADIX", RADIX_X}};
 			const std::vector<ShaderMacro> macros_y =
@@ -335,8 +372,8 @@ void RayTracer::render(uint32_t i) {
 					 .specialization_data = {wg_size_x / RADIX_X, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 0},
 					 .dims = {dim_y, 1, 1}})
 				.bind(post_desc_buffer)
-				.bind(input_img, img_sampler)
-				.bind(fft_img)
+				.bind(fft_ping_padded, img_sampler)
+				.bind(fft_pong_padded)
 				.bind(kernel_pong, img_sampler)
 				.push_constants(&fft_pc);
 			vertical = true;
@@ -347,8 +384,8 @@ void RayTracer::render(uint32_t i) {
 																		 uint32_t(vertical), 0},
 												 .dims = {dim_x, 1, 1}})
 				.bind(post_desc_buffer)
-				.bind(input_img, img_sampler)
-				.bind(fft_img)
+				.bind(fft_ping_padded, img_sampler)
+				.bind(fft_pong_padded)
 				.bind(kernel_pong, img_sampler)
 				.push_constants(&fft_pc);
 			instance->vkb.rg
@@ -359,8 +396,8 @@ void RayTracer::render(uint32_t i) {
 					 .specialization_data = {wg_size_y / RADIX_Y, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1},
 					 .dims = {dim_x, 1, 1}})
 				.bind(post_desc_buffer)
-				.bind(input_img, img_sampler)
-				.bind(fft_img)
+				.bind(fft_ping_padded, img_sampler)
+				.bind(fft_pong_padded)
 				.bind(kernel_pong, img_sampler)
 				.push_constants(&fft_pc);
 			vertical = false;
@@ -372,8 +409,8 @@ void RayTracer::render(uint32_t i) {
 					 .specialization_data = {wg_size_x / RADIX_X, uint32_t(FFT_SHARED_MEM), uint32_t(vertical), 1},
 					 .dims = {dim_y, 1, 1}})
 				.bind(post_desc_buffer)
-				.bind(input_img, img_sampler)
-				.bind(fft_img)
+				.bind(fft_ping_padded, img_sampler)
+				.bind(fft_pong_padded)
 				.bind(kernel_pong, img_sampler)
 				.push_constants(&fft_pc);
 		} else {
@@ -418,6 +455,7 @@ void RayTracer::render(uint32_t i) {
 	// Render image
 	integrator->render();
 #endif
+
 	auto cmdbuf = vkb.ctx.command_buffers[i];
 	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
@@ -440,7 +478,7 @@ void RayTracer::render(uint32_t i) {
 		.push_constants(&pc_post_settings)
 		//.read(integrator->output_tex) // Needed if shader inference is off
 		.bind(integrator->output_tex, integrator->texture_sampler)
-		.bind(fft_img, img_sampler)
+		.bind(fft_pong_padded, img_sampler)
 		.bind(kernel_pong, img_sampler);
 
 	if (write_exr) {
