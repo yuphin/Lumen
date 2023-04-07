@@ -16,7 +16,7 @@ void PostFX::init(LumenInstance& instance) {
 	vk::check(vkCreateSampler(instance.vkb.ctx.device, &sampler_ci, nullptr, &img_sampler),
 			  "Could not create image sampler");
 	// Load the kernel
-	const char* img_name_kernel = "PupilsResized.exr";
+const char* img_name_kernel = "assets/Octagonal512.exr";
 	int width, height;
 	float* data = load_exr(img_name_kernel, width, height);
 	auto img_dims = VkExtent2D{(uint32_t)width, (uint32_t)height};
@@ -136,6 +136,8 @@ void PostFX::render(Texture2D& input, Texture2D& output) {
 		.bind(kernel_pong, img_sampler);
 
 	pc_post_settings.enable_tonemapping = enable_tonemapping;
+	pc_post_settings.bloom_amount = bloom_amount;
+	pc_post_settings.bloom_exposure = bloom_exposure;
 
 	rg->add_gfx("Post FX", {.shaders = {{"src/shaders/post.vert"}, {"src/shaders/post.frag"}},
 							.width = output.base_extent.width,
@@ -153,7 +155,15 @@ void PostFX::render(Texture2D& input, Texture2D& output) {
 								}})
 		.push_constants(&pc_post_settings)
 		.bind(fft_pong_padded, img_sampler)
-		.bind(kernel_pong, img_sampler);
+		.bind(input, img_sampler);
 }
 
-bool PostFX::gui() { return ImGui::Checkbox("Enable ACES tonemapping", &enable_tonemapping); }
+bool PostFX::gui() {
+	bool updated = false;
+	updated ^= ImGui::Checkbox("Enable ACES tonemapping", &enable_tonemapping); 
+	float exposure = log10(bloom_exposure);
+	updated ^= ImGui::SliderFloat("Bloom exposure", &exposure, -20, 0, "%.2f");
+	bloom_exposure = pow(10, exposure);
+	updated ^= ImGui::SliderFloat("Bloom amount", &bloom_amount, 0.0f, 1.0f, "%.2f");
+	return updated;
+}
