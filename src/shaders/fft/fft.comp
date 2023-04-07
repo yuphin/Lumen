@@ -14,17 +14,15 @@
 #endif
 
 layout(constant_id = 0) const int WG_SIZE = 1024;
-layout(constant_id = 2) const int VERTICAL = 0;
-layout(constant_id = 3) const int INVERSE = 0;
+layout(constant_id = 1) const int VERTICAL = 0;
+layout(constant_id = 2) const int INVERSE = 0;
 layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
 
-layout(binding = 0) readonly buffer PostDesc_ { PostDesc post_desc; };
-layout(binding = 1) uniform sampler2D input_img;
-layout(rgba32f, binding = 2) uniform image2D fft_img;
+layout(binding = 0) uniform sampler2D input_img;
+layout(rgba32f, binding = 1) uniform image2D fft_img;
 #ifndef KERNEL_GENERATION
-layout(binding = 3) uniform sampler2D kernel;
+layout(binding = 2) uniform sampler2D kernel;
 #endif
-layout(push_constant) uniform PC { FFTPC pc; };
 #define PI 3.14159265359
 
 shared float s_data_real[WG_SIZE * RADIX];

@@ -108,7 +108,7 @@ class RenderPass {
 		  rt_settings(std::make_unique<RTPassSettings>(rt_settings)),
 		  macro_defines(rt_settings.macros),
 		  is_pipeline_cached(cached) {
-		for (auto& shader : this->gfx_settings->shaders) {
+		for (auto& shader : this->rt_settings->shaders) {
 			shader.name_with_macros = shader.filename + macro_string;
 		}
 	}

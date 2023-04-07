@@ -12,6 +12,7 @@
 #include "ReSTIR.h"
 #include "ReSTIRGI.h"
 #include "DDGI.h"
+#include "PostFX.h"
 
 class RayTracer : public LumenInstance {
    public:
@@ -24,9 +25,6 @@ class RayTracer : public LumenInstance {
 	bool resized = false;
 
    private:
-	struct Settings {
-		bool enable_tonemapping = false;
-	};
 
 	void init_resources();
 	void parse_args(int argc, char* argv[]);
@@ -37,38 +35,27 @@ class RayTracer : public LumenInstance {
 	float cpu_avg_time = 0;
 	int cnt = 0;
 	std::unique_ptr<Integrator> integrator;
+	PostFX post_fx;
 
-	PushConstantPost pc_post_settings;
-	Settings settings;
+	RTUtilsDesc rt_utils_desc;
+	RTUtilsPC rt_utils_pc;
+
 	Buffer gt_img_buffer;
 	Buffer output_img_buffer;
 	Buffer output_img_buffer_cpu;
-	Buffer post_desc_buffer;
 	Buffer residual_buffer;
 	Buffer counter_buffer;
 	Buffer rmse_val_buffer;
+	Buffer rt_utils_desc_buffer;
+
 
 	Buffer fft_buffers[2];
 	Buffer fft_cpu_buffers[2];
-	PostPC post_pc;
-	FFTPC fft_pc;
 	std::string scene_name;
 	LumenScene scene;
-
-	std::vector<glm::vec2> fft_arr;
 
 	clock_t start;
 	bool write_exr = false;
 	bool has_gt = false;
 	bool show_cam_stats = false;
-	const uint32_t FFT_SIZE = 2048;
-
-	Texture2D input_img_org;
-	Texture2D fft_ping_padded;
-	Texture2D fft_pong_padded;
-	Texture2D kernel_org;
-	Texture2D kernel_ping;
-	Texture2D kernel_pong;
-	VkSampler img_sampler;
-
 };

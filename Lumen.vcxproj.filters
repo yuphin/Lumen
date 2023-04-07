@@ -138,6 +138,7 @@
     <ClCompile Include="src\Framework\ImageUtils.cpp">
       <Filter>Framework</Filter>
     </ClCompile>
+    <ClCompile Include="src\RayTracer\PostFX.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\LumenPCH.h" />
@@ -279,7 +280,8 @@
     <ClInclude Include="src\RayTracer\ReSTIR.h">
       <Filter>RayTracer</Filter>
     </ClInclude>
-    <ClInclude Include="ImageUtils.h" />
+    <ClInclude Include="src\Framework\ImageUtils.h" />
+    <ClInclude Include="src\RayTracer\PostFX.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\integrators\bdpt\bdpt.rgen">
@@ -538,6 +540,7 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="src\shaders\fft\fft.comp" />
+    <None Include="src\shaders\fft\fft_general.comp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Framework">

@@ -8,7 +8,7 @@
 Texture2D::Texture2D(VulkanContext* ctx) : Texture(ctx) {}
 
 Texture2D::Texture2D(const std::string& name, VulkanContext* ctx, VkImage image, VkFormat format,
-					 VkImageUsageFlags usage_flags, VkImageAspectFlags aspect_flags, bool present)
+					 VkImageUsageFlags usage_flags, VkImageAspectFlags aspect_flags, VkExtent2D extent, bool present)
 	: Texture(ctx) {
 	img = image;
 	img_view = create_image_view(ctx->device, img, format);
@@ -16,6 +16,7 @@ Texture2D::Texture2D(const std::string& name, VulkanContext* ctx, VkImage image,
 	this->format = format;
 	this->aspect_flags = aspect_flags;
 	this->usage_flags = usage_flags;
+	this->base_extent = VkExtent3D(extent.width, extent.height);
 	if (!name.empty()) {
 		this->name = name;
 		DebugMarker::set_resource_name(ctx->device, (uint64_t)img, name.c_str(), VK_OBJECT_TYPE_IMAGE);

@@ -11,9 +11,8 @@
 layout(location = 0) in vec2 in_uv;
 layout(location = 0) out vec4 fragColor;
 layout(set = 0, binding = 0) uniform sampler2D input_img;
-layout(set = 0, binding = 1) uniform sampler2D lena;
-layout(set = 0, binding = 2) uniform sampler2D kernel;
-layout(push_constant) uniform PCPost {  PushConstantPost pc; };
+layout(set = 0, binding = 1) uniform sampler2D kernel;
+layout(push_constant) uniform PCPost_ {  PCPost pc; };
 
 vec3 aces(vec3 x) {
   const float a = 2.51;
@@ -35,16 +34,19 @@ float aces(float x) {
 
 void main() {
     // vec4 img = texture(input_img, in_uv).rgba;
-    vec4 img = ((texture(lena, in_uv).rgba));
+    vec2 uv_offset = vec2(textureSize(input_img, 0).xy - ivec2(1600, 900)) / vec2(2 * textureSize(input_img, 0).xy);
+    uv_offset.y *= -1;
+    vec4 bloom_tex = texelFetch(input_img, (textureSize(input_img, 0).xy - ivec2(1600, 900)) / 2 + ivec2(gl_FragCoord.xy), 0);
+    vec4 img = 0.0001 * bloom_tex;
 //
 ////    float abs_val = (sqrt(img.z * img.z + img.w * img.w));
 //    float abs_val = (sqrt(img.x * img.x + img.y * img.y));
 //
 //    // img = 0.00001 * abs_val * vec4(1);
-    img = abs(img);
+    // img = abs(img);
     
     
-    img.a = 1;
+    // img.a = 1;
     if(pc.enable_tonemapping == 1) {
         img = vec4(aces(img.rgb), img.a);
     }

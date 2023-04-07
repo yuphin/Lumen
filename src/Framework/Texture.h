@@ -53,7 +53,7 @@ class Texture2D : public Texture {
 	Texture2D(VulkanContext*);
 
 	Texture2D(const std::string& name, VulkanContext* ctx, VkImage image, VkFormat format, VkImageUsageFlags flags,
-			  VkImageAspectFlags aspect_flags, bool present = true);
+			  VkImageAspectFlags aspect_flags, VkExtent2D extent, bool present = true);
 	void load_from_data(VulkanContext* ctx, void* data, VkDeviceSize size, const VkImageCreateInfo& info,
 						VkSampler a_sampler, VkImageUsageFlags flags, bool generate_mipmaps = false);
 	void create_empty_texture(const char* name, VulkanContext* ctx, const TextureSettings& settings,

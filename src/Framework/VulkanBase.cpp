@@ -512,7 +512,7 @@ void VulkanBase::create_swapchain() {
 	vkGetSwapchainImagesKHR(ctx.device, ctx.swapchain, &image_cnt, images);
 	for (uint32_t i = 0; i < image_cnt; i++) {
 		swapchain_images.emplace_back("Swapchain Image #" + std::to_string(i), &ctx, images[i], surface_format.format,
-									  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_ASPECT_COLOR_BIT, true);
+									  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_ASPECT_COLOR_BIT, extent, true);
 	}
 	ctx.swapchain_extent = extent;
 
