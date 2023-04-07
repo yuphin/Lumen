@@ -1,7 +1,6 @@
 #include "LumenPCH.h"
 #include "PostFX.h"
 
-
 void PostFX::init(LumenInstance& instance) {
 	ctx = &instance.vk_ctx;
 	rg = instance.vkb.rg.get();
@@ -63,15 +62,21 @@ void PostFX::init(LumenInstance& instance) {
 
 	const int RADIX_X = (31 - std::countl_zero(fft_ping_padded.base_extent.width)) % 2 ? 2 : 4;
 	const int RADIX_Y = (31 - std::countl_zero(fft_ping_padded.base_extent.height)) % 2 ? 2 : 4;
+	const std::vector<ShaderMacro> macros_x = RADIX_X == 2
+												  ? std::vector<ShaderMacro>{{"KERNEL_GENERATION"}}
+												  : std::vector<ShaderMacro>{{"KERNEL_GENERATION"}, {"RADIX", RADIX_X}};
+	const std::vector<ShaderMacro> macros_y = RADIX_Y == 2
+												  ? std::vector<ShaderMacro>{{"KERNEL_GENERATION"}}
+												  : std::vector<ShaderMacro>{{"KERNEL_GENERATION"}, {"RADIX", RADIX_Y}};
 	rg->add_compute("FFT - Horizontal", {.shader = Shader("src/shaders/fft/fft.comp"),
-										 .macros = {{"KERNEL_GENERATION"}, {"RADIX", RADIX_X}},
+										 .macros = macros_x,
 										 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 0},
 										 .dims = {dim_y, 1, 1}})
 		.bind(kernel_ping, img_sampler)
 		.bind(kernel_pong);
 	vertical = true;
 	rg->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/fft/fft.comp"),
-									   .macros = {{"KERNEL_GENERATION"}, {"RADIX", RADIX_Y}},
+									   .macros = macros_y,
 									   .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 0},
 									   .dims = {dim_x, 1, 1}})
 		.bind(kernel_ping, img_sampler)
@@ -151,7 +156,4 @@ void PostFX::render(Texture2D& input, Texture2D& output) {
 		.bind(kernel_pong, img_sampler);
 }
 
-bool PostFX::gui() {
-	return ImGui::Checkbox("Enable ACES tonemapping", &enable_tonemapping);
-
-}
+bool PostFX::gui() { return ImGui::Checkbox("Enable ACES tonemapping", &enable_tonemapping); }

@@ -99,7 +99,7 @@ void RayTracer::init(Window* window) {
 	integrator->init();
 	post_fx.init(*instance);
 	init_resources();
-	LUMEN_INFO("Memory usage {} MB",  get_memory_usage(vk_ctx.physical_device) * 1e-6);
+	LUMEN_TRACE("Memory usage {} MB",  get_memory_usage(vk_ctx.physical_device) * 1e-6);
 }
 
 void RayTracer::init_resources() {

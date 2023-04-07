@@ -37,7 +37,7 @@ void main() {
     vec2 uv_offset = vec2(textureSize(input_img, 0).xy - ivec2(1600, 900)) / vec2(2 * textureSize(input_img, 0).xy);
     uv_offset.y *= -1;
     vec4 bloom_tex = texelFetch(input_img, (textureSize(input_img, 0).xy - ivec2(1600, 900)) / 2 + ivec2(gl_FragCoord.xy), 0);
-    vec4 img = 0.0001 * bloom_tex;
+    vec4 img = 0.00001 * bloom_tex;
 //
 ////    float abs_val = (sqrt(img.z * img.z + img.w * img.w));
 //    float abs_val = (sqrt(img.x * img.x + img.y * img.y));
