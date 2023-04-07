@@ -16,7 +16,7 @@ void PostFX::init(LumenInstance& instance) {
 	vk::check(vkCreateSampler(instance.vkb.ctx.device, &sampler_ci, nullptr, &img_sampler),
 			  "Could not create image sampler");
 	// Load the kernel
-	const char* img_name_kernel = "assets/kernels/Pupil512.exr";
+	const char* img_name_kernel = "assets/kernels/Octagonal512.exr";
 	int width, height;
 	float* data = load_exr(img_name_kernel, width, height);
 	auto img_dims = VkExtent2D{(uint32_t)width, (uint32_t)height};
@@ -47,7 +47,7 @@ void PostFX::init(LumenInstance& instance) {
 	// Copy the original kernel image to the padded texture
 	uint32_t pad_width = (kernel_org.base_extent.width + 31) / 32;
 	uint32_t pad_height = (kernel_org.base_extent.height + 31) / 32;
-	rg->add_compute("Pad Kernel", {.shader = Shader("src/shaders/fft/pad.comp"), .dims = {pad_width, pad_height, 1}})
+	rg->add_compute("Pad Kernel", {.shader = Shader("src/shaders/bloom/pad.comp"), .dims = {pad_width, pad_height, 1}})
 		.bind(kernel_org, img_sampler)
 		.bind(kernel_ping);
 
@@ -68,14 +68,14 @@ void PostFX::init(LumenInstance& instance) {
 	const std::vector<ShaderMacro> macros_y = RADIX_Y == 2
 												  ? std::vector<ShaderMacro>{{"KERNEL_GENERATION"}}
 												  : std::vector<ShaderMacro>{{"KERNEL_GENERATION"}, {"RADIX", RADIX_Y}};
-	rg->add_compute("FFT - Horizontal", {.shader = Shader("src/shaders/fft/fft.comp"),
+	rg->add_compute("FFT - Horizontal", {.shader = Shader("src/shaders/bloom/fft.comp"),
 										 .macros = macros_x,
 										 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 0},
 										 .dims = {dim_y, 1, 1}})
 		.bind(kernel_ping, img_sampler)
 		.bind(kernel_pong);
 	vertical = true;
-	rg->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/fft/fft.comp"),
+	rg->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/bloom/fft.comp"),
 									   .macros = macros_y,
 									   .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 0},
 									   .dims = {dim_x, 1, 1}})
@@ -89,7 +89,7 @@ void PostFX::render(Texture2D& input, Texture2D& output) {
 	// Copy the original image to the padded texture
 	uint32_t pad_width = (fft_ping_padded.base_extent.width + 31) / 32;
 	uint32_t pad_height = (fft_ping_padded.base_extent.height + 31) / 32;
-	rg->add_compute("Pad Image", {.shader = Shader("src/shaders/fft/pad.comp"), .dims = {pad_width, pad_height, 1}})
+	rg->add_compute("Pad Image", {.shader = Shader("src/shaders/bloom/pad.comp"), .dims = {pad_width, pad_height, 1}})
 		.bind(input, img_sampler)
 		.bind(fft_ping_padded);
 	uint32_t wg_size_x = fft_ping_padded.base_extent.width;
@@ -105,7 +105,7 @@ void PostFX::render(Texture2D& input, Texture2D& output) {
 		RADIX_X == 2 ? std::vector<ShaderMacro>{} : std::vector<ShaderMacro>{{"RADIX", RADIX_X}};
 	const std::vector<ShaderMacro> macros_y =
 		RADIX_Y == 2 ? std::vector<ShaderMacro>{} : std::vector<ShaderMacro>{{"RADIX", RADIX_Y}};
-	rg->add_compute("FFT - Horizontal", {.shader = Shader("src/shaders/fft/fft.comp"),
+	rg->add_compute("FFT - Horizontal", {.shader = Shader("src/shaders/bloom/fft.comp"),
 										 .macros = macros_x,
 										 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 0},
 										 .dims = {dim_y, 1, 1}})
@@ -113,14 +113,14 @@ void PostFX::render(Texture2D& input, Texture2D& output) {
 		.bind(fft_pong_padded)
 		.bind(kernel_pong, img_sampler);
 	vertical = true;
-	rg->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/fft/fft.comp"),
+	rg->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/bloom/fft.comp"),
 									   .macros = macros_y,
 									   .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 0},
 									   .dims = {dim_x, 1, 1}})
 		.bind(fft_ping_padded, img_sampler)
 		.bind(fft_pong_padded)
 		.bind(kernel_pong, img_sampler);
-	rg->add_compute("FFT - Vertical - Inverse", {.shader = Shader("src/shaders/fft/fft.comp"),
+	rg->add_compute("FFT - Vertical - Inverse", {.shader = Shader("src/shaders/bloom/fft.comp"),
 												 .macros = macros_y,
 												 .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 1},
 												 .dims = {dim_x, 1, 1}})
@@ -128,7 +128,7 @@ void PostFX::render(Texture2D& input, Texture2D& output) {
 		.bind(fft_pong_padded)
 		.bind(kernel_pong, img_sampler);
 	vertical = false;
-	rg->add_compute("FFT - Horizontal - Inverse", {.shader = Shader("src/shaders/fft/fft.comp"),
+	rg->add_compute("FFT - Horizontal - Inverse", {.shader = Shader("src/shaders/bloom/fft.comp"),
 												   .macros = macros_x,
 												   .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 1},
 												   .dims = {dim_y, 1, 1}})
