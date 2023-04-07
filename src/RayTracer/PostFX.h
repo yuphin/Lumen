@@ -11,6 +11,8 @@ public:
 	void init(LumenInstance& instance);
 	void render(Texture2D& input, Texture2D& output);
 	bool gui();
+	void destroy();
+
 private:
 	Texture2D kernel_ping;
 	Texture2D kernel_pong;

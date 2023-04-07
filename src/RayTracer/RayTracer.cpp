@@ -301,6 +301,7 @@ void RayTracer::cleanup() {
 			b->destroy();
 		}
 		integrator->destroy();
+		post_fx.destroy();
 		vkb.cleanup();
 	}
 }

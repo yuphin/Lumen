@@ -16,7 +16,7 @@ void PostFX::init(LumenInstance& instance) {
 	vk::check(vkCreateSampler(instance.vkb.ctx.device, &sampler_ci, nullptr, &img_sampler),
 			  "Could not create image sampler");
 	// Load the kernel
-const char* img_name_kernel = "assets/kernels/Pupil512.exr";
+	const char* img_name_kernel = "assets/kernels/Pupil512.exr";
 	int width, height;
 	float* data = load_exr(img_name_kernel, width, height);
 	auto img_dims = VkExtent2D{(uint32_t)width, (uint32_t)height};
@@ -82,6 +82,7 @@ const char* img_name_kernel = "assets/kernels/Pupil512.exr";
 		.bind(kernel_ping, img_sampler)
 		.bind(kernel_pong);
 	rg->run_and_submit(cmd);
+	kernel_org.destroy();
 }
 
 void PostFX::render(Texture2D& input, Texture2D& output) {
@@ -160,10 +161,18 @@ void PostFX::render(Texture2D& input, Texture2D& output) {
 
 bool PostFX::gui() {
 	bool updated = false;
-	updated ^= ImGui::Checkbox("Enable ACES tonemapping", &enable_tonemapping); 
+	updated ^= ImGui::Checkbox("Enable ACES tonemapping", &enable_tonemapping);
 	float exposure = log10(bloom_exposure);
 	updated ^= ImGui::SliderFloat("Bloom exposure", &exposure, -20, 0, "%.2f");
 	bloom_exposure = pow(10, exposure);
 	updated ^= ImGui::SliderFloat("Bloom amount", &bloom_amount, 0.0f, 1.0f, "%.2f");
 	return updated;
+}
+
+void PostFX::destroy() {
+	std::vector<Texture2D*> tex_list = {&kernel_ping, &kernel_pong, &fft_ping_padded, &fft_pong_padded};
+	for (auto t : tex_list) {
+		t->destroy();
+	}
+	vkDestroySampler(ctx->device, img_sampler, 0);
 }
