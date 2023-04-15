@@ -140,6 +140,7 @@
     </ClCompile>
     <ClCompile Include="src\RayTracer\PostFX.cpp" />
     <ClCompile Include="src\RayTracer\LumenUtils.cpp" />
+    <ClCompile Include="src\RayTracer\SceneConfig.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\LumenPCH.h" />
@@ -284,6 +285,7 @@
     <ClInclude Include="src\Framework\ImageUtils.h" />
     <ClInclude Include="src\RayTracer\PostFX.h" />
     <ClInclude Include="src\RayTracer\LumenUtils.h" />
+    <ClInclude Include="src\RayTracer\SceneConfig.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\integrators\bdpt\bdpt.rgen">

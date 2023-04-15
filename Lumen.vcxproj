@@ -363,6 +363,7 @@
     <ClCompile Include="src\Framework\Texture.cpp" />
     <ClCompile Include="src\RayTracer\ReSTIR.cpp" />
     <ClCompile Include="src\RayTracer\ReSTIRGI.cpp" />
+    <ClCompile Include="src\RayTracer\SceneConfig.cpp" />
     <ClCompile Include="src\RayTracer\SMLT.cpp" />
     <ClCompile Include="src\RayTracer\SPPM.cpp" />
     <ClCompile Include="src\RayTracer\VCM.cpp" />
@@ -414,6 +415,7 @@
     <ClInclude Include="src\Framework\Texture.h" />
     <ClInclude Include="src\RayTracer\ReSTIR.h" />
     <ClInclude Include="src\RayTracer\ReSTIRGI.h" />
+    <ClInclude Include="src\RayTracer\SceneConfig.h" />
     <ClInclude Include="src\RayTracer\SMLT.h" />
     <ClInclude Include="src\RayTracer\SPPM.h" />
     <ClInclude Include="src\RayTracer\VCM.h" />
