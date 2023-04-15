@@ -8,7 +8,7 @@
 // Possible solution: Make compilation with debugPrintf shaders synchronous?
 
 #define DIRTY_CHECK(x) \
-	if (!(x)) {          \
+	if (!(x)) {        \
 		return *this;  \
 	}
 
@@ -50,7 +50,11 @@ void RenderPass::register_dependencies(Buffer& buffer, VkAccessFlags dst_access_
 
 void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout) {
 	const bool has_storage_bit = (tex.usage_flags & VK_IMAGE_USAGE_STORAGE_BIT) == VK_IMAGE_USAGE_STORAGE_BIT;
-	if (!has_storage_bit && tex.layout == dst_layout) {
+	const bool eq_layouts = tex.layout == dst_layout;
+	// TODO
+	if (!has_storage_bit && eq_layouts) {
+		return;
+	} else if (eq_layouts && dst_layout == VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL) {
 		return;
 	}
 	auto img_resource = rg->img_resource_map.find(tex.img);
@@ -66,7 +70,7 @@ void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout)
 		if (opposing_pass.submitted) {
 			return;
 		}
-		if (opposing_pass.pass_idx < pass_idx) {
+		if (opposing_pass.pass_idx < pass_idx && opposing_pass.pass_idx >= rg->beginning_pass_idx) {
 			// Set current pass dependencies (Waiting pass)
 			if (wait_signals_img.find(tex.img) == wait_signals_img.end()) {
 				wait_signals_img[tex.img] = ImageSyncDescriptor{.old_layout = tex.layout,
@@ -154,7 +158,7 @@ void RenderPass::transition_resources() {
 			if (dst.buf) {
 				write_impl(*dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
 			}
-		} else { // buffer
+		} else {  // buffer
 			VkAccessFlags src_access_flags = VK_ACCESS_NONE_KHR;
 			read_impl(*src.buf, VK_ACCESS_TRANSFER_READ_BIT);
 			if (dst.buf) {
@@ -162,7 +166,6 @@ void RenderPass::transition_resources() {
 			}
 		}
 	}
-
 }
 
 static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_shaders) {
@@ -229,7 +232,7 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 							return shader;
 						},
 						shader));
-					 //shader->compile(pass);
+					// shader->compile(pass);
 					pass->rg->shader_cache[shader->name_with_macros] = *shader;
 				}
 			}
@@ -257,6 +260,7 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 						pass->rg->shader_cache[shader->name_with_macros] = *shader;
 					}
 				}
+				// shader->compile(pass);
 				pass->affected_buffer_pointers = shader->buffer_status_map;
 				process_bindings(*shader);
 			}
@@ -279,7 +283,7 @@ RenderPass& RenderGraph::add_compute(const std::string& name, const ComputePassS
 }
 
 RenderPass& RenderPass::bind(const ResourceBinding& binding) {
-	if(next_binding_idx >= bound_resources.size()) {
+	if (next_binding_idx >= bound_resources.size()) {
 		bound_resources.push_back(binding);
 		descriptor_counts.push_back(1);
 	} else {
@@ -438,7 +442,7 @@ RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<Textur
 RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 	// TODO: Extend this if check upon extending this function
 	if (dst.buf) {
-			resource_copies.push_back({ src,dst });
+		resource_copies.push_back({src, dst});
 	} else {
 		LUMEN_ERROR("Unimplemented copy operation")
 	}
@@ -447,7 +451,8 @@ RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 }
 
 void RenderPass::finalize() {
-	if (!rg->recording && !rg->reload_shaders) {
+	const bool not_recording_nor_reloading = !rg->recording && !rg->reload_shaders;
+	if (!record_override && not_recording_nor_reloading) {
 		// Handle resource transitions
 		transition_resources();
 		return;
@@ -484,10 +489,12 @@ void RenderPass::finalize() {
 						set_allocate_info.descriptorPool = pass->pipeline->tlas_descriptor_pool;
 						set_allocate_info.descriptorSetCount = 1;
 						set_allocate_info.pSetLayouts = &pass->pipeline->tlas_layout;
-						vkAllocateDescriptorSets(pass->rg->ctx->device, &set_allocate_info, &pass->pipeline->tlas_descriptor_set);
+						vkAllocateDescriptorSets(pass->rg->ctx->device, &set_allocate_info,
+												 &pass->pipeline->tlas_descriptor_set);
 					}
-					auto descriptor_write = vk::write_descriptor_set(
-						pass->pipeline->tlas_descriptor_set, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0, &pass->pipeline->tlas_info);
+					auto descriptor_write = vk::write_descriptor_set(pass->pipeline->tlas_descriptor_set,
+																	 VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0,
+																	 &pass->pipeline->tlas_info);
 					vkUpdateDescriptorSets(pass->rg->ctx->device, 1, &descriptor_write, 0, nullptr);
 				};
 				if (rg->multithreaded_pipeline_compilation) {
@@ -515,7 +522,7 @@ void RenderPass::finalize() {
 			transition_resources();
 		}
 	} else {
-		rg->pipeline_tasks.push_back({ nullptr , pass_idx});
+		rg->pipeline_tasks.push_back({nullptr, pass_idx});
 	}
 }
 
@@ -524,20 +531,17 @@ void RenderPass::write_impl(Buffer& buffer, VkAccessFlags access_flags) {
 	rg->buffer_resource_map[buffer.handle] = {pass_idx, access_flags};
 }
 
-
 void RenderPass::write_impl(Texture2D& tex) {
 	VkImageLayout target_layout = get_target_img_layout(tex, VK_ACCESS_SHADER_WRITE_BIT);
 	register_dependencies(tex, target_layout);
 	rg->img_resource_map[tex.img] = pass_idx;
 }
 
-void RenderPass::read_impl(Buffer& buffer) {
-	read_impl(buffer, VK_ACCESS_SHADER_READ_BIT);
-}
+void RenderPass::read_impl(Buffer& buffer) { read_impl(buffer, VK_ACCESS_SHADER_READ_BIT); }
 
 void RenderPass::read_impl(Buffer& buffer, VkAccessFlags access_flags) {
 	register_dependencies(buffer, access_flags);
-	rg->buffer_resource_map[buffer.handle] = {pass_idx, access_flags };
+	rg->buffer_resource_map[buffer.handle] = {pass_idx, access_flags};
 }
 
 void RenderPass::read_impl(Texture2D& tex) {
@@ -661,33 +665,31 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		switch (type) {
 			case PassType::RT: {
 				LUMEN_ASSERT(pipeline->tlas_descriptor_set, "TLAS descriptor set cannot be NULL!");
-// This doesnt work because we can't push TLAS descriptor with
-// template...
-// vkCmdPushDescriptorSetWithTemplateKHR(cmd,
-// pipeline->rt_update_template, pipeline->pipeline_layout, 0,
-// &tlas_buffer.descriptor);
-vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->pipeline_layout, 1, 1,
-	&pipeline->tlas_descriptor_set, 0, nullptr);
+				// This doesnt work because we can't push TLAS descriptor with
+				// template...
+				// vkCmdPushDescriptorSetWithTemplateKHR(cmd,
+				// pipeline->rt_update_template, pipeline->pipeline_layout, 0,
+				// &tlas_buffer.descriptor);
+				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->pipeline_layout, 1, 1,
+										&pipeline->tlas_descriptor_set, 0, nullptr);
 
-vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->handle);
+				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->handle);
 
-if (rt_settings->pass_func) {
-	rt_settings->pass_func(cmd, *this);
-}
-else {
-	auto& regions = pipeline->get_rt_regions();
-	auto& dims = rt_settings->dims;
-	vkCmdTraceRaysKHR(cmd, &regions[0], &regions[1], &regions[2], &regions[3], dims.x, dims.y, dims.z);
-}
-break;
+				if (rt_settings->pass_func) {
+					rt_settings->pass_func(cmd, *this);
+				} else {
+					auto& regions = pipeline->get_rt_regions();
+					auto& dims = rt_settings->dims;
+					vkCmdTraceRaysKHR(cmd, &regions[0], &regions[1], &regions[2], &regions[3], dims.x, dims.y, dims.z);
+				}
+				break;
 			}
 			case PassType::Compute: {
 				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->handle);
 
 				if (compute_settings->pass_func) {
 					compute_settings->pass_func(cmd, *this);
-				}
-				else {
+				} else {
 					auto& dims = compute_settings->dims;
 					vkCmdDispatch(cmd, dims.x, dims.y, dims.z);
 				}
@@ -735,12 +737,12 @@ break;
 
 				// Render
 				{
-					VkRenderingInfo render_info{ .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+					VkRenderingInfo render_info{.sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
 												.renderArea = {{0, 0}, {gfx_settings->width, gfx_settings->height}},
 												.layerCount = 1,
 												.colorAttachmentCount = (uint32_t)color_outputs.size(),
 												.pColorAttachments = rendering_attachments.data(),
-												.pDepthAttachment = depth_output ? &depth_stencil_attachment : nullptr };
+												.pDepthAttachment = depth_output ? &depth_stencil_attachment : nullptr};
 					vkCmdBeginRendering(cmd, &render_info);
 					gfx_settings->pass_func(cmd, *this);
 					vkCmdEndRendering(cmd);
@@ -777,7 +779,6 @@ break;
 		vkCmdPipelineBarrier2(cmd, &dependency_info);
 	}
 
-
 	for (const auto& [src, dst] : resource_copies) {
 		if (src.tex) {
 			if (dst.buf) {
@@ -790,11 +791,11 @@ break;
 				region.imageExtent = src.tex->base_extent;
 				VkImageLayout old_layout = src.tex->layout;
 				src.tex->transition(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-				vkCmdCopyImageToBuffer(cmd, src.tex->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-									   dst.buf->handle, 1, &region);
+				vkCmdCopyImageToBuffer(cmd, src.tex->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst.buf->handle, 1,
+									   &region);
 				src.tex->transition(cmd, old_layout);
 			}
-		} else { // buffer
+		} else {  // buffer
 			if (dst.buf) {
 				VkBufferCopy copy_region = {.size = src.buf->size};
 				vkCmdCopyBuffer(cmd, src.buf->handle, dst.buf->handle, 1, &copy_region);
@@ -841,34 +842,46 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	img_sync_resources.resize(passes.size());
 
 	// Compile shaders and process resources
-	if (recording || reload_shaders) {
+	const bool recording_or_reload = recording || reload_shaders;
+	if (!pass_idxs_with_shader_compilation_overrides.empty() || recording_or_reload) {
 		auto cmp = [](const std::pair<Shader*, RenderPass*>& a, const std::pair<Shader*, RenderPass*>& b) {
 			return a.first->name_with_macros < b.first->name_with_macros;
 		};
 		std::set<std::pair<Shader*, RenderPass*>, decltype(cmp)> unique_shaders_set;
 		std::unordered_map<RenderPass*, std::vector<Shader*>> unique_shaders;
 		std::unordered_map<RenderPass*, std::vector<Shader*>> existing_shaders;
-		
-		// Recording or reload -> The pass is active by default
-		for (auto i = beginning_pass_idx; i < ending_pass_idx; i++) {
+
+		auto process_pass = [&](uint32_t i) {
 			if (passes[i].gfx_settings) {
 				for (auto& shader : passes[i].gfx_settings->shaders) {
-					if (!unique_shaders_set.insert({ &shader, &passes[i] }).second) {
+					if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
 						existing_shaders[&passes[i]].push_back(&shader);
 					}
 				}
 			} else if (passes[i].rt_settings) {
 				for (auto& shader : passes[i].rt_settings->shaders) {
-					if (!unique_shaders_set.insert({ &shader, &passes[i] }).second) {
+					if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
 						existing_shaders[&passes[i]].push_back(&shader);
 					}
 				}
 			} else {
-				if (!unique_shaders_set.insert({ &passes[i].compute_settings->shader, &passes[i] }).second) {
+				if (!unique_shaders_set.insert({&passes[i].compute_settings->shader, &passes[i]}).second) {
 					existing_shaders[&passes[i]].push_back(&passes[i].compute_settings->shader);
 				}
 			}
+		};
+		if (recording_or_reload) {
+			// Recording or reload -> The pass is active by default
+			for (auto i = beginning_pass_idx; i < ending_pass_idx; i++) {
+				process_pass(i);
+			}
+		} else {
+			// Iterate over overridden passes
+			for (auto i : pass_idxs_with_shader_compilation_overrides) {
+				process_pass(i);
+			}
 		}
+
 		std::vector<std::future<void>> futures;
 		for (auto& [shader, rp] : unique_shaders_set) {
 			unique_shaders[rp].push_back(shader);
@@ -889,6 +902,12 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 			future.wait();
 		}
 	}
+
+	if (!pass_idxs_with_shader_compilation_overrides.empty()) {
+		std::sort(passes.begin(), passes.end(),
+				  [](const RenderPass& pass1, const RenderPass& pass2) { return pass1.pass_idx < pass2.pass_idx; });
+	}
+
 	uint32_t i = beginning_pass_idx;
 	uint32_t rem_passes = ending_pass_idx - beginning_pass_idx;
 	while (rem_passes > 0) {
@@ -914,10 +933,10 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 			passes[idx].transition_resources();
 		}
 		pipeline_tasks.clear();
-
 	}
 	i = beginning_pass_idx;
 	rem_passes = ending_pass_idx - beginning_pass_idx;
+
 	while (rem_passes > 0) {
 		if (!passes[i].active) {
 			i++;
@@ -934,6 +953,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 }
 
 void RenderGraph::reset(VkCommandBuffer cmd) {
+	pass_idxs_with_shader_compilation_overrides.clear();
 	event_pool.reset_events(ctx->device, cmd);
 	for (int i = 0; i < passes.size(); i++) {
 		passes[i].set_signals_buffer.clear();
@@ -954,19 +974,20 @@ void RenderGraph::reset(VkCommandBuffer cmd) {
 			passes[i].explicit_tex_reads.clear();
 			passes[i].explicit_tex_writes.clear();
 		}
+		auto& pass = passes[i];
+		if (passes[i].record_override || recording) {
+			pipeline_cache[passes[i].name].pass_idxs.push_back(passes[i].pass_idx);
+			pipeline_cache[passes[i].name].offset_idx = 0;
+			passes[i].record_override = false;
+		}
 		passes[i].submitted = false;
 	}
-	if (recording) {
-		for (auto& pass : passes) {
-			pipeline_cache[pass.name].pass_idxs.push_back(pass.pass_idx);
-			pipeline_cache[pass.name].offset_idx = 0;
-		}
-		recording = false;
-	} else {
+	if (!recording) {
 		for (auto& [k, v] : pipeline_cache) {
 			v.offset_idx = 0;
 		}
 	}
+	recording = false;
 	if (pipeline_tasks.size()) {
 		pipeline_tasks.clear();
 	}

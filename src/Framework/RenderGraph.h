@@ -67,6 +67,7 @@ class RenderGraph {
 	std::unordered_map<std::string, PipelineStorage> pipeline_cache;
 	std::vector<std::pair<std::function<void(RenderPass*)>, uint32_t>> pipeline_tasks;
 	std::vector<std::function<void(RenderPass*)>> shader_tasks;
+	std::vector<uint32_t> pass_idxs_with_shader_compilation_overrides;
 	// Sync related data
 	std::vector<BufferSyncResources> buffer_sync_resources;
 	std::vector<ImageSyncResources> img_sync_resources;
@@ -157,13 +158,14 @@ class RenderPass {
 	std::vector<ResourceBinding> bound_resources;
 
 	RenderGraph* rg;
-	const std::vector<ShaderMacro> macro_defines;
+	std::vector<ShaderMacro> macro_defines;
 	std::unordered_map<Buffer*, BufferStatus> affected_buffer_pointers;
 	std::unique_ptr<GraphicsPassSettings> gfx_settings = nullptr;
 	std::unique_ptr<RTPassSettings> rt_settings = nullptr;
 	std::unique_ptr<ComputePassSettings> compute_settings = nullptr;
 	PassType type;
 	bool active = true;
+	uint32_t pass_idx;
 
    private:
 	// When the automatic inference isn't used
@@ -186,12 +188,12 @@ class RenderPass {
 
 	std::string name;
 	Pipeline* pipeline;
-	uint32_t pass_idx;
 	int next_binding_idx = 0;
 	std::vector<uint32_t> descriptor_counts;
 	void* push_constant_data = nullptr;
 	bool is_pipeline_cached;
 	bool submitted = false;
+	bool record_override = true;
 	/*
 		Note:
 		The assumption is that a SyncDescriptor is unique to a pass (either via
@@ -223,13 +225,11 @@ class RenderPass {
 template <typename Settings>
 inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Settings& settings) {
 	Pipeline* pipeline;
-	uint32_t pass_idx = (uint32_t)passes.size();
+	uint32_t pass_idx = ending_pass_idx++;
 	bool cached = false;
 
 	std::string name_with_macros = name;
 	std::string macro_string;
-
-	ending_pass_idx++;
 
 	if (!settings.macros.empty()) {
 		macro_string += '(';
@@ -251,7 +251,8 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	if (pipeline_cache.find(name_with_macros) != pipeline_cache.end()) {
 		auto& storage = pipeline_cache[name_with_macros];
 		if (!recording && storage.pass_idxs.size()) {
-			auto idx = storage.pass_idxs[storage.offset_idx];
+			uint32_t offset_idx = storage.offset_idx;
+			auto idx = storage.pass_idxs[offset_idx];
 			if constexpr (std::is_same_v<GraphicsPassSettings, Settings>) {
 				auto& curr_pass = passes[idx];
 				curr_pass.gfx_settings->color_outputs = settings.color_outputs;
@@ -271,11 +272,21 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 				beginning_pass_idx = idx;
 				ending_pass_idx = idx + 1;
 			}
+
+			// Pass was inserted prior, shift the subsequent existing pass indices
+			if (!pass_idxs_with_shader_compilation_overrides.empty()) {
+				passes[idx].pass_idx += pass_idxs_with_shader_compilation_overrides.size();
+				storage.pass_idxs[offset_idx] = passes[idx].pass_idx;
+			}
+
 			return passes[idx];
 		}
 		pipeline = pipeline_cache[name_with_macros].pipeline.get();
 		cached = true;
 	} else {
+		if (!recording && !reload_shaders) {
+			pass_idxs_with_shader_compilation_overrides.push_back(passes.size());
+		}
 		pipeline_cache[name_with_macros] = {std::make_unique<Pipeline>(ctx, name_with_macros)};
 		pipeline = pipeline_cache[name_with_macros].pipeline.get();
 	}
@@ -287,6 +298,7 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	} else {
 		type = PassType::RT;
 	}
+
 	passes.emplace_back(type, pipeline, name_with_macros, this, pass_idx, settings, macro_string, cached);
 	return passes.back();
 }
