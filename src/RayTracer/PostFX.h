@@ -5,6 +5,7 @@
 #include "Framework/LumenInstance.h"
 #include "Framework/ImageUtils.h"
 #include "Framework/VkUtils.h"
+#include "shaders/commons.h"
 
 class PostFX {
 public:

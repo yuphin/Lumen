@@ -26,6 +26,7 @@ class RayTracer : public LumenInstance {
 
    private:
 
+	void assign_integrator(IntegratorType type);
 	void init_resources();
 	void parse_args(int argc, char* argv[]);
 	float draw_frame();

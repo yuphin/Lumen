@@ -5,6 +5,14 @@
       <Configuration>Debug</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="DebWithReleaseInfo|Win32">
+      <Configuration>DebWithReleaseInfo</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="DebWithReleaseInfo|x64">
+      <Configuration>DebWithReleaseInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
@@ -46,6 +54,13 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
@@ -53,6 +68,13 @@
     <CharacterSet>NotSet</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
@@ -76,10 +98,16 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -98,7 +126,18 @@
     <OutDir>$(SolutionDir)bin\$(Platform)$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)bin\intdir\misc\$(Platform)$(Configuration)\</IntDir>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(SolutionDir)bin\$(Platform)$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)bin\intdir\misc\$(Platform)$(Configuration)\</IntDir>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(SolutionDir)bin\$(Platform)$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)bin\intdir\misc\$(Platform)$(Configuration)\</IntDir>
+    <IncludePath>$(IncludePath)</IncludePath>
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'">
     <OutDir>$(SolutionDir)bin\$(Platform)$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)bin\intdir\misc\$(Platform)$(Configuration)\</IntDir>
     <IncludePath>$(IncludePath)</IncludePath>
@@ -154,7 +193,49 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_SILENCE_CXX20_CISO646_REMOVED_WARNING;TINYEXR_USE_MINIZ;TINYEXR_USE_MINIZ</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(SolutionDir)libs\glm;$(SolutionDir)libs\glfw\include;$(VULKAN_SDK)\Include;$(SolutionDir)libs\spdlog\include;$(SolutionDir)src;$(SolutionDir)libs\stb_image;$(SolutionDir)libs\gli;$(SolutionDir)libs\tinygltf;$(SolutionDir)libs\imgui;$(SolutionDir)libs\nvvk;$(SolutionDir)libs;C:\VulkanSDK\1.3.216.0\Include</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>LumenPCH.h</PrecompiledHeaderFile>
+      <DisableSpecificWarnings>
+      </DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>glfw3.lib;kernel32.lib;shell32.lib;gdi32.lib;spirv-cross-core.lib;spirv-cross-glsl.lib;shaderc_shared.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)libs\glfw\src\Release;$(VULKAN_SDK)\Lib</AdditionalLibraryDirectories>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -190,63 +271,76 @@
     <ClCompile Include="libs\imgui\imgui_impl_vulkan.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="libs\miniz.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\Framework\EventPool.cpp" />
     <ClCompile Include="libs\glslc\file_includer.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="libs\libshaderc_util\file_finder.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="libs\libshaderc_util\io_shaderc.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\Framework\RenderGraph.cpp" />
     <ClCompile Include="libs\imgui\imgui.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="libs\imgui\imgui_demo.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="libs\imgui\imgui_draw.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="libs\imgui\imgui_impl_glfw.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="libs\imgui\imgui_tables.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="libs\imgui\imgui_widgets.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="libs\mitsuba_parser\tinyparser-mitsuba.cpp" />
     <ClCompile Include="libs\tinyxml2\tinyxml2.cpp" />
     <ClCompile Include="src\Framework\MitsubaParser.cpp" />
     <ClCompile Include="src\RayTracer\BDPT.cpp" />
     <ClCompile Include="src\RayTracer\DDGI.cpp" />
+    <ClCompile Include="src\RayTracer\LumenUtils.cpp" />
     <ClCompile Include="src\RayTracer\PostFX.cpp" />
     <ClCompile Include="src\RayTracer\PSSMLT.cpp" />
     <ClCompile Include="src\RayTracer\RayTracer.cpp" />
     <ClCompile Include="src\RayTracer\Path.cpp" />
-    <ClCompile Include="src\Framework\LumenScene.cpp" />
+    <ClCompile Include="src\RayTracer\LumenScene.cpp" />
     <ClCompile Include="src\Framework\SBTWrapper.cpp" />
     <ClCompile Include="src\Framework\GltfScene.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\RayTracer\Integrator.cpp" />
     <ClCompile Include="src\Framework\LumenInstance.cpp" />
@@ -260,6 +354,7 @@
     <ClCompile Include="src\LumenPCH.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DebWithReleaseInfo|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Framework\VulkanBase.cpp" />
@@ -292,11 +387,12 @@
     <ClInclude Include="src\Framework\RenderGraphTypes.h" />
     <ClInclude Include="src\RayTracer\BDPT.h" />
     <ClInclude Include="src\RayTracer\DDGI.h" />
+    <ClInclude Include="src\RayTracer\LumenUtils.h" />
     <ClInclude Include="src\RayTracer\PostFX.h" />
     <ClInclude Include="src\RayTracer\PSSMLT.h" />
     <ClInclude Include="src\RayTracer\RayTracer.h" />
     <ClInclude Include="src\RayTracer\Path.h" />
-    <ClInclude Include="src\Framework\LumenScene.h" />
+    <ClInclude Include="src\RayTracer\LumenScene.h" />
     <ClInclude Include="src\Framework\SBTWrapper.h" />
     <ClInclude Include="src\Framework\GltfScene.hpp" />
     <ClInclude Include="src\RayTracer\Integrator.h" />

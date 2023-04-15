@@ -1,7 +1,6 @@
 #pragma once
 #include "LumenPCH.h"
 #include "gltfscene.hpp"
-#include "LumenScene.h"
 #include "Buffer.h"
 #include "Pipeline.h"
 uint32_t find_memory_type(VkPhysicalDevice* physical_device, uint32_t type_filter, VkMemoryPropertyFlags props);
@@ -14,7 +13,6 @@ VkImageView create_image_view(VkDevice device, const VkImage& img, VkFormat form
 							  VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT);
 
 BlasInput to_vk_geometry(GltfPrimMesh& prim, VkDeviceAddress vertex_address, VkDeviceAddress index_address);
-BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertex_address, VkDeviceAddress index_address);
 
 inline bool has_extension(std::string_view filename, std::string_view ext) { return filename.ends_with(ext); }
 

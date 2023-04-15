@@ -30,7 +30,7 @@
     <ClCompile Include="src\Framework\MitsubaParser.cpp">
       <Filter>Framework</Filter>
     </ClCompile>
-    <ClCompile Include="src\Framework\LumenScene.cpp">
+    <ClCompile Include="src\RayTracer\LumenScene.cpp">
       <Filter>Framework</Filter>
     </ClCompile>
     <ClCompile Include="src\Framework\LumenInstance.cpp">
@@ -139,6 +139,7 @@
       <Filter>Framework</Filter>
     </ClCompile>
     <ClCompile Include="src\RayTracer\PostFX.cpp" />
+    <ClCompile Include="src\RayTracer\LumenUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\LumenPCH.h" />
@@ -169,7 +170,7 @@
     <ClInclude Include="src\Framework\MitsubaParser.h">
       <Filter>Framework</Filter>
     </ClInclude>
-    <ClInclude Include="src\Framework\LumenScene.h">
+    <ClInclude Include="src\RayTracer\LumenScene.h">
       <Filter>Framework</Filter>
     </ClInclude>
     <ClInclude Include="src\Framework\LumenInstance.h">
@@ -282,6 +283,7 @@
     </ClInclude>
     <ClInclude Include="src\Framework\ImageUtils.h" />
     <ClInclude Include="src\RayTracer\PostFX.h" />
+    <ClInclude Include="src\RayTracer\LumenUtils.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\integrators\bdpt\bdpt.rgen">
