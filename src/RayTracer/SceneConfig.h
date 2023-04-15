@@ -1,6 +1,8 @@
 #pragma once
 #include "shaders/commons.h"
 
+#define CAST_CONFIG(ptr, cast) ((cast*)ptr)
+
 struct CameraSettings {
 	float fov;
 	glm::vec3 pos = glm::vec3(0);
@@ -10,67 +12,68 @@ struct CameraSettings {
 
 enum class IntegratorType { Path, BDPT, SPPM, VCM, PSSMLT, SMLT, VCMMLT, ReSTIR, ReSTIRGI, DDGI };
 
-struct BaseConfig {
+struct SceneConfig {
 	int path_length = 6;
 	glm::vec3 sky_col = glm::vec3(0);
 	const std::string integrator_name = "Path";
 	IntegratorType integrator_type = IntegratorType::Path;
+	CameraSettings cam_settings;
 
-	BaseConfig() = default;
-	BaseConfig(const std::string& integrator_name, IntegratorType type)
+	SceneConfig() = default;
+	SceneConfig(const std::string& integrator_name, IntegratorType type)
 		: integrator_name(integrator_name), integrator_type(type) {}
 };
 
-struct PathTracerConfig : BaseConfig {};
+struct PathConfig : SceneConfig {};
 
-struct BDPTConfig : BaseConfig {
-	BDPTConfig() : BaseConfig("BDPT", IntegratorType::BDPT) {}
+struct BDPTConfig : SceneConfig {
+	BDPTConfig() : SceneConfig("BDPT", IntegratorType::BDPT) {}
 };
 
-struct SPPMConfig : BaseConfig {
+struct SPPMConfig : SceneConfig {
 	float base_radius = 0.03f;
-	SPPMConfig() : BaseConfig("SPPM", IntegratorType::SPPM) {}
+	SPPMConfig() : SceneConfig("SPPM", IntegratorType::SPPM) {}
 };
 
-struct VCMConfig : BaseConfig {
+struct VCMConfig : SceneConfig {
 	float radius_factor = 0.025f;
 	bool enable_vm = false;
-	VCMConfig() : BaseConfig("VCM", IntegratorType::VCM) {}
+	VCMConfig() : SceneConfig("VCM", IntegratorType::VCM) {}
 };
 
-struct PSSMLTConfig : BaseConfig {
+struct PSSMLTConfig : SceneConfig {
 	float mutations_per_pixel = 100.0f;
 	int num_mlt_threads = 360000;
 	int num_bootstrap_samples = 360000;
-	PSSMLTConfig() : BaseConfig("PSSMLT", IntegratorType::PSSMLT) {}
+	PSSMLTConfig() : SceneConfig("PSSMLT", IntegratorType::PSSMLT) {}
 };
 
-struct SMLTConfig : BaseConfig {
+struct SMLTConfig : SceneConfig {
 	float mutations_per_pixel = 100.0f;
 	int num_mlt_threads = 360000;
 	int num_bootstrap_samples = 360000;
-	SMLTConfig() : BaseConfig("SMLT", IntegratorType::SMLT) {}
+	SMLTConfig() : SceneConfig("SMLT", IntegratorType::SMLT) {}
 };
 
-struct VCMMLTConfig : BaseConfig {
+struct VCMMLTConfig : SceneConfig {
 	float mutations_per_pixel = 100.0f;
 	int num_mlt_threads = 360000;
 	int num_bootstrap_samples = 360000;
-	float base_radius = 0.03f;
+	float radius_factor = 0.025f;
 	bool enable_vm = false;
 	bool alternate = true;
 	bool light_first = false;
-	VCMMLTConfig() : BaseConfig("VCMMLT", IntegratorType::VCMMLT) {}
+	VCMMLTConfig() : SceneConfig("VCMMLT", IntegratorType::VCMMLT) {}
 };
 
-struct ReSTIRConfig : BaseConfig {
-	ReSTIRConfig() : BaseConfig("ReSTIR", IntegratorType::ReSTIR) {}
+struct ReSTIRConfig : SceneConfig {
+	ReSTIRConfig() : SceneConfig("ReSTIR", IntegratorType::ReSTIR) {}
 };
 
-struct ReSTIRGIConfig : BaseConfig {
-	ReSTIRGIConfig() : BaseConfig("ReSTIR GI", IntegratorType::ReSTIRGI) {}
+struct ReSTIRGIConfig : SceneConfig {
+	ReSTIRGIConfig() : SceneConfig("ReSTIR GI", IntegratorType::ReSTIRGI) {}
 };
 
-struct DDGIConfig : BaseConfig {
-	DDGIConfig() : BaseConfig("DDGI", IntegratorType::DDGI) {}
+struct DDGIConfig : SceneConfig {
+	DDGIConfig() : SceneConfig("DDGI", IntegratorType::DDGI) {}
 };

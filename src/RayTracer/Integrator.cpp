@@ -11,14 +11,14 @@ void Integrator::init() {
 	LumenInstance* instance = this->instance;
 	Window* window = instance->window;
 
-	if (lumen_scene->config.cam_settings.pos != vec3(0)) {
+	if (lumen_scene->config->cam_settings.pos != vec3(0)) {
 		camera = std::unique_ptr<PerspectiveCamera>(new PerspectiveCamera(
-			lumen_scene->config.cam_settings.fov, 0.01f, 1000.0f, (float)instance->width / instance->height,
-			lumen_scene->config.cam_settings.dir, lumen_scene->config.cam_settings.pos));
+			lumen_scene->config->cam_settings.fov, 0.01f, 1000.0f, (float)instance->width / instance->height,
+			lumen_scene->config->cam_settings.dir, lumen_scene->config->cam_settings.pos));
 	} else {
 		// Assume the camera matrix is given
 		camera = std::unique_ptr<PerspectiveCamera>(
-			new PerspectiveCamera(lumen_scene->config.cam_settings.fov, lumen_scene->config.cam_settings.cam_matrix,
+			new PerspectiveCamera(lumen_scene->config->cam_settings.fov, lumen_scene->config->cam_settings.cam_matrix,
 								  0.01f, 1000.0f, (float)instance->width / instance->height));
 	}
 
@@ -165,8 +165,8 @@ void Integrator::init() {
 }
 
 bool Integrator::gui() {
-	ImGui::Text("Path length: %d", lumen_scene->config.path_length);
-	ImGui::Text("Integrator: %s", lumen_scene->config.integrator_name.c_str());
+	ImGui::Text("Path length: %d", lumen_scene->config->path_length);
+	ImGui::Text("Integrator: %s", lumen_scene->config->integrator_name.c_str());
 	return false;
 }
 

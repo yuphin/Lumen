@@ -8,14 +8,14 @@ void BDPT::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height * (lumen_scene->config.path_length + 1) * sizeof(PathVertex));
+		instance->width * instance->height * (lumen_scene->config->path_length + 1) * sizeof(PathVertex));
 
 	camera_path_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height * (lumen_scene->config.path_length + 1) * sizeof(PathVertex));
+		instance->width * instance->height * (lumen_scene->config->path_length + 1) * sizeof(PathVertex));
 
 	color_storage_buffer.create(
 		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -52,8 +52,8 @@ void BDPT::render() {
 	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = (int)lights.size();
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = lumen_scene->config.path_length;
-	pc_ray.sky_col = lumen_scene->config.sky_col;
+	pc_ray.max_depth = lumen_scene->config->path_length;
+	pc_ray.sky_col = lumen_scene->config->sky_col;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
 	instance->vkb.rg

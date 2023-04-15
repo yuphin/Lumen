@@ -62,7 +62,7 @@ void RayTracer::init(Window* window) {
 	// so this is turned off and pipeline barriers are used instead
 	vkb.rg->settings.use_events = true;
 
-	switch (scene.config.integrator_type) {
+	switch (scene.config->integrator_type) {
 		case IntegratorType::Path:
 			integrator = std::make_unique<Path>(this, &scene);
 			break;

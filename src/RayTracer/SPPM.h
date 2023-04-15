@@ -2,7 +2,8 @@
 #include "Integrator.h"
 class SPPM : public Integrator {
    public:
-	SPPM(LumenInstance* scene, LumenScene* lumen_scene) : Integrator(scene, lumen_scene) {}
+	SPPM(LumenInstance* scene, LumenScene* lumen_scene)
+		: Integrator(scene, lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), SPPMConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -21,4 +22,6 @@ class SPPM : public Integrator {
 	Buffer counter_buffer;
 	Buffer hash_buffer;
 	Buffer tmp_col_buffer;
+
+	SPPMConfig* config;
 };

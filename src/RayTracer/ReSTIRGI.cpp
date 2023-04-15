@@ -74,8 +74,8 @@ void ReSTIRGI::render() {
 	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = (int)lights.size();
 	pc_ray.random_num = rand() % UINT_MAX;
-	pc_ray.max_depth = lumen_scene->config.path_length;
-	pc_ray.sky_col = lumen_scene->config.sky_col;
+	pc_ray.max_depth = config->path_length;
+	pc_ray.sky_col = config->sky_col;
 	pc_ray.do_spatiotemporal = do_spatiotemporal;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;

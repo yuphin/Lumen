@@ -2,7 +2,8 @@
 #include "Integrator.h"
 class VCM : public Integrator {
    public:
-	VCM(LumenInstance* scene, LumenScene* lumen_scene) : Integrator(scene, lumen_scene) {}
+	VCM(LumenInstance* scene, LumenScene* lumen_scene)
+		: Integrator(scene, lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), VCMConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -26,4 +27,6 @@ class VCM : public Integrator {
 	Buffer avg_buffer;
 	bool do_spatiotemporal = false;
 	uint32_t total_frame_cnt = 0;
+
+	VCMConfig* config;
 };

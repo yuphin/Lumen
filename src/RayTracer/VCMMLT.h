@@ -2,7 +2,8 @@
 #include "Integrator.h"
 class VCMMLT : public Integrator {
    public:
-	VCMMLT(LumenInstance* scene, LumenScene* lumen_scene) : Integrator(scene, lumen_scene) {}
+	VCMMLT(LumenInstance* scene, LumenScene* lumen_scene)
+		: Integrator(scene, lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), VCMMLTConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool gui() override;
@@ -38,4 +39,6 @@ class VCMMLT : public Integrator {
 	int mutation_count;
 	int light_path_rand_count;
 	int sample_cnt = 0;
+
+	VCMMLTConfig* config;
 };

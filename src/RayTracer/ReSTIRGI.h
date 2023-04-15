@@ -2,7 +2,8 @@
 #include "Integrator.h"
 class ReSTIRGI : public Integrator {
    public:
-	ReSTIRGI(LumenInstance* scene, LumenScene* lumen_scene) : Integrator(scene, lumen_scene) {}
+	ReSTIRGI(LumenInstance* scene, LumenScene* lumen_scene)
+		: Integrator(scene, lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), ReSTIRGIConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -16,4 +17,6 @@ class ReSTIRGI : public Integrator {
 	Buffer tmp_col_buffer;
 	PushConstantRay pc_ray{};
 	bool do_spatiotemporal = false;
+
+	ReSTIRGIConfig* config;
 };

@@ -19,7 +19,7 @@ void VCM::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		instance->width * instance->height * (lumen_scene->config.path_length + 1) * sizeof(VCMVertex));
+		instance->width * instance->height * (config->path_length + 1) * sizeof(VCMVertex));
 
 	light_path_cnt_buffer.create("Light Path Count", &instance->vkb.ctx,
 								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
@@ -123,15 +123,15 @@ void VCM::render() {
 	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = lumen_scene->config.path_length;
-	pc_ray.sky_col = lumen_scene->config.sky_col;
+	pc_ray.max_depth = config->path_length;
+	pc_ray.sky_col = config->sky_col;
 	// VCM related constants
-	pc_ray.radius = lumen_scene->m_dimensions.radius * lumen_scene->config.radius_factor / 100.f;
+	pc_ray.radius = lumen_scene->m_dimensions.radius * config->radius_factor / 100.f;
 	pc_ray.radius /= (float)pow((double)pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
 	pc_ray.min_bounds = lumen_scene->m_dimensions.min;
 	pc_ray.max_bounds = lumen_scene->m_dimensions.max;
 	pc_ray.ppm_base_radius = ppm_base_radius;
-	pc_ray.use_vm = lumen_scene->config.enable_vm;
+	pc_ray.use_vm = config->enable_vm;
 	pc_ray.use_vc = use_vc;
 	pc_ray.do_spatiotemporal = do_spatiotemporal;
 	pc_ray.random_num = rand() % UINT_MAX;
@@ -154,7 +154,7 @@ void VCM::render() {
 						   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 			.push_constants(&pc_ray)
 			.bind(scene_desc_buffer)
-			.zero(photon_buffer, lumen_scene->config.enable_vm);
+			.zero(photon_buffer, config->enable_vm);
 
 	if (!do_spatiotemporal) {
 		prepare_pass.zero({light_samples_buffer, should_resample_buffer});

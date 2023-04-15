@@ -3,31 +3,7 @@
 #include <tiny_obj_loader.h>
 #include "shaders/commons.h"
 #include "Framework/MitsubaParser.h"
-
-struct CameraSettings {
-	float fov;
-	glm::vec3 pos = vec3(0);
-	glm::vec3 dir = vec3(0);
-	glm::mat4 cam_matrix = glm::mat4();
-};
-
-enum class IntegratorType { Path, BDPT, SPPM, VCM, PSSMLT, SMLT, VCMMLT, ReSTIR, ReSTIRGI, DDGI };
-
-struct SceneConfig {
-	IntegratorType integrator_type = IntegratorType::Path;
-	int path_length = 6;
-	vec3 sky_col = vec3(0, 0, 0);
-	CameraSettings cam_settings;
-	float base_radius = 0.03f;
-	float radius_factor = 0.025f;
-	float mutations_per_pixel = 100.0f;
-	int num_bootstrap_samples = 360000;
-	int num_mlt_threads = 360000;
-	bool enable_vm = false;
-	bool light_first = false;
-	bool alternate = true;
-	std::string integrator_name = "";
-};
+#include "SceneConfig.h"
 
 struct LumenPrimMesh {
 	std::string name;
@@ -49,6 +25,7 @@ struct LumenLight {
 	uint32_t light_flags;
 	float world_radius;
 };
+
 class LumenScene {
    public:
 	void load_scene(const std::string& path);
@@ -71,7 +48,7 @@ class LumenScene {
 		glm::vec3 center{0.f};
 		float radius{0};
 	} m_dimensions;
-	SceneConfig config;
+	std::unique_ptr<SceneConfig> config;
 
    private:
 	void compute_scene_dimensions();
