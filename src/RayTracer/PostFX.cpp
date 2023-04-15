@@ -87,56 +87,64 @@ void PostFX::init(LumenInstance& instance) {
 
 void PostFX::render(Texture2D& input, Texture2D& output) {
 	// Copy the original image to the padded texture
-	uint32_t pad_width = (fft_ping_padded.base_extent.width + 31) / 32;
-	uint32_t pad_height = (fft_ping_padded.base_extent.height + 31) / 32;
-	rg->add_compute("Pad Image", {.shader = Shader("src/shaders/bloom/pad.comp"), .dims = {pad_width, pad_height, 1}})
-		.bind(input, img_sampler)
-		.bind(fft_ping_padded);
-	uint32_t wg_size_x = fft_ping_padded.base_extent.width;
-	uint32_t wg_size_y = fft_ping_padded.base_extent.height;
-	auto dim_y =
-		(uint32_t)(fft_ping_padded.base_extent.width * fft_ping_padded.base_extent.height + wg_size_x - 1) / wg_size_x;
-	auto dim_x =
-		(uint32_t)(fft_ping_padded.base_extent.width * fft_ping_padded.base_extent.height + wg_size_y - 1) / wg_size_y;
-	bool vertical = false;
-	const int RADIX_X = (31 - std::countl_zero(fft_ping_padded.base_extent.width)) % 2 ? 2 : 4;
-	const int RADIX_Y = (31 - std::countl_zero(fft_ping_padded.base_extent.height)) % 2 ? 2 : 4;
-	const std::vector<ShaderMacro> macros_x =
-		RADIX_X == 2 ? std::vector<ShaderMacro>{} : std::vector<ShaderMacro>{{"RADIX", RADIX_X}};
-	const std::vector<ShaderMacro> macros_y =
-		RADIX_Y == 2 ? std::vector<ShaderMacro>{} : std::vector<ShaderMacro>{{"RADIX", RADIX_Y}};
-	rg->add_compute("FFT - Horizontal", {.shader = Shader("src/shaders/bloom/fft.comp"),
-										 .macros = macros_x,
-										 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 0},
-										 .dims = {dim_y, 1, 1}})
-		.bind(fft_ping_padded, img_sampler)
-		.bind(fft_pong_padded)
-		.bind(kernel_pong, img_sampler);
-	vertical = true;
-	rg->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/bloom/fft.comp"),
-									   .macros = macros_y,
-									   .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 0},
-									   .dims = {dim_x, 1, 1}})
-		.bind(fft_ping_padded, img_sampler)
-		.bind(fft_pong_padded)
-		.bind(kernel_pong, img_sampler);
-	rg->add_compute("FFT - Vertical - Inverse", {.shader = Shader("src/shaders/bloom/fft.comp"),
-												 .macros = macros_y,
-												 .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 1},
-												 .dims = {dim_x, 1, 1}})
-		.bind(fft_ping_padded, img_sampler)
-		.bind(fft_pong_padded)
-		.bind(kernel_pong, img_sampler);
-	vertical = false;
-	rg->add_compute("FFT - Horizontal - Inverse", {.shader = Shader("src/shaders/bloom/fft.comp"),
-												   .macros = macros_x,
-												   .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 1},
-												   .dims = {dim_y, 1, 1}})
-		.bind(fft_ping_padded, img_sampler)
-		.bind(fft_pong_padded)
-		.bind(kernel_pong, img_sampler);
+	if (enable_bloom) {
+		uint32_t pad_width = (fft_ping_padded.base_extent.width + 31) / 32;
+		uint32_t pad_height = (fft_ping_padded.base_extent.height + 31) / 32;
+		rg->add_compute("Pad Image",
+						{.shader = Shader("src/shaders/bloom/pad.comp"), .dims = {pad_width, pad_height, 1}})
+			.bind(input, img_sampler)
+			.bind(fft_ping_padded);
+		uint32_t wg_size_x = fft_ping_padded.base_extent.width;
+		uint32_t wg_size_y = fft_ping_padded.base_extent.height;
+		auto dim_y =
+			(uint32_t)(fft_ping_padded.base_extent.width * fft_ping_padded.base_extent.height + wg_size_x - 1) /
+			wg_size_x;
+		auto dim_x =
+			(uint32_t)(fft_ping_padded.base_extent.width * fft_ping_padded.base_extent.height + wg_size_y - 1) /
+			wg_size_y;
+		bool vertical = false;
+		const int RADIX_X = (31 - std::countl_zero(fft_ping_padded.base_extent.width)) % 2 ? 2 : 4;
+		const int RADIX_Y = (31 - std::countl_zero(fft_ping_padded.base_extent.height)) % 2 ? 2 : 4;
+		const std::vector<ShaderMacro> macros_x =
+			RADIX_X == 2 ? std::vector<ShaderMacro>{} : std::vector<ShaderMacro>{{"RADIX", RADIX_X}};
+		const std::vector<ShaderMacro> macros_y =
+			RADIX_Y == 2 ? std::vector<ShaderMacro>{} : std::vector<ShaderMacro>{{"RADIX", RADIX_Y}};
+		rg->add_compute("FFT - Horizontal", {.shader = Shader("src/shaders/bloom/fft.comp"),
+											 .macros = macros_x,
+											 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 0},
+											 .dims = {dim_y, 1, 1}})
+			.bind(fft_ping_padded, img_sampler)
+			.bind(fft_pong_padded)
+			.bind(kernel_pong, img_sampler);
+		vertical = true;
+		rg->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/bloom/fft.comp"),
+										   .macros = macros_y,
+										   .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 0},
+										   .dims = {dim_x, 1, 1}})
+			.bind(fft_ping_padded, img_sampler)
+			.bind(fft_pong_padded)
+			.bind(kernel_pong, img_sampler);
+		rg->add_compute("FFT - Vertical - Inverse",
+						{.shader = Shader("src/shaders/bloom/fft.comp"),
+						 .macros = macros_y,
+						 .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 1},
+						 .dims = {dim_x, 1, 1}})
+			.bind(fft_ping_padded, img_sampler)
+			.bind(fft_pong_padded)
+			.bind(kernel_pong, img_sampler);
+		vertical = false;
+		rg->add_compute("FFT - Horizontal - Inverse",
+						{.shader = Shader("src/shaders/bloom/fft.comp"),
+						 .macros = macros_x,
+						 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 1},
+						 .dims = {dim_y, 1, 1}})
+			.bind(fft_ping_padded, img_sampler)
+			.bind(fft_pong_padded)
+			.bind(kernel_pong, img_sampler);
+	}
 
 	pc_post_settings.enable_tonemapping = enable_tonemapping;
+	pc_post_settings.enable_bloom = enable_bloom;
 	pc_post_settings.bloom_amount = bloom_amount;
 	pc_post_settings.bloom_exposure = bloom_exposure;
 
@@ -162,10 +170,14 @@ void PostFX::render(Texture2D& input, Texture2D& output) {
 bool PostFX::gui() {
 	bool updated = false;
 	ImGui::Checkbox("Enable ACES tonemapping", &enable_tonemapping);
+	ImGui::Checkbox("Enable bloom", &enable_bloom);
 	float exposure = log10(bloom_exposure);
 	ImGui::SliderFloat("Bloom exposure", &exposure, -20, 0, "%.2f");
 	bloom_exposure = pow(10, exposure);
 	ImGui::SliderFloat("Bloom amount", &bloom_amount, 0.0f, 1.0f, "%.2f");
+	if (bloom_amount == 0.0f) {
+		enable_bloom = false;
+	}
 	return updated;
 }
 
