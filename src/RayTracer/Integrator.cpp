@@ -24,6 +24,9 @@ void Integrator::init() {
 
 	Camera* cam_ptr = camera.get();
 	instance->window->add_mouse_click_callback([cam_ptr, this, window](MouseAction button, KeyAction action) {
+		if (ImGui::GetIO().WantCaptureMouse) {
+			return;
+		}
 		if (updated && window->is_mouse_up(MouseAction::LEFT)) {
 			updated = true;
 		}
@@ -32,6 +35,9 @@ void Integrator::init() {
 		}
 	});
 	instance->window->add_mouse_move_callback([window, cam_ptr, this](double delta_x, double delta_y) {
+		if (ImGui::GetIO().WantCaptureMouse) {
+			return;
+		}
 		if (window->is_mouse_held(MouseAction::LEFT)) {
 			cam_ptr->rotate(0.05f * (float)delta_y, -0.05f * (float)delta_x, 0.0f);
 			// pc_ray.frame_num = -1;
