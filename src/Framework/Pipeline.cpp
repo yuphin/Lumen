@@ -481,11 +481,6 @@ void Pipeline::create_update_template(const std::vector<Shader>& shaders,
 	std::vector<VkDescriptorUpdateTemplateEntry> entries;
 	LUMEN_ASSERT(count_ones(binding_mask) == descriptor_counts.size(),
 				 "Descriptor size mismatch! Check shaders or the supplied descriptors.");
-	if (count_ones(binding_mask) != descriptor_counts.size()) {
-		auto b = count_ones(binding_mask);
-		int a = 4;
-	}
-
 	size_t offset = 0;
 	int idx = 0;
 	size_t tlas_offset = -1;
