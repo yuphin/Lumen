@@ -25,9 +25,8 @@ class RayTracer : public LumenInstance {
 	bool resized = false;
 
    private:
-
-	void assign_integrator(IntegratorType type);
 	void init_resources();
+	void cleanup_resources();
 	void parse_args(int argc, char* argv[]);
 	float draw_frame();
 	void render(uint32_t idx);

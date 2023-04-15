@@ -99,7 +99,7 @@ void RayTracer::init(Window* window) {
 	integrator->init();
 	post_fx.init(*instance);
 	init_resources();
-	LUMEN_TRACE("Memory usage {} MB",  get_memory_usage(vk_ctx.physical_device) * 1e-6);
+	LUMEN_TRACE("Memory usage {} MB", get_memory_usage(vk_ctx.physical_device) * 1e-6);
 }
 
 void RayTracer::init_resources() {
@@ -155,6 +155,17 @@ void RayTracer::init_resources() {
 	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, &rmse_val_buffer, instance->vkb.rg);
+}
+
+void RayTracer::cleanup_resources() {
+	std::vector<Buffer*> buffer_list = {&output_img_buffer, &output_img_buffer_cpu, &residual_buffer,
+										&counter_buffer,	&rmse_val_buffer,		&rt_utils_desc_buffer};
+	if (load_reference) {
+		buffer_list.push_back(&gt_img_buffer);
+	}
+	for (auto b : buffer_list) {
+		b->destroy();
+	}
 }
 
 void RayTracer::update() {
@@ -289,19 +300,10 @@ void RayTracer::cleanup() {
 	const auto device = vkb.ctx.device;
 	vkDeviceWaitIdle(device);
 	if (initialized) {
-		ImGui_ImplVulkan_Shutdown();
-		ImGui_ImplGlfw_Shutdown();
-		ImGui::DestroyContext();
-		std::vector<Buffer*> buffer_list = {&output_img_buffer, &output_img_buffer_cpu, &residual_buffer,
-											&counter_buffer,	&rmse_val_buffer,		&rt_utils_desc_buffer};
-		if (load_reference) {
-			buffer_list.push_back(&gt_img_buffer);
-		}
-		for (auto b : buffer_list) {
-			b->destroy();
-		}
+		cleanup_resources();
 		integrator->destroy();
 		post_fx.destroy();
+		vkb.destroy_imgui();
 		vkb.cleanup();
 	}
 }

@@ -592,6 +592,11 @@ void VulkanBase::init_imgui() {
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
+void VulkanBase::destroy_imgui() {
+		ImGui_ImplVulkan_Shutdown();
+		ImGui_ImplGlfw_Shutdown();
+		ImGui::DestroyContext();
+}
 
 void VulkanBase::create_command_buffers() {
 	ctx.command_buffers.resize(swapchain_images.size());
