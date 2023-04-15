@@ -58,4 +58,7 @@ class RayTracer : public LumenInstance {
 	bool write_exr = false;
 	bool has_gt = false;
 	bool show_cam_stats = false;
+
+	const bool enable_shader_inference = true;
+	const bool use_events = true;
 };

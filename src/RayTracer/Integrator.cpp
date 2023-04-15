@@ -40,7 +40,7 @@ void Integrator::init() {
 		}
 		if (window->is_mouse_held(MouseAction::LEFT)) {
 			cam_ptr->rotate(0.05f * (float)delta_y, -0.05f * (float)delta_x, 0.0f);
-			// pc_ray.frame_num = -1;
+			// pc_ray.frame_num = 0;
 			updated = true;
 		}
 	});
@@ -48,6 +48,10 @@ void Integrator::init() {
 	auto idx_buf_size = lumen_scene->indices.size() * sizeof(uint32_t);
 	std::vector<PrimMeshInfo> prim_lookup;
 	uint32_t idx = 0;
+
+	total_light_triangle_cnt = 0;
+	total_light_area = 0;
+	
 	for (auto& pm : lumen_scene->prim_meshes) {
 		PrimMeshInfo m_info;
 		m_info.index_offset = pm.first_idx;

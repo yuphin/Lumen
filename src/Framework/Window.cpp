@@ -1,10 +1,9 @@
 #include "LumenPCH.h"
 #include "Window.h"
 
-Window::Window(int width, int height, bool fullscreen) : height(height), width(width) {
+Window::Window(int width, int height, bool fullscreen) {
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 	window_handle = glfwCreateWindow(width, height, "Lumen", fullscreen ? glfwGetPrimaryMonitor() : nullptr, nullptr);
 	LUMEN_ASSERT(window_handle, "Failed to create a window!");
 	glfwSetWindowUserPointer(window_handle, this);

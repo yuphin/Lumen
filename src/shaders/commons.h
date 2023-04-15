@@ -93,6 +93,8 @@ struct PushConstantRay {
 struct PCPost {
     uint enable_tonemapping;
     uint enable_bloom;
+    int width;
+    int height;
 	float bloom_exposure;
 	float bloom_amount;
 };

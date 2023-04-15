@@ -31,9 +31,6 @@ struct VulkanContext {
 	VkSurfaceKHR surface;
 	VkPhysicalDevice physical_device = VK_NULL_HANDLE;
 	VkDevice device;
-	VkRenderPass default_render_pass;
-	VkPipelineLayout pipeline_layout;
-	VkPipeline gfx_pipeline;
 	// Swapchain related stuff
 	VkExtent2D swapchain_extent;
 	VkSwapchainKHR swapchain;
@@ -48,10 +45,6 @@ struct VulkanContext {
 
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props{
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
-
-	VkImage depth_img;
-	VkDeviceMemory depth_img_memory;
-	VkImageView depth_img_view;
 };
 
 enum class QueueType { GFX, COMPUTE, PRESENT };

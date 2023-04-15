@@ -52,7 +52,7 @@ struct VulkanBase {
 		bool update = false);
 	VkDeviceAddress get_blas_device_address(uint32_t blas_idx);
 	uint32_t prepare_frame();
-	VkResult submit_frame(uint32_t image_idx, bool& resized);
+	VkResult submit_frame(uint32_t image_idx);
 
 	struct SwapChainSupportDetails {
 		VkSurfaceCapabilitiesKHR capabilities = {};
@@ -96,6 +96,7 @@ struct VulkanBase {
 	// bool fullscreen;
 	// bool initialized = false;
 	VkShaderModule create_shader(const std::vector<char>& code);
+	void cleanup_app_data();
 	void cleanup();
 
    private:

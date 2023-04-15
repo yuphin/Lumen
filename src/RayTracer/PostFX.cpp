@@ -147,6 +147,8 @@ void PostFX::render(Texture2D& input, Texture2D& output) {
 	pc_post_settings.enable_bloom = enable_bloom;
 	pc_post_settings.bloom_amount = bloom_amount;
 	pc_post_settings.bloom_exposure = bloom_exposure;
+	pc_post_settings.width = output.base_extent.width;
+	pc_post_settings.height = output.base_extent.height;
 
 	rg->add_gfx("Post FX", {.shaders = {{"src/shaders/post.vert"}, {"src/shaders/post.frag"}},
 							.width = output.base_extent.width,

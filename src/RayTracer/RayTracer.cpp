@@ -13,11 +13,6 @@ RayTracer* RayTracer::instance = nullptr;
 bool load_reference = false;
 bool calc_rmse = false;
 
-static void fb_resize_callback(GLFWwindow* window, int width, int height) {
-	auto app = reinterpret_cast<RayTracer*>(glfwGetWindowUserPointer(window));
-	app->resized = true;
-}
-
 RayTracer::RayTracer(int width, int height, bool debug, int argc, char* argv[]) : LumenInstance(width, height, debug) {
 	this->instance = this;
 	parse_args(argc, argv);
@@ -28,7 +23,6 @@ void RayTracer::init(Window* window) {
 	srand(42);
 	this->window = window;
 	vkb.ctx.window_ptr = window->get_window_ptr();
-	glfwSetFramebufferSizeCallback(vkb.ctx.window_ptr, fb_resize_callback);
 	// Init with ray tracing extensions
 	vkb.add_device_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
 	vkb.add_device_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
@@ -56,11 +50,11 @@ void RayTracer::init(Window* window) {
 	scene.load_scene(scene_name);
 
 	// Enable shader reflections for the render graph
-	vkb.rg->settings.shader_inference = true;
+	vkb.rg->settings.shader_inference = enable_shader_inference;
 	// Disable event based synchronization
 	// Currently the event API that comes with Vulkan 1.3 is buggy on NVIDIA drivers
 	// so this is turned off and pipeline barriers are used instead
-	vkb.rg->settings.use_events = true;
+	vkb.rg->settings.use_events = use_events;
 
 	switch (scene.config->integrator_type) {
 		case IntegratorType::Path:
@@ -255,15 +249,37 @@ float RayTracer::draw_frame() {
 		return (float)t_diff;
 	}
 
+	auto resize_func = [this]() {
+		vkb.rg->settings.shader_inference = enable_shader_inference;
+		vkb.rg->settings.use_events = use_events;
+		glfwGetWindowSize(window->get_window_ptr(), (int*)&width, (int*)&height);
+		cleanup_resources();
+		integrator->destroy();
+		post_fx.destroy();
+		vkb.destroy_imgui();
+
+		integrator->init();
+		post_fx.init(*instance);
+		init_resources();
+		vkb.init_imgui();
+	};
+
 	uint32_t image_idx = vkb.prepare_frame();
 
 	if (image_idx == UINT32_MAX) {
+		resize_func();
 		auto t_end = glfwGetTime() * 1000;
 		auto t_diff = t_end - t_begin;
 		return (float)t_diff;
 	}
 	render(image_idx);
-	vkb.submit_frame(image_idx, resized);
+	VkResult result = vkb.submit_frame(image_idx);
+	if (result != VK_SUCCESS) {
+		resize_func();
+		auto t_end = glfwGetTime() * 1000;
+		auto t_diff = t_end - t_begin;
+		return (float)t_diff;
+	}
 	vkb.rg->reset(vkb.ctx.command_buffers[image_idx]);
 
 	auto now = clock();
