@@ -161,11 +161,11 @@ void PostFX::render(Texture2D& input, Texture2D& output) {
 
 bool PostFX::gui() {
 	bool updated = false;
-	updated ^= ImGui::Checkbox("Enable ACES tonemapping", &enable_tonemapping);
+	ImGui::Checkbox("Enable ACES tonemapping", &enable_tonemapping);
 	float exposure = log10(bloom_exposure);
-	updated ^= ImGui::SliderFloat("Bloom exposure", &exposure, -20, 0, "%.2f");
+	ImGui::SliderFloat("Bloom exposure", &exposure, -20, 0, "%.2f");
 	bloom_exposure = pow(10, exposure);
-	updated ^= ImGui::SliderFloat("Bloom amount", &bloom_amount, 0.0f, 1.0f, "%.2f");
+	ImGui::SliderFloat("Bloom amount", &bloom_amount, 0.0f, 1.0f, "%.2f");
 	return updated;
 }
 
