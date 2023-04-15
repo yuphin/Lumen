@@ -51,10 +51,9 @@ void RenderPass::register_dependencies(Buffer& buffer, VkAccessFlags dst_access_
 void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout) {
 	const bool has_storage_bit = (tex.usage_flags & VK_IMAGE_USAGE_STORAGE_BIT) == VK_IMAGE_USAGE_STORAGE_BIT;
 	const bool eq_layouts = tex.layout == dst_layout;
-	// TODO
-	if (!has_storage_bit && eq_layouts) {
-		return;
-	} else if (eq_layouts && dst_layout == VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL) {
+	// TODO: This should be possible
+	// if (eq_layouts && (!has_storage_bit || dst_layout == VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL))
+	if (eq_layouts && !has_storage_bit) {
 		return;
 	}
 	auto img_resource = rg->img_resource_map.find(tex.img);
