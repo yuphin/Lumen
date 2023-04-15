@@ -171,9 +171,9 @@ bool PostFX::gui() {
 	bool updated = false;
 	ImGui::Checkbox("Enable ACES tonemapping", &enable_tonemapping);
 	ImGui::Checkbox("Enable bloom", &enable_bloom);
-	float exposure = log10(bloom_exposure);
-	ImGui::SliderFloat("Bloom exposure", &exposure, -20, 0, "%.2f");
-	bloom_exposure = pow(10, exposure);
+	float exposure = log10f(bloom_exposure);
+	ImGui::SliderFloat("Bloom exposure", &exposure, -20.0f, 0.0f, "%.2f");
+	bloom_exposure = powf(10.0f, exposure);
 	ImGui::SliderFloat("Bloom amount", &bloom_amount, 0.0f, 1.0f, "%.2f");
 	if (bloom_amount == 0.0f) {
 		enable_bloom = false;
