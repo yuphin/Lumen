@@ -47,7 +47,7 @@ void main() {
         pixel(idx).radius = r_new;
         pixel(idx).M = 0;
         pixel(idx).phi = vec3(0);
-        col += pixel(idx).tau / (1600 * 900 * PI * r_new * r_new);
+        col += pixel(idx).tau / (size * PI * r_new * r_new);
     }
     pixel(idx).col = vec3(0);
     pixel(idx).tau = vec3(0);

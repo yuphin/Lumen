@@ -262,6 +262,7 @@ float RayTracer::draw_frame() {
 		post_fx.init(*instance);
 		init_resources();
 		vkb.init_imgui();
+		integrator->updated = true;
 	};
 
 	uint32_t image_idx = vkb.prepare_frame();
