@@ -51,8 +51,15 @@ void RenderPass::register_dependencies(Buffer& buffer, VkAccessFlags dst_access_
 void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout) {
 	const bool has_storage_bit = (tex.usage_flags & VK_IMAGE_USAGE_STORAGE_BIT) == VK_IMAGE_USAGE_STORAGE_BIT;
 	const bool eq_layouts = tex.layout == dst_layout;
-	// TODO: This should be possible
-	// if (eq_layouts && (!has_storage_bit || dst_layout == VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL))
+	// Note: Currently, the following optimization doesn't work for this:
+	//if (eq_layouts && (!has_storage_bit || dst_layout == VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL)) {
+	// The reason is that when both src and dst layout are VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, it's possible that prior to this pass,
+	// there was another pass that signalled a transition to READ_ONLY_OPTIMAL, and that pass might have a different pipeline type
+	// So example:
+	// (compute - Image layout : general) -> (compute - Image layout: read_only (for compute only)) - (fragment - Image layout: read only)
+	// In this case: The correct synchronization is needed to ensure a fragment shader read access.
+	// So in principle it would be possible to feed that access flag in the 2nd stage, but our architecture currently doesn't allow this
+	// as we don't explicitly store the pipeline stage for signals
 	if (eq_layouts && !has_storage_bit) {
 		return;
 	}
