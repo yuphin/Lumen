@@ -19,8 +19,7 @@ RayTracer::RayTracer(int width, int height, bool debug, int argc, char* argv[]) 
 }
 
 void RayTracer::init(Window* window) {
-	// srand((uint32_t)time(NULL));
-	srand(42);
+	 srand((uint32_t)time(NULL));
 	this->window = window;
 	vkb.ctx.window_ptr = window->get_window_ptr();
 	// Init with ray tracing extensions
