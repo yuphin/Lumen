@@ -153,7 +153,7 @@ class RenderPass {
 	RenderPass& zero(std::initializer_list<std::reference_wrapper<Texture2D>> textures);
 	RenderPass& zero(const Resource& resource, bool cond);
 	RenderPass& copy(const Resource& src, const Resource& dst);
-	void finalize();
+	void finalize(bool record_override_encountered);
 	friend RenderGraph;
 	std::vector<ResourceBinding> bound_resources;
 
@@ -275,10 +275,10 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 
 			// Pass was inserted prior, shift the subsequent existing pass indices
 			if (!pass_idxs_with_shader_compilation_overrides.empty()) {
-				passes[idx].pass_idx += pass_idxs_with_shader_compilation_overrides.size();
+				passes[idx].pass_idx += uint32_t(pass_idxs_with_shader_compilation_overrides.size());
 				storage.pass_idxs[offset_idx] = passes[idx].pass_idx;
 			}
-
+			passes[idx].is_pipeline_cached = true;
 			return passes[idx];
 		}
 		pipeline = pipeline_cache[name_with_macros].pipeline.get();
