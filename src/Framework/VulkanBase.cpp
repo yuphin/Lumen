@@ -917,6 +917,7 @@ uint32_t VulkanBase::prepare_frame() {
 		return UINT32_MAX;
 	} else if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
 		// Window resize
+		vkDeviceWaitIdle(ctx.device);
 		recreate_swap_chain(ctx);
 		cleanup_app_data();
 		rg = std::make_unique<RenderGraph>(&ctx);
@@ -983,6 +984,7 @@ VkResult VulkanBase::submit_frame(uint32_t image_idx) {
 
 	VkResult result = vkQueuePresentKHR(ctx.queues[(int)QueueType::GFX], &present_info);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+		vkDeviceWaitIdle(ctx.device);
 		recreate_swap_chain(ctx);
 		cleanup_app_data();
 		rg = std::make_unique<RenderGraph>(&ctx);
