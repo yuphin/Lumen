@@ -177,9 +177,6 @@ bool PostFX::gui() {
 	ImGui::SliderFloat("Bloom exposure", &exposure, -20.0f, 0.0f, "%.2f");
 	bloom_exposure = powf(10.0f, exposure);
 	ImGui::SliderFloat("Bloom amount", &bloom_amount, 0.0f, 1.0f, "%.2f");
-	if (bloom_amount == 0.0f) {
-		enable_bloom = false;
-	}
 	return updated;
 }
 
