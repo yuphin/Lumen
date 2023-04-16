@@ -25,7 +25,7 @@ private:
 	RenderGraph* rg = nullptr;
 	PCPost pc_post_settings;
 	bool enable_tonemapping = false;
-	bool enable_bloom = true;
+	bool enable_bloom = false;
 	float bloom_exposure = 1e-5f;
 	float bloom_amount = 0.26f;
 };

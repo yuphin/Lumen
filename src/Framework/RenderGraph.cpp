@@ -524,12 +524,10 @@ void RenderPass::finalize() {
 			default:
 				break;
 		}
-		if (!rg->multithreaded_pipeline_compilation) {
-			transition_resources();
-		}
 	} else {
 		rg->pipeline_tasks.push_back({nullptr, pass_idx});
 	}
+	transition_resources();
 }
 
 void RenderPass::write_impl(Buffer& buffer, VkAccessFlags access_flags) {
@@ -934,9 +932,6 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		}
 		for (auto& future : futures) {
 			future.wait();
-		}
-		for (auto& [_, idx] : pipeline_tasks) {
-			passes[idx].transition_resources();
 		}
 		pipeline_tasks.clear();
 	}
