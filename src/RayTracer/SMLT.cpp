@@ -404,7 +404,7 @@ void SMLT::render() {
 			}
 			iter += 100;
 			instance->vkb.rg->run(cmd.handle);
-			printf("%d / %d\n", iter, mutation_count);
+			LUMEN_TRACE("{} / {}", iter, mutation_count);
 			instance->vkb.rg->submit(cmd);
 		}
 		const uint32_t rem = mutation_count % iter_cnt;
