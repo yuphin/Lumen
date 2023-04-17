@@ -1,8 +1,8 @@
 #pragma once
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 #include <tiny_obj_loader.h>
 #include "shaders/commons.h"
-#include "Framework/MitsubaParser.h"
+#include "MitsubaParser.h"
 
 struct CameraSettings {
 	float fov;

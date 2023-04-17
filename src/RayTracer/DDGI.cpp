@@ -1,4 +1,4 @@
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 #include "DDGI.h"
 #include <random>
 constexpr int IRRADIANCE_SIDE_LENGTH = 8;

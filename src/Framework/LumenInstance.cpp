@@ -1,2 +1,2 @@
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 #include "LumenInstance.h"

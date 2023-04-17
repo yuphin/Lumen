@@ -1,4 +1,4 @@
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 #include "Logger.h"
 std::shared_ptr<spdlog::logger> Logger::s_logger;
 void Logger::init() {

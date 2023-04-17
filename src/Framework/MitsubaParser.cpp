@@ -1,4 +1,4 @@
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 #include "MitsubaParser.h"
 #include <mitsuba_parser/tinyparser-mitsuba.h>
 
@@ -89,10 +89,6 @@ void MitsubaParser::parse(const std::string& path) {
 			} break;
 			case OT_SHAPE: {
 				MitsubaMesh mesh;
-				if (obj->pluginType() == "obj") {
-				} else if (obj->pluginType() == "rectangle") {
-					int a = 4;
-				}
 				for (const auto& prop : obj->properties()) {
 					if (prop.first == "filename") {
 						mesh.file = prop.second.getString();

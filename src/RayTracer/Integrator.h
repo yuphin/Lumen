@@ -1,5 +1,5 @@
 #pragma once
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 #include "Framework/Camera.h"
 #include "Framework/CommandBuffer.h"
 #include "Framework/Pipeline.h"

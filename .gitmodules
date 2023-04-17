@@ -1,3 +1,21 @@
 [submodule "libs/gli"]
 	path = libs/gli
 	url = https://github.com/g-truc/gli.git
+[submodule "libs/SPIRV-Cross"]
+	path = libs/SPIRV-Cross
+	url = git@github.com:KhronosGroup/SPIRV-Cross.git
+[submodule "libs/--force"]
+	path = libs/--force
+	url = git@github.com:google/shaderc.git
+[submodule "libs/shaderc"]
+	path = libs/shaderc
+	url = git@github.com:google/shaderc.git
+[submodule "libs/SPIRV-Tools"]
+	path = libs/SPIRV-Tools
+	url = git@github.com:KhronosGroup/SPIRV-Tools.git
+[submodule "libs/SPIRV-Headers"]
+	path = libs/SPIRV-Headers
+	url = git@github.com:KhronosGroup/SPIRV-Headers.git
+[submodule "libs/glslang"]
+	path = libs/glslang
+	url = git@github.com:KhronosGroup/glslang.git

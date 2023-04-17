@@ -1,4 +1,4 @@
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 #include "Shader.h"
 #include "RenderGraph.h"
 #include <spirv_cross/spirv.h>
@@ -156,18 +156,6 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 		auto binding = glsl.get_decoration(storage_buffer.id, spv::DecorationBinding);
 		pass->bound_resources[binding].active = true;
 	}
-	/*for (auto& var : active_vars) {
-		auto binding = glsl.get_decoration(var, spv::DecorationBinding);
-		auto type = glsl.get_type_from_variable(var);
-		if (type.basetype == spirv_cross::SPIRType::SampledImage) {
-			pass->bound_resources[binding].read = true;
-			pass->bound_resources[binding].active = true;
-		} else if (type.basetype == spirv_cross::SPIRType::Image) {
-			pass->bound_resources[binding].write = true;
-			pass->bound_resources[binding].active = true;
-		} 
-	}*/
-
 	assert(code[0] == SpvMagicNumber);
 
 	uint32_t num_ids = code[3];
@@ -372,9 +360,6 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 					const uint32_t ptr_id = insn[1];
 					auto var_name = glsl.get_name(ptr_id);
 					auto ptr_type = glsl.get_type_from_variable(ptr_id);
-					/*	for (auto mem_type_id : ptr_type.member_types) {
-							auto mem_type = glsl.get_type(mem_type_id);
-						}*/
 					if (constant_map.find(access_chain.offset_idx) != constant_map.end()) {
 						auto parent_type_id = glsl.get_type_from_variable(access_chain.base_ptr_id).parent_type;
 						auto ptr_struct_type = glsl.get_type(parent_type_id);
@@ -575,26 +560,8 @@ int Shader::compile(RenderPass* pass) {
 		return str.substr(0, fnd);
 	};
 	const auto& str = buffer.str();
-	// Preprocessing
-	{
-		/* auto preprocessed = preprocess_shader(
-			 filename,mstages[get_ext(filename)], str);
-		 std::cout << "Compiled a vertex shader resulting in preprocessed text:"
-			 << std::endl
-			 << preprocessed << std::endl;*/
-	}  // Compiling
-	{
-		/*  auto assembly = compile_file_to_assembly(
-			  filename, mstages[get_ext(filename)], str);
-		  std::cout << "SPIR-V assembly:" << std::endl << assembly <<
-		  std::endl;*/
-		binary = compile_file(filename, mstages[get_ext(filename)], str);
-		if (filename == "src/shaders/integrators/path/path.rgen") {
-			int a = 4;
-		}
-		/*   std::cout << "Compiled to a binary module with " << binary.size()
-			   << " words." << std::endl;*/
-	}
+	 // Compiling
+	binary = compile_file(filename, mstages[get_ext(filename)], str);
 	parse_shader(*this, binary.data(), binary.size(), pass);
 	return 0;
 #else

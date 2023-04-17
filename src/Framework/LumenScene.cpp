@@ -1,10 +1,10 @@
-#include "LumenPCH.h"
+#include <LumenPCH.h>
 #include "LumenScene.h"
 #pragma warning(push, 0)
 #include <tinygltf/json.hpp>
 #pragma warning(pop)
 #include <tiny_obj_loader.h>
-#include "shaders/commons.h"
+#include <shaders/commons.h>
 
 struct Bbox {
 	Bbox() = default;
@@ -446,7 +446,7 @@ void LumenScene::load_scene(const std::string& path) {
 				materials[i].albedo = m_bsdf.albedo;
 
 			} else if (m_bsdf.type == "roughplastic") {
-				materials[i].subsurface = 0.1;
+				materials[i].subsurface = 0.1f;
 				materials[i].albedo = m_bsdf.albedo;
 				materials[i].roughness = m_bsdf.roughness;
 			} else if (m_bsdf.type == "conductor") {

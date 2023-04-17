@@ -1,5 +1,5 @@
 #pragma once
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 #include <mitsuba_parser/tinyparser-mitsuba.h>
 using namespace TPM_NAMESPACE;
 
