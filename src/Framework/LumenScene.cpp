@@ -1,7 +1,7 @@
 #include "LumenPCH.h"
 #include "LumenScene.h"
 #pragma warning(push, 0)
-#include <json.hpp>
+#include <tinygltf/json.hpp>
 #pragma warning(pop)
 #include <tiny_obj_loader.h>
 #include "shaders/commons.h"

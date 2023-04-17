@@ -1284,7 +1284,7 @@ static void CompressZip(unsigned char *dst,
 
   compressedSize = outSize;
 #else
-  uLong outSize = compressBound(static_cast<uLong>(src_size));
+  size_t outSize = compressBound(static_cast<size_t>(src_size));
   int ret = compress(dst, &outSize, static_cast<const Bytef *>(&tmpBuf.at(0)),
                      src_size);
   assert(ret == Z_OK);
@@ -1318,7 +1318,7 @@ static bool DecompressZip(unsigned char *dst,
   }
 #else
   int ret = uncompress(&tmpBuf.at(0), uncompressed_size, src, src_size);
-  if (Z_OK != ret) {
+  if (MZ_OK != ret) {
     return false;
   }
 #endif
@@ -6557,7 +6557,7 @@ static bool EncodePixelData(/* out */ std::vector<unsigned char>& out_data,
       static_cast<unsigned long>(buf.size())));
 #else
     std::vector<unsigned char> block(
-      compressBound(static_cast<uLong>(buf.size())));
+      compressBound(static_cast<size_t>(buf.size())));
 #endif
     tinyexr::tinyexr_uint64 outSize = block.size();
 

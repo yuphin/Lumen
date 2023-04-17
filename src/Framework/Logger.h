@@ -47,7 +47,7 @@ class Logger {
 	}
 #else
 #define LUMEN_ASSERT(x, ...)
-#define LUMEN_ASSERT(x)
+//#define LUMEN_ASSERT(x)
 #define LUMEN_ASSERT_PTR(x, ...)
 #endif
 #define LUMEN_EXIT(x, ...)  \

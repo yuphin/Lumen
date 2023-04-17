@@ -1,4 +1,3 @@
-#pragma once
 #include "LumenPCH.h"
 #include "Event.h"
 

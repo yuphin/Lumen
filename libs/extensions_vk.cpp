@@ -2192,7 +2192,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vkBindVideoSessionMemoryKHR(
 	VkDevice device, 
 	VkVideoSessionKHR videoSession, 
 	uint32_t videoSessionBindMemoryCount, 
-	const VkVideoBindMemoryKHR* pVideoSessionBindMemories) 
+	const VkBindVideoSessionMemoryInfoKHR* pVideoSessionBindMemories) 
 { 
   return pfn_vkBindVideoSessionMemoryKHR(device, videoSession, videoSessionBindMemoryCount, pVideoSessionBindMemories); 
 }
@@ -2246,7 +2246,7 @@ VKAPI_ATTR void VKAPI_CALL vkDestroyVideoSessionParametersKHR(
 }
 VKAPI_ATTR VkResult VKAPI_CALL vkGetPhysicalDeviceVideoCapabilitiesKHR(
 	VkPhysicalDevice physicalDevice, 
-	const VkVideoProfileKHR* pVideoProfile, 
+	const VkVideoProfileInfoKHR* pVideoProfile, 
 	VkVideoCapabilitiesKHR* pCapabilities) 
 { 
   return pfn_vkGetPhysicalDeviceVideoCapabilitiesKHR(physicalDevice, pVideoProfile, pCapabilities); 
@@ -2263,7 +2263,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vkGetVideoSessionMemoryRequirementsKHR(
 	VkDevice device, 
 	VkVideoSessionKHR videoSession, 
 	uint32_t* pVideoSessionMemoryRequirementsCount, 
-	VkVideoGetMemoryPropertiesKHR* pVideoSessionMemoryRequirements) 
+	VkVideoSessionMemoryRequirementsKHR* pVideoSessionMemoryRequirements) 
 { 
   return pfn_vkGetVideoSessionMemoryRequirementsKHR(device, videoSession, pVideoSessionMemoryRequirementsCount, pVideoSessionMemoryRequirements); 
 }

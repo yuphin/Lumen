@@ -53,7 +53,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/euler_angles.hpp>
 #include <glm/gtx/string_cast.hpp>
-#include <tiny_gltf.h>
+#include <tinygltf/tiny_gltf.h>
 #include <algorithm>
 #include <map>
 #include <string>
