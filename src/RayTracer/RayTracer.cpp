@@ -19,7 +19,7 @@ RayTracer::RayTracer(int width, int height, bool debug, int argc, char* argv[]) 
 }
 
 void RayTracer::init(Window* window) {
-	 srand((uint32_t)time(NULL));
+	srand((uint32_t)time(NULL));
 	this->window = window;
 	vkb.ctx.window_ptr = window->get_window_ptr();
 	// Init with ray tracing extensions
@@ -212,20 +212,10 @@ void RayTracer::render(uint32_t i) {
 	vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
 }
 
-float RayTracer::draw_frame() {
-	if (cnt == 0) {
-		start = clock();
-	}
-	auto t_begin = glfwGetTime() * 1000;
-	bool updated = false;
-	ImGui_ImplVulkan_NewFrame();
-	ImGui_ImplGlfw_NewFrame();
-	ImGui::NewFrame();
+bool RayTracer::gui() {
 	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time, 1000 / cpu_avg_time);
 	ImGui::Text("Memory Usage: %f MB", get_memory_usage(vk_ctx.physical_device) * 1e-6);
-
-	bool gui_updated = integrator->gui();
-	gui_updated |= post_fx.gui();
+	bool updated = false;
 	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
 	if (show_cam_stats) {
 		ImGui::PushItemWidth(170);
@@ -239,13 +229,12 @@ float RayTracer::draw_frame() {
 		vkb.rg->shader_cache.clear();
 		updated |= true;
 	}
+	return updated;
+}
 
-	if (updated || gui_updated) {
-		ImGui::Render();
-		auto t_end = glfwGetTime() * 1000;
-		auto t_diff = t_end - t_begin;
-		integrator->updated = true;
-		return (float)t_diff;
+float RayTracer::draw_frame() {
+	if (cnt == 0) {
+		start = clock();
 	}
 
 	auto resize_func = [this]() {
@@ -263,6 +252,23 @@ float RayTracer::draw_frame() {
 		vkb.init_imgui();
 		integrator->updated = true;
 	};
+	auto t_begin = glfwGetTime() * 1000;
+	bool updated = false;
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+
+	bool gui_updated = gui();
+	gui_updated |= integrator->gui();
+	gui_updated |= post_fx.gui();
+
+	if (updated || gui_updated) {
+		ImGui::Render();
+		auto t_end = glfwGetTime() * 1000;
+		auto t_diff = t_end - t_begin;
+		integrator->updated = true;
+		return (float)t_diff;
+	}
 
 	uint32_t image_idx = vkb.prepare_frame();
 
@@ -276,11 +282,9 @@ float RayTracer::draw_frame() {
 	VkResult result = vkb.submit_frame(image_idx);
 	if (result != VK_SUCCESS) {
 		resize_func();
-		auto t_end = glfwGetTime() * 1000;
-		auto t_diff = t_end - t_begin;
-		return (float)t_diff;
+	} else {
+		vkb.rg->reset(vkb.ctx.command_buffers[image_idx]);
 	}
-	vkb.rg->reset(vkb.ctx.command_buffers[image_idx]);
 
 	auto now = clock();
 	auto diff = ((float)now - start);
