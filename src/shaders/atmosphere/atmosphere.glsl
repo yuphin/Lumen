@@ -44,7 +44,7 @@
 
 // -------------------------------------
 // Math
-vec2 SphereIntersection (vec3 rayStart, vec3 rayDir, vec3 sphereCenter, float sphereRadius)
+vec2 sphere_intersection (vec3 rayStart, vec3 rayDir, vec3 sphereCenter, float sphereRadius)
 {
 	rayStart -= sphereCenter;
 	float a = dot(rayDir, rayDir);
@@ -61,13 +61,13 @@ vec2 SphereIntersection (vec3 rayStart, vec3 rayDir, vec3 sphereCenter, float sp
 		return vec2(-b - d, -b + d) / (2 * a);
 	}
 }
-vec2 PlanetIntersection (vec3 rayStart, vec3 rayDir)
+vec2 planet_intersection (vec3 rayStart, vec3 rayDir)
 {
-	return SphereIntersection(rayStart, rayDir, ATMOSPHERE_PLANET_CENTER, ATMOSPHERE_PLANET_RADIUS);
+	return sphere_intersection(rayStart, rayDir, ATMOSPHERE_PLANET_CENTER * vec3(0, 1.00001, 0), ATMOSPHERE_PLANET_RADIUS);
 }
-vec2 AtmosphereIntersection (vec3 rayStart, vec3 rayDir)
+vec2 atmosphere_intersection (vec3 rayStart, vec3 rayDir)
 {
-	return SphereIntersection(rayStart, rayDir, ATMOSPHERE_PLANET_CENTER, ATMOSPHERE_PLANET_RADIUS + ATMOSPHERE_ATMOSPHERE_HEIGHT);
+	return sphere_intersection(rayStart, rayDir, ATMOSPHERE_PLANET_CENTER, ATMOSPHERE_PLANET_RADIUS + ATMOSPHERE_ATMOSPHERE_HEIGHT);
 }
 
 // -------------------------------------
@@ -116,7 +116,7 @@ vec3 AtmosphereDensity (float h)
 // If you find the term "optical depth" confusing, you can think of it as "how much density was found along the ray in total".
 vec3 IntegrateOpticalDepth (vec3 rayStart, vec3 rayDir)
 {
-	vec2 intersection = AtmosphereIntersection(rayStart, rayDir);
+	vec2 intersection = atmosphere_intersection(rayStart, rayDir);
 	float  rayLength    = intersection.y;
 
 	int    sampleCount  = 8;
@@ -152,7 +152,7 @@ vec3 integrate_scattering (vec3 rayStart, vec3 rayDir, float rayLength, vec3 lig
 	float  rayHeight = AtmosphereHeight(rayStart);
 	float  sampleDistributionExponent = 1 + clamp(1 - rayHeight / ATMOSPHERE_ATMOSPHERE_HEIGHT, 0, 1) * 8; // Slightly arbitrary max exponent of 9
 
-	vec2 intersection = AtmosphereIntersection(rayStart, rayDir);
+	vec2 intersection = atmosphere_intersection(rayStart, rayDir);
 	rayLength = min(rayLength, intersection.y);
 	if (intersection.x > 0)
 	{
