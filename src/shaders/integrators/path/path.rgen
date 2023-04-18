@@ -47,7 +47,7 @@ void main() {
             break;
         }
         if (!found_isect) {
-            col += throughput * pc_ray.sky_col;
+            col += throughput * shade_atmosphere(pc_ray.dir_light_idx, pc_ray.sky_col, origin.xyz, direction, tmax);
             break;
         }
         const Material hit_mat =

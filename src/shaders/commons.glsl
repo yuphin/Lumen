@@ -2,6 +2,8 @@
 #define COMMONS_DEVICE
 #include "commons.h"
 #include "utils.glsl"
+#include "atmosphere/atmosphere.glsl"
+
 
 #ifndef SCENE_TEX_IDX
 #define SCENE_TEX_IDX 4
@@ -185,6 +187,15 @@ vec3 eval_albedo(const Material m) {
     return albedo;
 }
 
+vec3 shade_atmosphere(uint dir_light_idx, vec3 sky_col, vec3 ray_origin, vec3 ray_dir, float ray_length) {
+    if(dir_light_idx == -1) {
+        return sky_col;
+    }
+    Light light = lights[dir_light_idx];
+    vec3 light_dir = -normalize(light.to - light.pos);
+    vec3 transmittance;
+    return integrate_scattering(ray_origin, ray_dir, ray_length, light_dir, light.L, transmittance);
+}
 /*
     Light sampling
 */

@@ -70,9 +70,7 @@ void ReSTIRGI::init() {
 void ReSTIRGI::render() {
 	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.light_pos = scene_ubo.light_pos;
-	pc_ray.light_type = 0;
-	pc_ray.light_intensity = 10;
-	pc_ray.num_lights = (int)lights.size();
+			pc_ray.num_lights = (int)lights.size();
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;

@@ -52,20 +52,19 @@ using uint = unsigned int;
 #define DIFFUSE_AND_GLOSSY_ONLY 1
 
 struct PushConstantRay {
+    mat4 probe_rotation;
     vec4 clear_color;
     vec3 light_pos;
-    float light_intensity;
-    vec3 min_bounds;
-    int light_type;
-    vec3 max_bounds;
     int num_lights;
-    ivec3 grid_res;
+    vec3 min_bounds;
     int max_depth;
-    vec3 sky_col;
+    vec3 max_bounds;
     float total_light_area;
+    ivec3 grid_res;
+    float radius;
+    vec3 sky_col;
     uint frame_num;
     uint time;
-    float radius;
     uint size_x;
     uint size_y;
     float ppm_base_radius;
@@ -87,7 +86,7 @@ struct PushConstantRay {
     float world_radius;
     float pad;
     int first_frame;
-    mat4 probe_rotation;
+	uint dir_light_idx;
 };
 
 struct PCPost {
@@ -157,6 +156,7 @@ struct Light {
     uint light_flags;
     vec3 world_center;
     float world_radius;
+	//uint enabled;
 };
 
 struct LightVisibility {
