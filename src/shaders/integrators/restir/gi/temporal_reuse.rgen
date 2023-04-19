@@ -9,7 +9,7 @@
 #extension GL_EXT_shader_atomic_float : require
 
 #include "../../../commons.glsl"
-layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCReSTIRGI pc_ray; };
 layout(buffer_reference, scalar) buffer RestirSamples { ReservoirSample d[]; };
 layout(buffer_reference, scalar) buffer Reservoirs { Reservoir d[]; };
 const uint flags = gl_RayFlagsOpaqueEXT;

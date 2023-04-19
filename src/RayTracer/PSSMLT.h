@@ -11,7 +11,7 @@ class PSSMLT : public Integrator {
 
    private:
 	void prefix_scan(int level, int num_elems, int& counter, RenderGraph* rg);
-	PushConstantRay pc_ray{};
+	PCMLT pc_ray{};
 	PushConstantCompute pc_compute{};
 	// PSSMLT buffers
 	Buffer bootstrap_buffer;

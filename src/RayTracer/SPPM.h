@@ -10,7 +10,7 @@ class SPPM : public Integrator {
 	virtual void destroy() override;
 
    private:
-	PushConstantRay pc_ray{};
+	PCSPPM pc_ray{};
 	VkDescriptorPool desc_pool;
 	VkDescriptorSetLayout desc_set_layout;
 	VkDescriptorSet desc_set;

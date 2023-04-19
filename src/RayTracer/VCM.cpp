@@ -118,7 +118,6 @@ void VCM::init() {
 void VCM::render() {
 	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	const float ppm_base_radius = 0.25f;
-	pc_ray.light_pos = scene_ubo.light_pos;
 	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
@@ -128,7 +127,6 @@ void VCM::render() {
 	pc_ray.radius /= (float)pow((double)pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
 	pc_ray.min_bounds = lumen_scene->m_dimensions.min;
 	pc_ray.max_bounds = lumen_scene->m_dimensions.max;
-	pc_ray.ppm_base_radius = ppm_base_radius;
 	pc_ray.use_vm = config->enable_vm;
 	pc_ray.use_vc = use_vc;
 	pc_ray.do_spatiotemporal = do_spatiotemporal;
@@ -247,6 +245,7 @@ void VCM::render() {
 	if (!do_spatiotemporal) {
 		do_spatiotemporal = true;
 	}
+	pc_ray.total_frame_num++;
 	instance->vkb.rg->run_and_submit(cmd);
 }
 

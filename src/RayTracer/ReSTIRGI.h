@@ -15,7 +15,7 @@ class ReSTIRGI : public Integrator {
 	Buffer temporal_reservoir_buffer;
 	Buffer spatial_reservoir_buffer;
 	Buffer tmp_col_buffer;
-	PushConstantRay pc_ray{};
+	PCReSTIRGI pc_ray{};
 	bool do_spatiotemporal = false;
 
 	ReSTIRGIConfig* config;

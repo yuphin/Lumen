@@ -15,7 +15,7 @@ class ReSTIR : public Integrator {
 	Buffer temporal_reservoir_buffer;
 	Buffer spatial_reservoir_buffer;
 	Buffer tmp_col_buffer;
-	PushConstantRay pc_ray{};
+	PCReSTIR pc_ray{};
 	VkDescriptorPool desc_pool;
 	VkDescriptorSetLayout desc_set_layout;
 	VkDescriptorSet desc_set;

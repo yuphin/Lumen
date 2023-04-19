@@ -10,6 +10,4 @@
 
 layout(location = 0) rayPayloadInEXT HitPayload payload;
 
-layout(push_constant) uniform _PushConstantRay { PushConstantRay pcRay; };
-
 void main() { payload.material_idx = -1; }

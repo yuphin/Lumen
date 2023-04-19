@@ -10,6 +10,6 @@ class Path : public Integrator {
 	virtual void destroy() override;
 
    private:
-	PushConstantRay pc_ray{};
+	PCPath pc_ray{};
 	PathConfig* config;
 };

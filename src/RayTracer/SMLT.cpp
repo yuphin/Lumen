@@ -216,7 +216,6 @@ void SMLT::render() {
 	VkClearValue clear_depth = {1.0f, 0};
 	VkViewport viewport = vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
 	VkClearValue clear_values[] = {clear_color, clear_depth};
-	pc_ray.light_pos = scene_ubo.light_pos;
 	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
@@ -228,6 +227,9 @@ void SMLT::render() {
 	pc_ray.num_bootstrap_samples = num_bootstrap_samples;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
+
+	pc_ray.radius = lumen_scene->m_dimensions.radius * config->radius_factor / 100.f;
+	pc_ray.radius /= (float)pow((double)pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
 
 	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,

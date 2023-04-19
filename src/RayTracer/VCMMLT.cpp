@@ -208,7 +208,6 @@ void VCMMLT::render() {
 	VkClearValue clear_depth = {1.0f, 0};
 	VkViewport viewport = vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
 	VkClearValue clear_values[] = {clear_color, clear_depth};
-	pc_ray.light_pos = scene_ubo.light_pos;
 	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
@@ -222,7 +221,6 @@ void VCMMLT::render() {
 	pc_ray.radius /= (float)pow((double)pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
 	pc_ray.min_bounds = lumen_scene->m_dimensions.min;
 	pc_ray.max_bounds = lumen_scene->m_dimensions.max;
-	pc_ray.ppm_base_radius = ppm_base_radius;
 	const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
 	const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
 	const int base_grid_res = int(max_comp / pc_ray.radius);
