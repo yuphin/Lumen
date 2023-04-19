@@ -265,6 +265,9 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 					pipeline_cache[name_with_macros].pipeline = std::make_unique<Pipeline>(ctx, name_with_macros);
 				}
 				passes[idx].pipeline = pipeline_cache[name_with_macros].pipeline.get();
+				passes[idx].is_pipeline_cached = false;
+			} else {
+				passes[idx].is_pipeline_cached = true;
 			}
 			++storage.offset_idx;
 			// If this is a cached pipeline and the cached pipeline index is not 0, make this the starting pass index
@@ -278,7 +281,6 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 				passes[idx].pass_idx += uint32_t(pass_idxs_with_shader_compilation_overrides.size());
 				storage.pass_idxs[offset_idx] = passes[idx].pass_idx;
 			}
-			passes[idx].is_pipeline_cached = true;
 			return passes[idx];
 		}
 		pipeline = pipeline_cache[name_with_macros].pipeline.get();
