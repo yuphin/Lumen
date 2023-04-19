@@ -90,7 +90,6 @@ void Integrator::init() {
 		light.world_center = 0.5f * (lumen_scene->m_dimensions.max + lumen_scene->m_dimensions.min);
 		//light.enabled = l.enabled;
 		if (l.light_flags & LIGHT_DIRECTIONAL) {
-			LUMEN_ASSERT(lumen_scene->dir_light_idx == -1, "Currently 1 directional light is supported");
 			lumen_scene->dir_light_idx = i;
 		}
 		lights.emplace_back(light);
