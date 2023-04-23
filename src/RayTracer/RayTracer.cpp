@@ -256,7 +256,7 @@ bool RayTracer::gui() {
 		updated = true;
 		vkDeviceWaitIdle(vkb.ctx.device);
 		integrator->destroy();
-		vkb.rg->destroy(/*keep_pipeline_cache=*/true);
+		vkb.cleanup_app_data();
 		post_fx.destroy();
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, &output_img_buffer, instance->vkb.rg);
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);

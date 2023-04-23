@@ -37,7 +37,7 @@ class RenderGraph {
 	void reset(VkCommandBuffer cmd);
 	void submit(CommandBuffer& cmd);
 	void run_and_submit(CommandBuffer& cmd);
-	void destroy(bool keep_pipeline_cache = false);
+	void destroy();
 	friend RenderPass;
 	bool recording = true;
 	bool reload_shaders = false;
@@ -255,8 +255,10 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 			auto idx = storage.pass_idxs[offset_idx];
 			if constexpr (std::is_same_v<GraphicsPassSettings, Settings>) {
 				auto& curr_pass = passes[idx];
-				curr_pass.gfx_settings->color_outputs = settings.color_outputs;
-				curr_pass.gfx_settings->depth_output = settings.depth_output;
+				if (curr_pass.gfx_settings) {
+					curr_pass.gfx_settings->color_outputs = settings.color_outputs;
+					curr_pass.gfx_settings->depth_output = settings.depth_output;
+				}	
 			}
 			passes[idx].active = true;
 			if (reload_shaders) {

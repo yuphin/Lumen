@@ -1026,7 +1026,7 @@ void RenderGraph::run_and_submit(CommandBuffer& cmd) {
 	submit(cmd);
 }
 
-void RenderGraph::destroy(bool keep_pipeline_cache) {
+void RenderGraph::destroy() {
 	passes.clear();
 	event_pool.cleanup(ctx->device);
 	for (auto& pass : passes) {
@@ -1034,14 +1034,13 @@ void RenderGraph::destroy(bool keep_pipeline_cache) {
 			free(pass.push_constant_data);
 		}
 	}
-	if (!keep_pipeline_cache) {
-		for (const auto& [k, v] : pipeline_cache) {
-			v.pipeline->cleanup();
-		}
+	for (const auto& [k, v] : pipeline_cache) {
+		v.pipeline->cleanup();
 	}
 	recording = true;
 	buffer_resource_map.clear();
 	img_resource_map.clear();
 	registered_buffer_pointers.clear();
 	shader_cache.clear();
+	pipeline_cache.clear();
 }
