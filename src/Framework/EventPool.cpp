@@ -34,5 +34,6 @@ void EventPool::cleanup(VkDevice device) {
 			vkDestroyEvent(device, event, nullptr);
 		}
 	}
+	events_map.clear();
 
 }

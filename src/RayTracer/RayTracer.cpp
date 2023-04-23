@@ -55,40 +55,7 @@ void RayTracer::init(Window* window) {
 	// so this is turned off and pipeline barriers are used instead
 	vkb.rg->settings.use_events = use_events;
 
-	switch (scene.config->integrator_type) {
-		case IntegratorType::Path:
-			integrator = std::make_unique<Path>(this, &scene);
-			break;
-		case IntegratorType::BDPT:
-			integrator = std::make_unique<BDPT>(this, &scene);
-			break;
-		case IntegratorType::SPPM:
-			integrator = std::make_unique<SPPM>(this, &scene);
-			break;
-		case IntegratorType::VCM:
-			integrator = std::make_unique<VCM>(this, &scene);
-			break;
-		case IntegratorType::ReSTIR:
-			integrator = std::make_unique<ReSTIR>(this, &scene);
-			break;
-		case IntegratorType::ReSTIRGI:
-			integrator = std::make_unique<ReSTIRGI>(this, &scene);
-			break;
-		case IntegratorType::PSSMLT:
-			integrator = std::make_unique<PSSMLT>(this, &scene);
-			break;
-		case IntegratorType::SMLT:
-			integrator = std::make_unique<SMLT>(this, &scene);
-			break;
-		case IntegratorType::VCMMLT:
-			integrator = std::make_unique<VCMMLT>(this, &scene);
-			break;
-		case IntegratorType::DDGI:
-			integrator = std::make_unique<DDGI>(this, &scene);
-			break;
-		default:
-			break;
-	}
+	create_integrator(int(scene.config->integrator_type));
 	integrator->init();
 	post_fx.init(*instance);
 	init_resources();
@@ -212,6 +179,43 @@ void RayTracer::render(uint32_t i) {
 	vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
 }
 
+void RayTracer::create_integrator(int integrator_idx) {
+	switch (integrator_idx) {
+		case int(IntegratorType::Path):
+			integrator = std::make_unique<Path>(this, &scene);
+			break;
+		case int(IntegratorType::BDPT):
+			integrator = std::make_unique<BDPT>(this, &scene);
+			break;
+		case int(IntegratorType::SPPM):
+			integrator = std::make_unique<SPPM>(this, &scene);
+			break;
+		case int(IntegratorType::VCM):
+			integrator = std::make_unique<VCM>(this, &scene);
+			break;
+		case int(IntegratorType::ReSTIR):
+			integrator = std::make_unique<ReSTIR>(this, &scene);
+			break;
+		case int(IntegratorType::ReSTIRGI):
+			integrator = std::make_unique<ReSTIRGI>(this, &scene);
+			break;
+		case int(IntegratorType::PSSMLT):
+			integrator = std::make_unique<PSSMLT>(this, &scene);
+			break;
+		case int(IntegratorType::SMLT):
+			integrator = std::make_unique<SMLT>(this, &scene);
+			break;
+		case int(IntegratorType::VCMMLT):
+			integrator = std::make_unique<VCMMLT>(this, &scene);
+			break;
+		case int(IntegratorType::DDGI):
+			integrator = std::make_unique<DDGI>(this, &scene);
+			break;
+		default:
+			break;
+	}
+}
+
 bool RayTracer::gui() {
 	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time, 1000 / cpu_avg_time);
 	ImGui::Text("Memory Usage: %f MB", get_memory_usage(vk_ctx.physical_device) * 1e-6);
@@ -229,6 +233,44 @@ bool RayTracer::gui() {
 		vkb.rg->shader_cache.clear();
 		updated |= true;
 	}
+
+	const char* settings[] = {"Path", "BDPT", "SPPM", "VCM", "PSSMLT", "SMLT", "VCMMLT", "ReSTIR", "ReSTIRGI", "DDGI"};
+
+	static int curr_integrator_idx = int(scene.config->integrator_type);
+	if (ImGui::BeginCombo("Select Integrator", settings[curr_integrator_idx])) {
+		for (int n = 0; n < IM_ARRAYSIZE(settings); n++) {
+			const bool selected = curr_integrator_idx == n;
+			if (ImGui::Selectable(settings[n], selected)) {
+				curr_integrator_idx = n;
+			}
+
+			// Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+			if (selected) {
+				ImGui::SetItemDefaultFocus();
+			}
+		}
+		ImGui::EndCombo();
+	}
+
+	if (curr_integrator_idx != int(scene.config->integrator_type)) {
+		updated = true;
+		vkDeviceWaitIdle(vkb.ctx.device);
+		integrator->destroy();
+		vkb.rg->destroy(/*keep_pipeline_cache=*/true);
+		post_fx.destroy();
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, &output_img_buffer, instance->vkb.rg);
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, &rmse_val_buffer, instance->vkb.rg);
+
+		auto prev_cam_settings = scene.config->cam_settings;
+		scene.create_scene_config(std::string(settings[curr_integrator_idx]));
+		scene.config->cam_settings = prev_cam_settings;
+		create_integrator(curr_integrator_idx);
+		integrator->init();
+		post_fx.init(*instance);
+	}
+
 	return updated;
 }
 

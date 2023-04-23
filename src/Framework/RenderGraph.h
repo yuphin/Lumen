@@ -37,7 +37,7 @@ class RenderGraph {
 	void reset(VkCommandBuffer cmd);
 	void submit(CommandBuffer& cmd);
 	void run_and_submit(CommandBuffer& cmd);
-	void destroy();
+	void destroy(bool keep_pipeline_cache = false);
 	friend RenderPass;
 	bool recording = true;
 	bool reload_shaders = false;
