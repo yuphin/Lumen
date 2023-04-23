@@ -962,9 +962,9 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	}
 }
 
-void RenderGraph::reset(VkCommandBuffer cmd) {
+void RenderGraph::reset() {
 	pass_idxs_with_shader_compilation_overrides.clear();
-	event_pool.reset_events(ctx->device, cmd);
+	event_pool.reset_events(ctx->device);
 	for (int i = 0; i < passes.size(); i++) {
 		passes[i].set_signals_buffer.clear();
 		passes[i].wait_signals_buffer.clear();

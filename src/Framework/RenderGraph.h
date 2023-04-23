@@ -34,7 +34,7 @@ class RenderGraph {
 	RenderPass& add_gfx(const std::string& name, const GraphicsPassSettings& settings);
 	RenderPass& add_compute(const std::string& name, const ComputePassSettings& settings);
 	void run(VkCommandBuffer cmd);
-	void reset(VkCommandBuffer cmd);
+	void reset();
 	void submit(CommandBuffer& cmd);
 	void run_and_submit(CommandBuffer& cmd);
 	void destroy();

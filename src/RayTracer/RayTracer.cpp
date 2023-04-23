@@ -325,7 +325,7 @@ float RayTracer::draw_frame() {
 	if (result != VK_SUCCESS) {
 		resize_func();
 	} else {
-		vkb.rg->reset(vkb.ctx.command_buffers[image_idx]);
+		vkb.rg->reset();
 	}
 
 	auto now = clock();

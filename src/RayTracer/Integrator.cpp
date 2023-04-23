@@ -88,8 +88,7 @@ void Integrator::init() {
 		total_light_triangle_cnt++;
 		light.world_radius = lumen_scene->m_dimensions.radius;
 		light.world_center = 0.5f * (lumen_scene->m_dimensions.max + lumen_scene->m_dimensions.min);
-		//light.enabled = l.enabled;
-		if (l.light_flags & LIGHT_DIRECTIONAL) {
+		if ((l.light_flags & LIGHT_DIRECTIONAL) == LIGHT_DIRECTIONAL) {
 			lumen_scene->dir_light_idx = i;
 		}
 		lights.emplace_back(light);

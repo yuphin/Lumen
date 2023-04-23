@@ -8,7 +8,7 @@ class EventPool {
 	};
 	EventPool() = default;
 	VkEvent get_event(VkDevice device, VkCommandBuffer cmd);
-	void reset_events(VkDevice device, VkCommandBuffer cmd);
+	void reset_events(VkDevice device);
 	void cleanup(VkDevice device);
 
    private:
