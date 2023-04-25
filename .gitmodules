@@ -7,3 +7,9 @@
 [submodule "libs/shaderc"]
 	path = libs/shaderc
 	url = https://github.com/google/shaderc.git
+[submodule "libs/SPIRV-Tools"]
+	path = libs/SPIRV-Tools
+	url = https://github.com/KhronosGroup/SPIRV-Tools.git
+[submodule "libs/SPIRV-Headers"]
+	path = libs/SPIRV-Headers
+	url = https://github.com/KhronosGroup/SPIRV-Headers.git
