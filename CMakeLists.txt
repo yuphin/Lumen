@@ -6,7 +6,7 @@ enable_testing()
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
     message("Enabling vulkan validation layers")
-    add_compile_definitions(USEVKVALIDATIONLAYER)
+    add_compile_definitions(USEVKVALIDATIONLAYER _DEBUG)
 endif()
 
 find_package(Threads REQUIRED)
@@ -30,7 +30,7 @@ include_directories(${Vulkan_INCLUDE_DIR};${GLSLang_INCLUDE_DIR};${netCDF_INCLUD
 add_compile_definitions(TINYEXR_USE_MINIZ)
 add_executable(Lumen ${src_files})
 
-target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw spirv-cross-core spirv-cross-cpp spirv-cross-glsl)
+target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw spirv-cross-core spirv-cross-cpp spirv-cross-glsl volk)
 target_compile_features(Lumen PRIVATE cxx_std_20)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})

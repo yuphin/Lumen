@@ -1,7 +1,6 @@
 #include "LumenPCH.h"
 #include <regex>
 #include <stb_image/stb_image.h>
-#define TINYEXR_IMPLEMENTATION
 #include <tinyexr.h>
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION

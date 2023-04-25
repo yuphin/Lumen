@@ -18,6 +18,9 @@ file(GLOB mitsuba_src
 file(GLOB tinyxml_src
     "tinyxml2/tinyxml2.cpp"
 )
+file(GLOB miniz_src
+    "miniz.c"
+)
 
 include(CMakeDependentOption)
 cmake_dependent_option(GLFW_BUILD_WIN32 "Build support for Win32" ON "WIN32" OFF)
@@ -26,4 +29,5 @@ cmake_dependent_option(GLFW_BUILD_X11 "Build support for X11" ON "UNIX;NOT APPLE
 cmake_dependent_option(GLFW_BUILD_WAYLAND "Build support for Wayland"
     "${GLFW_USE_WAYLAND}" "UNIX;NOT APPLE" OFF)
 add_subdirectory(glfw)
-set(src_files "${src_files};${imgui_src};${mitsuba_src};${extension_src};${tinyxml_src}" PARENT_SCOPE)
+add_subdirectory(volk)
+set(src_files "${src_files};${imgui_src};${mitsuba_src};${extension_src};${tinyxml_src};${miniz_src}" PARENT_SCOPE)

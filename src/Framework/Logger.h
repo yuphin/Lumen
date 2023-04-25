@@ -21,6 +21,7 @@ class Logger {
 #ifdef _DEBUG
 #define LUMEN_INFO(...) Logger::get_logger()->info(__VA_ARGS__)
 #else
+#define LUMEN_INFO(...)
 #define VEX_INFO(...)
 #endif
 #define LUMEN_WARN(...) Logger::get_logger()->warn(__VA_ARGS__)
