@@ -453,10 +453,6 @@ static void parse_shader(Shader& shader, const uint32_t* code, size_t code_size,
 	}
 }
 
-static std::vector<uint32_t> compile_file(std::string_view source_name, const RenderPass& pass){
-	spirv_cross::CompilerGLSL::CompilerGLSL compiler;
-}
-
 #if USE_SHADERC
 #include <shaderc/shaderc.hpp>
 #include <libshaderc_util/file_finder.h>
