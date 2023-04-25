@@ -11,9 +11,6 @@ endif()
 
 find_package(Threads REQUIRED)
 find_package(Vulkan REQUIRED)
-find_package(spirv_cross_core REQUIRED)
-find_package(spirv_cross_glsl REQUIRED)
-find_package(spirv_cross_cpp REQUIRED)
 
 set(src_files)
 add_subdirectory(src)

@@ -30,7 +30,6 @@ cmake_dependent_option(GLFW_BUILD_WAYLAND "Build support for Wayland"
     "${GLFW_USE_WAYLAND}" "UNIX;NOT APPLE" OFF)
 add_subdirectory(glfw)
 add_subdirectory(volk)
-
 add_subdirectory(SPIRV-Headers)
 
 set(SKIP_SPIRV_TOOLS_INSTALL ON)
