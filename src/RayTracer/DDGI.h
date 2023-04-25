@@ -44,7 +44,7 @@ class DDGI : public Integrator {
 	glm::ivec3 probe_counts;
 	glm::vec3 probe_start_position;
 
-	PushConstantRay pc_ray{};
+	PCDDGI pc_ray{};
 	VkSampler bilinear_sampler;
 	VkSampler nearest_sampler;
 	bool first_frame = true;

@@ -7,6 +7,7 @@
 #include <numeric>
 #include <set>
 #include <sstream>
+#include "Logger.h"
 
 #define EXTENSION_ATTRIB_IRAY "NV_attributes_iray"
 
@@ -662,9 +663,7 @@ void GltfScene::compute_scene_dimensions() {
 	}
 
 	if (scnBbox.is_empty() || !scnBbox.isVolume()) {
-		printf(
-			"glTF: Scene bounding box invalid, Setting to: [-1,-1,-1], "
-			"[1,1,1]");
+		LUMEN_INFO("glTF: Scene bounding box invalid, Setting to: [-1,-1,-1], [1,1,1]");
 		scnBbox.insert({-1.0f, -1.0f, -1.0f});
 		scnBbox.insert({1.0f, 1.0f, 1.0f});
 	}
@@ -777,9 +776,9 @@ void GltfScene::check_required_extensions(const tinygltf::Model& tmodel) {
 
 	for (auto& e : tmodel.extensionsRequired) {
 		if (supportedExtensions.find(e) == supportedExtensions.end()) {
-			printf(
+			LUMEN_CRITICAL(
 				"\n---------------------------------------\n"
-				"The extension %s is REQUIRED and not supported \n",
+				"The extension {} is REQUIRED and not supported",
 				e.c_str());
 		}
 	}

@@ -1,7 +1,7 @@
 #ifndef PSSMLT_UTILS
 #define PSSMLT_UTILS
 #include "../../commons.glsl"
-layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCMLT pc_ray; };
 layout(constant_id = 0) const int SEEDING = 0;
 layout(buffer_reference, scalar) buffer BootstrapData { BootstrapSample d[]; };
 layout(buffer_reference, scalar) buffer SeedsData { SeedData d[]; };

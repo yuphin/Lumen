@@ -10,7 +10,7 @@ class BDPT : public Integrator {
 	virtual void destroy() override;
 
    private:
-	PushConstantRay pc_ray{};
+	PCBDPT pc_ray{};
 	Buffer light_path_buffer;
 	Buffer camera_path_buffer;
 	Buffer color_storage_buffer;

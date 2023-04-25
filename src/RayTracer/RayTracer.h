@@ -30,6 +30,8 @@ class RayTracer : public LumenInstance {
 	void parse_args(int argc, char* argv[]);
 	float draw_frame();
 	void render(uint32_t idx);
+	void create_integrator(int integrator_idx);
+	bool gui();
 	bool initialized = false;
 	bool rt_initialized = false;
 	float cpu_avg_time = 0;

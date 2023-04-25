@@ -70,19 +70,17 @@ void SMLT::init() {
 							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 							  num_mlt_threads * sizeof(ChainData));
 
-	splat_buffer.create(
-		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat));
+	splat_buffer.create(&instance->vkb.ctx,
+						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+							VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+						num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat));
 
-	past_splat_buffer.create(
-		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat));
+	past_splat_buffer.create(&instance->vkb.ctx,
+							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+							 num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat));
 
 	auto path_size = std::max(num_mlt_threads, num_bootstrap_samples);
 	light_path_buffer.create(&instance->vkb.ctx,
@@ -104,12 +102,11 @@ void SMLT::init() {
 								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 								 path_size * sizeof(float));
 
-	light_splats_buffer.create(
-		&instance->vkb.ctx,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		path_size * (config->path_length * (config->path_length + 1)) * sizeof(Splat));
+	light_splats_buffer.create(&instance->vkb.ctx,
+							   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+							   path_size * (config->path_length * (config->path_length + 1)) * sizeof(Splat));
 
 	light_splat_cnts_buffer.create(&instance->vkb.ctx,
 								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
@@ -219,9 +216,6 @@ void SMLT::render() {
 	VkClearValue clear_depth = {1.0f, 0};
 	VkViewport viewport = vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
 	VkClearValue clear_values[] = {clear_color, clear_depth};
-	pc_ray.light_pos = scene_ubo.light_pos;
-	pc_ray.light_type = 0;
-	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
@@ -233,6 +227,9 @@ void SMLT::render() {
 	pc_ray.num_bootstrap_samples = num_bootstrap_samples;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
+
+	pc_ray.radius = lumen_scene->m_dimensions.radius * config->radius_factor / 100.f;
+	pc_ray.radius /= (float)pow((double)pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
 
 	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
@@ -404,7 +401,7 @@ void SMLT::render() {
 			}
 			iter += 100;
 			instance->vkb.rg->run(cmd.handle);
-			printf("%d / %d\n", iter, mutation_count);
+			LUMEN_TRACE("{} / {}", iter, mutation_count);
 			instance->vkb.rg->submit(cmd);
 		}
 		const uint32_t rem = mutation_count % iter_cnt;

@@ -1,6 +1,6 @@
 #include "../../commons.glsl"
 layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
-layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCReSTIR pc_ray; };
 layout(buffer_reference, scalar) buffer GBuffer { GBufferData d[]; };
 layout(buffer_reference, scalar) buffer RestirReservoir_ {
     RestirReservoir d[];

@@ -24,6 +24,7 @@ struct LumenLight {
 	glm::vec3 L;
 	uint32_t light_flags;
 	float world_radius;
+	bool enabled = true;
 };
 
 class LumenScene {
@@ -49,6 +50,9 @@ class LumenScene {
 		float radius{0};
 	} m_dimensions;
 	std::unique_ptr<SceneConfig> config;
+
+	uint32_t dir_light_idx = -1;
+	void create_scene_config(const std::string& integrator_name);
 
    private:
 	void compute_scene_dimensions();

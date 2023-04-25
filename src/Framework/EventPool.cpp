@@ -2,6 +2,9 @@
 #include "EventPool.h"
 
 VkEvent EventPool::get_event(VkDevice device, VkCommandBuffer cmd) {
+	// Note: Render graph may be executed with a command buffer that has VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+	// Still, it looks like the VkCommandBuffer id is still the same across each frame.
+	// TODO: Check if this is defined.
 	VkEventCreateInfo event_create_info = {VK_STRUCTURE_TYPE_EVENT_CREATE_INFO};
 	if (events_map.find(cmd) == events_map.end()) {
 		events_map[cmd].events.push_back(VkEvent());
@@ -20,19 +23,17 @@ VkEvent EventPool::get_event(VkDevice device, VkCommandBuffer cmd) {
 	}
 }
 
-void EventPool::reset_events(VkDevice device, VkCommandBuffer cmd) {
-	if (events_map.find(cmd) == events_map.end()) {
-		return;
+void EventPool::reset_events(VkDevice device) {
+	for (auto& [cmd, event] : events_map) {
+		event.available_event_idx = 0;
 	}
-	auto& event = events_map[cmd];
-	event.available_event_idx = 0;
 }
 
 void EventPool::cleanup(VkDevice device) {
-	for (const auto& [k,v] : events_map) {
+	for (const auto& [k, v] : events_map) {
 		for (VkEvent event : v.events) {
 			vkDestroyEvent(device, event, nullptr);
 		}
 	}
-
+	events_map.clear();
 }

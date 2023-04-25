@@ -34,7 +34,7 @@ class RenderGraph {
 	RenderPass& add_gfx(const std::string& name, const GraphicsPassSettings& settings);
 	RenderPass& add_compute(const std::string& name, const ComputePassSettings& settings);
 	void run(VkCommandBuffer cmd);
-	void reset(VkCommandBuffer cmd);
+	void reset();
 	void submit(CommandBuffer& cmd);
 	void run_and_submit(CommandBuffer& cmd);
 	void destroy();
@@ -255,8 +255,10 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 			auto idx = storage.pass_idxs[offset_idx];
 			if constexpr (std::is_same_v<GraphicsPassSettings, Settings>) {
 				auto& curr_pass = passes[idx];
-				curr_pass.gfx_settings->color_outputs = settings.color_outputs;
-				curr_pass.gfx_settings->depth_output = settings.depth_output;
+				if (curr_pass.gfx_settings) {
+					curr_pass.gfx_settings->color_outputs = settings.color_outputs;
+					curr_pass.gfx_settings->depth_output = settings.depth_output;
+				}	
 			}
 			passes[idx].active = true;
 			if (reload_shaders) {
@@ -265,6 +267,9 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 					pipeline_cache[name_with_macros].pipeline = std::make_unique<Pipeline>(ctx, name_with_macros);
 				}
 				passes[idx].pipeline = pipeline_cache[name_with_macros].pipeline.get();
+				passes[idx].is_pipeline_cached = false;
+			} else {
+				passes[idx].is_pipeline_cached = true;
 			}
 			++storage.offset_idx;
 			// If this is a cached pipeline and the cached pipeline index is not 0, make this the starting pass index
@@ -278,7 +283,6 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 				passes[idx].pass_idx += uint32_t(pass_idxs_with_shader_compilation_overrides.size());
 				storage.pass_idxs[offset_idx] = passes[idx].pass_idx;
 			}
-			passes[idx].is_pipeline_cached = true;
 			return passes[idx];
 		}
 		pipeline = pipeline_cache[name_with_macros].pipeline.get();

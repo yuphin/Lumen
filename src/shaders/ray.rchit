@@ -29,7 +29,6 @@ layout(buffer_reference, scalar) readonly buffer TexCoords { vec2 t[]; };
 layout(buffer_reference, scalar) readonly buffer Materials {
     Material m[];
 };
-layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 
 void main() {
     

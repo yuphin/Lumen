@@ -77,10 +77,10 @@ void save_exr(const float* rgb, int width, int height, const char* outfilename) 
 	const char* err = NULL;	 // or nullptr in C++11 or later.
 	int ret = SaveEXRImageToFile(&image, &header, outfilename, &err);
 	if (ret != TINYEXR_SUCCESS) {
-		fprintf(stderr, "Save EXR err: %s\n", err);
+		LUMEN_ERROR("Save EXR err: {}", err);
 		FreeEXRErrorMessage(err);  // free's buffer for an error message
 	}
-	printf("Saved exr file. [ %s ] \n", outfilename);
+	LUMEN_TRACE("Saved exr file. [ {} ]", outfilename);
 
 	free(header.channels);
 	free(header.pixel_types);

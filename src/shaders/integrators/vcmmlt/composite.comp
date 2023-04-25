@@ -15,7 +15,7 @@ layout(buffer_reference, scalar) buffer MLTColor { vec3 d[]; };
 layout(binding = 0, rgba32f) uniform image2D image;
 layout(binding = 1) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(buffer_reference, scalar) buffer ChainStats { ChainData d[]; };
-layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCMLT pc_ray; };
 layout(buffer_reference, scalar) buffer CDFSum { float d; };
 ChainStats chain_stats = ChainStats(scene_desc.chain_stats_addr);
 ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);

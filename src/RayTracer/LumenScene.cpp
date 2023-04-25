@@ -4,7 +4,8 @@
 #include <tinygltf/json.hpp>
 #pragma warning(pop)
 #include <tiny_obj_loader.h>
-#include <shaders/commons.h>
+#include "shaders/commons.h"
+#include <cctype>
 
 struct Bbox {
 	Bbox() = default;
@@ -83,30 +84,6 @@ void LumenScene::load_scene(const std::string& path) {
 
 	auto root = path.substr(0, found + 1);
 
-	auto get_scene_config = [](const std::string& integrator_name) -> std::unique_ptr<SceneConfig> {
-		if (integrator_name == "path") {
-			return std::move(std::make_unique<PathConfig>());
-		} else if (integrator_name == "bdpt") {
-			return std::move( std::make_unique<BDPTConfig>());
-		} else if (integrator_name == "sppm") {
-			return  std::move(std::make_unique<SPPMConfig>());
-		} else if (integrator_name == "vcm") {
-			return std::move(std::make_unique<VCMConfig>());
-		} else if (integrator_name == "pssmlt") {
-			return  std::move(std::make_unique<PSSMLTConfig>());
-		} else if (integrator_name == "smlt") {
-			return  std::move(std::make_unique<SMLTConfig>());
-		} else if (integrator_name == "vcmmlt") {
-			return  std::move(std::make_unique<VCMMLTConfig>());
-		} else if (integrator_name == "restir") {
-			return  std::move(std::make_unique<ReSTIRConfig>());
-		} else if (integrator_name == "restirgi") {
-			return  std::move(std::make_unique<ReSTIRGIConfig>());
-		} else if (integrator_name == "ddgi") {
-			return  std::move(std::make_unique<DDGIConfig>());
-		}
-		return std::move(std::make_unique<PathConfig>());
-	};
 
 	if (ends_with(path, ".json")) {
 		std::ifstream i(path);
@@ -115,7 +92,7 @@ void LumenScene::load_scene(const std::string& path) {
 
 		auto& integrator = j["integrator"];
 
-		config = get_scene_config(integrator["type"]);
+		create_scene_config(integrator["type"]);
 
 		SceneConfig* curr_config = config.get();
 		if (!integrator["path_length"].is_null()) {
@@ -317,7 +294,7 @@ void LumenScene::load_scene(const std::string& path) {
 		MitsubaParser mitsuba_parser;
 		mitsuba_parser.parse(path);
 
-		config = get_scene_config(mitsuba_parser.integrator.type);
+		create_scene_config(mitsuba_parser.integrator.type);
 
 		SceneConfig* curr_config = config.get();
 
@@ -489,6 +466,34 @@ void LumenScene::load_scene(const std::string& path) {
 			}
 			i++;
 		}
+	}
+}
+
+void LumenScene::create_scene_config(const std::string& integrator_name) {
+	std::string name = integrator_name;
+	std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return std::tolower(c); });
+	if (name == "path") {
+		config = std::make_unique<PathConfig>();
+	} else if (name == "bdpt") {
+		config = std::make_unique<BDPTConfig>();
+	} else if (name == "sppm") {
+		config = std::make_unique<SPPMConfig>();
+	} else if (name == "vcm") {
+		config = std::make_unique<VCMConfig>();
+	} else if (name == "pssmlt") {
+		config = std::make_unique<PSSMLTConfig>();
+	} else if (name == "smlt") {
+		config = std::make_unique<SMLTConfig>();
+	} else if (name == "vcmmlt") {
+		config = std::make_unique<VCMMLTConfig>();
+	} else if (name == "restir") {
+		config = std::make_unique<ReSTIRConfig>();
+	} else if (name == "restirgi") {
+		config = std::make_unique<ReSTIRGIConfig>();
+	} else if (name == "ddgi") {
+		config = std::make_unique<DDGIConfig>();
+	} else {
+		config = std::make_unique<PathConfig>();
 	}
 }
 

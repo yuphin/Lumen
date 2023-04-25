@@ -69,9 +69,6 @@ void ReSTIRGI::init() {
 
 void ReSTIRGI::render() {
 	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	pc_ray.light_pos = scene_ubo.light_pos;
-	pc_ray.light_type = 0;
-	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = (int)lights.size();
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
@@ -79,7 +76,7 @@ void ReSTIRGI::render() {
 	pc_ray.do_spatiotemporal = do_spatiotemporal;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
-	
+
 	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
@@ -88,13 +85,13 @@ void ReSTIRGI::render() {
 
 	// Trace rays
 	instance->vkb.rg
-		->add_rt("ReSTIRGI - Generate Samples", { .shaders = {{"src/shaders/integrators/restir/gi/restir.rgen"},
+		->add_rt("ReSTIRGI - Generate Samples", {.shaders = {{"src/shaders/integrators/restir/gi/restir.rgen"},
 															 {"src/shaders/ray.rmiss"},
 															 {"src/shaders/ray_shadow.rmiss"},
 															 {"src/shaders/ray.rchit"},
 															 {"src/shaders/ray.rahit"}},
 												 .dims = {instance->width, instance->height},
-												 .accel = instance->vkb.tlas.accel })
+												 .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
 		.zero(restir_samples_buffer)
 		.zero(temporal_reservoir_buffer, !do_spatiotemporal)
@@ -137,10 +134,10 @@ void ReSTIRGI::render() {
 	// Output
 	instance->vkb.rg
 		->add_compute("Output",
-					  { .shader = Shader("src/shaders/integrators/restir/gi/output.comp"),
-					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1} })
+					  {.shader = Shader("src/shaders/integrators/restir/gi/output.comp"),
+					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
-		.bind({ output_tex, scene_desc_buffer });
+		.bind({output_tex, scene_desc_buffer});
 	if (!do_spatiotemporal) {
 		do_spatiotemporal = true;
 	}

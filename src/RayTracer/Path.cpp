@@ -24,15 +24,13 @@ void Path::init() {
 
 void Path::render() {
 	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	pc_ray.light_pos = scene_ubo.light_pos;
-	pc_ray.light_type = 0;
-	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = (int)lights.size();
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	pc_ray.dir_light_idx = lumen_scene->dir_light_idx;
 	instance->vkb.rg
 		->add_rt("Path", {.shaders = {{"src/shaders/integrators/path/path.rgen"},
 									  {"src/shaders/ray.rmiss"},

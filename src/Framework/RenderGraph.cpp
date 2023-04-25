@@ -962,9 +962,9 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	}
 }
 
-void RenderGraph::reset(VkCommandBuffer cmd) {
+void RenderGraph::reset() {
 	pass_idxs_with_shader_compilation_overrides.clear();
-	event_pool.reset_events(ctx->device, cmd);
+	event_pool.reset_events(ctx->device);
 	for (int i = 0; i < passes.size(); i++) {
 		passes[i].set_signals_buffer.clear();
 		passes[i].wait_signals_buffer.clear();
@@ -1027,6 +1027,7 @@ void RenderGraph::run_and_submit(CommandBuffer& cmd) {
 }
 
 void RenderGraph::destroy() {
+	passes.clear();
 	event_pool.cleanup(ctx->device);
 	for (auto& pass : passes) {
 		if (pass.push_constant_data) {
@@ -1036,4 +1037,10 @@ void RenderGraph::destroy() {
 	for (const auto& [k, v] : pipeline_cache) {
 		v.pipeline->cleanup();
 	}
+	recording = true;
+	buffer_resource_map.clear();
+	img_resource_map.clear();
+	registered_buffer_pointers.clear();
+	shader_cache.clear();
+	pipeline_cache.clear();
 }
