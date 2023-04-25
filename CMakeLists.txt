@@ -27,10 +27,11 @@ set(structures_INCLUDE_DIR
     "src"
 )
 include_directories(${Vulkan_INCLUDE_DIR};${GLSLang_INCLUDE_DIR};${netCDF_INCLUDE_DIR};${structures_INCLUDE_DIR})
-add_compile_definitions(TINYEXR_USE_MINIZ)
+add_compile_definitions(TINYEXR_USE_MINIZ)  # enables usage of miniz for opening exr images
+add_compile_definitions(USE_SHADERC)        # enables shader compilation via shaderc
 add_executable(Lumen ${src_files})
 
-target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw spirv-cross-core spirv-cross-cpp spirv-cross-glsl volk)
+target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw spirv-cross-core spirv-cross-cpp spirv-cross-glsl volk shaderc shaderc_util glslc)
 target_compile_features(Lumen PRIVATE cxx_std_20)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})

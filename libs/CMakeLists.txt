@@ -38,6 +38,10 @@ set(SPIRV_SKIP_TESTS ON)
 set(SPIRV_SKIP_EXECUTABLES ON)
 add_subdirectory(SPIRV-Tools)
 
+set(SKIP_GLSLANG_INSTALL ON)
+add_subdirectory(glslang)
+set(ENABLE_CTEST OFF CACHE BOOL "Enables testing")
+
 set(SHADERC_SKIP_INSTALL ON)
 set(SHADERC_SKIP_TESTS ON)
 set(SHADERC_SKIP_EXAMPLES ON)

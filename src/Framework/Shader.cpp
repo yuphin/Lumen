@@ -455,8 +455,8 @@ static void parse_shader(Shader& shader, const uint32_t* code, size_t code_size,
 
 #if USE_SHADERC
 #include <shaderc/shaderc.hpp>
+#include <shaderc/glslc/src/file_includer.h>
 #include <libshaderc_util/file_finder.h>
-#include <glslc/file_includer.h>
 
 static std::unordered_map<std::string, shaderc_shader_kind> mstages = {
 	{"vert", shaderc_vertex_shader}, {"frag", shaderc_fragment_shader}, {"comp", shaderc_compute_shader},

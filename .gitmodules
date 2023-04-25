@@ -13,3 +13,6 @@
 [submodule "libs/SPIRV-Headers"]
 	path = libs/SPIRV-Headers
 	url = https://github.com/KhronosGroup/SPIRV-Headers.git
+[submodule "libs/glslang"]
+	path = libs/glslang
+	url = https://github.com/KhronosGroup/glslang.git
