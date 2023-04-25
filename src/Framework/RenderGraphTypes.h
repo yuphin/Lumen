@@ -11,17 +11,27 @@
 class RenderGraph;
 class RenderPass;
 
+
+struct ShaderMacro {
+	ShaderMacro(const std::string name, int val) : name(name), val(val), has_val(true) {}
+	ShaderMacro(const std::string name) : name(name) {}
+	std::string name;
+	int val = 0;
+	bool has_val = false;
+};
+
 struct RenderGraphSettings {
 	bool shader_inference = false;
 	bool use_events = false;
 };
 
 struct GraphicsPassSettings {
+	std::vector<Shader> shaders;
+	const std::vector<ShaderMacro> macros = {};
 	uint32_t width;
 	uint32_t height;
 	VkClearValue clear_color;
 	VkClearValue clear_depth_stencil;
-	std::vector<Shader> shaders;
 	VkCullModeFlags cull_mode = VK_CULL_MODE_FRONT_BIT;
 	std::vector<Buffer*> vertex_buffers = {};
 	Buffer* index_buffer = nullptr;
@@ -40,6 +50,7 @@ struct GraphicsPassSettings {
 
 struct RTPassSettings {
 	std::vector<Shader> shaders;
+	std::vector<ShaderMacro> macros = {};
 	uint32_t recursion_depth = 1;
 	std::vector<uint32_t> specialization_data = {};
 	dim3 dims;
@@ -49,6 +60,7 @@ struct RTPassSettings {
 
 struct ComputePassSettings {
 	Shader shader;
+	std::vector<ShaderMacro> macros = {};
 	std::vector<uint32_t> specialization_data = {};
 	dim3 dims;
 	std::function<void(VkCommandBuffer cmd, const RenderPass& pass)> pass_func;
@@ -57,10 +69,6 @@ struct ComputePassSettings {
 enum class PassType { Compute, RT, Graphics };
 
 struct ResourceBinding {
-	struct ResourceStatus {
-		bool read = false;
-		bool write = false;
-	};
 	Buffer* buf = nullptr;
 	Texture2D* tex = nullptr;
 	VkSampler sampler = nullptr;

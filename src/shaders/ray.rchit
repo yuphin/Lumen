@@ -15,13 +15,13 @@ hitAttributeEXT vec2 attribs;
 
 layout(location = 0) rayPayloadInEXT HitPayload payload;
 
-layout(set = 0, binding = 1) readonly buffer InstanceInfo_ {
-    PrimMeshInfo prim_info[];
-};
-layout(set = 0, binding = 3, scalar) buffer SceneDesc_ {
+layout(set = 0, binding = 2, scalar) buffer SceneDesc_ {
     SceneDesc scene_desc;
 };
 layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
+layout(buffer_reference, scalar) readonly buffer InstanceInfo {
+    PrimMeshInfo prim_info[];
+};
 layout(buffer_reference, scalar) readonly buffer Vertices { vec3 v[]; };
 layout(buffer_reference, scalar) readonly buffer Indices { uint i[]; };
 layout(buffer_reference, scalar) readonly buffer Normals { vec3 n[]; };
@@ -32,7 +32,16 @@ layout(buffer_reference, scalar) readonly buffer Materials {
 layout(push_constant) uniform _PushConstantRay { PushConstantRay pc_ray; };
 
 void main() {
-    PrimMeshInfo pinfo = prim_info[gl_InstanceCustomIndexEXT];
+    
+    // Object data
+    Materials materials = Materials(scene_desc.material_addr);
+    Indices indices = Indices(scene_desc.index_addr);
+    Vertices vertices = Vertices(scene_desc.vertex_addr);
+    Normals normals = Normals(scene_desc.normal_addr);
+    TexCoords tex_coords = TexCoords(scene_desc.uv_addr);
+    InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
+
+    PrimMeshInfo pinfo = prim_infos.prim_info[gl_InstanceCustomIndexEXT];
     // Getting the 'first index' for this mesh (offset of the mesh + offset of
     // the triangle)
     uint index_offset = pinfo.index_offset + 3 * gl_PrimitiveID;
@@ -40,12 +49,6 @@ void main() {
         pinfo.vertex_offset; // Vertex offset as defined in glTF
     uint material_index = pinfo.material_index; // material of primitive mesh
 
-    // Object data
-    Materials materials = Materials(scene_desc.material_addr);
-    Indices indices = Indices(scene_desc.index_addr);
-    Vertices vertices = Vertices(scene_desc.vertex_addr);
-    Normals normals = Normals(scene_desc.normal_addr);
-    TexCoords tex_coords = TexCoords(scene_desc.uv_addr);
 
     // Indices of the triangle
     ivec3 ind = ivec3(indices.i[index_offset + 0], indices.i[index_offset + 1],

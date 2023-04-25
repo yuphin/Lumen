@@ -7,8 +7,8 @@ void SMLT::init() {
 	num_mlt_threads = 1600 * 900 / 2;
 	num_bootstrap_samples = 1600 * 900 / 2;
 	mutation_count = int(instance->width * instance->height * mutations_per_pixel / float(num_mlt_threads));
-	light_path_rand_count = 6 + 2 * lumen_scene->config.path_length;
-	cam_path_rand_count = 3 + 6 * lumen_scene->config.path_length;
+	light_path_rand_count = 6 + 2 * config->path_length;
+	cam_path_rand_count = 3 + 6 * config->path_length;
 
 	bootstrap_buffer.create(&instance->vkb.ctx,
 							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
@@ -75,20 +75,20 @@ void SMLT::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * (lumen_scene->config.path_length * (lumen_scene->config.path_length + 1)) * sizeof(Splat));
+		num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat));
 
 	past_splat_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		num_mlt_threads * (lumen_scene->config.path_length * (lumen_scene->config.path_length + 1)) * sizeof(Splat));
+		num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat));
 
 	auto path_size = std::max(num_mlt_threads, num_bootstrap_samples);
 	light_path_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-							 path_size * (lumen_scene->config.path_length + 1) * sizeof(VCMVertex));
+							 path_size * (config->path_length + 1) * sizeof(VCMVertex));
 
 	connected_lights_buffer.create(
 		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -109,7 +109,7 @@ void SMLT::init() {
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-		path_size * (lumen_scene->config.path_length * (lumen_scene->config.path_length + 1)) * sizeof(Splat));
+		path_size * (config->path_length * (config->path_length + 1)) * sizeof(Splat));
 
 	light_splat_cnts_buffer.create(&instance->vkb.ctx,
 								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
@@ -176,6 +176,7 @@ void SMLT::init() {
 	desc.light_splat_cnts_addr = light_splat_cnts_buffer.get_device_address();
 
 	assert(instance->vkb.rg->settings.shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, &bootstrap_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, &cdf_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, &cdf_sum_buffer, instance->vkb.rg);
@@ -223,8 +224,8 @@ void SMLT::render() {
 	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = lumen_scene->config.path_length;
-	pc_ray.sky_col = lumen_scene->config.sky_col;
+	pc_ray.max_depth = config->path_length;
+	pc_ray.sky_col = config->sky_col;
 	// SMLT related constants
 	pc_ray.light_rand_count = light_path_rand_count;
 	pc_ray.cam_rand_count = cam_path_rand_count;
@@ -233,9 +234,8 @@ void SMLT::render() {
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
 
-	std::initializer_list<ResourceBinding> rt_bindings = {
+	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
-		prim_lookup_buffer,
 		scene_ubo_buffer,
 		scene_desc_buffer,
 	};
@@ -276,7 +276,7 @@ void SMLT::render() {
 			.bind_tlas(instance->vkb.tlas);
 	}
 	int counter = 0;
-	prefix_scan(0, lumen_scene->config.num_bootstrap_samples, counter, instance->vkb.rg.get());
+	prefix_scan(0, config->num_bootstrap_samples, counter, instance->vkb.rg.get());
 	// Calculate CDF
 	instance->vkb.rg
 		->add_compute("Calculate CDF", {.shader = Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),

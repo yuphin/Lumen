@@ -51,6 +51,7 @@ void SPPM::init() {
 	pc_ray.size_y = instance->height;
 
 	assert(instance->vkb.rg->settings.shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, sppm_data_addr, &sppm_data_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, atomic_data_addr, &atomic_data_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, &photon_buffer, instance->vkb.rg);
@@ -65,16 +66,16 @@ void SPPM::render() {
 	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = lumen_scene->config.path_length;
-	pc_ray.sky_col = lumen_scene->config.sky_col;
+	pc_ray.max_depth = config->path_length;
+	pc_ray.sky_col = config->sky_col;
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
 	// PPM related constants
-	pc_ray.radius = lumen_scene->config.base_radius;
+	pc_ray.radius = config->base_radius;
 	pc_ray.min_bounds = lumen_scene->m_dimensions.min;
 	pc_ray.max_bounds = lumen_scene->m_dimensions.max;
-	pc_ray.ppm_base_radius = lumen_scene->config.base_radius;
+	pc_ray.ppm_base_radius = config->base_radius;
 	const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
 	const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
 	const int base_grid_res = int(max_comp / pc_ray.radius);
@@ -97,6 +98,12 @@ void SPPM::render() {
 		}
 	};
 
+	const std::initializer_list<ResourceBinding> rt_bindings = {
+		output_tex,
+		scene_ubo_buffer,
+		scene_desc_buffer,
+	};
+
 	// Trace rays from eye
 	instance->vkb.rg
 		->add_rt("SPPM - Eye", {.shaders = {{"src/shaders/integrators/sppm/sppm_eye.rgen"},
@@ -109,12 +116,7 @@ void SPPM::render() {
 		.push_constants(&pc_ray)
 		.zero(photon_buffer)
 		.zero(sppm_data_buffer, /*cond=*/pc_ray.frame_num == 0)
-		.bind({
-			output_tex,
-			prim_lookup_buffer,
-			scene_ubo_buffer,
-			scene_desc_buffer,
-		})
+		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
@@ -137,12 +139,7 @@ void SPPM::render() {
 								  .dims = {instance->width, instance->height},
 								  .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
-		.bind({
-			output_tex,
-			prim_lookup_buffer,
-			scene_ubo_buffer,
-			scene_desc_buffer,
-		})
+		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);

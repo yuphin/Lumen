@@ -1,5 +1,6 @@
 #pragma once
-#include "../LumenPCH.h"
+#include "LumenPCH.h"
+#include <vulkan/vulkan.h>
 #include "Buffer.h"
 #include "Event.h"
 #include "RenderGraph.h"
@@ -39,6 +40,8 @@ struct VulkanBase {
 	void create_sync_primitives();
 	void create_command_buffers();
 	void create_command_pools();
+	void init_imgui();
+	void destroy_imgui();
 	void cleanup_swapchain();
 	void recreate_swap_chain(VulkanContext&);
 	void add_device_extension(const char* name) { device_extensions.push_back(name); }
@@ -49,7 +52,7 @@ struct VulkanBase {
 		bool update = false);
 	VkDeviceAddress get_blas_device_address(uint32_t blas_idx);
 	uint32_t prepare_frame();
-	VkResult submit_frame(uint32_t image_idx, bool& resized);
+	VkResult submit_frame(uint32_t image_idx);
 
 	struct SwapChainSupportDetails {
 		VkSurfaceCapabilitiesKHR capabilities = {};
@@ -93,6 +96,7 @@ struct VulkanBase {
 	// bool fullscreen;
 	// bool initialized = false;
 	VkShaderModule create_shader(const std::vector<char>& code);
+	void cleanup_app_data();
 	void cleanup();
 
    private:
@@ -110,4 +114,5 @@ struct VulkanBase {
 						 VkBuildAccelerationStructureFlagsKHR flags,  // Build creation flag
 						 bool update								  // Update == animation
 	);
+	VkDescriptorPool imgui_pool = 0;
 };

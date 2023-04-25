@@ -1,6 +1,6 @@
 #pragma once
-#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <vulkan/vulkan.h>
 #include <optional>
 struct AccelKHR;
 
@@ -32,20 +32,9 @@ struct VulkanContext {
 	VkSurfaceKHR surface;
 	VkPhysicalDevice physical_device = VK_NULL_HANDLE;
 	VkDevice device;
-	// VkQueue gfx_queue;
-	// VkQueue present_queue;
-	// VkQueue compute_queue;
-	VkRenderPass default_render_pass;
-	VkPipelineLayout pipeline_layout;
-	VkPipeline gfx_pipeline;
 	// Swapchain related stuff
-	// VkFormat swapchain_image_format;
 	VkExtent2D swapchain_extent;
 	VkSwapchainKHR swapchain;
-	// std::vector<VkImage> swapchain_images;
-	// std::vector<VkImageView> swapchain_image_views;
-	// std::vector<VkFramebuffer> swapchain_framebuffers;
-	// std::vector<Texture2D> swapchain_images;
 	std::vector<VkCommandPool> cmd_pools;
 	std::vector<VkQueue> queues;
 	QueueFamilyIndices indices;
@@ -57,10 +46,6 @@ struct VulkanContext {
 
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props{
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
-
-	VkImage depth_img;
-	VkDeviceMemory depth_img_memory;
-	VkImageView depth_img_view;
 };
 
 enum class QueueType { GFX, COMPUTE, PRESENT };

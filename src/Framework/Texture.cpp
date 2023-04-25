@@ -8,7 +8,7 @@
 Texture2D::Texture2D(VulkanContext* ctx) : Texture(ctx) {}
 
 Texture2D::Texture2D(const std::string& name, VulkanContext* ctx, VkImage image, VkFormat format,
-					 VkImageUsageFlags usage_flags, VkImageAspectFlags aspect_flags, bool present)
+					 VkImageUsageFlags usage_flags, VkImageAspectFlags aspect_flags, VkExtent2D extent, bool present)
 	: Texture(ctx) {
 	img = image;
 	img_view = create_image_view(ctx->device, img, format);
@@ -16,6 +16,7 @@ Texture2D::Texture2D(const std::string& name, VulkanContext* ctx, VkImage image,
 	this->format = format;
 	this->aspect_flags = aspect_flags;
 	this->usage_flags = usage_flags;
+	this->base_extent = VkExtent3D(extent.width, extent.height);
 	if (!name.empty()) {
 		this->name = name;
 		DebugMarker::set_resource_name(ctx->device, (uint64_t)img, name.c_str(), VK_OBJECT_TYPE_IMAGE);
@@ -36,8 +37,7 @@ void Texture2D::transition(VkCommandBuffer cmd, VkImageLayout new_layout) {
 	layout = new_layout;
 }
 
-void Texture2D::force_transition(VkCommandBuffer cmd, VkImageLayout old_layout, VkImageLayout new_layout)
-{
+void Texture2D::force_transition(VkCommandBuffer cmd, VkImageLayout old_layout, VkImageLayout new_layout) {
 	VkImageSubresourceRange subresource_range = {};
 	subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	subresource_range.baseArrayLayer = 0;
@@ -61,7 +61,7 @@ VkDescriptorImageInfo Texture2D::descriptor(VkSampler sampler, VkImageLayout lay
 }
 
 VkDescriptorImageInfo Texture2D::descriptor(VkImageLayout layout) const {
-	//LUMEN_ASSERT(!present && sampler, "Sampler not found");
+	// LUMEN_ASSERT(!present && sampler, "Sampler not found");
 	VkDescriptorImageInfo desc_info;
 	desc_info.sampler = sampler;
 	desc_info.imageView = img_view;
@@ -87,10 +87,10 @@ VkDescriptorImageInfo Texture2D::descriptor() const {
 }
 
 void Texture2D::load_from_data(VulkanContext* ctx, void* data, VkDeviceSize size, const VkImageCreateInfo& info,
-							   VkSampler a_sampler, bool generate_mipmaps) {
+							   VkSampler a_sampler, VkImageUsageFlags flags, bool generate_mipmaps) {
 	this->ctx = ctx;
 	aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT;
-	usage_flags = VK_IMAGE_USAGE_SAMPLED_BIT;
+	usage_flags = flags;
 	Buffer staging_buffer;
 	staging_buffer.create(ctx, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -185,7 +185,8 @@ void Texture2D::create_empty_texture(const char* name, VulkanContext* ctx, const
 		vk::check(vkCreateSampler(ctx->device, &sampler_CI, nullptr, &sampler), "Could not create image sampler");
 		if (name) {
 			std::string sampler_name = std::string("Sampler: ") + std::string(name);
-			DebugMarker::set_resource_name(ctx->device, (uint64_t)sampler, sampler_name.c_str(), VK_OBJECT_TYPE_SAMPLER);
+			DebugMarker::set_resource_name(ctx->device, (uint64_t)sampler, sampler_name.c_str(),
+										   VK_OBJECT_TYPE_SAMPLER);
 		}
 	} else {
 		sampler = in_sampler;

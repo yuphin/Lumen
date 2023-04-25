@@ -10,10 +10,10 @@ file(GLOB mitsuba_src
     "mitsuba_parser/*.cpp"
 )
 
-file(GLOB extension_src
-    "*.cpp"
-    "*.c"
-)
+#file(GLOB extension_src
+#    "*.cpp"
+#    "*.c"
+#)
 
 file(GLOB tinyxml_src
     "tinyxml2/tinyxml2.cpp"

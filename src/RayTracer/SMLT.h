@@ -2,7 +2,8 @@
 #include "Integrator.h"
 class SMLT : public Integrator {
    public:
-	SMLT(LumenInstance* scene, LumenScene* lumen_scene) : Integrator(scene, lumen_scene) {}
+	SMLT(LumenInstance* scene, LumenScene* lumen_scene)
+		: Integrator(scene, lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), SMLTConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -12,7 +13,7 @@ class SMLT : public Integrator {
 	void prefix_scan(int level, int num_elems, int& counter, RenderGraph* rg);
 	PushConstantRay pc_ray{};
 	PushConstantCompute pc_compute{};
-	
+
 	// SMLT buffers
 	Buffer bootstrap_buffer;
 	Buffer cdf_buffer;
@@ -44,4 +45,6 @@ class SMLT : public Integrator {
 	int mutation_count;
 	int light_path_rand_count;
 	int cam_path_rand_count;
+
+	SMLTConfig* config;
 };

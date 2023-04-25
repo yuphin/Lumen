@@ -156,7 +156,6 @@ class Window {
 
    private:
 	GLFWwindow* window_handle;
-	int width{}, height{};
 	static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 	static void window_size_callback(GLFWwindow* window, int width, int height);
 	static void char_callback(GLFWwindow* window, uint32_t codepoint);

@@ -8,6 +8,7 @@ class RenderPass;
 struct Shader {
 	std::vector<uint32_t> binary;
 	std::string filename;
+	std::string name_with_macros;
 
 	VkShaderStageFlagBits stage = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
 	VkDescriptorType descriptor_types[32] = {};
@@ -22,6 +23,12 @@ struct Shader {
 	Shader(const std::string& filename);
 	int compile(RenderPass* pass);
 	VkShaderModule create_vk_shader_module(const VkDevice& device) const;
+	struct BindingStatus {
+		bool read = false;
+		bool write = false;
+		bool active = false;
+	};
 	std::vector<std::pair<VkFormat, uint32_t>> vertex_inputs;
 	std::unordered_map<Buffer*, BufferStatus> buffer_status_map;
+	std::unordered_map<uint32_t, BindingStatus> resource_binding_map;
 };

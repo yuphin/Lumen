@@ -25,6 +25,9 @@ void main() {
                          gl_GlobalInvocationID.x % pc_ray.size_y);
     vec3 col = vec3(0);
     col += mlt_col.d[gl_GlobalInvocationID.x] * cdf_sum.d / pc_ray.mutations_per_pixel;
+    if(isnan(luminance(col))) {
+        return;
+    }
     mlt_col.d[gl_GlobalInvocationID.x] = vec3(0);
     if (pc_ray.frame_num > 0) {
         float w = 1. / float(pc_ray.frame_num + 1);

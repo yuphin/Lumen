@@ -2,7 +2,8 @@
 #include "Integrator.h"
 class DDGI : public Integrator {
    public:
-	DDGI(LumenInstance* scene, LumenScene* lumen_scene) : Integrator(scene, lumen_scene) {}
+	DDGI(LumenInstance* scene, LumenScene* lumen_scene)
+		: Integrator(scene, lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), DDGIConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -49,4 +50,6 @@ class DDGI : public Integrator {
 	bool first_frame = true;
 	uint32_t frame_idx = 0;
 	uint total_frame_idx = 0;
+
+	DDGIConfig* config;
 };

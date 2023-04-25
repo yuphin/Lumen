@@ -17,6 +17,9 @@ void Path::init() {
 	pc_ray.frame_num = 0;
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
+	assert(instance->vkb.rg->settings.shader_inference == true);
+	// For shader resource dependency inference, use this macro to register a buffer address to the rendergraph
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
 }
 
 void Path::render() {
@@ -26,8 +29,8 @@ void Path::render() {
 	pc_ray.light_intensity = 10;
 	pc_ray.num_lights = (int)lights.size();
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = lumen_scene->config.path_length;
-	pc_ray.sky_col = lumen_scene->config.sky_col;
+	pc_ray.max_depth = config->path_length;
+	pc_ray.sky_col = config->sky_col;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
 	instance->vkb.rg
@@ -41,7 +44,6 @@ void Path::render() {
 		.push_constants(&pc_ray)
 		.bind({
 			output_tex,
-			prim_lookup_buffer,
 			scene_ubo_buffer,
 			scene_desc_buffer,
 		})

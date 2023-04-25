@@ -47,7 +47,7 @@ using uint = unsigned int;
 #define ALIGN16
 #endif
 
-#define ENABLE_DISNEY 1
+#define ENABLE_DISNEY 0
 #define DIFFUSE_ONLY 0
 #define DIFFUSE_AND_GLOSSY_ONLY 1
 
@@ -90,8 +90,13 @@ struct PushConstantRay {
     mat4 probe_rotation;
 };
 
-struct PushConstantPost {
+struct PCPost {
     uint enable_tonemapping;
+    uint enable_bloom;
+    int width;
+    int height;
+	float bloom_exposure;
+	float bloom_amount;
 };
 
 struct PushConstantCompute {
@@ -540,7 +545,7 @@ struct Desc2 {
 
 };
 
-struct PostDesc {
+struct RTUtilsDesc {
     uint64_t out_img_addr;
     uint64_t gt_img_addr;
     uint64_t residual_addr;
@@ -548,8 +553,13 @@ struct PostDesc {
     uint64_t rmse_val_addr;
 };
 
-struct PostPC {
+struct RTUtilsPC {
     uint size;
+};
+
+struct FFTPC {
+	uint idx;
+	uint n;
 };
 
 // Structure used for retrieving the primitive information in the closest hit

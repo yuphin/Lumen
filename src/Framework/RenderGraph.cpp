@@ -8,7 +8,7 @@
 // Possible solution: Make compilation with debugPrintf shaders synchronous?
 
 #define DIRTY_CHECK(x) \
-	if (!(x)) {          \
+	if (!(x)) {        \
 		return *this;  \
 	}
 
@@ -49,18 +49,34 @@ void RenderPass::register_dependencies(Buffer& buffer, VkAccessFlags dst_access_
 }
 
 void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout) {
-	if (tex.layout == dst_layout) {
+	const bool has_storage_bit = (tex.usage_flags & VK_IMAGE_USAGE_STORAGE_BIT) == VK_IMAGE_USAGE_STORAGE_BIT;
+	const bool eq_layouts = tex.layout == dst_layout;
+	// Note: Currently, the following optimization doesn't work for this:
+	// if (eq_layouts && (!has_storage_bit || dst_layout == VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL)) {
+	// The reason is that when both src and dst layout are VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, it's possible that prior
+	// to this pass, there was another pass that signalled a transition to READ_ONLY_OPTIMAL, and that pass might have a
+	// different pipeline type. So, for example: 
+	// (compute - Image layout : general) -> (compute - Image layout: read_only (for compute only)) - (fragment - Image layout: read only) 
+	// In this case: The correct synchronization is needed to ensure a fragment shader read access. 
+	// So in principle it would be possible to feed that access flag in the 2nd stage, 
+	// but our architecture currently doesn't allow this as we don't explicitly store the pipeline stage for signals
+	if (eq_layouts && !has_storage_bit) {
 		return;
 	}
-	if (tex.layout == VK_IMAGE_LAYOUT_UNDEFINED || rg->img_resource_map.find(tex.img) == rg->img_resource_map.end()) {
+	auto img_resource = rg->img_resource_map.find(tex.img);
+	const bool resource_exists = img_resource != rg->img_resource_map.end();
+	if (has_storage_bit && tex.layout == dst_layout && !resource_exists) {
+		return;
+	}
+	if (tex.layout == VK_IMAGE_LAYOUT_UNDEFINED || !resource_exists) {
 		layout_transitions.push_back({&tex, tex.layout, dst_layout});
 		tex.layout = dst_layout;
 	} else {
-		RenderPass& opposing_pass = rg->passes[rg->img_resource_map[tex.img]];
+		RenderPass& opposing_pass = rg->passes[img_resource->second];
 		if (opposing_pass.submitted) {
 			return;
 		}
-		if (opposing_pass.pass_idx < pass_idx) {
+		if (opposing_pass.pass_idx < pass_idx && opposing_pass.pass_idx >= rg->beginning_pass_idx) {
 			// Set current pass dependencies (Waiting pass)
 			if (wait_signals_img.find(tex.img) == wait_signals_img.end()) {
 				wait_signals_img[tex.img] = ImageSyncDescriptor{.old_layout = tex.layout,
@@ -148,19 +164,19 @@ void RenderPass::transition_resources() {
 			if (dst.buf) {
 				write_impl(*dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
 			}
-		} else { // buffer
+		} else {  // buffer
+			VkAccessFlags src_access_flags = VK_ACCESS_NONE_KHR;
 			read_impl(*src.buf, VK_ACCESS_TRANSFER_READ_BIT);
 			if (dst.buf) {
 				write_impl(*dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
 			}
 		}
 	}
-
 }
 
 static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_shaders) {
 	// todo: make resource processing in order
-	auto process_resources = [pass](const Shader& shader) {
+	auto process_bindless_resources = [pass](const Shader& shader) {
 		if (!pass->rg->settings.shader_inference) {
 			return;
 		}
@@ -173,13 +189,21 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 			}
 		}
 	};
+	auto process_bindings = [pass](const Shader& shader) {
+		for (auto& [k, v] : shader.resource_binding_map) {
+			assert(k < pass->bound_resources.size());
+			pass->bound_resources[k].active = v.active;
+			pass->bound_resources[k].read = v.read;
+			pass->bound_resources[k].write = v.write;
+		}
+	};
 	switch (pass->type) {
 		case PassType::Graphics: {
 			std::vector<std::future<Shader*>> shader_tasks;
 			shader_tasks.reserve(pass->gfx_settings->shaders.size());
 			for (auto& shader : active_shaders) {
-				if (pass->rg->shader_cache.find(shader->filename) != pass->rg->shader_cache.end()) {
-					*shader = pass->rg->shader_cache[shader->filename];
+				if (pass->rg->shader_cache.find(shader->name_with_macros) != pass->rg->shader_cache.end()) {
+					*shader = pass->rg->shader_cache[shader->name_with_macros];
 				} else {
 					shader_tasks.push_back(ThreadPool::submit(
 						[pass](Shader* shader) {
@@ -193,19 +217,20 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 				auto shader = task.get();
 				{
 					std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
-					pass->rg->shader_cache[shader->filename] = *shader;
+					pass->rg->shader_cache[shader->name_with_macros] = *shader;
 				}
 			}
 			for (auto& shader : active_shaders) {
-				process_resources(*shader);
+				process_bindless_resources(*shader);
+				process_bindings(*shader);
 			}
 		} break;
 		case PassType::RT: {
 			std::vector<std::future<Shader*>> shader_tasks;
 			shader_tasks.reserve(pass->rt_settings->shaders.size());
 			for (auto& shader : active_shaders) {
-				if (pass->rg->shader_cache.find(shader->filename) != pass->rg->shader_cache.end()) {
-					*shader = pass->rg->shader_cache[shader->filename];
+				if (pass->rg->shader_cache.find(shader->name_with_macros) != pass->rg->shader_cache.end()) {
+					*shader = pass->rg->shader_cache[shader->name_with_macros];
 				} else {
 					shader_tasks.push_back(ThreadPool::submit(
 						[pass](Shader* shader) {
@@ -213,34 +238,37 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 							return shader;
 						},
 						shader));
-					// shader.compile(this);
-					pass->rg->shader_cache[shader->filename] = *shader;
+					// shader->compile(pass);
+					pass->rg->shader_cache[shader->name_with_macros] = *shader;
 				}
 			}
 			for (auto& task : shader_tasks) {
 				auto shader = task.get();
 				{
 					std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
-					pass->rg->shader_cache[shader->filename] = *shader;
+					pass->rg->shader_cache[shader->name_with_macros] = *shader;
 				}
 			}
 			for (auto& shader : active_shaders) {
-				process_resources(*shader);
+				process_bindless_resources(*shader);
+				process_bindings(*shader);
 			}
 
 		} break;
 		case PassType::Compute: {
 			for (auto& shader : active_shaders) {
-				if (pass->rg->shader_cache.find(shader->filename) != pass->rg->shader_cache.end()) {
-					*shader = pass->rg->shader_cache[shader->filename];
+				if (pass->rg->shader_cache.find(shader->name_with_macros) != pass->rg->shader_cache.end()) {
+					*shader = pass->rg->shader_cache[shader->name_with_macros];
 				} else {
 					shader->compile(pass);
 					{
 						std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
-						pass->rg->shader_cache[shader->filename] = *shader;
+						pass->rg->shader_cache[shader->name_with_macros] = *shader;
 					}
 				}
+				// shader->compile(pass);
 				pass->affected_buffer_pointers = shader->buffer_status_map;
+				process_bindings(*shader);
 			}
 		} break;
 		default:
@@ -261,7 +289,7 @@ RenderPass& RenderGraph::add_compute(const std::string& name, const ComputePassS
 }
 
 RenderPass& RenderPass::bind(const ResourceBinding& binding) {
-	if(next_binding_idx >= bound_resources.size()) {
+	if (next_binding_idx >= bound_resources.size()) {
 		bound_resources.push_back(binding);
 		descriptor_counts.push_back(1);
 	} else {
@@ -419,10 +447,8 @@ RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<Textur
 
 RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 	// TODO: Extend this if check upon extending this function
-	if ((src.tex || src.buf) && dst.buf) {
-		if (dst.buf) {
-			resource_copies.push_back({ src,dst });
-		}
+	if (dst.buf) {
+		resource_copies.push_back({src, dst});
 	} else {
 		LUMEN_ERROR("Unimplemented copy operation")
 	}
@@ -430,8 +456,9 @@ RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 	return *this;
 }
 
-void RenderPass::finalize() {
-	if (!rg->recording && !rg->reload_shaders) {
+void RenderPass::finalize(bool record_override_encountered) {
+	const bool not_recording_nor_reloading = !rg->recording && !rg->reload_shaders;
+	if (!record_override && not_recording_nor_reloading && !record_override_encountered) {
 		// Handle resource transitions
 		transition_resources();
 		return;
@@ -446,7 +473,11 @@ void RenderPass::finalize() {
 														pass->gfx_settings->color_outputs,
 														pass->gfx_settings->depth_output);
 				};
-				rg->pipeline_tasks.push_back({func, pass_idx});
+				if (rg->multithreaded_pipeline_compilation) {
+					rg->pipeline_tasks.push_back({func, pass_idx});
+				} else {
+					func(this);
+				}
 				break;
 			}
 			case PassType::RT: {
@@ -464,30 +495,40 @@ void RenderPass::finalize() {
 						set_allocate_info.descriptorPool = pass->pipeline->tlas_descriptor_pool;
 						set_allocate_info.descriptorSetCount = 1;
 						set_allocate_info.pSetLayouts = &pass->pipeline->tlas_layout;
-						vkAllocateDescriptorSets(pass->rg->ctx->device, &set_allocate_info, &pass->pipeline->tlas_descriptor_set);
+						vkAllocateDescriptorSets(pass->rg->ctx->device, &set_allocate_info,
+												 &pass->pipeline->tlas_descriptor_set);
 					}
-					auto descriptor_write = vk::write_descriptor_set(
-						pass->pipeline->tlas_descriptor_set, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0, &pass->pipeline->tlas_info);
+					auto descriptor_write = vk::write_descriptor_set(pass->pipeline->tlas_descriptor_set,
+																	 VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0,
+																	 &pass->pipeline->tlas_info);
 					vkUpdateDescriptorSets(pass->rg->ctx->device, 1, &descriptor_write, 0, nullptr);
 				};
-				// TODO: Fix multithreaded pipeline building for RT
-				 //func(this);
-				rg->pipeline_tasks.push_back({func, pass_idx});
+				if (rg->multithreaded_pipeline_compilation) {
+					rg->pipeline_tasks.push_back({func, pass_idx});
+				} else {
+					func(this);
+				}
 				break;
 			}
 			case PassType::Compute: {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline->create_compute_pipeline(*pass->compute_settings, pass->descriptor_counts);
 				};
-				 //func(this);
-				rg->pipeline_tasks.push_back({func, pass_idx});
+				if (rg->multithreaded_pipeline_compilation) {
+					rg->pipeline_tasks.push_back({func, pass_idx});
+				} else {
+					func(this);
+				}
 				break;
 			}
 			default:
 				break;
 		}
+		if (!rg->multithreaded_pipeline_compilation) {
+			transition_resources();
+		}
 	} else {
-		rg->pipeline_tasks.push_back({ nullptr , pass_idx});
+		rg->pipeline_tasks.push_back({nullptr, pass_idx});
 	}
 }
 
@@ -496,26 +537,28 @@ void RenderPass::write_impl(Buffer& buffer, VkAccessFlags access_flags) {
 	rg->buffer_resource_map[buffer.handle] = {pass_idx, access_flags};
 }
 
-
 void RenderPass::write_impl(Texture2D& tex) {
 	VkImageLayout target_layout = get_target_img_layout(tex, VK_ACCESS_SHADER_WRITE_BIT);
 	register_dependencies(tex, target_layout);
 	rg->img_resource_map[tex.img] = pass_idx;
 }
 
-void RenderPass::read_impl(Buffer& buffer) {
-	read_impl(buffer, VK_ACCESS_SHADER_READ_BIT);
-}
+void RenderPass::read_impl(Buffer& buffer) { read_impl(buffer, VK_ACCESS_SHADER_READ_BIT); }
 
 void RenderPass::read_impl(Buffer& buffer, VkAccessFlags access_flags) {
 	register_dependencies(buffer, access_flags);
-	rg->buffer_resource_map[buffer.handle] = {pass_idx, access_flags };
+	rg->buffer_resource_map[buffer.handle] = {pass_idx, access_flags};
 }
 
 void RenderPass::read_impl(Texture2D& tex) {
 	VkImageLayout target_layout = get_target_img_layout(tex, VK_ACCESS_SHADER_READ_BIT);
 	register_dependencies(tex, target_layout);
 	rg->img_resource_map[tex.img] = pass_idx;
+}
+
+void RenderPass::post_execution_barrier(Buffer& buffer, VkAccessFlags access_flags) {
+	auto src_access_flags = rg->buffer_resource_map[buffer.handle].second;
+	post_execution_buffer_barriers.push_back({buffer.handle, src_access_flags, access_flags});
 }
 
 void RenderPass::run(VkCommandBuffer cmd) {
@@ -562,16 +605,19 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	}
 
 	// Buffer barriers
-	std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
-	buffer_memory_barriers.reserve(buffer_barriers.size());
-	for (auto& barrier : buffer_barriers) {
-		auto curr_stage = get_pipeline_stage(type, barrier.src_access_flags);
-		auto dst_stage = get_pipeline_stage(type, barrier.dst_access_flags);
-		buffer_memory_barriers.push_back(
-			buffer_barrier2(barrier.buffer, barrier.src_access_flags, barrier.dst_access_flags, curr_stage, dst_stage));
+	{
+		std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
+		buffer_memory_barriers.reserve(buffer_barriers.size());
+		for (auto& barrier : buffer_barriers) {
+			auto curr_stage = get_pipeline_stage(type, barrier.src_access_flags);
+			auto dst_stage = get_pipeline_stage(type, barrier.dst_access_flags);
+			buffer_memory_barriers.push_back(buffer_barrier2(barrier.buffer, barrier.src_access_flags,
+															 barrier.dst_access_flags, curr_stage, dst_stage));
+		}
+		auto dependency_info =
+			vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
+		vkCmdPipelineBarrier2(cmd, &dependency_info);
 	}
-	auto dependency_info = vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
-	vkCmdPipelineBarrier2(cmd, &dependency_info);
 
 	// Wait: Images
 	wait_events.clear();
@@ -724,6 +770,21 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		}
 	}
 
+	// Post execution buffer barriers
+	{
+		std::vector<VkBufferMemoryBarrier2> post_execution_buffer_memory_barriers;
+		post_execution_buffer_memory_barriers.reserve(buffer_barriers.size());
+		for (auto& barrier : buffer_barriers) {
+			auto curr_stage = get_pipeline_stage(type, barrier.src_access_flags);
+			auto dst_stage = get_pipeline_stage(type, barrier.dst_access_flags);
+			post_execution_buffer_memory_barriers.push_back(buffer_barrier2(
+				barrier.buffer, barrier.src_access_flags, barrier.dst_access_flags, curr_stage, dst_stage));
+		}
+		auto dependency_info = vk::dependency_info((uint32_t)post_execution_buffer_memory_barriers.size(),
+												   post_execution_buffer_memory_barriers.data());
+		vkCmdPipelineBarrier2(cmd, &dependency_info);
+	}
+
 	for (const auto& [src, dst] : resource_copies) {
 		if (src.tex) {
 			if (dst.buf) {
@@ -736,11 +797,11 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				region.imageExtent = src.tex->base_extent;
 				VkImageLayout old_layout = src.tex->layout;
 				src.tex->transition(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-				vkCmdCopyImageToBuffer(cmd, src.tex->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-									   dst.buf->handle, 1, &region);
+				vkCmdCopyImageToBuffer(cmd, src.tex->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst.buf->handle, 1,
+									   &region);
 				src.tex->transition(cmd, old_layout);
 			}
-		} else { // buffer
+		} else {  // buffer
 			if (dst.buf) {
 				VkBufferCopy copy_region = {.size = src.buf->size};
 				vkCmdCopyBuffer(cmd, src.buf->handle, dst.buf->handle, 1, &copy_region);
@@ -787,34 +848,46 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	img_sync_resources.resize(passes.size());
 
 	// Compile shaders and process resources
-	if (recording || reload_shaders) {
+	const bool recording_or_reload = recording || reload_shaders;
+	if (!pass_idxs_with_shader_compilation_overrides.empty() || recording_or_reload) {
 		auto cmp = [](const std::pair<Shader*, RenderPass*>& a, const std::pair<Shader*, RenderPass*>& b) {
-			return a.first->filename < b.first->filename;
+			return a.first->name_with_macros < b.first->name_with_macros;
 		};
 		std::set<std::pair<Shader*, RenderPass*>, decltype(cmp)> unique_shaders_set;
 		std::unordered_map<RenderPass*, std::vector<Shader*>> unique_shaders;
 		std::unordered_map<RenderPass*, std::vector<Shader*>> existing_shaders;
-		
-		// Recording or reload -> The pass is active by default
-		for (auto i = beginning_pass_idx; i < ending_pass_idx; i++) {
+
+		auto process_pass = [&](uint32_t i) {
 			if (passes[i].gfx_settings) {
 				for (auto& shader : passes[i].gfx_settings->shaders) {
-					if (!unique_shaders_set.insert({ &shader, &passes[i] }).second) {
+					if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
 						existing_shaders[&passes[i]].push_back(&shader);
 					}
 				}
 			} else if (passes[i].rt_settings) {
 				for (auto& shader : passes[i].rt_settings->shaders) {
-					if (!unique_shaders_set.insert({ &shader, &passes[i] }).second) {
+					if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
 						existing_shaders[&passes[i]].push_back(&shader);
 					}
 				}
 			} else {
-				if (!unique_shaders_set.insert({ &passes[i].compute_settings->shader, &passes[i] }).second) {
+				if (!unique_shaders_set.insert({&passes[i].compute_settings->shader, &passes[i]}).second) {
 					existing_shaders[&passes[i]].push_back(&passes[i].compute_settings->shader);
 				}
 			}
+		};
+		if (recording_or_reload) {
+			// Recording or reload -> The pass is active by default
+			for (auto i = beginning_pass_idx; i < ending_pass_idx; i++) {
+				process_pass(i);
+			}
+		} else {
+			// Iterate over overridden passes
+			for (auto i : pass_idxs_with_shader_compilation_overrides) {
+				process_pass(i);
+			}
 		}
+
 		std::vector<std::future<void>> futures;
 		for (auto& [shader, rp] : unique_shaders_set) {
 			unique_shaders[rp].push_back(shader);
@@ -835,11 +908,21 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 			future.wait();
 		}
 	}
+
+	if (!pass_idxs_with_shader_compilation_overrides.empty()) {
+		std::sort(passes.begin(), passes.end(),
+				  [](const RenderPass& pass1, const RenderPass& pass2) { return pass1.pass_idx < pass2.pass_idx; });
+	}
+
 	uint32_t i = beginning_pass_idx;
 	uint32_t rem_passes = ending_pass_idx - beginning_pass_idx;
+	bool record_override_encountered = false;
 	while (rem_passes > 0) {
 		if (passes[i].active) {
-			passes[i].finalize();
+			if (passes[i].record_override) {
+				record_override_encountered = true;
+			}
+			passes[i].finalize(record_override_encountered);
 			rem_passes--;
 		}
 		i++;
@@ -860,10 +943,10 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 			passes[idx].transition_resources();
 		}
 		pipeline_tasks.clear();
-
 	}
 	i = beginning_pass_idx;
 	rem_passes = ending_pass_idx - beginning_pass_idx;
+
 	while (rem_passes > 0) {
 		if (!passes[i].active) {
 			i++;
@@ -880,6 +963,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 }
 
 void RenderGraph::reset(VkCommandBuffer cmd) {
+	pass_idxs_with_shader_compilation_overrides.clear();
 	event_pool.reset_events(ctx->device, cmd);
 	for (int i = 0; i < passes.size(); i++) {
 		passes[i].set_signals_buffer.clear();
@@ -890,6 +974,7 @@ void RenderGraph::reset(VkCommandBuffer cmd) {
 		passes[i].resource_zeros.clear();
 		passes[i].resource_copies.clear();
 		passes[i].buffer_barriers.clear();
+		passes[i].post_execution_buffer_barriers.clear();
 		passes[i].disable_execution = false;
 		passes[i].active = false;
 		passes[i].next_binding_idx = 0;
@@ -899,19 +984,20 @@ void RenderGraph::reset(VkCommandBuffer cmd) {
 			passes[i].explicit_tex_reads.clear();
 			passes[i].explicit_tex_writes.clear();
 		}
+		auto& pass = passes[i];
+		if (passes[i].record_override || recording) {
+			pipeline_cache[passes[i].name].pass_idxs.push_back(passes[i].pass_idx);
+			pipeline_cache[passes[i].name].offset_idx = 0;
+			passes[i].record_override = false;
+		}
 		passes[i].submitted = false;
 	}
-	if (recording) {
-		for (auto& pass : passes) {
-			pipeline_cache[pass.name].pass_idxs.push_back(pass.pass_idx);
-			pipeline_cache[pass.name].offset_idx = 0;
-		}
-		recording = false;
-	} else {
+	if (!recording) {
 		for (auto& [k, v] : pipeline_cache) {
 			v.offset_idx = 0;
 		}
 	}
+	recording = false;
 	if (pipeline_tasks.size()) {
 		pipeline_tasks.clear();
 	}

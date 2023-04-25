@@ -11,19 +11,22 @@ void Integrator::init() {
 	LumenInstance* instance = this->instance;
 	Window* window = instance->window;
 
-	if (lumen_scene->config.cam_settings.pos != vec3(0)) {
+	if (lumen_scene->config->cam_settings.pos != vec3(0)) {
 		camera = std::unique_ptr<PerspectiveCamera>(new PerspectiveCamera(
-			lumen_scene->config.cam_settings.fov, 0.01f, 1000.0f, (float)instance->width / instance->height,
-			lumen_scene->config.cam_settings.dir, lumen_scene->config.cam_settings.pos));
+			lumen_scene->config->cam_settings.fov, 0.01f, 1000.0f, (float)instance->width / instance->height,
+			lumen_scene->config->cam_settings.dir, lumen_scene->config->cam_settings.pos));
 	} else {
 		// Assume the camera matrix is given
 		camera = std::unique_ptr<PerspectiveCamera>(
-			new PerspectiveCamera(lumen_scene->config.cam_settings.fov, lumen_scene->config.cam_settings.cam_matrix,
+			new PerspectiveCamera(lumen_scene->config->cam_settings.fov, lumen_scene->config->cam_settings.cam_matrix,
 								  0.01f, 1000.0f, (float)instance->width / instance->height));
 	}
 
 	Camera* cam_ptr = camera.get();
 	instance->window->add_mouse_click_callback([cam_ptr, this, window](MouseAction button, KeyAction action) {
+		if (ImGui::GetIO().WantCaptureMouse) {
+			return;
+		}
 		if (updated && window->is_mouse_up(MouseAction::LEFT)) {
 			updated = true;
 		}
@@ -32,9 +35,12 @@ void Integrator::init() {
 		}
 	});
 	instance->window->add_mouse_move_callback([window, cam_ptr, this](double delta_x, double delta_y) {
+		if (ImGui::GetIO().WantCaptureMouse) {
+			return;
+		}
 		if (window->is_mouse_held(MouseAction::LEFT)) {
 			cam_ptr->rotate(0.05f * (float)delta_y, -0.05f * (float)delta_x, 0.0f);
-			// pc_ray.frame_num = -1;
+			// pc_ray.frame_num = 0;
 			updated = true;
 		}
 	});
@@ -42,6 +48,10 @@ void Integrator::init() {
 	auto idx_buf_size = lumen_scene->indices.size() * sizeof(uint32_t);
 	std::vector<PrimMeshInfo> prim_lookup;
 	uint32_t idx = 0;
+
+	total_light_triangle_cnt = 0;
+	total_light_area = 0;
+	
 	for (auto& pm : lumen_scene->prim_meshes) {
 		PrimMeshInfo m_info;
 		m_info.index_offset = pm.first_idx;
@@ -131,7 +141,7 @@ void Integrator::init() {
 		std::array<uint8_t, 4> nil = {0, 0, 0, 0};
 		scene_textures.resize(1);
 		auto ci = make_img2d_ci(VkExtent2D{1, 1});
-		scene_textures[0].load_from_data(&instance->vkb.ctx, nil.data(), 4, ci, texture_sampler);
+		scene_textures[0].load_from_data(&instance->vkb.ctx, nil.data(), 4, ci, texture_sampler, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 	};
 
 	if (!lumen_scene->textures.size()) {
@@ -146,7 +156,7 @@ void Integrator::init() {
 			auto size = x * y * 4;
 			auto img_dims = VkExtent2D{(uint32_t)x, (uint32_t)y};
 			auto ci = make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-			scene_textures[i].load_from_data(&instance->vkb.ctx, data, size, ci, texture_sampler, false);
+			scene_textures[i].load_from_data(&instance->vkb.ctx, data, size, ci, texture_sampler, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 			stbi_image_free(data);
 			i++;
 		}
@@ -165,8 +175,8 @@ void Integrator::init() {
 }
 
 bool Integrator::gui() {
-	ImGui::Text("Path length: %d", lumen_scene->config.path_length);
-	ImGui::Text("Integrator: %s", lumen_scene->config.integrator_name.c_str());
+	ImGui::Text("Path length: %d", lumen_scene->config->path_length);
+	ImGui::Text("Integrator: %s", lumen_scene->config->integrator_name.c_str());
 	return false;
 }
 

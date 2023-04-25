@@ -10,8 +10,9 @@
 #include "commons.h"
 layout(location = 0) in vec2 in_uv;
 layout(location = 0) out vec4 fragColor;
-layout(set = 0, binding = 0) uniform sampler2D input_img;
-layout(push_constant) uniform PCPost {  PushConstantPost pc; };
+layout(set = 0, binding = 0) uniform sampler2D bloom_img;
+layout(set = 0, binding = 1) uniform sampler2D input_img;
+layout(push_constant) uniform PCPost_ {  PCPost pc; };
 
 vec3 aces(vec3 x) {
   const float a = 2.51;
@@ -32,7 +33,15 @@ float aces(float x) {
 }
 
 void main() {
-    vec4 img = texture(input_img, in_uv).rgba;
+    vec4 input_tex = texture(input_img, in_uv).rgba;
+    vec4 img;
+    if(pc.enable_bloom == 1) {
+      vec4 bloom_tex = texelFetch(bloom_img, (textureSize(bloom_img, 0).xy - ivec2(pc.width, pc.height)) / 2 + ivec2(gl_FragCoord.xy), 0);
+      img = mix(input_tex, bloom_tex * pc.bloom_exposure, pc.bloom_amount);
+    } else {
+      img = input_tex;
+    }
+
     if(pc.enable_tonemapping == 1) {
         img = vec4(aces(img.rgb), img.a);
     }

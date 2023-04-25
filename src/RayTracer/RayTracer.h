@@ -1,6 +1,7 @@
 #pragma once
 #include "LumenPCH.h"
 #include "Framework/LumenInstance.h"
+#include "Framework/ImageUtils.h"
 #include "Path.h"
 #include "BDPT.h"
 #include "SPPM.h"
@@ -11,6 +12,8 @@
 #include "ReSTIR.h"
 #include "ReSTIRGI.h"
 #include "DDGI.h"
+#include "PostFX.h"
+
 class RayTracer : public LumenInstance {
    public:
 	RayTracer(int width, int height, bool debug, int, char*[]);
@@ -22,32 +25,32 @@ class RayTracer : public LumenInstance {
 	bool resized = false;
 
    private:
-	struct Settings {
-		bool enable_tonemapping = false;
-	};
-
-	void render(uint32_t idx);
-	float draw_frame();
-	void init_imgui();
 	void init_resources();
+	void cleanup_resources();
 	void parse_args(int argc, char* argv[]);
-	void save_exr(const float* rgb, int width, int height, const char* outfilename);
+	float draw_frame();
+	void render(uint32_t idx);
 	bool initialized = false;
 	bool rt_initialized = false;
 	float cpu_avg_time = 0;
 	int cnt = 0;
 	std::unique_ptr<Integrator> integrator;
-	VkDescriptorPool imgui_pool = 0;
-	PushConstantPost pc_post_settings;
-	Settings settings;
+	PostFX post_fx;
+
+	RTUtilsDesc rt_utils_desc;
+	RTUtilsPC rt_utils_pc;
+
 	Buffer gt_img_buffer;
 	Buffer output_img_buffer;
 	Buffer output_img_buffer_cpu;
-	Buffer post_desc_buffer;
 	Buffer residual_buffer;
 	Buffer counter_buffer;
 	Buffer rmse_val_buffer;
-	PostPC post_pc;
+	Buffer rt_utils_desc_buffer;
+
+
+	Buffer fft_buffers[2];
+	Buffer fft_cpu_buffers[2];
 	std::string scene_name;
 	LumenScene scene;
 
@@ -56,4 +59,6 @@ class RayTracer : public LumenInstance {
 	bool has_gt = false;
 	bool show_cam_stats = false;
 
+	const bool enable_shader_inference = true;
+	const bool use_events = true;
 };

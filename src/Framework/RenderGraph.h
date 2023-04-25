@@ -26,7 +26,7 @@ class RenderGraph;
 class RenderPass;
 
 class RenderGraph {
-public:
+   public:
 	RenderGraph(VulkanContext* ctx) : ctx(ctx) { pipeline_tasks.reserve(32); }
 	RenderPass& current_pass() { return passes.back(); }
 
@@ -47,7 +47,7 @@ public:
 	RenderGraphSettings settings;
 	std::mutex shader_map_mutex;
 
-private:
+   private:
 	struct BufferSyncResources {
 		std::vector<VkBufferMemoryBarrier2> buffer_bariers;
 		std::vector<VkDependencyInfo> dependency_infos;
@@ -67,6 +67,7 @@ private:
 	std::unordered_map<std::string, PipelineStorage> pipeline_cache;
 	std::vector<std::pair<std::function<void(RenderPass*)>, uint32_t>> pipeline_tasks;
 	std::vector<std::function<void(RenderPass*)>> shader_tasks;
+	std::vector<uint32_t> pass_idxs_with_shader_compilation_overrides;
 	// Sync related data
 	std::vector<BufferSyncResources> buffer_sync_resources;
 	std::vector<ImageSyncResources> img_sync_resources;
@@ -75,6 +76,7 @@ private:
 	std::unordered_map<VkImage, uint32_t> img_resource_map;	 // Tex2D handle - Pass Idx
 	uint32_t beginning_pass_idx = 0;
 	uint32_t ending_pass_idx = 0;
+	const bool multithreaded_pipeline_compilation = true;
 
 	template <typename Settings>
 	RenderPass& add_pass_impl(const std::string& name, const Settings& settings);
@@ -83,34 +85,47 @@ private:
 class RenderPass {
    public:
 	RenderPass(PassType type, Pipeline* pipeline, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
-			   const GraphicsPassSettings& gfx_settings, bool cached = false)
+			   const GraphicsPassSettings& gfx_settings, const std::string& macro_string, bool cached = false)
 		: type(type),
 		  pipeline(pipeline),
 		  name(name),
 		  rg(rg),
 		  pass_idx(pass_idx),
 		  gfx_settings(std::make_unique<GraphicsPassSettings>(gfx_settings)),
-		  is_pipeline_cached(cached) {}
+		  macro_defines(gfx_settings.macros),
+		  is_pipeline_cached(cached) {
+		for (auto& shader : this->gfx_settings->shaders) {
+			shader.name_with_macros = shader.filename + macro_string;
+		}
+	}
 
 	RenderPass(PassType type, Pipeline* pipeline, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
-			   const RTPassSettings& rt_settings, bool cached = false)
+			   const RTPassSettings& rt_settings, const std::string& macro_string, bool cached = false)
 		: type(type),
 		  pipeline(pipeline),
 		  name(name),
 		  rg(rg),
 		  pass_idx(pass_idx),
 		  rt_settings(std::make_unique<RTPassSettings>(rt_settings)),
-		  is_pipeline_cached(cached) {}
+		  macro_defines(rt_settings.macros),
+		  is_pipeline_cached(cached) {
+		for (auto& shader : this->rt_settings->shaders) {
+			shader.name_with_macros = shader.filename + macro_string;
+		}
+	}
 
 	RenderPass(PassType type, Pipeline* pipeline, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
-			   const ComputePassSettings& compute_settings, bool cached = false)
+			   const ComputePassSettings& compute_settings, const std::string& macro_string, bool cached = false)
 		: type(type),
 		  pipeline(pipeline),
 		  name(name),
 		  rg(rg),
 		  pass_idx(pass_idx),
 		  compute_settings(std::make_unique<ComputePassSettings>(compute_settings)),
-		  is_pipeline_cached(cached) {}
+		  macro_defines(compute_settings.macros),
+		  is_pipeline_cached(cached) {
+		this->compute_settings->shader.name_with_macros = compute_settings.shader.filename + macro_string;
+	}
 
 	RenderPass& bind(const ResourceBinding& binding);
 	RenderPass& bind(Texture2D& tex, VkSampler sampler);
@@ -138,17 +153,19 @@ class RenderPass {
 	RenderPass& zero(std::initializer_list<std::reference_wrapper<Texture2D>> textures);
 	RenderPass& zero(const Resource& resource, bool cond);
 	RenderPass& copy(const Resource& src, const Resource& dst);
-	void finalize();
+	void finalize(bool record_override_encountered);
 	friend RenderGraph;
 	std::vector<ResourceBinding> bound_resources;
 
-	std::unordered_map<Buffer*, BufferStatus> affected_buffer_pointers;
 	RenderGraph* rg;
+	std::vector<ShaderMacro> macro_defines;
+	std::unordered_map<Buffer*, BufferStatus> affected_buffer_pointers;
 	std::unique_ptr<GraphicsPassSettings> gfx_settings = nullptr;
 	std::unique_ptr<RTPassSettings> rt_settings = nullptr;
 	std::unique_ptr<ComputePassSettings> compute_settings = nullptr;
 	PassType type;
 	bool active = true;
+	uint32_t pass_idx;
 
    private:
 	// When the automatic inference isn't used
@@ -162,7 +179,7 @@ class RenderPass {
 	void read_impl(Buffer& buffer);
 	void read_impl(Buffer& buffer, VkAccessFlags access_flags);
 	void read_impl(Texture2D& tex);
-
+	void post_execution_barrier(Buffer& buffer, VkAccessFlags access_flags);
 
 	void run(VkCommandBuffer cmd);
 	void register_dependencies(Buffer& buffer, VkAccessFlags dst_access_flags);
@@ -171,12 +188,12 @@ class RenderPass {
 
 	std::string name;
 	Pipeline* pipeline;
-	uint32_t pass_idx;
 	int next_binding_idx = 0;
 	std::vector<uint32_t> descriptor_counts;
 	void* push_constant_data = nullptr;
 	bool is_pipeline_cached;
 	bool submitted = false;
+	bool record_override = true;
 	/*
 		Note:
 		The assumption is that a SyncDescriptor is unique to a pass (either via
@@ -201,19 +218,41 @@ class RenderPass {
 	std::vector<Resource> resource_zeros;
 	std::vector<std::pair<Resource, Resource>> resource_copies;
 	std::vector<BufferBarrier> buffer_barriers;
+	std::vector<BufferBarrier> post_execution_buffer_barriers;
 	bool disable_execution = false;
 };
 
-template<typename Settings>
+template <typename Settings>
 inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Settings& settings) {
 	Pipeline* pipeline;
-	uint32_t pass_idx = (uint32_t)passes.size();
+	uint32_t pass_idx = ending_pass_idx++;
 	bool cached = false;
-	ending_pass_idx++;
-	if (pipeline_cache.find(name) != pipeline_cache.end()) {
-		auto& storage = pipeline_cache[name];
+
+	std::string name_with_macros = name;
+	std::string macro_string;
+
+	if (!settings.macros.empty()) {
+		macro_string += '(';
+	}
+	for (size_t i = 0; i < settings.macros.size(); i++) {
+		if (i > 0) {
+			macro_string += ',';
+		}
+		macro_string += settings.macros[i].name;
+		if (settings.macros[i].has_val) {
+			macro_string += "=" + std::to_string(settings.macros[i].val);
+		}
+	}
+	if (!settings.macros.empty()) {
+		macro_string += ')';
+	}
+	name_with_macros += macro_string;
+
+	if (pipeline_cache.find(name_with_macros) != pipeline_cache.end()) {
+		auto& storage = pipeline_cache[name_with_macros];
 		if (!recording && storage.pass_idxs.size()) {
-			auto idx = storage.pass_idxs[storage.offset_idx];
+			uint32_t offset_idx = storage.offset_idx;
+			auto idx = storage.pass_idxs[offset_idx];
 			if constexpr (std::is_same_v<GraphicsPassSettings, Settings>) {
 				auto& curr_pass = passes[idx];
 				curr_pass.gfx_settings->color_outputs = settings.color_outputs;
@@ -222,19 +261,34 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 			passes[idx].active = true;
 			if (reload_shaders) {
 				if (storage.offset_idx == 0) {
-					pipeline_cache[name].pipeline->cleanup();
-					pipeline_cache[name].pipeline = std::make_unique<Pipeline>(ctx, name);
+					pipeline_cache[name_with_macros].pipeline->cleanup();
+					pipeline_cache[name_with_macros].pipeline = std::make_unique<Pipeline>(ctx, name_with_macros);
 				}
-				passes[idx].pipeline = pipeline_cache[name].pipeline.get();
+				passes[idx].pipeline = pipeline_cache[name_with_macros].pipeline.get();
 			}
 			++storage.offset_idx;
+			// If this is a cached pipeline and the cached pipeline index is not 0, make this the starting pass index
+			if (idx != 0 && beginning_pass_idx == 0) {
+				beginning_pass_idx = idx;
+				ending_pass_idx = idx + 1;
+			}
+
+			// Pass was inserted prior, shift the subsequent existing pass indices
+			if (!pass_idxs_with_shader_compilation_overrides.empty()) {
+				passes[idx].pass_idx += uint32_t(pass_idxs_with_shader_compilation_overrides.size());
+				storage.pass_idxs[offset_idx] = passes[idx].pass_idx;
+			}
+			passes[idx].is_pipeline_cached = true;
 			return passes[idx];
 		}
-		pipeline = pipeline_cache[name].pipeline.get();
+		pipeline = pipeline_cache[name_with_macros].pipeline.get();
 		cached = true;
 	} else {
-		pipeline_cache[name] = {std::make_unique<Pipeline>(ctx, name)};
-		pipeline = pipeline_cache[name].pipeline.get();
+		if (!recording && !reload_shaders) {
+			pass_idxs_with_shader_compilation_overrides.push_back(passes.size());
+		}
+		pipeline_cache[name_with_macros] = {std::make_unique<Pipeline>(ctx, name_with_macros)};
+		pipeline = pipeline_cache[name_with_macros].pipeline.get();
 	}
 	PassType type;
 	if constexpr (std::is_same_v<ComputePassSettings, Settings>) {
@@ -244,11 +298,12 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	} else {
 		type = PassType::RT;
 	}
-	passes.emplace_back(type, pipeline, name, this, pass_idx, settings, cached);
+
+	passes.emplace_back(type, pipeline, name_with_macros, this, pass_idx, settings, macro_string, cached);
 	return passes.back();
 }
 
-template<typename T>
+template <typename T>
 inline RenderPass& RenderPass::push_constants(T* data) {
 	void* new_ptr = nullptr;
 	if (rg->recording) {

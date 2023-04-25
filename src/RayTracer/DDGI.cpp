@@ -132,8 +132,8 @@ void DDGI::init() {
 
 void DDGI::render() {
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = lumen_scene->config.path_length;
-	pc_ray.sky_col = lumen_scene->config.sky_col;
+	pc_ray.max_depth = config->path_length;
+	pc_ray.sky_col = config->sky_col;
 	pc_ray.first_frame = first_frame;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
@@ -147,9 +147,8 @@ void DDGI::render() {
 		pc_ray.probe_rotation = glm::mat4_cast(
 			glm::angleAxis(2.0f * glm::pi<float>() * rands.x, glm::normalize(glm::vec3(rands.y, rands.z, rands.w))));
 	}
-	std::initializer_list<ResourceBinding> rt_bindings = {
+	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
-		prim_lookup_buffer,
 		scene_ubo_buffer,
 		scene_desc_buffer,
 	};

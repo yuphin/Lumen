@@ -1,10 +1,9 @@
-#include "../LumenPCH.h"
+#include "LumenPCH.h"
+#define VOLK_IMPLEMENTATION
 #include "VulkanBase.h"
 #include "CommandBuffer.h"
 #include "VkUtils.h"
-#include <extensions_vk.hpp>
 #include <numeric>
-
 
 uint32_t VertexLayout::stride() {
 	uint32_t res = 0;
@@ -110,6 +109,7 @@ VkShaderModule VulkanBase::create_shader(const std::vector<char>& code) {
 	return shaderModule;
 }
 
+
 VkResult VulkanBase::vkExt_create_debug_messenger(VkInstance instance,
 												  const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
 												  const VkAllocationCallbacks* pAllocator,
@@ -168,19 +168,17 @@ void VulkanBase::cleanup_swapchain() {
 	// for (auto framebuffer : ctx.swapchain_framebuffers) {
 	//	vkDestroyFramebuffer(ctx.device, framebuffer, nullptr);
 	//}
+	vkDestroyDescriptorPool(ctx.device, imgui_pool, nullptr);
 	vkFreeCommandBuffers(ctx.device, ctx.cmd_pools[0], static_cast<uint32_t>(ctx.command_buffers.size()),
 						 ctx.command_buffers.data());
-	vkDestroyPipeline(ctx.device, ctx.gfx_pipeline, nullptr);
-	vkDestroyPipelineLayout(ctx.device, ctx.pipeline_layout, nullptr);
-	vkDestroyRenderPass(ctx.device, ctx.default_render_pass, nullptr);
 	for (auto& swapchain_img : swapchain_images) {
 		swapchain_img.destroy();
 	}
+	swapchain_images.clear();
 	vkDestroySwapchainKHR(ctx.device, ctx.swapchain, nullptr);
 }
 
-void VulkanBase::cleanup() {
-	// TODO: Move up
+void VulkanBase::cleanup_app_data() {
 	rg->destroy();
 	if (!blases.empty()) {
 		for (auto& b : blases) {
@@ -192,11 +190,12 @@ void VulkanBase::cleanup() {
 		tlas.buffer.destroy();
 		vkDestroyAccelerationStructureKHR(ctx.device, tlas.accel, nullptr);
 	}
-	cleanup_swapchain();
+	blases.clear();
+}
 
-	vkDestroyImageView(ctx.device, ctx.depth_img_view, nullptr);
-	vkDestroyImage(ctx.device, ctx.depth_img, nullptr);
-	vkFreeMemory(ctx.device, ctx.depth_img_memory, nullptr);
+void VulkanBase::cleanup() {
+	cleanup_app_data();
+	cleanup_swapchain();
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		vkDestroySemaphore(ctx.device, image_available_sem[i], nullptr);
@@ -219,9 +218,6 @@ void VulkanBase::cleanup() {
 }
 
 void VulkanBase::create_instance() {
-	if (enable_validation_layers && !check_validation_layer_support()) {
-		LUMEN_ERROR("Validation layers requested, but not available!");
-	}
 	VkApplicationInfo app_info{};
 	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	app_info.pApplicationName = "Lumen";
@@ -247,8 +243,12 @@ void VulkanBase::create_instance() {
 		instance_CI.enabledLayerCount = 0;
 		instance_CI.pNext = nullptr;
 	}
-
+	vk::check(volkInitialize(), "Failed to initialize volk");
 	vk::check(vkCreateInstance(&instance_CI, nullptr, &ctx.instance), "Failed to create instance");
+	volkLoadInstance(ctx.instance);
+	if (enable_validation_layers && !check_validation_layer_support()) {
+		LUMEN_ERROR("Validation layers requested, but not available!");
+	}
 	rg = std::make_unique<RenderGraph>(&ctx);
 }
 
@@ -411,7 +411,7 @@ void VulkanBase::create_logical_device() {
 	vk::check(vkCreateDevice(ctx.physical_device, &logical_device_CI, nullptr, &ctx.device),
 			  "Failed to create logical device");
 
-	load_VK_EXTENSIONS(ctx.instance, vkGetInstanceProcAddr, ctx.device, vkGetDeviceProcAddr);
+	// load_VK_EXTENSIONS(ctx.instance, vkGetInstanceProcAddr, ctx.device, vkGetDeviceProcAddr);
 	vkGetDeviceQueue(ctx.device, ctx.indices.gfx_family.value(), 0, &ctx.queues[(int)QueueType::GFX]);
 	vkGetDeviceQueue(ctx.device, ctx.indices.compute_family.value(), 0, &ctx.queues[(int)QueueType::COMPUTE]);
 	vkGetDeviceQueue(ctx.device, ctx.indices.present_family.value(), 0, &ctx.queues[(int)QueueType::PRESENT]);
@@ -510,25 +510,9 @@ void VulkanBase::create_swapchain() {
 	vkGetSwapchainImagesKHR(ctx.device, ctx.swapchain, &image_cnt, images);
 	for (uint32_t i = 0; i < image_cnt; i++) {
 		swapchain_images.emplace_back("Swapchain Image #" + std::to_string(i), &ctx, images[i], surface_format.format,
-									  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_ASPECT_COLOR_BIT, true);
+									  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_ASPECT_COLOR_BIT, extent, true);
 	}
 	ctx.swapchain_extent = extent;
-
-	auto extend3d = VkExtent3D{extent.width, extent.height, 1};
-	auto image_ci = vk::image_create_info(VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, extend3d);
-	vkCreateImage(ctx.device, &image_ci, nullptr, &ctx.depth_img);
-	VkMemoryRequirements mem_reqs;
-	vkGetImageMemoryRequirements(ctx.device, ctx.depth_img, &mem_reqs);
-	auto mem_type_idx =
-		find_memory_type(&ctx.physical_device, mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	assert(mem_type_idx != ~0u);
-	VkMemoryAllocateInfo alloc_info = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-	alloc_info.allocationSize = mem_reqs.size;
-	alloc_info.memoryTypeIndex = mem_type_idx;
-	VkDeviceMemory memory = nullptr;
-	vk::check(vkAllocateMemory(ctx.device, &alloc_info, nullptr, &ctx.depth_img_memory));
-	vk::check(vkBindImageMemory(ctx.device, ctx.depth_img, ctx.depth_img_memory, 0));
-	ctx.depth_img_view = create_image_view(ctx.device, ctx.depth_img, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
 void VulkanBase::create_command_pools() {
@@ -543,6 +527,58 @@ void VulkanBase::create_command_pools() {
 	}
 }
 
+void VulkanBase::init_imgui() {
+	VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
+										 {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
+										 {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
+										 {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
+										 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
+										 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
+										 {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
+
+	VkDescriptorPoolCreateInfo pool_info = {};
+	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	pool_info.maxSets = 1000;
+	pool_info.poolSizeCount = (uint32_t)std::size(pool_sizes);
+	pool_info.pPoolSizes = pool_sizes;
+	vk::check(vkCreateDescriptorPool(ctx.device, &pool_info, nullptr, &imgui_pool));
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	// Setup Platform/Renderer backends
+	ImGui::StyleColorsDark();
+	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	ImGui_ImplGlfw_InitForVulkan(ctx.window_ptr, true);
+
+	ImGui_ImplVulkan_InitInfo init_info = {};
+	init_info.Instance = ctx.instance;
+	init_info.PhysicalDevice = ctx.physical_device;
+	init_info.Device = ctx.device;
+	init_info.Queue = ctx.queues[(int)QueueType::GFX];
+	init_info.DescriptorPool = imgui_pool;
+	init_info.MinImageCount = 3;
+	init_info.ImageCount = 3;
+	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+	init_info.UseDynamicRendering = true;
+	init_info.ColorAttachmentFormat = swapchain_format;
+
+	ImGui_ImplVulkan_Init(&init_info, nullptr);
+
+	CommandBuffer cmd(&ctx, true);
+	ImGui_ImplVulkan_CreateFontsTexture(cmd.handle);
+	cmd.submit(ctx.queues[(int)QueueType::GFX]);
+	ImGui_ImplVulkan_DestroyFontUploadObjects();
+}
+
+void VulkanBase::destroy_imgui() {
+	ImGui_ImplVulkan_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+}
 
 void VulkanBase::create_command_buffers() {
 	ctx.command_buffers.resize(swapchain_images.size());
@@ -615,6 +651,7 @@ AccelKHR VulkanBase::create_acceleration(VkAccelerationStructureCreateInfoKHR& a
 	// Allocating the buffer to hold the acceleration structure
 	Buffer accel_buff;
 	accel_buff.create(
+		"Blas Buffer",
 		&ctx, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, accel.size);
 	// Setting the buffer
@@ -876,12 +913,14 @@ uint32_t VulkanBase::prepare_frame() {
 	uint32_t image_idx;
 	VkResult result = vkAcquireNextImageKHR(ctx.device, ctx.swapchain, UINT64_MAX, image_available_sem[current_frame],
 											VK_NULL_HANDLE, &image_idx);
-	vk::check(vkResetCommandBuffer(ctx.command_buffers[image_idx], 0));
 	if (result == VK_NOT_READY) {
 		return UINT32_MAX;
-	} else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+	} else if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
 		// Window resize
+		vkDeviceWaitIdle(ctx.device);
 		recreate_swap_chain(ctx);
+		cleanup_app_data();
+		rg = std::make_unique<RenderGraph>(&ctx);
 		return UINT32_MAX;
 	} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
 		LUMEN_ERROR("Failed to acquire new swap chain image");
@@ -889,6 +928,9 @@ uint32_t VulkanBase::prepare_frame() {
 	if (images_in_flight[image_idx] != VK_NULL_HANDLE) {
 		vkWaitForFences(ctx.device, 1, &images_in_flight[image_idx], VK_TRUE, UINT64_MAX);
 	}
+
+	vk::check(vkResetCommandBuffer(ctx.command_buffers[image_idx], 0));
+	vkResetFences(ctx.device, 1, &in_flight_fences[current_frame]);
 
 	EventHandler::begin();
 	if (EventHandler::consume_event(LumenEvent::SHADER_RELOAD)) {
@@ -910,7 +952,7 @@ uint32_t VulkanBase::prepare_frame() {
 	return image_idx;
 }
 
-VkResult VulkanBase::submit_frame(uint32_t image_idx, bool& resized) {
+VkResult VulkanBase::submit_frame(uint32_t image_idx) {
 	VkSubmitInfo submit_info = vk::submit_info();
 	VkSemaphore wait_semaphores[] = {image_available_sem[current_frame]};
 	VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
@@ -925,10 +967,9 @@ VkResult VulkanBase::submit_frame(uint32_t image_idx, bool& resized) {
 	submit_info.signalSemaphoreCount = 1;
 	submit_info.pSignalSemaphores = signal_semaphores;
 
-	vkResetFences(ctx.device, 1, &in_flight_fences[current_frame]);
-
 	vk::check(vkQueueSubmit(ctx.queues[(int)QueueType::GFX], 1, &submit_info, in_flight_fences[current_frame]),
 			  "Failed to submit draw command buffer");
+	current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 	VkPresentInfoKHR present_info{};
 	present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
@@ -942,13 +983,16 @@ VkResult VulkanBase::submit_frame(uint32_t image_idx, bool& resized) {
 	present_info.pImageIndices = &image_idx;
 
 	VkResult result = vkQueuePresentKHR(ctx.queues[(int)QueueType::GFX], &present_info);
-	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || resized) {
-		resized = false;
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+		vkDeviceWaitIdle(ctx.device);
 		recreate_swap_chain(ctx);
+		cleanup_app_data();
+		rg = std::make_unique<RenderGraph>(&ctx);
+		return result;
 	} else if (result != VK_SUCCESS) {
 		LUMEN_ERROR("Failed to present swap chain image");
 	}
-	current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+
 	return result;
 }
 
