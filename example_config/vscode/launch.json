@@ -6,12 +6,12 @@
     "configurations": [
         {
             "name": "(gdb) Launch Caustics",
-            "type": "cppdbg",
+            "type": "cppdbg", // "cppvsdbg" for windows
             "request": "launch",
             // Resolved by CMake Tools:
             "program": "${command:cmake.launchTargetPath}",
             
-            "args": ["${workspaceFolder}/Lumen/scenes/caustics.json"],
+            "args": ["${workspaceFolder}/scenes/caustics.json"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",//"${command:cmake.getLaunchTargetDirectory}",
             "externalConsole": false,

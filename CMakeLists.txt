@@ -6,7 +6,7 @@ enable_testing()
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
     message("Enabling vulkan validation layers")
-    add_compile_definitions(USEVKVALIDATIONLAYER _DEBUG)
+    #add_compile_definitions(USEVKVALIDATIONLAYER _DEBUG)
 endif()
 
 find_package(Vulkan REQUIRED)
@@ -24,6 +24,7 @@ set(structures_INCLUDE_DIR
     "libs/gli"
     "src"
 )
+
 include_directories(${Vulkan_INCLUDE_DIR};${GLSLang_INCLUDE_DIR};${netCDF_INCLUDE_DIR};${structures_INCLUDE_DIR})
 add_compile_definitions(TINYEXR_USE_MINIZ)  # enables usage of miniz for opening exr images
 add_compile_definitions(USE_SHADERC)        # enables shader compilation via shaderc

@@ -1,9 +1,8 @@
 #include "../LumenPCH.h"
 #include "Shader.h"
 #include "RenderGraph.h"
-#include <spirv_cross/spirv.h>
-#include <spirv_cross/spirv_cross.hpp>
-#include <spirv_cross/spirv_glsl.hpp>
+#include <SPIRV-Cross/spirv.h>
+#include <SPIRV-Cross/spirv_glsl.hpp>
 
 enum class ResourceType { UniformBuffer, StorageBuffer, StorageImage, SampledImage, AccelarationStructure };
 
