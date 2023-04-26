@@ -84,7 +84,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <stddef.h>  // for size_t
 #include <stdint.h>  // guess stdint.h is available(C99)
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -2446,7 +2445,7 @@ static bool hufBuildDecTable(const long long *hcode,  // i : encoding table
         unsigned int *p = pl->p;
         pl->p = new unsigned int[pl->lit];
 
-        for (int i = 0; i < pl->lit - 1; ++i) pl->p[i] = p[i];
+        for (unsigned int i = 0; i < pl->lit - 1; ++i) pl->p[i] = p[i];
 
         delete[] p;
       } else {
@@ -4161,12 +4160,12 @@ static unsigned char **AllocateImage(int num_channels,
 
 #ifdef _WIN32
 static inline std::wstring UTF8ToWchar(const std::string &str) {
-  int wstr_size =
-      MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), NULL, 0);
-  std::wstring wstr(wstr_size, 0);
-  MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), &wstr[0],
-                      (int)wstr.size());
-  return wstr;
+  //int wstr_size =
+  //    MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), nullptr, 0);
+  //std::wstring wstr(wstr_size, 0);
+  //MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), &wstr[0],
+  //                    (int)wstr.size());
+  return std::wstring(str.begin(), str.end());
 }
 #endif
 

@@ -59,6 +59,8 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <codecvt>
+#include <locale>
 
 #ifndef TINYGLTF_USE_CPP14
 #include <functional>
@@ -2474,12 +2476,12 @@ void TinyGLTF::SetFsCallbacks(FsCallbacks callbacks) { fs = callbacks; }
 
 #ifdef _WIN32
 static inline std::wstring UTF8ToWchar(const std::string &str) {
-  int wstr_size =
-      MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), nullptr, 0);
-  std::wstring wstr(wstr_size, 0);
-  MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), &wstr[0],
-                      (int)wstr.size());
-  return wstr;
+  //int wstr_size =
+  //    MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), nullptr, 0);
+  //std::wstring wstr(wstr_size, 0);
+  //MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), &wstr[0],
+  //                    (int)wstr.size());
+  return std::wstring(str.begin(), str.end());
 }
 #endif
 
