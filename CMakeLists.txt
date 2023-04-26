@@ -9,8 +9,8 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
     add_compile_definitions(USEVKVALIDATIONLAYER _DEBUG)
 endif()
 
-find_package(Threads REQUIRED)
 find_package(Vulkan REQUIRED)
+find_package(Threads REQUIRED)
 
 set(src_files)
 add_subdirectory(src)
@@ -21,15 +21,15 @@ set(structures_INCLUDE_DIR
     "libs/spdlog/include"
     "libs/glfw/include"
     "libs/shaderc/include"
-    "src"
     "libs/gli"
+    "src"
 )
 include_directories(${Vulkan_INCLUDE_DIR};${GLSLang_INCLUDE_DIR};${netCDF_INCLUDE_DIR};${structures_INCLUDE_DIR})
 add_compile_definitions(TINYEXR_USE_MINIZ)  # enables usage of miniz for opening exr images
 add_compile_definitions(USE_SHADERC)        # enables shader compilation via shaderc
 add_executable(Lumen ${src_files})
 
-target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc shaderc_util glslc glm)
+target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc shaderc_util glslc glm spirv-cross-glsl)
 target_compile_features(Lumen PRIVATE cxx_std_20)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})

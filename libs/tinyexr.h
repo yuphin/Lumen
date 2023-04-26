@@ -2700,7 +2700,7 @@ static bool hufDecode(const long long *hcode,  // i : encoding table
         // Search long code
         //
 
-        int j;
+        unsigned int j;
 
         for (j = 0; j < pl.lit; j++) {
           int l = hufLength(hcode[pl.p[j]]);

@@ -44,4 +44,10 @@ set(SHADERC_SKIP_COPYRIGHT_CHECK ON)
 set(SHADERC_ENABLE_SHARED_CRT ON) # enables shared std lib build for windows, otherwise compilation would fail. Does not affect Linux builds
 add_subdirectory(shaderc)
 
+add_subdirectory(SPIRV-Cross)
+set(SPIRV_CROSS_ENABLE_TESTS OFF CACHE BOOL "Enable SPIRV-Cross tests.")
+set(SPIRV_CROSS_SKIP_INSTALL ON CACHE BOOL "Skips installation targets.")
+set(SPIRV_CROSS_CLI OFF CACHE BOOL "Build the CLI binary. Requires SPIRV_CROSS_STATIC.")
+set(SPIRV_CROSS_ENABLE_C_API OFF CACHE BOOL "Enable C API wrapper support in static library.")
+
 set(src_files "${src_files};${imgui_src};${mitsuba_src};${tinyxml_src};${miniz_src}" PARENT_SCOPE)
