@@ -11,7 +11,7 @@
             // Resolved by CMake Tools:
             "program": "${command:cmake.launchTargetPath}",
             
-            "args": ["/home/lachei/Dokumente/github/Lumen/scenes/caustics.json"],
+            "args": ["${workspaceFolder}/Lumen/scenes/caustics.json"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",//"${command:cmake.getLaunchTargetDirectory}",
             "externalConsole": false,
