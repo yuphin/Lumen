@@ -11,8 +11,8 @@ class VCM : public Integrator {
 
    private:
 	PCVCM pc_ray{};
-	VkDescriptorPool desc_pool;
-	VkDescriptorSetLayout desc_set_layout;
+	VkDescriptorPool desc_pool{};
+	VkDescriptorSetLayout desc_set_layout{};
 	VkDescriptorSet desc_set;
 	Buffer photon_buffer;
 	Buffer vcm_light_vertices_buffer;
