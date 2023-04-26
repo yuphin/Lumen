@@ -45,6 +45,7 @@ set(SHADERC_SKIP_INSTALL ON)
 set(SHADERC_SKIP_TESTS ON)
 set(SHADERC_SKIP_EXAMPLES ON)
 set(SHADERC_SKIP_COPYRIGHT_CHECK ON)
+set(SHADERC_ENABLE_SHARED_CRT ON) # enables shared std lib build for windows, otherwise compilation would fail. Does not affect Linux builds
 add_subdirectory(shaderc)
 
 set(src_files "${src_files};${imgui_src};${mitsuba_src};${extension_src};${tinyxml_src};${miniz_src}" PARENT_SCOPE)
