@@ -4,21 +4,6 @@
 [submodule "libs/volk"]
 	path = libs/volk
 	url = https://github.com/zeux/volk.git
-[submodule "libs/shaderc"]
-	path = libs/shaderc
-	url = https://github.com/google/shaderc.git
-[submodule "libs/SPIRV-Tools"]
-	path = libs/SPIRV-Tools
-	url = https://github.com/KhronosGroup/SPIRV-Tools.git
-[submodule "libs/SPIRV-Headers"]
-	path = libs/SPIRV-Headers
-	url = https://github.com/KhronosGroup/SPIRV-Headers.git
-[submodule "libs/glslang"]
-	path = libs/glslang
-	url = https://github.com/KhronosGroup/glslang.git
 [submodule "libs/glm"]
 	path = libs/glm
 	url = https://github.com/g-truc/glm.git
-[submodule "libs/SPIRV-Cross"]
-	path = libs/SPIRV-Cross
-	url = git@github.com:KhronosGroup/SPIRV-Cross.git

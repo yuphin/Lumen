@@ -1,5 +1,10 @@
-file(GLOB glfw_src
-    "glfw/src/*.c"
+file(GLOB glslc_src
+    "glslc/file_includer.cc"
+)
+
+file(GLOB libshaderc_util
+    "libshaderc_util/file_finder.cc"
+    "libshaderc_util/io_shaderc.cc"
 )
 
 file(GLOB imgui_src
@@ -26,28 +31,6 @@ cmake_dependent_option(GLFW_BUILD_WAYLAND "Build support for Wayland"
 add_subdirectory(glfw)
 add_subdirectory(volk)
 add_subdirectory(glm)
-add_subdirectory(SPIRV-Headers)
 
-set(SKIP_SPIRV_TOOLS_INSTALL ON)
-set(SPIRV_SKIP_TESTS ON)
-set(SPIRV_SKIP_EXECUTABLES ON)
-add_subdirectory(SPIRV-Tools)
 
-set(SKIP_GLSLANG_INSTALL ON)
-add_subdirectory(glslang)
-set(ENABLE_CTEST OFF CACHE BOOL "Enables testing")
-
-set(SHADERC_SKIP_INSTALL ON)
-set(SHADERC_SKIP_TESTS ON)
-set(SHADERC_SKIP_EXAMPLES ON)
-set(SHADERC_SKIP_COPYRIGHT_CHECK ON)
-set(SHADERC_ENABLE_SHARED_CRT ON) # enables shared std lib build for windows, otherwise compilation would fail. Does not affect Linux builds
-add_subdirectory(shaderc)
-
-add_subdirectory(SPIRV-Cross)
-set(SPIRV_CROSS_ENABLE_TESTS OFF CACHE BOOL "Enable SPIRV-Cross tests.")
-set(SPIRV_CROSS_SKIP_INSTALL ON CACHE BOOL "Skips installation targets.")
-set(SPIRV_CROSS_CLI OFF CACHE BOOL "Build the CLI binary. Requires SPIRV_CROSS_STATIC.")
-set(SPIRV_CROSS_ENABLE_C_API OFF CACHE BOOL "Enable C API wrapper support in static library.")
-
-set(src_files "${src_files};${imgui_src};${mitsuba_src};${tinyxml_src};${miniz_src}" PARENT_SCOPE)
+set(src_files "${src_files};${glslc_src};${libshaderc_util};${imgui_src};${mitsuba_src};${tinyxml_src};${miniz_src}" PARENT_SCOPE)

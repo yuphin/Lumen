@@ -20,7 +20,6 @@ set(structures_INCLUDE_DIR
     "libs"
     "libs/spdlog/include"
     "libs/glfw/include"
-    "libs/shaderc/include"
     "libs/gli"
     "src"
 )
@@ -30,7 +29,7 @@ add_compile_definitions(TINYEXR_USE_MINIZ)  # enables usage of miniz for opening
 add_compile_definitions(USE_SHADERC)        # enables shader compilation via shaderc
 add_executable(Lumen ${src_files})
 
-target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc shaderc_util glslc glm spirv-cross-glsl)
+target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared spirv-cross-core spirv-cross-glsl glm)
 target_compile_features(Lumen PRIVATE cxx_std_20)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
