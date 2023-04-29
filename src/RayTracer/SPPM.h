@@ -11,8 +11,8 @@ class SPPM : public Integrator {
 
    private:
 	PCSPPM pc_ray{};
-	VkDescriptorPool desc_pool;
-	VkDescriptorSetLayout desc_set_layout;
+	VkDescriptorPool desc_pool{};
+	VkDescriptorSetLayout desc_set_layout{};
 	VkDescriptorSet desc_set;
 
 	Buffer sppm_data_buffer;

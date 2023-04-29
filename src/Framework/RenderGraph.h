@@ -1,11 +1,11 @@
 #pragma once
-#include "LumenPCH.h"
-#include "Framework/CommandBuffer.h"
-#include "Framework/Pipeline.h"
-#include "Framework/Shader.h"
-#include "Framework/Texture.h"
-#include "Framework/EventPool.h"
-#include "Framework/RenderGraphTypes.h"
+#include "../LumenPCH.h"
+#include "CommandBuffer.h"
+#include "Pipeline.h"
+#include "Shader.h"
+#include "Texture.h"
+#include "EventPool.h"
+#include "RenderGraphTypes.h"
 
 #define TO_STR(V) (#V)
 

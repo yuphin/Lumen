@@ -1,7 +1,7 @@
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 #include "SBTWrapper.h"
-#include "Framework/VkUtils.h"
-#include "Framework/CommandBuffer.h"
+#include "VkUtils.h"
+#include "CommandBuffer.h"
 
 void SBTWrapper::setup(VulkanContext* ctx, uint32_t family_idx,
 					   const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rt_props) {

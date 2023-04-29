@@ -1,11 +1,11 @@
 #pragma once
-#include "LumenPCH.h"
-#include "Framework/Camera.h"
-#include "Framework/Pipeline.h"
-#include "Framework/Shader.h"
-#include "Framework/Texture.h"
-#include "Framework/VulkanBase.h"
-#include "Framework/Window.h"
+#include "../LumenPCH.h"
+#include "Camera.h"
+#include "Pipeline.h"
+#include "Shader.h"
+#include "Texture.h"
+#include "VulkanBase.h"
+#include "Window.h"
 #include <glm/glm.hpp>
 class LumenInstance {
    public:

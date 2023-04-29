@@ -1,9 +1,9 @@
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 #include "Texture.h"
-#include "Framework/CommandBuffer.h"
-#include "Framework/VkUtils.h"
+#include "CommandBuffer.h"
+#include "VkUtils.h"
 #include <gli/gli.hpp>
-#include <stb_image.h>
+#include <stb_image/stb_image.h>
 
 Texture2D::Texture2D(VulkanContext* ctx) : Texture(ctx) {}
 

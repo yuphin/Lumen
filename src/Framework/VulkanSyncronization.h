@@ -1,5 +1,5 @@
 #pragma once
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 class VulkanSyncronization {
    public:
 	   static std::mutex queue_mutex;

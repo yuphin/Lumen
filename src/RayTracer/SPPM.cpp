@@ -176,6 +176,8 @@ void SPPM::destroy() {
 		b->destroy();
 	}
 
-	vkDestroyDescriptorSetLayout(device, desc_set_layout, nullptr);
-	vkDestroyDescriptorPool(device, desc_pool, nullptr);
+	if(desc_set_layout)
+		vkDestroyDescriptorSetLayout(device, desc_set_layout, nullptr);
+	if(desc_pool)
+		vkDestroyDescriptorPool(device, desc_pool, nullptr);
 }

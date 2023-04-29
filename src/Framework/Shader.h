@@ -1,5 +1,5 @@
 #pragma once
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 #include "CommonTypes.h"
 #include "Buffer.h"
 

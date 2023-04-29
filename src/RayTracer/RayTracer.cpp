@@ -1,13 +1,13 @@
 #include "LumenPCH.h"
 #include <regex>
-#include <stb_image.h>
+#include <stb_image/stb_image.h>
+#include <tinyexr.h>
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "RayTracer.h"
-#include <complex>
-#include <tinyexr.h>
+#include <string.h>
 
 RayTracer* RayTracer::instance = nullptr;
 bool load_reference = false;

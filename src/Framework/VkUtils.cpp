@@ -1,7 +1,7 @@
-#include "LumenPCH.h"
+#include "../LumenPCH.h"
 #include "VkUtils.h"
 #include "CommandBuffer.h"
-#include "Framework/ThreadPool.h"
+#include "ThreadPool.h"
 
 uint32_t find_memory_type(VkPhysicalDevice* physical_device, uint32_t type_filter, VkMemoryPropertyFlags props) {
 	VkPhysicalDeviceMemoryProperties mem_props;

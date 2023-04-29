@@ -84,7 +84,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <stddef.h>  // for size_t
 #include <stdint.h>  // guess stdint.h is available(C99)
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1284,7 +1283,7 @@ static void CompressZip(unsigned char *dst,
 
   compressedSize = outSize;
 #else
-  uLong outSize = compressBound(static_cast<uLong>(src_size));
+  size_t outSize = compressBound(static_cast<size_t>(src_size));
   int ret = compress(dst, &outSize, static_cast<const Bytef *>(&tmpBuf.at(0)),
                      src_size);
   assert(ret == Z_OK);
@@ -1318,7 +1317,7 @@ static bool DecompressZip(unsigned char *dst,
   }
 #else
   int ret = uncompress(&tmpBuf.at(0), uncompressed_size, src, src_size);
-  if (Z_OK != ret) {
+  if (MZ_OK != ret) {
     return false;
   }
 #endif
@@ -2446,7 +2445,7 @@ static bool hufBuildDecTable(const long long *hcode,  // i : encoding table
         unsigned int *p = pl->p;
         pl->p = new unsigned int[pl->lit];
 
-        for (int i = 0; i < pl->lit - 1; ++i) pl->p[i] = p[i];
+        for (unsigned int i = 0; i < pl->lit - 1; ++i) pl->p[i] = p[i];
 
         delete[] p;
       } else {
@@ -2701,7 +2700,7 @@ static bool hufDecode(const long long *hcode,  // i : encoding table
         // Search long code
         //
 
-        int j;
+        unsigned int j;
 
         for (j = 0; j < pl.lit; j++) {
           int l = hufLength(hcode[pl.p[j]]);
@@ -4161,12 +4160,12 @@ static unsigned char **AllocateImage(int num_channels,
 
 #ifdef _WIN32
 static inline std::wstring UTF8ToWchar(const std::string &str) {
-  int wstr_size =
-      MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), NULL, 0);
-  std::wstring wstr(wstr_size, 0);
-  MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), &wstr[0],
-                      (int)wstr.size());
-  return wstr;
+  //int wstr_size =
+  //    MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), nullptr, 0);
+  //std::wstring wstr(wstr_size, 0);
+  //MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), &wstr[0],
+  //                    (int)wstr.size());
+  return std::wstring(str.begin(), str.end());
 }
 #endif
 
@@ -6557,7 +6556,7 @@ static bool EncodePixelData(/* out */ std::vector<unsigned char>& out_data,
       static_cast<unsigned long>(buf.size())));
 #else
     std::vector<unsigned char> block(
-      compressBound(static_cast<uLong>(buf.size())));
+      compressBound(static_cast<size_t>(buf.size())));
 #endif
     tinyexr::tinyexr_uint64 outSize = block.size();
 

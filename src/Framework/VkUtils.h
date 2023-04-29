@@ -1,6 +1,6 @@
 #pragma once
 #include "LumenPCH.h"
-#include "gltfscene.hpp"
+#include "GltfScene.hpp"
 #include "Buffer.h"
 #include "Pipeline.h"
 uint32_t find_memory_type(VkPhysicalDevice* physical_device, uint32_t type_filter, VkMemoryPropertyFlags props);

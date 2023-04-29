@@ -2,8 +2,8 @@
 #include "LumenPCH.h"
 #include <volk/volk.h>
 #include "Buffer.h"
-#include "Framework/Event.h"
-#include "Framework/RenderGraph.h"
+#include "Event.h"
+#include "RenderGraph.h"
 
 class RenderGraph;
 

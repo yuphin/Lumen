@@ -16,8 +16,8 @@
  * SPDX-FileCopyrightText: Copyright (c) 2014-2021 NVIDIA CORPORATION
  * SPDX-License-Identifier: Apache-2.0
  */
-#include "LumenPCH.h"
-#include "Framework/Buffer.h"
+#include "../LumenPCH.h"
+#include "Buffer.h"
 #pragma once
 
 class SBTWrapper {
