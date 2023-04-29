@@ -41,6 +41,13 @@ else()
     target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared spirv-cross-core spirv-cross-glsl glm)
 endif()
 
+if(MSVC)
+	target_compile_options(Lumen PRIVATE "/MP")
+	set_target_properties(Lumen PROPERTIES
+    				      VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+    set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Lumen)
+endif()
+
 target_compile_features(Lumen PRIVATE cxx_std_20)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
