@@ -65,12 +65,9 @@ To build Lumen, start cloning the repository with
 git clone --recursive https://github.com/yuphin/Lumen.git
 ```
 ### Requirements
+- Vulkan SDK
 - Turing+ or RDNA2 GPU
-- VS2022 or VS2019
-
-Currently, Lumen only builds on Windows, however, there is no platform specific code in the codebase and it can be ported to Linux with ease.
-
-
+- CMake 3.4 or above (Credits to [@Lachei](https://github.com/lachei) for porting the project to CMake and testing it on Linux)
 
 
 ## Usage
