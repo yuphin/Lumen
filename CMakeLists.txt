@@ -24,15 +24,38 @@ set(structures_INCLUDE_DIR
     "src"
 )
 
+file(GLOB_RECURSE shaders_src CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.glsl  
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.comp  
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.rgen  
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.rahit  
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.rchit  
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.rmiss  
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.vert  
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.frag  
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.h  
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.rcall
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.rint
+)
+
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders PREFIX Shaders FILES ${shaders_src})
+file(GLOB_RECURSE FRAMEWORK_SRC CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/Framework/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/Framework/*.h ${CMAKE_CURRENT_SOURCE_DIR}/src/Framework/*.hpp)
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src/Framework PREFIX Framework FILES ${FRAMEWORK_SRC})
+file(GLOB_RECURSE RT_SRC CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/RayTracer/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/RayTracer/*.h)
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src/RayTracer PREFIX RayTracer FILES ${RT_SRC})
+file(GLOB_RECURSE LIB_SRC CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/libs/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/libs/*.h ${CMAKE_CURRENT_SOURCE_DIR}/libs/*.c ${CMAKE_CURRENT_SOURCE_DIR}/libs/*.hpp ${CMAKE_CURRENT_SOURCE_DIR}/libs/*.cc)
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/libs PREFIX Libs FILES ${LIB_SRC})
+
 include_directories(${Vulkan_INCLUDE_DIR};${structures_INCLUDE_DIR})
 if(WIN32)
     message("-- Adding vulkan library lib to search paths for the linker to find spirv libraries")
     get_filename_component(vulkan_lib_folder ${Vulkan_LIBRARIES} DIRECTORY)
     link_directories(${vulkan_lib_folder})
 endif()
+
 add_compile_definitions(TINYEXR_USE_MINIZ)  # enables usage of miniz for opening exr images
 add_compile_definitions(USE_SHADERC)        # enables shader compilation via shaderc
-add_executable(Lumen ${src_files})
+add_executable(Lumen ${src_files} ${shaders_src})
 if(WIN32)
     target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared glm
     $<$<CONFIG:Debug>:spirv-cross-cored> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-core>
