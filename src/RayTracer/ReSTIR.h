@@ -16,10 +16,6 @@ class ReSTIR : public Integrator {
 	Buffer spatial_reservoir_buffer;
 	Buffer tmp_col_buffer;
 	PCReSTIR pc_ray{};
-	VkDescriptorPool desc_pool;
-	VkDescriptorSetLayout desc_set_layout;
-	VkDescriptorSet desc_set;
-
 	bool do_spatiotemporal = false;
 	ReSTIRConfig* config;
 };

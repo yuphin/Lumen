@@ -25,7 +25,6 @@ ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
 void main() {
     const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
     const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
-    // vec2 d = vec2(rand(seed), rand(seed)) * 2.0 - 1.0;
     vec2 d = in_uv * 2.0 - 1.0;
     vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
     vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
@@ -67,7 +66,6 @@ void main() {
             load_material(payload.material_idx, payload.uv);
         if (depth == 0 || specular) {
             const vec3 val = throughput * hit_mat.emissive_factor;
-            // col += val;
             if (depth > 0) {
                 L_o += val;
             } else {

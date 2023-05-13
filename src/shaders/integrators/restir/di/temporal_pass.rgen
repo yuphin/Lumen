@@ -9,7 +9,7 @@
 #extension GL_EXT_shader_atomic_float : require
 
 #include "restir_commons.glsl"
-#include "../pt_commons.glsl"
+#include "../../pt_commons.glsl"
 
 void main() {
     const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
@@ -87,6 +87,8 @@ void main() {
             const float g = abs(cos_from_light) / (wi_len * wi_len);
             const vec3 f =
                 eval_bsdf(normal, wo, hit_mat, 1, side, wi, bsdf_pdf, cos_x);
+
+            pdf_light *= 1 / pc_ray.num_lights;
             // f * L * G / pdf
             RestirData s;
             s.light_idx = record.light_idx;

@@ -110,9 +110,7 @@ void main() {
     const float angle_threshold = 25 * PI / 180;
     ReservoirSample q = samples.d[pixel_idx];
     Reservoir r_s;
-    // if (length(q.n_s) == 0) {
-    //     return;
-    // }
+   
     if (pc_ray.do_spatiotemporal == 1) {
         r_s = spatial_reservoirs.d[offset(pingpong ^ 1) + pixel_idx];
     } else {

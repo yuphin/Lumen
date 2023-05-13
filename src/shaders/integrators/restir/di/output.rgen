@@ -14,7 +14,7 @@ void main() {
     load_g_buffer();
     vec3 col = vec3(0);
     const RestirReservoir r = spatial_reservoirs.d[pixel_idx];
-    col += tmp_col.d[pixel_idx];
+    // col += tmp_col.d[pixel_idx];
     if (isnan(luminance(col))) {
         return;
     }

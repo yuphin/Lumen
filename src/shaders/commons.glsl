@@ -219,7 +219,6 @@ TriangleRecord sample_area_light(const vec4 rands, const int num_lights,
                                  out float v) {
     PrimMeshInfo pinfo = prim_infos.d[light.prim_mesh_idx];
     material_idx = pinfo.material_index;
-    // triangle_idx = 6;
     triangle_idx = uint(rands.y * light.num_triangles);
     return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix, u,
                            v);
