@@ -1,5 +1,6 @@
 #include "LumenPCH.h"
 #include "Integrator.h"
+#include <Framework/Window.h>
 #include <stb_image/stb_image.h>
 
 void Integrator::init() {
@@ -23,27 +24,29 @@ void Integrator::init() {
 	}
 
 	Camera* cam_ptr = camera.get();
-	instance->window->add_mouse_click_callback([cam_ptr, this, window](MouseAction button, KeyAction action) {
-		if (ImGui::GetIO().WantCaptureMouse) {
-			return;
-		}
-		if (updated && window->is_mouse_up(MouseAction::LEFT)) {
-			updated = true;
-		}
-		if (updated && window->is_mouse_down(MouseAction::LEFT)) {
-			updated = true;
-		}
-	});
-	instance->window->add_mouse_move_callback([window, cam_ptr, this](double delta_x, double delta_y) {
-		if (ImGui::GetIO().WantCaptureMouse) {
-			return;
-		}
-		if (window->is_mouse_held(MouseAction::LEFT)) {
-			cam_ptr->rotate(0.05f * (float)delta_y, -0.05f * (float)delta_x, 0.0f);
-			// pc_ray.frame_num = 0;
-			updated = true;
-		}
-	});
+	instance->window->add_mouse_click_callback(
+		[cam_ptr, this, window](MouseAction button, KeyAction action, double x, double y) {
+			if (ImGui::GetIO().WantCaptureMouse) {
+				return;
+			}
+			if (updated && window->is_mouse_up(MouseAction::LEFT)) {
+				updated = true;
+			}
+			if (updated && window->is_mouse_down(MouseAction::LEFT)) {
+				updated = true;
+			}
+		});
+	instance->window->add_mouse_move_callback(
+		[window, cam_ptr, this](double delta_x, double delta_y, double x, double y) {
+			if (ImGui::GetIO().WantCaptureMouse) {
+				return;
+			}
+			if (window->is_mouse_held(MouseAction::LEFT) && !window->is_key_held(KeyInput::KEY_TAB)) {
+				cam_ptr->rotate(0.05f * (float)delta_y, -0.05f * (float)delta_x, 0.0f);
+				updated = true;
+			}
+		});
+
 	auto vertex_buf_size = lumen_scene->positions.size() * sizeof(glm::vec3);
 	auto idx_buf_size = lumen_scene->indices.size() * sizeof(uint32_t);
 	std::vector<PrimMeshInfo> prim_lookup;
@@ -51,7 +54,7 @@ void Integrator::init() {
 
 	total_light_triangle_cnt = 0;
 	total_light_area = 0;
-	
+
 	for (auto& pm : lumen_scene->prim_meshes) {
 		PrimMeshInfo m_info;
 		m_info.index_offset = pm.first_idx;
@@ -70,7 +73,6 @@ void Integrator::init() {
 			light.light_flags = LIGHT_AREA;
 			// Is finite
 			light.light_flags |= 1 << 4;
-			auto a = ((light.light_flags >> 4) & 0x1) != 0;
 			;
 			lights.emplace_back(light);
 			total_light_triangle_cnt += light.num_triangles;
@@ -145,7 +147,8 @@ void Integrator::init() {
 		std::array<uint8_t, 4> nil = {0, 0, 0, 0};
 		scene_textures.resize(1);
 		auto ci = make_img2d_ci(VkExtent2D{1, 1});
-		scene_textures[0].load_from_data(&instance->vkb.ctx, nil.data(), 4, ci, texture_sampler, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+		scene_textures[0].load_from_data(&instance->vkb.ctx, nil.data(), 4, ci, texture_sampler,
+										 VK_IMAGE_USAGE_SAMPLED_BIT, false);
 	};
 
 	if (!lumen_scene->textures.size()) {
@@ -160,7 +163,8 @@ void Integrator::init() {
 			auto size = x * y * 4;
 			auto img_dims = VkExtent2D{(uint32_t)x, (uint32_t)y};
 			auto ci = make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-			scene_textures[i].load_from_data(&instance->vkb.ctx, data, size, ci, texture_sampler, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+			scene_textures[i].load_from_data(&instance->vkb.ctx, data, size, ci, texture_sampler,
+											 VK_IMAGE_USAGE_SAMPLED_BIT, false);
 			stbi_image_free(data);
 			i++;
 		}
@@ -254,7 +258,6 @@ void Integrator::update_uniform_buffers() {
 }
 
 bool Integrator::update() {
-	glm::vec3 translation{};
 	float trans_speed = 0.01f;
 	glm::vec3 front;
 	if (instance->window->is_key_held(KeyInput::KEY_LEFT_SHIFT)) {
@@ -294,12 +297,21 @@ bool Integrator::update() {
 		camera->position -= up * trans_speed;
 		updated = true;
 	}
+
+	if (instance->window->is_key_held(KeyInput::KEY_TAB) &&
+		instance->window->is_mouse_held(MouseAction::LEFT, scene_ubo.clicked_pos)) {
+		scene_ubo.debug_click = 1;
+	} else {
+		scene_ubo.debug_click = 0;
+	}
+
 	bool result = false;
 	if (updated) {
 		result = true;
 		updated = false;
 	}
 	update_uniform_buffers();
+
 	return result;
 }
 

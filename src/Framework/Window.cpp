@@ -17,6 +17,7 @@ Window::Window(int width, int height, bool fullscreen) {
 
 void Window::poll() { glfwPollEvents(); }
 
+
 Window::~Window() {
 	glfwDestroyWindow(window_handle);
 	glfwTerminate();
@@ -38,6 +39,7 @@ void Window::char_callback(GLFWwindow* window, uint32_t codepoint) {
 
 void Window::mouse_click_callback(GLFWwindow* window, int button, int action, int mods) {
 	KeyAction callback_action;
+
 	switch (action) {
 		case GLFW_RELEASE:
 			callback_action = KeyAction::RELEASE;
@@ -70,9 +72,11 @@ void Window::mouse_click_callback(GLFWwindow* window, int button, int action, in
 	}
 
 	auto window_ptr = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
-	window_ptr->mouse_map[mouse_button] = callback_action;
+	double xpos, ypos;
+	glfwGetCursorPos(window, &xpos, &ypos);
+	window_ptr->mouse_map[mouse_button] = {callback_action, xpos, ypos};
 	for (auto& cb : window_ptr->mouse_click_callbacks) {
-		cb(mouse_button, callback_action);
+		cb(mouse_button, callback_action, xpos, ypos);
 	}
 }
 
@@ -87,8 +91,16 @@ void Window::mouse_move_callback(GLFWwindow* window, double x, double y) {
 	window_ptr->mouse_delta_prev_y = window_ptr->mouse_prev_y - window_ptr->mouse_pos_y;
 	window_ptr->mouse_delta_prev_x *= -1;
 
+	double xpos, ypos;
+	glfwGetCursorPos(window, &xpos, &ypos);
+	for (auto& [k, v] : window_ptr->mouse_map)
+	{
+		v.x = xpos;
+		v.y = ypos;
+	}
+
 	for (auto& cb : window_ptr->mouse_move_callbacks) {
-		cb(window_ptr->mouse_delta_prev_x, window_ptr->mouse_delta_prev_y);
+		cb(window_ptr->mouse_delta_prev_x, window_ptr->mouse_delta_prev_y, xpos, ypos);
 	}
 }
 
@@ -102,3 +114,21 @@ void Window::add_mouse_click_callback(MouseClickCallback callback) { mouse_click
 void Window::add_mouse_move_callback(MouseMoveCallback callback) { mouse_move_callbacks.push_back(callback); }
 
 void Window::add_scroll_callback(MouseScrollCallback callback) { mouse_scroll_callbacks.push_back(callback); }
+
+bool Window::is_mouse_held(MouseAction mb, glm::ivec2& pos) {
+	auto res = mouse_map.find(mb);
+	if (res == mouse_map.end() || (res->second.action != KeyAction::PRESS && res->second.action != KeyAction::REPEAT)) {
+		return false;
+	}
+	pos = glm::ivec2(res->second.x, res->second.y);
+	return true;
+}
+
+bool Window::is_mouse_up(MouseAction mb, glm::ivec2& pos) {
+	auto res = mouse_map.find(mb);
+	if (res == mouse_map.end() || res->second.action != KeyAction::RELEASE) {
+		return false;
+	}
+	pos = glm::ivec2(res->second.x, res->second.y);
+	return true;
+}

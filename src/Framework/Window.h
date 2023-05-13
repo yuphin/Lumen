@@ -128,8 +128,15 @@ enum class KeyInput {
 enum class KeyAction { RELEASE, PRESS, REPEAT, UNKNOWN };
 
 enum class MouseAction { LEFT, RIGHT, MIDDLE, UNKNOWN };
-using MouseClickCallback = std::function<void(MouseAction button, KeyAction action)>;
-using MouseMoveCallback = std::function<void(double x, double y)>;
+
+struct MouseInput {
+	KeyAction action;
+	double x;
+	double y;
+};
+
+using MouseClickCallback = std::function<void(MouseAction button, KeyAction action, double x, double y)>;
+using MouseMoveCallback = std::function<void(double delta_x, double delta_y,  double x, double y)>;
 using MouseScrollCallback = std::function<void(double x, double y)>;
 class Window {
    public:
@@ -142,10 +149,20 @@ class Window {
 		return key_map[input] == KeyAction::REPEAT || key_map[input] == KeyAction::PRESS;
 	}
 	inline bool is_mouse_held(MouseAction mb) {
-		return mouse_map[mb] == KeyAction::PRESS || mouse_map[mb] == KeyAction::REPEAT;
+		auto res = mouse_map.find(mb);
+		return res != mouse_map.end() && 
+			(res->second.action == KeyAction::PRESS || res->second.action == KeyAction::REPEAT );
 	}
-	inline bool is_mouse_down(MouseAction mb) { return mouse_map[mb] == KeyAction::PRESS; }
-	inline bool is_mouse_up(MouseAction mb) { return mouse_map[mb] == KeyAction::RELEASE; }
+	inline bool is_mouse_down(MouseAction mb) { 
+		auto res = mouse_map.find(mb);
+		return res != mouse_map.end() && res->second.action ==  KeyAction::PRESS;
+	}
+	inline bool is_mouse_up(MouseAction mb) { 
+		auto res = mouse_map.find(mb);
+		return res != mouse_map.end() && res->second.action == KeyAction::RELEASE;
+	}
+	bool is_mouse_held(MouseAction mb, glm::ivec2& pos);
+	bool is_mouse_up(MouseAction mb, glm::ivec2& pos);
 	~Window();
 	inline GLFWwindow* get_window_ptr() { return window_handle; }
 	inline bool window_resized() { return resized; }
@@ -163,7 +180,7 @@ class Window {
 	static void mouse_move_callback(GLFWwindow* window, double x, double y);
 	static void scroll_callback(GLFWwindow* window, double x, double y);
 	std::unordered_map<KeyInput, KeyAction> key_map{};
-	std::unordered_map<MouseAction, KeyAction> mouse_map{};
+	std::unordered_map<MouseAction, MouseInput> mouse_map{};
 	std::vector<MouseClickCallback> mouse_click_callbacks;
 	std::vector<MouseMoveCallback> mouse_move_callbacks;
 	std::vector<MouseScrollCallback> mouse_scroll_callbacks;
