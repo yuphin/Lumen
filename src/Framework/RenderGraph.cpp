@@ -773,8 +773,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	// Post execution buffer barriers
 	{
 		std::vector<VkBufferMemoryBarrier2> post_execution_buffer_memory_barriers;
-		post_execution_buffer_memory_barriers.reserve(buffer_barriers.size());
-		for (auto& barrier : buffer_barriers) {
+		post_execution_buffer_memory_barriers.reserve(post_execution_buffer_barriers.size());
+		for (auto& barrier : post_execution_buffer_barriers) {
 			auto curr_stage = get_pipeline_stage(type, barrier.src_access_flags);
 			auto dst_stage = get_pipeline_stage(type, barrier.dst_access_flags);
 			post_execution_buffer_memory_barriers.push_back(buffer_barrier2(
