@@ -60,7 +60,7 @@ void main() {
     if (idx == 0) {
         cnt.d += 1;
     }
-    if (limit < 1024 && idx == 0) {
+    if (idx == 0) {
         chain_stats.d[MODE].total_luminance += valf.x;
         chain_stats.d[MODE].lum_samples += valu;
         chain_stats.d[MODE].total_samples += valf.y;
