@@ -3,9 +3,9 @@
 
 void SMLT::init() {
 	Integrator::init();
-	mutations_per_pixel = 100.0f;
-	num_mlt_threads = 1600 * 900 / 2;
-	num_bootstrap_samples = 1600 * 900 / 2;
+	mutations_per_pixel = config->mutations_per_pixel;
+	num_mlt_threads = config->num_mlt_threads;
+	num_bootstrap_samples = config->num_bootstrap_samples;
 	mutation_count = int(instance->width * instance->height * mutations_per_pixel / float(num_mlt_threads));
 	light_path_rand_count = 6 + 2 * config->path_length;
 	cam_path_rand_count = 3 + 6 * config->path_length;
@@ -227,9 +227,6 @@ void SMLT::render() {
 	pc_ray.num_bootstrap_samples = num_bootstrap_samples;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
-
-	pc_ray.radius = lumen_scene->m_dimensions.radius * config->radius_factor / 100.f;
-	pc_ray.radius /= (float)pow((double)pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
 
 	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,

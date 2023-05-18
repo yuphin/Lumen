@@ -52,7 +52,6 @@ struct SMLTConfig : SceneConfig {
 	float mutations_per_pixel = 100.0f;
 	int num_mlt_threads = 360000;
 	int num_bootstrap_samples = 360000;
-	float radius_factor = 0.025f;
 	SMLTConfig() : SceneConfig("SMLT", IntegratorType::SMLT) {}
 };
 
