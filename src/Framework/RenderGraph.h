@@ -275,7 +275,6 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 			// If this is a cached pipeline and the cached pipeline index is not 0, make this the starting pass index
 			if (idx != 0 && beginning_pass_idx == 0) {
 				beginning_pass_idx = idx;
-				ending_pass_idx = idx + 1;
 			}
 
 			// Pass was inserted prior, shift the subsequent existing pass indices
@@ -283,6 +282,7 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 				passes[idx].pass_idx += uint32_t(pass_idxs_with_shader_compilation_overrides.size());
 				storage.pass_idxs[offset_idx] = passes[idx].pass_idx;
 			}
+			ending_pass_idx = std::max(ending_pass_idx, idx + 1);
 			return passes[idx];
 		}
 		pipeline = pipeline_cache[name_with_macros].pipeline.get();
