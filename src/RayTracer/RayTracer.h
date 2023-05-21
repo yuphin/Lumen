@@ -11,6 +11,7 @@
 #include "VCMMLT.h"
 #include "ReSTIR.h"
 #include "ReSTIRGI.h"
+#include "ReSTIRPT.h"
 #include "DDGI.h"
 #include "PostFX.h"
 

@@ -1,0 +1,152 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+
+#include "../../../commons.glsl"
+layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc_ray; };
+layout(buffer_reference, scalar) buffer RestirSamples { ReservoirSample d[]; };
+const uint flags = gl_RayFlagsOpaqueEXT;
+const float tmin = 0.001;
+const float tmax = 10000.0;
+#define RR_MIN_DEPTH 3
+uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num);
+layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
+RestirSamples samples = RestirSamples(scene_desc.restir_samples_addr);
+ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
+#include "../../pt_commons.glsl"
+
+void main() {
+    const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+    const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
+    vec2 d = in_uv * 2.0 - 1.0;
+    vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
+    vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
+    vec3 direction = vec3(sample_camera(d));
+    vec3 col = vec3(0);
+    vec3 x_v = vec3(0), n_v = vec3(0);
+    vec3 x_s = vec3(0), n_s = vec3(0);
+    float p_q = 0;
+    vec3 L_o = vec3(0);
+    vec3 x_f = vec3(0);
+    uint mat_idx = -1;
+    uint bsdf_props = 0;
+    vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
+                                               2. / gl_LaunchSizeEXT.y, 0, 1));
+    area_int /= (area_int.w);
+    const float cam_area = abs(area_int.x * area_int.y);
+    bool specular = false;
+    vec3 throughput = vec3(1);
+    vec3 t0 = vec3(1);
+    for (int depth = 0;; depth++) {
+        traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction,
+                    tmax, 0);
+        const bool found_isect = payload.material_idx != -1;
+        if (depth >= pc_ray.max_depth - 1) {
+            break;
+        }
+        if (!found_isect) {
+            const vec3 val = throughput * pc_ray.sky_col;
+            if(depth <= 1) {
+                col += t0 * val;
+            } else {
+                L_o += t0 * val;
+            }
+         
+            break;
+        }
+
+        const Material hit_mat =
+            load_material(payload.material_idx, payload.uv);
+        if (depth == 0 || specular) {
+            const vec3 val = throughput * hit_mat.emissive_factor;
+            if (depth > 0) {
+                L_o += val;
+            } else {
+                col += val;
+            }
+        }
+        const vec3 wo = -direction;
+        vec3 shading_nrm = payload.n_s;
+        bool side = true;
+        vec3 geometry_nrm = payload.n_g;
+        if (dot(payload.n_g, wo) < 0.)
+            geometry_nrm = -geometry_nrm;
+        if (dot(geometry_nrm, payload.n_s) < 0) {
+            shading_nrm = -shading_nrm;
+            side = false;
+        }
+        const vec3 pos = offset_ray(payload.pos, geometry_nrm);
+        if (depth == 1) {
+            x_s = pos;
+            n_s = shading_nrm;
+        }
+        if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
+            const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+            const vec3 val = throughput *
+                             uniform_sample_light(hit_mat, payload.pos, side,
+                                                  shading_nrm, wo, specular) /
+                             light_pick_pdf;
+            if (depth > 0) {
+                L_o += val;
+            } else {
+                col += val;
+            }
+        }
+        // Sample direction & update throughput
+        float pdf, cos_theta;
+        const vec3 f = sample_bsdf(shading_nrm, wo, hit_mat, 1 /*radiance=cam*/,
+                                   side, direction, pdf, cos_theta, seed);
+
+        if (pdf == 0) {
+            break;
+        }
+
+        if (depth == 0) {
+            x_v = pos;
+            n_v = shading_nrm;
+            p_q = pdf;
+            x_f = f;
+            mat_idx = payload.material_idx;
+            bsdf_props = hit_mat.bsdf_props;
+        }
+
+        if (depth > 0) {
+            throughput *= f * abs(cos_theta) / pdf;
+        } else {
+            t0 = f * abs(cos_theta) / pdf;
+        }
+        specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
+        origin.xyz = pos;
+        float rr_scale = 1.0;
+        if (hit_mat.bsdf_type == BSDF_GLASS) {
+            rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
+        }
+        if (depth > RR_MIN_DEPTH) {
+            float rr_prob = min(0.95f, luminance(throughput) * rr_scale);
+            if (rr_prob < rand(seed))
+                break;
+            else
+                throughput /= rr_prob;
+        }
+    }
+    ivec2 coords = ivec2(0.5 * (1 + d) * vec2(pc_ray.size_x, pc_ray.size_y));
+    uint coords_idx = coords.x * pc_ray.size_y + coords.y;
+    // Fill in the samples buffer
+    samples.d[pixel_idx].x_v = x_v;
+    samples.d[pixel_idx].n_v = n_v;
+    samples.d[pixel_idx].x_s = x_s;
+    samples.d[pixel_idx].n_s = n_s;
+    samples.d[pixel_idx].L_o = L_o;
+    samples.d[pixel_idx].p_q = p_q;
+    samples.d[pixel_idx].f = x_f;
+    samples.d[pixel_idx].mat_idx = mat_idx;
+    samples.d[pixel_idx].bsdf_props = bsdf_props;
+    tmp_col.d[pixel_idx] += col;
+}

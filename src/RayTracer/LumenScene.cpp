@@ -490,7 +490,10 @@ void LumenScene::create_scene_config(const std::string& integrator_name) {
 		config = std::make_unique<ReSTIRConfig>();
 	} else if (name == "restirgi") {
 		config = std::make_unique<ReSTIRGIConfig>();
-	} else if (name == "ddgi") {
+	} else if (name == "restirpt") {
+		config = std::make_unique<ReSTIRPTConfig>();
+	}
+	else if (name == "ddgi") {
 		config = std::make_unique<DDGIConfig>();
 	} else {
 		config = std::make_unique<PathConfig>();

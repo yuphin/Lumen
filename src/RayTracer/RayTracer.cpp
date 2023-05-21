@@ -199,6 +199,9 @@ void RayTracer::create_integrator(int integrator_idx) {
 		case int(IntegratorType::ReSTIRGI):
 			integrator = std::make_unique<ReSTIRGI>(this, &scene);
 			break;
+		case int(IntegratorType::ReSTIRPT):
+			integrator = std::make_unique<ReSTIRPT>(this, &scene);
+			break;
 		case int(IntegratorType::PSSMLT):
 			integrator = std::make_unique<PSSMLT>(this, &scene);
 			break;
@@ -234,7 +237,7 @@ bool RayTracer::gui() {
 		updated |= true;
 	}
 
-	const char* settings[] = {"Path", "BDPT", "SPPM", "VCM", "PSSMLT", "SMLT", "VCMMLT", "ReSTIR", "ReSTIRGI", "DDGI"};
+	const char* settings[] = {"Path", "BDPT", "SPPM", "VCM", "PSSMLT", "SMLT", "VCMMLT", "ReSTIR", "ReSTIR GI", "ReSTIR PT", "DDGI"};
 
 	static int curr_integrator_idx = int(scene.config->integrator_type);
 	if (ImGui::BeginCombo("Select Integrator", settings[curr_integrator_idx])) {
@@ -264,7 +267,10 @@ bool RayTracer::gui() {
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, &rmse_val_buffer, instance->vkb.rg);
 
 		auto prev_cam_settings = scene.config->cam_settings;
-		scene.create_scene_config(std::string(settings[curr_integrator_idx]));
+		auto integrator_str = std::string(settings[curr_integrator_idx]);
+		integrator_str.erase(std::remove_if(integrator_str.begin(), integrator_str.end(), ::isspace), integrator_str.end());
+		std::transform(integrator_str.begin(), integrator_str.end(), integrator_str.begin(), ::tolower);
+		scene.create_scene_config(integrator_str);
 		scene.config->cam_settings = prev_cam_settings;
 		create_integrator(curr_integrator_idx);
 		integrator->init();

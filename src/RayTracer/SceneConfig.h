@@ -10,7 +10,7 @@ struct CameraSettings {
 	glm::mat4 cam_matrix = glm::mat4();
 };
 
-enum class IntegratorType { Path, BDPT, SPPM, VCM, PSSMLT, SMLT, VCMMLT, ReSTIR, ReSTIRGI, DDGI };
+enum class IntegratorType { Path, BDPT, SPPM, VCM, PSSMLT, SMLT, VCMMLT, ReSTIR, ReSTIRGI, ReSTIRPT, DDGI };
 
 struct SceneConfig {
 	int path_length = 6;
@@ -76,4 +76,8 @@ struct ReSTIRGIConfig : SceneConfig {
 
 struct DDGIConfig : SceneConfig {
 	DDGIConfig() : SceneConfig("DDGI", IntegratorType::DDGI) {}
+};
+
+struct ReSTIRPTConfig : SceneConfig {
+	ReSTIRPTConfig() : SceneConfig("ReSTIR PT", IntegratorType::ReSTIRPT) {}
 };
