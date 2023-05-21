@@ -23,34 +23,29 @@ ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
 Reservoirs temp_reservoirs = Reservoirs(scene_desc.temporal_reservoir_addr);
 Reservoirs spatial_reservoirs = Reservoirs(scene_desc.spatial_reservoir_addr);
 
-uint offset(const uint pingpong) {
-    return pingpong * pc_ray.size_x * pc_ray.size_y;
-}
+uint offset(const uint pingpong) { return pingpong * pc_ray.size_x * pc_ray.size_y; }
 
 void main() {
-    ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc_ray.size_y,
-                         gl_GlobalInvocationID.x % pc_ray.size_y);
-    if (gl_GlobalInvocationID.x >= pc_ray.size_x * pc_ray.size_y) {
-        return;
-    }
-    const uint pingpong = (pc_ray.total_frame_num % 2);
-    vec3 col = vec3(0);
-    col += tmp_col.d[gl_GlobalInvocationID.x];
-    uint idx = gl_GlobalInvocationID.x;
-    tmp_col.d[gl_GlobalInvocationID.x] = vec3(0);
-    const Reservoir r =
-        spatial_reservoirs.d[offset(pingpong) + gl_GlobalInvocationID.x];
-    if (r.W > 0) {
-        const ReservoirSample s = r.s;
-        const vec3 wi = normalize(s.x_s - s.x_v);
-        col += s.f * abs(dot(wi, s.n_v)) * s.L_o * r.W;
-    }
-    if (pc_ray.frame_num > 0) {
-        float w = 1. / float(pc_ray.frame_num + 1);
-        vec3 old_col = imageLoad(image, ivec2(coords)).xyz;
-        // imageStore(image, ivec2(coords), vec4(mix(old_col, col, w), 1.f));
-        imageStore(image, ivec2(coords), vec4(col, 1.f));
-    } else {
-        imageStore(image, ivec2(coords), vec4(col, 1.f));
-    }
+	ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc_ray.size_y, gl_GlobalInvocationID.x % pc_ray.size_y);
+	if (gl_GlobalInvocationID.x >= pc_ray.size_x * pc_ray.size_y) {
+		return;
+	}
+	const uint pingpong = (pc_ray.total_frame_num % 2);
+	vec3 col = vec3(0);
+	col += tmp_col.d[gl_GlobalInvocationID.x];
+	uint idx = gl_GlobalInvocationID.x;
+	tmp_col.d[gl_GlobalInvocationID.x] = vec3(0);
+	const Reservoir r = spatial_reservoirs.d[offset(pingpong) + gl_GlobalInvocationID.x];
+	if (r.W > 0) {
+		const ReservoirSample s = r.s;
+		const vec3 wi = normalize(s.x_s - s.x_v);
+		col += s.f * abs(dot(wi, s.n_v)) * s.L_o * r.W;
+	}
+	if (pc_ray.enable_accumulation == 0 || pc_ray.frame_num == 0) {
+		imageStore(image, ivec2(coords), vec4(col, 1.f));
+	} else {
+		float w = 1. / float(pc_ray.frame_num + 1);
+		vec3 old_col = imageLoad(image, ivec2(coords)).xyz;
+		imageStore(image, ivec2(coords), vec4(mix(old_col, col, w), 1.f));
+	}
 }

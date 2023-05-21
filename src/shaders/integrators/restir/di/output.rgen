@@ -11,28 +11,26 @@
 #include "restir_commons.glsl"
 
 void main() {
-    load_g_buffer();
-    vec3 col = vec3(0);
-    const RestirReservoir r = spatial_reservoirs.d[pixel_idx];
-    // col += tmp_col.d[pixel_idx];
-    if (isnan(luminance(col))) {
-        return;
-    }
-    if (r.W > 0) {
-        col += r.W * calc_L_with_visibility_check(r) * pc_ray.light_triangle_count;
-        temporal_reservoirs.d[pixel_idx].w_sum = r.w_sum;
-        temporal_reservoirs.d[pixel_idx].W = r.W;
-        temporal_reservoirs.d[pixel_idx].m = r.m;
-        temporal_reservoirs.d[pixel_idx].s = r.s;
-    }
-    tmp_col.d[pixel_idx] = vec3(0);
-    if (pc_ray.frame_num > 0) {
-        float w = 1. / float(pc_ray.frame_num + 1);
-        vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
-        // imageStore(image, ivec2(gl_LaunchIDEXT.xy),
-        //            vec4(mix(old_col, col, w), 1.f));
-        imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
-    } else {
-        imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
-    }
+	load_g_buffer();
+	vec3 col = vec3(0);
+	const RestirReservoir r = spatial_reservoirs.d[pixel_idx];
+	// col += tmp_col.d[pixel_idx];
+	if (isnan(luminance(col))) {
+		return;
+	}
+	if (r.W > 0) {
+		col += r.W * calc_L_with_visibility_check(r) * pc_ray.light_triangle_count;
+		temporal_reservoirs.d[pixel_idx].w_sum = r.w_sum;
+		temporal_reservoirs.d[pixel_idx].W = r.W;
+		temporal_reservoirs.d[pixel_idx].m = r.m;
+		temporal_reservoirs.d[pixel_idx].s = r.s;
+	}
+	tmp_col.d[pixel_idx] = vec3(0);
+	if (pc_ray.frame_num == 0 || pc_ray.enable_accumulation == 0) {
+		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+	} else {
+		float w = 1. / float(pc_ray.frame_num + 1);
+		vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
+	}
 }

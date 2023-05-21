@@ -75,6 +75,7 @@ void ReSTIR::render() {
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	pc_ray.enable_accumulation = enable_accumulation;
 
 	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
@@ -142,6 +143,12 @@ bool ReSTIR::update() {
 		pc_ray.frame_num = 0;
 	}
 	return updated;
+}
+
+bool ReSTIR::gui() { 
+	bool result = false;
+	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
+	return result;
 }
 
 void ReSTIR::destroy() {

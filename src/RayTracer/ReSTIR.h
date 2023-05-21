@@ -7,6 +7,7 @@ class ReSTIR : public Integrator {
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
+	virtual bool gui() override;
 	virtual void destroy() override;
 
    private:
@@ -17,5 +18,6 @@ class ReSTIR : public Integrator {
 	Buffer tmp_col_buffer;
 	PCReSTIR pc_ray{};
 	bool do_spatiotemporal = false;
+	bool enable_accumulation = false;
 	ReSTIRConfig* config;
 };

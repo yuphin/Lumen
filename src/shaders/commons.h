@@ -178,6 +178,7 @@ struct PCReSTIR {
 	uint dir_light_idx;
 	uint do_spatiotemporal;
 	uint random_num;
+	int enable_accumulation;
 };
 
 struct PCReSTIRGI {
@@ -195,6 +196,7 @@ struct PCReSTIRGI {
 	uint random_num;
 	uint total_frame_num;
 	float world_radius;
+	int enable_accumulation;
 };
 
 struct PCSPPM {

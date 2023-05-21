@@ -76,6 +76,7 @@ void ReSTIRGI::render() {
 	pc_ray.do_spatiotemporal = do_spatiotemporal;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	pc_ray.enable_accumulation = enable_accumulation;
 
 	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
@@ -152,6 +153,12 @@ bool ReSTIRGI::update() {
 		pc_ray.frame_num = 0;
 	}
 	return updated;
+}
+
+bool ReSTIRGI::gui() { 
+	bool result = false;
+	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
+	return result;
 }
 
 void ReSTIRGI::destroy() {

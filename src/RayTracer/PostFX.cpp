@@ -171,6 +171,8 @@ void PostFX::render(Texture2D& input, Texture2D& output) {
 
 bool PostFX::gui() {
 	bool updated = false;
+	ImGui::NewLine();
+	ImGui::Text("Post FX Settings:");
 	ImGui::Checkbox("Enable ACES tonemapping", &enable_tonemapping);
 	ImGui::Checkbox("Enable bloom", &enable_bloom);
 	float exposure = log10f(bloom_exposure);
