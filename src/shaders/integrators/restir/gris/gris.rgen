@@ -1,0 +1,155 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+
+#include "../../../commons.glsl"
+layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc_ray; };
+layout(buffer_reference, scalar) buffer GrisReservoir { ReSTIRPTReservoir d[]; };
+layout(buffer_reference, scalar) buffer GrisGBuffer { ReSTIRPTGBuffer d[]; };
+const uint flags = gl_RayFlagsOpaqueEXT;
+const float tmin = 0.001;
+const float tmax = 10000.0;
+#define RR_MIN_DEPTH 3
+uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num);
+GrisReservoir reservoirs = GrisReservoir(scene_desc.gris_reservoir_addr);
+GrisGBuffer g_buffers = GrisGBuffer(scene_desc.gris_gbuffer_addr);
+#include "../../pt_commons.glsl"
+
+void init_reservoir(out ReSTIRPTReservoir r) {
+	r.M = 0;
+	r.W = 0.0;
+    r.rc_postfix_L = vec3(0);
+}
+
+void init_gbuffer(out ReSTIRPTGBuffer gbuffer) {
+    gbuffer.material_idx = -1;
+}
+
+bool is_rough(in Material mat) {
+    // Only check if it's diffuse for now
+    return (mat.bsdf_type & BSDF_DIFFUSE) != 0;
+}
+
+void main() {
+	const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+	const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
+	vec2 d = in_uv * 2.0 - 1.0;
+	vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
+	vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
+	vec3 direction = vec3(sample_camera(d));
+	vec3 col = vec3(0);
+
+	ReSTIRPTReservoir reservoir;
+    ReSTIRPTGBuffer gbuffer;
+	init_reservoir(reservoir);
+    init_gbuffer(gbuffer);
+
+    bool specular = false;
+	vec3 throughput = vec3(1);
+    // Updated after a connectable vertex is found
+    vec3 postfix_throughput = vec3(1);
+
+    bool prev_rough = false;
+    bool connectable_vertex_found = false;
+    reservoir.init_seed = seed;
+
+	for (int depth = 0;; depth++) {
+		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
+		const bool found_isect = payload.material_idx != -1;
+		if (depth >= pc_ray.max_depth - 1) {
+			break;
+		}
+		if (!found_isect) {
+            vec3 atmosphere_L = shade_atmosphere(pc_ray.dir_light_idx, pc_ray.sky_col, origin.xyz, direction, tmax);
+			col += throughput * atmosphere_L;
+            if(connectable_vertex_found) {
+                reservoir.rc_postfix_L += postfix_throughput * atmosphere_L;
+            }
+			break;
+		}
+		const Material hit_mat = load_material(payload.material_idx, payload.uv);
+
+        if(depth == 0) {
+            gbuffer.pos = payload.pos;
+            gbuffer.n_s = payload.n_s;
+            gbuffer.n_g = payload.n_g;
+            gbuffer.material_idx = payload.material_idx;
+        }
+
+      
+        if (depth == 0 || specular) {
+			col += throughput * hit_mat.emissive_factor;
+		}
+
+		const vec3 wo = -direction;
+		vec3 n_s = payload.n_s;
+		bool side = true;
+		vec3 n_g = payload.n_g;
+		if (dot(payload.n_g, wo) < 0.) n_g = -n_g;
+		if (dot(n_g, payload.n_s) < 0) {
+			n_s = -n_s;
+			side = false;
+		}
+		origin.xyz = offset_ray(payload.pos, n_g);
+		if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
+			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+            vec3 light_L = uniform_sample_light(hit_mat, payload.pos, side, n_s, wo, specular) / light_pick_pdf;
+			col += throughput * light_L;
+            if(connectable_vertex_found) {
+                reservoir.rc_postfix_L += postfix_throughput * light_L;
+            }
+		}
+		// Sample direction & update throughput
+		float pdf, cos_theta;
+		const vec3 f = sample_bsdf(n_s, wo, hit_mat, 1 /*radiance=cam*/, side, direction, pdf, cos_theta, seed);
+		if (pdf == 0) {
+			break;
+		}
+        bool rough = is_rough(hit_mat);
+        bool is_connectable = !connectable_vertex_found && (prev_rough && rough);
+        if(is_connectable) {
+            reservoir.rc_seed = seed;
+            reservoir.rc_pos = payload.pos;
+            reservoir.rc_wi = direction;
+            connectable_vertex_found = true;
+        }
+        vec3 t = f * abs(cos_theta) / pdf;
+		throughput *= t;
+        if(connectable_vertex_found) {
+            postfix_throughput *= t;
+        }
+		specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
+
+
+		float rr_scale = 1.0;
+		if (hit_mat.bsdf_type == BSDF_GLASS) {
+			rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
+		}
+		if (depth > RR_MIN_DEPTH) {
+			float rr_prob = min(0.95f, luminance(throughput) * rr_scale);
+			if (rr_prob == 0 || rr_prob < rand(seed))
+				break;
+			else
+				throughput /= rr_prob;
+		}
+        prev_rough = is_rough(hit_mat);
+	}
+	if (isnan(luminance(col))) {
+		return;
+	}
+    reservoir.M = 1;
+    // Will be changed after the addition of spatial reuse
+    reservoir.W = 1.0f;
+    
+    reservoir.F = col;
+
+    reservoirs.d[pixel_idx] = reservoir;
+    g_buffers.d[pixel_idx] = gbuffer;
+}

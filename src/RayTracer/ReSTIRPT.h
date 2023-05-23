@@ -11,13 +11,9 @@ class ReSTIRPT : public Integrator {
 	virtual bool gui() override;
 
    private:
-	Buffer restir_samples_buffer;
-	Buffer restir_samples_old_buffer;
-	Buffer temporal_reservoir_buffer;
-	Buffer spatial_reservoir_buffer;
-	Buffer tmp_col_buffer;
+	Buffer gris_gbuffer;
+	Buffer gris_reservoir_buffer;
 	PCReSTIRPT pc_ray{};
-	bool do_spatiotemporal = false;
 	bool enable_accumulation = false;
 
 	ReSTIRGIConfig* config;

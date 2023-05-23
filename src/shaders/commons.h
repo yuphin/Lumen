@@ -210,10 +210,8 @@ struct PCReSTIRPT {
 	float total_light_area;
 	int light_triangle_count;
 	uint dir_light_idx;
-	uint do_spatiotemporal;
 	uint random_num;
 	uint total_frame_num;
-	float world_radius;
 	uint enable_accumulation;
 };
 
@@ -538,15 +536,23 @@ struct Reservoir {
 	ReservoirSample s;
 };
 
+struct ReSTIRPTGBuffer {
+	vec3 pos;
+	vec3 n_s;
+	vec3 n_g;
+	vec2 uv;
+	uint material_idx;
+};
+
 struct ReSTIRPTReservoir {
-	float m;
+	uint M;
 	float W;
-	vec3 L;
-	uint path_flags;
+	vec3 F; // Integrand
 	uvec4 init_seed;
 	// Reconnection vertex data
 	uvec4 rc_seed;
 	vec3 rc_pos;
+	vec3 rc_wi;
 	vec3 rc_postfix_L;
 };
 
@@ -689,6 +695,9 @@ struct SceneDesc {
 	uint64_t temporal_reservoir_addr;
 	uint64_t passthrough_reservoir_addr;
 	uint64_t spatial_reservoir_addr;
+	// ReSTIR PT
+	uint64_t gris_gbuffer_addr;
+	uint64_t gris_reservoir_addr;
 
 	// VCM Reservoir
 	uint64_t vcm_reservoir_addr;
