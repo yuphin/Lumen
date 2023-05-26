@@ -199,21 +199,6 @@ struct PCReSTIRGI {
 	int enable_accumulation;
 };
 
-struct PCReSTIRPT {
-	vec3 sky_col;
-	uint frame_num;
-	uint size_x;
-	uint size_y;
-	int num_lights;
-	uint time;
-	int max_depth;
-	float total_light_area;
-	int light_triangle_count;
-	uint dir_light_idx;
-	uint random_num;
-	uint total_frame_num;
-	uint enable_accumulation;
-};
 
 
 struct PCSPPM {
@@ -536,6 +521,26 @@ struct Reservoir {
 	ReservoirSample s;
 };
 
+struct PCReSTIRPT {
+	vec3 sky_col;
+	uint frame_num;
+	uint size_x;
+	uint size_y;
+	int num_lights;
+	uint time;
+	int max_depth;
+	float total_light_area;
+	int light_triangle_count;
+	uint dir_light_idx;
+	uint random_num;
+	uint total_frame_num;
+	uint enable_accumulation;
+	float max_spatial_radius;
+	float scene_extent;
+	uint num_spatial_samples;
+};
+
+
 struct ReSTIRPTGBuffer {
 	vec3 pos;
 	vec3 n_s;
@@ -544,9 +549,7 @@ struct ReSTIRPTGBuffer {
 	uint material_idx;
 };
 
-struct ReSTIRPTReservoir {
-	uint M;
-	float W;
+struct GrisData {
 	vec3 F; // Integrand
 	uvec4 init_seed;
 	// Reconnection vertex data
@@ -554,6 +557,13 @@ struct ReSTIRPTReservoir {
 	vec3 rc_pos;
 	vec3 rc_wi;
 	vec3 rc_postfix_L;
+};
+
+struct ReSTIRPTReservoir {
+	GrisData gris_data;
+	uint M;
+	float W;
+	float w_sum;
 };
 
 struct GBufferData {
