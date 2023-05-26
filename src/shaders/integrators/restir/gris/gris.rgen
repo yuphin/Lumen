@@ -151,7 +151,9 @@ void main() {
 		
         if(connectable_vertex_found) {
             postfix_throughput *= t;
-        } 
+        } else {
+			source_pdf *= pdf;
+		}
 
 		specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
 
