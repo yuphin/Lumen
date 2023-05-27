@@ -16,9 +16,9 @@ layout(binding = 1) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc_ray; };
 layout(buffer_reference, scalar) buffer GrisReservoir { ReSTIRPTReservoir d[]; };
 layout(buffer_reference, scalar) buffer GrisGBuffer { ReSTIRPTGBuffer d[]; };
-
+layout(buffer_reference, scalar) buffer GrisDirectLighting { vec3 d[]; };
 GrisReservoir reservoirs = GrisReservoir(scene_desc.gris_reservoir_addr);
-
+GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
 void main() {
 	ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc_ray.size_y, gl_GlobalInvocationID.x % pc_ray.size_y);
 	if (gl_GlobalInvocationID.x >= pc_ray.size_x * pc_ray.size_y) {
@@ -27,8 +27,9 @@ void main() {
 	const uint pingpong = (pc_ray.total_frame_num % 2);
 	vec3 col = vec3(0);
 	const ReSTIRPTReservoir r = reservoirs.d[gl_GlobalInvocationID.x];
+	col += direct_lighting_buffer.d[gl_GlobalInvocationID.x];
 	if (r.W > 0) {
-		col += r.gris_data.rc_postfix_L;
+		col += r.gris_data.F;
 	}
 
 	if (pc_ray.enable_accumulation == 0 || pc_ray.frame_num == 0) {

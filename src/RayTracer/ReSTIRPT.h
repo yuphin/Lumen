@@ -11,6 +11,7 @@ class ReSTIRPT : public Integrator {
 	virtual bool gui() override;
 
    private:
+	Buffer direct_lighting_buffer;
 	Buffer gris_gbuffer;
 	Buffer gris_reservoir_buffer;
 	PCReSTIRPT pc_ray{};

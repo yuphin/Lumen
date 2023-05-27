@@ -557,6 +557,7 @@ struct GrisData {
 	vec3 rc_pos;
 	vec3 rc_wi;
 	vec3 rc_postfix_L;
+	uint postfix_length;
 };
 
 struct ReSTIRPTReservoir {
@@ -708,6 +709,7 @@ struct SceneDesc {
 	// ReSTIR PT
 	uint64_t gris_gbuffer_addr;
 	uint64_t gris_reservoir_addr;
+	uint64_t gris_direct_lighting_addr;
 
 	// VCM Reservoir
 	uint64_t vcm_reservoir_addr;

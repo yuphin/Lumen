@@ -12,6 +12,7 @@
 layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc_ray; };
 layout(buffer_reference, scalar) buffer GrisReservoir { ReSTIRPTReservoir d[]; };
 layout(buffer_reference, scalar) buffer GrisGBuffer { ReSTIRPTGBuffer d[]; };
+layout(buffer_reference, scalar) buffer GrisDirectLighting { vec3 d[]; };
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
@@ -20,6 +21,7 @@ uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num);
 GrisReservoir reservoirs = GrisReservoir(scene_desc.gris_reservoir_addr);
 GrisGBuffer g_buffers = GrisGBuffer(scene_desc.gris_gbuffer_addr);
+GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
 #include "../../pt_commons.glsl"
 
 void init_reservoir(out ReSTIRPTReservoir r) {
@@ -70,12 +72,14 @@ void main() {
 	float source_pdf = 1.0;
     // Updated after a connectable vertex is found
     vec3 postfix_throughput = vec3(1);
+	uint postfix_length = 0;
 
     bool connectable_vertex_found = false;
     data.init_seed = seed;
 	bool curr_rough = false;
 	bool prev_rough = false;
 	vec3 prev_pos = origin.xyz;
+	vec3 direct_lighting = vec3(0);
 	for (int depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.material_idx != -1;
@@ -84,7 +88,12 @@ void main() {
 		}
 		if (!found_isect) {
             vec3 atmosphere_L = shade_atmosphere(pc_ray.dir_light_idx, pc_ray.sky_col, origin.xyz, direction, tmax);
-			col += throughput * atmosphere_L;
+			if(depth == 0) {
+				direct_lighting += throughput * atmosphere_L;
+			} else {
+				col += throughput * atmosphere_L;
+
+			}
             if(connectable_vertex_found) {
                 data.rc_postfix_L += postfix_throughput * atmosphere_L;
             }
@@ -99,9 +108,17 @@ void main() {
             gbuffer.material_idx = payload.material_idx;
         }
 
+		if(connectable_vertex_found) {
+			postfix_length++;
+		}
+
       
-        if (depth == 0 || specular) {
+	  	if(depth == 0) {
+			direct_lighting += throughput * hit_mat.emissive_factor;
+
+		} else if(specular){
 			col += throughput * hit_mat.emissive_factor;
+
 		}
 
 		const vec3 wo = -direction;
@@ -119,7 +136,11 @@ void main() {
 		if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
 			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
             vec3 light_L = uniform_sample_light(hit_mat, payload.pos, side, n_s, wo, specular) / light_pick_pdf;
-			col += throughput * light_L;
+			if(depth == 0) {
+				direct_lighting += throughput * light_L;
+			} else {
+				col += throughput * light_L;
+			}
             if(connectable_vertex_found) {
                 data.rc_postfix_L += postfix_throughput * light_L;
             }
@@ -177,9 +198,11 @@ void main() {
 		return;
 	}
     data.F = col;
+	data.postfix_length = postfix_length;
 
 	update_reservoir(reservoir, data, target_pdf / source_pdf);
 	reservoir.W = target_pdf == 0 ? 0 : reservoir.w_sum / target_pdf;
     reservoirs.d[pixel_idx] = reservoir;
     g_buffers.d[pixel_idx] = gbuffer;
+	direct_lighting_buffer.d[pixel_idx] = direct_lighting;
 }

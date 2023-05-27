@@ -10,6 +10,12 @@ void ReSTIRPT::init() {
 						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 						instance->width * instance->height * sizeof(ReSTIRPTGBuffer));
 
+	direct_lighting_buffer.create("GRIS Direct Lighting", &instance->vkb.ctx,
+						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+							VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+						instance->width * instance->height * sizeof(glm::vec3));
+
 	gris_reservoir_buffer.create("GRIS Reservoirs", &instance->vkb.ctx,
 								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -26,6 +32,7 @@ void ReSTIRPT::init() {
 	// ReSTIR PT (GRIS)
 	desc.gris_gbuffer_addr = gris_gbuffer.get_device_address();
 	desc.gris_reservoir_addr = gris_reservoir_buffer.get_device_address();
+	desc.gris_direct_lighting_addr = direct_lighting_buffer.get_device_address();
 	scene_desc_buffer.create(
 		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
@@ -39,6 +46,7 @@ void ReSTIRPT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &gris_gbuffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_gbuffer_addr, &gris_reservoir_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, &gris_reservoir_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, &direct_lighting_buffer, instance->vkb.rg);
 }
 
 void ReSTIRPT::render() {
