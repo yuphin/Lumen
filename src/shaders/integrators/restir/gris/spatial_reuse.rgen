@@ -1,0 +1,136 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+
+#include "../../../commons.glsl"
+layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc_ray; };
+layout(buffer_reference, scalar) buffer GrisReservoir { ReSTIRPTReservoir d[]; };
+layout(buffer_reference, scalar) buffer GrisGBuffer { ReSTIRPTGBuffer d[]; };
+const uint flags = gl_RayFlagsOpaqueEXT;
+const float tmin = 0.001;
+const float tmax = 10000.0;
+#define RR_MIN_DEPTH 3
+
+uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num);
+GrisReservoir reservoirs = GrisReservoir(scene_desc.gris_reservoir_addr);
+GrisGBuffer g_buffers = GrisGBuffer(scene_desc.gris_gbuffer_addr);
+
+#include "../../pt_commons.glsl"
+
+
+ivec2 get_neighbor_offset(inout uvec4 seed) {
+	const float randa = rand(seed) * 2 * PI;
+	const float randr = sqrt(rand(seed)) * pc_ray.max_spatial_radius;
+	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
+}
+
+bool is_rough(in Material mat) {
+	// Only check if it's diffuse for now
+	return (mat.bsdf_type & BSDF_DIFFUSE) != 0;
+}
+
+void main() {
+	const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+	const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
+	vec2 d = in_uv * 2.0 - 1.0;
+	vec3 direction = vec3(sample_camera(d));
+	ReSTIRPTGBuffer gbuffer = g_buffers.d[pixel_idx];
+
+	GrisData data = reservoirs.d[pixel_idx].gris_data;
+
+	if (gbuffer.material_idx == -1) {
+		return;
+	}
+
+	Material hit_mat = load_material(gbuffer.material_idx, gbuffer.uv);
+	vec3 pos = gbuffer.pos;
+	vec3 prefix_throughput = vec3(1);
+	vec3 prefix_col = prefix_throughput * hit_mat.emissive_factor;
+
+	bool connected = false;
+
+	uvec4 reservoir_seed = data.init_seed;
+	uint prefix_depth = 0;
+	vec3 n_s = gbuffer.n_s;
+	bool side = true;
+	vec3 n_g = gbuffer.n_g;
+	vec3 wo = -direction;
+	bool specular = false;
+
+
+	if (dot(n_g, wo) < 0.) n_g = -n_g;
+	if (dot(n_g, n_s) < 0) {
+			n_s = -n_s;
+			side = false;
+	}
+	vec3 origin = offset_ray(gbuffer.pos, n_g);
+	while (true) {
+		if ((prefix_depth + data.postfix_length) >= pc_ray.max_depth - 1) {
+			break;
+		}
+
+		connected = is_rough(hit_mat) && length(pos - data.rc_pos) > 0.01 * pc_ray.scene_extent;
+		if (connected) {
+			break;
+		}
+
+
+		float pdf, cos_theta;
+		const vec3 f = sample_bsdf(n_s, wo, hit_mat, 1 /*radiance=cam*/, side, direction, pdf, cos_theta, reservoir_seed);
+		if (pdf == 0) {
+			break;
+		}
+		prefix_throughput *= f * abs(cos_theta) / pdf;
+		specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
+
+		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin, tmin, direction, tmax, 0);
+		const bool found_isect = payload.material_idx != -1;
+
+		if(!found_isect) {
+			break;
+		}
+		hit_mat = load_material(payload.material_idx, payload.uv);
+
+		if(specular){
+			prefix_col += prefix_throughput * hit_mat.emissive_factor;
+		}
+
+		wo = -direction;
+		n_s = payload.n_s;
+		side = true;
+		n_g = payload.n_g;
+		if (dot(payload.n_g, wo) < 0.) n_g = -n_g;
+		if (dot(n_g, payload.n_s) < 0) {
+			n_s = -n_s;
+			side = false;
+		}
+
+		origin = offset_ray(payload.pos, n_g);
+
+
+		if((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
+			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+            prefix_col += prefix_throughput * uniform_sample_light(hit_mat, payload.pos, side, n_s, wo, specular) / light_pick_pdf;
+		}
+
+		pos = payload.pos;
+		origin = offset_ray(payload.pos, n_g);
+		prefix_depth++;
+	}
+
+
+#if 0
+	for (uint i = 0; i < pc_ray.num_spatial_samples; i++) {
+	    ivec2 rand_offset = get_neighbor_offset(seed);
+		const ivec2 coords = clamp(ivec2(gl_LaunchIDEXT.xy) + rand_offset, ivec2(0), ivec2(gl_LaunchSizeEXT.xy) - 1);
+	    const uint coords_idx = coords.x * pc_ray.size_y + coords.y;
+	}
+#endif
+}
