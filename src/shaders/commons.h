@@ -543,8 +543,8 @@ struct PCReSTIRPT {
 
 struct ReSTIRPTGBuffer {
 	vec3 pos;
-	vec3 n_s;
 	vec3 n_g;
+	vec3 n_s;
 	vec2 uv;
 	uint material_idx;
 };
@@ -555,8 +555,14 @@ struct GrisData {
 	// Reconnection vertex data
 	uvec4 rc_seed;
 	vec3 rc_pos;
+	vec2 rc_uv;
+	vec3 rc_ns;
 	vec3 rc_wi;
+	uint rc_mat_id;
 	vec3 rc_postfix_L;
+	uint rc_side;
+	uint rc_nee_visible;
+	vec3 rc_nee_L;
 	uint postfix_length;
 };
 
@@ -651,7 +657,7 @@ struct AvgStruct {
 };
 
 // Scene buffer addresses
-struct SceneDesc {
+ struct ALIGN16 SceneDesc {
 	uint64_t vertex_addr;
 	uint64_t normal_addr;
 	uint64_t uv_addr;
