@@ -1,8 +1,7 @@
 #ifndef PT_COMMONS
 #define PT_COMMONS
-vec3 uniform_sample_light(const Material mat, vec3 pos, const bool side,
-                          const vec3 n_s, const vec3 wo,
-                          const bool is_specular) {
+vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const bool side,
+                          const vec3 n_s, const vec3 wo, out bool visible) {
     vec3 res = vec3(0);
     // Sample light
     vec3 wi;
@@ -17,7 +16,6 @@ vec3 uniform_sample_light(const Material mat, vec3 pos, const bool side,
     const vec3 p = offset_ray2(pos, n_s);
     float bsdf_pdf;
     float cos_x = dot(n_s, wi);
-    const uint props = is_specular ? BSDF_ALL : BSDF_ALL & ~BSDF_SPECULAR;
     vec3 f = eval_bsdf(n_s, wo, mat, 1, side, wi, bsdf_pdf, cos_x);
     float pdf_light;
     any_hit_payload.hit = 1;
@@ -25,7 +23,7 @@ vec3 uniform_sample_light(const Material mat, vec3 pos, const bool side,
                 gl_RayFlagsTerminateOnFirstHitEXT |
                     gl_RayFlagsSkipClosestHitShaderEXT,
                 0xFF, 1, 0, 1, p, 0, wi, wi_len - EPS, 1);
-    const bool visible = any_hit_payload.hit == 0;
+    visible = any_hit_payload.hit == 0;
     if (visible && pdf_light_w > 0) {
         const float mis_weight =
             is_light_delta(record.flags) ? 1 : 1 / (1 + bsdf_pdf / pdf_light_w);
@@ -48,5 +46,11 @@ vec3 uniform_sample_light(const Material mat, vec3 pos, const bool side,
         }
     }
     return res;
+}
+
+vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const bool side,
+                          const vec3 n_s, const vec3 wo) {
+   bool unused;
+   return uniform_sample_light(seed, mat, pos, side, n_s, wo, unused);
 }
 #endif

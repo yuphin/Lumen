@@ -13,5 +13,10 @@
 hitAttributeEXT vec2 attribs;
 
 layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
+layout(location = 1) rayPayloadInEXT AnyHitPayload payload;
 #extension GL_EXT_debug_printf : enable
-void main() { terminateRayEXT; }
+void main() { 
+    payload.dist = gl_RayTminEXT + gl_HitTEXT;
+    terminateRayEXT; 
+    
+}

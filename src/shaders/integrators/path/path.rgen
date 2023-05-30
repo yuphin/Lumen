@@ -50,6 +50,21 @@ void main() {
             col += throughput * shade_atmosphere(pc_ray.dir_light_idx, pc_ray.sky_col, origin.xyz, direction, tmax);
             break;
         }
+
+        {
+            vec3 wi_test = payload.pos - origin.xyz;
+			float wi_test_len = max(length(wi_test) - EPS, 0);
+			wi_test /= wi_test_len;
+			any_hit_payload.hit = 1;
+
+			traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, origin.xyz,
+						EPS, direction, wi_test_len, 1);
+            bool test_visible = any_hit_payload.hit == 0; 
+            if(!test_visible) {
+                LOG_CLICKED2("%f - %f\n", payload.dist, any_hit_payload.dist);
+            }
+
+        }
         const Material hit_mat =
             load_material(payload.material_idx, payload.uv);
         if (depth == 0 || specular) {
@@ -70,7 +85,7 @@ void main() {
         if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
             const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
             col += throughput *
-                   uniform_sample_light(hit_mat, payload.pos, side, n_s, wo,
+                   uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo,
                                         specular) /
                    light_pick_pdf;
         }

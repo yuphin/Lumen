@@ -50,14 +50,24 @@ using uint = unsigned int;
 // Debug logger for Raygen shaders
 #ifndef __cplusplus
 
-	#define LOG_CLICKED(str) \
+	#define LOG_CLICKED0(str) \
 		if(ubo.debug_click == 1 && ivec2(gl_LaunchIDEXT.xy) == ubo.clicked_pos) { \
 			debugPrintfEXT(str); \
 	}
 
-	#define LOG_CLICKED_VAL(str, args) \
+	#define LOG_CLICKED(str, args) \
 		if(ubo.debug_click == 1 && ivec2(gl_LaunchIDEXT.xy) == ubo.clicked_pos) { \
 			debugPrintfEXT(str, args); \
+		}
+
+	#define LOG_CLICKED2(str, args1, args2) \
+		if(ubo.debug_click == 1 && ivec2(gl_LaunchIDEXT.xy) == ubo.clicked_pos) { \
+			debugPrintfEXT(str, args1, args2); \
+		}
+
+	#define LOG_CLICKED3(str, args1, args2, args3) \
+		if(ubo.debug_click == 1 && ivec2(gl_LaunchIDEXT.xy) == ubo.clicked_pos) { \
+			debugPrintfEXT(str, args1, args2, args3); \
 		}
 
 	#define ASSERT_CLICKED_STR(cond, expected, str, val) \
