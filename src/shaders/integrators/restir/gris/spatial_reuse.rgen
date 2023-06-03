@@ -8,34 +8,17 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
-#include "../../../commons.glsl"
-layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc_ray; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisReservoir { ReSTIRPTReservoir d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisGBuffer { ReSTIRPTGBuffer d[]; };
-const uint flags = gl_RayFlagsOpaqueEXT;
-const float tmin = 0.001;
-const float tmax = 10000.0;
-#define RR_MIN_DEPTH 3
 
-uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num);
+#include "gris_commons.glsl"
 GrisReservoir reservoirs = GrisReservoir(scene_desc.gris_reservoir_addr);
 GrisGBuffer g_buffers = GrisGBuffer(scene_desc.gris_gbuffer_addr);
 
-#include "../../pt_commons.glsl"
 
 ivec2 get_neighbor_offset(inout uvec4 seed) {
 	const float randa = rand(seed) * 2 * PI;
 	const float randr = sqrt(rand(seed)) * pc_ray.max_spatial_radius;
 	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
 }
-
-bool is_rough(in Material mat) {
-	// Only check if it's diffuse for now
-	return (mat.bsdf_type & BSDF_DIFFUSE) != 0;
-}
-
-bool is_diffuse(in Material mat) { return (mat.bsdf_type & BSDF_DIFFUSE) != 0; }
 
 vec3 uniform_sample_light_with_visibility_override(inout uvec4 seed, const Material mat, vec3 pos, const bool side,
 												   const vec3 n_s, const vec3 wo, bool visible_light) {
@@ -218,7 +201,7 @@ void main() {
 		if (isnan(target_pdf)) {
 			return;
 		}
-		reservoirs.d[pixel_idx].gris_data.F = reservoir_contribution;
+		// reservoirs.d[pixel_idx].gris_data.F = reservoir_contribution;
 	}
 
 #if 0
