@@ -1,4 +1,5 @@
 #include "../../../commons.glsl"
+#include "gris_commons.h"
 layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc_ray; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisReservoir { ReSTIRPTReservoir d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisGBuffer { ReSTIRPTGBuffer d[]; };

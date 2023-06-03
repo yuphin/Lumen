@@ -8,7 +8,9 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
+#include "bdpt_commons.h"
 #include "../../commons.glsl"
+
 layout(push_constant) uniform _PushConstantRay { PCBDPT pc_ray; };
 // BDPT buffers
 layout(buffer_reference, scalar) buffer LightVertices { PathVertex d[]; };

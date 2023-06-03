@@ -1,5 +1,7 @@
 #pragma once
 #include "Integrator.h"
+#include "shaders/integrators/bdpt/bdpt_commons.h"
+
 class BDPT : public Integrator {
    public:
 	BDPT(LumenInstance* scene, LumenScene* lumen_scene)

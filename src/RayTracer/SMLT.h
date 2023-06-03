@@ -1,5 +1,6 @@
 #pragma once
 #include "Integrator.h"
+#include "shaders/integrators/smlt/smlt_commons.h"
 class SMLT : public Integrator {
    public:
 	SMLT(LumenInstance* scene, LumenScene* lumen_scene)

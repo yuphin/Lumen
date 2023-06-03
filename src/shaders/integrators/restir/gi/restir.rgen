@@ -8,6 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
+#include "restirgi_commons.h"
 #include "../../../commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PCReSTIRGI pc_ray; };
 layout(buffer_reference, scalar) buffer RestirSamples { ReservoirSample d[]; };
@@ -90,7 +91,7 @@ void main() {
         if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
             const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
             const vec3 val = throughput *
-                             uniform_sample_light(hit_mat, payload.pos, side,
+                             uniform_sample_light(seed, hit_mat, payload.pos, side,
                                                   shading_nrm, wo, specular) /
                              light_pick_pdf;
             if (depth > 0) {

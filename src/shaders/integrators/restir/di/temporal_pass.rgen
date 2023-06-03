@@ -8,7 +8,8 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
-#include "restir_commons.glsl"
+#include "restirdi_commons.h"
+#include "restirdi_commons.glsl"
 #include "../../pt_commons.glsl"
 
 void main() {
@@ -199,7 +200,7 @@ void main() {
             if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
                 const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
                 col += throughput *
-                       uniform_sample_light(hit_mat, payload.pos, side, n_s, wo,
+                       uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo,
                                             specular) /
                        light_pick_pdf;
             }

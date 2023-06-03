@@ -8,7 +8,9 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
+#include "sppm_commons.h"
 #include "../../commons.glsl"
+
 layout(push_constant) uniform _PushConstantRay { PCSPPM pc_ray; };
 // SPPM buffers
 layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
@@ -83,7 +85,7 @@ void main() {
             const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
             sppm_data.d[pixel_idx].col +=
                 throughput *
-                uniform_sample_light(hit_mat, pos, side, n_s, wo,
+                uniform_sample_light(seed, hit_mat, pos, side, n_s, wo,
                                      specular) /
                 light_pick_pdf;
         }

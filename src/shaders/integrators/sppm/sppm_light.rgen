@@ -8,7 +8,9 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
+#include "sppm_commons.h"
 #include "../../commons.glsl"
+
 layout(push_constant) uniform _PushConstantRay { PCSPPM pc_ray; };
 // SPPM buffers
 layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };

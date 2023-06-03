@@ -1,5 +1,6 @@
 #pragma once
 #include "Integrator.h"
+#include "shaders/integrators/path/path_commons.h"
 class Path : public Integrator {
    public:
 	Path(LumenInstance* scene, LumenScene* lumen_scene)

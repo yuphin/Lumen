@@ -1,5 +1,6 @@
 #pragma once
 #include "Integrator.h"
+#include "shaders/integrators/ddgi/ddgi_commons.h"
 class DDGI : public Integrator {
    public:
 	DDGI(LumenInstance* scene, LumenScene* lumen_scene)

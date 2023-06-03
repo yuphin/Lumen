@@ -1,5 +1,6 @@
 #pragma once
 #include "Integrator.h"
+#include "shaders/integrators/sppm/sppm_commons.h"
 class SPPM : public Integrator {
    public:
 	SPPM(LumenInstance* scene, LumenScene* lumen_scene)

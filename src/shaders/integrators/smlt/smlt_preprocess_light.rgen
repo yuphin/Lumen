@@ -8,6 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 // Includes all the buffer addresses and indices
+#include "smlt_commons.h"
 #include "smlt_commons.glsl"
 void main() {
 #define mlt_sampler mlt_samplers.d[mlt_sampler_idx]

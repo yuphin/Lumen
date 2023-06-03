@@ -9,6 +9,8 @@
 #extension GL_EXT_shader_atomic_float : require
 
 #include "../../commons.glsl"
+#include "path_commons.h"
+
 layout(push_constant) uniform _PushConstantRay { PCPath pc_ray; };
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
@@ -51,20 +53,6 @@ void main() {
             break;
         }
 
-        {
-            vec3 wi_test = payload.pos - origin.xyz;
-			float wi_test_len = max(length(wi_test) - EPS, 0);
-			wi_test /= wi_test_len;
-			any_hit_payload.hit = 1;
-
-			traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, origin.xyz,
-						EPS, direction, wi_test_len, 1);
-            bool test_visible = any_hit_payload.hit == 0; 
-            if(!test_visible) {
-                LOG_CLICKED2("%f - %f\n", payload.dist, any_hit_payload.dist);
-            }
-
-        }
         const Material hit_mat =
             load_material(payload.material_idx, payload.uv);
         if (depth == 0 || specular) {

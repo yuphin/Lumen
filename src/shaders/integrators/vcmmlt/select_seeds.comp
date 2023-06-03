@@ -7,8 +7,10 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
-#include "../../commons.h"
+
+#include "vcmmlt_commons.h"
 #include "../../utils.glsl"
+
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(buffer_reference, scalar) buffer BootstrapData { BootstrapSample d[]; };

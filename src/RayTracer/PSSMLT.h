@@ -1,5 +1,6 @@
 #pragma once
 #include "Integrator.h"
+#include "shaders/integrators/pssmlt/pssmlt_commons.h"
 class PSSMLT : public Integrator {
    public:
 	PSSMLT(LumenInstance* scene, LumenScene* lumen_scene)

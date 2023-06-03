@@ -14,7 +14,7 @@ layout(buffer_reference, scalar) buffer LightVertices { VCMVertex d[]; };
 layout(buffer_reference, scalar) buffer CameraVertices { VCMVertex d[]; };
 layout(buffer_reference, scalar) buffer PathCnt { uint d[]; };
 layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
-layout(buffer_reference, scalar) buffer PhotonData_ { PhotonHash d[]; };
+layout(buffer_reference, scalar) buffer PhotonData_ { VCMPhotonHash d[]; };
 
 layout(buffer_reference, scalar) buffer MLTSumData { SumData d[]; };
 

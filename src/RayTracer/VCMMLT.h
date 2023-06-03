@@ -1,5 +1,6 @@
 #pragma once
 #include "Integrator.h"
+#include "shaders/integrators/vcmmlt/vcmmlt_commons.h"
 class VCMMLT : public Integrator {
    public:
 	VCMMLT(LumenInstance* scene, LumenScene* lumen_scene)

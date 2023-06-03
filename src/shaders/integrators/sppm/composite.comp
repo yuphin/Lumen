@@ -8,6 +8,7 @@
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #include "../../utils.glsl"
+#include "sppm_commons.h"
 layout(binding = 0, rgba32f) uniform image2D image;
 layout(binding = 1) buffer SceneDesc_ { SceneDesc scene_desc; };
 

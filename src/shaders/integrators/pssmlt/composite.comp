@@ -7,7 +7,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
-#include "../../commons.h"
+#include "pssmlt_commons.h"
 #include "../../utils.glsl"
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };

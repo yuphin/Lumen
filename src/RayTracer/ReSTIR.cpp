@@ -8,7 +8,7 @@ void ReSTIR::init() {
 					VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 						VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-					instance->width * instance->height * sizeof(GBufferData));
+					instance->width * instance->height * sizeof(RestirGBufferData));
 
 	temporal_reservoir_buffer.create("Temporal Reservoirs", &instance->vkb.ctx,
 									 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |

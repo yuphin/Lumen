@@ -1,5 +1,6 @@
 #pragma once
 #include "Integrator.h"
+#include "shaders/integrators/restir/di/restirdi_commons.h"
 class ReSTIR : public Integrator {
    public:
 	ReSTIR(LumenInstance* scene, LumenScene* lumen_scene)

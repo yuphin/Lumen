@@ -9,6 +9,7 @@
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 
 #include "../../utils.glsl"
+#include "sppm_commons.h"
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };

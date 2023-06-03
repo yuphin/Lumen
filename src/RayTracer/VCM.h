@@ -1,5 +1,6 @@
 #pragma once
 #include "Integrator.h"
+#include "shaders/integrators/vcm/vcm_commons.h"
 class VCM : public Integrator {
    public:
 	VCM(LumenInstance* scene, LumenScene* lumen_scene)
