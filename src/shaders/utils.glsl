@@ -35,7 +35,6 @@ struct VCMState {
 };
 
 struct AnyHitPayload {
-    float dist;
     int hit;
 };
 

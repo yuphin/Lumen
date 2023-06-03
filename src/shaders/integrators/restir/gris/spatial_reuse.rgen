@@ -100,26 +100,29 @@ bool connect_vertex(in ReSTIRPTGBuffer gbuffer, in GrisData data, vec3 direction
 	}
 	vec3 origin = offset_ray(gbuffer.pos, n_g);
 	while (true) {
-		if ((prefix_depth + data.postfix_length) >= pc_ray.max_depth - 1) {
+		if ((prefix_depth + data.postfix_length) >= pc_ray.max_depth) {
 			return false;
 		}
 
 		vec3 wi = data.rc_pos - pos;
 		float wi_len = length(wi);
 		wi /= wi_len;
+
+		if (prefix_depth > 0 && (hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
+			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+			vec3 contrib = prefix_throughput *
+						   uniform_sample_light(reservoir_seed, hit_mat, payload.pos, side, n_s, wo) / light_pick_pdf;
+			reservoir_contribution += contrib;
+		}
+
 		bool connectable = is_rough(hit_mat) && wi_len > 0.01 * pc_ray.scene_extent;
-		connectable = is_rough(hit_mat);
+		connectable = connectable && prefix_depth >= (data.rc_depth - 1);
 		if (connectable) {
 			vec3 p = offset_ray2(pos, n_s);
 			any_hit_payload.hit = 1;
 			traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p,
 						0, wi, wi_len - EPS, 1);
 			connected = any_hit_payload.hit == 0;
-
-			if (!connected) {
-				LOG_CLICKED0("Fail\n");
-			}
-
 		}
 
 		if (connected) {
@@ -152,13 +155,6 @@ bool connect_vertex(in ReSTIRPTGBuffer gbuffer, in GrisData data, vec3 direction
 
 			reservoir_contribution += prefix_throughput * rc_f * abs(cos_x) * data.rc_postfix_L / bsdf_pdf;
 			return true;
-		}
-
-		if (prefix_depth > 0 && (hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
-			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
-			reservoir_contribution += prefix_throughput *
-									  uniform_sample_light(reservoir_seed, hit_mat, payload.pos, side, n_s, wo) /
-									  light_pick_pdf;
 		}
 
 		float pdf, cos_theta;

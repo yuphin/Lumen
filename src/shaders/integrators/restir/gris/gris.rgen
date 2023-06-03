@@ -73,7 +73,7 @@ void main() {
 	uint postfix_length = 0;
 
 	bool connectable_vertex_found = false;
-	
+
 	bool curr_rough = false;
 	bool prev_rough = false;
 	vec3 prev_pos = origin.xyz;
@@ -96,7 +96,7 @@ void main() {
 			}
 			break;
 		}
-		
+
 		const Material hit_mat = load_material(payload.material_idx, payload.uv);
 
 		// Fill in GBuffer
@@ -106,20 +106,16 @@ void main() {
 			gbuffer.n_g = payload.n_g;
 			gbuffer.material_idx = payload.material_idx;
 			gbuffer.uv = payload.uv;
-		}
-
-		if (connectable_vertex_found) {
-			postfix_length++;
-		}
-
-		if (depth == 0) {
 			direct_lighting += throughput * hit_mat.emissive_factor;
-
 		} else if (specular) {
 			col += throughput * hit_mat.emissive_factor;
 			if (connectable_vertex_found) {
 				data.rc_postfix_L += postfix_throughput * hit_mat.emissive_factor;
 			}
+		}
+
+		if (connectable_vertex_found) {
+			postfix_length++;
 		}
 
 		const vec3 wo = -direction;
@@ -137,11 +133,6 @@ void main() {
 		curr_rough = is_rough(hit_mat);
 		bool connectable = !connectable_vertex_found &&
 						   ((prev_rough && curr_rough) && length(payload.pos - prev_pos) > 0.01 * pc_ray.scene_extent);
-						   
-
-		connectable = !connectable_vertex_found && ((prev_rough && curr_rough));
-		prev_pos = payload.pos;
-
 		prev_pos = payload.pos;
 		if (connectable) {
 			data.rc_seed = seed;
@@ -150,6 +141,7 @@ void main() {
 			data.rc_ns = n_s;
 			data.rc_mat_id = payload.material_idx;
 			data.rc_side = uint(side);
+			data.rc_depth = depth;
 		}
 
 		bool nee_visible = false;
@@ -167,7 +159,7 @@ void main() {
 			}
 		}
 
-		if(depth == 0) {
+		if (depth == 0) {
 			data.init_seed = seed;
 		}
 
@@ -196,18 +188,19 @@ void main() {
 
 		specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
 
+#if 0
 		float rr_scale = 1.0;
-		// if (hit_mat.bsdf_type == BSDF_GLASS) {
-		// 	rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
-		// }
-		// if (depth > RR_MIN_DEPTH) {
-		// 	float rr_prob = min(0.95f, luminance(throughput) * rr_scale);
-		// 	if (rr_prob == 0 || rr_prob < rand(seed))
-		// 		break;
-		// 	else
-		// 		throughput /= rr_prob;
-		// }
-
+		if (hit_mat.bsdf_type == BSDF_GLASS) {
+			rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
+		}
+		if (depth > RR_MIN_DEPTH) {
+			float rr_prob = min(0.95f, luminance(throughput) * rr_scale);
+			if (rr_prob == 0 || rr_prob < rand(seed))
+				break;
+			else
+				throughput /= rr_prob;
+		}
+#endif
 	}
 
 	g_buffers.d[pixel_idx] = gbuffer;

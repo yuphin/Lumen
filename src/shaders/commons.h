@@ -574,6 +574,7 @@ struct GrisData {
 	uint rc_nee_visible;
 	vec3 rc_nee_L;
 	uint postfix_length;
+	uint rc_depth;
 };
 
 struct ReSTIRPTReservoir {
