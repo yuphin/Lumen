@@ -267,7 +267,7 @@ void VCMMLT::render() {
 		scene_ubo_buffer,
 		scene_desc_buffer,
 	};
-	std::initializer_list<uint32_t> spec_consts;
+	std::vector<uint32_t> spec_consts;
 	if (!light_first) {
 		spec_consts = {1, 0};
 	} else {
