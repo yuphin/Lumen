@@ -83,23 +83,24 @@ using uint = unsigned int;
 			if(cond != expected)  {\
 				debugPrintfEXT("Assertion failed!\n"); \
 			} \
-	}
+		}
 
 	#define LOG_VAL(str, args, coord) \
 		if(ivec2(gl_LaunchIDEXT.xy) == coord) { \
 			debugPrintfEXT(str, args); \
-		} \
+		}
 
 	#define LOG(str, coord) \
 		if(ivec2(gl_LaunchIDEXT.xy) == coord) { \
 			debugPrintfEXT(str); \
-		} \
-
-	#define ASSERT(cond, expected) \
-		if(cond != expected) \
-			debugPrintfEXT("Assertion failed on pixel %v2i", ivec2(gl_LaunchIDEXT.xy)); \
 		}
 
+	#define ASSERT(cond) \
+		if(!(cond))  { \
+			debugPrintfEXT("Assertion failed on pixel %v2i\n", ivec2(gl_LaunchIDEXT.xy)); \
+		}
+		
+	#define ASSERT0() debugPrintfEXT("Assertion failed on pixel %v2i\n", ivec2(gl_LaunchIDEXT.xy));
 
 #endif
 

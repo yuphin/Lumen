@@ -171,13 +171,14 @@ void main() {
 	g_buffers.d[pixel_idx] = gbuffer;
 
 	ReSTIRPTGBuffer gbuf2 = g_buffers.d[pixel_idx];
+#if 0
 	float epos = dot(gbuffer.pos - gbuf2.pos, gbuffer.pos - gbuf2.pos);
 	float euv = dot(gbuffer.uv - gbuf2.uv, gbuffer.uv - gbuf2.uv);
 	float ens = dot(gbuffer.n_s - gbuf2.n_s, gbuffer.n_s - gbuf2.n_s);
 	float eng = dot(gbuffer.n_g - gbuf2.n_g, gbuffer.n_g - gbuf2.n_g);
-	if (epos > 1e-8 || euv > 1e-8 || ens > 1e-8 || eng > 1e-8 || gbuffer.material_idx != gbuf2.material_idx) {
-		debugPrintfEXT("Assertion failed\n");
-	}
+	ASSERT(!(epos > 1e-8 || euv > 1e-8 || ens > 1e-8 || eng > 1e-8 || gbuffer.material_idx != gbuf2.material_idx));
+#endif
+	
 	direct_lighting_buffer.d[pixel_idx] = direct_lighting;
 	float target_pdf = luminance(col);
 	if (isnan(target_pdf)) {

@@ -201,7 +201,7 @@ void main() {
 		if (isnan(target_pdf)) {
 			return;
 		}
-		// reservoirs.d[pixel_idx].gris_data.F = reservoir_contribution;
+		reservoirs.d[pixel_idx].gris_data.F = reservoir_contribution;
 	}
 
 #if 0
