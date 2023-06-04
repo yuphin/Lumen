@@ -23,9 +23,9 @@ void main() {
 	vec3 direction = vec3(sample_camera(d));
 	vec3 col = vec3(0);
 
-	ReSTIRPTReservoir reservoir;
+	Reservoir reservoir;
 	GrisData data;
-	ReSTIRPTGBuffer gbuffer;
+	GBuffer gbuffer;
 	init_reservoir(reservoir);
 	init_gris_data(data);
 	init_gbuffer(gbuffer);
@@ -170,7 +170,7 @@ void main() {
 
 	g_buffers.d[pixel_idx] = gbuffer;
 
-	ReSTIRPTGBuffer gbuf2 = g_buffers.d[pixel_idx];
+	GBuffer gbuf2 = g_buffers.d[pixel_idx];
 #if 0
 	float epos = dot(gbuffer.pos - gbuf2.pos, gbuffer.pos - gbuf2.pos);
 	float euv = dot(gbuffer.uv - gbuf2.uv, gbuffer.uv - gbuf2.uv);

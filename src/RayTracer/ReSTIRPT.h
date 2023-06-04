@@ -1,6 +1,7 @@
 #pragma once
 #include "Integrator.h"
 #include "shaders/integrators/restir/gris/gris_commons.h"
+using namespace RestirPT;
 class ReSTIRPT : public Integrator {
    public:
 	ReSTIRPT(LumenInstance* scene, LumenScene* lumen_scene)

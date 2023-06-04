@@ -1,5 +1,7 @@
 #include "../../../commons.h"
 
+NAMESPACE_BEGIN(RestirPT)
+
 struct PCReSTIRPT {
 	vec3 sky_col;
 	uint frame_num;
@@ -20,7 +22,7 @@ struct PCReSTIRPT {
 };
 
 
-struct ReSTIRPTGBuffer {
+struct GBuffer {
 	vec3 pos;
 	vec3 n_g;
 	vec3 n_s;
@@ -46,9 +48,11 @@ struct GrisData {
 	uint rc_depth;
 };
 
-struct ReSTIRPTReservoir {
+struct Reservoir {
 	GrisData gris_data;
 	uint M;
 	float W;
 	float w_sum;
 };
+
+NAMESPACE_END()

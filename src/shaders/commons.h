@@ -42,7 +42,11 @@ using uvec4 = glm::uvec4;
 using ivec2 = glm::ivec2;
 using uint = unsigned int;
 #define ALIGN16 alignas(16)
+#define NAMESPACE_BEGIN(name) namespace name {
+#define NAMESPACE_END() }
 #else
+#define NAMESPACE_BEGIN(name)
+#define NAMESPACE_END()
 #define ALIGN16
 #endif
 

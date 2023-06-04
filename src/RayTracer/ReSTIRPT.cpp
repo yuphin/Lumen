@@ -9,7 +9,7 @@ void ReSTIRPT::init() {
 						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						instance->width * instance->height * sizeof(ReSTIRPTGBuffer));
+						instance->width * instance->height * sizeof(GBuffer));
 
 	direct_lighting_buffer.create("GRIS Direct Lighting", &instance->vkb.ctx,
 								  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
@@ -21,7 +21,7 @@ void ReSTIRPT::init() {
 								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-								 instance->width * instance->height * sizeof(ReSTIRPTReservoir));
+								 instance->width * instance->height * sizeof(Reservoir));
 
 	SceneDesc desc;
 	desc.vertex_addr = vertex_buffer.get_device_address();

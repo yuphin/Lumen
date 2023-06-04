@@ -56,7 +56,7 @@ vec3 uniform_sample_light_with_visibility_override(inout uvec4 seed, const Mater
 	return res;
 }
 
-bool connect_vertex(in ReSTIRPTGBuffer gbuffer, in GrisData data, vec3 direction, uvec4 reservoir_seed,
+bool connect_vertex(in GBuffer gbuffer, in GrisData data, vec3 direction, uvec4 reservoir_seed,
 					out vec3 reservoir_contribution) {
 	bool connected = false;
 
@@ -186,7 +186,7 @@ void main() {
 	const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
 	vec2 d = in_uv * 2.0 - 1.0;
 	vec3 direction = vec3(sample_camera(d));
-	ReSTIRPTGBuffer gbuffer = g_buffers.d[pixel_idx];
+	GBuffer gbuffer = g_buffers.d[pixel_idx];
 
 	GrisData data = reservoirs.d[pixel_idx].gris_data;
 

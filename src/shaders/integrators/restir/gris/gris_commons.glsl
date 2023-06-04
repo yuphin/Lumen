@@ -1,8 +1,8 @@
 #include "../../../commons.glsl"
 #include "gris_commons.h"
 layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc_ray; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisReservoir { ReSTIRPTReservoir d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisGBuffer { ReSTIRPTGBuffer d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisReservoir { Reservoir d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisGBuffer { GBuffer d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisDirectLighting { vec3 d[]; };
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
@@ -13,7 +13,7 @@ uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame
 
 #include "../../pt_commons.glsl"
 
-void init_reservoir(out ReSTIRPTReservoir r) {
+void init_reservoir(out Reservoir r) {
 	r.M = 0;
 	r.W = 0.0;
 	r.w_sum = 0.0;
@@ -23,7 +23,7 @@ void init_gris_data(out GrisData data) {
 	data.rc_postfix_L = vec3(0);
 }
 
-void update_reservoir(inout ReSTIRPTReservoir r_new, const GrisData data, float w_i) {
+void update_reservoir(inout Reservoir r_new, const GrisData data, float w_i) {
 	r_new.w_sum += w_i;
 	r_new.M++;
 	if (rand(seed) < w_i / r_new.w_sum) {
@@ -31,7 +31,7 @@ void update_reservoir(inout ReSTIRPTReservoir r_new, const GrisData data, float 
 	}
 }
 
-void init_gbuffer(out ReSTIRPTGBuffer gbuffer) { gbuffer.material_idx = -1; }
+void init_gbuffer(out GBuffer gbuffer) { gbuffer.material_idx = -1; }
 
 bool is_rough(in Material mat) {
 	// Only check if it's diffuse for now
