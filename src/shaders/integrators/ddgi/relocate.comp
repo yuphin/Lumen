@@ -18,8 +18,8 @@ layout(binding = 1) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 2) uniform _DDGIUniforms { DDGIUniforms ddgi_ubo; };
 layout(binding = 3) uniform sampler2D dir_dist_img;
 layout(push_constant) uniform _PushConstantRay { PCDDGI pc; };
-layout(buffer_reference, scalar) buffer GBuffer { GBufferData d[]; };
-layout(buffer_reference, scalar) buffer ProbeOffset { vec4 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GBuffer { GBufferData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ProbeOffset { vec4 d[]; };
 
 ProbeOffset probe_offsets = ProbeOffset(scene_desc.probe_offsets_addr);
 

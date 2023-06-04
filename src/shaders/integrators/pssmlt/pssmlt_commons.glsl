@@ -3,15 +3,15 @@
 #include "../../commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PCMLT pc_ray; };
 layout(constant_id = 0) const int SEEDING = 0;
-layout(buffer_reference, scalar) buffer BootstrapData { BootstrapSample d[]; };
-layout(buffer_reference, scalar) buffer SeedsData { SeedData d[]; };
-layout(buffer_reference, scalar) buffer PrimarySamples { PrimarySample d[]; };
-layout(buffer_reference, scalar) buffer MLTSamplers { MLTSampler d[]; };
-layout(buffer_reference, scalar) buffer MLTColor { vec3 d[]; };
-layout(buffer_reference, scalar) buffer ChainStats { ChainData d[]; };
-layout(buffer_reference, scalar) buffer Splats { Splat d[]; };
-layout(buffer_reference, scalar) buffer LightVertices { MLTPathVertex d[]; };
-layout(buffer_reference, scalar) buffer CameraVertices { MLTPathVertex d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BootstrapData { BootstrapSample d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SeedsData { SeedData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PrimarySamples { PrimarySample d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTSamplers { MLTSampler d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTColor { vec3 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ChainStats { ChainData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer Splats { Splat d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightVertices { MLTPathVertex d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CameraVertices { MLTPathVertex d[]; };
 
 LightVertices light_verts = LightVertices(scene_desc.light_path_addr);
 CameraVertices camera_verts = CameraVertices(scene_desc.camera_path_addr);

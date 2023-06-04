@@ -13,9 +13,9 @@
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(push_constant) uniform _PushConstantRay { PCMLT pc_ray; };
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
-layout(buffer_reference, scalar) buffer BootstrapData { BootstrapSample d[]; };
-layout(buffer_reference, scalar) buffer CDFSum { float d; };
-layout(buffer_reference, scalar) buffer CDF { float d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BootstrapData { BootstrapSample d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDFSum { float d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDF { float d[]; };
 CDFSum cdf_sum = CDFSum(scene_desc.cdf_sum_addr);
 CDF cdf_data = CDF(scene_desc.cdf_addr);
 void main() {

@@ -12,8 +12,8 @@
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PCVCM pc_ray; };
-layout(buffer_reference, scalar) buffer LightSamples { VCMRestirData d[]; };
-layout(buffer_reference, scalar) buffer VCMReservoir_ { VCMReservoir d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightSamples { VCMRestirData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMReservoir_ { VCMReservoir d[]; };
 uvec4 seed =
     init_rng(gl_GlobalInvocationID.xy, gl_NumWorkGroups.xy *uvec2(32, 1),
              pc_ray.frame_num ^ pc_ray.random_num);

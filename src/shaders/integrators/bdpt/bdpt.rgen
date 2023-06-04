@@ -13,9 +13,9 @@
 
 layout(push_constant) uniform _PushConstantRay { PCBDPT pc_ray; };
 // BDPT buffers
-layout(buffer_reference, scalar) buffer LightVertices { PathVertex d[]; };
-layout(buffer_reference, scalar) buffer CameraVertices { PathVertex d[]; };
-layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightVertices { PathVertex d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CameraVertices { PathVertex d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
 
 LightVertices light_verts = LightVertices(scene_desc.light_path_addr);
 CameraVertices camera_verts = CameraVertices(scene_desc.camera_path_addr);

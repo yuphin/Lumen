@@ -15,10 +15,10 @@ layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 1) uniform sampler2D scene_textures[];
 layout(push_constant) uniform _PushConstantRay { PCSPPM pc_ray; };
-layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
-layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
-layout(buffer_reference, scalar) buffer PhotonData_ { PhotonHash d[]; };
-layout(buffer_reference, scalar) readonly buffer Materials { Material m[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SPPMData_ { SPPMData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer AtomicData_ { AtomicData d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonData_ { PhotonHash d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
 
 uint size = pc_ray.size_x * pc_ray.size_y;
 SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);

@@ -11,14 +11,14 @@
 #include "restirgi_commons.h"
 #include "../../../commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PCReSTIRGI pc_ray; };
-layout(buffer_reference, scalar) buffer RestirSamples { ReservoirSample d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer RestirSamples { ReservoirSample d[]; };
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num);
-layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
 RestirSamples samples = RestirSamples(scene_desc.restir_samples_addr);
 ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
 #include "../../pt_commons.glsl"

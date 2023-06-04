@@ -13,7 +13,7 @@ layout(binding = 5) uniform _DDGIUniforms { DDGIUniforms ddgi_ubo; };
 layout(binding = 6) uniform sampler2D radiance_img;
 layout(binding = 7) uniform sampler2D dir_dist_img;
 layout(push_constant) uniform _PushConstantRay { PCDDGI pc; };
-layout(buffer_reference, scalar) buffer ProbeOffset { vec4 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ProbeOffset { vec4 d[]; };
 ProbeOffset probe_offsets = ProbeOffset(scene_desc.probe_offsets_addr);
 
 #define CACHE_SIZE 32

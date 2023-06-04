@@ -1,6 +1,6 @@
 layout(push_constant) uniform _PushConstantRay { PCReSTIRGI pc_ray; };
-layout(buffer_reference, scalar) buffer RestirSamples { ReservoirSample d[]; };
-layout(buffer_reference, scalar) buffer Reservoirs { Reservoir d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer RestirSamples { ReservoirSample d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer Reservoirs { Reservoir d[]; };
 
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uvec4 seed =

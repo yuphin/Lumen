@@ -13,11 +13,11 @@
 
 layout(push_constant) uniform _PushConstantRay { PCVCM pc_ray; };
 // VCM buffers
-layout(buffer_reference, scalar) buffer VCMReservoir_ { VCMReservoir d[]; };
-layout(buffer_reference, scalar) buffer ShouldResample { uint d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMReservoir_ { VCMReservoir d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ShouldResample { uint d; };
 
-layout(buffer_reference, scalar) buffer LightSamples { VCMRestirData d[]; };
-layout(buffer_reference, scalar) buffer SampleAvg { AvgStruct d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightSamples { VCMRestirData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SampleAvg { AvgStruct d; };
 LightSamples light_samples = LightSamples(scene_desc.light_samples_addr);
 ShouldResample should_resample =
     ShouldResample(scene_desc.should_resample_addr);

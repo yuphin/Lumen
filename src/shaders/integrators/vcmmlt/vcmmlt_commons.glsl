@@ -3,20 +3,20 @@
 #include "../../commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PCMLT pc_ray; };
 layout(constant_id = 0) const int SEEDING = 0;
-layout(buffer_reference, scalar) buffer BootstrapData { BootstrapSample d[]; };
-layout(buffer_reference, scalar) buffer SeedsData { VCMMLTSeedData d[]; };
-layout(buffer_reference, scalar) buffer PrimarySamples { PrimarySample d[]; };
-layout(buffer_reference, scalar) buffer MLTSamplers { VCMMLTSampler d[]; };
-layout(buffer_reference, scalar) buffer MLTColor { vec3 d[]; };
-layout(buffer_reference, scalar) buffer ChainStats { ChainData d[]; };
-layout(buffer_reference, scalar) buffer Splats { Splat d[]; };
-layout(buffer_reference, scalar) buffer LightVertices { VCMVertex d[]; };
-layout(buffer_reference, scalar) buffer CameraVertices { VCMVertex d[]; };
-layout(buffer_reference, scalar) buffer PathCnt { uint d[]; };
-layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
-layout(buffer_reference, scalar) buffer PhotonData_ { VCMPhotonHash d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BootstrapData { BootstrapSample d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SeedsData { VCMMLTSeedData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PrimarySamples { PrimarySample d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTSamplers { VCMMLTSampler d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTColor { vec3 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ChainStats { ChainData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer Splats { Splat d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightVertices { VCMVertex d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CameraVertices { VCMVertex d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PathCnt { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonData_ { VCMPhotonHash d[]; };
 
-layout(buffer_reference, scalar) buffer MLTSumData { SumData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTSumData { SumData d[]; };
 
 uint chain = 0;
 uint depth_factor = pc_ray.max_depth * (pc_ray.max_depth + 1);

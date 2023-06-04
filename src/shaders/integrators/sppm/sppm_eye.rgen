@@ -13,7 +13,7 @@
 
 layout(push_constant) uniform _PushConstantRay { PCSPPM pc_ray; };
 // SPPM buffers
-layout(buffer_reference, scalar) buffer SPPMData_ { SPPMData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SPPMData_ { SPPMData d[]; };
 
 SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
 

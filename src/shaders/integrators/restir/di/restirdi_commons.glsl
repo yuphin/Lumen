@@ -1,8 +1,8 @@
 #include "../../../commons.glsl"
-layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
 layout(push_constant) uniform _PushConstantRay { PCReSTIR pc_ray; };
-layout(buffer_reference, scalar) buffer GBuffer { RestirGBufferData d[]; };
-layout(buffer_reference, scalar) buffer RestirReservoir_ {
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GBuffer { RestirGBufferData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer RestirReservoir_ {
     RestirReservoir d[];
 };
 const uint flags = gl_RayFlagsOpaqueEXT;

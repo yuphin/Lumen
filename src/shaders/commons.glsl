@@ -19,14 +19,14 @@ layout(binding = SCENE_TEX_IDX) uniform sampler2D scene_textures[];
 
 
 layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
-layout(buffer_reference, scalar) readonly buffer InstanceInfo {
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo {
     PrimMeshInfo d[];
 };
-layout(buffer_reference, scalar) readonly buffer Vertices { vec3 v[]; };
-layout(buffer_reference, scalar) readonly buffer Indices { uint i[]; };
-layout(buffer_reference, scalar) readonly buffer Normals { vec3 n[]; };
-layout(buffer_reference, scalar) readonly buffer TexCoords { vec2 t[]; };
-layout(buffer_reference, scalar) readonly buffer Materials { Material m[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Vertices { vec3 v[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Normals { vec3 n[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer TexCoords { vec2 t[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
 
 Indices indices = Indices(scene_desc.index_addr);
 Vertices vertices = Vertices(scene_desc.vertex_addr);

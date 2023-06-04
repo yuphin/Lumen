@@ -14,9 +14,9 @@
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PCSPPM pc_ray; };
-layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
-layout(buffer_reference, scalar) buffer ResidualData { vec4 d[]; };
-layout(buffer_reference, scalar) buffer CounterData { int d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer AtomicData_ { AtomicData d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ResidualData { vec4 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CounterData { int d; };
 uint size = pc_ray.size_x * pc_ray.size_y;
 ResidualData res_data = ResidualData(scene_desc.residual_addr);
 CounterData cnt = CounterData(scene_desc.counter_addr);

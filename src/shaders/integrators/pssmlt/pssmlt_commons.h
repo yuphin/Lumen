@@ -1,6 +1,5 @@
 #include "../mlt_commons.h"
-
-
+#include "../bdpt/bdpt_commons.h"
 
 struct MLTPathVertex {
 	vec3 dir;

@@ -10,8 +10,8 @@
 #include "../commons.h"
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) readonly buffer RTUtilsDesc_ { RTUtilsDesc post_desc; };
-layout(buffer_reference, scalar) readonly buffer Img { vec4 d[]; };
-layout(buffer_reference, scalar) readonly buffer Residual { float d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Img { vec4 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Residual { float d[]; };
 layout(push_constant) uniform PC { RTUtilsPC pc; };
 Img gt_img = Img(post_desc.gt_img_addr);
 Img out_img = Img(post_desc.out_img_addr);

@@ -26,8 +26,8 @@ layout(binding = 5) uniform _DDGIUniforms {
 };
 
 layout(push_constant) uniform _PushConstantRay { PCDDGI pc; };
-layout(buffer_reference, scalar) buffer GBuffer { GBufferData d[]; };
-layout(buffer_reference, scalar) buffer ProbeOffset { vec4 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GBuffer { GBufferData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ProbeOffset { vec4 d[]; };
 
 GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
 ProbeOffset probe_offsets = ProbeOffset(scene_desc.probe_offsets_addr);

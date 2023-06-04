@@ -13,21 +13,21 @@
 
 layout(push_constant) uniform _PushConstantRay { PCVCM pc_ray; };
 // VCM buffers
-layout(buffer_reference, scalar) buffer PhotonData_ { VCMPhotonHash d[]; };
-layout(buffer_reference, scalar) buffer VCMVertex_ { VCMVertex d[]; };
-layout(buffer_reference, scalar) buffer LightPathCnt { uint d[]; };
-layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonData_ { VCMPhotonHash d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMVertex_ { VCMVertex d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightPathCnt { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
 
-layout(buffer_reference, scalar) buffer VCMReservoir_ { VCMReservoir d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMReservoir_ { VCMReservoir d[]; };
 
-layout(buffer_reference, scalar) buffer SelectedReservoirs_ {
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SelectedReservoirs_ {
     SelectedReservoirs d[];
 };
 
-layout(buffer_reference, scalar) buffer LightSamples { VCMRestirData d[]; };
-layout(buffer_reference, scalar) buffer ShouldResample { uint d; };
-layout(buffer_reference, scalar) buffer LightStates { LightState d[]; };
-layout(buffer_reference, scalar) buffer Angles { AngleStruct d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightSamples { VCMRestirData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ShouldResample { uint d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightStates { LightState d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer Angles { AngleStruct d[]; };
 
 layout(constant_id = 0) const int RAY_GUIDE = 0;
 

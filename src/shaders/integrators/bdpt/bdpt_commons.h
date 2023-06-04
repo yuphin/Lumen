@@ -1,3 +1,5 @@
+#ifndef BDPT_COMMONS_H
+#define BDPT_COMMONS_H
 #include "../../commons.h"
 
 struct PCBDPT {
@@ -27,3 +29,4 @@ struct PathVertex {
 	float pdf_fwd;
 	float pdf_rev;
 };
+#endif

@@ -3,22 +3,22 @@
 #include "../../commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PCMLT pc_ray; };
 layout(constant_id = 0) const int SEEDING = 0;
-layout(buffer_reference, scalar) buffer BootstrapData { BootstrapSample d[]; };
-layout(buffer_reference, scalar) buffer SeedsData { SeedData d[]; };
-layout(buffer_reference, scalar) buffer PrimarySamples { PrimarySample d[]; };
-layout(buffer_reference, scalar) buffer MLTSamplers { MLTSampler d[]; };
-layout(buffer_reference, scalar) buffer MLTColor { vec3 d[]; };
-layout(buffer_reference, scalar) buffer ChainStats { ChainData d[]; };
-layout(buffer_reference, scalar) buffer Splats { Splat d[]; };
-layout(buffer_reference, scalar) buffer LightVertices { VCMVertex d[]; };
-layout(buffer_reference, scalar) buffer CameraVertices { VCMVertex d[]; };
-layout(buffer_reference, scalar) buffer PathCnt { uint d[]; };
-layout(buffer_reference, scalar) buffer ConnectedLights { uint d[]; };
-layout(buffer_reference, scalar) buffer TmpSeeds { SeedData d[]; };
-layout(buffer_reference, scalar) buffer TmpLuminance { float d[]; };
-layout(buffer_reference, scalar) buffer ProbCarryover { uint d[]; };
-layout(buffer_reference, scalar) buffer LightSplats { Splat d[]; };
-layout(buffer_reference, scalar) buffer LightSplatCnts { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BootstrapData { BootstrapSample d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SeedsData { SeedData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PrimarySamples { PrimarySample d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTSamplers { MLTSampler d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTColor { vec3 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ChainStats { ChainData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer Splats { Splat d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightVertices { VCMVertex d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CameraVertices { VCMVertex d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PathCnt { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ConnectedLights { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer TmpSeeds { SeedData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer TmpLuminance { float d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ProbCarryover { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightSplats { Splat d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightSplatCnts { uint d[]; };
 
 TmpSeeds tmp_seeds_data = TmpSeeds(scene_desc.tmp_seeds_addr);
 TmpLuminance tmp_lum_data = TmpLuminance(scene_desc.tmp_lum_addr);

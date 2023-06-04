@@ -13,10 +13,10 @@
 
 layout(push_constant) uniform _PushConstantRay { PCVCM pc_ray; };
 // VCM buffers
-layout(buffer_reference, scalar) buffer PhotonData_ { VCMPhotonHash d[]; };
-layout(buffer_reference, scalar) buffer VCMVertex_ { VCMVertex d[]; };
-layout(buffer_reference, scalar) buffer LightPathCnt { uint d[]; };
-layout(buffer_reference, scalar) buffer ColorStorages { vec3 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonData_ { VCMPhotonHash d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMVertex_ { VCMVertex d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightPathCnt { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
 
 PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
 VCMVertex_ vcm_lights = VCMVertex_(scene_desc.vcm_vertices_addr);

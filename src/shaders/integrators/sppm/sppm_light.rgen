@@ -13,8 +13,8 @@
 
 layout(push_constant) uniform _PushConstantRay { PCSPPM pc_ray; };
 // SPPM buffers
-layout(buffer_reference, scalar) buffer AtomicData_ { AtomicData d; };
-layout(buffer_reference, scalar) buffer PhotonData_ { PhotonHash d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer AtomicData_ { AtomicData d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonData_ { PhotonHash d[]; };
 
 AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
 PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
