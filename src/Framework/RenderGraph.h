@@ -175,7 +175,7 @@ class RenderPass {
 	std::vector<Texture2D*> explicit_tex_reads;
 
 	void write_impl(Buffer& buffer, VkAccessFlags access_flags);
-	void write_impl(Texture2D& tex);
+	void write_impl(Texture2D& tex, VkAccessFlags access_flags = VK_ACCESS_SHADER_WRITE_BIT);
 	void read_impl(Buffer& buffer);
 	void read_impl(Buffer& buffer, VkAccessFlags access_flags);
 	void read_impl(Texture2D& tex);

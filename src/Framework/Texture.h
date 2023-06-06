@@ -22,6 +22,7 @@ class Texture {
 	//		VkImageType);
 	void destroy();
 	inline void set_context(VulkanContext* ctx) { this->ctx = ctx; }
+	inline bool valid() { return img != VK_NULL_HANDLE; }
 	VkImage img = VK_NULL_HANDLE;
 	VkImageView img_view = VK_NULL_HANDLE;
 	VkDeviceMemory img_mem = VK_NULL_HANDLE;

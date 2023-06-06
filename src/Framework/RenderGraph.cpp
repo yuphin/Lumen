@@ -55,10 +55,10 @@ void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout)
 	// if (eq_layouts && (!has_storage_bit || dst_layout == VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL)) {
 	// The reason is that when both src and dst layout are VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, it's possible that prior
 	// to this pass, there was another pass that signalled a transition to READ_ONLY_OPTIMAL, and that pass might have a
-	// different pipeline type. So, for example: 
-	// (compute - Image layout : general) -> (compute - Image layout: read_only (for compute only)) - (fragment - Image layout: read only) 
-	// In this case: The correct synchronization is needed to ensure a fragment shader read access. 
-	// So in principle it would be possible to feed that access flag in the 2nd stage, 
+	// different pipeline type. So, for example:
+	// (compute - Image layout : general) -> (compute - Image layout: read_only (for compute only)) - (fragment - Image
+	// layout: read only) In this case: The correct synchronization is needed to ensure a fragment shader read access.
+	// So in principle it would be possible to feed that access flag in the 2nd stage,
 	// but our architecture currently doesn't allow this as we don't explicitly store the pipeline stage for signals
 	if (eq_layouts && !has_storage_bit) {
 		return;
@@ -163,12 +163,15 @@ void RenderPass::transition_resources() {
 		if (src.tex) {
 			if (dst.buf) {
 				write_impl(*dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
+			} else {
+				write_impl(*dst.tex, VK_ACCESS_TRANSFER_WRITE_BIT);
 			}
 		} else {  // buffer
-			VkAccessFlags src_access_flags = VK_ACCESS_NONE_KHR;
 			read_impl(*src.buf, VK_ACCESS_TRANSFER_READ_BIT);
 			if (dst.buf) {
 				write_impl(*dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
+			} else {
+				write_impl(*dst.tex, VK_ACCESS_TRANSFER_WRITE_BIT);
 			}
 		}
 	}
@@ -447,14 +450,7 @@ RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<Textur
 
 RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 	// TODO: Extend this if check upon extending this function
-	if (dst.buf) {
-		resource_copies.push_back({src, dst});
-	} else if(dst.tex) {
-		// TODO
-	} else {
-		LUMEN_ERROR("Unimplemented copy operation")
-	}
-
+	resource_copies.push_back({src, dst});
 	return *this;
 }
 
@@ -539,8 +535,8 @@ void RenderPass::write_impl(Buffer& buffer, VkAccessFlags access_flags) {
 	rg->buffer_resource_map[buffer.handle] = {pass_idx, access_flags};
 }
 
-void RenderPass::write_impl(Texture2D& tex) {
-	VkImageLayout target_layout = get_target_img_layout(tex, VK_ACCESS_SHADER_WRITE_BIT);
+void RenderPass::write_impl(Texture2D& tex, VkAccessFlags access_flags) {
+	VkImageLayout target_layout = get_target_img_layout(tex, access_flags);
 	register_dependencies(tex, target_layout);
 	rg->img_resource_map[tex.img] = pass_idx;
 }
@@ -789,10 +785,11 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 	for (const auto& [src, dst] : resource_copies) {
 		if (src.tex) {
+			// Assumption: The copy(...) is called in the pass after the src is produced
 			if (dst.buf) {
-				// Assumption: The copy(...) is called in the pass after the src is produced
+				LUMEN_ASSERT(src.tex->aspect_flags == dst.tex->aspect_flags, "Aspect flags mismatch");
 				VkBufferImageCopy region = {};
-				region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				region.imageSubresource.aspectMask = src.tex->aspect_flags;
 				region.imageSubresource.mipLevel = 0;
 				region.imageSubresource.baseArrayLayer = 0;
 				region.imageSubresource.layerCount = 1;
@@ -802,6 +799,18 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				vkCmdCopyImageToBuffer(cmd, src.tex->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst.buf->handle, 1,
 									   &region);
 				src.tex->transition(cmd, old_layout);
+			} else {
+				VkImageCopy region = {};
+				VkImageLayout old_layout = src.tex->layout;
+				src.tex->transition(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+				dst.tex->transition(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+				region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				region.srcSubresource.layerCount = 1;
+				region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				region.dstSubresource.layerCount = 1;
+				region.extent = src.tex->base_extent;
+				vkCmdCopyImage(cmd, src.tex->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst.tex->img,
+							   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 			}
 		} else {  // buffer
 			if (dst.buf) {

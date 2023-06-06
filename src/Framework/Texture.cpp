@@ -275,4 +275,5 @@ void Texture::destroy() {
 		vkDestroyImage(ctx->device, img, nullptr);
 		vkFreeMemory(ctx->device, img_mem, nullptr);
 	}
+	img = VK_NULL_HANDLE;
 }

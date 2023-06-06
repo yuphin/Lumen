@@ -27,10 +27,14 @@ void RayTracer::init(Window* window) {
 			write_exr = true;
 		} else if (instance->window->is_key_down(KeyInput::KEY_F11)) {
 			comparison_mode ^= true;
-		} else if (comparison_mode && instance->window->is_key_down(KeyInput::KEY_F5)) {
+		} else if (instance->window->is_key_down(KeyInput::KEY_F5)) {
 			capture_ref_img = true;
-		} else if (comparison_mode && instance->window->is_key_down(KeyInput::KEY_F6)) {
-			capture_target_img;	
+		} else if (instance->window->is_key_down(KeyInput::KEY_F6)) {
+			capture_target_img = true;
+		} else if (comparison_mode && instance->window->is_key_down(KeyInput::KEY_LEFT)) {
+			comparison_img_toggle = false;
+		} else if (comparison_mode && instance->window->is_key_down(KeyInput::KEY_RIGHT)) {
+			comparison_img_toggle = true;
 		}
 	});
 
@@ -103,6 +107,14 @@ void RayTracer::init_resources() {
 						   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 						   VK_SHARING_MODE_EXCLUSIVE, sizeof(float));
 
+	TextureSettings settings;
+	settings.usage_flags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+						   VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	settings.base_extent = {(uint32_t)instance->width, (uint32_t)instance->height, 1};
+	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	reference_tex.create_empty_texture("Reference Texture", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL);
+	target_tex.create_empty_texture("Target Texture", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL);
+
 	if (load_reference) {
 		// Load the ground truth image
 		int width, height;
@@ -132,11 +144,15 @@ void RayTracer::init_resources() {
 void RayTracer::cleanup_resources() {
 	std::vector<Buffer*> buffer_list = {&output_img_buffer, &output_img_buffer_cpu, &residual_buffer,
 										&counter_buffer,	&rmse_val_buffer,		&rt_utils_desc_buffer};
+	std::vector<Texture2D*> tex_list = {&reference_tex, &target_tex};
 	if (load_reference) {
 		buffer_list.push_back(&gt_img_buffer);
 	}
 	for (auto b : buffer_list) {
 		b->destroy();
+	}
+	for (auto t : tex_list) {
+		t->destroy();
 	}
 }
 
@@ -149,7 +165,6 @@ void RayTracer::update() {
 
 void RayTracer::render(uint32_t i) {
 	integrator->render();
-	post_fx.render(integrator->output_tex, vkb.swapchain_images[i]);
 	auto cmdbuf = vkb.ctx.command_buffers[i];
 	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
@@ -158,9 +173,18 @@ void RayTracer::render(uint32_t i) {
 		instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer_cpu);
 	} else if (capture_ref_img) {
 		instance->vkb.rg->current_pass().copy(integrator->output_tex, reference_tex);
+	
 	} else if (capture_target_img) {
 		instance->vkb.rg->current_pass().copy(integrator->output_tex, target_tex);
+	
 	}
+
+	if (capture_ref_img || capture_target_img) {
+		img_captured = true;
+		capture_ref_img = false;
+		capture_target_img = false;
+	}
+
 	if (calc_rmse && has_gt) {
 		auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name,
 							 const std::string& reduce_name, const std::string& reduce_shader_name) {
@@ -186,6 +210,14 @@ void RayTracer::render(uint32_t i) {
 			.push_constants(&rt_utils_pc)
 			.bind(rt_utils_desc_buffer);
 	}
+	
+	Texture2D* input_tex = nullptr;
+	if (comparison_mode && img_captured) {
+		input_tex = comparison_img_toggle ? &target_tex : &reference_tex;
+	} else {
+		input_tex = &integrator->output_tex;
+	}
+	post_fx.render(*input_tex, vkb.swapchain_images[i]);
 
 	vkb.rg->run(cmdbuf);
 
@@ -250,6 +282,18 @@ bool RayTracer::gui() {
 		updated |= true;
 	}
 	ImGui::Checkbox("Comparison mode (F11)", &comparison_mode);
+	if (comparison_mode && img_captured) {
+		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0,255,0,255));
+		const char* texts[] = {"Showing: Reference Image", "Showing: Target Image"};
+		ImGui::Text(texts[uint32_t(comparison_img_toggle)]);
+		ImGui::PopStyleColor();
+	}
+	if (ImGui::Button("Capture reference image (F5)")) {
+		capture_ref_img = true;
+	}
+	if (ImGui::Button("Capture target image (F6)")) {
+		capture_target_img = true;
+	}
 
 	const char* settings[] = {"Path",	"BDPT",	  "SPPM",	   "VCM",		"PSSMLT", "SMLT",
 							  "VCMMLT", "ReSTIR", "ReSTIR GI", "ReSTIR PT", "DDGI"};

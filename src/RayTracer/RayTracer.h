@@ -54,7 +54,6 @@ class RayTracer : public LumenInstance {
 	Texture2D reference_tex;
 	Texture2D target_tex;
 
-
 	Buffer fft_buffers[2];
 	Buffer fft_cpu_buffers[2];
 	std::string scene_name;
@@ -68,6 +67,8 @@ class RayTracer : public LumenInstance {
 	bool comparison_mode = false;
 	bool capture_ref_img = false;
 	bool capture_target_img = false;
+	bool comparison_img_toggle = false;
+	bool img_captured = false;
 
 	const bool enable_shader_inference = true;
 	const bool use_events = true;
