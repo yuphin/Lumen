@@ -52,7 +52,7 @@ class RayTracer : public LumenInstance {
 	Buffer rt_utils_desc_buffer;
 
 	Texture2D reference_tex;
-	Texture2D target_ref;
+	Texture2D target_tex;
 
 
 	Buffer fft_buffers[2];
@@ -64,7 +64,10 @@ class RayTracer : public LumenInstance {
 	bool write_exr = false;
 	bool has_gt = false;
 	bool show_cam_stats = false;
+
 	bool comparison_mode = false;
+	bool capture_ref_img = false;
+	bool capture_target_img = false;
 
 	const bool enable_shader_inference = true;
 	const bool use_events = true;

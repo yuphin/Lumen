@@ -449,6 +449,8 @@ RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 	// TODO: Extend this if check upon extending this function
 	if (dst.buf) {
 		resource_copies.push_back({src, dst});
+	} else if(dst.tex) {
+		// TODO
 	} else {
 		LUMEN_ERROR("Unimplemented copy operation")
 	}

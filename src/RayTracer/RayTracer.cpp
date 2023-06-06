@@ -27,6 +27,10 @@ void RayTracer::init(Window* window) {
 			write_exr = true;
 		} else if (instance->window->is_key_down(KeyInput::KEY_F11)) {
 			comparison_mode ^= true;
+		} else if (comparison_mode && instance->window->is_key_down(KeyInput::KEY_F5)) {
+			capture_ref_img = true;
+		} else if (comparison_mode && instance->window->is_key_down(KeyInput::KEY_F6)) {
+			capture_target_img;	
 		}
 	});
 
@@ -152,6 +156,10 @@ void RayTracer::render(uint32_t i) {
 
 	if (write_exr) {
 		instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer_cpu);
+	} else if (capture_ref_img) {
+		instance->vkb.rg->current_pass().copy(integrator->output_tex, reference_tex);
+	} else if (capture_target_img) {
+		instance->vkb.rg->current_pass().copy(integrator->output_tex, target_tex);
 	}
 	if (calc_rmse && has_gt) {
 		auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name,
