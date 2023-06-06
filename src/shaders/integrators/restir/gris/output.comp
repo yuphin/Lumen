@@ -32,8 +32,11 @@ void main() {
 		col += direct_lighting_buffer.d[gl_GlobalInvocationID.x];
 	}
 	if (r.W > 0) {
-		col += r.gris_data.F;
-		// col += r.gris_data.rc_postfix_L;
+		if(pc_ray.show_reconnection_radiance == 1) {
+			col += r.gris_data.rc_postfix_L;
+		} else {
+			col += r.gris_data.F;
+		}
 	}
 
 	if (pc_ray.enable_accumulation == 0 || pc_ray.frame_num == 0) {

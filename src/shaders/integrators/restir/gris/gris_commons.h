@@ -16,11 +16,13 @@ struct PCReSTIRPT {
 	uint random_num;
 	uint total_frame_num;
 	uint enable_accumulation;
-	float max_spatial_radius;
 	float scene_extent;
 	uint num_spatial_samples;
 	uint direct_lighting;
 	uint enable_rr;
+	uint enable_spatial_reuse;
+	uint show_reconnection_radiance;
+	float spatial_radius;
 };
 
 

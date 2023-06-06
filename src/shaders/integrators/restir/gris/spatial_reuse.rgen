@@ -14,7 +14,7 @@ GrisGBuffer g_buffers = GrisGBuffer(scene_desc.gris_gbuffer_addr);
 
 ivec2 get_neighbor_offset(inout uvec4 seed) {
 	const float randa = rand(seed) * 2 * PI;
-	const float randr = sqrt(rand(seed)) * pc_ray.max_spatial_radius;
+	const float randr = sqrt(rand(seed)) * pc_ray.spatial_radius;
 	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
 }
 
@@ -188,7 +188,7 @@ void main() {
 
 	GrisData data = reservoirs.d[pixel_idx].gris_data;
 
-	if (gbuffer.material_idx == -1) {
+	if (gbuffer.material_idx == -1 || pc_ray.enable_spatial_reuse == 0) {
 		return;
 	}
 

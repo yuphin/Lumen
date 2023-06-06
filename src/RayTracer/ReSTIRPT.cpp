@@ -64,6 +64,10 @@ void ReSTIRPT::render() {
 	pc_ray.direct_lighting = direct_lighting;
 	pc_ray.enable_rr = enable_rr;
 
+	pc_ray.spatial_radius = spatial_reuse_radius;
+	pc_ray.enable_spatial_reuse = enable_spatial_reuse;
+	pc_ray.show_reconnection_radiance = show_reconnection_radiance;
+
 	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
@@ -137,5 +141,11 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
 	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
 	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);
+	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
+	result |= ImGui::Checkbox("Show reconnection radius", &show_reconnection_radiance);
+	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
+	if (spatial_reuse_radius == 0.0f) {
+		enable_spatial_reuse = false;
+	}
 	return result;
 }
