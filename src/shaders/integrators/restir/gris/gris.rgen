@@ -117,10 +117,10 @@ void main() {
 		if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
 			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
 			nee_L = uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo, nee_visible) / light_pick_pdf;
-			if (pc_ray.direct_lighting == 1 && depth == 0) {
-				direct_lighting += throughput * nee_L;
-			} else {
+			if (depth > 0) {
 				col += throughput * nee_L;
+			} else if(pc_ray.direct_lighting == 1){
+				direct_lighting += throughput * nee_L;
 			}
 			if (connectable_vertex_found) {
 				data.rc_postfix_L += postfix_throughput * nee_L;
