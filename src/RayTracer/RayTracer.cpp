@@ -265,6 +265,9 @@ void RayTracer::create_integrator(int integrator_idx) {
 }
 
 bool RayTracer::gui() {
+	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
+	ImGui::Text("General settings:");
+	ImGui::PopStyleColor();
 	ImGui::Text("Frame time %f ms ( %f FPS )", cpu_avg_time, 1000 / cpu_avg_time);
 	ImGui::Text("Memory Usage: %f MB", get_memory_usage(vk_ctx.physical_device) * 1e-6);
 	bool updated = false;

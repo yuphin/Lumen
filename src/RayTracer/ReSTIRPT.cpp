@@ -138,7 +138,7 @@ void ReSTIRPT::destroy() {
 }
 
 bool ReSTIRPT::gui() {
-	bool result = false;
+	bool result = Integrator::gui();
 	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
 	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
 	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);

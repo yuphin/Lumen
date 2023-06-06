@@ -183,8 +183,11 @@ void Integrator::init() {
 }
 
 bool Integrator::gui() {
+	ImGui::NewLine();
+	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
+	ImGui::Text("Integrator settings:");
+	ImGui::PopStyleColor();
 	ImGui::Text("Path length: %d", lumen_scene->config->path_length);
-	ImGui::Text("Integrator: %s", lumen_scene->config->integrator_name.c_str());
 	return false;
 }
 
