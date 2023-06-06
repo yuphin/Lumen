@@ -61,6 +61,8 @@ void ReSTIRPT::render() {
 	pc_ray.dir_light_idx = lumen_scene->dir_light_idx;
 	pc_ray.enable_accumulation = enable_accumulation;
 	pc_ray.scene_extent = glm::length(lumen_scene->m_dimensions.max - lumen_scene->m_dimensions.min);
+	pc_ray.direct_lighting = direct_lighting;
+	pc_ray.enable_rr = enable_rr;
 
 	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
@@ -133,5 +135,7 @@ void ReSTIRPT::destroy() {
 bool ReSTIRPT::gui() {
 	bool result = false;
 	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
+	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
+	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);
 	return result;
 }

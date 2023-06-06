@@ -51,7 +51,7 @@ void main() {
 		}
 		if (!found_isect) {
 			vec3 atmosphere_L = shade_atmosphere(pc_ray.dir_light_idx, pc_ray.sky_col, origin.xyz, direction, tmax);
-			if (depth == 0) {
+			if (pc_ray.direct_lighting == 1 && depth == 0) {
 				direct_lighting += throughput * atmosphere_L;
 			} else {
 				col += throughput * atmosphere_L;
@@ -71,7 +71,10 @@ void main() {
 			gbuffer.n_g = payload.n_g;
 			gbuffer.material_idx = payload.material_idx;
 			gbuffer.uv = payload.uv;
-			direct_lighting += throughput * hit_mat.emissive_factor;
+			if(pc_ray.direct_lighting == 1) {
+				direct_lighting += throughput * hit_mat.emissive_factor;
+			}
+
 		} else if (specular) {
 			col += throughput * hit_mat.emissive_factor;
 			if (connectable_vertex_found) {
@@ -114,7 +117,7 @@ void main() {
 		if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
 			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
 			nee_L = uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo, nee_visible) / light_pick_pdf;
-			if (depth == 0) {
+			if (pc_ray.direct_lighting == 1 && depth == 0) {
 				direct_lighting += throughput * nee_L;
 			} else {
 				col += throughput * nee_L;
@@ -153,19 +156,19 @@ void main() {
 
 		specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
 
-#if 0
-		float rr_scale = 1.0;
-		if (hit_mat.bsdf_type == BSDF_GLASS) {
-			rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
+		if(pc_ray.enable_rr == 1) {
+			float rr_scale = 1.0;
+			if (hit_mat.bsdf_type == BSDF_GLASS) {
+				rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
+			}
+			if (depth > RR_MIN_DEPTH) {
+				float rr_prob = min(0.95f, luminance(throughput) * rr_scale);
+				if (rr_prob == 0 || rr_prob < rand(seed))
+					break;
+				else
+					throughput /= rr_prob;
+			}
 		}
-		if (depth > RR_MIN_DEPTH) {
-			float rr_prob = min(0.95f, luminance(throughput) * rr_scale);
-			if (rr_prob == 0 || rr_prob < rand(seed))
-				break;
-			else
-				throughput /= rr_prob;
-		}
-#endif
 	}
 
 	g_buffers.d[pixel_idx] = gbuffer;
@@ -178,8 +181,9 @@ void main() {
 	float eng = dot(gbuffer.n_g - gbuf2.n_g, gbuffer.n_g - gbuf2.n_g);
 	ASSERT(!(epos > 1e-8 || euv > 1e-8 || ens > 1e-8 || eng > 1e-8 || gbuffer.material_idx != gbuf2.material_idx));
 #endif
-	
-	direct_lighting_buffer.d[pixel_idx] = direct_lighting;
+	if(pc_ray.direct_lighting == 1) {
+		direct_lighting_buffer.d[pixel_idx] = direct_lighting;
+	}
 	float target_pdf = luminance(col);
 	if (isnan(target_pdf)) {
 		return;

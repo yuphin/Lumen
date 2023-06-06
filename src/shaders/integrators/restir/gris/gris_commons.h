@@ -19,6 +19,8 @@ struct PCReSTIRPT {
 	float max_spatial_radius;
 	float scene_extent;
 	uint num_spatial_samples;
+	uint direct_lighting;
+	uint enable_rr;
 };
 
 

@@ -18,6 +18,8 @@ class ReSTIRPT : public Integrator {
 	Buffer gris_reservoir_buffer;
 	PCReSTIRPT pc_ray{};
 	bool enable_accumulation = true;
+	bool direct_lighting = false;
+	bool enable_rr = false;
 
 	ReSTIRGIConfig* config;
 };

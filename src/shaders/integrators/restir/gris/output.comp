@@ -28,7 +28,9 @@ void main() {
 	const uint pingpong = (pc_ray.total_frame_num % 2);
 	vec3 col = vec3(0);
 	const Reservoir r = reservoirs.d[gl_GlobalInvocationID.x];
-	// col += direct_lighting_buffer.d[gl_GlobalInvocationID.x];
+	if(pc_ray.direct_lighting == 1) {
+		col += direct_lighting_buffer.d[gl_GlobalInvocationID.x];
+	}
 	if (r.W > 0) {
 		col += r.gris_data.F;
 		// col += r.gris_data.rc_postfix_L;
