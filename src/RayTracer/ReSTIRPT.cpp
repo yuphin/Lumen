@@ -67,6 +67,7 @@ void ReSTIRPT::render() {
 	pc_ray.spatial_radius = spatial_reuse_radius;
 	pc_ray.enable_spatial_reuse = enable_spatial_reuse;
 	pc_ray.show_reconnection_radiance = show_reconnection_radiance;
+	pc_ray.min_vertex_distance_ratio = min_vertex_distance_ratio;
 
 	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
@@ -142,8 +143,9 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
 	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);
 	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
-	result |= ImGui::Checkbox("Show reconnection radius", &show_reconnection_radiance);
+	result |= ImGui::Checkbox("Show reconnection radiance", &show_reconnection_radiance);
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
+	result |= ImGui::SliderFloat("Min reconnection distance ratio", &min_vertex_distance_ratio, 0.0f, 1.0f);
 	if (spatial_reuse_radius == 0.0f) {
 		enable_spatial_reuse = false;
 	}

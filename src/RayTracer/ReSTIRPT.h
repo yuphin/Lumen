@@ -23,6 +23,7 @@ class ReSTIRPT : public Integrator {
 	bool enable_spatial_reuse = true; 
 	bool show_reconnection_radiance = false;
 	float spatial_reuse_radius = 32.0f;
+	float min_vertex_distance_ratio = 0.01f;
 
 	ReSTIRGIConfig* config;
 };

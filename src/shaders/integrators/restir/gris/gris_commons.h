@@ -23,6 +23,7 @@ struct PCReSTIRPT {
 	uint enable_spatial_reuse;
 	uint show_reconnection_radiance;
 	float spatial_radius;
+	float min_vertex_distance_ratio;
 };
 
 
