@@ -165,18 +165,30 @@ void RayTracer::update() {
 
 void RayTracer::render(uint32_t i) {
 	integrator->render();
+	render_debug_utils();
+	Texture2D* input_tex = nullptr;
+	if (comparison_mode && img_captured) {
+		input_tex = comparison_img_toggle ? &target_tex : &reference_tex;
+	} else {
+		input_tex = &integrator->output_tex;
+	}
+	post_fx.render(*input_tex, vkb.swapchain_images[i]);
+
 	auto cmdbuf = vkb.ctx.command_buffers[i];
 	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
+	vkb.rg->run(cmdbuf);
+	vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
+}
 
+void RayTracer::render_debug_utils() {
 	if (write_exr) {
 		instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer_cpu);
 	} else if (capture_ref_img) {
 		instance->vkb.rg->current_pass().copy(integrator->output_tex, reference_tex);
-	
+
 	} else if (capture_target_img) {
 		instance->vkb.rg->current_pass().copy(integrator->output_tex, target_tex);
-	
 	}
 
 	if (capture_ref_img || capture_target_img) {
@@ -210,18 +222,6 @@ void RayTracer::render(uint32_t i) {
 			.push_constants(&rt_utils_pc)
 			.bind(rt_utils_desc_buffer);
 	}
-	
-	Texture2D* input_tex = nullptr;
-	if (comparison_mode && img_captured) {
-		input_tex = comparison_img_toggle ? &target_tex : &reference_tex;
-	} else {
-		input_tex = &integrator->output_tex;
-	}
-	post_fx.render(*input_tex, vkb.swapchain_images[i]);
-
-	vkb.rg->run(cmdbuf);
-
-	vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
 }
 
 void RayTracer::create_integrator(int integrator_idx) {
@@ -283,7 +283,7 @@ bool RayTracer::gui() {
 	}
 	ImGui::Checkbox("Comparison mode (F11)", &comparison_mode);
 	if (comparison_mode && img_captured) {
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0,255,0,255));
+		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
 		const char* texts[] = {"Showing: Reference Image", "Showing: Target Image"};
 		ImGui::Text(texts[uint32_t(comparison_img_toggle)]);
 		ImGui::PopStyleColor();
