@@ -24,6 +24,7 @@ struct PCReSTIRPT {
 	uint show_reconnection_radiance;
 	float spatial_radius;
 	float min_vertex_distance_ratio;
+	uint path_length;
 };
 
 

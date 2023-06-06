@@ -48,13 +48,15 @@ void ReSTIRPT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_gbuffer_addr, &gris_gbuffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, &gris_reservoir_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, &direct_lighting_buffer, instance->vkb.rg);
+
+	path_length = config->path_length;
 }
 
 void ReSTIRPT::render() {
 	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true);
 	pc_ray.num_lights = (int)lights.size();
 	pc_ray.random_num = rand() % UINT_MAX;
-	pc_ray.max_depth = config->path_length;
+	pc_ray.max_depth = path_length;
 	pc_ray.sky_col = config->sky_col;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
@@ -144,6 +146,7 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);
 	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
 	result |= ImGui::Checkbox("Show reconnection radiance", &show_reconnection_radiance);
+	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
 	result |= ImGui::SliderFloat("Min reconnection distance ratio", &min_vertex_distance_ratio, 0.0f, 1.0f);
 	if (spatial_reuse_radius == 0.0f) {
