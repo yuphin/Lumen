@@ -138,6 +138,7 @@ struct MouseInput {
 using MouseClickCallback = std::function<void(MouseAction button, KeyAction action, double x, double y)>;
 using MouseMoveCallback = std::function<void(double delta_x, double delta_y,  double x, double y)>;
 using MouseScrollCallback = std::function<void(double x, double y)>;
+using KeyCallback = std::function<void(KeyInput input, KeyAction action)>;
 class Window {
    public:
 	Window(int width, int height, bool fullscreen);
@@ -146,7 +147,7 @@ class Window {
 	inline bool is_key_down(KeyInput input) { return key_map[input] == KeyAction::PRESS; }
 	inline bool is_key_up(KeyInput input) { return key_map[input] == KeyAction::RELEASE; }
 	inline bool is_key_held(KeyInput input) {
-		return key_map[input] == KeyAction::REPEAT || key_map[input] == KeyAction::PRESS;
+		return key_map[input] == KeyAction::PRESS || key_map[input] == KeyAction::REPEAT;
 	}
 	inline bool is_mouse_held(MouseAction mb) {
 		auto res = mouse_map.find(mb);
@@ -170,6 +171,7 @@ class Window {
 	void add_mouse_click_callback(MouseClickCallback callback);
 	void add_mouse_move_callback(MouseMoveCallback callback);
 	void add_scroll_callback(MouseScrollCallback callback);
+	void add_key_callback(KeyCallback callback);
 
    private:
 	GLFWwindow* window_handle;
@@ -184,6 +186,7 @@ class Window {
 	std::vector<MouseClickCallback> mouse_click_callbacks;
 	std::vector<MouseMoveCallback> mouse_move_callbacks;
 	std::vector<MouseScrollCallback> mouse_scroll_callbacks;
+	std::vector<KeyCallback> key_callbacks;
 	double mouse_pos_x, mouse_pos_y;
 	double mouse_prev_x, mouse_prev_y;
 	double mouse_delta_prev_x, mouse_delta_prev_y;

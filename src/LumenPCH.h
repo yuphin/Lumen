@@ -44,6 +44,7 @@
 #include "Framework/Logger.h"
 #include <assert.h>
 #include <unordered_map>
+#include <unordered_set>
 #include <robin-hood/robin_hood.h>
 
 #pragma warning(push,0)

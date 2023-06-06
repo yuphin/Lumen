@@ -22,6 +22,14 @@ void RayTracer::init(Window* window) {
 	srand((uint32_t)time(NULL));
 	this->window = window;
 	vkb.ctx.window_ptr = window->get_window_ptr();
+	window->add_key_callback([this](KeyInput key, KeyAction action) {
+		if (instance->window->is_key_down(KeyInput::KEY_F10)) {
+			write_exr = true;
+		} else if (instance->window->is_key_down(KeyInput::KEY_F11)) {
+			comparison_mode ^= true;
+		}
+	});
+
 	// Init with ray tracing extensions
 	vkb.add_device_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
 	vkb.add_device_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
@@ -129,9 +137,6 @@ void RayTracer::cleanup_resources() {
 }
 
 void RayTracer::update() {
-	if (instance->window->is_key_down(KeyInput::KEY_F10)) {
-		write_exr = true;
-	}
 	float frame_time = draw_frame();
 	cpu_avg_time = (1.0f - 1.0f / (cnt)) * cpu_avg_time + frame_time / (float)cnt;
 	cpu_avg_time = 0.95f * cpu_avg_time + 0.05f * frame_time;
@@ -236,8 +241,10 @@ bool RayTracer::gui() {
 		vkb.rg->shader_cache.clear();
 		updated |= true;
 	}
+	ImGui::Checkbox("Comparison mode (F11)", &comparison_mode);
 
-	const char* settings[] = {"Path", "BDPT", "SPPM", "VCM", "PSSMLT", "SMLT", "VCMMLT", "ReSTIR", "ReSTIR GI", "ReSTIR PT", "DDGI"};
+	const char* settings[] = {"Path",	"BDPT",	  "SPPM",	   "VCM",		"PSSMLT", "SMLT",
+							  "VCMMLT", "ReSTIR", "ReSTIR GI", "ReSTIR PT", "DDGI"};
 
 	static int curr_integrator_idx = int(scene.config->integrator_type);
 	if (ImGui::BeginCombo("Select Integrator", settings[curr_integrator_idx])) {
@@ -268,7 +275,8 @@ bool RayTracer::gui() {
 
 		auto prev_cam_settings = scene.config->cam_settings;
 		auto integrator_str = std::string(settings[curr_integrator_idx]);
-		integrator_str.erase(std::remove_if(integrator_str.begin(), integrator_str.end(), ::isspace), integrator_str.end());
+		integrator_str.erase(std::remove_if(integrator_str.begin(), integrator_str.end(), ::isspace),
+							 integrator_str.end());
 		std::transform(integrator_str.begin(), integrator_str.end(), integrator_str.begin(), ::tolower);
 		scene.create_scene_config(integrator_str);
 		scene.config->cam_settings = prev_cam_settings;

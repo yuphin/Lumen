@@ -26,6 +26,9 @@ Window::~Window() {
 void Window::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	auto ptr = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
 	ptr->key_map[static_cast<KeyInput>(key)] = static_cast<KeyAction>(action);
+	for (auto& cb : ptr->key_callbacks) {
+		cb(static_cast<KeyInput>(key),  static_cast<KeyAction>(action));
+	}
 }
 
 void Window::window_size_callback(GLFWwindow* window, int width, int height) {
@@ -44,11 +47,12 @@ void Window::mouse_click_callback(GLFWwindow* window, int button, int action, in
 		case GLFW_RELEASE:
 			callback_action = KeyAction::RELEASE;
 			break;
-		case GLFW_PRESS:
-			callback_action = KeyAction::PRESS;
-			break;
+	
 		case GLFW_REPEAT:
 			callback_action = KeyAction::REPEAT;
+			break;
+		case GLFW_PRESS:
+			callback_action = KeyAction::PRESS;
 			break;
 		default:
 			callback_action = KeyAction::UNKNOWN;
@@ -114,6 +118,8 @@ void Window::add_mouse_click_callback(MouseClickCallback callback) { mouse_click
 void Window::add_mouse_move_callback(MouseMoveCallback callback) { mouse_move_callbacks.push_back(callback); }
 
 void Window::add_scroll_callback(MouseScrollCallback callback) { mouse_scroll_callbacks.push_back(callback); }
+
+void Window::add_key_callback(KeyCallback callback) { key_callbacks.push_back(callback); }
 
 bool Window::is_mouse_held(MouseAction mb, glm::ivec2& pos) {
 	auto res = mouse_map.find(mb);
