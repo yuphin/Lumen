@@ -58,7 +58,6 @@
 #include <map>
 #include <string>
 #include <unordered_map>
-#include <robin-hood/robin_hood.h>
 #include <vector>
 
 #define KHR_LIGHTS_PUNCTUAL_EXTENSION_NAME "KHR_lights_punctual"

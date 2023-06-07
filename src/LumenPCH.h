@@ -1,5 +1,7 @@
 #ifdef WIN32
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #define WIN32_LEAN_AND_MEAN
 #define NOGDICAPMASKS
 #define NOCRYPT
@@ -45,7 +47,6 @@
 #include <assert.h>
 #include <unordered_map>
 #include <unordered_set>
-#include <robin-hood/robin_hood.h>
 
 #pragma warning(push,0)
 #include "Framework/VulkanStructs.h"

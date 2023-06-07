@@ -22,7 +22,7 @@ class Integrator {
 	virtual bool update();
 	virtual void destroy();
 	Texture2D output_tex;
-	std::unique_ptr<Camera> camera = nullptr;
+	std::unique_ptr<Camera> camera;
 	bool updated = false;
 	VkSampler texture_sampler;
 

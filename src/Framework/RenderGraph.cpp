@@ -1,4 +1,5 @@
 #include "../LumenPCH.h"
+#include "Framework/RenderGraph.h"
 #include "RenderGraph.h"
 #include "VkUtils.h"
 #include <unordered_set>
@@ -277,6 +278,12 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 		default:
 			break;
 	}
+}
+
+RenderGraph::RenderGraph(VulkanContext* ctx) : ctx(ctx) { pipeline_tasks.reserve(32); }
+
+RenderPass& RenderGraph::current_pass() {
+	return passes.back();
 }
 
 RenderPass& RenderGraph::add_rt(const std::string& name, const RTPassSettings& settings) {

@@ -27,9 +27,8 @@ class RenderPass;
 
 class RenderGraph {
    public:
-	RenderGraph(VulkanContext* ctx) : ctx(ctx) { pipeline_tasks.reserve(32); }
-	RenderPass& current_pass() { return passes.back(); }
-
+	RenderGraph(VulkanContext* ctx);
+	RenderPass& current_pass();
 	RenderPass& add_rt(const std::string& name, const RTPassSettings& settings);
 	RenderPass& add_gfx(const std::string& name, const GraphicsPassSettings& settings);
 	RenderPass& add_compute(const std::string& name, const ComputePassSettings& settings);
