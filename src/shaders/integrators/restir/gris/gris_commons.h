@@ -39,6 +39,8 @@ struct GBuffer {
 struct GrisData {
 	vec3 F; // Integrand
 	uvec4 init_seed;
+	uint postfix_length;
+	uint prefix_length;
 	// Reconnection vertex data
 	uvec4 rc_seed;
 	vec3 rc_pos;
@@ -50,8 +52,8 @@ struct GrisData {
 	uint rc_side;
 	uint rc_nee_visible;
 	vec3 rc_nee_L;
-	uint postfix_length;
-	uint rc_depth;
+	// Debug
+	float src_pdf;
 };
 
 struct Reservoir {

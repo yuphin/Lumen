@@ -55,9 +55,8 @@ vec3 uniform_sample_light_with_visibility_override(inout uvec4 seed, const Mater
 }
 
 bool connect_vertex(in GBuffer gbuffer, in GrisData data, vec3 direction, uvec4 reservoir_seed,
-					out vec3 reservoir_contribution) {
-	bool connected = false;
-
+					out vec3 prefix_contribution, out vec3 reservoir_contribution, out uint prefix_length,
+					out float src_pdf) {
 	if (data.rc_mat_id == -1) {
 		return false;
 	}
@@ -65,7 +64,10 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, vec3 direction, uvec4 
 	Material hit_mat = load_material(gbuffer.material_idx, gbuffer.uv);
 	vec3 pos = gbuffer.pos;
 	vec3 prefix_throughput = vec3(1);
+
+	prefix_contribution = vec3(0);
 	reservoir_contribution = vec3(0);
+	src_pdf = 1.0;
 
 	uint prefix_depth = 0;
 	vec3 n_s = gbuffer.n_s;
@@ -81,7 +83,7 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, vec3 direction, uvec4 
 	}
 	vec3 origin = offset_ray(gbuffer.pos, n_g);
 	while (true) {
-		if ((prefix_depth + data.postfix_length) >= pc_ray.max_depth) {
+		if ((prefix_depth + data.postfix_length) >= pc_ray.max_depth - 1) {
 			return false;
 		}
 
@@ -93,18 +95,18 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, vec3 direction, uvec4 
 			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
 			vec3 contrib = prefix_throughput *
 						   uniform_sample_light(reservoir_seed, hit_mat, payload.pos, side, n_s, wo) / light_pick_pdf;
-			reservoir_contribution += contrib;
+			prefix_contribution += contrib;
 		}
 
 		bool connectable = is_rough(hit_mat) && wi_len > pc_ray.min_vertex_distance_ratio * pc_ray.scene_extent;
-		connectable = connectable && prefix_depth >= (data.rc_depth - 1);
+		connectable = connectable && prefix_depth >= (data.prefix_length - 1);
+		bool connected = false;
 		if (connectable) {
 			vec3 p = offset_ray2(pos, n_s);
 			any_hit_payload.hit = 1;
 			traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p,
 						0, wi, wi_len - EPS, 1);
 			connected = any_hit_payload.hit == 0;
-			connected = true;
 		}
 
 		if (connected) {
@@ -115,8 +117,8 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, vec3 direction, uvec4 
 			if (bsdf_pdf == 0) {
 				return false;
 			}
-
-			prefix_throughput *= f * abs(cos_x) / bsdf_pdf;
+			src_pdf = bsdf_pdf;
+			prefix_throughput *= f * abs(cos_x);
 			// Compute lighting on the connected vertex
 			const Material rc_mat = load_material(data.rc_mat_id, data.rc_uv);
 			if (is_diffuse(rc_mat)) {
@@ -136,6 +138,7 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, vec3 direction, uvec4 
 			const vec3 rc_f = eval_bsdf(data.rc_ns, -wi, rc_mat, 1, data.rc_side == 1, data.rc_wi, bsdf_pdf, cos_x);
 
 			reservoir_contribution += prefix_throughput * rc_f * abs(cos_x) * data.rc_postfix_L / bsdf_pdf;
+			prefix_length = prefix_depth + 1;
 			return true;
 		}
 
@@ -158,7 +161,7 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, vec3 direction, uvec4 
 		hit_mat = load_material(payload.material_idx, payload.uv);
 
 		if (specular) {
-			reservoir_contribution += prefix_throughput * hit_mat.emissive_factor;
+			prefix_contribution += prefix_throughput * hit_mat.emissive_factor;
 		}
 
 		wo = -direction;
@@ -177,37 +180,42 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, vec3 direction, uvec4 
 		prefix_depth++;
 	}
 
-	return connected;
+	return false;
 }
 
 void main() {
 	const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
 	const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
 	vec2 d = in_uv * 2.0 - 1.0;
-	vec3 direction = vec3(sample_camera(d));
+	vec3 primary_direction = vec3(sample_camera(d));
 	GBuffer gbuffer = g_buffers.d[pixel_idx];
-
-	GrisData data = reservoirs.d[pixel_idx].gris_data;
 
 	if (gbuffer.material_idx == -1 || pc_ray.enable_spatial_reuse == 0) {
 		return;
 	}
 
-	vec3 reservoir_contribution = vec3(0);
-	bool connected = connect_vertex(gbuffer, data, direction, data.init_seed, reservoir_contribution);
-	if (connected) {
-		float target_pdf = luminance(reservoir_contribution);
-		if (isnan(target_pdf)) {
+	for (uint i = 0; i < pc_ray.num_spatial_samples; i++) {
+		ivec2 rand_offset = get_neighbor_offset(seed);
+		const ivec2 coords = clamp(ivec2(gl_LaunchIDEXT.xy) + rand_offset, ivec2(0), ivec2(gl_LaunchSizeEXT.xy) - 1);
+		const uint coords_idx = coords.x * pc_ray.size_y + coords.y;
+		if (any(lessThan(coords, ivec2(0))) || any(greaterThanEqual(coords, gl_LaunchSizeEXT.xy))) {
+			continue;
+		}
+
+		vec3 reservoir_contribution;
+		vec3 prefix_contribution;
+		uint prefix_length;
+		float src_pdf;
+		GrisData neighbor_data = reservoirs.d[pixel_idx].gris_data;
+		bool connected = connect_vertex(gbuffer, neighbor_data, primary_direction, neighbor_data.init_seed,
+										prefix_contribution, reservoir_contribution, prefix_length, src_pdf);
+		if (connected) {
+			float target_pdf = luminance(reservoir_contribution);
+			if (isnan(target_pdf)) {
+				continue;
+			}
+			reservoirs.d[pixel_idx].gris_data.F = prefix_contribution + reservoir_contribution / src_pdf;
 			return;
 		}
-		reservoirs.d[pixel_idx].gris_data.F = reservoir_contribution;
 	}
-
-#if 0
-	for (uint i = 0; i < pc_ray.num_spatial_samples; i++) {
-	    ivec2 rand_offset = get_neighbor_offset(seed);
-		const ivec2 coords = clamp(ivec2(gl_LaunchIDEXT.xy) + rand_offset, ivec2(0), ivec2(gl_LaunchSizeEXT.xy) - 1);
-	    const uint coords_idx = coords.x * pc_ray.size_y + coords.y;
-	}
-#endif
 }

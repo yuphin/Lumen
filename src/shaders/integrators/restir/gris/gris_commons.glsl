@@ -23,12 +23,20 @@ void init_gris_data(out GrisData data) {
 	data.rc_postfix_L = vec3(0);
 }
 
-void update_reservoir(inout Reservoir r_new, const GrisData data, float w_i) {
+void update_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData data, float w_i) {
 	r_new.w_sum += w_i;
 	r_new.M++;
 	if (rand(seed) < w_i / r_new.w_sum) {
 		r_new.gris_data = data;
 	}
+}
+
+void calc_reservoir_W(inout Reservoir r, float target_pdf) {
+	r.W = target_pdf == 0.0 ? 0.0 : r.w_sum / target_pdf;
+}
+
+float calc_target_pdf(vec3 f) {
+	return luminance(f);
 }
 
 void init_gbuffer(out GBuffer gbuffer) { gbuffer.material_idx = -1; }

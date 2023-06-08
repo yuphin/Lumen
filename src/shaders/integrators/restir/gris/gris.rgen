@@ -43,6 +43,7 @@ void main() {
 	bool prev_rough = false;
 	vec3 prev_pos = origin.xyz;
 	vec3 direct_lighting = vec3(0);
+	float pdf;
 	for (int depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.material_idx != -1;
@@ -109,7 +110,8 @@ void main() {
 			data.rc_ns = n_s;
 			data.rc_mat_id = payload.material_idx;
 			data.rc_side = uint(side);
-			data.rc_depth = depth;
+			data.prefix_length = depth;
+			source_pdf = pdf;
 		}
 
 		bool nee_visible = false;
@@ -132,7 +134,7 @@ void main() {
 		}
 
 		// Sample direction & update throughput
-		float pdf, cos_theta;
+		float cos_theta;
 		const vec3 f = sample_bsdf(n_s, wo, hit_mat, 1 /*radiance=cam*/, side, direction, pdf, cos_theta, seed);
 		if (pdf == 0) {
 			break;
@@ -143,8 +145,6 @@ void main() {
 
 		if (connectable_vertex_found) {
 			postfix_throughput *= t;
-		} else {
-			source_pdf *= pdf;
 		}
 
 		if (connectable) {
@@ -184,15 +184,15 @@ void main() {
 	if(pc_ray.direct_lighting == 1) {
 		direct_lighting_buffer.d[pixel_idx] = direct_lighting;
 	}
-	float target_pdf = luminance(col);
+	float target_pdf = calc_target_pdf(col);
 	if (isnan(target_pdf)) {
 		return;
 	}
 	data.F = col;
 	data.postfix_length = postfix_length;
+	data.src_pdf = source_pdf;
 
-	update_reservoir(reservoir, data, target_pdf / source_pdf);
-	reservoir.W = target_pdf == 0 ? 0 : reservoir.w_sum / target_pdf;
-
+	update_reservoir(seed, reservoir, data, target_pdf / source_pdf);
+	calc_reservoir_W(reservoir, target_pdf);
 	reservoirs.d[pixel_idx] = reservoir;
 }

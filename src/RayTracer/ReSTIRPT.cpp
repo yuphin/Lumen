@@ -62,6 +62,7 @@ void ReSTIRPT::render() {
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
 	pc_ray.dir_light_idx = lumen_scene->dir_light_idx;
 	pc_ray.enable_accumulation = enable_accumulation;
+	pc_ray.num_spatial_samples = num_spatial_samples;
 	pc_ray.scene_extent = glm::length(lumen_scene->m_dimensions.max - lumen_scene->m_dimensions.min);
 	pc_ray.direct_lighting = direct_lighting;
 	pc_ray.enable_rr = enable_rr;
@@ -146,6 +147,7 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);
 	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
 	result |= ImGui::Checkbox("Show reconnection radiance", &show_reconnection_radiance);
+	result |= ImGui::SliderInt("Num spatial samples", (int*)&num_spatial_samples, 0, 12);
 	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
 	result |= ImGui::SliderFloat("Min reconnection distance ratio", &min_vertex_distance_ratio, 0.0f, 1.0f);

@@ -99,6 +99,11 @@ using uint = unsigned int;
 			debugPrintfEXT(str); \
 		}
 
+	#define LOG0(str) debugPrintfEXT(str);
+	#define LOG1(str, val) debugPrintfEXT(str, val);
+	#define LOG2(str, val, val2) debugPrintfEXT(str, val, val2);
+	#define LOG3(str, val, val2, val3) debugPrintfEXT(str, val, val2, val3);
+
 	#define ASSERT(cond) \
 		if(!(cond))  { \
 			debugPrintfEXT("Assertion failed on pixel %v2i\n", ivec2(gl_LaunchIDEXT.xy)); \
