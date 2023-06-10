@@ -25,6 +25,7 @@ struct PCReSTIRPT {
 	float spatial_radius;
 	float min_vertex_distance_ratio;
 	uint path_length;
+	uint buffer_idx;
 };
 
 
@@ -38,22 +39,25 @@ struct GBuffer {
 
 struct GrisData {
 	vec3 F; // Integrand
+	float src_pdf;
 	uvec4 init_seed;
-	uint postfix_length;
-	uint prefix_length;
-	// Reconnection vertex data
 	uvec4 rc_seed;
 	vec3 rc_pos;
+	uint postfix_length;
 	vec2 rc_uv;
+	uint prefix_length;
+	uint rc_side;
 	vec3 rc_ns;
+	float rc_g;
 	vec3 rc_wi;
 	uint rc_mat_id;
 	vec3 rc_postfix_L;
-	uint rc_side;
 	uint rc_nee_visible;
 	vec3 rc_nee_L;
+	float pad1;
 	// Debug
-	float src_pdf;
+	vec3 reservoir_contribution;
+	float pad2;
 };
 
 struct Reservoir {
@@ -61,6 +65,7 @@ struct Reservoir {
 	uint M;
 	float W;
 	float w_sum;
+	float pad;
 };
 
 NAMESPACE_END()

@@ -21,7 +21,7 @@ void ReSTIRPT::init() {
 								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-								 instance->width * instance->height * sizeof(Reservoir));
+								 2 * instance->width * instance->height * sizeof(Reservoir));
 
 	SceneDesc desc;
 	desc.vertex_addr = vertex_buffer.get_device_address();
@@ -43,6 +43,7 @@ void ReSTIRPT::init() {
 	pc_ray.total_frame_num = 0;
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
+	pc_ray.buffer_idx = 0;
 	assert(instance->vkb.rg->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_gbuffer_addr, &gris_gbuffer, instance->vkb.rg);
@@ -88,13 +89,11 @@ void ReSTIRPT::render() {
 											 .dims = {instance->width, instance->height},
 											 .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
+		.zero(gris_reservoir_buffer)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
-
-	instance->vkb.rg->run_and_submit(cmd);
-	cmd.begin();
 
 	// Spatial Reuse
 	instance->vkb.rg
@@ -120,6 +119,7 @@ void ReSTIRPT::render() {
 		.bind({output_tex, scene_desc_buffer});
 	pc_ray.total_frame_num++;
 	instance->vkb.rg->run_and_submit(cmd);
+	//pc_ray.buffer_idx = 1 - pc_ray.buffer_idx;
 }
 
 bool ReSTIRPT::update() {
@@ -151,8 +151,5 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
 	result |= ImGui::SliderFloat("Min reconnection distance ratio", &min_vertex_distance_ratio, 0.0f, 1.0f);
-	if (spatial_reuse_radius == 0.0f) {
-		enable_spatial_reuse = false;
-	}
 	return result;
 }

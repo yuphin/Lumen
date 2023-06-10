@@ -21,14 +21,29 @@ void init_reservoir(out Reservoir r) {
 void init_gris_data(out GrisData data) {
 	data.rc_mat_id = -1;
 	data.rc_postfix_L = vec3(0);
+	data.F = vec3(0);
+	data.reservoir_contribution = vec3(0);
 }
 
-void update_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData data, float w_i) {
+bool update_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData data, float w_i) {
 	r_new.w_sum += w_i;
 	r_new.M++;
-	if (rand(seed) < w_i / r_new.w_sum) {
+	if (rand(seed) * r_new.w_sum < w_i) {
 		r_new.gris_data = data;
+		return true;
 	}
+	return false;
+}
+
+bool stream_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData data, float w_i) {
+	r_new.M++;
+	return update_reservoir(seed, r_new, data, w_i);
+}
+
+bool combine_reservoir(inout uvec4 seed, inout Reservoir target_reservoir, const Reservoir input_reservoir, float w) {
+	float weight = w * input_reservoir.W;
+	target_reservoir.M += input_reservoir.M;
+	return update_reservoir(seed, target_reservoir, input_reservoir.gris_data, weight);
 }
 
 void calc_reservoir_W(inout Reservoir r, float target_pdf) {
@@ -47,3 +62,7 @@ bool is_rough(in Material mat) {
 }
 
 bool is_diffuse(in Material mat) { return (mat.bsdf_type & BSDF_DIFFUSE) != 0; }
+
+uint offset(const uint pingpong) {
+    return pingpong * pc_ray.size_x * pc_ray.size_y;
+}

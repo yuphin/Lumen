@@ -20,12 +20,12 @@ class ReSTIRPT : public Integrator {
 	bool enable_accumulation = true;
 	bool direct_lighting = false;
 	bool enable_rr = false;
-	bool enable_spatial_reuse = true; 
+	bool enable_spatial_reuse = false; 
 	bool show_reconnection_radiance = false;
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.01f;
 	uint32_t path_length = 0;
-	uint32_t num_spatial_samples = 3;
+	uint32_t num_spatial_samples = 1;
 
 	ReSTIRGIConfig* config;
 };

@@ -74,6 +74,11 @@ using uint = unsigned int;
 			debugPrintfEXT(str, args1, args2, args3); \
 		}
 
+	#define LOG_CLICKED4(str, args1, args2, args3, args4) \
+		if(ubo.debug_click == 1 && ivec2(gl_LaunchIDEXT.xy) == ubo.clicked_pos) { \
+			debugPrintfEXT(str, args1, args2, args3, args4); \
+		}
+
 	#define ASSERT_CLICKED_STR(cond, expected, str, val) \
 		if(ubo.debug_click == 1 && ivec2(gl_LaunchIDEXT.xy) == ubo.clicked_pos) { \
 			if(cond != expected)  {\

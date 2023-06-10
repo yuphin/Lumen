@@ -67,7 +67,7 @@ void combine_reservoir(inout Reservoir r1, const Reservoir r2,
 void main() {
     // TODO: Adaptively change this
     const uint pingpong = (pc_ray.total_frame_num % 2);
-    const float max_r = 3;
+    const float max_r = 10;
     const float dist_threshold = 0.01;
     const float angle_threshold = 25 * PI / 180;
     ReservoirSample q = samples.d[pixel_idx];
