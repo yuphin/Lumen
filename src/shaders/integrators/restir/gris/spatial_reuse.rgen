@@ -126,7 +126,7 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, float g_prev, vec3 dir
 			// Compute the direct lighting on the reconnection vertex
 			const Material rc_mat = load_material(data.rc_mat_id, data.rc_uv);
 			if (is_diffuse(rc_mat)) {
-				L_direct = data.rc_nee_L;
+				L_direct = data.rc_Li;
 			} else {
 				const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
 				L_direct +=
@@ -227,7 +227,7 @@ void main() {
 		float m_i = 0;
 		float target_pdf = 0;
 		if (connected) {
-			neighbor_reservoir.gris_data.prefix_contribution = prefix_contribution;
+			neighbor_reservoir.gris_data.F = prefix_contribution;
 			calc_reservoir_contribution(neighbor_reservoir.gris_data, L_direct, rc_wo, partial_throughput);
 			target_pdf = calc_target_pdf(neighbor_reservoir.gris_data.reservoir_contribution);
 			float m_i_num = neighbor_reservoir.M * neighbor_pdf;

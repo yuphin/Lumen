@@ -52,10 +52,9 @@ struct GrisData {
 	uint rc_mat_id;
 	vec3 rc_postfix_L;
 	uint rc_nee_visible;
-	vec3 rc_nee_L;
+	vec3 rc_Li;
 	float m_i;
 	vec3 reservoir_contribution;
-	vec3 prefix_contribution;
 };
 
 struct Reservoir {

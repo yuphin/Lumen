@@ -24,10 +24,9 @@ void init_gris_data(out GrisData data) {
 	data.prefix_length = 0;
 	data.rc_mat_id = -1;
 	data.rc_postfix_L = vec3(0);
-	data.rc_nee_L = vec3(0);
+	data.rc_Li = vec3(0);
 	data.rc_g = 0;
 	data.reservoir_contribution = vec3(0);
-	data.prefix_contribution = vec3(0);
 }
 
 bool update_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData data, float w_i) {
@@ -72,9 +71,9 @@ vec3 calc_reservoir_contribution(GrisData data, vec3 L_direct, vec3 wo, vec3 par
 }
 
 void calc_reservoir_integrand(inout Reservoir r) {
-	r.gris_data.F = r.gris_data.prefix_contribution;
 	if(r.W > 0) {
 		r.gris_data.F += r.gris_data.reservoir_contribution * r.W;
+
 	}
 }
 
