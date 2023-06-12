@@ -27,7 +27,7 @@ void main() {
 	GrisData data;
 	GBuffer gbuffer;
 	init_reservoir(reservoir);
-	init_gris_data(data);
+	init_data(data);
 	init_gbuffer(gbuffer);
 
 	bool specular = false;

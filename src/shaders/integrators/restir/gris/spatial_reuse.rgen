@@ -200,7 +200,7 @@ void main() {
 	float m_c = 1.0;
 
 	uint num_spatial_samples = pc_ray.enable_spatial_reuse == 1 ? pc_ray.num_spatial_samples : 0;
-	float curr_pdf = calc_target_pdf(canonical_reservoir.gris_data.reservoir_contribution);
+	float curr_pdf = calc_target_pdf(canonical_reservoir.data.reservoir_contribution);
 	uint valid_count = 0;
 	for (uint i = 0; i < num_spatial_samples; i++) {
 		ivec2 rand_offset = get_neighbor_offset(seed);
@@ -220,16 +220,16 @@ void main() {
 		bool neighbor_visible = false;
 		Reservoir neighbor_reservoir = reservoirs.d[offset(pc_ray.buffer_idx) + neighbor_pixel_idx];
 
-		bool connected = connect_vertex(gbuffer, neighbor_reservoir.gris_data, neighbor_reservoir.gris_data.rc_g,
-										primary_direction, neighbor_reservoir.gris_data.init_seed, prefix_contribution,
+		bool connected = connect_vertex(gbuffer, neighbor_reservoir.data, neighbor_reservoir.data.rc_g,
+										primary_direction, neighbor_reservoir.data.init_seed, prefix_contribution,
 										L_direct, partial_throughput, rc_wo, prefix_length, jacobian, neighbor_visible);
-		float neighbor_pdf = calc_target_pdf(neighbor_reservoir.gris_data.reservoir_contribution);
+		float neighbor_pdf = calc_target_pdf(neighbor_reservoir.data.reservoir_contribution);
 		float m_i = 0;
 		float target_pdf = 0;
 		if (connected) {
-			neighbor_reservoir.gris_data.F = prefix_contribution;
-			calc_reservoir_contribution(neighbor_reservoir.gris_data, L_direct, rc_wo, partial_throughput);
-			target_pdf = calc_target_pdf(neighbor_reservoir.gris_data.reservoir_contribution);
+			neighbor_reservoir.data.F = prefix_contribution;
+			calc_reservoir_contribution(neighbor_reservoir.data, L_direct, rc_wo, partial_throughput);
+			target_pdf = calc_target_pdf(neighbor_reservoir.data.reservoir_contribution);
 			float m_i_num = neighbor_reservoir.M * neighbor_pdf;
 			float m_i_denom = m_i_num + canonical_reservoir.M * target_pdf * jacobian / pc_ray.num_spatial_samples;
 			m_i = m_i_denom == 0 ? 0 : m_i_num / m_i_denom;
@@ -249,12 +249,12 @@ void main() {
 			float jacobian;
 			GBuffer neighbor_gbuffer = g_buffers.d[neighbor_pixel_idx];
 			bool connected =
-				connect_vertex(neighbor_gbuffer, canonical_reservoir.gris_data, canonical_reservoir.gris_data.rc_g,
-							   neighbor_primary_direction, canonical_reservoir.gris_data.init_seed, prefix_contribution,
+				connect_vertex(neighbor_gbuffer, canonical_reservoir.data, canonical_reservoir.data.rc_g,
+							   neighbor_primary_direction, canonical_reservoir.data.init_seed, prefix_contribution,
 							   L_direct, partial_throughput, rc_wo, prefix_length, jacobian, center_visible);
 			if (connected) {
 				vec3 neighbor_contribution =
-					calc_reservoir_contribution(canonical_reservoir.gris_data, L_direct, rc_wo, partial_throughput);
+					calc_reservoir_contribution(canonical_reservoir.data, L_direct, rc_wo, partial_throughput);
 				m_c_num = neighbor_reservoir.M * calc_target_pdf(neighbor_contribution) * jacobian;
 			}
 		}
@@ -275,7 +275,7 @@ void main() {
 		combine_reservoir(seed, reservoir, neighbor_reservoir, target_pdf * jacobian * m_i);
 	}
 	bool canonical = combine_reservoir(seed, reservoir, canonical_reservoir, curr_pdf * m_c);
-	float target_pdf = calc_target_pdf(reservoir.gris_data.reservoir_contribution);
+	float target_pdf = calc_target_pdf(reservoir.data.reservoir_contribution);
 	reservoir.W = target_pdf == 0.0 ? 0.0 : reservoir.w_sum / (target_pdf * (1 + num_valid_samples));
 	calc_reservoir_integrand(reservoir);
 	reservoirs.d[offset(1 - pc_ray.buffer_idx) + pixel_idx] = reservoir;

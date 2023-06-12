@@ -18,7 +18,7 @@ void init_reservoir(out Reservoir r) {
 	r.W = 0.0;
 	r.w_sum = 0.0;
 }
-void init_gris_data(out GrisData data) {
+void init_data(out GrisData data) {
 	data.F = vec3 (0);
 	data.postfix_length = 0;
 	data.prefix_length = 0;
@@ -33,7 +33,7 @@ bool update_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData da
 	r_new.w_sum += w_i;
 	r_new.M++;
 	if (rand(seed) * r_new.w_sum < w_i) {
-		r_new.gris_data = data;
+		r_new.data = data;
 		return true;
 	}
 	return false;
@@ -47,7 +47,7 @@ bool stream_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData da
 bool combine_reservoir(inout uvec4 seed, inout Reservoir target_reservoir, const Reservoir input_reservoir, float w) {
 	float weight = w * input_reservoir.W;
 	target_reservoir.M += input_reservoir.M;
-	return update_reservoir(seed, target_reservoir, input_reservoir.gris_data, weight);
+	return update_reservoir(seed, target_reservoir, input_reservoir.data, weight);
 }
 
 void calc_reservoir_W(inout Reservoir r, float target_pdf) {
@@ -72,7 +72,7 @@ vec3 calc_reservoir_contribution(GrisData data, vec3 L_direct, vec3 wo, vec3 par
 
 void calc_reservoir_integrand(inout Reservoir r) {
 	if(r.W > 0) {
-		r.gris_data.F += r.gris_data.reservoir_contribution * r.W;
+		r.data.F += r.data.reservoir_contribution * r.W;
 
 	}
 }

@@ -119,7 +119,6 @@ void ReSTIRPT::render() {
 		.bind({output_tex, scene_desc_buffer});
 	pc_ray.total_frame_num++;
 	instance->vkb.rg->run_and_submit(cmd);
-	//pc_ray.buffer_idx = 1 - pc_ray.buffer_idx;
 }
 
 bool ReSTIRPT::update() {

@@ -36,9 +36,9 @@ void main() {
 	}
 
 	if (pc_ray.show_reconnection_radiance == 1) {
-		col += r.gris_data.rc_postfix_L;
+		col += r.data.rc_postfix_L;
 	} else {
-		col += r.gris_data.F;
+		col += r.data.F;
 	}
 
 	if (pc_ray.enable_accumulation == 0 || pc_ray.frame_num == 0) {
