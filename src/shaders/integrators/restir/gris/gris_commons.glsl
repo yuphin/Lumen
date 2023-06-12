@@ -64,7 +64,6 @@ vec3 calc_reservoir_contribution(GrisData data, vec3 L_direct, vec3 wo, vec3 par
 	float cos_x = dot(data.rc_ns, data.rc_wi);
 	float bsdf_pdf;
 	vec3 result = L_direct;
-	// vec3 result = vec3(0.01);
 	const vec3 f = eval_bsdf(data.rc_ns, wo, rc_mat, 1, data.rc_side == 1, data.rc_wi, bsdf_pdf, cos_x);
 	if(bsdf_pdf > 0) {
 		result += f * abs(cos_x) * data.rc_postfix_L / bsdf_pdf;

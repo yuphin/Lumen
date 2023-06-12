@@ -109,8 +109,7 @@ void main() {
 		prev_rough = curr_rough;
 		curr_rough = is_rough(hit_mat);
 		bool connectable = !connectable_vertex_found &&
-						   ((prev_rough && curr_rough) &&
-							length(payload.pos - prev_pos) > pc_ray.min_vertex_distance_ratio * pc_ray.scene_extent);
+						   ((prev_rough && curr_rough));
 		prev_pos = payload.pos;
 		if (connectable) {
 			data.rc_seed = seed;
