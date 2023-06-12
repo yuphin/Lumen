@@ -113,8 +113,17 @@ using uint = unsigned int;
 		if(!(cond))  { \
 			debugPrintfEXT("Assertion failed on pixel %v2i\n", ivec2(gl_LaunchIDEXT.xy)); \
 		}
+
+	#define ASSERT0(cond, str) \
+		if(!(cond))  { \
+			debugPrintfEXT(str); \
+		}
+
+	#define ASSERT1(cond, str, val1) \
+		if(!(cond))  { \
+			debugPrintfEXT(str, val1); \
+		}
 		
-	#define ASSERT0() debugPrintfEXT("Assertion failed on pixel %v2i\n", ivec2(gl_LaunchIDEXT.xy));
 
 #endif
 

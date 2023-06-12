@@ -21,9 +21,7 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisDirectLi
 GrisReservoir reservoirs = GrisReservoir(scene_desc.gris_reservoir_addr);
 GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
 
-uint offset(const uint pingpong) {
-    return pingpong * pc_ray.size_x * pc_ray.size_y;
-}
+uint offset(const uint pingpong) { return pingpong * pc_ray.size_x * pc_ray.size_y; }
 
 void main() {
 	ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc_ray.size_y, gl_GlobalInvocationID.x % pc_ray.size_y);
@@ -33,15 +31,14 @@ void main() {
 	const uint pingpong = (pc_ray.total_frame_num % 2);
 	vec3 col = vec3(0);
 	const Reservoir r = reservoirs.d[offset(1 - pc_ray.buffer_idx) + gl_GlobalInvocationID.x];
-	if(pc_ray.direct_lighting == 1) {
+	if (pc_ray.direct_lighting == 1) {
 		col += direct_lighting_buffer.d[gl_GlobalInvocationID.x];
 	}
-	if (r.W > 0) {
-		if(pc_ray.show_reconnection_radiance == 1) {
-			col += r.gris_data.rc_postfix_L;
-		} else {
-			col += r.gris_data.F;
-		}
+
+	if (pc_ray.show_reconnection_radiance == 1) {
+		col += r.gris_data.rc_postfix_L;
+	} else {
+		col += r.gris_data.F;
 	}
 
 	if (pc_ray.enable_accumulation == 0 || pc_ray.frame_num == 0) {

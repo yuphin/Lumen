@@ -19,10 +19,15 @@ void init_reservoir(out Reservoir r) {
 	r.w_sum = 0.0;
 }
 void init_gris_data(out GrisData data) {
+	data.F = vec3 (0);
+	data.postfix_length = 0;
+	data.prefix_length = 0;
 	data.rc_mat_id = -1;
 	data.rc_postfix_L = vec3(0);
-	data.F = vec3(0);
+	data.rc_nee_L = vec3(0);
+	data.rc_g = 0;
 	data.reservoir_contribution = vec3(0);
+	data.prefix_contribution = vec3(0);
 }
 
 bool update_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData data, float w_i) {
@@ -52,6 +57,26 @@ void calc_reservoir_W(inout Reservoir r, float target_pdf) {
 
 float calc_target_pdf(vec3 f) {
 	return luminance(f);
+}
+
+vec3 calc_reservoir_contribution(GrisData data, vec3 L_direct, vec3 wo, vec3 partial_throughput) {
+	const Material rc_mat = load_material(data.rc_mat_id, data.rc_uv);
+	float cos_x = dot(data.rc_ns, data.rc_wi);
+	float bsdf_pdf;
+	vec3 result = L_direct;
+	// vec3 result = vec3(0.01);
+	const vec3 f = eval_bsdf(data.rc_ns, wo, rc_mat, 1, data.rc_side == 1, data.rc_wi, bsdf_pdf, cos_x);
+	if(bsdf_pdf > 0) {
+		result += f * abs(cos_x) * data.rc_postfix_L / bsdf_pdf;
+	}
+	return partial_throughput * result;
+}
+
+void calc_reservoir_integrand(inout Reservoir r) {
+	r.gris_data.F = r.gris_data.prefix_contribution;
+	if(r.W > 0) {
+		r.gris_data.F += r.gris_data.reservoir_contribution * r.W;
+	}
 }
 
 void init_gbuffer(out GBuffer gbuffer) { gbuffer.material_idx = -1; }

@@ -55,8 +55,8 @@ vec3 uniform_sample_light_with_visibility_override(inout uvec4 seed, const Mater
 }
 
 bool connect_vertex(in GBuffer gbuffer, in GrisData data, float g_prev, vec3 direction, uvec4 reservoir_seed,
-					out vec3 prefix_contribution, out vec3 reservoir_contribution, out uint prefix_length,
-					out float src_pdf, out float jacobian) {
+					out vec3 prefix_contribution, out vec3 L_direct, out vec3 partial_throughput, out vec3 rc_wo,
+					out uint prefix_length, out float jacobian, out bool visibility) {
 	if (data.rc_mat_id == -1) {
 		return false;
 	}
@@ -66,8 +66,7 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, float g_prev, vec3 dir
 	vec3 prefix_throughput = vec3(1);
 
 	prefix_contribution = vec3(0);
-	reservoir_contribution = vec3(0);
-	src_pdf = 1.0;
+	L_direct = vec3(0);
 
 	uint prefix_depth = 0;
 	vec3 n_s = gbuffer.n_s;
@@ -107,41 +106,34 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, float g_prev, vec3 dir
 			traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p,
 						0, wi, wi_len - EPS, 1);
 			connected = any_hit_payload.hit == 0;
+			visibility = connected;
 		}
 
 		if (connected) {
-			// Update the prefix throughput
-			float bsdf_pdf;
+			rc_wo = -wi;
+			float rc_pdf;
 			float cos_x = dot(n_s, wi);
-			vec3 f = eval_bsdf(n_s, wo, hit_mat, 1, side, wi, bsdf_pdf, cos_x);
-			// Compute the Jacobian
-			float g_curr = abs(cos_x) / (wi_len * wi_len);
-			float j = g_curr / g_prev;
-			if (bsdf_pdf == 0 || g_prev == 0) {
+			vec3 rc_f = eval_bsdf(n_s, wo, hit_mat, 1, side, wi, rc_pdf, cos_x);
+			if (rc_pdf == 0) {
 				return false;
 			}
-			src_pdf = bsdf_pdf;
+			// Compute the partial F
+			partial_throughput = rc_f * abs(cos_x);
+			// Compute the Jacobian
+			float g_curr = abs(dot(data.rc_ns, rc_wo)) / (wi_len * wi_len);
+			float j = g_prev == 0.0 ? 0.0 : g_curr / g_prev;
 			jacobian = j;
-			prefix_throughput *= f * abs(cos_x);
-			// Compute lighting on the connected vertex
+			// Compute the direct lighting on the reconnection vertex
 			const Material rc_mat = load_material(data.rc_mat_id, data.rc_uv);
 			if (is_diffuse(rc_mat)) {
-				reservoir_contribution += prefix_throughput * data.rc_nee_L;
-
+				L_direct = data.rc_nee_L;
 			} else {
 				const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
-				reservoir_contribution +=
-					prefix_throughput *
+				L_direct +=
 					uniform_sample_light_with_visibility_override(data.rc_seed, rc_mat, data.rc_pos, data.rc_side == 1,
 																  data.rc_ns, -wi, data.rc_nee_visible == 1) /
 					light_pick_pdf;
 			}
-
-			// Evaluate the contribution for the incoming radiance
-			cos_x = dot(data.rc_ns, data.rc_wi);
-			const vec3 rc_f = eval_bsdf(data.rc_ns, -wi, rc_mat, 1, data.rc_side == 1, data.rc_wi, bsdf_pdf, cos_x);
-
-			reservoir_contribution += prefix_throughput * rc_f * abs(cos_x) * data.rc_postfix_L / bsdf_pdf;
 			prefix_length = prefix_depth + 1;
 			return true;
 		}
@@ -208,70 +200,83 @@ void main() {
 	float m_c = 1.0;
 
 	uint num_spatial_samples = pc_ray.enable_spatial_reuse == 1 ? pc_ray.num_spatial_samples : 0;
+	float curr_pdf = calc_target_pdf(canonical_reservoir.gris_data.reservoir_contribution);
+	uint valid_count = 0;
 	for (uint i = 0; i < num_spatial_samples; i++) {
 		ivec2 rand_offset = get_neighbor_offset(seed);
-		const ivec2 coords = clamp(ivec2(gl_LaunchIDEXT.xy) + rand_offset, ivec2(0), ivec2(gl_LaunchSizeEXT.xy) - 1);
+		const ivec2 coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
 		const uint neighbor_pixel_idx = coords.x * pc_ray.size_y + coords.y;
 		if (any(lessThan(coords, ivec2(0))) || any(greaterThanEqual(coords, gl_LaunchSizeEXT.xy))) {
 			continue;
 		}
 		num_valid_samples++;
 
-		vec3 reservoir_contribution;
 		vec3 prefix_contribution;
+		vec3 L_direct;
+		vec3 rc_wo;
+		vec3 partial_throughput;
 		uint prefix_length;
-		float src_pdf;
 		float jacobian;
+		bool neighbor_visible = false;
 		Reservoir neighbor_reservoir = reservoirs.d[offset(pc_ray.buffer_idx) + neighbor_pixel_idx];
 
-		bool connected = connect_vertex(gbuffer, neighbor_reservoir.gris_data, canonical_reservoir.gris_data.rc_g,
+		bool connected = connect_vertex(gbuffer, neighbor_reservoir.gris_data, neighbor_reservoir.gris_data.rc_g,
 										primary_direction, neighbor_reservoir.gris_data.init_seed, prefix_contribution,
-										reservoir_contribution, prefix_length, src_pdf, jacobian);
-		float target_pdf = calc_target_pdf(reservoir_contribution);
+										L_direct, partial_throughput, rc_wo, prefix_length, jacobian, neighbor_visible);
 		float neighbor_pdf = calc_target_pdf(neighbor_reservoir.gris_data.reservoir_contribution);
-		if (connected && !isnan(target_pdf)) {
-			neighbor_reservoir.gris_data.F = prefix_contribution;
-			neighbor_reservoir.gris_data.reservoir_contribution = reservoir_contribution;
-		} else {
-			target_pdf = 0;
-			neighbor_reservoir.gris_data.reservoir_contribution = vec3(0);
-			neighbor_reservoir.gris_data.F = vec3(0);
+		float m_i = 0;
+		float target_pdf = 0;
+		if (connected) {
+			neighbor_reservoir.gris_data.prefix_contribution = prefix_contribution;
+			calc_reservoir_contribution(neighbor_reservoir.gris_data, L_direct, rc_wo, partial_throughput);
+			target_pdf = calc_target_pdf(neighbor_reservoir.gris_data.reservoir_contribution);
+			float m_i_num = neighbor_reservoir.M * neighbor_pdf;
+			float m_i_denom = m_i_num + canonical_reservoir.M * target_pdf * jacobian / pc_ray.num_spatial_samples;
+			m_i = m_i_denom == 0 ? 0 : m_i_num / m_i_denom;
 		}
-		float m_i_num = neighbor_reservoir.M * neighbor_pdf;
-		float m_i_denom = m_i_num + canonical_reservoir.M * target_pdf * jacobian / pc_ray.num_spatial_samples;
-		float m_i = m_i_denom == 0 ? 0 : m_i_num / m_i_denom;
 
-		float m_c_num;
-		{
+		float m_c_num = 0;
+		bool center_visible = false;
+		if (m_i > 0) {
 			const vec2 neighbor_uv = vec2(coords + vec2(0.5)) / vec2(gl_LaunchSizeEXT.xy);
 			const vec2 neighbor_d = neighbor_uv * 2.0 - 1.0;
 			vec3 neighbor_primary_direction = vec3(sample_camera(neighbor_d));
-			vec3 reservoir_contribution;
 			vec3 prefix_contribution;
+			vec3 L_direct;
+			vec3 rc_wo;
+			vec3 partial_throughput;
 			uint prefix_length;
-			float src_pdf;
 			float jacobian;
 			GBuffer neighbor_gbuffer = g_buffers.d[neighbor_pixel_idx];
-			connect_vertex(neighbor_gbuffer, canonical_reservoir.gris_data, neighbor_reservoir.gris_data.rc_g,
-						   neighbor_primary_direction, canonical_reservoir.gris_data.init_seed, prefix_contribution,
-						   reservoir_contribution, prefix_length, src_pdf, jacobian);
-
-			m_c_num = neighbor_reservoir.M * calc_target_pdf(reservoir_contribution) * jacobian;
+			bool connected =
+				connect_vertex(neighbor_gbuffer, canonical_reservoir.gris_data, canonical_reservoir.gris_data.rc_g,
+							   neighbor_primary_direction, canonical_reservoir.gris_data.init_seed, prefix_contribution,
+							   L_direct, partial_throughput, rc_wo, prefix_length, jacobian, center_visible);
+			if (connected) {
+				vec3 neighbor_contribution =
+					calc_reservoir_contribution(canonical_reservoir.gris_data, L_direct, rc_wo, partial_throughput);
+				m_c_num = neighbor_reservoir.M * calc_target_pdf(neighbor_contribution) * jacobian;
+			}
 		}
-		float m_c_denom = m_c_num + canonical_reservoir.M *
-										calc_target_pdf(canonical_reservoir.gris_data.reservoir_contribution) /
-										pc_ray.num_spatial_samples;
+		float m_c_denom = m_c_num + canonical_reservoir.M * curr_pdf / pc_ray.num_spatial_samples;
+		float m_c_val = m_c_denom == 0.0 ? 0.0 : m_c_num / m_c_denom;
+		if (m_c_val <= 0) {
+			m_i = 0;
+		}
 
-		m_c += 1 - m_c_num / m_c_denom;
+		if (neighbor_visible && center_visible) {
+			valid_count++;
+		}
+
+		ASSERT1(m_c_val > -1e-3 && m_c_val <= 1.001, "m_c_val <= 1.0 : %f\n", m_c_val);
+		ASSERT1(m_i > -1e-3 && m_i <= 1.001, "m_i <= 1.0 : %f\n", m_i);
+
+		m_c += 1.0 - m_c_val;
 		combine_reservoir(seed, reservoir, neighbor_reservoir, target_pdf * jacobian * m_i);
 	}
-	bool canonical = combine_reservoir(seed, reservoir, canonical_reservoir,
-									   calc_target_pdf(canonical_reservoir.gris_data.reservoir_contribution) * m_c);
+	bool canonical = combine_reservoir(seed, reservoir, canonical_reservoir, curr_pdf * m_c);
 	float target_pdf = calc_target_pdf(reservoir.gris_data.reservoir_contribution);
 	reservoir.W = target_pdf == 0.0 ? 0.0 : reservoir.w_sum / (target_pdf * (1 + num_valid_samples));
-	if (!canonical) {
-		reservoir.gris_data.F += reservoir.gris_data.reservoir_contribution * reservoir.W;
-	}
-
+	calc_reservoir_integrand(reservoir);
 	reservoirs.d[offset(1 - pc_ray.buffer_idx) + pixel_idx] = reservoir;
 }

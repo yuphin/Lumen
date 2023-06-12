@@ -39,7 +39,6 @@ struct GBuffer {
 
 struct GrisData {
 	vec3 F; // Integrand
-	float src_pdf;
 	uvec4 init_seed;
 	uvec4 rc_seed;
 	vec3 rc_pos;
@@ -54,10 +53,9 @@ struct GrisData {
 	vec3 rc_postfix_L;
 	uint rc_nee_visible;
 	vec3 rc_nee_L;
-	float pad1;
-	// Debug
+	float m_i;
 	vec3 reservoir_contribution;
-	float pad2;
+	vec3 prefix_contribution;
 };
 
 struct Reservoir {
@@ -65,7 +63,6 @@ struct Reservoir {
 	uint M;
 	float W;
 	float w_sum;
-	float pad;
 };
 
 NAMESPACE_END()
