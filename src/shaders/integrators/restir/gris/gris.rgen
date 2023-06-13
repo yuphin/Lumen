@@ -46,7 +46,7 @@ void main() {
 	float pdf;
 	float g = 0;
 	vec3 connection_wi = vec3(0);
-	vec3 connection_f_cos = vec3(0);
+	vec3 partial_throughput = vec3(0);
 	vec3 rc_partial_throughput = vec3(0);
 	for (int depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
@@ -121,7 +121,7 @@ void main() {
 			data.prefix_length = depth;
 			data.rc_g = g;
 			data.F = col;
-			rc_partial_throughput = connection_f_cos;
+			rc_partial_throughput = partial_throughput;
 
 			source_pdf = pdf;
 			connection_wi = direction;
@@ -153,12 +153,12 @@ void main() {
 			break;
 		}
 
-		connection_f_cos = f * abs(cos_theta);
-		vec3 t = connection_f_cos / pdf;
-		throughput *= t;
+		vec3 f_cos  = f * abs(cos_theta);
+		partial_throughput = throughput * f_cos;
+		throughput = partial_throughput / pdf;
 
 		if (connectable_vertex_found) {
-			postfix_throughput *= t;
+			postfix_throughput *= f_cos / pdf;
 		}
 
 		if (connectable) {

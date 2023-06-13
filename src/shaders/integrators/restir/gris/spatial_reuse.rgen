@@ -118,7 +118,7 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, float g_prev, vec3 dir
 				return false;
 			}
 			// Compute the partial F
-			partial_throughput = rc_f * abs(cos_x);
+			partial_throughput = prefix_throughput * rc_f * abs(cos_x);
 			// Compute the Jacobian
 			float g_curr = abs(dot(data.rc_ns, rc_wo)) / (wi_len * wi_len);
 			float j = g_prev == 0.0 ? 0.0 : g_curr / g_prev;
