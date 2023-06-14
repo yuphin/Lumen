@@ -283,6 +283,5 @@ void main() {
 		prefix_contribution = reservoir.data.F;
 	}
 	reservoir.data.F = prefix_contribution + calc_reservoir_integrand(reservoir);
-
 	reservoirs.d[offset(1 - pc_ray.buffer_idx) + pixel_idx] = reservoir;
 }

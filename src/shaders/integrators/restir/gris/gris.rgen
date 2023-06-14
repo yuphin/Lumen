@@ -56,10 +56,10 @@ void main() {
 		}
 		if (!found_isect) {
 			vec3 atmosphere_L = shade_atmosphere(pc_ray.dir_light_idx, pc_ray.sky_col, origin.xyz, direction, tmax);
-			if (pc_ray.direct_lighting == 1 && depth == 0) {
-				direct_lighting += throughput * atmosphere_L;
-			} else {
+			if (depth > 0) {
 				col += throughput * atmosphere_L;
+			} else if(pc_ray.direct_lighting == 1) {
+				direct_lighting += throughput * atmosphere_L;
 			}
 			if (connectable_vertex_found) {
 				data.rc_postfix_L += postfix_throughput * atmosphere_L;
@@ -204,6 +204,9 @@ void main() {
 	float target_pdf = calc_target_pdf(data.reservoir_contribution);
 	stream_reservoir(seed, reservoir, data, target_pdf / source_pdf);
 	calc_reservoir_W(reservoir, target_pdf);
+	if(!connectable_vertex_found) {
+		reservoir.data.F = col;
+	}
 	reservoirs.d[offset(pc_ray.buffer_idx) + pixel_idx] = reservoir;
 	g_buffers.d[pixel_idx] = gbuffer;
 }
