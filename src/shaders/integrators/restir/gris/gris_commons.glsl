@@ -70,11 +70,11 @@ vec3 calc_reservoir_contribution(GrisData data, vec3 L_direct, vec3 wo, vec3 par
 	return partial_throughput * result;
 }
 
-void calc_reservoir_integrand(inout Reservoir r) {
+vec3 calc_reservoir_integrand(in Reservoir r) {
 	if(r.W > 0) {
-		r.data.F += r.data.reservoir_contribution * r.W;
-
+		return r.data.reservoir_contribution * r.W;
 	}
+	return vec3(0);
 }
 
 void init_gbuffer(out GBuffer gbuffer) { gbuffer.material_idx = -1; }

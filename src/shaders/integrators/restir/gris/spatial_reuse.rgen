@@ -228,7 +228,8 @@ void main() {
 		float target_pdf = 0;
 		if (connected) {
 			neighbor_reservoir.data.F = prefix_contribution;
-			calc_reservoir_contribution(neighbor_reservoir.data, L_direct, rc_wo, partial_throughput);
+			neighbor_reservoir.data.reservoir_contribution =
+				calc_reservoir_contribution(neighbor_reservoir.data, L_direct, rc_wo, partial_throughput);
 			target_pdf = calc_target_pdf(neighbor_reservoir.data.reservoir_contribution);
 			float m_i_num = neighbor_reservoir.M * neighbor_pdf;
 			float m_i_denom = m_i_num + canonical_reservoir.M * target_pdf * jacobian / pc_ray.num_spatial_samples;
@@ -277,6 +278,11 @@ void main() {
 	bool canonical = combine_reservoir(seed, reservoir, canonical_reservoir, curr_pdf * m_c);
 	float target_pdf = calc_target_pdf(reservoir.data.reservoir_contribution);
 	reservoir.W = target_pdf == 0.0 ? 0.0 : reservoir.w_sum / (target_pdf * (1 + num_valid_samples));
-	calc_reservoir_integrand(reservoir);
+	vec3 prefix_contribution = canonical_reservoir.data.F;
+	if (reservoir.W > 0) {
+		prefix_contribution = reservoir.data.F;
+	}
+	reservoir.data.F = prefix_contribution + calc_reservoir_integrand(reservoir);
+
 	reservoirs.d[offset(1 - pc_ray.buffer_idx) + pixel_idx] = reservoir;
 }
