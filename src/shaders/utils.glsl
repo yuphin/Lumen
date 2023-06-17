@@ -133,6 +133,10 @@ float uint_to_float(uint x) {
     return uintBitsToFloat(0x3f800000 | (x >> 9)) - 1.0f;
 }
 
+uvec4 init_rng(uvec2 pixel_coords, uvec2 resolution, uint frame_num, uint state) {
+    return uvec4(pixel_coords.xy, frame_num, 0);
+}
+
 uvec4 init_rng(uvec2 pixel_coords, uvec2 resolution, uint frame_num) {
     return uvec4(pixel_coords.xy, frame_num, 0);
 }

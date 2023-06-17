@@ -39,21 +39,19 @@ struct GBuffer {
 
 struct GrisData {
 	vec3 F; // Integrand
-	uvec4 init_seed;
-	uvec4 rc_seed;
-	vec3 rc_pos;
-	uint postfix_length;
+	uint init_seed;
+	// Layout for the path flags
+	// | 5b postfix_length| 5b prefix_length |1b nee_visible |1b side|
+	uint path_flags;
 	vec2 rc_uv;
-	uint prefix_length;
-	uint rc_side;
 	vec3 rc_ns;
 	float rc_g;
+	uint rc_seed;
+	vec3 rc_pos;
 	vec3 rc_wi;
 	uint rc_mat_id;
 	vec3 rc_postfix_L;
-	uint rc_nee_visible;
 	vec3 rc_Li;
-	float m_i;
 	vec3 reservoir_contribution;
 };
 

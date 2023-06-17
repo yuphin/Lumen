@@ -109,14 +109,6 @@ void ReSTIRPT::render() {
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
-
-	// Output
-	instance->vkb.rg
-		->add_compute("GRIS - Output",
-					  {.shader = Shader("src/shaders/integrators/restir/gris/output.comp"),
-					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
-		.push_constants(&pc_ray)
-		.bind({output_tex, scene_desc_buffer});
 	pc_ray.total_frame_num++;
 	instance->vkb.rg->run_and_submit(cmd);
 }

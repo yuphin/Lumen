@@ -20,11 +20,8 @@ void init_reservoir(out Reservoir r) {
 }
 void init_data(out GrisData data) {
 	data.F = vec3 (0);
-	data.postfix_length = 0;
-	data.prefix_length = 0;
 	data.rc_mat_id = -1;
 	data.rc_postfix_L = vec3(0);
-	data.rc_Li = vec3(0);
 	data.rc_g = 0;
 	data.reservoir_contribution = vec3(0);
 }
@@ -63,7 +60,8 @@ vec3 calc_reservoir_contribution(GrisData data, vec3 L_direct, vec3 wo, vec3 par
 	float cos_x = dot(data.rc_ns, data.rc_wi);
 	float bsdf_pdf;
 	vec3 result = L_direct;
-	const vec3 f = eval_bsdf(data.rc_ns, wo, rc_mat, 1, data.rc_side == 1, data.rc_wi, bsdf_pdf, cos_x);
+	bool rc_side = (data.path_flags & 0x1F) == 1;
+	const vec3 f = eval_bsdf(data.rc_ns, wo, rc_mat, 1, rc_side, data.rc_wi, bsdf_pdf, cos_x);
 	if(bsdf_pdf > 0) {
 		result += f * abs(cos_x) * data.rc_postfix_L / bsdf_pdf;
 	}
@@ -88,4 +86,15 @@ bool is_diffuse(in Material mat) { return (mat.bsdf_type & BSDF_DIFFUSE) != 0; }
 
 uint offset(const uint pingpong) {
     return pingpong * pc_ray.size_x * pc_ray.size_y;
+}
+
+uint set_path_flags(bool side, bool nee_visible, uint prefix_length) {
+	return  (prefix_length & 0x1F) << 2 | uint(nee_visible) << 1 | uint(side);
+}
+
+void unpack_path_flags(uint packed_data, out bool side, out bool nee_visible, out uint prefix_length, out uint postfix_length) {
+	side = (packed_data & 0x1) == 1;
+	nee_visible = ((packed_data >> 1) & 0x1) == 1;
+	prefix_length = (packed_data >> 2) & 0x1F;
+	postfix_length = (packed_data >> 7) & 0x1F; 
 }

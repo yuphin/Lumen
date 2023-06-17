@@ -58,7 +58,7 @@ void main() {
 			vec3 atmosphere_L = shade_atmosphere(pc_ray.dir_light_idx, pc_ray.sky_col, origin.xyz, direction, tmax);
 			if (depth > 0) {
 				col += throughput * atmosphere_L;
-			} else if(pc_ray.direct_lighting == 1) {
+			} else if (pc_ray.direct_lighting == 1) {
 				direct_lighting += throughput * atmosphere_L;
 			}
 			if (connectable_vertex_found) {
@@ -102,27 +102,22 @@ void main() {
 		}
 
 		vec3 dist = payload.pos - origin.xyz;
-		g = abs(dot(n_s, -wo))/ dot(dist, dist);
+		g = abs(dot(n_s, -wo)) / dot(dist, dist);
 
 		origin.xyz = offset_ray(payload.pos, n_g);
 
 		prev_rough = curr_rough;
 		curr_rough = is_rough(hit_mat);
-		bool connectable = !connectable_vertex_found &&
-						   ((prev_rough && curr_rough));
+		bool connectable = !connectable_vertex_found && ((prev_rough && curr_rough));
 		prev_pos = payload.pos;
 		if (connectable) {
-			data.rc_seed = seed;
-			data.rc_pos = payload.pos;
+			data.rc_seed = seed.w;
 			data.rc_uv = payload.uv;
 			data.rc_ns = n_s;
 			data.rc_mat_id = payload.material_idx;
-			data.rc_side = uint(side);
-			data.prefix_length = depth;
 			data.rc_g = g;
 			data.F = col;
 			rc_partial_throughput = partial_throughput;
-
 			source_pdf = pdf;
 			connection_wi = direction;
 		}
@@ -143,7 +138,7 @@ void main() {
 		}
 
 		if (depth == 0) {
-			data.init_seed = seed;
+			data.init_seed = seed.w;
 		}
 
 		// Sample direction & update throughput
@@ -153,7 +148,7 @@ void main() {
 			break;
 		}
 
-		vec3 f_cos  = f * abs(cos_theta);
+		vec3 f_cos = f * abs(cos_theta);
 		partial_throughput = throughput * f_cos;
 		throughput = partial_throughput / pdf;
 
@@ -163,9 +158,10 @@ void main() {
 
 		if (connectable) {
 			data.rc_wi = direction;
-			data.rc_nee_visible = uint(nee_visible);
+			data.rc_pos = payload.pos;
 			data.rc_Li = rc_Li;
 			connectable_vertex_found = true;
+			data.path_flags = set_path_flags(side, nee_visible, depth);
 		}
 
 		specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
@@ -198,13 +194,13 @@ void main() {
 	if (isnan(luminance(col))) {
 		return;
 	}
-	data.postfix_length = postfix_length;
+	data.path_flags = (postfix_length & 0x1F) << 7 | data.path_flags;
 	data.reservoir_contribution = calc_reservoir_contribution(data, data.rc_Li, -connection_wi, rc_partial_throughput);
 
 	float target_pdf = calc_target_pdf(data.reservoir_contribution);
 	stream_reservoir(seed, reservoir, data, target_pdf / source_pdf);
 	calc_reservoir_W(reservoir, target_pdf);
-	if(!connectable_vertex_found) {
+	if (!connectable_vertex_found) {
 		reservoir.data.F = col;
 	}
 	reservoirs.d[offset(pc_ray.buffer_idx) + pixel_idx] = reservoir;
