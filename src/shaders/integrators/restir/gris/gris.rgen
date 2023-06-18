@@ -13,6 +13,7 @@
 GrisReservoir reservoirs = GrisReservoir(scene_desc.gris_reservoir_addr);
 GrisGBuffer g_buffers = GrisGBuffer(scene_desc.gris_gbuffer_addr);
 GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
+PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
 
 void main() {
 	const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
@@ -48,6 +49,7 @@ void main() {
 	vec3 connection_wi = vec3(0);
 	vec3 partial_throughput = vec3(0);
 	vec3 rc_partial_throughput = vec3(0);
+	vec3 prefix_contribution = vec3(0);
 	for (int depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.material_idx != -1;
@@ -116,7 +118,7 @@ void main() {
 			data.rc_ns = n_s;
 			data.rc_mat_id = payload.material_idx;
 			data.rc_g = g;
-			data.F = col;
+			prefix_contribution = col;
 			rc_partial_throughput = partial_throughput;
 			source_pdf = pdf;
 			connection_wi = direction;
@@ -201,8 +203,9 @@ void main() {
 	stream_reservoir(seed, reservoir, data, target_pdf / source_pdf);
 	calc_reservoir_W(reservoir, target_pdf);
 	if (!connectable_vertex_found) {
-		reservoir.data.F = col;
+		prefix_contribution = col;
 	}
-	reservoirs.d[offset(pc_ray.buffer_idx) + pixel_idx] = reservoir;
+	prefix_contributions.d[pixel_idx] = prefix_contribution;
+	reservoirs.d[pixel_idx] = reservoir;
 	g_buffers.d[pixel_idx] = gbuffer;
 }

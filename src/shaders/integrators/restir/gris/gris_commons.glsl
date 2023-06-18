@@ -4,6 +4,7 @@ layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc_ray; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisReservoir { Reservoir d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisGBuffer { GBuffer d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisDirectLighting { vec3 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PrefixContributions { vec3 d[]; };
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
@@ -19,7 +20,6 @@ void init_reservoir(out Reservoir r) {
 	r.w_sum = 0.0;
 }
 void init_data(out GrisData data) {
-	data.F = vec3 (0);
 	data.rc_mat_id = -1;
 	data.rc_postfix_L = vec3(0);
 	data.rc_g = 0;

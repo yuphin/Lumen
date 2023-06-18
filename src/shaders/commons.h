@@ -267,6 +267,7 @@ struct Material {
 	uint64_t gris_gbuffer_addr;
 	uint64_t gris_reservoir_addr;
 	uint64_t gris_direct_lighting_addr;
+	uint64_t prefix_contributions_addr;
 
 	// VCM Reservoir
 	uint64_t vcm_reservoir_addr;

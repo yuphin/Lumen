@@ -16,6 +16,7 @@ class ReSTIRPT : public Integrator {
 	Buffer direct_lighting_buffer;
 	Buffer gris_gbuffer;
 	Buffer gris_reservoir_buffer;
+	Buffer prefix_contribution_buffer;
 	PCReSTIRPT pc_ray{};
 	bool enable_accumulation = false;
 	bool direct_lighting = false;
