@@ -57,12 +57,15 @@ vec3 uniform_sample_light_with_visibility_override(inout uvec4 seed, const Mater
 	return res;
 }
 
-bool connect_vertex(in GBuffer gbuffer, in GrisData data, float g_prev, vec3 direction, uvec2 coords,
-					out vec3 prefix_contribution, out vec3 L_direct, out vec3 partial_throughput, out vec3 rc_wo,
-					out uint prefix_length, out float jacobian, out bool visibility) {
+bool retrace_paths(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords,
+				   out vec3 prefix_contribution, out float jacobian, out vec3 reservoir_contribution) {
 	if (data.rc_mat_id == -1) {
 		return false;
 	}
+
+	const vec2 uv = vec2(source_coords + vec2(0.5)) / vec2(gl_LaunchSizeEXT.xy);
+	const vec2 d = uv * 2.0 - 1.0;
+	vec3 direction = vec3(sample_camera(d));
 
 	bool rc_side;
 	bool rc_nee_visible;
@@ -71,32 +74,33 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, float g_prev, vec3 dir
 	unpack_path_flags(data.path_flags, rc_side, rc_nee_visible, reservoir_prefix_length, reservoir_postfix_length);
 
 	Material hit_mat = load_material(gbuffer.material_idx, gbuffer.uv);
-	vec3 pos = gbuffer.pos;
 	vec3 prefix_throughput = vec3(1);
 
 	prefix_contribution = vec3(0);
-	L_direct = vec3(0);
 
 	uint prefix_depth = 0;
-	vec3 n_s = gbuffer.n_s;
-	bool side = true;
-	vec3 n_g = gbuffer.n_g;
-	vec3 wo = -direction;
 	bool specular = false;
 
-	if (dot(n_g, wo) < 0.) n_g = -n_g;
-	if (dot(n_g, n_s) < 0) {
-		n_s = -n_s;
-		side = false;
-	}
-	vec3 origin = offset_ray(gbuffer.pos, n_g);
+	vec3 n_s = gbuffer.n_s;
+	vec3 n_g = gbuffer.n_g;
+	vec3 pos = gbuffer.pos;
+
 	uvec4 reservoir_seed =
-		init_rng(coords, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num, data.init_seed);
+		init_rng(target_coords, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num, data.init_seed);
 
 	while (true) {
 		if ((prefix_depth + reservoir_postfix_length) >= pc_ray.max_depth - 1) {
 			return false;
 		}
+
+		vec3 wo = -direction;
+		bool side = true;
+		if (dot(n_g, wo) < 0.) n_g = -n_g;
+		if (dot(n_g, n_s) < 0) {
+			n_s = -n_s;
+			side = false;
+		}
+		vec3 origin = offset_ray(pos, n_g);
 
 		vec3 wi = data.rc_pos - pos;
 		float wi_len = length(wi);
@@ -118,11 +122,9 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, float g_prev, vec3 dir
 			traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p,
 						0, wi, wi_len - EPS, 1);
 			connected = any_hit_payload.hit == 0;
-			visibility = connected;
 		}
 
 		if (connected) {
-			rc_wo = -wi;
 			float rc_pdf;
 			float cos_x = dot(n_s, wi);
 			vec3 rc_f = eval_bsdf(n_s, wo, hit_mat, 1, side, wi, rc_pdf, cos_x);
@@ -130,24 +132,34 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, float g_prev, vec3 dir
 				return false;
 			}
 			// Compute the partial F
-			partial_throughput = prefix_throughput * rc_f * abs(cos_x);
+			vec3 partial_throughput = prefix_throughput * rc_f * abs(cos_x);
 			// Compute the Jacobian
-			float g_curr = abs(dot(data.rc_ns, rc_wo)) / (wi_len * wi_len);
-			float j = g_prev == 0.0 ? 0.0 : g_curr / g_prev;
+			float g_curr = abs(dot(data.rc_ns, wi)) / (wi_len * wi_len);
+			float j = data.rc_g == 0.0 ? 0.0 : g_curr / data.rc_g;
 			jacobian = j;
 			// Compute the direct lighting on the reconnection vertex
 			const Material rc_mat = load_material(data.rc_mat_id, data.rc_uv);
+
+			vec3 L_direct;
 			if (is_diffuse(rc_mat)) {
 				L_direct = data.rc_Li;
 			} else {
 				const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
-				uvec4 reconnection_seed =
-					init_rng(coords, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num, data.rc_seed);
-				L_direct += uniform_sample_light_with_visibility_override(reconnection_seed, rc_mat, data.rc_pos,
-																		  rc_side, data.rc_ns, -wi, rc_nee_visible) /
-							light_pick_pdf;
+				uvec4 reconnection_seed = init_rng(target_coords, gl_LaunchSizeEXT.xy,
+												   pc_ray.total_frame_num ^ pc_ray.random_num, data.rc_seed);
+				L_direct = uniform_sample_light_with_visibility_override(reconnection_seed, rc_mat, data.rc_pos,
+																		 rc_side, data.rc_ns, -wi, rc_nee_visible) /
+						   light_pick_pdf;
 			}
-			prefix_length = prefix_depth + 1;
+
+			float rc_cos_x = dot(data.rc_ns, data.rc_wi);
+			float bsdf_pdf;
+			reservoir_contribution = L_direct;
+			const vec3 f = eval_bsdf(data.rc_ns, wo, rc_mat, 1, rc_side, data.rc_wi, bsdf_pdf, rc_cos_x);
+			if (bsdf_pdf > 0) {
+				reservoir_contribution += f * abs(rc_cos_x) * data.rc_postfix_L / bsdf_pdf;
+			}
+			reservoir_contribution = partial_throughput * reservoir_contribution;
 			return true;
 		}
 
@@ -173,17 +185,8 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, float g_prev, vec3 dir
 			prefix_contribution += prefix_throughput * hit_mat.emissive_factor;
 		}
 
-		wo = -direction;
 		n_s = payload.n_s;
-		side = true;
 		n_g = payload.n_g;
-		if (dot(payload.n_g, wo) < 0.) n_g = -n_g;
-		if (dot(n_g, payload.n_s) < 0) {
-			n_s = -n_s;
-			side = false;
-		}
-
-		origin = offset_ray(payload.pos, n_g);
 		pos = payload.pos;
 
 		prefix_depth++;
@@ -192,30 +195,36 @@ bool connect_vertex(in GBuffer gbuffer, in GrisData data, float g_prev, vec3 dir
 	return false;
 }
 
-void main() {
-	const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
-	const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
-	vec2 d = in_uv * 2.0 - 1.0;
-	vec3 primary_direction = vec3(sample_camera(d));
-	GBuffer gbuffer = g_buffers.d[pixel_idx];
+bool retrace_paths_and_evaluate(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords,
+								out float target_pdf) {
+	vec3 unused;
+	vec3 reservoir_contribution;
+	float jacobian;
+	bool result = retrace_paths(gbuffer, data, source_coords, target_coords, unused, jacobian, reservoir_contribution);
+	target_pdf = calc_target_pdf(reservoir_contribution) * jacobian;
+	return result;
+}
 
+void main() {
+	GBuffer gbuffer = g_buffers.d[pixel_idx];
 	if (gbuffer.material_idx == -1) {
 		return;
 	}
-
-	uint num_valid_samples = 0;
 
 	Reservoir reservoir;
 	init_reservoir(reservoir);
 
 	Reservoir canonical_reservoir = reservoirs.d[pixel_idx];
 
-	float m_c = 1.0;
-
-	uint num_spatial_samples = pc_ray.enable_spatial_reuse == 1 ? pc_ray.num_spatial_samples : 0;
-	float curr_pdf = calc_target_pdf(canonical_reservoir.data.reservoir_contribution);
 	const vec3 canonical_prefix_contribution = prefix_contributions.d[pixel_idx];
+	const vec3 canonical_reservoir_contribution = canonical_reservoir.data.reservoir_contribution;
+	
+	uint num_spatial_samples = pc_ray.enable_spatial_reuse == 1 ? pc_ray.num_spatial_samples : 0;
 	vec3 curr_prefix_contribution = canonical_prefix_contribution;
+	vec3 curr_reservoir_contribution = canonical_reservoir_contribution;
+	float m_c = 1.0;
+	const float canonical_in_canonical_pdf = calc_target_pdf(canonical_reservoir_contribution);
+	uint num_valid_samples = 0;
 	for (uint i = 0; i < num_spatial_samples; i++) {
 		ivec2 rand_offset = get_neighbor_offset(seed);
 		const ivec2 coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
@@ -225,74 +234,70 @@ void main() {
 		}
 		num_valid_samples++;
 
+		const Reservoir neighbor_reservoir = reservoirs.d[neighbor_pixel_idx];
 		vec3 prefix_contribution;
-		vec3 L_direct;
-		vec3 rc_wo;
-		vec3 partial_throughput;
-		uint prefix_length;
+		vec3 reservoir_contribution;
 		float jacobian;
-		bool neighbor_visible = false;
-		Reservoir neighbor_reservoir = reservoirs.d[neighbor_pixel_idx];
+		bool neighbor_in_canonical = retrace_paths(gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy, uvec2(coords),
+												   prefix_contribution, jacobian, reservoir_contribution);
 
-		bool connected = connect_vertex(gbuffer, neighbor_reservoir.data, neighbor_reservoir.data.rc_g,
-										primary_direction, uvec2(coords), prefix_contribution, L_direct,
-										partial_throughput, rc_wo, prefix_length, jacobian, neighbor_visible);
-		float neighbor_pdf = calc_target_pdf(neighbor_reservoir.data.reservoir_contribution);
-		float m_i = 0;
-		float target_pdf = 0;
-		if (connected) {
-			neighbor_reservoir.data.reservoir_contribution =
-				calc_reservoir_contribution(neighbor_reservoir.data, L_direct, rc_wo, partial_throughput);
-			target_pdf = calc_target_pdf(neighbor_reservoir.data.reservoir_contribution);
-			float m_i_num = neighbor_reservoir.M * neighbor_pdf;
-			float m_i_denom = m_i_num + canonical_reservoir.M * target_pdf * jacobian / pc_ray.num_spatial_samples;
-			m_i = m_i_denom == 0 ? 0 : m_i_num / m_i_denom;
+		if (!neighbor_in_canonical) {
+			reservoir.M += neighbor_reservoir.M;
+			m_c += 1.0;
+			continue;
+		}
+		float neighbor_in_neighbor_pdf = calc_target_pdf(neighbor_reservoir.data.reservoir_contribution);
+		float neighbor_in_canonical_pdf = calc_target_pdf(reservoir_contribution) * jacobian;
+		const float m_i_num = neighbor_reservoir.M * neighbor_in_neighbor_pdf;
+		const float m_i_denom =
+			m_i_num + canonical_reservoir.M * neighbor_in_canonical_pdf / pc_ray.num_spatial_samples;
+		const float m_i = m_i_denom == 0 ? 0 : m_i_num / m_i_denom;
+		if (m_i <= 0) {
+			reservoir.M += neighbor_reservoir.M;
+			m_c += 1.0;
+			continue;
+		}
+		GBuffer neighbor_gbuffer = g_buffers.d[neighbor_pixel_idx];
+		float canonical_in_neighbor_pdf;
+		bool canonical_in_neighbor = retrace_paths_and_evaluate(
+			neighbor_gbuffer, canonical_reservoir.data, uvec2(coords), gl_LaunchIDEXT.xy, canonical_in_neighbor_pdf);
+		if (!canonical_in_neighbor) {
+			reservoir.M += neighbor_reservoir.M;
+			m_c += 1.0;
+			continue;
 		}
 
-		float m_c_num = 0;
-		bool center_visible = false;
-		if (m_i > 0) {
-			const vec2 neighbor_uv = vec2(coords + vec2(0.5)) / vec2(gl_LaunchSizeEXT.xy);
-			const vec2 neighbor_d = neighbor_uv * 2.0 - 1.0;
-			vec3 neighbor_primary_direction = vec3(sample_camera(neighbor_d));
-			vec3 prefix_contribution;
-			vec3 L_direct;
-			vec3 rc_wo;
-			vec3 partial_throughput;
-			uint prefix_length;
-			float jacobian;
-			GBuffer neighbor_gbuffer = g_buffers.d[neighbor_pixel_idx];
-			bool connected =
-				connect_vertex(neighbor_gbuffer, canonical_reservoir.data, canonical_reservoir.data.rc_g,
-							   neighbor_primary_direction, uvec2(gl_LaunchIDEXT.xy), prefix_contribution, L_direct,
-							   partial_throughput, rc_wo, prefix_length, jacobian, center_visible);
-			if (connected) {
-				vec3 neighbor_contribution =
-					calc_reservoir_contribution(canonical_reservoir.data, L_direct, rc_wo, partial_throughput);
-				m_c_num = neighbor_reservoir.M * calc_target_pdf(neighbor_contribution) * jacobian;
-			}
-		}
-		float m_c_denom = m_c_num + canonical_reservoir.M * curr_pdf / pc_ray.num_spatial_samples;
-		float m_c_val = m_c_denom == 0.0 ? 0.0 : m_c_num / m_c_denom;
+		const float m_c_num = neighbor_reservoir.M * canonical_in_neighbor_pdf;
+
+		const float m_c_denom =
+			m_c_num + canonical_reservoir.M * canonical_in_canonical_pdf / pc_ray.num_spatial_samples;
+		const float m_c_val = m_c_denom == 0.0 ? 0.0 : m_c_num / m_c_denom;
 		if (m_c_val <= 0) {
-			m_i = 0;
+			reservoir.M += neighbor_reservoir.M;
+			m_c += 1.0;
+			continue;
 		}
+		m_c += 1.0 - m_c_val;
 		ASSERT1(m_c_val > -1e-3 && m_c_val <= 1.001, "m_c_val <= 1.0 : %f\n", m_c_val);
 		ASSERT1(m_i > -1e-3 && m_i <= 1.001, "m_i <= 1.0 : %f\n", m_i);
-
-		m_c += 1.0 - m_c_val;
-		bool accepted = combine_reservoir(seed, reservoir, neighbor_reservoir, target_pdf * jacobian * m_i);
-		if(accepted) {
+		bool accepted = combine_reservoir(seed, reservoir, neighbor_reservoir, neighbor_in_canonical_pdf * m_i);
+		if (accepted) {
 			curr_prefix_contribution = prefix_contribution;
+			curr_reservoir_contribution = reservoir_contribution;
 		}
 	}
-	bool canonical = combine_reservoir(seed, reservoir, canonical_reservoir, curr_pdf * m_c);
-	float target_pdf = calc_target_pdf(reservoir.data.reservoir_contribution);
-	reservoir.W = target_pdf == 0.0 ? 0.0 : reservoir.w_sum / (target_pdf * (1 + num_valid_samples));
-	if(canonical) {
+	bool canonical = combine_reservoir(seed, reservoir, canonical_reservoir, canonical_in_canonical_pdf * m_c);
+	if (canonical) {
 		curr_prefix_contribution = canonical_prefix_contribution;
+		curr_reservoir_contribution = canonical_reservoir_contribution;
 	}
-	vec3 final_contribution = curr_prefix_contribution + calc_reservoir_integrand(reservoir);
+	const float target_pdf = calc_target_pdf(curr_reservoir_contribution);
+	reservoir.W = target_pdf == 0.0 ? 0.0 : reservoir.w_sum / (target_pdf * (1 + num_valid_samples));
+
+	vec3 final_contribution = curr_prefix_contribution;
+	if (reservoir.W > 0) {
+		final_contribution += curr_reservoir_contribution * reservoir.W;
+	}
 
 	vec3 col = vec3(0);
 	if (pc_ray.direct_lighting == 1) {
@@ -309,7 +314,7 @@ void main() {
 		imageStore(image, ivec2(coords), vec4(col, 1.f));
 	} else {
 		float w = 1. / float(pc_ray.frame_num + 1);
-			vec3 old_col = imageLoad(image, ivec2(coords)).xyz;
-			imageStore(image, ivec2(coords), vec4(mix(old_col, col, w), 1.f));
+		vec3 old_col = imageLoad(image, ivec2(coords)).xyz;
+		imageStore(image, ivec2(coords), vec4(mix(old_col, col, w), 1.f));
 	}
 }
