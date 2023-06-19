@@ -61,4 +61,11 @@ struct Reservoir {
 	float w_sum;
 };
 
+struct ReconnectionData {
+	vec3 prefix_contribution;
+	float jacobian;
+	vec3 reservoir_contribution;
+	float target_pdf_in_neighbor;
+};
+
 NAMESPACE_END()

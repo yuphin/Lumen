@@ -17,12 +17,14 @@ class ReSTIRPT : public Integrator {
 	Buffer gris_gbuffer;
 	Buffer gris_reservoir_buffer;
 	Buffer prefix_contribution_buffer;
+	Buffer reconnection_buffer;
 	PCReSTIRPT pc_ray{};
 	bool enable_accumulation = false;
 	bool direct_lighting = false;
 	bool enable_rr = false;
 	bool enable_spatial_reuse = true; 
 	bool show_reconnection_radiance = false;
+	bool enable_mis_in_gris = false;
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.01f;
 	uint32_t path_length = 0;

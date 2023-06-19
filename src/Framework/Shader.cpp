@@ -472,7 +472,7 @@ static std::vector<uint32_t> compile_file(const std::string& source_name, shader
 		if (macro.has_val) {
 			options.AddMacroDefinition(macro.name, std::to_string(macro.val));
 			
-		} else {
+		} else if(!macro.name.empty()) {
 			options.AddMacroDefinition(macro.name);
 		}
 	}

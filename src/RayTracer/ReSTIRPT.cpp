@@ -23,10 +23,16 @@ void ReSTIRPT::init() {
 								 instance->width * instance->height * sizeof(Reservoir));
 
 	prefix_contribution_buffer.create("Prefix Contributions", &instance->vkb.ctx,
-								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-									 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-								 instance->width * instance->height * sizeof(glm::vec3));
+									  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+										  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+									  instance->width * instance->height * sizeof(glm::vec3));
+
+	reconnection_buffer.create("Reservoir Connection", &instance->vkb.ctx,
+							   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+							   instance->width * instance->height * sizeof(ReconnectionData));
 
 	SceneDesc desc;
 	desc.vertex_addr = vertex_buffer.get_device_address();
@@ -40,6 +46,7 @@ void ReSTIRPT::init() {
 	desc.gris_reservoir_addr = gris_reservoir_buffer.get_device_address();
 	desc.gris_direct_lighting_addr = direct_lighting_buffer.get_device_address();
 	desc.prefix_contributions_addr = prefix_contribution_buffer.get_device_address();
+	desc.reconnection_addr = reconnection_buffer.get_device_address();
 	scene_desc_buffer.create(
 		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
@@ -55,6 +62,7 @@ void ReSTIRPT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_gbuffer_addr, &gris_gbuffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, &gris_reservoir_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, &direct_lighting_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, reconnection_addr, &reconnection_buffer, instance->vkb.rg);
 
 	path_length = config->path_length;
 }
@@ -85,6 +93,7 @@ void ReSTIRPT::render() {
 		scene_desc_buffer,
 	};
 
+	const std::vector<ShaderMacro> macros = {{"MIS", enable_mis_in_gris}};
 	// Trace rays
 	instance->vkb.rg
 		->add_rt("GRIS - Generate Samples", {.shaders = {{"src/shaders/integrators/restir/gris/gris.rgen"},
@@ -92,6 +101,7 @@ void ReSTIRPT::render() {
 														 {"src/shaders/ray_shadow.rmiss"},
 														 {"src/shaders/ray.rchit"},
 														 {"src/shaders/ray.rahit"}},
+											 .macros = macros,
 											 .dims = {instance->width, instance->height},
 											 .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
@@ -101,20 +111,53 @@ void ReSTIRPT::render() {
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 
-	// Spatial Reuse
+	// Retrace
 	instance->vkb.rg
-		->add_rt("GRIS - Spatial Reuse", {.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse.rgen"},
-													  {"src/shaders/ray.rmiss"},
-													  {"src/shaders/ray_shadow.rmiss"},
-													  {"src/shaders/ray.rchit"},
-													  {"src/shaders/ray.rahit"}},
-										  .dims = {instance->width, instance->height},
-										  .accel = instance->vkb.tlas.accel})
+		->add_rt("GRIS - Retrace Reservoirs", {.shaders = {{"src/shaders/integrators/restir/gris/retrace_paths.rgen"},
+														   {"src/shaders/ray.rmiss"},
+														   {"src/shaders/ray_shadow.rmiss"},
+														   {"src/shaders/ray.rchit"},
+														   {"src/shaders/ray.rahit"}},
+											   .macros = macros,
+											   .dims = {instance->width, instance->height},
+											   .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
+
+	// Validate
+	instance->vkb.rg
+		->add_rt("GRIS - Validate Samples", {.shaders = {{"src/shaders/integrators/restir/gris/validate_samples.rgen"},
+														 {"src/shaders/ray.rmiss"},
+														 {"src/shaders/ray_shadow.rmiss"},
+														 {"src/shaders/ray.rchit"},
+														 {"src/shaders/ray.rahit"}},
+											 .macros = macros,
+											 .dims = {instance->width, instance->height},
+											 .accel = instance->vkb.tlas.accel})
+		.push_constants(&pc_ray)
+		.bind(rt_bindings)
+		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
+		.bind_tlas(instance->vkb.tlas);
+
+	// Spatial Reuse
+	//instance->vkb.rg
+	//	->add_rt("GRIS - Spatial Reuse", {.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse.rgen"},
+	//												  {"src/shaders/ray.rmiss"},
+	//												  {"src/shaders/ray_shadow.rmiss"},
+	//												  {"src/shaders/ray.rchit"},
+	//												  {"src/shaders/ray.rahit"}},
+	//									  .macros = macros,
+	//									  .dims = {instance->width, instance->height},
+	//									  .accel = instance->vkb.tlas.accel})
+	//	.push_constants(&pc_ray)
+	//	.bind(rt_bindings)
+	//	.bind(mesh_lights_buffer)
+	//	.bind_texture_array(scene_textures)
+	//	.bind_tlas(instance->vkb.tlas);
 	pc_ray.total_frame_num++;
 	instance->vkb.rg->run_and_submit(cmd);
 }
@@ -144,6 +187,7 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);
 	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
 	result |= ImGui::Checkbox("Show reconnection radiance", &show_reconnection_radiance);
+	result |= ImGui::Checkbox("Enable MIS in GRIS", &enable_mis_in_gris);
 	result |= ImGui::SliderInt("Num spatial samples", (int*)&num_spatial_samples, 0, 12);
 	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
