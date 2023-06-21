@@ -34,11 +34,11 @@ void main() {
 		if (any(lessThan(coords, ivec2(0))) || any(greaterThanEqual(coords, gl_LaunchSizeEXT.xy))) {
 			continue;
 		}
-		GBuffer neighbor_gbuffer = g_buffers.d[neighbor_pixel_idx];	
+		GBuffer neighbor_gbuffer = g_buffers.d[neighbor_pixel_idx];
 		float target_pdf_in_neighbor;
-		bool canonical_in_neighbor = retrace_paths_and_evaluate(neighbor_gbuffer, canonical_reservoir.data,
-																uvec2(coords), gl_LaunchIDEXT.xy, target_pdf_in_neighbor);
-		if(!canonical_in_neighbor) {
+		bool canonical_in_neighbor = retrace_paths_and_evaluate(
+			neighbor_gbuffer, canonical_reservoir.data, uvec2(coords), gl_LaunchIDEXT.xy, target_pdf_in_neighbor);
+		if (!canonical_in_neighbor) {
 			target_pdf_in_neighbor = 0;
 		}
 		reconnection_data.d[pixel_idx].target_pdf_in_neighbor = target_pdf_in_neighbor;

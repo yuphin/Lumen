@@ -38,7 +38,7 @@ void main() {
 		ReconnectionData data;
 		const Reservoir neighbor_reservoir = reservoirs.d[neighbor_pixel_idx];
 		bool neighbor_in_canonical =
-			retrace_paths(gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy, uvec2(coords), data.prefix_contribution, data.jacobian,
+			retrace_paths(gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy, uvec2(coords), data.jacobian,
 						  data.reservoir_contribution);
 		if(!neighbor_in_canonical) {
 			data.jacobian = 0;

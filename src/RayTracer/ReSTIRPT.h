@@ -27,6 +27,7 @@ class ReSTIRPT : public Integrator {
 	bool enable_mis_in_gris = false;
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.01f;
+	bool enable_experimental = false;
 	uint32_t path_length = 0;
 	uint32_t num_spatial_samples = 1;
 

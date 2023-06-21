@@ -32,11 +32,9 @@ void main() {
 
 	Reservoir canonical_reservoir = reservoirs.d[pixel_idx];
 
-	const vec3 canonical_prefix_contribution = prefix_contributions.d[pixel_idx];
 	const vec3 canonical_reservoir_contribution = canonical_reservoir.data.reservoir_contribution;
-	
+
 	uint num_spatial_samples = pc_ray.enable_spatial_reuse == 1 ? pc_ray.num_spatial_samples : 0;
-	vec3 curr_prefix_contribution = canonical_prefix_contribution;
 	vec3 curr_reservoir_contribution = canonical_reservoir_contribution;
 	float m_c = 1.0;
 	const float canonical_in_canonical_pdf = calc_target_pdf(canonical_reservoir_contribution);
@@ -51,11 +49,10 @@ void main() {
 		num_valid_samples++;
 
 		const Reservoir neighbor_reservoir = reservoirs.d[neighbor_pixel_idx];
-		vec3 prefix_contribution;
 		vec3 reservoir_contribution;
 		float jacobian;
 		bool neighbor_in_canonical = retrace_paths(gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy, uvec2(coords),
-												   prefix_contribution, jacobian, reservoir_contribution);
+												   jacobian, reservoir_contribution);
 
 		if (!neighbor_in_canonical) {
 			reservoir.M += neighbor_reservoir.M;
@@ -98,19 +95,17 @@ void main() {
 		ASSERT1(m_i > -1e-3 && m_i <= 1.001, "m_i <= 1.0 : %f\n", m_i);
 		bool accepted = combine_reservoir(seed, reservoir, neighbor_reservoir, neighbor_in_canonical_pdf * m_i);
 		if (accepted) {
-			curr_prefix_contribution = prefix_contribution;
 			curr_reservoir_contribution = reservoir_contribution;
 		}
 	}
 	bool canonical = combine_reservoir(seed, reservoir, canonical_reservoir, canonical_in_canonical_pdf * m_c);
 	if (canonical) {
-		curr_prefix_contribution = canonical_prefix_contribution;
 		curr_reservoir_contribution = canonical_reservoir_contribution;
 	}
 	const float target_pdf = calc_target_pdf(curr_reservoir_contribution);
 	reservoir.W = target_pdf == 0.0 ? 0.0 : reservoir.w_sum / (target_pdf * (1 + num_valid_samples));
 
-	vec3 final_contribution = curr_prefix_contribution;
+	vec3 final_contribution = prefix_contributions.d[pixel_idx];
 	if (reservoir.W > 0) {
 		final_contribution += curr_reservoir_contribution * reservoir.W;
 	}

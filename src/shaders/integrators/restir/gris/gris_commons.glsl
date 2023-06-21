@@ -143,8 +143,7 @@ vec3 uniform_sample_light_with_visibility_override(inout uvec4 seed, const Mater
 	return res;
 }
 
-bool retrace_paths(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords,
-				   out vec3 prefix_contribution, out float jacobian, out vec3 reservoir_contribution) {
+bool retrace_paths(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords, out float jacobian, out vec3 reservoir_contribution) {
 	if (data.rc_mat_id == -1) {
 		return false;
 	}
@@ -162,11 +161,7 @@ bool retrace_paths(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uv
 	Material hit_mat = load_material(gbuffer.material_idx, gbuffer.uv);
 	vec3 prefix_throughput = vec3(1);
 
-	prefix_contribution = vec3(0);
-
 	uint prefix_depth = 0;
-	bool specular = false;
-
 	vec3 n_s = gbuffer.n_s;
 	vec3 n_g = gbuffer.n_g;
 	vec3 pos = gbuffer.pos;
@@ -191,13 +186,6 @@ bool retrace_paths(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uv
 		vec3 wi = data.rc_pos - pos;
 		float wi_len = length(wi);
 		wi /= wi_len;
-
-		if (prefix_depth > 0 && (hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
-			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
-			vec3 contrib = prefix_throughput *
-						   uniform_sample_light(reservoir_seed, hit_mat, payload.pos, side, n_s, wo) / light_pick_pdf;
-			prefix_contribution += contrib;
-		}
 
 		bool connectable = is_rough(hit_mat) && wi_len > pc_ray.min_vertex_distance_ratio * pc_ray.scene_extent;
 		connectable = connectable && prefix_depth >= (reservoir_prefix_length - 1);
@@ -258,7 +246,6 @@ bool retrace_paths(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uv
 		}
 
 		prefix_throughput *= f * abs(cos_theta) / pdf;
-		specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
 
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin, tmin, direction, tmax, 0);
 		const bool found_isect = payload.material_idx != -1;
@@ -267,10 +254,6 @@ bool retrace_paths(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uv
 			return false;
 		}
 		hit_mat = load_material(payload.material_idx, payload.uv);
-
-		if (specular) {
-			prefix_contribution += prefix_throughput * hit_mat.emissive_factor;
-		}
 
 		n_s = payload.n_s;
 		n_g = payload.n_g;
@@ -284,10 +267,9 @@ bool retrace_paths(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uv
 
 bool retrace_paths_and_evaluate(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords,
 								out float target_pdf) {
-	vec3 unused;
 	vec3 reservoir_contribution;
 	float jacobian;
-	bool result = retrace_paths(gbuffer, data, source_coords, target_coords, unused, jacobian, reservoir_contribution);
+	bool result = retrace_paths(gbuffer, data, source_coords, target_coords, jacobian, reservoir_contribution);
 	target_pdf = calc_target_pdf(reservoir_contribution) * jacobian;
 	return result;
 }

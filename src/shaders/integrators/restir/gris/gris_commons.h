@@ -62,7 +62,6 @@ struct Reservoir {
 };
 
 struct ReconnectionData {
-	vec3 prefix_contribution;
 	float jacobian;
 	vec3 reservoir_contribution;
 	float target_pdf_in_neighbor;

@@ -111,53 +111,58 @@ void ReSTIRPT::render() {
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 
-	// Retrace
-	instance->vkb.rg
-		->add_rt("GRIS - Retrace Reservoirs", {.shaders = {{"src/shaders/integrators/restir/gris/retrace_paths.rgen"},
-														   {"src/shaders/ray.rmiss"},
-														   {"src/shaders/ray_shadow.rmiss"},
-														   {"src/shaders/ray.rchit"},
-														   {"src/shaders/ray.rahit"}},
-											   .macros = macros,
-											   .dims = {instance->width, instance->height},
-											   .accel = instance->vkb.tlas.accel})
-		.push_constants(&pc_ray)
-		.bind(rt_bindings)
-		.bind(mesh_lights_buffer)
-		.bind_texture_array(scene_textures)
-		.bind_tlas(instance->vkb.tlas);
+	if (enable_experimental) {
+		// Retrace
+		instance->vkb.rg
+			->add_rt("GRIS - Retrace Reservoirs",
+					 {.shaders = {{"src/shaders/integrators/restir/gris/retrace_paths.rgen"},
+								  {"src/shaders/ray.rmiss"},
+								  {"src/shaders/ray_shadow.rmiss"},
+								  {"src/shaders/ray.rchit"},
+								  {"src/shaders/ray.rahit"}},
+					  .macros = macros,
+					  .dims = {instance->width, instance->height},
+					  .accel = instance->vkb.tlas.accel})
+			.push_constants(&pc_ray)
+			.bind(rt_bindings)
+			.bind(mesh_lights_buffer)
+			.bind_texture_array(scene_textures)
+			.bind_tlas(instance->vkb.tlas);
 
-	// Validate
-	instance->vkb.rg
-		->add_rt("GRIS - Validate Samples", {.shaders = {{"src/shaders/integrators/restir/gris/validate_samples.rgen"},
-														 {"src/shaders/ray.rmiss"},
-														 {"src/shaders/ray_shadow.rmiss"},
-														 {"src/shaders/ray.rchit"},
-														 {"src/shaders/ray.rahit"}},
-											 .macros = macros,
-											 .dims = {instance->width, instance->height},
-											 .accel = instance->vkb.tlas.accel})
-		.push_constants(&pc_ray)
-		.bind(rt_bindings)
-		.bind(mesh_lights_buffer)
-		.bind_texture_array(scene_textures)
-		.bind_tlas(instance->vkb.tlas);
+		// Validate
+		instance->vkb.rg
+			->add_rt("GRIS - Validate Samples",
+					 {.shaders = {{"src/shaders/integrators/restir/gris/validate_samples.rgen"},
+								  {"src/shaders/ray.rmiss"},
+								  {"src/shaders/ray_shadow.rmiss"},
+								  {"src/shaders/ray.rchit"},
+								  {"src/shaders/ray.rahit"}},
+					  .macros = macros,
+					  .dims = {instance->width, instance->height},
+					  .accel = instance->vkb.tlas.accel})
+			.push_constants(&pc_ray)
+			.bind(rt_bindings)
+			.bind(mesh_lights_buffer)
+			.bind_texture_array(scene_textures)
+			.bind_tlas(instance->vkb.tlas);
+	} else {
+		// Spatial Reuse
+		instance->vkb.rg
+			->add_rt("GRIS - Spatial Reuse", {.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse.rgen"},
+														  {"src/shaders/ray.rmiss"},
+														  {"src/shaders/ray_shadow.rmiss"},
+														  {"src/shaders/ray.rchit"},
+														  {"src/shaders/ray.rahit"}},
+											  .macros = macros,
+											  .dims = {instance->width, instance->height},
+											  .accel = instance->vkb.tlas.accel})
+			.push_constants(&pc_ray)
+			.bind(rt_bindings)
+			.bind(mesh_lights_buffer)
+			.bind_texture_array(scene_textures)
+			.bind_tlas(instance->vkb.tlas);
+	}
 
-	// Spatial Reuse
-	//instance->vkb.rg
-	//	->add_rt("GRIS - Spatial Reuse", {.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse.rgen"},
-	//												  {"src/shaders/ray.rmiss"},
-	//												  {"src/shaders/ray_shadow.rmiss"},
-	//												  {"src/shaders/ray.rchit"},
-	//												  {"src/shaders/ray.rahit"}},
-	//									  .macros = macros,
-	//									  .dims = {instance->width, instance->height},
-	//									  .accel = instance->vkb.tlas.accel})
-	//	.push_constants(&pc_ray)
-	//	.bind(rt_bindings)
-	//	.bind(mesh_lights_buffer)
-	//	.bind_texture_array(scene_textures)
-	//	.bind_tlas(instance->vkb.tlas);
 	pc_ray.total_frame_num++;
 	instance->vkb.rg->run_and_submit(cmd);
 }
@@ -188,6 +193,7 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
 	result |= ImGui::Checkbox("Show reconnection radiance", &show_reconnection_radiance);
 	result |= ImGui::Checkbox("Enable MIS in GRIS", &enable_mis_in_gris);
+	result |= ImGui::Checkbox("Enable experimental", &enable_experimental);
 	result |= ImGui::SliderInt("Num spatial samples", (int*)&num_spatial_samples, 0, 12);
 	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
