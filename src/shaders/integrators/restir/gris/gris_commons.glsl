@@ -55,26 +55,6 @@ float calc_target_pdf(vec3 f) {
 	return luminance(f);
 }
 
-vec3 calc_reservoir_contribution(GrisData data, vec3 L_direct, vec3 wo, vec3 partial_throughput) {
-	const Material rc_mat = load_material(data.rc_mat_id, data.rc_uv);
-	float cos_x = dot(data.rc_ns, data.rc_wi);
-	float bsdf_pdf;
-	vec3 result = L_direct;
-	bool rc_side = (data.path_flags & 0x1F) == 1;
-	const vec3 f = eval_bsdf(data.rc_ns, wo, rc_mat, 1, rc_side, data.rc_wi, bsdf_pdf, cos_x);
-	if(bsdf_pdf > 0) {
-		result += f * abs(cos_x) * data.rc_postfix_L / bsdf_pdf;
-	}
-	return partial_throughput * result;
-}
-
-vec3 calc_reservoir_integrand(in Reservoir r) {
-	if(r.W > 0) {
-		return r.data.reservoir_contribution * r.W;
-	}
-	return vec3(0);
-}
-
 void init_gbuffer(out GBuffer gbuffer) { gbuffer.material_idx = -1; }
 
 bool is_rough(in Material mat) {
