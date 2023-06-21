@@ -23,11 +23,13 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 
 void main() {
 	GBuffer gbuffer = g_buffers.d[pixel_idx];
-	if (gbuffer.material_idx == -1) {
+	if (!gbuffer_data_valid(gbuffer)) {
 		return;
 	}
 	const Reservoir canonical_reservoir = reservoirs.d[pixel_idx];
 	uint num_spatial_samples = pc_ray.enable_spatial_reuse == 1 ? pc_ray.num_spatial_samples : 0;
+	UnpackedGBuffer unpacked_gbuffer;
+	unpack_gbuffer(gbuffer, unpacked_gbuffer);
 	for (uint i = 0; i < num_spatial_samples; i++) {
 		ivec2 rand_offset = get_neighbor_offset(seed);
 		const ivec2 coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
@@ -37,10 +39,9 @@ void main() {
 		}
 		ReconnectionData data;
 		const Reservoir neighbor_reservoir = reservoirs.d[neighbor_pixel_idx];
-		bool neighbor_in_canonical =
-			retrace_paths(gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy, uvec2(coords), data.jacobian,
-						  data.reservoir_contribution);
-		if(!neighbor_in_canonical) {
+		bool neighbor_in_canonical = retrace_paths(unpacked_gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy,
+												   uvec2(coords), data.jacobian, data.reservoir_contribution);
+		if (!neighbor_in_canonical) {
 			data.jacobian = 0;
 		}
 		reconnection_data.d[pixel_idx] = data;

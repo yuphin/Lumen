@@ -30,11 +30,13 @@ struct PCReSTIRPT {
 
 
 struct GBuffer {
-	vec3 pos;
-	vec3 n_g;
-	vec3 n_s;
-	vec2 uv;
-	uint material_idx;
+	// vec3 pos;
+	// vec3 n_g;
+	// vec3 n_s;
+	// vec2 uv;
+	// uint material_idx;
+	vec2 barycentrics;
+	uvec2 primitive_instance_id;
 };
 
 struct GrisData {
@@ -42,16 +44,14 @@ struct GrisData {
 	// Layout for the path flags
 	// | 5b postfix_length| 5b prefix_length |1b nee_visible |1b side|
 	uint path_flags;
-	vec2 rc_uv;
-	vec3 rc_ns;
 	float rc_g;
 	uint rc_seed;
-	vec3 rc_pos;
 	vec3 rc_wi;
-	uint rc_mat_id;
 	vec3 rc_postfix_L;
 	vec3 rc_Li;
 	vec3 reservoir_contribution;
+	vec2 rc_barycentrics;
+	uvec2 rc_primitive_instance_id;
 };
 
 struct Reservoir {

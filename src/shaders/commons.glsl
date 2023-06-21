@@ -33,6 +33,7 @@ Vertices vertices = Vertices(scene_desc.vertex_addr);
 Normals normals = Normals(scene_desc.normal_addr);
 Materials materials = Materials(scene_desc.material_addr);
 InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
+TexCoords tex_coords = TexCoords(scene_desc.uv_addr);
 
 #include "bsdf_commons.glsl"
 

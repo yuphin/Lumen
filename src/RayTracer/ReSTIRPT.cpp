@@ -4,6 +4,12 @@
 void ReSTIRPT::init() {
 	Integrator::init();
 
+	std::vector<glm::mat4> transformations;
+	transformations.resize(lumen_scene->prim_meshes.size());
+	for (auto& pm : lumen_scene->prim_meshes) {
+		transformations[pm.prim_idx] = pm.world_matrix;
+	}
+
 	gris_gbuffer.create("GRIS GBuffer", &instance->vkb.ctx,
 						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -33,6 +39,10 @@ void ReSTIRPT::init() {
 								   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 							   instance->width * instance->height * sizeof(ReconnectionData));
+	transformations_buffer.create("Transformations Buffer", &instance->vkb.ctx,
+								  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								  transformations.size() * sizeof(glm::mat4), transformations.data(), true);
 
 	SceneDesc desc;
 	desc.vertex_addr = vertex_buffer.get_device_address();
@@ -42,6 +52,7 @@ void ReSTIRPT::init() {
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
 	// ReSTIR PT (GRIS)
+	desc.transformations_addr = transformations_buffer.get_device_address();
 	desc.gris_gbuffer_addr = gris_gbuffer.get_device_address();
 	desc.gris_reservoir_addr = gris_reservoir_buffer.get_device_address();
 	desc.gris_direct_lighting_addr = direct_lighting_buffer.get_device_address();
@@ -179,7 +190,7 @@ bool ReSTIRPT::update() {
 void ReSTIRPT::destroy() {
 	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
-	std::vector<Buffer*> buffer_list = {&gris_gbuffer, &gris_reservoir_buffer, &direct_lighting_buffer};
+	std::vector<Buffer*> buffer_list = {&gris_gbuffer, &gris_reservoir_buffer, &direct_lighting_buffer, &transformations_buffer};
 	for (auto b : buffer_list) {
 		b->destroy();
 	}

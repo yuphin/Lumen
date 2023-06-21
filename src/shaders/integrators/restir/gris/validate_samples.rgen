@@ -22,7 +22,7 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 
 void main() {
 	GBuffer gbuffer = g_buffers.d[pixel_idx];
-	if (gbuffer.material_idx == -1) {
+	if (!gbuffer_data_valid(gbuffer)) {
 		return;
 	}
 	const Reservoir canonical_reservoir = reservoirs.d[pixel_idx];
@@ -35,9 +35,16 @@ void main() {
 			continue;
 		}
 		GBuffer neighbor_gbuffer = g_buffers.d[neighbor_pixel_idx];
+		if (!gbuffer_data_valid(neighbor_gbuffer)) {
+			continue;
+		}
+		UnpackedGBuffer unpacked_neighbor_gbuffer;
+		unpack_gbuffer(neighbor_gbuffer, unpacked_neighbor_gbuffer);
+
 		float target_pdf_in_neighbor;
-		bool canonical_in_neighbor = retrace_paths_and_evaluate(
-			neighbor_gbuffer, canonical_reservoir.data, uvec2(coords), gl_LaunchIDEXT.xy, target_pdf_in_neighbor);
+		bool canonical_in_neighbor =
+			retrace_paths_and_evaluate(unpacked_neighbor_gbuffer, canonical_reservoir.data, uvec2(coords),
+									   gl_LaunchIDEXT.xy, target_pdf_in_neighbor);
 		if (!canonical_in_neighbor) {
 			target_pdf_in_neighbor = 0;
 		}

@@ -73,11 +73,8 @@ void main() {
 
 		// Fill in GBuffer
 		if (depth == 0) {
-			gbuffer.pos = payload.pos;
-			gbuffer.n_s = payload.n_s;
-			gbuffer.n_g = payload.n_g;
-			gbuffer.material_idx = payload.material_idx;
-			gbuffer.uv = payload.uv;
+			gbuffer.barycentrics = payload.barycentrics;
+			gbuffer.primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 			if (pc_ray.direct_lighting == 1) {
 				direct_lighting += throughput * hit_mat.emissive_factor;
 			}
@@ -114,9 +111,8 @@ void main() {
 		prev_pos = payload.pos;
 		if (connectable) {
 			data.rc_seed = seed.w;
-			data.rc_uv = payload.uv;
-			data.rc_ns = n_s;
-			data.rc_mat_id = payload.material_idx;
+			data.rc_barycentrics = payload.barycentrics;
+			data.rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 			data.rc_g = g;
 			prefix_contribution = col;
 			rc_partial_throughput = partial_throughput;
@@ -160,7 +156,6 @@ void main() {
 
 		if (connectable) {
 			data.rc_wi = direction;
-			data.rc_pos = payload.pos;
 			data.rc_Li = rc_Li;
 			connectable_vertex_found = true;
 			data.path_flags = set_path_flags(side, nee_visible, depth);
@@ -182,14 +177,6 @@ void main() {
 			}
 		}
 	}
-#if 0
-	GBuffer gbuf2 = g_buffers.d[pixel_idx];
-	float epos = dot(gbuffer.pos - gbuf2.pos, gbuffer.pos - gbuf2.pos);
-	float euv = dot(gbuffer.uv - gbuf2.uv, gbuffer.uv - gbuf2.uv);
-	float ens = dot(gbuffer.n_s - gbuf2.n_s, gbuffer.n_s - gbuf2.n_s);
-	float eng = dot(gbuffer.n_g - gbuf2.n_g, gbuffer.n_g - gbuf2.n_g);
-	ASSERT(!(epos > 1e-8 || euv > 1e-8 || ens > 1e-8 || eng > 1e-8 || gbuffer.material_idx != gbuf2.material_idx));
-#endif
 	if (pc_ray.direct_lighting == 1) {
 		direct_lighting_buffer.d[pixel_idx] = direct_lighting;
 	}
@@ -197,7 +184,7 @@ void main() {
 		return;
 	}
 	data.path_flags = (postfix_length & 0x1F) << 7 | data.path_flags;
-	data.reservoir_contribution = calc_reservoir_contribution(data, data.rc_Li, -connection_wi, rc_partial_throughput);
+	data.reservoir_contribution = rc_partial_throughput * data.rc_postfix_L;
 
 	float target_pdf = calc_target_pdf(data.reservoir_contribution);
 	stream_reservoir(seed, reservoir, data, target_pdf / source_pdf);

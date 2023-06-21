@@ -6,6 +6,9 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisGBuffer 
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisDirectLighting { vec3 d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PrefixContributions { vec3 d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PathReconnections { ReconnectionData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Transformation { mat4 m[]; };
+
+Transformation transforms = Transformation(scene_desc.transformations_addr);
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
@@ -15,16 +18,86 @@ uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame
 
 #include "../../pt_commons.glsl"
 
+struct UnpackedGBuffer {
+	vec3 pos;
+	vec3 n_g;
+	vec3 n_s;
+	vec2 uv;
+	uint material_idx;
+};
+
+vec3 get_pos(ivec3 ind, vec3 bary, mat4 to_world) {
+	const vec3 v0 = vertices.v[ind.x];
+	const vec3 v1 = vertices.v[ind.y];
+	const vec3 v2 = vertices.v[ind.z];
+	const vec3 pos = v0 * bary.x + v1 * bary.y + v2 * bary.z;
+	return vec3(to_world * vec4(pos, 1.0));
+}
+
+vec3 get_normal(ivec3 ind, vec3 bary, mat4 tsp_inv_to_world) {
+	const vec3 n0 = normals.n[ind.x];
+	const vec3 n1 = normals.n[ind.y];
+	const vec3 n2 = normals.n[ind.z];
+	const vec3 n = normalize(n0 * bary.x + n1 * bary.y + n2 * bary.z);
+	return normalize(vec3(tsp_inv_to_world * vec4(n, 0.0)));
+}
+
+vec2 get_uv(ivec3 ind, vec3 bary) {
+	const vec2 uv0 = tex_coords.t[ind.x];
+	const vec2 uv1 = tex_coords.t[ind.y];
+	const vec2 uv2 = tex_coords.t[ind.z];
+	return uv0 * bary.x + uv1 * bary.y + uv2 * bary.z;
+}
+
+void init_gbuffer(out GBuffer gbuffer) { gbuffer.primitive_instance_id = uvec2(-1); }
+
 void init_reservoir(out Reservoir r) {
 	r.M = 0;
 	r.W = 0.0;
 	r.w_sum = 0.0;
 }
 void init_data(out GrisData data) {
-	data.rc_mat_id = -1;
 	data.rc_postfix_L = vec3(0);
 	data.rc_g = 0;
 	data.reservoir_contribution = vec3(0);
+	data.rc_primitive_instance_id = uvec2(-1);
+}
+
+bool reservoir_data_valid(in GrisData data) { return data.rc_primitive_instance_id.y != -1; }
+
+bool gbuffer_data_valid(in GBuffer gbuffer) { return gbuffer.primitive_instance_id.y != -1; }
+
+void unpack_gbuffer(vec2 barycentrics, uvec2 primitive_instance_id, out UnpackedGBuffer unpacked_gbuffer) {
+	const PrimMeshInfo pinfo = prim_infos.d[primitive_instance_id.y];
+	const uint index_offset = pinfo.index_offset + 3 * primitive_instance_id.x;
+	const ivec3 ind = ivec3(indices.i[index_offset + 0], indices.i[index_offset + 1], indices.i[index_offset + 2]);
+	const vec3 bary = vec3(1.0 - barycentrics.x - barycentrics.y, barycentrics.x, barycentrics.y);
+	const mat4 to_world = transforms.m[primitive_instance_id.y];
+	unpacked_gbuffer.pos = get_pos(ind, bary, to_world);
+	unpacked_gbuffer.n_s = get_normal(ind, bary, transpose(inverse(to_world)));
+	unpacked_gbuffer.uv = get_uv(ind, bary);
+	unpacked_gbuffer.material_idx = pinfo.material_index;
+}
+
+void unpack_gbuffer(in GBuffer gbuffer, out UnpackedGBuffer unpacked_gbuffer) {
+	const PrimMeshInfo pinfo = prim_infos.d[gbuffer.primitive_instance_id.y];
+	const uint index_offset = pinfo.index_offset + 3 * gbuffer.primitive_instance_id.x;
+	const ivec3 ind = ivec3(indices.i[index_offset + 0], indices.i[index_offset + 1], indices.i[index_offset + 2]);
+	const vec3 bary = vec3(1.0 - gbuffer.barycentrics.x - gbuffer.barycentrics.y, gbuffer.barycentrics.x, gbuffer.barycentrics.y);
+	const mat4 to_world = transforms.m[gbuffer.primitive_instance_id.y];
+	const mat4 tsp_inv_to_world = transpose(inverse(to_world));
+	
+	const vec3 v0 = vertices.v[ind.x];
+	const vec3 v1 = vertices.v[ind.y];
+	const vec3 v2 = vertices.v[ind.z];
+	unpacked_gbuffer.n_s = get_normal(ind, bary, tsp_inv_to_world);
+	unpacked_gbuffer.uv = get_uv(ind, bary);
+	unpacked_gbuffer.material_idx = pinfo.material_index;
+	const vec3 pos = v0 * bary.x + v1 * bary.y + v2 * bary.z;
+	unpacked_gbuffer.pos = vec3(to_world * vec4(pos, 1.0));
+	const vec3 e0 = v2 - v0;
+    const vec3 e1 = v1 - v0;
+	unpacked_gbuffer.n_g = (tsp_inv_to_world * vec4(cross(e0, e1), 0)).xyz;
 }
 
 bool update_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData data, float w_i) {
@@ -47,35 +120,16 @@ bool combine_reservoir(inout uvec4 seed, inout Reservoir target_reservoir, const
 	return update_reservoir(seed, target_reservoir, input_reservoir.data, weight);
 }
 
-void calc_reservoir_W(inout Reservoir r, float target_pdf) {
-	r.W = target_pdf == 0.0 ? 0.0 : r.w_sum / target_pdf;
-}
+void calc_reservoir_W(inout Reservoir r, float target_pdf) { r.W = target_pdf == 0.0 ? 0.0 : r.w_sum / target_pdf; }
 
-float calc_target_pdf(vec3 f) {
-	return luminance(f);
-}
-
-vec3 calc_reservoir_contribution(GrisData data, vec3 L_direct, vec3 wo, vec3 partial_throughput) {
-	const Material rc_mat = load_material(data.rc_mat_id, data.rc_uv);
-	float cos_x = dot(data.rc_ns, data.rc_wi);
-	float bsdf_pdf;
-	vec3 result = L_direct;
-	bool rc_side = (data.path_flags & 0x1F) == 1;
-	const vec3 f = eval_bsdf(data.rc_ns, wo, rc_mat, 1, rc_side, data.rc_wi, bsdf_pdf, cos_x);
-	if(bsdf_pdf > 0) {
-		result += f * abs(cos_x) * data.rc_postfix_L / bsdf_pdf;
-	}
-	return partial_throughput * result;
-}
+float calc_target_pdf(vec3 f) { return luminance(f); }
 
 vec3 calc_reservoir_integrand(in Reservoir r) {
-	if(r.W > 0) {
+	if (r.W > 0) {
 		return r.data.reservoir_contribution * r.W;
 	}
 	return vec3(0);
 }
-
-void init_gbuffer(out GBuffer gbuffer) { gbuffer.material_idx = -1; }
 
 bool is_rough(in Material mat) {
 	// Only check if it's diffuse for now
@@ -84,19 +138,18 @@ bool is_rough(in Material mat) {
 
 bool is_diffuse(in Material mat) { return (mat.bsdf_type & BSDF_DIFFUSE) != 0; }
 
-uint offset(const uint pingpong) {
-    return pingpong * pc_ray.size_x * pc_ray.size_y;
-}
+uint offset(const uint pingpong) { return pingpong * pc_ray.size_x * pc_ray.size_y; }
 
 uint set_path_flags(bool side, bool nee_visible, uint prefix_length) {
-	return  (prefix_length & 0x1F) << 2 | uint(nee_visible) << 1 | uint(side);
+	return (prefix_length & 0x1F) << 2 | uint(nee_visible) << 1 | uint(side);
 }
 
-void unpack_path_flags(uint packed_data, out bool side, out bool nee_visible, out uint prefix_length, out uint postfix_length) {
+void unpack_path_flags(uint packed_data, out bool side, out bool nee_visible, out uint prefix_length,
+					   out uint postfix_length) {
 	side = (packed_data & 0x1) == 1;
 	nee_visible = ((packed_data >> 1) & 0x1) == 1;
 	prefix_length = (packed_data >> 2) & 0x1F;
-	postfix_length = (packed_data >> 7) & 0x1F; 
+	postfix_length = (packed_data >> 7) & 0x1F;
 }
 
 
@@ -143,8 +196,9 @@ vec3 uniform_sample_light_with_visibility_override(inout uvec4 seed, const Mater
 	return res;
 }
 
-bool retrace_paths(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords, out float jacobian, out vec3 reservoir_contribution) {
-	if (data.rc_mat_id == -1) {
+bool retrace_paths(in UnpackedGBuffer gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords,
+				   out float jacobian, out vec3 reservoir_contribution) {
+	if (!reservoir_data_valid(data)) {
 		return false;
 	}
 
@@ -162,12 +216,19 @@ bool retrace_paths(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uv
 	vec3 prefix_throughput = vec3(1);
 
 	uint prefix_depth = 0;
+
 	vec3 n_s = gbuffer.n_s;
 	vec3 n_g = gbuffer.n_g;
 	vec3 pos = gbuffer.pos;
 
 	uvec4 reservoir_seed =
 		init_rng(target_coords, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num, data.init_seed);
+
+	UnpackedGBuffer rc_gbuffer;
+	unpack_gbuffer(data.rc_barycentrics, data.rc_primitive_instance_id, rc_gbuffer);
+	if(!rc_side) {
+		rc_gbuffer.n_s *= -1;
+	}
 
 	while (true) {
 		if ((prefix_depth + reservoir_postfix_length) >= pc_ray.max_depth - 1) {
@@ -183,7 +244,7 @@ bool retrace_paths(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uv
 		}
 		vec3 origin = offset_ray(pos, n_g);
 
-		vec3 wi = data.rc_pos - pos;
+		vec3 wi = rc_gbuffer.pos - pos;
 		float wi_len = length(wi);
 		wi /= wi_len;
 
@@ -208,11 +269,11 @@ bool retrace_paths(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uv
 			// Compute the partial F
 			vec3 partial_throughput = prefix_throughput * rc_f * abs(cos_x);
 			// Compute the Jacobian
-			float g_curr = abs(dot(data.rc_ns, wi)) / (wi_len * wi_len);
+			float g_curr = abs(dot(rc_gbuffer.n_s, wi)) / (wi_len * wi_len);
 			float j = data.rc_g == 0.0 ? 0.0 : g_curr / data.rc_g;
 			jacobian = j;
 			// Compute the direct lighting on the reconnection vertex
-			const Material rc_mat = load_material(data.rc_mat_id, data.rc_uv);
+			const Material rc_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
 
 			vec3 L_direct;
 			if (is_diffuse(rc_mat)) {
@@ -221,16 +282,15 @@ bool retrace_paths(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uv
 				const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
 				uvec4 reconnection_seed = init_rng(target_coords, gl_LaunchSizeEXT.xy,
 												   pc_ray.total_frame_num ^ pc_ray.random_num, data.rc_seed);
-				L_direct = uniform_sample_light_with_visibility_override(reconnection_seed, rc_mat, data.rc_pos,
-																		 rc_side, data.rc_ns, -wi, rc_nee_visible) /
+				L_direct = uniform_sample_light_with_visibility_override(reconnection_seed, rc_mat, rc_gbuffer.pos, rc_side,
+																		 rc_gbuffer.n_s, -wi, rc_nee_visible) /
 						   light_pick_pdf;
 			}
-			
 
-			float rc_cos_x = dot(data.rc_ns, data.rc_wi);
+			float rc_cos_x = dot(rc_gbuffer.n_s, data.rc_wi);
 			float bsdf_pdf;
 			reservoir_contribution = L_direct;
-			const vec3 f = eval_bsdf(data.rc_ns, wo, rc_mat, 1, rc_side, data.rc_wi, bsdf_pdf, rc_cos_x);
+			const vec3 f = eval_bsdf(rc_gbuffer.n_s, wo, rc_mat, 1, rc_side, data.rc_wi, bsdf_pdf, rc_cos_x);
 			if (bsdf_pdf > 0) {
 				reservoir_contribution += f * abs(rc_cos_x) * data.rc_postfix_L / bsdf_pdf;
 			}
@@ -265,7 +325,7 @@ bool retrace_paths(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uv
 	return false;
 }
 
-bool retrace_paths_and_evaluate(in GBuffer gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords,
+bool retrace_paths_and_evaluate(in UnpackedGBuffer gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords,
 								out float target_pdf) {
 	vec3 reservoir_contribution;
 	float jacobian;
