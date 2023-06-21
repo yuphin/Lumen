@@ -140,22 +140,22 @@ void ReSTIRPT::render() {
 			.bind_texture_array(scene_textures)
 			.bind_tlas(instance->vkb.tlas);
 
-		// Validate
-		instance->vkb.rg
-			->add_rt("GRIS - Validate Samples",
-					 {.shaders = {{"src/shaders/integrators/restir/gris/validate_samples.rgen"},
-								  {"src/shaders/ray.rmiss"},
-								  {"src/shaders/ray_shadow.rmiss"},
-								  {"src/shaders/ray.rchit"},
-								  {"src/shaders/ray.rahit"}},
-					  .macros = macros,
-					  .dims = {instance->width, instance->height},
-					  .accel = instance->vkb.tlas.accel})
-			.push_constants(&pc_ray)
-			.bind(rt_bindings)
-			.bind(mesh_lights_buffer)
-			.bind_texture_array(scene_textures)
-			.bind_tlas(instance->vkb.tlas);
+		//// Validate
+		//instance->vkb.rg
+		//	->add_rt("GRIS - Validate Samples",
+		//			 {.shaders = {{"src/shaders/integrators/restir/gris/validate_samples.rgen"},
+		//						  {"src/shaders/ray.rmiss"},
+		//						  {"src/shaders/ray_shadow.rmiss"},
+		//						  {"src/shaders/ray.rchit"},
+		//						  {"src/shaders/ray.rahit"}},
+		//			  .macros = macros,
+		//			  .dims = {instance->width, instance->height},
+		//			  .accel = instance->vkb.tlas.accel})
+		//	.push_constants(&pc_ray)
+		//	.bind(rt_bindings)
+		//	.bind(mesh_lights_buffer)
+		//	.bind_texture_array(scene_textures)
+		//	.bind_tlas(instance->vkb.tlas);
 	} else {
 		// Spatial Reuse
 		instance->vkb.rg
