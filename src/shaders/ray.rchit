@@ -97,6 +97,4 @@ void main() {
     payload.area = 0.5 * length(cross(e0t, e1t));
     payload.dist = gl_RayTminEXT + gl_HitTEXT;
     payload.hit_kind = gl_HitKindEXT;
-    payload.instance_idx = gl_InstanceCustomIndexEXT;
-    payload.barycentrics = attribs.xy;
 }

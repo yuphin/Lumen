@@ -19,8 +19,6 @@ struct HitPayload {
     float area;
     float dist;
     uint hit_kind;
-    uint instance_idx;
-    vec2 barycentrics;
 };
 
 struct VCMState {

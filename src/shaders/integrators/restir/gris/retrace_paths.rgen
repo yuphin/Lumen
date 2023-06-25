@@ -8,6 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
+#define RECONNECTION
 #include "gris_commons.glsl"
 GrisReservoir reservoirs = GrisReservoir(scene_desc.gris_reservoir_addr);
 GrisGBuffer g_buffers = GrisGBuffer(scene_desc.gris_gbuffer_addr);
@@ -20,7 +21,6 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
 }
 
-
 void main() {
 	GBuffer gbuffer = g_buffers.d[pixel_idx];
 	if (!gbuffer_data_valid(gbuffer)) {
@@ -28,8 +28,8 @@ void main() {
 	}
 	const Reservoir canonical_reservoir = reservoirs.d[pixel_idx];
 	uint num_spatial_samples = pc_ray.enable_spatial_reuse == 1 ? pc_ray.num_spatial_samples : 0;
-	UnpackedGBuffer unpacked_gbuffer;
-	unpack_gbuffer(gbuffer, unpacked_gbuffer);
+	UnpackedGBuffer unpacked_gbuffer =
+		get_gbuffer(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
 	for (uint i = 0; i < num_spatial_samples; i++) {
 		ivec2 rand_offset = get_neighbor_offset(seed);
 		const ivec2 coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
@@ -38,12 +38,17 @@ void main() {
 			continue;
 		}
 		ReconnectionData data;
+		data.reservoir_contribution = vec3(0);
+		data.target_pdf_in_neighbor = 0;
+		data.jacobian = 0;
+		GBuffer neighbor_gbuffer = g_buffers.d[neighbor_pixel_idx];
+		if (!gbuffer_data_valid(neighbor_gbuffer)) {
+			reconnection_data.d[pixel_idx] = data;
+			continue;
+		}
 		const Reservoir neighbor_reservoir = reservoirs.d[neighbor_pixel_idx];
 		bool neighbor_in_canonical = retrace_paths(unpacked_gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy,
 												   uvec2(coords), data.jacobian, data.reservoir_contribution);
-		if (!neighbor_in_canonical) {
-			data.jacobian = 0;
-		}
 		reconnection_data.d[pixel_idx] = data;
 	}
 }

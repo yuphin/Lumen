@@ -1,6 +1,8 @@
 #ifndef PSSMLT_UTILS
 #define PSSMLT_UTILS
 #include "../../commons.glsl"
+layout(location = 0) rayPayloadEXT HitPayload payload;
+layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCMLT pc_ray; };
 layout(constant_id = 0) const int SEEDING = 0;
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BootstrapData { BootstrapSample d[]; };
