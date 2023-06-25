@@ -69,7 +69,7 @@ void main() {
 			break;
 		}
 
-		UnpackedGBuffer gbuffer = get_gbuffer(payload.attribs, payload.instance_idx, payload.triangle_idx);
+		HitData gbuffer = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
 		const Material hit_mat = load_material(gbuffer.material_idx, gbuffer.uv);
 
 		// Fill in GBuffer

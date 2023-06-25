@@ -1,6 +1,7 @@
-#include "../../../commons.glsl"
 #include "gris_commons.h"
+#include "../../../commons.glsl"
 layout(location = 0) rayPayloadEXT GrisHitPayload payload;
+layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc_ray; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisReservoir { Reservoir d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisGBuffer { GBuffer d[]; };
@@ -19,7 +20,7 @@ const float tmax = 10000.0;
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num);
 
-struct UnpackedGBuffer {
+struct HitData {
 	vec3 pos;
 	vec3 n_g;
 	vec3 n_s;
@@ -27,21 +28,20 @@ struct UnpackedGBuffer {
 	uint material_idx;
 };
 
-struct UnpackedGBufferNoNgAndUv {
+struct HitDataWithoutUVAndGeometryNormals {
 	vec3 pos;
 	vec3 n_s;
 	uint material_idx;
 };
 
-struct UnpackedGBufferNoNg {
+struct HitDataWithoutGeometryNormals {
 	vec3 pos;
 	vec3 n_s;
 	uint material_idx;
 	vec2 uv;
 };
 
-
-UnpackedGBuffer get_gbuffer(vec2 attribs, uint instance_idx, uint triangle_idx) {
+HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx) {
 	const PrimMeshInfo pinfo = prim_infos.d[instance_idx];
 	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
 	const ivec3 ind = ivec3(pinfo.vertex_offset) +
@@ -50,7 +50,7 @@ UnpackedGBuffer get_gbuffer(vec2 attribs, uint instance_idx, uint triangle_idx) 
 	const mat4 to_world = transforms.m[instance_idx];
 	const mat4 tsp_inv_to_world = transpose(inverse(to_world));
 
-	UnpackedGBuffer gbuffer;
+	HitData gbuffer;
 	Vertex vtx[3];
 
 	vtx[0] = compact_vertices.d[ind.x];
@@ -68,7 +68,7 @@ UnpackedGBuffer get_gbuffer(vec2 attribs, uint instance_idx, uint triangle_idx) 
 	return gbuffer;
 }
 
-UnpackedGBufferNoNgAndUv get_gbuffer_no_ng_and_uv(vec2 attribs, uint instance_idx, uint triangle_idx) {
+HitDataWithoutUVAndGeometryNormals get_hitdata_no_ng_uv(vec2 attribs, uint instance_idx, uint triangle_idx) {
 	const PrimMeshInfo pinfo = prim_infos.d[instance_idx];
 	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
 	const ivec3 ind = ivec3(pinfo.vertex_offset) +
@@ -76,7 +76,7 @@ UnpackedGBufferNoNgAndUv get_gbuffer_no_ng_and_uv(vec2 attribs, uint instance_id
 	const vec3 bary = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 	const mat4 to_world = transforms.m[instance_idx];
 	const mat4 tsp_inv_to_world = transpose(inverse(to_world));
-	UnpackedGBufferNoNgAndUv gbuffer;
+	HitDataWithoutUVAndGeometryNormals gbuffer;
 	Vertex vtx[3];
 
 	vtx[0] = compact_vertices.d[ind.x];
@@ -89,7 +89,7 @@ UnpackedGBufferNoNgAndUv get_gbuffer_no_ng_and_uv(vec2 attribs, uint instance_id
 	return gbuffer;
 }
 
-UnpackedGBufferNoNg get_gbuffer_no_ng(vec2 attribs, uint instance_idx, uint triangle_idx) {
+HitDataWithoutGeometryNormals get_hitdata_no_ng(vec2 attribs, uint instance_idx, uint triangle_idx) {
 	const PrimMeshInfo pinfo = prim_infos.d[instance_idx];
 	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
 	const ivec3 ind = ivec3(pinfo.vertex_offset) +
@@ -97,7 +97,7 @@ UnpackedGBufferNoNg get_gbuffer_no_ng(vec2 attribs, uint instance_idx, uint tria
 	const vec3 bary = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 	const mat4 to_world = transforms.m[instance_idx];
 	const mat4 tsp_inv_to_world = transpose(inverse(to_world));
-	UnpackedGBufferNoNg gbuffer;
+	HitDataWithoutGeometryNormals gbuffer;
 	Vertex vtx[3];
 
 	vtx[0] = compact_vertices.d[ind.x];
@@ -157,8 +157,8 @@ vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const 
 			if (payload.instance_idx == -1) {
 				return res;
 			}
-			UnpackedGBufferNoNgAndUv gbuffer =
-				get_gbuffer_no_ng_and_uv(payload.attribs, payload.instance_idx, payload.triangle_idx);
+			HitDataWithoutUVAndGeometryNormals gbuffer =
+				get_hitdata_no_ng_uv(payload.attribs, payload.instance_idx, payload.triangle_idx);
 			if (gbuffer.material_idx == record.material_idx && payload.triangle_idx == record.triangle_idx) {
 				const float wi_len = length(gbuffer.pos - pos);
 				const float g = abs(dot(gbuffer.n_s, -wi)) / (wi_len * wi_len);
@@ -268,7 +268,7 @@ void unpack_path_flags(uint packed_data, out bool side, out bool nee_visible, ou
 	postfix_length = (packed_data >> 7) & 0x1F;
 }
 
-bool retrace_paths(in UnpackedGBuffer gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords,
+bool retrace_paths(in HitData gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords,
 				   out float jacobian, out vec3 reservoir_contribution) {
 	if (!reservoir_data_valid(data)) {
 		return false;
@@ -296,8 +296,8 @@ bool retrace_paths(in UnpackedGBuffer gbuffer, in GrisData data, uvec2 source_co
 	uvec4 reservoir_seed =
 		init_rng(target_coords, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num, data.init_seed);
 
-	UnpackedGBufferNoNg rc_gbuffer =
-		get_gbuffer_no_ng(data.rc_barycentrics, data.rc_primitive_instance_id.y, data.rc_primitive_instance_id.x);
+	HitDataWithoutGeometryNormals rc_gbuffer =
+		get_hitdata_no_ng(data.rc_barycentrics, data.rc_primitive_instance_id.y, data.rc_primitive_instance_id.x);
 	if (!rc_side) {
 		rc_gbuffer.n_s *= -1;
 	}
@@ -381,7 +381,7 @@ bool retrace_paths(in UnpackedGBuffer gbuffer, in GrisData data, uvec2 source_co
 		if (!found_isect) {
 			return false;
 		}
-		UnpackedGBuffer gbuffer = get_gbuffer(payload.attribs, payload.instance_idx, payload.triangle_idx);
+		HitData gbuffer = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
 		hit_mat = load_material(gbuffer.material_idx, gbuffer.uv);
 
 		n_s = gbuffer.n_s;
@@ -394,7 +394,7 @@ bool retrace_paths(in UnpackedGBuffer gbuffer, in GrisData data, uvec2 source_co
 	return false;
 }
 
-bool retrace_paths_and_evaluate(in UnpackedGBuffer gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords,
+bool retrace_paths_and_evaluate(in HitData gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords,
 								out float target_pdf) {
 	vec3 reservoir_contribution;
 	float jacobian;

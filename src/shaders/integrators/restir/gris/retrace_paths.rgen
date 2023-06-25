@@ -28,8 +28,8 @@ void main() {
 	}
 	const Reservoir canonical_reservoir = reservoirs.d[pixel_idx];
 	uint num_spatial_samples = pc_ray.enable_spatial_reuse == 1 ? pc_ray.num_spatial_samples : 0;
-	UnpackedGBuffer unpacked_gbuffer =
-		get_gbuffer(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
+	HitData unpacked_gbuffer =
+		get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
 	for (uint i = 0; i < num_spatial_samples; i++) {
 		ivec2 rand_offset = get_neighbor_offset(seed);
 		const ivec2 coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
