@@ -176,7 +176,10 @@ bool PostFX::gui() {
 	ImGui::Text("PostFX Settings:");
 	ImGui::PopStyleColor();
 	ImGui::Checkbox("Enable ACES tonemapping", &enable_tonemapping);
-	ImGui::Checkbox("Enable bloom", &enable_bloom);
+	bool bloom_check = ImGui::Checkbox("Enable bloom", &enable_bloom);
+	if (bloom_check) {
+		int a = 4;
+	}
 	float exposure = log10f(bloom_exposure);
 	ImGui::SliderFloat("Bloom exposure", &exposure, -20.0f, 0.0f, "%.2f");
 	bloom_exposure = powf(10.0f, exposure);

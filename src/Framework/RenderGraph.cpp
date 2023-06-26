@@ -8,6 +8,8 @@
 // doesn't show any output from the debugPrintf...
 // Possible solution: Make compilation with debugPrintf shaders synchronous?
 
+// TODO: Re-cache bound resources for shaders in pipelines
+
 #define DIRTY_CHECK(x) \
 	if (!(x)) {        \
 		return *this;  \
@@ -282,9 +284,7 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 
 RenderGraph::RenderGraph(VulkanContext* ctx) : ctx(ctx) { pipeline_tasks.reserve(32); }
 
-RenderPass& RenderGraph::current_pass() {
-	return passes.back();
-}
+RenderPass& RenderGraph::current_pass() { return passes.back(); }
 
 RenderPass& RenderGraph::add_rt(const std::string& name, const RTPassSettings& settings) {
 	return add_pass_impl(name, settings);
@@ -327,28 +327,38 @@ RenderPass& RenderPass::bind(Texture2D& tex, VkSampler sampler) {
 	return *this;
 }
 
-RenderPass& RenderPass::bind_texture_array(std::vector<Texture2D>& textures) {
-	next_binding_idx++;
-	DIRTY_CHECK(rg->recording);
-	for (auto& texture : textures) {
-		bound_resources.emplace_back(texture);
+RenderPass& RenderPass::bind_texture_array(std::vector<Texture2D>& textures, bool force_update) {
+	DIRTY_CHECK(!cached_in_rendergraph || rg->recording || force_update);
+	if (next_binding_idx >= bound_resources.size()) {
+		for (auto& texture : textures) {
+			bound_resources.emplace_back(texture);
+		}
+		descriptor_counts.push_back((uint32_t)textures.size());
+	} else {
+		for (auto i = 0; i < textures.size(); i++) {
+			bound_resources[next_binding_idx + i].replace(textures[i]);
+		}
 	}
-	descriptor_counts.push_back((uint32_t)textures.size());
 	return *this;
 }
 
-RenderPass& RenderPass::bind_buffer_array(std::vector<Buffer>& buffers) {
-	next_binding_idx++;
-	DIRTY_CHECK(rg->recording);
-	for (auto& buffer : buffers) {
-		bound_resources.emplace_back(buffer);
+RenderPass& RenderPass::bind_buffer_array(std::vector<Buffer>& buffers, bool force_update) {
+	DIRTY_CHECK(!cached_in_rendergraph || rg->recording || force_update);
+	if (next_binding_idx >= bound_resources.size()) {
+		for (auto& buffer : buffers) {
+			bound_resources.emplace_back(buffer);
+		}
+		descriptor_counts.push_back((uint32_t)buffers.size());
+	} else {
+		for (auto i = 0; i < buffers.size(); i++) {
+			bound_resources[next_binding_idx + i].replace(buffers[i]);
+		}
 	}
-	descriptor_counts.push_back((uint32_t)buffers.size());
 	return *this;
 }
 
 RenderPass& RenderPass::bind_tlas(const AccelKHR& tlas) {
-	DIRTY_CHECK(rg->recording || rg->reload_shaders);
+	DIRTY_CHECK(!pipeline->handle || rg->recording || rg->reload_shaders);
 	pipeline->tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
 	pipeline->tlas_info.accelerationStructureCount = 1;
 	pipeline->tlas_info.pAccelerationStructures = &tlas.accel;
@@ -461,9 +471,8 @@ RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 	return *this;
 }
 
-void RenderPass::finalize(bool record_override_encountered) {
-	const bool not_recording_nor_reloading = !rg->recording && !rg->reload_shaders;
-	if (!record_override && not_recording_nor_reloading && !record_override_encountered) {
+void RenderPass::finalize() {
+	if (!rg->reload_shaders && pipeline->handle) {
 		// Handle resource transitions
 		transition_resources();
 		return;
@@ -930,17 +939,37 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	if (!pass_idxs_with_shader_compilation_overrides.empty()) {
 		std::sort(passes.begin(), passes.end(),
 				  [](const RenderPass& pass1, const RenderPass& pass2) { return pass1.pass_idx < pass2.pass_idx; });
+		pass_idxs_with_shader_compilation_overrides.clear();
+		uint32_t prev_pass_idx = -1;
+		for (auto it = passes.begin() + beginning_pass_idx; it != passes.end();) {
+			if (!it->active) {
+				prev_pass_idx = it->pass_idx;
+			} else if(prev_pass_idx == it->pass_idx) {
+				auto prev_it = it - 1;
+				auto& storage = pipeline_cache[prev_it->name];
+				for (auto pass_it = storage.pass_idxs.begin(); pass_it != storage.pass_idxs.end();) {
+					if (*pass_it == prev_it->pass_idx) {
+						pass_it = storage.pass_idxs.erase(pass_it);
+					} else {
+						++pass_it;
+					}
+				}
+				it = passes.erase(prev_it);
+			}
+			++it;
+		
+		}
 	}
 
-	uint32_t i = beginning_pass_idx;
 	uint32_t rem_passes = ending_pass_idx - beginning_pass_idx;
-	bool record_override_encountered = false;
+	uint32_t num_encountered_inactive_passes = 0;
+	uint32_t i = beginning_pass_idx;
 	while (rem_passes > 0) {
 		if (passes[i].active) {
-			if (passes[i].record_override) {
-				record_override_encountered = true;
-			}
-			passes[i].finalize(record_override_encountered);
+			passes[i].finalize();
+
+		} else if (passes[i].pass_idx >= beginning_pass_idx && passes[i].pass_idx < ending_pass_idx) {
+			++num_encountered_inactive_passes;
 		}
 		rem_passes--;
 		i++;
@@ -978,11 +1007,79 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		passes[i].run(cmd);
 		i++;
 	}
+
+	if (num_encountered_inactive_passes) {
+		std::unordered_map<uint32_t, uint32_t> modified_pass_idxs;	// Stores new offsets
+		uint32_t last_inactive_pass_idx = -1;
+		for (auto it = passes.begin() + beginning_pass_idx; it != passes.end();) {
+			if (!it->active && (it->pass_idx < ending_pass_idx)) {
+				modified_pass_idxs[it->pass_idx] = INVALID_PASS_IDX;
+				last_inactive_pass_idx = it->pass_idx;
+				it = passes.erase(it);
+			} else {
+				uint32_t new_pass_idx;
+				if (last_inactive_pass_idx == it->pass_idx) {
+					new_pass_idx = it->pass_idx;
+					--num_encountered_inactive_passes;
+				} else {
+					new_pass_idx = it->pass_idx - num_encountered_inactive_passes;
+				}
+				modified_pass_idxs[it->pass_idx] = new_pass_idx;
+				it->pass_idx = new_pass_idx;
+				++it;
+			}
+		}
+		// Modify the pass indices in pipeline_cache
+		for (auto& [_, storage] : pipeline_cache) {
+			bool should_remove = false;
+			//for (uint32_t& pass_idx : storage.pass_idxs) {
+			for (auto pass_it = storage.pass_idxs.begin(); pass_it != storage.pass_idxs.end();) {
+				if (auto it = modified_pass_idxs.find(*pass_it); it != modified_pass_idxs.end()) {
+					if (it->second == INVALID_PASS_IDX) {
+						pass_it = storage.pass_idxs.erase(pass_it);
+						continue;
+					} else {
+						*pass_it = it->second;
+					}
+				}
+				++pass_it;
+			}
+		}
+		// Modify the pass indices in registered resources
+		for (auto buffer_it = buffer_resource_map.begin(); buffer_it != buffer_resource_map.end();) {
+			if (auto it = modified_pass_idxs.find(buffer_it->second.first); it != modified_pass_idxs.end()) {
+				if (it->second == INVALID_PASS_IDX) {
+					buffer_it = buffer_resource_map.erase(buffer_it);
+					continue;
+				} else {
+					buffer_it->second.first = it->second;
+				}
+			}
+			++buffer_it;
+		}
+		for (auto img_it = img_resource_map.begin(); img_it != img_resource_map.end();) {
+			if (auto it = modified_pass_idxs.find(img_it->second); it != modified_pass_idxs.end()) {
+				if (it->second == INVALID_PASS_IDX) {
+					img_it = img_resource_map.erase(img_it);
+					continue;
+				} else {
+					img_it->second = it->second;
+				}
+			}
+			++img_it;
+		}
+	}
+	ending_pass_idx = ending_pass_idx - num_encountered_inactive_passes;
 }
 
 void RenderGraph::reset() {
 	pass_idxs_with_shader_compilation_overrides.clear();
 	event_pool.reset_events(ctx->device);
+
+	for (auto& [k, v] : pipeline_cache) {
+		v.offset_idx = 0;
+	}
+
 	for (int i = 0; i < passes.size(); i++) {
 		passes[i].set_signals_buffer.clear();
 		passes[i].wait_signals_buffer.clear();
@@ -995,6 +1092,7 @@ void RenderGraph::reset() {
 		passes[i].post_execution_buffer_barriers.clear();
 		passes[i].disable_execution = false;
 		passes[i].active = false;
+		passes[i].cached_in_rendergraph = false;
 		passes[i].next_binding_idx = 0;
 		if (!settings.shader_inference) {
 			passes[i].explicit_buffer_reads.clear();
@@ -1002,19 +1100,13 @@ void RenderGraph::reset() {
 			passes[i].explicit_tex_reads.clear();
 			passes[i].explicit_tex_writes.clear();
 		}
-		auto& pass = passes[i];
-		if (passes[i].record_override || recording) {
+		if (recording || passes[i].record_override) {
 			pipeline_cache[passes[i].name].pass_idxs.push_back(passes[i].pass_idx);
-			pipeline_cache[passes[i].name].offset_idx = 0;
-			passes[i].record_override = false;
 		}
+		passes[i].record_override = false;
 		passes[i].submitted = false;
 	}
-	if (!recording) {
-		for (auto& [k, v] : pipeline_cache) {
-			v.offset_idx = 0;
-		}
-	}
+
 	recording = false;
 	if (pipeline_tasks.size()) {
 		pipeline_tasks.clear();

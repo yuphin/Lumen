@@ -76,6 +76,7 @@ class RenderGraph {
 	uint32_t beginning_pass_idx = 0;
 	uint32_t ending_pass_idx = 0;
 	const bool multithreaded_pipeline_compilation = false;
+	static const uint32_t INVALID_PASS_IDX = UINT_MAX;
 
 	template <typename Settings>
 	RenderPass& add_pass_impl(const std::string& name, const Settings& settings);
@@ -129,8 +130,8 @@ class RenderPass {
 	RenderPass& bind(const ResourceBinding& binding);
 	RenderPass& bind(Texture2D& tex, VkSampler sampler);
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
-	RenderPass& bind_texture_array(std::vector<Texture2D>& texes);
-	RenderPass& bind_buffer_array(std::vector<Buffer>& buffers);
+	RenderPass& bind_texture_array(std::vector<Texture2D>& texes, bool force_update = false);
+	RenderPass& bind_buffer_array(std::vector<Buffer>& buffers, bool force_update = false);
 	RenderPass& bind_tlas(const AccelKHR& tlas);
 
 	RenderPass& write(Texture2D& tex);
@@ -152,7 +153,7 @@ class RenderPass {
 	RenderPass& zero(std::initializer_list<std::reference_wrapper<Texture2D>> textures);
 	RenderPass& zero(const Resource& resource, bool cond);
 	RenderPass& copy(const Resource& src, const Resource& dst);
-	void finalize(bool record_override_encountered);
+	void finalize();
 	friend RenderGraph;
 	std::vector<ResourceBinding> bound_resources;
 
@@ -193,6 +194,7 @@ class RenderPass {
 	bool is_pipeline_cached;
 	bool submitted = false;
 	bool record_override = true;
+	bool cached_in_rendergraph = false;
 	/*
 		Note:
 		The assumption is that a SyncDescriptor is unique to a pass (either via
@@ -245,6 +247,9 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	if (!settings.macros.empty()) {
 		macro_string += ')';
 	}
+	if (macro_string == "()") {
+		macro_string.clear();
+	}
 	name_with_macros += macro_string;
 
 	if (pipeline_cache.find(name_with_macros) != pipeline_cache.end()) {
@@ -271,10 +276,6 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 				passes[idx].is_pipeline_cached = true;
 			}
 			++storage.offset_idx;
-			// If this is a cached pipeline and the cached pipeline index is not 0, make this the starting pass index
-			if (idx != 0 && beginning_pass_idx == 0) {
-				beginning_pass_idx = idx;
-			}
 
 			// Pass was inserted prior, shift the subsequent existing pass indices
 			if (!pass_idxs_with_shader_compilation_overrides.empty()) {
@@ -282,7 +283,11 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 				storage.pass_idxs[offset_idx] = passes[idx].pass_idx;
 			}
 			ending_pass_idx = std::max(ending_pass_idx, idx + 1);
+			passes[idx].cached_in_rendergraph = true;
 			return passes[idx];
+		}
+		if (!recording && !reload_shaders) {
+			pass_idxs_with_shader_compilation_overrides.push_back(passes.size());
 		}
 		pipeline = pipeline_cache[name_with_macros].pipeline.get();
 		cached = true;
@@ -308,13 +313,9 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 
 template <typename T>
 inline RenderPass& RenderPass::push_constants(T* data) {
-	void* new_ptr = nullptr;
-	if (rg->recording) {
-		new_ptr = malloc(sizeof(T));
-	} else {
-		new_ptr = push_constant_data;
+	if (!push_constant_data) {
+		push_constant_data = malloc(sizeof(T));
 	}
-	memcpy(new_ptr, data, sizeof(T));
-	push_constant_data = new_ptr;
+	memcpy(push_constant_data, data, sizeof(T));
 	return *this;
 }
