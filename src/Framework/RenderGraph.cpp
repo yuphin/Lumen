@@ -1093,9 +1093,6 @@ void RenderGraph::reset() {
 			passes[i].explicit_tex_reads.clear();
 			passes[i].explicit_tex_writes.clear();
 		}
-		if (recording || passes[i].record_override) {
-			pipeline_cache[passes[i].name].pass_idxs.push_back(passes[i].pass_idx);
-		}
 		passes[i].record_override = false;
 		passes[i].submitted = false;
 	}

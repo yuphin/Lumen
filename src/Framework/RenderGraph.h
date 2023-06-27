@@ -311,6 +311,7 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	}
 
 	passes.emplace_back(type, pipeline, name_with_macros, this, pass_idx, settings, macro_string, cached);
+	pipeline_cache[name_with_macros].pass_idxs.push_back(pass_idx);
 	return passes.back();
 }
 
