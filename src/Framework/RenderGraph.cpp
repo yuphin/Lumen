@@ -8,8 +8,6 @@
 // doesn't show any output from the debugPrintf...
 // Possible solution: Make compilation with debugPrintf shaders synchronous?
 
-// TODO: Re-cache bound resources for shaders in pipelines
-
 #define DIRTY_CHECK(x) \
 	if (!(x)) {        \
 		return *this;  \
@@ -178,6 +176,63 @@ void RenderPass::transition_resources() {
 			}
 		}
 	}
+}
+
+void RenderGraph::cleanup_inactive_passes(uint32_t num_encountered_inactive_passes) {
+	if (num_encountered_inactive_passes == 0) {
+		return;
+	}
+	std::unordered_map<uint32_t, uint32_t> modified_pass_idxs;	// Stores new offsets
+	for (auto it = passes.begin() + beginning_pass_idx; it != passes.end();) {
+		if (!it->active && (it->pass_idx < ending_pass_idx)) {
+			modified_pass_idxs[it->pass_idx] = INVALID_PASS_IDX;
+			it = passes.erase(it);
+		} else {
+			uint32_t new_pass_idx = it->pass_idx - num_encountered_inactive_passes;
+			modified_pass_idxs[it->pass_idx] = new_pass_idx;
+			it->pass_idx = new_pass_idx;
+			++it;
+		}
+	}
+	// Modify the pass indices in pipeline_cache
+	for (auto& [_, storage] : pipeline_cache) {
+		bool should_remove = false;
+		for (auto pass_it = storage.pass_idxs.begin(); pass_it != storage.pass_idxs.end();) {
+			if (auto it = modified_pass_idxs.find(*pass_it); it != modified_pass_idxs.end()) {
+				if (it->second == INVALID_PASS_IDX) {
+					pass_it = storage.pass_idxs.erase(pass_it);
+					continue;
+				} else {
+					*pass_it = it->second;
+				}
+			}
+			++pass_it;
+		}
+	}
+	// Modify the pass indices in registered resources
+	for (auto buffer_it = buffer_resource_map.begin(); buffer_it != buffer_resource_map.end();) {
+		if (auto it = modified_pass_idxs.find(buffer_it->second.first); it != modified_pass_idxs.end()) {
+			if (it->second == INVALID_PASS_IDX) {
+				buffer_it = buffer_resource_map.erase(buffer_it);
+				continue;
+			} else {
+				buffer_it->second.first = it->second;
+			}
+		}
+		++buffer_it;
+	}
+	for (auto img_it = img_resource_map.begin(); img_it != img_resource_map.end();) {
+		if (auto it = modified_pass_idxs.find(img_it->second); it != modified_pass_idxs.end()) {
+			if (it->second == INVALID_PASS_IDX) {
+				img_it = img_resource_map.erase(img_it);
+				continue;
+			} else {
+				img_it->second = it->second;
+			}
+		}
+		++img_it;
+	}
+	ending_pass_idx = ending_pass_idx - num_encountered_inactive_passes;
 }
 
 static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_shaders) {
@@ -940,11 +995,12 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		std::sort(passes.begin(), passes.end(),
 				  [](const RenderPass& pass1, const RenderPass& pass2) { return pass1.pass_idx < pass2.pass_idx; });
 		pass_idxs_with_shader_compilation_overrides.clear();
-		uint32_t prev_pass_idx = -1;
+		// Remove duplicate passes
+		uint32_t prev_inactive_pass_idx = -1;
 		for (auto it = passes.begin() + beginning_pass_idx; it != passes.end();) {
 			if (!it->active) {
-				prev_pass_idx = it->pass_idx;
-			} else if(prev_pass_idx == it->pass_idx) {
+				prev_inactive_pass_idx = it->pass_idx;
+			} else if (prev_inactive_pass_idx == it->pass_idx) {
 				auto prev_it = it - 1;
 				auto& storage = pipeline_cache[prev_it->name];
 				for (auto pass_it = storage.pass_idxs.begin(); pass_it != storage.pass_idxs.end();) {
@@ -957,7 +1013,6 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 				it = passes.erase(prev_it);
 			}
 			++it;
-		
 		}
 	}
 
@@ -1007,69 +1062,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		passes[i].run(cmd);
 		i++;
 	}
-
-	if (num_encountered_inactive_passes) {
-		std::unordered_map<uint32_t, uint32_t> modified_pass_idxs;	// Stores new offsets
-		uint32_t last_inactive_pass_idx = -1;
-		for (auto it = passes.begin() + beginning_pass_idx; it != passes.end();) {
-			if (!it->active && (it->pass_idx < ending_pass_idx)) {
-				modified_pass_idxs[it->pass_idx] = INVALID_PASS_IDX;
-				last_inactive_pass_idx = it->pass_idx;
-				it = passes.erase(it);
-			} else {
-				uint32_t new_pass_idx;
-				if (last_inactive_pass_idx == it->pass_idx) {
-					new_pass_idx = it->pass_idx;
-					--num_encountered_inactive_passes;
-				} else {
-					new_pass_idx = it->pass_idx - num_encountered_inactive_passes;
-				}
-				modified_pass_idxs[it->pass_idx] = new_pass_idx;
-				it->pass_idx = new_pass_idx;
-				++it;
-			}
-		}
-		// Modify the pass indices in pipeline_cache
-		for (auto& [_, storage] : pipeline_cache) {
-			bool should_remove = false;
-			//for (uint32_t& pass_idx : storage.pass_idxs) {
-			for (auto pass_it = storage.pass_idxs.begin(); pass_it != storage.pass_idxs.end();) {
-				if (auto it = modified_pass_idxs.find(*pass_it); it != modified_pass_idxs.end()) {
-					if (it->second == INVALID_PASS_IDX) {
-						pass_it = storage.pass_idxs.erase(pass_it);
-						continue;
-					} else {
-						*pass_it = it->second;
-					}
-				}
-				++pass_it;
-			}
-		}
-		// Modify the pass indices in registered resources
-		for (auto buffer_it = buffer_resource_map.begin(); buffer_it != buffer_resource_map.end();) {
-			if (auto it = modified_pass_idxs.find(buffer_it->second.first); it != modified_pass_idxs.end()) {
-				if (it->second == INVALID_PASS_IDX) {
-					buffer_it = buffer_resource_map.erase(buffer_it);
-					continue;
-				} else {
-					buffer_it->second.first = it->second;
-				}
-			}
-			++buffer_it;
-		}
-		for (auto img_it = img_resource_map.begin(); img_it != img_resource_map.end();) {
-			if (auto it = modified_pass_idxs.find(img_it->second); it != modified_pass_idxs.end()) {
-				if (it->second == INVALID_PASS_IDX) {
-					img_it = img_resource_map.erase(img_it);
-					continue;
-				} else {
-					img_it->second = it->second;
-				}
-			}
-			++img_it;
-		}
-	}
-	ending_pass_idx = ending_pass_idx - num_encountered_inactive_passes;
+	cleanup_inactive_passes(num_encountered_inactive_passes);
 }
 
 void RenderGraph::reset() {

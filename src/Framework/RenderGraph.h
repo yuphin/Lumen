@@ -80,6 +80,9 @@ class RenderGraph {
 
 	template <typename Settings>
 	RenderPass& add_pass_impl(const std::string& name, const Settings& settings);
+
+   private:
+	void cleanup_inactive_passes(uint32_t num_encountered_inactive_passes);
 };
 
 class RenderPass {
@@ -262,7 +265,7 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 				if (curr_pass.gfx_settings) {
 					curr_pass.gfx_settings->color_outputs = settings.color_outputs;
 					curr_pass.gfx_settings->depth_output = settings.depth_output;
-				}	
+				}
 			}
 			passes[idx].active = true;
 			if (reload_shaders) {

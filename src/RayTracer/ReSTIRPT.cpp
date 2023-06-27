@@ -222,8 +222,5 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
 	result |= ImGui::SliderFloat("Min reconnection distance ratio", &min_vertex_distance_ratio, 0.0f, 1.0f);
-	if (result) {
-		int a = 4;
-	}
 	return result;
 }
