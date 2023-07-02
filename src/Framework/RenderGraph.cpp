@@ -178,7 +178,8 @@ void RenderPass::transition_resources() {
 	}
 }
 
-void RenderGraph::cleanup_inactive_passes(uint32_t num_encountered_inactive_passes) {
+void RenderGraph::cleanup_inactive_passes(uint32_t num_encountered_inactive_passes, 
+										  std::unordered_map<uint32_t, uint32_t> inactive_passes_map) {
 	if (num_encountered_inactive_passes == 0) {
 		return;
 	}
@@ -188,7 +189,13 @@ void RenderGraph::cleanup_inactive_passes(uint32_t num_encountered_inactive_pass
 			modified_pass_idxs[it->pass_idx] = INVALID_PASS_IDX;
 			it = passes.erase(it);
 		} else {
-			uint32_t new_pass_idx = it->pass_idx - num_encountered_inactive_passes;
+			auto pass_it = inactive_passes_map.find(it->pass_idx);
+			uint32_t new_pass_idx = it->pass_idx;
+			if (pass_it != inactive_passes_map.end()) {
+				new_pass_idx -= pass_it->second;
+			} else if (it->pass_idx >= ending_pass_idx) {
+				new_pass_idx -= num_encountered_inactive_passes;
+			}
 			modified_pass_idxs[it->pass_idx] = new_pass_idx;
 			it->pass_idx = new_pass_idx;
 			++it;
@@ -527,7 +534,7 @@ RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 }
 
 void RenderPass::finalize() {
-	if (!rg->reload_shaders && pipeline->handle) {
+	if (pipeline->handle) {
 		// Handle resource transitions
 		transition_resources();
 		return;
@@ -1019,8 +1026,12 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	uint32_t rem_passes = ending_pass_idx - beginning_pass_idx;
 	uint32_t num_encountered_inactive_passes = 0;
 	uint32_t i = beginning_pass_idx;
+	std::unordered_map<uint32_t, uint32_t> inactive_passes_map;
 	while (rem_passes > 0) {
 		if (passes[i].active) {
+			if (num_encountered_inactive_passes > 0) {
+				inactive_passes_map[i] = num_encountered_inactive_passes;
+			}
 			passes[i].finalize();
 
 		} else if (passes[i].pass_idx >= beginning_pass_idx && passes[i].pass_idx < ending_pass_idx) {
@@ -1062,7 +1073,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		passes[i].run(cmd);
 		i++;
 	}
-	cleanup_inactive_passes(num_encountered_inactive_passes);
+	cleanup_inactive_passes(num_encountered_inactive_passes, inactive_passes_map);
 }
 
 void RenderGraph::reset() {
@@ -1143,4 +1154,10 @@ void RenderGraph::destroy() {
 	registered_buffer_pointers.clear();
 	shader_cache.clear();
 	pipeline_cache.clear();
+}
+
+void RenderGraph::set_pipelines_dirty() {
+	for (auto& [k, v] : pipeline_cache) {
+		v.dirty = true;
+	}
 }

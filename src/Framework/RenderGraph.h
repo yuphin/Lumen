@@ -37,6 +37,7 @@ class RenderGraph {
 	void submit(CommandBuffer& cmd);
 	void run_and_submit(CommandBuffer& cmd);
 	void destroy();
+	void set_pipelines_dirty();
 	friend RenderPass;
 	bool recording = true;
 	bool reload_shaders = false;
@@ -60,6 +61,7 @@ class RenderGraph {
 		std::unique_ptr<Pipeline> pipeline;
 		uint32_t offset_idx;
 		std::vector<uint32_t> pass_idxs;
+		bool dirty = false;
 	};
 	VulkanContext* ctx = nullptr;
 	std::vector<RenderPass> passes;
@@ -82,7 +84,8 @@ class RenderGraph {
 	RenderPass& add_pass_impl(const std::string& name, const Settings& settings);
 
    private:
-	void cleanup_inactive_passes(uint32_t num_encountered_inactive_passes);
+	void cleanup_inactive_passes(uint32_t num_encountered_inactive_passes, std::unordered_map<uint32_t, uint32_t> inactive_passes_map);
+	bool dirty_pass_encountered = false;
 };
 
 class RenderPass {
@@ -194,7 +197,7 @@ class RenderPass {
 	int next_binding_idx = 0;
 	std::vector<uint32_t> descriptor_counts;
 	void* push_constant_data = nullptr;
-	bool is_pipeline_cached;
+	bool is_pipeline_cached = false;
 	bool submitted = false;
 	bool record_override = true;
 	bool cached_in_rendergraph = false;
@@ -255,8 +258,8 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	}
 	name_with_macros += macro_string;
 
-	if (pipeline_cache.find(name_with_macros) != pipeline_cache.end()) {
-		auto& storage = pipeline_cache[name_with_macros];
+	if (auto cache_it = pipeline_cache.find(name_with_macros); cache_it != pipeline_cache.end()) {
+		auto& storage = cache_it->second;
 		if (!recording && storage.pass_idxs.size()) {
 			uint32_t offset_idx = storage.offset_idx;
 			auto idx = storage.pass_idxs[offset_idx];
@@ -268,13 +271,17 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 				}
 			}
 			passes[idx].active = true;
-			if (reload_shaders) {
-				if (storage.offset_idx == 0) {
-					pipeline_cache[name_with_macros].pipeline->cleanup();
-					pipeline_cache[name_with_macros].pipeline = std::make_unique<Pipeline>(ctx, name_with_macros);
-				}
-				passes[idx].pipeline = pipeline_cache[name_with_macros].pipeline.get();
+
+			if (cache_it->second.dirty) {
+				cache_it->second.pipeline->cleanup();
+				cache_it->second.pipeline = std::make_unique<Pipeline>(ctx, name_with_macros);
+				dirty_pass_encountered = true;
 				passes[idx].is_pipeline_cached = false;
+				cache_it->second.dirty = false;
+			}
+
+			if (dirty_pass_encountered) {
+				passes[idx].pipeline = cache_it->second.pipeline.get();
 			} else {
 				passes[idx].is_pipeline_cached = true;
 			}
