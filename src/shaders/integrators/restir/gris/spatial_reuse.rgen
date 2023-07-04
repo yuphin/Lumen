@@ -25,6 +25,7 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 void main() {
 	GBuffer gbuffer = g_buffers.d[pixel_idx];
 	if (!gbuffer_data_valid(gbuffer)) {
+		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(0));
 		return;
 	}
 
