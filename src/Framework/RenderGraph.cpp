@@ -869,7 +869,6 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		if (src.tex) {
 			// Assumption: The copy(...) is called in the pass after the src is produced
 			if (dst.buf) {
-				LUMEN_ASSERT(src.tex->aspect_flags == dst.tex->aspect_flags, "Aspect flags mismatch");
 				VkBufferImageCopy region = {};
 				region.imageSubresource.aspectMask = src.tex->aspect_flags;
 				region.imageSubresource.mipLevel = 0;
@@ -882,6 +881,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 									   &region);
 				src.tex->transition(cmd, old_layout);
 			} else {
+				LUMEN_ASSERT(src.tex->aspect_flags == dst.tex->aspect_flags, "Aspect flags mismatch");
 				VkImageCopy region = {};
 				VkImageLayout old_layout = src.tex->layout;
 				src.tex->transition(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
