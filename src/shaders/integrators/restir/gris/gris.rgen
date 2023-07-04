@@ -119,7 +119,6 @@ void main() {
 			rc_partial_throughput = partial_throughput;
 			source_pdf = pdf;
 			connection_wi = direction;
-			connectable_vertex_found = true;
 		}
 
 		bool nee_visible = false;
@@ -160,6 +159,8 @@ void main() {
 			data.rc_wi = direction;
 			data.rc_Li = rc_Li;
 			data.path_flags = set_path_flags(side, nee_visible, depth);
+			connectable_vertex_found = true;
+			data.reservoir_contribution = f_cos / pdf;
 		}
 
 		specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
@@ -185,7 +186,7 @@ void main() {
 		return;
 	}
 	data.path_flags = (postfix_length & 0x1F) << 7 | data.path_flags;
-	data.reservoir_contribution = rc_partial_throughput * data.rc_postfix_L;
+	data.reservoir_contribution = rc_partial_throughput * (data.rc_Li + data.reservoir_contribution * data.rc_postfix_L);
 
 	float target_pdf = calc_target_pdf(data.reservoir_contribution);
 	stream_reservoir(seed, reservoir, data, target_pdf / source_pdf);

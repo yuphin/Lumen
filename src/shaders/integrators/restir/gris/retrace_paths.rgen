@@ -9,11 +9,12 @@
 #extension GL_EXT_shader_atomic_float : require
 
 #define RECONNECTION
+#define SCENE_TEX_IDX 5
 #include "gris_commons.glsl"
 GrisReservoir reservoirs = GrisReservoir(scene_desc.gris_reservoir_addr);
 GrisGBuffer g_buffers = GrisGBuffer(scene_desc.gris_gbuffer_addr);
 GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
-PathReconnections reconnection_data = PathReconnections(scene_desc.reconnection_addr);
+layout(binding = 4, std430) buffer PathReconnections { ReconnectionData reconnection_data[]; };
 
 ivec2 get_neighbor_offset(inout uvec4 seed) {
 	const float randa = rand(seed) * 2 * PI;
@@ -39,16 +40,16 @@ void main() {
 		}
 		ReconnectionData data;
 		data.reservoir_contribution = vec3(0);
-		data.target_pdf_in_neighbor = 0;
 		data.jacobian = 0;
 		GBuffer neighbor_gbuffer = g_buffers.d[neighbor_pixel_idx];
 		if (!gbuffer_data_valid(neighbor_gbuffer)) {
-			reconnection_data.d[pixel_idx] = data;
 			continue;
 		}
 		const Reservoir neighbor_reservoir = reservoirs.d[neighbor_pixel_idx];
+		uvec4 reservoir_seed = init_rng(coords, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num,
+										neighbor_reservoir.data.init_seed);
 		bool neighbor_in_canonical = retrace_paths(unpacked_gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy,
 												   uvec2(coords), data.jacobian, data.reservoir_contribution);
-		reconnection_data.d[pixel_idx] = data;
+		reconnection_data[num_spatial_samples * pixel_idx + i] = data;
 	}
 }

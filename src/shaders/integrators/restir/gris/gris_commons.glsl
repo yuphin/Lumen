@@ -7,7 +7,6 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisReservoi
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisGBuffer { GBuffer d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisDirectLighting { vec3 d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PrefixContributions { vec3 d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PathReconnections { ReconnectionData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Transformation { mat4 m[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
 
@@ -364,6 +363,7 @@ bool retrace_paths(in HitData gbuffer, in GrisData data, uvec2 source_coords, uv
 				reservoir_contribution += f * abs(rc_cos_x) * data.rc_postfix_L / bsdf_pdf;
 			}
 			reservoir_contribution = partial_throughput * reservoir_contribution;
+			// reservoir_contribution = partial_throughput * data.rc_postfix_L;
 			return true;
 		}
 

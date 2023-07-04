@@ -40,16 +40,16 @@ struct GBuffer {
 };
 
 struct GrisData {
+	vec3 rc_wi;
 	uint init_seed;
 	// Layout for the path flags
 	// | 5b postfix_length| 5b prefix_length |1b nee_visible |1b side|
-	uint path_flags;
-	float rc_g;
-	uint rc_seed;
-	vec3 rc_wi;
 	vec3 rc_postfix_L;
+	uint path_flags;
 	vec3 rc_Li;
+	float rc_g;
 	vec3 reservoir_contribution;
+	uint rc_seed;
 	vec2 rc_barycentrics;
 	uvec2 rc_primitive_instance_id;
 };
@@ -62,8 +62,9 @@ struct Reservoir {
 };
 
 struct ReconnectionData {
-	float jacobian;
 	vec3 reservoir_contribution;
+	float jacobian;
+	vec3 pad;
 	float target_pdf_in_neighbor;
 };
 

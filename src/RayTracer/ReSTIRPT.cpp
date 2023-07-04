@@ -38,7 +38,7 @@ void ReSTIRPT::init() {
 							   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-							   instance->width * instance->height * sizeof(ReconnectionData));
+							   instance->width * instance->height * sizeof(ReconnectionData) * num_spatial_samples);
 	transformations_buffer.create("Transformations Buffer", &instance->vkb.ctx,
 								  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
@@ -71,7 +71,6 @@ void ReSTIRPT::init() {
 	desc.gris_reservoir_addr = gris_reservoir_buffer.get_device_address();
 	desc.gris_direct_lighting_addr = direct_lighting_buffer.get_device_address();
 	desc.prefix_contributions_addr = prefix_contribution_buffer.get_device_address();
-	desc.reconnection_addr = reconnection_buffer.get_device_address();
 	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
 	scene_desc_buffer.create(
 		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -88,7 +87,6 @@ void ReSTIRPT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_gbuffer_addr, &gris_gbuffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, &gris_reservoir_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, &direct_lighting_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, reconnection_addr, &reconnection_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, &compact_vertices_buffer, instance->vkb.rg);
 
 	path_length = config->path_length;
@@ -132,8 +130,6 @@ void ReSTIRPT::render() {
 											 .dims = {instance->width, instance->height},
 											 .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
-		.zero(gris_reservoir_buffer)
-		.zero(reconnection_buffer)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
 		.bind_texture_array(scene_textures)
@@ -152,6 +148,7 @@ void ReSTIRPT::render() {
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
+		.bind(reconnection_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 
@@ -168,6 +165,7 @@ void ReSTIRPT::render() {
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
+		.bind(reconnection_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 
@@ -184,6 +182,7 @@ void ReSTIRPT::render() {
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
+		.bind(reconnection_buffer)
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 
@@ -218,9 +217,19 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
 	result |= ImGui::Checkbox("Show reconnection radiance", &show_reconnection_radiance);
 	result |= ImGui::Checkbox("Enable MIS in GRIS", &enable_mis_in_gris);
-	result |= ImGui::SliderInt("Num spatial samples", (int*)&num_spatial_samples, 0, 12);
+	bool spatial_samples_changed = ImGui::SliderInt("Num spatial samples", (int*)&num_spatial_samples, 0, 12);
+	result |= spatial_samples_changed;
 	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
 	result |= ImGui::SliderFloat("Min reconnection distance ratio", &min_vertex_distance_ratio, 0.0f, 1.0f);
+
+	if (spatial_samples_changed && num_spatial_samples > 0) {
+		reconnection_buffer.destroy();
+		reconnection_buffer.create("Reservoir Connection", &instance->vkb.ctx,
+								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+									   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								   instance->width * instance->height * sizeof(ReconnectionData) * num_spatial_samples);
+	}
 	return result;
 }
