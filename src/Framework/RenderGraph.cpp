@@ -4,10 +4,6 @@
 #include "VkUtils.h"
 #include <unordered_set>
 
-// TODO: "Handle" the stupid bug where the multithreaded pipeline compilation
-// doesn't show any output from the debugPrintf...
-// Possible solution: Make compilation with debugPrintf shaders synchronous?
-
 #define DIRTY_CHECK(x) \
 	if (!(x)) {        \
 		return *this;  \
