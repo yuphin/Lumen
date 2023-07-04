@@ -282,6 +282,7 @@ bool RayTracer::gui() {
 	if (ImGui::Button("Reload shaders")) {
 		vkb.rg->reload_shaders = true;
 		vkb.rg->shader_cache.clear();
+		vkb.rg->set_pipelines_dirty();
 		updated |= true;
 	}
 	ImGui::Checkbox("Comparison mode (F11)", &comparison_mode);
