@@ -26,10 +26,10 @@ void main() {
 
 	Reservoir reservoir;
 	GrisData data;
-	GBuffer gbuffer;
+	GBuffer gbuffer_out;
 	init_reservoir(reservoir);
 	init_data(data);
-	init_gbuffer(gbuffer);
+	init_gbuffer(gbuffer_out);
 
 	bool specular = false;
 	vec3 throughput = vec3(1);
@@ -52,7 +52,7 @@ void main() {
 	vec3 prefix_contribution = vec3(0);
 	for (int depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
-		const bool found_isect = payload.material_idx != -1;
+		const bool found_isect = payload.instance_idx != -1;
 		if (depth >= pc_ray.max_depth - 1) {
 			break;
 		}
@@ -69,15 +69,13 @@ void main() {
 			break;
 		}
 
-		const Material hit_mat = load_material(payload.material_idx, payload.uv);
+		HitData gbuffer = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
+		const Material hit_mat = load_material(gbuffer.material_idx, gbuffer.uv);
 
 		// Fill in GBuffer
 		if (depth == 0) {
-			gbuffer.pos = payload.pos;
-			gbuffer.n_s = payload.n_s;
-			gbuffer.n_g = payload.n_g;
-			gbuffer.material_idx = payload.material_idx;
-			gbuffer.uv = payload.uv;
+			gbuffer_out.barycentrics = payload.attribs;
+			gbuffer_out.primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 			if (pc_ray.direct_lighting == 1) {
 				direct_lighting += throughput * hit_mat.emissive_factor;
 			}
@@ -94,42 +92,40 @@ void main() {
 		}
 
 		const vec3 wo = -direction;
-		vec3 n_s = payload.n_s;
+		vec3 n_s = gbuffer.n_s;
 		bool side = true;
-		vec3 n_g = payload.n_g;
-		if (dot(payload.n_g, wo) < 0.) n_g = -n_g;
-		if (dot(n_g, payload.n_s) < 0) {
+		vec3 n_g = gbuffer.n_g;
+		if (dot(gbuffer.n_g, wo) < 0.) n_g = -n_g;
+		if (dot(n_g, gbuffer.n_s) < 0) {
 			n_s = -n_s;
 			side = false;
 		}
 
-		vec3 dist = payload.pos - origin.xyz;
+		vec3 dist = gbuffer.pos - origin.xyz;
 		g = abs(dot(n_s, -wo)) / dot(dist, dist);
 
-		origin.xyz = offset_ray(payload.pos, n_g);
+		origin.xyz = offset_ray(gbuffer.pos, n_g);
 
 		prev_rough = curr_rough;
 		curr_rough = is_rough(hit_mat);
 		bool connectable = !connectable_vertex_found && ((prev_rough && curr_rough));
-		prev_pos = payload.pos;
+		prev_pos = gbuffer.pos;
 		if (connectable) {
 			data.rc_seed = seed.w;
-			data.rc_uv = payload.uv;
-			data.rc_ns = n_s;
-			data.rc_mat_id = payload.material_idx;
+			data.rc_barycentrics = payload.attribs;
+			data.rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 			data.rc_g = g;
 			prefix_contribution = col;
 			rc_partial_throughput = partial_throughput;
 			source_pdf = pdf;
 			connection_wi = direction;
-			connectable_vertex_found = true;
 		}
 
 		bool nee_visible = false;
 		vec3 rc_Li = vec3(0);
 		if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
 			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
-			rc_Li = uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo, nee_visible) / light_pick_pdf;
+			rc_Li = uniform_sample_light(seed, hit_mat, gbuffer.pos, side, n_s, wo, nee_visible) / light_pick_pdf;
 			if (depth > 0) {
 				col += throughput * rc_Li;
 			} else if (pc_ray.direct_lighting == 1) {
@@ -161,9 +157,10 @@ void main() {
 
 		if (connectable) {
 			data.rc_wi = direction;
-			data.rc_pos = payload.pos;
 			data.rc_Li = rc_Li;
 			data.path_flags = set_path_flags(side, nee_visible, depth);
+			connectable_vertex_found = true;
+			data.reservoir_contribution = f_cos / pdf;
 		}
 
 		specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
@@ -182,14 +179,6 @@ void main() {
 			}
 		}
 	}
-#if 0
-	GBuffer gbuf2 = g_buffers.d[pixel_idx];
-	float epos = dot(gbuffer.pos - gbuf2.pos, gbuffer.pos - gbuf2.pos);
-	float euv = dot(gbuffer.uv - gbuf2.uv, gbuffer.uv - gbuf2.uv);
-	float ens = dot(gbuffer.n_s - gbuf2.n_s, gbuffer.n_s - gbuf2.n_s);
-	float eng = dot(gbuffer.n_g - gbuf2.n_g, gbuffer.n_g - gbuf2.n_g);
-	ASSERT(!(epos > 1e-8 || euv > 1e-8 || ens > 1e-8 || eng > 1e-8 || gbuffer.material_idx != gbuf2.material_idx));
-#endif
 	if (pc_ray.direct_lighting == 1) {
 		direct_lighting_buffer.d[pixel_idx] = direct_lighting;
 	}
@@ -197,7 +186,7 @@ void main() {
 		return;
 	}
 	data.path_flags = (postfix_length & 0x1F) << 7 | data.path_flags;
-	data.reservoir_contribution = rc_partial_throughput * data.rc_postfix_L;
+	data.reservoir_contribution = rc_partial_throughput * (data.rc_Li + data.reservoir_contribution * data.rc_postfix_L);
 
 	float target_pdf = calc_target_pdf(data.reservoir_contribution);
 	stream_reservoir(seed, reservoir, data, target_pdf / source_pdf);
@@ -207,5 +196,5 @@ void main() {
 	}
 	prefix_contributions.d[pixel_idx] = prefix_contribution;
 	reservoirs.d[pixel_idx] = reservoir;
-	g_buffers.d[pixel_idx] = gbuffer;
+	g_buffers.d[pixel_idx] = gbuffer_out;
 }

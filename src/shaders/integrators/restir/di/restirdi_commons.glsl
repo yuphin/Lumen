@@ -1,4 +1,6 @@
 #include "../../../commons.glsl"
+layout(location = 0) rayPayloadEXT HitPayload payload;
+layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
 layout(push_constant) uniform _PushConstantRay { PCReSTIR pc_ray; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GBuffer { RestirGBufferData d[]; };

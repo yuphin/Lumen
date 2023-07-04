@@ -10,6 +10,8 @@
 
 #include "restirgi_commons.h"
 #include "../../../commons.glsl"
+layout(location = 0) rayPayloadEXT HitPayload payload;
+layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 #include "restirgi_commons.glsl"
 #define M_MAX 30
 

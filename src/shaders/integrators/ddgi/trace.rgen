@@ -13,7 +13,8 @@
 #include "ddgi_commons.h"
 #include "../../commons.glsl"
 #include "ddgi_commons.glsl"
-
+layout(location = 0) rayPayloadEXT HitPayload payload;
+layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCDDGI pc_ray; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GBuffer { GBufferData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ProbeOffset { vec4 d[]; };

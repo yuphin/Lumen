@@ -8,12 +8,13 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
-// TODO: Change prefix length when temporal reuse is added
+#define SCENE_TEX_IDX 5
 #include "gris_commons.glsl"
 GrisReservoir reservoirs = GrisReservoir(scene_desc.gris_reservoir_addr);
 GrisGBuffer g_buffers = GrisGBuffer(scene_desc.gris_gbuffer_addr);
 GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
 PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
+layout(binding = 4, std430) readonly buffer PathReconnections { ReconnectionData reconnection_data[]; };
 
 ivec2 get_neighbor_offset(inout uvec4 seed) {
 	const float randa = rand(seed) * 2 * PI;
@@ -23,7 +24,7 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 
 void main() {
 	GBuffer gbuffer = g_buffers.d[pixel_idx];
-	if (gbuffer.material_idx == -1) {
+	if (!gbuffer_data_valid(gbuffer)) {
 		return;
 	}
 
@@ -39,8 +40,9 @@ void main() {
 	float m_c = 1.0;
 	const float canonical_in_canonical_pdf = calc_target_pdf(canonical_reservoir_contribution);
 	uint num_valid_samples = 0;
+	uvec4 neighbor_seed = seed;
 	for (uint i = 0; i < num_spatial_samples; i++) {
-		ivec2 rand_offset = get_neighbor_offset(seed);
+		ivec2 rand_offset = get_neighbor_offset(neighbor_seed);
 		const ivec2 coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
 		const uint neighbor_pixel_idx = coords.x * pc_ray.size_y + coords.y;
 		if (any(lessThan(coords, ivec2(0))) || any(greaterThanEqual(coords, gl_LaunchSizeEXT.xy))) {
@@ -48,44 +50,34 @@ void main() {
 		}
 		num_valid_samples++;
 
-		const Reservoir neighbor_reservoir = reservoirs.d[neighbor_pixel_idx];
-		vec3 reservoir_contribution;
-		float jacobian;
-		bool neighbor_in_canonical = retrace_paths(gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy, uvec2(coords),
-												   jacobian, reservoir_contribution);
+		const ReconnectionData data = reconnection_data[num_spatial_samples * pixel_idx + i];
 
-		if (!neighbor_in_canonical) {
+		const Reservoir neighbor_reservoir = reservoirs.d[neighbor_pixel_idx];
+
+		GBuffer neighbor_gbuffer = g_buffers.d[neighbor_pixel_idx];
+		if (!gbuffer_data_valid(neighbor_gbuffer)) {
 			reservoir.M += neighbor_reservoir.M;
 			m_c += 1.0;
 			continue;
 		}
 		float neighbor_in_neighbor_pdf = calc_target_pdf(neighbor_reservoir.data.reservoir_contribution);
-		float neighbor_in_canonical_pdf = calc_target_pdf(reservoir_contribution) * jacobian;
+		float neighbor_in_canonical_pdf = calc_target_pdf(data.reservoir_contribution) * data.jacobian;
 		const float m_i_num = neighbor_reservoir.M * neighbor_in_neighbor_pdf;
 		const float m_i_denom =
 			m_i_num + canonical_reservoir.M * neighbor_in_canonical_pdf / pc_ray.num_spatial_samples;
-		const float m_i = m_i_denom == 0 ? 0 : m_i_num / m_i_denom;
-		if (m_i <= 0) {
-			reservoir.M += neighbor_reservoir.M;
-			m_c += 1.0;
-			continue;
-		}
-		GBuffer neighbor_gbuffer = g_buffers.d[neighbor_pixel_idx];
-		float canonical_in_neighbor_pdf;
-		bool canonical_in_neighbor = retrace_paths_and_evaluate(
-			neighbor_gbuffer, canonical_reservoir.data, uvec2(coords), gl_LaunchIDEXT.xy, canonical_in_neighbor_pdf);
-		if (!canonical_in_neighbor) {
+		float m_i = m_i_denom == 0 ? 0 : m_i_num / m_i_denom;
+
+		if (m_i <= 0.0 || m_i >= 1.0) {
 			reservoir.M += neighbor_reservoir.M;
 			m_c += 1.0;
 			continue;
 		}
 
-		const float m_c_num = neighbor_reservoir.M * canonical_in_neighbor_pdf;
-
+		const float m_c_num = neighbor_reservoir.M * data.target_pdf_in_neighbor;
 		const float m_c_denom =
 			m_c_num + canonical_reservoir.M * canonical_in_canonical_pdf / pc_ray.num_spatial_samples;
 		const float m_c_val = m_c_denom == 0.0 ? 0.0 : m_c_num / m_c_denom;
-		if (m_c_val <= 0) {
+		if (m_c_val <= 0.0) {
 			reservoir.M += neighbor_reservoir.M;
 			m_c += 1.0;
 			continue;
@@ -95,7 +87,7 @@ void main() {
 		ASSERT1(m_i > -1e-3 && m_i <= 1.001, "m_i <= 1.0 : %f\n", m_i);
 		bool accepted = combine_reservoir(seed, reservoir, neighbor_reservoir, neighbor_in_canonical_pdf * m_i);
 		if (accepted) {
-			curr_reservoir_contribution = reservoir_contribution;
+			curr_reservoir_contribution = data.reservoir_contribution;
 		}
 	}
 	bool canonical = combine_reservoir(seed, reservoir, canonical_reservoir, canonical_in_canonical_pdf * m_c);

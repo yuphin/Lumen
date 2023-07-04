@@ -41,6 +41,7 @@ using mat4 = glm::mat4;
 using uvec4 = glm::uvec4;
 using ivec2 = glm::ivec2;
 using uint = unsigned int;
+using uvec2 = glm::uvec2;
 #define ALIGN16 alignas(16)
 #define NAMESPACE_BEGIN(name) namespace name {
 #define NAMESPACE_END() }
@@ -268,7 +269,8 @@ struct Material {
 	uint64_t gris_reservoir_addr;
 	uint64_t gris_direct_lighting_addr;
 	uint64_t prefix_contributions_addr;
-	uint64_t reconnection_addr;
+	uint64_t transformations_addr;
+	uint64_t compact_vertices_addr;
 
 	// VCM Reservoir
 	uint64_t vcm_reservoir_addr;

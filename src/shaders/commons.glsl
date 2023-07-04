@@ -9,8 +9,6 @@
 #define SCENE_TEX_IDX 4
 #endif
 
-layout(location = 0) rayPayloadEXT HitPayload payload;
-layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(binding = 0, rgba32f) uniform image2D image;
 layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
 layout(binding = 2) buffer SceneDesc_ { SceneDesc scene_desc; };
@@ -33,6 +31,7 @@ Vertices vertices = Vertices(scene_desc.vertex_addr);
 Normals normals = Normals(scene_desc.normal_addr);
 Materials materials = Materials(scene_desc.material_addr);
 InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
+TexCoords tex_coords = TexCoords(scene_desc.uv_addr);
 
 #include "bsdf_commons.glsl"
 
@@ -177,14 +176,6 @@ TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands,
                                uint triangle_idx, in mat4 world_matrix) {
     float u, v;
     return sample_triangle(pinfo, rands, triangle_idx, world_matrix, u, v);
-}
-
-vec3 eval_albedo(const Material m) {
-    vec3 albedo = m.albedo;
-    if (m.texture_id > -1) {
-        albedo *= texture(scene_textures[m.texture_id], payload.uv).xyz;
-    }
-    return albedo;
 }
 
 vec3 shade_atmosphere(uint dir_light_idx, vec3 sky_col, vec3 ray_origin, vec3 ray_dir, float ray_length) {

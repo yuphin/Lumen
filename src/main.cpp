@@ -12,8 +12,8 @@ int main(int argc, char* argv[]) {
 	bool enable_debug = false;
 #endif
 	bool fullscreen = false;
-	int width = 1600;
-	int height = 900;
+	int width = 1920;
+	int height = 1080;
 	Logger::init();
 	ThreadPool::init();
 	Window window(width, height, fullscreen);

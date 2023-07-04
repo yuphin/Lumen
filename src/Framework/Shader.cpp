@@ -484,7 +484,7 @@ static std::vector<uint32_t> compile_file(const std::string& source_name, shader
 	options.SetIncluder(std::make_unique<glslc::FileIncluder>(&fileFinder));
 	options.SetTargetSpirv(shaderc_spirv_version_1_6);
 	options.SetTargetEnvironment(shaderc_target_env_vulkan, 2);
-#if 0
+#if 1
 	options.SetGenerateDebugInfo();
 #endif
 

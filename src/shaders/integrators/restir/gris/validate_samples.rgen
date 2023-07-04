@@ -8,11 +8,13 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
+#define RECONNECTION
+#define SCENE_TEX_IDX 5
 #include "gris_commons.glsl"
 GrisReservoir reservoirs = GrisReservoir(scene_desc.gris_reservoir_addr);
 GrisGBuffer g_buffers = GrisGBuffer(scene_desc.gris_gbuffer_addr);
 GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
-PathReconnections reconnection_data = PathReconnections(scene_desc.reconnection_addr);
+layout(binding = 4, std430) buffer PathReconnections { ReconnectionData reconnection_data[]; };
 
 ivec2 get_neighbor_offset(inout uvec4 seed) {
 	const float randa = rand(seed) * 2 * PI;
@@ -22,7 +24,7 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 
 void main() {
 	GBuffer gbuffer = g_buffers.d[pixel_idx];
-	if (gbuffer.material_idx == -1) {
+	if (!gbuffer_data_valid(gbuffer)) {
 		return;
 	}
 	const Reservoir canonical_reservoir = reservoirs.d[pixel_idx];
@@ -35,12 +37,19 @@ void main() {
 			continue;
 		}
 		GBuffer neighbor_gbuffer = g_buffers.d[neighbor_pixel_idx];
-		float target_pdf_in_neighbor;
-		bool canonical_in_neighbor = retrace_paths_and_evaluate(
-			neighbor_gbuffer, canonical_reservoir.data, uvec2(coords), gl_LaunchIDEXT.xy, target_pdf_in_neighbor);
-		if (!canonical_in_neighbor) {
-			target_pdf_in_neighbor = 0;
+		if (!gbuffer_data_valid(neighbor_gbuffer)) {
+			continue;
 		}
-		reconnection_data.d[pixel_idx].target_pdf_in_neighbor = target_pdf_in_neighbor;
+		HitData unpacked_neighbor_gbuffer =
+			get_hitdata(neighbor_gbuffer.barycentrics, neighbor_gbuffer.primitive_instance_id.y,
+						neighbor_gbuffer.primitive_instance_id.x);
+		ReconnectionData data = reconnection_data[num_spatial_samples * pixel_idx + i];
+		float target_pdf_in_neighbor = 0;
+		bool canonical_in_neighbor =
+			retrace_paths_and_evaluate(unpacked_neighbor_gbuffer, canonical_reservoir.data, uvec2(coords),
+									   gl_LaunchIDEXT.xy, target_pdf_in_neighbor);
+		reconnection_data[num_spatial_samples * pixel_idx + i].target_pdf_in_neighbor = target_pdf_in_neighbor;
 	}
+
+	
 }
