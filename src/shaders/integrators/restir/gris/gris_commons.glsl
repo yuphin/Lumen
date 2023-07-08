@@ -3,8 +3,6 @@
 layout(location = 0) rayPayloadEXT GrisHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc_ray; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisReservoir { Reservoir d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisGBuffer { GBuffer d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisDirectLighting { vec3 d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PrefixContributions { vec3 d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Transformation { mat4 m[]; };
@@ -108,6 +106,23 @@ HitDataWithoutGeometryNormals get_hitdata_no_ng(vec2 attribs, uint instance_idx,
 	gbuffer.material_idx = pinfo.material_index;
 	gbuffer.uv = vtx[0].uv0 * bary.x + vtx[1].uv0 * bary.y + vtx[2].uv0 * bary.z;
 	return gbuffer;
+}
+
+vec3 get_hitdata_pos_only(vec2 attribs, uint instance_idx, uint triangle_idx) {
+	const PrimMeshInfo pinfo = prim_infos.d[instance_idx];
+	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
+	const ivec3 ind = ivec3(pinfo.vertex_offset) +
+					  ivec3(indices.i[index_offset + 0], indices.i[index_offset + 1], indices.i[index_offset + 2]);
+	const vec3 bary = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
+	const mat4 to_world = transforms.m[instance_idx];
+	const mat4 tsp_inv_to_world = transpose(inverse(to_world));
+	HitDataWithoutGeometryNormals gbuffer;
+	Vertex vtx[3];
+
+	vtx[0] = compact_vertices.d[ind.x];
+	vtx[1] = compact_vertices.d[ind.y];
+	vtx[2] = compact_vertices.d[ind.z];
+	return vec3(to_world * vec4(vtx[0].pos * bary.x + vtx[1].pos * bary.y + vtx[2].pos * bary.z, 1.0));
 }
 
 void init_gbuffer(out GBuffer gbuffer) { gbuffer.primitive_instance_id = uvec2(-1); }
@@ -267,7 +282,7 @@ void unpack_path_flags(uint packed_data, out bool side, out bool nee_visible, ou
 	postfix_length = (packed_data >> 7) & 0x1F;
 }
 
-bool retrace_paths(in HitData gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords,
+bool retrace_paths(in HitData gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords, uint seed_helper,
 				   out float jacobian, out vec3 reservoir_contribution) {
 	if (!reservoir_data_valid(data)) {
 		return false;
@@ -293,7 +308,7 @@ bool retrace_paths(in HitData gbuffer, in GrisData data, uvec2 source_coords, uv
 	vec3 pos = gbuffer.pos;
 
 	uvec4 reservoir_seed =
-		init_rng(target_coords, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num, data.init_seed);
+		init_rng(target_coords, gl_LaunchSizeEXT.xy, seed_helper, data.init_seed);
 
 	HitDataWithoutGeometryNormals rc_gbuffer =
 		get_hitdata_no_ng(data.rc_barycentrics, data.rc_primitive_instance_id.y, data.rc_primitive_instance_id.x);
@@ -349,7 +364,7 @@ bool retrace_paths(in HitData gbuffer, in GrisData data, uvec2 source_coords, uv
 			} else {
 				const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
 				uvec4 reconnection_seed = init_rng(target_coords, gl_LaunchSizeEXT.xy,
-												   pc_ray.total_frame_num ^ pc_ray.random_num, data.rc_seed);
+												   seed_helper, data.rc_seed);
 				reservoir_contribution =
 					uniform_sample_light_with_visibility_override(reconnection_seed, rc_mat, rc_gbuffer.pos, rc_side,
 																  rc_gbuffer.n_s, -wi, rc_nee_visible) /
@@ -395,10 +410,10 @@ bool retrace_paths(in HitData gbuffer, in GrisData data, uvec2 source_coords, uv
 }
 
 bool retrace_paths_and_evaluate(in HitData gbuffer, in GrisData data, uvec2 source_coords, uvec2 target_coords,
-								out float target_pdf) {
+								uint seed_helper, out float target_pdf) {
 	vec3 reservoir_contribution;
 	float jacobian;
-	bool result = retrace_paths(gbuffer, data, source_coords, target_coords, jacobian, reservoir_contribution);
+	bool result = retrace_paths(gbuffer, data, source_coords, target_coords, seed_helper, jacobian, reservoir_contribution);
 	target_pdf = result ? calc_target_pdf(reservoir_contribution) * jacobian : 0.0;
 	return result;
 }

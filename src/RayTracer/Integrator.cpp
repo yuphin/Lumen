@@ -249,7 +249,9 @@ void Integrator::create_tlas() {
 
 void Integrator::update_uniform_buffers() {
 	camera->update_view_matrix();
+	scene_ubo.prev_view = scene_ubo.view;
 	scene_ubo.view = camera->view;
+	scene_ubo.prev_projection = camera->projection;
 	scene_ubo.projection = camera->projection;
 	scene_ubo.view_pos = glm::vec4(camera->position, 1);
 	scene_ubo.inv_view = glm::inverse(camera->view);

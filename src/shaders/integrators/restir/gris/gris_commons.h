@@ -14,6 +14,7 @@ struct PCReSTIRPT {
 	int light_triangle_count;
 	uint dir_light_idx;
 	uint random_num;
+	uint prev_random_num;
 	uint total_frame_num;
 	uint enable_accumulation;
 	float scene_extent;
@@ -30,11 +31,6 @@ struct PCReSTIRPT {
 
 
 struct GBuffer {
-	// vec3 pos;
-	// vec3 n_g;
-	// vec3 n_s;
-	// vec2 uv;
-	// uint material_idx;
 	vec2 barycentrics;
 	uvec2 primitive_instance_id;
 };
@@ -59,6 +55,7 @@ struct Reservoir {
 	uint M;
 	float W;
 	float w_sum;
+	float pad;
 };
 
 struct ReconnectionData {

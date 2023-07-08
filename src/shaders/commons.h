@@ -265,8 +265,6 @@ struct Material {
 	uint64_t passthrough_reservoir_addr;
 	uint64_t spatial_reservoir_addr;
 	// ReSTIR PT
-	uint64_t gris_gbuffer_addr;
-	uint64_t gris_reservoir_addr;
 	uint64_t gris_direct_lighting_addr;
 	uint64_t prefix_contributions_addr;
 	uint64_t transformations_addr;

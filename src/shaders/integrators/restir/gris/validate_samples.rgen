@@ -9,13 +9,13 @@
 #extension GL_EXT_shader_atomic_float : require
 
 #define RECONNECTION
-#define SCENE_TEX_IDX 5
+#define SCENE_TEX_IDX 7
 #include "gris_commons.glsl"
-GrisReservoir reservoirs = GrisReservoir(scene_desc.gris_reservoir_addr);
 GrisGBuffer g_buffers = GrisGBuffer(scene_desc.gris_gbuffer_addr);
 GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
 layout(binding = 4, std430) buffer PathReconnections { ReconnectionData reconnection_data[]; };
-
+layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir in_reservoirs[]; };
+layout(binding = 6, std430) readonly buffer PrevReservoirs { Reservoir prev_reservoirs[]; };
 ivec2 get_neighbor_offset(inout uvec4 seed) {
 	const float randa = rand(seed) * 2 * PI;
 	const float randr = sqrt(rand(seed)) * pc_ray.spatial_radius;
@@ -27,8 +27,32 @@ void main() {
 	if (!gbuffer_data_valid(gbuffer)) {
 		return;
 	}
-	const Reservoir canonical_reservoir = reservoirs.d[pixel_idx];
 	uint num_spatial_samples = pc_ray.enable_spatial_reuse == 1 ? pc_ray.num_spatial_samples : 0;
+	const Reservoir canonical_reservoir = in_reservoirs[pixel_idx];
+	// Temporal reuse
+	vec3 pos =
+		get_hitdata_pos_only(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
+	vec4 prev_pos = ubo.prev_view * vec4(pos, 1);
+	prev_pos /= prev_pos.z;
+	prev_pos = -ubo.prev_projection * prev_pos;
+	ivec2 prev_coords = ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
+	bool temporal_reservoirs_valid = false;
+	if (pc_ray.total_frame_num > 0 && !(any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy)))) {
+		const uint prev_idx = prev_coords.x * pc_ray.size_y + prev_coords.y;
+		GBuffer prev_gbuffer = g_buffers.d[prev_idx];
+		if (gbuffer_data_valid(prev_gbuffer)) {
+			HitData unpacked_prev_reservoir = get_hitdata(
+				prev_gbuffer.barycentrics, prev_gbuffer.primitive_instance_id.y, prev_gbuffer.primitive_instance_id.x);
+			ReconnectionData data = reconnection_data[(num_spatial_samples + 1) * pixel_idx + 0];
+			float target_pdf_in_prev = 0;
+			bool canonical_in_neighbor = retrace_paths_and_evaluate(
+				unpacked_prev_reservoir, canonical_reservoir.data, uvec2(prev_coords), gl_LaunchIDEXT.xy,
+				(pc_ray.total_frame_num - 1) ^ pc_ray.prev_random_num, target_pdf_in_prev);
+			reconnection_data[(num_spatial_samples + 1) * pixel_idx + 0].target_pdf_in_neighbor = target_pdf_in_prev;
+		}
+	}
+
+	uint seed_helper = pc_ray.total_frame_num ^ pc_ray.random_num;
 	for (uint i = 0; i < num_spatial_samples; i++) {
 		ivec2 rand_offset = get_neighbor_offset(seed);
 		const ivec2 coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
@@ -47,9 +71,8 @@ void main() {
 		float target_pdf_in_neighbor = 0;
 		bool canonical_in_neighbor =
 			retrace_paths_and_evaluate(unpacked_neighbor_gbuffer, canonical_reservoir.data, uvec2(coords),
-									   gl_LaunchIDEXT.xy, target_pdf_in_neighbor);
-		reconnection_data[num_spatial_samples * pixel_idx + i].target_pdf_in_neighbor = target_pdf_in_neighbor;
+									   gl_LaunchIDEXT.xy, seed_helper, target_pdf_in_neighbor);
+		reconnection_data[(num_spatial_samples + 1) * pixel_idx + i + 1].target_pdf_in_neighbor =
+			target_pdf_in_neighbor;
 	}
-
-	
 }

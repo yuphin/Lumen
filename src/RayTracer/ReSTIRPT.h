@@ -15,7 +15,9 @@ class ReSTIRPT : public Integrator {
    private:
 	Buffer direct_lighting_buffer;
 	Buffer gris_gbuffer;
-	Buffer gris_reservoir_buffer;
+	Buffer gris_prev_gbuffer;
+	Buffer gris_reservoir_ping_buffer;
+	Buffer gris_reservoir_pong_buffer;
 	Buffer prefix_contribution_buffer;
 	Buffer reconnection_buffer;
 	Buffer transformations_buffer;
@@ -27,10 +29,11 @@ class ReSTIRPT : public Integrator {
 	bool enable_spatial_reuse = true; 
 	bool show_reconnection_radiance = false;
 	bool enable_mis_in_gris = false;
+	bool enable_temporal_reuse = false;
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.01f;
 	uint32_t path_length = 0;
-	uint32_t num_spatial_samples = 2;
+	uint32_t num_spatial_samples = 0;
 
 	ReSTIRGIConfig* config;
 };

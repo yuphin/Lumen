@@ -77,7 +77,7 @@ class RenderGraph {
 	std::unordered_map<VkImage, uint32_t> img_resource_map;	 // Tex2D handle - Pass Idx
 	uint32_t beginning_pass_idx = 0;
 	uint32_t ending_pass_idx = 0;
-	const bool multithreaded_pipeline_compilation = true;
+	const bool multithreaded_pipeline_compilation = false;
 	static const uint32_t INVALID_PASS_IDX = UINT_MAX;
 
 	template <typename Settings>
