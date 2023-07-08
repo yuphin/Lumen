@@ -17,10 +17,10 @@ void ReSTIRPT::init() {
 						instance->width * instance->height * sizeof(GBuffer));
 
 	gris_prev_gbuffer.create("GRIS Previous GBuffer", &instance->vkb.ctx,
-						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						instance->width * instance->height * sizeof(GBuffer));
+							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+							 instance->width * instance->height * sizeof(GBuffer));
 
 	direct_lighting_buffer.create("GRIS Direct Lighting", &instance->vkb.ctx,
 								  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
@@ -83,7 +83,6 @@ void ReSTIRPT::init() {
 	desc.gris_direct_lighting_addr = direct_lighting_buffer.get_device_address();
 	desc.prefix_contributions_addr = prefix_contribution_buffer.get_device_address();
 	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
-	desc.gris_gbuffer_addr = gris_gbuffer.get_device_address();
 	scene_desc_buffer.create(
 		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
@@ -96,7 +95,6 @@ void ReSTIRPT::init() {
 	pc_ray.buffer_idx = 0;
 	assert(instance->vkb.rg->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_gbuffer_addr, &gris_gbuffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, &gris_reservoir_ping_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, &direct_lighting_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, &compact_vertices_buffer, instance->vkb.rg);
@@ -132,6 +130,7 @@ void ReSTIRPT::render() {
 	};
 
 	const std::array<Buffer*, 2> reservoir_buffers = {&gris_reservoir_ping_buffer, &gris_reservoir_pong_buffer};
+	const std::array<Buffer*, 2> gbuffers = {&gris_prev_gbuffer, &gris_gbuffer};
 	int ping_pong = pc_ray.total_frame_num % 2;
 
 	const std::vector<ShaderMacro> macros = {{"MIS", enable_mis_in_gris}};
@@ -150,6 +149,7 @@ void ReSTIRPT::render() {
 		.bind(mesh_lights_buffer)
 		.bind(*reservoir_buffers[ping_pong])
 		.bind(*reservoir_buffers[1 - ping_pong])
+		.bind(*gbuffers[1 - ping_pong])
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 
@@ -169,6 +169,8 @@ void ReSTIRPT::render() {
 		.bind(reconnection_buffer)
 		.bind(*reservoir_buffers[1 - ping_pong])
 		.bind(*reservoir_buffers[ping_pong])
+		.bind(*gbuffers[1 - ping_pong])
+		.bind(*gbuffers[ping_pong])
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 
@@ -188,6 +190,8 @@ void ReSTIRPT::render() {
 		.bind(reconnection_buffer)
 		.bind(*reservoir_buffers[1 - ping_pong])
 		.bind(*reservoir_buffers[ping_pong])
+		.bind(*gbuffers[1 - ping_pong])
+		.bind(*gbuffers[ping_pong])
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 
@@ -208,6 +212,7 @@ void ReSTIRPT::render() {
 			.bind(reconnection_buffer)
 			.bind(*reservoir_buffers[1 - ping_pong])
 			.bind(*reservoir_buffers[ping_pong])
+			.bind(*gbuffers[1 - ping_pong])
 			.bind_texture_array(scene_textures)
 			.bind_tlas(instance->vkb.tlas);
 	}
@@ -228,6 +233,7 @@ void ReSTIRPT::render() {
 		.bind(reconnection_buffer)
 		.bind(*reservoir_buffers[1 - ping_pong])
 		.bind(*reservoir_buffers[ping_pong])
+		.bind(*gbuffers[1 - ping_pong])
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 

@@ -9,13 +9,15 @@
 #extension GL_EXT_shader_atomic_float : require
 
 #define RECONNECTION
-#define SCENE_TEX_IDX 7
+#define SCENE_TEX_IDX 9
 #include "gris_commons.glsl"
-GrisGBuffer g_buffers = GrisGBuffer(scene_desc.gris_gbuffer_addr);
 GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
 layout(binding = 4, std430) buffer PathReconnections { ReconnectionData reconnection_data[]; };
 layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir in_reservoirs[]; };
 layout(binding = 6, std430) readonly buffer PrevReservoirs { Reservoir prev_reservoirs[]; };
+layout(binding = 7, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
+layout(binding = 8, std430) readonly buffer PrevGbuffer { GBuffer prev_gbuffers[]; };
+
 ivec2 get_neighbor_offset(inout uvec4 seed) {
 	const float randa = rand(seed) * 2 * PI;
 	const float randr = sqrt(rand(seed)) * pc_ray.spatial_radius;
@@ -23,7 +25,7 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 }
 
 void main() {
-	GBuffer gbuffer = g_buffers.d[pixel_idx];
+	GBuffer gbuffer = curr_gbuffers[pixel_idx];
 	if (!gbuffer_data_valid(gbuffer)) {
 		return;
 	}
@@ -39,7 +41,7 @@ void main() {
 	bool temporal_reservoirs_valid = false;
 	if (pc_ray.total_frame_num > 0 && !(any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy)))) {
 		const uint prev_idx = prev_coords.x * pc_ray.size_y + prev_coords.y;
-		GBuffer prev_gbuffer = g_buffers.d[prev_idx];
+		GBuffer prev_gbuffer = prev_gbuffers[prev_idx];
 		if (gbuffer_data_valid(prev_gbuffer)) {
 			HitData unpacked_prev_reservoir = get_hitdata(
 				prev_gbuffer.barycentrics, prev_gbuffer.primitive_instance_id.y, prev_gbuffer.primitive_instance_id.x);
@@ -60,7 +62,7 @@ void main() {
 		if (any(lessThan(coords, ivec2(0))) || any(greaterThanEqual(coords, gl_LaunchSizeEXT.xy))) {
 			continue;
 		}
-		GBuffer neighbor_gbuffer = g_buffers.d[neighbor_pixel_idx];
+		GBuffer neighbor_gbuffer = curr_gbuffers[neighbor_pixel_idx];
 		if (!gbuffer_data_valid(neighbor_gbuffer)) {
 			continue;
 		}

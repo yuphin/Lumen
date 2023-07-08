@@ -8,14 +8,14 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
-#define SCENE_TEX_IDX 7
+#define SCENE_TEX_IDX 8
 #include "gris_commons.glsl"
-GrisGBuffer g_buffers = GrisGBuffer(scene_desc.gris_gbuffer_addr);
 GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
 PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
 layout(binding = 4, std430) readonly buffer PathReconnections { ReconnectionData reconnection_data[]; };
 layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir in_reservoirs[]; };
 layout(binding = 6, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
+layout(binding = 7, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
 
 ivec2 get_neighbor_offset(inout uvec4 seed) {
 	const float randa = rand(seed) * 2 * PI;
@@ -28,7 +28,7 @@ bool process_reservoir(inout Reservoir reservoir, inout float m_c, in Reservoir 
 					   float canonical_in_canonical_pdf, out vec3 curr_reservoir_contribution) {
 	const uint neighbor_pixel_idx = neighbor_coords.x * pc_ray.size_y + neighbor_coords.y;
 	source_reservoir.M = min(source_reservoir.M, 20);
-	GBuffer neighbor_gbuffer = g_buffers.d[neighbor_pixel_idx];
+	GBuffer neighbor_gbuffer = curr_gbuffers[neighbor_pixel_idx];
 	if (!gbuffer_data_valid(neighbor_gbuffer)) {
 		reservoir.M += source_reservoir.M;
 		m_c += 1.0;
@@ -65,7 +65,7 @@ bool process_reservoir(inout Reservoir reservoir, inout float m_c, in Reservoir 
 }
 
 void main() {
-	GBuffer gbuffer = g_buffers.d[pixel_idx];
+	GBuffer gbuffer = curr_gbuffers[pixel_idx];
 	if (!gbuffer_data_valid(gbuffer)) {
 		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(0));
 		return;

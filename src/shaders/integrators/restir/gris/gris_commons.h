@@ -31,8 +31,10 @@ struct PCReSTIRPT {
 
 
 struct GBuffer {
+	uvec2 pad1;
 	vec2 barycentrics;
 	uvec2 primitive_instance_id;
+	uvec2 pad2;
 };
 
 struct GrisData {
