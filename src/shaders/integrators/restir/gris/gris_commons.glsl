@@ -360,7 +360,7 @@ bool retrace_paths(in HitData gbuffer, in GrisData data, uvec2 source_coords, uv
 			// Compute the direct lighting on the reconnection vertex
 			const Material rc_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
 
-			if (is_diffuse(rc_mat)) {
+			if (/*is_diffuse(rc_mat)*/false) { // TODO: This causes some bias for some reason.
 				reservoir_contribution = data.rc_Li;
 			} else {
 				const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
