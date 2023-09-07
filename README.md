@@ -14,6 +14,7 @@
  - Combined VCM + MLT Integrator (VCMMLT)
  - ReSTIR
  - ReSTIR GI
+ - ReSTIR PT / GRIS (Temporal version is still WIP)
  - DDGI (Real time)
  - FFT Convolution Bloom
 
