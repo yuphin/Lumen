@@ -217,6 +217,52 @@ void VulkanBase::cleanup() {
 	glfwTerminate();
 }
 
+static int init_cuda_helper(uint8_t* vkDeviceUUID, size_t UUID_SIZE) {
+	int current_device = 0;
+	int device_count = 0;
+	int devices_prohibited = 0;
+
+	cudaDeviceProp deviceProp;
+	checkCudaErrors(cudaGetDeviceCount(&device_count));
+
+	if (device_count == 0) {
+		fprintf(stderr, "CUDA error: no devices supporting CUDA.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	// Find the GPU which is selected by Vulkan
+	while (current_device < device_count) {
+		cudaGetDeviceProperties(&deviceProp, current_device);
+
+		if ((deviceProp.computeMode != cudaComputeModeProhibited)) {
+			// Compare the cuda device UUID with vulkan UUID
+			int ret = memcmp((void*)&deviceProp.uuid, vkDeviceUUID, UUID_SIZE);
+			if (ret == 0) {
+				checkCudaErrors(cudaSetDevice(current_device));
+				checkCudaErrors(cudaGetDeviceProperties(&deviceProp, current_device));
+				printf("GPU Device %d: \"%s\" with compute capability %d.%d\n\n", current_device, deviceProp.name,
+					   deviceProp.major, deviceProp.minor);
+
+				return current_device;
+			}
+
+		} else {
+			devices_prohibited++;
+		}
+
+		current_device++;
+	}
+
+	if (devices_prohibited == device_count) {
+		fprintf(stderr,
+				"CUDA error:"
+				" No Vulkan-CUDA Interop capable GPU found.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	return -1;
+}
+
 void VulkanBase::create_instance() {
 	VkApplicationInfo app_info{};
 	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -246,6 +292,8 @@ void VulkanBase::create_instance() {
 	vk::check(volkInitialize(), "Failed to initialize volk");
 	vk::check(vkCreateInstance(&instance_CI, nullptr, &ctx.instance), "Failed to create instance");
 	volkLoadInstance(ctx.instance);
+
+
 	if (enable_validation_layers && !check_validation_layer_support()) {
 		LUMEN_ERROR("Validation layers requested, but not available!");
 	}
@@ -312,8 +360,12 @@ void VulkanBase::pick_physical_device() {
 		LUMEN_ERROR("Failed to find a suitable GPU");
 	}
 	VkPhysicalDeviceProperties2 prop2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+
+	VkPhysicalDeviceIDProperties id_props = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES};
+	ctx.rt_props.pNext = &id_props;
 	prop2.pNext = &ctx.rt_props;
 	vkGetPhysicalDeviceProperties2(ctx.physical_device, &prop2);
+	memcpy(device_uuid, id_props.deviceUUID, VK_UUID_SIZE);
 }
 
 void VulkanBase::create_logical_device() {
@@ -524,6 +576,14 @@ void VulkanBase::create_command_pools() {
 	for (unsigned int i = 0; i < processor_count; i++) {
 		vk::check(vkCreateCommandPool(ctx.device, &pool_info, nullptr, &ctx.cmd_pools[i]),
 				  "Failed to create command pool!");
+	}
+}
+
+void VulkanBase::init_cuda() {
+	auto cuda_device = init_cuda_helper(device_uuid, VK_UUID_SIZE);
+	if (cuda_device == -1) {
+		printf("Error: No CUDA-Vulkan interop capable device found\n");
+		exit(EXIT_FAILURE);
 	}
 }
 

@@ -7,3 +7,7 @@
 [submodule "libs/glm"]
 	path = libs/glm
 	url = https://github.com/g-truc/glm.git
+[submodule "libs/tiny-cuda-nn"]
+	path = libs/tiny-cuda-nn
+	url = https://github.com/NVlabs/tiny-cuda-nn.git
+

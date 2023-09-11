@@ -59,6 +59,7 @@ void RayTracer::init(Window* window) {
 	vkb.create_command_pools();
 	vkb.create_command_buffers();
 	vkb.create_sync_primitives();
+	vkb.init_cuda();
 	vkb.init_imgui();
 	initialized = true;
 
@@ -259,6 +260,9 @@ void RayTracer::create_integrator(int integrator_idx) {
 		case int(IntegratorType::DDGI):
 			integrator = std::make_unique<DDGI>(this, &scene);
 			break;
+		case int(IntegratorType::NRC):
+			integrator = std::make_unique<NRC>(this, &scene);
+			break;
 		default:
 			break;
 	}
@@ -300,7 +304,7 @@ bool RayTracer::gui() {
 	}
 
 	const char* settings[] = {"Path",	"BDPT",	  "SPPM",	   "VCM",		"PSSMLT", "SMLT",
-							  "VCMMLT", "ReSTIR", "ReSTIR GI", "ReSTIR PT", "DDGI"};
+							  "VCMMLT", "ReSTIR", "ReSTIR GI", "ReSTIR PT", "DDGI",	  "NRC"};
 
 	static int curr_integrator_idx = int(scene.config->integrator_type);
 	if (ImGui::BeginCombo("Select Integrator", settings[curr_integrator_idx])) {

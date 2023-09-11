@@ -4,6 +4,8 @@
 #include "Buffer.h"
 #include "Event.h"
 #include "RenderGraph.h"
+#include <cuda_runtime_api.h>
+#include <cuda_helpers/helper_cuda.h>
 
 class RenderGraph;
 
@@ -40,6 +42,7 @@ struct VulkanBase {
 	void create_sync_primitives();
 	void create_command_buffers();
 	void create_command_pools();
+	void init_cuda();
 	void init_imgui();
 	void destroy_imgui();
 	void cleanup_swapchain();
@@ -85,6 +88,8 @@ struct VulkanBase {
 	VulkanContext ctx;
 	std::unique_ptr<RenderGraph> rg;
 	VkFormat swapchain_format;
+
+	uint8_t device_uuid[16];
 
 	std::vector<AccelKHR> blases;
 	std::vector<Texture2D> swapchain_images;

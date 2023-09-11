@@ -43,6 +43,7 @@
 #define NODEFERWINDOWPOS
 #define NOMCX
 #endif
+
 #include "Framework/Logger.h"
 #include <assert.h>
 #include <unordered_map>

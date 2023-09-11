@@ -13,6 +13,7 @@
 #include "ReSTIRGI.h"
 #include "ReSTIRPT.h"
 #include "DDGI.h"
+#include "NRC.h"
 #include "PostFX.h"
 
 class RayTracer : public LumenInstance {

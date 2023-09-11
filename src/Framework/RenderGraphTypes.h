@@ -58,7 +58,7 @@ struct RTPassSettings {
 	std::vector<ShaderMacro> macros = {};
 	uint32_t recursion_depth = 1;
 	std::vector<uint32_t> specialization_data = {};
-	dim3 dims;
+	dim3u dims;
 	VkAccelerationStructureKHR accel;
 	std::function<void(VkCommandBuffer cmd, const RenderPass& pass)> pass_func;
 };
@@ -67,7 +67,7 @@ struct ComputePassSettings {
 	Shader shader;
 	std::vector<ShaderMacro> macros = {};
 	std::vector<uint32_t> specialization_data = {};
-	dim3 dims;
+	dim3u dims;
 	std::function<void(VkCommandBuffer cmd, const RenderPass& pass)> pass_func;
 };
 

@@ -495,6 +495,8 @@ void LumenScene::create_scene_config(const std::string& integrator_name) {
 	}
 	else if (name == "ddgi") {
 		config = std::make_unique<DDGIConfig>();
+	} else if (name == "nrc") {
+		config = std::make_unique<NRCConfig>();
 	} else {
 		config = std::make_unique<PathConfig>();
 	}

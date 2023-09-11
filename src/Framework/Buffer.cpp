@@ -3,11 +3,83 @@
 #include "CommandBuffer.h"
 #include "VkUtils.h"
 
+#ifdef _WIN64
+#include <VersionHelpers.h>
+#include <dxgi1_2.h>
+#include <aclapi.h>
+class WindowsSecurityAttributes {
+   protected:
+	SECURITY_ATTRIBUTES m_winSecurityAttributes;
+	PSECURITY_DESCRIPTOR m_winPSecurityDescriptor;
+
+   public:
+	WindowsSecurityAttributes();
+	SECURITY_ATTRIBUTES *operator&();
+	~WindowsSecurityAttributes();
+};
+
+WindowsSecurityAttributes::WindowsSecurityAttributes() {
+	m_winPSecurityDescriptor = (PSECURITY_DESCRIPTOR)calloc(1, SECURITY_DESCRIPTOR_MIN_LENGTH + 2 * sizeof(void **));
+	if (!m_winPSecurityDescriptor) {
+		throw std::runtime_error("Failed to allocate memory for security descriptor");
+	}
+
+	PSID *ppSID = (PSID *)((PBYTE)m_winPSecurityDescriptor + SECURITY_DESCRIPTOR_MIN_LENGTH);
+	PACL *ppACL = (PACL *)((PBYTE)ppSID + sizeof(PSID *));
+
+	InitializeSecurityDescriptor(m_winPSecurityDescriptor, SECURITY_DESCRIPTOR_REVISION);
+
+	SID_IDENTIFIER_AUTHORITY sidIdentifierAuthority = SECURITY_WORLD_SID_AUTHORITY;
+	AllocateAndInitializeSid(&sidIdentifierAuthority, 1, SECURITY_WORLD_RID, 0, 0, 0, 0, 0, 0, 0, ppSID);
+
+	EXPLICIT_ACCESS explicitAccess;
+	ZeroMemory(&explicitAccess, sizeof(EXPLICIT_ACCESS));
+	explicitAccess.grfAccessPermissions = STANDARD_RIGHTS_ALL | SPECIFIC_RIGHTS_ALL;
+	explicitAccess.grfAccessMode = SET_ACCESS;
+	explicitAccess.grfInheritance = INHERIT_ONLY;
+	explicitAccess.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+	explicitAccess.Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+	explicitAccess.Trustee.ptstrName = (LPTSTR)*ppSID;
+
+	SetEntriesInAcl(1, &explicitAccess, NULL, ppACL);
+
+	SetSecurityDescriptorDacl(m_winPSecurityDescriptor, TRUE, *ppACL, FALSE);
+
+	m_winSecurityAttributes.nLength = sizeof(m_winSecurityAttributes);
+	m_winSecurityAttributes.lpSecurityDescriptor = m_winPSecurityDescriptor;
+	m_winSecurityAttributes.bInheritHandle = TRUE;
+}
+
+SECURITY_ATTRIBUTES *WindowsSecurityAttributes::operator&() { return &m_winSecurityAttributes; }
+
+WindowsSecurityAttributes::~WindowsSecurityAttributes() {
+	PSID *ppSID = (PSID *)((PBYTE)m_winPSecurityDescriptor + SECURITY_DESCRIPTOR_MIN_LENGTH);
+	PACL *ppACL = (PACL *)((PBYTE)ppSID + sizeof(PSID *));
+
+	if (*ppSID) {
+		FreeSid(*ppSID);
+	}
+	if (*ppACL) {
+		LocalFree(*ppACL);
+	}
+	free(m_winPSecurityDescriptor);
+}
+#endif /* _WIN64 */
+
+static VkExternalMemoryHandleTypeFlagBits getDefaultMemHandleType() {
+#ifdef _WIN64
+	return IsWindows8Point1OrGreater() ? VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT
+									   : VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT;
+#else
+	return VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif /* _WIN64 */
+}
+
 void Buffer::create(const char* name, VulkanContext* ctx,
 					VkBufferUsageFlags usage,
 					VkMemoryPropertyFlags mem_property_flags,
 					VkSharingMode sharing_mode, VkDeviceSize size, void* data,
-					bool use_staging) {
+					bool use_staging, bool external) {
 	if (!this->ctx) {
 		this->ctx = ctx;
 		this->mem_property_flags = mem_property_flags;
@@ -40,6 +112,35 @@ void Buffer::create(const char* name, VulkanContext* ctx,
 		// Create the buffer handle
 		VkBufferCreateInfo buffer_CI =
 			vk::buffer_create_info(usage, size, sharing_mode);
+
+		VkExternalMemoryBufferCreateInfo externalMemoryBufferInfo = {};
+		externalMemoryBufferInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
+		externalMemoryBufferInfo.handleTypes = getDefaultMemHandleType();
+		if (external) {
+			buffer_CI.pNext = &externalMemoryBufferInfo;
+#ifdef _WIN64
+			WindowsSecurityAttributes winSecurityAttributes;
+
+			VkExportMemoryWin32HandleInfoKHR vulkanExportMemoryWin32HandleInfoKHR = {};
+			vulkanExportMemoryWin32HandleInfoKHR.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_WIN32_HANDLE_INFO_KHR;
+			vulkanExportMemoryWin32HandleInfoKHR.pNext = NULL;
+			vulkanExportMemoryWin32HandleInfoKHR.pAttributes = &winSecurityAttributes;
+			vulkanExportMemoryWin32HandleInfoKHR.dwAccess = DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE;
+			vulkanExportMemoryWin32HandleInfoKHR.name = (LPCWSTR)NULL;
+#endif /* _WIN64 */
+			VkExportMemoryAllocateInfoKHR vulkanExportMemoryAllocateInfoKHR = {};
+			vulkanExportMemoryAllocateInfoKHR.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR;
+#ifdef _WIN64
+			vulkanExportMemoryAllocateInfoKHR.pNext =
+				getDefaultMemHandleType() & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR
+					? &vulkanExportMemoryWin32HandleInfoKHR
+					: NULL;
+			vulkanExportMemoryAllocateInfoKHR.handleTypes = getDefaultMemHandleType();
+#else
+			vulkanExportMemoryAllocateInfoKHR.pNext = NULL;
+			vulkanExportMemoryAllocateInfoKHR.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif /* _WIN64 */
+		}
 		vk::check(
 			vkCreateBuffer(ctx->device, &buffer_CI, nullptr, &this->handle),
 			"Failed to create vertex buffer!");

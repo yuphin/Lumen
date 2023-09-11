@@ -34,11 +34,16 @@ struct Buffer {
 	}
 
 	void create(const char* name, VulkanContext*, VkBufferUsageFlags, VkMemoryPropertyFlags, VkSharingMode,
-				VkDeviceSize, void* data = nullptr, bool use_staging = false);
+				VkDeviceSize, void* data = nullptr, bool use_staging = false, bool external = false);
 
 	inline void create(VulkanContext* ctx, VkBufferUsageFlags flags, VkMemoryPropertyFlags mem_property_flags,
 					   VkSharingMode sharing_mode, VkDeviceSize size, void* data = nullptr, bool use_staging = false) {
 		return create("", ctx, flags, mem_property_flags, sharing_mode, size, data, use_staging);
+	}
+
+	inline void create_external(VulkanContext* ctx, VkBufferUsageFlags flags, VkMemoryPropertyFlags mem_property_flags,
+					   VkSharingMode sharing_mode, VkDeviceSize size, void* data = nullptr, bool use_staging = false) {
+		return create("", ctx, flags, mem_property_flags, sharing_mode, size, data, use_staging, true);
 	}
 	void flush(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
 	void invalidate(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
