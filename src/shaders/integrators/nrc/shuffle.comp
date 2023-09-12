@@ -1,0 +1,34 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "nrc_commons.h"
+#include "../../utils.glsl"
+layout(push_constant) uniform _PushConstantRay { PCNRC pc_ray; };
+uvec4 seed = init_rng(gl_GlobalInvocationID.xy, uvec2(0), pc_ray.frame_num);
+
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SampleCount { uint d; };
+layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(binding = 1) readonly buffer QueryDataPing { RadianceQuery in_queries[]; };
+layout(binding = 2) readonly buffer TargetDataPing { vec3 in_targets[]; };
+layout(binding = 3) writeonly buffer QueryDataPong { RadianceQuery out_queries[]; };
+layout(binding = 4) writeonly buffer TargetDataPong { vec3 out_targets[]; };
+SampleCount sample_count = SampleCount(scene_desc.sample_count_addr);
+
+void main() {
+    uint in_idx = gl_GlobalInvocationID.x;
+    if(in_idx >= sample_count.d) {
+        return;
+    }
+    uint dst_idx = randu(seed) % sample_count.d;
+    out_queries[dst_idx] = in_queries[in_idx];
+    out_targets[dst_idx] = in_targets[in_idx];
+
+}

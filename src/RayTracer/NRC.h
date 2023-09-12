@@ -13,9 +13,16 @@ class NRC : public Integrator {
    private:
 	PCNRC pc_ray{};
 	NRCConfig* config;
-	Buffer test_buffer2;
-	VkBuffer test_buffer;
-	VkDeviceMemory test_memory;
-	float* cuda_mem_ptr = nullptr;
-	cudaExternalMemory_t cuda_mem;
+	Buffer radiance_query_buffer_ping;
+	Buffer radiance_target_buffer_ping;
+	Buffer radiance_query_buffer_pong;
+	Buffer radiance_target_buffer_pong;
+	Buffer sample_count_buffer;
+	float* radiance_query_addr_cuda = nullptr;
+	cudaExternalMemory_t radiance_query_mem_cuda;
+	float* radiance_target_addr_cuda = nullptr;
+	cudaExternalMemory_t radiance_target_mem_cuda;
+	uint32_t* sample_count_addr_cuda = nullptr;
+	cudaExternalMemory_t sample_count_mem_cuda;
+	int max_samples_count = -1;
 };

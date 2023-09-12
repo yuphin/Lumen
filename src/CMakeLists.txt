@@ -13,5 +13,10 @@ file(GLOB raytracing_src
     "RayTracer/*.h"
     "RayTracer/*.hpp"
 )
+file(GLOB network_src
+    "RayTracer/*.cu"
+)
 
 set(src_files "${src_files};${main_src};${framework_src};${raytracing_src}" PARENT_SCOPE)
+
+set(cuda_src "${cuda_src};${network_src}" PARENT_SCOPE)

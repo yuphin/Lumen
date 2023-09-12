@@ -287,7 +287,11 @@ struct Material {
 	uint64_t probe_dir_depth_addr;
 	uint64_t direct_lighting_addr;
 	uint64_t probe_offsets_addr;
-};
+	// NRC
+	uint64_t radiance_query_addr;
+	uint64_t radiance_target_addr;
+	uint64_t sample_count_addr;
+ };
 
 
 struct RTUtilsDesc {

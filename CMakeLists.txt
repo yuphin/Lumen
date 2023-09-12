@@ -11,12 +11,14 @@ endif()
 
 find_package(Vulkan REQUIRED)
 find_package(Threads REQUIRED)
+find_package(CUDA REQUIRED)
 
 if (WIN32)
    set(VOLK_STATIC_DEFINES VK_USE_PLATFORM_WIN32_KHR)
 endif()
 
 set(src_files)
+set(cuda_src)
 add_subdirectory(src)
 add_subdirectory(libs)
 
@@ -35,6 +37,8 @@ set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_EXTENSIONS OFF)
 set(CUDA_LINK_LIBRARIES_KEYWORD PUBLIC)
+
+set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};--expt-extended-lambda;-lineinfo;")
 
 # If the CUDA version does not support the chosen architecture, target
 # the latest supported one instead.
@@ -113,7 +117,7 @@ file(GLOB_RECURSE shaders_src CONFIGURE_DEPENDS
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders PREFIX Shaders FILES ${shaders_src})
 file(GLOB_RECURSE FRAMEWORK_SRC CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/Framework/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/Framework/*.h ${CMAKE_CURRENT_SOURCE_DIR}/src/Framework/*.hpp)
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src/Framework PREFIX Framework FILES ${FRAMEWORK_SRC})
-file(GLOB_RECURSE RT_SRC CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/RayTracer/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/RayTracer/*.h)
+file(GLOB_RECURSE RT_SRC CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/RayTracer/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/RayTracer/*.h ${CMAKE_CURRENT_SOURCE_DIR}/src/RayTracer/*.cu)
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src/RayTracer PREFIX RayTracer FILES ${RT_SRC})
 file(GLOB_RECURSE LIB_SRC CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/libs/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/libs/*.h ${CMAKE_CURRENT_SOURCE_DIR}/libs/*.c ${CMAKE_CURRENT_SOURCE_DIR}/libs/*.hpp ${CMAKE_CURRENT_SOURCE_DIR}/libs/*.cc)
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/libs PREFIX Libs FILES ${LIB_SRC})
@@ -127,12 +131,14 @@ endif()
 
 add_compile_definitions(TINYEXR_USE_MINIZ)  # enables usage of miniz for opening exr images
 add_compile_definitions(USE_SHADERC)        # enables shader compilation via shaderc
-add_executable(Lumen ${src_files} ${shaders_src})
+# cuda_add_executable(Lumen ${src_files} ${shaders_src})
+cuda_add_executable(Lumen ${src_files} ${shaders_src} ${cuda_src})
+# cuda_add_executable(Network ${CMAKE_CURRENT_SOURCE_DIR}/src/RayTracer/Network.cu)
 if(WIN32)
     target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared glm
     $<$<CONFIG:Debug>:spirv-cross-cored> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-core>
     $<$<CONFIG:Debug>:spirv-cross-glsld> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-glsl>
-    cudart)
+    cudart tiny-cuda-nn)
 else()
     target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared spirv-cross-core spirv-cross-glsl glm cudart)
 endif()

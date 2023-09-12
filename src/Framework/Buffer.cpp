@@ -3,20 +3,7 @@
 #include "CommandBuffer.h"
 #include "VkUtils.h"
 
-static uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
-	VkPhysicalDeviceMemoryProperties memProperties;
-	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
-	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-		if (typeFilter & (1 << i) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-			return i;
-		}
-	}
-	return ~0;
-}
 #ifdef _WIN64
-#include <dxgi1_2.h>
-#include <aclapi.h>
-#include <VersionHelpers.h>
 class WindowsSecurityAttributes {
    protected:
 	SECURITY_ATTRIBUTES m_winSecurityAttributes;
@@ -76,14 +63,6 @@ WindowsSecurityAttributes::~WindowsSecurityAttributes() {
 }
 #endif /* _WIN64 */
 
-static VkExternalMemoryHandleTypeFlagBits getDefaultMemHandleType() {
-#ifdef _WIN64
-	return IsWindows8Point1OrGreater() ? VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT
-									   : VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT;
-#else
-	return VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-#endif /* _WIN64 */
-}
 
 void Buffer::create(const char *name, VulkanContext *ctx, VkBufferUsageFlags usage,
 					VkMemoryPropertyFlags mem_property_flags, VkSharingMode sharing_mode, VkDeviceSize size, void *data,
@@ -267,7 +246,7 @@ void Buffer::createExternalBuffer(VkPhysicalDevice physical_device, VkDevice dev
 	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocInfo.pNext = &vulkanExportMemoryAllocateInfoKHR;
 	allocInfo.allocationSize = memRequirements.size;
-	allocInfo.memoryTypeIndex = findMemoryType(physical_device, memRequirements.memoryTypeBits, properties);
+	allocInfo.memoryTypeIndex = find_memory_type(&physical_device, memRequirements.memoryTypeBits, properties);
 
 	if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
 		throw std::runtime_error("failed to allocate external buffer memory!");

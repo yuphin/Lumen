@@ -3,6 +3,14 @@
 #include "GltfScene.hpp"
 #include "Buffer.h"
 #include "Pipeline.h"
+#ifdef _WIN64
+#include <dxgi1_2.h>
+#include <aclapi.h>
+#include <VersionHelpers.h>
+#include <vulkan/vulkan_win32.h>
+#endif
+#include <cuda_runtime_api.h>
+#include <cuda_helpers/helper_cuda.h>
 uint32_t find_memory_type(VkPhysicalDevice* physical_device, uint32_t type_filter, VkMemoryPropertyFlags props);
 
 void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image, VkImageLayout old_layout,
@@ -187,3 +195,10 @@ inline void insert(VkDevice device, VkCommandBuffer cmd, const char* name, glm::
 	}
 }
 }  // namespace DebugMarker
+
+VkExternalMemoryHandleTypeFlagBits getDefaultMemHandleType();
+
+void* get_memory_handle(VkDevice device, VkDeviceMemory memory, VkExternalMemoryHandleTypeFlagBits handleType);
+
+void import_cuda_external_memory(void** cudaPtr, cudaExternalMemory_t& cudaMem, VkDeviceMemory& vkMem, VkDeviceSize size,
+						 VkExternalMemoryHandleTypeFlagBits handleType, VkDevice device);

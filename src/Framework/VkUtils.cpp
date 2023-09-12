@@ -248,8 +248,6 @@ BlasInput to_vk_geometry(GltfPrimMesh& prim, VkDeviceAddress vertexAddress, VkDe
 	return input;
 }
 
-
-
 VkPipelineStageFlags get_pipeline_stage(PassType pass_type, VkAccessFlags access_flags) {
 	VkPipelineStageFlags res = 0;
 	switch (pass_type) {
@@ -418,4 +416,80 @@ VkImageLayout get_target_img_layout(const Texture2D& tex, VkAccessFlags access_f
 		return VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
 	}
 	return VK_IMAGE_LAYOUT_GENERAL;
+}
+
+VkExternalMemoryHandleTypeFlagBits getDefaultMemHandleType() {
+#ifdef _WIN64
+	return IsWindows8Point1OrGreater() ? VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT
+									   : VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT;
+#else
+	return VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif /* _WIN64 */
+}
+
+void* get_memory_handle(VkDevice device, VkDeviceMemory memory, VkExternalMemoryHandleTypeFlagBits handleType) {
+#ifdef _WIN64
+	HANDLE handle = 0;
+
+	VkMemoryGetWin32HandleInfoKHR vkMemoryGetWin32HandleInfoKHR = {};
+	vkMemoryGetWin32HandleInfoKHR.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
+	vkMemoryGetWin32HandleInfoKHR.pNext = NULL;
+	vkMemoryGetWin32HandleInfoKHR.memory = memory;
+	vkMemoryGetWin32HandleInfoKHR.handleType = handleType;
+
+	if (vkGetMemoryWin32HandleKHR(device, &vkMemoryGetWin32HandleInfoKHR, &handle) != VK_SUCCESS) {
+		throw std::runtime_error("Failed to retrieve handle for buffer!");
+	}
+	return (void*)handle;
+#else
+	int fd = -1;
+
+	VkMemoryGetFdInfoKHR vkMemoryGetFdInfoKHR = {};
+	vkMemoryGetFdInfoKHR.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
+	vkMemoryGetFdInfoKHR.pNext = NULL;
+	vkMemoryGetFdInfoKHR.memory = memory;
+	vkMemoryGetFdInfoKHR.handleType = handleType;
+
+	PFN_vkGetMemoryFdKHR fpGetMemoryFdKHR;
+	fpGetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)vkGetDeviceProcAddr(m_device, "vkGetMemoryFdKHR");
+	if (!fpGetMemoryFdKHR) {
+		throw std::runtime_error("Failed to retrieve vkGetMemoryWin32HandleKHR!");
+	}
+	if (fpGetMemoryFdKHR(m_device, &vkMemoryGetFdInfoKHR, &fd) != VK_SUCCESS) {
+		throw std::runtime_error("Failed to retrieve handle for buffer!");
+	}
+	return (void*)(uintptr_t)fd;
+#endif /* _WIN64 */
+}
+
+void import_cuda_external_memory(void** cudaPtr, cudaExternalMemory_t& cudaMem, VkDeviceMemory& vkMem, VkDeviceSize size,
+							  VkExternalMemoryHandleTypeFlagBits handleType, VkDevice device) {
+	cudaExternalMemoryHandleDesc externalMemoryHandleDesc = {};
+
+	if (handleType & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT) {
+		externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueWin32;
+	} else if (handleType & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT) {
+		externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueWin32Kmt;
+	} else if (handleType & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT) {
+		externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueFd;
+	} else {
+		throw std::runtime_error("Unknown handle type requested!");
+	}
+
+	externalMemoryHandleDesc.size = size;
+
+#ifdef _WIN64
+	externalMemoryHandleDesc.handle.win32.handle = (HANDLE)get_memory_handle(device, vkMem, handleType);
+#else
+	externalMemoryHandleDesc.handle.fd = (int)(uintptr_t)getMemHandle(vkMem, handleType);
+#endif
+
+	checkCudaErrors(cudaImportExternalMemory(&cudaMem, &externalMemoryHandleDesc));
+
+	cudaExternalMemoryBufferDesc externalMemBufferDesc = {};
+	externalMemBufferDesc.offset = 0;
+	externalMemBufferDesc.size = size;
+	externalMemBufferDesc.flags = 0;
+
+	checkCudaErrors(cudaExternalMemoryGetMappedBuffer(cudaPtr, cudaMem, &externalMemBufferDesc));
 }
