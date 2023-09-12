@@ -19,30 +19,33 @@ void NRC::init() {
 	import_cuda_external_memory((void **)&radiance_query_addr_cuda, radiance_query_mem_cuda,
 								radiance_query_buffer_pong.buffer_memory, max_samples_count * sizeof(RadianceQuery),
 								getDefaultMemHandleType(), instance->vk_ctx.device);
-
+	radiance_target_buffer_pong.create_external(&instance->vkb.ctx,
+												VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+													VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+												VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+												max_samples_count * 3 * sizeof(float));
+	import_cuda_external_memory((void **)&radiance_target_addr_cuda, radiance_target_mem_cuda,
+								radiance_target_buffer_pong.buffer_memory, max_samples_count * 3 * sizeof(float),
+								getDefaultMemHandleType(), instance->vk_ctx.device);
+	sample_count_buffer.create_external(&instance->vkb.ctx,
+										VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+											VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+										sizeof(uint32_t));
 	radiance_query_buffer_ping.create(&instance->vkb.ctx,
 									  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 										  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 									  max_samples_count * sizeof(RadianceQuery));
 
+	import_cuda_external_memory((void **)&sample_count_addr_cuda, sample_count_mem_cuda,
+								sample_count_buffer.buffer_memory, sizeof(uint32_t), getDefaultMemHandleType(),
+								instance->vk_ctx.device);
 	radiance_target_buffer_ping.create(&instance->vkb.ctx,
 									   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 										   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 									   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 									   max_samples_count * 3 * sizeof(float));
-
-	radiance_target_buffer_pong.create_external(&instance->vkb.ctx,
-												VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-													VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-												VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-												max_samples_count * 3 * sizeof(float));
-
-	sample_count_buffer.create_external(&instance->vkb.ctx,
-										VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-											VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-										sizeof(uint32_t));
 
 	desc.radiance_query_addr = radiance_query_buffer_ping.get_device_address();
 	desc.radiance_target_addr = radiance_target_buffer_ping.get_device_address();
@@ -55,13 +58,6 @@ void NRC::init() {
 	CommandBuffer cmd(&instance->vk_ctx, true);
 	vkCmdFillBuffer(cmd.handle, sample_count_buffer.handle, 0, sample_count_buffer.size, 0);
 	cmd.submit();
-
-	import_cuda_external_memory((void **)&radiance_target_addr_cuda, radiance_target_mem_cuda,
-								radiance_target_buffer_pong.buffer_memory, max_samples_count * 3 * sizeof(float),
-								getDefaultMemHandleType(), instance->vk_ctx.device);
-	import_cuda_external_memory((void **)&sample_count_addr_cuda, sample_count_mem_cuda,
-								sample_count_buffer.buffer_memory, sizeof(uint32_t), getDefaultMemHandleType(),
-								instance->vk_ctx.device);
 
 	pc_ray.frame_num = 0;
 	pc_ray.size_x = instance->width;
