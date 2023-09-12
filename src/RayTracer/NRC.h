@@ -13,7 +13,9 @@ class NRC : public Integrator {
    private:
 	PCNRC pc_ray{};
 	NRCConfig* config;
-	Buffer test_buffer;
+	Buffer test_buffer2;
+	VkBuffer test_buffer;
+	VkDeviceMemory test_memory;
 	float* cuda_mem_ptr = nullptr;
 	cudaExternalMemory_t cuda_mem;
 };

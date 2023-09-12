@@ -99,17 +99,24 @@ void NRC::init() {
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
 
-	test_buffer.create(&instance->vkb.ctx, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-						   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-					   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-					   instance->width * instance->height * sizeof(float));
+	//test_buffer.create_external(&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	//					   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	//				   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+	//				   instance->width * instance->height * sizeof(float));
+
+	
+	test_buffer2.createExternalBuffer(
+        instance->vkb.ctx.physical_device, instance->vkb.ctx.device, instance->width * instance->height * sizeof(float),
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, getDefaultMemHandleType(),
+        test_buffer, test_memory);
 
 	scene_desc_buffer.create("Scene Desc", &instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc,
 							 true);
 
-	importCudaExternalMemory((void **)&cuda_mem_ptr, cuda_mem, test_buffer.buffer_memory,
+	importCudaExternalMemory((void **)&cuda_mem_ptr, cuda_mem, test_memory,
 							 instance->width * instance->height * sizeof(float), getDefaultMemHandleType(),
 							 instance->vk_ctx.device);
 

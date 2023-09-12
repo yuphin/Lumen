@@ -47,6 +47,7 @@ void RayTracer::init(Window* window) {
 	vkb.add_device_extension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
 	vkb.add_device_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
 	vkb.add_device_extension(VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_EXTENSION_NAME);
+	vkb.add_device_extension(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
 
 	vkb.create_instance();
 	if (vkb.enable_validation_layers) {

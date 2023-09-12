@@ -3,10 +3,20 @@
 #include "CommandBuffer.h"
 #include "VkUtils.h"
 
+static uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+	VkPhysicalDeviceMemoryProperties memProperties;
+	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+		if (typeFilter & (1 << i) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+			return i;
+		}
+	}
+	return ~0;
+}
 #ifdef _WIN64
-#include <VersionHelpers.h>
 #include <dxgi1_2.h>
 #include <aclapi.h>
+#include <VersionHelpers.h>
 class WindowsSecurityAttributes {
    protected:
 	SECURITY_ATTRIBUTES m_winSecurityAttributes;
@@ -75,10 +85,8 @@ static VkExternalMemoryHandleTypeFlagBits getDefaultMemHandleType() {
 #endif /* _WIN64 */
 }
 
-void Buffer::create(const char* name, VulkanContext* ctx,
-					VkBufferUsageFlags usage,
-					VkMemoryPropertyFlags mem_property_flags,
-					VkSharingMode sharing_mode, VkDeviceSize size, void* data,
+void Buffer::create(const char *name, VulkanContext *ctx, VkBufferUsageFlags usage,
+					VkMemoryPropertyFlags mem_property_flags, VkSharingMode sharing_mode, VkDeviceSize size, void *data,
 					bool use_staging, bool external) {
 	if (!this->ctx) {
 		this->ctx = ctx;
@@ -89,29 +97,24 @@ void Buffer::create(const char* name, VulkanContext* ctx,
 	if (use_staging) {
 		Buffer staging_buffer;
 
-		LUMEN_ASSERT(mem_property_flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-					 "Buffer creation error");
+		LUMEN_ASSERT(mem_property_flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, "Buffer creation error");
 		staging_buffer.create(ctx, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-							  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
-								  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+							  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 							  VK_SHARING_MODE_EXCLUSIVE, size, data);
 
 		staging_buffer.unmap();
-		this->create(ctx, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
-					 mem_property_flags, sharing_mode, size, nullptr);
+		this->create(ctx, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage, mem_property_flags, sharing_mode, size, nullptr);
 
 		CommandBuffer copy_cmd(ctx, true);
 		VkBufferCopy copy_region = {};
 
 		copy_region.size = size;
-		vkCmdCopyBuffer(copy_cmd.handle, staging_buffer.handle, this->handle, 1,
-						&copy_region);
+		vkCmdCopyBuffer(copy_cmd.handle, staging_buffer.handle, this->handle, 1, &copy_region);
 		copy_cmd.submit(ctx->queues[0]);
 		staging_buffer.destroy();
 	} else {
 		// Create the buffer handle
-		VkBufferCreateInfo buffer_CI =
-			vk::buffer_create_info(usage, size, sharing_mode);
+		VkBufferCreateInfo buffer_CI = vk::buffer_create_info(usage, size, sharing_mode);
 
 		VkExternalMemoryBufferCreateInfo externalMemoryBufferInfo = {};
 		externalMemoryBufferInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
@@ -141,9 +144,7 @@ void Buffer::create(const char* name, VulkanContext* ctx,
 			vulkanExportMemoryAllocateInfoKHR.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif /* _WIN64 */
 		}
-		vk::check(
-			vkCreateBuffer(ctx->device, &buffer_CI, nullptr, &this->handle),
-			"Failed to create vertex buffer!");
+		vk::check(vkCreateBuffer(ctx->device, &buffer_CI, nullptr, &this->handle), "Failed to create vertex buffer!");
 
 		// Create the memory backing up the buffer handle
 		VkMemoryRequirements mem_reqs;
@@ -152,17 +153,45 @@ void Buffer::create(const char* name, VulkanContext* ctx,
 
 		mem_alloc_info.allocationSize = mem_reqs.size;
 		// Find a memory type index that fits the properties of the buffer
-		mem_alloc_info.memoryTypeIndex = find_memory_type(
-			&ctx->physical_device, mem_reqs.memoryTypeBits, mem_property_flags);
+		mem_alloc_info.memoryTypeIndex =
+			find_memory_type(&ctx->physical_device, mem_reqs.memoryTypeBits, mem_property_flags);
 
-		VkMemoryAllocateFlagsInfo flags_info{
-			VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
+		VkMemoryAllocateFlagsInfo flags_info{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
 		if (usage_flags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
 			flags_info.flags |= VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
 			mem_alloc_info.pNext = &flags_info;
 		}
-		vk::check(vkAllocateMemory(ctx->device, &mem_alloc_info, nullptr,
-								   &this->buffer_memory),
+
+#ifdef _WIN64
+		WindowsSecurityAttributes winSecurityAttributes;
+
+		VkExportMemoryWin32HandleInfoKHR vulkanExportMemoryWin32HandleInfoKHR = {};
+		vulkanExportMemoryWin32HandleInfoKHR.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_WIN32_HANDLE_INFO_KHR;
+		vulkanExportMemoryWin32HandleInfoKHR.pNext = NULL;
+		vulkanExportMemoryWin32HandleInfoKHR.pAttributes = &winSecurityAttributes;
+		vulkanExportMemoryWin32HandleInfoKHR.dwAccess = DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE;
+		vulkanExportMemoryWin32HandleInfoKHR.name = (LPCWSTR)NULL;
+#endif /* _WIN64 */
+		VkExportMemoryAllocateInfoKHR vulkanExportMemoryAllocateInfoKHR = {};
+		vulkanExportMemoryAllocateInfoKHR.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR;
+#ifdef _WIN64
+		vulkanExportMemoryAllocateInfoKHR.pNext =
+			getDefaultMemHandleType() & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR
+				? &vulkanExportMemoryWin32HandleInfoKHR
+				: NULL;
+		vulkanExportMemoryAllocateInfoKHR.handleTypes = getDefaultMemHandleType();
+#else
+		vulkanExportMemoryAllocateInfoKHR.pNext = NULL;
+		vulkanExportMemoryAllocateInfoKHR.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif /* _WIN64 */
+
+		if (external && (usage_flags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0) {
+			flags_info.pNext = &vulkanExportMemoryAllocateInfoKHR;
+		} else if (external) {
+			mem_alloc_info.pNext = &vulkanExportMemoryAllocateInfoKHR;
+		}
+
+		vk::check(vkAllocateMemory(ctx->device, &mem_alloc_info, nullptr, &this->buffer_memory),
 				  "Failed to allocate buffer memory!");
 
 		alignment = mem_reqs.alignment;
@@ -177,8 +206,7 @@ void Buffer::create(const char* name, VulkanContext* ctx,
 		if (data != nullptr) {
 			// Memory is assumed mapped at this point
 			memcpy(this->data, data, size);
-			if ((mem_property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) ==
-				0) {
+			if ((mem_property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
 				this->flush();
 			}
 		}
@@ -188,10 +216,64 @@ void Buffer::create(const char* name, VulkanContext* ctx,
 		this->bind();
 	}
 	if (name) {
-		DebugMarker::set_resource_name(ctx->device, (uint64_t)handle, name,
-									   VK_OBJECT_TYPE_BUFFER);
+		DebugMarker::set_resource_name(ctx->device, (uint64_t)handle, name, VK_OBJECT_TYPE_BUFFER);
 		this->name = name;
 	}
+}
+void Buffer::createExternalBuffer(VkPhysicalDevice physical_device, VkDevice device, VkDeviceSize size,
+								  VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+								  VkExternalMemoryHandleTypeFlagsKHR extMemHandleType, VkBuffer &buffer,
+								  VkDeviceMemory &bufferMemory) {
+	VkBufferCreateInfo bufferInfo = {};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size = size;
+	bufferInfo.usage = usage;
+	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	VkExternalMemoryBufferCreateInfo externalMemoryBufferInfo = {};
+	externalMemoryBufferInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
+	externalMemoryBufferInfo.handleTypes = extMemHandleType;
+	bufferInfo.pNext = &externalMemoryBufferInfo;
+
+	if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create buffer!");
+	}
+
+	VkMemoryRequirements memRequirements;
+	vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+#ifdef _WIN64
+	WindowsSecurityAttributes winSecurityAttributes;
+
+	VkExportMemoryWin32HandleInfoKHR vulkanExportMemoryWin32HandleInfoKHR = {};
+	vulkanExportMemoryWin32HandleInfoKHR.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_WIN32_HANDLE_INFO_KHR;
+	vulkanExportMemoryWin32HandleInfoKHR.pNext = NULL;
+	vulkanExportMemoryWin32HandleInfoKHR.pAttributes = &winSecurityAttributes;
+	vulkanExportMemoryWin32HandleInfoKHR.dwAccess = DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE;
+	vulkanExportMemoryWin32HandleInfoKHR.name = (LPCWSTR)NULL;
+#endif /* _WIN64 */
+	VkExportMemoryAllocateInfoKHR vulkanExportMemoryAllocateInfoKHR = {};
+	vulkanExportMemoryAllocateInfoKHR.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR;
+#ifdef _WIN64
+	vulkanExportMemoryAllocateInfoKHR.pNext = extMemHandleType & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR
+												  ? &vulkanExportMemoryWin32HandleInfoKHR
+												  : NULL;
+	vulkanExportMemoryAllocateInfoKHR.handleTypes = extMemHandleType;
+#else
+	vulkanExportMemoryAllocateInfoKHR.pNext = NULL;
+	vulkanExportMemoryAllocateInfoKHR.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif /* _WIN64 */
+	VkMemoryAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.pNext = &vulkanExportMemoryAllocateInfoKHR;
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = findMemoryType(physical_device, memRequirements.memoryTypeBits, properties);
+
+	if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+		throw std::runtime_error("failed to allocate external buffer memory!");
+	}
+
+	vkBindBufferMemory(device, buffer, bufferMemory, 0);
 }
 void Buffer::flush(VkDeviceSize size, VkDeviceSize offset) {
 	VkMappedMemoryRange mapped_range = {};
@@ -199,8 +281,7 @@ void Buffer::flush(VkDeviceSize size, VkDeviceSize offset) {
 	mapped_range.memory = buffer_memory;
 	mapped_range.offset = offset;
 	mapped_range.size = size;
-	vk::check(vkFlushMappedMemoryRanges(ctx->device, 1, &mapped_range),
-			  "Failed to flush mapped memory ranges");
+	vk::check(vkFlushMappedMemoryRanges(ctx->device, 1, &mapped_range), "Failed to flush mapped memory ranges");
 }
 
 void Buffer::invalidate(VkDeviceSize size, VkDeviceSize offset) {
@@ -219,17 +300,14 @@ void Buffer::prepare_descriptor(VkDeviceSize size, VkDeviceSize offset) {
 	descriptor.range = size;
 }
 
-void Buffer::copy(Buffer& dst_buffer, VkCommandBuffer cmdbuf) {
+void Buffer::copy(Buffer &dst_buffer, VkCommandBuffer cmdbuf) {
 	VkBufferCopy copy_region;
 	copy_region.srcOffset = 0;
 	copy_region.dstOffset = 0;
 	copy_region.size = dst_buffer.size;
 	vkCmdCopyBuffer(cmdbuf, handle, dst_buffer.handle, 1, &copy_region);
-	VkBufferMemoryBarrier copy_barrier =
-		buffer_barrier(dst_buffer.handle, VK_ACCESS_TRANSFER_WRITE_BIT,
-					   VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-	vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT,
-						 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0,
-						 0);
+	VkBufferMemoryBarrier copy_barrier = buffer_barrier(dst_buffer.handle, VK_ACCESS_TRANSFER_WRITE_BIT,
+														VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+	vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
 }

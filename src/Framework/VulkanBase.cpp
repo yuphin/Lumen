@@ -109,7 +109,6 @@ VkShaderModule VulkanBase::create_shader(const std::vector<char>& code) {
 	return shaderModule;
 }
 
-
 VkResult VulkanBase::vkExt_create_debug_messenger(VkInstance instance,
 												  const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
 												  const VkAllocationCallbacks* pAllocator,
@@ -292,7 +291,6 @@ void VulkanBase::create_instance() {
 	vk::check(volkInitialize(), "Failed to initialize volk");
 	vk::check(vkCreateInstance(&instance_CI, nullptr, &ctx.instance), "Failed to create instance");
 	volkLoadInstance(ctx.instance);
-
 
 	if (enable_validation_layers && !check_validation_layer_support()) {
 		LUMEN_ERROR("Validation layers requested, but not available!");
@@ -585,6 +583,10 @@ void VulkanBase::init_cuda() {
 		printf("Error: No CUDA-Vulkan interop capable device found\n");
 		exit(EXIT_FAILURE);
 	}
+
+	cudaDeviceProp prop = {};
+	checkCudaErrors(cudaSetDevice(cuda_device));
+	checkCudaErrors(cudaGetDeviceProperties(&prop, cuda_device));
 }
 
 void VulkanBase::init_imgui() {
@@ -711,8 +713,8 @@ AccelKHR VulkanBase::create_acceleration(VkAccelerationStructureCreateInfoKHR& a
 	// Allocating the buffer to hold the acceleration structure
 	Buffer accel_buff;
 	accel_buff.create(
-		"Blas Buffer",
-		&ctx, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		"Blas Buffer", &ctx,
+		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, accel.size);
 	// Setting the buffer
 	result_accel.buffer = accel_buff;

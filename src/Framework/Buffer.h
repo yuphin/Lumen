@@ -42,9 +42,14 @@ struct Buffer {
 	}
 
 	inline void create_external(VulkanContext* ctx, VkBufferUsageFlags flags, VkMemoryPropertyFlags mem_property_flags,
-					   VkSharingMode sharing_mode, VkDeviceSize size, void* data = nullptr, bool use_staging = false) {
+								VkSharingMode sharing_mode, VkDeviceSize size, void* data = nullptr,
+								bool use_staging = false) {
 		return create("", ctx, flags, mem_property_flags, sharing_mode, size, data, use_staging, true);
 	}
+
+	void createExternalBuffer(VkPhysicalDevice physical_device, VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage,
+							  VkMemoryPropertyFlags properties, VkExternalMemoryHandleTypeFlagsKHR extMemHandleType,
+							  VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	void flush(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
 	void invalidate(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
 	void prepare_descriptor(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
