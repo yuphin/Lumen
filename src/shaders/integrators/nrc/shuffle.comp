@@ -28,7 +28,10 @@ void main() {
         return;
     }
     uint dst_idx = randu(seed) % sample_count.d;
-    out_queries[dst_idx] = in_queries[in_idx];
-    out_targets[dst_idx] = in_targets[in_idx];
+    // out_queries[dst_idx] = in_queries[in_idx];
+    // out_targets[dst_idx] = in_targets[in_idx];
+    out_queries[in_idx] = in_queries[in_idx];
+    out_targets[in_idx] = in_targets[in_idx];
+    
 
 }

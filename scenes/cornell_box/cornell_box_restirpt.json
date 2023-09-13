@@ -1,7 +1,7 @@
 {
     "integrator" : {
-        "type" : "nrc",
-        "path_length" : 3,
+        "type" : "restirpt",
+        "path_length" : 6,
         "sky_col" : [
             0,0,0
         ]
@@ -9,7 +9,6 @@
  
     "bsdfs": [
         {
-            "ior": 1.52,
             "name": "Glass",
             "refs": [
                 "glass_sphere"
@@ -22,6 +21,11 @@
             "type": "diffuse"
         },
         {
+            "albedo": [
+                1,
+                1,
+                1
+            ],
             "name": "Mirror",
             "refs": [
                 "mirror_sphere"

@@ -70,15 +70,13 @@ void main() {
 
 	vec3 secondary_throughput = vec3(1);
 
-	ivec2 tile = ivec2(gl_LaunchIDEXT.xy) % ivec2(8);
-	bool is_training_px = (tile.x * 8 + tile.y + pc_ray.tile_offset) % 64 == 0;
+	ivec2 tile = ivec2(gl_LaunchIDEXT.xy) % ivec2(4);
+	bool is_training_px = (tile.x * 4 + tile.y + pc_ray.tile_offset) % 16 == 0;
     uint sample_idx;
 	for (int depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.material_idx != -1;
-		if (depth >= pc_ray.max_depth - 1) {
-			break;
-		}
+		
 		if (!found_isect) {
 			col += throughput * shade_atmosphere(pc_ray.dir_light_idx, pc_ray.sky_col, origin.xyz, direction, tmax);
 			break;
@@ -105,12 +103,10 @@ void main() {
 			vec3 nee_result =
 				uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo, specular) / light_pick_pdf;
 			col += throughput * nee_result;
-            if(depth > 0 && is_training_px) {
-                target_data.d[sample_idx] = nee_result;
-            
-            }
             if(depth == 1 && is_training_px) {
-                col = nee_result;
+                target_data.d[sample_idx] = col;//nee_result;
+                // target_data.d[sample_idx] = nee_result;
+                // target_data.d[sample_idx]  = nee_result;
             }
 		}
 		// Sample direction & update throughput
@@ -135,8 +131,13 @@ void main() {
 			else
 				throughput /= rr_prob;
 		}
-		if (is_training_px) {
+
+		if (depth >= pc_ray.max_depth - 1) {
+			break;
+		}
+		if (is_training_px && depth == 0) {
             sample_idx = atomicAdd(sample_count.d, 1);
+			
 			make_radiance_query(payload.pos, n_s, direction, 1.0, hit_mat.albedo, vec3(0), query);
             query_data.d[sample_idx] = query;
 		}
@@ -145,12 +146,12 @@ void main() {
 		return;
 	}
 
-	if (pc_ray.frame_num > 0) {
-		float w = 1. / float(pc_ray.frame_num + 1);
-		vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
-		// imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
-		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
-	} else {
-		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
-	}
+	// if (pc_ray.frame_num > 0) {
+	// 	float w = 1. / float(pc_ray.frame_num + 1);
+	// 	vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+	// 	// imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+	// 	imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
+	// } else {
+	// 	imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+	// }
 }
