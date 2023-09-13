@@ -15,6 +15,7 @@ uvec4 seed = init_rng(gl_GlobalInvocationID.xy, uvec2(0), pc_ray.frame_num);
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SampleCount { uint d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer Throughput { vec3 d[]; };
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 1) readonly buffer InferenceRadiance { vec3 inference_radiance[]; };
 layout(binding = 2, rgba32f) uniform image2D image;
@@ -23,6 +24,7 @@ SampleCount sample_count = SampleCount(scene_desc.sample_count_addr);
 
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InferenceRadianceA { vec3 d[]; };
 InferenceRadianceA inference_radiance_a = InferenceRadianceA(scene_desc.inference_radiance_addr);
+Throughput throughput_buffer = Throughput(scene_desc.throughput_addr);
 
 
 void main() {
@@ -44,6 +46,8 @@ void main() {
     // }
 
     // vec3 inference_L = inference_radiance[in_idx];
+    vec3 direct_L = imageLoad(image, ivec2(coords.xy)).xyz;
     vec3 inference_L = inference_radiance_a.d[in_idx];
-    imageStore(image, ivec2(coords), vec4(inference_L, 1.f));
+    vec3 col = direct_L + throughput_buffer.d[in_idx] * inference_L;
+    imageStore(image, ivec2(coords), vec4(col, 1.f));
 }

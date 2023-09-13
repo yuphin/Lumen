@@ -10,16 +10,27 @@
 #include "nrc_commons.h"
 #include "../../utils.glsl"
 layout(push_constant) uniform _PushConstantRay { PCNRC pc_ray; };
-uvec4 seed = init_rng(gl_GlobalInvocationID.xy, uvec2(0), pc_ray.frame_num);
+uvec4 seed = init_rng(gl_GlobalInvocationID.xy, uvec2(0), pc_ray.total_frame_num);
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SampleCount { uint d; };
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
-layout(binding = 1) readonly buffer QueryDataPing { RadianceQuery in_queries[]; };
-layout(binding = 2) readonly buffer TargetDataPing { vec3 in_targets[]; };
-layout(binding = 3) writeonly buffer QueryDataPong { RadianceQuery out_queries[]; };
-layout(binding = 4) writeonly buffer TargetDataPong { vec3 out_targets[]; };
+// layout(binding = 1) readonly buffer QueryDataPing { RadianceQuery in_queries[]; };
+// layout(binding = 2) readonly buffer TargetDataPing { vec3 in_targets[]; };
+// layout(binding = 3) writeonly buffer QueryDataPong { RadianceQuery out_queries[]; };
+// layout(binding = 4) writeonly buffer TargetDataPong { vec3 out_targets[]; };
+
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer RadianceQueryIn { RadianceQuery d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer RadianceQueryOut { RadianceQuery d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer TargetDataIn { vec3 d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer TargetDataOut { vec3 d[]; };
+
+RadianceQueryIn query_in  = RadianceQueryIn(scene_desc.radiance_query_addr);
+RadianceQueryOut query_out = RadianceQueryOut(scene_desc.radiance_query_out_addr);
+TargetDataIn target_in = TargetDataIn(scene_desc.radiance_target_addr);
+TargetDataOut target_out = TargetDataOut(scene_desc.radiance_target_out_addr);
+
 SampleCount sample_count = SampleCount(scene_desc.sample_count_addr);
 
 void main() {
@@ -30,8 +41,10 @@ void main() {
     uint dst_idx = randu(seed) % sample_count.d;
     // out_queries[dst_idx] = in_queries[in_idx];
     // out_targets[dst_idx] = in_targets[in_idx];
-    out_queries[in_idx] = in_queries[in_idx];
-    out_targets[in_idx] = in_targets[in_idx];
+    query_out.d[dst_idx] = query_in.d[in_idx];
+    target_out.d[dst_idx] = target_in.d[in_idx];
+    // out_queries[in_idx] = in_queries[in_idx];
+    // out_targets[in_idx] = in_targets[in_idx];
     
 
 }

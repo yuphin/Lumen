@@ -22,6 +22,7 @@ class NRC : public Integrator {
 
 	Buffer inference_query_buffer;
 	Buffer inference_radiance_buffer;
+	Buffer throughput_buffer;
 
 	float* radiance_query_addr_cuda = nullptr;
 	cudaExternalMemory_t radiance_query_mem_cuda;

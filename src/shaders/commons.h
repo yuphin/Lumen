@@ -290,9 +290,12 @@ struct Material {
 	// NRC
 	uint64_t radiance_query_addr;
 	uint64_t radiance_target_addr;
+	uint64_t radiance_query_out_addr;
+	uint64_t radiance_target_out_addr;
 	uint64_t sample_count_addr;
 	uint64_t inference_radiance_addr;
 	uint64_t inference_query_addr;
+	uint64_t throughput_addr;
  };
 
 
