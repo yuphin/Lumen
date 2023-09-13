@@ -96,6 +96,31 @@ void NRC::init() {
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 							 instance->width * instance->height * 3 * sizeof(float));
 
+	// ReSTIR buffers
+	g_buffer.create("G-Buffer", &instance->vkb.ctx,
+					VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+						VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+					instance->width * instance->height * sizeof(RestirGBufferData));
+
+	temporal_reservoir_buffer.create("Temporal Reservoirs", &instance->vkb.ctx,
+									 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+										 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+									 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+									 instance->width * instance->height * sizeof(RestirReservoir));
+
+	passthrough_reservoir_buffer.create("Passthrough Buffer", &instance->vkb.ctx,
+										VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+											VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+										instance->width * instance->height * sizeof(RestirReservoir));
+
+	spatial_reservoir_buffer.create("Spatial Reservoirs", &instance->vkb.ctx,
+									VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+										VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+									VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+									instance->width * instance->height * sizeof(RestirReservoir));
+
 	desc.radiance_query_addr = radiance_query_buffer_ping.get_device_address();
 	desc.radiance_target_addr = radiance_target_buffer_ping.get_device_address();
 	desc.radiance_query_out_addr = radiance_query_buffer_pong.get_device_address();
@@ -104,6 +129,11 @@ void NRC::init() {
 	desc.inference_radiance_addr = inference_radiance_buffer.get_device_address();
 	desc.inference_query_addr = inference_query_buffer.get_device_address();
 	desc.throughput_addr = throughput_buffer.get_device_address();
+	// ReSTIR
+	desc.g_buffer_addr = g_buffer.get_device_address();
+	desc.temporal_reservoir_addr = temporal_reservoir_buffer.get_device_address();
+	desc.spatial_reservoir_addr = spatial_reservoir_buffer.get_device_address();
+	desc.passthrough_reservoir_addr = passthrough_reservoir_buffer.get_device_address();
 
 	scene_desc_buffer.create("Scene Desc", &instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -129,6 +159,14 @@ void NRC::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, inference_radiance_addr, &inference_radiance_buffer,
 								 instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, throughput_addr, &throughput_buffer, instance->vkb.rg);
+	// RESTIR
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, &g_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, temporal_reservoir_addr, &temporal_reservoir_buffer,
+								 instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, spatial_reservoir_addr, &spatial_reservoir_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, passthrough_reservoir_addr, &passthrough_reservoir_buffer,
+								 instance->vkb.rg);
 }
 
 void NRC::render() {

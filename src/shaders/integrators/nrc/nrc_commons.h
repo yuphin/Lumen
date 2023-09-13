@@ -1,5 +1,6 @@
 #include "../../commons.h"
 
+#include "../restir/di/restir_structs.h"
 struct PCNRC {
 	vec3 sky_col;
 	uint frame_num;

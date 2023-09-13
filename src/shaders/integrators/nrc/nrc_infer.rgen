@@ -121,7 +121,7 @@ void main() {
 			break;
 		}
 
-		if (depth == 0) {
+		if (depth == 1) {
             RadianceQuery query;
 			make_radiance_query(payload.pos, n_s, direction, 1.0, hit_mat.albedo, vec3(0), query);
 			inference_queries.d[pixel_idx] = query;

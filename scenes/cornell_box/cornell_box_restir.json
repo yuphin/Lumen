@@ -1,7 +1,7 @@
 {
     "integrator" : {
         "type" : "restir",
-        "path_length" : 6,
+        "path_length" : 3,
         "sky_col" : [
             0,0,0
         ]
@@ -20,14 +20,14 @@
                 1,
                 1
             ],
-            "type": "glass"
+            "type": "diffuse"
         },
         {
             "name": "Mirror",
             "refs": [
                 "mirror_sphere"
             ],
-            "type": "mirror"
+            "type": "diffuse"
         },
         {
             "albedo": [

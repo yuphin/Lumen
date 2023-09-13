@@ -49,5 +49,6 @@ void main() {
     vec3 direct_L = imageLoad(image, ivec2(coords.xy)).xyz;
     vec3 inference_L = inference_radiance_a.d[in_idx];
     vec3 col = direct_L + throughput_buffer.d[in_idx] * inference_L;
+    // vec3 col = inference_L;
     imageStore(image, ivec2(coords), vec4(col, 1.f));
 }

@@ -24,6 +24,12 @@ class NRC : public Integrator {
 	Buffer inference_radiance_buffer;
 	Buffer throughput_buffer;
 
+	// ReSTIR Data
+	Buffer g_buffer;
+	Buffer passthrough_reservoir_buffer;
+	Buffer temporal_reservoir_buffer;
+	Buffer spatial_reservoir_buffer;
+
 	float* radiance_query_addr_cuda = nullptr;
 	cudaExternalMemory_t radiance_query_mem_cuda;
 	float* radiance_target_addr_cuda = nullptr;
