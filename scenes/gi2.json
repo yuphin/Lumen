@@ -1,0 +1,88 @@
+{
+    "integrator" : {
+        "type" : "nrc",
+        "path_length" : 3,
+        "sky_col" : [
+            1,1,1
+        ]
+
+    },
+
+    "bsdfs": [
+        {
+            "ior": 1.52,
+            "name": "Teapot",
+            "refs": [
+                "teapot"
+            ],
+            "albedo": [
+                1,
+                1,
+                1
+            ],
+            "type": "diffuse"
+        },
+        {
+            "albedo": [
+                0.63,
+                0.065,
+                0.05
+            ],
+            "name": "Left Wall",
+            "refs": [
+                "left_wall"
+            ],
+            "type": "diffuse"
+        },
+        {
+            "albedo": [
+                0.725,
+                0.71,
+                0.68
+            ],
+            "name": "Other Walls",
+            "refs": [
+                "right_wall",
+                "wall1",
+                "wall2",
+                "wall3",
+                "wall4",
+                "wall5",
+                "wall6",
+                "wall7"
+            ],
+            "type": "diffuse"
+        },
+        {
+            "emissive_factor": [
+                17,
+                12,
+                4
+            ],
+            "albedo": [
+                1,
+                1,
+                1
+            ],
+            "name": "Light",
+            "refs": [
+                "light1",
+                "light2"
+            ],
+            "type": "diffuse"
+        }
+       
+    ],
+    "camera": {
+        "fov": 45,
+        "position": [
+            -25,
+            18,
+            82
+        ],
+        "dir" : [
+            -1.420776,-2.158489, 2
+        ]
+    },
+    "mesh_file": "gi2.obj"
+}

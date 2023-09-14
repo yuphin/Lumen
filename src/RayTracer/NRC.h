@@ -49,4 +49,5 @@ class NRC : public Integrator {
 	uint32_t total_frame_num = 0;
 
 	bool do_spatiotemporal = false;
+	bool train = true;
 };

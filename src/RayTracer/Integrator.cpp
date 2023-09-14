@@ -262,7 +262,7 @@ void Integrator::update_uniform_buffers() {
 }
 
 bool Integrator::update() {
-	float trans_speed = 0.01f;
+	float trans_speed = 0.1f;
 	glm::vec3 front;
 	if (instance->window->is_key_held(KeyInput::KEY_LEFT_SHIFT)) {
 		trans_speed *= 4;

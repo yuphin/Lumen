@@ -13,6 +13,10 @@ find_package(Vulkan REQUIRED)
 find_package(Threads REQUIRED)
 find_package(CUDA REQUIRED)
 
+set(TCNN_CUDA_ARCHITECTURES "86")
+set(CUDA_ARCHITECTURES "86")
+set(CMAKE_CUDA_ARCHITECTURES "86")
+
 if (WIN32)
    set(VOLK_STATIC_DEFINES VK_USE_PLATFORM_WIN32_KHR)
 endif()
@@ -132,6 +136,7 @@ endif()
 add_compile_definitions(TINYEXR_USE_MINIZ)  # enables usage of miniz for opening exr images
 add_compile_definitions(USE_SHADERC)        # enables shader compilation via shaderc
 # cuda_add_executable(Lumen ${src_files} ${shaders_src})
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_86,code=sm_86)
 cuda_add_executable(Lumen ${src_files} ${shaders_src} ${cuda_src})
 # cuda_add_executable(Network ${CMAKE_CURRENT_SOURCE_DIR}/src/RayTracer/Network.cu)
 if(WIN32)
@@ -147,7 +152,8 @@ if(MSVC)
 	target_compile_options(Lumen PRIVATE "/MP")
 	set_target_properties(Lumen PROPERTIES
     				      VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-                          CUDA_SEPARABLE_COMPILATION ON)
+                          CUDA_SEPARABLE_COMPILATION ON
+                          CUDA_ARCHITECTURES 86)
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Lumen)
 endif()
 

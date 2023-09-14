@@ -167,6 +167,12 @@ void NRC::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, spatial_reservoir_addr, &spatial_reservoir_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, passthrough_reservoir_addr, &passthrough_reservoir_buffer,
 								 instance->vkb.rg);
+
+	instance->window->add_key_callback([this](KeyInput key, KeyAction action) {
+		if (instance->window->is_key_down(KeyInput::KEY_F2)) {
+			train ^= true;
+		} 
+	});
 }
 
 void NRC::render() {
@@ -226,55 +232,57 @@ void NRC::render() {
 		.bind_tlas(instance->vkb.tlas);
 
 	// Collect samples
-	for (int i = 0; i < COLLECTION_FRAME_COUNT; i++) {
+	if (train) {
+		for (int i = 0; i < COLLECTION_FRAME_COUNT; i++) {
+			instance->vkb.rg
+				->add_rt("NRC - Collection", {.shaders = {{"src/shaders/integrators/nrc/nrc_train.rgen"},
+														  {"src/shaders/ray.rmiss"},
+														  {"src/shaders/ray_shadow.rmiss"},
+														  {"src/shaders/ray.rchit"},
+														  {"src/shaders/ray.rahit"}},
+											  .dims = {instance->width, instance->height},
+											  .accel = instance->vkb.tlas.accel})
+				.push_constants(&pc_ray)
+				.zero(sample_count_buffer)
+				.zero(radiance_target_buffer_ping)
+				.zero(radiance_query_buffer_ping)
+				.bind({
+					output_tex,
+					scene_ubo_buffer,
+					scene_desc_buffer,
+				})
+				.bind(mesh_lights_buffer)
+				.bind_texture_array(scene_textures)
+				.bind_tlas(instance->vkb.tlas);
+		}
+
+		// Shuffle
+		uint32_t wg_x = (max_samples_count + 1023) / 1024;
+		uint32_t wg_y = 1;
 		instance->vkb.rg
-			->add_rt("NRC - Collection", {.shaders = {{"src/shaders/integrators/nrc/nrc_train.rgen"},
-													  {"src/shaders/ray.rmiss"},
-													  {"src/shaders/ray_shadow.rmiss"},
-													  {"src/shaders/ray.rchit"},
-													  {"src/shaders/ray.rahit"}},
-										  .dims = {instance->width, instance->height},
-										  .accel = instance->vkb.tlas.accel})
+			->add_compute("NRC - Shuffle",
+						  {.shader = Shader("src/shaders/integrators/nrc/shuffle.comp"), .dims = {wg_x, wg_y}})
 			.push_constants(&pc_ray)
-			.zero(sample_count_buffer)
-			.zero(radiance_target_buffer_ping)
-			.zero(radiance_query_buffer_ping)
-			.bind({
-				output_tex,
-				scene_ubo_buffer,
-				scene_desc_buffer,
-			})
-			.bind(mesh_lights_buffer)
-			.bind_texture_array(scene_textures)
-			.bind_tlas(instance->vkb.tlas);
+			.bind(scene_desc_buffer)
+			.zero(radiance_query_buffer_pong)
+			.zero(radiance_target_buffer_pong);
+
+		instance->vkb.rg->run_and_submit(cmd);
+		// Train
+		const int NUM_TRAIN_STEPS = 4;
+		uint32_t batch_size = max_samples_count / NUM_TRAIN_STEPS;
+		uint32_t data_start_idx = 0;
+		for (int i = 0; i < NUM_TRAIN_STEPS; i++) {
+			LUMEN_INFO("Training step {}", i);
+			neural_radiance_cache.train(cu_stream, radiance_query_addr_cuda + 14 * data_start_idx,
+										radiance_target_addr_cuda + 3 * data_start_idx, batch_size, nullptr);
+			data_start_idx += batch_size;
+		}
+		cudaStreamSynchronize(cu_stream);
+		cudaDeviceSynchronize();
+		cmd.begin();
 	}
 
-	// Shuffle
-	uint32_t wg_x = (max_samples_count + 1023) / 1024;
-	uint32_t wg_y = 1;
-	instance->vkb.rg
-		->add_compute("NRC - Shuffle",
-					  {.shader = Shader("src/shaders/integrators/nrc/shuffle.comp"), .dims = {wg_x, wg_y}})
-		.push_constants(&pc_ray)
-		.bind(scene_desc_buffer)
-		.zero(radiance_query_buffer_pong)
-		.zero(radiance_target_buffer_pong);
-
-	instance->vkb.rg->run_and_submit(cmd);
-	// Train
-	const int NUM_TRAIN_STEPS = 4;
-	uint32_t batch_size = max_samples_count / NUM_TRAIN_STEPS;
-	uint32_t data_start_idx = 0;
-	for (int i = 0; i < NUM_TRAIN_STEPS; i++) {
-		LUMEN_INFO("Training step {}", i);
-		neural_radiance_cache.train(cu_stream, radiance_query_addr_cuda + 14 * data_start_idx,
-									radiance_target_addr_cuda + 3 * data_start_idx, batch_size, nullptr);
-		data_start_idx += batch_size;
-	}
-	cudaStreamSynchronize(cu_stream);
-	cudaDeviceSynchronize();
-
-	cmd.begin();
 	instance->vkb.rg
 		->add_rt("NRC - Infer", {.shaders = {{"src/shaders/integrators/nrc/nrc_infer.rgen"},
 											 {"src/shaders/ray.rmiss"},
