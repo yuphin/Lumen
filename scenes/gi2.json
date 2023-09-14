@@ -36,14 +36,25 @@
         },
         {
             "albedo": [
+                0.14,
+                0.45,
+                0.091
+            ],
+            "name": "Right Wall",
+            "refs": [
+                "right_wall",
+                "wall1"
+            ],
+            "type": "diffuse"
+        },
+        {
+            "albedo": [
                 0.725,
                 0.71,
                 0.68
             ],
             "name": "Other Walls",
             "refs": [
-                "right_wall",
-                "wall1",
                 "wall2",
                 "wall3",
                 "wall4",
@@ -55,9 +66,9 @@
         },
         {
             "emissive_factor": [
-                17,
-                12,
-                4
+                51,
+                36,
+                12
             ],
             "albedo": [
                 1,

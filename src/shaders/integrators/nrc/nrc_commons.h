@@ -18,6 +18,7 @@ struct PCNRC {
 	uint total_frame_num;
 	uint do_spatiotemporal;
 	uint random_num;
+	uint curr_mode;
 
 };
 

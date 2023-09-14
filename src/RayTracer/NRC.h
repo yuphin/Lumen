@@ -10,6 +10,8 @@ class NRC : public Integrator {
 	virtual void render() override;
 	virtual bool update() override;
 	virtual void destroy() override;
+	virtual bool gui() override;
+
 
    private:
 	PCNRC pc_ray{};
@@ -50,4 +52,5 @@ class NRC : public Integrator {
 
 	bool do_spatiotemporal = false;
 	bool train = true;
+	uint curr_mode = 0;
 };

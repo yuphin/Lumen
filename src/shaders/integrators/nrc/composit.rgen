@@ -42,7 +42,12 @@ void main() {
     uint in_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
     vec3 direct_L = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
     vec3 inference_L = inference_radiance.d[in_idx];
-    // col += direct_L + throughput_buffer.d[in_idx] * inference_L;
-    col += throughput_buffer.d[in_idx] * inference_L;
+    if(pc_ray.curr_mode == 0) {
+        col += direct_L + throughput_buffer.d[in_idx] * inference_L;
+    } else if(pc_ray.curr_mode == 1) {
+        col += direct_L;
+    } else if(pc_ray.curr_mode == 2) {
+        col = inference_L;
+    }
     imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
 }

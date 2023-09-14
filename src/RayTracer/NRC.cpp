@@ -192,6 +192,7 @@ void NRC::render() {
 	pc_ray.total_frame_num = total_frame_num;
 	pc_ray.do_spatiotemporal = do_spatiotemporal;
 	pc_ray.random_num = rand() % UINT_MAX;
+	pc_ray.curr_mode = curr_mode;
 
 	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
@@ -345,3 +346,27 @@ bool NRC::update() {
 }
 
 void NRC::destroy() { Integrator::destroy(); }
+
+bool NRC::gui() {
+	bool result = Integrator::gui();
+	const char *settings[] = {"Direct + Indirect", "Direct", "Indirect"};
+
+	static int curr_mode_idx = int(curr_mode);
+	if (ImGui::BeginCombo("Select lighting mode", settings[curr_mode])) {
+		for (int n = 0; n < IM_ARRAYSIZE(settings); n++) {
+			const bool selected = curr_mode_idx == n;
+			if (ImGui::Selectable(settings[n], selected)) {
+				curr_mode_idx = n;
+			}
+
+			// Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+			if (selected) {
+				ImGui::SetItemDefaultFocus();
+			}
+		}
+		ImGui::EndCombo();
+	}
+
+	curr_mode = curr_mode_idx;
+	return result;
+}
