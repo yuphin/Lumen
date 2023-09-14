@@ -1,4 +1,6 @@
+#ifdef __cplusplus
 #pragma once
+#endif
 struct RestirData {
 	uint light_idx;
 	uint light_mesh_idx;

@@ -47,4 +47,6 @@ class NRC : public Integrator {
 	NeuralRadianceCache neural_radiance_cache;
 	CUstream cu_stream;
 	uint32_t total_frame_num = 0;
+
+	bool do_spatiotemporal = false;
 };

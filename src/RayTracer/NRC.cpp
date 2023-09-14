@@ -184,6 +184,46 @@ void NRC::render() {
 	pc_ray.size_y = instance->height;
 	pc_ray.size_x = instance->width;
 	pc_ray.total_frame_num = total_frame_num;
+	pc_ray.do_spatiotemporal = do_spatiotemporal;
+	pc_ray.random_num = rand() % UINT_MAX;
+
+	const std::initializer_list<ResourceBinding> rt_bindings = {
+		output_tex,
+		scene_ubo_buffer,
+		scene_desc_buffer,
+	};
+
+	// Temporal pass + path tracing
+	instance->vkb.rg
+		->add_rt("ReSTIR - Temporal Pass", {.shaders = {{"src/shaders/integrators/restir/di/temporal_pass.rgen"},
+														{"src/shaders/ray.rmiss"},
+														{"src/shaders/ray_shadow.rmiss"},
+														{"src/shaders/ray.rchit"},
+														{"src/shaders/ray.rahit"}},
+											.dims = {instance->width, instance->height},
+											.accel = instance->vkb.tlas.accel})
+		.push_constants(&pc_ray)
+		.zero(g_buffer)
+		.zero(spatial_reservoir_buffer)
+		.zero(temporal_reservoir_buffer, !do_spatiotemporal)
+		.bind(rt_bindings)
+		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
+		.bind_tlas(instance->vkb.tlas);
+	// Spatial pass
+	instance->vkb.rg
+		->add_rt("ReSTIR - Spatial Pass", {.shaders = {{"src/shaders/integrators/restir/di/spatial_pass.rgen"},
+													   {"src/shaders/ray.rmiss"},
+													   {"src/shaders/ray_shadow.rmiss"},
+													   {"src/shaders/ray.rchit"},
+													   {"src/shaders/ray.rahit"}},
+										   .dims = {instance->width, instance->height},
+										   .accel = instance->vkb.tlas.accel})
+		.push_constants(&pc_ray)
+		.bind(rt_bindings)
+		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
+		.bind_tlas(instance->vkb.tlas);
 
 	// Collect samples
 	for (int i = 0; i < COLLECTION_FRAME_COUNT; i++) {
@@ -265,15 +305,25 @@ void NRC::render() {
 		cudaDeviceSynchronize();
 	}
 	cmd.begin();
-	wg_x = (instance->width * instance->height + 1023) / 1024;
-	wg_y = 1;
+	// Output
 	instance->vkb.rg
-		->add_compute("NRC - Composite",
-					  {.shader = Shader("src/shaders/integrators/nrc/composite.comp"), .dims = {wg_x, wg_y}})
+		->add_rt("ReSTIR - Output", {.shaders = {{"src/shaders/integrators/nrc/composit.rgen"},
+												 {"src/shaders/ray.rmiss"},
+												 {"src/shaders/ray_shadow.rmiss"},
+												 {"src/shaders/ray.rchit"},
+												 {"src/shaders/ray.rahit"}},
+									 .dims = {instance->width, instance->height},
+									 .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
-		.bind(scene_desc_buffer)
-		.bind(inference_radiance_buffer)
-		.bind(output_tex);
+		.bind(rt_bindings)
+		.bind(mesh_lights_buffer)
+		.bind_texture_array(scene_textures)
+		.bind_tlas(instance->vkb.tlas);
+
+	if (!do_spatiotemporal) {
+		do_spatiotemporal = true;
+	}
+	instance->vkb.rg->run_and_submit(cmd);
 }
 
 bool NRC::update() {

@@ -94,8 +94,8 @@ void main() {
 		if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
 			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
             if(depth > 0) {
-                col +=
-                    throughput * uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo, specular) / light_pick_pdf;
+                // col +=
+                //     throughput * uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo, specular) / light_pick_pdf;
             }
 		}
 		// Sample direction & update throughput

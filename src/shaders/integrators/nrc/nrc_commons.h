@@ -16,6 +16,9 @@ struct PCNRC {
 	uint dir_light_idx;
 	uint tile_offset;
 	uint total_frame_num;
+	uint do_spatiotemporal;
+	uint random_num;
+
 };
 
 struct RadianceQuery {
