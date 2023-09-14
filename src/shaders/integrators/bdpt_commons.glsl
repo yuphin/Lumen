@@ -255,7 +255,7 @@ int bdpt_generate_camera_subpath(vec2 d, const vec3 origin, int max_depth,
     float cos_theta = dot(camera_verts.d[bdpt_path_idx].dir,
                           camera_verts.d[bdpt_path_idx].n_s);
     float pdf =
-        1 / (cam_area * screen_size * cos_theta * cos_theta * cos_theta);
+        1.0 / (cam_area * screen_size * cos_theta * cos_theta * cos_theta);
     return bdpt_random_walk_eye(max_depth - 1, vec3(1), pdf) + 1;
 }
 
@@ -459,7 +459,7 @@ float calc_mis_weight(int s, int t, const in PathVertex sampled) {
     }
 #undef cam_vtx
 #undef light_vtx
-    return 1 / (1 + sum_ri);
+    return 1.0 / (1 + sum_ri);
 }
 
 vec3 bdpt_connect_cam(int s, out ivec2 coords) {

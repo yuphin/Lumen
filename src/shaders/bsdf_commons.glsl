@@ -107,7 +107,7 @@ vec3 disney_f(const Material mat, const vec3 wo, const vec3 wi,
     float D_r = GTR1(nh, mix(0.1, 0.001, mat.clearcoat_gloss));
     float F_r = mix(0.04, 1.0, fh);
     float G_r = smithG_GGX(nl, .25) * smithG_GGX(nv, .25);
-    return ((1 / PI) * mix(F_d, ss, mat.subsurface) * mat.albedo + F_sheen) *
+    return ((1.0 / PI) * mix(F_d, ss, mat.subsurface) * mat.albedo + F_sheen) *
                (1 - mat.metallic) +
            0.25 * G_s * F_s * D_s / (nl * nv) +
            0.25 * mat.clearcoat * G_r * F_r * D_r;

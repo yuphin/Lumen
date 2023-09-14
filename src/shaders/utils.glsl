@@ -238,7 +238,7 @@ float schlick_w(float u) {
 
 float GTR1(float nh, float a) {
     if (a >= 1) {
-        return 1 / PI;
+        return 1.0 / PI;
     }
     float a2 = a * a;
     float t = 1 + (a2 - 1) * nh * nh;
@@ -252,17 +252,17 @@ float GTR2(float nh, float a) {
 }
 
 float GTR2_aniso(float nh, float hx, float hy, float ax, float ay) {
-    return 1 / (PI * ax * ay * sqr(sqr(hx / ax) + sqr(hy / ay) + nh * nh));
+    return 1.0 / (PI * ax * ay * sqr(sqr(hx / ax) + sqr(hy / ay) + nh * nh));
 }
 
 float smithG_GGX(float nv, float alpha_g) {
     float a = alpha_g * alpha_g;
     float b = nv * nv;
-    return 1 / (nv + sqrt(a + b - a * b));
+    return 1.0 / (nv + sqrt(a + b - a * b));
 }
 
 float smithG_GGX_aniso(float nv, float vx, float vy, float ax, float ay) {
-    return 1 / (nv + sqrt(sqr(vx * ax) + sqr(vy * ay) + sqr(nv)));
+    return 1.0 / (nv + sqrt(sqr(vx * ax) + sqr(vy * ay) + sqr(nv)));
 }
 
 // Input Ve: view direction

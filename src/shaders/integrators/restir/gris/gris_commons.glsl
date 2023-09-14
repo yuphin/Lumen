@@ -158,7 +158,7 @@ vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const 
 #if !defined(MIS) && defined(RECONNECTION)
 		mis_weight = 1;
 #else
-		mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + bsdf_pdf / pdf_light_w);
+		mis_weight = is_light_delta(record.flags) ? 1.0 : 1.0 / (1 + bsdf_pdf / pdf_light_w);
 #endif
 		res += mis_weight * f * abs(cos_x) * Le / pdf_light_w;
 	}

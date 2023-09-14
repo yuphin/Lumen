@@ -26,7 +26,7 @@ vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const 
     visible = any_hit_payload.hit == 0;
     if (visible && pdf_light_w > 0) {
         const float mis_weight =
-            is_light_delta(record.flags) ? 1 : 1 / (1 + bsdf_pdf / pdf_light_w);
+            is_light_delta(record.flags) ? 1.0 : 1.0 / (1 + bsdf_pdf / pdf_light_w);
         res += mis_weight * f * abs(cos_x) * Le / pdf_light_w;
     }
     if (get_light_type(record.flags) == LIGHT_AREA) {

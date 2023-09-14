@@ -91,7 +91,7 @@ void main() {
             const vec3 f =
                 eval_bsdf(normal, wo, hit_mat, 1, side, wi, bsdf_pdf, cos_x);
 
-            pdf_light *= 1 / pc_ray.num_lights;
+            pdf_light *= 1.0 / pc_ray.num_lights;
             // f * L * G / pdf
             RestirData s;
             s.light_idx = record.light_idx;
