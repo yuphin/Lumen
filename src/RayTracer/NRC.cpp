@@ -31,7 +31,7 @@ void NRC::init() {
 
 	max_samples_count = (max_samples_count + 1023) / 1024 * 1024;
 
-	neural_radiance_cache.initialize(PositionEncoding::HashGrid, 5, 1e-3f);
+	neural_radiance_cache.initialize(PositionEncoding::HashGrid, 10, 1e-3f);
 	CUDADRV_CHECK(cuStreamCreate(&cu_stream, 0));
 	radiance_query_buffer_pong.create_external(&instance->vkb.ctx,
 											   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
@@ -283,7 +283,8 @@ void NRC::render() {
 		cudaDeviceSynchronize();
 		cmd.begin();
 	}
-
+	pc_ray.random_num = rand() % UINT_MAX;
+	pc_ray.time = rand() % UINT_MAX;
 	instance->vkb.rg
 		->add_rt("NRC - Infer", {.shaders = {{"src/shaders/integrators/nrc/nrc_infer.rgen"},
 											 {"src/shaders/ray.rmiss"},
@@ -293,7 +294,7 @@ void NRC::render() {
 								 .dims = {instance->width, instance->height},
 								 .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
-		.zero(sample_count_buffer)
+		.zero(throughput_buffer)
 		.zero(inference_radiance_buffer)
 		.zero(inference_query_buffer)
 		.bind({
@@ -316,7 +317,7 @@ void NRC::render() {
 	cmd.begin();
 	// Output
 	instance->vkb.rg
-		->add_rt("ReSTIR - Output", {.shaders = {{"src/shaders/integrators/nrc/composit.rgen"},
+		->add_rt("ReSTIR - Output", {.shaders = {{"src/shaders/integrators/nrc/composite.rgen"},
 												 {"src/shaders/ray.rmiss"},
 												 {"src/shaders/ray_shadow.rmiss"},
 												 {"src/shaders/ray.rchit"},

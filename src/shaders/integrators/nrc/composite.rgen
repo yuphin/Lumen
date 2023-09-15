@@ -47,6 +47,7 @@ void main() {
     } else if(pc_ray.curr_mode == 1) {
         col += direct_L;
     } else if(pc_ray.curr_mode == 2) {
+        // col = throughput_buffer.d[in_idx] * inference_L;
         col = inference_L;
     }
     imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));

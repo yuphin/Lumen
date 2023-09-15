@@ -76,7 +76,9 @@ void main() {
 	for (int depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.material_idx != -1;
-		
+		if (depth >= pc_ray.max_depth - 1) {
+			break;
+		}
 		if (!found_isect) {
 			col += throughput * shade_atmosphere(pc_ray.dir_light_idx, pc_ray.sky_col, origin.xyz, direction, tmax);
 			break;
@@ -103,8 +105,8 @@ void main() {
 			vec3 nee_result =
 				uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo, specular) / light_pick_pdf;
 			col += throughput * nee_result;
-            if(depth > 0 && is_training_px) {
-                target_data.d[sample_idx] = nee_result;
+            if(depth == 1 && is_training_px) {
+                target_data.d[sample_idx] = throughput * nee_result;
             }
             if(depth == 1 && is_training_px) {
                 col = nee_result;
@@ -116,8 +118,10 @@ void main() {
 		if (pdf == 0) {
 			break;
 		}
-		throughput *= f * abs(cos_theta) / pdf;
+		// if(depth > 0) {
+		// }
 		if (depth > 0) {
+			throughput *= f * abs(cos_theta) / pdf;
 			secondary_throughput *= f * abs(cos_theta) / pdf;
 		}
 		specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
@@ -133,13 +137,11 @@ void main() {
 				throughput /= rr_prob;
 		}
 
-		if (depth >= pc_ray.max_depth - 1) {
-			break;
-		}
-		if (is_training_px) {
+		
+		if (is_training_px && depth == 0) {
             sample_idx = atomicAdd(sample_count.d, 1);
 			
-			make_radiance_query(payload.pos, n_s, direction, 1.0, hit_mat.albedo, vec3(0), query);
+			make_radiance_query(payload.pos, payload.n_s, direction, 1.0, hit_mat.albedo, vec3(0), query);
             query_data.d[sample_idx] = query;
 		}
 	}
