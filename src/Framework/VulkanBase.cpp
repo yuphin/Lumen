@@ -368,6 +368,7 @@ void VulkanBase::create_logical_device() {
 	features12.bufferDeviceAddress = true;
 	features12.runtimeDescriptorArray = true;
 	features12.shaderSampledImageArrayNonUniformIndexing = true;
+	features12.scalarBlockLayout = true;
 	if (1) {
 		dynamic_rendering_feature.dynamicRendering = true;
 		syncronization2_features.synchronization2 = true;
