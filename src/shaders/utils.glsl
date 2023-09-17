@@ -134,7 +134,7 @@ float uint_to_float(uint x) {
 }
 
 uvec4 init_rng(uvec2 pixel_coords, uvec2 resolution, uint frame_num, uint state) {
-    return uvec4(pixel_coords.xy, frame_num, 0);
+    return uvec4(pixel_coords.xy, frame_num, state);
 }
 
 uvec4 init_rng(uvec2 pixel_coords, uvec2 resolution, uint frame_num) {
