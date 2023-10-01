@@ -28,10 +28,11 @@ class ReSTIRPT : public Integrator {
 	bool enable_rr = false;
 	bool enable_spatial_reuse = true; 
 	bool show_reconnection_radiance = false;
-	bool enable_mis_in_gris = false;
+	bool enable_mis_in_gris = true;
 	bool enable_temporal_reuse = false;
+	bool talbot_mis = true;
 	float spatial_reuse_radius = 32.0f;
-	float min_vertex_distance_ratio = 0.01f;
+	float min_vertex_distance_ratio = 0.00f;
 	uint32_t path_length = 0;
 	uint32_t num_spatial_samples = 0;
 

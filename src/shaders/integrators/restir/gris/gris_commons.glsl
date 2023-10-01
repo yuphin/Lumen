@@ -16,7 +16,6 @@ const float tmin = 0.001;
 const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num);
 
 struct HitData {
 	vec3 pos;
@@ -158,7 +157,7 @@ vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const 
 #if !defined(MIS) && defined(RECONNECTION)
 		mis_weight = 1;
 #else
-		mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + bsdf_pdf / pdf_light_w);
+		mis_weight = is_light_delta(record.flags) ? 1.0 : 1.0 / (1 + bsdf_pdf / pdf_light_w);
 #endif
 		res += mis_weight * f * abs(cos_x) * Le / pdf_light_w;
 	}
@@ -308,8 +307,7 @@ bool retrace_paths(in HitData gbuffer, in GrisData data, uvec2 source_coords, uv
 	vec3 n_g = gbuffer.n_g;
 	vec3 pos = gbuffer.pos;
 
-	uvec4 reservoir_seed =
-		init_rng(target_coords, gl_LaunchSizeEXT.xy, seed_helper, data.init_seed);
+	uvec4 reservoir_seed = init_rng(target_coords, gl_LaunchSizeEXT.xy, seed_helper, data.init_seed);
 
 	HitDataWithoutGeometryNormals rc_gbuffer =
 		get_hitdata_no_ng(data.rc_barycentrics, data.rc_primitive_instance_id.y, data.rc_primitive_instance_id.x);
@@ -360,12 +358,11 @@ bool retrace_paths(in HitData gbuffer, in GrisData data, uvec2 source_coords, uv
 			// Compute the direct lighting on the reconnection vertex
 			const Material rc_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
 
-			if (/*is_diffuse(rc_mat)*/false) { // TODO: This causes some bias for some reason.
+			if (/*is_diffuse(rc_mat)*/ false) {	 // TODO: This causes some bias for some reason.
 				reservoir_contribution = data.rc_Li;
 			} else {
 				const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
-				uvec4 reconnection_seed = init_rng(target_coords, gl_LaunchSizeEXT.xy,
-												   seed_helper, data.rc_seed);
+				uvec4 reconnection_seed = init_rng(target_coords, gl_LaunchSizeEXT.xy, seed_helper, data.rc_seed);
 				reservoir_contribution =
 					uniform_sample_light_with_visibility_override(reconnection_seed, rc_mat, rc_gbuffer.pos, rc_side,
 																  rc_gbuffer.n_s, -wi, rc_nee_visible) /
@@ -379,7 +376,6 @@ bool retrace_paths(in HitData gbuffer, in GrisData data, uvec2 source_coords, uv
 				reservoir_contribution += f * abs(rc_cos_x) * data.rc_postfix_L / bsdf_pdf;
 			}
 			reservoir_contribution = partial_throughput * reservoir_contribution;
-			// reservoir_contribution = partial_throughput * data.rc_postfix_L;
 			return true;
 		}
 
@@ -414,7 +410,8 @@ bool retrace_paths_and_evaluate(in HitData gbuffer, in GrisData data, uvec2 sour
 								uint seed_helper, out float target_pdf) {
 	vec3 reservoir_contribution;
 	float jacobian;
-	bool result = retrace_paths(gbuffer, data, source_coords, target_coords, seed_helper, jacobian, reservoir_contribution);
+	bool result =
+		retrace_paths(gbuffer, data, source_coords, target_coords, seed_helper, jacobian, reservoir_contribution);
 	target_pdf = result ? calc_target_pdf(reservoir_contribution) * jacobian : 0.0;
 	return result;
 }
