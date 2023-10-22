@@ -72,6 +72,7 @@ void main() {
 		if (!gbuffer_data_valid(neighbor_gbuffer)) {
 			continue;
 		}
+		LOG_CLICKED("Retrace - %v2i\n", rand_offset);
 		const Reservoir neighbor_reservoir = in_reservoirs[neighbor_pixel_idx];
 		bool neighbor_in_canonical =
 			retrace_paths(unpacked_gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy, uvec2(coords), seed_helper,

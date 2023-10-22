@@ -450,22 +450,13 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 		return false;
 	}
 
-	bool side = true;
-	if (dot(dst_gbuffer.n_g, dst_wo) < 0.) dst_gbuffer.n_g = -dst_gbuffer.n_g;
-	if (dot(dst_gbuffer.n_g, dst_gbuffer.n_s) < 0) {
-		dst_gbuffer.n_s = -dst_gbuffer.n_s;
-		side = false;
-	}
+	bool side = face_forward(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo);
+
 	vec3 dst_wi = rc_src_gbuffer.pos - dst_gbuffer.pos;
 	float wi_len = length(dst_wi);
 	dst_wi /= wi_len;
 
-	rc_side = true;
-	if (dot(rc_src_gbuffer.n_g, -dst_wi) < 0) rc_src_gbuffer.n_g = -rc_src_gbuffer.n_g;
-	if (dot(rc_src_gbuffer.n_g, rc_src_gbuffer.n_s) < 0) {
-		rc_side = false;
-		rc_src_gbuffer.n_s = -rc_src_gbuffer.n_s;
-	}
+	rc_side = face_forward(rc_src_gbuffer.n_s, rc_src_gbuffer.n_g, -dst_wi);
 
 	bool connectable = same_hemisphere(dst_wo, dst_wi, dst_gbuffer.n_s) && same_hemisphere(-dst_wi, data.rc_wi, rc_src_gbuffer.n_s);
 	bool connected = false;
@@ -496,11 +487,7 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 		float len_src_wi_sqr = dot(src_wi, src_wi);
 		src_wi /= sqrt(len_src_wi_sqr);
 		float g_source = abs(dot(rc_src_gbuffer.n_s, -src_wi)) / len_src_wi_sqr;
-
-		if (dot(src_gbuffer.n_g, src_wo) < 0.) src_gbuffer.n_g = -src_gbuffer.n_g;
-		if (dot(src_gbuffer.n_g, src_gbuffer.n_s) < 0) {
-			src_gbuffer.n_s = -src_gbuffer.n_s;
-		}
+		bool src_side = face_forward(src_gbuffer.n_s, src_gbuffer.n_g, src_wo);
 
 		Material src_hit_mat = load_material(src_gbuffer.material_idx, src_gbuffer.uv);
 		float src_pdf = bsdf_pdf(src_hit_mat, src_gbuffer.n_s, src_wo, src_wi);
@@ -508,7 +495,6 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 		g_source *= src_pdf;
 
 		if (!same_hemisphere(src_wo, src_wi, src_gbuffer.n_s)) {
-			jacobian = 0;
 			return false;
 		}
 		jacobian = g_source == 0 ? 0 : jacobian / g_source;

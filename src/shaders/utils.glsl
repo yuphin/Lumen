@@ -303,15 +303,6 @@ vec3 sample_gtr1(vec2 uv, float alpha2, const vec3 n, vec3 v) {
     return normalize(rot_quat(invert_quat(local_quat), l));
 }
 
-void correct_shading_normal(const vec3 wo, const vec3 wi, inout vec3 n_s,
-                            inout vec3 n_g) {
-    float res1 = abs(dot(wo, n_s)) * abs(dot(wi, n_g));
-    float res2 = abs(dot(wo, n_g)) * abs(dot(wi, n_s));
-    if (res1 != res2) {
-        n_s *= -1;
-    }
-}
-
 void make_coord_system(const vec3 v1, out vec3 v2, out vec3 v3) {
     if (abs(v1.x) > abs(v1.y)) {
         v2 = normalize(vec3(-v1.z, 0, v1.x));
@@ -320,6 +311,18 @@ void make_coord_system(const vec3 v1, out vec3 v2, out vec3 v3) {
     }
     v3 = cross(v1, v2);
 }
+
+bool face_forward(inout vec3 n_s, inout vec3 n_g, vec3 wo) {
+    bool side = true;
+    if(dot(n_g, wo) < 0.0) {
+        n_g *= -1;
+    }
+    if(dot(n_g, n_s) < 0.0) {
+        n_s *= -1;
+        side = false;
+    }
+    return side;
+} 
 
 vec2 concentric_sample_disk(vec2 rands) {
     vec2 offset = 2 * rands - 1;

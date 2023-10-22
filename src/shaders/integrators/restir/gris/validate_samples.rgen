@@ -67,6 +67,7 @@ void main() {
 		if (!gbuffer_data_valid(neighbor_gbuffer)) {
 			continue;
 		}
+		LOG_CLICKED("Validate - %v2i\n", rand_offset);
 		HitData unpacked_neighbor_gbuffer =
 			get_hitdata(neighbor_gbuffer.barycentrics, neighbor_gbuffer.primitive_instance_id.y,
 						neighbor_gbuffer.primitive_instance_id.x);

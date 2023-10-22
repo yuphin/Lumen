@@ -40,18 +40,6 @@ vec4 sample_camera(in vec2 d) {
     return ubo.inv_view * vec4(normalize(target.xyz), 0); // direction
 }
 
-float correct_shading_normal(const vec3 n_g, const vec3 n_s, const vec3 wi,
-                             const vec3 wo, int mode) {
-    if (mode == 0) {
-        float num = abs(dot(wo, n_s) * abs(dot(wi, n_g)));
-        float denom = abs(dot(wo, n_g) * abs(dot(wi, n_s)));
-        if (denom == 0)
-            return 0.;
-        return num / denom;
-    } else {
-        return 1.;
-    }
-}
 
 float uniform_cone_pdf(float cos_max) { return 1. / (PI2 * (1 - cos_max)); }
 

@@ -100,14 +100,9 @@ void main() {
 
 		const vec3 wo = -direction;
 		vec3 n_s = gbuffer.n_s;
-		bool side = true;
 		vec3 n_g = gbuffer.n_g;
 
-		if (dot(gbuffer.n_g, wo) < 0.) n_g = -n_g;
-		if (dot(n_g, gbuffer.n_s) < 0) {
-			n_s = -n_s;
-			side = false;
-		}
+		bool side = face_forward(n_s, n_g, wo);
 
 		vec3 dist = gbuffer.pos - prev_pos;
 		vec3 dir_wo = (prev_pos - gbuffer.pos);
