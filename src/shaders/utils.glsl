@@ -170,25 +170,6 @@ vec3 rot_quat(vec4 q, vec3 v) {
            2.0f * q.w * cross(q_axis, v);
 }
 
-bool same_hemisphere(in vec3 wi, in vec3 wo, in vec3 n) {
-    return dot(wi, n) * dot(wo, n) > 0;
-}
-
-vec3 sample_cos_hemisphere(vec2 uv, vec3 n) {
-    float phi = PI2 * uv.x;
-    float cos_theta = 2.0 * uv.y - 1.0;
-    return normalize(
-        n + vec3(sqrt(1.0 - cos_theta * cos_theta) * vec2(cos(phi), sin(phi)),
-                 cos_theta));
-}
-
-vec3 sample_cos_hemisphere(vec2 uv, vec3 n, inout float phi) {
-    phi = PI2 * uv.x;
-    float cos_theta = 2.0 * uv.y - 1.0;
-    return normalize(
-        n + vec3(sqrt(1.0 - cos_theta * cos_theta) * vec2(cos(phi), sin(phi)),
-                 cos_theta));
-}
 
 vec3 fresnel_schlick(vec3 f0, float ns) {
     return f0 + (1 - f0) * pow(1.0f - ns, 5.0f);

@@ -29,7 +29,7 @@ void main() {
 		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(0));
 		return;
 	}
-	HitData unpacked_gbuffer =
+	HitData canonical_gbuffer =
 		get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
 
 	Reservoir reservoir;
@@ -37,34 +37,35 @@ void main() {
 
 	Reservoir canonical_reservoir = in_reservoirs[pixel_idx];
 
-	const vec3 canonical_reservoir_contribution = canonical_reservoir.data.reservoir_contribution;
-
 	int num_spatial_samples = pc_ray.enable_spatial_reuse == 1 ? int(pc_ray.num_spatial_samples) : 0;
-	vec3 curr_reservoir_contribution;
-	float m_c = 1.0;
-	const float canonical_in_canonical_pdf = calc_target_pdf(canonical_reservoir_contribution);
-	uint num_valid_samples = 0;
+	vec3 curr_reservoir_contribution = vec3(0);
 
 	uint seed_helper = pc_ray.total_frame_num ^ pc_ray.random_num;
-	const uvec4 neighbor_offset_seed = seed; 
-
-	ivec2 offsets[4];
-	for(int i = 0; i < 4; i++) {
+	ivec2 offsets[12];
+	for (int i = 0; i < 12; i++) {
 		offsets[i] = get_neighbor_offset(seed);
 	}
+	float mis_weight_sum = 0;
 	for (int i = -1; i < num_spatial_samples; i++) {
 		ivec2 rand_offset = i == -1 ? ivec2(0) : offsets[i];
-		const ivec2 coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
-		if (any(lessThan(coords, ivec2(0))) || any(greaterThanEqual(coords, gl_LaunchSizeEXT.xy))) {
+		const ivec2 neighbor_coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
+		if (any(lessThan(neighbor_coords, ivec2(0))) || any(greaterThanEqual(neighbor_coords, gl_LaunchSizeEXT.xy))) {
 			continue;
 		}
-		const uint neighbor_pixel_idx = coords.x * pc_ray.size_y + coords.y;
+		const uint neighbor_pixel_idx = neighbor_coords.x * pc_ray.size_y + neighbor_coords.y;
 		GBuffer neighbor_gbuffer = curr_gbuffers[neighbor_pixel_idx];
 		if (!gbuffer_data_valid(neighbor_gbuffer)) {
 			continue;
 		}
+
+		HitData unpacked_neighbor_gbuffer =
+			get_hitdata(neighbor_gbuffer.barycentrics, neighbor_gbuffer.primitive_instance_id.y,
+						neighbor_gbuffer.primitive_instance_id.x);
 		bool valid_reservoir = false;
 		const Reservoir neighbor_reservoir = in_reservoirs[neighbor_pixel_idx];
+		if (!reservoir_data_valid(neighbor_reservoir.data)) {
+			continue;
+		}
 		float jacobian;
 		vec3 reservoir_contribution = vec3(0);
 		float p_sum = 0;
@@ -74,13 +75,14 @@ void main() {
 			jacobian = 1.0;
 			reservoir_contribution = neighbor_reservoir.data.reservoir_contribution;
 		} else {
-			valid_reservoir = retrace_paths(unpacked_gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy, uvec2(coords),
-											seed_helper, jacobian, reservoir_contribution);
+			valid_reservoir = reconnect_paths(canonical_gbuffer, unpacked_neighbor_gbuffer, neighbor_reservoir.data,
+											  gl_LaunchIDEXT.xy, uvec2(neighbor_coords), seed_helper, jacobian,
+											  reservoir_contribution);
 		}
 
 		float reservoir_pdf = calc_target_pdf(reservoir_contribution) * jacobian;
-		float num_valid_samples = 1;
-		if (reservoir_pdf > 0.0) {
+		if (reservoir_pdf * neighbor_reservoir.W * neighbor_reservoir.M > 0.0 && !isnan(reservoir_pdf)) {
+			LOG_CLICKED3("%d - %f - %v2i\n", i, jacobian, rand_offset);
 			for (int j = -1; j < num_spatial_samples; j++) {
 				if (j == -1) {
 					float p = calc_target_pdf(reservoir_contribution) * canonical_reservoir.M;
@@ -90,7 +92,9 @@ void main() {
 					}
 				} else {
 					if (i == j) {
-						p_curr = calc_target_pdf(neighbor_reservoir.data.reservoir_contribution) / jacobian * neighbor_reservoir.M;
+						p_curr = jacobian == 0 ? 0
+											   : calc_target_pdf(neighbor_reservoir.data.reservoir_contribution) *
+													 float(neighbor_reservoir.M) / jacobian;
 						p_sum += p_curr;
 						continue;
 					}
@@ -104,22 +108,21 @@ void main() {
 					if (!gbuffer_data_valid(validation_gbuffer)) {
 						continue;
 					}
+					const Reservoir validation_reservoir = in_reservoirs[validation_pixel_idx];
 					HitData unpacked_validation_gbuffer =
 						get_hitdata(validation_gbuffer.barycentrics, validation_gbuffer.primitive_instance_id.y,
 									validation_gbuffer.primitive_instance_id.x);
 					float target_pdf_in_neighbor = 0;
-					const Reservoir validation_reservoir = in_reservoirs[validation_pixel_idx];
-					bool valid = retrace_paths_and_evaluate(unpacked_validation_gbuffer, neighbor_reservoir.data, uvec2(validation_coords),
-									   coords, seed_helper, target_pdf_in_neighbor);
-					if(valid) {
-						p_sum += target_pdf_in_neighbor * validation_reservoir.M;
-					}
+					bool valid = reconnect_paths_and_evaluate(
+						unpacked_validation_gbuffer, canonical_gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy,
+						uvec2(validation_coords), seed_helper, target_pdf_in_neighbor);
+					p_sum += target_pdf_in_neighbor * validation_reservoir.M;
 				}
 			}
 		}
-		float mis_weight = p_sum == 0.0 ? 0.0 : p_curr / p_sum;
+		float mis_weight = p_sum <= 0.0 ? 0.0 : p_curr / p_sum;
 		bool accepted = combine_reservoir(seed, reservoir, neighbor_reservoir, reservoir_pdf * mis_weight);
-		if(accepted) {
+		if (accepted) {
 			curr_reservoir_contribution = reservoir_contribution;
 		}
 	}
@@ -130,7 +133,6 @@ void main() {
 	if (reservoir.W > 0) {
 		final_contribution += curr_reservoir_contribution * reservoir.W;
 	}
-
 	out_reservoirs[pixel_idx] = reservoir;
 
 	vec3 col = vec3(0);
@@ -143,12 +145,12 @@ void main() {
 		col += final_contribution;
 	}
 
-	ivec2 coords = ivec2(gl_LaunchIDEXT.xy);
+	ivec2 neighbor_coords = ivec2(gl_LaunchIDEXT.xy);
 	if (pc_ray.enable_accumulation == 0 || pc_ray.frame_num == 0) {
-		imageStore(image, ivec2(coords), vec4(col, 1.f));
+		imageStore(image, ivec2(neighbor_coords), vec4(col, 1.f));
 	} else {
 		float w = 1. / float(pc_ray.frame_num + 1);
-		vec3 old_col = imageLoad(image, ivec2(coords)).xyz;
-		imageStore(image, ivec2(coords), vec4(mix(old_col, col, w), 1.f));
+		vec3 old_col = imageLoad(image, ivec2(neighbor_coords)).xyz;
+		imageStore(image, ivec2(neighbor_coords), vec4(mix(old_col, col, w), 1.f));
 	}
 }

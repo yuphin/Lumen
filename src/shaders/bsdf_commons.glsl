@@ -1,3 +1,4 @@
+// #define UNIFORM_SAMPLING
 Material load_material(const uint material_idx, const vec2 uv) {
     Material m = materials.m[material_idx];
     if (m.texture_id > -1) {
@@ -6,12 +7,54 @@ Material load_material(const uint material_idx, const vec2 uv) {
     return m;
 }
 
-float diffuse_pdf(const vec3 n, const vec3 l, out float cos_theta) {
-    cos_theta = dot(n, l);
-    return max(cos_theta / PI, 0);
+bool same_hemisphere(in vec3 wi, in vec3 wo, in vec3 n) {
+    return dot(wi, n) * dot(wo, n) > 0;
 }
 
-float diffuse_pdf(const vec3 n, const vec3 l) { return max(dot(n, l) / PI, 0); }
+vec3 sample_cos_hemisphere(vec2 uv, vec3 n) {
+    float phi = PI2 * uv.x;
+    float cos_theta = 2.0 * uv.y - 1.0;
+#ifndef UNIFORM_SAMPLING
+    return normalize(
+        n + vec3(sqrt(1.0 - cos_theta * cos_theta) * vec2(cos(phi), sin(phi)),
+                 cos_theta));
+#else
+    return normalize(
+        vec3(sqrt(1.0 - cos_theta * cos_theta) * vec2(cos(phi), sin(phi)),
+                 cos_theta));
+#endif
+}
+
+vec3 sample_cos_hemisphere(vec2 uv, vec3 n, inout float phi) {
+    phi = PI2 * uv.x;
+    float cos_theta = 2.0 * uv.y - 1.0;
+#ifndef UNIFORM_SAMPLING
+    return normalize(
+       n + vec3(sqrt(1.0 - cos_theta * cos_theta) * vec2(cos(phi), sin(phi)),
+                 cos_theta));
+#else
+    return normalize(
+       vec3(sqrt(1.0 - cos_theta * cos_theta) * vec2(cos(phi), sin(phi)),
+                 cos_theta));
+#endif
+}
+
+float diffuse_pdf(const vec3 n, const vec3 l, out float cos_theta) {
+    cos_theta = dot(n, l);
+#ifndef UNIFORM_SAMPLING
+    return max(cos_theta / PI, 0);
+#else
+    return 1.0 / (2.0 * PI);
+#endif
+}
+
+float diffuse_pdf(const vec3 n, const vec3 wi, const vec3 wo) { 
+#ifndef UNIFORM_SAMPLING
+    return max(dot(n, wi) / PI, 0); 
+#else
+    return 1.0 / (2.0 * PI);
+#endif
+}
 
 float glossy_pdf(float cos_theta, float hl, float nh, float beckmann_term) {
     return 0.5 * (max(cos_theta / PI, 0) + beckmann_term * nh / (4 * hl));
@@ -232,11 +275,15 @@ vec3 sample_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
 vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
                const uint mode, const bool side, const vec3 dir,
                out float pdf_w, float cos_theta) {
+    if (!same_hemisphere(dir, wo, n_s)) {
+        pdf_w = 0.;
+        return vec3(0);
+    }
     vec3 f;
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
         f = diffuse_f(mat);
-        pdf_w = diffuse_pdf(n_s, dir);
+        pdf_w = diffuse_pdf(n_s, dir, wo);
     } break;
     case BSDF_MIRROR: {
         f = vec3(0);
@@ -247,30 +294,22 @@ vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
         pdf_w = 0.;
     } break;
     case BSDF_GLOSSY: {
-        if (!same_hemisphere(dir, wo, n_s)) {
-            f = vec3(0);
-            pdf_w = 0.;
-        } else {
-            const vec3 h = normalize(wo + dir);
-            float nh = max(0.00001f, min(1.0f, dot(n_s, h)));
-            float hl = max(0.00001f, min(1.0f, dot(h, dir)));
-            float nl = max(0.00001f, min(1.0f, dot(n_s, dir)));
-            float nv = max(0.00001f, min(1.0f, dot(n_s, wo)));
-            float beckmann_term = beckmann_d(mat.roughness, nh);
-            f = glossy_f(mat, wo, dir, n_s, hl, nl, nv, beckmann_term);
-            pdf_w = glossy_pdf(cos_theta, hl, nh, beckmann_term);
-        }
-
+        const vec3 h = normalize(wo + dir);
+        float nh = max(0.00001f, min(1.0f, dot(n_s, h)));
+        float hl = max(0.00001f, min(1.0f, dot(h, dir)));
+        float nl = max(0.00001f, min(1.0f, dot(n_s, dir)));
+        float nv = max(0.00001f, min(1.0f, dot(n_s, wo)));
+        float beckmann_term = beckmann_d(mat.roughness, nh);
+        f = glossy_f(mat, wo, dir, n_s, hl, nl, nv, beckmann_term);
+        pdf_w = glossy_pdf(cos_theta, hl, nh, beckmann_term);
     } break;
     case BSDF_DISNEY: {
 #if ENABLE_DISNEY
-        if (!same_hemisphere(dir, wo, n_s)) {
-            f = vec3(0);
-            pdf_w = 0.;
-        } else {
-            f = disney_f(mat, wo, dir, n_s);
-            pdf_w = disney_pdf(n_s, mat, wo, dir);
-        }
+        f = disney_f(mat, wo, dir, n_s);
+        pdf_w = disney_pdf(n_s, mat, wo, dir);
+#else
+        f = vec3(0);
+        pdf_w = 0;
 #endif
     } break;
     default: // Unknown
@@ -278,16 +317,20 @@ vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
     }
     return f;
 }
-
 vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
                const uint mode, const bool side, const vec3 dir,
                out float pdf_w, out float pdf_rev_w, in float cos_theta) {
+    if (!same_hemisphere(dir, wo, n_s)) {
+        pdf_w = 0;
+        pdf_rev_w = 0;
+        return vec3(0);
+    } 
     vec3 f;
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
         f = diffuse_f(mat);
-        pdf_w = diffuse_pdf(n_s, dir);
-        pdf_rev_w = diffuse_pdf(n_s, wo);
+        pdf_w = diffuse_pdf(n_s, dir, wo);
+        pdf_rev_w = diffuse_pdf(n_s, wo, dir);
     } break;
     case BSDF_MIRROR: {
         f = vec3(0);
@@ -300,21 +343,16 @@ vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
         pdf_rev_w = 0.;
     } break;
     case BSDF_GLOSSY: {
-        if (!same_hemisphere(dir, wo, n_s)) {
-            f = vec3(0);
-            pdf_w = 0.;
-        } else {
-            const vec3 h = normalize(wo + dir);
-            float nh = max(0.00001f, min(1.0f, dot(n_s, h)));
-            float hl = max(0.00001f, min(1.0f, dot(h, dir)));
-            float nl = max(0.00001f, min(1.0f, dot(n_s, dir)));
-            float nv = max(0.00001f, min(1.0f, dot(n_s, wo)));
-            float beckmann_term = beckmann_d(mat.roughness, nh);
-            f = glossy_f(mat, wo, dir, n_s, hl, nl, nv, beckmann_term);
-            pdf_w = glossy_pdf(cos_theta, hl, nh, beckmann_term);
-            float cos_theta_wo = dot(wo, n_s);
-            pdf_rev_w = glossy_pdf(cos_theta_wo, hl, nh, beckmann_term);
-        }
+        const vec3 h = normalize(wo + dir);
+        float nh = max(0.00001f, min(1.0f, dot(n_s, h)));
+        float hl = max(0.00001f, min(1.0f, dot(h, dir)));
+        float nl = max(0.00001f, min(1.0f, dot(n_s, dir)));
+        float nv = max(0.00001f, min(1.0f, dot(n_s, wo)));
+        float beckmann_term = beckmann_d(mat.roughness, nh);
+        f = glossy_f(mat, wo, dir, n_s, hl, nl, nv, beckmann_term);
+        pdf_w = glossy_pdf(cos_theta, hl, nh, beckmann_term);
+        float cos_theta_wo = dot(wo, n_s);
+        pdf_rev_w = glossy_pdf(cos_theta_wo, hl, nh, beckmann_term);
     } break;
     case BSDF_DISNEY: {
 #if ENABLE_DISNEY
@@ -331,6 +369,9 @@ vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
 
 vec3 eval_bsdf(const Material mat, const vec3 wo, const vec3 wi,
                const vec3 n_s) {
+    if (!same_hemisphere(wi, wo, n_s)) {
+        return vec3(0);
+    } 
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
         return diffuse_f(mat);
@@ -340,9 +381,6 @@ vec3 eval_bsdf(const Material mat, const vec3 wo, const vec3 wi,
         return vec3(0);
     } break;
     case BSDF_GLOSSY: {
-        if (!same_hemisphere(wi, wo, n_s)) {
-            return vec3(0);
-        }
         const vec3 h = normalize(wo + wi);
         float nh = max(0.00001f, min(1.0f, dot(n_s, h)));
         float hl = max(0.00001f, min(1.0f, dot(h, wi)));
@@ -365,14 +403,14 @@ vec3 eval_bsdf(const Material mat, const vec3 wo, const vec3 wi,
 
 float bsdf_pdf(const Material mat, const vec3 n_s, const vec3 wo,
                const vec3 wi) {
+    if (!same_hemisphere(wi, wo, n_s)) {
+        return 0;
+    } 
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
-        return diffuse_pdf(n_s, wi);
+        return diffuse_pdf(n_s, wi, wo);
     } break;
     case BSDF_GLOSSY: {
-        if (!same_hemisphere(wo, wi, n_s)) {
-            return 0;
-        }
         const vec3 h = normalize(wo + wi);
         float nh = max(0.00001f, min(1.0f, dot(n_s, h)));
         float hl = max(0.00001f, min(1.0f, dot(h, wi)));
