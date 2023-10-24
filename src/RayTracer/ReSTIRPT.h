@@ -24,7 +24,7 @@ class ReSTIRPT : public Integrator {
 	Buffer compact_vertices_buffer;
 	PCReSTIRPT pc_ray{};
 	bool enable_accumulation = false;
-	bool direct_lighting = false;
+	bool direct_lighting = true;
 	bool enable_rr = false;
 	bool enable_spatial_reuse = true; 
 	bool show_reconnection_radiance = false;

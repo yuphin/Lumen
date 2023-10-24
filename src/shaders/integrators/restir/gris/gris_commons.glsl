@@ -38,7 +38,8 @@ struct HitDataWithoutGeometryNormals {
 	vec2 uv;
 };
 
-HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx) {
+
+HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx, out float area) {
 	const PrimMeshInfo pinfo = prim_infos.d[instance_idx];
 	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
 	const ivec3 ind = ivec3(pinfo.vertex_offset) +
@@ -59,10 +60,19 @@ HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx) {
 		vec3(tsp_inv_to_world * vec4(vtx[0].normal * bary.x + vtx[1].normal * bary.y + vtx[2].normal * bary.z, 1.0));
 	const vec3 e0 = vtx[2].pos - vtx[0].pos;
 	const vec3 e1 = vtx[1].pos - vtx[0].pos;
+
+	const vec4 e0t = to_world * vec4(vtx[2].pos - vtx[0].pos,0);
+	const vec4 e1t = to_world * vec4(vtx[1].pos - vtx[0].pos, 0);
+	area = 0.5 * length(cross(vec3(e0t), vec3(e1t)));
 	gbuffer.n_g = (tsp_inv_to_world * vec4(cross(e0, e1), 0)).xyz;
 	gbuffer.uv = vtx[0].uv0 * bary.x + vtx[1].uv0 * bary.y + vtx[2].uv0 * bary.z;
 	gbuffer.material_idx = pinfo.material_index;
 	return gbuffer;
+}
+
+HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx) {
+	float unused;
+	return get_hitdata(attribs, instance_idx, triangle_idx, unused);
 }
 
 HitDataWithoutUVAndGeometryNormals get_hitdata_no_ng_uv(vec2 attribs, uint instance_idx, uint triangle_idx) {
@@ -458,7 +468,8 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 
 	rc_side = face_forward(rc_src_gbuffer.n_s, rc_src_gbuffer.n_g, -dst_wi);
 
-	bool connectable = same_hemisphere(dst_wo, dst_wi, dst_gbuffer.n_s) && same_hemisphere(-dst_wi, data.rc_wi, rc_src_gbuffer.n_s);
+	// bool connectable =  is_rough(hit_mat) && same_hemisphere(dst_wo, dst_wi, dst_gbuffer.n_s) && same_hemisphere(-dst_wi, data.rc_wi, rc_src_gbuffer.n_s);
+	bool connectable =  is_rough(hit_mat);
 	bool connected = false;
 	if (connectable) {
 		vec3 p = offset_ray2(dst_gbuffer.pos, dst_gbuffer.n_s);

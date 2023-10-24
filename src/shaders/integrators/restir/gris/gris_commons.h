@@ -73,6 +73,7 @@ struct GrisHitPayload {
 	vec2 attribs;
 	uint instance_idx;
 	uint triangle_idx;
+	float dist;
 };
 
 NAMESPACE_END()

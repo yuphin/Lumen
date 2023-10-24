@@ -31,4 +31,5 @@ void main() {
     payload.triangle_idx = gl_PrimitiveID;
     payload.instance_idx = gl_InstanceCustomIndexEXT;
     payload.attribs = attribs;
+    payload.dist = gl_RayTminEXT + gl_HitTEXT;
 }

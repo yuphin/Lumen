@@ -1,0 +1,221 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#define SCENE_TEX_IDX 6
+#include "gris_commons.glsl"
+
+GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
+PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
+
+layout(binding = 4, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
+layout(binding = 5, std430) writeonly buffer OutGBuffer { GBuffer out_gbuffers[]; };
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num);
+
+void main() {
+	const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+	const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
+	vec2 d = in_uv * 2.0 - 1.0;
+	vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
+	vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
+	vec3 direction = vec3(sample_camera(d));
+	vec3 col = vec3(0);
+
+	Reservoir reservoir;
+	GrisData data;
+	GBuffer gbuffer_out;
+	init_reservoir(reservoir);
+	init_data(data);
+	init_gbuffer(gbuffer_out);
+
+	bool specular = false;
+	vec3 throughput = vec3(1);
+	float source_pdf = 1.0;
+	// Updated after a connectable vertex is found
+	vec3 postfix_throughput = vec3(1);
+	uint postfix_length = 0;
+
+	bool connectable_vertex_found = false;
+
+	bool curr_rough = false;
+	bool prev_rough = false;
+	vec3 prev_pos = origin.xyz;
+	vec3 direct_lighting = vec3(0);
+	float pdf;
+	float g = 0;
+	vec3 connection_wi = vec3(0);
+	vec3 partial_throughput = vec3(0);
+	vec3 rc_partial_throughput = vec3(0);
+	vec3 prefix_contribution = vec3(0);
+
+	vec3 prev_ns;
+	vec3 prev_wo;
+	Material prev_mat;
+
+	for (int depth = 0;; depth++) {
+		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
+		const bool found_isect = payload.instance_idx != -1;
+		if (depth >= pc_ray.max_depth - 1) {
+			break;
+		}
+		if (!found_isect) {
+			vec3 atmosphere_L = shade_atmosphere(pc_ray.dir_light_idx, pc_ray.sky_col, origin.xyz, direction, tmax);
+			if (depth > 0) {
+				col += throughput * atmosphere_L;
+			} else if (pc_ray.direct_lighting == 1) {
+				direct_lighting += throughput * atmosphere_L;
+			}
+			if (connectable_vertex_found) {
+				data.rc_postfix_L += postfix_throughput * atmosphere_L;
+			}
+			break;
+		}
+
+		HitData gbuffer = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
+		const Material hit_mat = load_material(gbuffer.material_idx, gbuffer.uv);
+
+		// Fill in GBuffer
+		if (depth == 0) {
+			gbuffer_out.barycentrics = payload.attribs;
+			gbuffer_out.primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
+			if (pc_ray.direct_lighting == 1) {
+				direct_lighting += throughput * hit_mat.emissive_factor;
+			}
+
+		} else if (specular) {
+			col += throughput * hit_mat.emissive_factor;
+			if (connectable_vertex_found) {
+				data.rc_postfix_L += postfix_throughput * hit_mat.emissive_factor;
+			}
+		}
+
+		if (connectable_vertex_found) {
+			postfix_length++;
+		}
+
+		const vec3 wo = -direction;
+		vec3 n_s = gbuffer.n_s;
+		vec3 n_g = gbuffer.n_g;
+
+		bool side = face_forward(n_s, n_g, wo);
+
+		vec3 dist = gbuffer.pos - prev_pos;
+		vec3 dir_wo = (prev_pos - gbuffer.pos);
+		float dir_wo_len_sqr = dot(dir_wo, dir_wo);
+		dir_wo /= sqrt(dir_wo_len_sqr);
+		// g = (abs(dot(n_s, dir_wo)))/ (dir_wo_len_sqr);
+		g = (abs(dot(n_s, wo))) / (dot(dist, dist));
+
+		origin.xyz = offset_ray(gbuffer.pos, n_g);
+
+		prev_rough = curr_rough;
+		curr_rough = is_rough(hit_mat);
+		bool connectable = !connectable_vertex_found && ((prev_rough && curr_rough));
+		prev_pos = gbuffer.pos;
+		if (connectable) {
+			data.rc_seed = seed.w;
+			data.rc_barycentrics = payload.attribs;
+			data.rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
+			// float pdf2 = bsdf_pdf(prev_mat, prev_ns, prev_wo, -dir_wo);
+			// g *= pdf2;
+			g *= pdf;
+			data.rc_g = g;
+
+			HitDataWithoutGeometryNormals rc_gbuffer = get_hitdata_no_ng(
+				data.rc_barycentrics, data.rc_primitive_instance_id.y, data.rc_primitive_instance_id.x);
+
+			prefix_contribution = col;
+			rc_partial_throughput = partial_throughput;
+			source_pdf = pdf;
+			connection_wi = direction;
+		}
+
+		prev_ns = n_s;
+		prev_wo = wo;
+		prev_mat = hit_mat;
+
+		bool nee_visible = false;
+		vec3 rc_Li = vec3(0);
+		if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
+			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+			rc_Li = uniform_sample_light(seed, hit_mat, gbuffer.pos, side, n_s, wo, nee_visible) / light_pick_pdf;
+			if (depth > 0) {
+				col += throughput * rc_Li;
+			} else if (pc_ray.direct_lighting == 1) {
+				direct_lighting += throughput * rc_Li;
+			}
+			if (connectable_vertex_found) {
+				data.rc_postfix_L += postfix_throughput * rc_Li;
+			}
+		}
+
+		if (depth == 0) {
+			data.init_seed = seed.w;
+		}
+
+		// Sample direction & update throughput
+		float cos_theta;
+		const vec3 f = sample_bsdf(n_s, wo, hit_mat, 1 /*radiance=cam*/, side, direction, pdf, cos_theta, seed);
+		if (pdf == 0) {
+			break;
+		}
+
+		vec3 f_cos = f * abs(cos_theta);
+		partial_throughput = throughput * f_cos;
+		throughput *= partial_throughput / pdf;
+
+		if (connectable_vertex_found) {
+			postfix_throughput *= f_cos / pdf;
+		}
+
+		if (connectable) {
+			data.rc_wi = direction;
+			data.rc_Li = rc_Li;
+			data.path_flags = set_path_flags(side, nee_visible, depth);
+			connectable_vertex_found = true;
+			// data.reservoir_contribution = vec3(1);
+			data.reservoir_contribution = f_cos / pdf;
+		}
+
+		specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
+
+		if (pc_ray.enable_rr == 1) {
+			float rr_scale = 1.0;
+			if (hit_mat.bsdf_type == BSDF_GLASS) {
+				rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
+			}
+			if (depth > RR_MIN_DEPTH) {
+				float rr_prob = min(0.95f, luminance(throughput) * rr_scale);
+				if (rr_prob == 0 || rr_prob < rand(seed))
+					break;
+				else
+					throughput /= rr_prob;
+			}
+		}
+	}
+	if (pc_ray.direct_lighting == 1) {
+		direct_lighting_buffer.d[pixel_idx] = direct_lighting;
+	}
+	if (isnan(luminance(col))) {
+		return;
+	}
+	data.path_flags = ((postfix_length & 0x1F) << 7) | data.path_flags;
+	// data.rc_postfix_L = vec3(0);
+	data.reservoir_contribution =
+		rc_partial_throughput * (data.rc_Li + data.reservoir_contribution * data.rc_postfix_L);
+
+	float target_pdf = calc_target_pdf(data.reservoir_contribution);
+	stream_reservoir(seed, reservoir, data, target_pdf / source_pdf);
+	calc_reservoir_W(reservoir, target_pdf);
+	if (!connectable_vertex_found) {
+		prefix_contribution = col;
+	}
+	prefix_contributions.d[pixel_idx] = prefix_contribution;
+	out_reservoirs[pixel_idx] = reservoir;
+	out_gbuffers[pixel_idx] = gbuffer_out;
+}

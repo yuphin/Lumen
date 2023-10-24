@@ -152,6 +152,8 @@ TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands,
     const vec4 world_pos = world_matrix * pos;
     const vec3 e0 = vec3(v2 - v0);
     const vec3 e1 = vec3(v1 - v0);
+	// LOG_CLICKED("%v3f\n", v2);
+	// LOG_CLICKED("%v3i\n", ind);
     result.n_s = normalize(vec3(inv_tr_mat * nrm));
     result.triangle_pdf = 2. / length((cross(vec3(etmp0), vec3(etmp1))));
     result.pos = vec3(world_pos);
@@ -265,7 +267,8 @@ vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights,
         float wi_len_sqr = dot(wi, wi);
         wi_len = sqrt(wi_len_sqr);
         wi /= wi_len;
-        cos_from_light = max(dot(record.n_s, -wi), 0);
+        // cos_from_light = max(dot(record.n_s, -wi), 0);
+        cos_from_light = abs(dot(record.n_s, -wi));
         L = light_mat.emissive_factor;
         pdf_pos_a = record.triangle_pdf;
         light_record.material_idx = material_idx;
@@ -336,7 +339,7 @@ vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights,
         float wi_len_sqr = dot(wi, wi);
         wi_len = sqrt(wi_len_sqr);
         wi /= wi_len;
-        cos_from_light = max(dot(record.n_s, -wi), 0);
+        cos_from_light = abs(dot(record.n_s, -wi));
         L = light_mat.emissive_factor;
         pdf_pos_a = record.triangle_pdf;
         pdf_pos_w = pdf_pos_a * wi_len_sqr / cos_from_light;
