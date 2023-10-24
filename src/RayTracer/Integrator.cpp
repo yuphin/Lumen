@@ -219,7 +219,7 @@ void Integrator::create_tlas() {
 	}
 
 	for (auto& l : lights) {
-		if (l.light_flags == LIGHT_AREA) {
+		if ((l.light_flags & 0x7) == LIGHT_AREA) {
 			const auto& pm = lumen_scene->prim_meshes[l.prim_mesh_idx];
 			l.world_matrix = pm.world_matrix;
 			auto& idx_base_offset = pm.first_idx;
