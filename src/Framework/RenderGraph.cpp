@@ -174,11 +174,8 @@ void RenderPass::transition_resources() {
 	}
 }
 
-void RenderGraph::cleanup_inactive_passes(uint32_t num_encountered_inactive_passes,
+void RenderGraph::update_pass_indices(uint32_t num_encountered_inactive_passes,
 										  std::unordered_map<uint32_t, uint32_t> inactive_passes_map) {
-	if (num_encountered_inactive_passes == 0) {
-		return;
-	}
 	std::unordered_map<uint32_t, uint32_t> modified_pass_idxs;	// Stores new offsets
 	for (auto it = passes.begin() + beginning_pass_idx; it != passes.end();) {
 		if (!it->active && (it->pass_idx < ending_pass_idx)) {
@@ -192,8 +189,10 @@ void RenderGraph::cleanup_inactive_passes(uint32_t num_encountered_inactive_pass
 			} else if (it->pass_idx >= ending_pass_idx) {
 				new_pass_idx -= num_encountered_inactive_passes;
 			}
-			modified_pass_idxs[it->pass_idx] = new_pass_idx;
-			it->pass_idx = new_pass_idx;
+			if (it->pass_idx != new_pass_idx) {
+				modified_pass_idxs[it->pass_idx] = new_pass_idx;
+				it->pass_idx = new_pass_idx;
+			}
 			++it;
 		}
 	}
@@ -1003,9 +1002,19 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	}
 
 	if (!pass_idxs_with_shader_compilation_overrides.empty()) {
+		RenderPass* beginning_pass = &passes[beginning_pass_idx];
+		RenderPass* ending_pass = ending_pass_idx < passes.size() ? &passes[ending_pass_idx] : nullptr;
 		std::sort(passes.begin(), passes.end(),
 				  [](const RenderPass& pass1, const RenderPass& pass2) { return pass1.pass_idx < pass2.pass_idx; });
 		pass_idxs_with_shader_compilation_overrides.clear();
+		for (auto i = 0; i < passes.size(); i++) {
+			if (&passes[i] == beginning_pass) {
+				beginning_pass_idx = i;
+			}
+			if (ending_pass != nullptr && &passes[i] == ending_pass) {
+				ending_pass_idx = i;
+			}
+		}
 		// Remove duplicate passes
 		uint32_t prev_inactive_pass_idx = -1;
 		for (auto it = passes.begin() + beginning_pass_idx; it != passes.end();) {
@@ -1025,6 +1034,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 			}
 			++it;
 		}
+		update_pass_indices();
 	}
 
 	uint32_t rem_passes = ending_pass_idx - beginning_pass_idx;
@@ -1077,7 +1087,9 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		passes[i].run(cmd);
 		i++;
 	}
-	cleanup_inactive_passes(num_encountered_inactive_passes, inactive_passes_map);
+	if (num_encountered_inactive_passes > 0) {
+		update_pass_indices(num_encountered_inactive_passes, inactive_passes_map);
+	}
 }
 
 void RenderGraph::reset() {

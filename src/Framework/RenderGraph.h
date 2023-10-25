@@ -84,7 +84,8 @@ class RenderGraph {
 	RenderPass& add_pass_impl(const std::string& name, const Settings& settings);
 
    private:
-	void cleanup_inactive_passes(uint32_t num_encountered_inactive_passes, std::unordered_map<uint32_t, uint32_t> inactive_passes_map);
+	void update_pass_indices(uint32_t num_encountered_inactive_passes = 0,
+								 std::unordered_map<uint32_t, uint32_t> inactive_passes_map = {});
 	bool dirty_pass_encountered = false;
 };
 
