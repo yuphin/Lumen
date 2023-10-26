@@ -143,9 +143,6 @@ void init_reservoir(out Reservoir r) {
 	r.w_sum = 0.0;
 }
 void init_data(out GrisData data) {
-	data.rc_postfix_L = vec3(0);
-	data.rc_g = 0;
-	data.reservoir_contribution = vec3(0);
 	data.rc_primitive_instance_id = uvec2(-1);
 }
 
@@ -240,6 +237,17 @@ vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const 
 	return uniform_sample_light(seed, mat, pos, side, n_s, wo, unused);
 }
 
+bool update_reservoir2(inout uvec4 seed, inout Reservoir r_new, const GrisData data, float target_pdf, float source_pdf) {
+	float w_i = target_pdf / source_pdf;
+	r_new.w_sum += w_i;
+	if (rand(seed) * r_new.w_sum < w_i) {
+		r_new.data = data;
+		r_new.target_pdf = target_pdf;
+		return true;
+	}
+	return false;
+}
+
 bool update_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData data, float w_i) {
 	r_new.w_sum += w_i;
 	if (rand(seed) * r_new.w_sum < w_i) {
@@ -249,9 +257,9 @@ bool update_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData da
 	return false;
 }
 
-bool stream_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData data, float w_i) {
+bool stream_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData data, float target_pdf, float source_pdf) {
 	r_new.M++;
-	return update_reservoir(seed, r_new, data, w_i);
+	return update_reservoir2(seed, r_new, data, target_pdf, source_pdf);
 }
 
 bool combine_reservoir(inout uvec4 seed, inout Reservoir target_reservoir, const Reservoir input_reservoir, float w) {
@@ -263,7 +271,9 @@ bool combine_reservoir(inout uvec4 seed, inout Reservoir target_reservoir, const
 	return update_reservoir(seed, target_reservoir, input_reservoir.data, weight);
 }
 
-void calc_reservoir_W(inout Reservoir r, float target_pdf) { r.W = target_pdf == 0.0 ? 0.0 : r.w_sum / target_pdf; }
+void calc_reservoir_W(inout Reservoir r) { 
+	r.W = r.target_pdf == 0.0 ? 0.0 : r.w_sum / r.target_pdf; 
+}
 
 float calc_target_pdf(vec3 f) { return luminance(f); }
 
@@ -283,9 +293,14 @@ bool is_diffuse(in Material mat) { return (mat.bsdf_type & BSDF_DIFFUSE) != 0; }
 
 uint offset(const uint pingpong) { return pingpong * pc_ray.size_x * pc_ray.size_y; }
 
-uint set_path_flags(bool side, bool nee_visible, uint prefix_length) {
-	return (prefix_length & 0x1F) << 2 | uint(nee_visible) << 1 | uint(side);
+// uint set_path_flags(bool side, bool nee_visible, uint prefix_length) {
+// 	return (prefix_length & 0x1F) << 2 | uint(nee_visible) << 1 | uint(side);
+// }
+
+uint set_path_flags(uint prefix_length, uint postfix_length, bool is_nee) {
+	return (postfix_length & 0x1F) << 6 |  (prefix_length & 0x1F) << 1 | uint(is_nee);
 }
+
 
 void unpack_path_flags(uint packed_data, out bool side, out bool nee_visible, out uint prefix_length,
 					   out uint postfix_length) {

@@ -40,9 +40,9 @@ struct GBuffer {
 struct GrisData {
 	vec3 rc_wi;
 	uint init_seed;
-	// Layout for the path flags
-	// | 5b postfix_length| 5b prefix_length |1b nee_visible |1b side|
 	vec3 rc_postfix_L;
+	// Layout for the path flags
+	// | 5b postfix_length| 5b prefix_length |1b is_nee
 	uint path_flags;
 	vec3 rc_Li;
 	float rc_g;
@@ -57,7 +57,7 @@ struct Reservoir {
 	uint M;
 	float W;
 	float w_sum;
-	float pad;
+	float target_pdf;
 };
 
 struct ReconnectionData {
