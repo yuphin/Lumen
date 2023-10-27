@@ -82,6 +82,8 @@ void main() {
 	int depth;
 	int postfix_depth = 0;
 	int prefix_depth;
+
+	vec3 prefix_col = vec3(0);
 	for (depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.instance_idx != -1;
@@ -121,7 +123,7 @@ void main() {
 		if (depth == 0 && pc_ray.direct_lighting == 1) {
 			direct_lighting += partial_throughput * hit_mat.emissive_factor / joint_pdf;
 
-		} else if (luminance(hit_mat.emissive_factor) > 0) {
+		} else if (depth > 0 && luminance(hit_mat.emissive_factor) > 0) {
 			float mis_weight = 1.0;
 			float pdf_light_w;
 			if (!specular) {
@@ -130,7 +132,13 @@ void main() {
 				mis_weight = 1.0 / (1 + pdf_light_w / bsdf_pdf);
 			}
 			vec3 partial_contrib = mis_weight * hit_mat.emissive_factor;
-			col += partial_contrib * partial_throughput / joint_pdf;
+			if (depth == 1) {
+				if (pc_ray.direct_lighting == 1) {
+					direct_lighting += partial_contrib * partial_throughput / joint_pdf;
+				}
+			} else {
+				col += partial_contrib * partial_throughput / joint_pdf;
+			}
 			if (connectable_vertex_found) {
 				postfix_L += partial_contrib * partial_postfix_throughput / postfix_joint_pdf;
 			}
@@ -148,7 +156,7 @@ void main() {
 			vec3 Li = do_nee(seed, gbuffer, hit_mat, side, n_s, wo, wi, pdf_light);
 			vec3 partial_contrib = partial_throughput * Li;
 			vec3 contrib = partial_contrib / joint_pdf;
-			col += contrib;
+
 			// Stream the NEE path at the reconnection vertex
 			if (connectable && !nee_streamed) {
 				reconnection_data.rc_wi = wi;
@@ -159,8 +167,15 @@ void main() {
 				stream_reservoir(seed, reservoir, reconnection_data,
 								 calc_target_pdf(reconnection_data.reservoir_contribution), joint_pdf);
 				nee_streamed = true;
+				prefix_col = col;
 			} else if (connectable_vertex_found) {
 				postfix_L += Li * partial_postfix_throughput / postfix_joint_pdf;
+			}
+
+			if (depth > 0) {
+				col += contrib;
+			} else if (pc_ray.direct_lighting == 1) {
+				direct_lighting += contrib;
 			}
 		}
 
@@ -178,7 +193,7 @@ void main() {
 		vec3 f_cos = f * abs(cos_theta);
 		partial_throughput *= f_cos;
 		joint_pdf *= bsdf_pdf;
-		if (nee_streamed) {
+		if (nee_streamed && connectable) {
 			// Prepare reconnection data for the non-NEE path
 			reconnection_data.rc_wi = direction;
 			// Seed is not relevant here
@@ -227,17 +242,12 @@ void main() {
 	// Stream the non-NEE path
 	if (connectable_vertex_found) {
 		reconnection_data.rc_Li = postfix_L;
-		reconnection_data.reservoir_contribution =
-			reconnection_data.reservoir_contribution * partial_postfix_throughput * postfix_L;
+		reconnection_data.reservoir_contribution = reconnection_data.reservoir_contribution * postfix_L;
 		reconnection_data.path_flags = set_path_flags(prefix_depth, postfix_depth, false);
-		bool accepted = stream_reservoir(seed, reservoir, reconnection_data,
-						 calc_target_pdf(reconnection_data.reservoir_contribution), prefix_pdf * rc_pdf * postfix_joint_pdf);
-		LOG_CLICKED("%d\n", accepted);
-			
-
+		stream_reservoir(seed, reservoir, reconnection_data, calc_target_pdf(reconnection_data.reservoir_contribution),
+						 prefix_pdf * rc_pdf);
 		calc_reservoir_W(reservoir);
-
-		col = reservoir.data.reservoir_contribution * reservoir.W;
+		col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
 	}
 
 	if (pc_ray.frame_num > 0) {
