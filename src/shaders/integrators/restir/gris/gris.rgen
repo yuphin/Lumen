@@ -234,11 +234,9 @@ void main() {
 	if (pc_ray.direct_lighting == 1) {
 		direct_lighting_buffer.d[pixel_idx] = direct_lighting;
 	}
-	col += direct_lighting;
 	if (isnan(luminance(col))) {
 		return;
 	}
-
 	// Stream the non-NEE path
 	if (connectable_vertex_found) {
 		reconnection_data.rc_Li = postfix_L;
@@ -248,6 +246,9 @@ void main() {
 						 prefix_pdf * rc_pdf);
 		calc_reservoir_W(reservoir);
 		col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
+	}
+	if(pc_ray.direct_lighting == 1) {
+		col += direct_lighting;
 	}
 
 	if (pc_ray.frame_num > 0) {
