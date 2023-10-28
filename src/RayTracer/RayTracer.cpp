@@ -28,8 +28,12 @@ void RayTracer::init(Window* window) {
 		} else if (instance->window->is_key_down(KeyInput::KEY_F11)) {
 			comparison_mode ^= true;
 		} else if (instance->window->is_key_down(KeyInput::KEY_F5)) {
-			capture_ref_img = true;
+			vkb.rg->reload_shaders = true;
+			vkb.rg->shader_cache.clear();
+			vkb.rg->set_pipelines_dirty();
 		} else if (instance->window->is_key_down(KeyInput::KEY_F6)) {
+			capture_ref_img = true;
+		} else if (instance->window->is_key_down(KeyInput::KEY_F7)) {
 			capture_target_img = true;
 		} else if (comparison_mode && instance->window->is_key_down(KeyInput::KEY_LEFT)) {
 			comparison_img_toggle = false;
@@ -279,7 +283,7 @@ bool RayTracer::gui() {
 		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[2]), 0.05f);
 		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[3]), 0.05f);
 	}
-	if (ImGui::Button("Reload shaders")) {
+	if (ImGui::Button("Reload shaders (F5)")) {
 		vkb.rg->reload_shaders = true;
 		vkb.rg->shader_cache.clear();
 		vkb.rg->set_pipelines_dirty();
@@ -292,10 +296,10 @@ bool RayTracer::gui() {
 		ImGui::Text(texts[uint32_t(comparison_img_toggle)]);
 		ImGui::PopStyleColor();
 	}
-	if (ImGui::Button("Capture reference image (F5)")) {
+	if (ImGui::Button("Capture reference image (F6)")) {
 		capture_ref_img = true;
 	}
-	if (ImGui::Button("Capture target image (F6)")) {
+	if (ImGui::Button("Capture target image (F7)")) {
 		capture_target_img = true;
 	}
 
