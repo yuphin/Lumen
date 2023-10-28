@@ -64,7 +64,6 @@ void main() {
 
 	// GRIS variables
 	bool connectable_vertex_found = false;
-	bool nee_streamed = false;
 	bool prev_rough = false;
 	bool curr_rough = false;
 	uint init_seed;
@@ -75,8 +74,7 @@ void main() {
 	float joint_pdf = 1.0;
 	vec3 postfix_L = vec3(0);
 	vec3 postfix_throughput = vec3(1);
-	float rc_pdf;
-	float prefix_pdf;
+	float prefix_pdf_times_rc_pdf;
 
 	int depth;
 	int postfix_depth = 0;
@@ -94,7 +92,7 @@ void main() {
 			vec3 contrib = partial_throughput * atmosphere_L / joint_pdf;
 			if (depth > 0) {
 				col += contrib;
-			} else if (pc_ray.direct_lighting == 1) {
+			} else {
 				direct_lighting += contrib;
 			}
 			if (connectable_vertex_found) {
@@ -119,10 +117,10 @@ void main() {
 		bool side = face_forward(n_s, n_g, wo);
 
 		// Fill in GBuffer
-		if (depth == 0 && pc_ray.direct_lighting == 1) {
+		if (depth == 0) {
 			direct_lighting += partial_throughput * hit_mat.emissive_factor / joint_pdf;
 
-		} else if (depth > 0 && luminance(hit_mat.emissive_factor) > 0) {
+		} else if (depth > 0) {
 			float mis_weight = 1.0;
 			float pdf_light_w;
 			if (!specular) {
@@ -132,9 +130,7 @@ void main() {
 			}
 			vec3 partial_contrib = mis_weight * hit_mat.emissive_factor;
 			if (depth == 1) {
-				if (pc_ray.direct_lighting == 1) {
-					direct_lighting += partial_contrib * partial_throughput / joint_pdf;
-				}
+				direct_lighting += partial_contrib * partial_throughput / joint_pdf;
 			} else {
 				col += partial_contrib * partial_throughput / joint_pdf;
 			}
@@ -157,15 +153,14 @@ void main() {
 			vec3 contrib = partial_contrib / joint_pdf;
 
 			// Stream the NEE path at the reconnection vertex
-			if (connectable && !nee_streamed) {
+			if (connectable) {
 				reconnection_data.rc_wi = wi;
 				reconnection_data.rc_Li = Li;
 				reconnection_data.reservoir_contribution = partial_contrib;
 				reconnection_data.rc_seed = rc_seed;
 				reconnection_data.path_flags = set_path_flags(depth, 1, true);
 				stream_reservoir(seed, reservoir, reconnection_data,
-								 calc_target_pdf(reconnection_data.reservoir_contribution), joint_pdf);
-				nee_streamed = true;
+								 calc_target_pdf(reconnection_data.reservoir_contribution), 1.0 / joint_pdf);
 				prefix_col = col;
 			} else if (connectable_vertex_found) {
 				postfix_L += Li * postfix_throughput;
@@ -173,7 +168,7 @@ void main() {
 
 			if (depth > 0) {
 				col += contrib;
-			} else if (pc_ray.direct_lighting == 1) {
+			} else {
 				direct_lighting += contrib;
 			}
 		}
@@ -192,17 +187,6 @@ void main() {
 		vec3 f_cos = f * abs(cos_theta);
 		partial_throughput *= f_cos;
 		joint_pdf *= bsdf_pdf;
-		if (nee_streamed && connectable) {
-			// Prepare reconnection data for the non-NEE path
-			reconnection_data.rc_wi = direction;
-			// Seed is not relevant here
-			reconnection_data.rc_seed = -1;
-			// Partially fill in the contribution data
-			reconnection_data.reservoir_contribution = partial_throughput;
-			rc_pdf = bsdf_pdf;
-			prefix_pdf = joint_pdf / rc_pdf;
-		}
-
 		if (connectable_vertex_found) {
 			postfix_throughput *= f_cos / bsdf_pdf;
 			postfix_depth++;
@@ -213,6 +197,13 @@ void main() {
 			reconnection_data.rc_barycentrics = payload.attribs;
 			reconnection_data.rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 			prefix_depth = depth;
+			// Prepare reconnection data for the non-NEE path
+			reconnection_data.rc_wi = direction;
+			// Seed is not relevant here
+			reconnection_data.rc_seed = -1;
+			// Partially fill in the contribution data
+			reconnection_data.reservoir_contribution = partial_throughput;
+			prefix_pdf_times_rc_pdf = joint_pdf;
 		}
 
 		if (pc_ray.enable_rr == 1) {
@@ -229,9 +220,7 @@ void main() {
 			}
 		}
 	}
-	if (pc_ray.direct_lighting == 1) {
-		direct_lighting_buffer.d[pixel_idx] = direct_lighting;
-	}
+	
 	if (isnan(luminance(col))) {
 		return;
 	}
@@ -241,12 +230,17 @@ void main() {
 		reconnection_data.reservoir_contribution = reconnection_data.reservoir_contribution * postfix_L;
 		reconnection_data.path_flags = set_path_flags(prefix_depth, postfix_depth, false);
 		stream_reservoir(seed, reservoir, reconnection_data, calc_target_pdf(reconnection_data.reservoir_contribution),
-						 prefix_pdf * rc_pdf);
+						 1.0 / prefix_pdf_times_rc_pdf);
+		// The samples are additive, therefore set M to 1
+		reservoir.M = 1;
 		calc_reservoir_W(reservoir);
 		col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
 	}
-	if(pc_ray.direct_lighting == 1) {
+	if (pc_ray.direct_lighting == 1) {
 		col += direct_lighting;
+	}
+	if (pc_ray.direct_lighting == 1) {
+		direct_lighting_buffer.d[pixel_idx] = direct_lighting;
 	}
 
 	if (pc_ray.frame_num > 0) {
