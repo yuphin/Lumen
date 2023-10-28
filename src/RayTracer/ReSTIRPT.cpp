@@ -122,6 +122,7 @@ void ReSTIRPT::render() {
 	pc_ray.enable_spatial_reuse = enable_spatial_reuse;
 	pc_ray.show_reconnection_radiance = show_reconnection_radiance;
 	pc_ray.min_vertex_distance_ratio = min_vertex_distance_ratio;
+	pc_ray.enable_gris = enable_gris;
 
 	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
@@ -298,6 +299,10 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
 	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);
 	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
+	result |= ImGui::Checkbox("Enable GRIS", &enable_gris);
+	if (!enable_gris) {
+		return result;
+	}
 	result |= ImGui::Checkbox("Show reconnection radiance", &show_reconnection_radiance);
 	result |= ImGui::Checkbox("Enable MIS in GRIS", &enable_mis_in_gris);
 	result |= ImGui::Checkbox("Enable Talbot MIS weights", &talbot_mis);

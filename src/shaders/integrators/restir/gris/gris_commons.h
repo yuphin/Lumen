@@ -27,6 +27,7 @@ struct PCReSTIRPT {
 	float min_vertex_distance_ratio;
 	uint path_length;
 	uint buffer_idx;
+	uint enable_gris;
 };
 
 

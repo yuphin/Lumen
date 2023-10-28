@@ -31,6 +31,7 @@ void RayTracer::init(Window* window) {
 			vkb.rg->reload_shaders = true;
 			vkb.rg->shader_cache.clear();
 			vkb.rg->set_pipelines_dirty();
+			integrator->updated = true;
 		} else if (instance->window->is_key_down(KeyInput::KEY_F6)) {
 			capture_ref_img = true;
 		} else if (instance->window->is_key_down(KeyInput::KEY_F7)) {

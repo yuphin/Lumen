@@ -74,8 +74,7 @@ void main() {
 	init_data(reconnection_data);
 	float joint_pdf = 1.0;
 	vec3 postfix_L = vec3(0);
-	vec3 partial_postfix_throughput = vec3(1);
-	float postfix_joint_pdf = 1.0;
+	vec3 postfix_throughput = vec3(1);
 	float rc_pdf;
 	float prefix_pdf;
 
@@ -99,7 +98,7 @@ void main() {
 				direct_lighting += contrib;
 			}
 			if (connectable_vertex_found) {
-				postfix_L += partial_postfix_throughput * atmosphere_L / postfix_joint_pdf;
+				postfix_L += postfix_throughput * atmosphere_L;
 			}
 			break;
 		}
@@ -140,7 +139,7 @@ void main() {
 				col += partial_contrib * partial_throughput / joint_pdf;
 			}
 			if (connectable_vertex_found) {
-				postfix_L += partial_contrib * partial_postfix_throughput / postfix_joint_pdf;
+				postfix_L += partial_contrib * postfix_throughput;
 			}
 		}
 
@@ -169,7 +168,7 @@ void main() {
 				nee_streamed = true;
 				prefix_col = col;
 			} else if (connectable_vertex_found) {
-				postfix_L += Li * partial_postfix_throughput / postfix_joint_pdf;
+				postfix_L += Li * postfix_throughput;
 			}
 
 			if (depth > 0) {
@@ -205,8 +204,7 @@ void main() {
 		}
 
 		if (connectable_vertex_found) {
-			partial_postfix_throughput *= f_cos;
-			postfix_joint_pdf *= bsdf_pdf;
+			postfix_throughput *= f_cos / bsdf_pdf;
 			postfix_depth++;
 		}
 
@@ -238,7 +236,7 @@ void main() {
 		return;
 	}
 	// Stream the non-NEE path
-	if (connectable_vertex_found) {
+	if (pc_ray.enable_gris == 1 && connectable_vertex_found) {
 		reconnection_data.rc_Li = postfix_L;
 		reconnection_data.reservoir_contribution = reconnection_data.reservoir_contribution * postfix_L;
 		reconnection_data.path_flags = set_path_flags(prefix_depth, postfix_depth, false);
