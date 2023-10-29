@@ -35,7 +35,7 @@ class ReSTIRPT : public Integrator {
 	float spatial_reuse_radius = 0.0f;
 	float min_vertex_distance_ratio = 0.00f;
 	uint32_t path_length = 0;
-	uint32_t num_spatial_samples = 6;
+	uint32_t num_spatial_samples = 1;
 
 	ReSTIRGIConfig* config;
 };

@@ -148,8 +148,28 @@ void ReSTIRPT::render() {
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
-		//.zero({*reservoir_buffers[1 - ping_pong], *reservoir_buffers[ping_pong]})
+		.zero({*reservoir_buffers[1 - ping_pong], *reservoir_buffers[ping_pong]})
 		.bind(*reservoir_buffers[1 - ping_pong])
+		.bind(*gbuffers[1 - ping_pong])
+		.bind_texture_array(scene_textures)
+		.bind_tlas(instance->vkb.tlas);
+	instance->vkb.rg->run_and_submit(cmd);
+	cmd.begin();
+	instance->vkb.rg
+		->add_rt("GRIS - Spatial Reuse - Talbot",
+				 {.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen"},
+							  {"src/shaders/integrators/restir/gris/ray.rmiss"},
+							  {"src/shaders/ray_shadow.rmiss"},
+							  {"src/shaders/integrators/restir/gris/ray.rchit"},
+							  {"src/shaders/ray.rahit"}},
+				  .macros = macros,
+				  .dims = {instance->width, instance->height},
+				  .accel = instance->vkb.tlas.accel})
+		.push_constants(&pc_ray)
+		.bind(rt_bindings)
+		.bind(mesh_lights_buffer)
+		.bind(*reservoir_buffers[1 - ping_pong])
+		.bind(*reservoir_buffers[ping_pong])
 		.bind(*gbuffers[1 - ping_pong])
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
@@ -300,6 +320,7 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);
 	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
 	result |= ImGui::Checkbox("Enable GRIS", &enable_gris);
+	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
 	if (!enable_gris) {
 		return result;
 	}
@@ -309,7 +330,6 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Enable temporal reuse", &enable_temporal_reuse);
 	bool spatial_samples_changed = ImGui::SliderInt("Num spatial samples", (int*)&num_spatial_samples, 0, 12);
 	result |= spatial_samples_changed;
-	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
 	result |= ImGui::SliderFloat("Min reconnection distance ratio", &min_vertex_distance_ratio, 0.0f, 1.0f);
 

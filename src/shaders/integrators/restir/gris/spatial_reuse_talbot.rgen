@@ -81,8 +81,7 @@ void main() {
 		}
 
 		float reservoir_pdf = calc_target_pdf(reservoir_contribution) * jacobian;
-		if (reservoir_pdf * neighbor_reservoir.W * neighbor_reservoir.M > 0.0 && !isnan(reservoir_pdf)) {
-			LOG_CLICKED3("%d - %f - %v2i\n", i, jacobian, rand_offset);
+		if (reservoir_pdf * neighbor_reservoir.W > 0.0) {
 			for (int j = -1; j < num_spatial_samples; j++) {
 				if (j == -1) {
 					float p = calc_target_pdf(reservoir_contribution) * canonical_reservoir.M;
@@ -121,13 +120,13 @@ void main() {
 			}
 		}
 		float mis_weight = p_sum <= 0.0 ? 0.0 : p_curr / p_sum;
-		bool accepted = combine_reservoir(seed, reservoir, neighbor_reservoir, reservoir_pdf * mis_weight);
+		bool accepted = combine_reservoir(seed, reservoir, neighbor_reservoir, calc_target_pdf(reservoir_contribution),
+										  mis_weight, jacobian);
 		if (accepted) {
 			curr_reservoir_contribution = reservoir_contribution;
 		}
 	}
-	const float target_pdf = calc_target_pdf(curr_reservoir_contribution);
-	reservoir.W = target_pdf == 0.0 ? 0.0 : reservoir.w_sum / (target_pdf);
+	calc_reservoir_W_with_mis(reservoir);
 
 	vec3 final_contribution = prefix_contributions.d[pixel_idx];
 	if (reservoir.W > 0) {

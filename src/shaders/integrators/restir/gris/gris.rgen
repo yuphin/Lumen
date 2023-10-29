@@ -16,31 +16,6 @@ PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix
 layout(binding = 4, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
 layout(binding = 5, std430) writeonly buffer OutGBuffer { GBuffer out_gbuffers[]; };
 
-vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3 n_s, vec3 wo, out vec3 wi,
-			out float pdf_light_w) {
-	float wi_len;
-	float pdf_light_a;
-	LightRecord record;
-	float cos_from_light;
-	const vec3 Le = sample_light_Li(seed, gbuffer.pos, pc_ray.num_lights, pdf_light_w, wi, wi_len, pdf_light_a,
-									cos_from_light, record);
-	const vec3 p = offset_ray2(gbuffer.pos, n_s);
-	float light_bsdf_pdf;
-	float cos_x = dot(n_s, wi);
-	vec3 f_light = eval_bsdf(n_s, wo, hit_mat, 1, side, wi, light_bsdf_pdf, cos_x);
-	any_hit_payload.hit = 1;
-	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0, wi,
-				wi_len - EPS, 1);
-	bool visible = any_hit_payload.hit == 0;
-
-	const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
-	if (visible && pdf_light_w > 0) {
-		const float mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + light_bsdf_pdf / pdf_light_w);
-		return mis_weight * f_light * abs(cos_x) * Le / (pdf_light_w * light_pick_pdf);
-	}
-	return vec3(0);
-}
-
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num);
 
 void main() {
@@ -57,10 +32,10 @@ void main() {
 
 	bool specular = false;
 	vec3 partial_throughput = vec3(1);
-	// Updated after a connectable vertex is found
-
+	float joint_pdf = 1.0;
 	vec3 direct_lighting = vec3(0);
 	float bsdf_pdf;
+	int depth;
 
 	// GRIS variables
 	bool connectable_vertex_found = false;
@@ -71,16 +46,20 @@ void main() {
 	GrisData reconnection_data;
 	init_reservoir(reservoir);
 	init_data(reconnection_data);
-	float joint_pdf = 1.0;
+	init_data(reservoir.data);
 	vec3 postfix_L = vec3(0);
 	vec3 postfix_throughput = vec3(1);
 	float prefix_pdf_times_rc_pdf;
-
-	int depth;
 	int postfix_depth = 0;
 	int prefix_depth;
-
 	vec3 prefix_col = vec3(0);
+
+	// Common reconnection data
+	vec2 rc_barycentrics;
+	uvec2 rc_primitive_instance_id;
+	uint rc_coords = gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y;
+
+	bool valid_reservoir = false;
 	for (depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.instance_idx != -1;
@@ -89,11 +68,11 @@ void main() {
 		}
 		if (!found_isect) {
 			vec3 atmosphere_L = shade_atmosphere(pc_ray.dir_light_idx, pc_ray.sky_col, origin.xyz, direction, tmax);
-			vec3 contrib = partial_throughput * atmosphere_L / joint_pdf;
+			vec3 contribution = partial_throughput * atmosphere_L / joint_pdf;
 			if (depth > 0) {
-				col += contrib;
+				col += contribution;
 			} else {
-				direct_lighting += contrib;
+				direct_lighting += contribution;
 			}
 			if (connectable_vertex_found) {
 				postfix_L += postfix_throughput * atmosphere_L;
@@ -119,7 +98,8 @@ void main() {
 		// Fill in GBuffer
 		if (depth == 0) {
 			direct_lighting += partial_throughput * hit_mat.emissive_factor / joint_pdf;
-
+			gbuffer_out.barycentrics = payload.attribs;
+			gbuffer_out.primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 		} else if (depth > 0) {
 			float mis_weight = 1.0;
 			float pdf_light_w;
@@ -146,30 +126,40 @@ void main() {
 		// NEE
 		if (!specular) {
 			vec3 wi;
-			float pdf_light;
 			uint rc_seed = seed.w;
-			vec3 Li = do_nee(seed, gbuffer, hit_mat, side, n_s, wo, wi, pdf_light);
+			uvec4 debug_seed = seed;
+			vec3 Li = do_nee(seed, gbuffer, hit_mat, side, n_s, wo, wi, true);
 			vec3 partial_contrib = partial_throughput * Li;
-			vec3 contrib = partial_contrib / joint_pdf;
+			vec3 contribution = partial_contrib / joint_pdf;
 
 			// Stream the NEE path at the reconnection vertex
 			if (connectable) {
+				rc_barycentrics = payload.attribs;
+				rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
+				reconnection_data.rc_seed = rc_seed;
 				reconnection_data.rc_wi = wi;
 				reconnection_data.rc_Li = Li;
 				reconnection_data.reservoir_contribution = partial_contrib;
-				reconnection_data.rc_seed = rc_seed;
+				reservoir.data.debug_seed = debug_seed;
 				reconnection_data.path_flags = set_path_flags(depth, 1, true);
-				stream_reservoir(seed, reservoir, reconnection_data,
-								 calc_target_pdf(reconnection_data.reservoir_contribution), 1.0 / joint_pdf);
+				valid_reservoir =
+					valid_reservoir ||
+					stream_reservoir(seed, reservoir, reconnection_data,
+									 calc_target_pdf(reconnection_data.reservoir_contribution), 1.0 / joint_pdf);
 				prefix_col = col;
+				if (!valid_reservoir) {
+					ASSERT(reservoir.data.path_flags == 0);
+				} else {
+					ASSERT(reservoir.data.path_flags != 0);
+				}
 			} else if (connectable_vertex_found) {
 				postfix_L += Li * postfix_throughput;
 			}
 
 			if (depth > 0) {
-				col += contrib;
+				col += contribution;
 			} else {
-				direct_lighting += contrib;
+				direct_lighting += contribution;
 			}
 		}
 
@@ -194,8 +184,6 @@ void main() {
 
 		if (connectable) {
 			connectable_vertex_found = true;
-			reconnection_data.rc_barycentrics = payload.attribs;
-			reconnection_data.rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 			prefix_depth = depth;
 			// Prepare reconnection data for the non-NEE path
 			reconnection_data.rc_wi = direction;
@@ -220,7 +208,7 @@ void main() {
 			}
 		}
 	}
-	
+
 	if (isnan(luminance(col))) {
 		return;
 	}
@@ -229,12 +217,36 @@ void main() {
 		reconnection_data.rc_Li = postfix_L;
 		reconnection_data.reservoir_contribution = reconnection_data.reservoir_contribution * postfix_L;
 		reconnection_data.path_flags = set_path_flags(prefix_depth, postfix_depth, false);
-		stream_reservoir(seed, reservoir, reconnection_data, calc_target_pdf(reconnection_data.reservoir_contribution),
-						 1.0 / prefix_pdf_times_rc_pdf);
+		ASSERT(reconnection_data.path_flags != 0);
+		bool merged =
+			stream_reservoir(seed, reservoir, reconnection_data,
+							 calc_target_pdf(reconnection_data.reservoir_contribution), 1.0 / prefix_pdf_times_rc_pdf);
+		valid_reservoir = valid_reservoir || merged;
 		// The samples are additive, therefore set M to 1
 		reservoir.M = 1;
-		calc_reservoir_W(reservoir);
-		col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
+		if (valid_reservoir) {
+			reservoir.data.rc_barycentrics = rc_barycentrics;
+			reservoir.data.rc_primitive_instance_id = rc_primitive_instance_id;
+			reservoir.data.rc_coords = rc_coords;
+
+			
+			calc_reservoir_W(reservoir);
+			col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
+
+			bool is_nee;
+			uint rc_prefix_length;
+			uint rc_postfix_length;
+			unpack_path_flags(reservoir.data.path_flags, is_nee, rc_prefix_length, rc_postfix_length);
+			if (merged) {
+				ASSERT(!is_nee);
+				ASSERT(reservoir.data.rc_seed == -1);
+			} else {
+				ASSERT(is_nee);
+				ASSERT(reservoir.data.rc_seed != -1);
+			}
+			ASSERT(reservoir.data.path_flags != 0);
+			ASSERT(reservoir_data_valid(reservoir.data));
+		}
 	}
 	if (pc_ray.direct_lighting == 1) {
 		col += direct_lighting;
@@ -242,13 +254,20 @@ void main() {
 	if (pc_ray.direct_lighting == 1) {
 		direct_lighting_buffer.d[pixel_idx] = direct_lighting;
 	}
-
-	if (pc_ray.frame_num > 0) {
-		float w = 1. / float(pc_ray.frame_num + 1);
-		vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
-		// imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
-		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
-	} else {
-		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+	if (!valid_reservoir) {
+		ASSERT(!reservoir_data_valid(reservoir.data));
+		ASSERT(reservoir.data.path_flags == 0);
 	}
+
+	out_reservoirs[pixel_idx] = reservoir;
+	out_gbuffers[pixel_idx] = gbuffer_out;
+
+	// if (pc_ray.frame_num > 0) {
+	// 	float w = 1. / float(pc_ray.frame_num + 1);
+	// 	vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+	// 	// imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+	// 	imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
+	// } else {
+	// 	imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+	// }
 }
