@@ -153,26 +153,26 @@ void ReSTIRPT::render() {
 		.bind(*gbuffers[1 - ping_pong])
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
-	instance->vkb.rg->run_and_submit(cmd);
-	cmd.begin();
-	instance->vkb.rg
-		->add_rt("GRIS - Spatial Reuse - Talbot",
-				 {.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen"},
-							  {"src/shaders/integrators/restir/gris/ray.rmiss"},
-							  {"src/shaders/ray_shadow.rmiss"},
-							  {"src/shaders/integrators/restir/gris/ray.rchit"},
-							  {"src/shaders/ray.rahit"}},
-				  .macros = macros,
-				  .dims = {instance->width, instance->height},
-				  .accel = instance->vkb.tlas.accel})
-		.push_constants(&pc_ray)
-		.bind(rt_bindings)
-		.bind(mesh_lights_buffer)
-		.bind(*reservoir_buffers[1 - ping_pong])
-		.bind(*reservoir_buffers[ping_pong])
-		.bind(*gbuffers[1 - ping_pong])
-		.bind_texture_array(scene_textures)
-		.bind_tlas(instance->vkb.tlas);
+	if (enable_gris) {
+		instance->vkb.rg
+			->add_rt("GRIS - Spatial Reuse - Talbot",
+					 {.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen"},
+								  {"src/shaders/integrators/restir/gris/ray.rmiss"},
+								  {"src/shaders/ray_shadow.rmiss"},
+								  {"src/shaders/integrators/restir/gris/ray.rchit"},
+								  {"src/shaders/ray.rahit"}},
+					  .macros = macros,
+					  .dims = {instance->width, instance->height},
+					  .accel = instance->vkb.tlas.accel})
+			.push_constants(&pc_ray)
+			.bind(rt_bindings)
+			.bind(mesh_lights_buffer)
+			.bind(*reservoir_buffers[1 - ping_pong])
+			.bind(*reservoir_buffers[ping_pong])
+			.bind(*gbuffers[1 - ping_pong])
+			.bind_texture_array(scene_textures)
+			.bind_tlas(instance->vkb.tlas);
+	}
 
 #if 0
 	instance->vkb.rg->run_and_submit(cmd);

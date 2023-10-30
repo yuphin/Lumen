@@ -38,8 +38,7 @@ struct HitDataWithoutGeometryNormals {
 	vec2 uv;
 };
 
-vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3 n_s, vec3 wo, out vec3 wi,
-			bool trace_ray) {
+vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3 n_s, vec3 wo, out vec3 wi, bool trace_ray) {
 	float wi_len;
 	float pdf_light_a;
 	float pdf_light_w;
@@ -63,7 +62,7 @@ vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3
 	const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
 	if (visible && pdf_light_w > 0) {
 		const float mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + light_bsdf_pdf / pdf_light_w);
-		return mis_weight * f_light * abs(cos_x) * Le / (pdf_light_w * light_pick_pdf);
+		return mis_weight * f_light * abs(cos_x) * Le / (light_pick_pdf * pdf_light_w);
 	}
 	return vec3(0);
 }
@@ -178,8 +177,8 @@ bool reservoir_data_valid(in GrisData data) { return data.rc_primitive_instance_
 bool gbuffer_data_valid(in GBuffer gbuffer) { return gbuffer.primitive_instance_id.y != -1; }
 
 bool update_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData data, float target_pdf,
-					  float source_pdf) {
-	float w_i = target_pdf * source_pdf;
+					  float inv_source_pdf) {
+	float w_i = target_pdf * inv_source_pdf;
 	r_new.w_sum += w_i;
 	if (rand(seed) * r_new.w_sum < w_i) {
 		r_new.data = data;
@@ -201,7 +200,7 @@ bool stream_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData da
 bool combine_reservoir(inout uvec4 seed, inout Reservoir target_reservoir, const Reservoir input_reservoir,
 					   float target_pdf, float mis_weight, float jacobian) {
 	float inv_source_pdf = mis_weight * jacobian * input_reservoir.W;
-	if (isnan(inv_source_pdf) || inv_source_pdf == 0.0) {
+	if (isnan(inv_source_pdf) || inv_source_pdf == 0.0 || isinf(inv_source_pdf)) {
 		return false;
 	}
 	target_reservoir.M += input_reservoir.M;
@@ -242,11 +241,11 @@ vec3 get_primary_direction(uvec2 coords) {
 	return normalize(sample_camera(d).xyz);
 }
 
-bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 src_coords,
-					 uvec2 dst_coords, uint seed_helper, out float jacobian_out, out vec3 reservoir_contribution) {
+bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords,
+					 uvec2 src_coords, uint seed_helper, out float jacobian_out, out vec3 reservoir_contribution) {
 	reservoir_contribution = vec3(0);
 	jacobian_out = 0;
-	float jacobian = 0;
+	float jacobian = 1;
 	if (!reservoir_data_valid(data)) {
 		return false;
 	}
@@ -256,6 +255,7 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 	bool is_nee;
 	uint rc_prefix_length;
 	uint rc_postfix_length;
+
 	unpack_path_flags(data.path_flags, is_nee, rc_prefix_length, rc_postfix_length);
 
 	Material dst_hit_mat = load_material(dst_gbuffer.material_idx, dst_gbuffer.uv);
@@ -266,14 +266,16 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 	bool dst_side = face_forward(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo);
 	bool src_side = face_forward(src_gbuffer.n_s, src_gbuffer.n_g, src_wo);
 
+	// The offsets here are needed for proper Jacobian determinant values
+	dst_gbuffer.pos = offset_ray(dst_gbuffer.pos, dst_gbuffer.n_g);
+	src_gbuffer.pos = offset_ray(src_gbuffer.pos, src_gbuffer.n_g);
 	vec3 dst_wi = rc_gbuffer.pos - dst_gbuffer.pos;
 	float wi_len = length(dst_wi);
 	dst_wi /= wi_len;
 
-	if (is_rough(dst_hit_mat)) {
-		vec3 p = offset_ray2(dst_gbuffer.pos, dst_gbuffer.n_s);
+	if (is_rough(dst_hit_mat) && same_hemisphere(dst_wo, dst_wi, dst_gbuffer.n_s)) {
 		any_hit_payload.hit = 1;
-		traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0,
+		traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, dst_gbuffer.pos, 0,
 					dst_wi, wi_len - EPS, 1);
 		bool connected = any_hit_payload.hit == 0;
 		if (!connected) {
@@ -284,10 +286,10 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 	}
 
 	// Adjust normals from dst to reconnection
-	vec3 rc_n_s = rc_gbuffer.n_s;
-	vec3 rc_n_g = rc_gbuffer.n_g;
-	bool rc_side = face_forward(rc_n_s, rc_n_g, -dst_wi);
-	float g_dst = abs(dot(rc_n_s, -dst_wi)) / (wi_len * wi_len);
+	vec3 rc_n_s_dst = rc_gbuffer.n_s;
+	vec3 rc_n_g_dst = rc_gbuffer.n_g;
+	bool rc_side_dst = face_forward(rc_n_s_dst, rc_n_g_dst, -dst_wi);
+	float g_dst = abs(dot(rc_n_s_dst, -dst_wi)) / (wi_len * wi_len);
 	// The "source" location does not necessarily mean the canonical location
 	vec3 rc_n_s_src = rc_gbuffer.n_s;
 	vec3 rc_n_g_src = rc_gbuffer.n_g;
@@ -296,7 +298,7 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 	rc_wo_src /= rc_wo_src_len;
 	bool rc_side_src = face_forward(rc_n_s_src, rc_n_g_src, rc_wo_src);
 	float g_src = abs(dot(rc_n_s_src, rc_wo_src)) / (rc_wo_src_len * rc_wo_src_len);
-	jacobian = g_dst / g_src;
+	jacobian = g_src == 0 ? 0 : g_dst / g_src;
 	// Correction for solid angle Jacobians
 	float dst_pdf;
 	float cos_x = dot(dst_gbuffer.n_s, dst_wi);
@@ -308,6 +310,13 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 	float src_pdf = bsdf_pdf(src_hit_mat, src_gbuffer.n_s, src_wo, -rc_wo_src);
 
 	jacobian *= dst_pdf / src_pdf;
+	Material rc_hit_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
+
+	if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
+		jacobian_out = 0;
+		reservoir_contribution = vec3(0);
+		return false;
+	}
 	if (is_nee) {
 		// The NEE PDF does not depend on the surface, only MIS weight does
 		// Also we do not need to trace visibility ray since we know this was accepted into the reservoir
@@ -315,16 +324,16 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 		uvec4 reconnection_seed = init_rng(rc_coords, gl_LaunchSizeEXT.xy, seed_helper, data.rc_seed);
 		vec3 dst_L_wi;
 		uvec4 debug_seed = reconnection_seed;
-		vec3 Li =
-			do_nee(reconnection_seed, dst_gbuffer, dst_hit_mat, dst_side, dst_gbuffer.n_s, dst_wo, dst_L_wi, false);
+		vec3 Li = do_nee(reconnection_seed, rc_gbuffer, rc_hit_mat, rc_side_dst, rc_n_s_dst, -dst_wi, dst_L_wi, false);
 		ASSERT(debug_seed == data.debug_seed);
+		ASSERT(dst_L_wi == data.rc_wi);
 		reservoir_contribution = dst_f * abs(cos_x) * Li;
 	} else {
 		ASSERT(data.rc_seed == -1);
-		Material rc_hit_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
 		float dst_postfix_pdf;
-		float rc_cos_x = dot(rc_n_s, data.rc_wi);
-		vec3 dst_postfix_f = eval_bsdf(rc_n_s, -dst_wi, rc_hit_mat, 1, rc_side, data.rc_wi, dst_postfix_pdf, rc_cos_x);
+		float rc_cos_x = dot(rc_n_s_dst, data.rc_wi);
+		vec3 dst_postfix_f =
+			eval_bsdf(rc_n_s_dst, -dst_wi, rc_hit_mat, 1, rc_side_dst, data.rc_wi, dst_postfix_pdf, rc_cos_x);
 
 		float src_postfix_pdf = bsdf_pdf(rc_hit_mat, rc_n_s_src, rc_wo_src, data.rc_wi);
 		jacobian *= dst_postfix_pdf / src_postfix_pdf;
@@ -333,6 +342,7 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 	}
 
 	if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
+		jacobian_out = 0;
 		reservoir_contribution = vec3(0);
 		return false;
 	}
@@ -341,11 +351,11 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 	return true;
 }
 
-bool reconnect_paths_and_evaluate(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 src_coords,
-								  uvec2 dst_coords, uint seed_helper, out float target_pdf) {
+bool reconnect_paths_and_evaluate(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords,
+								  uvec2 src_coords, uint seed_helper, out float target_pdf) {
 	vec3 reservoir_contribution;
 	float jacobian;
-	bool result = reconnect_paths(dst_gbuffer, src_gbuffer, data, src_coords, dst_coords, seed_helper, jacobian,
+	bool result = reconnect_paths(dst_gbuffer, src_gbuffer, data, dst_coords, src_coords, seed_helper, jacobian,
 								  reservoir_contribution);
 	target_pdf = (result && jacobian > 0) ? calc_target_pdf(reservoir_contribution) * jacobian : 0.0;
 	return result;

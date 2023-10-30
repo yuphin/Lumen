@@ -58,6 +58,7 @@ void main() {
 	vec2 rc_barycentrics;
 	uvec2 rc_primitive_instance_id;
 	uint rc_coords = gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y;
+	float g;
 
 	bool valid_reservoir = false;
 	for (depth = 0;; depth++) {
@@ -134,12 +135,14 @@ void main() {
 
 			// Stream the NEE path at the reconnection vertex
 			if (connectable) {
+				g = (abs(dot(n_s, wo))) / (dot(payload.dist, payload.dist));
 				rc_barycentrics = payload.attribs;
 				rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 				reconnection_data.rc_seed = rc_seed;
 				reconnection_data.rc_wi = wi;
 				reconnection_data.rc_Li = Li;
-				reconnection_data.reservoir_contribution = partial_contrib;
+				reconnection_data.reservoir_contribution = partial_throughput * Li;
+				// reconnection_data.reservoir_contribution = Li;
 				reservoir.data.debug_seed = debug_seed;
 				reconnection_data.path_flags = set_path_flags(depth, 1, true);
 				valid_reservoir =
@@ -222,16 +225,13 @@ void main() {
 			stream_reservoir(seed, reservoir, reconnection_data,
 							 calc_target_pdf(reconnection_data.reservoir_contribution), 1.0 / prefix_pdf_times_rc_pdf);
 		valid_reservoir = valid_reservoir || merged;
-		// The samples are additive, therefore set M to 1
-		reservoir.M = 1;
+
 		if (valid_reservoir) {
 			reservoir.data.rc_barycentrics = rc_barycentrics;
 			reservoir.data.rc_primitive_instance_id = rc_primitive_instance_id;
 			reservoir.data.rc_coords = rc_coords;
+			reservoir.data.rc_g = g;
 
-			
-			calc_reservoir_W(reservoir);
-			col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
 
 			bool is_nee;
 			uint rc_prefix_length;
@@ -251,23 +251,35 @@ void main() {
 	if (pc_ray.direct_lighting == 1) {
 		col += direct_lighting;
 	}
-	if (pc_ray.direct_lighting == 1) {
-		direct_lighting_buffer.d[pixel_idx] = direct_lighting;
-	}
-	if (!valid_reservoir) {
-		ASSERT(!reservoir_data_valid(reservoir.data));
-		ASSERT(reservoir.data.path_flags == 0);
+
+
+	if(pc_ray.enable_gris == 1)  {
+		// The samples are additive, therefore set M to 1
+		reservoir.M = 1;
+		calc_reservoir_W(reservoir);
+		col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
+
 	}
 
-	out_reservoirs[pixel_idx] = reservoir;
-	out_gbuffers[pixel_idx] = gbuffer_out;
+	if (pc_ray.enable_gris == 0) {
+		if (pc_ray.frame_num > 0) {
+			float w = 1. / float(pc_ray.frame_num + 1);
+			vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+			// imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
+		} else {
+			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+		}
+	} else {
+		if (pc_ray.direct_lighting == 1) {
+			direct_lighting_buffer.d[pixel_idx] = direct_lighting;
+		}
+		if (!valid_reservoir) {
+			ASSERT(!reservoir_data_valid(reservoir.data));
+			ASSERT(reservoir.data.path_flags == 0);
+		}
 
-	// if (pc_ray.frame_num > 0) {
-	// 	float w = 1. / float(pc_ray.frame_num + 1);
-	// 	vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
-	// 	// imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
-	// 	imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
-	// } else {
-	// 	imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
-	// }
+		out_reservoirs[pixel_idx] = reservoir;
+		out_gbuffers[pixel_idx] = gbuffer_out;
+	}
 }

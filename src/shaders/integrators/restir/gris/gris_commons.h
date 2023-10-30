@@ -47,12 +47,13 @@ struct GrisData {
 	uint path_flags;
 	vec3 rc_Li;
 	float rc_g;
-	uint rc_coords;
 	vec3 reservoir_contribution;
-	uint rc_seed;
+	uint rc_coords;
+	uvec4 debug_seed;
 	vec2 rc_barycentrics;
 	uvec2 rc_primitive_instance_id;
-	uvec4 debug_seed;
+	vec3 pad;
+	uint rc_seed;
 };
 
 struct Reservoir {
