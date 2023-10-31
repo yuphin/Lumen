@@ -327,7 +327,7 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 		vec3 Li = do_nee(reconnection_seed, rc_gbuffer, rc_hit_mat, rc_side_dst, rc_n_s_dst, -dst_wi, dst_L_wi, false);
 		ASSERT(debug_seed == data.debug_seed);
 		ASSERT(dst_L_wi == data.rc_wi);
-		reservoir_contribution = dst_f * abs(cos_x) * Li;
+		reservoir_contribution = dst_f * abs(cos_x) * Li / dst_pdf;
 	} else {
 		ASSERT(data.rc_seed == -1);
 		float dst_postfix_pdf;
@@ -338,7 +338,7 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 		float src_postfix_pdf = bsdf_pdf(rc_hit_mat, rc_n_s_src, rc_wo_src, data.rc_wi);
 		jacobian *= dst_postfix_pdf / src_postfix_pdf;
 
-		reservoir_contribution = dst_f * abs(cos_x) * dst_postfix_f * abs(rc_cos_x) * data.rc_Li;
+		reservoir_contribution = dst_f * abs(cos_x) * dst_postfix_f * abs(rc_cos_x) * data.rc_Li / dst_postfix_pdf;
 	}
 
 	if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
