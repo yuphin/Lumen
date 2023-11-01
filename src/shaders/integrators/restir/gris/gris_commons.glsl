@@ -38,7 +38,8 @@ struct HitDataWithoutGeometryNormals {
 	vec2 uv;
 };
 
-vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3 n_s, vec3 wo, out vec3 wi, bool trace_ray) {
+vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3 n_s, vec3 wo, out vec3 wi,
+			bool trace_ray) {
 	float wi_len;
 	float pdf_light_a;
 	float pdf_light_w;
@@ -266,16 +267,16 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 	bool dst_side = face_forward(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo);
 	bool src_side = face_forward(src_gbuffer.n_s, src_gbuffer.n_g, src_wo);
 
-	// The offsets here are needed for proper Jacobian determinant values
-	dst_gbuffer.pos = offset_ray(dst_gbuffer.pos, dst_gbuffer.n_g);
+	// The offset is needed for proper Jacobian determinant values
 	src_gbuffer.pos = offset_ray(src_gbuffer.pos, src_gbuffer.n_g);
 	vec3 dst_wi = rc_gbuffer.pos - dst_gbuffer.pos;
 	float wi_len = length(dst_wi);
 	dst_wi /= wi_len;
 
-	if (is_rough(dst_hit_mat) && same_hemisphere(dst_wo, dst_wi, dst_gbuffer.n_s)) {
+	if (is_rough(dst_hit_mat)) {
 		any_hit_payload.hit = 1;
-		traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, dst_gbuffer.pos, 0,
+		vec3 p = offset_ray2(dst_gbuffer.pos, dst_gbuffer.n_s);
+		traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0,
 					dst_wi, wi_len - EPS, 1);
 		bool connected = any_hit_payload.hit == 0;
 		if (!connected) {
@@ -313,8 +314,9 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 	Material rc_hit_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
 
 	if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
-		jacobian_out = 0;
-		reservoir_contribution = vec3(0);
+		return false;
+	}
+	if (!same_hemisphere(data.rc_wi, -dst_wi, rc_n_s_dst)) {
 		return false;
 	}
 	if (is_nee) {
@@ -330,6 +332,7 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 		reservoir_contribution = dst_f * abs(cos_x) * Li / dst_pdf;
 	} else {
 		ASSERT(data.rc_seed == -1);
+		ASSERT(luminance(data.rc_Li) != 0.0);
 		float dst_postfix_pdf;
 		float rc_cos_x = dot(rc_n_s_dst, data.rc_wi);
 		vec3 dst_postfix_f =
@@ -338,7 +341,8 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 		float src_postfix_pdf = bsdf_pdf(rc_hit_mat, rc_n_s_src, rc_wo_src, data.rc_wi);
 		jacobian *= dst_postfix_pdf / src_postfix_pdf;
 
-		reservoir_contribution = dst_f * abs(cos_x) * dst_postfix_f * abs(rc_cos_x) * data.rc_Li / (dst_postfix_pdf * dst_pdf);
+		reservoir_contribution =
+			dst_f * abs(cos_x) * dst_postfix_f * abs(rc_cos_x) * data.rc_Li / (dst_postfix_pdf * dst_pdf);
 	}
 
 	if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
