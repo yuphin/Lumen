@@ -130,7 +130,6 @@ void main() {
 	calc_reservoir_W_with_mis(reservoir);
 	vec3 final_contribution = prefix_contributions.d[pixel_idx];
 	if (reservoir.W > 0) {
-		// LOG_CLICKED("%f\n", mis_weight_sum);
 		final_contribution += curr_reservoir_contribution * reservoir.W;
 	}
 	out_reservoirs[pixel_idx] = reservoir;
@@ -140,10 +139,11 @@ void main() {
 		col += direct_lighting_buffer.d[pixel_idx];
 	}
 	if (pc_ray.show_reconnection_radiance == 1) {
-		col += reservoir.data.rc_postfix_L;
+		// col += reservoir.data.rc_postfix_L;
 	} else {
 		col += final_contribution;
 	}
+	LOG_CLICKED("%v3f\n", col);
 
 	ivec2 neighbor_coords = ivec2(gl_LaunchIDEXT.xy);
 	if (pc_ray.enable_accumulation == 0 || pc_ray.frame_num == 0) {

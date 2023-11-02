@@ -39,20 +39,19 @@ struct GBuffer {
 };
 
 struct GrisData {
+	uvec4 debug_seed;
 	vec3 rc_wi;
 	uint init_seed;
-	vec3 rc_postfix_L;
-	// Layout for the path flags
-	// | 5b postfix_length| 5b prefix_length |1b is_nee
-	uint path_flags;
 	vec3 rc_Li;
-	float rc_g;
+	// Layout for the path flags
+	// | 5b postfix_length| 5b prefix_length |2b is_nee/is_emissive_after_rc/default
+	uint path_flags;
 	vec3 reservoir_contribution;
 	uint rc_coords;
-	uvec4 debug_seed;
 	vec2 rc_barycentrics;
 	uvec2 rc_primitive_instance_id;
-	vec3 pad;
+	vec2 pad;
+	float pdf_light_w;
 	uint rc_seed;
 };
 

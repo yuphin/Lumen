@@ -112,7 +112,7 @@ using uvec2 = glm::uvec2;
 
 	#define ASSERT(cond) \
 		if(!(cond))  { \
-			debugPrintfEXT("Assertion failed on pixel %v2i\n", ivec2(gl_LaunchIDEXT.xy)); \
+			debugPrintfEXT("Assertion failed (L%d) on pixel %v2i\n", __LINE__, ivec2(gl_LaunchIDEXT.xy)); \
 		}
 
 	#define ASSERT0(cond, str) \

@@ -17,6 +17,11 @@ const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 
+#define RECONNECTION_TYPE_INVALID 0
+#define RECONNECTION_TYPE_NEE 1
+#define RECONNECTION_TYPE_EMISSIVE_AFTER_RC 2
+#define RECONNECTION_TYPE_DEFAULT 3
+
 struct HitData {
 	vec3 pos;
 	vec3 n_g;
@@ -170,8 +175,12 @@ void init_reservoir(out Reservoir r) {
 	r.M = 0;
 	r.W = 0.0;
 	r.w_sum = 0.0;
+	r.target_pdf = 0.0;
 }
-void init_data(out GrisData data) { data.rc_primitive_instance_id = uvec2(-1); }
+void init_data(out GrisData data) { 
+	data.rc_primitive_instance_id = uvec2(-1); 
+	data.path_flags = 0;
+}
 
 bool reservoir_data_valid(in GrisData data) { return data.rc_primitive_instance_id.y != -1; }
 
@@ -226,14 +235,14 @@ bool is_diffuse(in Material mat) { return (mat.bsdf_type & BSDF_DIFFUSE) != 0; }
 
 uint offset(const uint pingpong) { return pingpong * pc_ray.size_x * pc_ray.size_y; }
 
-uint set_path_flags(uint prefix_length, uint postfix_length, bool is_nee) {
-	return (postfix_length & 0x1F) << 6 | (prefix_length & 0x1F) << 1 | uint(is_nee);
+uint set_path_flags(uint prefix_length, uint postfix_length, uint reconnection_type) {
+	return (postfix_length & 0x1F) << 7 | (prefix_length & 0x1F) << 2 | uint(reconnection_type & 0x3);
 }
 
-void unpack_path_flags(uint packed_data, out bool is_nee, out uint prefix_length, out uint postfix_length) {
-	is_nee = (packed_data & 0x1) == 1;
-	prefix_length = (packed_data >> 1) & 0x1F;
-	postfix_length = (packed_data >> 6) & 0x1F;
+void unpack_path_flags(uint packed_data, out uint reconnection_type, out uint prefix_length, out uint postfix_length) {
+	reconnection_type = (packed_data & 0x3);
+	prefix_length = (packed_data >> 2) & 0x1F;
+	postfix_length = (packed_data >> 7) & 0x1F;
 }
 
 vec3 get_primary_direction(uvec2 coords) {
@@ -253,11 +262,11 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 	vec3 dst_wo = -get_primary_direction(dst_coords);
 	vec3 src_wo = -get_primary_direction(src_coords);
 
-	bool is_nee;
+	uint rc_type;
 	uint rc_prefix_length;
 	uint rc_postfix_length;
 
-	unpack_path_flags(data.path_flags, is_nee, rc_prefix_length, rc_postfix_length);
+	unpack_path_flags(data.path_flags, rc_type, rc_prefix_length, rc_postfix_length);
 
 	Material dst_hit_mat = load_material(dst_gbuffer.material_idx, dst_gbuffer.uv);
 
@@ -319,7 +328,7 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 	if (!same_hemisphere(data.rc_wi, -dst_wi, rc_n_s_dst)) {
 		return false;
 	}
-	if (is_nee) {
+	if (rc_type == RECONNECTION_TYPE_NEE) {
 		// The NEE PDF does not depend on the surface, only MIS weight does
 		// Also we do not need to trace visibility ray since we know this was accepted into the reservoir
 		uvec2 rc_coords = uvec2(data.rc_coords / gl_LaunchSizeEXT.y, data.rc_coords % gl_LaunchSizeEXT.y);
@@ -330,7 +339,19 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 		ASSERT(debug_seed == data.debug_seed);
 		ASSERT(dst_L_wi == data.rc_wi);
 		reservoir_contribution = dst_f * abs(cos_x) * Li / dst_pdf;
-	} else {
+	} else if (rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
+		ASSERT(data.rc_seed == -1);
+		float dst_postfix_pdf;
+		float rc_cos_x = dot(rc_n_s_dst, data.rc_wi);
+		vec3 dst_postfix_f =
+			eval_bsdf(rc_n_s_dst, -dst_wi, rc_hit_mat, 1, rc_side_dst, data.rc_wi, dst_postfix_pdf, rc_cos_x);
+
+		float src_postfix_pdf = bsdf_pdf(rc_hit_mat, rc_n_s_src, rc_wo_src, data.rc_wi);
+		jacobian *= dst_postfix_pdf / src_postfix_pdf;
+		float mis_weight = 1.0 / (1 + data.pdf_light_w / dst_postfix_pdf);
+		reservoir_contribution =
+			mis_weight * dst_f * abs(cos_x) * dst_postfix_f * abs(rc_cos_x) * data.rc_Li / (dst_postfix_pdf * dst_pdf);
+	} else if(rc_type == RECONNECTION_TYPE_DEFAULT){
 		ASSERT(data.rc_seed == -1);
 		ASSERT(luminance(data.rc_Li) != 0.0);
 		float dst_postfix_pdf;
@@ -340,7 +361,6 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 
 		float src_postfix_pdf = bsdf_pdf(rc_hit_mat, rc_n_s_src, rc_wo_src, data.rc_wi);
 		jacobian *= dst_postfix_pdf / src_postfix_pdf;
-
 		reservoir_contribution =
 			dst_f * abs(cos_x) * dst_postfix_f * abs(rc_cos_x) * data.rc_Li / (dst_postfix_pdf * dst_pdf);
 	}
