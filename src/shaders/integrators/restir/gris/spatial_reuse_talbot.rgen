@@ -130,7 +130,7 @@ void main() {
 	if (pc_ray.direct_lighting == 1) {
 		col += direct_lighting_buffer.d[pixel_idx];
 	}
-	if (pc_ray.show_reconnection_radiance == 1) {
+	if (pc_ray.show_reconnection_radiance == 1 && reservoir.W > 0) {
 		col += reservoir.data.rc_Li;
 	} else {
 		col += final_contribution;
