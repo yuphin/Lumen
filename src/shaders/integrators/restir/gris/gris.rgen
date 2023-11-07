@@ -67,6 +67,8 @@ void main() {
 	bool valid_reservoir = false;
 	bool connectable = false;
 	bool was_connectable = false;
+	vec3 postfix_L = vec3(0);
+	int postfix_depth = 0;
 	for (depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.instance_idx != -1;
@@ -83,6 +85,7 @@ void main() {
 				direct_lighting += contribution;
 			}
 			if (connectable_vertex_found) {
+#if STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 				reconnection_data.rc_Li = postfix_throughput * atmosphere_L;
 				reconnection_data.reservoir_contribution =
 					rc_throughput * reconnection_data.rc_Li / (rc_pdf * rc_postfix_pdf * prefix_pdf_without_rc_pdf);
@@ -91,6 +94,9 @@ void main() {
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
+#else	// STREAMING_MODE != STREAMING_MODE_INDIVIDUAL
+				postfix_L += postfix_throughput * atmosphere_L;
+#endif	// STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 			}
 			break;
 		}
@@ -130,6 +136,7 @@ void main() {
 				col += partial_contrib * partial_throughput / joint_pdf_times_bsdf_pdf;
 			}
 			if (connectable_vertex_found) {
+#if STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 				// Stream in the emissive contribution
 				reconnection_data.rc_Li = postfix_throughput;
 				reconnection_data.rc_Li *= (was_connectable ? hit_mat.emissive_factor : partial_contrib);
@@ -146,6 +153,9 @@ void main() {
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
+#else	// STREAMING_MODE != STREAMING_MODE_INDIVIDUAL
+				postfix_L += partial_contrib * postfix_throughput;
+#endif	// STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 			}
 		}
 
@@ -187,6 +197,7 @@ void main() {
 					ASSERT(reservoir.data.path_flags != 0);
 				}
 			} else if (connectable_vertex_found) {
+#if STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 				reconnection_data.rc_Li = postfix_throughput * Li;
 				reconnection_data.reservoir_contribution =
 					contribution;  // rc_throughput * reconnection_data.rc_Li / (rc_pdf * rc_postfix_pdf *
@@ -196,6 +207,9 @@ void main() {
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
+#else	// STREAMING_MODE != STREAMING_MODE_INDIVIDUAL
+				postfix_L += Li * postfix_throughput;
+#endif	// STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 			}
 
 			if (depth > 0) {
@@ -224,6 +238,7 @@ void main() {
 		partial_throughput *= f_cos;
 		if (connectable_vertex_found) {
 			postfix_throughput *= f_cos / bsdf_pdf_val;
+			postfix_depth++;
 		}
 
 		if (connectable) {
@@ -259,6 +274,16 @@ void main() {
 		return;
 	}
 	if (pc_ray.enable_gris == 1 && connectable_vertex_found) {
+#if STREAMING_MODE == STREAMING_MODE_SPLIT
+		reconnection_data.rc_Li = postfix_L;
+		reconnection_data.reservoir_contribution =
+			reconnection_data.reservoir_contribution * postfix_L / (rc_pdf * rc_postfix_pdf);
+		reconnection_data.path_flags = set_path_flags(prefix_depth, postfix_depth, RECONNECTION_TYPE_DEFAULT);
+		bool merged = stream_reservoir(seed, reservoir, reconnection_data,
+									   calc_target_pdf(reconnection_data.reservoir_contribution),
+									   1.0 / prefix_pdf_without_rc_pdf);
+		valid_reservoir = valid_reservoir || merged;
+#endif	// STREAMING_MODE == STREAMING_MODE_SPLIT
 		if (valid_reservoir) {
 			reservoir.data.rc_barycentrics = rc_barycentrics;
 			reservoir.data.rc_primitive_instance_id = rc_primitive_instance_id;

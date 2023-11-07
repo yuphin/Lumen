@@ -134,7 +134,7 @@ void ReSTIRPT::render() {
 	const std::array<Buffer*, 2> gbuffers = {&gris_prev_gbuffer, &gris_gbuffer};
 	int ping_pong = pc_ray.total_frame_num % 2;
 
-	const std::vector<ShaderMacro> macros = {};
+	const std::vector<ShaderMacro> macros = {{"STREAMING_MODE", int(streaming_method)}};
 	// Trace rays
 	instance->vkb.rg
 		->add_rt("GRIS - Generate Samples", {.shaders = {{"src/shaders/integrators/restir/gris/gris.rgen"},
@@ -315,15 +315,15 @@ void ReSTIRPT::destroy() {
 
 bool ReSTIRPT::gui() {
 	bool result = Integrator::gui();
-	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
 	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
 	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);
-	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
 	result |= ImGui::Checkbox("Enable GRIS", &enable_gris);
 	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
 	if (!enable_gris) {
 		return result;
 	}
+	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
+	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
 	result |= ImGui::Checkbox("Show reconnection radiance", &show_reconnection_radiance);
 	result |= ImGui::Checkbox("Enable Talbot MIS weights", &talbot_mis);
 	result |= ImGui::Checkbox("Enable temporal reuse", &enable_temporal_reuse);
@@ -332,6 +332,17 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
 	result |= ImGui::SliderFloat("Min reconnection distance ratio", &min_vertex_distance_ratio, 0.0f, 1.0f);
 
+
+	int curr_streaming_method = static_cast<int>(streaming_method);
+	std::array<const char*, 2> streaming_methods = {
+		"Individual contributions",
+		"Split at reconnection",
+	};
+	if(ImGui::Combo("Streaming method", &curr_streaming_method, streaming_methods.data(), int(streaming_methods.size())))
+	{
+		result = true;
+		streaming_method = static_cast<StreamingMethod>(curr_streaming_method);
+	}
 	if (spatial_samples_changed && num_spatial_samples > 0) {
 		reconnection_buffer.destroy();
 		reconnection_buffer.create(

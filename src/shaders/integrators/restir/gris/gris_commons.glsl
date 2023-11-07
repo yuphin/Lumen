@@ -22,6 +22,15 @@ uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 #define RECONNECTION_TYPE_EMISSIVE_AFTER_RC 2
 #define RECONNECTION_TYPE_DEFAULT 3
 
+
+#define STREAMING_MODE_INDIVIDUAL 0
+#define STREAMING_MODE_SPLIT 1
+
+#ifndef STREAMING_MODE
+#define STREAMING_MODE STREAMING_MODE_INDIVIDUAL
+#endif // STREAMING_MODE
+
+
 struct HitData {
 	vec3 pos;
 	vec3 n_g;

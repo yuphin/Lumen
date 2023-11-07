@@ -39,6 +39,6 @@ class ReSTIRPT : public Integrator {
 	float min_vertex_distance_ratio = 0.00f;
 	uint32_t path_length = 0;
 	uint32_t num_spatial_samples = 1;
-	StreamingMethod curr_streaming_method = StreamingMethod::INDIVIDUAL_CONTRIBUTIONS;
+	StreamingMethod streaming_method = StreamingMethod::INDIVIDUAL_CONTRIBUTIONS;
 	ReSTIRPTConfig* config;
 };
