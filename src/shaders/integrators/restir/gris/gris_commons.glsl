@@ -43,6 +43,12 @@ struct HitDataWithoutGeometryNormals {
 	vec2 uv;
 };
 
+ivec2 get_neighbor_offset(inout uvec4 seed) {
+	const float randa = rand(seed) * 2 * PI;
+	const float randr = sqrt(rand(seed)) * pc_ray.spatial_radius;
+	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
+}
+
 vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3 n_s, vec3 wo, out vec3 wi,
 			bool trace_ray) {
 	float wi_len;

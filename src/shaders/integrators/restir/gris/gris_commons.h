@@ -70,8 +70,6 @@ struct ReconnectionData {
 	float target_pdf_in_neighbor;
 };
 
-
-
 struct GrisHitPayload {
 	vec2 attribs;
 	uint instance_idx;

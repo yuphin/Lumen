@@ -134,7 +134,7 @@ void ReSTIRPT::render() {
 	const std::array<Buffer*, 2> gbuffers = {&gris_prev_gbuffer, &gris_gbuffer};
 	int ping_pong = pc_ray.total_frame_num % 2;
 
-	const std::vector<ShaderMacro> macros = {{"MIS", enable_mis_in_gris}};
+	const std::vector<ShaderMacro> macros = {};
 	// Trace rays
 	instance->vkb.rg
 		->add_rt("GRIS - Generate Samples", {.shaders = {{"src/shaders/integrators/restir/gris/gris.rgen"},
@@ -325,7 +325,6 @@ bool ReSTIRPT::gui() {
 		return result;
 	}
 	result |= ImGui::Checkbox("Show reconnection radiance", &show_reconnection_radiance);
-	result |= ImGui::Checkbox("Enable MIS in GRIS", &enable_mis_in_gris);
 	result |= ImGui::Checkbox("Enable Talbot MIS weights", &talbot_mis);
 	result |= ImGui::Checkbox("Enable temporal reuse", &enable_temporal_reuse);
 	bool spatial_samples_changed = ImGui::SliderInt("Num spatial samples", (int*)&num_spatial_samples, 0, 12);

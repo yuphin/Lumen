@@ -17,11 +17,7 @@ layout(binding = 5, std430) writeonly buffer OutReservoirs { Reservoir out_reser
 layout(binding = 6, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num);
 
-ivec2 get_neighbor_offset(inout uvec4 seed) {
-	const float randa = rand(seed) * 2 * PI;
-	const float randr = sqrt(rand(seed)) * pc_ray.spatial_radius;
-	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
-}
+#define MAX_SPATIAL_SAMPLES 12
 
 void main() {
 	GBuffer gbuffer = curr_gbuffers[pixel_idx];
@@ -41,8 +37,8 @@ void main() {
 	vec3 curr_reservoir_contribution = vec3(0);
 
 	uint seed_helper = pc_ray.random_num;
-	ivec2 offsets[12];
-	for (int i = 0; i < 12; i++) {
+	ivec2 offsets[MAX_SPATIAL_SAMPLES];
+	for (int i = 0; i < MAX_SPATIAL_SAMPLES; i++) {
 		ivec2 offset = get_neighbor_offset(seed);
 		offsets[i++] = offset;
 	}
