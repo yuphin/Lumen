@@ -15,7 +15,7 @@ PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix
 layout(binding = 4, std430) readonly buffer InReservoirs { Reservoir in_reservoirs[]; };
 layout(binding = 5, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
 layout(binding = 6, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.random_num);
 
 ivec2 get_neighbor_offset(inout uvec4 seed) {
 	const float randa = rand(seed) * 2 * PI;
@@ -40,7 +40,7 @@ void main() {
 	int num_spatial_samples = pc_ray.enable_spatial_reuse == 1 ? int(pc_ray.num_spatial_samples) : 0;
 	vec3 curr_reservoir_contribution = vec3(0);
 
-	uint seed_helper = pc_ray.total_frame_num ^ pc_ray.random_num;
+	uint seed_helper = pc_ray.random_num;
 	ivec2 offsets[12];
 	for (int i = 0; i < 12; i++) {
 		offsets[i] = get_neighbor_offset(seed);
