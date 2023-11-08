@@ -202,11 +202,11 @@ int bdpt_generate_light_subpath(int max_depth) {
     const vec2 rands_dir =
         vec2(mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step));
     const vec3 Le = sample_light_Le(
-        pc_ray.num_lights, pc_ray.light_triangle_count, cos_theta, light_record,
+        pc.num_lights, pc.light_triangle_count, cos_theta, light_record,
         pos, wi, n, pdf_pos, pdf_dir, rands_pos, rands_dir);
 #else
     const vec3 Le =
-        sample_light_Le(seed, pc_ray.num_lights, pc_ray.light_triangle_count,
+        sample_light_Le(seed, pc.num_lights, pc.light_triangle_count,
                         cos_theta, light_record, pos, wi, n, pdf_pos, pdf_dir);
 #endif
     if (pdf_dir <= 0) {
@@ -249,8 +249,8 @@ int bdpt_generate_camera_subpath(vec2 d, const vec3 origin, int max_depth,
     camera_verts.d[bdpt_path_idx].delta = 0;
     camera_verts.d[bdpt_path_idx].n_s = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
 #if BDPT_MLT == 1
-    ivec2 coords = ivec2(0.5 * (1 + d) * vec2(pc_ray.size_x, pc_ray.size_y));
-    camera_verts.d[bdpt_path_idx].coords = coords.x * pc_ray.size_y + coords.y;
+    ivec2 coords = ivec2(0.5 * (1 + d) * vec2(pc.size_x, pc.size_y));
+    camera_verts.d[bdpt_path_idx].coords = coords.x * pc.size_y + coords.y;
 #endif
     float cos_theta = dot(camera_verts.d[bdpt_path_idx].dir,
                           camera_verts.d[bdpt_path_idx].n_s);
@@ -343,7 +343,7 @@ float calc_mis_weight(int s, int t, const in PathVertex sampled) {
             // s == 0, i.e the path is on a finite light source
             // cam_vtx(t-1).area gives the area of the emitter that was hit
             cam_vtx(t - 1).pdf_rev =
-                1.0 / (pc_ray.light_triangle_count * cam_vtx(t - 1).area);
+                1.0 / (pc.light_triangle_count * cam_vtx(t - 1).area);
         }
     }
     if (t > 1) {
@@ -507,9 +507,9 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
     target /= target.z;
     target = -ubo.projection * target;
     coords =
-        ivec2(0.5 * (1 + target.xy) * vec2(pc_ray.size_x, pc_ray.size_y) - 0.5);
-    if (coords.x < 0 || coords.x >= pc_ray.size_x || coords.y < 0 ||
-        coords.y >= pc_ray.size_y || dot(dir, cam_vtx(0).n_s) < 0) {
+        ivec2(0.5 * (1 + target.xy) * vec2(pc.size_x, pc.size_y) - 0.5);
+    if (coords.x < 0 || coords.x >= pc.size_x || coords.y < 0 ||
+        coords.y >= pc.size_y || dot(dir, cam_vtx(0).n_s) < 0) {
         return vec3(0);
     }
     float mis_weight = 1.0;
@@ -549,11 +549,11 @@ vec3 bdpt_connect(int s, int t) {
             mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step),
             mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step));
         const vec3 Le =
-            sample_light_Li(rands_pos, cam_vtx(t - 1).pos, pc_ray.num_lights,
+            sample_light_Li(rands_pos, cam_vtx(t - 1).pos, pc.num_lights,
                             wi, wi_len, n, pos, pdf_pos_a, cos_y, record);
 #else
         const vec3 Le =
-            sample_light_Li(seed, cam_vtx(t - 1).pos, pc_ray.num_lights, wi,
+            sample_light_Li(seed, cam_vtx(t - 1).pos, pc.num_lights, wi,
                             wi_len, n, pos, pdf_pos_a, cos_y, record);
 #endif
         const float cos_x = abs(dot(wi, cam_vtx(t - 1).n_s));
@@ -575,8 +575,8 @@ vec3 bdpt_connect(int s, int t) {
                 const float pdf_light_w =
                     light_pdf_a_to_w(record.flags, pdf_pos_a, n,
                                      wi_len * wi_len, cos_y) /
-                    pc_ray.light_triangle_count;
-                sampled.pdf_fwd = pdf_pos_a / pc_ray.light_triangle_count;
+                    pc.light_triangle_count;
+                sampled.pdf_fwd = pdf_pos_a / pc.light_triangle_count;
                 sampled.pos = pos;
                 sampled.n_s = n;
                 sampled.delta = uint(is_light_delta(record.flags));

@@ -13,14 +13,14 @@
 
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
-layout(push_constant) uniform _PushConstantRay { PCPath pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCPath pc; };
 
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.frame_num);
 #include "../pt_commons.glsl"
 
 void main() {
@@ -48,11 +48,11 @@ void main() {
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction,
                     tmax, 0);
         const bool found_isect = payload.material_idx != -1;
-        if (depth >= pc_ray.max_depth - 1) {
+        if (depth >= pc.max_depth - 1) {
             break;
         }
         if (!found_isect) {
-            col += throughput * shade_atmosphere(pc_ray.dir_light_idx, pc_ray.sky_col, origin.xyz, direction, tmax);
+            col += throughput * shade_atmosphere(pc.dir_light_idx, pc.sky_col, origin.xyz, direction, tmax);
             break;
         }
 
@@ -74,7 +74,7 @@ void main() {
         float cos_wo = dot(wo, n_s);
         origin.xyz = offset_ray(payload.pos, n_g);
         if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
-            const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+            const float light_pick_pdf = 1. / pc.light_triangle_count;
             col += throughput *
                    uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo,
                                         specular) /
@@ -105,9 +105,9 @@ void main() {
         return;
     }
 
-    if (pc_ray.frame_num > 0) {
+    if (pc.frame_num > 0) {
 
-        float w = 1. / float(pc_ray.frame_num + 1);
+        float w = 1. / float(pc.frame_num + 1);
         vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
         // imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
         imageStore(image, ivec2(gl_LaunchIDEXT.xy),

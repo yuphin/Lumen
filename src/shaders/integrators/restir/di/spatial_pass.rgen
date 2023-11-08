@@ -31,7 +31,7 @@ void main() {
             const ivec2 coords =
                 clamp(ivec2(gl_LaunchIDEXT.xy) + rand_offset, ivec2(0),
                       ivec2(gl_LaunchSizeEXT.xy) - 1);
-            const uint neighbor_idx = coords.x * pc_ray.size_y + coords.y;
+            const uint neighbor_idx = coords.x * pc.size_y + coords.y;
 
             const RestirReservoir r_n = passthrough_reservoirs.d[neighbor_idx];
 

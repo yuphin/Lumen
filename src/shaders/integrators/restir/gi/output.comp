@@ -14,7 +14,7 @@
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0, rgba32f) uniform image2D image;
 layout(binding = 1) buffer SceneDesc_ { SceneDesc scene_desc; };
-layout(push_constant) uniform _PushConstantRay { PCReSTIRGI pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCReSTIRGI pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer RestirSamples { ReservoirSample d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer Reservoirs { Reservoir d[]; };
@@ -24,14 +24,14 @@ ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
 Reservoirs temp_reservoirs = Reservoirs(scene_desc.temporal_reservoir_addr);
 Reservoirs spatial_reservoirs = Reservoirs(scene_desc.spatial_reservoir_addr);
 
-uint offset(const uint pingpong) { return pingpong * pc_ray.size_x * pc_ray.size_y; }
+uint offset(const uint pingpong) { return pingpong * pc.size_x * pc.size_y; }
 
 void main() {
-	ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc_ray.size_y, gl_GlobalInvocationID.x % pc_ray.size_y);
-	if (gl_GlobalInvocationID.x >= pc_ray.size_x * pc_ray.size_y) {
+	ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.size_y, gl_GlobalInvocationID.x % pc.size_y);
+	if (gl_GlobalInvocationID.x >= pc.size_x * pc.size_y) {
 		return;
 	}
-	const uint pingpong = (pc_ray.total_frame_num % 2);
+	const uint pingpong = (pc.total_frame_num % 2);
 	vec3 col = vec3(0);
 	col += tmp_col.d[gl_GlobalInvocationID.x];
 	uint idx = gl_GlobalInvocationID.x;
@@ -42,10 +42,10 @@ void main() {
 		const vec3 wi = normalize(s.x_s - s.x_v);
 		col += s.f * abs(dot(wi, s.n_v)) * s.L_o * r.W;
 	}
-	if (pc_ray.enable_accumulation == 0 || pc_ray.frame_num == 0) {
+	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
 		imageStore(image, ivec2(coords), vec4(col, 1.f));
 	} else {
-		float w = 1. / float(pc_ray.frame_num + 1);
+		float w = 1. / float(pc.frame_num + 1);
 		vec3 old_col = imageLoad(image, ivec2(coords)).xyz;
 		imageStore(image, ivec2(coords), vec4(mix(old_col, col, w), 1.f));
 	}

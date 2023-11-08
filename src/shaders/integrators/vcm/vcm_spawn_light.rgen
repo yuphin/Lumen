@@ -13,7 +13,7 @@
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 
-layout(push_constant) uniform _PushConstantRay { PCVCM pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCVCM pc; };
 // VCM buffers
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMReservoir_ { VCMReservoir d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ShouldResample { uint d; };
@@ -33,10 +33,10 @@ const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
-                      pc_ray.total_frame_num ^ pc_ray.random_num);
+                      pc.total_frame_num ^ pc.random_num);
 uint vcm_light_path_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
-    (pc_ray.max_depth);
+    (pc.max_depth);
 
 const uint FRAME_INTERVAL = 10;
 
@@ -56,11 +56,11 @@ ivec3 get_grid_idx(vec3 p, vec3 min_bnds, vec3 max_bnds, ivec3 grid_res) {
 
 uint get_restir_hash_idx(uint light_idx, float u, float v) {
     const int base_res =
-        int(sqrt(float(screen_size) / pc_ray.light_triangle_count));
-    ivec3 grid_res = ivec3(pc_ray.light_triangle_count, base_res, base_res);
+        int(sqrt(float(screen_size) / pc.light_triangle_count));
+    ivec3 grid_res = ivec3(pc.light_triangle_count, base_res, base_res);
     ivec3 grid_idx =
         get_grid_idx(vec3(light_idx, u, v), vec3(0, 0, 0),
-                     vec3(pc_ray.light_triangle_count, 1, 1), grid_res);
+                     vec3(pc.light_triangle_count, 1, 1), grid_res);
     return restir_hash(grid_idx, screen_size);
 }
 
@@ -71,7 +71,7 @@ bool vcm_generate_light_sample(out LightState light_state) {
     float cos_theta;
     float u, v;
     const vec3 Le = sample_light_Le(
-        seed, pc_ray.num_lights, pc_ray.light_triangle_count, cos_theta, light_record,
+        seed, pc.num_lights, pc.light_triangle_count, cos_theta, light_record,
         pos, wi, pdf_pos, pdf_dir, phi, u, v);
     if (pdf_dir <= 0) {
         return false;
@@ -88,7 +88,7 @@ void main() {
     LightState light_state;
     bool generate_samples = true;
     if (vcm_generate_light_sample(light_state)) {
-        if (should_resample.d == 0 && pc_ray.do_spatiotemporal == 1) {
+        if (should_resample.d == 0 && pc.do_spatiotemporal == 1) {
             temporal_reservoirs.d[light_state.hash_idx].selected_idx =
                 pixel_idx;
         }

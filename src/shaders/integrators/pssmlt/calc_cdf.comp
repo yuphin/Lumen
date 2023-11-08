@@ -11,7 +11,7 @@
 #include "../../utils.glsl"
 // TODO
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
-layout(push_constant) uniform _PushConstantRay { PCMLT pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BootstrapData { BootstrapSample d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDFSum { float d; };
@@ -21,8 +21,8 @@ CDF cdf_data = CDF(scene_desc.cdf_addr);
 void main() {
     uint idx = gl_GlobalInvocationID.x;
     if (idx == 0) {
-        cdf_sum.d = cdf_data.d[pc_ray.num_bootstrap_samples - 1];
+        cdf_sum.d = cdf_data.d[pc.num_bootstrap_samples - 1];
     }
-    const float inv_sum = 1. / cdf_data.d[pc_ray.num_bootstrap_samples - 1];
+    const float inv_sum = 1. / cdf_data.d[pc.num_bootstrap_samples - 1];
     cdf_data.d[idx] *= inv_sum;
 }

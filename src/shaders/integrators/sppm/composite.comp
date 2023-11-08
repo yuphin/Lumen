@@ -13,11 +13,11 @@ layout(binding = 0, rgba32f) uniform image2D image;
 layout(binding = 1) buffer SceneDesc_ { SceneDesc scene_desc; };
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
-layout(push_constant) uniform _PushConstantRay { PCSPPM pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCSPPM pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SPPMData_ { SPPMData d[]; };
-uint size = pc_ray.size_x * pc_ray.size_y;
+uint size = pc.size_x * pc.size_y;
 SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
-uint screen_size = pc_ray.size_x * pc_ray.size_y;
+uint screen_size = pc.size_x * pc.size_y;
 vec3 normalize_grid(vec3 p, vec3 min_bnds, vec3 max_bnds) {
     return (p - min_bnds) / (max_bnds - min_bnds);
 }
@@ -33,8 +33,8 @@ void main() {
     if (idx >= size) {
         return;
     }
-    ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc_ray.size_y,
-                         gl_GlobalInvocationID.x % pc_ray.size_y);
+    ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.size_y,
+                         gl_GlobalInvocationID.x % pc.size_y);
 #define pixel(idx) sppm_data.d[idx]
     vec3 col = pixel(idx).col;
     if (pixel(idx).M > 0 ) {
@@ -52,8 +52,8 @@ void main() {
     }
     pixel(idx).col = vec3(0);
     pixel(idx).tau = vec3(0);
-    if (pc_ray.frame_num > 0) {
-        float w = 1. / float(pc_ray.frame_num + 1);
+    if (pc.frame_num > 0) {
+        float w = 1. / float(pc.frame_num + 1);
         vec3 old_col = imageLoad(image, coords).xyz;
         imageStore(image, coords, vec4(mix(old_col, col, w), 1.f));
     } else {

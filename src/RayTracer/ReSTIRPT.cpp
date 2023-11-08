@@ -153,26 +153,26 @@ void ReSTIRPT::render() {
 		.bind(*gbuffers[1 - ping_pong])
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
-	 if (enable_gris) {
-	 	instance->vkb.rg
-	 		->add_rt("GRIS - Spatial Reuse - Talbot",
-	 				 {.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen"},
-	 							  {"src/shaders/integrators/restir/gris/ray.rmiss"},
-	 							  {"src/shaders/ray_shadow.rmiss"},
-	 							  {"src/shaders/integrators/restir/gris/ray.rchit"},
-	 							  {"src/shaders/ray.rahit"}},
-	 				  .macros = macros,
-	 				  .dims = {instance->width, instance->height},
-	 				  .accel = instance->vkb.tlas.accel})
-	 		.push_constants(&pc_ray)
-	 		.bind(rt_bindings)
-	 		.bind(mesh_lights_buffer)
-	 		.bind(*reservoir_buffers[1 - ping_pong])
-	 		.bind(*reservoir_buffers[ping_pong])
-	 		.bind(*gbuffers[1 - ping_pong])
-	 		.bind_texture_array(scene_textures)
-	 		.bind_tlas(instance->vkb.tlas);
-	 }
+	if (enable_gris) {
+		instance->vkb.rg
+			->add_rt("GRIS - Spatial Reuse - Talbot",
+					 {.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen"},
+								  {"src/shaders/integrators/restir/gris/ray.rmiss"},
+								  {"src/shaders/ray_shadow.rmiss"},
+								  {"src/shaders/integrators/restir/gris/ray.rchit"},
+								  {"src/shaders/ray.rahit"}},
+					  .macros = macros,
+					  .dims = {instance->width, instance->height},
+					  .accel = instance->vkb.tlas.accel})
+			.push_constants(&pc_ray)
+			.bind(rt_bindings)
+			.bind(mesh_lights_buffer)
+			.bind(*reservoir_buffers[1 - ping_pong])
+			.bind(*reservoir_buffers[ping_pong])
+			.bind(*gbuffers[1 - ping_pong])
+			.bind_texture_array(scene_textures)
+			.bind_tlas(instance->vkb.tlas);
+	}
 
 #if 0
 	instance->vkb.rg->run_and_submit(cmd);
@@ -307,7 +307,8 @@ void ReSTIRPT::destroy() {
 	Integrator::destroy();
 	std::vector<Buffer*> buffer_list = {
 		&gris_gbuffer,			 &gris_reservoir_ping_buffer, &gris_reservoir_pong_buffer, &direct_lighting_buffer,
-		&transformations_buffer, &compact_vertices_buffer,	  &prefix_contribution_buffer, &reconnection_buffer};
+		&transformations_buffer, &compact_vertices_buffer,	  &prefix_contribution_buffer, &reconnection_buffer,
+		&gris_prev_gbuffer};
 	for (auto b : buffer_list) {
 		b->destroy();
 	}
@@ -322,8 +323,8 @@ bool ReSTIRPT::gui() {
 	if (!enable_gris) {
 		return result;
 	}
-	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
 	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
+	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
 	result |= ImGui::Checkbox("Show reconnection radiance", &show_reconnection_radiance);
 	result |= ImGui::Checkbox("Enable Talbot MIS weights", &talbot_mis);
 	result |= ImGui::Checkbox("Enable temporal reuse", &enable_temporal_reuse);
@@ -332,14 +333,13 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
 	result |= ImGui::SliderFloat("Min reconnection distance ratio", &min_vertex_distance_ratio, 0.0f, 1.0f);
 
-
 	int curr_streaming_method = static_cast<int>(streaming_method);
 	std::array<const char*, 2> streaming_methods = {
 		"Individual contributions",
 		"Split at reconnection",
 	};
-	if(ImGui::Combo("Streaming method", &curr_streaming_method, streaming_methods.data(), int(streaming_methods.size())))
-	{
+	if (ImGui::Combo("Streaming method", &curr_streaming_method, streaming_methods.data(),
+					 int(streaming_methods.size()))) {
 		result = true;
 		streaming_method = static_cast<StreamingMethod>(curr_streaming_method);
 	}

@@ -14,19 +14,19 @@
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 1) uniform sampler2D scene_textures[];
-layout(push_constant) uniform _PushConstantRay { PCSPPM pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCSPPM pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SPPMData_ { SPPMData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer AtomicData_ { AtomicData d; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonData_ { PhotonHash d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
 
-uint size = pc_ray.size_x * pc_ray.size_y;
+uint size = pc.size_x * pc.size_y;
 SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
 AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
 PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
 Materials materials = Materials(scene_desc.material_addr);
 
-uint screen_size = pc_ray.size_x * pc_ray.size_y;
+uint screen_size = pc.size_x * pc.size_y;
 
 #include "../../bsdf_commons.glsl"
 
@@ -67,7 +67,7 @@ void main() {
                     if (dist_sqr > r_sqr) {
                         continue;
                     }
-                    if (pc_ray.max_depth < (photons.d[h].path_len +
+                    if (pc.max_depth < (photons.d[h].path_len +
                                             sppm_data.d[idx].path_len + 1)) {
                         continue;
                     }

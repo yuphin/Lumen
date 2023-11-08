@@ -1,10 +1,10 @@
-layout(push_constant) uniform _PushConstantRay { PCReSTIRGI pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCReSTIRGI pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer RestirSamples { ReservoirSample d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer Reservoirs { Reservoir d[]; };
 
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uvec4 seed =
-    init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num);
+    init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.total_frame_num);
 
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
@@ -40,7 +40,7 @@ float p_hat(const vec3 f) { return length(f); }
 
 
 uint offset(const uint pingpong) {
-    return pingpong * pc_ray.size_x * pc_ray.size_y;
+    return pingpong * pc.size_x * pc.size_y;
 }
 
 

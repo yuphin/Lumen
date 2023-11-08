@@ -14,10 +14,10 @@
 layout(constant_id = 0) const int MODE = 0;
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
-layout(push_constant) uniform _PushConstantRay { PCMLT pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTSumData { SumData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ResidualData { SumData d[]; };
-uint size = pc_ray.num_mlt_threads;
+uint size = pc.num_mlt_threads;
 shared vec2 dataf[32];
 shared uint datau[32];
 MLTSumData sum_data = MLTSumData(scene_desc.mlt_atomicsum_addr);

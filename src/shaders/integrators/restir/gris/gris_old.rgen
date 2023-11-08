@@ -15,7 +15,7 @@ PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix
 
 layout(binding = 4, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
 layout(binding = 5, std430) writeonly buffer OutGBuffer { GBuffer out_gbuffers[]; };
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.random_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.random_num);
 
 void main() {
 	const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
@@ -60,14 +60,14 @@ void main() {
 	for (int depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.instance_idx != -1;
-		if (depth >= pc_ray.max_depth - 1) {
+		if (depth >= pc.max_depth - 1) {
 			break;
 		}
 		if (!found_isect) {
-			vec3 atmosphere_L = shade_atmosphere(pc_ray.dir_light_idx, pc_ray.sky_col, origin.xyz, direction, tmax);
+			vec3 atmosphere_L = shade_atmosphere(pc.dir_light_idx, pc.sky_col, origin.xyz, direction, tmax);
 			if (depth > 0) {
 				col += throughput * atmosphere_L;
-			} else if (pc_ray.direct_lighting == 1) {
+			} else if (pc.direct_lighting == 1) {
 				direct_lighting += throughput * atmosphere_L;
 			}
 			if (connectable_vertex_found) {
@@ -83,7 +83,7 @@ void main() {
 		if (depth == 0) {
 			gbuffer_out.barycentrics = payload.attribs;
 			gbuffer_out.primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
-			if (pc_ray.direct_lighting == 1) {
+			if (pc.direct_lighting == 1) {
 				direct_lighting += throughput * hit_mat.emissive_factor;
 			}
 
@@ -142,11 +142,11 @@ void main() {
 		bool nee_visible = false;
 		vec3 rc_Li = vec3(0);
 		if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
-			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+			const float light_pick_pdf = 1. / pc.light_triangle_count;
 			rc_Li = uniform_sample_light(seed, hit_mat, gbuffer.pos, side, n_s, wo, nee_visible) / light_pick_pdf;
 			if (depth > 0) {
 				col += throughput * rc_Li;
-			} else if (pc_ray.direct_lighting == 1) {
+			} else if (pc.direct_lighting == 1) {
 				direct_lighting += throughput * rc_Li;
 			}
 			if (connectable_vertex_found) {
@@ -176,7 +176,7 @@ void main() {
 		if (connectable) {
 			data.rc_wi = direction;
 			data.rc_Li = rc_Li;
-			data.path_flags = set_path_flags(side, nee_visible, depth);
+			data.path_flags = pack_path_flags(side, nee_visible, depth);
 			connectable_vertex_found = true;
 			// data.reservoir_contribution = vec3(1);
 			data.reservoir_contribution = f_cos / pdf;
@@ -184,7 +184,7 @@ void main() {
 
 		specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
 
-		if (pc_ray.enable_rr == 1) {
+		if (pc.enable_rr == 1) {
 			float rr_scale = 1.0;
 			if (hit_mat.bsdf_type == BSDF_GLASS) {
 				rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
@@ -198,7 +198,7 @@ void main() {
 			}
 		}
 	}
-	if (pc_ray.direct_lighting == 1) {
+	if (pc.direct_lighting == 1) {
 		direct_lighting_buffer.d[pixel_idx] = direct_lighting;
 	}
 	if (isnan(luminance(col))) {

@@ -2,7 +2,7 @@
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
-layout(push_constant) uniform _PushConstantRay { PCReSTIR pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCReSTIR pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GBuffer { RestirGBufferData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer RestirReservoir_ {
     RestirReservoir d[];
@@ -29,7 +29,7 @@ vec3 origin;
 
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
-                      pc_ray.frame_num ^ pc_ray.random_num);
+                      pc.frame_num ^ pc.random_num);
 
 void load_g_buffer() {
     pos = gbuffer.d[pixel_idx].pos;
@@ -65,7 +65,7 @@ vec3 calc_L(const RestirReservoir r) {
     const vec4 rands_pos =
         vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
     vec3 Le =
-        sample_light_with_idx(rands_pos, pos, pc_ray.num_lights, light_idx,
+        sample_light_with_idx(rands_pos, pos, pc.num_lights, light_idx,
                               light_triangle_idx, light_pos, light_n);
     vec3 wi = light_pos - pos;
     const float wi_len = length(wi);
@@ -87,7 +87,7 @@ vec3 calc_L_with_visibility_check(const RestirReservoir r) {
     const vec4 rands_pos =
         vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
     vec3 Le = sample_light_with_idx(
-        rands_pos, pos, pc_ray.num_lights, light_idx, light_triangle_idx,
+        rands_pos, pos, pc.num_lights, light_idx, light_triangle_idx,
         light_pos, light_n);
     vec3 wi = light_pos - pos;
     const float wi_len = length(wi);

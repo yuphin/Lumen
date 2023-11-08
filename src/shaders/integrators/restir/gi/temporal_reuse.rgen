@@ -22,7 +22,7 @@ Reservoirs spatial_reservoirs = Reservoirs(scene_desc.spatial_reservoir_addr);
 
 #define tr temp_reservoirs.d[offset(pingpong ^ 1) + pixel_idx]
 void main() {
-    const uint pingpong = (pc_ray.total_frame_num % 2);
+    const uint pingpong = (pc.total_frame_num % 2);
     const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
     const ReservoirSample s = samples.d[pixel_idx];
     Reservoir r;
@@ -35,7 +35,7 @@ void main() {
         spatial_reservoirs.d[offset(pingpong ^ 1) + pixel_idx] = r;
         return;
     }
-    if (pc_ray.do_spatiotemporal == 0) {
+    if (pc.do_spatiotemporal == 0) {
         init_reservoir(r);
     } else {
         vec4 prev_pos = ubo.prev_view * vec4(s.x_v, 1);
@@ -47,7 +47,7 @@ void main() {
         uint prev_coords_idx;
         if (prev_coords.x >= 0 && prev_coords.x < gl_LaunchSizeEXT.x &&
             prev_coords.y >= 0 && prev_coords.y < gl_LaunchSizeEXT.y) {
-            prev_coords_idx = prev_coords.x * pc_ray.size_y + prev_coords.y;
+            prev_coords_idx = prev_coords.x * pc.size_y + prev_coords.y;
             if (similar(samples.d[prev_coords_idx], old_samples.d[pixel_idx])) {
                 reprojection_failed = false;
             }

@@ -2,7 +2,7 @@
 #include "../../../commons.glsl"
 layout(location = 0) rayPayloadEXT GrisHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
-layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisReservoir { Reservoir d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisDirectLighting { vec3 d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PrefixContributions { vec3 d[]; };
@@ -202,7 +202,7 @@ vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const 
 	LightRecord record;
 	float cos_from_light;
 	const vec3 Le =
-		sample_light_Li(seed, pos, pc_ray.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
+		sample_light_Li(seed, pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
 	const vec3 p = offset_ray2(pos, n_s);
 	any_hit_payload.hit = 1;
 	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0, wi,
@@ -222,7 +222,7 @@ vec3 uniform_sample_light_with_visibility_override(inout uvec4 seed, const Mater
 	LightRecord record;
 	float cos_from_light;
 	const vec3 Le =
-		sample_light_Li(seed, pos, pc_ray.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
+		sample_light_Li(seed, pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
 	vec3 p;
 #ifdef MIS
 	p = offset_ray2(pos, n_s);
@@ -291,13 +291,13 @@ bool is_rough(in Material mat) {
 
 bool is_diffuse(in Material mat) { return (mat.bsdf_type & BSDF_DIFFUSE) != 0; }
 
-uint offset(const uint pingpong) { return pingpong * pc_ray.size_x * pc_ray.size_y; }
+uint offset(const uint pingpong) { return pingpong * pc.size_x * pc.size_y; }
 
-// uint set_path_flags(bool side, bool nee_visible, uint prefix_length) {
+// uint pack_path_flags(bool side, bool nee_visible, uint prefix_length) {
 // 	return (prefix_length & 0x1F) << 2 | uint(nee_visible) << 1 | uint(side);
 // }
 
-uint set_path_flags(uint prefix_length, uint postfix_length, bool is_nee) {
+uint pack_path_flags(uint prefix_length, uint postfix_length, bool is_nee) {
 	return (postfix_length & 0x1F) << 6 |  (prefix_length & 0x1F) << 1 | uint(is_nee);
 }
 
@@ -345,7 +345,7 @@ bool retrace_paths(in HitData gbuffer, in GrisData data, uvec2 source_coords, uv
 		rc_gbuffer.n_s *= -1;
 	}
 	while (true) {
-		if ((prefix_depth + reservoir_postfix_length) >= pc_ray.max_depth - 1) {
+		if ((prefix_depth + reservoir_postfix_length) >= pc.max_depth - 1) {
 			return false;
 		}
 
@@ -362,7 +362,7 @@ bool retrace_paths(in HitData gbuffer, in GrisData data, uvec2 source_coords, uv
 		float wi_len = length(wi);
 		wi /= wi_len;
 
-		bool connectable = is_rough(hit_mat) && wi_len > pc_ray.min_vertex_distance_ratio * pc_ray.scene_extent;
+		bool connectable = is_rough(hit_mat) && wi_len > pc.min_vertex_distance_ratio * pc.scene_extent;
 		connectable = connectable && prefix_depth >= (reservoir_prefix_length - 1) && same_hemisphere(wo, wi, n_s) &&
 					  same_hemisphere(-wi, data.rc_wi, rc_gbuffer.n_s);
 		bool connected = false;
@@ -396,7 +396,7 @@ bool retrace_paths(in HitData gbuffer, in GrisData data, uvec2 source_coords, uv
 			if (/*is_diffuse(rc_mat)*/ true) {	// TODO: This causes some bias for some reason.
 				reservoir_contribution = data.rc_Li;
 			} else {
-				const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+				const float light_pick_pdf = 1. / pc.light_triangle_count;
 				uvec4 reconnection_seed = init_rng(target_coords, gl_LaunchSizeEXT.xy, seed_helper, data.rc_seed);
 				reservoir_contribution =
 					uniform_sample_light_with_visibility_override(reconnection_seed, rc_mat, rc_gbuffer.pos, rc_side,
@@ -471,7 +471,7 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 	HitData rc_src_gbuffer =
 		get_hitdata(data.rc_barycentrics, data.rc_primitive_instance_id.y, data.rc_primitive_instance_id.x);
 	
-	// if ((prefix_depth + reservoir_postfix_length) >= pc_ray.max_depth - 1) {
+	// if ((prefix_depth + reservoir_postfix_length) >= pc.max_depth - 1) {
 	// 	return false;
 	// }
 
@@ -534,7 +534,7 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 		if (/*is_diffuse(rc_mat)*/ true) {	// TODO: This causes some bias for some reason.
 			reservoir_contribution = data.rc_Li;
 		} else {
-			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+			const float light_pick_pdf = 1. / pc.light_triangle_count;
 			uvec4 reconnection_seed = init_rng(dst_coords, gl_LaunchSizeEXT.xy, seed_helper, data.rc_seed);
 			reservoir_contribution =
 				uniform_sample_light_with_visibility_override(reconnection_seed, rc_mat, rc_src_gbuffer.pos,

@@ -13,7 +13,7 @@
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 
-layout(push_constant) uniform _PushConstantRay { PCDDGI pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCDDGI pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GBuffer { GBufferData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer DirLight { vec3 d[]; };
 const uint flags = gl_RayFlagsOpaqueEXT;
@@ -21,7 +21,7 @@ const float tmin = 0.001;
 const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.frame_num);
 #include "../pt_commons.glsl"
 
 GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
@@ -39,7 +39,7 @@ void main() {
 	const bool found_isect = payload.material_idx != -1;
 	vec3 col = vec3(0);
 	if (!found_isect) {
-		col += throughput * pc_ray.sky_col;
+		col += throughput * pc.sky_col;
 	} else {
 		const Material hit_mat = load_material(payload.material_idx, payload.uv);
 		const vec3 wo = -direction;
@@ -61,7 +61,7 @@ void main() {
 		gbuffer.d[pixel_idx].albedo = hit_mat.albedo;
 		// Shade
 		if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
-			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+			const float light_pick_pdf = 1. / pc.light_triangle_count;
 			col += throughput * uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo) / light_pick_pdf;
 		}
 	}

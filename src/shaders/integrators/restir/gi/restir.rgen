@@ -12,14 +12,14 @@
 #include "../../../commons.glsl"
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
-layout(push_constant) uniform _PushConstantRay { PCReSTIRGI pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCReSTIRGI pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer RestirSamples { ReservoirSample d[]; };
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.random_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.random_num);
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
 RestirSamples samples = RestirSamples(scene_desc.restir_samples_addr);
 ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
@@ -51,11 +51,11 @@ void main() {
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction,
                     tmax, 0);
         const bool found_isect = payload.material_idx != -1;
-        if (depth >= pc_ray.max_depth - 1) {
+        if (depth >= pc.max_depth - 1) {
             break;
         }
         if (!found_isect) {
-            const vec3 val = throughput * pc_ray.sky_col;
+            const vec3 val = throughput * pc.sky_col;
             if(depth <= 1) {
                 col += t0 * val;
             } else {
@@ -91,7 +91,7 @@ void main() {
             n_s = shading_nrm;
         }
         if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
-            const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+            const float light_pick_pdf = 1. / pc.light_triangle_count;
             const vec3 val = throughput *
                              uniform_sample_light(seed, hit_mat, payload.pos, side,
                                                   shading_nrm, wo, specular) /
@@ -139,8 +139,8 @@ void main() {
                 throughput /= rr_prob;
         }
     }
-    ivec2 coords = ivec2(0.5 * (1 + d) * vec2(pc_ray.size_x, pc_ray.size_y));
-    uint coords_idx = coords.x * pc_ray.size_y + coords.y;
+    ivec2 coords = ivec2(0.5 * (1 + d) * vec2(pc.size_x, pc.size_y));
+    uint coords_idx = coords.x * pc.size_y + coords.y;
     // Fill in the samples buffer
     samples.d[pixel_idx].x_v = x_v;
     samples.d[pixel_idx].n_v = n_v;

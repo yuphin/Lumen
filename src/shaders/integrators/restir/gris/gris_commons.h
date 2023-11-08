@@ -44,7 +44,7 @@ struct GrisData {
 	uint init_seed;
 	vec3 rc_Li;
 	// Layout for the path flags
-	// | 5b postfix_length| 5b prefix_length |2b is_nee/is_emissive_after_rc/default
+	// 1b side | 5b postfix_length| 5b prefix_length |2b is_nee/is_emissive_after_rc/default
 	uint path_flags;
 	vec3 reservoir_contribution;
 	uint rc_coords;

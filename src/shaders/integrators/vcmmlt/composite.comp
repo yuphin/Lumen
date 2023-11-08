@@ -17,34 +17,34 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTColor { v
 layout(binding = 0, rgba32f) uniform image2D image;
 layout(binding = 1) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ChainStats { ChainData d[]; };
-layout(push_constant) uniform _PushConstantRay { PCMLT pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDFSum { float d; };
 ChainStats chain_stats = ChainStats(scene_desc.chain_stats_addr);
 ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
 MLTColor mlt_col = MLTColor(scene_desc.mlt_col_addr);
 CDFSum cdf_sum = CDFSum(scene_desc.cdf_sum_addr);
 void main() {
-    ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc_ray.size_y,
-                         gl_GlobalInvocationID.x % pc_ray.size_y);
+    ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.size_y,
+                         gl_GlobalInvocationID.x % pc.size_y);
     vec3 col = vec3(0);
-    float mut_factor = pc_ray.size_x * pc_ray.size_y / pc_ray.num_mlt_threads;
+    float mut_factor = pc.size_x * pc.size_y / pc.num_mlt_threads;
     float mult_factor =  1. / (2 * mut_factor * 2);
     for (int i = 0; i < 2; i++) {
         float factor =
             chain_stats.d[i].normalization /
-            (pc_ray.mutations_per_pixel);
+            (pc.mutations_per_pixel);
         col +=  mlt_col.d[gl_GlobalInvocationID.x] * factor;
         // col += mlt_col.d[gl_GlobalInvocationID.x] * cdf_sum.d /
-        //        (pc_ray.mutations_per_pixel);
+        //        (pc.mutations_per_pixel);
         // col += 0.5 * mlt_col.d[gl_GlobalInvocationID.x] *
-        //        chain_stats.d[i].normalization * pc_ray.size_x * pc_ray.size_y /
+        //        chain_stats.d[i].normalization * pc.size_x * pc.size_y /
         //        (chain_stats.d[i].total_samples);
     }
     col += tmp_col.d[gl_GlobalInvocationID.x];
     mlt_col.d[gl_GlobalInvocationID.x] = vec3(0);
     tmp_col.d[gl_GlobalInvocationID.x] = vec3(0);
-    if (pc_ray.frame_num > 0) {
-        float w = 1. / float(pc_ray.frame_num + 1);
+    if (pc.frame_num > 0) {
+        float w = 1. / float(pc.frame_num + 1);
 
         vec3 old_col = imageLoad(image, ivec2(coords)).xyz;
         imageStore(image, ivec2(coords), vec4(mix(old_col, col, w), 1.f));

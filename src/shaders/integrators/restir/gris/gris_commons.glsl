@@ -2,7 +2,7 @@
 #include "../../../commons.glsl"
 layout(location = 0) rayPayloadEXT GrisHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
-layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisReservoir { Reservoir d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisDirectLighting { vec3 d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PrefixContributions { vec3 d[]; };
@@ -22,14 +22,12 @@ uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 #define RECONNECTION_TYPE_EMISSIVE_AFTER_RC 2
 #define RECONNECTION_TYPE_DEFAULT 3
 
-
 #define STREAMING_MODE_INDIVIDUAL 0
 #define STREAMING_MODE_SPLIT 1
 
 #ifndef STREAMING_MODE
 #define STREAMING_MODE STREAMING_MODE_INDIVIDUAL
-#endif // STREAMING_MODE
-
+#endif	// STREAMING_MODE
 
 struct HitData {
 	vec3 pos;
@@ -54,7 +52,7 @@ struct HitDataWithoutGeometryNormals {
 
 ivec2 get_neighbor_offset(inout uvec4 seed) {
 	const float randa = rand(seed) * 2 * PI;
-	const float randr = sqrt(rand(seed)) * pc_ray.spatial_radius;
+	const float randr = sqrt(rand(seed)) * pc.spatial_radius;
 	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
 }
 
@@ -65,8 +63,8 @@ vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3
 	float pdf_light_w;
 	LightRecord record;
 	float cos_from_light;
-	const vec3 Le = sample_light_Li(seed, gbuffer.pos, pc_ray.num_lights, pdf_light_w, wi, wi_len, pdf_light_a,
-									cos_from_light, record);
+	const vec3 Le =
+		sample_light_Li(seed, gbuffer.pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
 	const vec3 p = offset_ray2(gbuffer.pos, n_s);
 	float light_bsdf_pdf;
 	float cos_x = dot(n_s, wi);
@@ -80,7 +78,7 @@ vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3
 					wi, wi_len - EPS, 1);
 		visible = any_hit_payload.hit == 0;
 	}
-	const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+	const float light_pick_pdf = 1. / pc.light_triangle_count;
 	if (visible && pdf_light_w > 0) {
 		const float mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + light_bsdf_pdf / pdf_light_w);
 		return mis_weight * f_light * abs(cos_x) * Le / (light_pick_pdf * pdf_light_w);
@@ -248,16 +246,17 @@ bool is_rough(in Material mat) {
 
 bool is_diffuse(in Material mat) { return (mat.bsdf_type & BSDF_DIFFUSE) != 0; }
 
-uint offset(const uint pingpong) { return pingpong * pc_ray.size_x * pc_ray.size_y; }
+uint offset(const uint pingpong) { return pingpong * pc.size_x * pc.size_y; }
 
-uint set_path_flags(uint prefix_length, uint postfix_length, uint reconnection_type) {
-	return (postfix_length & 0x1F) << 7 | (prefix_length & 0x1F) << 2 | uint(reconnection_type & 0x3);
+uint pack_path_flags(uint prefix_length, uint postfix_length, uint reconnection_type, bool side) {
+	return uint(side) << 12 | (postfix_length & 0x1F) << 7 | (prefix_length & 0x1F) << 2 | uint(reconnection_type & 0x3);
 }
 
-void unpack_path_flags(uint packed_data, out uint reconnection_type, out uint prefix_length, out uint postfix_length) {
+void unpack_path_flags(uint packed_data, out uint reconnection_type, out uint prefix_length, out uint postfix_length, out bool side) {
 	reconnection_type = (packed_data & 0x3);
 	prefix_length = (packed_data >> 2) & 0x1F;
 	postfix_length = (packed_data >> 7) & 0x1F;
+	side = ((packed_data >> 12) & 1) == 1;
 }
 
 vec3 get_primary_direction(uvec2 coords) {
@@ -266,6 +265,11 @@ vec3 get_primary_direction(uvec2 coords) {
 	return normalize(sample_camera(d).xyz);
 }
 
+bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords, uvec2 src_coords,
+				   uint seed_helper, out float jacobian_out, out vec3 reservoir_contribution) {
+    // TODO
+	return false;
+}
 bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords,
 					 uvec2 src_coords, uint seed_helper, out float jacobian_out, out vec3 reservoir_contribution) {
 	reservoir_contribution = vec3(0);
@@ -280,8 +284,9 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 	uint rc_type;
 	uint rc_prefix_length;
 	uint rc_postfix_length;
+	bool rc_side;
 
-	unpack_path_flags(data.path_flags, rc_type, rc_prefix_length, rc_postfix_length);
+	unpack_path_flags(data.path_flags, rc_type, rc_prefix_length, rc_postfix_length, rc_side);
 
 	Material dst_hit_mat = load_material(dst_gbuffer.material_idx, dst_gbuffer.uv);
 
@@ -292,7 +297,7 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 	bool src_side = face_forward(src_gbuffer.n_s, src_gbuffer.n_g, src_wo);
 
 	// The offset is needed for proper Jacobian determinant values
-	// This is because the initial reservoir samples are generated with ray offsets 
+	// This is because the initial reservoir samples are generated with ray offsets
 	dst_gbuffer.pos = offset_ray(dst_gbuffer.pos, dst_gbuffer.n_g);
 	src_gbuffer.pos = offset_ray(src_gbuffer.pos, src_gbuffer.n_g);
 	vec3 dst_wi = rc_gbuffer.pos - dst_gbuffer.pos;

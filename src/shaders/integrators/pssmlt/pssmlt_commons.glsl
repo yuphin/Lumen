@@ -1,7 +1,7 @@
 #ifndef PSSMLT_UTILS
 #define PSSMLT_UTILS
 #include "../../commons.glsl"
-layout(push_constant) uniform _PushConstantRay { PCMLT pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
 layout(constant_id = 0) const int SEEDING = 0;
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
@@ -37,25 +37,25 @@ const float tmin = 0.001;
 const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
-                      pc_ray.frame_num ^ pc_ray.random_num);
+                      pc.frame_num ^ pc.random_num);
 uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uint splat_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
-                 ((pc_ray.max_depth * (pc_ray.max_depth + 1)));
+                 ((pc.max_depth * (pc.max_depth + 1)));
 uint bdpt_path_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
-    (pc_ray.max_depth + 1);
+    (pc.max_depth + 1);
 
 uint mlt_sampler_idx = pixel_idx;
 uint light_primary_sample_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
-    pc_ray.light_rand_count;
+    pc.light_rand_count;
 uint cam_primary_sample_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
-    pc_ray.cam_rand_count;
+    pc.cam_rand_count;
 uint connection_primary_sample_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
-    pc_ray.connection_rand_count;
+    pc.connection_rand_count;
 uint prim_sample_idxs[3] =
     uint[](light_primary_sample_idx, cam_primary_sample_idx,
            connection_primary_sample_idx);
@@ -76,13 +76,13 @@ float mlt_L(const vec4 origin, const float cam_area) {
     if (save_radiance) {
         mlt_start_chain(0);
     }
-    int num_light_paths = bdpt_generate_light_subpath(pc_ray.max_depth + 1);
+    int num_light_paths = bdpt_generate_light_subpath(pc.max_depth + 1);
     if (save_radiance) {
         mlt_start_chain(1);
     }
     vec2 unused;
     int num_cam_paths = bdpt_generate_camera_subpath(
-        unused, origin.xyz, pc_ray.max_depth + 1, cam_area);
+        unused, origin.xyz, pc.max_depth + 1, cam_area);
     if (save_radiance) {
         mlt_start_chain(2);
     }
@@ -91,7 +91,7 @@ float mlt_L(const vec4 origin, const float cam_area) {
     for (int t = 1; t <= num_cam_paths; t++) {
         for (int s = 0; s <= num_light_paths; s++) {
             int depth = s + t - 2;
-            if (depth > (pc_ray.max_depth - 1) || depth < 0 ||
+            if (depth > (pc.max_depth - 1) || depth < 0 ||
                 (s == 1 && t == 1)) {
                 continue;
             }
@@ -100,7 +100,7 @@ float mlt_L(const vec4 origin, const float cam_area) {
                 vec3 splat_col = bdpt_connect_cam(s, coords);
                 lum_sum += luminance(splat_col);
                 if (save_radiance && luminance(splat_col) > 0) {
-                    uint idx = coords.x * pc_ray.size_y + coords.y;
+                    uint idx = coords.x * pc.size_y + coords.y;
                     const uint splat_cnt = mlt_sampler.splat_cnt;
                     mlt_sampler.splat_cnt++;
                     splat(splat_cnt).idx = idx;

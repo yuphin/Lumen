@@ -16,7 +16,7 @@ PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix
 layout(binding = 4, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
 layout(binding = 5, std430) writeonly buffer OutGBuffer { GBuffer out_gbuffers[]; };
 
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.random_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.random_num);
 
 void main() {
 	const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
@@ -58,6 +58,8 @@ void main() {
 	float rc_postfix_pdf = 1;
 	// PDF at the vertex just before reconnection vertex
 	float rc_pdf = 1;
+	// Whether the normals at the reconnection vertex has been flipped
+	bool rc_side = false;
 	int prefix_depth = 0;
 	vec3 prefix_col = vec3(0);
 	// Common reconnection data
@@ -72,12 +74,12 @@ void main() {
 	for (depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.instance_idx != -1;
-		if (depth >= pc_ray.max_depth - 1) {
+		if (depth >= pc.max_depth - 1) {
 			break;
 		}
 		float joint_pdf_times_bsdf_pdf = joint_pdf * bsdf_pdf_val;
 		if (!found_isect) {
-			vec3 atmosphere_L = shade_atmosphere(pc_ray.dir_light_idx, pc_ray.sky_col, origin.xyz, direction, tmax);
+			vec3 atmosphere_L = shade_atmosphere(pc.dir_light_idx, pc.sky_col, origin.xyz, direction, tmax);
 			vec3 contribution = partial_throughput * atmosphere_L / joint_pdf_times_bsdf_pdf;
 			if (depth > 0) {
 				col += contribution;
@@ -90,7 +92,7 @@ void main() {
 				reconnection_data.reservoir_contribution =
 					rc_throughput * reconnection_data.rc_Li / (rc_pdf * rc_postfix_pdf * prefix_pdf_without_rc_pdf);
 				reconnection_data.path_flags =
-					set_path_flags(prefix_depth, depth - prefix_depth, RECONNECTION_TYPE_DEFAULT);
+					pack_path_flags(prefix_depth, depth - prefix_depth, RECONNECTION_TYPE_DEFAULT, false);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
@@ -148,8 +150,8 @@ void main() {
 				}
 				float prev = reservoir.w_sum;
 				reconnection_data.path_flags =
-					set_path_flags(prefix_depth, depth - prefix_depth,
-								   was_connectable ? RECONNECTION_TYPE_EMISSIVE_AFTER_RC : RECONNECTION_TYPE_DEFAULT);
+					pack_path_flags(prefix_depth, depth - prefix_depth,
+								   was_connectable ? RECONNECTION_TYPE_EMISSIVE_AFTER_RC : RECONNECTION_TYPE_DEFAULT, side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
@@ -185,7 +187,7 @@ void main() {
 				reconnection_data.reservoir_contribution =
 					contribution;  // partial_throughput * reconnection_data.rc_Li / (joint_pdf * rc_pdf);
 				reservoir.data.debug_seed = debug_seed;
-				reconnection_data.path_flags = set_path_flags(depth, 1, RECONNECTION_TYPE_NEE);
+				reconnection_data.path_flags = pack_path_flags(depth, 1, RECONNECTION_TYPE_NEE, side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 
@@ -203,7 +205,7 @@ void main() {
 					contribution;  // rc_throughput * reconnection_data.rc_Li / (rc_pdf * rc_postfix_pdf *
 								   // prefix_pdf_without_rc_pdf);
 				reconnection_data.path_flags =
-					set_path_flags(prefix_depth, depth - prefix_depth, RECONNECTION_TYPE_DEFAULT);
+					pack_path_flags(prefix_depth, depth - prefix_depth, RECONNECTION_TYPE_DEFAULT, side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
@@ -253,9 +255,10 @@ void main() {
 			rc_postfix_pdf = bsdf_pdf_val;
 			prefix_pdf_without_rc_pdf = joint_prev;
 			rc_throughput = partial_throughput;
+			rc_side = side;
 		}
 
-		if (pc_ray.enable_rr == 1) {
+		if (pc.enable_rr == 1) {
 			float rr_scale = 1.0;
 			if (hit_mat.bsdf_type == BSDF_GLASS) {
 				rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
@@ -273,12 +276,12 @@ void main() {
 	if (isnan(luminance(col))) {
 		return;
 	}
-	if (pc_ray.enable_gris == 1 && connectable_vertex_found) {
+	if (pc.enable_gris == 1 && connectable_vertex_found) {
 #if STREAMING_MODE == STREAMING_MODE_SPLIT
 		reconnection_data.rc_Li = postfix_L;
 		reconnection_data.reservoir_contribution =
 			reconnection_data.reservoir_contribution * postfix_L / (rc_pdf * rc_postfix_pdf);
-		reconnection_data.path_flags = set_path_flags(prefix_depth, postfix_depth, RECONNECTION_TYPE_DEFAULT);
+		reconnection_data.path_flags = pack_path_flags(prefix_depth, postfix_depth, RECONNECTION_TYPE_DEFAULT, rc_side);
 		bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 									   calc_target_pdf(reconnection_data.reservoir_contribution),
 									   1.0 / prefix_pdf_without_rc_pdf);
@@ -292,17 +295,18 @@ void main() {
 			uint rc_type;
 			uint rc_prefix_length;
 			uint rc_postfix_length;
-			unpack_path_flags(reservoir.data.path_flags, rc_type, rc_prefix_length, rc_postfix_length);
+			bool side;
+			unpack_path_flags(reservoir.data.path_flags, rc_type, rc_prefix_length, rc_postfix_length, side);
 			ASSERT(reservoir.data.path_flags != 0);
 			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
 			ASSERT(reservoir_data_valid(reservoir.data));
 		}
 	}
-	if (pc_ray.direct_lighting == 1) {
+	if (pc.direct_lighting == 1) {
 		col += direct_lighting;
 	}
 
-	if (pc_ray.enable_gris == 1) {
+	if (pc.enable_gris == 1) {
 		ASSERT(reservoir.w_sum >= reservoir.target_pdf);
 		// The samples are additive, therefore set M to 1
 		reservoir.M = 1;
@@ -310,16 +314,16 @@ void main() {
 		col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
 	}
 
-	if (pc_ray.enable_gris == 0) {
-		if (pc_ray.frame_num > 0) {
-			float w = 1. / float(pc_ray.frame_num + 1);
+	if (pc.enable_gris == 0) {
+		if (pc.frame_num > 0) {
+			float w = 1. / float(pc.frame_num + 1);
 			vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
 			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
 		} else {
 			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
 		}
 	} else {
-		if (pc_ray.direct_lighting == 1) {
+		if (pc.direct_lighting == 1) {
 			direct_lighting_buffer.d[pixel_idx] = direct_lighting;
 		}
 		if (!valid_reservoir) {

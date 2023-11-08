@@ -13,12 +13,12 @@
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
-layout(push_constant) uniform _PushConstantRay { PCMLT pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ResidualData { SumData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ChainStats { ChainData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CounterData { int d; };
 layout(constant_id = 0) const int MODE = 0;
-uint size = pc_ray.num_mlt_threads;
+uint size = pc.num_mlt_threads;
 ResidualData res_data = ResidualData(scene_desc.residual_addr);
 CounterData cnt = CounterData(scene_desc.counter_addr);
 ChainStats chain_stats = ChainStats(scene_desc.chain_stats_addr);

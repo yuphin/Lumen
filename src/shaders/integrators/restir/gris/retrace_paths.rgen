@@ -17,11 +17,11 @@ layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir in_reservoi
 layout(binding = 6, std430) readonly buffer PrevReservoirs { Reservoir prev_reservoirs[]; };
 layout(binding = 7, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
 layout(binding = 8, std430) readonly buffer PrevGbuffer { GBuffer prev_gbuffers[]; };
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.random_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.random_num);
 
 ivec2 get_neighbor_offset(inout uvec4 seed) {
 	const float randa = rand(seed) * 2 * PI;
-	const float randr = sqrt(rand(seed)) * pc_ray.spatial_radius;
+	const float randr = sqrt(rand(seed)) * pc.spatial_radius;
 	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
 }
 
@@ -31,7 +31,7 @@ void main() {
 		return;
 	}
 	const Reservoir canonical_reservoir = in_reservoirs[pixel_idx];
-	uint num_spatial_samples = pc_ray.enable_spatial_reuse == 1 ? pc_ray.num_spatial_samples : 0;
+	uint num_spatial_samples = pc.enable_spatial_reuse == 1 ? pc.num_spatial_samples : 0;
 	HitData unpacked_gbuffer =
 		get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
 
@@ -45,23 +45,23 @@ void main() {
 	data.reservoir_contribution = vec3(0);
 	data.jacobian = 0;
 	data.target_pdf_in_neighbor = 0;
-	if (pc_ray.total_frame_num > 0 && !(any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy)))) {
-		const uint prev_idx = prev_coords.x * pc_ray.size_y + prev_coords.y;
+	if (pc.total_frame_num > 0 && !(any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy)))) {
+		const uint prev_idx = prev_coords.x * pc.size_y + prev_coords.y;
 		GBuffer prev_gbuffer = prev_gbuffers[prev_idx];
 		if (gbuffer_data_valid(prev_gbuffer)) {
 			const Reservoir prev_reservoir = prev_reservoirs[prev_idx];
 			bool prev_in_canonical = retrace_paths(
 				unpacked_gbuffer, prev_reservoir.data, gl_LaunchIDEXT.xy, uvec2(prev_coords),
-				(pc_ray.total_frame_num - 1) ^ pc_ray.prev_random_num, data.jacobian, data.reservoir_contribution);
+				(pc.total_frame_num - 1) ^ pc.prev_random_num, data.jacobian, data.reservoir_contribution);
 		}
 	}
 	reconnection_data[(num_spatial_samples + 1) * pixel_idx + 0] = data;
 
-	uint seed_helper = pc_ray.random_num;
+	uint seed_helper = pc.random_num;
 	for (uint i = 0; i < num_spatial_samples; i++) {
 		ivec2 rand_offset = get_neighbor_offset(seed);
 		const ivec2 coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
-		const uint neighbor_pixel_idx = coords.x * pc_ray.size_y + coords.y;
+		const uint neighbor_pixel_idx = coords.x * pc.size_y + coords.y;
 		if (any(lessThan(coords, ivec2(0))) || any(greaterThanEqual(coords, gl_LaunchSizeEXT.xy))) {
 			continue;
 		}

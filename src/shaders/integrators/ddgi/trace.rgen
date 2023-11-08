@@ -15,7 +15,7 @@
 #include "ddgi_commons.glsl"
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
-layout(push_constant) uniform _PushConstantRay { PCDDGI pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCDDGI pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GBuffer { GBufferData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ProbeOffset { vec4 d[]; };
 const uint flags = gl_RayFlagsOpaqueEXT;
@@ -23,7 +23,7 @@ const float tmin = 0.001;
 const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);  // X: Num rays, Y: Num probes
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.frame_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.frame_num);
 #include "../pt_commons.glsl"
 layout(binding = 4) uniform _DDGIUniforms { DDGIUniforms ddgi_ubo; };
 layout(binding = 5, rgba16f) uniform image2D radiance_img;
@@ -73,14 +73,14 @@ void main() {
 	int ray_id = int(gl_LaunchIDEXT.x);
 	int probe_id = int(gl_LaunchIDEXT.y);
 	vec3 o = probe_location(probe_id);
-	vec3 d = normalize(mat3(pc_ray.probe_rotation) * spherical_fibonacci(ray_id, ddgi_ubo.rays_per_probe));
+	vec3 d = normalize(mat3(pc.probe_rotation) * spherical_fibonacci(ray_id, ddgi_ubo.rays_per_probe));
 	payload.dist = tmax;
 	traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, o, tmin, d, tmax, 0);
 	const bool found_isect = payload.material_idx != -1;
 	vec3 col = vec3(0);
 	float dist;
 	if (!found_isect) {
-		col += pc_ray.sky_col;
+		col += pc.sky_col;
 		dist = 1e10;
 	} else if (payload.hit_kind == gl_HitKindBackFacingTriangleEXT) {
 		dist = -0.2 * payload.dist;
@@ -98,7 +98,7 @@ void main() {
 		}
 
 		if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
-			const float light_pick_pdf = 1. / pc_ray.light_triangle_count;
+			const float light_pick_pdf = 1. / pc.light_triangle_count;
 			col += uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo) / light_pick_pdf;
 		}
 	}

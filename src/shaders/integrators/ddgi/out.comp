@@ -11,7 +11,7 @@
 #include "ddgi_commons.h"
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
-layout(push_constant) uniform _PushConstantRay { PCDDGI pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCDDGI pc; };
 layout(binding = 0, rgba32f) uniform image2D image;
 layout(binding = 1) uniform _SceneUBO { SceneUBO ubo; };
 layout(binding = 2) buffer SceneDesc_ { SceneDesc scene_desc; };
@@ -26,14 +26,14 @@ Materials materials = Materials(scene_desc.material_addr);
 
 void main() {
     uvec2 dims = gl_GlobalInvocationID.xy;
-    if (dims.x >= pc_ray.size_x || dims.y >= pc_ray.size_y) {
+    if (dims.x >= pc.size_x || dims.y >= pc.size_y) {
         return;
     }
-    const ivec2 size = ivec2(pc_ray.size_x, pc_ray.size_y);
+    const ivec2 size = ivec2(pc.size_x, pc.size_y);
     const vec2 pixel_center = vec2(dims) + vec2(0.5);
     const vec2 tex_coord = pixel_center / vec2(size);
     uint idx =
-        pc_ray.size_y * gl_GlobalInvocationID.x + gl_GlobalInvocationID.y;
+        pc.size_y * gl_GlobalInvocationID.x + gl_GlobalInvocationID.y;
     // vec3 direct_lighting = imageLoad(image, ivec2(dims.xy)).xyz;
     vec3 col = direct_lighting.d[idx];
     // vec3 indirect = gbumat_idx = payload.material_idx;ffer.d[idx].normal;

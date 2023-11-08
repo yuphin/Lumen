@@ -13,7 +13,7 @@
 
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
-layout(push_constant) uniform _PushConstantRay { PCBDPT pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCBDPT pc; };
 // BDPT buffers
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightVertices { PathVertex d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CameraVertices { PathVertex d[]; };
@@ -26,7 +26,7 @@ ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
 uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 uint bdpt_path_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
-    (pc_ray.max_depth + 1);
+    (pc.max_depth + 1);
 
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
@@ -34,7 +34,7 @@ const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
-                      pc_ray.frame_num ^ pc_ray.time);
+                      pc.frame_num ^ pc.time);
 #include "../bdpt_commons.glsl"
 
 void main() {
@@ -51,13 +51,13 @@ void main() {
     area_int /= (area_int.w);
     const float cam_area = abs(area_int.x * area_int.y);
 
-    int num_light_paths = bdpt_generate_light_subpath(pc_ray.max_depth + 1);
+    int num_light_paths = bdpt_generate_light_subpath(pc.max_depth + 1);
     int num_cam_paths = bdpt_generate_camera_subpath(
-        d, origin.xyz, pc_ray.max_depth + 1, cam_area);
+        d, origin.xyz, pc.max_depth + 1, cam_area);
     for (int t = 1; t <= num_cam_paths; t++) {
         for (int s = 0; s <= num_light_paths; s++) {
             int depth = s + t - 2;
-            if (depth > (pc_ray.max_depth - 1) || depth < 0 ||
+            if (depth > (pc.max_depth - 1) || depth < 0 ||
                 (s == 1 && t == 1)) {
                 continue;
             }
@@ -79,8 +79,8 @@ void main() {
     if (isnan(luminance(col))) {
         return;
     }
-    if (pc_ray.frame_num > 0) {
-        float w = 1. / float(pc_ray.frame_num + 1);
+    if (pc.frame_num > 0) {
+        float w = 1. / float(pc.frame_num + 1);
         vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
         // imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
         imageStore(image, ivec2(gl_LaunchIDEXT.xy),

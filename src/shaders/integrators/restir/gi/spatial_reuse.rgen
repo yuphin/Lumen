@@ -67,14 +67,14 @@ void combine_reservoir(inout Reservoir r1, const Reservoir r2,
 
 void main() {
     // TODO: Adaptively change this
-    const uint pingpong = (pc_ray.total_frame_num % 2);
+    const uint pingpong = (pc.total_frame_num % 2);
     const float max_r = 10;
     const float dist_threshold = 0.01;
     const float angle_threshold = 25 * PI / 180;
     ReservoirSample q = samples.d[pixel_idx];
     Reservoir r_s;
    
-    if (pc_ray.do_spatiotemporal == 1) {
+    if (pc.do_spatiotemporal == 1) {
         r_s = spatial_reservoirs.d[offset(pingpong ^ 1) + pixel_idx];
     } else {
         init_reservoir(r_s);
@@ -91,7 +91,7 @@ void main() {
     r.W = 0;
     r.m = 0;
     const float factor =
-        pc_ray.do_spatiotemporal == 0 ? 0 : r_s.m * r_s.W * p_hat(r_s.s.L_o);
+        pc.do_spatiotemporal == 0 ? 0 : r_s.m * r_s.W * p_hat(r_s.s.L_o);
     if (factor > 0) {
         update_reservoir(r, r_s.s, factor);
     }
@@ -107,7 +107,7 @@ void main() {
             ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
         const ivec2 coords = clamp(ivec2(gl_LaunchIDEXT.xy) + rand_offset,
                                    ivec2(0), ivec2(gl_LaunchSizeEXT.xy) - 1);
-        const uint coords_idx = coords.x * pc_ray.size_y + coords.y;
+        const uint coords_idx = coords.x * pc.size_y + coords.y;
 
         q_n = samples.d[coords_idx];
         if (length(q_n.n_s) == 0) {

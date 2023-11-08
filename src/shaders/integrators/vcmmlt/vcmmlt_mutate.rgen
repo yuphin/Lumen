@@ -17,14 +17,14 @@ void main() {
 #define past_splat(i) past_splat_data.d[splat_idx + chain * depth_factor + i]
 #define splat(i) splat_data.d[splat_idx + chain * depth_factor + i]
 #define mlt_sampler_mux(c) mlt_samplers.d[mlt_sampler_idx + c]
-    const uint chain_idx = pc_ray.mutation_counter % 2;
+    const uint chain_idx = pc.mutation_counter % 2;
     vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
     vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
                                                2. / gl_LaunchSizeEXT.y, 0, 1));
     area_int /= area_int.w;
     const float cam_area = abs(area_int.x * area_int.y);
     vec3 cam_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
-    chain = pc_ray.mutation_counter % 2;
+    chain = pc.mutation_counter % 2;
     chain = (mlt_sampler.swap + chain) % 2;
     const uvec4 chain0_seed = seeds_data.d[gl_LaunchIDEXT.x].chain0_seed;
     const uvec4 chain1_seed = seeds_data.d[gl_LaunchIDEXT.x].chain1_seed;
@@ -58,7 +58,7 @@ void main() {
             sum_data.d[2 * pixel_idx].x += eval_target(proposed_luminance, 0);
             sum_data.d[2 * pixel_idx + 1].x +=
                 eval_target(proposed_luminance, 1);
-            if (proposed_luminance / pc_ray.mutations_per_pixel >
+            if (proposed_luminance / pc.mutations_per_pixel >
                 chain_stats.d[1].normalization) {
                 sum_data.d[2 * pixel_idx + 1].x -=
                     eval_target(proposed_luminance, 1);

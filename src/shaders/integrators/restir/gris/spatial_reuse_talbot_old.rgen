@@ -15,11 +15,11 @@ PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix
 layout(binding = 4, std430) readonly buffer InReservoirs { Reservoir in_reservoirs[]; };
 layout(binding = 5, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
 layout(binding = 6, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.random_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.random_num);
 
 ivec2 get_neighbor_offset(inout uvec4 seed) {
 	const float randa = rand(seed) * 2 * PI;
-	const float randr = sqrt(rand(seed)) * pc_ray.spatial_radius;
+	const float randr = sqrt(rand(seed)) * pc.spatial_radius;
 	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
 }
 
@@ -37,10 +37,10 @@ void main() {
 
 	Reservoir canonical_reservoir = in_reservoirs[pixel_idx];
 
-	int num_spatial_samples = pc_ray.enable_spatial_reuse == 1 ? int(pc_ray.num_spatial_samples) : 0;
+	int num_spatial_samples = pc.enable_spatial_reuse == 1 ? int(pc.num_spatial_samples) : 0;
 	vec3 curr_reservoir_contribution = vec3(0);
 
-	uint seed_helper = pc_ray.random_num;
+	uint seed_helper = pc.random_num;
 	ivec2 offsets[12];
 	for (int i = 0; i < 12; i++) {
 		offsets[i] = get_neighbor_offset(seed);
@@ -52,7 +52,7 @@ void main() {
 		if (any(lessThan(neighbor_coords, ivec2(0))) || any(greaterThanEqual(neighbor_coords, gl_LaunchSizeEXT.xy))) {
 			continue;
 		}
-		const uint neighbor_pixel_idx = neighbor_coords.x * pc_ray.size_y + neighbor_coords.y;
+		const uint neighbor_pixel_idx = neighbor_coords.x * pc.size_y + neighbor_coords.y;
 		GBuffer neighbor_gbuffer = curr_gbuffers[neighbor_pixel_idx];
 		if (!gbuffer_data_valid(neighbor_gbuffer)) {
 			continue;
@@ -103,7 +103,7 @@ void main() {
 						any(greaterThanEqual(validation_coords, gl_LaunchSizeEXT.xy))) {
 						continue;
 					}
-					const uint validation_pixel_idx = validation_coords.x * pc_ray.size_y + validation_coords.y;
+					const uint validation_pixel_idx = validation_coords.x * pc.size_y + validation_coords.y;
 					GBuffer validation_gbuffer = curr_gbuffers[validation_pixel_idx];
 					if (!gbuffer_data_valid(validation_gbuffer)) {
 						continue;
@@ -136,20 +136,20 @@ void main() {
 	out_reservoirs[pixel_idx] = reservoir;
 
 	vec3 col = vec3(0);
-	if (pc_ray.direct_lighting == 1) {
+	if (pc.direct_lighting == 1) {
 		col += direct_lighting_buffer.d[pixel_idx];
 	}
-	if (pc_ray.show_reconnection_radiance == 1) {
+	if (pc.show_reconnection_radiance == 1) {
 		col += reservoir.data.rc_postfix_L;
 	} else {
 		col += final_contribution;
 	}
 
 	ivec2 neighbor_coords = ivec2(gl_LaunchIDEXT.xy);
-	if (pc_ray.enable_accumulation == 0 || pc_ray.frame_num == 0) {
+	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
 		imageStore(image, ivec2(neighbor_coords), vec4(col, 1.f));
 	} else {
-		float w = 1. / float(pc_ray.frame_num + 1);
+		float w = 1. / float(pc.frame_num + 1);
 		vec3 old_col = imageLoad(image, ivec2(neighbor_coords)).xyz;
 		imageStore(image, ivec2(neighbor_coords), vec4(mix(old_col, col, w), 1.f));
 	}

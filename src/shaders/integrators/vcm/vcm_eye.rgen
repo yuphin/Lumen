@@ -13,7 +13,7 @@
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 
-layout(push_constant) uniform _PushConstantRay { PCVCM pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCVCM pc; };
 // VCM buffers
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonData_ { VCMPhotonHash d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMVertex_ { VCMVertex d[]; };
@@ -33,10 +33,10 @@ const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
-                      pc_ray.frame_num ^ pc_ray.random_num);
+                      pc.frame_num ^ pc.random_num);
 uint vcm_light_path_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
-    (pc_ray.max_depth + 1);
+    (pc.max_depth + 1);
 
 #include "../vcm_commons.glsl"
 void main() {
@@ -58,11 +58,11 @@ void main() {
                                                2. / gl_LaunchSizeEXT.y, 0, 1));
     area_int /= (area_int.w);
     const float cam_area = abs(area_int.x * area_int.y);
-    const float radius = pc_ray.radius;
+    const float radius = pc.radius;
     const float radius_sqr = radius * radius;
     float eta_vcm = PI * radius_sqr * screen_size;
-    float eta_vc = pc_ray.use_vc == 1 ? 1.0 / eta_vcm : 0;
-    float eta_vm = pc_ray.use_vm == 1 ? PI * radius_sqr * screen_size : 0;
+    float eta_vc = pc.use_vc == 1 ? 1.0 / eta_vcm : 0;
+    float eta_vm = pc.use_vm == 1 ? PI * radius_sqr * screen_size : 0;
     VCMState camera_state;
     // Generate camera sample
     camera_state.wi = direction;
@@ -85,8 +85,8 @@ void main() {
     col += splat_img;
     tmp_col.d[pixel_idx] = vec3(0);
 #undef light_vtx
-    if (pc_ray.frame_num > 0) {
-        float w = 1. / float(pc_ray.frame_num + 1);
+    if (pc.frame_num > 0) {
+        float w = 1. / float(pc.frame_num + 1);
         vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
         // imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
         imageStore(image, ivec2(gl_LaunchIDEXT.xy),

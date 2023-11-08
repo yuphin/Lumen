@@ -13,7 +13,7 @@
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 
-layout(push_constant) uniform _PushConstantRay { PCVCM pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCVCM pc; };
 // VCM buffers
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonData_ { VCMPhotonHash d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMVertex_ { VCMVertex d[]; };
@@ -55,10 +55,10 @@ const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
-                      pc_ray.random_num);
+                      pc.random_num);
 uint vcm_light_path_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
-    (pc_ray.max_depth + 1);
+    (pc.max_depth + 1);
 #include "../vcm_commons.glsl"
 const uint FRAME_INTERVAL = 10;
 
@@ -68,11 +68,11 @@ uint restir_hash(ivec3 p, uint size) {
 
 uint get_restir_hash_idx(uint light_idx, float u, float v) {
     const int base_res =
-        int(sqrt(float(screen_size) / pc_ray.light_triangle_count));
-    ivec3 grid_res = ivec3(pc_ray.light_triangle_count, base_res, base_res);
+        int(sqrt(float(screen_size) / pc.light_triangle_count));
+    ivec3 grid_res = ivec3(pc.light_triangle_count, base_res, base_res);
     ivec3 grid_idx =
         get_grid_idx(vec3(light_idx, u, v), vec3(0, 0, 0),
-                     vec3(pc_ray.light_triangle_count, 1, 1), grid_res);
+                     vec3(pc.light_triangle_count, 1, 1), grid_res);
 
     return restir_hash(grid_idx, screen_size);
 }
@@ -80,7 +80,7 @@ uint get_restir_hash_idx(uint light_idx, float u, float v) {
 void load_vcm_state(float eta_vc, const VCMReservoir r,
                     const LightState light_state, out VCMState state,
                     bool use_reservoir) {
-    float pdf_pos = light_state.triangle_pdf / pc_ray.light_triangle_count;
+    float pdf_pos = light_state.triangle_pdf / pc.light_triangle_count;
     vec3 wi;
     float W;
     float cos_theta;
@@ -91,10 +91,10 @@ void load_vcm_state(float eta_vc, const VCMReservoir r,
         // float cos_deg = degrees(acos(cos_theta));
         // if(true) {
         // //if(light_state.hash_idx == 1231707) {
-        //     angles.d[pixel_idx % pc_ray.max_angle_samples].is_active = 1;
-        //     angles.d[pixel_idx % pc_ray.max_angle_samples].theta =
+        //     angles.d[pixel_idx % pc.max_angle_samples].is_active = 1;
+        //     angles.d[pixel_idx % pc.max_angle_samples].theta =
         //     acos(cos_theta); angles.d[pixel_idx %
-        //     pc_ray.max_angle_samples].phi = r.s.phi;
+        //     pc.max_angle_samples].phi = r.s.phi;
         // }
         W = r.W;
     } else {
@@ -134,11 +134,11 @@ void main() {
     VCMState vcm_state;
 
 #define light_vtx(i) vcm_lights.d[vcm_light_path_idx + i]
-    const float radius = pc_ray.radius;
+    const float radius = pc.radius;
     const float radius_sqr = radius * radius;
     float eta_vcm = PI * radius_sqr * screen_size;
-    float eta_vc = (pc_ray.use_vc == 1) ? 1.0 / eta_vcm : 0;
-    float eta_vm = (pc_ray.use_vm == 1) ? PI * radius_sqr * screen_size : 0;
+    float eta_vc = (pc.use_vc == 1) ? 1.0 / eta_vcm : 0;
+    float eta_vm = (pc.use_vm == 1) ? PI * radius_sqr * screen_size : 0;
     bool specular = false;
     bool result;
     bool finite;

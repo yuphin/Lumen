@@ -16,24 +16,24 @@ layout(binding = 4, std430) readonly buffer PathReconnections { ReconnectionData
 layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir in_reservoirs[]; };
 layout(binding = 6, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
 layout(binding = 7, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.random_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.random_num);
 
 ivec2 get_neighbor_offset(inout uvec4 seed) {
 	const float randa = rand(seed) * 2 * PI;
-	const float randr = sqrt(rand(seed)) * pc_ray.spatial_radius;
+	const float randr = sqrt(rand(seed)) * pc.spatial_radius;
 	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
 }
 
 bool process_reservoir(inout Reservoir reservoir, inout float m_c, in Reservoir canonical_reservoir,
 					   in Reservoir source_reservoir, in ReconnectionData data, ivec2 neighbor_coords,
 					   float canonical_in_canonical_pdf, out vec3 curr_reservoir_contribution) {
-	const uint neighbor_pixel_idx = neighbor_coords.x * pc_ray.size_y + neighbor_coords.y;
+	const uint neighbor_pixel_idx = neighbor_coords.x * pc.size_y + neighbor_coords.y;
 	source_reservoir.M = min(source_reservoir.M, 20);
 
 	float neighbor_in_neighbor_pdf = calc_target_pdf(source_reservoir.data.reservoir_contribution);
 	float neighbor_in_canonical_pdf = calc_target_pdf(data.reservoir_contribution) * data.jacobian;
 	const float m_i_num = source_reservoir.M * neighbor_in_neighbor_pdf;
-	const float m_i_denom = m_i_num + canonical_reservoir.M * neighbor_in_canonical_pdf / pc_ray.num_spatial_samples;
+	const float m_i_denom = m_i_num + canonical_reservoir.M * neighbor_in_canonical_pdf / pc.num_spatial_samples;
 	float m_i = m_i_denom == 0 ? 0 : m_i_num / m_i_denom;
 	// float m_i = 0;
 	// m_i = clamp(m_i, 0, 1);
@@ -55,7 +55,7 @@ bool process_reservoir(inout Reservoir reservoir, inout float m_c, in Reservoir 
 
 
 	const float m_c_num = source_reservoir.M * data.target_pdf_in_neighbor;
-	const float m_c_denom = m_c_num + canonical_reservoir.M * canonical_in_canonical_pdf / pc_ray.num_spatial_samples;
+	const float m_c_denom = m_c_num + canonical_reservoir.M * canonical_in_canonical_pdf / pc.num_spatial_samples;
 	float m_c_val = m_c_denom == 0.0 ? 0.0 : m_c_num / m_c_denom;
 	// m_c_val = clamp(m_c_val, 0, 1);
 	if (m_c_val <= 0.0) {
@@ -90,7 +90,7 @@ void main() {
 
 	const vec3 canonical_reservoir_contribution = canonical_reservoir.data.reservoir_contribution;
 
-	uint num_spatial_samples = pc_ray.enable_spatial_reuse == 1 ? pc_ray.num_spatial_samples : 0;
+	uint num_spatial_samples = pc.enable_spatial_reuse == 1 ? pc.num_spatial_samples : 0;
 	vec3 curr_reservoir_contribution = vec3(0);
 	float m_c = 1.0;
 	const float canonical_in_canonical_pdf = calc_target_pdf(canonical_reservoir_contribution);
@@ -98,13 +98,13 @@ void main() {
 
 	HitData unpacked_gbuffer =
 		get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
-	uint seed_helper = pc_ray.random_num;
+	uint seed_helper = pc.random_num;
 	uvec4 neighbor_seed = seed;
 	if (reservoir_data_valid(canonical_reservoir.data)) {
 		for (uint i = 0; i < num_spatial_samples; i++) {
 			ivec2 rand_offset = get_neighbor_offset(neighbor_seed);
 			const ivec2 coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
-			const uint neighbor_pixel_idx = coords.x * pc_ray.size_y + coords.y;
+			const uint neighbor_pixel_idx = coords.x * pc.size_y + coords.y;
 			if (any(lessThan(coords, ivec2(0))) || any(greaterThanEqual(coords, gl_LaunchSizeEXT.xy))) {
 				continue;
 			}
@@ -162,20 +162,20 @@ void main() {
 	out_reservoirs[pixel_idx] = reservoir;
 
 	vec3 col = vec3(0);
-	if (pc_ray.direct_lighting == 1) {
+	if (pc.direct_lighting == 1) {
 		col += direct_lighting_buffer.d[pixel_idx];
 	}
-	if (pc_ray.show_reconnection_radiance == 1) {
+	if (pc.show_reconnection_radiance == 1) {
 		col += reservoir.data.rc_postfix_L;
 	} else {
 		col += final_contribution;
 	}
 
 	ivec2 coords = ivec2(gl_LaunchIDEXT.xy);
-	if (pc_ray.enable_accumulation == 0 || pc_ray.frame_num == 0) {
+	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
 		imageStore(image, ivec2(coords), vec4(col, 1.f));
 	} else {
-		float w = 1. / float(pc_ray.frame_num + 1);
+		float w = 1. / float(pc.frame_num + 1);
 		vec3 old_col = imageLoad(image, ivec2(coords)).xyz;
 		imageStore(image, ivec2(coords), vec4(mix(old_col, col, w), 1.f));
 	}

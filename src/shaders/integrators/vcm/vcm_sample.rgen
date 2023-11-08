@@ -13,7 +13,7 @@
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 
-layout(push_constant) uniform _PushConstantRay { PCVCM pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCVCM pc; };
 // VCM buffers
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMReservoir_ { VCMReservoir d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ShouldResample { uint d; };
@@ -36,10 +36,10 @@ const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
-                      pc_ray.random_num);
+                      pc.random_num);
 uint vcm_light_path_idx =
     (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
-    (pc_ray.max_depth);
+    (pc.max_depth);
 
 const uint FRAME_INTERVAL = 10;
 
@@ -111,11 +111,11 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
 
 uint get_restir_hash_idx(uint light_idx, float u, float v) {
     const int base_res =
-        int(sqrt(float(screen_size) / pc_ray.light_triangle_count));
-    ivec3 grid_res = ivec3(pc_ray.light_triangle_count, base_res, base_res);
+        int(sqrt(float(screen_size) / pc.light_triangle_count));
+    ivec3 grid_res = ivec3(pc.light_triangle_count, base_res, base_res);
     ivec3 grid_idx =
         get_grid_idx(vec3(light_idx, u, v), vec3(0, 0, 0),
-                     vec3(pc_ray.light_triangle_count, 1, 1), grid_res);
+                     vec3(pc.light_triangle_count, 1, 1), grid_res);
 
     return restir_hash(grid_idx, screen_size);
 }
@@ -215,7 +215,7 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
   
     
     const vec3 Le =
-        sample_light_Le(pc_ray.num_lights, pc_ray.light_triangle_count,
+        sample_light_Le(pc.num_lights, pc.light_triangle_count,
                         light_idx, light_triangle_idx, light_material_idx,
                         light, record, light_mat, pdf_pos, seed, wi, pdf_dir, phi, u, v);
     float cos_theta = abs(dot(wi, record.n_s));
@@ -248,13 +248,13 @@ void main() {
         return;
     }
     if (pixel_idx == 0) {
-        if(pc_ray.frame_num == 0) {
+        if(pc.frame_num == 0) {
             avg.d.avg = 0;
             avg.d.prev = 0;
         } else {
-            avg.d.avg = 0.6 * avg.d.avg + 0.4 * (pc_ray.frame_num - avg.d.prev);
-            avg.d.prev = pc_ray.frame_num;
-            //debugPrintfEXT("resampling %d, avg: %f\n", pc_ray.total_frame_num, avg.d.avg);
+            avg.d.avg = 0.6 * avg.d.avg + 0.4 * (pc.frame_num - avg.d.prev);
+            avg.d.prev = pc.frame_num;
+            //debugPrintfEXT("resampling %d, avg: %f\n", pc.total_frame_num, avg.d.avg);
         }
     }
 
@@ -271,11 +271,11 @@ void main() {
     const float cam_area = abs(area_int.x * area_int.y);
     VCMRestirData s;
     float pdf_o;
-    const float radius = pc_ray.radius;
+    const float radius = pc.radius;
     const float radius_sqr = radius * radius;
     float eta_vcm = PI * radius_sqr * screen_size;
-    float eta_vc = (pc_ray.use_vc == 1) ? 1.0 / eta_vcm : 0;
-    float eta_vm = (pc_ray.use_vm == 1) ? PI * radius_sqr * screen_size : 0;
+    float eta_vc = (pc.use_vc == 1) ? 1.0 / eta_vcm : 0;
+    float eta_vm = (pc.use_vm == 1) ? PI * radius_sqr * screen_size : 0;
     VCMState light_state;
     bool result = vcm_generate_light_sample(eta_vc, light_state, s, pdf_o);
     if (!result) {
@@ -326,13 +326,13 @@ void main() {
             light_state.d_vcm /= cos_theta_wo;
             light_state.d_vc /= cos_theta_wo;
             light_state.d_vm /= cos_theta_wo;
-            if (depth >= pc_ray.max_depth + 1) {
+            if (depth >= pc.max_depth + 1) {
                 break;
             }
             // Reverse pdf in solid angle form, since we have geometry term
             // at the outer paranthesis
             if (!mat_specular &&
-                (pc_ray.use_vc == 1 && depth < pc_ray.max_depth)) {
+                (pc.use_vc == 1 && depth < pc.max_depth)) {
                 // Connect to camera
                 ivec2 coords;
                 vec3 splat_col = vcm_connect_cam(
@@ -395,7 +395,7 @@ void main() {
     if (p_hat > 0) {
         s.p_hat = p_hat;
         s.valid = 1;
-        s.frame_idx = pc_ray.total_frame_num;
+        s.frame_idx = pc.total_frame_num;
         atomicAdd(temporal_reservoirs.d[s.hash_idx].factor, 1);
         light_samples.d[pixel_idx] = s;
     }

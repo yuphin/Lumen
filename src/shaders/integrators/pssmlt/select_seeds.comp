@@ -13,17 +13,17 @@ layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BootstrapData { BootstrapSample d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SeedsData { SeedData d[]; };
-layout(push_constant) uniform _PushConstantRay { PCMLT pc_ray; };
+layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDF { float d[]; };
 BootstrapData bootstrap_data = BootstrapData(scene_desc.bootstrap_addr);
 SeedsData seeds_data = SeedsData(scene_desc.seeds_addr);
 CDF cdf_data = CDF(scene_desc.cdf_addr);
 uvec4 seed =
     init_rng(gl_GlobalInvocationID.xy, gl_NumWorkGroups.xy *uvec2(32, 1),
-             pc_ray.frame_num ^ pc_ray.random_num);
+             pc.frame_num ^ pc.random_num);
 uint binary_search_cdf(float random_float) {
    uint l = 0;
-    uint r = pc_ray.num_bootstrap_samples;
+    uint r = pc.num_bootstrap_samples;
     uint lum_idx = -1;
     uint len = r - l;
     uint first = 0;
@@ -37,7 +37,7 @@ uint binary_search_cdf(float random_float) {
             len = hlf;
         }
     }
-    return clamp(first - 1, 0, pc_ray.num_bootstrap_samples -2);
+    return clamp(first - 1, 0, pc.num_bootstrap_samples -2);
     uint result = lum_idx;
     if (lum_idx > 0) {
         while (result > 0 && bootstrap_data.d[result].lum == 0) {
