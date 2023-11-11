@@ -249,10 +249,12 @@ bool is_diffuse(in Material mat) { return (mat.bsdf_type & BSDF_DIFFUSE) != 0; }
 uint offset(const uint pingpong) { return pingpong * pc.size_x * pc.size_y; }
 
 uint pack_path_flags(uint prefix_length, uint postfix_length, uint reconnection_type, bool side) {
-	return uint(side) << 12 | (postfix_length & 0x1F) << 7 | (prefix_length & 0x1F) << 2 | uint(reconnection_type & 0x3);
+	return uint(side) << 12 | (postfix_length & 0x1F) << 7 | (prefix_length & 0x1F) << 2 |
+		   uint(reconnection_type & 0x3);
 }
 
-void unpack_path_flags(uint packed_data, out uint reconnection_type, out uint prefix_length, out uint postfix_length, out bool side) {
+void unpack_path_flags(uint packed_data, out uint reconnection_type, out uint prefix_length, out uint postfix_length,
+					   out bool side) {
 	reconnection_type = (packed_data & 0x3);
 	prefix_length = (packed_data >> 2) & 0x1F;
 	postfix_length = (packed_data >> 7) & 0x1F;
@@ -267,7 +269,122 @@ vec3 get_primary_direction(uvec2 coords) {
 
 bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords, uvec2 src_coords,
 				   uint seed_helper, out float jacobian_out, out vec3 reservoir_contribution) {
-    // TODO
+	// Note: The source reservoir always corresponds to the canonical reservoir because retracing only happens on
+	// pairwise mode
+
+	reservoir_contribution = vec3(0);
+	jacobian_out = 0;
+	float jacobian = 1;
+	if (!reservoir_data_valid(data)) {
+		return false;
+	}
+
+	uvec4 reservoir_seed = init_rng(src_coords, gl_LaunchSizeEXT.xy, seed_helper, data.init_seed);
+	HitData rc_gbuffer =
+		get_hitdata(data.rc_barycentrics, data.rc_primitive_instance_id.y, data.rc_primitive_instance_id.x);
+	Material rc_hit_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
+
+	uint rc_type;
+	uint rc_prefix_length;
+	uint rc_postfix_length;
+	bool rc_side;
+	unpack_path_flags(data.path_flags, rc_type, rc_prefix_length, rc_postfix_length, rc_side);
+
+	uint prefix_depth = 0;
+	vec3 prefix_throughput = vec3(1);
+
+	vec3 dst_wi = get_primary_direction(dst_coords);
+	while (true) {
+		if ((prefix_depth + rc_postfix_length) >= pc.max_depth - 1) {
+			return false;
+		}
+		dst_gbuffer.pos = offset_ray(dst_gbuffer.pos, dst_gbuffer.n_g);
+		Material dst_hit_mat = load_material(dst_gbuffer.material_idx, dst_gbuffer.uv);
+
+		vec3 dst_wo = -dst_wi;
+		bool dst_side = face_forward(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo);
+
+		vec3 rc_wi = rc_gbuffer.pos - dst_gbuffer.pos;
+		float rc_wi_len = length(rc_wi);
+		rc_wi /= rc_wi_len;
+
+		bool connectable = is_rough(dst_hit_mat) && rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent &&
+						   prefix_depth >= (rc_prefix_length - 1);
+		bool connected = false;
+		if (connectable) {
+			any_hit_payload.hit = 1;
+			vec3 p = offset_ray2(dst_gbuffer.pos, dst_gbuffer.n_s);
+			traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p,
+						0, rc_wi, rc_wi_len - EPS, 1);
+			connected = any_hit_payload.hit == 0;
+		}
+		if (connected) {
+			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
+			bool rc_side_dst = face_forward(rc_gbuffer.n_s, rc_gbuffer.n_g, dst_wo);
+			float g_dst = abs(dot(rc_gbuffer.n_s, -rc_wi)) / (rc_wi_len * rc_wi_len);
+
+			float dst_pdf;
+			float cos_x = dot(dst_gbuffer.n_s, rc_wi);
+			vec3 dst_f = eval_bsdf(dst_gbuffer.n_s, dst_wo, dst_hit_mat, 1, dst_side, rc_wi, dst_pdf, cos_x);
+			if (dst_f == vec3(0)) {
+				return false;
+			}
+
+			jacobian =
+				data.rc_partial_jacobian == 0 ? 0.0 : data.rc_partial_jacobian * dst_pdf / data.rc_partial_jacobian;
+			if (rc_type == RECONNECTION_TYPE_NEE) {
+				// The NEE PDF does not depend on the surface, only MIS weight does
+				// Also we do not need to trace visibility ray since we know this was accepted into the reservoir
+				uvec2 rc_coords = uvec2(data.rc_coords / gl_LaunchSizeEXT.y, data.rc_coords % gl_LaunchSizeEXT.y);
+				uvec4 reconnection_seed = init_rng(rc_coords, gl_LaunchSizeEXT.xy, seed_helper, data.rc_seed);
+				vec3 dst_L_wi;
+				uvec4 debug_seed = reconnection_seed;
+				vec3 Li = do_nee(reconnection_seed, rc_gbuffer, rc_hit_mat, rc_side_dst, rc_gbuffer.n_s, -rc_wi,
+								 dst_L_wi, false);
+				ASSERT(debug_seed == data.debug_seed);
+				ASSERT(dst_L_wi == data.rc_wi);
+				reservoir_contribution = dst_f * abs(cos_x) * Li / dst_pdf;
+			} else {
+				ASSERT(data.rc_seed == -1);
+
+				float dst_postfix_pdf;
+				float rc_cos_x = dot(rc_gbuffer.n_s, data.rc_wi);
+				vec3 dst_postfix_f = eval_bsdf(rc_gbuffer.n_s, -rc_wi, rc_hit_mat, 1, rc_side_dst, data.rc_wi,
+											   dst_postfix_pdf, rc_cos_x);
+				jacobian *= dst_postfix_pdf;
+				float mis_weight = 1.0;
+				if (rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
+					mis_weight = 1.0 / (1 + data.pdf_light_w / dst_postfix_pdf);
+				}
+				reservoir_contribution = mis_weight * dst_f * abs(cos_x) * dst_postfix_f * abs(rc_cos_x) * data.rc_Li /
+										 (dst_postfix_pdf * dst_pdf);
+			}
+			if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
+				jacobian_out = 0;
+				reservoir_contribution = vec3(0);
+				return false;
+			}
+			jacobian_out = jacobian;
+
+			return true;
+		}
+		float pdf, cos_theta;
+		const vec3 f = sample_bsdf(dst_gbuffer.n_s, dst_wo, dst_hit_mat, 1 /*radiance=cam*/, dst_side, dst_wi, pdf,
+								   cos_theta, reservoir_seed);
+		if (pdf == 0) {
+			return false;
+		}
+
+		prefix_throughput *= f * abs(cos_theta) / pdf;
+
+		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, dst_gbuffer.pos, tmin, dst_wi, tmax, 0);
+		const bool found_isect = payload.instance_idx != -1;
+		if (!found_isect) {
+			return false;
+		}
+		dst_gbuffer = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
+		prefix_depth++;
+	}
 	return false;
 }
 bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords,

@@ -50,7 +50,8 @@ struct GrisData {
 	uint rc_coords;
 	vec2 rc_barycentrics;
 	uvec2 rc_primitive_instance_id;
-	vec2 pad;
+	float rc_partial_jacobian; // g * rc_pdf (* rc_postfix_pdf)
+	float pad;
 	float pdf_light_w;
 	uint rc_seed;
 };

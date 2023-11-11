@@ -190,13 +190,13 @@ bool face_forward(inout vec3 n_s, inout vec3 n_g, vec3 wo) {
         n_s *= -1;
         side = false;
     }
-    // const float kCosThetaThreshold = 0.1f;
-    // float cosTheta = dot(wo, n_s);
-    // if (cosTheta <= kCosThetaThreshold) {
-    //     float t = clamp(cosTheta * (1.f / kCosThetaThreshold), 0, 1);
-    //     n_s = normalize(mix(n_g, n_s, t));
-    // }
     return side;
+} 
+
+void face_forward(inout vec3 n_s, bool side) {
+    if(!side) {
+        n_s *= -1;
+    }
 } 
 
 vec2 concentric_sample_disk(vec2 rands) {

@@ -60,6 +60,9 @@ void main() {
 	float rc_pdf = 1;
 	// Whether the normals at the reconnection vertex has been flipped
 	bool rc_side = false;
+	// Reconnection pdf times the geometry term at the reconnection vertex
+	float rc_partial_jacobian = 0;
+
 	int prefix_depth = 0;
 	vec3 prefix_col = vec3(0);
 	// Common reconnection data
@@ -160,10 +163,7 @@ void main() {
 #endif	// STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 			}
 		}
-
-		vec3 prev = origin.xyz;
-		origin.xyz = offset_ray(gbuffer.pos, n_g);
-
+	
 		vec3 rc_Li = vec3(0);
 		last_vertex_specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
 		// NEE
@@ -180,6 +180,13 @@ void main() {
 				rc_barycentrics = payload.attribs;
 				rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 				rc_pdf = bsdf_pdf_val;
+				vec3 to_prev = origin.xyz - gbuffer.pos;
+				rc_partial_jacobian = abs(dot(n_s, wo)) / dot(to_prev, to_prev);
+
+				reconnection_data.rc_barycentrics = rc_barycentrics;
+				reconnection_data.rc_primitive_instance_id = rc_primitive_instance_id;
+				reconnection_data.rc_coords = rc_coords;
+				reconnection_data.rc_partial_jacobian = rc_partial_jacobian;
 
 				reconnection_data.rc_seed = rc_seed;
 				reconnection_data.rc_wi = wi;
@@ -220,7 +227,7 @@ void main() {
 				direct_lighting += contribution;
 			}
 		}
-
+		origin.xyz = offset_ray(gbuffer.pos, n_g);
 		// Record initial seed after direct light sampling
 		if (depth == 0) {
 			init_seed = seed.w;
@@ -252,6 +259,8 @@ void main() {
 			reconnection_data.rc_seed = -1;
 			// Partially fill in the contribution data
 			reconnection_data.reservoir_contribution = partial_throughput;
+			reconnection_data.rc_partial_jacobian *= bsdf_pdf_val;
+
 			rc_postfix_pdf = bsdf_pdf_val;
 			prefix_pdf_without_rc_pdf = joint_prev;
 			rc_throughput = partial_throughput;
@@ -288,10 +297,6 @@ void main() {
 		valid_reservoir = valid_reservoir || merged;
 #endif	// STREAMING_MODE == STREAMING_MODE_SPLIT
 		if (valid_reservoir) {
-			reservoir.data.rc_barycentrics = rc_barycentrics;
-			reservoir.data.rc_primitive_instance_id = rc_primitive_instance_id;
-			reservoir.data.rc_coords = rc_coords;
-
 			uint rc_type;
 			uint rc_prefix_length;
 			uint rc_postfix_length;
