@@ -17,6 +17,11 @@ class ReSTIRPT : public Integrator {
 		INDIVIDUAL_CONTRIBUTIONS,
 		SPLITTING_AT_RECONNECTION
 	};
+
+	enum class MISMethod {
+		TALBOT,
+		PAIRWISE
+	};
 	Buffer direct_lighting_buffer;
 	Buffer gris_gbuffer;
 	Buffer gris_prev_gbuffer;
@@ -33,12 +38,12 @@ class ReSTIRPT : public Integrator {
 	bool enable_spatial_reuse = true;
 	bool show_reconnection_radiance = false;
 	bool enable_temporal_reuse = false;
-	bool talbot_mis = true;
 	bool enable_gris = true;
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.00f;
 	uint32_t path_length = 0;
 	uint32_t num_spatial_samples = 1;
 	StreamingMethod streaming_method = StreamingMethod::INDIVIDUAL_CONTRIBUTIONS;
+	MISMethod mis_method = MISMethod::PAIRWISE;
 	ReSTIRPTConfig* config;
 };

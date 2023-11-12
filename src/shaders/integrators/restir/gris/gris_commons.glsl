@@ -222,11 +222,11 @@ bool stream_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData da
 
 bool combine_reservoir(inout uvec4 seed, inout Reservoir target_reservoir, const Reservoir input_reservoir,
 					   float target_pdf, float mis_weight, float jacobian) {
+	target_reservoir.M += input_reservoir.M;
 	float inv_source_pdf = mis_weight * jacobian * input_reservoir.W;
 	if (isnan(inv_source_pdf) || inv_source_pdf == 0.0 || isinf(inv_source_pdf)) {
 		return false;
 	}
-	target_reservoir.M += input_reservoir.M;
 	return update_reservoir(seed, target_reservoir, input_reservoir.data, target_pdf, inv_source_pdf);
 }
 
@@ -267,8 +267,8 @@ vec3 get_primary_direction(uvec2 coords) {
 	return normalize(sample_camera(d).xyz);
 }
 
-bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords, uvec2 src_coords,
-				   uint seed_helper, out float jacobian_out, out vec3 reservoir_contribution) {
+bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, uvec2 src_coords, uint seed_helper,
+				   out float jacobian_out, out vec3 reservoir_contribution) {
 	// Note: The source reservoir always corresponds to the canonical reservoir because retracing only happens on
 	// pairwise mode
 
@@ -278,7 +278,6 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 	if (!reservoir_data_valid(data)) {
 		return false;
 	}
-
 	uvec4 reservoir_seed = init_rng(src_coords, gl_LaunchSizeEXT.xy, seed_helper, data.init_seed);
 	HitData rc_gbuffer =
 		get_hitdata(data.rc_barycentrics, data.rc_primitive_instance_id.y, data.rc_primitive_instance_id.x);
@@ -298,16 +297,14 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		if ((prefix_depth + rc_postfix_length) >= pc.max_depth - 1) {
 			return false;
 		}
-		dst_gbuffer.pos = offset_ray(dst_gbuffer.pos, dst_gbuffer.n_g);
-		Material dst_hit_mat = load_material(dst_gbuffer.material_idx, dst_gbuffer.uv);
-
 		vec3 dst_wo = -dst_wi;
 		bool dst_side = face_forward(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo);
+		dst_gbuffer.pos = offset_ray(dst_gbuffer.pos, dst_gbuffer.n_g);
+		Material dst_hit_mat = load_material(dst_gbuffer.material_idx, dst_gbuffer.uv);
 
 		vec3 rc_wi = rc_gbuffer.pos - dst_gbuffer.pos;
 		float rc_wi_len = length(rc_wi);
 		rc_wi /= rc_wi_len;
-
 		bool connectable = is_rough(dst_hit_mat) && rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent &&
 						   prefix_depth >= (rc_prefix_length - 1);
 		bool connected = false;
@@ -320,18 +317,18 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		}
 		if (connected) {
 			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
-			bool rc_side_dst = face_forward(rc_gbuffer.n_s, rc_gbuffer.n_g, dst_wo);
+			bool rc_side_dst = face_forward(rc_gbuffer.n_s, rc_gbuffer.n_g, -rc_wi);
 			float g_dst = abs(dot(rc_gbuffer.n_s, -rc_wi)) / (rc_wi_len * rc_wi_len);
-
+			// The "source" location does not necessarily mean the canonical location
+			jacobian = g_dst / data.rc_partial_jacobian;
+			// Correction for solid angle Jacobians
 			float dst_pdf;
 			float cos_x = dot(dst_gbuffer.n_s, rc_wi);
 			vec3 dst_f = eval_bsdf(dst_gbuffer.n_s, dst_wo, dst_hit_mat, 1, dst_side, rc_wi, dst_pdf, cos_x);
 			if (dst_f == vec3(0)) {
 				return false;
 			}
-
-			jacobian =
-				data.rc_partial_jacobian == 0 ? 0.0 : data.rc_partial_jacobian * dst_pdf / data.rc_partial_jacobian;
+			jacobian *= dst_pdf;
 			if (rc_type == RECONNECTION_TYPE_NEE) {
 				// The NEE PDF does not depend on the surface, only MIS weight does
 				// Also we do not need to trace visibility ray since we know this was accepted into the reservoir
@@ -342,7 +339,6 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 				vec3 Li = do_nee(reconnection_seed, rc_gbuffer, rc_hit_mat, rc_side_dst, rc_gbuffer.n_s, -rc_wi,
 								 dst_L_wi, false);
 				ASSERT(debug_seed == data.debug_seed);
-				ASSERT(dst_L_wi == data.rc_wi);
 				reservoir_contribution = dst_f * abs(cos_x) * Li / dst_pdf;
 			} else {
 				ASSERT(data.rc_seed == -1);
@@ -367,6 +363,8 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 			jacobian_out = jacobian;
 
 			return true;
+		} else if (connectable) {
+			return false;
 		}
 		float pdf, cos_theta;
 		const vec3 f = sample_bsdf(dst_gbuffer.n_s, dst_wo, dst_hit_mat, 1 /*radiance=cam*/, dst_side, dst_wi, pdf,
@@ -387,6 +385,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 	}
 	return false;
 }
+
 bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords,
 					 uvec2 src_coords, uint seed_helper, out float jacobian_out, out vec3 reservoir_contribution) {
 	reservoir_contribution = vec3(0);
@@ -512,6 +511,16 @@ bool reconnect_paths_and_evaluate(in HitData dst_gbuffer, in HitData src_gbuffer
 	float jacobian = 0;
 	bool result = reconnect_paths(dst_gbuffer, src_gbuffer, data, dst_coords, src_coords, seed_helper, jacobian,
 								  reservoir_contribution);
+	target_pdf = calc_target_pdf(reservoir_contribution) * jacobian;
+	return result;
+}
+
+bool retrace_paths_and_evaluate(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, uvec2 src_coords,
+								uint seed_helper, out float target_pdf) {
+	vec3 reservoir_contribution;
+	float jacobian = 0;
+	bool result =
+		retrace_paths(dst_gbuffer, data, dst_coords, src_coords, seed_helper, jacobian, reservoir_contribution);
 	target_pdf = calc_target_pdf(reservoir_contribution) * jacobian;
 	return result;
 }

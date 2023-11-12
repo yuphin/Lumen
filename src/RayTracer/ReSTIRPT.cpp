@@ -124,15 +124,14 @@ void ReSTIRPT::render() {
 	pc_ray.min_vertex_distance_ratio = min_vertex_distance_ratio;
 	pc_ray.enable_gris = enable_gris;
 
-	const std::initializer_list<ResourceBinding> rt_bindings = {
-		output_tex,
-		scene_ubo_buffer,
-		scene_desc_buffer,
-	};
+	const std::initializer_list<ResourceBinding> common_bindings = {output_tex, scene_ubo_buffer, scene_desc_buffer,
+																	mesh_lights_buffer};
 
 	const std::array<Buffer*, 2> reservoir_buffers = {&gris_reservoir_ping_buffer, &gris_reservoir_pong_buffer};
 	const std::array<Buffer*, 2> gbuffers = {&gris_prev_gbuffer, &gris_gbuffer};
-	int ping_pong = pc_ray.total_frame_num % 2;
+
+	int ping = pc_ray.total_frame_num % 2;
+	int pong = ping ^ 1;
 
 	const std::vector<ShaderMacro> macros = {{"STREAMING_MODE", int(streaming_method)}};
 	// Trace rays
@@ -146,32 +145,91 @@ void ReSTIRPT::render() {
 											 .dims = {instance->width, instance->height},
 											 .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
-		.bind(rt_bindings)
-		.bind(mesh_lights_buffer)
-		.zero({*reservoir_buffers[1 - ping_pong], *reservoir_buffers[ping_pong]})
-		.bind(*reservoir_buffers[1 - ping_pong])
-		.bind(*gbuffers[1 - ping_pong])
+		.bind(common_bindings)
+		.bind(*reservoir_buffers[pong])
+		.bind(*gbuffers[pong])
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	if (enable_gris) {
-		instance->vkb.rg
-			->add_rt("GRIS - Spatial Reuse - Talbot",
-					 {.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen"},
-								  {"src/shaders/integrators/restir/gris/ray.rmiss"},
-								  {"src/shaders/ray_shadow.rmiss"},
-								  {"src/shaders/integrators/restir/gris/ray.rchit"},
-								  {"src/shaders/ray.rahit"}},
-					  .macros = macros,
-					  .dims = {instance->width, instance->height},
-					  .accel = instance->vkb.tlas.accel})
-			.push_constants(&pc_ray)
-			.bind(rt_bindings)
-			.bind(mesh_lights_buffer)
-			.bind(*reservoir_buffers[1 - ping_pong])
-			.bind(*reservoir_buffers[ping_pong])
-			.bind(*gbuffers[1 - ping_pong])
-			.bind_texture_array(scene_textures)
-			.bind_tlas(instance->vkb.tlas);
+		if (mis_method == MISMethod::TALBOT) {
+			instance->vkb.rg
+				->add_rt("GRIS - Spatial Reuse - Talbot",
+						 {.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen"},
+									  {"src/shaders/integrators/restir/gris/ray.rmiss"},
+									  {"src/shaders/ray_shadow.rmiss"},
+									  {"src/shaders/integrators/restir/gris/ray.rchit"},
+									  {"src/shaders/ray.rahit"}},
+						  .macros = macros,
+						  .dims = {instance->width, instance->height},
+						  .accel = instance->vkb.tlas.accel})
+				.push_constants(&pc_ray)
+				.bind(common_bindings)
+				.bind(*reservoir_buffers[pong])
+				.bind(*reservoir_buffers[ping])
+				.bind(*gbuffers[pong])
+				.bind_texture_array(scene_textures)
+				.bind_tlas(instance->vkb.tlas);
+		} else {
+			// Retrace
+			instance->vkb.rg
+				->add_rt("GRIS - Retrace Reservoirs",
+						 {.shaders = {{"src/shaders/integrators/restir/gris/retrace_paths.rgen"},
+									  {"src/shaders/integrators/restir/gris/ray.rmiss"},
+									  {"src/shaders/ray_shadow.rmiss"},
+									  {"src/shaders/integrators/restir/gris/ray.rchit"},
+									  {"src/shaders/ray.rahit"}},
+						  .macros = macros,
+						  .dims = {instance->width, instance->height},
+						  .accel = instance->vkb.tlas.accel})
+				.push_constants(&pc_ray)
+				.bind(common_bindings)
+				.bind(reconnection_buffer)
+				.bind(*reservoir_buffers[pong])
+				.bind(*reservoir_buffers[ping])
+				.bind(*gbuffers[pong])
+				.bind(*gbuffers[ping])
+				.bind_texture_array(scene_textures)
+				.bind_tlas(instance->vkb.tlas);
+			// Validate
+			instance->vkb.rg
+				->add_rt("GRIS - Validate Samples",
+						 {.shaders = {{"src/shaders/integrators/restir/gris/validate_samples.rgen"},
+									  {"src/shaders/integrators/restir/gris/ray.rmiss"},
+									  {"src/shaders/ray_shadow.rmiss"},
+									  {"src/shaders/integrators/restir/gris/ray.rchit"},
+									  {"src/shaders/ray.rahit"}},
+						  .macros = macros,
+						  .dims = {instance->width, instance->height},
+						  .accel = instance->vkb.tlas.accel})
+				.push_constants(&pc_ray)
+				.bind(common_bindings)
+				.bind(reconnection_buffer)
+				.bind(*reservoir_buffers[pong])
+				.bind(*reservoir_buffers[ping])
+				.bind(*gbuffers[pong])
+				.bind(*gbuffers[ping])
+				.bind_texture_array(scene_textures)
+				.bind_tlas(instance->vkb.tlas);
+			// Spatial Reuse
+			instance->vkb.rg
+				->add_rt("GRIS - Spatial Reuse",
+						 {.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse.rgen"},
+									  {"src/shaders/integrators/restir/gris/ray.rmiss"},
+									  {"src/shaders/ray_shadow.rmiss"},
+									  {"src/shaders/integrators/restir/gris/ray.rchit"},
+									  {"src/shaders/ray.rahit"}},
+						  .macros = macros,
+						  .dims = {instance->width, instance->height},
+						  .accel = instance->vkb.tlas.accel})
+				.push_constants(&pc_ray)
+				.bind(common_bindings)
+				.bind(reconnection_buffer)
+				.bind(*reservoir_buffers[pong])
+				.bind(*reservoir_buffers[ping])
+				.bind(*gbuffers[pong])
+				.bind_texture_array(scene_textures)
+				.bind_tlas(instance->vkb.tlas);
+		}
 	}
 
 #if 0
@@ -326,7 +384,15 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
 	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
 	result |= ImGui::Checkbox("Show reconnection radiance", &show_reconnection_radiance);
-	result |= ImGui::Checkbox("Enable Talbot MIS weights", &talbot_mis);
+	std::array<const char*, 2> mis_methods = {
+		"Talbot (Reconnection only)",
+		"Pairwise",
+	};
+	int curr_mis_method = static_cast<int>(mis_method);
+	if (ImGui::Combo("MIS method", &curr_mis_method, mis_methods.data(), int(mis_methods.size()))) {
+		result = true;
+		mis_method = static_cast<MISMethod>(curr_mis_method);
+	}
 	result |= ImGui::Checkbox("Enable temporal reuse", &enable_temporal_reuse);
 	bool spatial_samples_changed = ImGui::SliderInt("Num spatial samples", (int*)&num_spatial_samples, 0, 12);
 	result |= spatial_samples_changed;

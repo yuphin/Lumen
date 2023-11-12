@@ -181,19 +181,19 @@ void main() {
 				rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 				rc_pdf = bsdf_pdf_val;
 				vec3 to_prev = origin.xyz - gbuffer.pos;
-				rc_partial_jacobian = abs(dot(n_s, wo)) / dot(to_prev, to_prev);
+				rc_partial_jacobian = bsdf_pdf_val * abs(dot(n_s, wo)) / dot(to_prev, to_prev);
 
 				reconnection_data.rc_barycentrics = rc_barycentrics;
 				reconnection_data.rc_primitive_instance_id = rc_primitive_instance_id;
 				reconnection_data.rc_coords = rc_coords;
 				reconnection_data.rc_partial_jacobian = rc_partial_jacobian;
 
+				reconnection_data.debug_seed = debug_seed;
 				reconnection_data.rc_seed = rc_seed;
 				reconnection_data.rc_wi = wi;
 				reconnection_data.rc_Li = Li;
 				reconnection_data.reservoir_contribution =
 					contribution;  // partial_throughput * reconnection_data.rc_Li / (joint_pdf * rc_pdf);
-				reservoir.data.debug_seed = debug_seed;
 				reconnection_data.path_flags = pack_path_flags(depth, 1, RECONNECTION_TYPE_NEE, side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
@@ -260,6 +260,7 @@ void main() {
 			// Partially fill in the contribution data
 			reconnection_data.reservoir_contribution = partial_throughput;
 			reconnection_data.rc_partial_jacobian *= bsdf_pdf_val;
+			reconnection_data.debug_seed = uvec4(-1);
 
 			rc_postfix_pdf = bsdf_pdf_val;
 			prefix_pdf_without_rc_pdf = joint_prev;
