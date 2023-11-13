@@ -114,7 +114,8 @@ void main() {
 		curr_rough = is_rough(hit_mat);
 		// TODO: Check hit distance
 		was_connectable = connectable;
-		connectable = !connectable_vertex_found && ((prev_rough && curr_rough));
+		connectable = !connectable_vertex_found && ((prev_rough && curr_rough)) &&
+					  length(gbuffer.pos - origin.xyz) > pc.min_vertex_distance_ratio * pc.scene_extent;
 
 		const vec3 wo = -direction;
 		vec3 n_s = gbuffer.n_s;
@@ -152,9 +153,9 @@ void main() {
 					reconnection_data.pdf_light_w = pdf_light_w;
 				}
 				float prev = reservoir.w_sum;
-				reconnection_data.path_flags =
-					pack_path_flags(prefix_depth, depth - prefix_depth,
-								   was_connectable ? RECONNECTION_TYPE_EMISSIVE_AFTER_RC : RECONNECTION_TYPE_DEFAULT, side);
+				reconnection_data.path_flags = pack_path_flags(
+					prefix_depth, depth - prefix_depth,
+					was_connectable ? RECONNECTION_TYPE_EMISSIVE_AFTER_RC : RECONNECTION_TYPE_DEFAULT, side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
@@ -163,7 +164,7 @@ void main() {
 #endif	// STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 			}
 		}
-	
+
 		vec3 rc_Li = vec3(0);
 		last_vertex_specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
 		// NEE
@@ -317,7 +318,13 @@ void main() {
 		// The samples are additive, therefore set M to 1
 		reservoir.M = 1;
 		calc_reservoir_W(reservoir);
-		col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
+		if(!connectable_vertex_found) {
+			prefix_col = col;
+		}
+		prefix_contributions.d[pixel_idx] = prefix_col;
+#if 0
+			col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
+#endif
 	}
 
 	if (pc.enable_gris == 0) {
