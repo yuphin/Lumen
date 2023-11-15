@@ -339,7 +339,7 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, u
 				vec3 Li = do_nee(reconnection_seed, rc_gbuffer, rc_hit_mat, rc_side_dst, rc_gbuffer.n_s, -rc_wi,
 								 dst_L_wi, false);
 				ASSERT(debug_seed == data.debug_seed);
-				reservoir_contribution = dst_f * abs(cos_x) * Li / dst_pdf;
+				reservoir_contribution = prefix_throughput * dst_f * abs(cos_x) * Li / dst_pdf;
 			} else {
 				ASSERT(data.rc_seed == -1);
 
@@ -352,7 +352,7 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, u
 				if (rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
 					mis_weight = 1.0 / (1 + data.pdf_light_w / dst_postfix_pdf);
 				}
-				reservoir_contribution = mis_weight * dst_f * abs(cos_x) * dst_postfix_f * abs(rc_cos_x) * data.rc_Li /
+				reservoir_contribution = prefix_throughput * mis_weight * dst_f * abs(cos_x) * dst_postfix_f * abs(rc_cos_x) * data.rc_Li /
 										 (dst_postfix_pdf * dst_pdf);
 			}
 			if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
@@ -363,7 +363,8 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, u
 			jacobian_out = jacobian;
 
 			return true;
-		} else if (connectable) {
+		} 
+		else if (connectable) {
 			return false;
 		}
 		float pdf, cos_theta;

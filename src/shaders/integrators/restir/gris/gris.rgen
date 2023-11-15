@@ -41,7 +41,6 @@ void main() {
 	bool connectable_vertex_found = false;
 	bool prev_rough = false;
 	bool curr_rough = false;
-	uint init_seed;
 	Reservoir reservoir;
 	GrisData reconnection_data;
 	init_reservoir(reservoir);
@@ -231,7 +230,7 @@ void main() {
 		origin.xyz = offset_ray(gbuffer.pos, n_g);
 		// Record initial seed after direct light sampling
 		if (depth == 0) {
-			init_seed = seed.w;
+			reconnection_data.init_seed = seed.w;
 		}
 
 		// Joint PDF includes up until the PDF that generates the reconnection vertex
@@ -318,7 +317,7 @@ void main() {
 		// The samples are additive, therefore set M to 1
 		reservoir.M = 1;
 		calc_reservoir_W(reservoir);
-		if(!connectable_vertex_found) {
+		if (!connectable_vertex_found) {
 			prefix_col = col;
 		}
 		prefix_contributions.d[pixel_idx] = prefix_col;

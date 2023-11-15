@@ -51,6 +51,5 @@ void main() {
 			retrace_paths(canonical_gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy,
 							uvec2(coords), seed_helper, data.jacobian, data.reservoir_contribution);
 		reconnection_data[(num_spatial_samples + 1) * pixel_idx + i + 1] = data;
-		LOG_CLICKED("%f\n", data.jacobian);
 	}
 }
