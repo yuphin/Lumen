@@ -60,7 +60,7 @@ void main() {
 	// Whether the normals at the reconnection vertex has been flipped
 	bool rc_side = false;
 	// Reconnection pdf times the geometry term at the reconnection vertex
-	float rc_partial_jacobian = 0;
+	float rc_partial_jacobian = 1;
 
 	int prefix_depth = 0;
 	vec3 prefix_col = vec3(0);
@@ -181,7 +181,7 @@ void main() {
 				rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 				rc_pdf = bsdf_pdf_val;
 				vec3 to_prev = origin.xyz - gbuffer.pos;
-				rc_partial_jacobian = bsdf_pdf_val * abs(dot(n_s, wo)) / dot(to_prev, to_prev);
+				rc_partial_jacobian *= bsdf_pdf_val * abs(dot(n_s, wo)) / dot(to_prev, to_prev);
 
 				reconnection_data.rc_barycentrics = rc_barycentrics;
 				reconnection_data.rc_primitive_instance_id = rc_primitive_instance_id;
@@ -266,6 +266,10 @@ void main() {
 			prefix_pdf_without_rc_pdf = joint_prev;
 			rc_throughput = partial_throughput;
 			rc_side = side;
+		}
+
+		if(depth > 0 && !connectable && !connectable_vertex_found) {
+			rc_partial_jacobian *= bsdf_pdf_val;
 		}
 
 		if (pc.enable_rr == 1) {

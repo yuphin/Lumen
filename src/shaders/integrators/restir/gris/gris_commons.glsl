@@ -293,8 +293,13 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, u
 	vec3 prefix_throughput = vec3(1);
 
 	vec3 dst_wi = get_primary_direction(dst_coords);
+	float prefix_jacobian = 1.0;
 	while (true) {
 		if ((prefix_depth + rc_postfix_length) >= pc.max_depth - 1) {
+			return false;
+		}
+
+		if(prefix_depth > (rc_prefix_length - 1)) {
 			return false;
 		}
 		vec3 dst_wo = -dst_wi;
@@ -306,7 +311,7 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, u
 		float rc_wi_len = length(rc_wi);
 		rc_wi /= rc_wi_len;
 		bool connectable = is_rough(dst_hit_mat) && rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent &&
-						   prefix_depth >= (rc_prefix_length - 1);
+						   prefix_depth == (rc_prefix_length - 1);
 		bool connected = false;
 		if (connectable) {
 			any_hit_payload.hit = 1;
@@ -314,6 +319,9 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, u
 			traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p,
 						0, rc_wi, rc_wi_len - EPS, 1);
 			connected = any_hit_payload.hit == 0;
+			if(!connected) {
+				return false;
+			}
 		}
 		if (connected) {
 			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
@@ -328,7 +336,7 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, u
 			if (dst_f == vec3(0)) {
 				return false;
 			}
-			jacobian *= dst_pdf;
+			jacobian *= dst_pdf * prefix_jacobian;
 			if (rc_type == RECONNECTION_TYPE_NEE) {
 				// The NEE PDF does not depend on the surface, only MIS weight does
 				// Also we do not need to trace visibility ray since we know this was accepted into the reservoir
@@ -364,9 +372,6 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, u
 
 			return true;
 		} 
-		else if (connectable) {
-			return false;
-		}
 		float pdf, cos_theta;
 		const vec3 f = sample_bsdf(dst_gbuffer.n_s, dst_wo, dst_hit_mat, 1 /*radiance=cam*/, dst_side, dst_wi, pdf,
 								   cos_theta, reservoir_seed);
@@ -374,6 +379,7 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, u
 			return false;
 		}
 
+		prefix_jacobian *= pdf;
 		prefix_throughput *= f * abs(cos_theta) / pdf;
 
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, dst_gbuffer.pos, tmin, dst_wi, tmax, 0);
