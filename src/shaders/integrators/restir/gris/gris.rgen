@@ -238,6 +238,7 @@ void main() {
 		joint_pdf *= bsdf_pdf_val;
 		// Sample direction & update partial_throughput
 		float cos_theta;
+
 		const vec3 f =
 			sample_bsdf(n_s, wo, hit_mat, 1 /*radiance=cam*/, side, direction, bsdf_pdf_val, cos_theta, seed);
 		if (bsdf_pdf_val == 0) {
@@ -268,7 +269,7 @@ void main() {
 			rc_side = side;
 		}
 
-		if(depth > 0 && !connectable && !connectable_vertex_found) {
+		if (depth > 0 && !connectable && !connectable_vertex_found) {
 			rc_partial_jacobian *= bsdf_pdf_val;
 		}
 

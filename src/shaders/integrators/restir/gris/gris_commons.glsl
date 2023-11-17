@@ -267,8 +267,8 @@ vec3 get_primary_direction(uvec2 coords) {
 	return normalize(sample_camera(d).xyz);
 }
 
-bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, uvec2 src_coords, uint seed_helper,
-				   out float jacobian_out, out vec3 reservoir_contribution) {
+bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords, uvec2 src_coords,
+				   uint seed_helper, out float jacobian_out, out vec3 reservoir_contribution) {
 	// Note: The source reservoir always corresponds to the canonical reservoir because retracing only happens on
 	// pairwise mode
 
@@ -294,12 +294,12 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, u
 
 	vec3 dst_wi = get_primary_direction(dst_coords);
 	float prefix_jacobian = 1.0;
+	
+	Material src_hit_mat = load_material(src_gbuffer.material_idx, src_gbuffer.uv);
+	bool src_rough = is_rough(src_hit_mat);
+	bool src_far = length(rc_gbuffer.pos - src_gbuffer.pos) > pc.min_vertex_distance_ratio * pc.scene_extent;
 	while (true) {
-		if ((prefix_depth + rc_postfix_length) >= pc.max_depth - 1) {
-			return false;
-		}
-
-		if(prefix_depth > (rc_prefix_length - 1)) {
+		if (((prefix_depth + rc_postfix_length) >= pc.max_depth - 1) || prefix_depth > (rc_prefix_length - 1)) {
 			return false;
 		}
 		vec3 dst_wo = -dst_wi;
@@ -310,8 +310,10 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, u
 		vec3 rc_wi = rc_gbuffer.pos - dst_gbuffer.pos;
 		float rc_wi_len = length(rc_wi);
 		rc_wi /= rc_wi_len;
-		bool connectable = is_rough(dst_hit_mat) && rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent &&
-						   prefix_depth == (rc_prefix_length - 1);
+
+		bool dst_rough = is_rough(dst_hit_mat);
+		bool dst_far = rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent;
+		bool connectable = dst_rough && dst_far && prefix_depth == (rc_prefix_length - 1);
 		bool connected = false;
 		if (connectable) {
 			any_hit_payload.hit = 1;
@@ -319,7 +321,7 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, u
 			traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p,
 						0, rc_wi, rc_wi_len - EPS, 1);
 			connected = any_hit_payload.hit == 0;
-			if(!connected) {
+			if (!connected) {
 				return false;
 			}
 		}
@@ -360,8 +362,8 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, u
 				if (rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
 					mis_weight = 1.0 / (1 + data.pdf_light_w / dst_postfix_pdf);
 				}
-				reservoir_contribution = prefix_throughput * mis_weight * dst_f * abs(cos_x) * dst_postfix_f * abs(rc_cos_x) * data.rc_Li /
-										 (dst_postfix_pdf * dst_pdf);
+				reservoir_contribution = prefix_throughput * mis_weight * dst_f * abs(cos_x) * dst_postfix_f *
+										 abs(rc_cos_x) * data.rc_Li / (dst_postfix_pdf * dst_pdf);
 			}
 			if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
 				jacobian_out = 0;
@@ -371,11 +373,16 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, u
 			jacobian_out = jacobian;
 
 			return true;
-		} 
+		}
 		float pdf, cos_theta;
 		const vec3 f = sample_bsdf(dst_gbuffer.n_s, dst_wo, dst_hit_mat, 1 /*radiance=cam*/, dst_side, dst_wi, pdf,
 								   cos_theta, reservoir_seed);
 		if (pdf == 0) {
+			return false;
+		}
+		// If the connectability conditions are violated, we need to ensure symmetry
+		if(prefix_depth == 0 && (src_far &&  src_rough)) {
+			// If the source reservoir is valid from the first bounce, then it's not a valid neighbor
 			return false;
 		}
 
@@ -522,12 +529,12 @@ bool reconnect_paths_and_evaluate(in HitData dst_gbuffer, in HitData src_gbuffer
 	return result;
 }
 
-bool retrace_paths_and_evaluate(in HitData dst_gbuffer, in GrisData data, uvec2 dst_coords, uvec2 src_coords,
-								uint seed_helper, out float target_pdf) {
+bool retrace_paths_and_evaluate(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords,
+								uvec2 src_coords, uint seed_helper, out float target_pdf) {
 	vec3 reservoir_contribution;
 	float jacobian = 0;
-	bool result =
-		retrace_paths(dst_gbuffer, data, dst_coords, src_coords, seed_helper, jacobian, reservoir_contribution);
+	bool result = retrace_paths(dst_gbuffer, src_gbuffer, data, dst_coords, src_coords, seed_helper, jacobian,
+								reservoir_contribution);
 	target_pdf = calc_target_pdf(reservoir_contribution) * jacobian;
 	return result;
 }

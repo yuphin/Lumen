@@ -25,6 +25,9 @@ void main() {
 		return;
 	}
 
+	HitData canonical_gbuffer =
+		get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
+
 	uint num_spatial_samples = pc.enable_spatial_reuse == 1 ? pc.num_spatial_samples : 0;
 	const Reservoir canonical_reservoir = in_reservoirs[pixel_idx];
 
@@ -48,7 +51,7 @@ void main() {
 		ReconnectionData data = reconnection_data[num_spatial_samples * pixel_idx + i];
 		float target_pdf_in_neighbor = 0;
 		bool canonical_in_neighbor =
-			retrace_paths_and_evaluate(unpacked_neighbor_gbuffer, canonical_reservoir.data, uvec2(coords),
+			retrace_paths_and_evaluate(unpacked_neighbor_gbuffer, canonical_gbuffer, canonical_reservoir.data, uvec2(coords),
 									   gl_LaunchIDEXT.xy, seed_helper, target_pdf_in_neighbor);
 		reconnection_data[(num_spatial_samples + 1) * pixel_idx + i + 1].target_pdf_in_neighbor =
 			target_pdf_in_neighbor;
