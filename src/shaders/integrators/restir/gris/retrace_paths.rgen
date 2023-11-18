@@ -16,7 +16,6 @@ layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir in_reservoi
 layout(binding = 6, std430) readonly buffer PrevReservoirs { Reservoir prev_reservoirs[]; };
 layout(binding = 7, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
 layout(binding = 8, std430) readonly buffer PrevGbuffer { GBuffer prev_gbuffers[]; };
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.random_num);
 uvec4 seed2 = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, 0);
 
 void main() {
@@ -30,7 +29,7 @@ void main() {
 
 	// TODO: Temporal reuse
 
-	uint seed_helper = pc.random_num;
+	uvec2 seed_helpers = uvec2(pc.general_seed, pc.sampling_seed);
 	for (uint i = 0; i < num_spatial_samples; i++) {
 		ivec2 rand_offset = get_neighbor_offset(seed2);
 		const ivec2 coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
@@ -52,7 +51,7 @@ void main() {
 						neighbor_gbuffer.primitive_instance_id.x);
 
 		bool valid = retrace_paths(canonical_gbuffer, unpacked_neighbor_gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy,
-								   uvec2(coords), seed_helper, data.jacobian, data.reservoir_contribution);
+								   uvec2(coords), seed_helpers, data.jacobian, data.reservoir_contribution);
 		reconnection_data[(num_spatial_samples + 1) * pixel_idx + i + 1] = data;
 	}
 }

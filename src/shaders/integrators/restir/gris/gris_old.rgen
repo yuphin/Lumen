@@ -15,7 +15,7 @@ PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix
 
 layout(binding = 4, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
 layout(binding = 5, std430) writeonly buffer OutGBuffer { GBuffer out_gbuffers[]; };
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.random_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
 
 void main() {
 	const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);

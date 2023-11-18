@@ -36,7 +36,7 @@ void main() {
 	int num_spatial_samples = pc.enable_spatial_reuse == 1 ? int(pc.num_spatial_samples) : 0;
 	vec3 curr_reservoir_contribution = vec3(0);
 
-	uint seed_helper = pc.random_num;
+	uint seed_helper = pc.general_seed;
 	ivec2 offsets[MAX_SPATIAL_SAMPLES];
 	for (int i = 0; i < MAX_SPATIAL_SAMPLES; i++) {
 		ivec2 offset = get_neighbor_offset(seed);

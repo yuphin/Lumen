@@ -105,8 +105,9 @@ void ReSTIRPT::init() {
 void ReSTIRPT::render() {
 	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true);
 	pc_ray.num_lights = (int)lights.size();
-	pc_ray.prev_random_num = pc_ray.random_num;
-	pc_ray.random_num = rand() % UINT_MAX;
+	pc_ray.prev_random_num = pc_ray.general_seed;
+	pc_ray.general_seed = rand() % UINT_MAX;
+	pc_ray.sampling_seed = rand() % UINT_MAX;
 	pc_ray.max_depth = path_length;
 	pc_ray.sky_col = config->sky_col;
 	pc_ray.total_light_area = total_light_area;

@@ -13,7 +13,8 @@ struct PCReSTIRPT {
 	float total_light_area;
 	int light_triangle_count;
 	uint dir_light_idx;
-	uint random_num;
+	uint general_seed;
+	uint sampling_seed;
 	uint prev_random_num;
 	uint total_frame_num;
 	uint enable_accumulation;

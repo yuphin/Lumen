@@ -268,7 +268,7 @@ vec3 get_primary_direction(uvec2 coords) {
 }
 
 bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords, uvec2 src_coords,
-				   uint seed_helper, out float jacobian_out, out vec3 reservoir_contribution) {
+				   uvec2 seed_helpers, out float jacobian_out, out vec3 reservoir_contribution) {
 	// Note: The source reservoir always corresponds to the canonical reservoir because retracing only happens on
 	// pairwise mode
 
@@ -278,7 +278,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 	if (!reservoir_data_valid(data)) {
 		return false;
 	}
-	uvec4 reservoir_seed = init_rng(src_coords, gl_LaunchSizeEXT.xy, seed_helper, data.init_seed);
+	uvec4 reservoir_seed = init_rng(src_coords, gl_LaunchSizeEXT.xy, seed_helpers.y, data.init_seed);
 	HitData rc_gbuffer =
 		get_hitdata(data.rc_barycentrics, data.rc_primitive_instance_id.y, data.rc_primitive_instance_id.x);
 	Material rc_hit_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
@@ -294,7 +294,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 
 	vec3 dst_wi = get_primary_direction(dst_coords);
 	float prefix_jacobian = 1.0;
-	
+
 	Material src_hit_mat = load_material(src_gbuffer.material_idx, src_gbuffer.uv);
 	bool src_rough = is_rough(src_hit_mat);
 	bool src_far = length(rc_gbuffer.pos - src_gbuffer.pos) > pc.min_vertex_distance_ratio * pc.scene_extent;
@@ -343,7 +343,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 				// The NEE PDF does not depend on the surface, only MIS weight does
 				// Also we do not need to trace visibility ray since we know this was accepted into the reservoir
 				uvec2 rc_coords = uvec2(data.rc_coords / gl_LaunchSizeEXT.y, data.rc_coords % gl_LaunchSizeEXT.y);
-				uvec4 reconnection_seed = init_rng(rc_coords, gl_LaunchSizeEXT.xy, seed_helper, data.rc_seed);
+				uvec4 reconnection_seed = init_rng(rc_coords, gl_LaunchSizeEXT.xy, seed_helpers.x, data.rc_seed);
 				vec3 dst_L_wi;
 				uvec4 debug_seed = reconnection_seed;
 				vec3 Li = do_nee(reconnection_seed, rc_gbuffer, rc_hit_mat, rc_side_dst, rc_gbuffer.n_s, -rc_wi,
@@ -381,7 +381,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 			return false;
 		}
 		// If the connectability conditions are violated, we need to ensure symmetry
-		if(prefix_depth == 0 && (src_far &&  src_rough)) {
+		if (prefix_depth == 0 && (src_far && src_rough)) {
 			// If the source reservoir is valid from the first bounce, then it's not a valid neighbor
 			return false;
 		}
@@ -530,10 +530,10 @@ bool reconnect_paths_and_evaluate(in HitData dst_gbuffer, in HitData src_gbuffer
 }
 
 bool retrace_paths_and_evaluate(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords,
-								uvec2 src_coords, uint seed_helper, out float target_pdf) {
+								uvec2 src_coords, uvec2 seed_helpers, out float target_pdf) {
 	vec3 reservoir_contribution;
 	float jacobian = 0;
-	bool result = retrace_paths(dst_gbuffer, src_gbuffer, data, dst_coords, src_coords, seed_helper, jacobian,
+	bool result = retrace_paths(dst_gbuffer, src_gbuffer, data, dst_coords, src_coords, seed_helpers, jacobian,
 								reservoir_contribution);
 	target_pdf = calc_target_pdf(reservoir_contribution) * jacobian;
 	return result;

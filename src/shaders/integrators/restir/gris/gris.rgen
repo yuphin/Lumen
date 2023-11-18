@@ -16,7 +16,8 @@ PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix
 layout(binding = 4, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
 layout(binding = 5, std430) writeonly buffer OutGBuffer { GBuffer out_gbuffers[]; };
 
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.random_num);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
+uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
 
 void main() {
 	const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
@@ -181,7 +182,7 @@ void main() {
 				rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 				rc_pdf = bsdf_pdf_val;
 				vec3 to_prev = origin.xyz - gbuffer.pos;
-				rc_partial_jacobian *= bsdf_pdf_val * abs(dot(n_s, wo)) / dot(to_prev, to_prev);
+				rc_partial_jacobian *= abs(dot(n_s, wo)) / dot(to_prev, to_prev);
 
 				reconnection_data.rc_barycentrics = rc_barycentrics;
 				reconnection_data.rc_primitive_instance_id = rc_primitive_instance_id;
@@ -230,7 +231,7 @@ void main() {
 		origin.xyz = offset_ray(gbuffer.pos, n_g);
 		// Record initial seed after direct light sampling
 		if (depth == 0) {
-			reconnection_data.init_seed = seed.w;
+			reconnection_data.init_seed = sampling_seed.w;
 		}
 
 		// Joint PDF includes up until the PDF that generates the reconnection vertex
@@ -240,7 +241,7 @@ void main() {
 		float cos_theta;
 
 		const vec3 f =
-			sample_bsdf(n_s, wo, hit_mat, 1 /*radiance=cam*/, side, direction, bsdf_pdf_val, cos_theta, seed);
+			sample_bsdf(n_s, wo, hit_mat, 1 /*radiance=cam*/, side, direction, bsdf_pdf_val, cos_theta, sampling_seed);
 		if (bsdf_pdf_val == 0) {
 			break;
 		}
@@ -269,10 +270,7 @@ void main() {
 			rc_side = side;
 		}
 
-		if (depth > 0 && !connectable && !connectable_vertex_found) {
-			rc_partial_jacobian *= bsdf_pdf_val;
-		}
-
+		rc_partial_jacobian *= bsdf_pdf_val;
 		if (pc.enable_rr == 1) {
 			float rr_scale = 1.0;
 			if (hit_mat.bsdf_type == BSDF_GLASS) {
