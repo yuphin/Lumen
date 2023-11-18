@@ -133,7 +133,10 @@ void ReSTIRPT::render() {
 	int ping = pc_ray.total_frame_num % 2;
 	int pong = ping ^ 1;
 
-	const std::vector<ShaderMacro> macros = {{"STREAMING_MODE", int(streaming_method)}};
+	std::vector<ShaderMacro> macros = {{"STREAMING_MODE", int(streaming_method)}};
+	if (canonical_only) {
+		macros.push_back(ShaderMacro("CANONICAL_ONLY"));
+	}
 	// Trace rays
 	instance->vkb.rg
 		->add_rt("GRIS - Generate Samples", {.shaders = {{"src/shaders/integrators/restir/gris/gris.rgen"},
@@ -150,7 +153,7 @@ void ReSTIRPT::render() {
 		.bind(*gbuffers[pong])
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
-	if (enable_gris) {
+	if (enable_gris && !canonical_only) {
 		if (mis_method == MISMethod::TALBOT) {
 			instance->vkb.rg
 				->add_rt("GRIS - Spatial Reuse - Talbot",
@@ -378,7 +381,8 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);
 	result |= ImGui::Checkbox("Enable GRIS", &enable_gris);
 	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
-	if (!enable_gris) {
+	result |= ImGui::Checkbox("Enable canonical-only mode", &canonical_only);
+	if (!enable_gris || canonical_only) {
 		return result;
 	}
 	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);

@@ -326,9 +326,20 @@ void main() {
 			prefix_col = col;
 		}
 		prefix_contributions.d[pixel_idx] = prefix_col;
-#if 0
-			col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
-#endif
+#ifdef CANONICAL_ONLY
+		col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
+		if(pc.direct_lighting == 1) {
+			col += direct_lighting;
+		}
+		if (pc.frame_num > 0) {
+			float w = 1. / float(pc.frame_num + 1);
+			vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
+		} else {
+			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+		}
+		return;
+#endif // CANONICAL_ONLY
 	}
 
 	if (pc.enable_gris == 0) {
