@@ -202,6 +202,7 @@ void SMLT::init() {
 
 	pc_ray.total_light_area = 0;
 	pc_ray.frame_num = 0;
+	frameNUM = 0;
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 	pc_ray.mutations_per_pixel = mutations_per_pixel;
@@ -422,9 +423,11 @@ void SMLT::render() {
 
 bool SMLT::update() {
 	pc_ray.frame_num++;
+	frameNUM++;
 	bool updated = Integrator::update();
 	if (updated) {
 		pc_ray.frame_num = 0;
+		frameNUM = 0;
 	}
 	return updated;
 }

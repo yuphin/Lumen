@@ -51,7 +51,7 @@ struct LightRecord {
     uint flags;
 };
 
-#define pow5(x) (x * x) * (x * x) * x
+#define pow5(x) (((x) * (x)) * ((x) * (x)) * (x))
 #define sqr(x) (x * x)
 
 uint hash(ivec3 p, uint size) {
@@ -172,7 +172,7 @@ vec3 rot_quat(vec4 q, vec3 v) {
 
 
 vec3 fresnel_schlick(vec3 f0, float ns) {
-    return f0 + (1 - f0) * pow(1.0f - ns, 5.0f);
+    return f0 + (1 - f0) * pow5(1.0f - ns);
 }
 
 float beckmann_alpha_to_s(float alpha) {

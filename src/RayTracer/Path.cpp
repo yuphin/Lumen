@@ -15,6 +15,7 @@ void Path::init() {
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc,
 							 true);
 	pc_ray.frame_num = 0;
+	frameNUM = 0;
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 	assert(instance->vkb.rg->settings.shader_inference == true);
@@ -54,9 +55,11 @@ void Path::render() {
 
 bool Path::update() {
 	pc_ray.frame_num++;
+	frameNUM++;
 	bool updated = Integrator::update();
 	if (updated) {
 		pc_ray.frame_num = 0;
+		frameNUM = 0;
 	}
 	return updated;
 }

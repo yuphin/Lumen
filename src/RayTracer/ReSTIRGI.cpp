@@ -52,6 +52,7 @@ void ReSTIRGI::init() {
 
 	pc_ray.total_light_area = 0;
 	pc_ray.frame_num = 0;
+	frameNUM = 0;
 	pc_ray.total_frame_num = 0;
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
@@ -148,9 +149,11 @@ void ReSTIRGI::render() {
 
 bool ReSTIRGI::update() {
 	pc_ray.frame_num++;
+	frameNUM++;
 	bool updated = Integrator::update();
 	if (updated) {
 		pc_ray.frame_num = 0;
+		frameNUM = 0;
 	}
 	return updated;
 }
