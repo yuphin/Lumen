@@ -112,8 +112,9 @@ void main() {
 		curr_rough = is_rough(hit_mat);
 		// TODO: Check hit distance
 		was_connectable = connectable;
-		connectable = !connectable_vertex_found && ((prev_rough && curr_rough)) &&
-					  length(gbuffer.pos - origin.xyz) > pc.min_vertex_distance_ratio * pc.scene_extent;
+
+		bool constraints_satisfied = prev_rough && length(gbuffer.pos - origin.xyz) > pc.min_vertex_distance_ratio * pc.scene_extent;
+		connectable = !connectable_vertex_found && (curr_rough && constraints_satisfied);
 
 		const vec3 wo = -direction;
 		vec3 n_s = gbuffer.n_s;
@@ -165,6 +166,8 @@ void main() {
 
 		if (connectable_vertex_found) {
 			postfix_depth++;
+		} else if(depth > 0) {
+			set_bounce_flag(reconnection_data.bounce_flags, depth - 1, constraints_satisfied);
 		}
 
 		if (depth >= pc.max_depth - 1) {
@@ -273,7 +276,6 @@ void main() {
 			rc_throughput = partial_throughput;
 			rc_side = side;
 		}
-
 		rc_partial_jacobian *= bsdf_pdf_val;
 		if (pc.enable_rr == 1) {
 			float rr_scale = 1.0;

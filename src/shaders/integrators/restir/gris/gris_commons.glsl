@@ -261,6 +261,12 @@ void unpack_path_flags(uint packed_data, out uint reconnection_type, out uint pr
 	side = ((packed_data >> 12) & 1) == 1;
 }
 
+void set_bounce_flag(inout uint flags, uint depth, bool constraints_satisfied) {
+	flags |= (uint(constraints_satisfied) << depth);
+}
+
+bool get_bounce_flag(uint flags, uint depth) { return ((flags >> depth) & 1) == 1; }
+
 vec3 get_primary_direction(uvec2 coords) {
 	const vec2 uv = vec2(coords + vec2(0.5)) / vec2(gl_LaunchSizeEXT.xy);
 	const vec2 d = uv * 2.0 - 1;
@@ -315,9 +321,14 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		bool dst_rough = is_rough(dst_hit_mat);
 		bool dst_far = rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent;
 
+		bool src_satisfied = get_bounce_flag(data.bounce_flags, prefix_depth);
 		constraints_satisfied = dst_rough && dst_far;
 
-		bool connectable = constraints_satisfied && prefix_depth == int(rc_prefix_length - 1);
+		if(src_satisfied != constraints_satisfied) {
+			return false;
+		}
+		bool connectable = constraints_satisfied && prefix_depth == (rc_prefix_length - 1);
+
 		bool connected = false;
 		if (connectable) {
 			any_hit_payload.hit = 1;
@@ -384,12 +395,6 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		if (pdf == 0) {
 			return false;
 		}
-		// If the connectability conditions are violated, we need to ensure symmetry
-		if (prefix_depth == 0 && (src_far && src_rough)) {
-			// If the source reservoir is valid from the first bounce, then it's not a valid neighbor
-			return false;
-		}
-
 		prefix_jacobian *= pdf;
 		prefix_throughput *= f * abs(cos_theta) / pdf;
 
