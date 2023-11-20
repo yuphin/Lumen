@@ -193,8 +193,9 @@ void VCMMLT::init() {
 		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
 	pc_ray.total_light_area = 0;
-	pc_ray.frame_num = 0;
+
 	frameNUM = 0;
+
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 	pc_ray.mutations_per_pixel = config->mutations_per_pixel;
@@ -213,6 +214,7 @@ void VCMMLT::render() {
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;
+	pc_ray.frame_num = frameNUM;
 	// VCMMLT related constants
 	pc_ray.use_vm = use_vm;
 	pc_ray.light_rand_count = light_path_rand_count;
@@ -423,11 +425,9 @@ bool VCMMLT::gui() {
 }
 
 bool VCMMLT::update() {
-	pc_ray.frame_num++;
 	frameNUM++;
 	bool updated = Integrator::update();
 	if (updated) {
-		pc_ray.frame_num = 0;
 		frameNUM = 0;
 	}
 	return updated;

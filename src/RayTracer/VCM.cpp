@@ -97,8 +97,9 @@ void VCM::init() {
 		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
 	pc_ray.total_light_area = 0;
-	pc_ray.frame_num = 0;
+
 	frameNUM = 0;
+
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 
@@ -123,6 +124,7 @@ void VCM::render() {
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;
+	pc_ray.frame_num = frameNUM;
 	// VCM related constants
 	pc_ray.radius = lumen_scene->m_dimensions.radius * config->radius_factor / 100.f;
 	pc_ray.radius /= (float)pow((double)pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
@@ -251,11 +253,9 @@ void VCM::render() {
 }
 
 bool VCM::update() {
-	pc_ray.frame_num++;
 	frameNUM++;
 	bool updated = Integrator::update();
 	if (updated) {
-		pc_ray.frame_num = 0;
 		frameNUM = 0;
 	}
 	return updated;

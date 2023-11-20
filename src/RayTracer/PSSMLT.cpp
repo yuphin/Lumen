@@ -176,8 +176,9 @@ void PSSMLT::init() {
 		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
 	pc_ray.total_light_area = 0;
-	pc_ray.frame_num = 0;
+
 	frameNUM = 0;
+
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 
@@ -199,6 +200,7 @@ void PSSMLT::render() {
 	pc_ray.num_bootstrap_samples = config->num_bootstrap_samples;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	pc_ray.frame_num = frameNUM;
 
 	std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
@@ -346,11 +348,9 @@ void PSSMLT::render() {
 }
 
 bool PSSMLT::update() {
-	pc_ray.frame_num++;
 	frameNUM++;
 	bool updated = Integrator::update();
 	if (updated) {
-		pc_ray.frame_num = 0;
 		frameNUM = 0;
 	}
 	return updated;
