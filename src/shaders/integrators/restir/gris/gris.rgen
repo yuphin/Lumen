@@ -77,9 +77,7 @@ void main() {
 	for (depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.instance_idx != -1;
-		if (depth >= pc.max_depth - 1) {
-			break;
-		}
+
 		float joint_pdf_times_bsdf_pdf = joint_pdf * bsdf_pdf_val;
 		if (!found_isect) {
 			vec3 atmosphere_L = shade_atmosphere(pc.dir_light_idx, pc.sky_col, origin.xyz, direction, tmax);
@@ -95,7 +93,7 @@ void main() {
 				reconnection_data.reservoir_contribution =
 					rc_throughput * reconnection_data.rc_Li / (rc_pdf * rc_postfix_pdf * prefix_pdf_without_rc_pdf);
 				reconnection_data.path_flags =
-					pack_path_flags(prefix_depth, depth - prefix_depth, RECONNECTION_TYPE_DEFAULT, false);
+					pack_path_flags(prefix_depth, depth - prefix_depth + 1, RECONNECTION_TYPE_DEFAULT, false);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
@@ -154,7 +152,7 @@ void main() {
 				}
 				float prev = reservoir.w_sum;
 				reconnection_data.path_flags = pack_path_flags(
-					prefix_depth, depth - prefix_depth,
+					prefix_depth, depth - prefix_depth + 1,
 					was_connectable ? RECONNECTION_TYPE_EMISSIVE_AFTER_RC : RECONNECTION_TYPE_DEFAULT, side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
@@ -163,6 +161,14 @@ void main() {
 				postfix_L += partial_contrib * postfix_throughput;
 #endif	// STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 			}
+		}
+
+		if (connectable_vertex_found) {
+			postfix_depth++;
+		}
+
+		if (depth >= pc.max_depth - 1) {
+			break;
 		}
 
 		vec3 rc_Li = vec3(0);
@@ -213,7 +219,7 @@ void main() {
 					contribution;  // rc_throughput * reconnection_data.rc_Li / (rc_pdf * rc_postfix_pdf *
 								   // prefix_pdf_without_rc_pdf);
 				reconnection_data.path_flags =
-					pack_path_flags(prefix_depth, depth - prefix_depth, RECONNECTION_TYPE_DEFAULT, side);
+					pack_path_flags(prefix_depth, depth - prefix_depth + 1, RECONNECTION_TYPE_DEFAULT, side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
@@ -249,13 +255,11 @@ void main() {
 		partial_throughput *= f_cos;
 		if (connectable_vertex_found) {
 			postfix_throughput *= f_cos / bsdf_pdf_val;
-			postfix_depth++;
 		}
 
 		if (connectable) {
 			connectable_vertex_found = true;
 			prefix_depth = depth;
-			// Prepare reconnection data for the non-NEE path
 			reconnection_data.rc_wi = direction;
 			// Seed is not relevant here
 			reconnection_data.rc_seed = -1;
@@ -326,7 +330,7 @@ void main() {
 		prefix_contributions.d[pixel_idx] = prefix_col;
 #ifdef CANONICAL_ONLY
 		col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
-		if(pc.direct_lighting == 1) {
+		if (pc.direct_lighting == 1) {
 			col += direct_lighting;
 		}
 		if (pc.frame_num > 0) {
@@ -337,7 +341,7 @@ void main() {
 			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
 		}
 		return;
-#endif // CANONICAL_ONLY
+#endif	// CANONICAL_ONLY
 	}
 
 	if (pc.enable_gris == 0) {

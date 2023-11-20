@@ -298,8 +298,9 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 	Material src_hit_mat = load_material(src_gbuffer.material_idx, src_gbuffer.uv);
 	bool src_rough = is_rough(src_hit_mat);
 	bool src_far = length(rc_gbuffer.pos - src_gbuffer.pos) > pc.min_vertex_distance_ratio * pc.scene_extent;
+	bool constraints_satisfied = true;
 	while (true) {
-		if (((prefix_depth + rc_postfix_length) >= pc.max_depth - 1) || prefix_depth > (rc_prefix_length - 1)) {
+		if (((prefix_depth + rc_postfix_length + 2) > pc.max_depth) || prefix_depth > (rc_prefix_length - 1)) {
 			return false;
 		}
 		vec3 dst_wo = -dst_wi;
@@ -313,7 +314,10 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 
 		bool dst_rough = is_rough(dst_hit_mat);
 		bool dst_far = rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent;
-		bool connectable = dst_rough && dst_far && prefix_depth == (rc_prefix_length - 1);
+
+		constraints_satisfied = dst_rough && dst_far;
+
+		bool connectable = constraints_satisfied && prefix_depth == int(rc_prefix_length - 1);
 		bool connected = false;
 		if (connectable) {
 			any_hit_payload.hit = 1;
