@@ -298,13 +298,13 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 			return passes[idx];
 		}
 		if (!recording && !reload_shaders) {
-			pass_idxs_with_shader_compilation_overrides.push_back(passes.size());
+			pass_idxs_with_shader_compilation_overrides.push_back(uint32_t(passes.size()));
 		}
 		pipeline = pipeline_cache[name_with_macros].pipeline.get();
 		cached = true;
 	} else {
 		if (!recording && !reload_shaders) {
-			pass_idxs_with_shader_compilation_overrides.push_back(passes.size());
+			pass_idxs_with_shader_compilation_overrides.push_back(uint32_t(passes.size()));
 		}
 		pipeline_cache[name_with_macros] = {std::make_unique<Pipeline>(ctx, name_with_macros)};
 		pipeline = pipeline_cache[name_with_macros].pipeline.get();
