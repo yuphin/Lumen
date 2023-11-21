@@ -4,8 +4,6 @@ x64/
 cpp.hint
 .vscode/
 scenes/Sponza
-scenes/bedroom
-scenes/classroom
 *.spv
 *.vcxproj.user
 *.as
