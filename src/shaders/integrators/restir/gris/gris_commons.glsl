@@ -193,6 +193,7 @@ void init_reservoir(out Reservoir r) {
 void init_data(out GrisData data) {
 	data.rc_primitive_instance_id = uvec2(-1);
 	data.path_flags = 0;
+	data.bounce_flags = 0;
 }
 
 bool reservoir_data_valid(in GrisData data) { return data.rc_primitive_instance_id.y != -1; }
