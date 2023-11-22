@@ -20,7 +20,8 @@ uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 #define RECONNECTION_TYPE_INVALID 0
 #define RECONNECTION_TYPE_NEE 1
 #define RECONNECTION_TYPE_EMISSIVE_AFTER_RC 2
-#define RECONNECTION_TYPE_DEFAULT 3
+#define RECONNECTION_TYPE_EMISSIVE 3
+#define RECONNECTION_TYPE_DEFAULT 4
 
 #define STREAMING_MODE_INDIVIDUAL 0
 #define STREAMING_MODE_SPLIT 1
@@ -250,16 +251,16 @@ bool is_diffuse(in Material mat) { return (mat.bsdf_type & BSDF_DIFFUSE) != 0; }
 uint offset(const uint pingpong) { return pingpong * pc.size_x * pc.size_y; }
 
 uint pack_path_flags(uint prefix_length, uint postfix_length, uint reconnection_type, bool side) {
-	return uint(side) << 12 | (postfix_length & 0x1F) << 7 | (prefix_length & 0x1F) << 2 |
-		   uint(reconnection_type & 0x3);
+	return uint(side) << 13 | (postfix_length & 0x1F) << 8 | (prefix_length & 0x1F) << 3 |
+		   uint(reconnection_type & 0x7);
 }
 
 void unpack_path_flags(uint packed_data, out uint reconnection_type, out uint prefix_length, out uint postfix_length,
 					   out bool side) {
-	reconnection_type = (packed_data & 0x3);
-	prefix_length = (packed_data >> 2) & 0x1F;
-	postfix_length = (packed_data >> 7) & 0x1F;
-	side = ((packed_data >> 12) & 1) == 1;
+	reconnection_type = (packed_data & 0x7);
+	prefix_length = (packed_data >> 3) & 0x1F;
+	postfix_length = (packed_data >> 8) & 0x1F;
+	side = ((packed_data >> 13) & 1) == 1;
 }
 
 void set_bounce_flag(inout uint flags, uint depth, bool constraints_satisfied) {
@@ -325,7 +326,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		bool src_satisfied = get_bounce_flag(data.bounce_flags, prefix_depth);
 		constraints_satisfied = dst_rough && dst_far;
 
-		if(src_satisfied != constraints_satisfied) {
+		if (src_satisfied != constraints_satisfied) {
 			return false;
 		}
 		bool connectable = constraints_satisfied && prefix_depth == (rc_prefix_length - 1);
@@ -342,6 +343,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 			}
 		}
 		if (connected) {
+			LOG_CLICKED3("%d - %d - %d\n", rc_type, prefix_depth, rc_postfix_length);
 			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
 			bool rc_side_dst = face_forward(rc_gbuffer.n_s, rc_gbuffer.n_g, -rc_wi);
 			float g_dst = abs(dot(rc_gbuffer.n_s, -rc_wi)) / (rc_wi_len * rc_wi_len);
@@ -366,7 +368,14 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 								 dst_L_wi, false);
 				ASSERT(debug_seed == data.debug_seed);
 				reservoir_contribution = prefix_throughput * dst_f * abs(cos_x) * Li / dst_pdf;
-			} else {
+			} 
+			else if (rc_type == RECONNECTION_TYPE_EMISSIVE) {
+				ASSERT(data.rc_Li == vec3(-1));
+				LOG3("%d - %d - %d\n", rc_type, prefix_depth, rc_postfix_length);
+				ASSERT(luminance(rc_hit_mat.emissive_factor) > 0);
+				reservoir_contribution = prefix_throughput * dst_f * abs(cos_x) * data.rc_Li / dst_pdf;
+			} 
+			else {
 				ASSERT(data.rc_seed == -1);
 
 				float dst_postfix_pdf;

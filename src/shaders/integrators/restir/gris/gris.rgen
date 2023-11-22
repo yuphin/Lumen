@@ -66,6 +66,7 @@ void main() {
 	bool was_connectable = false;
 	vec3 postfix_L = vec3(0);
 	int postfix_depth = 0;
+
 	for (depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.instance_idx != -1;
@@ -106,6 +107,7 @@ void main() {
 		bool constraints_satisfied =
 			prev_rough && length(gbuffer.pos - origin.xyz) > pc.min_vertex_distance_ratio * pc.scene_extent;
 		connectable = !connectable_vertex_found && (curr_rough && constraints_satisfied);
+		bool connectable_processed = false;
 
 		const vec3 wo = -direction;
 		vec3 n_s = gbuffer.n_s;
@@ -152,6 +154,34 @@ void main() {
 #else	// STREAMING_MODE != STREAMING_MODE_INDIVIDUAL
 				postfix_L += partial_contrib * postfix_throughput;
 #endif	// STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
+			} else if (connectable && any(greaterThan(hit_mat.emissive_factor, vec3(0))) && depth > 1) {
+				// Make the emissive surface the reconnection point
+				rc_barycentrics = payload.attribs;
+				rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
+				vec3 to_prev = origin.xyz - gbuffer.pos;
+				rc_partial_jacobian *= abs(dot(n_s, wo)) / dot(to_prev, to_prev);
+
+				reconnection_data.rc_barycentrics = rc_barycentrics;
+				reconnection_data.rc_primitive_instance_id = rc_primitive_instance_id;
+				reconnection_data.rc_coords = rc_coords;
+				reconnection_data.rc_partial_jacobian = rc_partial_jacobian;
+				// Ignored
+				reconnection_data.rc_wi = vec3(-1);
+				reconnection_data.rc_Li = partial_contrib * throughput;//vec3(-1);
+				reconnection_data.reservoir_contribution = partial_contrib * throughput;
+				reconnection_data.path_flags = pack_path_flags(depth, 0, RECONNECTION_TYPE_EMISSIVE, side);
+				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
+											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
+				valid_reservoir = valid_reservoir || merged;
+				prefix_col = col;
+				if (!valid_reservoir) {
+					ASSERT(reservoir.data.path_flags == 0);
+				} else {
+					ASSERT(reservoir.data.path_flags != 0);
+				}
+
+				// connectable_processed = true;
+				LOG_CLICKED("%d\n", depth);
 			}
 		}
 
@@ -176,7 +206,7 @@ void main() {
 			vec3 contribution = Li * throughput;
 
 			// Stream the NEE path at the reconnection vertex
-			if (connectable) {
+			if (connectable && !connectable_processed) {
 				rc_barycentrics = payload.attribs;
 				rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 				vec3 to_prev = origin.xyz - gbuffer.pos;
@@ -203,7 +233,7 @@ void main() {
 				} else {
 					ASSERT(reservoir.data.path_flags != 0);
 				}
-			} else if (connectable_vertex_found) {
+			} else if (connectable_vertex_found || connectable_processed) {
 #if STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 				reconnection_data.rc_Li = postfix_throughput * Li;
 				reconnection_data.reservoir_contribution = contribution;
@@ -292,6 +322,12 @@ void main() {
 			ASSERT(reservoir.data.path_flags != 0);
 			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
 			ASSERT(reservoir_data_valid(reservoir.data));
+
+			if(rc_type != RECONNECTION_TYPE_EMISSIVE) {
+				ASSERT(reservoir.data.rc_Li != vec3(-1));
+			} else {
+				LOG_CLICKED0("Pog\n");
+			}
 		}
 	}
 	if (pc.direct_lighting == 1) {
