@@ -40,19 +40,6 @@ vec4 sample_camera(in vec2 d) {
     return ubo.inv_view * vec4(normalize(target.xyz), 0); // direction
 }
 
-float correct_shading_normal(const vec3 n_g, const vec3 n_s, const vec3 wi,
-                             const vec3 wo, int mode) {
-    if (mode == 0) {
-        float num = abs(dot(wo, n_s) * abs(dot(wi, n_g)));
-        float denom = abs(dot(wo, n_g) * abs(dot(wi, n_s)));
-        if (denom == 0)
-            return 0.;
-        return num / denom;
-    } else {
-        return 1.;
-    }
-}
-
 float uniform_cone_pdf(float cos_max) { return 1. / (PI2 * (1 - cos_max)); }
 
 bool is_light_finite(uint light_props) {
@@ -64,22 +51,6 @@ bool is_light_delta(uint light_props) {
 }
 
 uint get_light_type(uint light_props) { return uint(light_props & 0x7); }
-
-float light_pdf(const Light light, const vec3 n_s, const vec3 wi) {
-    uint light_type = get_light_type(light.light_flags);
-    switch (light_type) {
-    case LIGHT_AREA: {
-        return max(dot(n_s, wi) * INV_PI, 0);
-    } break;
-    case LIGHT_SPOT: {
-        const float cos_width = cos(30 * PI / 180);
-        return uniform_cone_pdf(cos_width);
-    } break;
-    case LIGHT_DIRECTIONAL: {
-        return 0;
-    } break;
-    }
-}
 
 float light_pdf_a_to_w(const uint light_flags, const float pdf_a,
                        const vec3 n_s, const float wi_len_sqr,
