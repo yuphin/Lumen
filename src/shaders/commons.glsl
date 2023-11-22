@@ -70,7 +70,7 @@ float light_pdf(const Light light, const vec3 n_s, const vec3 wi) {
     uint light_type = get_light_type(light.light_flags);
     switch (light_type) {
     case LIGHT_AREA: {
-        return max(dot(n_s, wi) / PI, 0);
+        return max(dot(n_s, wi) * INV_PI, 0);
     } break;
     case LIGHT_SPOT: {
         return uniform_cone_pdf(cos_width);
@@ -104,7 +104,7 @@ float light_pdf(uint light_flags, const vec3 n_s, const vec3 wi) {
     uint light_type = get_light_type(light_flags);
     switch (light_type) {
     case LIGHT_AREA: {
-        return max(dot(n_s, wi) / PI, 0);
+        return max(dot(n_s, wi) * INV_PI, 0);
     }
     case LIGHT_SPOT: {
         return uniform_cone_pdf(cos_width);
@@ -119,7 +119,7 @@ float light_pdf_Le(uint light_flags, const vec3 n_s, const vec3 wi) {
     const float cos_width = cos(30 * PI / 180);
     switch (get_light_type(light_flags)) {
     case LIGHT_AREA: {
-        return max(dot(n_s, wi) / PI, 0);
+        return max(dot(n_s, wi) * INV_PI, 0);
     }
     case LIGHT_SPOT: {
         return uniform_cone_pdf(cos_width);
@@ -514,7 +514,7 @@ vec3 sample_light_Le(const vec4 rands_pos, const vec2 rands_dir,
         L = light_mat.emissive_factor;
         cos_from_light = max(dot(record.n_s, wi), 0);
         pdf_pos_a = record.triangle_pdf;
-        pdf_dir_w = (dot(wi, record.n_s)) / PI;
+        pdf_dir_w = (dot(wi, record.n_s)) * INV_PI;
         pdf_emit_w = pdf_pos_a * pdf_dir_w;
         pdf_direct_a = pdf_pos_a;
         light_record.material_idx = material_idx;

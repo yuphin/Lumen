@@ -15,7 +15,7 @@ void Path::init() {
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc,
 							 true);
 
-	frameNUM = 0;
+	frame_num = 0;
 
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
@@ -33,7 +33,7 @@ void Path::render() {
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
 	pc_ray.dir_light_idx = lumen_scene->dir_light_idx;
-	pc_ray.frame_num = frameNUM;
+	pc_ray.frame_num = frame_num;
 	instance->vkb.rg
 		->add_rt("Path", {.shaders = {{"src/shaders/integrators/path/path.rgen"},
 									  {"src/shaders/ray.rmiss"},
@@ -56,10 +56,10 @@ void Path::render() {
 }
 
 bool Path::update() {
-	frameNUM++;
+	frame_num++;
 	bool updated = Integrator::update();
 	if (updated) {
-		frameNUM = 0;
+		frame_num = 0;
 	}
 	return updated;
 }

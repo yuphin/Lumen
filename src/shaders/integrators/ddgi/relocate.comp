@@ -40,9 +40,9 @@ void main() {
     vec3 closest_backface_vector;
     vec3 farthest_frontface_vector;
     vec3 closest_frontface_vector;
-    float closest_backface_dist = 1e10;
+    float closest_backface_dist = INF;
     float farthest_frontface_dist = 0;
-    float closest_frontface_dist = 1e10;
+    float closest_frontface_dist = INF;
 
     vec3 current_offset = probe_offsets.d[linear_probe_id].xyz;
 
@@ -71,7 +71,7 @@ void main() {
             }
         }
     }
-    vec3 full_offset = vec3(1e10);
+    vec3 full_offset = vec3(INF);
     if (backface_count / ddgi_ubo.rays_per_probe > ddgi_ubo.backface_ratio) {
         float scale_factor = 2.0;
         for (int i = 1; i <= 100; i++) {

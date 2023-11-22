@@ -23,7 +23,9 @@ layout(rgba32f, binding = 1) uniform image2D fft_img;
 #ifndef KERNEL_GENERATION
 layout(binding = 2) uniform sampler2D kernel;
 #endif
-#define PI 3.14159265359
+
+#define PI 3.1415926535897932384626433832795
+#define PI2 6.283185307179586476925286766559
 
 shared float s_data_real[WG_SIZE * RADIX];
 shared float s_data_imag[WG_SIZE * RADIX];
@@ -109,7 +111,7 @@ void fft_shared_img(bool is_rg, ivec2 coords[RADIX], inout vec2 data[RADIX]) {
 
 	for (uint stride = 1; stride < N; stride *= RADIX) {
 		const uint stride_factor = stride * uint(j / stride);
-		float angle = 2 * PI * stride_factor / N;
+		float angle = PI2 * stride_factor / N;
 		if (INVERSE == 1) {
 			angle *= -1;
 		}

@@ -21,7 +21,7 @@ int bdpt_random_walk_light(const int max_depth, vec3 throughput,
     int prev = 0;
     const uint flags = gl_RayFlagsOpaqueEXT;
     const float tmin = 0.001;
-    const float tmax = 1e6;
+    const float tmax = INF;
     vec3 ray_pos = vtx(-1, pos);
     float pdf_fwd = pdf;
     float pdf_rev = 0.;
@@ -110,7 +110,7 @@ int bdpt_random_walk_eye(const int max_depth, vec3 throughput,
     int prev = 0;
     const uint flags = gl_RayFlagsOpaqueEXT;
     const float tmin = 0.001;
-    const float tmax = 1e6;
+    const float tmax = INF;
     vec3 ray_pos = vtx(-1, pos);
     float pdf_fwd = pdf;
     float pdf_rev = 0.;

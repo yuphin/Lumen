@@ -20,7 +20,7 @@ layout(binding = 8, std430) readonly buffer PrevGbuffer { GBuffer prev_gbuffers[
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num);
 
 ivec2 get_neighbor_offset(inout uvec4 seed) {
-	const float randa = rand(seed) * 2 * PI;
+	const float randa = rand(seed) * PI2;
 	const float randr = sqrt(rand(seed)) * pc_ray.spatial_radius;
 	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
 }

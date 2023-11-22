@@ -268,7 +268,7 @@ bool RayTracer::gui() {
 	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
 	ImGui::Text("General settings:");
 	ImGui::PopStyleColor();
-	ImGui::Text("Frame %d time %.2f ms ( %.2f FPS )", integrator->frameNUM, cpu_avg_time, 1000 / cpu_avg_time);
+	ImGui::Text("Frame %d time %.2f ms ( %.2f FPS )", integrator->frame_num, cpu_avg_time, 1000 / cpu_avg_time);
 	ImGui::Text("Memory Usage: %.2f MB", get_memory_usage(vk_ctx.physical_device) * 1e-6);
 	bool updated = false;
 	ImGui::Checkbox("Show camera statistics", &show_cam_stats);

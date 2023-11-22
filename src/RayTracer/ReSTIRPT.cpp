@@ -89,7 +89,7 @@ void ReSTIRPT::init() {
 
 	pc_ray.total_light_area = 0;
 
-	frameNUM = 0;
+	frame_num = 0;
 
 	pc_ray.total_frame_num = 0;
 	pc_ray.size_x = instance->width;
@@ -124,7 +124,7 @@ void ReSTIRPT::render() {
 	pc_ray.enable_spatial_reuse = enable_spatial_reuse;
 	pc_ray.show_reconnection_radiance = show_reconnection_radiance;
 	pc_ray.min_vertex_distance_ratio = min_vertex_distance_ratio;
-	pc_ray.frame_num = frameNUM;
+	pc_ray.frame_num = frame_num;
 
 	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
@@ -274,10 +274,10 @@ void ReSTIRPT::render() {
 }
 
 bool ReSTIRPT::update() {
-	frameNUM++;
+	frame_num++;
 	bool updated = Integrator::update();
 	if (updated) {
-		frameNUM = 0;
+		frame_num = 0;
 	}
 	return updated;
 }

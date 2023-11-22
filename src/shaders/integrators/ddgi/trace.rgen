@@ -81,7 +81,7 @@ void main() {
 	float dist;
 	if (!found_isect) {
 		col += pc_ray.sky_col;
-		dist = 1e10;
+		dist = INF;
 	} else if (payload.hit_kind == gl_HitKindBackFacingTriangleEXT) {
 		dist = -0.2 * payload.dist;
 	} else {

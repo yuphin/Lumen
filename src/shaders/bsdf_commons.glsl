@@ -42,22 +42,22 @@ vec3 sample_cos_hemisphere(vec2 uv, vec3 n, inout float phi) {
 float diffuse_pdf(const vec3 n, const vec3 l, out float cos_theta) {
     cos_theta = dot(n, l);
 #ifndef UNIFORM_SAMPLING
-    return max(cos_theta / PI, 0);
+    return max(cos_theta * INV_PI, 0);
 #else
-    return 1.0 / (2.0 * PI);
+    return INV_PI2;
 #endif
 }
 
 float diffuse_pdf(const vec3 n, const vec3 wi, const vec3 wo) { 
 #ifndef UNIFORM_SAMPLING
-    return max(dot(n, wi) / PI, 0); 
+    return max(dot(n, wi) * INV_PI, 0); 
 #else
-    return 1.0 / (2.0 * PI);
+    return INV_PI2;
 #endif
 }
 
 float glossy_pdf(float cos_theta, float hl, float nh, float beckmann_term) {
-    return 0.5 * (max(cos_theta / PI, 0) + beckmann_term * nh / (4 * hl));
+    return 0.5 * (max(cos_theta * INV_PI, 0) + beckmann_term * nh / (4 * hl));
 }
 
 float disney_pdf(const vec3 n, const Material mat, const vec3 v, const vec3 l) {
@@ -80,7 +80,7 @@ float disney_pdf(const vec3 n, const Material mat, const vec3 v, const vec3 l) {
     // float pdf_specular = 0.25 * D * G * abs_lh / (abs_nl * abs_vh) ;
     float pdf_specular = 0.25 * D * G / abs_nv;
     // Diffuse
-    float pdf_diffuse = abs_nl / PI;
+    float pdf_diffuse = abs_nl * INV_PI;
     // Clearcoat
     float pdf_clearcoat = 0.25 *
                           GTR1(abs_nh, mix(0.1, 0.001, mat.clearcoat_gloss)) *
@@ -93,7 +93,7 @@ float disney_pdf(const vec3 n, const Material mat, const vec3 v, const vec3 l) {
     return pdf_diffuse + pdf_specular + pdf_clearcoat;
 }
 
-vec3 diffuse_f(const Material mat) { return mat.albedo / PI; }
+vec3 diffuse_f(const Material mat) { return mat.albedo * INV_PI; }
 
 vec3 glossy_f(const Material mat, const vec3 wo, const vec3 wi, const vec3 n_s,
               float hl, float nl, float nv, float beckmann_term) {
@@ -150,10 +150,12 @@ vec3 disney_f(const Material mat, const vec3 wo, const vec3 wi,
     float D_r = GTR1(nh, mix(0.1, 0.001, mat.clearcoat_gloss));
     float F_r = mix(0.04, 1.0, fh);
     float G_r = smithG_GGX(nl, .25) * smithG_GGX(nv, .25);
-    return ((1 / PI) * mix(F_d, ss, mat.subsurface) * mat.albedo + F_sheen) *
+    return (INV_PI * mix(F_d, ss, mat.subsurface) * mat.albedo + F_sheen) *
                (1 - mat.metallic) +
-           0.25 * G_s * F_s * D_s / (nl * nv) +
-           0.25 * mat.clearcoat * G_r * F_r * D_r;
+           0.25 * (
+					G_s * F_s * D_s / (nl * nv) +
+					mat.clearcoat * G_r * F_r * D_r
+					);
 }
 
 vec3 sample_bsdf(const vec3 n_s, const vec3 wo, const Material mat,

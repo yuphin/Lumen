@@ -149,7 +149,7 @@ vec3 vcm_get_light_radiance(in const Material mat,
     const float pdf_light_pos =
         1.0 / (payload.area * pc_ray.light_triangle_count);
 
-    const float pdf_light_dir = abs(dot(payload.n_s, -camera_state.wi)) / PI;
+    const float pdf_light_dir = abs(dot(payload.n_s, -camera_state.wi)) * INV_PI;
     const float w_camera =
         pdf_light_pos * camera_state.d_vcm +
         (pc_ray.use_vc == 1 || pc_ray.use_vm == 1

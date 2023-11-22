@@ -1,12 +1,12 @@
 #ifndef UTILS_DEVICE
 #define UTILS_DEVICE
 #include "commons.h"
-#define PI 3.14159265359
-#define PI2 6.28318530718
-#define INV_PI (1. / PI)
+#define PI 3.1415926535897932384626433832795
+#define PI2 6.283185307179586476925286766559
+#define INV_PI 0.31830988618379067153776752674503
+#define INV_PI2 0.15915494309189533576888376337251
 #define INF 1e10
 #define EPS 0.001
-#define SHADOW_EPS 2 / 65536.
 #define sqrt2 1.41421356237309504880
 
 struct HitPayload {
@@ -213,7 +213,7 @@ float schlick_w(float u) {
 
 float GTR1(float nh, float a) {
     if (a >= 1) {
-        return 1 / PI;
+        return INV_PI;
     }
     float a2 = a * a;
     float t = 1 + (a2 - 1) * nh * nh;
@@ -262,7 +262,7 @@ vec3 sample_ggx_vndf(vec3 Ve, float alpha_x, float alpha_y, float U1, float U2,
     vec3 T2 = cross(Vh, T1);
     // Section 4.2: parameterization of the projected area
     float r = sqrt(U1);
-    float phi = 2.0 * PI * U2;
+    float phi = PI2 * U2;
     float t1 = r * cos(phi);
     float t2 = r * sin(phi);
     float s = 0.5 * (1.0 + Vh.z);

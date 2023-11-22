@@ -19,7 +19,7 @@ layout(binding = 7, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc_ray.total_frame_num ^ pc_ray.random_num);
 
 ivec2 get_neighbor_offset(inout uvec4 seed) {
-	const float randa = rand(seed) * 2 * PI;
+	const float randa = rand(seed) * PI2;
 	const float randr = sqrt(rand(seed)) * pc_ray.spatial_radius;
 	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
 }
@@ -55,8 +55,8 @@ bool process_reservoir(inout Reservoir reservoir, inout float m_c, in Reservoir 
 		return false;
 	}
 	m_c += 1.0 - m_c_val;
-	ASSERT1(m_c_val > -1e-3 && m_c_val <= 1.001, "m_c_val <= 1.0 : %f\n", m_c_val);
-	ASSERT1(m_i > -1e-3 && m_i <= 1.001, "m_i <= 1.0 : %f\n", m_i);
+	ASSERT1(m_c_val > -EPS && m_c_val <= 1.001, "m_c_val <= 1.0 : %f\n", m_c_val);
+	ASSERT1(m_i > -EPS && m_i <= 1.001, "m_i <= 1.0 : %f\n", m_i);
 	bool accepted = combine_reservoir(seed, reservoir, source_reservoir, neighbor_in_canonical_pdf * m_i);
 	if (accepted) {
 		curr_reservoir_contribution = data.reservoir_contribution;

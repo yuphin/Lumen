@@ -101,7 +101,7 @@ void main() {
 
     for (int i = 0; i < max_iter; i++) {
         // Choose a neighbor pixel
-        const float randa = rand(seed) * 2 * PI;
+        const float randa = rand(seed) * PI2;
         const float randr = sqrt(rand(seed)) * max_r;
         ivec2 rand_offset =
             ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));

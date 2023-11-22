@@ -80,7 +80,7 @@ void LumenScene::load_scene(const std::string& path) {
 		return std::equal(end.rbegin(), end.rend(), str.rbegin());
 	};
 
-	auto found = path.find_last_of('/\\');
+	auto found = path.find_last_of("/\\");
 
 	auto root = path.substr(0, found + 1);
 

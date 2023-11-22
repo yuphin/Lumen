@@ -35,9 +35,9 @@
 
 // -------------------------------------
 // Coefficients
-#define ATMOSPHERE_C_RAYLEIGH          (vec3(5.802, 13.558, 33.100) * 1e-6)
-#define ATMOSPHERE_C_MIE               (vec3(3.996,  3.996,  3.996) * 1e-6)
-#define ATMOSPHERE_C_OZONE             (vec3(0.650,  1.881,  0.085) * 1e-6)
+#define ATMOSPHERE_C_RAYLEIGH          (vec3(5.802, 13.558, 33.100) * ATMOSPHERE_EPS)
+#define ATMOSPHERE_C_MIE               (vec3(3.996,  3.996,  3.996) * ATMOSPHERE_EPS)
+#define ATMOSPHERE_C_OZONE             (vec3(0.650,  1.881,  0.085) * ATMOSPHERE_EPS)
 
 #define ATMOSPHERE_ATMOSPHERE_DENSITY  1
 #define ATMOSPHERE_EXPOSURE            20

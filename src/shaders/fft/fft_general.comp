@@ -15,7 +15,9 @@ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 1, scalar) readonly buffer FFT_Read { vec2 fft_read[]; };
 layout(binding = 2, scalar) writeonly buffer FFT_Write { vec2 fft_write[]; };
 layout(push_constant) uniform PC { FFTPC pc; };
-#define PI 3.14159265359
+
+#define PI 3.1415926535897932384626433832795
+#define PI2 6.283185307179586476925286766559
 
 shared float s_data_real[WG_SIZE * 2];
 shared float s_data_imag[WG_SIZE * 2];
@@ -49,7 +51,7 @@ void fft_global() {
 		return;
 	}
 	const uint stride_factor = stride * uint(j / stride);
-	const float angle = 2 * PI * stride_factor / pc.n;
+	const float angle = PI2 * stride_factor / pc.n;
 	const vec2 wp = vec2(cos(angle), -sin(angle));
 
 	const vec4 butterfly = fft_2(fft_read[j], fft_read[j + m], wp);
@@ -68,7 +70,7 @@ void fft_shared() {
 
 	for (uint stride = 1; stride < N; stride *= 2) {
 		const uint stride_factor = stride * uint(j / stride);
-		const float angle = 2 * PI * stride_factor / N;
+		const float angle = PI2 * stride_factor / N;
 		const vec2 wp = vec2(cos(angle), -sin(angle));
 		const vec4 butterfly = fft_2(a, b, wp);
 		const uint fixed_idx = j % stride + (stride_factor << 1);
