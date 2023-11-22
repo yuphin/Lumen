@@ -66,13 +66,13 @@ bool is_light_delta(uint light_props) {
 uint get_light_type(uint light_props) { return uint(light_props & 0x7); }
 
 float light_pdf(const Light light, const vec3 n_s, const vec3 wi) {
-    const float cos_width = cos(30 * PI / 180);
     uint light_type = get_light_type(light.light_flags);
     switch (light_type) {
     case LIGHT_AREA: {
         return max(dot(n_s, wi) * INV_PI, 0);
     } break;
     case LIGHT_SPOT: {
+        const float cos_width = cos(30 * PI / 180);
         return uniform_cone_pdf(cos_width);
     } break;
     case LIGHT_DIRECTIONAL: {
@@ -100,13 +100,13 @@ float light_pdf_a_to_w(const uint light_flags, const float pdf_a,
 }
 
 float light_pdf(uint light_flags, const vec3 n_s, const vec3 wi) {
-    const float cos_width = cos(30 * PI / 180);
     uint light_type = get_light_type(light_flags);
     switch (light_type) {
     case LIGHT_AREA: {
         return max(dot(n_s, wi) * INV_PI, 0);
     }
     case LIGHT_SPOT: {
+        const float cos_width = cos(30 * PI / 180);
         return uniform_cone_pdf(cos_width);
     }
     case LIGHT_DIRECTIONAL: {
@@ -116,12 +116,12 @@ float light_pdf(uint light_flags, const vec3 n_s, const vec3 wi) {
 }
 
 float light_pdf_Le(uint light_flags, const vec3 n_s, const vec3 wi) {
-    const float cos_width = cos(30 * PI / 180);
     switch (get_light_type(light_flags)) {
     case LIGHT_AREA: {
         return max(dot(n_s, wi) * INV_PI, 0);
     }
     case LIGHT_SPOT: {
+        const float cos_width = cos(30 * PI / 180);
         return uniform_cone_pdf(cos_width);
     }
     case LIGHT_DIRECTIONAL: {

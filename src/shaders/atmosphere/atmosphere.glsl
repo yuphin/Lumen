@@ -25,7 +25,9 @@
 // -------------------------------------
 // Defines
 #define ATMOSPHERE_EPS                 1e-6
-#define ATMOSPHERE_PI                  3.14159265359
+#define ATMOSPHERE_PI                  3.1415926535897932384626433832795
+#define ATMOSPHERE_4PI                 12.566370614359172953850573533118
+#define ATMOSPHERE_3PI16               0.05968310365946075091333141126469
 #define ATMOSPHERE_INFINITY            1.0 / 0.0
 #define ATMOSPHERE_PLANET_RADIUS       6371000
 #define ATMOSPHERE_PLANET_CENTER       vec3(0, -ATMOSPHERE_PLANET_RADIUS, 0)
@@ -74,14 +76,15 @@ vec2 atmosphere_intersection (vec3 rayStart, vec3 rayDir)
 // Phase functions
 float PhaseRayleigh (float costh)
 {
-	return 3 * (1 + costh*costh) / (16 * ATMOSPHERE_PI);
+	//return 3 * (1 + costh*costh) / (16 * ATMOSPHERE_PI);
+	return (1 + costh*costh) * ATMOSPHERE_3PI16;
 }
 float PhaseMie (float costh, float g)
 {
 	g = min(g, 0.9381);
 	float k = 1.55*g - 0.55*g*g*g;
 	float kcosth = k*costh;
-	return (1 - k*k) / ((4 * ATMOSPHERE_PI) * (1-kcosth) * (1-kcosth));
+	return (1 - k*k) / (ATMOSPHERE_4PI * (1-kcosth) * (1-kcosth));
 }
 
 // -------------------------------------
