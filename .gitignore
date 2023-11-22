@@ -12,3 +12,4 @@ scenes/classroom
 imgui.ini
 .*/
 build/
+*.bat
