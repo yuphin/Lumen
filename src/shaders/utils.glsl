@@ -51,7 +51,7 @@ struct LightRecord {
     uint flags;
 };
 
-#define pow5(x) (x * x) * (x * x) * x
+#define pow5(x) (((x) * (x)) * ((x) * (x)) * (x))
 #define sqr(x) (x * x)
 
 uint hash(ivec3 p, uint size) {

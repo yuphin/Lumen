@@ -25,6 +25,7 @@ class Integrator {
 	std::unique_ptr<Camera> camera;
 	bool updated = false;
 	VkSampler texture_sampler;
+	uint frame_num = 0;
 
    protected:
 	virtual void update_uniform_buffers();

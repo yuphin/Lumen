@@ -88,7 +88,9 @@ void ReSTIRPT::init() {
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
 
 	pc_ray.total_light_area = 0;
-	pc_ray.frame_num = 0;
+
+	frame_num = 0;
+
 	pc_ray.total_frame_num = 0;
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
@@ -124,6 +126,7 @@ void ReSTIRPT::render() {
 	pc_ray.show_reconnection_radiance = show_reconnection_radiance;
 	pc_ray.min_vertex_distance_ratio = min_vertex_distance_ratio;
 	pc_ray.enable_gris = enable_gris;
+	pc_ray.frame_num = frame_num;
 
 	const std::initializer_list<ResourceBinding> common_bindings = {output_tex, scene_ubo_buffer, scene_desc_buffer,
 																	mesh_lights_buffer};
@@ -356,10 +359,10 @@ void ReSTIRPT::render() {
 }
 
 bool ReSTIRPT::update() {
-	pc_ray.frame_num++;
+	frame_num++;
 	bool updated = Integrator::update();
 	if (updated) {
-		pc_ray.frame_num = 0;
+		frame_num = 0;
 	}
 	return updated;
 }

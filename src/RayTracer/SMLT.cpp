@@ -201,7 +201,9 @@ void SMLT::init() {
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
 
 	pc_ray.total_light_area = 0;
-	pc_ray.frame_num = 0;
+
+	frame_num = 0;
+
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 	pc_ray.mutations_per_pixel = mutations_per_pixel;
@@ -227,6 +229,7 @@ void SMLT::render() {
 	pc_ray.num_bootstrap_samples = num_bootstrap_samples;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	pc_ray.frame_num = frame_num;
 
 	const std::initializer_list<ResourceBinding> rt_bindings = {
 		output_tex,
@@ -421,10 +424,10 @@ void SMLT::render() {
 }
 
 bool SMLT::update() {
-	pc_ray.frame_num++;
+	frame_num++;
 	bool updated = Integrator::update();
 	if (updated) {
-		pc_ray.frame_num = 0;
+		frame_num = 0;
 	}
 	return updated;
 }

@@ -125,7 +125,9 @@ void DDGI::init() {
 
 	update_ddgi_uniforms();
 	pc_ray.total_light_area = 0;
-	pc_ray.frame_num = 0;
+
+	frame_num = 0;
+
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 }
@@ -137,6 +139,7 @@ void DDGI::render() {
 	pc_ray.first_frame = first_frame;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	pc_ray.frame_num = frame_num;
 	bool ping_pong = bool(frame_idx % 2);  // ping_pong true = read
 	// Generate random orientation for probes
 	{
@@ -248,10 +251,10 @@ void DDGI::render() {
 }
 
 bool DDGI::update() {
-	pc_ray.frame_num++;
+	frame_num++;
 	bool updated = Integrator::update();
 	if (updated) {
-		pc_ray.frame_num = 0;
+		frame_num = 0;
 	}
 	return updated;
 }
