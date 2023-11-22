@@ -59,11 +59,6 @@ uint hash(ivec3 p, uint size) {
            (10 * size);
     // return uint(p.x + p.y * grid_res.x + p.z * grid_res.x * grid_res.y);
 }
-#define FLT_EPSILON 0.5 * 1.19209290E-07
-float gamma(int n) {
-#define MachineEpsilon
-    return (n * FLT_EPSILON) / (1 - n * FLT_EPSILON);
-}
 
 // Ray Tracing Gems chapter 6
 vec3 offset_ray(const vec3 p, const vec3 n) {
@@ -175,26 +170,6 @@ vec3 fresnel_schlick(vec3 f0, float ns) {
     return f0 + (1 - f0) * pow5(1.0f - ns);
 }
 
-float beckmann_alpha_to_s(float alpha) {
-    return 2.0f / min(0.9999f, max(0.0002f, (alpha * alpha))) - 2.0f;
-}
-
-vec3 sample_phong(vec2 uv, const vec3 v, const vec3 n, float s) {
-    // Transform into local space where the n = (0,0,1)
-    vec4 local_quat = to_local_quat(n);
-    vec3 v_loc = rot_quat(local_quat, v);
-    float phi = PI2 * uv.x;
-    float cos_theta = pow(1. - uv.x, 1. / (1. + s));
-    float sin_theta = sqrt(1 - cos_theta * cos_theta);
-    vec3 local_phong_dir =
-        vec3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
-    vec3 reflected_local_dir = reflect(v_loc, vec3(0, 0, 1));
-    vec3 local_phong_dir_rotated =
-        rot_quat(in_local_quat(reflected_local_dir), local_phong_dir);
-    return normalize(
-        rot_quat(invert_quat(local_quat), local_phong_dir_rotated));
-}
-
 float beckmann_d(float alpha, float nh) {
     nh = max(0.00001f, nh);
     alpha = max(0.00001f, alpha);
@@ -226,18 +201,10 @@ float GTR2(float nh, float a) {
     return a2 / (PI * t * t);
 }
 
-float GTR2_aniso(float nh, float hx, float hy, float ax, float ay) {
-    return 1 / (PI * ax * ay * sqr(sqr(hx / ax) + sqr(hy / ay) + nh * nh));
-}
-
 float smithG_GGX(float nv, float alpha_g) {
     float a = alpha_g * alpha_g;
     float b = nv * nv;
     return 1 / (nv + sqrt(a + b - a * b));
-}
-
-float smithG_GGX_aniso(float nv, float vx, float vy, float ax, float ay) {
-    return 1 / (nv + sqrt(sqr(vx * ax) + sqr(vy * ay) + sqr(nv)));
 }
 
 // Input Ve: view direction
