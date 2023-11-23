@@ -128,11 +128,7 @@ void main() {
 				mis_weight = 1.0 / (1 + pdf_light_w / bsdf_pdf_val);
 			}
 			vec3 partial_contrib = mis_weight * hit_mat.emissive_factor;
-			if (depth == 1) {
-				direct_lighting += partial_contrib * throughput;
-			} else {
-				col += partial_contrib * throughput;
-			}
+
 			if (connectable_vertex_found) {
 #if STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 				// Stream in the emissive contribution
@@ -154,7 +150,7 @@ void main() {
 #else	// STREAMING_MODE != STREAMING_MODE_INDIVIDUAL
 				postfix_L += partial_contrib * postfix_throughput;
 #endif	// STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
-			} else if (connectable && any(greaterThan(hit_mat.emissive_factor, vec3(0))) && depth > 1) {
+			} else if (connectable) {
 				// Make the emissive surface the reconnection point
 				rc_barycentrics = payload.attribs;
 				rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
@@ -165,23 +161,30 @@ void main() {
 				reconnection_data.rc_primitive_instance_id = rc_primitive_instance_id;
 				reconnection_data.rc_coords = rc_coords;
 				reconnection_data.rc_partial_jacobian = rc_partial_jacobian;
-				// Ignored
-				reconnection_data.rc_wi = vec3(-1);
-				reconnection_data.rc_Li = partial_contrib * throughput;//vec3(-1);
-				reconnection_data.reservoir_contribution = partial_contrib * throughput;
-				reconnection_data.path_flags = pack_path_flags(depth, 0, RECONNECTION_TYPE_EMISSIVE, side);
-				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
-											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
-				valid_reservoir = valid_reservoir || merged;
-				prefix_col = col;
-				if (!valid_reservoir) {
-					ASSERT(reservoir.data.path_flags == 0);
-				} else {
-					ASSERT(reservoir.data.path_flags != 0);
-				}
+				if (depth > 1 && any(greaterThan(hit_mat.emissive_factor, vec3(0)))) {
+					// Ignored
+					reconnection_data.rc_wi = vec3(-1);
+					reconnection_data.rc_Li = partial_contrib * throughput;	 // vec3(-1);
+					reconnection_data.reservoir_contribution = partial_contrib * throughput;
+					reconnection_data.path_flags = pack_path_flags(depth, 0, RECONNECTION_TYPE_EMISSIVE, side);
+					bool merged = stream_reservoir(seed, reservoir, reconnection_data,
+												   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
+					valid_reservoir = valid_reservoir || merged;
+					prefix_col = col;
+					if (!valid_reservoir) {
+						ASSERT(reservoir.data.path_flags == 0);
+					} else {
+						ASSERT(reservoir.data.path_flags != 0);
+					}
 
-				// connectable_processed = true;
-				LOG_CLICKED("%d\n", depth);
+					connectable_processed = true;
+					LOG_CLICKED("%d\n", depth);
+				}
+			}
+			if (depth == 1) {
+				direct_lighting += partial_contrib * throughput;
+			} else {
+				col += partial_contrib * throughput;
 			}
 		}
 
@@ -192,6 +195,9 @@ void main() {
 		}
 
 		if (depth >= pc.max_depth - 1) {
+			if(connectable_processed) {
+				connectable_vertex_found = true;
+			}
 			break;
 		}
 
@@ -206,17 +212,7 @@ void main() {
 			vec3 contribution = Li * throughput;
 
 			// Stream the NEE path at the reconnection vertex
-			if (connectable && !connectable_processed) {
-				rc_barycentrics = payload.attribs;
-				rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
-				vec3 to_prev = origin.xyz - gbuffer.pos;
-				rc_partial_jacobian *= abs(dot(n_s, wo)) / dot(to_prev, to_prev);
-
-				reconnection_data.rc_barycentrics = rc_barycentrics;
-				reconnection_data.rc_primitive_instance_id = rc_primitive_instance_id;
-				reconnection_data.rc_coords = rc_coords;
-				reconnection_data.rc_partial_jacobian = rc_partial_jacobian;
-
+			if (connectable) {
 				reconnection_data.debug_seed = debug_seed;
 				reconnection_data.rc_seed = rc_seed;
 				reconnection_data.rc_wi = wi;
@@ -225,15 +221,19 @@ void main() {
 				reconnection_data.path_flags = pack_path_flags(depth, 1, RECONNECTION_TYPE_NEE, side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
-
 				valid_reservoir = valid_reservoir || merged;
-				prefix_col = col;
+				// If this was already seen as the reconnection vertex, we do not want the emissive factor included
+				if (!connectable_processed) {
+					prefix_col = col;
+				}
 				if (!valid_reservoir) {
 					ASSERT(reservoir.data.path_flags == 0);
 				} else {
 					ASSERT(reservoir.data.path_flags != 0);
 				}
-			} else if (connectable_vertex_found || connectable_processed) {
+
+				connectable_processed = true;
+			} else if (connectable_vertex_found) {
 #if STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 				reconnection_data.rc_Li = postfix_throughput * Li;
 				reconnection_data.reservoir_contribution = contribution;
@@ -273,7 +273,7 @@ void main() {
 			postfix_throughput *= f_cos / bsdf_pdf_val;
 		}
 
-		if (connectable) {
+		if (connectable_processed) {
 			connectable_vertex_found = true;
 			prefix_depth = depth;
 			reconnection_data.rc_wi = direction;
@@ -323,11 +323,6 @@ void main() {
 			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
 			ASSERT(reservoir_data_valid(reservoir.data));
 
-			if(rc_type != RECONNECTION_TYPE_EMISSIVE) {
-				ASSERT(reservoir.data.rc_Li != vec3(-1));
-			} else {
-				LOG_CLICKED0("Pog\n");
-			}
 		}
 	}
 	if (pc.direct_lighting == 1) {
