@@ -386,7 +386,20 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Enable GRIS", &enable_gris);
 	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
 	result |= ImGui::Checkbox("Enable canonical-only mode", &canonical_only);
-	if (!enable_gris || canonical_only) {
+	if (!enable_gris) {
+		return result;
+	}
+	int curr_streaming_method = static_cast<int>(streaming_method);
+	std::array<const char*, 2> streaming_methods = {
+		"Individual contributions",
+		"Split at reconnection",
+	};
+	if (ImGui::Combo("Streaming method", &curr_streaming_method, streaming_methods.data(),
+					 int(streaming_methods.size()))) {
+		result = true;
+		streaming_method = static_cast<StreamingMethod>(curr_streaming_method);
+	}
+	if (canonical_only) {
 		return result;
 	}
 	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
@@ -407,16 +420,7 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
 	result |= ImGui::SliderFloat("Min reconnection distance ratio", &min_vertex_distance_ratio, 0.0f, 1.0f);
 
-	int curr_streaming_method = static_cast<int>(streaming_method);
-	std::array<const char*, 2> streaming_methods = {
-		"Individual contributions",
-		"Split at reconnection",
-	};
-	if (ImGui::Combo("Streaming method", &curr_streaming_method, streaming_methods.data(),
-					 int(streaming_methods.size()))) {
-		result = true;
-		streaming_method = static_cast<StreamingMethod>(curr_streaming_method);
-	}
+
 	if (spatial_samples_changed && num_spatial_samples > 0) {
 		reconnection_buffer.destroy();
 		reconnection_buffer.create(
