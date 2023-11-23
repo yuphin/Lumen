@@ -371,9 +371,9 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 			} 
 			else if (rc_type == RECONNECTION_TYPE_EMISSIVE) {
 				ASSERT(data.rc_Li == vec3(-1));
-				LOG3("%d - %d - %d\n", rc_type, prefix_depth, rc_postfix_length);
 				ASSERT(luminance(rc_hit_mat.emissive_factor) > 0);
-				reservoir_contribution = prefix_throughput * dst_f * abs(cos_x) * data.rc_Li / dst_pdf;
+				float mis_weight = 1.0 / (1 + data.pdf_light_w / dst_pdf);
+				reservoir_contribution = prefix_throughput * dst_f * abs(cos_x) * mis_weight * rc_hit_mat.emissive_factor / dst_pdf;
 			} 
 			else {
 				ASSERT(data.rc_seed == -1);
