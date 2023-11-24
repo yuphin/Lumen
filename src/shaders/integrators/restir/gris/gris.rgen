@@ -115,6 +115,12 @@ void main() {
 
 		bool side = face_forward(n_s, n_g, wo);
 
+		if (connectable_vertex_found) {
+			postfix_depth++;
+		} else if (depth > 0) {
+			set_bounce_flag(reconnection_data.bounce_flags, depth - 1, constraints_satisfied);
+		}
+
 		if (depth == 0) {
 			// Fill in GBuffer
 			direct_lighting += throughput * hit_mat.emissive_factor;
@@ -164,7 +170,7 @@ void main() {
 				if (depth > 1 && any(greaterThan(hit_mat.emissive_factor, vec3(0)))) {
 					// Ignored
 					reconnection_data.rc_wi = vec3(-1);
-					reconnection_data.rc_Li = vec3(-1); // partial_contrib * throughput;
+					reconnection_data.rc_Li = vec3(-1);	 // partial_contrib * throughput;
 					reconnection_data.pdf_light_w = pdf_light_w;
 					reconnection_data.reservoir_contribution = partial_contrib * throughput;
 					reconnection_data.path_flags = pack_path_flags(depth, 0, RECONNECTION_TYPE_EMISSIVE, side);
@@ -179,7 +185,7 @@ void main() {
 					}
 
 					connectable_processed = true;
-					LOG_CLICKED("%d\n", depth);
+					// LOG_CLICKED("%d\n", depth);
 				}
 			}
 			if (depth == 1) {
@@ -189,14 +195,10 @@ void main() {
 			}
 		}
 
-		if (connectable_vertex_found) {
-			postfix_depth++;
-		} else if (depth > 0) {
-			set_bounce_flag(reconnection_data.bounce_flags, depth - 1, constraints_satisfied);
-		}
+		
 
 		if (depth >= pc.max_depth - 1) {
-			if(connectable_processed) {
+			if (connectable_processed) {
 				connectable_vertex_found = true;
 			}
 			break;
@@ -323,7 +325,13 @@ void main() {
 			ASSERT(reservoir.data.path_flags != 0);
 			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
 			ASSERT(reservoir_data_valid(reservoir.data));
-
+			// if (rc_type == RECONNECTION_TYPE_EMISSIVE) {
+			// 	// LOG_CLICKED2("%d - %d\n", rc_prefix_length, rc_postfix_length);
+			// 	uint flag0 = uint(get_bounce_flag(reservoir.data.bounce_flags, 0));
+			// 	uint flag1 = uint(get_bounce_flag(reservoir.data.bounce_flags, 1));
+			// 	uint flag2 = uint(get_bounce_flag(reservoir.data.bounce_flags, 2));
+			// 	LOG_CLICKED4("Len %d : %d - %d - %d\n", rc_prefix_length, flag0, flag1, flag2);
+			// }
 		}
 	}
 	if (pc.direct_lighting == 1) {
