@@ -31,6 +31,7 @@ class ReSTIRPT : public Integrator {
 	Buffer reconnection_buffer;
 	Buffer transformations_buffer;
 	Buffer compact_vertices_buffer;
+	Buffer debug_vis_buffer;
 	PCReSTIRPT pc_ray{};
 	bool enable_accumulation = false;
 	bool direct_lighting = false;
@@ -40,6 +41,7 @@ class ReSTIRPT : public Integrator {
 	bool show_reconnection_radiance = false;
 	bool enable_temporal_reuse = false;
 	bool enable_gris = true;
+	bool pixel_debug = false;
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.00f;
 	uint32_t path_length = 0;

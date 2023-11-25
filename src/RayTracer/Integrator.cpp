@@ -302,8 +302,8 @@ bool Integrator::update() {
 		updated = true;
 	}
 
-	if (instance->window->is_key_held(KeyInput::KEY_TAB) &&
-		instance->window->is_mouse_held(MouseAction::LEFT, scene_ubo.clicked_pos)) {
+	if (instance->window->is_mouse_held(MouseAction::LEFT, scene_ubo.clicked_pos) && 
+		instance->window->is_key_held(KeyInput::KEY_TAB)) {
 		scene_ubo.debug_click = 1;
 	} else {
 		scene_ubo.debug_click = 0;

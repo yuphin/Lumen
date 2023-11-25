@@ -170,7 +170,7 @@ void main() {
 				if (depth > 1 && any(greaterThan(hit_mat.emissive_factor, vec3(0)))) {
 					// Ignored
 					reconnection_data.rc_wi = vec3(-1);
-					reconnection_data.rc_Li = vec3(-1);	 // partial_contrib * throughput;
+					reconnection_data.rc_Li = vec3(0);//partial_contrib * throughput;
 					reconnection_data.pdf_light_w = pdf_light_w;
 					reconnection_data.reservoir_contribution = partial_contrib * throughput;
 					reconnection_data.path_flags = pack_path_flags(depth, 0, RECONNECTION_TYPE_EMISSIVE, side);

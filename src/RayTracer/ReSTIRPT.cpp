@@ -46,6 +46,12 @@ void ReSTIRPT::init() {
 									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 									  instance->width * instance->height * sizeof(glm::vec3));
 
+	debug_vis_buffer.create("Debug Vis", &instance->vkb.ctx,
+							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+							instance->width * instance->height * sizeof(uint32_t));
+
 	reconnection_buffer.create(
 		"Reservoir Connection", &instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
@@ -83,6 +89,7 @@ void ReSTIRPT::init() {
 	desc.gris_direct_lighting_addr = direct_lighting_buffer.get_device_address();
 	desc.prefix_contributions_addr = prefix_contribution_buffer.get_device_address();
 	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
+	desc.debug_vis_addr = debug_vis_buffer.get_device_address();
 	scene_desc_buffer.create(
 		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
@@ -100,6 +107,7 @@ void ReSTIRPT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, &gris_reservoir_ping_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, &direct_lighting_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, &compact_vertices_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, debug_vis_addr, &debug_vis_buffer, instance->vkb.rg);
 
 	path_length = config->path_length;
 }
@@ -110,6 +118,7 @@ void ReSTIRPT::render() {
 	pc_ray.prev_random_num = pc_ray.general_seed;
 	pc_ray.general_seed = rand() % UINT_MAX;
 	pc_ray.sampling_seed = rand() % UINT_MAX;
+	pc_ray.seed2 = rand() % UINT_MAX;
 	pc_ray.max_depth = path_length;
 	pc_ray.sky_col = config->sky_col;
 	pc_ray.total_light_area = total_light_area;
@@ -127,6 +136,7 @@ void ReSTIRPT::render() {
 	pc_ray.min_vertex_distance_ratio = min_vertex_distance_ratio;
 	pc_ray.enable_gris = enable_gris;
 	pc_ray.frame_num = frame_num;
+	pc_ray.pixel_debug = pixel_debug;
 
 	const std::initializer_list<ResourceBinding> common_bindings = {output_tex, scene_ubo_buffer, scene_desc_buffer,
 																	mesh_lights_buffer};
@@ -152,6 +162,7 @@ void ReSTIRPT::render() {
 											 .dims = {instance->width, instance->height},
 											 .accel = instance->vkb.tlas.accel})
 		.push_constants(&pc_ray)
+		.zero(debug_vis_buffer)
 		.bind(common_bindings)
 		.bind(*reservoir_buffers[pong])
 		.bind(*gbuffers[pong])
@@ -236,6 +247,14 @@ void ReSTIRPT::render() {
 				.bind(*gbuffers[pong])
 				.bind_texture_array(scene_textures)
 				.bind_tlas(instance->vkb.tlas);
+		}
+		if (pixel_debug) {
+			uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
+			instance->vkb.rg
+				->add_compute("Classify Probes",
+							  {.shader = Shader("src/shaders/integrators/restir/gris/debug_vis.comp"), .dims = {num_wgs}})
+				.push_constants(&pc_ray)
+				.bind({output_tex, scene_ubo_buffer, scene_desc_buffer});
 		}
 	}
 
@@ -370,10 +389,16 @@ bool ReSTIRPT::update() {
 void ReSTIRPT::destroy() {
 	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
-	std::vector<Buffer*> buffer_list = {
-		&gris_gbuffer,			 &gris_reservoir_ping_buffer, &gris_reservoir_pong_buffer, &direct_lighting_buffer,
-		&transformations_buffer, &compact_vertices_buffer,	  &prefix_contribution_buffer, &reconnection_buffer,
-		&gris_prev_gbuffer};
+	std::vector<Buffer*> buffer_list = {&gris_gbuffer,
+										&gris_reservoir_ping_buffer,
+										&gris_reservoir_pong_buffer,
+										&direct_lighting_buffer,
+										&transformations_buffer,
+										&compact_vertices_buffer,
+										&prefix_contribution_buffer,
+										&reconnection_buffer,
+										&gris_prev_gbuffer,
+										&debug_vis_buffer};
 	for (auto b : buffer_list) {
 		b->destroy();
 	}
@@ -403,6 +428,7 @@ bool ReSTIRPT::gui() {
 		return result;
 	}
 	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
+	result |= ImGui::Checkbox("Debug pixels", &pixel_debug);
 	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
 	result |= ImGui::Checkbox("Show reconnection radiance", &show_reconnection_radiance);
 	std::array<const char*, 2> mis_methods = {
@@ -419,7 +445,6 @@ bool ReSTIRPT::gui() {
 	result |= spatial_samples_changed;
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
 	result |= ImGui::SliderFloat("Min reconnection distance ratio", &min_vertex_distance_ratio, 0.0f, 1.0f);
-
 
 	if (spatial_samples_changed && num_spatial_samples > 0) {
 		reconnection_buffer.destroy();

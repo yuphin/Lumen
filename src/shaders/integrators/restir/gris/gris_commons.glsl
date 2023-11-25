@@ -347,7 +347,6 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
 			bool rc_side_dst = face_forward(rc_gbuffer.n_s, rc_gbuffer.n_g, -rc_wi);
 			float g_dst = abs(dot(rc_gbuffer.n_s, -rc_wi)) / (rc_wi_len * rc_wi_len);
-			// The "source" location does not necessarily mean the canonical location
 			jacobian = g_dst / data.rc_partial_jacobian;
 			// Correction for solid angle Jacobians
 			float dst_pdf;
@@ -370,7 +369,6 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 				reservoir_contribution = prefix_throughput * dst_f * abs(cos_x) * Li / dst_pdf;
 			} 
 			else if (rc_type == RECONNECTION_TYPE_EMISSIVE) {
-				ASSERT(data.rc_Li == vec3(-1));
 				ASSERT(luminance(rc_hit_mat.emissive_factor) > 0);
 				float mis_weight = 1.0 / (1 + data.pdf_light_w / dst_pdf);
 				reservoir_contribution = prefix_throughput * dst_f * abs(cos_x) * mis_weight * rc_hit_mat.emissive_factor / dst_pdf;

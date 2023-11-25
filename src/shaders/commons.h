@@ -271,6 +271,7 @@ struct Material {
 	uint64_t prefix_contributions_addr;
 	uint64_t transformations_addr;
 	uint64_t compact_vertices_addr;
+	uint64_t debug_vis_addr;
 
 	// VCM Reservoir
 	uint64_t vcm_reservoir_addr;

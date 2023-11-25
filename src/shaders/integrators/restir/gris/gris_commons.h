@@ -15,6 +15,7 @@ struct PCReSTIRPT {
 	uint dir_light_idx;
 	uint general_seed;
 	uint sampling_seed;
+	uint seed2;
 	uint prev_random_num;
 	uint total_frame_num;
 	uint enable_accumulation;
@@ -29,6 +30,7 @@ struct PCReSTIRPT {
 	uint path_length;
 	uint buffer_idx;
 	uint enable_gris;
+	uint pixel_debug;
 };
 
 
