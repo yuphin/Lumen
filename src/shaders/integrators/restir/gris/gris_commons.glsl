@@ -57,11 +57,11 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
 }
 
-vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3 n_s, vec3 wo, out vec3 wi,
-			bool trace_ray) {
-	float wi_len;
+vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3 n_s, vec3 wo, bool trace, out float g) {
 	float pdf_light_a;
 	float pdf_light_w;
+	vec3 wi;
+	float wi_len;
 	LightRecord record;
 	float cos_from_light;
 	const vec3 Le =
@@ -72,13 +72,16 @@ vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3
 	vec3 f_light = eval_bsdf(n_s, wo, hit_mat, 1, side, wi, light_bsdf_pdf, cos_x);
 	any_hit_payload.hit = 1;
 	bool visible;
-	if (!trace_ray) {
+	if (!trace) {
 		visible = true;
 	} else {
 		traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0,
 					wi, wi_len - EPS, 1);
 		visible = any_hit_payload.hit == 0;
 	}
+
+	g = cos_from_light / (wi_len * wi_len);
+
 	const float light_pick_pdf = 1. / pc.light_triangle_count;
 	if (visible && pdf_light_w > 0) {
 		const float mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + light_bsdf_pdf / pdf_light_w);
@@ -86,6 +89,12 @@ vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3
 	}
 	return vec3(0);
 }
+
+vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3 n_s, vec3 wo, bool trace) {
+	float unused;
+	return do_nee(seed, gbuffer, hit_mat, side, n_s, wo, trace, unused);
+}
+
 
 HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx, out float area) {
 	const PrimMeshInfo pinfo = prim_infos.d[instance_idx];
@@ -304,11 +313,10 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 	float prefix_jacobian = 1.0;
 
 	Material src_hit_mat = load_material(src_gbuffer.material_idx, src_gbuffer.uv);
-	bool src_rough = is_rough(src_hit_mat);
-	bool src_far = length(rc_gbuffer.pos - src_gbuffer.pos) > pc.min_vertex_distance_ratio * pc.scene_extent;
 	bool constraints_satisfied = true;
+
 	while (true) {
-		if (((prefix_depth + rc_postfix_length + 2) > pc.max_depth) || prefix_depth > (rc_prefix_length - 1)) {
+		if (((prefix_depth + rc_postfix_length + 1) > pc.max_depth) || prefix_depth > rc_prefix_length) {
 			return false;
 		}
 		vec3 dst_wo = -dst_wi;
@@ -323,31 +331,55 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		bool dst_rough = is_rough(dst_hit_mat);
 		bool dst_far = rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent;
 
-		bool src_satisfied = get_bounce_flag(data.bounce_flags, prefix_depth);
 		constraints_satisfied = dst_rough && dst_far;
 
-		if (src_satisfied != constraints_satisfied) {
-			return false;
-		}
-		bool connectable = constraints_satisfied && prefix_depth == (rc_prefix_length - 1);
+		bool src_satisfied = get_bounce_flag(data.bounce_flags, prefix_depth);
 
-		bool connected = false;
+		bool connectable = false;
+		if (prefix_depth == (rc_prefix_length - 1)) {
+			// If it's not symmetric, don't connect
+			if (src_satisfied != constraints_satisfied) {
+				return false;
+			}
+			connectable = constraints_satisfied && (prefix_depth + rc_postfix_length + 2 <= pc.max_depth);
+		} else if (prefix_depth == rc_prefix_length && rc_type == RECONNECTION_TYPE_NEE) {
+			ASSERT(data.d.z == 0);
+			// In this case directly re-use the NEE result
+			ASSERT(prefix_depth != 0);	// Can't process direct lighting
+			uvec2 rc_coords = uvec2(data.rc_coords / gl_LaunchSizeEXT.y, data.rc_coords % gl_LaunchSizeEXT.y);
+			uvec4 reconnection_seed = init_rng(rc_coords, gl_LaunchSizeEXT.xy, seed_helpers.x, data.rc_seed);
+			uvec4 debug_seed = reconnection_seed;
+			float g_dst;
+			vec3 Li = do_nee(reconnection_seed, dst_gbuffer, dst_hit_mat, dst_side, dst_gbuffer.n_s, dst_wo, true, g_dst);
+
+			if(Li == vec3(0)) {
+				return false;
+			}
+			jacobian = prefix_jacobian / data.d.x;
+			if(jacobian > 1.01) {
+				LOG_CLICKED4("%f - %f - %d - %d\n", prefix_jacobian, data.d.x, rc_prefix_length, data.bounce_flags);
+			}
+
+			jacobian_out = jacobian;
+			// LOG_CLICKED4("%d - %d - %d - %f\n", rc_type, prefix_depth, rc_postfix_length, jacobian_out);
+			reservoir_contribution = prefix_throughput * Li;
+			return true;
+		}
+
 		if (connectable) {
 			any_hit_payload.hit = 1;
 			vec3 p = offset_ray2(dst_gbuffer.pos, dst_gbuffer.n_s);
 			traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p,
 						0, rc_wi, rc_wi_len - EPS, 1);
-			connected = any_hit_payload.hit == 0;
-			if (!connected) {
+			connectable = any_hit_payload.hit == 0;
+			if (any_hit_payload.hit == 1) {
 				return false;
 			}
-		}
-		if (connected) {
-			LOG_CLICKED3("%d - %d - %d\n", rc_type, prefix_depth, rc_postfix_length);
 			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
 			bool rc_side_dst = face_forward(rc_gbuffer.n_s, rc_gbuffer.n_g, -rc_wi);
 			float g_dst = abs(dot(rc_gbuffer.n_s, -rc_wi)) / (rc_wi_len * rc_wi_len);
-			jacobian = g_dst / data.rc_partial_jacobian;
+			jacobian = prefix_jacobian * g_dst;
+			jacobian /= (rc_type == RECONNECTION_TYPE_NEE ? (data.d.x * data.d.y) : data.rc_partial_jacobian);
 			// Correction for solid angle Jacobians
 			float dst_pdf;
 			float cos_x = dot(dst_gbuffer.n_s, rc_wi);
@@ -355,25 +387,22 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 			if (dst_f == vec3(0)) {
 				return false;
 			}
-			jacobian *= dst_pdf * prefix_jacobian;
+			jacobian *= dst_pdf;
 			if (rc_type == RECONNECTION_TYPE_NEE) {
 				// The NEE PDF does not depend on the surface, only MIS weight does
 				// Also we do not need to trace visibility ray since we know this was accepted into the reservoir
+				LOG_CLICKED3("%f - %d - %d\n", prefix_jacobian, prefix_depth, rc_postfix_length);
 				uvec2 rc_coords = uvec2(data.rc_coords / gl_LaunchSizeEXT.y, data.rc_coords % gl_LaunchSizeEXT.y);
 				uvec4 reconnection_seed = init_rng(rc_coords, gl_LaunchSizeEXT.xy, seed_helpers.x, data.rc_seed);
-				vec3 dst_L_wi;
 				uvec4 debug_seed = reconnection_seed;
-				vec3 Li = do_nee(reconnection_seed, rc_gbuffer, rc_hit_mat, rc_side_dst, rc_gbuffer.n_s, -rc_wi,
-								 dst_L_wi, false);
+				vec3 Li = do_nee(reconnection_seed, rc_gbuffer, rc_hit_mat, rc_side_dst, rc_gbuffer.n_s, -rc_wi, false);
 				ASSERT(debug_seed == data.debug_seed);
 				reservoir_contribution = prefix_throughput * dst_f * abs(cos_x) * Li / dst_pdf;
-			} 
-			else if (rc_type == RECONNECTION_TYPE_EMISSIVE) {
-				ASSERT(luminance(rc_hit_mat.emissive_factor) > 0);
+			} else if (rc_type == RECONNECTION_TYPE_EMISSIVE) {
 				float mis_weight = 1.0 / (1 + data.pdf_light_w / dst_pdf);
-				reservoir_contribution = prefix_throughput * dst_f * abs(cos_x) * mis_weight * rc_hit_mat.emissive_factor / dst_pdf;
-			} 
-			else {
+				reservoir_contribution =
+					prefix_throughput * dst_f * abs(cos_x) * mis_weight * rc_hit_mat.emissive_factor / dst_pdf;
+			} else {
 				ASSERT(data.rc_seed == -1);
 
 				float dst_postfix_pdf;
@@ -389,7 +418,6 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 										 abs(rc_cos_x) * data.rc_Li / (dst_postfix_pdf * dst_pdf);
 			}
 			if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
-				jacobian_out = 0;
 				reservoir_contribution = vec3(0);
 				return false;
 			}
@@ -411,7 +439,15 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		if (!found_isect) {
 			return false;
 		}
+
+		vec3 prev_pos = dst_gbuffer.pos;
 		dst_gbuffer = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
+		bool prev_far = length(dst_gbuffer.pos - prev_pos) > pc.min_vertex_distance_ratio * pc.scene_extent;
+		bool prev_constraints_satisfied = dst_rough && prev_far;
+		// Can't connect if the sampled path is not symmetric
+		if (src_satisfied != prev_constraints_satisfied) {
+			return false;
+		}
 		prefix_depth++;
 	}
 	return false;
@@ -502,11 +538,10 @@ bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData
 		// Also we do not need to trace visibility ray since we know this was accepted into the reservoir
 		uvec2 rc_coords = uvec2(data.rc_coords / gl_LaunchSizeEXT.y, data.rc_coords % gl_LaunchSizeEXT.y);
 		uvec4 reconnection_seed = init_rng(rc_coords, gl_LaunchSizeEXT.xy, seed_helper, data.rc_seed);
-		vec3 dst_L_wi;
 		uvec4 debug_seed = reconnection_seed;
-		vec3 Li = do_nee(reconnection_seed, rc_gbuffer, rc_hit_mat, rc_side_dst, rc_n_s_dst, -dst_wi, dst_L_wi, false);
+		vec3 Li =
+			do_nee(reconnection_seed, rc_gbuffer, rc_hit_mat, rc_side_dst, rc_n_s_dst, -dst_wi, false);
 		ASSERT(debug_seed == data.debug_seed);
-		ASSERT(dst_L_wi == data.rc_wi);
 		reservoir_contribution = dst_f * abs(cos_x) * Li / dst_pdf;
 	} else {
 		ASSERT(data.rc_seed == -1);

@@ -43,6 +43,7 @@ struct GBuffer {
 
 struct GrisData {
 	uvec4 debug_seed;
+	vec4 d;
 	vec3 rc_wi;
 	uint init_seed;
 	vec3 rc_Li;
