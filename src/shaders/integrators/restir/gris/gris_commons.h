@@ -43,7 +43,6 @@ struct GBuffer {
 
 struct GrisData {
 	uvec4 debug_seed;
-	vec4 d;
 	vec3 rc_wi;
 	uint init_seed;
 	vec3 rc_Li;
@@ -52,11 +51,12 @@ struct GrisData {
 	uint path_flags;
 	vec3 reservoir_contribution;
 	uint rc_coords;
+	vec2 rc_partial_jacobian; // g * rc_pdf (* rc_postfix_pdf)
 	vec2 rc_barycentrics;
 	uvec2 rc_primitive_instance_id;
-	float rc_partial_jacobian; // g * rc_pdf (* rc_postfix_pdf)
 	uint bounce_flags;
 	float pdf_light_w;
+	vec3 pad;
 	uint rc_seed;
 };
 

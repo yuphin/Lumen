@@ -413,6 +413,7 @@ vec3 sample_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
 vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
                const uint mode, const bool side, const vec3 dir,
                out float pdf_w, float cos_theta) {
+    pdf_w = 0;
     if (!same_hemisphere(dir, wo, n_s)) {
         pdf_w = 0.;
         return vec3(0);

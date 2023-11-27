@@ -160,7 +160,7 @@ void main() {
 				reconnection_data.rc_coords = rc_coords;
 
 				vec3 to_prev = origin.xyz - gbuffer.pos;
-				reconnection_data.rc_partial_jacobian = abs(dot(n_s, wo)) / dot(to_prev, to_prev) * rc_partial_jacobian;
+				reconnection_data.rc_partial_jacobian.x = abs(dot(n_s, wo)) / dot(to_prev, to_prev) * rc_partial_jacobian;
 				if (depth > 1 && any(greaterThan(hit_mat.emissive_factor, vec3(0)))) {
 					// Ignored
 					reconnection_data.rc_wi = vec3(-1);
@@ -204,7 +204,7 @@ void main() {
 			vec3 Li = do_nee(seed, gbuffer, hit_mat, side, n_s, wo, true, g_src);
 			vec3 contribution = Li * throughput;
 
-			bool nee_connectable = depth > 0 && !connectable_vertex_found && curr_rough;
+			bool nee_connectable = depth > 0 && !connectable_vertex_found && !connectable && curr_rough;
 
 			// Stream the NEE path at the reconnection vertex
 			if (nee_connectable) {
@@ -220,10 +220,8 @@ void main() {
 				reconnection_data.path_flags = pack_path_flags(depth, 1, RECONNECTION_TYPE_NEE, side);
 
 				vec3 to_prev = origin.xyz - gbuffer.pos;
-				// TODO: Fix
-				reconnection_data.d.x = rc_partial_jacobian;
-				reconnection_data.d.y =abs(dot(n_s, wo)) / dot(to_prev, to_prev) ;
-				reconnection_data.d.z = 0;
+
+				reconnection_data.rc_partial_jacobian = vec2(rc_partial_jacobian, abs(dot(n_s, wo)) / dot(to_prev, to_prev));
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
@@ -280,7 +278,7 @@ void main() {
 			reconnection_data.rc_seed = -1;
 			// Partially fill in the contribution data
 			reconnection_data.reservoir_contribution = throughput;
-			reconnection_data.rc_partial_jacobian *= bsdf_pdf_val;
+			reconnection_data.rc_partial_jacobian.x *= bsdf_pdf_val;
 			reconnection_data.debug_seed = uvec4(-1);
 			rc_side = side;
 		}
@@ -323,7 +321,6 @@ void main() {
 			// LOG_CLICKED3("%d - %d - %d\n", rc_type, rc_prefix_length, rc_postfix_length);
 			if (rc_type != RECONNECTION_TYPE_NEE) {
 				ASSERT(reservoir_data_valid(reservoir.data));
-			} else {
 			}
 			// if (rc_type == RECONNECTION_TYPE_EMISSIVE) {
 			// 	// LOG_CLICKED2("%d - %d\n", rc_prefix_length, rc_postfix_length);
