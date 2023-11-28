@@ -111,6 +111,13 @@ void main() {
 
 		bool side = face_forward(n_s, n_g, wo);
 
+		if (was_connectable) {
+			vec3 to_prev = origin.xyz - gbuffer.pos;
+			reconnection_data.rc_partial_jacobian.y *= abs(dot(n_s, wo)) / dot(to_prev, to_prev);
+			reconnection_data.rc_postfix_n_s = gbuffer.n_s;
+			reconnection_data.rc_postfix_pos = gbuffer.pos;
+		}
+
 		if (connectable_vertex_found) {
 			postfix_depth++;
 		} else if (depth > 0) {
@@ -160,7 +167,8 @@ void main() {
 				reconnection_data.rc_coords = rc_coords;
 
 				vec3 to_prev = origin.xyz - gbuffer.pos;
-				reconnection_data.rc_partial_jacobian.x = abs(dot(n_s, wo)) / dot(to_prev, to_prev) * rc_partial_jacobian;
+				reconnection_data.rc_partial_jacobian.x =
+					abs(dot(n_s, wo)) / dot(to_prev, to_prev) * rc_partial_jacobian;
 				if (depth > 1 && any(greaterThan(hit_mat.emissive_factor, vec3(0)))) {
 					// Ignored
 					reconnection_data.rc_wi = vec3(-1);
@@ -213,7 +221,7 @@ void main() {
 				reconnection_data.rc_barycentrics = rc_barycentrics;
 				reconnection_data.rc_primitive_instance_id = rc_primitive_instance_id;
 				reconnection_data.rc_coords = rc_coords;
-				
+
 				reconnection_data.debug_seed = debug_seed;
 				reconnection_data.rc_seed = rc_seed;
 				reconnection_data.reservoir_contribution = contribution;
@@ -221,7 +229,8 @@ void main() {
 
 				vec3 to_prev = origin.xyz - gbuffer.pos;
 
-				reconnection_data.rc_partial_jacobian = vec2(rc_partial_jacobian, abs(dot(n_s, wo)) / dot(to_prev, to_prev));
+				reconnection_data.rc_partial_jacobian =
+					vec2(rc_partial_jacobian, abs(dot(n_s, wo)) / dot(to_prev, to_prev));
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
@@ -279,6 +288,7 @@ void main() {
 			// Partially fill in the contribution data
 			reconnection_data.reservoir_contribution = throughput;
 			reconnection_data.rc_partial_jacobian.x *= bsdf_pdf_val;
+			reconnection_data.rc_partial_jacobian.y = rc_partial_jacobian * bsdf_pdf_val;
 			reconnection_data.debug_seed = uvec4(-1);
 			rc_side = side;
 		}

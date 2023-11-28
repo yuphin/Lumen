@@ -56,8 +56,10 @@ struct GrisData {
 	uvec2 rc_primitive_instance_id;
 	uint bounce_flags;
 	float pdf_light_w;
-	vec3 pad;
+	vec3 rc_postfix_n_s; // TODO: Remove later
 	uint rc_seed;
+	vec3 rc_postfix_pos; // TODO: Remove later
+	float pad;
 };
 
 struct Reservoir {
