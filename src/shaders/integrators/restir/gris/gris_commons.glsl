@@ -316,20 +316,30 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 	bool constraints_satisfied = true;
 
 	uint bounce_flags = 0;
+	vec3 dst_wo;
+	Material dst_hit_mat;
+	bool dst_side;
+	bool dst_rough;
+	vec3 rc_wi;
+	float rc_wi_len;
+
+	bool found_connection_at_rc_vertex = false;
+	bool found_connection_to_rc_vertex = false;
+
 	while (true) {
 		if (((prefix_depth + rc_postfix_length + 1) > pc.max_depth) || prefix_depth > rc_prefix_length) {
 			return false;
 		}
-		vec3 dst_wo = -dst_wi;
-		bool dst_side = face_forward(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo);
+		dst_wo = -dst_wi;
+		dst_side = face_forward(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo);
 		dst_gbuffer.pos = offset_ray(dst_gbuffer.pos, dst_gbuffer.n_g);
-		Material dst_hit_mat = load_material(dst_gbuffer.material_idx, dst_gbuffer.uv);
+		dst_hit_mat = load_material(dst_gbuffer.material_idx, dst_gbuffer.uv);
 
-		vec3 rc_wi = rc_gbuffer.pos - dst_gbuffer.pos;
-		float rc_wi_len = length(rc_wi);
+		rc_wi = rc_gbuffer.pos - dst_gbuffer.pos;
+		rc_wi_len = length(rc_wi);
 		rc_wi /= rc_wi_len;
 
-		bool dst_rough = is_rough(dst_hit_mat);
+		dst_rough = is_rough(dst_hit_mat);
 		bool dst_far = rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent;
 
 		constraints_satisfied = dst_rough && dst_far;
@@ -337,168 +347,31 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		bool src_satisfied = get_bounce_flag(data.bounce_flags, prefix_depth);
 
 		bool connectable = false;
-		if (prefix_depth == rc_prefix_length && rc_type == RECONNECTION_TYPE_NEE) {
-			// In this case directly re-use the NEE result
-			ASSERT(prefix_depth != 0);	// Can't process direct lighting
-			uvec2 rc_coords = uvec2(data.rc_coords / gl_LaunchSizeEXT.y, data.rc_coords % gl_LaunchSizeEXT.y);
-			uvec4 reconnection_seed = init_rng(rc_coords, gl_LaunchSizeEXT.xy, seed_helpers.x, data.rc_seed);
-			uvec4 debug_seed = reconnection_seed;
-			float g_dst;
-			vec3 Li =
-				do_nee(reconnection_seed, dst_gbuffer, dst_hit_mat, dst_side, dst_gbuffer.n_s, dst_wo, true, g_dst);
 
-			if (Li == vec3(0)) {
-				return false;
-			}
-			jacobian = prefix_jacobian / data.rc_partial_jacobian.x;
-			if (jacobian > 1.01) {
-				LOG_CLICKED4("%f - %f - %d - %d\n", prefix_jacobian, data.rc_partial_jacobian.x, rc_prefix_length,
-							 data.bounce_flags);
-			}
-			reservoir_contribution = prefix_throughput * Li;
-			// LOG_CLICKED0("BB\n");
-
-			if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
-				reservoir_contribution = vec3(0);
-				return false;
-			}
-
-			jacobian_out = jacobian;
-			// LOG_CLICKED3("%d - %d - %d\n", prefix_depth, data.bounce_flags, bounce_flags);
-			// LOG_CLICKED4("%d - %d - %d - %f\n", rc_type, prefix_depth, rc_postfix_length, jacobian_out);
-			return true;
-			// TODO
-			// } else if (prefix_depth == (rc_prefix_length - 1) || prefix_depth == rc_prefix_length) {
-		} else if (prefix_depth == rc_prefix_length && rc_type == RECONNECTION_TYPE_DEFAULT) {
-
-			// LOG_CLICKED4("%d - %d - %d - %d\n", prefix_depth, rc_postfix_length, bounce_flags | uint(dst_rough), data.bounce_flags);
-			// if ((src_satisfied != constraints_satisfied)) {
-			// 	return false;
-			// }
-			if(!constraints_satisfied || (prefix_depth + rc_postfix_length + 1) > pc.max_depth) {
-				return false;
-			}
-			vec3 dst_postfix_wi = data.rc_postfix_pos - dst_gbuffer.pos;
-			float wi_len_sqr = dot(dst_postfix_wi, dst_postfix_wi);
-			float wi_len = sqrt(wi_len_sqr);
-			dst_postfix_wi /= wi_len;
-
-			any_hit_payload.hit = 1;
-			vec3 p = offset_ray2(dst_gbuffer.pos, dst_gbuffer.n_s);
-			traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p,
-						0, dst_postfix_wi, wi_len - EPS, 1);
-			connectable = any_hit_payload.hit == 0;
-			if (any_hit_payload.hit == 1) {
-				return false;
-			}
-
-			float g = abs(dot(dst_postfix_wi, data.rc_postfix_n_s)) / wi_len_sqr;
-
-			float dst_postfix_pdf;
-			float rc_cos_x = dot(dst_gbuffer.n_s, dst_postfix_wi);
-			vec3 dst_postfix_f =
-				eval_bsdf(dst_gbuffer.n_s, dst_wo, dst_hit_mat, 1, dst_side, dst_postfix_wi, dst_postfix_pdf, rc_cos_x);
-
-			jacobian = dst_postfix_pdf * prefix_jacobian * g / data.rc_partial_jacobian.y;
-			reservoir_contribution = prefix_throughput * abs(rc_cos_x) * dst_postfix_f * data.rc_Li / dst_postfix_pdf;
-
-			LOG_CLICKED0("AA\n");
-
-			if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
-				reservoir_contribution = vec3(0);
-				return false;
-			}
-
-			jacobian_out = jacobian;
-
-		} else if (prefix_depth == (rc_prefix_length - 1) && rc_type != RECONNECTION_TYPE_DEFAULT) {
+		if (prefix_depth == rc_prefix_length &&
+			(rc_type == RECONNECTION_TYPE_DEFAULT || rc_type == RECONNECTION_TYPE_NEE)) {
+			found_connection_at_rc_vertex = true;
+			break;
+		} else if (prefix_depth == rc_prefix_length - 1) {
 			// If it's not symmetric, don't connect
 			if ((src_satisfied != constraints_satisfied)) {
 				return false;
 			}
-			connectable = constraints_satisfied && ((prefix_depth + rc_postfix_length + 2) <= pc.max_depth);
+
+			if (constraints_satisfied && (prefix_depth + rc_postfix_length + 2) <= pc.max_depth) {
+				found_connection_to_rc_vertex = true;
+				break;
+			}
 		}
 
-		if (connectable) {
-			any_hit_payload.hit = 1;
-			vec3 p = offset_ray2(dst_gbuffer.pos, dst_gbuffer.n_s);
-			traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p,
-						0, rc_wi, rc_wi_len - EPS, 1);
-			connectable = any_hit_payload.hit == 0;
-			if (any_hit_payload.hit == 1) {
-				return false;
-			}
-			// LOG_CLICKED3("%d - %d - %d\n", prefix_depth, data.bounce_flags, bounce_flags);
-			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
-			bool rc_side_dst = face_forward(rc_gbuffer.n_s, rc_gbuffer.n_g, -rc_wi);
-			float g_dst = abs(dot(rc_gbuffer.n_s, -rc_wi)) / (rc_wi_len * rc_wi_len);
-			jacobian = prefix_jacobian * g_dst;
-			jacobian /= (rc_type == RECONNECTION_TYPE_NEE ? (data.rc_partial_jacobian.x * data.rc_partial_jacobian.y)
-														  : data.rc_partial_jacobian.x);
-			// Correction for solid angle Jacobians
-			float dst_pdf;
-			float cos_x = dot(dst_gbuffer.n_s, rc_wi);
-			vec3 dst_f = eval_bsdf(dst_gbuffer.n_s, dst_wo, dst_hit_mat, 1, dst_side, rc_wi, dst_pdf, cos_x);
-			if (dst_f == vec3(0)) {
-				return false;
-			}
-			jacobian *= dst_pdf;
-			if (rc_type == RECONNECTION_TYPE_NEE) {
-				// The NEE PDF does not depend on the surface, only MIS weight does
-				// Also we do not need to trace visibility ray since we know this was accepted into the reservoir
-				if (canonical) {
-					// LOG_CLICKED3("%d - %d - %d\n", prefix_depth, data.bounce_flags, bounce_flags);
-				}
-				uvec2 rc_coords = uvec2(data.rc_coords / gl_LaunchSizeEXT.y, data.rc_coords % gl_LaunchSizeEXT.y);
-				uvec4 reconnection_seed = init_rng(rc_coords, gl_LaunchSizeEXT.xy, seed_helpers.x, data.rc_seed);
-				uvec4 debug_seed = reconnection_seed;
-				vec3 Li = do_nee(reconnection_seed, rc_gbuffer, rc_hit_mat, rc_side_dst, rc_gbuffer.n_s, -rc_wi, false);
-				ASSERT(debug_seed == data.debug_seed);
-				reservoir_contribution = prefix_throughput * dst_f * abs(cos_x) * Li / dst_pdf;
-			} else if (rc_type == RECONNECTION_TYPE_EMISSIVE) {
-				float mis_weight = 1.0 / (1 + data.pdf_light_w / dst_pdf);
-				reservoir_contribution =
-					prefix_throughput * dst_f * abs(cos_x) * mis_weight * rc_hit_mat.emissive_factor / dst_pdf;
-			} else if (rc_type == RECONNECTION_TYPE_DEFAULT) {
-				// TODO
-				return false;
-				ASSERT(data.rc_seed == -1);
-
-				float dst_postfix_pdf;
-				float rc_cos_x = dot(rc_gbuffer.n_s, data.rc_wi);
-				vec3 dst_postfix_f = eval_bsdf(rc_gbuffer.n_s, -rc_wi, rc_hit_mat, 1, rc_side_dst, data.rc_wi,
-											   dst_postfix_pdf, rc_cos_x);
-				jacobian *= dst_postfix_pdf;
-				float mis_weight = 1.0;
-				if (rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
-					mis_weight = 1.0 / (1 + data.pdf_light_w / dst_postfix_pdf);
-				}
-				if (isnan(dst_postfix_pdf) || dst_postfix_pdf == 0) {
-					return false;
-				}
-				// LOG_CLICKED4("%d - %d : %d - %d\n", prefix_depth, rc_postfix_length, data.bounce_flags,
-				// bounce_flags);
-				reservoir_contribution = prefix_throughput * mis_weight * dst_f * abs(cos_x) * dst_postfix_f *
-										 abs(rc_cos_x) * data.rc_Li / (dst_postfix_pdf * dst_pdf);
-
-				if (reservoir_contribution == vec3(0) || isnan(luminance(reservoir_contribution))) {
-					return false;
-				}
-			}
-			if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
-				reservoir_contribution = vec3(0);
-				return false;
-			}
-			jacobian_out = jacobian;
-
-			return true;
-		}
 		float pdf, cos_theta;
 		const vec3 f = sample_bsdf(dst_gbuffer.n_s, dst_wo, dst_hit_mat, 1 /*radiance=cam*/, dst_side, dst_wi, pdf,
 								   cos_theta, reservoir_seed);
+
 		if (pdf == 0) {
 			return false;
 		}
+
 		prefix_jacobian *= pdf;
 		prefix_throughput *= f * abs(cos_theta) / pdf;
 
@@ -518,6 +391,122 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		}
 		set_bounce_flag(bounce_flags, prefix_depth, prev_constraints_satisfied);
 		prefix_depth++;
+	}
+
+	if (found_connection_at_rc_vertex) {
+#if 0
+		if (!constraints_satisfied || (prefix_depth + rc_postfix_length + 1) > pc.max_depth) {
+			return false;
+		}
+		if (rc_type == RECONNECTION_TYPE_DEFAULT) {
+			vec3 dst_postfix_wi = data.rc_postfix_pos - dst_gbuffer.pos;
+			float wi_len_sqr = dot(dst_postfix_wi, dst_postfix_wi);
+			float wi_len = sqrt(wi_len_sqr);
+			dst_postfix_wi /= wi_len;
+
+			any_hit_payload.hit = 1;
+			vec3 p = offset_ray2(dst_gbuffer.pos, dst_gbuffer.n_s);
+			traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p,
+						0, dst_postfix_wi, wi_len - EPS, 1);
+			if (any_hit_payload.hit == 1) {
+				return false;
+			}
+
+			float g = abs(dot(dst_postfix_wi, data.rc_postfix_n_s)) / wi_len_sqr;
+
+			float dst_postfix_pdf;
+			float rc_cos_x = dot(dst_gbuffer.n_s, dst_postfix_wi);
+			vec3 dst_postfix_f =
+				eval_bsdf(dst_gbuffer.n_s, dst_wo, dst_hit_mat, 1, dst_side, dst_postfix_wi, dst_postfix_pdf, rc_cos_x);
+
+			jacobian = dst_postfix_pdf * prefix_jacobian * g / data.rc_partial_jacobian.y;
+			reservoir_contribution = prefix_throughput * abs(rc_cos_x) * dst_postfix_f * data.rc_Li / dst_postfix_pdf;
+
+			jacobian_out = jacobian;
+			LOG_CLICKED4("Default: %d - %d - %d - %d\n", prefix_depth, rc_postfix_length,
+						 bounce_flags | uint(dst_rough), data.bounce_flags);
+		} else if (rc_type == RECONNECTION_TYPE_NEE) {
+			// In this case directly re-use the NEE result
+			ASSERT(prefix_depth != 0);	// Can't process direct lighting
+			uvec2 rc_coords = uvec2(data.rc_coords / gl_LaunchSizeEXT.y, data.rc_coords % gl_LaunchSizeEXT.y);
+			uvec4 reconnection_seed = init_rng(rc_coords, gl_LaunchSizeEXT.xy, seed_helpers.x, data.rc_seed);
+			ASSERT(reconnection_seed == data.debug_seed);
+			float g_dst;
+			vec3 Li =
+				do_nee(reconnection_seed, dst_gbuffer, dst_hit_mat, dst_side, dst_gbuffer.n_s, dst_wo, true, g_dst);
+			if (Li == vec3(0)) {
+				return false;
+			}
+			jacobian = prefix_jacobian / data.rc_partial_jacobian.x;
+			reservoir_contribution = prefix_throughput * Li;
+
+			jacobian_out = jacobian;
+			LOG_CLICKED4("NEE: %d - %d - %d - %f\n", rc_type, prefix_depth, rc_postfix_length, jacobian_out);
+		}
+
+		if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
+			jacobian = 0;
+			reservoir_contribution = vec3(0);
+			return false;
+		}
+#endif
+	} else if (found_connection_to_rc_vertex) {
+		any_hit_payload.hit = 1;
+		vec3 p = offset_ray2(dst_gbuffer.pos, dst_gbuffer.n_s);
+		traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0,
+					rc_wi, rc_wi_len - EPS, 1);
+		if (any_hit_payload.hit == 1) {
+			return false;
+		}
+		ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
+		bool rc_side_dst = face_forward(rc_gbuffer.n_s, rc_gbuffer.n_g, -rc_wi);
+		float g_dst = abs(dot(rc_gbuffer.n_s, -rc_wi)) / (rc_wi_len * rc_wi_len);
+		jacobian = prefix_jacobian * g_dst;
+		jacobian /= (rc_type == RECONNECTION_TYPE_NEE ? (data.rc_partial_jacobian.x * data.rc_partial_jacobian.y)
+													  : data.rc_partial_jacobian.x);
+		// Correction for solid angle Jacobians
+		float dst_pdf;
+		float cos_x = dot(dst_gbuffer.n_s, rc_wi);
+		vec3 dst_f = eval_bsdf(dst_gbuffer.n_s, dst_wo, dst_hit_mat, 1, dst_side, rc_wi, dst_pdf, cos_x);
+		if (dst_f == vec3(0)) {
+			return false;
+		}
+		jacobian *= dst_pdf;
+		if (rc_type == RECONNECTION_TYPE_NEE) {
+			return false;
+			uvec2 rc_coords = uvec2(data.rc_coords / gl_LaunchSizeEXT.y, data.rc_coords % gl_LaunchSizeEXT.y);
+			uvec4 reconnection_seed = init_rng(rc_coords, gl_LaunchSizeEXT.xy, seed_helpers.x, data.rc_seed);
+			ASSERT(reconnection_seed == data.debug_seed);
+			vec3 Li = do_nee(reconnection_seed, rc_gbuffer, rc_hit_mat, rc_side_dst, rc_gbuffer.n_s, -rc_wi, false);
+			reservoir_contribution = prefix_throughput * dst_f * abs(cos_x) * Li / dst_pdf;
+		} else if (rc_type == RECONNECTION_TYPE_EMISSIVE) {
+			return false;
+			float mis_weight = 1.0 / (1 + data.pdf_light_w / dst_pdf);
+			reservoir_contribution =
+				prefix_throughput * dst_f * abs(cos_x) * mis_weight * rc_hit_mat.emissive_factor / dst_pdf;
+		} else {
+			// Default or emissive after reconnection
+			float dst_postfix_pdf;
+			float rc_cos_x = dot(rc_gbuffer.n_s, data.rc_wi);
+			vec3 dst_postfix_f =
+				eval_bsdf(rc_gbuffer.n_s, -rc_wi, rc_hit_mat, 1, rc_side_dst, data.rc_wi, dst_postfix_pdf, rc_cos_x);
+			jacobian *= dst_postfix_pdf;
+			float mis_weight = 1.0;
+			if (rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
+				return false;
+				mis_weight = 1.0 / (1 + data.pdf_light_w / dst_postfix_pdf);
+			}
+			reservoir_contribution = prefix_throughput * mis_weight * dst_f * abs(cos_x) * dst_postfix_f *
+									 abs(rc_cos_x) * data.rc_Li / (dst_postfix_pdf * dst_pdf);
+		}
+		if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
+			jacobian = 0;
+			reservoir_contribution = vec3(0);
+			return false;
+		}
+		jacobian_out = jacobian;
+		LOG_CLICKED4("%d - %d : %d - %d\n", prefix_depth, rc_postfix_length, data.bounce_flags, bounce_flags);
+		return true;
 	}
 	return false;
 }
