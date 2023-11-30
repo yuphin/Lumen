@@ -82,7 +82,7 @@ void main() {
 				reconnection_data.rc_Li = postfix_throughput * atmosphere_L;
 				reconnection_data.reservoir_contribution = contribution;
 				reconnection_data.path_flags =
-					pack_path_flags(prefix_depth, depth - prefix_depth + 1, RECONNECTION_TYPE_DEFAULT, false);
+					pack_path_flags(prefix_depth, depth - prefix_depth, RECONNECTION_TYPE_DEFAULT, false);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
@@ -150,7 +150,7 @@ void main() {
 					reconnection_data.pdf_light_w = pdf_light_w;
 				}
 				reconnection_data.path_flags = pack_path_flags(
-					prefix_depth, depth - prefix_depth + 1,
+					prefix_depth, depth - prefix_depth,
 					was_connectable ? RECONNECTION_TYPE_EMISSIVE_AFTER_RC : RECONNECTION_TYPE_DEFAULT, side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
