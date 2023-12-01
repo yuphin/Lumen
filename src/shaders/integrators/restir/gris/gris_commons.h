@@ -53,13 +53,11 @@ struct GrisData {
 	uint rc_coords;
 	vec2 rc_partial_jacobian; // g * rc_pdf (* rc_postfix_pdf)
 	vec2 rc_barycentrics;
-	uvec2 rc_primitive_instance_id;
+	vec3 pad;
 	uint bounce_flags;
+	uvec2 rc_primitive_instance_id;
 	float pdf_light_w;
-	vec3 rc_postfix_n_s; // TODO: Remove later
 	uint rc_seed;
-	vec3 rc_postfix_pos; // TODO: Remove later
-	float pad;
 };
 
 struct Reservoir {

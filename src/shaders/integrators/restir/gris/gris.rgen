@@ -62,8 +62,13 @@ void main() {
 	bool valid_reservoir = false;
 	bool connectable = false;
 	bool was_connectable = false;
+
 	vec3 postfix_L = vec3(0);
 	int postfix_depth = 0;
+
+	// Record initial seed after direct light sampling
+	ASSERT(sampling_seed.w == 0);
+	reconnection_data.init_seed = sampling_seed.w;
 
 	for (depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
@@ -97,26 +102,19 @@ void main() {
 		HitData gbuffer = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx, triangle_area);
 		const Material hit_mat = load_material(gbuffer.material_idx, gbuffer.uv);
 
-		prev_rough = curr_rough;
-		curr_rough = is_rough(hit_mat);
-		was_connectable = connectable;
-
-		bool constraints_satisfied =
-			prev_rough && length(gbuffer.pos - origin.xyz) > pc.min_vertex_distance_ratio * pc.scene_extent;
-		connectable = depth > 1 && !connectable_vertex_found && (curr_rough && constraints_satisfied);
-
 		const vec3 wo = -direction;
 		vec3 n_s = gbuffer.n_s;
 		vec3 n_g = gbuffer.n_g;
 
 		bool side = face_forward(n_s, n_g, wo);
 
-		if (was_connectable) {
-			vec3 to_prev = origin.xyz - gbuffer.pos;
-			reconnection_data.rc_partial_jacobian.y *= abs(dot(n_s, wo)) / dot(to_prev, to_prev);
-			reconnection_data.rc_postfix_n_s = gbuffer.n_s;
-			reconnection_data.rc_postfix_pos = gbuffer.pos;
-		}
+		prev_rough = curr_rough;
+		curr_rough = is_rough(hit_mat);
+		was_connectable = connectable;
+
+		bool far_constaint_satisfied =
+			length(gbuffer.pos - origin.xyz) > pc.min_vertex_distance_ratio * pc.scene_extent;
+		bool constraints_satisfied = prev_rough && far_constaint_satisfied;
 
 		if (connectable_vertex_found) {
 			postfix_depth++;
@@ -124,6 +122,27 @@ void main() {
 			set_bounce_flag(reconnection_data.bounce_flags, depth - 1, constraints_satisfied);
 		}
 
+		if (was_connectable && curr_rough && far_constaint_satisfied) {
+			vec2 rc_barycentrics = payload.attribs;
+			uvec2 rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
+			reconnection_data.rc_barycentrics = rc_barycentrics;
+			reconnection_data.rc_primitive_instance_id = rc_primitive_instance_id;
+			reconnection_data.rc_coords = rc_coords;
+
+			
+			connectable_vertex_found = true;
+			prefix_depth = depth - 1;
+			reconnection_data.rc_wi = direction;
+			// Seed is not relevant here
+			reconnection_data.rc_seed = -1;
+			// Partially fill in the contribution data
+			reconnection_data.reservoir_contribution = throughput;
+			vec3 to_prev = origin.xyz - gbuffer.pos;
+			reconnection_data.rc_partial_jacobian.y = abs(dot(n_s, wo)) * rc_partial_jacobian / dot(to_prev, to_prev);
+		}
+		
+		connectable = !connectable_vertex_found && curr_rough;
+		
 		if (depth == 0) {
 			// Fill in GBuffer
 			direct_lighting += throughput * hit_mat.emissive_factor;
@@ -138,7 +157,7 @@ void main() {
 			}
 			vec3 partial_contrib = mis_weight * hit_mat.emissive_factor;
 
-			if (connectable_vertex_found) {
+			if (connectable_vertex_found && depth > 1) {
 #if STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 				// Stream in the emissive contribution
 				// If the previous vertex was the connection vertex, delay MIS computation to the shifting phase
@@ -158,33 +177,6 @@ void main() {
 #else	// STREAMING_MODE != STREAMING_MODE_INDIVIDUAL
 				postfix_L += partial_contrib * postfix_throughput;
 #endif	// STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
-			} else if (connectable) {
-				// Make the emissive surface the reconnection point
-				vec2 rc_barycentrics = payload.attribs;
-				uvec2 rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
-				reconnection_data.rc_barycentrics = rc_barycentrics;
-				reconnection_data.rc_primitive_instance_id = rc_primitive_instance_id;
-				reconnection_data.rc_coords = rc_coords;
-
-				vec3 to_prev = origin.xyz - gbuffer.pos;
-				reconnection_data.rc_partial_jacobian.x =
-					abs(dot(n_s, wo)) / dot(to_prev, to_prev) * rc_partial_jacobian;
-				if (depth > 1 && any(greaterThan(hit_mat.emissive_factor, vec3(0)))) {
-					// Ignored
-					reconnection_data.rc_wi = vec3(-1);
-					reconnection_data.rc_Li = vec3(0);	// partial_contrib * throughput;
-					reconnection_data.pdf_light_w = pdf_light_w;
-					reconnection_data.reservoir_contribution = partial_contrib * throughput;
-					reconnection_data.path_flags = pack_path_flags(depth, 0, RECONNECTION_TYPE_EMISSIVE, side);
-					bool merged = stream_reservoir(seed, reservoir, reconnection_data,
-												   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
-					valid_reservoir = valid_reservoir || merged;
-					if (!valid_reservoir) {
-						ASSERT(reservoir.data.path_flags == 0);
-					} else {
-						ASSERT(reservoir.data.path_flags != 0);
-					}
-				}
 			} else if (depth > 1) {
 				prefix_col += partial_contrib * throughput;
 			}
@@ -196,9 +188,6 @@ void main() {
 		}
 
 		if (depth >= pc.max_depth - 1) {
-			if (connectable) {
-				connectable_vertex_found = true;
-			}
 			break;
 		}
 
@@ -212,28 +201,20 @@ void main() {
 			vec3 Li = do_nee(seed, gbuffer, hit_mat, side, n_s, wo, true, g_src);
 			vec3 contribution = Li * throughput;
 
-			bool nee_connectable = depth > 0 && !connectable_vertex_found && !connectable && curr_rough;
+			// At 0 depth, we let ReSTIR DI handle the direct lighting
+			bool nee_connectable = depth > 0 && connectable;
 
 			// Stream the NEE path at the reconnection vertex
 			if (nee_connectable) {
-				vec2 rc_barycentrics = payload.attribs;
-				uvec2 rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
-				reconnection_data.rc_barycentrics = rc_barycentrics;
-				reconnection_data.rc_primitive_instance_id = rc_primitive_instance_id;
-				reconnection_data.rc_coords = rc_coords;
-
 				reconnection_data.debug_seed = debug_seed;
 				reconnection_data.rc_seed = rc_seed;
 				reconnection_data.reservoir_contribution = contribution;
 				reconnection_data.path_flags = pack_path_flags(depth, 1, RECONNECTION_TYPE_NEE, side);
 
-				vec3 to_prev = origin.xyz - gbuffer.pos;
-
-				reconnection_data.rc_partial_jacobian =
-					vec2(rc_partial_jacobian, abs(dot(n_s, wo)) / dot(to_prev, to_prev));
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
+				
 				if (!valid_reservoir) {
 					ASSERT(reservoir.data.path_flags == 0);
 				} else {
@@ -260,10 +241,6 @@ void main() {
 			}
 		}
 		origin.xyz = offset_ray(gbuffer.pos, n_g);
-		// Record initial seed after direct light sampling
-		if (depth == 0) {
-			reconnection_data.init_seed = sampling_seed.w;
-		}
 
 		// Sample direction
 		float cos_theta;
@@ -279,19 +256,6 @@ void main() {
 			postfix_throughput *= f_cos / bsdf_pdf_val;
 		}
 
-		if (connectable) {
-			connectable_vertex_found = true;
-			prefix_depth = depth;
-			reconnection_data.rc_wi = direction;
-			// Seed is not relevant here
-			reconnection_data.rc_seed = -1;
-			// Partially fill in the contribution data
-			reconnection_data.reservoir_contribution = throughput;
-			reconnection_data.rc_partial_jacobian.x *= bsdf_pdf_val;
-			reconnection_data.rc_partial_jacobian.y = rc_partial_jacobian * bsdf_pdf_val;
-			reconnection_data.debug_seed = uvec4(-1);
-			rc_side = side;
-		}
 		rc_partial_jacobian *= bsdf_pdf_val;
 		if (pc.enable_rr == 1) {
 			float rr_scale = 1.0;
@@ -328,6 +292,7 @@ void main() {
 			unpack_path_flags(reservoir.data.path_flags, rc_type, rc_prefix_length, rc_postfix_length, side);
 			ASSERT(reservoir.data.path_flags != 0);
 			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
+			
 			// LOG_CLICKED3("%d - %d - %d\n", rc_type, rc_prefix_length, rc_postfix_length);
 			if (rc_type != RECONNECTION_TYPE_NEE) {
 				ASSERT(reservoir_data_valid(reservoir.data));
