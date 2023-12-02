@@ -352,7 +352,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		prev_constraints_satisfied = constraints_satisfied;
 		// constraints_satisfied = dst_rough && next_src_satisfied && prev_far;
 		if(prefix_depth > 0 && prev_rough) {
-			constraints_satisfied = dst_rough && next_src_satisfied && dst_far;
+			constraints_satisfied = dst_rough && next_src_satisfied;
 		} else {
 			constraints_satisfied = dst_rough && prev_far;
 		}
