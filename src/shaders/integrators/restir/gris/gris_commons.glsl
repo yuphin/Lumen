@@ -329,6 +329,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 
 	bool prev_far = true;
 	bool dst_far;
+	bool prev_constraints_satisfied;
 	while (true) {
 		if (((prefix_depth + rc_postfix_length + 1) > pc.max_depth) || prefix_depth > rc_prefix_length) {
 			return false;
@@ -345,14 +346,30 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		dst_rough = is_rough(dst_hit_mat);
 		dst_far = rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent;
 
+		prev_constraints_satisfied = constraints_satisfied;
 		constraints_satisfied = dst_rough && prev_far;
-		src_satisfied = get_bounce_flag(data.bounce_flags, prefix_depth);
 
-		if (src_satisfied != constraints_satisfied) {
+		bool next_src_satisfied = get_bounce_flag(data.bounce_flags, prefix_depth + 1);
+		bool proposed_constraints_satisfied = dst_rough && dst_far;
+		if(dst_rough && next_src_satisfied != proposed_constraints_satisfied) {
 			return false;
 		}
+		src_satisfied = get_bounce_flag(data.bounce_flags, prefix_depth);
+
+		// if (src_satisfied != constraints_satisfied) {
+		// 	// LOG_CLICKED("%d\n", prefix_depth);
+		// 	// fail = true;
+		// 	return false;
+		// }
+
+		// if (prefix_depth > 0 && prev_constraints_satisfied && constraints_satisfied) {
+		// 	reservoir_contribution = vec3(0);
+		// 	jacobian_out = 0;
+		// 	return false;
+		// }
 		set_bounce_flag(bounce_flags, prefix_depth, constraints_satisfied);
 		if (prefix_depth == rc_prefix_length) {
+			// LOG_CLICKED("%d\n", prefix_depth);
 			break;
 		}
 
@@ -383,12 +400,15 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 	if (!constraints_satisfied || (prefix_depth + rc_postfix_length + 1) > pc.max_depth) {
 		return false;
 	}
-	if (!dst_far) {
+
+	bool connection_constraints_satisfied = dst_rough && dst_far;
+	bool src_next_satisfied = get_bounce_flag(data.bounce_flags, prefix_depth + 1);
+	if (!constraints_satisfied || !src_next_satisfied) {
 		return false;
 	}
-
 	if (rc_type == RECONNECTION_TYPE_NEE) {
 		return false;
+		// return false;
 		// In this case directly re-use the NEE result
 		ASSERT(prefix_depth != 0);	// Can't process direct lighting
 		uvec2 rc_coords = uvec2(data.rc_coords / gl_LaunchSizeEXT.y, data.rc_coords % gl_LaunchSizeEXT.y);
@@ -397,12 +417,14 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		float g_dst;
 		vec3 Li = do_nee(reconnection_seed, dst_gbuffer, dst_hit_mat, dst_side, dst_gbuffer.n_s, dst_wo, true, g_dst);
 		if (Li == vec3(0)) {
+			reservoir_contribution = vec3(0);
+			jacobian_out = 0;
 			return false;
 		}
 		jacobian = prefix_jacobian / data.rc_partial_jacobian.x;
 		reservoir_contribution = prefix_throughput * Li;
 
-		LOG_CLICKED4("NEE: %d - %d - %d - %f\n", rc_type, prefix_depth, rc_postfix_length, jacobian_out);
+		// LOG_CLICKED4("NEE: %d - %d - %d - %f\n", rc_type, prefix_depth, rc_postfix_length, jacobian_out);
 	} else {
 		// Connection paths
 		vec3 dst_postfix_wi = rc_gbuffer.pos - dst_gbuffer.pos;
@@ -415,6 +437,11 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0,
 					dst_postfix_wi, wi_len - EPS, 1);
 		if (any_hit_payload.hit == 1) {
+			return false;
+		}
+
+		set_bounce_flag(bounce_flags, prefix_depth + 1, constraints_satisfied);
+		if (bounce_flags != data.bounce_flags) {
 			return false;
 		}
 
@@ -435,12 +462,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		}
 		reservoir_contribution =
 			prefix_throughput * abs(rc_cos_x) * dst_postfix_f * data.rc_Li * mis_weight / dst_postfix_pdf;
-
-		// LOG_CLICKED3("Default: %d - %d - %f\n", prefix_depth, rc_postfix_length, data.rc_partial_jacobian.y);
-
-		set_bounce_flag(bounce_flags, prefix_depth, constraints_satisfied);
-		LOG_CLICKED4("Default: %d - %d - %d - %d\n", prefix_depth, rc_postfix_length, bounce_flags | uint(dst_rough),
-					 data.bounce_flags);
+		LOG_CLICKED3("Default: %d - %d - %d\n", prefix_depth, bounce_flags, data.bounce_flags);
 	}
 	if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
 		jacobian = 0;

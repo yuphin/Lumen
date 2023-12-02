@@ -30,6 +30,10 @@ void main() {
 	// TODO: Temporal reuse
 
 	uvec2 seed_helpers = uvec2(pc.general_seed, pc.sampling_seed);
+	ReconnectionData empty_data;
+	empty_data.reservoir_contribution = vec3(0);
+	empty_data.jacobian = 0;
+	empty_data.target_pdf_in_neighbor = 0;
 	for (uint i = 0; i < num_spatial_samples; i++) {
 		ivec2 rand_offset = get_neighbor_offset(seed2);
 		const ivec2 coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
@@ -52,6 +56,10 @@ void main() {
 
 		bool valid = retrace_paths(canonical_gbuffer, unpacked_neighbor_gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy,
 								   uvec2(coords), seed_helpers, data.jacobian, data.reservoir_contribution);
-		reconnection_data[(num_spatial_samples + 1) * pixel_idx + i + 1] = data;
+		if(valid) {
+			reconnection_data[(num_spatial_samples + 1) * pixel_idx + i + 1] = data;
+		} else {
+			reconnection_data[(num_spatial_samples + 1) * pixel_idx + i + 1] = empty_data;
+		}
 	}
 }
