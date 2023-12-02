@@ -114,22 +114,25 @@ void main() {
 
 		bool far_constaint_satisfied =
 			length(gbuffer.pos - origin.xyz) > pc.min_vertex_distance_ratio * pc.scene_extent;
-		bool constraints_satisfied = prev_rough && far_constaint_satisfied;
+		bool constraints_satisfied = curr_rough && far_constaint_satisfied;
 
 		if (connectable_vertex_found) {
 			postfix_depth++;
-		} else if (depth > 0) {
-			set_bounce_flag(reconnection_data.bounce_flags, depth - 1, constraints_satisfied);
+		} else {
+			if (depth > 0) {
+				set_bounce_flag(reconnection_data.bounce_flags, depth, constraints_satisfied);
+			} else {
+				set_bounce_flag(reconnection_data.bounce_flags, 0, curr_rough);
+			}
 		}
 
-		if (was_connectable && curr_rough && far_constaint_satisfied) {
+		if (was_connectable && prev_rough && constraints_satisfied) {
 			vec2 rc_barycentrics = payload.attribs;
 			uvec2 rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 			reconnection_data.rc_barycentrics = rc_barycentrics;
 			reconnection_data.rc_primitive_instance_id = rc_primitive_instance_id;
 			reconnection_data.rc_coords = rc_coords;
 
-			
 			connectable_vertex_found = true;
 			prefix_depth = depth - 1;
 			reconnection_data.rc_wi = direction;
@@ -140,9 +143,9 @@ void main() {
 			vec3 to_prev = origin.xyz - gbuffer.pos;
 			reconnection_data.rc_partial_jacobian.y = abs(dot(n_s, wo)) * rc_partial_jacobian / dot(to_prev, to_prev);
 		}
-		
+
 		connectable = !connectable_vertex_found && curr_rough;
-		
+
 		if (depth == 0) {
 			// Fill in GBuffer
 			direct_lighting += throughput * hit_mat.emissive_factor;
@@ -214,7 +217,7 @@ void main() {
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
-				
+
 				if (!valid_reservoir) {
 					ASSERT(reservoir.data.path_flags == 0);
 				} else {
@@ -292,7 +295,7 @@ void main() {
 			unpack_path_flags(reservoir.data.path_flags, rc_type, rc_prefix_length, rc_postfix_length, side);
 			ASSERT(reservoir.data.path_flags != 0);
 			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
-			
+
 			// LOG_CLICKED3("%d - %d - %d\n", rc_type, rc_prefix_length, rc_postfix_length);
 			if (rc_type != RECONNECTION_TYPE_NEE) {
 				ASSERT(reservoir_data_valid(reservoir.data));
