@@ -330,6 +330,8 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 	bool prev_far = true;
 	bool dst_far;
 	bool prev_constraints_satisfied;
+	bool next_src_satisfied = true;
+	bool prev_rough = dst_rough;
 	while (true) {
 		if (((prefix_depth + rc_postfix_length + 1) > pc.max_depth) || prefix_depth > rc_prefix_length) {
 			return false;
@@ -343,13 +345,19 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		rc_wi_len = length(rc_wi);
 		rc_wi /= rc_wi_len;
 
+		prev_rough = dst_rough;
 		dst_rough = is_rough(dst_hit_mat);
 		dst_far = rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent;
 
 		prev_constraints_satisfied = constraints_satisfied;
-		constraints_satisfied = dst_rough && prev_far;
+		// constraints_satisfied = dst_rough && next_src_satisfied && prev_far;
+		if(prefix_depth > 0 && prev_rough) {
+			constraints_satisfied = dst_rough && next_src_satisfied && dst_far;
+		} else {
+			constraints_satisfied = dst_rough && prev_far;
+		}
 
-		bool next_src_satisfied = get_bounce_flag(data.bounce_flags, prefix_depth + 1);
+		next_src_satisfied = get_bounce_flag(data.bounce_flags, prefix_depth + 1);
 		bool proposed_constraints_satisfied = dst_rough && dst_far;
 		if(dst_rough && next_src_satisfied != proposed_constraints_satisfied) {
 			return false;
@@ -395,7 +403,9 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		prev_far = length(dst_gbuffer.pos - prev_pos) > pc.min_vertex_distance_ratio * pc.scene_extent;
 		prefix_depth++;
 	}
-
+	// if(prefix_depth > 0 && prev_rough) {
+	// }
+	constraints_satisfied = dst_rough && dst_far;
 	// Reconnection
 	if (!constraints_satisfied || (prefix_depth + rc_postfix_length + 1) > pc.max_depth) {
 		return false;
@@ -403,9 +413,9 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 
 	bool connection_constraints_satisfied = dst_rough && dst_far;
 	bool src_next_satisfied = get_bounce_flag(data.bounce_flags, prefix_depth + 1);
-	if (!constraints_satisfied || !src_next_satisfied) {
-		return false;
-	}
+	// if (!constraints_satisfied || !src_next_satisfied) {
+	// 	return false;
+	// }
 	if (rc_type == RECONNECTION_TYPE_NEE) {
 		return false;
 		// return false;
