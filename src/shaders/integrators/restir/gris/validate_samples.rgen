@@ -17,7 +17,7 @@ layout(binding = 6, std430) readonly buffer PrevReservoirs { Reservoir prev_rese
 layout(binding = 7, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
 layout(binding = 8, std430) readonly buffer PrevGbuffer { GBuffer prev_gbuffers[]; };
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
-uvec4 seed2 = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, 0);
+uvec4 seed2 = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
 
 void main() {
 	GBuffer gbuffer = curr_gbuffers[pixel_idx];
@@ -54,6 +54,6 @@ void main() {
 			retrace_paths_and_evaluate(unpacked_neighbor_gbuffer, canonical_gbuffer, canonical_reservoir.data,
 									   uvec2(coords), gl_LaunchIDEXT.xy, seed_helpers, target_pdf_in_neighbor);
 		reconnection_data[(num_spatial_samples + 1) * pixel_idx + i + 1].target_pdf_in_neighbor =
-			canonical_in_neighbor ? target_pdf_in_neighbor : 0;
+			target_pdf_in_neighbor;
 	}
 }

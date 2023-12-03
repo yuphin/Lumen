@@ -208,6 +208,8 @@ void ReSTIRPT::render() {
 				.bind(*gbuffers[ping])
 				.bind_texture_array(scene_textures)
 				.bind_tlas(instance->vkb.tlas);
+			instance->vkb.rg->run_and_submit(cmd);
+			cmd.begin();
 			// Validate
 			instance->vkb.rg
 				->add_rt("GRIS - Validate Samples",
@@ -228,6 +230,8 @@ void ReSTIRPT::render() {
 				.bind(*gbuffers[ping])
 				.bind_texture_array(scene_textures)
 				.bind_tlas(instance->vkb.tlas);
+			instance->vkb.rg->run_and_submit(cmd);
+			cmd.begin();
 			// Spatial Reuse
 			instance->vkb.rg
 				->add_rt("GRIS - Spatial Reuse",
@@ -251,8 +255,9 @@ void ReSTIRPT::render() {
 		if (pixel_debug) {
 			uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
 			instance->vkb.rg
-				->add_compute("Classify Probes",
-							  {.shader = Shader("src/shaders/integrators/restir/gris/debug_vis.comp"), .dims = {num_wgs}})
+				->add_compute(
+					"Classify Probes",
+					{.shader = Shader("src/shaders/integrators/restir/gris/debug_vis.comp"), .dims = {num_wgs}})
 				.push_constants(&pc_ray)
 				.bind({output_tex, scene_ubo_buffer, scene_desc_buffer});
 		}

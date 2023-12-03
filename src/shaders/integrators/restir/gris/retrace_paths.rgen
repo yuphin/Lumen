@@ -16,7 +16,7 @@ layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir in_reservoi
 layout(binding = 6, std430) readonly buffer PrevReservoirs { Reservoir prev_reservoirs[]; };
 layout(binding = 7, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
 layout(binding = 8, std430) readonly buffer PrevGbuffer { GBuffer prev_gbuffers[]; };
-uvec4 seed2 = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, 0);
+uvec4 seed2 = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
 
 void main() {
 	GBuffer gbuffer = curr_gbuffers[pixel_idx];
@@ -56,10 +56,10 @@ void main() {
 
 		bool valid = retrace_paths(canonical_gbuffer, unpacked_neighbor_gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy,
 								   uvec2(coords), seed_helpers, data.jacobian, data.reservoir_contribution);
-		if(valid) {
-			reconnection_data[(num_spatial_samples + 1) * pixel_idx + i + 1] = data;
-		} else {
-			reconnection_data[(num_spatial_samples + 1) * pixel_idx + i + 1] = empty_data;
-		}
+		reconnection_data[(num_spatial_samples + 1) * pixel_idx + i + 1] = data;
+		// if(valid) {
+		// } else {
+		// 	reconnection_data[(num_spatial_samples + 1) * pixel_idx + i + 1] = empty_data;
+		// }
 	}
 }

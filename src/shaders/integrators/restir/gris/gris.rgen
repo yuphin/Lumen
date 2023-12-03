@@ -201,7 +201,8 @@ void main() {
 			uint rc_seed = seed.w;
 			uvec4 debug_seed = seed;
 			float g_src;
-			vec3 Li = do_nee(seed, gbuffer, hit_mat, side, n_s, wo, true, g_src);
+			vec3 light_pos;
+			vec3 Li = do_nee(seed, gbuffer, hit_mat, side, n_s, wo, true, g_src, light_pos);
 			vec3 contribution = Li * throughput;
 
 			// At 0 depth, we let ReSTIR DI handle the direct lighting
@@ -209,10 +210,18 @@ void main() {
 
 			// Stream the NEE path at the reconnection vertex
 			if (nee_connectable) {
+				// TODO: Optimize
+				reconnection_data.rc_primitive_instance_id = uvec2(0);
+				reconnection_data.rc_coords = rc_coords;
+				reconnection_data.rc_partial_jacobian.x = rc_partial_jacobian;
+				reconnection_data.pad = light_pos;
+
 				reconnection_data.debug_seed = debug_seed;
 				reconnection_data.rc_seed = rc_seed;
 				reconnection_data.reservoir_contribution = contribution;
 				reconnection_data.path_flags = pack_path_flags(depth, 1, RECONNECTION_TYPE_NEE, side);
+
+				reconnection_data.rc_Li = Li;
 
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
@@ -223,6 +232,8 @@ void main() {
 				} else {
 					ASSERT(reservoir.data.path_flags != 0);
 				}
+
+				reconnection_data.rc_primitive_instance_id = uvec2(-1);
 			} else if (connectable_vertex_found) {
 #if STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 				reconnection_data.rc_Li = postfix_throughput * Li;
