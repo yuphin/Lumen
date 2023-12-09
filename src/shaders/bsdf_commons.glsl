@@ -418,7 +418,7 @@ vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
         pdf_w = 0.;
         return vec3(0);
     }
-    vec3 f;
+    vec3 f = vec3(0);
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
         f = diffuse_f(mat);
