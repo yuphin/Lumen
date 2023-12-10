@@ -70,6 +70,8 @@ void main() {
 	ASSERT(sampling_seed.w == 0);
 	reconnection_data.init_seed = sampling_seed.w;
 
+	bool debug_bool = false;
+
 	for (depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.instance_idx != -1;
@@ -114,6 +116,9 @@ void main() {
 
 		bool far_constaint_satisfied =
 			length(gbuffer.pos - origin.xyz) > pc.min_vertex_distance_ratio * pc.scene_extent;
+		if(!far_constaint_satisfied) {
+			debug_bool = true;
+		}
 		bool constraints_satisfied = curr_rough && far_constaint_satisfied;
 
 		if (connectable_vertex_found) {
@@ -202,16 +207,20 @@ void main() {
 			uvec4 debug_seed = seed;
 			float g_src;
 			vec3 light_pos;
-			vec3 Li = do_nee(seed, gbuffer, hit_mat, side, n_s, wo, true, g_src, light_pos);
+			vec2 uv;
+			uint instance_idx;
+			uint triangle_idx;
+			vec3 Li = do_nee(seed, gbuffer, hit_mat, side, n_s, wo, true, g_src, light_pos, uv, instance_idx, triangle_idx);
 			vec3 contribution = Li * throughput;
 
 			// At 0 depth, we let ReSTIR DI handle the direct lighting
 			bool nee_connectable = depth > 0 && connectable;
 
 			// Stream the NEE path at the reconnection vertex
-			if (nee_connectable) {
+			if (nee_connectable && instance_idx != -1) {
 				// TODO: Optimize
-				reconnection_data.rc_primitive_instance_id = uvec2(0);
+				reconnection_data.rc_barycentrics = uv;
+				reconnection_data.rc_primitive_instance_id = uvec2(triangle_idx, instance_idx);
 				reconnection_data.rc_coords = rc_coords;
 				reconnection_data.rc_partial_jacobian.x = rc_partial_jacobian;
 				reconnection_data.pad = light_pos;
@@ -233,7 +242,6 @@ void main() {
 					ASSERT(reservoir.data.path_flags != 0);
 				}
 
-				reconnection_data.rc_primitive_instance_id = uvec2(-1);
 			} else if (connectable_vertex_found) {
 #if STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 				reconnection_data.rc_Li = postfix_throughput * Li;
@@ -322,7 +330,9 @@ void main() {
 			uint flag0 = uint(get_bounce_flag(reservoir.data.bounce_flags, 0));
 			uint flag1 = uint(get_bounce_flag(reservoir.data.bounce_flags, 1));
 			uint flag2 = uint(get_bounce_flag(reservoir.data.bounce_flags, 2));
-			// LOG_CLICKED3("Len %d : %d - %d\n", rc_prefix_length, rc_type, reservoir.data.bounce_flags);
+			if(debug_bool) {
+				LOG_CLICKED3("Len %d : %d - %d\n", rc_prefix_length, rc_type, reservoir.data.bounce_flags);
+			}
 		}
 	}
 	if (pc.direct_lighting == 1) {

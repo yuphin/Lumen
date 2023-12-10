@@ -58,15 +58,16 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 }
 
 vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3 n_s, vec3 wo, bool trace, out float g,
-			out vec3 light_pos) {
+			out vec3 light_pos, out vec2 uv, out uint instance_idx, out uint triangle_idx) {
 	float pdf_light_a;
 	float pdf_light_w;
 	vec3 wi;
 	float wi_len;
 	LightRecord record;
 	float cos_from_light;
+	vec4 rands = vec4(rand(seed), rand(seed), rand(seed), rand(seed));
 	const vec3 Le =
-		sample_light_Li(seed, gbuffer.pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
+		sample_light_Li(rands, gbuffer.pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record, uv, instance_idx, triangle_idx);
 	const vec3 p = offset_ray2(gbuffer.pos, n_s);
 	float light_bsdf_pdf;
 	float cos_x = dot(n_s, wi);
@@ -92,36 +93,13 @@ vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3
 	return vec3(0);
 }
 
-vec3 do_nee2(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3 n_s, vec3 wo, bool trace,
-			 out float g) {
-	float pdf_light_a;
-	float pdf_light_w;
-	vec3 wi;
-	float wi_len;
-	LightRecord record;
-	float cos_from_light;
-	const vec3 Le =
-		sample_light_Li(seed, gbuffer.pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
-	const vec3 p = offset_ray2(gbuffer.pos, n_s);
-	float light_bsdf_pdf;
-	float cos_x = dot(n_s, wi);
-	vec3 f_light = eval_bsdf(n_s, wo, hit_mat, 1, side, wi, light_bsdf_pdf, cos_x);
-	any_hit_payload.hit = 1;
-	bool visible = true;
-	g = cos_from_light / (wi_len * wi_len);
-
-	const float light_pick_pdf = 1. / pc.light_triangle_count;
-	if (visible && pdf_light_w > 0) {
-		const float mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + light_bsdf_pdf / pdf_light_w);
-		return mis_weight * f_light * abs(cos_x) * Le / (light_pick_pdf * pdf_light_w);
-	}
-	return vec3(0);
-}
-
 vec3 do_nee(inout uvec4 seed, HitData gbuffer, Material hit_mat, bool side, vec3 n_s, vec3 wo, bool trace) {
 	float unused;
 	vec3 unused_pos;
-	return do_nee(seed, gbuffer, hit_mat, side, n_s, wo, trace, unused, unused_pos);
+	vec2 unused_uv;
+	uint unused_instance_idx;
+	uint unused_triangle_idx;
+	return do_nee(seed, gbuffer, hit_mat, side, n_s, wo, trace, unused, unused_pos, unused_uv, unused_instance_idx, unused_triangle_idx);
 }
 
 HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx, out float area) {
@@ -333,11 +311,9 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 	bool rc_side;
 	unpack_path_flags(data.path_flags, rc_type, rc_prefix_length, rc_postfix_length, rc_side);
 
-	if (rc_type != RECONNECTION_TYPE_NEE) {
-		rc_gbuffer =
-			get_hitdata(data.rc_barycentrics, data.rc_primitive_instance_id.y, data.rc_primitive_instance_id.x);
-		rc_hit_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
-	}
+	rc_gbuffer =
+		get_hitdata(data.rc_barycentrics, data.rc_primitive_instance_id.y, data.rc_primitive_instance_id.x);
+	rc_hit_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
 
 	uint prefix_depth = 0;
 	vec3 prefix_throughput = vec3(1);
@@ -379,14 +355,11 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		dst_gbuffer.pos = offset_ray(dst_gbuffer.pos, dst_gbuffer.n_g);
 		dst_hit_mat = load_material(dst_gbuffer.material_idx, dst_gbuffer.uv);
 
-		if (rc_type != RECONNECTION_TYPE_NEE) {
-			rc_wi = rc_gbuffer.pos - dst_gbuffer.pos;
-			rc_wi_len = length(rc_wi);
-			rc_wi /= rc_wi_len;
-			dst_far = rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent;
-		} else {
-			dst_far = true;
-		}
+		rc_wi = rc_gbuffer.pos - dst_gbuffer.pos;
+		rc_wi_len = length(rc_wi);
+		rc_wi /= rc_wi_len;
+		dst_far = rc_type != RECONNECTION_TYPE_NEE ? rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent : true;
+
 
 		prev_rough = dst_rough;
 		dst_rough = is_rough(dst_hit_mat);
@@ -464,16 +437,10 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 	// 	return false;
 	// }
 
-	if (rc_type == RECONNECTION_TYPE_NEE) {
-		dst_postfix_wi = normalize(data.pad - dst_gbuffer.pos);
-		wi_len = length(data.pad - dst_gbuffer.pos);
-
-	} else {
-		dst_postfix_wi = rc_gbuffer.pos - dst_gbuffer.pos;
-		wi_len_sqr = dot(dst_postfix_wi, dst_postfix_wi);
-		wi_len = sqrt(wi_len_sqr);
-		dst_postfix_wi /= wi_len;
-	}
+	dst_postfix_wi = rc_gbuffer.pos - dst_gbuffer.pos;
+	wi_len_sqr = dot(dst_postfix_wi, dst_postfix_wi);
+	wi_len = sqrt(wi_len_sqr);
+	dst_postfix_wi /= wi_len;
 	vec3 p = offset_ray2(dst_gbuffer.pos, dst_gbuffer.n_s);
 	any_hit_payload.hit = 1;
 	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0,
@@ -493,8 +460,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 			return false;
 		}
 
-		float g_dst;
-		vec3 Li = do_nee2(reconnection_seed, dst_gbuffer, dst_hit_mat, dst_side, dst_gbuffer.n_s, dst_wo, true, g_dst);
+		vec3 Li = do_nee(reconnection_seed, dst_gbuffer, dst_hit_mat, dst_side, dst_gbuffer.n_s, dst_wo, false);
 		// if (Li == vec3(0)) {
 		// 	return false;
 		// }

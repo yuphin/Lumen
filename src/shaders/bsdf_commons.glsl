@@ -295,6 +295,9 @@ vec3 sample_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
                  const uint mode, const bool side, out vec3 dir,
                  out float pdf_w, out float cos_theta, const vec2 rands) {
     vec3 f = vec3(0);
+    pdf_w = 0;
+    cos_theta = 0;
+    dir = vec3(0);
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
         dir = sample_cos_hemisphere(rands, n_s);
@@ -456,6 +459,8 @@ vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
 vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
                const uint mode, const bool side, const vec3 dir,
                out float pdf_w, out float pdf_rev_w, in float cos_theta) {
+    pdf_w = 0;
+    pdf_rev_w = 0;
     if (!same_hemisphere(dir, wo, n_s)) {
         pdf_w = 0;
         pdf_rev_w = 0;
