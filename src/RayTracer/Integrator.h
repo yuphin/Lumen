@@ -31,8 +31,7 @@ class Integrator {
 	virtual void update_uniform_buffers();
 	SceneUBO scene_ubo{};
 	Buffer vertex_buffer;
-	Buffer normal_buffer;
-	Buffer uv_buffer;
+	Buffer compact_vertices_buffer;
 	Buffer index_buffer;
 	Buffer materials_buffer;
 	Buffer prim_lookup_buffer;

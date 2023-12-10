@@ -74,10 +74,9 @@ void VCM::init() {
 					  VK_SHARING_MODE_EXCLUSIVE, sizeof(AvgStruct));
 
 	SceneDesc desc;
-	desc.vertex_addr = vertex_buffer.get_device_address();
-	desc.index_addr = index_buffer.get_device_address();
-	desc.normal_addr = normal_buffer.get_device_address();
-	desc.uv_addr = uv_buffer.get_device_address();
+		desc.index_addr = index_buffer.get_device_address();
+	
+	
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
 	// VCM

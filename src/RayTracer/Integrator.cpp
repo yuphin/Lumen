@@ -114,17 +114,6 @@ void Integrator::init() {
 						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, idx_buf_size,
 						lumen_scene->indices.data(), true);
 
-	normal_buffer.create("Normal Buffer", &instance->vkb.ctx,
-						 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-							 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						 lumen_scene->normals.size() * sizeof(lumen_scene->normals[0]), lumen_scene->normals.data(),
-						 true);
-	uv_buffer.create("UV Buffer", &instance->vkb.ctx,
-					 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-						 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-					 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-					 lumen_scene->texcoords0.size() * sizeof(glm::vec2), lumen_scene->texcoords0.data(), true);
 	materials_buffer.create("Materials Buffer", &instance->vkb.ctx,
 							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
@@ -133,6 +122,26 @@ void Integrator::init() {
 							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 							  prim_lookup.size() * sizeof(PrimMeshInfo), prim_lookup.data(), true);
+
+	std::vector<Vertex> vertices;
+	std::vector<Vertex> positions;
+	std::vector<Vertex> normals;
+	vertices.reserve(lumen_scene->positions.size());
+	for (auto i = 0; i < lumen_scene->positions.size(); i++) {
+		Vertex v;
+		v.pos = lumen_scene->positions[i];
+		positions.push_back(v);
+		v.normal = lumen_scene->normals[i];
+		normals.push_back(v);
+		v.uv0 = lumen_scene->texcoords0[i];
+
+		vertices.push_back(v);
+	}
+
+	compact_vertices_buffer.create("Compact Vertices Buffer", &instance->vkb.ctx,
+								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								   vertices.size() * sizeof(vertices[0]), vertices.data(), true);
 
 	// Create a sampler for textures
 	VkSamplerCreateInfo sampler_ci = vk::sampler_create_info();
@@ -302,7 +311,7 @@ bool Integrator::update() {
 		updated = true;
 	}
 
-	if (instance->window->is_mouse_held(MouseAction::LEFT, scene_ubo.clicked_pos) && 
+	if (instance->window->is_mouse_held(MouseAction::LEFT, scene_ubo.clicked_pos) &&
 		instance->window->is_key_held(KeyInput::KEY_TAB)) {
 		scene_ubo.debug_click = 1;
 	} else {
@@ -320,8 +329,8 @@ bool Integrator::update() {
 }
 
 void Integrator::destroy() {
-	std::vector<Buffer*> buffer_list = {&vertex_buffer,	   &normal_buffer,		&uv_buffer,			&index_buffer,
-										&materials_buffer, &prim_lookup_buffer, &scene_desc_buffer, &scene_ubo_buffer};
+	std::vector<Buffer*> buffer_list = {&vertex_buffer,		 &index_buffer,		 &materials_buffer,
+										&prim_lookup_buffer, &scene_desc_buffer, &scene_ubo_buffer};
 	if (lights.size()) {
 		buffer_list.push_back(&mesh_lights_buffer);
 	}

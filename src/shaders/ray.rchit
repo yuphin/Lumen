@@ -22,10 +22,8 @@ layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo {
     PrimMeshInfo prim_info[];
 };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Vertices { vec3 v[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Normals { vec3 n[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer TexCoords { vec2 t[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials {
     Material m[];
 };
@@ -35,10 +33,8 @@ void main() {
     // Object data
     Materials materials = Materials(scene_desc.material_addr);
     Indices indices = Indices(scene_desc.index_addr);
-    Vertices vertices = Vertices(scene_desc.vertex_addr);
-    Normals normals = Normals(scene_desc.normal_addr);
-    TexCoords tex_coords = TexCoords(scene_desc.uv_addr);
     InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
+    CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
 
     PrimMeshInfo pinfo = prim_infos.prim_info[gl_InstanceCustomIndexEXT];
     // Getting the 'first index' for this mesh (offset of the mesh + offset of
@@ -55,17 +51,20 @@ void main() {
 
     ind += ivec3(vertex_offset);
     // Vertex of the triangle
-    const vec3 v0 = vertices.v[ind.x];
-    const vec3 v1 = vertices.v[ind.y];
-    const vec3 v2 = vertices.v[ind.z];
+    Vertex vtx[3];
+	vtx[0] = compact_vertices.d[ind.x];
+	vtx[1] = compact_vertices.d[ind.y];
+	vtx[2] = compact_vertices.d[ind.z];
+	const vec3 v0 = vtx[0].pos;
+	const vec3 v1 = vtx[1].pos;
+	const vec3 v2 = vtx[2].pos;
+	const vec3 n0 = vtx[0].normal;
+	const vec3 n1 = vtx[1].normal;
+	const vec3 n2 = vtx[2].normal;
 
-    const vec3 n0 = normals.n[ind.x];
-    const vec3 n1 = normals.n[ind.y];
-    const vec3 n2 = normals.n[ind.z];
-
-    const vec2 uv0 = tex_coords.t[ind.x];
-    const vec2 uv1 = tex_coords.t[ind.y];
-    const vec2 uv2 = tex_coords.t[ind.z];
+    const vec2 uv0 = vtx[0].uv0;
+    const vec2 uv1 = vtx[1].uv0;
+    const vec2 uv2 = vtx[2].uv0;
     const vec3 barycentrics =
         vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
     // Computing the coordinates of the hit position

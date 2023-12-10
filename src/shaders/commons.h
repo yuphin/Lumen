@@ -190,12 +190,12 @@ struct Light {
 
 struct Material {
 	vec3 albedo;
-	vec3 emissive_factor;
 	float ior;
+	vec3 emissive_factor;
 	uint bsdf_type;
+	vec3 metalness;
 	uint bsdf_props;
 	int texture_id;
-	vec3 metalness;
 	float roughness;
 	// Disney BSDF
 	float metallic;
@@ -210,9 +210,7 @@ struct Material {
 
 // Scene buffer addresses
  struct ALIGN16 SceneDesc {
-	uint64_t vertex_addr;
-	uint64_t normal_addr;
-	uint64_t uv_addr;
+	uint64_t compact_vertices_addr;
 	uint64_t index_addr;
 	uint64_t material_addr;
 	uint64_t prim_info_addr;
@@ -270,7 +268,6 @@ struct Material {
 	uint64_t gris_direct_lighting_addr;
 	uint64_t prefix_contributions_addr;
 	uint64_t transformations_addr;
-	uint64_t compact_vertices_addr;
 	uint64_t debug_vis_addr;
 
 	// VCM Reservoir

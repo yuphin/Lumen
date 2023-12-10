@@ -63,32 +63,17 @@ void ReSTIRPT::init() {
 								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
 								  transformations.size() * sizeof(glm::mat4), transformations.data(), true);
 
-	std::vector<Vertex> vertices;
-	vertices.reserve(lumen_scene->positions.size());
-	for (auto i = 0; i < lumen_scene->positions.size(); i++) {
-		Vertex v;
-		v.pos = lumen_scene->positions[i];
-		v.normal = lumen_scene->normals[i];
-		v.uv0 = lumen_scene->texcoords0[i];
-		vertices.push_back(v);
-	}
-	compact_vertices_buffer.create("Compact Vertices Buffer", &instance->vkb.ctx,
-								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-								   vertices.size() * sizeof(vertices[0]), vertices.data(), true);
-
 	SceneDesc desc;
-	desc.vertex_addr = vertex_buffer.get_device_address();
-	desc.index_addr = index_buffer.get_device_address();
-	desc.normal_addr = normal_buffer.get_device_address();
-	desc.uv_addr = uv_buffer.get_device_address();
+		desc.index_addr = index_buffer.get_device_address();
+	
+	
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
+	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
 	// ReSTIR PT (GRIS)
 	desc.transformations_addr = transformations_buffer.get_device_address();
 	desc.gris_direct_lighting_addr = direct_lighting_buffer.get_device_address();
 	desc.prefix_contributions_addr = prefix_contribution_buffer.get_device_address();
-	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
 	desc.debug_vis_addr = debug_vis_buffer.get_device_address();
 	scene_desc_buffer.create(
 		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,

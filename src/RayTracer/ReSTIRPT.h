@@ -30,7 +30,6 @@ class ReSTIRPT : public Integrator {
 	Buffer prefix_contribution_buffer;
 	Buffer reconnection_buffer;
 	Buffer transformations_buffer;
-	Buffer compact_vertices_buffer;
 	Buffer debug_vis_buffer;
 	PCReSTIRPT pc_ray{};
 	bool enable_accumulation = false;

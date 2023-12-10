@@ -20,18 +20,14 @@ layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo {
     PrimMeshInfo d[];
 };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Vertices { vec3 v[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Normals { vec3 n[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer TexCoords { vec2 t[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
 
 Indices indices = Indices(scene_desc.index_addr);
-Vertices vertices = Vertices(scene_desc.vertex_addr);
-Normals normals = Normals(scene_desc.normal_addr);
 Materials materials = Materials(scene_desc.material_addr);
 InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
-TexCoords tex_coords = TexCoords(scene_desc.uv_addr);
+CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
 
 #include "bsdf_commons.glsl"
 
@@ -127,13 +123,16 @@ TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands,
     ivec3 ind = ivec3(indices.i[index_offset + 0], indices.i[index_offset + 1],
                       indices.i[index_offset + 2]);
     ind += ivec3(vertex_offset);
-    const vec4 v0 = vec4(vertices.v[ind.x], 1.0);
-    const vec4 v1 = vec4(vertices.v[ind.y], 1.0);
-    const vec4 v2 = vec4(vertices.v[ind.z], 1.0);
-
-    const vec4 n0 = vec4(normals.n[ind.x], 1.0);
-    const vec4 n1 = vec4(normals.n[ind.y], 1.0);
-    const vec4 n2 = vec4(normals.n[ind.z], 1.0);
+  	Vertex vtx[3];
+	vtx[0] = compact_vertices.d[ind.x];
+	vtx[1] = compact_vertices.d[ind.y];
+	vtx[2] = compact_vertices.d[ind.z];
+	const vec3 v0 = vtx[0].pos;
+	const vec3 v1 = vtx[1].pos;
+	const vec3 v2 = vtx[2].pos;
+	const vec3 n0 = vtx[0].normal;
+	const vec3 n1 = vtx[1].normal;
+	const vec3 n2 = vtx[2].normal;
     //    mat4x3 matrix = mat4x3(vec3(world_matrix[0]), vec3(world_matrix[1]),
     //                           vec3(world_matrix[2]), vec3(world_matrix[3]));
     mat4x4 inv_tr_mat = transpose(inverse(world_matrix));
@@ -143,18 +142,18 @@ TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands,
     float v = rands.y * sqrt(rands.x);
     const vec3 barycentrics = vec3(1.0 - u - v, u, v);
 
-    const vec4 etmp0 = world_matrix * (v1 - v0);
-    const vec4 etmp1 = world_matrix * (v2 - v0);
-    const vec4 pos =
+    const vec4 etmp0 = world_matrix * vec4(v1 - v0, 1.0);
+    const vec4 etmp1 = world_matrix * vec4(v2 - v0, 1.0);
+    const vec3 pos =
         v0 * barycentrics.x + v1 * barycentrics.y + v2 * barycentrics.z;
-    const vec4 nrm = normalize(n0 * barycentrics.x + n1 * barycentrics.y +
+    const vec3 nrm = normalize(n0 * barycentrics.x + n1 * barycentrics.y +
                                n2 * barycentrics.z);
-    const vec4 world_pos = world_matrix * pos;
+    const vec4 world_pos = world_matrix * vec4(pos, 1.0);
     const vec3 e0 = vec3(v2 - v0);
     const vec3 e1 = vec3(v1 - v0);
 	// LOG_CLICKED("%v3f\n", v2);
 	// LOG_CLICKED("%v3i\n", ind);
-    result.n_s = normalize(vec3(inv_tr_mat * nrm));
+    result.n_s = normalize(vec3(inv_tr_mat * vec4(nrm, 1.0)));
     result.triangle_pdf = 2. / length((cross(vec3(etmp0), vec3(etmp1))));
     result.pos = vec3(world_pos);
     o_u = u;
@@ -250,6 +249,16 @@ vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights,
                      out vec3 wi, out float wi_len, out vec3 n, out vec3 pos,
                      out float pdf_pos_a, out float cos_from_light,
                      out LightRecord light_record) {
+    wi = vec3(0);
+    wi_len = 0;
+    pdf_pos_a = 0;
+    cos_from_light = 0;
+    light_record.material_idx = -1;
+    light_record.light_idx = -1;
+    light_record.triangle_idx = -1;
+    light_record.flags = -1;
+    n = vec3(0);
+    pos = vec3(0);
 
     uint light_idx = uint(rands_pos.x * num_lights);
     Light light = lights[light_idx];
@@ -417,6 +426,17 @@ vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights,
                      out vec3 wi, out float wi_len, out float pdf_pos_w,
                      out float pdf_pos_dir_w, out float cos_from_light,
                      out LightRecord light_record) {
+
+    pdf_pos_w = 0;
+    pdf_pos_dir_w = 0;
+    wi = vec3(0);
+    wi_len = 0;
+    cos_from_light = 0;
+    light_record.material_idx = -1;
+    light_record.light_idx = -1;
+    light_record.triangle_idx = -1;
+    light_record.flags = -1;
+
     uint light_idx = uint(rands_pos.x * num_lights);
     Light light = lights[light_idx];
     uint light_type = get_light_type(light.light_flags);

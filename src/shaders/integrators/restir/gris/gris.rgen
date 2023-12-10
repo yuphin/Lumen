@@ -210,7 +210,7 @@ void main() {
 			vec2 uv;
 			uint instance_idx;
 			uint triangle_idx;
-			vec3 Li = do_nee(seed, gbuffer, hit_mat, side, n_s, wo, true, g_src, light_pos, uv, instance_idx, triangle_idx);
+			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, wo, true, g_src, light_pos, uv, instance_idx, triangle_idx);
 			vec3 contribution = Li * throughput;
 
 			// At 0 depth, we let ReSTIR DI handle the direct lighting
@@ -231,7 +231,7 @@ void main() {
 				reconnection_data.reservoir_contribution = contribution;
 				reconnection_data.path_flags = pack_path_flags(depth, 1, RECONNECTION_TYPE_NEE, side);
 
-				reconnection_data.rc_Li = Li;
+				reconnection_data.rc_Li = vec3(1000);
 
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
@@ -335,7 +335,7 @@ void main() {
 			uint flag1 = uint(get_bounce_flag(reservoir.data.bounce_flags, 1));
 			uint flag2 = uint(get_bounce_flag(reservoir.data.bounce_flags, 2));
 			if(debug_bool) {
-				LOG_CLICKED3("Len %d : %d - %d\n", rc_prefix_length, rc_type, reservoir.data.bounce_flags);
+				// LOG_CLICKED3("Len %d : %d - %d\n", rc_prefix_length, rc_type, reservoir.data.bounce_flags);
 			}
 		}
 	}
