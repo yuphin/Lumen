@@ -180,9 +180,6 @@ float diffuse_pdf(const vec3 n, const vec3 wo, const vec3 wi, out float cos_thet
         return 0;
     }
 #ifndef UNIFORM_SAMPLING
-    // if(min(dot(wo, n), cos_theta) < 1e-6) {
-    //     return 0;
-    // }
     return cos_theta / PI;
 #else
     return 1.0 / (2.0 * PI);
@@ -297,7 +294,7 @@ vec3 disney_f(const Material mat, const vec3 wo, const vec3 wi,
 vec3 sample_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
                  const uint mode, const bool side, out vec3 dir,
                  out float pdf_w, out float cos_theta, const vec2 rands) {
-    vec3 f;
+    vec3 f = vec3(0);
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
         dir = sample_cos_hemisphere(rands, n_s);
@@ -464,7 +461,7 @@ vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
         pdf_rev_w = 0;
         return vec3(0);
     } 
-    vec3 f;
+    vec3 f = vec3(0);
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
         f = diffuse_f(mat);
