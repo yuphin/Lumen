@@ -217,7 +217,8 @@ void main() {
 			bool nee_connectable = depth > 0 && connectable;
 
 			// Stream the NEE path at the reconnection vertex
-			if (nee_connectable && instance_idx != -1) {
+			if (nee_connectable) {
+				ASSERT(instance_idx != -1);
 				// TODO: Optimize
 				reconnection_data.rc_barycentrics = uv;
 				reconnection_data.rc_primitive_instance_id = uvec2(triangle_idx, instance_idx);
@@ -234,6 +235,9 @@ void main() {
 
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
+				if(merged) {
+					set_bounce_flag(reservoir.data.bounce_flags, depth + 1, true);
+				}
 				valid_reservoir = valid_reservoir || merged;
 
 				if (!valid_reservoir) {
