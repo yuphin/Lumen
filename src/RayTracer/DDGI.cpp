@@ -102,12 +102,12 @@ void DDGI::init() {
 								sizeof(vec4) * num_probes);
 
 	SceneDesc desc;
-		desc.index_addr = index_buffer.get_device_address();
-	
-	
+	desc.index_addr = index_buffer.get_device_address();
+
 	desc.material_addr = materials_buffer.get_device_address();
 	// DDGI
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
+	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
 	desc.direct_lighting_addr = direct_lighting_buffer.get_device_address();
 	desc.probe_offsets_addr = probe_offsets_buffer.get_device_address();
 	desc.g_buffer_addr = g_buffer.get_device_address();
@@ -281,18 +281,9 @@ void DDGI::update_ddgi_uniforms() {
 void DDGI::destroy() {
 	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
-	std::vector<Buffer*> buffer_list = {
-		&g_buffer,
-		&direct_lighting_buffer,
-		&ddgi_ubo_buffer,
-		&probe_offsets_buffer
-	};
+	std::vector<Buffer*> buffer_list = {&g_buffer, &direct_lighting_buffer, &ddgi_ubo_buffer, &probe_offsets_buffer};
 
-	std::vector<Texture*> tex_list = {
-		&rt.radiance_tex,
-		&rt.dir_depth_tex,
-		&output.tex
-	};
+	std::vector<Texture*> tex_list = {&rt.radiance_tex, &rt.dir_depth_tex, &output.tex};
 
 	for (auto b : buffer_list) {
 		b->destroy();
@@ -312,5 +303,4 @@ void DDGI::destroy() {
 	for (auto& depth_tex : depth_texes) {
 		depth_tex.destroy();
 	}
-
 }

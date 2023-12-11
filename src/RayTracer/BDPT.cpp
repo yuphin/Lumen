@@ -21,11 +21,11 @@ void BDPT::init() {
 		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, instance->width * instance->height * 3 * 4);
 	SceneDesc desc;
-		desc.index_addr = index_buffer.get_device_address();
-	
-	
+	desc.index_addr = index_buffer.get_device_address();
+
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
+	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
 	// BDPT
 	desc.light_path_addr = light_path_buffer.get_device_address();
 	desc.camera_path_addr = camera_path_buffer.get_device_address();

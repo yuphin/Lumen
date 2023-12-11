@@ -4,11 +4,11 @@
 void Path::init() {
 	Integrator::init();
 	SceneDesc desc;
-		desc.index_addr = index_buffer.get_device_address();
-	
-	
+	desc.index_addr = index_buffer.get_device_address();
+
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
+	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
 	scene_desc_buffer.create("Scene Desc", &instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc,

@@ -34,11 +34,11 @@ void ReSTIR::init() {
 						  instance->width * instance->height * sizeof(float) * 3);
 
 	SceneDesc desc;
-		desc.index_addr = index_buffer.get_device_address();
-	
-	
+	desc.index_addr = index_buffer.get_device_address();
+
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
+	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
 	// ReSTIR
 	desc.g_buffer_addr = g_buffer.get_device_address();
 	desc.temporal_reservoir_addr = temporal_reservoir_buffer.get_device_address();
@@ -147,7 +147,7 @@ bool ReSTIR::update() {
 	return updated;
 }
 
-bool ReSTIR::gui() { 
+bool ReSTIR::gui() {
 	bool result = false;
 	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
 	return result;

@@ -140,11 +140,11 @@ void VCMMLT::init() {
 	} while (arr_size > 1);
 
 	SceneDesc desc;
-		desc.index_addr = index_buffer.get_device_address();
-	
-	
+	desc.index_addr = index_buffer.get_device_address();
+
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
+	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
 	// VCMMLT
 	desc.bootstrap_addr = bootstrap_buffer.get_device_address();
 	desc.cdf_addr = cdf_buffer.get_device_address();

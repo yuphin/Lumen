@@ -31,11 +31,11 @@ void SPPM::init() {
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(int));
 
 	SceneDesc desc;
-		desc.index_addr = index_buffer.get_device_address();
-	
-	
+	desc.index_addr = index_buffer.get_device_address();
+
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
+	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
 	// SPPM
 	desc.sppm_data_addr = sppm_data_buffer.get_device_address();
 	desc.atomic_data_addr = atomic_data_buffer.get_device_address();
@@ -178,8 +178,6 @@ void SPPM::destroy() {
 		b->destroy();
 	}
 
-	if(desc_set_layout)
-		vkDestroyDescriptorSetLayout(device, desc_set_layout, nullptr);
-	if(desc_pool)
-		vkDestroyDescriptorPool(device, desc_pool, nullptr);
+	if (desc_set_layout) vkDestroyDescriptorSetLayout(device, desc_set_layout, nullptr);
+	if (desc_pool) vkDestroyDescriptorPool(device, desc_pool, nullptr);
 }

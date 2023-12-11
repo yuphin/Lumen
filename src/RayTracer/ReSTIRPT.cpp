@@ -64,11 +64,11 @@ void ReSTIRPT::init() {
 								  transformations.size() * sizeof(glm::mat4), transformations.data(), true);
 
 	SceneDesc desc;
-		desc.index_addr = index_buffer.get_device_address();
-	
-	
+	desc.index_addr = index_buffer.get_device_address();
+
 	desc.material_addr = materials_buffer.get_device_address();
 	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
+	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
 	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
 	// ReSTIR PT (GRIS)
 	desc.transformations_addr = transformations_buffer.get_device_address();
