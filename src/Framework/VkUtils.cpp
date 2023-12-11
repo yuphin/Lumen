@@ -1,4 +1,5 @@
 #include "../LumenPCH.h"
+#include "RayTracer/LumenScene.h"
 #include "VkUtils.h"
 #include "CommandBuffer.h"
 #include "ThreadPool.h"
@@ -210,7 +211,7 @@ VkImageView create_image_view(VkDevice device, const VkImage& img, VkFormat form
 	return image_view;
 }
 
-BlasInput to_vk_geometry(GltfPrimMesh& prim, VkDeviceAddress vertexAddress, VkDeviceAddress indexAddress) {
+BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertexAddress, VkDeviceAddress indexAddress) {
 	uint32_t maxPrimitiveCount = prim.idx_count / 3;
 
 	// Describe buffer as array of VertexObj.

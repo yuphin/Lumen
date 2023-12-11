@@ -12,7 +12,6 @@
 #include "Framework/GltfScene.hpp"
 #include "shaders/commons.h"
 #include "LumenScene.h"
-#include "LumenUtils.h"
 class Integrator {
    public:
 	Integrator(LumenInstance* instance, LumenScene* lumen_scene) : instance(instance), lumen_scene(lumen_scene) {}

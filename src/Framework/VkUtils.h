@@ -3,6 +3,7 @@
 #include "GltfScene.hpp"
 #include "Buffer.h"
 #include "Pipeline.h"
+#include "RayTracer/LumenScene.h"
 uint32_t find_memory_type(VkPhysicalDevice* physical_device, uint32_t type_filter, VkMemoryPropertyFlags props);
 
 void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image, VkImageLayout old_layout,
@@ -12,7 +13,7 @@ void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image, VkImageLay
 VkImageView create_image_view(VkDevice device, const VkImage& img, VkFormat format,
 							  VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT);
 
-BlasInput to_vk_geometry(GltfPrimMesh& prim, VkDeviceAddress vertex_address, VkDeviceAddress index_address);
+BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertex_address, VkDeviceAddress index_address);
 
 inline bool has_extension(std::string_view filename, std::string_view ext) { return filename.ends_with(ext); }
 
