@@ -325,8 +325,9 @@ bool Integrator::update() {
 }
 
 void Integrator::destroy() {
-	std::vector<Buffer*> buffer_list = {&vertex_buffer,		 &index_buffer,		 &materials_buffer,
-										&prim_lookup_buffer, &scene_desc_buffer, &scene_ubo_buffer};
+	std::vector<Buffer*> buffer_list = {&vertex_buffer,			 &index_buffer,		 &materials_buffer,
+										&prim_lookup_buffer,	 &scene_desc_buffer, &scene_ubo_buffer,
+										&compact_vertices_buffer};
 	if (lights.size()) {
 		buffer_list.push_back(&mesh_lights_buffer);
 	}

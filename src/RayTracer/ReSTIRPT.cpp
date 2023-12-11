@@ -379,16 +379,10 @@ bool ReSTIRPT::update() {
 void ReSTIRPT::destroy() {
 	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
-	std::vector<Buffer*> buffer_list = {&gris_gbuffer,
-										&gris_reservoir_ping_buffer,
-										&gris_reservoir_pong_buffer,
-										&direct_lighting_buffer,
-										&transformations_buffer,
-										&compact_vertices_buffer,
-										&prefix_contribution_buffer,
-										&reconnection_buffer,
-										&gris_prev_gbuffer,
-										&debug_vis_buffer};
+	std::vector<Buffer*> buffer_list = {
+		&gris_gbuffer,			 &gris_reservoir_ping_buffer, &gris_reservoir_pong_buffer,
+		&direct_lighting_buffer, &transformations_buffer,	  &prefix_contribution_buffer,
+		&reconnection_buffer,	 &gris_prev_gbuffer,		  &debug_vis_buffer};
 	for (auto b : buffer_list) {
 		b->destroy();
 	}

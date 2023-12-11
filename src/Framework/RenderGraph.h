@@ -135,7 +135,7 @@ class RenderPass {
 	}
 
 	RenderPass& bind(const ResourceBinding& binding);
-	RenderPass& bind(Texture2D& tex, VkSampler sampler);
+	RenderPass& bind_texture_with_sampler(Texture2D& tex, VkSampler sampler);
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
 	RenderPass& bind_texture_array(std::vector<Texture2D>& texes, bool force_update = false);
 	RenderPass& bind_buffer_array(std::vector<Buffer>& buffers, bool force_update = false);

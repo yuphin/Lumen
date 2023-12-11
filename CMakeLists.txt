@@ -60,6 +60,7 @@ if(WIN32)
     target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared glm
     $<$<CONFIG:Debug>:spirv-cross-cored> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-core>
     $<$<CONFIG:Debug>:spirv-cross-glsld> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-glsl>)
+    target_compile_definitions(Lumen PRIVATE _CRT_SECURE_NO_WARNINGS)
 else()
     target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared spirv-cross-core spirv-cross-glsl glm)
 endif()

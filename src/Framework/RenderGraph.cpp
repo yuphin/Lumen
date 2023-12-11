@@ -381,7 +381,7 @@ RenderPass& RenderPass::bind(std::initializer_list<ResourceBinding> bindings) {
 	return *this;
 }
 
-RenderPass& RenderPass::bind(Texture2D& tex, VkSampler sampler) {
+RenderPass& RenderPass::bind_texture_with_sampler(Texture2D& tex, VkSampler sampler) {
 	if (next_binding_idx >= bound_resources.size()) {
 		bound_resources.emplace_back(tex, sampler);
 		descriptor_counts.push_back(1);

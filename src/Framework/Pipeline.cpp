@@ -230,6 +230,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 			case VK_SHADER_STAGE_TASK_BIT_NV:
 			case VK_SHADER_STAGE_MESH_BIT_NV:
 			case VK_SHADER_STAGE_SUBPASS_SHADING_BIT_HUAWEI:
+			case VK_SHADER_STAGE_CLUSTER_CULLING_BIT_HUAWEI:
 				break;
 		}
 		groups.push_back(group);

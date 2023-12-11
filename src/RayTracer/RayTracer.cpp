@@ -294,7 +294,7 @@ bool RayTracer::gui() {
 	if (comparison_mode && img_captured) {
 		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
 		const char* texts[] = {"Showing: Reference Image", "Showing: Target Image"};
-		ImGui::Text(texts[uint32_t(comparison_img_toggle)]);
+		ImGui::Text("%s\n", texts[uint32_t(comparison_img_toggle)]);
 		ImGui::PopStyleColor();
 	}
 	if (ImGui::Button("Capture reference image (F6)")) {

@@ -48,7 +48,7 @@ void PostFX::init(LumenInstance& instance) {
 	uint32_t pad_width = (kernel_org.base_extent.width + 31) / 32;
 	uint32_t pad_height = (kernel_org.base_extent.height + 31) / 32;
 	rg->add_compute("Pad Kernel", {.shader = Shader("src/shaders/bloom/pad.comp"), .dims = {pad_width, pad_height, 1}})
-		.bind(kernel_org, img_sampler)
+		.bind_texture_with_sampler(kernel_org, img_sampler)
 		.bind(kernel_ping);
 
 	const bool FFT_SHARED_MEM = true;
@@ -72,14 +72,14 @@ void PostFX::init(LumenInstance& instance) {
 										 .macros = macros_x,
 										 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 0},
 										 .dims = {dim_y, 1, 1}})
-		.bind(kernel_ping, img_sampler)
+		.bind_texture_with_sampler(kernel_ping, img_sampler)
 		.bind(kernel_pong);
 	vertical = true;
 	rg->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/bloom/fft.comp"),
 									   .macros = macros_y,
 									   .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 0},
 									   .dims = {dim_x, 1, 1}})
-		.bind(kernel_ping, img_sampler)
+		.bind_texture_with_sampler(kernel_ping, img_sampler)
 		.bind(kernel_pong);
 	rg->run_and_submit(cmd);
 	kernel_org.destroy();
@@ -92,7 +92,7 @@ void PostFX::render(Texture2D& input, Texture2D& output) {
 		uint32_t pad_height = (fft_ping_padded.base_extent.height + 31) / 32;
 		rg->add_compute("Pad Image",
 						{.shader = Shader("src/shaders/bloom/pad.comp"), .dims = {pad_width, pad_height, 1}})
-			.bind(input, img_sampler)
+			.bind_texture_with_sampler(input, img_sampler)
 			.bind(fft_ping_padded);
 		uint32_t wg_size_x = fft_ping_padded.base_extent.width;
 		uint32_t wg_size_y = fft_ping_padded.base_extent.height;
@@ -113,34 +113,34 @@ void PostFX::render(Texture2D& input, Texture2D& output) {
 											 .macros = macros_x,
 											 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 0},
 											 .dims = {dim_y, 1, 1}})
-			.bind(fft_ping_padded, img_sampler)
+			.bind_texture_with_sampler(fft_ping_padded, img_sampler)
 			.bind(fft_pong_padded)
-			.bind(kernel_pong, img_sampler);
+			.bind_texture_with_sampler(kernel_pong, img_sampler);
 		vertical = true;
 		rg->add_compute("FFT - Vertical", {.shader = Shader("src/shaders/bloom/fft.comp"),
 										   .macros = macros_y,
 										   .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 0},
 										   .dims = {dim_x, 1, 1}})
-			.bind(fft_ping_padded, img_sampler)
+			.bind_texture_with_sampler(fft_ping_padded, img_sampler)
 			.bind(fft_pong_padded)
-			.bind(kernel_pong, img_sampler);
+			.bind_texture_with_sampler(kernel_pong, img_sampler);
 		rg->add_compute("FFT - Vertical - Inverse",
 						{.shader = Shader("src/shaders/bloom/fft.comp"),
 						 .macros = macros_y,
 						 .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 1},
 						 .dims = {dim_x, 1, 1}})
-			.bind(fft_ping_padded, img_sampler)
+			.bind_texture_with_sampler(fft_ping_padded, img_sampler)
 			.bind(fft_pong_padded)
-			.bind(kernel_pong, img_sampler);
+			.bind_texture_with_sampler(kernel_pong, img_sampler);
 		vertical = false;
 		rg->add_compute("FFT - Horizontal - Inverse",
 						{.shader = Shader("src/shaders/bloom/fft.comp"),
 						 .macros = macros_x,
 						 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 1},
 						 .dims = {dim_y, 1, 1}})
-			.bind(fft_ping_padded, img_sampler)
+			.bind_texture_with_sampler(fft_ping_padded, img_sampler)
 			.bind(fft_pong_padded)
-			.bind(kernel_pong, img_sampler);
+			.bind_texture_with_sampler(kernel_pong, img_sampler);
 	}
 
 	pc_post_settings.enable_tonemapping = enable_tonemapping;
@@ -165,8 +165,8 @@ void PostFX::render(Texture2D& input, Texture2D& output) {
 									ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 								}})
 		.push_constants(&pc_post_settings)
-		.bind(fft_pong_padded, img_sampler)
-		.bind(input, img_sampler);
+		.bind_texture_with_sampler(fft_pong_padded, img_sampler)
+		.bind_texture_with_sampler(input, img_sampler);
 }
 
 bool PostFX::gui() {

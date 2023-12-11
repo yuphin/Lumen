@@ -17,7 +17,7 @@ class Integrator {
    public:
 	Integrator(LumenInstance* instance, LumenScene* lumen_scene) : instance(instance), lumen_scene(lumen_scene) {}
 	virtual void init();
-	virtual void render() = 0;
+	virtual void render() {};
 	virtual bool gui();
 	virtual bool update();
 	virtual void destroy();

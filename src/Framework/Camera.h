@@ -2,6 +2,8 @@
 #include "../LumenPCH.h"
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtx/quaternion.hpp>
+
+
 class Camera {
    public:
 	enum class CameraType { FPS, LookAt };
@@ -42,10 +44,6 @@ class Camera {
 	float cam_near, cam_far;
 	CameraType type = CameraType::FPS;
 	glm::vec3 position{}, rotation{}, direction{};
-
-   protected:
-	virtual void make_projection_matrix(bool use_fov) = 0;
-
    private:
 };
 
@@ -54,24 +52,24 @@ class PerspectiveCamera : public Camera {
 	explicit PerspectiveCamera(float fov, float cam_near, float cam_far, float aspect_ratio, const glm::vec3& pos)
 		: fov(fov), aspect_ratio(aspect_ratio), Camera(cam_near, cam_far) {
 		left = right = top = bot = -1;
-		this->make_projection_matrix(true);
-		this->set_position(pos);
-		this->update_view_matrix();
+		make_projection_matrix(true);
+		set_position(pos);
+		update_view_matrix();
 	}
 	explicit PerspectiveCamera(float left, float right, float top, float bot, float cam_near, float cam_far,
 							   const glm::vec3& pos = glm::vec3(0.0f))
 		: left(left), right(right), top(top), bot(bot), Camera(cam_near, cam_far) {
 		fov = aspect_ratio = -1;
-		this->make_projection_matrix();
-		this->set_position(pos);
-		this->update_view_matrix();
+		make_projection_matrix();
+		set_position(pos);
+		update_view_matrix();
 	}
 
 	explicit PerspectiveCamera(float fov, float cam_near, float cam_far, float aspect_ratio, const glm::vec3& dir,
 							   const glm::vec3& pos)
 		: fov(fov), aspect_ratio(aspect_ratio), Camera(cam_near, cam_far) {
 		left = right = top = bot = -1;
-		this->make_projection_matrix(true);
+		make_projection_matrix(true);
 		this->set_position(pos);
 		this->set_direction(dir);
 		view = glm::lookAtLH(position, position + direction, glm::vec3(0, 1, 0));
@@ -108,7 +106,7 @@ class PerspectiveCamera : public Camera {
 	}
 
    private:
-	void make_projection_matrix(bool use_fov = false) override {
+	void make_projection_matrix(bool use_fov = false) {
 		if (use_fov) {
 			projection[0][0] = 1 / (aspect_ratio * tanf(glm::radians(fov / 2)));
 			projection[1][1] = -1 / (tanf(glm::radians(fov / 2)));
