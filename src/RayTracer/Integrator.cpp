@@ -124,15 +124,11 @@ void Integrator::init() {
 							  prim_lookup.size() * sizeof(PrimMeshInfo), prim_lookup.data(), true);
 
 	std::vector<Vertex> vertices;
-	std::vector<Vertex> positions;
-	std::vector<Vertex> normals;
 	vertices.reserve(lumen_scene->positions.size());
 	for (auto i = 0; i < lumen_scene->positions.size(); i++) {
 		Vertex v;
 		v.pos = lumen_scene->positions[i];
-		positions.push_back(v);
 		v.normal = lumen_scene->normals[i];
-		normals.push_back(v);
 		v.uv0 = lumen_scene->texcoords0[i];
 
 		vertices.push_back(v);

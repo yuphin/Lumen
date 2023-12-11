@@ -434,7 +434,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 				reservoir_contribution = prefix_throughput * Li;
 
 				// LOG_CLICKED4("NEE: %d - %d - %d - %f\n", rc_type, prefix_depth, rc_postfix_length, jacobian);
-				// LOG_CLICKED3("NEE: %d - %d - %d\n", prefix_depth, bounce_flags, data.bounce_flags);
+				LOG_CLICKED3("NEE: %d - %d - %d\n", prefix_depth, bounce_flags, data.bounce_flags);
 			} else {
 				ASSERT(rc_type != RECONNECTION_TYPE_NEE);
 
@@ -459,7 +459,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 				}
 				reservoir_contribution =
 					prefix_throughput * abs(rc_cos_x) * dst_postfix_f * data.rc_Li * mis_weight / dst_postfix_pdf;
-				// LOG_CLICKED3("Default: %d - %d - %d\n", prefix_depth, bounce_flags, data.bounce_flags);
+				LOG_CLICKED3("Default: %d - %d - %d\n", prefix_depth, bounce_flags, data.bounce_flags);
 			}
 			if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
 				jacobian = 0;

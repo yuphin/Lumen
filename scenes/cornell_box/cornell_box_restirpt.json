@@ -19,7 +19,7 @@
                 1,
                 1
             ],
-            "type": "diffuse"
+            "type": "mirror"
         },
         {
             "albedo": [
@@ -31,7 +31,7 @@
             "refs": [
                 "mirror_sphere"
             ],
-            "type": "diffuse"
+            "type": "mirror"
         },
         {
             "albedo": [
