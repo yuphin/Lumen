@@ -17,7 +17,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 								   std::vector<Texture2D*> color_outputs, Texture2D* depth_output) {
 	LUMEN_ASSERT(color_outputs.size(), "No color outputs for GFX pipeline");
 	type = PipelineType::GFX;
-	binding_mask = get_bindings(settings.shaders, descriptor_types);
+	binding_mask = get_bindings_for_shader_set(settings.shaders, descriptor_types);
 	create_set_layout(settings.shaders, descriptor_counts);
 	for (const auto& shader : settings.shaders) {
 		if (push_constant_size && shader.push_constant_size) {
@@ -163,7 +163,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 
 void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vector<uint32_t>& descriptor_counts) {
 	type = PipelineType::RT;
-	binding_mask = get_bindings(settings.shaders, descriptor_types);
+	binding_mask = get_bindings_for_shader_set(settings.shaders, descriptor_types);
 	create_set_layout(settings.shaders, descriptor_counts);
 	for (const auto& shader : settings.shaders) {
 		if (push_constant_size && shader.push_constant_size) {
@@ -270,7 +270,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
 									   const std::vector<uint32_t>& descriptor_counts) {
 	type = PipelineType::COMPUTE;
-	binding_mask = get_bindings({settings.shader}, descriptor_types);
+	binding_mask = get_bindings_for_shader_set({settings.shader}, descriptor_types);
 	create_set_layout({settings.shader}, descriptor_counts);
 	if (settings.shader.push_constant_size > 0) {
 		push_constant_size = settings.shader.push_constant_size;

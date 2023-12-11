@@ -119,12 +119,6 @@ inline VkImageMemoryBarrier2 image_barrier2(VkImage image, VkAccessFlags src_acc
 	return result;
 }
 
-inline VkDeviceAddress get_device_address(VkDevice device, VkBuffer handle) {
-	VkBufferDeviceAddressInfo info = {VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
-	info.buffer = handle;
-	return vkGetBufferDeviceAddress(device, &info);
-}
-
 inline VkDeviceSize get_memory_usage(VkPhysicalDevice physical_device) {
 	VkPhysicalDeviceMemoryProperties2 props = {};
 	props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
@@ -142,9 +136,7 @@ inline uint32_t calc_mip_levels(VkExtent2D extent) {
 VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format = VK_FORMAT_R8G8B8A8_UNORM,
 								VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT, bool mipmaps = false);
 
-void dispatch_compute(const Pipeline& pipeline, VkCommandBuffer cmdbuf, int wg_x, int wg_y, int width, int height);
-
-uint32_t get_bindings(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types);
+uint32_t get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types);
 
 VkImageLayout get_target_img_layout(const Texture2D& tex, VkAccessFlags access_flags);
 

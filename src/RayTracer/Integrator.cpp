@@ -7,7 +7,6 @@ void Integrator::init() {
 	VkPhysicalDeviceProperties2 prop2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
 	prop2.pNext = &rt_props;
 	vkGetPhysicalDeviceProperties2(instance->vkb.ctx.physical_device, &prop2);
-	constexpr int VERTEX_BINDING_ID = 0;
 
 	LumenInstance* instance = this->instance;
 	Window* window = instance->window;
@@ -197,8 +196,8 @@ bool Integrator::gui() {
 
 void Integrator::create_blas() {
 	std::vector<BlasInput> blas_inputs;
-	auto vertex_address = get_device_address(instance->vkb.ctx.device, vertex_buffer.handle);
-	auto idx_address = get_device_address(instance->vkb.ctx.device, index_buffer.handle);
+	auto vertex_address = vertex_buffer.get_device_address();
+	auto idx_address = index_buffer.get_device_address();
 	for (auto& prim_mesh : lumen_scene->prim_meshes) {
 		BlasInput geo = to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({geo});

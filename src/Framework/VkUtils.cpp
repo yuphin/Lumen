@@ -248,8 +248,6 @@ BlasInput to_vk_geometry(GltfPrimMesh& prim, VkDeviceAddress vertexAddress, VkDe
 	return input;
 }
 
-
-
 VkPipelineStageFlags get_pipeline_stage(PassType pass_type, VkAccessFlags access_flags) {
 	VkPipelineStageFlags res = 0;
 	switch (pass_type) {
@@ -287,88 +285,6 @@ VkImageLayout get_image_layout(VkDescriptorType type) {
 	return VK_IMAGE_LAYOUT_GENERAL;
 }
 
-VkRenderPass create_render_pass(VkDevice device, const std::vector<VkFormat>& color_attachment_formats,
-								VkFormat depth_attachment_format, uint32_t subpass_count /*= 1*/,
-								bool clear_color /*= true*/, bool clear_depth /*= true*/,
-								VkImageLayout initial_layout /*= VK_IMAGE_LAYOUT_UNDEFINED */,
-								VkImageLayout final_layout /*= VK_IMAGE_LAYOUT_PRESENT_SRC_KHR*/) {
-	std::vector<VkAttachmentDescription> all_attachments;
-	std::vector<VkAttachmentReference> color_attachment_refs;
-
-	bool has_depth = (depth_attachment_format != VK_FORMAT_UNDEFINED);
-
-	for (const auto& format : color_attachment_formats) {
-		VkAttachmentDescription color_attachment = {};
-		color_attachment.format = format;
-		color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-		color_attachment.loadOp = clear_color
-									  ? VK_ATTACHMENT_LOAD_OP_CLEAR
-									  : ((initial_layout == VK_IMAGE_LAYOUT_UNDEFINED) ? VK_ATTACHMENT_LOAD_OP_DONT_CARE
-																					   : VK_ATTACHMENT_LOAD_OP_LOAD);
-		color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		color_attachment.initialLayout = initial_layout;
-		color_attachment.finalLayout = final_layout;
-
-		VkAttachmentReference color_attachment_ref = {};
-		color_attachment_ref.attachment = static_cast<uint32_t>(all_attachments.size());
-		color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-		all_attachments.push_back(color_attachment);
-		color_attachment_refs.push_back(color_attachment_ref);
-	}
-
-	VkAttachmentReference depth_attachment_ref = {};
-	if (has_depth) {
-		VkAttachmentDescription depth_attachment = {};
-		depth_attachment.format = depth_attachment_format;
-		depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-		depth_attachment.loadOp = clear_depth ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
-
-		depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-		depth_attachment_ref.attachment = static_cast<uint32_t>(all_attachments.size());
-		depth_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-		all_attachments.push_back(depth_attachment);
-	}
-	std::vector<VkSubpassDescription> subpasses;
-	std::vector<VkSubpassDependency> subpass_dependencies;
-	for (uint32_t i = 0; i < subpass_count; i++) {
-		VkSubpassDescription subpass = {};
-		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpass.colorAttachmentCount = static_cast<uint32_t>(color_attachment_refs.size());
-		subpass.pColorAttachments = color_attachment_refs.data();
-		subpass.pDepthStencilAttachment = has_depth ? &depth_attachment_ref : VK_NULL_HANDLE;
-
-		VkSubpassDependency dependency = {};
-		dependency.srcSubpass = i == 0 ? (VK_SUBPASS_EXTERNAL) : (i - 1);
-		dependency.dstSubpass = i;
-		dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dependency.srcAccessMask = 0;
-		dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-		subpasses.push_back(subpass);
-		subpass_dependencies.push_back(dependency);
-	}
-
-	VkRenderPassCreateInfo rpi{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
-	rpi.attachmentCount = static_cast<uint32_t>(all_attachments.size());
-	rpi.pAttachments = all_attachments.data();
-	rpi.subpassCount = static_cast<uint32_t>(subpasses.size());
-	rpi.pSubpasses = subpasses.data();
-	rpi.dependencyCount = static_cast<uint32_t>(subpass_dependencies.size());
-	rpi.pDependencies = subpass_dependencies.data();
-	VkRenderPass rp;
-	vk::check(vkCreateRenderPass(device, &rpi, nullptr, &rp));
-	return rp;
-}
 
 VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format, VkImageUsageFlags usage, bool mipmaps) {
 	VkImageCreateInfo ici = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
@@ -384,18 +300,7 @@ VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format, VkImage
 	return ici;
 }
 
-void dispatch_compute(const Pipeline& pipeline, VkCommandBuffer cmdbuf, int wg_x, int wg_y, int width, int height) {
-	vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline.handle);
-	const auto num_wg_x = (uint32_t)ceil(width / float(wg_x));
-	const auto num_wg_y = (uint32_t)ceil(height / float(wg_y));
-	vkCmdDispatch(cmdbuf, num_wg_x, num_wg_y, 1);
-}
-
-glm::ivec2 get_num_wgs(int width, int height, int wg_x_size, int wg_y_size) {
-	return glm::ivec2{ceil(width / float(wg_x_size)), ceil(height / float(wg_y_size))};
-}
-
-uint32_t get_bindings(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types) {
+uint32_t get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types) {
 	uint32_t binding_mask = 0;
 	for (const auto& shader : shaders) {
 		for (uint32_t i = 0; i < 32; ++i) {
