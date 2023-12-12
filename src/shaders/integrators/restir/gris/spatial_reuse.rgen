@@ -138,7 +138,7 @@ void main() {
 	calc_reservoir_W_with_mis(reservoir);
 	reservoir.W /= (1.0 + num_valid_samples);
 
-	vec3 final_contribution;
+	vec3 final_contribution = vec3(0);
 	if (pc.show_reconnection_radiance == 1) {
 		final_contribution = vec3(0);
 	} else {

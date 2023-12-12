@@ -375,7 +375,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		rc_wi = rc_gbuffer.pos - dst_gbuffer.pos;
 		rc_wi_len = length(rc_wi);
 		rc_wi /= rc_wi_len;
-		dst_far = rc_type != RECONNECTION_TYPE_NEE ? rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent : true;
+		dst_far = rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent;
 
 		prev_rough = dst_rough;
 		dst_rough = is_rough(dst_hit_mat);
