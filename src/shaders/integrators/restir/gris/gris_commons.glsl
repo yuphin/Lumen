@@ -313,7 +313,6 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 				   uvec2 seed_helpers, out float jacobian_out, out vec3 reservoir_contribution, bool canonical) {
 	// Note: The source reservoir always corresponds to the canonical reservoir because retracing only happens on
 	// pairwise mode
-
 	reservoir_contribution = vec3(0);
 	jacobian_out = 0;
 	float jacobian = 1;
@@ -339,48 +338,32 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 	vec3 dst_wi = get_primary_direction(dst_coords);
 	float prefix_jacobian = 1.0;
 
-	Material src_hit_mat = load_material(src_gbuffer.material_idx, src_gbuffer.uv);
-	bool constraints_satisfied = true;
-
 	uint bounce_flags = 0;
-	vec3 dst_wo;
-	Material dst_hit_mat;
-	bool dst_side;
-	bool dst_rough;
-	vec3 rc_wi;
-	float rc_wi_len;
-
-	bool found_connection_at_rc_vertex = false;
-
-	bool src_satisfied;
 
 	bool prev_far = true;
 	bool dst_far;
 	bool next_src_satisfied = true;
+	bool dst_rough = true;
 	bool prev_rough = dst_rough;
-
-	vec3 dst_postfix_wi;
-	float wi_len_sqr;
-	float wi_len;
 
 	while (true) {
 		if (((prefix_depth + rc_postfix_length + 1) > pc.max_depth) || prefix_depth > rc_prefix_length) {
 			return false;
 		}
-		dst_wo = -dst_wi;
-		dst_side = face_forward(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo);
+		vec3 dst_wo = -dst_wi;
+		bool dst_side = face_forward(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo);
 		dst_gbuffer.pos = offset_ray(dst_gbuffer.pos, dst_gbuffer.n_g);
-		dst_hit_mat = load_material(dst_gbuffer.material_idx, dst_gbuffer.uv);
+		Material dst_hit_mat = load_material(dst_gbuffer.material_idx, dst_gbuffer.uv);
 
-		rc_wi = rc_gbuffer.pos - dst_gbuffer.pos;
-		rc_wi_len = length(rc_wi);
+		vec3 rc_wi = rc_gbuffer.pos - dst_gbuffer.pos;
+		float rc_wi_len = length(rc_wi);
 		rc_wi /= rc_wi_len;
 		dst_far = rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent;
 
 		prev_rough = dst_rough;
 		dst_rough = is_rough(dst_hit_mat);
 
-		constraints_satisfied = dst_rough && prev_far;
+		bool constraints_satisfied = dst_rough && prev_far;
 
 		if (prefix_depth > 0 && prev_rough) {
 			constraints_satisfied = constraints_satisfied && next_src_satisfied;
@@ -392,12 +375,8 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 			return false;
 		}
 
-		src_satisfied = get_bounce_flag(data.bounce_flags, prefix_depth);
-
 		set_bounce_flag(bounce_flags, prefix_depth, constraints_satisfied);
 		if (prefix_depth == rc_prefix_length) {
-			// LOG_CLICKED("%d\n", prefix_depth);
-			// break;
 			dst_far = rc_type == RECONNECTION_TYPE_NEE ? true : dst_far;
 			constraints_satisfied = dst_rough && dst_far;
 			// Reconnection
@@ -405,9 +384,9 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 				return false;
 			}
 
-			dst_postfix_wi = rc_gbuffer.pos - dst_gbuffer.pos;
-			wi_len_sqr = dot(dst_postfix_wi, dst_postfix_wi);
-			wi_len = sqrt(wi_len_sqr);
+			vec3 dst_postfix_wi = rc_gbuffer.pos - dst_gbuffer.pos;
+			float wi_len_sqr = dot(dst_postfix_wi, dst_postfix_wi);
+			float wi_len = sqrt(wi_len_sqr);
 			dst_postfix_wi /= wi_len;
 			vec3 p = offset_ray2(dst_gbuffer.pos, dst_gbuffer.n_s);
 			any_hit_payload.hit = 1;
@@ -432,8 +411,6 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 				vec3 Li = do_nee(reconnection_seed, dst_gbuffer.pos, dst_hit_mat, dst_side, dst_gbuffer.n_s, dst_wo, false);
 				jacobian = prefix_jacobian / data.rc_partial_jacobian.x;
 				reservoir_contribution = prefix_throughput * Li;
-
-				// LOG_CLICKED4("NEE: %d - %d - %d - %f\n", rc_type, prefix_depth, rc_postfix_length, jacobian);
 				LOG_CLICKED3("NEE: %d - %d - %d\n", prefix_depth, bounce_flags, data.bounce_flags);
 			} else {
 				ASSERT(rc_type != RECONNECTION_TYPE_NEE);
