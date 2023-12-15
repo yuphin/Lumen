@@ -175,12 +175,21 @@ void RenderPass::transition_resources() {
 }
 
 void RenderGraph::update_pass_indices(uint32_t num_encountered_inactive_passes,
-										  std::unordered_map<uint32_t, uint32_t> inactive_passes_map) {
+									  std::unordered_map<uint32_t, uint32_t> inactive_passes_map) {
 	std::unordered_map<uint32_t, uint32_t> modified_pass_idxs;	// Stores new offsets
+	std::unordered_set<uint32_t> passes_encountered;
+	std::unordered_map<uint32_t, std::vector<RenderPass>::iterator> duplicate_pass_idxs;
 	for (auto it = passes.begin() + beginning_pass_idx; it != passes.end();) {
 		if (!it->active && (it->pass_idx < ending_pass_idx)) {
-			modified_pass_idxs[it->pass_idx] = INVALID_PASS_IDX;
-			it = passes.erase(it);
+			bool is_duplicate = passes_encountered.find(it->pass_idx) != passes_encountered.end();
+			if (!is_duplicate) {
+				modified_pass_idxs[it->pass_idx] = INVALID_PASS_IDX;
+				it = passes.erase(it);
+			} else {
+				// Note: We assume that only 1 duplicate pass index can be formed
+				duplicate_pass_idxs[it->pass_idx] = it;
+				it++;
+			}
 		} else {
 			auto pass_it = inactive_passes_map.find(it->pass_idx);
 			uint32_t new_pass_idx = it->pass_idx;
@@ -193,13 +202,20 @@ void RenderGraph::update_pass_indices(uint32_t num_encountered_inactive_passes,
 				modified_pass_idxs[it->pass_idx] = new_pass_idx;
 				it->pass_idx = new_pass_idx;
 			}
+			passes_encountered.insert(it->pass_idx);
 			++it;
 		}
 	}
+
 	// Modify the pass indices in pipeline_cache
-	for (auto& [_, storage] : pipeline_cache) {
+	for (auto& [name, storage] : pipeline_cache) {
 		bool should_remove = false;
 		for (auto pass_it = storage.pass_idxs.begin(); pass_it != storage.pass_idxs.end();) {
+			if (auto duplicate_pass = duplicate_pass_idxs.find(*pass_it);
+				duplicate_pass != duplicate_pass_idxs.end() && duplicate_pass->second->name == name) {
+				pass_it = storage.pass_idxs.erase(pass_it);
+				continue;
+			}
 			if (auto it = modified_pass_idxs.find(*pass_it); it != modified_pass_idxs.end()) {
 				if (it->second == INVALID_PASS_IDX) {
 					pass_it = storage.pass_idxs.erase(pass_it);
@@ -233,6 +249,10 @@ void RenderGraph::update_pass_indices(uint32_t num_encountered_inactive_passes,
 			}
 		}
 		++img_it;
+	}
+
+	for (auto& [_, duplicate_pass] : duplicate_pass_idxs) {
+		passes.erase(duplicate_pass);
 	}
 	ending_pass_idx = ending_pass_idx - num_encountered_inactive_passes;
 }

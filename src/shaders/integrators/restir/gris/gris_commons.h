@@ -30,15 +30,14 @@ struct PCReSTIRPT {
 	uint path_length;
 	uint buffer_idx;
 	uint enable_gris;
+	uint temporal_reuse;
 	uint pixel_debug;
 };
 
 
 struct GBuffer {
-	uvec2 pad1;
 	vec2 barycentrics;
 	uvec2 primitive_instance_id;
-	uvec2 pad2;
 };
 
 struct GrisData {
@@ -53,9 +52,10 @@ struct GrisData {
 	uint rc_coords;
 	vec2 rc_partial_jacobian; // g * rc_pdf (* rc_postfix_pdf)
 	vec2 rc_barycentrics;
-	vec3 pad;
-	uint bounce_flags;
+	uvec2 seed_helpers;
 	uvec2 rc_primitive_instance_id;
+	float pad;
+	uint bounce_flags;
 	float pdf_light_w;
 	uint rc_seed;
 };

@@ -85,7 +85,7 @@ class RenderGraph {
 
    private:
 	void update_pass_indices(uint32_t num_encountered_inactive_passes = 0,
-								 std::unordered_map<uint32_t, uint32_t> inactive_passes_map = {});
+							 std::unordered_map<uint32_t, uint32_t> inactive_passes_map = {});
 	bool dirty_pass_encountered = false;
 };
 

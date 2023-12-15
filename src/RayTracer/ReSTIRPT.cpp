@@ -122,6 +122,7 @@ void ReSTIRPT::render() {
 	pc_ray.enable_gris = enable_gris;
 	pc_ray.frame_num = frame_num;
 	pc_ray.pixel_debug = pixel_debug;
+	pc_ray.temporal_reuse = uint(enable_temporal_reuse);
 
 	const std::initializer_list<ResourceBinding> common_bindings = {output_tex, scene_ubo_buffer, scene_desc_buffer,
 																	mesh_lights_buffer};
@@ -153,6 +154,31 @@ void ReSTIRPT::render() {
 		.bind(*gbuffers[pong])
 		.bind_texture_array(scene_textures)
 		.bind_tlas(instance->vkb.tlas);
+
+	bool should_do_temporal = enable_temporal_reuse && pc_ray.total_frame_num > 0;
+	if (should_do_temporal) {
+		// Temporal Reuse
+		instance->vkb.rg
+			->add_rt("GRIS - Temporal Reuse", {.shaders = {{"src/shaders/integrators/restir/gris/temporal_reuse.rgen"},
+														   {"src/shaders/integrators/restir/gris/ray.rmiss"},
+														   {"src/shaders/ray_shadow.rmiss"},
+														   {"src/shaders/integrators/restir/gris/ray.rchit"},
+														   {"src/shaders/ray.rahit"}},
+											   .macros = macros,
+											   .dims = {instance->width, instance->height},
+											   .accel = instance->vkb.tlas.accel})
+			.push_constants(&pc_ray)
+			.bind(common_bindings)
+			.bind(reconnection_buffer)
+			.bind(*reservoir_buffers[pong])
+			.bind(*reservoir_buffers[ping])
+			.bind(*gbuffers[pong])
+			.bind(*gbuffers[ping])
+			.bind_texture_array(scene_textures)
+			.bind_tlas(instance->vkb.tlas);
+	} else {
+		int a = 4;
+	}
 	if (enable_gris && !canonical_only) {
 		if (mis_method == MISMethod::TALBOT) {
 			instance->vkb.rg
@@ -188,9 +214,7 @@ void ReSTIRPT::render() {
 				.bind(common_bindings)
 				.bind(reconnection_buffer)
 				.bind(*reservoir_buffers[pong])
-				.bind(*reservoir_buffers[ping])
 				.bind(*gbuffers[pong])
-				.bind(*gbuffers[ping])
 				.bind_texture_array(scene_textures)
 				.bind_tlas(instance->vkb.tlas);
 			// Validate
@@ -208,33 +232,10 @@ void ReSTIRPT::render() {
 				.bind(common_bindings)
 				.bind(reconnection_buffer)
 				.bind(*reservoir_buffers[pong])
-				.bind(*reservoir_buffers[ping])
 				.bind(*gbuffers[pong])
-				.bind(*gbuffers[ping])
 				.bind_texture_array(scene_textures)
 				.bind_tlas(instance->vkb.tlas);
-			if (enable_temporal_reuse) {
-				// Temporal Reuse
-				instance->vkb.rg
-					->add_rt("GRIS - Temporal Reuse",
-							 {.shaders = {{"src/shaders/integrators/restir/gris/temporal_reuse.rgen"},
-										  {"src/shaders/integrators/restir/gris/ray.rmiss"},
-										  {"src/shaders/ray_shadow.rmiss"},
-										  {"src/shaders/integrators/restir/gris/ray.rchit"},
-										  {"src/shaders/ray.rahit"}},
-							  .macros = macros,
-							  .dims = {instance->width, instance->height},
-							  .accel = instance->vkb.tlas.accel})
-					.push_constants(&pc_ray)
-					.bind(common_bindings)
-					.bind(reconnection_buffer)
-					.bind(*reservoir_buffers[pong])
-					.bind(*reservoir_buffers[ping])
-					.bind(*gbuffers[pong])
-					.bind(*gbuffers[ping])
-					.bind_texture_array(scene_textures)
-					.bind_tlas(instance->vkb.tlas);
-			}
+
 			// Spatial Reuse
 			instance->vkb.rg
 				->add_rt("GRIS - Spatial Reuse",

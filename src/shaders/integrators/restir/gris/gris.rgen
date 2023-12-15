@@ -224,7 +224,6 @@ void main() {
 				reconnection_data.rc_primitive_instance_id = uvec2(triangle_idx, instance_idx);
 				reconnection_data.rc_coords = rc_coords;
 				reconnection_data.rc_partial_jacobian.x = rc_partial_jacobian;
-				reconnection_data.pad = light_pos;
 
 				reconnection_data.debug_seed = debug_seed;
 				reconnection_data.rc_seed = rc_seed;
@@ -349,6 +348,7 @@ void main() {
 		reservoir.M = 1;
 		calc_reservoir_W(reservoir);
 		prefix_contributions.d[pixel_idx] = prefix_col;
+		reservoir.data.seed_helpers = uvec2(pc.general_seed, pc.sampling_seed);
 #ifdef CANONICAL_ONLY
 		col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
 		if (pc.direct_lighting == 1) {

@@ -208,19 +208,9 @@ void init_gbuffer(out GBuffer gbuffer) {
 }
 
 void init_data(out GrisData data) {
-	data.debug_seed = uvec4(0);
-	data.rc_wi = vec3(0);
-	data.rc_Li = vec3(0);
 	data.path_flags = 0;
-	data.reservoir_contribution = vec3(0);
-	data.rc_coords = 0;
-	data.rc_partial_jacobian = vec2(0);
-	data.rc_barycentrics = uvec2(0);
-	data.pad = vec3(0);
 	data.bounce_flags = 0;
 	data.rc_primitive_instance_id = uvec2(-1);
-	data.pdf_light_w = 0;
-	data.rc_seed = 0;
 }
 
 void init_reservoir(out Reservoir r) {
@@ -310,7 +300,7 @@ vec3 get_primary_direction(uvec2 coords) {
 }
 
 bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords, uvec2 src_coords,
-				   uvec2 seed_helpers, out float jacobian_out, out vec3 reservoir_contribution, bool canonical) {
+				   out float jacobian_out, out vec3 reservoir_contribution, bool canonical) {
 	// Note: The source reservoir always corresponds to the canonical reservoir because retracing only happens on
 	// pairwise mode
 	reservoir_contribution = vec3(0);
@@ -319,7 +309,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 	if (!reservoir_data_valid(data)) {
 		return false;
 	}
-	uvec4 reservoir_seed = init_rng(src_coords, gl_LaunchSizeEXT.xy, seed_helpers.y, data.init_seed);
+	uvec4 reservoir_seed = init_rng(src_coords, gl_LaunchSizeEXT.xy, data.seed_helpers.y, data.init_seed);
 	HitData rc_gbuffer;
 	Material rc_hit_mat;
 
@@ -400,7 +390,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 				// In this case directly re-use the NEE result
 				ASSERT(prefix_depth != 0);	// Can't process direct lighting
 				uvec2 rc_coords = uvec2(data.rc_coords / gl_LaunchSizeEXT.y, data.rc_coords % gl_LaunchSizeEXT.y);
-				uvec4 reconnection_seed = init_rng(rc_coords, gl_LaunchSizeEXT.xy, seed_helpers.x, data.rc_seed);
+				uvec4 reconnection_seed = init_rng(rc_coords, gl_LaunchSizeEXT.xy, data.seed_helpers.x, data.rc_seed);
 				ASSERT(reconnection_seed == data.debug_seed);
 
 				set_bounce_flag(bounce_flags, prefix_depth + 1, true);
@@ -411,7 +401,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 				vec3 Li = do_nee(reconnection_seed, dst_gbuffer.pos, dst_hit_mat, dst_side, dst_gbuffer.n_s, dst_wo, false);
 				jacobian = prefix_jacobian / data.rc_partial_jacobian.x;
 				reservoir_contribution = prefix_throughput * Li;
-				LOG_CLICKED3("NEE: %d - %d - %d\n", prefix_depth, bounce_flags, data.bounce_flags);
+				LOG_CLICKED4("NEE: %d - %d - %d - %v2u\n", prefix_depth, bounce_flags, data.bounce_flags, data.seed_helpers);
 			} else {
 				ASSERT(rc_type != RECONNECTION_TYPE_NEE);
 
@@ -436,7 +426,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 				}
 				reservoir_contribution =
 					prefix_throughput * abs(rc_cos_x) * dst_postfix_f * data.rc_Li * mis_weight / dst_postfix_pdf;
-				LOG_CLICKED3("Default: %d - %d - %d\n", prefix_depth, bounce_flags, data.bounce_flags);
+				LOG_CLICKED4("Default: %d - %d - %d - %v2u\n", prefix_depth, bounce_flags, data.bounce_flags, data.seed_helpers);
 			}
 			if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
 				jacobian = 0;
@@ -472,8 +462,8 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 }
 
 bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords, uvec2 src_coords,
-				   uvec2 seed_helpers, out float jacobian_out, out vec3 reservoir_contribution) {
-	return retrace_paths(dst_gbuffer, src_gbuffer, data, dst_coords, src_coords, seed_helpers, jacobian_out,
+				   out float jacobian_out, out vec3 reservoir_contribution) {
+	return retrace_paths(dst_gbuffer, src_gbuffer, data, dst_coords, src_coords, jacobian_out,
 						 reservoir_contribution, true);
 }
 bool reconnect_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords,
@@ -604,11 +594,56 @@ bool reconnect_paths_and_evaluate(in HitData dst_gbuffer, in HitData src_gbuffer
 }
 
 bool retrace_paths_and_evaluate(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords,
-								uvec2 src_coords, uvec2 seed_helpers, out float target_pdf) {
+								uvec2 src_coords, out float target_pdf) {
 	vec3 reservoir_contribution;
 	float jacobian = 0;
-	bool result = retrace_paths(dst_gbuffer, src_gbuffer, data, dst_coords, src_coords, seed_helpers, jacobian,
+	bool result = retrace_paths(dst_gbuffer, src_gbuffer, data, dst_coords, src_coords, jacobian,
 								reservoir_contribution, false);
 	target_pdf = calc_target_pdf(reservoir_contribution) * jacobian;
+	return result;
+}
+
+
+bool process_reservoir(inout uvec4 seed, inout Reservoir reservoir, inout float m_c, in Reservoir canonical_reservoir,
+					   in Reservoir source_reservoir, in ReconnectionData data, ivec2 neighbor_coords,
+					   float canonical_in_canonical_pdf, inout vec3 curr_reservoir_contribution) {
+	source_reservoir.M = min(source_reservoir.M, 20);
+
+	bool result = false;
+
+	float neighbor_in_neighbor_pdf = calc_target_pdf(source_reservoir.data.reservoir_contribution);
+	float neighbor_in_canonical_pdf = calc_target_pdf(data.reservoir_contribution) * data.jacobian;
+
+	float m_i_num = source_reservoir.M * neighbor_in_neighbor_pdf;
+	float m_i_denom = m_i_num + canonical_reservoir.M * neighbor_in_canonical_pdf / pc.num_spatial_samples;
+	float m_i = neighbor_in_canonical_pdf <= 0 ? 0 : m_i_num / m_i_denom;
+
+	// if (m_i <= 0.0 || m_i >= 1.0) {
+	// 	reservoir.M += source_reservoir.M;
+	// 	m_c += 1.0;
+	// 	return false;
+	// }
+
+	m_c += 1.0;
+	float m_c_num = source_reservoir.M * data.target_pdf_in_neighbor;
+	float m_c_denom = m_c_num + canonical_reservoir.M * canonical_in_canonical_pdf / pc.num_spatial_samples;
+	float m_c_val = m_c_denom == 0.0 ? 0.0 : m_c_num / m_c_denom;
+	if (m_c_val > 0) {
+		m_c -= m_c_val;
+	}
+	// if (m_c_val <= 0.0) {
+	// 	reservoir.M += source_reservoir.M;
+	// 	return false;
+	// }
+
+	ASSERT1(m_c_val > -1e-3 && m_c_val <= 1.001, "m_c_val <= 1.0 : %f\n", m_c_val);
+	ASSERT1(m_i > -1e-3 && m_i <= 1.001, "m_i <= 1.0 : %f\n", m_i);
+
+	bool accepted = combine_reservoir(seed, reservoir, source_reservoir, calc_target_pdf(data.reservoir_contribution),
+									  m_i, data.jacobian);
+	if (accepted) {
+		curr_reservoir_contribution = data.reservoir_contribution;
+		result = true;
+	}
 	return result;
 }
