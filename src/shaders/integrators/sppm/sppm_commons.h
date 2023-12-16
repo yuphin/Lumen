@@ -21,7 +21,6 @@ struct PCSPPM {
 	int light_triangle_count;
 	uint dir_light_idx;
 	uint random_num;
-	float radius;
 	float ppm_base_radius;
 };
 

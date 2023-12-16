@@ -71,17 +71,16 @@ void SPPM::render() {
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
 	pc_ray.frame_num = frame_num;
 	// PPM related constants
-	pc_ray.radius = config->base_radius;
+	if(config->base_radius < 1e-7f) {
+		config->base_radius = 1e-7f;
+	}
 	pc_ray.min_bounds = lumen_scene->m_dimensions.min;
 	pc_ray.max_bounds = lumen_scene->m_dimensions.max;
 	pc_ray.ppm_base_radius = config->base_radius;
 	const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
 	const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
-	const int base_grid_res = int(max_comp / pc_ray.radius);
+	const int base_grid_res = int(max_comp / config->base_radius);
 	pc_ray.grid_res = glm::max(ivec3(diam * float(base_grid_res) / max_comp), ivec3(1));
-	if (pc_ray.radius < 1e-7f) {
-		pc_ray.radius = 1e-7f;
-	}
 	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name, const std::string& reduce_name,
 						 const std::string& reduce_shader_name) {
 		uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
