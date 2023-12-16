@@ -8,29 +8,20 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
-#define SCENE_TEX_IDX 9
+#define SCENE_TEX_IDX 8
 #include "gris_commons.glsl"
 GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
 PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
-layout(binding = 4, std430) readonly buffer PathReconnections { ReconnectionData reconnection_data[]; };
-layout(binding = 5, std430) buffer OutReservoirs { Reservoir curr_reservoirs[]; };
-layout(binding = 6, std430) readonly buffer InReservoirs { Reservoir prev_reservoirs[]; };
-layout(binding = 7, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
-layout(binding = 8, std430) readonly buffer PrevGBuffer { GBuffer prev_gbuffers[]; };
+layout(binding = 4, std430) buffer OutReservoirs { Reservoir curr_reservoirs[]; };
+layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir prev_reservoirs[]; };
+layout(binding = 6, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
+layout(binding = 7, std430) readonly buffer PrevGBuffer { GBuffer prev_gbuffers[]; };
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
 uvec4 seed2 = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
-
-bool process_reservoir(inout Reservoir reservoir, inout float m_c, in Reservoir canonical_reservoir,
-					   in Reservoir source_reservoir, in ReconnectionData data, uint neighbor_coords_idx,
-					   float canonical_in_canonical_pdf, out vec3 curr_reservoir_contribution) {
-	source_reservoir.M = min(source_reservoir.M, 20);
-	return true;
-}
 
 void main() {
 	GBuffer gbuffer = curr_gbuffers[pixel_idx];
 	if (!gbuffer_data_valid(gbuffer)) {
-		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(0));
 		return;
 	}
 	Reservoir canonical_reservoir = curr_reservoirs[pixel_idx];
@@ -42,25 +33,28 @@ void main() {
 	prev_pos = -ubo.prev_projection * prev_pos;
 	ivec2 prev_coords = ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
 
+	if (any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy))) {
+		return;
+	}
+	const uint prev_idx = prev_coords.x * pc.size_y + prev_coords.y;
+	GBuffer prev_gbuffer = prev_gbuffers[prev_idx];
+	if (!gbuffer_data_valid(prev_gbuffer)) {
+		return;
+	}
 	ReconnectionData data;
 	data.reservoir_contribution = vec3(0);
 	data.jacobian = 0;
 	data.target_pdf_in_neighbor = 0;
-	if (!(any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy)))) {
-		const uint prev_idx = prev_coords.x * pc.size_y + prev_coords.y;
-		GBuffer prev_gbuffer = prev_gbuffers[prev_idx];
-		if (gbuffer_data_valid(prev_gbuffer)) {
-			const Reservoir prev_reservoir = prev_reservoirs[prev_idx];
-			HitData prev_hitdata = get_hitdata(prev_gbuffer.barycentrics, prev_gbuffer.primitive_instance_id.y,
-											   prev_gbuffer.primitive_instance_id.x);
-			bool prev_in_canonical =
-				retrace_paths(canonical_gbuffer, prev_hitdata, prev_reservoir.data, gl_LaunchIDEXT.xy,
-							  uvec2(prev_coords), data.jacobian, data.reservoir_contribution);
-			retrace_paths_and_evaluate(prev_hitdata, canonical_gbuffer, canonical_reservoir.data, uvec2(prev_coords),
-									   gl_LaunchIDEXT.xy, data.target_pdf_in_neighbor);
-		}
-	}
+	const Reservoir prev_reservoir = prev_reservoirs[prev_idx];
+	HitData prev_hitdata = get_hitdata(prev_gbuffer.barycentrics, prev_gbuffer.primitive_instance_id.y,
+									   prev_gbuffer.primitive_instance_id.x);
+	bool prev_in_canonical = retrace_paths(canonical_gbuffer, prev_hitdata, prev_reservoir.data, gl_LaunchIDEXT.xy,
+										   uvec2(prev_coords), data.jacobian, data.reservoir_contribution);
+	retrace_paths_and_evaluate(prev_hitdata, canonical_gbuffer, canonical_reservoir.data, uvec2(prev_coords),
+							   gl_LaunchIDEXT.xy, data.target_pdf_in_neighbor);
 
 	Reservoir reservoir;
 	init_reservoir(reservoir);
+	// process_reservoir(seed, reservoir, m_c, canonical_reservoir, neighbor_reservoir, data, neighbor_coords,
+	// 				  canonical_in_canonical_pdf, curr_reservoir_contribution);
 }

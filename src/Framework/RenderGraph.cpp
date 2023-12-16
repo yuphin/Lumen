@@ -369,7 +369,7 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 
 RenderGraph::RenderGraph(VulkanContext* ctx) : ctx(ctx) { pipeline_tasks.reserve(32); }
 
-RenderPass& RenderGraph::current_pass() { return passes.back(); }
+RenderPass& RenderGraph::current_pass() { return passes[ending_pass_idx - 1]; }
 
 RenderPass& RenderGraph::add_rt(const std::string& name, const RTPassSettings& settings) {
 	return add_pass_impl(name, settings);
@@ -516,8 +516,8 @@ RenderPass& RenderPass::write(ResourceBinding& resource) {
 	return *this;
 }
 
-RenderPass& RenderPass::skip_execution() {
-	disable_execution = true;
+RenderPass& RenderPass::skip_execution(bool condition) {
+	disable_execution = condition;
 	return *this;
 }
 

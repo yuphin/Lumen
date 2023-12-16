@@ -170,7 +170,6 @@ void RayTracer::update() {
 
 void RayTracer::render(uint32_t i) {
 	integrator->render();
-	render_debug_utils();
 	Texture2D* input_tex = nullptr;
 	if (comparison_mode && img_captured) {
 		input_tex = comparison_img_toggle ? &target_tex : &reference_tex;
@@ -178,6 +177,7 @@ void RayTracer::render(uint32_t i) {
 		input_tex = &integrator->output_tex;
 	}
 	post_fx.render(*input_tex, vkb.swapchain_images[i]);
+	render_debug_utils();
 
 	auto cmdbuf = vkb.ctx.command_buffers[i];
 	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);

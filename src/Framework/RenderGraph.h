@@ -152,7 +152,7 @@ class RenderPass {
 	RenderPass& write(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
 	RenderPass& write(std::initializer_list<std::reference_wrapper<Texture2D>> texes);
 
-	RenderPass& skip_execution();
+	RenderPass& skip_execution(bool condition = true);
 	template <typename T>
 	RenderPass& push_constants(T* data);
 	RenderPass& zero(const Resource& resource);
