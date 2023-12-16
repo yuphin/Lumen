@@ -116,7 +116,7 @@ void main() {
 
 		bool far_constaint_satisfied =
 			length(gbuffer.pos - origin.xyz) > pc.min_vertex_distance_ratio * pc.scene_extent;
-		if(!far_constaint_satisfied) {
+		if (!far_constaint_satisfied) {
 			debug_bool = true;
 		}
 		bool constraints_satisfied = curr_rough && far_constaint_satisfied;
@@ -146,7 +146,7 @@ void main() {
 			// Partially fill in the contribution data
 			reconnection_data.reservoir_contribution = throughput;
 			vec3 to_prev = origin.xyz - gbuffer.pos;
-			reconnection_data.rc_partial_jacobian.y = abs(dot(n_s, wo)) * rc_partial_jacobian / dot(to_prev, to_prev);
+			reconnection_data.rc_partial_jacobian = abs(dot(n_s, wo)) * rc_partial_jacobian / dot(to_prev, to_prev);
 		}
 
 		connectable = !connectable_vertex_found && curr_rough;
@@ -210,20 +210,21 @@ void main() {
 			vec2 uv;
 			uint instance_idx;
 			uint triangle_idx;
-			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, wo, true, g_src, light_pos, uv, instance_idx, triangle_idx);
+			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, wo, true, g_src, light_pos, uv, instance_idx,
+							 triangle_idx);
 			vec3 contribution = Li * throughput;
 
 			// At 0 depth, we let ReSTIR DI handle the direct lighting
 			bool nee_connectable = depth > 0 && connectable;
 
 			// Stream the NEE path at the reconnection vertex
-			if (nee_connectable) {
+			if (nee_connectable && any(greaterThan(Li, vec3(0)))) {
 				ASSERT(instance_idx != -1);
 				// TODO: Optimize
 				reconnection_data.rc_barycentrics = uv;
 				reconnection_data.rc_primitive_instance_id = uvec2(triangle_idx, instance_idx);
 				reconnection_data.rc_coords = rc_coords;
-				reconnection_data.rc_partial_jacobian.x = rc_partial_jacobian;
+				reconnection_data.rc_partial_jacobian = rc_partial_jacobian;
 
 				reconnection_data.debug_seed = debug_seed;
 				reconnection_data.rc_seed = rc_seed;
@@ -234,7 +235,7 @@ void main() {
 
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
-				if(merged) {
+				if (merged) {
 					set_bounce_flag(reservoir.data.bounce_flags, depth + 1, true);
 				}
 				valid_reservoir = valid_reservoir || merged;
@@ -333,7 +334,7 @@ void main() {
 			uint flag0 = uint(get_bounce_flag(reservoir.data.bounce_flags, 0));
 			uint flag1 = uint(get_bounce_flag(reservoir.data.bounce_flags, 1));
 			uint flag2 = uint(get_bounce_flag(reservoir.data.bounce_flags, 2));
-			if(debug_bool) {
+			if (debug_bool) {
 				// LOG_CLICKED3("Len %d : %d - %d\n", rc_prefix_length, rc_type, reservoir.data.bounce_flags);
 			}
 		}

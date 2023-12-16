@@ -50,14 +50,14 @@ struct GrisData {
 	uint path_flags;
 	vec3 reservoir_contribution;
 	uint rc_coords;
-	vec2 rc_partial_jacobian; // g * rc_pdf (* rc_postfix_pdf)
 	vec2 rc_barycentrics;
 	uvec2 seed_helpers;
 	uvec2 rc_primitive_instance_id;
-	float pad;
+	float rc_partial_jacobian; // g * rc_pdf (* rc_postfix_pdf)
 	uint bounce_flags;
 	float pdf_light_w;
 	uint rc_seed;
+	vec2 pad;
 };
 
 struct Reservoir {

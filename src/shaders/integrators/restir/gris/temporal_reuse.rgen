@@ -48,10 +48,10 @@ void main() {
 	const Reservoir prev_reservoir = prev_reservoirs[prev_idx];
 	HitData prev_hitdata = get_hitdata(prev_gbuffer.barycentrics, prev_gbuffer.primitive_instance_id.y,
 									   prev_gbuffer.primitive_instance_id.x);
-	bool prev_in_canonical = retrace_paths(canonical_gbuffer, prev_hitdata, prev_reservoir.data, gl_LaunchIDEXT.xy,
-										   uvec2(prev_coords), data.jacobian, data.reservoir_contribution);
-	retrace_paths_and_evaluate(prev_hitdata, canonical_gbuffer, canonical_reservoir.data, uvec2(prev_coords),
-							   gl_LaunchIDEXT.xy, data.target_pdf_in_neighbor);
+	// bool prev_in_canonical = retrace_paths(canonical_gbuffer, prev_hitdata, prev_reservoir.data, gl_LaunchIDEXT.xy,
+	// 									   uvec2(prev_coords), data.jacobian, data.reservoir_contribution);
+	// retrace_paths_and_evaluate(prev_hitdata, canonical_gbuffer, canonical_reservoir.data, uvec2(prev_coords),
+	// 						   gl_LaunchIDEXT.xy, data.target_pdf_in_neighbor);
 
 	Reservoir reservoir;
 	init_reservoir(reservoir);
