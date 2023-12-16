@@ -406,7 +406,7 @@ void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
         if ((!mat_specular && (pc.use_vc == 1 || pc.use_vm == 1))) {
 
             // Copy to light vertex buffer
-            // light_vtx(path_idx).wi = vcm_state.wi;
+            light_vtx(path_idx).wi = vcm_state.wi;
             light_vtx(path_idx).wo = wo; //-vcm_state.wi;
             light_vtx(path_idx).n_s = n_s;
             light_vtx(path_idx).pos = payload.pos;
