@@ -20,8 +20,12 @@ uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
 uvec4 seed2 = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
 
 void main() {
+	Reservoir reservoir;
+	init_reservoir(reservoir);
 	GBuffer gbuffer = curr_gbuffers[pixel_idx];
 	if (!gbuffer_data_valid(gbuffer)) {
+		curr_reservoirs[pixel_idx] = reservoir;
+		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(vec3(0), 1.f));
 		return;
 	}
 	Reservoir canonical_reservoir = curr_reservoirs[pixel_idx];
@@ -34,27 +38,78 @@ void main() {
 	ivec2 prev_coords = ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
 
 	if (any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy))) {
+		curr_reservoirs[pixel_idx] = reservoir;
+		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(vec3(0), 1.f));
 		return;
 	}
 	const uint prev_idx = prev_coords.x * pc.size_y + prev_coords.y;
 	GBuffer prev_gbuffer = prev_gbuffers[prev_idx];
 	if (!gbuffer_data_valid(prev_gbuffer)) {
+		curr_reservoirs[pixel_idx] = reservoir;
+		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(vec3(0), 1.f));
 		return;
 	}
+	
 	ReconnectionData data;
 	data.reservoir_contribution = vec3(0);
 	data.jacobian = 0;
 	data.target_pdf_in_neighbor = 0;
+
 	const Reservoir prev_reservoir = prev_reservoirs[prev_idx];
 	HitData prev_hitdata = get_hitdata(prev_gbuffer.barycentrics, prev_gbuffer.primitive_instance_id.y,
 									   prev_gbuffer.primitive_instance_id.x);
-	// bool prev_in_canonical = retrace_paths(canonical_gbuffer, prev_hitdata, prev_reservoir.data, gl_LaunchIDEXT.xy,
-	// 									   uvec2(prev_coords), data.jacobian, data.reservoir_contribution);
-	// retrace_paths_and_evaluate(prev_hitdata, canonical_gbuffer, canonical_reservoir.data, uvec2(prev_coords),
-	// 						   gl_LaunchIDEXT.xy, data.target_pdf_in_neighbor);
+	float new_jacobian;
+	retrace_paths(canonical_gbuffer, prev_hitdata, prev_reservoir.data, gl_LaunchIDEXT.xy,
+									   uvec2(prev_coords), prev_reservoir.data.rc_partial_jacobian, data.jacobian,
+									   data.reservoir_contribution, new_jacobian);
+	
+	retrace_paths_and_evaluate(prev_hitdata, canonical_gbuffer, canonical_reservoir.data, uvec2(prev_coords),
+							   gl_LaunchIDEXT.xy, data.target_pdf_in_neighbor);
 
-	Reservoir reservoir;
-	init_reservoir(reservoir);
-	// process_reservoir(seed, reservoir, m_c, canonical_reservoir, neighbor_reservoir, data, neighbor_coords,
-	// 				  canonical_in_canonical_pdf, curr_reservoir_contribution);
+	float m_c = 0;
+	vec3 curr_reservoir_contribution = vec3(0);
+	float canonical_in_canonical_pdf = calc_target_pdf(canonical_reservoir.data.reservoir_contribution);
+	bool prev_accepted = process_reservoir(seed, reservoir, m_c, canonical_reservoir, prev_reservoir, data, prev_coords,
+										   canonical_in_canonical_pdf, 1, curr_reservoir_contribution);
+	// Stream in the canonical reservoir
+	m_c = m_c == 0 ? 1.0 : m_c;
+	bool canonical = combine_reservoir(seed, reservoir, canonical_reservoir, canonical_in_canonical_pdf, m_c, 1.0);
+	if (canonical) {
+		curr_reservoir_contribution = canonical_reservoir.data.reservoir_contribution;
+	}
+	float target_pdf = calc_target_pdf(curr_reservoir_contribution);
+	calc_reservoir_W_with_mis(reservoir);
+
+	if(prev_accepted && !canonical) {
+		reservoir.data.rc_partial_jacobian = new_jacobian;
+	}
+	reservoir.data.reservoir_contribution = curr_reservoir_contribution;
+
+	curr_reservoirs[pixel_idx] = reservoir;
+
+	vec3 final_contribution = vec3(0);
+	if (pc.show_reconnection_radiance == 1) {
+		final_contribution = vec3(0);
+	} else {
+		final_contribution = prefix_contributions.d[pixel_idx];
+	}
+	if (reservoir.W > 0) {
+		final_contribution += curr_reservoir_contribution * reservoir.W;
+	}
+
+	vec3 col = vec3(0);
+	if (pc.direct_lighting == 1) {
+		col += direct_lighting_buffer.d[pixel_idx];
+	}
+	col += final_contribution;
+
+
+	ivec2 neighbor_coords = ivec2(gl_LaunchIDEXT.xy);
+	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
+		imageStore(image, ivec2(neighbor_coords), vec4(col, 1.f));
+	} else {
+		float w = 1. / float(pc.frame_num + 1);
+		vec3 old_col = imageLoad(image, ivec2(neighbor_coords)).xyz;
+		imageStore(image, ivec2(neighbor_coords), vec4(mix(old_col, col, w), 1.f));
+	}
 }

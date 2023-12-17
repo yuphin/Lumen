@@ -80,7 +80,7 @@ void main() {
 								   data.target_pdf_in_neighbor);
 #endif
 		bool accepted = process_reservoir(seed, reservoir, m_c, canonical_reservoir, neighbor_reservoir, data,
-										  neighbor_coords, canonical_in_canonical_pdf, curr_reservoir_contribution);
+										  neighbor_coords, canonical_in_canonical_pdf, pc.num_spatial_samples, curr_reservoir_contribution);
 		if (accepted) {
 			accepted_positions[num_accepted_positions++] = neighbor_pixel_idx;
 		}

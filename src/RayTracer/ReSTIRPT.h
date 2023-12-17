@@ -38,7 +38,7 @@ class ReSTIRPT : public Integrator {
 	bool enable_spatial_reuse = true;
 	bool canonical_only = false;
 	bool show_reconnection_radiance = false;
-	bool enable_temporal_reuse = false;
+	bool enable_temporal_reuse = true;
 	bool enable_gris = true;
 	bool pixel_debug = false;
 	float spatial_reuse_radius = 32.0f;

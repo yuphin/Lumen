@@ -505,7 +505,7 @@ bool retrace_paths_and_evaluate(in HitData dst_gbuffer, in HitData src_gbuffer, 
 
 bool process_reservoir(inout uvec4 seed, inout Reservoir reservoir, inout float m_c, in Reservoir canonical_reservoir,
 					   in Reservoir source_reservoir, in ReconnectionData data, ivec2 neighbor_coords,
-					   float canonical_in_canonical_pdf, inout vec3 curr_reservoir_contribution) {
+					   float canonical_in_canonical_pdf, uint num_spatial_samples, inout vec3 curr_reservoir_contribution) {
 	source_reservoir.M = min(source_reservoir.M, 20);
 
 	bool result = false;
@@ -514,7 +514,7 @@ bool process_reservoir(inout uvec4 seed, inout Reservoir reservoir, inout float 
 	float neighbor_in_canonical_pdf = calc_target_pdf(data.reservoir_contribution) * data.jacobian;
 
 	float m_i_num = source_reservoir.M * neighbor_in_neighbor_pdf;
-	float m_i_denom = m_i_num + canonical_reservoir.M * neighbor_in_canonical_pdf / pc.num_spatial_samples;
+	float m_i_denom = m_i_num + canonical_reservoir.M * neighbor_in_canonical_pdf / num_spatial_samples;
 	float m_i = neighbor_in_canonical_pdf <= 0 ? 0 : m_i_num / m_i_denom;
 
 	// if (m_i <= 0.0 || m_i >= 1.0) {
@@ -525,7 +525,7 @@ bool process_reservoir(inout uvec4 seed, inout Reservoir reservoir, inout float 
 
 	m_c += 1.0;
 	float m_c_num = source_reservoir.M * data.target_pdf_in_neighbor;
-	float m_c_denom = m_c_num + canonical_reservoir.M * canonical_in_canonical_pdf / pc.num_spatial_samples;
+	float m_c_denom = m_c_num + canonical_reservoir.M * canonical_in_canonical_pdf / num_spatial_samples;
 	float m_c_val = m_c_denom == 0.0 ? 0.0 : m_c_num / m_c_denom;
 	if (m_c_val > 0) {
 		m_c -= m_c_val;
