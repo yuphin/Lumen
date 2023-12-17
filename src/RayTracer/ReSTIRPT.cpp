@@ -138,14 +138,16 @@ void ReSTIRPT::render() {
 	}
 	// Trace rays
 	instance->vkb.rg
-		->add_rt("GRIS - Generate Samples", {.shaders = {{"src/shaders/integrators/restir/gris/gris.rgen"},
-														 {"src/shaders/integrators/restir/gris/ray.rmiss"},
-														 {"src/shaders/ray_shadow.rmiss"},
-														 {"src/shaders/integrators/restir/gris/ray.rchit"},
-														 {"src/shaders/ray.rahit"}},
-											 .macros = macros,
-											 .dims = {instance->width, instance->height},
-											 .accel = instance->vkb.tlas.accel})
+		->add_rt("GRIS - Generate Samples",
+				 {
+					 .shaders = {{"src/shaders/integrators/restir/gris/gris.rgen"},
+								 {"src/shaders/integrators/restir/gris/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/integrators/restir/gris/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .macros = macros,
+					 .dims = {instance->width, instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.zero(debug_vis_buffer)
 		.bind(common_bindings)
@@ -157,14 +159,16 @@ void ReSTIRPT::render() {
 	bool should_do_temporal = enable_temporal_reuse && pc_ray.total_frame_num > 0;
 	// Temporal Reuse
 	instance->vkb.rg
-		->add_rt("GRIS - Temporal Reuse", {.shaders = {{"src/shaders/integrators/restir/gris/temporal_reuse.rgen"},
-													   {"src/shaders/integrators/restir/gris/ray.rmiss"},
-													   {"src/shaders/ray_shadow.rmiss"},
-													   {"src/shaders/integrators/restir/gris/ray.rchit"},
-													   {"src/shaders/ray.rahit"}},
-										   .macros = macros,
-										   .dims = {instance->width, instance->height},
-										   .accel = instance->vkb.tlas.accel})
+		->add_rt("GRIS - Temporal Reuse",
+				 {
+					 .shaders = {{"src/shaders/integrators/restir/gris/temporal_reuse.rgen"},
+								 {"src/shaders/integrators/restir/gris/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/integrators/restir/gris/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .macros = macros,
+					 .dims = {instance->width, instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.bind(common_bindings)
 		.bind(*reservoir_buffers[pong])
@@ -179,14 +183,15 @@ void ReSTIRPT::render() {
 		if (mis_method == MISMethod::TALBOT) {
 			instance->vkb.rg
 				->add_rt("GRIS - Spatial Reuse - Talbot",
-						 {.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen"},
-									  {"src/shaders/integrators/restir/gris/ray.rmiss"},
-									  {"src/shaders/ray_shadow.rmiss"},
-									  {"src/shaders/integrators/restir/gris/ray.rchit"},
-									  {"src/shaders/ray.rahit"}},
-						  .macros = macros,
-						  .dims = {instance->width, instance->height},
-						  .accel = instance->vkb.tlas.accel})
+						 {
+							 .shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen"},
+										 {"src/shaders/integrators/restir/gris/ray.rmiss"},
+										 {"src/shaders/ray_shadow.rmiss"},
+										 {"src/shaders/integrators/restir/gris/ray.rchit"},
+										 {"src/shaders/ray.rahit"}},
+							 .macros = macros,
+							 .dims = {instance->width, instance->height},
+						 })
 				.push_constants(&pc_ray)
 				.bind(common_bindings)
 				.bind(*reservoir_buffers[pong])
@@ -205,7 +210,7 @@ void ReSTIRPT::render() {
 			// 						  {"src/shaders/ray.rahit"}},
 			// 			  .macros = macros,
 			// 			  .dims = {instance->width, instance->height},
-			// 			  .accel = instance->vkb.tlas.accel})
+			// 			  })
 			// 	.push_constants(&pc_ray)
 			// 	.bind(common_bindings)
 			// 	.bind(reconnection_buffer)
@@ -223,7 +228,7 @@ void ReSTIRPT::render() {
 			// 						  {"src/shaders/ray.rahit"}},
 			// 			  .macros = macros,
 			// 			  .dims = {instance->width, instance->height},
-			// 			  .accel = instance->vkb.tlas.accel})
+			// 			  })
 			// 	.push_constants(&pc_ray)
 			// 	.bind(common_bindings)
 			// 	.bind(reconnection_buffer)
@@ -242,7 +247,7 @@ void ReSTIRPT::render() {
 			// 						  {"src/shaders/ray.rahit"}},
 			// 			  .macros = macros,
 			// 			  .dims = {instance->width, instance->height},
-			// 			  .accel = instance->vkb.tlas.accel})
+			// 			  })
 			// 	.push_constants(&pc_ray)
 			// 	.bind(common_bindings)
 			// 	.bind(reconnection_buffer)

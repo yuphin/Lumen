@@ -71,7 +71,7 @@ void SPPM::render() {
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
 	pc_ray.frame_num = frame_num;
 	// PPM related constants
-	if(config->base_radius < 1e-7f) {
+	if (config->base_radius < 1e-7f) {
 		config->base_radius = 1e-7f;
 	}
 	pc_ray.min_bounds = lumen_scene->m_dimensions.min;
@@ -104,13 +104,15 @@ void SPPM::render() {
 
 	// Trace rays from eye
 	instance->vkb.rg
-		->add_rt("SPPM - Eye", {.shaders = {{"src/shaders/integrators/sppm/sppm_eye.rgen"},
-											{"src/shaders/ray.rmiss"},
-											{"src/shaders/ray_shadow.rmiss"},
-											{"src/shaders/ray.rchit"},
-											{"src/shaders/ray.rahit"}},
-								.dims = {instance->width, instance->height},
-								.accel = instance->vkb.tlas.accel})
+		->add_rt("SPPM - Eye",
+				 {
+					 .shaders = {{"src/shaders/integrators/sppm/sppm_eye.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .dims = {instance->width, instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.zero(photon_buffer)
 		.zero(sppm_data_buffer, /*cond=*/pc_ray.frame_num == 0)
@@ -129,13 +131,15 @@ void SPPM::render() {
 		.bind(scene_desc_buffer);
 	// Trace from light
 	instance->vkb.rg
-		->add_rt("SPPM - Light", {.shaders = {{"src/shaders/integrators/sppm/sppm_light.rgen"},
-											  {"src/shaders/ray.rmiss"},
-											  {"src/shaders/ray_shadow.rmiss"},
-											  {"src/shaders/ray.rchit"},
-											  {"src/shaders/ray.rahit"}},
-								  .dims = {instance->width, instance->height},
-								  .accel = instance->vkb.tlas.accel})
+		->add_rt("SPPM - Light",
+				 {
+					 .shaders = {{"src/shaders/integrators/sppm/sppm_light.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .dims = {instance->width, instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)

@@ -34,13 +34,15 @@ void Path::render() {
 	pc_ray.dir_light_idx = lumen_scene->dir_light_idx;
 	pc_ray.frame_num = frame_num;
 	instance->vkb.rg
-		->add_rt("Path", {.shaders = {{"src/shaders/integrators/path/path.rgen"},
-									  {"src/shaders/ray.rmiss"},
-									  {"src/shaders/ray_shadow.rmiss"},
-									  {"src/shaders/ray.rchit"},
-									  {"src/shaders/ray.rahit"}},
-						  .dims = {instance->width, instance->height},
-						  .accel = instance->vkb.tlas.accel})
+		->add_rt("Path",
+				 {
+					 .shaders = {{"src/shaders/integrators/path/path.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .dims = {instance->width, instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.bind({
 			output_tex,

@@ -58,7 +58,6 @@ struct RTPassSettings {
 	uint32_t recursion_depth = 1;
 	std::vector<uint32_t> specialization_data = {};
 	dim3 dims;
-	VkAccelerationStructureKHR accel;
 	std::function<void(VkCommandBuffer cmd, const RenderPass& pass)> pass_func;
 };
 

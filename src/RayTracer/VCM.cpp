@@ -162,13 +162,15 @@ void VCM::render() {
 
 	// Do resampling
 	instance->vkb.rg
-		->add_rt("Resample", {.shaders = {{"src/shaders/integrators/vcm/vcm_sample.rgen"},
-										  {"src/shaders/ray.rmiss"},
-										  {"src/shaders/ray_shadow.rmiss"},
-										  {"src/shaders/ray.rchit"},
-										  {"src/shaders/ray.rahit"}},
-							  .dims = {instance->width, instance->height},
-							  .accel = instance->vkb.tlas.accel})
+		->add_rt("Resample",
+				 {
+					 .shaders = {{"src/shaders/integrators/vcm/vcm_sample.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .dims = {instance->width, instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
@@ -186,13 +188,15 @@ void VCM::render() {
 	pc_ray.random_num = rand() % UINT_MAX;
 	// Spawn light rays
 	instance->vkb.rg
-		->add_rt("VCM - Spawn Light", {.shaders = {{"src/shaders/integrators/vcm/vcm_spawn_light.rgen"},
-												   {"src/shaders/ray.rmiss"},
-												   {"src/shaders/ray_shadow.rmiss"},
-												   {"src/shaders/ray.rchit"},
-												   {"src/shaders/ray.rahit"}},
-									   .dims = {instance->width, instance->height},
-									   .accel = instance->vkb.tlas.accel})
+		->add_rt("VCM - Spawn Light",
+				 {
+					 .shaders = {{"src/shaders/integrators/vcm/vcm_spawn_light.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .dims = {instance->width, instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.zero(light_state_buffer)
 		.bind(rt_bindings)
@@ -202,13 +206,15 @@ void VCM::render() {
 	pc_ray.random_num = rand() % UINT_MAX;
 	// Trace spawned rays
 	instance->vkb.rg
-		->add_rt("VCM - Trace Light", {.shaders = {{"src/shaders/integrators/vcm/vcm_light.rgen"},
-												   {"src/shaders/ray.rmiss"},
-												   {"src/shaders/ray_shadow.rmiss"},
-												   {"src/shaders/ray.rchit"},
-												   {"src/shaders/ray.rahit"}},
-									   .dims = {instance->width, instance->height},
-									   .accel = instance->vkb.tlas.accel})
+		->add_rt("VCM - Trace Light",
+				 {
+					 .shaders = {{"src/shaders/integrators/vcm/vcm_light.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .dims = {instance->width, instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
@@ -231,13 +237,15 @@ void VCM::render() {
 		.push_constants(&pc_ray);
 	// Trace rays from eye
 	instance->vkb.rg
-		->add_rt("VCM - Trace Eye", {.shaders = {{"src/shaders/integrators/vcm/vcm_eye.rgen"},
-												 {"src/shaders/ray.rmiss"},
-												 {"src/shaders/ray_shadow.rmiss"},
-												 {"src/shaders/ray.rchit"},
-												 {"src/shaders/ray.rahit"}},
-									 .dims = {instance->width, instance->height},
-									 .accel = instance->vkb.tlas.accel})
+		->add_rt("VCM - Trace Eye",
+				 {
+					 .shaders = {{"src/shaders/integrators/vcm/vcm_eye.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .dims = {instance->width, instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)

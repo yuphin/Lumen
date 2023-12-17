@@ -241,14 +241,15 @@ void SMLT::render() {
 		// Light
 		instance->vkb.rg
 			->add_rt("SMLT - Bootstrap Sampling - Light",
-					 {.shaders = {{"src/shaders/integrators/smlt/smlt_seed_light.rgen"},
-								  {"src/shaders/ray.rmiss"},
-								  {"src/shaders/ray_shadow.rmiss"},
-								  {"src/shaders/ray.rchit"},
-								  {"src/shaders/ray.rahit"}},
-					  .specialization_data = {1},
-					  .dims = {(uint32_t)num_bootstrap_samples},
-					  .accel = instance->vkb.tlas.accel})
+					 {
+						 .shaders = {{"src/shaders/integrators/smlt/smlt_seed_light.rgen"},
+									 {"src/shaders/ray.rmiss"},
+									 {"src/shaders/ray_shadow.rmiss"},
+									 {"src/shaders/ray.rchit"},
+									 {"src/shaders/ray.rahit"}},
+						 .specialization_data = {1},
+						 .dims = {(uint32_t)num_bootstrap_samples},
+					 })
 			.push_constants(&pc_ray)
 			.bind(rt_bindings)
 			.bind(mesh_lights_buffer)
@@ -257,14 +258,15 @@ void SMLT::render() {
 		// Eye
 		instance->vkb.rg
 			->add_rt("SMLT - Bootstrap Sampling - Eye",
-					 {.shaders = {{"src/shaders/integrators/smlt/smlt_seed_eye.rgen"},
-								  {"src/shaders/ray.rmiss"},
-								  {"src/shaders/ray_shadow.rmiss"},
-								  {"src/shaders/ray.rchit"},
-								  {"src/shaders/ray.rahit"}},
-					  .specialization_data = {1},
-					  .dims = {(uint32_t)num_bootstrap_samples},
-					  .accel = instance->vkb.tlas.accel})
+					 {
+						 .shaders = {{"src/shaders/integrators/smlt/smlt_seed_eye.rgen"},
+									 {"src/shaders/ray.rmiss"},
+									 {"src/shaders/ray_shadow.rmiss"},
+									 {"src/shaders/ray.rchit"},
+									 {"src/shaders/ray.rahit"}},
+						 .specialization_data = {1},
+						 .dims = {(uint32_t)num_bootstrap_samples},
+					 })
 			.push_constants(&pc_ray)
 			.bind(rt_bindings)
 			.bind(mesh_lights_buffer)
@@ -325,13 +327,14 @@ void SMLT::render() {
 		// Light
 		instance->vkb.rg
 			->add_rt("SMLT - Preprocess - Light",
-					 {.shaders = {{"src/shaders/integrators/smlt/smlt_preprocess_light.rgen"},
-								  {"src/shaders/ray.rmiss"},
-								  {"src/shaders/ray_shadow.rmiss"},
-								  {"src/shaders/ray.rchit"},
-								  {"src/shaders/ray.rahit"}},
-					  .dims = {(uint32_t)num_mlt_threads},
-					  .accel = instance->vkb.tlas.accel})
+					 {
+						 .shaders = {{"src/shaders/integrators/smlt/smlt_preprocess_light.rgen"},
+									 {"src/shaders/ray.rmiss"},
+									 {"src/shaders/ray_shadow.rmiss"},
+									 {"src/shaders/ray.rchit"},
+									 {"src/shaders/ray.rahit"}},
+						 .dims = {(uint32_t)num_mlt_threads},
+					 })
 			.push_constants(&pc_ray)
 			.zero(mlt_samplers_buffer)
 			.bind(rt_bindings)
@@ -340,13 +343,15 @@ void SMLT::render() {
 			.bind_tlas(instance->vkb.tlas);
 		// Eye
 		instance->vkb.rg
-			->add_rt("SMLT - Preprocess - Eye", {.shaders = {{"src/shaders/integrators/smlt/smlt_preprocess_eye.rgen"},
-															 {"src/shaders/ray.rmiss"},
-															 {"src/shaders/ray_shadow.rmiss"},
-															 {"src/shaders/ray.rchit"},
-															 {"src/shaders/ray.rahit"}},
-												 .dims = {(uint32_t)num_mlt_threads},
-												 .accel = instance->vkb.tlas.accel})
+			->add_rt("SMLT - Preprocess - Eye",
+					 {
+						 .shaders = {{"src/shaders/integrators/smlt/smlt_preprocess_eye.rgen"},
+									 {"src/shaders/ray.rmiss"},
+									 {"src/shaders/ray_shadow.rmiss"},
+									 {"src/shaders/ray.rchit"},
+									 {"src/shaders/ray.rahit"}},
+						 .dims = {(uint32_t)num_mlt_threads},
+					 })
 			.push_constants(&pc_ray)
 			.zero(mlt_samplers_buffer)
 			.bind(rt_bindings)
@@ -363,13 +368,14 @@ void SMLT::render() {
 			// Light
 			instance->vkb.rg
 				->add_rt("PSSMLT - Mutate - Light",
-						 {.shaders = {{"src/shaders/integrators/smlt/smlt_mutate_light.rgen"},
-									  {"src/shaders/ray.rmiss"},
-									  {"src/shaders/ray_shadow.rmiss"},
-									  {"src/shaders/ray.rchit"},
-									  {"src/shaders/ray.rahit"}},
-						  .dims = {(uint32_t)num_mlt_threads},
-						  .accel = instance->vkb.tlas.accel})
+						 {
+							 .shaders = {{"src/shaders/integrators/smlt/smlt_mutate_light.rgen"},
+										 {"src/shaders/ray.rmiss"},
+										 {"src/shaders/ray_shadow.rmiss"},
+										 {"src/shaders/ray.rchit"},
+										 {"src/shaders/ray.rahit"}},
+							 .dims = {(uint32_t)num_mlt_threads},
+						 })
 				.push_constants(&pc_ray)
 				.bind(rt_bindings)
 				.bind(mesh_lights_buffer)
@@ -377,13 +383,15 @@ void SMLT::render() {
 				.bind_tlas(instance->vkb.tlas);
 			// Eye
 			instance->vkb.rg
-				->add_rt("PSSMLT - Mutate - Eye", {.shaders = {{"src/shaders/integrators/smlt/smlt_mutate_eye.rgen"},
-															   {"src/shaders/ray.rmiss"},
-															   {"src/shaders/ray_shadow.rmiss"},
-															   {"src/shaders/ray.rchit"},
-															   {"src/shaders/ray.rahit"}},
-												   .dims = {(uint32_t)num_mlt_threads},
-												   .accel = instance->vkb.tlas.accel})
+				->add_rt("PSSMLT - Mutate - Eye",
+						 {
+							 .shaders = {{"src/shaders/integrators/smlt/smlt_mutate_eye.rgen"},
+										 {"src/shaders/ray.rmiss"},
+										 {"src/shaders/ray_shadow.rmiss"},
+										 {"src/shaders/ray.rchit"},
+										 {"src/shaders/ray.rahit"}},
+							 .dims = {(uint32_t)num_mlt_threads},
+						 })
 				.push_constants(&pc_ray)
 				.bind(rt_bindings)
 				.bind(mesh_lights_buffer)

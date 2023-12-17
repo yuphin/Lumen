@@ -87,13 +87,15 @@ void ReSTIR::render() {
 
 	// Temporal pass + path tracing
 	instance->vkb.rg
-		->add_rt("ReSTIR - Temporal Pass", {.shaders = {{"src/shaders/integrators/restir/di/temporal_pass.rgen"},
-														{"src/shaders/ray.rmiss"},
-														{"src/shaders/ray_shadow.rmiss"},
-														{"src/shaders/ray.rchit"},
-														{"src/shaders/ray.rahit"}},
-											.dims = {instance->width, instance->height},
-											.accel = instance->vkb.tlas.accel})
+		->add_rt("ReSTIR - Temporal Pass",
+				 {
+					 .shaders = {{"src/shaders/integrators/restir/di/temporal_pass.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .dims = {instance->width, instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.zero(g_buffer)
 		.zero(spatial_reservoir_buffer)
@@ -104,13 +106,15 @@ void ReSTIR::render() {
 		.bind_tlas(instance->vkb.tlas);
 	// Spatial pass
 	instance->vkb.rg
-		->add_rt("ReSTIR - Spatial Pass", {.shaders = {{"src/shaders/integrators/restir/di/spatial_pass.rgen"},
-													   {"src/shaders/ray.rmiss"},
-													   {"src/shaders/ray_shadow.rmiss"},
-													   {"src/shaders/ray.rchit"},
-													   {"src/shaders/ray.rahit"}},
-										   .dims = {instance->width, instance->height},
-										   .accel = instance->vkb.tlas.accel})
+		->add_rt("ReSTIR - Spatial Pass",
+				 {
+					 .shaders = {{"src/shaders/integrators/restir/di/spatial_pass.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .dims = {instance->width, instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
@@ -119,13 +123,15 @@ void ReSTIR::render() {
 
 	// Output
 	instance->vkb.rg
-		->add_rt("ReSTIR - Output", {.shaders = {{"src/shaders/integrators/restir/di/output.rgen"},
-												 {"src/shaders/ray.rmiss"},
-												 {"src/shaders/ray_shadow.rmiss"},
-												 {"src/shaders/ray.rchit"},
-												 {"src/shaders/ray.rahit"}},
-									 .dims = {instance->width, instance->height},
-									 .accel = instance->vkb.tlas.accel})
+		->add_rt("ReSTIR - Output",
+				 {
+					 .shaders = {{"src/shaders/integrators/restir/di/output.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .dims = {instance->width, instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)

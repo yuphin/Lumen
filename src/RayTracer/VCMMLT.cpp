@@ -279,14 +279,16 @@ void VCMMLT::render() {
 	// Shoot rays
 	std::string pipeline_name = "VCMMLT - Trace " + pipeline_postfix;
 	instance->vkb.rg
-		->add_rt(pipeline_name, {.shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_eye.rgen"},
-											 {"src/shaders/ray.rmiss"},
-											 {"src/shaders/ray_shadow.rmiss"},
-											 {"src/shaders/ray.rchit"},
-											 {"src/shaders/ray.rahit"}},
-								 .specialization_data = spec_consts,
-								 .dims = {instance->width * instance->height},
-								 .accel = instance->vkb.tlas.accel})
+		->add_rt(pipeline_name,
+				 {
+					 .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_eye.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .specialization_data = spec_consts,
+					 .dims = {instance->width * instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.zero({chain_stats_buffer, mlt_atomicsum_buffer})
 		.zero(photon_buffer, use_vm)
@@ -297,14 +299,16 @@ void VCMMLT::render() {
 	// Start bootstrap sampling
 	pipeline_name = "VCMMLT - Bootstrap " + pipeline_postfix;
 	instance->vkb.rg
-		->add_rt(pipeline_name, {.shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_seed.rgen"},
-											 {"src/shaders/ray.rmiss"},
-											 {"src/shaders/ray_shadow.rmiss"},
-											 {"src/shaders/ray.rchit"},
-											 {"src/shaders/ray.rahit"}},
-								 .specialization_data = spec_consts,
-								 .dims = {(uint32_t)config->num_bootstrap_samples},
-								 .accel = instance->vkb.tlas.accel})
+		->add_rt(pipeline_name,
+				 {
+					 .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_seed.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .specialization_data = spec_consts,
+					 .dims = {(uint32_t)config->num_bootstrap_samples},
+				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
@@ -330,14 +334,16 @@ void VCMMLT::render() {
 		// Fill
 		std::string pipeline_name = "VCMMLT - Preprocess " + pipeline_postfix;
 		instance->vkb.rg
-			->add_rt(pipeline_name, {.shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_preprocess.rgen"},
-												 {"src/shaders/ray.rmiss"},
-												 {"src/shaders/ray_shadow.rmiss"},
-												 {"src/shaders/ray.rchit"},
-												 {"src/shaders/ray.rahit"}},
-									 .specialization_data = spec_consts,
-									 .dims = {(uint32_t)config->num_mlt_threads},
-									 .accel = instance->vkb.tlas.accel})
+			->add_rt(pipeline_name,
+					 {
+						 .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_preprocess.rgen"},
+									 {"src/shaders/ray.rmiss"},
+									 {"src/shaders/ray_shadow.rmiss"},
+									 {"src/shaders/ray.rchit"},
+									 {"src/shaders/ray.rahit"}},
+						 .specialization_data = spec_consts,
+						 .dims = {(uint32_t)config->num_mlt_threads},
+					 })
 			.push_constants(&pc_ray)
 			.bind(rt_bindings)
 			.bind(mesh_lights_buffer)
@@ -361,13 +367,15 @@ void VCMMLT::render() {
 			pc_ray.mutation_counter = i;
 			// Mutate
 			instance->vkb.rg
-				->add_rt(pipeline_name, {.shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_mutate.rgen"},
-													 {"src/shaders/ray.rmiss"},
-													 {"src/shaders/ray_shadow.rmiss"},
-													 {"src/shaders/ray.rchit"},
-													 {"src/shaders/ray.rahit"}},
-										 .dims = {(uint32_t)config->num_mlt_threads},
-										 .accel = instance->vkb.tlas.accel})
+				->add_rt(pipeline_name,
+						 {
+							 .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_mutate.rgen"},
+										 {"src/shaders/ray.rmiss"},
+										 {"src/shaders/ray_shadow.rmiss"},
+										 {"src/shaders/ray.rchit"},
+										 {"src/shaders/ray.rahit"}},
+							 .dims = {(uint32_t)config->num_mlt_threads},
+						 })
 				.push_constants(&pc_ray)
 				.zero(mlt_atomicsum_buffer)
 				.bind(rt_bindings)

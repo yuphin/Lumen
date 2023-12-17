@@ -156,14 +156,16 @@ void DDGI::render() {
 	};
 	// Trace Primary rays and fill G buffer
 	instance->vkb.rg
-		->add_rt("DDGI - GBuffer Pass", {.shaders = {{"src/shaders/integrators/ddgi/primary_rays.rgen"},
-													 {"src/shaders/ray.rmiss"},
-													 {"src/shaders/ray_shadow.rmiss"},
-													 {"src/shaders/ray.rchit"},
-													 {"src/shaders/ray.rahit"}},
-										 .specialization_data = {1},
-										 .dims = {(uint32_t)instance->width, (uint32_t)instance->height},
-										 .accel = instance->vkb.tlas.accel})
+		->add_rt("DDGI - GBuffer Pass",
+				 {
+					 .shaders = {{"src/shaders/integrators/ddgi/primary_rays.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .specialization_data = {1},
+					 .dims = {(uint32_t)instance->width, (uint32_t)instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.zero(g_buffer)
 		.bind(rt_bindings)
@@ -173,14 +175,16 @@ void DDGI::render() {
 	// Trace rays from probes
 	uint32_t grid_size = probe_counts.x * probe_counts.y * probe_counts.z;
 	instance->vkb.rg
-		->add_rt("DDGI - Probe Trace", {.shaders = {{"src/shaders/integrators/ddgi/trace.rgen"},
-													{"src/shaders/ray.rmiss"},
-													{"src/shaders/ray_shadow.rmiss"},
-													{"src/shaders/ray.rchit"},
-													{"src/shaders/ray.rahit"}},
-										.specialization_data = {1},
-										.dims = {(uint32_t)rays_per_probe, grid_size},
-										.accel = instance->vkb.tlas.accel})
+		->add_rt("DDGI - Probe Trace",
+				 {
+					 .shaders = {{"src/shaders/integrators/ddgi/trace.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .specialization_data = {1},
+					 .dims = {(uint32_t)rays_per_probe, grid_size},
+				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind({mesh_lights_buffer, ddgi_ubo_buffer, rt.radiance_tex, rt.dir_depth_tex})

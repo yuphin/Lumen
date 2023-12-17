@@ -209,14 +209,16 @@ void PSSMLT::render() {
 	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	// Start bootstrap sampling
 	instance->vkb.rg
-		->add_rt("PSSMLT - Bootstrap Sampling", {.shaders = {{"src/shaders/integrators/pssmlt/pssmlt_seed.rgen"},
-															 {"src/shaders/ray.rmiss"},
-															 {"src/shaders/ray_shadow.rmiss"},
-															 {"src/shaders/ray.rchit"},
-															 {"src/shaders/ray.rahit"}},
-												 .specialization_data = {1},
-												 .dims = {(uint32_t)config->num_bootstrap_samples},
-												 .accel = instance->vkb.tlas.accel})
+		->add_rt("PSSMLT - Bootstrap Sampling",
+				 {
+					 .shaders = {{"src/shaders/integrators/pssmlt/pssmlt_seed.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .specialization_data = {1},
+					 .dims = {(uint32_t)config->num_bootstrap_samples},
+				 })
 		.push_constants(&pc_ray)
 		.zero({light_path_buffer, camera_path_buffer})
 		.bind(rt_bindings)
@@ -279,13 +281,15 @@ void PSSMLT::render() {
 
 	// Fill in the samplers for mutations
 	instance->vkb.rg
-		->add_rt("PSSMLT - Preprocess", {.shaders = {{"src/shaders/integrators/pssmlt/pssmlt_preprocess.rgen"},
-													 {"src/shaders/ray.rmiss"},
-													 {"src/shaders/ray_shadow.rmiss"},
-													 {"src/shaders/ray.rchit"},
-													 {"src/shaders/ray.rahit"}},
-										 .dims = {(uint32_t)config->num_mlt_threads},
-										 .accel = instance->vkb.tlas.accel})
+		->add_rt("PSSMLT - Preprocess",
+				 {
+					 .shaders = {{"src/shaders/integrators/pssmlt/pssmlt_preprocess.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .dims = {(uint32_t)config->num_mlt_threads},
+				 })
 		.push_constants(&pc_ray)
 		.zero({light_path_buffer, camera_path_buffer})
 		.bind(rt_bindings)
@@ -300,13 +304,15 @@ void PSSMLT::render() {
 			pc_ray.random_num = rand() % UINT_MAX;
 			pc_ray.mutation_counter = i;
 			instance->vkb.rg
-				->add_rt("PSSMLT - Mutate", {.shaders = {{"src/shaders/integrators/pssmlt/pssmlt_mutate.rgen"},
-														 {"src/shaders/ray.rmiss"},
-														 {"src/shaders/ray_shadow.rmiss"},
-														 {"src/shaders/ray.rchit"},
-														 {"src/shaders/ray.rahit"}},
-											 .dims = {(uint32_t)config->num_mlt_threads},
-											 .accel = instance->vkb.tlas.accel})
+				->add_rt("PSSMLT - Mutate",
+						 {
+							 .shaders = {{"src/shaders/integrators/pssmlt/pssmlt_mutate.rgen"},
+										 {"src/shaders/ray.rmiss"},
+										 {"src/shaders/ray_shadow.rmiss"},
+										 {"src/shaders/ray.rchit"},
+										 {"src/shaders/ray.rahit"}},
+							 .dims = {(uint32_t)config->num_mlt_threads},
+						 })
 				.push_constants(&pc_ray)
 				.zero({light_path_buffer, camera_path_buffer})
 				.bind(rt_bindings)

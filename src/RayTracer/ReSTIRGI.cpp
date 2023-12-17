@@ -88,13 +88,15 @@ void ReSTIRGI::render() {
 
 	// Trace rays
 	instance->vkb.rg
-		->add_rt("ReSTIRGI - Generate Samples", {.shaders = {{"src/shaders/integrators/restir/gi/restir.rgen"},
-															 {"src/shaders/ray.rmiss"},
-															 {"src/shaders/ray_shadow.rmiss"},
-															 {"src/shaders/ray.rchit"},
-															 {"src/shaders/ray.rahit"}},
-												 .dims = {instance->width, instance->height},
-												 .accel = instance->vkb.tlas.accel})
+		->add_rt("ReSTIRGI - Generate Samples",
+				 {
+					 .shaders = {{"src/shaders/integrators/restir/gi/restir.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .dims = {instance->width, instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.zero(restir_samples_buffer)
 		.zero(temporal_reservoir_buffer, !do_spatiotemporal)
@@ -107,13 +109,15 @@ void ReSTIRGI::render() {
 
 	// Temporal reuse
 	instance->vkb.rg
-		->add_rt("ReSTIRGI - Temporal Reuse", {.shaders = {{"src/shaders/integrators/restir/gi/temporal_reuse.rgen"},
-														   {"src/shaders/ray.rmiss"},
-														   {"src/shaders/ray_shadow.rmiss"},
-														   {"src/shaders/ray.rchit"},
-														   {"src/shaders/ray.rahit"}},
-											   .dims = {instance->width, instance->height},
-											   .accel = instance->vkb.tlas.accel})
+		->add_rt("ReSTIRGI - Temporal Reuse",
+				 {
+					 .shaders = {{"src/shaders/integrators/restir/gi/temporal_reuse.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .dims = {instance->width, instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)
@@ -122,13 +126,15 @@ void ReSTIRGI::render() {
 
 	// Spatial reuse
 	instance->vkb.rg
-		->add_rt("ReSTIRGI - Spatial Reuse", {.shaders = {{"src/shaders/integrators/restir/gi/spatial_reuse.rgen"},
-														  {"src/shaders/ray.rmiss"},
-														  {"src/shaders/ray_shadow.rmiss"},
-														  {"src/shaders/ray.rchit"},
-														  {"src/shaders/ray.rahit"}},
-											  .dims = {instance->width, instance->height},
-											  .accel = instance->vkb.tlas.accel})
+		->add_rt("ReSTIRGI - Spatial Reuse",
+				 {
+					 .shaders = {{"src/shaders/integrators/restir/gi/spatial_reuse.rgen"},
+								 {"src/shaders/ray.rmiss"},
+								 {"src/shaders/ray_shadow.rmiss"},
+								 {"src/shaders/ray.rchit"},
+								 {"src/shaders/ray.rahit"}},
+					 .dims = {instance->width, instance->height},
+				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(mesh_lights_buffer)

@@ -65,7 +65,7 @@ void BDPT::render() {
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
 					 .dims = {instance->width, instance->height},
-					 .accel = instance->vkb.tlas.accel})
+				 })
 		.zero(light_path_buffer)
 		.zero(camera_path_buffer)
 		//.read(light_path_buffer) // Needed if shader inference is disabled
