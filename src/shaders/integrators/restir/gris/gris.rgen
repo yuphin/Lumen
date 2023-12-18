@@ -350,20 +350,24 @@ void main() {
 		calc_reservoir_W(reservoir);
 		prefix_contributions.d[pixel_idx] = prefix_col;
 		reservoir.data.seed_helpers = uvec2(pc.general_seed, pc.sampling_seed);
-#ifdef CANONICAL_ONLY
-		col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
-		if (pc.direct_lighting == 1) {
-			col += direct_lighting;
+		float uv_x = float(gl_LaunchIDEXT.x) / float(gl_LaunchSizeEXT.x);
+		if (pc.canonical_only == 1 || uv_x >= pc.gris_separator) {
+			col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
+			if (pc.direct_lighting == 1) {
+				col += direct_lighting;
+			}
+			if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
+				imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+			} else {
+				float w = 1. / float(pc.frame_num + 1);
+				vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+				imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
+			}
 		}
-		if (pc.frame_num > 0) {
-			float w = 1. / float(pc.frame_num + 1);
-			vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
-			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
-		} else {
-			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+
+		if (pc.canonical_only == 1) {
+			return;
 		}
-		return;
-#endif	// CANONICAL_ONLY
 	}
 
 	if (pc.enable_gris == 0) {

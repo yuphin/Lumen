@@ -113,10 +113,16 @@ void main() {
 		final_contribution += curr_reservoir_contribution * reservoir.W;
 	}
 
+	float uv_x = float(gl_LaunchIDEXT.x) / float(gl_LaunchSizeEXT.x);
+	if(uv_x >= pc.gris_separator) {
+		return;
+	}
+
 	vec3 col = vec3(0);
 	if (pc.direct_lighting == 1) {
 		col += direct_lighting_buffer.d[pixel_idx];
 	}
+
 	col += final_contribution;
 
 	if (pc.pixel_debug == 1 && ubo.clicked_pos == ivec2(gl_LaunchIDEXT.xy)) {

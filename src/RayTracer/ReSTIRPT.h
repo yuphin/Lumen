@@ -44,6 +44,7 @@ class ReSTIRPT : public Integrator {
 	bool enable_permutation_sampling = false;
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.00f;
+	float gris_separator = 1.0f;
 	uint32_t path_length = 0;
 	uint32_t num_spatial_samples = 1;
 	StreamingMethod streaming_method = StreamingMethod::INDIVIDUAL_CONTRIBUTIONS;

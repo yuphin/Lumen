@@ -24,5 +24,15 @@ void main() {
     if(debug_vis.d[gl_GlobalInvocationID.x] == 1) {
         ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.size_y, gl_GlobalInvocationID.x % pc.size_y);
         imageStore(image, ivec2(coords), vec4(vec3(1,1, 1), 1.f));
+    } else if(pc.gris_separator < 1.0) {
+        int x = int(gl_GlobalInvocationID.x) / int(pc.size_y);
+        float uv_x =  float(x) / float(pc.size_x);
+        float line = clamp(1.0 - abs(uv_x - pc.gris_separator), 0, 1);
+        if(line > 0.999 ) {
+            ivec2 coords = ivec2(x, gl_GlobalInvocationID.x % pc.size_y);
+            imageStore(image, ivec2(coords), vec4(vec3(1,0,0), 1.f));
+
+        }
     }
+
 }
