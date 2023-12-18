@@ -32,6 +32,7 @@ struct PCReSTIRPT {
 	uint enable_gris;
 	uint temporal_reuse;
 	uint pixel_debug;
+	uint permutation_sampling;
 };
 
 

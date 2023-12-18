@@ -122,6 +122,7 @@ void ReSTIRPT::render() {
 	pc_ray.frame_num = frame_num;
 	pc_ray.pixel_debug = pixel_debug;
 	pc_ray.temporal_reuse = uint(enable_temporal_reuse);
+	pc_ray.permutation_sampling = uint(enable_permutation_sampling);
 
 	const std::initializer_list<ResourceBinding> common_bindings = {output_tex, scene_ubo_buffer, scene_desc_buffer,
 																	mesh_lights_buffer};
@@ -320,6 +321,7 @@ bool ReSTIRPT::gui() {
 	}
 	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
 	result |= ImGui::Checkbox("Debug pixels", &pixel_debug);
+	result |= ImGui::Checkbox("Enable permutation sampling", &enable_permutation_sampling);
 	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
 	result |= ImGui::Checkbox("Show reconnection radiance", &show_reconnection_radiance);
 	std::array<const char*, 2> mis_methods = {

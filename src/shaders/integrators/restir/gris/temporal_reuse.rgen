@@ -44,9 +44,9 @@ void main() {
 	prev_pos = -ubo.prev_projection * prev_pos;
 	ivec2 prev_coords = ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
 
-#if 0
-	prev_coords = get_permuted_coords(seed, prev_coords);
-#endif
+	if(pc.permutation_sampling == 1) {
+		prev_coords = get_permuted_coords(seed, prev_coords);
+	}
 
 	float m_c = 0;
 	float canonical_in_canonical_pdf = calc_target_pdf(canonical_reservoir.data.reservoir_contribution);
