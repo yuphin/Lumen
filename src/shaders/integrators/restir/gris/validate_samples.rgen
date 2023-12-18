@@ -29,7 +29,6 @@ void main() {
 	uint num_spatial_samples = pc.enable_spatial_reuse == 1 ? pc.num_spatial_samples : 0;
 	const Reservoir canonical_reservoir = in_reservoirs[pixel_idx];
 
-	uvec2 seed_helpers = uvec2(pc.general_seed, pc.sampling_seed);
 	for (uint i = 0; i < num_spatial_samples; i++) {
 		ivec2 rand_offset = get_neighbor_offset(seed2);
 		const ivec2 coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
@@ -46,9 +45,9 @@ void main() {
 						neighbor_gbuffer.primitive_instance_id.x);
 		ReconnectionData data = reconnection_data[num_spatial_samples * pixel_idx + i];
 		float target_pdf_in_neighbor = 0;
-		bool canonical_in_neighbor =
-			retrace_paths_and_evaluate(unpacked_neighbor_gbuffer, canonical_gbuffer, canonical_reservoir.data,
-									   uvec2(coords), gl_LaunchIDEXT.xy, target_pdf_in_neighbor);
+		vec3 primary_direction = get_primary_direction(uvec2(coords));
+		retrace_paths_and_evaluate(unpacked_neighbor_gbuffer, canonical_reservoir.data, primary_direction,
+								   gl_LaunchIDEXT.xy, target_pdf_in_neighbor);
 		reconnection_data[(num_spatial_samples + 1) * pixel_idx + i + 1].target_pdf_in_neighbor =
 			target_pdf_in_neighbor;
 	}

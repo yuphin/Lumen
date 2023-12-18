@@ -33,7 +33,6 @@ void main() {
 	init_reservoir(reservoir);
 	GBuffer gbuffer = curr_gbuffers[pixel_idx];
 	if (!gbuffer_data_valid(gbuffer)) {
-		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(vec3(0), 1.f));
 		return;
 	}
 	Reservoir canonical_reservoir = curr_reservoirs[pixel_idx];
@@ -97,29 +96,4 @@ void main() {
 	}
 
 	curr_reservoirs[pixel_idx] = reservoir;
-
-	vec3 final_contribution = vec3(0);
-	if (pc.show_reconnection_radiance == 1) {
-		final_contribution = vec3(0);
-	} else {
-		final_contribution = prefix_contributions.d[pixel_idx];
-	}
-	if (reservoir.W > 0) {
-		final_contribution += curr_reservoir_contribution * reservoir.W;
-	}
-
-	vec3 col = vec3(0);
-	if (pc.direct_lighting == 1) {
-		col += direct_lighting_buffer.d[pixel_idx];
-	}
-	col += final_contribution;
-
-	ivec2 neighbor_coords = ivec2(gl_LaunchIDEXT.xy);
-	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
-		imageStore(image, ivec2(neighbor_coords), vec4(col, 1.f));
-	} else {
-		float w = 1. / float(pc.frame_num + 1);
-		vec3 old_col = imageLoad(image, ivec2(neighbor_coords)).xyz;
-		imageStore(image, ivec2(neighbor_coords), vec4(mix(old_col, col, w), 1.f));
-	}
 }

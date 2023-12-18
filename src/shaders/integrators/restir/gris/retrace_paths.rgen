@@ -45,8 +45,10 @@ void main() {
 			get_hitdata(neighbor_gbuffer.barycentrics, neighbor_gbuffer.primitive_instance_id.y,
 						neighbor_gbuffer.primitive_instance_id.x);
 
-		bool valid = retrace_paths(canonical_gbuffer, unpacked_neighbor_gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy,
-								   uvec2(coords), data.jacobian, data.reservoir_contribution);
+		vec3 primary_direction = get_primary_direction(uvec2(gl_LaunchIDEXT.xy));
+		retrace_paths(canonical_gbuffer, neighbor_reservoir.data, primary_direction, uvec2(coords),
+					  neighbor_reservoir.data.rc_partial_jacobian, data.jacobian, data.reservoir_contribution,
+					  data.new_jacobian);
 		reconnection_data[(num_spatial_samples + 1) * pixel_idx + i + 1] = data;
 	}
 }
