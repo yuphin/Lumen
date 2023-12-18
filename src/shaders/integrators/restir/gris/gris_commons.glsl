@@ -298,7 +298,13 @@ vec3 get_primary_direction(uvec2 coords) {
 	return normalize(sample_camera(d).xyz);
 }
 
-bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords, uvec2 src_coords,
+vec3 get_prev_primary_direction(uvec2 coords) {
+	const vec2 uv = vec2(coords + vec2(0.5)) / vec2(gl_LaunchSizeEXT.xy);
+	const vec2 d = uv * 2.0 - 1;
+	return normalize(sample_prev_camera(d).xyz);
+}
+
+bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, uvec2 src_coords,
 				   float src_jacobian, out float jacobian_out, out vec3 reservoir_contribution,
 				   out float jacobian_num) {
 	// Note: The source reservoir always corresponds to the canonical reservoir because retracing only happens on
@@ -331,7 +337,6 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 	uint prefix_depth = 0;
 	vec3 prefix_throughput = vec3(1);
 
-	vec3 dst_wi = get_primary_direction(dst_coords);
 	float prefix_jacobian = 1.0;
 
 	uint bounce_flags = 0;
@@ -372,6 +377,7 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 		if (dst_rough && next_src_satisfied != proposed_constraints_satisfied) {
 			return false;
 		}
+
 
 		set_bounce_flag(bounce_flags, prefix_depth, constraints_satisfied);
 		if (prefix_depth == rc_prefix_length) {
@@ -479,33 +485,34 @@ bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData d
 	}
 }
 
-bool retrace_paths(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords, uvec2 src_coords,
+bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, uvec2 src_coords,
 				   out float jacobian_out, out vec3 reservoir_contribution) {
 	float unused_jacobian;
-	return retrace_paths(dst_gbuffer, src_gbuffer, data, dst_coords, src_coords, data.rc_partial_jacobian, jacobian_out,
+	return retrace_paths(dst_gbuffer, data, dst_wi, src_coords, data.rc_partial_jacobian, jacobian_out,
 						 reservoir_contribution, unused_jacobian);
 }
 
-bool retrace_paths_and_evaluate(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords,
+bool retrace_paths_and_evaluate(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi,
 								uvec2 src_coords, float src_jacobian, out float target_pdf) {
 	vec3 reservoir_contribution;
 	float jacobian = 0;
 	float unused_jacobian_num;
-	bool result = retrace_paths(dst_gbuffer, src_gbuffer, data, dst_coords, src_coords, src_jacobian, jacobian,
+	bool result = retrace_paths(dst_gbuffer, data, dst_wi, src_coords, src_jacobian, jacobian,
 								reservoir_contribution, unused_jacobian_num);
 	target_pdf = calc_target_pdf(reservoir_contribution) * jacobian;
 	return result;
 }
 
-bool retrace_paths_and_evaluate(in HitData dst_gbuffer, in HitData src_gbuffer, in GrisData data, uvec2 dst_coords,
+bool retrace_paths_and_evaluate(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi,
 								uvec2 src_coords, out float target_pdf) {
-	return retrace_paths_and_evaluate(dst_gbuffer, src_gbuffer, data, dst_coords, src_coords, data.rc_partial_jacobian,
+	return retrace_paths_and_evaluate(dst_gbuffer, data, dst_wi, src_coords, data.rc_partial_jacobian,
 									  target_pdf);
 }
 
 bool process_reservoir(inout uvec4 seed, inout Reservoir reservoir, inout float m_c, in Reservoir canonical_reservoir,
 					   in Reservoir source_reservoir, in ReconnectionData data, ivec2 neighbor_coords,
-					   float canonical_in_canonical_pdf, uint num_spatial_samples, inout vec3 curr_reservoir_contribution) {
+					   float canonical_in_canonical_pdf, uint num_spatial_samples,
+					   inout vec3 curr_reservoir_contribution) {
 	source_reservoir.M = min(source_reservoir.M, 20);
 
 	bool result = false;

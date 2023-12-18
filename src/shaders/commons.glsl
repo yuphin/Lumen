@@ -36,6 +36,11 @@ vec4 sample_camera(in vec2 d) {
     return ubo.inv_view * vec4(normalize(target.xyz), 0); // direction
 }
 
+vec4 sample_prev_camera(in vec2 d) {
+    vec4 target = inverse(ubo.prev_projection) * vec4(d.x, d.y, 1, 1);
+    return inverse(ubo.prev_view) * vec4(normalize(target.xyz), 0); // direction
+}
+
 
 float uniform_cone_pdf(float cos_max) { return 1. / (PI2 * (1 - cos_max)); }
 
