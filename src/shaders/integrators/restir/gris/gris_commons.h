@@ -45,22 +45,21 @@ struct GBuffer {
 
 struct GrisData {
 	uvec4 debug_seed;
-	vec3 rc_wi;
-	uint init_seed;
 	vec3 rc_Li;
+	uint init_seed;
 	// Layout for the path flags
 	// 1b side | 5b postfix_length| 5b prefix_length |3b is_nee/emissive_after_rc/emissive/default
-	uint path_flags;
 	vec3 reservoir_contribution;
-	uint rc_coords;
+	uint path_flags;
 	vec2 rc_barycentrics;
 	uvec2 seed_helpers;
 	uvec2 rc_primitive_instance_id;
+	uint rc_coords;
 	float rc_partial_jacobian; // g * rc_pdf (* rc_postfix_pdf)
 	uint bounce_flags;
 	float pdf_light_w;
 	uint rc_seed;
-	vec2 pad;
+	float pad;
 };
 
 struct Reservoir {

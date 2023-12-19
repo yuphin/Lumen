@@ -42,6 +42,7 @@ class ReSTIRPT : public Integrator {
 	bool enable_gris = false;
 	bool pixel_debug = false;
 	bool enable_permutation_sampling = false;
+	bool enable_atmosphere = false;
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.00f;
 	float gris_separator = 1.0f;

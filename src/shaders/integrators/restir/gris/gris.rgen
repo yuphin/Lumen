@@ -77,7 +77,11 @@ void main() {
 		const bool found_isect = payload.instance_idx != -1;
 
 		if (!found_isect) {
+#ifdef ENABLE_ATMOSPHERE
 			vec3 atmosphere_L = shade_atmosphere(pc.dir_light_idx, pc.sky_col, origin.xyz, direction, tmax);
+#else
+			vec3 atmosphere_L = pc.sky_col;
+#endif // ENABLE_ATMOSPHERE
 			vec3 contribution = throughput * atmosphere_L;
 			if (depth > 0) {
 				col += contribution;
@@ -140,7 +144,6 @@ void main() {
 
 			connectable_vertex_found = true;
 			prefix_depth = depth - 1;
-			reconnection_data.rc_wi = direction;
 			// Seed is not relevant here
 			reconnection_data.rc_seed = -1;
 			// Partially fill in the contribution data
@@ -205,13 +208,8 @@ void main() {
 		if (!last_vertex_specular) {
 			uint rc_seed = seed.w;
 			uvec4 debug_seed = seed;
-			float g_src;
 			vec3 light_pos;
-			vec2 uv;
-			uint instance_idx;
-			uint triangle_idx;
-			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, wo, true, g_src, light_pos, uv, instance_idx,
-							 triangle_idx);
+			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, wo, true, light_pos);
 			vec3 contribution = Li * throughput;
 
 			// At 0 depth, we let ReSTIR DI handle the direct lighting
@@ -219,10 +217,6 @@ void main() {
 
 			// Stream the NEE path at the reconnection vertex
 			if (nee_connectable && any(greaterThan(Li, vec3(0)))) {
-				ASSERT(instance_idx != -1);
-				// TODO: Optimize
-				reconnection_data.rc_barycentrics = uv;
-				reconnection_data.rc_primitive_instance_id = uvec2(triangle_idx, instance_idx);
 				reconnection_data.rc_coords = rc_coords;
 				reconnection_data.rc_partial_jacobian = rc_partial_jacobian;
 
@@ -231,7 +225,7 @@ void main() {
 				reconnection_data.reservoir_contribution = contribution;
 				reconnection_data.path_flags = pack_path_flags(depth, 1, RECONNECTION_TYPE_NEE, side);
 
-				reconnection_data.rc_Li = vec3(1000);
+				reconnection_data.rc_Li = light_pos;
 
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);

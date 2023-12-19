@@ -140,8 +140,8 @@ void ReSTIRPT::render() {
 	constexpr int READ_OR_PREV_IDX = 0;
 
 	std::vector<ShaderMacro> macros = {{"STREAMING_MODE", int(streaming_method)}};
-	if (canonical_only) {
-		macros.push_back(ShaderMacro("CANONICAL_ONLY"));
+	if (enable_atmosphere) {
+		macros.push_back(ShaderMacro("ENABLE_ATMOSPHERE"));
 	}
 	// Trace rays
 	instance->vkb.rg
@@ -306,6 +306,7 @@ void ReSTIRPT::destroy() {
 bool ReSTIRPT::gui() {
 	bool result = Integrator::gui();
 	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
+	result |= ImGui::Checkbox("Enable atmosphere", &enable_atmosphere);
 	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);
 	result |= ImGui::Checkbox("Enable GRIS", &enable_gris);
 	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
