@@ -151,7 +151,7 @@ vec3 get_hitdata_pos_only(vec2 attribs, uint instance_idx, uint triangle_idx) {
 	return vec3(to_world * vec4(vtx[0].pos * bary.x + vtx[1].pos * bary.y + vtx[2].pos * bary.z, 1.0));
 }
 
-vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 wo, bool trace, out vec3 light_pos) {
+vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 wo, bool trace, out vec3 light_pos, out bool is_directional_light) {
 	float pdf_light_a;
 	float pdf_light_w;
 	vec3 wi = vec3(0);
@@ -175,7 +175,12 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 					wi, wi_len - EPS, 1);
 		visible = any_hit_payload.hit == 0;
 	}
-	light_pos = pos + wi * wi_len;
+	is_directional_light =  get_light_type(record.flags) == LIGHT_DIRECTIONAL;
+	if(is_directional_light) {
+		light_pos = wi * wi_len;
+	} else {
+		light_pos = pos + wi * wi_len;
+	}
 
 	const float light_pick_pdf = 1. / pc.light_triangle_count;
 	if (visible && pdf_light_w > 0) {
@@ -187,7 +192,8 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 
 vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 wo, bool trace) {
 	vec3 unused_pos;
-	return do_nee(seed, pos, hit_mat, side, n_s, wo, trace, unused_pos);
+	bool unused_bool;
+	return do_nee(seed, pos, hit_mat, side, n_s, wo, trace, unused_pos, unused_bool);
 }
 
 void init_gbuffer(out GBuffer gbuffer) {
@@ -268,11 +274,12 @@ uint pack_path_flags(uint prefix_length, uint postfix_length, uint reconnection_
 }
 
 void unpack_path_flags(uint packed_data, out uint reconnection_type, out uint prefix_length, out uint postfix_length,
-					   out bool side) {
+					   out bool side, out bool is_directional_light) {
 	reconnection_type = (packed_data & 0x7);
 	prefix_length = (packed_data >> 3) & 0x1F;
 	postfix_length = (packed_data >> 8) & 0x1F;
 	side = ((packed_data >> 13) & 1) == 1;
+	is_directional_light = ((packed_data >> 14) & 1) == 1;
 }
 
 void set_bounce_flag(inout uint flags, uint depth, bool constraints_satisfied) {
@@ -311,7 +318,8 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, uvec2 
 	uint rc_prefix_length;
 	uint rc_postfix_length;
 	bool rc_side;
-	unpack_path_flags(data.path_flags, rc_type, rc_prefix_length, rc_postfix_length, rc_side);
+	bool is_directional_light;
+	unpack_path_flags(data.path_flags, rc_type, rc_prefix_length, rc_postfix_length, rc_side, is_directional_light);
 
 	HitData rc_gbuffer;
 	Material rc_hit_mat;
@@ -336,13 +344,16 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, uvec2 
 	bool dst_rough = true;
 	bool prev_rough = dst_rough;
 
+	vec3 org_pos;
 	while (true) {
 		if (((prefix_depth + rc_postfix_length + 1) > pc.max_depth) || prefix_depth > rc_prefix_length) {
 			return false;
 		}
 		vec3 dst_wo = -dst_wi;
 		bool dst_side = face_forward(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo);
+		org_pos = dst_gbuffer.pos;
 		dst_gbuffer.pos = offset_ray(dst_gbuffer.pos, dst_gbuffer.n_g);
+		
 		Material dst_hit_mat = load_material(dst_gbuffer.material_idx, dst_gbuffer.uv);
 
 		if (rc_type != RECONNECTION_TYPE_NEE) {
@@ -363,9 +374,12 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, uvec2 
 
 		next_src_satisfied = get_bounce_flag(data.bounce_flags, prefix_depth + 1);
 		bool proposed_constraints_satisfied = dst_rough && dst_far;
+		// TODO: Investigate with far constraint
+#if 0
 		if (dst_rough && next_src_satisfied != proposed_constraints_satisfied) {
 			return false;
 		}
+#endif
 
 
 		set_bounce_flag(bounce_flags, prefix_depth, constraints_satisfied);
@@ -379,16 +393,15 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, uvec2 
 
 			vec3 dst_postfix_wi;
 			if (rc_type == RECONNECTION_TYPE_NEE) {
-				dst_postfix_wi = data.rc_Li - dst_gbuffer.pos;
+				dst_postfix_wi = is_directional_light ? data.rc_Li : data.rc_Li - dst_gbuffer.pos;
 			} else {
 				dst_postfix_wi = rc_gbuffer.pos - dst_gbuffer.pos;
 			}
 
-			// vec3 dst_postfix_wi = rc_gbuffer.pos - dst_gbuffer.pos;
 			float wi_len_sqr = dot(dst_postfix_wi, dst_postfix_wi);
 			float wi_len = sqrt(wi_len_sqr);
 			dst_postfix_wi /= wi_len;
-			vec3 p = offset_ray2(dst_gbuffer.pos, dst_gbuffer.n_s);
+			vec3 p = offset_ray2(is_directional_light ? org_pos : dst_gbuffer.pos, dst_gbuffer.n_s);
 			any_hit_payload.hit = 1;
 			traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p,
 						0, dst_postfix_wi, wi_len - EPS, 1);
@@ -438,7 +451,7 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, uvec2 
 				}
 				reservoir_contribution =
 					prefix_throughput * abs(rc_cos_x) * dst_postfix_f * data.rc_Li * mis_weight / dst_postfix_pdf;
-				LOG_CLICKED4("Default: %d - %d - %d - %v2u\n", prefix_depth, bounce_flags, data.bounce_flags,
+				LOG_CLICKED4("Default: %d - %d - %d - %v2u\n", prefix_depth, rc_postfix_length, data.bounce_flags,
 							 data.seed_helpers);
 			}
 			if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {

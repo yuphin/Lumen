@@ -48,7 +48,7 @@ struct GrisData {
 	vec3 rc_Li;
 	uint init_seed;
 	// Layout for the path flags
-	// 1b side | 5b postfix_length| 5b prefix_length |3b is_nee/emissive_after_rc/emissive/default
+	//1b is_directional_light | 1b side | 5b postfix_length| 5b prefix_length |3b is_nee/emissive_after_rc/emissive/default
 	vec3 reservoir_contribution;
 	uint path_flags;
 	vec2 rc_barycentrics;

@@ -139,10 +139,6 @@ void ReSTIRPT::render() {
 	constexpr int WRITE_OR_CURR_IDX = 1;
 	constexpr int READ_OR_PREV_IDX = 0;
 
-	std::vector<ShaderMacro> macros = {{"STREAMING_MODE", int(streaming_method)}};
-	if (enable_atmosphere) {
-		macros.push_back(ShaderMacro("ENABLE_ATMOSPHERE"));
-	}
 	// Trace rays
 	instance->vkb.rg
 		->add_rt("GRIS - Generate Samples",
@@ -152,7 +148,7 @@ void ReSTIRPT::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/integrators/restir/gris/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .macros = macros,
+					 .macros = {{"STREAMING_MODE", int(streaming_method)}, ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
 					 .dims = {instance->width, instance->height},
 				 })
 		.push_constants(&pc_ray)
@@ -174,7 +170,6 @@ void ReSTIRPT::render() {
 									 {"src/shaders/ray_shadow.rmiss"},
 									 {"src/shaders/integrators/restir/gris/ray.rchit"},
 									 {"src/shaders/ray.rahit"}},
-						 .macros = macros,
 						 .dims = {instance->width, instance->height},
 					 })
 			.push_constants(&pc_ray)
@@ -186,6 +181,7 @@ void ReSTIRPT::render() {
 			.bind_texture_array(scene_textures)
 			.bind_tlas(instance->vkb.tlas)
 			.skip_execution(!should_do_temporal);
+		pc_ray.seed2 = rand() % UINT_MAX;
 		if (!canonical_only) {
 			if (mis_method == MISMethod::TALBOT) {
 				instance->vkb.rg
@@ -196,7 +192,6 @@ void ReSTIRPT::render() {
 											 {"src/shaders/ray_shadow.rmiss"},
 											 {"src/shaders/integrators/restir/gris/ray.rchit"},
 											 {"src/shaders/ray.rahit"}},
-								 .macros = macros,
 								 .dims = {instance->width, instance->height},
 							 })
 					.push_constants(&pc_ray)
@@ -216,7 +211,6 @@ void ReSTIRPT::render() {
 											 {"src/shaders/ray_shadow.rmiss"},
 											 {"src/shaders/integrators/restir/gris/ray.rchit"},
 											 {"src/shaders/ray.rahit"}},
-								 .macros = macros,
 								 .dims = {instance->width, instance->height},
 							 })
 					.push_constants(&pc_ray)
@@ -235,7 +229,6 @@ void ReSTIRPT::render() {
 											 {"src/shaders/ray_shadow.rmiss"},
 											 {"src/shaders/integrators/restir/gris/ray.rchit"},
 											 {"src/shaders/ray.rahit"}},
-								 .macros = macros,
 								 .dims = {instance->width, instance->height},
 							 })
 					.push_constants(&pc_ray)
@@ -255,7 +248,7 @@ void ReSTIRPT::render() {
 											 {"src/shaders/ray_shadow.rmiss"},
 											 {"src/shaders/integrators/restir/gris/ray.rchit"},
 											 {"src/shaders/ray.rahit"}},
-								 .macros = macros,
+								 .macros = {ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS", enable_defensive_formulation)},
 								 .dims = {instance->width, instance->height},
 							 })
 					.push_constants(&pc_ray)
@@ -330,6 +323,7 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::SliderFloat("GRIS / Default", &gris_separator, 0.0f, 1.0f);
 	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
 	result |= ImGui::Checkbox("Debug pixels", &pixel_debug);
+	result |= ImGui::Checkbox("Enable defensive formulation", &enable_defensive_formulation);
 	result |= ImGui::Checkbox("Enable permutation sampling", &enable_permutation_sampling);
 	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
 	result |= ImGui::Checkbox("Show reconnection radiance", &show_reconnection_radiance);

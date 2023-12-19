@@ -16,8 +16,7 @@ layout(binding = 4, std430) buffer OutReservoirs { Reservoir curr_reservoirs[]; 
 layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir prev_reservoirs[]; };
 layout(binding = 6, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
 layout(binding = 7, std430) readonly buffer PrevGBuffer { GBuffer prev_gbuffers[]; };
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
-uvec4 seed2 = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
 
 ivec2 get_permuted_coords(inout uvec4 seed, ivec2 coords) {
 	uvec2 rands = uvec2(floatBitsToUint(rand(seed)), floatBitsToUint(rand(seed)));

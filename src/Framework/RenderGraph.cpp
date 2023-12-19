@@ -1026,7 +1026,6 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		RenderPass* ending_pass = ending_pass_idx < passes.size() ? &passes[ending_pass_idx] : nullptr;
 		std::sort(passes.begin(), passes.end(),
 				  [](const RenderPass& pass1, const RenderPass& pass2) { return pass1.pass_idx < pass2.pass_idx; });
-		pass_idxs_with_shader_compilation_overrides.clear();
 		for (auto i = 0; i < passes.size(); i++) {
 			if (&passes[i] == beginning_pass) {
 				beginning_pass_idx = i;
@@ -1037,6 +1036,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		}
 		// Remove duplicate passes
 		uint32_t prev_inactive_pass_idx = -1;
+		uint32_t num_erased_count = 0;
 		for (auto it = passes.begin() + beginning_pass_idx; it != passes.end();) {
 			if (!it->active) {
 				prev_inactive_pass_idx = it->pass_idx;
@@ -1051,10 +1051,20 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 					}
 				}
 				it = passes.erase(prev_it);
+				num_erased_count++;
+			}
+			// Undo index modifications
+			if (it->index_changed_due_to_prior_insertion) {
+				it->pass_idx -= num_erased_count;
+				auto& storage = pipeline_cache[it->name];
+				for (uint32_t i = 0; i < storage.offset_idx; i++) {
+					storage.pass_idxs[i] = it->pass_idx;
+				}
 			}
 			++it;
 		}
 		update_pass_indices();
+		pass_idxs_with_shader_compilation_overrides.clear();
 	}
 
 	uint32_t rem_passes = ending_pass_idx - beginning_pass_idx;
@@ -1133,6 +1143,7 @@ void RenderGraph::reset() {
 		passes[i].disable_execution = false;
 		passes[i].active = false;
 		passes[i].cached_in_rendergraph = false;
+		passes[i].index_changed_due_to_prior_insertion = false;
 		passes[i].next_binding_idx = 0;
 		if (!settings.shader_inference) {
 			passes[i].explicit_buffer_reads.clear();

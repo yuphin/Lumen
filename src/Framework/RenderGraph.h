@@ -202,6 +202,7 @@ class RenderPass {
 	bool submitted = false;
 	bool record_override = true;
 	bool cached_in_rendergraph = false;
+	bool index_changed_due_to_prior_insertion = false;
 	/*
 		Note:
 		The assumption is that a SyncDescriptor is unique to a pass (either via
@@ -292,6 +293,7 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 			if (!pass_idxs_with_shader_compilation_overrides.empty()) {
 				passes[idx].pass_idx += uint32_t(pass_idxs_with_shader_compilation_overrides.size());
 				storage.pass_idxs[offset_idx] = passes[idx].pass_idx;
+				passes[idx].index_changed_due_to_prior_insertion = true;
 			}
 			ending_pass_idx = std::max(ending_pass_idx, idx + 1);
 			passes[idx].cached_in_rendergraph = true;

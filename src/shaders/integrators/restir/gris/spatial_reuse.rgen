@@ -34,30 +34,36 @@ void main() {
 		return;
 	}
 
-
-	Reservoir canonical_reservoir = in_reservoirs[pixel_idx];
-
-	vec3 canonical_reservoir_contribution = canonical_reservoir.data.reservoir_contribution;
-	uint num_spatial_samples = pc.enable_spatial_reuse == 1 ? pc.num_spatial_samples : 0;
-	float m_c = 1.0;
-	float canonical_in_canonical_pdf = calc_target_pdf(canonical_reservoir_contribution);
-	uint num_valid_samples = 0;
-	vec3 curr_reservoir_contribution = vec3(0);
-	float curr_new_partial_jacobian = 0;
-
 	HitData canonical_gbuffer =
 		get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
+	Reservoir canonical_reservoir = in_reservoirs[pixel_idx];
+
+	int num_spatial_samples = pc.enable_spatial_reuse == 1 ? int(pc.num_spatial_samples) : 0;
+	vec3 curr_reservoir_contribution = vec3(0);
+
+	vec3 canonical_reservoir_contribution = canonical_reservoir.data.reservoir_contribution;
+	float canonical_in_canonical_pdf = calc_target_pdf(canonical_reservoir_contribution);
+	uint num_valid_samples = 0;
+	float curr_new_partial_jacobian = 0;
+
 	uvec4 neighbor_seed = seed2;
 
 	uint accepted_positions[13];
 	uint num_accepted_positions = 0;
-	
+
+	vec3 primary_direction = get_primary_direction(uvec2(gl_LaunchIDEXT.xy));
+#ifdef ENABLE_DEFENSIVE_PAIRWISE_MIS
+	float m_c = 1.0;
+#else
+	float m_c = 0;
+#endif	// ENABLE_DEFENSIVE_PAIRWISE_MIS
 	for (int i = 0; i < num_spatial_samples; i++) {
-		ivec2 neighbor_coords = ivec2(gl_LaunchIDEXT.xy) + get_neighbor_offset(neighbor_seed);
-		uint neighbor_pixel_idx = neighbor_coords.x * pc.size_y + neighbor_coords.y;
+		ivec2 rand_offset = get_neighbor_offset(neighbor_seed);
+		const ivec2 neighbor_coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
 		if (any(lessThan(neighbor_coords, ivec2(0))) || any(greaterThanEqual(neighbor_coords, gl_LaunchSizeEXT.xy))) {
 			continue;
 		}
+		const uint neighbor_pixel_idx = neighbor_coords.x * pc.size_y + neighbor_coords.y;
 		GBuffer neighbor_gbuffer = curr_gbuffers[neighbor_pixel_idx];
 		if (!gbuffer_data_valid(neighbor_gbuffer)) {
 			continue;
@@ -75,32 +81,44 @@ void main() {
 		HitData unpacked_neighbor_gbuffer =
 			get_hitdata(neighbor_gbuffer.barycentrics, neighbor_gbuffer.primitive_instance_id.y,
 						neighbor_gbuffer.primitive_instance_id.x);
-		retrace_paths(canonical_gbuffer, unpacked_neighbor_gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy,
-					  uvec2(neighbor_coords), seed_helpers, data.jacobian, data.reservoir_contribution);
-		retrace_paths_and_evaluate(unpacked_neighbor_gbuffer, canonical_gbuffer, canonical_reservoir.data,
-								   uvec2(neighbor_coords), gl_LaunchIDEXT.xy, seed_helpers,
-								   data.target_pdf_in_neighbor);
+		vec3 primary_direction = get_primary_direction(uvec2(gl_LaunchIDEXT.xy));
+		retrace_paths(canonical_gbuffer, neighbor_reservoir.data, primary_direction, uvec2(neighbor_coords),
+					  neighbor_reservoir.data.rc_partial_jacobian, data.jacobian, data.reservoir_contribution,
+					  data.new_jacobian);
+		primary_direction = get_primary_direction(uvec2(neighbor_coords.xy));
+		retrace_paths_and_evaluate(unpacked_neighbor_gbuffer, canonical_reservoir.data, primary_direction,
+								   gl_LaunchIDEXT.xy, data.target_pdf_in_neighbor);
 #endif
 		bool accepted = process_reservoir(seed, reservoir, m_c, canonical_reservoir, neighbor_reservoir, data,
-										  neighbor_coords, canonical_in_canonical_pdf, pc.num_spatial_samples, curr_reservoir_contribution);
+										   neighbor_coords, canonical_in_canonical_pdf, pc.num_spatial_samples, curr_reservoir_contribution);
 		if (accepted) {
 			curr_new_partial_jacobian = data.new_jacobian;
 			accepted_positions[num_accepted_positions++] = neighbor_pixel_idx;
 		}
 	}
 
-	bool canonical = combine_reservoir(seed, reservoir, canonical_reservoir, canonical_in_canonical_pdf, m_c, 1.0);
-	if (canonical) {
-		curr_new_partial_jacobian = canonical_reservoir.data.rc_partial_jacobian;
-		curr_reservoir_contribution = canonical_reservoir_contribution;
+#ifndef ENABLE_DEFENSIVE_PAIRWISE_MIS
+	if (num_valid_samples == 0) {
+		m_c = 1;
 	}
-	const float target_pdf = calc_target_pdf(curr_reservoir_contribution);
+#endif	// ENABLE_DEFENSIVE_PAIRWISE_MIS
+
+	bool accepted = combine_reservoir(seed, reservoir, canonical_reservoir,
+									  calc_target_pdf(canonical_reservoir.data.reservoir_contribution), m_c, 1.0);
+	if (accepted) {
+		curr_reservoir_contribution = canonical_reservoir.data.reservoir_contribution;
+		curr_new_partial_jacobian = canonical_reservoir.data.rc_partial_jacobian;
+	}
+
 	calc_reservoir_W_with_mis(reservoir);
+#ifdef ENABLE_DEFENSIVE_PAIRWISE_MIS
 	reservoir.W /= (1.0 + num_valid_samples);
+#else
+	reservoir.W /= max(num_valid_samples, 1);
+#endif	// ENABLE_DEFENSIVE_PAIRWISE_MIS
 
 	reservoir.data.reservoir_contribution = curr_reservoir_contribution;
 	reservoir.data.rc_partial_jacobian = curr_new_partial_jacobian;
-	// LOG_CLICKED("%d\n", reservoir.M);
 	out_reservoirs[pixel_idx] = reservoir;
 
 	vec3 final_contribution = vec3(0);
@@ -114,7 +132,7 @@ void main() {
 	}
 
 	float uv_x = float(gl_LaunchIDEXT.x) / float(gl_LaunchSizeEXT.x);
-	if(uv_x >= pc.gris_separator) {
+	if (uv_x >= pc.gris_separator) {
 		return;
 	}
 

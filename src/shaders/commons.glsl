@@ -315,9 +315,9 @@ vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights,
         pos = light.pos;
     } break;
     case LIGHT_DIRECTIONAL: {
-        const vec3 dir = normalize(light.pos - light.to);
-        const vec3 light_p = p + dir * (2 * light.world_radius);
-        wi = light_p - p;
+        const vec3 dir = (2 * light.world_radius) * normalize(light.pos - light.to);
+        const vec3 light_p = p + dir;
+        wi = dir;
         wi_len = length(wi);
         wi /= wi_len;
         pdf_pos_a = 1;
