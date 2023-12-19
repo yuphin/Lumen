@@ -43,6 +43,7 @@ void main() {
 		offsets[i++] = offset;
 	}
 	float mis_weight_sum = 0;
+	float curr_new_partial_jacobian = 0;
 	for (int i = -1; i < num_spatial_samples; i++) {
 		ivec2 rand_offset = i == -1 ? ivec2(0) : offsets[i];
 		const ivec2 neighbor_coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
@@ -71,10 +72,10 @@ void main() {
 			new_jacobian = neighbor_reservoir.data.rc_partial_jacobian;
 			reservoir_contribution = neighbor_reservoir.data.reservoir_contribution;
 		} else {
-			valid_reservoir =
-				retrace_paths(canonical_gbuffer, unpacked_neighbor_gbuffer, neighbor_reservoir.data, gl_LaunchIDEXT.xy,
-							  uvec2(neighbor_coords), neighbor_reservoir.data.rc_partial_jacobian, jacobian,
-							  reservoir_contribution, new_jacobian);
+			vec3 primary_direction = get_primary_direction(uvec2(gl_LaunchIDEXT.xy));
+			valid_reservoir = retrace_paths(canonical_gbuffer, neighbor_reservoir.data, primary_direction,
+											uvec2(neighbor_coords), neighbor_reservoir.data.rc_partial_jacobian,
+											jacobian, reservoir_contribution, new_jacobian);
 		}
 
 		float reservoir_pdf = calc_target_pdf(reservoir_contribution) * jacobian;
@@ -109,9 +110,10 @@ void main() {
 						get_hitdata(validation_gbuffer.barycentrics, validation_gbuffer.primitive_instance_id.y,
 									validation_gbuffer.primitive_instance_id.x);
 					float target_pdf_in_neighbor = 0;
-					bool valid = retrace_paths_and_evaluate(unpacked_validation_gbuffer, canonical_gbuffer,
-															neighbor_reservoir.data, uvec2(validation_coords),
-															gl_LaunchIDEXT.xy, new_jacobian, target_pdf_in_neighbor);
+					vec3 primary_direction = get_primary_direction(uvec2(validation_coords.xy));
+					bool valid = retrace_paths_and_evaluate(unpacked_validation_gbuffer, neighbor_reservoir.data,
+															primary_direction, gl_LaunchIDEXT.xy, new_jacobian,
+															target_pdf_in_neighbor);
 					p_sum += target_pdf_in_neighbor * validation_reservoir.M;
 				}
 			}
@@ -122,22 +124,37 @@ void main() {
 										  mis_weight, jacobian);
 		if (accepted) {
 			curr_reservoir_contribution = reservoir_contribution;
+			curr_new_partial_jacobian = new_jacobian;
 		}
 	}
 	calc_reservoir_W_with_mis(reservoir);
-	vec3 final_contribution = prefix_contributions.d[pixel_idx];
+
+	reservoir.data.reservoir_contribution = curr_reservoir_contribution;
+	reservoir.data.rc_partial_jacobian = curr_new_partial_jacobian;
+	// LOG_CLICKED("%d\n", reservoir.M);
+	out_reservoirs[pixel_idx] = reservoir;
+
+	vec3 final_contribution = vec3(0);
+	if (pc.show_reconnection_radiance == 1) {
+		final_contribution = vec3(0);
+	} else {
+		final_contribution = prefix_contributions.d[pixel_idx];
+	}
 	if (reservoir.W > 0) {
 		final_contribution += curr_reservoir_contribution * reservoir.W;
 	}
+
+	float uv_x = float(gl_LaunchIDEXT.x) / float(gl_LaunchSizeEXT.x);
+	if (uv_x >= pc.gris_separator) {
+		return;
+	}
+
 	vec3 col = vec3(0);
 	if (pc.direct_lighting == 1) {
 		col += direct_lighting_buffer.d[pixel_idx];
 	}
-	if (pc.show_reconnection_radiance == 1 && reservoir.W > 0) {
-		col += reservoir.data.rc_Li;
-	} else {
-		col += final_contribution;
-	}
+
+	col += final_contribution;
 
 	ivec2 neighbor_coords = ivec2(gl_LaunchIDEXT.xy);
 	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {

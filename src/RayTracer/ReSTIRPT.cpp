@@ -201,8 +201,8 @@ void ReSTIRPT::render() {
 							 })
 					.push_constants(&pc_ray)
 					.bind(common_bindings)
-					.bind(*reservoir_buffers[READ_OR_PREV_IDX])
 					.bind(*reservoir_buffers[WRITE_OR_CURR_IDX])
+					.bind(*reservoir_buffers[READ_OR_PREV_IDX])
 					.bind(*gbuffers[pong])
 					.bind_texture_array(scene_textures)
 					.bind_tlas(instance->vkb.tlas);
