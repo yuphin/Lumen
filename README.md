@@ -14,7 +14,7 @@
  - Combined VCM + MLT Integrator (VCMMLT)
  - ReSTIR
  - ReSTIR GI
- - ReSTIR PT / GRIS (Temporal version is still WIP)
+ - ReSTIR PT / GRIS
  - DDGI (Real time)
  - FFT Convolution Bloom
 
@@ -56,8 +56,12 @@
 ![4](/media/ReSTIR1spp.png?raw=true "ReSTIR")
 ##### ReSTIR GI 1 sample per pixel ([Video comparison](https://drive.google.com/file/d/1UV1FpyMhtcX8cUo4CFIXFXhWI8UWr121/view?usp=sharing))
 ![5](/media/ReSTIRGI1spp.PNG?raw=true "ReSTIR GI")
+
+##### Unbiased ReSTIR PT (aka GRIS) 1 sample per pixel (Indirect lighting only, on/off comparison)
+![6](/media/GRIS1spp.png?raw=true "ReSTIR GI")
+
 ##### Dynamic Diffuse Global Illumination (DDGI)
-![6](/media/CornellDDGI.png?raw=true "DDGI")
+![7](/media/CornellDDGI.png?raw=true "DDGI")
 ## Building
 
 To build Lumen, start cloning the repository with

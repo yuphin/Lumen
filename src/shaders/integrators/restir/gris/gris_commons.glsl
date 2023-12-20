@@ -275,7 +275,6 @@ uint pack_path_flags(uint prefix_length, uint postfix_length, uint reconnection_
 
 void unpack_path_flags(uint packed_data, out uint reconnection_type, out uint prefix_length, out uint postfix_length,
 					   out bool side, out bool is_directional_light) {
-	packed_data = packed_data & 0x0000FFFF;
 	reconnection_type = (packed_data & 0x7);
 	prefix_length = (packed_data >> 3) & 0x1F;
 	postfix_length = (packed_data >> 8) & 0x1F;
