@@ -104,6 +104,7 @@ void ReSTIRPT::render() {
 	pc_ray.prev_random_num = pc_ray.general_seed;
 	pc_ray.sampling_seed = rand() % UINT_MAX;
 	pc_ray.seed2 = rand() % UINT_MAX;
+	pc_ray.seed3 = rand() % UINT_MAX;
 	pc_ray.max_depth = path_length;
 	pc_ray.sky_col = config->sky_col;
 	pc_ray.total_light_area = total_light_area;

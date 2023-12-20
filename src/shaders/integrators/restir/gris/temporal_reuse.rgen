@@ -16,7 +16,7 @@ layout(binding = 4, std430) buffer OutReservoirs { Reservoir curr_reservoirs[]; 
 layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir prev_reservoirs[]; };
 layout(binding = 6, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
 layout(binding = 7, std430) readonly buffer PrevGBuffer { GBuffer prev_gbuffers[]; };
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed3);
 
 ivec2 get_permuted_coords(inout uvec4 seed, ivec2 coords) {
 	uvec2 rands = uvec2(floatBitsToUint(rand(seed)), floatBitsToUint(rand(seed)));
@@ -43,7 +43,7 @@ void main() {
 	prev_pos = -ubo.prev_projection * prev_pos;
 	ivec2 prev_coords = ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
 
-	if(pc.permutation_sampling == 1) {
+	if (pc.permutation_sampling == 1) {
 		prev_coords = get_permuted_coords(seed, prev_coords);
 	}
 
@@ -68,12 +68,12 @@ void main() {
 
 			vec3 primary_direction = get_primary_direction(uvec2(gl_LaunchIDEXT.xy));
 			vec3 prev_primary_direction = get_prev_primary_direction(uvec2(prev_coords));
-			retrace_paths(canonical_gbuffer, prev_reservoir.data, primary_direction, uvec2(prev_coords),
+			retrace_paths(canonical_gbuffer, prev_reservoir.data, primary_direction,
 						  prev_reservoir.data.rc_partial_jacobian, data.jacobian, data.reservoir_contribution,
 						  new_jacobian);
 
 			retrace_paths_and_evaluate(prev_hitdata, canonical_reservoir.data, prev_primary_direction,
-									   gl_LaunchIDEXT.xy, data.target_pdf_in_neighbor);
+									   data.target_pdf_in_neighbor);
 
 			prev_accepted = process_reservoir(seed, reservoir, m_c, canonical_reservoir, prev_reservoir, data,
 											  prev_coords, canonical_in_canonical_pdf, 1, curr_reservoir_contribution);

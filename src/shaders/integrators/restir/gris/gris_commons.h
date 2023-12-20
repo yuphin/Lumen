@@ -16,6 +16,7 @@ struct PCReSTIRPT {
 	uint general_seed;
 	uint sampling_seed;
 	uint seed2;
+	uint seed3;
 	uint prev_random_num;
 	uint total_frame_num;
 	uint enable_accumulation;
@@ -44,6 +45,7 @@ struct GBuffer {
 };
 
 struct GrisData {
+	uvec4 debug_sampling_seed;
 	uvec4 debug_seed;
 	vec3 rc_Li;
 	uint init_seed;
