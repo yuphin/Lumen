@@ -1,4 +1,7 @@
+#define DISABLE_LOGGING
 #include "../../../commons.h"
+
+#define DEBUG 0
 
 NAMESPACE_BEGIN(RestirPT)
 
@@ -45,10 +48,12 @@ struct GBuffer {
 };
 
 struct GrisData {
+#if DEBUG == 1
 	uvec4 debug_sampling_seed;
 	uvec4 debug_seed;
+#endif
 	vec3 rc_Li;
-	uint init_seed;
+	uint rc_seed;
 	// Layout for the path flags
 	//1b is_directional_light | 1b side | 5b postfix_length| 5b prefix_length |3b is_nee/emissive_after_rc/emissive/default
 	vec3 reservoir_contribution;
@@ -58,10 +63,6 @@ struct GrisData {
 	uvec2 rc_primitive_instance_id;
 	uint rc_coords;
 	float rc_partial_jacobian; // g * rc_pdf (* rc_postfix_pdf)
-	uint bounce_flags;
-	float pdf_light_w;
-	uint rc_seed;
-	float pad;
 };
 
 struct Reservoir {

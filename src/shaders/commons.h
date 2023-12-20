@@ -55,6 +55,7 @@ using uvec2 = glm::uvec2;
 // Debug logger for Raygen shaders
 #ifndef __cplusplus
 
+#ifndef DISABLE_LOGGING
 	#define LOG_CLICKED0(str) \
 		if(ubo.debug_click == 1 && ivec2(gl_LaunchIDEXT.xy) == ubo.clicked_pos) { \
 			debugPrintfEXT(str); \
@@ -80,21 +81,6 @@ using uvec2 = glm::uvec2;
 			debugPrintfEXT(str, args1, args2, args3, args4); \
 		}
 
-	#define ASSERT_CLICKED_STR(cond, expected, str, val) \
-		if(ubo.debug_click == 1 && ivec2(gl_LaunchIDEXT.xy) == ubo.clicked_pos) { \
-			if(cond != expected)  {\
-				debugPrintfEXT("Assertion failed: "); \
-				debugPrintfEXT(str, val); \
-			} \
-		}
-
-	#define ASSERT_CLICKED(cond, expected) \
-		if(ubo.debug_click == 1 && ivec2(gl_LaunchIDEXT.xy) == ubo.clicked_pos) { \
-			if(cond != expected)  {\
-				debugPrintfEXT("Assertion failed!\n"); \
-			} \
-		}
-
 	#define LOG_VAL(str, args, coord) \
 		if(ivec2(gl_LaunchIDEXT.xy) == coord) { \
 			debugPrintfEXT(str, args); \
@@ -110,6 +96,23 @@ using uvec2 = glm::uvec2;
 	#define LOG2(str, val, val2) debugPrintfEXT(str, val, val2);
 	#define LOG3(str, val, val2, val3) debugPrintfEXT(str, val, val2, val3);
 
+	#define ASSERT_CLICKED_STR(cond, expected, str, val) \
+		if(ubo.debug_click == 1 && ivec2(gl_LaunchIDEXT.xy) == ubo.clicked_pos) { \
+			if(cond != expected)  {\
+				debugPrintfEXT("Assertion failed: "); \
+				debugPrintfEXT(str, val); \
+			} \
+		}
+
+	#define ASSERT_CLICKED(cond, expected) \
+		if(ubo.debug_click == 1 && ivec2(gl_LaunchIDEXT.xy) == ubo.clicked_pos) { \
+			if(cond != expected)  {\
+				debugPrintfEXT("Assertion failed!\n"); \
+			} \
+		}
+
+	
+
 	#define ASSERT(cond) \
 		if(!(cond))  { \
 			debugPrintfEXT("Assertion failed (L%d) on pixel %v2i\n", __LINE__, ivec2(gl_LaunchIDEXT.xy)); \
@@ -124,7 +127,24 @@ using uvec2 = glm::uvec2;
 		if(!(cond))  { \
 			debugPrintfEXT(str, val1); \
 		}
-		
+#else
+	#define LOG_CLICKED0(str)
+	#define LOG_CLICKED(str, args)
+	#define LOG_CLICKED2(str, args1, args2)
+	#define LOG_CLICKED3(str, args1, args2, args3)
+	#define LOG_CLICKED4(str, args1, args2, args3, args4)
+	#define LOG_VAL(str, args, coord)
+	#define LOG(str, coord)
+	#define LOG0(str)
+	#define LOG1(str, val)
+	#define LOG2(str, val, val2)
+	#define LOG3(str, val, val2, val3) 
+	#define ASSERT_CLICKED_STR(cond, expected, str, val)
+	#define ASSERT_CLICKED(cond, expected)
+	#define ASSERT(cond)
+	#define ASSERT0(cond, str)
+	#define ASSERT1(cond, str, val1)
+#endif // DISABLE_ASSERTS 		
 
 #endif
 

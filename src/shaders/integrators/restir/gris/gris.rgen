@@ -68,7 +68,6 @@ void main() {
 
 	// Record initial seed after direct light sampling
 	ASSERT(sampling_seed.w == 0);
-	reconnection_data.init_seed = sampling_seed.w;
 
 	bool debug_bool = false;
 
@@ -93,7 +92,7 @@ void main() {
 				reconnection_data.rc_Li = postfix_throughput * atmosphere_L;
 				reconnection_data.reservoir_contribution = contribution;
 				reconnection_data.path_flags =
-					pack_path_flags(prefix_depth, depth - prefix_depth, RECONNECTION_TYPE_DEFAULT, false);
+					(reconnection_data.path_flags & 0xFFFF0000) | pack_path_flags(prefix_depth, depth - prefix_depth, RECONNECTION_TYPE_DEFAULT, false);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
@@ -129,9 +128,9 @@ void main() {
 			postfix_depth++;
 		} else {
 			if (depth > 0) {
-				set_bounce_flag(reconnection_data.bounce_flags, depth, constraints_satisfied);
+				set_bounce_flag(reconnection_data.path_flags, depth, constraints_satisfied);
 			} else {
-				set_bounce_flag(reconnection_data.bounce_flags, 0, curr_rough);
+				set_bounce_flag(reconnection_data.path_flags, 0, curr_rough);
 			}
 		}
 
@@ -141,8 +140,10 @@ void main() {
 			reconnection_data.rc_barycentrics = rc_barycentrics;
 			reconnection_data.rc_primitive_instance_id = rc_primitive_instance_id;
 			reconnection_data.rc_coords = rc_coords;
+#if DEBUG == 1
 			reconnection_data.debug_sampling_seed = sampling_seed;
 			reconnection_data.debug_sampling_seed.w -= 2;
+#endif // DEBUG == 1
 
 			connectable_vertex_found = true;
 			prefix_depth = depth - 1;
@@ -179,9 +180,9 @@ void main() {
 				reconnection_data.reservoir_contribution = partial_contrib_for_rc * throughput;
 				if (was_connectable) {
 					reconnection_data.reservoir_contribution *= mis_weight;
-					reconnection_data.pdf_light_w = pdf_light_w;
+					reconnection_data.rc_seed = floatBitsToUint(pdf_light_w);
 				}
-				reconnection_data.path_flags = pack_path_flags(
+				reconnection_data.path_flags = (reconnection_data.path_flags & 0xFFFF0000) | pack_path_flags(
 					prefix_depth, depth - prefix_depth,
 					was_connectable ? RECONNECTION_TYPE_EMISSIVE_AFTER_RC : RECONNECTION_TYPE_DEFAULT, side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
@@ -222,13 +223,13 @@ void main() {
 			if (nee_connectable && any(greaterThan(Li, vec3(0)))) {
 				reconnection_data.rc_coords = rc_coords;
 				reconnection_data.rc_partial_jacobian = rc_partial_jacobian;
-
+#if DEBUG == 1
 				reconnection_data.debug_seed = debug_seed;
 				reconnection_data.debug_sampling_seed = sampling_seed;
+#endif
 				reconnection_data.rc_seed = rc_seed;
 				reconnection_data.reservoir_contribution = contribution;
-				reconnection_data.path_flags = pack_path_flags(depth, 1, RECONNECTION_TYPE_NEE, side);
-				reconnection_data.path_flags = uint(is_directional_light) << 14 | reconnection_data.path_flags;
+				reconnection_data.path_flags = (reconnection_data.path_flags & 0xFFFF0000) | pack_path_flags(depth, 1, RECONNECTION_TYPE_NEE, side) | uint(is_directional_light) << 14;
 
 
 				reconnection_data.rc_Li = light_pos;
@@ -236,7 +237,7 @@ void main() {
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				if (merged) {
-					set_bounce_flag(reservoir.data.bounce_flags, depth + 1, true);
+					set_bounce_flag(reservoir.data.path_flags, depth + 1, true);
 				}
 				valid_reservoir = valid_reservoir || merged;
 
@@ -251,7 +252,7 @@ void main() {
 				reconnection_data.rc_Li = postfix_throughput * Li;
 				reconnection_data.reservoir_contribution = contribution;
 				reconnection_data.path_flags =
-					pack_path_flags(prefix_depth, depth - prefix_depth + 1, RECONNECTION_TYPE_DEFAULT, side);
+					(reconnection_data.path_flags & 0xFFFF0000) | pack_path_flags(prefix_depth, depth - prefix_depth + 1, RECONNECTION_TYPE_DEFAULT, side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
@@ -305,7 +306,7 @@ void main() {
 #if STREAMING_MODE == STREAMING_MODE_SPLIT
 		reconnection_data.rc_Li = postfix_L;
 		reconnection_data.reservoir_contribution *= postfix_L;
-		reconnection_data.path_flags = pack_path_flags(prefix_depth, postfix_depth, RECONNECTION_TYPE_DEFAULT, rc_side);
+		reconnection_data.path_flags = (reconnection_data.path_flags & 0xFFFF0000) | pack_path_flags(prefix_depth, postfix_depth, RECONNECTION_TYPE_DEFAULT, rc_side);
 		bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 									   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 		valid_reservoir = valid_reservoir || merged;
@@ -320,23 +321,8 @@ void main() {
 			ASSERT(reservoir.data.path_flags != 0);
 			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
 
-			// LOG_CLICKED3("%d - %d - %d\n", rc_type, rc_prefix_length, rc_postfix_length);
 			if (rc_type != RECONNECTION_TYPE_NEE) {
 				ASSERT(reservoir_data_valid(reservoir.data));
-			}
-			// if (rc_type == RECONNECTION_TYPE_EMISSIVE) {
-			// 	// LOG_CLICKED2("%d - %d\n", rc_prefix_length, rc_postfix_length);
-			// 	uint flag0 = uint(get_bounce_flag(reservoir.data.bounce_flags, 0));
-			// 	uint flag1 = uint(get_bounce_flag(reservoir.data.bounce_flags, 1));
-			// 	uint flag2 = uint(get_bounce_flag(reservoir.data.bounce_flags, 2));
-			// 	LOG_CLICKED4("Len %d : %d - %d - %d\n", rc_prefix_length, flag0, flag1, flag2);
-			// }
-
-			uint flag0 = uint(get_bounce_flag(reservoir.data.bounce_flags, 0));
-			uint flag1 = uint(get_bounce_flag(reservoir.data.bounce_flags, 1));
-			uint flag2 = uint(get_bounce_flag(reservoir.data.bounce_flags, 2));
-			if (debug_bool) {
-				// LOG_CLICKED3("Len %d : %d - %d\n", rc_prefix_length, rc_type, reservoir.data.bounce_flags);
 			}
 		}
 	}
