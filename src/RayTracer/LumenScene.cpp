@@ -410,7 +410,6 @@ void LumenScene::load_scene(const std::string& path) {
 				materials[i].metallic = 1;
 				materials[i].roughness = m_bsdf.roughness;
 				materials[i].albedo = m_bsdf.albedo;
-
 			} else if (m_bsdf.type == "roughplastic") {
 				materials[i].subsurface = 0.1f;
 				materials[i].albedo = m_bsdf.albedo;
@@ -418,6 +417,10 @@ void LumenScene::load_scene(const std::string& path) {
 			} else if (m_bsdf.type == "conductor") {
 				materials[i].bsdf_type = BSDF_MIRROR;
 				materials[i].bsdf_props = BSDF_SPECULAR | BSDF_REFLECTIVE;
+			} else if (m_bsdf.type == "glass") {
+				materials[i].bsdf_type = BSDF_GLASS;
+				materials[i].bsdf_props = BSDF_SPECULAR | BSDF_TRANSMISSIVE;
+				materials[i].ior = m_bsdf.ior;
 			}
 #elif DIFFUSE_ONLY
 			materials[i].albedo = m_bsdf.albedo;
