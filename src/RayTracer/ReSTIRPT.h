@@ -39,7 +39,7 @@ class ReSTIRPT : public Integrator {
 	bool canonical_only = false;
 	bool show_reconnection_radiance = false;
 	bool enable_temporal_reuse = true;
-	bool enable_gris = false;
+	bool enable_gris = true;
 	bool pixel_debug = false;
 	bool enable_permutation_sampling = false;
 	bool enable_atmosphere = false;
