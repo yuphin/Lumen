@@ -42,7 +42,7 @@ vec4 sample_prev_camera(in vec2 d) {
 }
 
 
-float uniform_cone_pdf(float cos_max) { return 1. / (PI2 * (1 - cos_max)); }
+float uniform_cone_pdf(float cos_max) { return 1. / (TWO_PI * (1 - cos_max)); }
 
 bool is_light_finite(uint light_props) {
     return ((light_props >> 4) & 0x1) != 0;
@@ -246,7 +246,7 @@ TriangleRecord sample_area_light(const vec4 rands, const Light light) {
 vec3 uniform_sample_cone(vec2 uv, float cos_max) {
     const float cos_theta = (1. - uv.x) + uv.x * cos_max;
     const float sin_theta = sqrt(1 - cos_theta * cos_theta);
-    const float phi = uv.y * PI2;
+    const float phi = uv.y * TWO_PI;
     return vec3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
 }
 

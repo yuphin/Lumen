@@ -1,5 +1,6 @@
 // #define UNIFORM_SAMPLING
 // #define CONCENTRIC_DISK_MAPPING
+#include "bsdf/diffuse.glsl"
 Material load_material(const uint material_idx, const vec2 uv) {
     Material m = materials.m[material_idx];
     if (m.texture_id > -1) {
@@ -13,7 +14,7 @@ bool same_hemisphere(in vec3 wi, in vec3 wo, in vec3 n) {
 }
 
 vec3 sample_cos_hemisphere(vec2 uv, vec3 n, inout float phi) {
-    phi = PI2 * uv.x;
+    phi = TWO_PI * uv.x;
     float cos_theta = (2.0 * uv.y - 1.0) * 0.999;
 #if defined(UNIFORM_SAMPLING)
     return normalize(
@@ -54,7 +55,7 @@ vec3 sample_phong(vec2 uv, const vec3 v, const vec3 n, float s) {
     // Transform into local space where the n = (0,0,1)
     vec4 local_quat = to_local_quat(n);
     vec3 v_loc = rot_quat(local_quat, v);
-    float phi = PI2 * uv.x;
+    float phi = TWO_PI * uv.x;
     float cos_theta = pow(1. - uv.x, 1. / (1. + s));
     float sin_theta = sqrt(1 - cos_theta * cos_theta);
     vec3 local_phong_dir =
@@ -153,7 +154,7 @@ vec3 sample_beckmann(vec2 uv, float alpha, vec3 n, const vec3 v) {
     vec4 local_quat = to_local_quat(n);
     vec3 v_loc = rot_quat(local_quat, v);
     float tan2 = -(alpha * alpha) * log(1. - uv.x);
-    float phi = PI2 * uv.y;
+    float phi = TWO_PI * uv.y;
     float cos_theta = 1. / (sqrt(1. + tan2));
     float sin_theta = sqrt(1 - cos_theta * cos_theta);
     const vec3 h =
@@ -168,7 +169,7 @@ vec3 sample_gtr1(vec2 uv, float alpha2, const vec3 n, vec3 v) {
     const float cos_theta =
         sqrt(max(0, (1. - pow(alpha2, 1.0 - uv.x)) / (1.0 - alpha2)));
     const float sin_theta = sqrt(max(0, 1. - cos_theta * cos_theta));
-    const float phi = PI2 * uv.y;
+    const float phi = TWO_PI * uv.y;
     const vec3 h = vec3(sin_theta * cos(phi), sin_theta * sin(phi), cos_theta);
     const vec3 l = reflect(-v, h);
     return normalize(rot_quat(invert_quat(local_quat), l));
@@ -300,9 +301,16 @@ vec3 sample_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
     dir = vec3(0);
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
+#if 0
         dir = sample_cos_hemisphere(rands, n_s);
         f = diffuse_f(mat);
         pdf_w = diffuse_pdf(n_s, wo, dir, cos_theta);
+#else
+        vec3 T,B;
+        branchless_onb(n_s, T, B);
+        f = sample_diffuse(mat, to_local(wo, T, B, n_s), dir, pdf_w, cos_theta, rands);
+        dir = to_world(dir, T, B, n_s);
+#endif
     } break;
     case BSDF_MIRROR: {
         dir = reflect(-wo, n_s);
@@ -419,10 +427,12 @@ vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
         return vec3(0);
     }
     vec3 f = vec3(0);
+    vec3 T,B;
+    branchless_onb(n_s, T, B);
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
-        f = diffuse_f(mat);
-        pdf_w = diffuse_pdf(n_s, wo, dir);
+        float unused_pdf;
+        f = eval_diffuse(mat, to_local(wo, T, B, n_s), to_local(dir, T, B, n_s), pdf_w, unused_pdf);
     } break;
     case BSDF_MIRROR: {
         f = vec3(0);
@@ -469,9 +479,7 @@ vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
     vec3 f = vec3(0);
     switch (mat.bsdf_type) {
     case BSDF_DIFFUSE: {
-        f = diffuse_f(mat);
-        pdf_w = diffuse_pdf(n_s, wo, dir);
-        pdf_rev_w = diffuse_pdf(n_s, dir, wo);
+        f = eval_diffuse(mat, wo, dir, pdf_w, pdf_rev_w);
     } break;
     case BSDF_MIRROR: {
         f = vec3(0);
