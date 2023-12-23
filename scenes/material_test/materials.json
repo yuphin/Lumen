@@ -1,0 +1,99 @@
+{
+    "integrator" : {
+        "type" : "path",
+        "path_length" : 10,
+        "sky_col" : [
+            0.5,0.5,0.5
+        ]
+    },
+ 
+    "bsdfs": [
+        {
+            "ior": 1.52,
+            "name": "Glass",
+            "refs": [
+                "sphere1"
+            ],
+            "albedo": [
+                1,
+                1,
+                1
+            ],
+            "type": "glass"
+        },
+        {
+            "name": "Mirror",
+            "refs": [
+                "sphere2"
+            ],
+            "type": "mirror"
+        },
+        {
+            "albedo": [
+                0.725,
+                0.71,
+                0.68
+            ],
+            "name": "Other Walls",
+            "refs": [
+                "ceiling",
+                "back_wall",
+                "sphere3",
+                "sphere4",
+                "sphere5",
+                "sphere6",
+                "sphere7",
+                "sphere8",
+                "sphere9",
+                "sphere10",
+                "sphere11",
+                "sphere12"
+            ],
+            "type": "diffuse"
+        },
+
+        {
+            "albedo": [
+                0.725,
+                0.71,
+                0.68
+            ],
+            "name": "Floor",
+            "refs": [
+                "floor"
+            ],
+            "type": "diffuse"
+        },
+        {
+            "emissive_factor": [
+                17,
+                12,
+                4
+            ],
+            "albedo": [
+                1,
+                1,
+                1
+            ],
+            "name": "Light",
+            "refs": [
+                "light",
+                "light2",
+                "light3"
+            ],
+            "type": "diffuse"
+        }
+    ],
+    "camera": {
+        "fov": 45,
+        "position": [
+            0.7,
+            0.5,
+            17.5
+        ],
+        "dir" : [
+            0,0, 2
+        ]
+    },
+    "mesh_file": "materials.obj"
+}
