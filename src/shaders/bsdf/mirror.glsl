@@ -1,4 +1,10 @@
 vec3 sample_mirror(vec3 n_s, vec3 wo, out vec3 wi, out float pdf_w, out float cos_theta) {
+    if(dot(wo, n_s) <= 0) {
+        pdf_w = 0;
+        cos_theta = 0;
+        wi = vec3(0);
+        return vec3(0);
+    }
     wi = reflect(-wo, n_s);
     cos_theta = dot(wi, n_s);
     pdf_w = 1.0;
