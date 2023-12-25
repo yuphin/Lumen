@@ -10,7 +10,7 @@
     "bsdfs": [
         {
             "ior": 1.52,
-            "name": "Glass",
+            "name": "Dielectric1",
             "refs": [
                 "sphere1"
             ],
@@ -19,7 +19,21 @@
                 1,
                 1
             ],
-            "type": "glass"
+            "type": "dielectric"
+        },
+
+        {
+            "ior": 1.52,
+            "name": "Dielectric2",
+            "refs": [
+                "sphere7"
+            ],
+            "albedo": [
+                1,
+                1,
+                1
+            ],
+            "type": "dielectric"
         },
         {
             "name": "Mirror",
@@ -42,7 +56,6 @@
                 "sphere4",
                 "sphere5",
                 "sphere6",
-                "sphere7",
                 "sphere8",
                 "sphere9",
                 "sphere10",

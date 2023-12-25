@@ -1,9 +1,9 @@
 {
     "integrator" : {
         "type" : "path",
-        "path_length" : 6,
+        "path_length" : 10,
         "sky_col" : [
-            1,1,1
+            0,0,0
         ]
     },
  
@@ -19,7 +19,7 @@
                 1,
                 1
             ],
-            "type": "glass"
+            "type": "dielectric"
         },
         {
             "name": "Mirror",
