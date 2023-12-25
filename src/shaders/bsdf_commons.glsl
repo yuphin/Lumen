@@ -1,6 +1,9 @@
 // #define UNIFORM_SAMPLING
 // #define CONCENTRIC_DISK_MAPPING
 #include "bsdf/diffuse.glsl"
+#include "bsdf/mirror.glsl"
+#include "bsdf/glass.glsl"
+#include "bsdf/dielectric.glsl"
 Material load_material(const uint material_idx, const vec2 uv) {
     Material m = materials.m[material_idx];
     if (m.texture_id > -1) {
@@ -77,11 +80,6 @@ float beckmann_d(float alpha, float nh) {
     return num / denom;
 }
 
-float schlick_w(float u) {
-    float m = clamp(1 - u, 0, 1);
-    float m2 = m * m;
-    return m2 * m2 * m;
-}
 
 float GTR1(float nh, float a) {
     if (a >= 1) {
@@ -300,8 +298,8 @@ vec3 sample_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
     cos_theta = 0;
     dir = vec3(0);
     switch (mat.bsdf_type) {
-    case BSDF_DIFFUSE: {
-#if 0
+    case BSDF_TYPE_DIFFUSE: {
+#if 1
         dir = sample_cos_hemisphere(rands, n_s);
         f = diffuse_f(mat);
         pdf_w = diffuse_pdf(n_s, wo, dir, cos_theta);
@@ -312,13 +310,13 @@ vec3 sample_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
         dir = to_world(dir, T, B, n_s);
 #endif
     } break;
-    case BSDF_MIRROR: {
+    case BSDF_TYPE_MIRROR: {
         dir = reflect(-wo, n_s);
         cos_theta = dot(n_s, dir);
         f = vec3(1.) / abs(cos_theta);
         pdf_w = 1.;
     } break;
-    case BSDF_GLOSSY: {
+    case BSDF_TYPE_GLOSSY: {
         if (rands.x < .5) {
             const vec2 rands_new = vec2(2 * rands.x, rands.y);
             dir = sample_cos_hemisphere(rands_new, n_s);
@@ -343,7 +341,7 @@ vec3 sample_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
         pdf_w = glossy_pdf(cos_theta, hl, nh, beckmann_term);
     } break;
 
-    case BSDF_DISNEY: {
+    case BSDF_TYPE_DISNEY: {
 
 #if ENABLE_DISNEY
         const float diffuse_ratio = 0.5 * (1 - mat.metallic);
@@ -385,7 +383,7 @@ vec3 sample_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
         cos_theta = dot(n_s, dir);
 #endif
     } break;
-    case BSDF_GLASS: {
+    case BSDF_TYPE_GLASS: {
         const float ior = side ? 1. / mat.ior : mat.ior;
 
         // Refract
@@ -428,21 +426,20 @@ vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
     }
     vec3 f = vec3(0);
     vec3 T,B;
-    branchless_onb(n_s, T, B);
     switch (mat.bsdf_type) {
-    case BSDF_DIFFUSE: {
-        float unused_pdf;
-        f = eval_diffuse(mat, to_local(wo, T, B, n_s), to_local(dir, T, B, n_s), pdf_w, unused_pdf);
+    case BSDF_TYPE_DIFFUSE: {
+        f = diffuse_f(mat);
+        pdf_w = diffuse_pdf(n_s, wo, dir);
     } break;
-    case BSDF_MIRROR: {
+    case BSDF_TYPE_MIRROR: {
         f = vec3(0);
         pdf_w = 0.;
     } break;
-    case BSDF_GLASS: {
+    case BSDF_TYPE_GLASS: {
         f = vec3(0);
         pdf_w = 0.;
     } break;
-    case BSDF_GLOSSY: {
+    case BSDF_TYPE_GLOSSY: {
         const vec3 h = normalize(wo + dir);
         float nh = max(0.00001f, min(1.0f, dot(n_s, h)));
         float hl = max(0.00001f, min(1.0f, dot(h, dir)));
@@ -452,7 +449,7 @@ vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
         f = glossy_f(mat, wo, dir, n_s, hl, nl, nv, beckmann_term);
         pdf_w = glossy_pdf(cos_theta, hl, nh, beckmann_term);
     } break;
-    case BSDF_DISNEY: {
+    case BSDF_TYPE_DISNEY: {
 #if ENABLE_DISNEY
         f = disney_f(mat, wo, dir, n_s);
         pdf_w = disney_pdf(n_s, mat, wo, dir);
@@ -478,20 +475,22 @@ vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
     } 
     vec3 f = vec3(0);
     switch (mat.bsdf_type) {
-    case BSDF_DIFFUSE: {
-        f = eval_diffuse(mat, wo, dir, pdf_w, pdf_rev_w);
+    case BSDF_TYPE_DIFFUSE: {
+        f = diffuse_f(mat);
+        pdf_w = diffuse_pdf(n_s, wo, dir);
+        pdf_rev_w = diffuse_pdf(n_s, dir, wo);
     } break;
-    case BSDF_MIRROR: {
+    case BSDF_TYPE_MIRROR: {
         f = vec3(0);
         pdf_w = 0.;
         pdf_rev_w = 0.;
     } break;
-    case BSDF_GLASS: {
+    case BSDF_TYPE_GLASS: {
         f = vec3(0);
         pdf_w = 0.;
         pdf_rev_w = 0.;
     } break;
-    case BSDF_GLOSSY: {
+    case BSDF_TYPE_GLOSSY: {
         const vec3 h = normalize(wo + dir);
         float nh = max(0.00001f, min(1.0f, dot(n_s, h)));
         float hl = max(0.00001f, min(1.0f, dot(h, dir)));
@@ -503,7 +502,7 @@ vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat,
         float cos_theta_wo = dot(wo, n_s);
         pdf_rev_w = glossy_pdf(cos_theta_wo, hl, nh, beckmann_term);
     } break;
-    case BSDF_DISNEY: {
+    case BSDF_TYPE_DISNEY: {
 #if ENABLE_DISNEY
         f = disney_f(mat, wo, dir, n_s);
         pdf_w = disney_pdf(n_s, mat, wo, dir);
@@ -522,14 +521,14 @@ vec3 eval_bsdf(const Material mat, const vec3 wo, const vec3 wi,
         return vec3(0);
     } 
     switch (mat.bsdf_type) {
-    case BSDF_DIFFUSE: {
+    case BSDF_TYPE_DIFFUSE: {
         return diffuse_f(mat);
     } break;
-    case BSDF_MIRROR:
-    case BSDF_GLASS: {
+    case BSDF_TYPE_MIRROR:
+    case BSDF_TYPE_GLASS: {
         return vec3(0);
     } break;
-    case BSDF_GLOSSY: {
+    case BSDF_TYPE_GLOSSY: {
         const vec3 h = normalize(wo + wi);
         float nh = max(0.00001f, min(1.0f, dot(n_s, h)));
         float hl = max(0.00001f, min(1.0f, dot(h, wi)));
@@ -538,7 +537,7 @@ vec3 eval_bsdf(const Material mat, const vec3 wo, const vec3 wi,
         float beckmann_term = beckmann_d(mat.roughness, nh);
         return glossy_f(mat, wo, wi, n_s, hl, nl, nv, beckmann_term);
     } break;
-    case BSDF_DISNEY: {
+    case BSDF_TYPE_DISNEY: {
 #if ENABLE_DISNEY
         return disney_f(mat, wo, wi, n_s);
 #endif
@@ -556,10 +555,10 @@ float bsdf_pdf(const Material mat, const vec3 n_s, const vec3 wo,
         return 0;
     } 
     switch (mat.bsdf_type) {
-    case BSDF_DIFFUSE: {
+    case BSDF_TYPE_DIFFUSE: {
         return diffuse_pdf(n_s, wo, wi);
     } break;
-    case BSDF_GLOSSY: {
+    case BSDF_TYPE_GLOSSY: {
         const vec3 h = normalize(wo + wi);
         float nh = max(0.00001f, min(1.0f, dot(n_s, h)));
         float hl = max(0.00001f, min(1.0f, dot(h, wi)));
@@ -567,11 +566,84 @@ float bsdf_pdf(const Material mat, const vec3 n_s, const vec3 wo,
         float cos_theta = dot(n_s, wi);
         return glossy_pdf(cos_theta, hl, nh, beckmann_term);
     } break;
-    case BSDF_DISNEY: {
+    case BSDF_TYPE_DISNEY: {
 #if ENABLE_DISNEY
         return disney_pdf(n_s, mat, wo, wi);
 #endif
     } break;
     }
     return 0;
+}
+
+
+vec3 sample_bsdf_new(const vec3 n_s, const vec3 wo, const Material mat,
+                 const uint mode, const bool side, out vec3 wi,
+                 out float pdf_w, out float cos_theta, inout uvec4 seed) {
+
+    vec2 rands = rand2(seed);
+    vec3 f = vec3(0);
+    pdf_w = 0;
+    cos_theta = 0;
+    wi = vec3(0);
+
+    vec3 T,B;
+    branchless_onb(n_s, T, B);
+
+    switch (mat.bsdf_type) {
+    case BSDF_TYPE_DIFFUSE: {
+        f = sample_diffuse(mat, to_local(wo, T, B, n_s), wi, pdf_w, cos_theta, rands);
+        wi = to_world(wi, T, B, n_s);
+    } break;
+    case BSDF_TYPE_MIRROR: {
+        f = sample_mirror(n_s, wo, wi, pdf_w, cos_theta);
+    } break;
+    case BSDF_TYPE_GLASS: {
+        f = sample_glass(mat, n_s, wo, wi, pdf_w, cos_theta, mode, side);
+    } break;
+
+    case BSDF_TYPE_DIELECTRIC: {
+        f = sample_dielectric(mat, to_local(wo, T, B, n_s), wi, mode, side, pdf_w, cos_theta,  rands);
+        wi = to_world(wi, T, B, n_s);
+        // LOG_CLICKED("%v3f\n", f);
+    } break;
+    default: // Unknown
+        break;
+    }
+    return f;
+}
+
+vec3 eval_bsdf_new(const vec3 n_s, const vec3 wo, const Material mat,
+               const uint mode, const bool side, const vec3 wi,
+               out float pdf_w, out float pdf_rev_w, float cos_theta) {
+    pdf_w = 0;
+    if (!same_hemisphere(wi, wo, n_s)) {
+        pdf_w = 0.;
+        return vec3(0);
+    }
+    vec3 f = vec3(0);
+    vec3 T,B;
+    branchless_onb(n_s, T, B);
+    switch (mat.bsdf_type) {
+    case BSDF_TYPE_DIFFUSE: {
+        f = eval_diffuse(mat, to_local(wo, T, B, n_s), to_local(wi, T, B, n_s), pdf_w, pdf_rev_w);
+    } break;
+    case BSDF_TYPE_MIRROR: {
+        f = eval_mirror(pdf_w, pdf_rev_w);
+    } break;
+    case BSDF_TYPE_GLASS: {
+        f = eval_glass(pdf_w, pdf_rev_w);
+    } break;
+    case BSDF_TYPE_DIELECTRIC: {
+        f = eval_dielectric(mat, to_local(wo, T, B, n_s), to_local(wi, T, B, n_s), pdf_w, pdf_rev_w);
+    } break;
+    default: // Unknown
+        break;
+    }
+    return f;
+}
+vec3 eval_bsdf_new(const vec3 n_s, const vec3 wo, const Material mat,
+               const uint mode, const bool side, const vec3 dir,
+               out float pdf_w, float cos_theta) {
+    float unused_pdf;
+    return eval_bsdf_new(n_s, wo, mat, mode, side, dir, pdf_w, unused_pdf, cos_theta);
 }

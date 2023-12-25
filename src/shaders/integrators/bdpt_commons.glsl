@@ -55,9 +55,9 @@ int bdpt_random_walk_light(const int max_depth, vec3 throughput,
         vtx_assign(b, throughput, throughput);
         const Material mat = load_material(payload.material_idx, payload.uv);
         const bool mat_specular =
-            (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
+            (mat.bsdf_props & BSDF_FLAG_SPECULAR) == BSDF_FLAG_SPECULAR;
         const bool mat_transmissive =
-            (mat.bsdf_props & BSDF_TRANSMISSIVE) == BSDF_TRANSMISSIVE;
+            (mat.bsdf_props & BSDF_FLAG_TRANSMISSION) == BSDF_FLAG_TRANSMISSION;
         vtx_assign(b, delta, int(mat_specular));
 
         if (++b >= max_depth) {
@@ -147,9 +147,9 @@ int bdpt_random_walk_eye(const int max_depth, vec3 throughput,
         vtx_assign(b, throughput, throughput);
         const Material mat = load_material(payload.material_idx, payload.uv);
         const bool mat_specular =
-            (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
+            (mat.bsdf_props & BSDF_FLAG_SPECULAR) == BSDF_FLAG_SPECULAR;
         const bool mat_transmissive =
-            (mat.bsdf_props & BSDF_TRANSMISSIVE) == BSDF_TRANSMISSIVE;
+            (mat.bsdf_props & BSDF_FLAG_TRANSMISSION) == BSDF_FLAG_TRANSMISSION;
         vtx_assign(b, delta, int(mat_specular));
 
         if (++b >= max_depth) {

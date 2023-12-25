@@ -393,7 +393,7 @@ void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
         wo /= dist;
         const Material mat = load_material(payload.material_idx, payload.uv);
         const bool mat_specular =
-            (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
+            (mat.bsdf_props & BSDF_FLAG_SPECULAR) == BSDF_FLAG_SPECULAR;
         // Complete the missing geometry terms
         float cos_theta_wo = abs(dot(wo, n_s));
 
@@ -481,7 +481,7 @@ void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
         const bool same_hemisphere = same_hemisphere(vcm_state.wi, wo, n_s);
 
         const bool mat_transmissive =
-            (mat.bsdf_props & BSDF_TRANSMISSIVE) == BSDF_TRANSMISSIVE;
+            (mat.bsdf_props & BSDF_FLAG_TRANSMISSION) == BSDF_FLAG_TRANSMISSION;
         if (f == vec3(0) || pdf_dir == 0 ||
             (!same_hemisphere && !mat_transmissive)) {
             break;
@@ -619,7 +619,7 @@ vec3 vcm_trace_eye(VCMState camera_state, float eta_vcm, float eta_vc,
 
         const Material mat = load_material(payload.material_idx, payload.uv);
         const bool mat_specular =
-            (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
+            (mat.bsdf_props & BSDF_FLAG_SPECULAR) == BSDF_FLAG_SPECULAR;
         // Complete the missing geometry terms
         camera_state.d_vcm *= dist_sqr;
         camera_state.d_vcm /= cos_wo;
@@ -674,7 +674,7 @@ vec3 vcm_trace_eye(VCMState camera_state, float eta_vcm, float eta_vc,
 #endif
 
         const bool mat_transmissive =
-            (mat.bsdf_props & BSDF_TRANSMISSIVE) == BSDF_TRANSMISSIVE;
+            (mat.bsdf_props & BSDF_FLAG_TRANSMISSION) == BSDF_FLAG_TRANSMISSION;
         const bool same_hemisphere = same_hemisphere(camera_state.wi, wo, n_s);
         if (f == vec3(0) || pdf_dir == 0 ||
             (!same_hemisphere && !mat_transmissive)) {
@@ -768,7 +768,7 @@ float mlt_fill_eye() {
 
         const Material mat = load_material(payload.material_idx, payload.uv);
         const bool mat_specular =
-            (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
+            (mat.bsdf_props & BSDF_FLAG_SPECULAR) == BSDF_FLAG_SPECULAR;
         // Complete the missing geometry terms
         camera_state.d_vcm *= dist_sqr;
         camera_state.d_vcm /= cos_wo;
@@ -821,7 +821,7 @@ float mlt_fill_eye() {
                         cos_theta, seed);
 
         const bool mat_transmissive =
-            (mat.bsdf_props & BSDF_TRANSMISSIVE) == BSDF_TRANSMISSIVE;
+            (mat.bsdf_props & BSDF_FLAG_TRANSMISSION) == BSDF_FLAG_TRANSMISSION;
         const bool same_hemisphere = same_hemisphere(camera_state.wi, wo, n_s);
         if (f == vec3(0) || pdf_dir == 0 ||
             (!same_hemisphere && !mat_transmissive)) {
@@ -908,7 +908,7 @@ float mlt_trace_light() {
         wo /= dist;
         const Material mat = load_material(payload.material_idx, payload.uv);
         const bool mat_specular =
-            (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
+            (mat.bsdf_props & BSDF_FLAG_SPECULAR) == BSDF_FLAG_SPECULAR;
         // Complete the missing geometry terms
         float cos_theta_wo = abs(dot(wo, n_s));
         // Can't connect from specular to camera path, can't merge either
@@ -1017,7 +1017,7 @@ float mlt_trace_light() {
         const bool same_hemisphere = same_hemisphere(light_state.wi, wo, n_s);
 
         const bool mat_transmissive =
-            (mat.bsdf_props & BSDF_TRANSMISSIVE) == BSDF_TRANSMISSIVE;
+            (mat.bsdf_props & BSDF_FLAG_TRANSMISSION) == BSDF_FLAG_TRANSMISSION;
         if (f == vec3(0) || pdf_dir == 0 ||
             (!same_hemisphere && !mat_transmissive)) {
             break;

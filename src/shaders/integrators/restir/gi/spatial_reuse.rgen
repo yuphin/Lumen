@@ -31,7 +31,7 @@ void combine_reservoir(inout Reservoir r1, const Reservoir r2,
     const float wi_len = length(wi);
     wi /= wi_len;
     bool visible;
-    if ((q.bsdf_props & BSDF_TRANSMISSIVE) == 0) {
+    if ((q.bsdf_props & BSDF_FLAG_TRANSMISSION) == 0) {
         traceRayEXT(tlas,
                     gl_RayFlagsTerminateOnFirstHitEXT |
                         gl_RayFlagsSkipClosestHitShaderEXT,
@@ -135,7 +135,7 @@ void main() {
             dir /= len;
             const vec3 o = offset_ray(r.s.x_v, r.s.n_v);
             const bool mat_transmissive =
-                (r.s.bsdf_props & BSDF_TRANSMISSIVE) == BSDF_TRANSMISSIVE;
+                (r.s.bsdf_props & BSDF_FLAG_TRANSMISSION) == BSDF_FLAG_TRANSMISSION;
             bool visible = true;
             if (!mat_transmissive) {
                 any_hit_payload.hit = 1;

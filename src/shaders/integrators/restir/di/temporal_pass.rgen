@@ -56,7 +56,7 @@ void main() {
         const uint light_samples = min(pc.light_triangle_count, 32);
 
         if (pc.do_spatiotemporal == 1 &&
-            ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0)) {
+            ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0)) {
 
             vec4 prev_pos = ubo.prev_view * vec4(pos, 1);
             prev_pos /= prev_pos.z;
@@ -166,7 +166,7 @@ void main() {
         vec3 f = sample_bsdf(normal, wo, hit_mat, 1 /*radiance=cam*/, side,
                              direction, pdf, cos_theta, seed);
         throughput *= f * abs(cos_theta) / pdf;
-        bool specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
+        bool specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
         origin = offset_ray(pos, n_g);
         // Do traditional path tracing
         for (int depth = 1;; depth++) {
@@ -197,7 +197,7 @@ void main() {
             }
             float cos_wo = dot(wo, n_s);
             origin = offset_ray(payload.pos, n_s);
-            if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
+            if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
                 const float light_pick_pdf = 1. / pc.light_triangle_count;
                 col += throughput *
                        uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo,
@@ -214,9 +214,9 @@ void main() {
                 break;
             }
             throughput *= f * abs(cos_theta) / pdf;
-            specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
+            specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
             float rr_scale = 1.0;
-            if (hit_mat.bsdf_type == BSDF_GLASS) {
+            if (hit_mat.bsdf_type == BSDF_TYPE_GLASS) {
                 rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
             }
             if (depth > RR_MIN_DEPTH) {

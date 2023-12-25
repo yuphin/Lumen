@@ -44,7 +44,8 @@ void main() {
     const float cam_area = abs(area_int.x * area_int.y);
     bool specular = false;
     vec3 throughput = vec3(1);
-    for (int depth = 0;; depth++) {
+    int depth;
+    for (depth = 0;; depth++) {
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction,
                     tmax, 0);
         const bool found_isect = payload.material_idx != -1;
@@ -71,9 +72,10 @@ void main() {
             n_s = -n_s;
             side = false;
         }
+      
         float cos_wo = dot(wo, n_s);
         origin.xyz = offset_ray(payload.pos, n_g);
-        if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
+        if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
             const float light_pick_pdf = 1. / pc.light_triangle_count;
             col += throughput *
                    uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo,
@@ -82,15 +84,16 @@ void main() {
         }
         // Sample direction & update throughput
         float pdf, cos_theta;
-        const vec3 f = sample_bsdf(n_s, wo, hit_mat, 1 /*radiance=cam*/, side,
+
+        const vec3 f = sample_bsdf_new(n_s, wo, hit_mat, 1 /*radiance=cam*/, side,
                                    direction, pdf, cos_theta, seed);
         if (pdf == 0) {
             break;
         }
         throughput *= f * abs(cos_theta) / pdf;
-        specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
+        specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
         float rr_scale = 1.0;
-        if (hit_mat.bsdf_type == BSDF_GLASS) {
+        if (bsdf_has_property(hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION)) {
             rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
         }
         if (depth > RR_MIN_DEPTH) {

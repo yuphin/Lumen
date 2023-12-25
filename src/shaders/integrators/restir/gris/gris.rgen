@@ -206,7 +206,7 @@ void main() {
 		}
 
 		vec3 rc_Li = vec3(0);
-		last_vertex_specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
+		last_vertex_specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
 		// NEE
 		if (!last_vertex_specular) {
 			uint rc_seed = seed.w;
@@ -286,7 +286,7 @@ void main() {
 		rc_partial_jacobian *= bsdf_pdf_val;
 		if (pc.enable_rr == 1) {
 			float rr_scale = 1.0;
-			if (hit_mat.bsdf_type == BSDF_GLASS) {
+			if (bsdf_has_property(hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION)) {
 				rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
 			}
 			if (depth > RR_MIN_DEPTH) {

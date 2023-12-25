@@ -10,20 +10,27 @@
 #define INTERATOR_COUNT 6
 
 // BSDF Types
-#define BSDF_DIFFUSE 1 << 0
-#define BSDF_MIRROR 1 << 1
-#define BSDF_GLASS 1 << 2
-#define BSDF_GLOSSY 1 << 3
-#define BSDF_DISNEY 1 << 4
+#define BSDF_TYPE_DIFFUSE 1 << 0
+#define BSDF_TYPE_MIRROR 1 << 1
+#define BSDF_TYPE_GLASS 1 << 2
+#define BSDF_TYPE_GLOSSY 1 << 3
+#define BSDF_TYPE_DISNEY 1 << 4
+#define BSDF_TYPE_DIELECTRIC 1 << 5
 #define BSDF_NONE -1
 
 // BSDF Props
-#define BSDF_LAMBERTIAN 1 << 4
-#define BSDF_SPECULAR 1 << 5
-#define BSDF_TRANSMISSIVE 1 << 6
-#define BSDF_REFLECTIVE 1 << 7
-#define BSDF_OPAQUE 1 << 8
-#define BSDF_ALL BSDF_SPECULAR | BSDF_TRANSMISSIVE | BSDF_REFLECTIVE | BSDF_OPAQUE | BSDF_LAMBERTIAN
+#define BSDF_FLAG_DIFFUSE 1 << 0
+#define BSDF_FLAG_SPECULAR 1 << 1
+#define BSDF_FLAG_GLOSSY 1 << 2
+#define BSDF_FLAG_REFLECTION 1 << 3
+#define BSDF_FLAG_TRANSMISSION 1 << 4
+
+#define BSDF_FLAG_DIFFUSE_REFLECTION BSDF_FLAG_DIFFUSE | BSDF_FLAG_REFLECTION
+#define BSDF_FLAG_DIFFUSE_TRANSMISSION BSDF_FLAG_DIFFUSE | BSDF_FLAG_TRANSMISSION
+#define BSDF_FLAG_SPECULAR_REFLECTION BSDF_FLAG_SPECULAR | BSDF_FLAG_REFLECTION
+#define BSDF_FLAG_SPECULAR_TRANSMISSION BSDF_FLAG_SPECULAR | BSDF_FLAG_TRANSMISSION
+
+#define BSDF_FLAG_ALL BSDF_FLAG_DIFFUSE | BSDF_FLAG_SPECULAR | BSDF_FLAG_REFLECTION | BSDF_FLAG_TRANSMISSION
 
 // Light Type
 #define LIGHT_SPOT 1
@@ -149,12 +156,6 @@ using uvec2 = glm::uvec2;
 #endif
 
 #define ENABLE_DISNEY 1
-#define DIFFUSE_ONLY 0
-#define DIFFUSE_AND_GLOSSY_ONLY 1
-
-
-
-
 
 struct PCPost {
 	uint enable_tonemapping;
@@ -216,8 +217,8 @@ struct Material {
 	vec3 metalness;
 	uint bsdf_props;
 	int texture_id;
+	
 	float roughness;
-	// Disney BSDF
 	float metallic;
 	float specular_tint;
 	float sheen_tint;

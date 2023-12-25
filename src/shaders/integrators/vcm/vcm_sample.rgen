@@ -318,7 +318,7 @@ void main() {
             const Material mat =
                 load_material(payload.material_idx, payload.uv);
             const bool mat_specular =
-                (mat.bsdf_props & BSDF_SPECULAR) == BSDF_SPECULAR;
+                (mat.bsdf_props & BSDF_FLAG_SPECULAR) == BSDF_FLAG_SPECULAR;
             // Complete the missing geometry terms
             float cos_theta_wo = abs(dot(wo, n_s));
             // Can't connect from specular to camera path, can't merge either
@@ -354,7 +354,7 @@ void main() {
                 same_hemisphere(light_state.wi, wo, n_s);
 
             const bool mat_transmissive =
-                (mat.bsdf_props & BSDF_TRANSMISSIVE) == BSDF_TRANSMISSIVE;
+                (mat.bsdf_props & BSDF_FLAG_TRANSMISSION) == BSDF_FLAG_TRANSMISSION;
             if (f == vec3(0) || pdf_dir == 0 ||
                 (!same_hemisphere && !mat_transmissive)) {
                 break;

@@ -60,7 +60,7 @@ void main() {
 		gbuffer.d[pixel_idx].mat_idx = payload.material_idx;
 		gbuffer.d[pixel_idx].albedo = hit_mat.albedo;
 		// Shade
-		if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
+		if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
 			const float light_pick_pdf = 1. / pc.light_triangle_count;
 			col += throughput * uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo) / light_pick_pdf;
 		}

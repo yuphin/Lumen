@@ -261,10 +261,10 @@ float calc_target_pdf(vec3 f) { return luminance(f); }
 
 bool is_rough(in Material mat) {
 	// Only check if it's diffuse for now
-	return (mat.bsdf_type & BSDF_DIFFUSE) != 0;
+	return (mat.bsdf_type & BSDF_TYPE_DIFFUSE) != 0;
 }
 
-bool is_diffuse(in Material mat) { return (mat.bsdf_type & BSDF_DIFFUSE) != 0; }
+bool is_diffuse(in Material mat) { return (mat.bsdf_type & BSDF_TYPE_DIFFUSE) != 0; }
 
 uint offset(const uint pingpong) { return pingpong * pc.size_x * pc.size_y; }
 

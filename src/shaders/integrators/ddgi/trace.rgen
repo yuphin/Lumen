@@ -97,7 +97,7 @@ void main() {
 			side = false;
 		}
 
-		if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
+		if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
 			const float light_pick_pdf = 1. / pc.light_triangle_count;
 			col += uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo) / light_pick_pdf;
 		}

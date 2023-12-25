@@ -252,5 +252,6 @@ float erf_inv(float x) {
 	}
 	return p * x;
 }
+bool bsdf_has_property(uint props, uint flag) { return (props & flag) != 0; }
 
 #endif

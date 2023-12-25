@@ -90,7 +90,7 @@ void main() {
             x_s = pos;
             n_s = shading_nrm;
         }
-        if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
+        if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
             const float light_pick_pdf = 1. / pc.light_triangle_count;
             const vec3 val = throughput *
                              uniform_sample_light(seed, hit_mat, payload.pos, side,
@@ -125,10 +125,10 @@ void main() {
         } else {
             t0 = f * abs(cos_theta) / pdf;
         }
-        specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
+        specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
         origin.xyz = pos;
         float rr_scale = 1.0;
-        if (hit_mat.bsdf_type == BSDF_GLASS) {
+        if (bsdf_has_property(hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION)) {
             rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
         }
         if (depth > RR_MIN_DEPTH) {

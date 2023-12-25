@@ -83,7 +83,7 @@ void main() {
         float cos_wo = dot(wo, n_s);
         const vec3 pos = payload.pos;
         origin.xyz = offset_ray(pos, n_g);
-        if ((hit_mat.bsdf_props & BSDF_SPECULAR) == 0) {
+        if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
             const float light_pick_pdf = 1. / pc.light_triangle_count;
             sppm_data.d[pixel_idx].col +=
                 throughput *
@@ -92,10 +92,10 @@ void main() {
                 light_pick_pdf;
         }
 
-        specular = (hit_mat.bsdf_props & BSDF_SPECULAR) != 0;
-        glossy = hit_mat.bsdf_type == BSDF_GLOSSY;
+        specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
+        glossy = hit_mat.bsdf_type == BSDF_TYPE_GLOSSY;
 
-        const bool mat_diffuse = (hit_mat.bsdf_type & BSDF_DIFFUSE) != 0;
+        const bool mat_diffuse = (hit_mat.bsdf_type & BSDF_TYPE_DIFFUSE) != 0;
         const bool mat_specular = specular;
         if (mat_diffuse ||
             ((glossy || specular) && d == pc.max_depth - 1)) {
