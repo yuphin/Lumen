@@ -335,12 +335,18 @@ bool RayTracer::gui() {
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, &rmse_val_buffer, instance->vkb.rg);
 
 		auto prev_cam_settings = scene.config->cam_settings;
+
+		glm::vec3 prev_sky_col = scene.config->sky_col;
+
 		auto integrator_str = std::string(settings[curr_integrator_idx]);
 		integrator_str.erase(std::remove_if(integrator_str.begin(), integrator_str.end(), ::isspace),
 							 integrator_str.end());
 		std::transform(integrator_str.begin(), integrator_str.end(), integrator_str.begin(), ::tolower);
 		scene.create_scene_config(integrator_str);
 		scene.config->cam_settings = prev_cam_settings;
+
+		scene.config->sky_col = prev_sky_col;
+
 		create_integrator(curr_integrator_idx);
 		integrator->init();
 		post_fx.init(*instance);
