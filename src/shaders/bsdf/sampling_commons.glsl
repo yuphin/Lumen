@@ -15,12 +15,12 @@ float schlick_w(float u) {
 }
 bool bsdf_is_delta(float alpha) { return alpha == 0.0; }
 
-bool refract(vec3 n_s, vec3 wo, bool forward_facing, float eta, uint mode, out vec3 wi, out vec3 f) {
+bool refract(vec3 n_s, vec3 wo, bool forward_facing, float eta, uint mode, out vec3 wi, out vec3 f, out float inv_eta) {
 	wi = vec3(0);
 	f = vec3(0);
 	// Relative IOR (Inside / outside). If the normal direction has been changed, we take the inverse
 	float cos_i = dot(n_s, wo);
-	float inv_eta = forward_facing ? 1.0 / eta : eta;
+	inv_eta = forward_facing ? 1.0 / eta : eta;
 	const float sin2_t = inv_eta * inv_eta * (1. - cos_i * cos_i);
 	if (sin2_t >= 1.) {
 #if 1
@@ -34,6 +34,11 @@ bool refract(vec3 n_s, vec3 wo, bool forward_facing, float eta, uint mode, out v
 	}
 	f = mode == 1 ? vec3(inv_eta * inv_eta) : vec3(1);
 	return true;
+}
+
+bool refract(vec3 n_s, vec3 wo, bool forward_facing, float eta, uint mode, out vec3 wi, out vec3 f) {
+	float unused_eta;
+	return refract(n_s, wo, forward_facing, eta, mode, wi, f, unused_eta);
 }
 
 float fresnel_dielectric(float cos_i, float eta, bool forward_facing) {

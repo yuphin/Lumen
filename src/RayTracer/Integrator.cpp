@@ -129,7 +129,6 @@ void Integrator::init() {
 		v.pos = lumen_scene->positions[i];
 		v.normal = lumen_scene->normals[i];
 		v.uv0 = lumen_scene->texcoords0[i];
-
 		vertices.push_back(v);
 	}
 

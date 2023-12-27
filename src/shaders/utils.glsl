@@ -180,13 +180,9 @@ void branchless_onb(vec3 n, out vec3 b1, out vec3 b2) {
 	b2 = vec3(b, sign + n.y * n.y * a, -n.y);
 }
 
-vec3 to_world(vec3 v, vec3 T, vec3 B, vec3 N) {
-    return v.x * T + v.y * B + v.z * N;
-}
+vec3 to_world(vec3 v, vec3 T, vec3 B, vec3 N) { return v.x * T + v.y * B + v.z * N; }
 
-vec3 to_local(vec3 v, vec3 T, vec3 B, vec3 N) {
-    return vec3(dot(v, T), dot(v, B),dot(v, N));
-}
+vec3 to_local(vec3 v, vec3 T, vec3 B, vec3 N) { return vec3(dot(v, T), dot(v, B), dot(v, N)); }
 
 bool face_forward(inout vec3 n_s, inout vec3 n_g, vec3 wo) {
 	bool side = true;

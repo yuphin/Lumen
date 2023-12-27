@@ -5,6 +5,16 @@
 #include "Framework/MitsubaParser.h"
 #include "SceneConfig.h"
 
+struct MeshData {
+	std::vector<glm::vec3> positions;
+	std::vector<uint32_t> indices;
+	std::vector<glm::vec3> normals;
+	std::vector<glm::vec3> tangents;
+	std::vector<glm::vec2> texcoords0;
+	std::vector<glm::vec2> texcoords1;
+	std::vector<glm::vec4> colors0;
+};
+
 struct LumenPrimMesh {
 	std::string name;
 	uint32_t material_idx;
@@ -16,6 +26,7 @@ struct LumenPrimMesh {
 	glm::mat4 world_matrix;
 	glm::vec3 min_pos;
 	glm::vec3 max_pos;
+
 };
 
 struct LumenLight {
@@ -33,10 +44,11 @@ class LumenScene {
 	std::vector<glm::vec3> positions;
 	std::vector<uint32_t> indices;
 	std::vector<glm::vec3> normals;
-	std::vector<glm::vec4> tangents;
+	std::vector<glm::vec3> tangents;
 	std::vector<glm::vec2> texcoords0;
 	std::vector<glm::vec2> texcoords1;
 	std::vector<glm::vec4> colors0;
+
 	std::vector<LumenPrimMesh> prim_meshes;
 	std::vector<Material> materials;
 	std::vector<std::string> textures;

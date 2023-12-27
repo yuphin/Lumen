@@ -84,7 +84,6 @@ void LumenScene::load_scene(const std::string& path) {
 
 	auto root = path.substr(0, found + 1);
 
-
 	if (ends_with(path, ".json")) {
 		std::ifstream i(path);
 		json j;
@@ -145,6 +144,7 @@ void LumenScene::load_scene(const std::string& path) {
 
 		prim_meshes.resize(shapes.size());
 		for (uint32_t s = 0; s < shapes.size(); s++) {
+			MeshData mesh_data;
 			prim_meshes[s].first_idx = (uint32_t)indices.size();
 			prim_meshes[s].vtx_offset = (uint32_t)positions.size();
 			prim_meshes[s].name = shapes[s].name;
@@ -158,23 +158,23 @@ void LumenScene::load_scene(const std::string& path) {
 			for (uint32_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
 				for (uint32_t v = 0; v < 3; v++) {
 					tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
-					indices.push_back(idx_val++);
+					mesh_data.indices.push_back(idx_val++);
 					tinyobj::real_t vx = attrib.vertices[3 * uint32_t(idx.vertex_index) + 0];
 					tinyobj::real_t vy = attrib.vertices[3 * uint32_t(idx.vertex_index) + 1];
 					tinyobj::real_t vz = attrib.vertices[3 * uint32_t(idx.vertex_index) + 2];
-					positions.emplace_back(vx, vy, vz);
-					min_vtx = glm::min(positions[positions.size() - 1], min_vtx);
-					max_vtx = glm::max(positions[positions.size() - 1], max_vtx);
+					mesh_data.positions.emplace_back(vx, vy, vz);
+					min_vtx = glm::min(mesh_data.positions[mesh_data.positions.size() - 1], min_vtx);
+					max_vtx = glm::max(mesh_data.positions[mesh_data.positions.size() - 1], max_vtx);
 					if (idx.normal_index >= 0) {
 						tinyobj::real_t nx = attrib.normals[3 * uint32_t(idx.normal_index) + 0];
 						tinyobj::real_t ny = attrib.normals[3 * uint32_t(idx.normal_index) + 1];
 						tinyobj::real_t nz = attrib.normals[3 * uint32_t(idx.normal_index) + 2];
-						normals.emplace_back(nx, ny, nz);
+						mesh_data.normals.emplace_back(nx, ny, nz);
 					}
 					if (idx.texcoord_index >= 0) {
 						tinyobj::real_t tx = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 0];
 						tinyobj::real_t ty = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 1];
-						texcoords0.emplace_back(tx, ty);
+						mesh_data.texcoords0.emplace_back(tx, ty);
 					}
 				}
 				index_offset += 3;
@@ -182,8 +182,18 @@ void LumenScene::load_scene(const std::string& path) {
 			prim_meshes[s].min_pos = min_vtx;
 			prim_meshes[s].max_pos = max_vtx;
 			prim_meshes[s].world_matrix = glm::mat4(1);
+
+		    positions.insert(positions.end(), std::make_move_iterator(mesh_data.positions.begin()), std::make_move_iterator(mesh_data.positions.end()));
+		    indices.insert(indices.end(), std::make_move_iterator(mesh_data.indices.begin()), std::make_move_iterator(mesh_data.indices.end()));
+		    normals.insert(normals.end(), std::make_move_iterator(mesh_data.normals.begin()), std::make_move_iterator(mesh_data.normals.end()));
+		    tangents.insert(tangents.end(), std::make_move_iterator(mesh_data.tangents.begin()), std::make_move_iterator(mesh_data.tangents.end()));
+		    texcoords0.insert(texcoords0.end(), std::make_move_iterator(mesh_data.texcoords0.begin()), std::make_move_iterator(mesh_data.texcoords0.end()));
+		    texcoords1.insert(texcoords1.end(), std::make_move_iterator(mesh_data.texcoords1.begin()), std::make_move_iterator(mesh_data.texcoords1.end()));
+		    colors0.insert(colors0.end(), std::make_move_iterator(mesh_data.colors0.begin()), std::make_move_iterator(mesh_data.colors0.end()));
 			// TODO: Implement world transforms
 		}
+
+
 		auto& bsdfs_arr = j["bsdfs"];
 		auto& lights_arr = j["lights"];
 		materials.resize(bsdfs_arr.size());
@@ -230,8 +240,7 @@ void LumenScene::load_scene(const std::string& path) {
 				materials[bsdf_idx].bsdf_type = BSDF_TYPE_GLASS;
 				materials[bsdf_idx].bsdf_props = BSDF_FLAG_SPECULAR | BSDF_FLAG_TRANSMISSION;
 				materials[bsdf_idx].ior = bsdf["ior"];
-			} 
-			 else if (bsdf["type"] == "dielectric") {
+			} else if (bsdf["type"] == "dielectric") {
 				materials[bsdf_idx].bsdf_type = BSDF_TYPE_DIELECTRIC;
 				materials[bsdf_idx].bsdf_props = BSDF_FLAG_SPECULAR | BSDF_FLAG_TRANSMISSION | BSDF_FLAG_REFLECTION;
 				materials[bsdf_idx].ior = bsdf["ior"];
@@ -240,8 +249,7 @@ void LumenScene::load_scene(const std::string& path) {
 				} else {
 					materials[bsdf_idx].roughness = 0.0f;
 				}
-			}
-			else if (bsdf["type"] == "glossy") {
+			} else if (bsdf["type"] == "glossy") {
 				materials[bsdf_idx].bsdf_type = BSDF_TYPE_GLOSSY;
 				materials[bsdf_idx].bsdf_props = BSDF_FLAG_GLOSSY;
 				const auto& metalness = bsdf["metalness"];
@@ -477,8 +485,7 @@ void LumenScene::create_scene_config(const std::string& integrator_name) {
 		config = std::make_unique<ReSTIRGIConfig>();
 	} else if (name == "restirpt") {
 		config = std::make_unique<ReSTIRPTConfig>();
-	}
-	else if (name == "ddgi") {
+	} else if (name == "ddgi") {
 		config = std::make_unique<DDGIConfig>();
 	} else {
 		config = std::make_unique<PathConfig>();

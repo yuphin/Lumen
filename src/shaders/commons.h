@@ -52,6 +52,8 @@ using uvec2 = glm::uvec2;
 #define ALIGN16 alignas(16)
 #define NAMESPACE_BEGIN(name) namespace name {
 #define NAMESPACE_END() }
+
+
 #else
 #define NAMESPACE_BEGIN(name)
 #define NAMESPACE_END()

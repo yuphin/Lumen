@@ -72,7 +72,6 @@ void main() {
             n_s = -n_s;
             side = false;
         }
-      
         float cos_wo = dot(wo, n_s);
         origin.xyz = offset_ray(payload.pos, n_g);
         if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
