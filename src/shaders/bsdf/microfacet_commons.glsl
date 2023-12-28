@@ -65,12 +65,13 @@ float G1_GGX_isotropic(float alpha_sqr, float cos_theta) {
 
 // pdf = G1(wo) * D(h) * max(0,dot(wo,h)) / wo.z
 float eval_vndf_pdf_isotropic(float alpha, vec3 wo, vec3 h, out float D) {
+	D = 0.0;
 	if (wo.z <= 0) {
 		return 0.0;
 	}
 	float alpha_sqr = alpha * alpha;
 	float G1 = G1_GGX_isotropic(alpha_sqr, wo.z);
-	D = D_GGX_isotropic(alpha_sqr, wo.z);
+	D = D_GGX_isotropic(alpha_sqr, h.z);
 	return G1 * D * max(0.0, dot(wo, h)) / abs(wo.z);
 }
 

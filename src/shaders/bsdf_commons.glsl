@@ -4,6 +4,20 @@
 #include "bsdf/mirror.glsl"
 #include "bsdf/glass.glsl"
 #include "bsdf/dielectric.glsl"
+
+bool is_specular(Material mat) {
+    return (mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
+}
+
+bool is_glossy(Material mat) {
+    return (mat.bsdf_props & BSDF_FLAG_GLOSSY) != 0;
+}
+
+bool is_diffuse(Material mat) {
+    return (mat.bsdf_props & BSDF_FLAG_DIFFUSE) != 0;
+}
+
+
 Material load_material(const uint material_idx, const vec2 uv) {
     Material m = materials.m[material_idx];
     if (m.texture_id > -1) {
@@ -577,7 +591,7 @@ float bsdf_pdf(const Material mat, const vec3 n_s, const vec3 wo,
 
 
 vec3 sample_bsdf_new(vec3 n_s, vec3 wo, const Material mat,
-                 const uint mode, const bool side, out vec3 wi,
+                 const uint mode, const bool forward_facing, out vec3 wi,
                  out float pdf_w, out float cos_theta, inout uvec4 seed) {
 
     vec2 rands = rand2(seed);
@@ -597,12 +611,11 @@ vec3 sample_bsdf_new(vec3 n_s, vec3 wo, const Material mat,
         f = sample_mirror(vec3(0,0,1), wo, wi, pdf_w, cos_theta);
     } break;
     case BSDF_TYPE_GLASS: {
-        f = sample_glass(mat, vec3(0,0,1), wo, wi, pdf_w, cos_theta, mode, side);
+        f = sample_glass(mat, vec3(0,0,1), wo, wi, pdf_w, cos_theta, mode, forward_facing);
     } break;
 
     case BSDF_TYPE_DIELECTRIC: {
-        f = sample_dielectric(mat, wo, wi, mode, side, pdf_w, cos_theta,  rands);
-        // LOG_CLICKED("%v3f\n", f);
+        f = sample_dielectric(mat, wo, wi, mode, forward_facing, pdf_w, cos_theta,  rands);
     } break;
     default: // Unknown
         break;
@@ -612,8 +625,8 @@ vec3 sample_bsdf_new(vec3 n_s, vec3 wo, const Material mat,
 }
 
 vec3 eval_bsdf_new(const vec3 n_s, vec3 wo, const Material mat,
-               const uint mode, const bool side, vec3 wi,
-               out float pdf_w, out float pdf_rev_w, float cos_theta) {
+               const uint mode, const bool forward_facing, vec3 wi,
+               out float pdf_w, out float pdf_rev_w, float cos_theta, bool eval_reverse) {
     pdf_w = 0;
     pdf_rev_w = 0;
     vec3 f = vec3(0);
@@ -632,16 +645,23 @@ vec3 eval_bsdf_new(const vec3 n_s, vec3 wo, const Material mat,
         f = eval_glass(pdf_w, pdf_rev_w);
     } break;
     case BSDF_TYPE_DIELECTRIC: {
-        f = eval_dielectric(mat, wo, wi, pdf_w, pdf_rev_w);
+        f = eval_dielectric(mat, wo, wi, pdf_w, pdf_rev_w, forward_facing, mode, eval_reverse);
     } break;
     default: // Unknown
         break;
     }
     return f;
 }
+
+vec3 eval_bsdf_new(const vec3 n_s, vec3 wo, const Material mat,
+               const uint mode, const bool forward_facing, vec3 wi,
+               out float pdf_w, out float pdf_rev_w, float cos_theta) {
+   
+    return eval_bsdf_new(n_s, wo, mat, mode, forward_facing, wi,  pdf_w, pdf_rev_w, cos_theta, true);
+}
 vec3 eval_bsdf_new(const vec3 n_s, const vec3 wo, const Material mat,
-               const uint mode, const bool side, const vec3 dir,
+               const uint mode, const bool forward_facing, const vec3 dir,
                out float pdf_w, float cos_theta) {
     float unused_pdf;
-    return eval_bsdf_new(n_s, wo, mat, mode, side, dir, pdf_w, unused_pdf, cos_theta);
+    return eval_bsdf_new(n_s, wo, mat, mode, forward_facing, dir, pdf_w, unused_pdf, cos_theta, false);
 }

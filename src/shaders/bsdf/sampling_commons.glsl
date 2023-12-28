@@ -15,6 +15,8 @@ float schlick_w(float u) {
 }
 bool bsdf_is_delta(float alpha) { return alpha == 0.0; }
 
+
+// Note: eta (relative IOR) is nu_i / nu_o
 bool refract(vec3 n_s, vec3 wo, bool forward_facing, float eta, uint mode, out vec3 wi, out vec3 f, out float inv_eta) {
 	wi = vec3(0);
 	f = vec3(0);
@@ -42,7 +44,7 @@ bool refract(vec3 n_s, vec3 wo, bool forward_facing, float eta, uint mode, out v
 }
 
 float fresnel_dielectric(float cos_i, float eta, bool forward_facing) {
-	cos_i = clamp(cos_i, 0.0, 1.0);
+	cos_i = clamp(cos_i, -1.0, 1.0);
 	if (!forward_facing) {
 		eta = 1.0 / eta;
 	}

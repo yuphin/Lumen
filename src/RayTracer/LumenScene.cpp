@@ -243,7 +243,6 @@ void LumenScene::load_scene(const std::string& path) {
 				materials[bsdf_idx].ior = bsdf["ior"];
 			} else if (bsdf["type"] == "dielectric") {
 				materials[bsdf_idx].bsdf_type = BSDF_TYPE_DIELECTRIC;
-				materials[bsdf_idx].bsdf_props = BSDF_FLAG_SPECULAR;
 				auto ior = bsdf["ior"];
 				auto roughness = bsdf["roughness"];
 				auto transmission = bsdf["transmission"];
@@ -255,6 +254,11 @@ void LumenScene::load_scene(const std::string& path) {
 				}
 				if(reflection.is_null() || bool(reflection)) {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_REFLECTION;
+				}
+				if(materials[bsdf_idx].ior != 1.0 && materials[bsdf_idx].roughness > 0.0) {
+					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_GLOSSY;
+				} else {
+					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_SPECULAR;
 				}
 			} else if (bsdf["type"] == "glossy") {
 				materials[bsdf_idx].bsdf_type = BSDF_TYPE_GLOSSY;
