@@ -20,7 +20,7 @@ vec3 sample_dielectric(const Material mat, const vec3 wo, out vec3 wi, const uin
 
 		ASSERT1(F <= 1, "%f\n", F);
 
-		if ((!has_reflection && !has_transmission) || (has_transmission && F == 0.0)) {
+		if ((!has_reflection && !has_transmission)) {
 			return vec3(0);
 		}
 		float pr = F;
