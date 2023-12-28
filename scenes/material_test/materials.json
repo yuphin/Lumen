@@ -35,6 +35,23 @@
             ],
             "type": "dielectric"
         },
+
+        {
+            "ior": 1.52,
+            "name": "Dielectric3",
+            "refs": [
+                "sphere8"
+            ],
+            "albedo": [
+                1,
+                1,
+                1
+            ],
+            "type": "dielectric",
+            "roughness" : 0.3,
+            "transmission" : true,
+            "reflection" : true 
+        },
         {
             "name": "Mirror",
             "refs": [
@@ -50,13 +67,11 @@
             ],
             "name": "Other Walls",
             "refs": [
-                "ceiling",
                 "back_wall",
                 "sphere3",
                 "sphere4",
                 "sphere5",
                 "sphere6",
-                "sphere8",
                 "sphere9",
                 "sphere10",
                 "sphere11",
@@ -67,13 +82,26 @@
 
         {
             "albedo": [
-                0.725,
-                0.71,
-                0.68
+                0.63,
+                0.065,
+                0.05
             ],
             "name": "Floor",
             "refs": [
                 "floor"
+            ],
+            "type": "diffuse"
+        },
+
+        {
+            "albedo": [
+                0.14,
+                0.45,
+                0.091
+            ],
+            "name": "Ceiling",
+            "refs": [
+                "ceiling"
             ],
             "type": "diffuse"
         },

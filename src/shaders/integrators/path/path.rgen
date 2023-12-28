@@ -89,6 +89,9 @@ void main() {
         if (pdf == 0) {
             break;
         }
+        if(depth == 0) {
+            // LOG_CLICKED3("%v3f - %f - %f\n", f, pdf, cos_theta);
+        }
         throughput *= f * abs(cos_theta) / pdf;
         specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
         float rr_scale = 1.0;

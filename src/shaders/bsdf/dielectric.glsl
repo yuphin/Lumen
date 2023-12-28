@@ -81,18 +81,19 @@ vec3 sample_dielectric(const Material mat, const vec3 wo, out vec3 wi, const uin
 		f = vec3(0.25 * D * F * G_GGX_correlated_isotropic(alpha, wo, wi) / (wi.z * wo.z));
 	} else {
 		float possibly_modified_eta;
-		bool tir = !refract(vec3(0, 0, 1), wo, forward_facing, mat.ior, mode, wi, f, possibly_modified_eta);
+		bool tir = !refract(h, wo, forward_facing, mat.ior, mode, wi, f, possibly_modified_eta);
 		if (wo.z * wi.z > 0 || wi.z > 0 || tir) {
 			return vec3(0);
 		}
 		float jacobian_denom = dot(wi, h) + dot(wo, h) * possibly_modified_eta;
 		jacobian_denom = jacobian_denom * jacobian_denom;
 		float jacobian = abs(dot(wi, h)) / jacobian_denom;
-		pdf_w = pdf_w * (pr / (pr + pt)) * jacobian;
+		pdf_w = pdf_w * (pt / (pr + pt)) * jacobian;
 
 		f = f * (1.0 - F) * D * G_GGX_correlated_isotropic(alpha, wo, wi) *
 			abs(dot(wi, h) * dot(wo, h) / (wi.z * wo.z * jacobian_denom));
 	}
+	cos_theta = abs(wi.z);
 	return f;
 }
 

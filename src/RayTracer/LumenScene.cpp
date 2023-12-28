@@ -212,6 +212,7 @@ void LumenScene::load_scene(const std::string& path) {
 			materials[bsdf_idx].texture_id = -1;
 			auto& refs = bsdf["refs"];
 
+
 			if (!bsdf["texture"].is_null()) {
 				textures.push_back(root + (std::string)bsdf["texture"]);
 				materials[bsdf_idx].texture_id = (int)textures.size() - 1;
@@ -242,12 +243,18 @@ void LumenScene::load_scene(const std::string& path) {
 				materials[bsdf_idx].ior = bsdf["ior"];
 			} else if (bsdf["type"] == "dielectric") {
 				materials[bsdf_idx].bsdf_type = BSDF_TYPE_DIELECTRIC;
-				materials[bsdf_idx].bsdf_props = BSDF_FLAG_SPECULAR | BSDF_FLAG_TRANSMISSION | BSDF_FLAG_REFLECTION;
-				materials[bsdf_idx].ior = bsdf["ior"];
-				if (!bsdf["roughness"].is_null()) {
-					materials[bsdf_idx].roughness = bsdf["roughness"];
-				} else {
-					materials[bsdf_idx].roughness = 0.0f;
+				materials[bsdf_idx].bsdf_props = BSDF_FLAG_SPECULAR;
+				auto ior = bsdf["ior"];
+				auto roughness = bsdf["roughness"];
+				auto transmission = bsdf["transmission"];
+				auto reflection = bsdf["reflection"];
+				materials[bsdf_idx].ior = ior.is_null() ? 1.0f : float(ior);
+				materials[bsdf_idx].roughness = roughness.is_null() ? 0.0f : float(roughness);
+				if(transmission.is_null() || bool(transmission)) {
+					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_TRANSMISSION;
+				}
+				if(reflection.is_null() || bool(reflection)) {
+					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_REFLECTION;
 				}
 			} else if (bsdf["type"] == "glossy") {
 				materials[bsdf_idx].bsdf_type = BSDF_TYPE_GLOSSY;
