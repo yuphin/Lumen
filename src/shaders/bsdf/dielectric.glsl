@@ -37,14 +37,14 @@ vec3 sample_dielectric(const Material mat, const vec3 wo, out vec3 wi, const uin
 		vec3 f;
 		if (is_reflection) {
 			wi = vec3(-wo.x, -wo.y, wo.z);
-			cos_theta = abs(wi.z);
+			cos_theta = wi.z;
 			f = vec3(F) / (cos_theta);
 			pdf_w = pr / (pr + pt);
 		} else {
 			if (!refract(vec3(0, 0, 1), wo, forward_facing, mat.ior, mode, wi, f)) {
 				return vec3(0);
 			}
-			cos_theta = abs(wi.z);
+			cos_theta = wi.z;
 			f = f * (1.0 - F) / cos_theta;
 			pdf_w = pt / (pr + pt);
 		}
@@ -87,7 +87,7 @@ vec3 sample_dielectric(const Material mat, const vec3 wo, out vec3 wi, const uin
 		f = f * (1.0 - F) * D * G_GGX_correlated_isotropic(alpha, wo, wi) *
 			abs(dot(wi, h) * dot(wo, h) / (wi.z * wo.z * jacobian_denom));
 	}
-	cos_theta = abs(wi.z);
+	cos_theta = wi.z;
 	return f;
 }
 
@@ -202,8 +202,7 @@ float eval_dielectric_pdf(Material mat, vec3 wo, vec3 wi, bool forward_facing) {
 	float pr = has_reflection ? F : 0.0;
 	float pt = has_transmission ? (1.0 - F) : 0.0;
 
-	float D;
-	float pdf_w = eval_vndf_pdf_isotropic(alpha, wo, h, D);
+	float pdf_w = eval_vndf_pdf_isotropic(alpha, wo, h);
 	if (is_reflection) {
 		float jacobian = 1.0 / (4.0 * abs(dot(wo, h)));
 		float prob_reflection = pr / (pr + pt);

@@ -1,5 +1,5 @@
 #ifndef MICROFACT_COMMONS_GLSL
-#define SMICROFACT_COMMONS_GLSL
+#define MICROFACT_COMMONS_GLSL
 #include "sampling_commons.glsl"
 
 float Smith_lambda_isotropic(float alpha_sqr, float cos_theta) {
@@ -75,6 +75,12 @@ float eval_vndf_pdf_isotropic(float alpha, vec3 wo, vec3 h, out float D) {
 	return G1 * D * max(0.0, dot(wo, h)) / abs(wo.z);
 }
 
+float eval_vndf_pdf_isotropic(float alpha, vec3 wo, vec3 h) {
+	float unused_D;
+	return eval_vndf_pdf_isotropic(alpha, wo, h, unused_D);
+	
+}
+
 float eval_vndf_pdf_anisotropic(vec2 alpha, vec3 wo, vec3 h, out float D) {
 	if (wo.z <= 0) {
 		return 0.0;
@@ -87,7 +93,7 @@ float eval_vndf_pdf_anisotropic(vec2 alpha, vec3 wo, vec3 h, out float D) {
 vec3 sample_ggx_vndf_common(vec2 alpha, vec3 wo, vec2 xi) {
 	vec3 wo_hemisphere = normalize(vec3(alpha.x * wo.x, alpha.y * wo.y, wo.z));
 
-#if 0  // Source: "Sampling Visible GGX Normals with Spherical Caps" by Dupuy & Benyoub
+#if 1 // Source: "Sampling Visible GGX Normals with Spherical Caps" by Dupuy & Benyoub
   	float phi = 2.0 * PI * xi.x;
 	float z = ((1.0 - xi.y) * (1.0f + wo_hemisphere.z)) - wo_hemisphere.z;
 	float sin_theta = sqrt(clamp(1.0f - z * z, 0.0, 1.0));

@@ -4,6 +4,7 @@
 #include "bsdf/mirror.glsl"
 #include "bsdf/glass.glsl"
 #include "bsdf/dielectric.glsl"
+#include "bsdf/conductor.glsl"
 
 bool is_specular(Material mat) {
     return (mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
@@ -613,9 +614,11 @@ vec3 sample_bsdf_new(vec3 n_s, vec3 wo, const Material mat,
     case BSDF_TYPE_GLASS: {
         f = sample_glass(mat, vec3(0,0,1), wo, wi, pdf_w, cos_theta, mode, forward_facing);
     } break;
-
     case BSDF_TYPE_DIELECTRIC: {
-        f = sample_dielectric(mat, wo, wi, mode, forward_facing, pdf_w, cos_theta,  rands);
+        f = sample_dielectric(mat, wo, wi, mode, forward_facing, pdf_w, cos_theta, rands);
+    } break;
+     case BSDF_TYPE_CONDUCTOR: {
+        f = sample_conductor(mat, wo, wi, pdf_w, cos_theta, rands);
     } break;
     default: // Unknown
         break;
@@ -646,6 +649,9 @@ vec3 eval_bsdf_new(const vec3 n_s, vec3 wo, const Material mat,
     } break;
     case BSDF_TYPE_DIELECTRIC: {
         f = eval_dielectric(mat, wo, wi, pdf_w, pdf_rev_w, forward_facing, mode, eval_reverse);
+    } break;
+     case BSDF_TYPE_CONDUCTOR: {
+        f = eval_conductor(mat, wo, wi, pdf_w, pdf_rev_w, eval_reverse);
     } break;
     default: // Unknown
         break;

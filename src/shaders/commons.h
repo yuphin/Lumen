@@ -16,6 +16,7 @@
 #define BSDF_TYPE_GLOSSY 1 << 3
 #define BSDF_TYPE_DISNEY 1 << 4
 #define BSDF_TYPE_DIELECTRIC 1 << 5
+#define BSDF_TYPE_CONDUCTOR 1 << 6
 #define BSDF_NONE -1
 
 // BSDF Props
@@ -218,6 +219,8 @@ struct Material {
 	uint bsdf_type;
 	vec3 metalness;
 	uint bsdf_props;
+	// TODO: Organize
+	vec3 eta;
 	int texture_id;
 	
 	float roughness;

@@ -183,16 +183,22 @@ void LumenScene::load_scene(const std::string& path) {
 			prim_meshes[s].max_pos = max_vtx;
 			prim_meshes[s].world_matrix = glm::mat4(1);
 
-		    positions.insert(positions.end(), std::make_move_iterator(mesh_data.positions.begin()), std::make_move_iterator(mesh_data.positions.end()));
-		    indices.insert(indices.end(), std::make_move_iterator(mesh_data.indices.begin()), std::make_move_iterator(mesh_data.indices.end()));
-		    normals.insert(normals.end(), std::make_move_iterator(mesh_data.normals.begin()), std::make_move_iterator(mesh_data.normals.end()));
-		    tangents.insert(tangents.end(), std::make_move_iterator(mesh_data.tangents.begin()), std::make_move_iterator(mesh_data.tangents.end()));
-		    texcoords0.insert(texcoords0.end(), std::make_move_iterator(mesh_data.texcoords0.begin()), std::make_move_iterator(mesh_data.texcoords0.end()));
-		    texcoords1.insert(texcoords1.end(), std::make_move_iterator(mesh_data.texcoords1.begin()), std::make_move_iterator(mesh_data.texcoords1.end()));
-		    colors0.insert(colors0.end(), std::make_move_iterator(mesh_data.colors0.begin()), std::make_move_iterator(mesh_data.colors0.end()));
+			positions.insert(positions.end(), std::make_move_iterator(mesh_data.positions.begin()),
+							 std::make_move_iterator(mesh_data.positions.end()));
+			indices.insert(indices.end(), std::make_move_iterator(mesh_data.indices.begin()),
+						   std::make_move_iterator(mesh_data.indices.end()));
+			normals.insert(normals.end(), std::make_move_iterator(mesh_data.normals.begin()),
+						   std::make_move_iterator(mesh_data.normals.end()));
+			tangents.insert(tangents.end(), std::make_move_iterator(mesh_data.tangents.begin()),
+							std::make_move_iterator(mesh_data.tangents.end()));
+			texcoords0.insert(texcoords0.end(), std::make_move_iterator(mesh_data.texcoords0.begin()),
+							  std::make_move_iterator(mesh_data.texcoords0.end()));
+			texcoords1.insert(texcoords1.end(), std::make_move_iterator(mesh_data.texcoords1.begin()),
+							  std::make_move_iterator(mesh_data.texcoords1.end()));
+			colors0.insert(colors0.end(), std::make_move_iterator(mesh_data.colors0.begin()),
+						   std::make_move_iterator(mesh_data.colors0.end()));
 			// TODO: Implement world transforms
 		}
-
 
 		auto& bsdfs_arr = j["bsdfs"];
 		auto& lights_arr = j["lights"];
@@ -211,7 +217,6 @@ void LumenScene::load_scene(const std::string& path) {
 		for (auto& bsdf : bsdfs_arr) {
 			materials[bsdf_idx].texture_id = -1;
 			auto& refs = bsdf["refs"];
-
 
 			if (!bsdf["texture"].is_null()) {
 				textures.push_back(root + (std::string)bsdf["texture"]);
@@ -249,13 +254,32 @@ void LumenScene::load_scene(const std::string& path) {
 				auto reflection = bsdf["reflection"];
 				materials[bsdf_idx].ior = ior.is_null() ? 1.0f : float(ior);
 				materials[bsdf_idx].roughness = roughness.is_null() ? 0.0f : float(roughness);
-				if(transmission.is_null() || bool(transmission)) {
+				if (transmission.is_null() || bool(transmission)) {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_TRANSMISSION;
 				}
-				if(reflection.is_null() || bool(reflection)) {
+				if (reflection.is_null() || bool(reflection)) {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_REFLECTION;
 				}
-				if(materials[bsdf_idx].ior != 1.0 && materials[bsdf_idx].roughness > 0.0) {
+				if (materials[bsdf_idx].ior != 1.0 && materials[bsdf_idx].roughness > 0.0) {
+					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_GLOSSY;
+				} else {
+					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_SPECULAR;
+				}
+			} else if (bsdf["type"] == "conductor") {
+				materials[bsdf_idx].bsdf_type = BSDF_TYPE_CONDUCTOR;
+				auto roughness = bsdf["roughness"];
+				auto reflectivity = bsdf["reflectivity"];
+				auto edge_tint = bsdf["edge_tint"];
+				auto reflectance = bsdf["reflectance"];
+				materials[bsdf_idx].roughness = roughness.is_null() ? 0.0f : float(roughness);
+				if (!reflectance.is_null()) {
+					auto reflectance_val = glm::clamp(glm::vec3(reflectance[0], reflectance[1], reflectance[2]), 0.0f, 0.9999f);
+					materials[bsdf_idx].albedo = glm::vec3(1.0);
+					materials[bsdf_idx].eta =
+						2.0f * glm::sqrt(reflectance_val) / glm::sqrt(glm::max(glm::vec3(1.0f) - reflectance_val, 0.0f));
+				}
+				materials[bsdf_idx].bsdf_props = BSDF_FLAG_REFLECTION;
+				if(materials[bsdf_idx].roughness > 0.0) {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_GLOSSY;
 				} else {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_SPECULAR;

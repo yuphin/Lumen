@@ -7,14 +7,12 @@
 
 #define SAMPLING_MODE 1
 
-
 float schlick_w(float u) {
-    float m = clamp(1 - u, 0, 1);
-    float m2 = m * m;
-    return m2 * m2 * m;
+	float m = clamp(1 - u, 0, 1);
+	float m2 = m * m;
+	return m2 * m2 * m;
 }
 bool bsdf_is_delta(float alpha) { return alpha == 0.0; }
-
 
 // Note: eta (relative IOR) is nu_i / nu_o
 bool refract(vec3 n_s, vec3 wo, bool forward_facing, float eta, uint mode, out vec3 wi, out vec3 f, out float inv_eta) {
@@ -60,6 +58,28 @@ float fresnel_dielectric(float cos_i, float eta, bool forward_facing) {
 	float r_parallel = (eta * cos_i - cos_t) / (eta * cos_i + cos_t);
 	float r_perp = (cos_i - eta * cos_t) / (cos_i + eta * cos_t);
 	return 0.5 * (r_parallel * r_parallel + r_perp * r_perp);
+}
+
+// https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
+float fresnel_conductor(float cos_i, float eta, float k) {
+	float cos_sqr = cos_i * cos_i;
+	float sin_sqr = max(1.0f - cos_sqr, 0.0f);
+	float sin_4 = sin_sqr * sin_sqr;
+
+	float inner_term = eta * eta - k * k - sin_sqr;
+	float a_sq_p_b_sq = sqrt(max(inner_term * inner_term + 4.0f * eta * eta * k * k, 0.0f));
+	float a = sqrt(max((a_sq_p_b_sq + inner_term) * 0.5f, 0.0f));
+
+	float rs = ((a_sq_p_b_sq + cos_sqr) - (2.0f * a * cos_i)) / ((a_sq_p_b_sq + cos_sqr) + (2.0f * a * cos_i));
+	float rp = ((cos_sqr * a_sq_p_b_sq + sin_4) - (2.0f * a * cos_i * sin_sqr)) /
+			   ((cos_sqr * a_sq_p_b_sq + sin_4) + (2.0f * a * cos_i * sin_sqr));
+
+	return 0.5f * (rs + rs * rp);
+}
+
+vec3 fresnel_conductor(float cos_i, vec3 eta, vec3 k) {
+	return vec3(fresnel_conductor(cos_i, eta.x, k.x), fresnel_conductor(cos_i, eta.y, k.y),
+				fresnel_conductor(cos_i, eta.z, k.z));
 }
 
 vec3 sample_hemisphere(vec2 xi, out float phi) {
