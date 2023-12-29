@@ -48,7 +48,7 @@
                 1
             ],
             "type": "dielectric",
-            "roughness" : 0.3,
+            "roughness" : 0.1,
             "transmission" : true,
             "reflection" : true 
         },
@@ -59,6 +59,16 @@
             ],
             "type": "mirror"
         },
+
+        {
+            "name": "Conductor",
+            "refs": [
+                "sphere3"
+            ],
+            "type": "conductor",
+            "roughness" : 0.2,
+            "reflectance" : [1,1,0]
+        },
         {
             "albedo": [
                 0.725,
@@ -68,7 +78,6 @@
             "name": "Other Walls",
             "refs": [
                 "back_wall",
-                "sphere3",
                 "sphere4",
                 "sphere5",
                 "sphere6",
