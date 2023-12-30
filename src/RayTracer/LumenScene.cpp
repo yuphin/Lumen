@@ -273,13 +273,14 @@ void LumenScene::load_scene(const std::string& path) {
 				auto reflectance = bsdf["reflectance"];
 				materials[bsdf_idx].roughness = roughness.is_null() ? 0.0f : float(roughness);
 				if (!reflectance.is_null()) {
-					auto reflectance_val = glm::clamp(glm::vec3(reflectance[0], reflectance[1], reflectance[2]), 0.0f, 0.9999f);
+					auto reflectance_val =
+						glm::clamp(glm::vec3(reflectance[0], reflectance[1], reflectance[2]), 0.0f, 0.9999f);
 					materials[bsdf_idx].albedo = glm::vec3(1.0);
-					materials[bsdf_idx].eta =
-						2.0f * glm::sqrt(reflectance_val) / glm::sqrt(glm::max(glm::vec3(1.0f) - reflectance_val, 0.0f));
+					materials[bsdf_idx].eta = 2.0f * glm::sqrt(reflectance_val) /
+											  glm::sqrt(glm::max(glm::vec3(1.0f) - reflectance_val, 0.0f));
 				}
 				materials[bsdf_idx].bsdf_props = BSDF_FLAG_REFLECTION;
-				if(materials[bsdf_idx].roughness > 0.0) {
+				if (materials[bsdf_idx].roughness > 0.0) {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_GLOSSY;
 				} else {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_SPECULAR;

@@ -82,6 +82,11 @@ vec3 fresnel_conductor(float cos_i, vec3 eta, vec3 k) {
 				fresnel_conductor(cos_i, eta.z, k.z));
 }
 
+float fresnel_schlick(float f0, float f90, float ns) {
+	// Makes sure that (1.0 - n_s) >= 0
+    return f0 + (f90 - f0) * pow(max(1.0 - ns, 0), 5.0f);
+}
+
 vec3 sample_hemisphere(vec2 xi, out float phi) {
 	phi = TWO_PI * xi.x;
 	float cos_theta = (2.0 * xi.y - 1.0);
