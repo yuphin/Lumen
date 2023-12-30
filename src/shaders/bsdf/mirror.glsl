@@ -1,3 +1,5 @@
+#ifndef MIRROR_GLSL
+#define MIRROR_GLSL
 vec3 sample_mirror(vec3 n_s, vec3 wo, out vec3 wi, out float pdf_w, out float cos_theta) {
     if(dot(wo, n_s) <= 0) {
         pdf_w = 0;
@@ -20,3 +22,4 @@ vec3 eval_mirror(out float pdf_w, out float pdf_rev_w) {
 float eval_mirror_pdf() {
     return 0.0;
 }
+#endif

@@ -1,3 +1,5 @@
+#ifndef DIELECTRIC_GLSL
+#define DIELECTRIC_GLSL
 #include "microfacet_commons.glsl"
 
 vec3 sample_dielectric(const Material mat, const vec3 wo, out vec3 wi, const uint mode, const bool forward_facing,
@@ -219,3 +221,4 @@ float eval_dielectric_pdf(Material mat, vec3 wo, vec3 wi, bool forward_facing) {
 
 	return pdf_w;
 }
+#endif

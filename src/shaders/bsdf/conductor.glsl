@@ -1,3 +1,5 @@
+#ifndef CONDUCTOR_GLSL
+#define CONDUCTOR_GLSL
 #include "microfacet_commons.glsl"
 
 // Conductor BRDF assumes no refraction
@@ -86,3 +88,4 @@ float eval_conductor_pdf(Material mat, vec3 wo, vec3 wi) {
 
 	return eval_vndf_pdf_isotropic(alpha, wo, h) / (4.0 * dot(wo, h));
 }
+#endif

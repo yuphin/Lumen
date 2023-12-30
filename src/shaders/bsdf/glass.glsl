@@ -1,3 +1,5 @@
+#ifndef GLASS_GLSL
+#define GLASS_GLSL
 #include "sampling_commons.glsl"
 vec3 sample_glass(Material mat, vec3 n_s, vec3 wo, out vec3 wi, out float pdf_w, out float cos_theta, uint mode, bool forward_facing) {
 	wi = vec3(0);
@@ -20,3 +22,4 @@ vec3 eval_glass(out float pdf_w, out float pdf_rev_w) {
 }
 
 float eval_glass_pdf() { return 0.0; }
+#endif

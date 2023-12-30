@@ -1,11 +1,14 @@
-
+#ifndef DIFFUSE_GLSL
+#define DIFFUSE_GLSL
 #include "sampling_commons.glsl"
 
 #define DIFFUSE_BSDF_MODE_LAMBERTIAN 0
 #define DIFFUSE_BSDF_MODE_DISNEY 1
 #define DIFFUSE_BSDF_MODE_FROSTBITE 2
 
+#ifndef DIFFUSE_BSDF_MODE
 #define DIFFUSE_BSDF_MODE DIFFUSE_BSDF_MODE_LAMBERTIAN
+#endif
 
 vec3 sample_lambertian(Material mat, vec3 wo, out vec3 wi, out float pdf_w, out float cos_theta, vec2 xi) {
 	wi = sample_hemisphere(xi);
@@ -132,3 +135,4 @@ float eval_diffuse_pdf(Material mat, vec3 wo, vec3 wi) {
 	return eval_frostbite_pdf(wo, wi);
 #endif
 }
+#endif
