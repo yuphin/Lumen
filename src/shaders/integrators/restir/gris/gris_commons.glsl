@@ -165,7 +165,7 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	const vec3 p = offset_ray2(pos, n_s);
 	float light_bsdf_pdf;
 	float cos_x = dot(n_s, wi);
-	vec3 f_light = eval_bsdf(n_s, wo, hit_mat, 1, side, wi, light_bsdf_pdf, cos_x);
+	vec3 f_light = eval_bsdf(n_s, wo, hit_mat, 1, side, wi, light_bsdf_pdf);
 	any_hit_payload.hit = 1;
 	bool visible;
 
@@ -263,8 +263,6 @@ bool is_rough(in Material mat) {
 	// Only check if it's diffuse for now
 	return (mat.bsdf_type & BSDF_TYPE_DIFFUSE) != 0;
 }
-
-bool is_diffuse(in Material mat) { return (mat.bsdf_type & BSDF_TYPE_DIFFUSE) != 0; }
 
 uint offset(const uint pingpong) { return pingpong * pc.size_x * pc.size_y; }
 
@@ -427,7 +425,7 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 				float dst_postfix_pdf;
 				float rc_cos_x = dot(dst_gbuffer.n_s, dst_postfix_wi);
 				vec3 dst_postfix_f = eval_bsdf(dst_gbuffer.n_s, dst_wo, dst_hit_mat, 1, dst_side, dst_postfix_wi,
-											   dst_postfix_pdf, rc_cos_x);
+											   dst_postfix_pdf);
 
 				ASSERT(rc_type == RECONNECTION_TYPE_DEFAULT || rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC);
 				jacobian_num = dst_postfix_pdf * prefix_jacobian * g;

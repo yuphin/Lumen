@@ -48,7 +48,7 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, vec3 n_s,
     vec3 ray_origin = offset_ray2(pos, n_s);
     float pdf_rev, pdf_fwd;
     const vec3 f = eval_bsdf(n_s, wo, mat, 0, dot(payload.n_s, wo) > 0, dir,
-                             pdf_fwd, pdf_rev, cos_y);
+                             pdf_fwd, pdf_rev);
     if (f == vec3(0)) {
         return L;
     }
@@ -199,7 +199,7 @@ vec3 vcm_connect_light(vec3 n_s, vec3 wo, Material mat, bool side, float eta_vm,
     const vec3 ray_origin = offset_ray2(payload.pos, n_s);
     any_hit_payload.hit = 1;
     float pdf_fwd;
-    f = eval_bsdf(n_s, wo, mat, 1, side, wi, pdf_fwd, pdf_rev, cos_x);
+    f = eval_bsdf(n_s, wo, mat, 1, side, wi, pdf_fwd, pdf_rev);
     if (f != vec3(0)) {
         traceRayEXT(tlas,
                     gl_RayFlagsTerminateOnFirstHitEXT |
@@ -247,7 +247,7 @@ vec3 vcm_connect_light_vertices(uint light_path_len, uint light_path_idx,
         if (G > 0) {
             float cam_pdf_fwd, light_pdf_fwd, light_pdf_rev;
             const vec3 f_cam =
-                eval_bsdf(n_s, wo, mat, 1, side, dir, cam_pdf_fwd, cos_cam);
+                eval_bsdf(n_s, wo, mat, 1, side, dir, cam_pdf_fwd);
             const Material light_mat =
                 load_material(light_vtx(light_path_idx + i).material_idx,
                               light_vtx(light_path_idx + i).uv);
@@ -256,7 +256,7 @@ vec3 vcm_connect_light_vertices(uint light_path_len, uint light_path_idx,
                 eval_bsdf(light_vtx(light_path_idx + i).n_s,
                           light_vtx(light_path_idx + i).wo, light_mat, 0,
                           light_vtx(light_path_idx + i).side == 1, -dir,
-                          light_pdf_fwd, light_pdf_rev, cos_light);
+                          light_pdf_fwd, light_pdf_rev);
             if (f_light != vec3(0) && f_cam != vec3(0)) {
                 cam_pdf_fwd *= abs(cos_light) / len_sqr;
                 light_pdf_fwd *= abs(cos_cam) / len_sqr;
@@ -319,7 +319,7 @@ vec3 vcm_merge_light_vertices(uint light_path_len, uint light_path_idx,
                     float cam_pdf_fwd, cam_pdf_rev;
                     const float cos_theta = dot(photons.d[h].wi, n_s);
                     vec3 f = eval_bsdf(n_s, wo, mat, 1, side, photons.d[h].wi,
-                                       cam_pdf_fwd, cam_pdf_rev, cos_theta);
+                                       cam_pdf_fwd, cam_pdf_rev);
 
                     if (f != vec3(0)) {
                         const float w_light = photons.d[h].d_vcm * eta_vc +
@@ -488,7 +488,7 @@ void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
         }
         float pdf_rev = pdf_dir;
         if (!mat_specular) {
-            pdf_rev = bsdf_pdf(mat, n_s, vcm_state.wi, wo);
+            pdf_rev = bsdf_pdf(mat, n_s, vcm_state.wi, wo, side);
         }
         const float abs_cos_theta = abs(cos_theta);
 
@@ -682,7 +682,7 @@ vec3 vcm_trace_eye(VCMState camera_state, float eta_vcm, float eta_vc,
         }
         pdf_rev = pdf_dir;
         if (!mat_specular) {
-            pdf_rev = bsdf_pdf(mat, n_s, camera_state.wi, wo);
+            pdf_rev = bsdf_pdf(mat, n_s, camera_state.wi, wo, side);
         }
         const float abs_cos_theta = abs(cos_theta);
 
@@ -829,7 +829,7 @@ float mlt_fill_eye() {
         }
         pdf_rev = pdf_dir;
         if (!mat_specular) {
-            pdf_rev = bsdf_pdf(mat, n_s, camera_state.wi, wo);
+            pdf_rev = bsdf_pdf(mat, n_s, camera_state.wi, wo, side);
         }
         const float abs_cos_theta = abs(cos_theta);
 
@@ -958,7 +958,7 @@ float mlt_trace_light() {
                 const float cos_cam = dot(cam_vtx(path_idx + i).n_s, dir);
                 const float G = cos_cam * cos_light / len_sqr;
                 if (G > 0) {
-                    float pdf_rev = bsdf_pdf(mat, n_s, -dir, wo);
+                    float pdf_rev = bsdf_pdf(mat, n_s, -dir, wo, cam_vtx(path_idx + i).side == 1);
                     vec3 unused;
                     float cam_pdf_fwd, cam_pdf_rev, light_pdf_fwd;
                     const Material cam_mat =
@@ -967,9 +967,9 @@ float mlt_trace_light() {
                     const vec3 f_cam = eval_bsdf(
                         cam_vtx(path_idx + i).n_s, cam_vtx(path_idx + i).wo,
                         cam_mat, 1, cam_vtx(path_idx + i).side == 1, dir,
-                        cam_pdf_fwd, cam_pdf_rev, cos_cam);
+                        cam_pdf_fwd, cam_pdf_rev);
                     const vec3 f_light = eval_bsdf(n_s, wo, mat, 0, side, -dir,
-                                                   light_pdf_fwd, cos_light);
+                                                   light_pdf_fwd);
                     if (f_light != vec3(0) && f_cam != vec3(0)) {
                         cam_pdf_fwd *= abs(cos_light) / len_sqr;
                         light_pdf_fwd *= abs(cos_cam) / len_sqr;
@@ -1025,7 +1025,7 @@ float mlt_trace_light() {
 
         float pdf_rev = pdf_dir;
         if (!mat_specular) {
-            pdf_rev = bsdf_pdf(mat, n_s, light_state.wi, wo);
+            pdf_rev = bsdf_pdf(mat, n_s, light_state.wi, wo, side);
         }
         const float abs_cos_theta = abs(cos_theta);
 

@@ -552,7 +552,7 @@ vec3 sample_light_Le(const vec4 rands_pos, const vec2 rands_dir,
             rands_pos, light, material_idx, triangle_idx, u, v);
         Material light_mat = load_material(material_idx, uv_unused);
         pos = record.pos;
-        wi = sample_cos_hemisphere(rands_dir, record.n_s, phi);
+        wi = sample_hemisphere(rands_dir, record.n_s, phi);
         n = record.n_s;
         L = light_mat.emissive_factor;
         cos_from_light = max(dot(record.n_s, wi), 0);

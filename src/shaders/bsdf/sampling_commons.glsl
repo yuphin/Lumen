@@ -84,9 +84,31 @@ vec3 fresnel_conductor(float cos_i, vec3 eta, vec3 k) {
 
 float fresnel_schlick(float f0, float f90, float ns) {
 	// Makes sure that (1.0 - n_s) >= 0
-    return f0 + (f90 - f0) * pow(max(1.0 - ns, 0), 5.0f);
+	return f0 + (f90 - f0) * pow(max(1.0 - ns, 0), 5.0f);
 }
 
+
+// Cos-weighted hemisphere sampling with explicit normal
+vec3 sample_hemisphere(vec2 xi, vec3 n, out float phi) {
+	phi = TWO_PI * xi.x;
+	float cos_theta = (2.0 * xi.y - 1.0);
+#if SAMPLING_MODE == SAMPLING_MODE_CONCENTRIC_DISK_MAPPING
+	vec3 T, B;
+	branchless_onb(n, T, B);
+	vec2 d = concentric_sample_disk(xi);
+	float z = sqrt(max(0., 1. - dot(d, d)));
+	return to_world(vec3(d, z), T, B, n);
+#else
+	return normalize(n + (vec3(sqrt(1.0 - cos_theta * cos_theta) * vec2(cos(phi), sin(phi)), cos_theta)));
+#endif
+}
+
+vec3 sample_hemisphere(vec2 xi, vec3 n) {
+	float unused_phi;
+	return sample_hemisphere(xi, n, unused_phi);
+}
+
+// Cos-weighted hemisphere sampling in local shading frame
 vec3 sample_hemisphere(vec2 xi, out float phi) {
 	phi = TWO_PI * xi.x;
 	float cos_theta = (2.0 * xi.y - 1.0);

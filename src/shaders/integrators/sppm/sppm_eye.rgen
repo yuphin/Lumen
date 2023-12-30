@@ -107,6 +107,7 @@ void main() {
             sppm_data.d[pixel_idx].throughput = throughput;
             sppm_data.d[pixel_idx].n_s = n_s;
             sppm_data.d[pixel_idx].path_len = d;
+            sppm_data.d[pixel_idx].side = uint(side);
 
             break;
         }

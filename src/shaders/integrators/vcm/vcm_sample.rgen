@@ -79,7 +79,7 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
     vec3 ray_origin = offset_ray(pos, nrm);
     float pdf_rev, pdf_fwd;
     const vec3 f = eval_bsdf(nrm, wo, mat, 0, dot(payload.n_s, wo) > 0,
-                             dir, pdf_fwd, pdf_rev, cos_y);
+                             dir, pdf_fwd, pdf_rev);
     if (f == vec3(0)) {
         return L;
     }
@@ -139,7 +139,7 @@ vec3 sample_light_Le(const vec4 rands_pos, const vec2 rands_dir,
         light_mat = load_material(material_idx, uv_unused);
         pdf_pos = record.triangle_pdf / total_light;
         L = light_mat.emissive_factor;
-        wi = sample_cos_hemisphere(rands_dir, record.n_s, phi);
+        wi = sample_hemisphere(rands_dir, record.n_s, phi);
         pdf_dir = (dot(wi, record.n_s)) / PI;
     } else if (light_type == LIGHT_SPOT) {
         const float cos_width = cos(30 * PI / 180);
@@ -361,7 +361,7 @@ void main() {
             }
             float pdf_rev = pdf_dir;
             if (!mat_specular) {
-                pdf_rev = bsdf_pdf(mat, n_s, light_state.wi, wo);
+                pdf_rev = bsdf_pdf(mat, n_s, light_state.wi, wo, side);
             }
             const float abs_cos_theta = abs(cos_theta);
 

@@ -25,6 +25,8 @@ struct PathVertex {
 	uint light_idx;
 	uint material_idx;
 	uint delta;
+	uint side;
+	uint mode;
 	float area;
 	float pdf_fwd;
 	float pdf_rev;

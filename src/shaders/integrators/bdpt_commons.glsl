@@ -53,6 +53,8 @@ int bdpt_random_walk_light(const int max_depth, vec3 throughput,
         vtx_assign(b, uv, payload.uv);
         vtx_assign(b, material_idx, payload.material_idx);
         vtx_assign(b, throughput, throughput);
+        vtx_assign(b, side, uint(side));
+        vtx_assign(b, mode, 0);
         const Material mat = load_material(payload.material_idx, payload.uv);
         const bool mat_specular =
             (mat.bsdf_props & BSDF_FLAG_SPECULAR) == BSDF_FLAG_SPECULAR;
@@ -82,7 +84,7 @@ int bdpt_random_walk_light(const int max_depth, vec3 throughput,
 
         pdf_rev = pdf_fwd;
         if (!mat_specular) {
-            pdf_rev = bsdf_pdf(mat, n_s, wi, wo);
+            pdf_rev = bsdf_pdf(mat, n_s, wi, wo, side);
         }
         bool g_term = false;
         if (prev > -1 || finite_light) {
@@ -145,6 +147,8 @@ int bdpt_random_walk_eye(const int max_depth, vec3 throughput,
         vtx_assign(b, uv, payload.uv);
         vtx_assign(b, material_idx, payload.material_idx);
         vtx_assign(b, throughput, throughput);
+        vtx_assign(b, side, uint(side));
+        vtx_assign(b, mode, 1);
         const Material mat = load_material(payload.material_idx, payload.uv);
         const bool mat_specular =
             (mat.bsdf_props & BSDF_FLAG_SPECULAR) == BSDF_FLAG_SPECULAR;
@@ -175,7 +179,7 @@ int bdpt_random_walk_eye(const int max_depth, vec3 throughput,
 
         pdf_rev = pdf_fwd;
         if (!mat_specular) {
-            pdf_rev = bsdf_pdf(mat, n_s, wi, wo);
+            pdf_rev = bsdf_pdf(mat, n_s, wi, wo, side);
         }
         bool g_term = true;
 
@@ -220,6 +224,8 @@ int bdpt_generate_light_subpath(int max_depth) {
     light_verts.d[bdpt_path_idx].dir = wi;
     light_verts.d[bdpt_path_idx].pdf_fwd = pdf_pos;
     light_verts.d[bdpt_path_idx].n_s = n;
+    light_verts.d[bdpt_path_idx].side = 1;
+    light_verts.d[bdpt_path_idx].mode = 0;
     vec3 throughput =
         Le * cos_theta / (pdf_dir * light_verts.d[bdpt_path_idx + 0].pdf_fwd);
     light_verts.d[bdpt_path_idx + 0].throughput = Le;
@@ -248,6 +254,8 @@ int bdpt_generate_camera_subpath(vec2 d, const vec3 origin, int max_depth,
     camera_verts.d[bdpt_path_idx].throughput = vec3(1.0);
     camera_verts.d[bdpt_path_idx].delta = 0;
     camera_verts.d[bdpt_path_idx].n_s = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
+    camera_verts.d[bdpt_path_idx].side = 1;
+    light_verts.d[bdpt_path_idx].mode = 1;
 #if BDPT_MLT == 1
     ivec2 coords = ivec2(0.5 * (1 + d) * vec2(pc.size_x, pc.size_y));
     camera_verts.d[bdpt_path_idx].coords = coords.x * pc.size_y + coords.y;
@@ -323,7 +331,7 @@ float calc_mis_weight(int s, int t, const in PathVertex sampled) {
             float pdf_rev;
             if (s >= 2) {
                 wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
-                pdf_rev = bsdf_pdf(mat, light_vtx(s - 1).n_s, wo, dir);
+                pdf_rev = bsdf_pdf(mat, light_vtx(s - 1).n_s, wo, dir, light_vtx(s - 1).side == 1);
                 pdf_rev *=
                     abs(dot(dir, cam_vtx(t - 1).n_s)) / (dir_len * dir_len);
             } else if (s == 1) {
@@ -356,7 +364,7 @@ float calc_mis_weight(int s, int t, const in PathVertex sampled) {
             const Material mat =
                 load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
             vec3 wo = normalize(light_vtx(s - 1).pos - cam_vtx(t - 1).pos);
-            cam_vtx(t - 2).pdf_rev = bsdf_pdf(mat, cam_vtx(t - 1).n_s, wo, dir);
+            cam_vtx(t - 2).pdf_rev = bsdf_pdf(mat, cam_vtx(t - 1).n_s, wo, dir, cam_vtx(t - 1).side == 1);
             if (cam_vtx(t - 2).pdf_rev != 0) {
                 cam_vtx(t - 2).pdf_rev *=
                     abs(dot(dir, cam_vtx(t - 2).n_s)) / (dir_len * dir_len);
@@ -389,7 +397,7 @@ float calc_mis_weight(int s, int t, const in PathVertex sampled) {
             const Material mat =
                 load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
             light_vtx(s - 1).pdf_rev =
-                bsdf_pdf(mat, cam_vtx(t - 1).n_s, wo, dir);
+                bsdf_pdf(mat, cam_vtx(t - 1).n_s, wo, dir, cam_vtx(t - 1).side == 1);
             if ((s == 1 && is_light_finite(light_vtx(0).light_flags)) ||
                 s > 1) {
                 light_vtx(s - 1).pdf_rev *=
@@ -407,7 +415,7 @@ float calc_mis_weight(int s, int t, const in PathVertex sampled) {
         const Material mat =
             load_material(light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
         // t - 1 -> s-1 -> s-2
-        light_vtx(s - 2).pdf_rev = bsdf_pdf(mat, light_vtx(s - 1).n_s, wo, dir);
+        light_vtx(s - 2).pdf_rev = bsdf_pdf(mat, light_vtx(s - 1).n_s, wo, dir, light_vtx(s - 1).side == 1);
         // g = 1 for infinite lights
         if (s == 2 && is_light_finite(light_vtx(0).light_flags) || s > 2) {
             light_vtx(s - 2).pdf_rev *=
@@ -484,7 +492,7 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
     const Material mat =
         load_material(light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
     const vec3 wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
-    const vec3 f = eval_bsdf(mat, wo, dir, light_vtx(s - 1).n_s);
+    const vec3 f = eval_bsdf(mat, wo, dir, light_vtx(s - 1).n_s, ight_vtx(s - 1).mode, ight_vtx(s - 1).side == 1);
     if (f == vec3(0)) {
         return L;
     }
@@ -564,7 +572,7 @@ vec3 bdpt_connect(int s, int t) {
         // TODO
         const Material mat =
             load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
-        const vec3 f = eval_bsdf(mat, wo, wi, cam_vtx(t - 1).n_s);
+        const vec3 f = eval_bsdf(mat, wo, wi, cam_vtx(t - 1).n_s, cam_vtx(t - 1).mode, cam_vtx(t - 1).side == 1);
         if (f != vec3(0)) {
             traceRayEXT(tlas,
                         gl_RayFlagsTerminateOnFirstHitEXT |
@@ -600,8 +608,8 @@ vec3 bdpt_connect(int s, int t) {
 
             vec3 wo_1 = normalize(cam_vtx(t - 2).pos - cam_vtx(t - 1).pos);
             vec3 wo_2 = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
-            const vec3 brdf1 = eval_bsdf(mat_1, wo_1, d, cam_vtx(t - 1).n_s);
-            const vec3 brdf2 = eval_bsdf(mat_2, wo_2, -d, light_vtx(s - 1).n_s);
+            const vec3 brdf1 = eval_bsdf(mat_1, wo_1, d, cam_vtx(t - 1).n_s, cam_vtx(t - 1).mode, cam_vtx(t - 1).side == 1);
+            const vec3 brdf2 = eval_bsdf(mat_2, wo_2, -d, light_vtx(s - 1).n_s, light_vtx(s - 1).mode, light_vtx(s - 1).side == 1);
             if (brdf1 != vec3(0) && brdf2 != vec3(0)) {
                 vec3 ray_origin =
                     offset_ray2(cam_vtx(t - 1).pos, cam_vtx(t - 1).n_s);

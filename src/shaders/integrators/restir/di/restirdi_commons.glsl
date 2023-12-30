@@ -70,7 +70,8 @@ vec3 calc_L(const RestirReservoir r) {
     vec3 wi = light_pos - pos;
     const float wi_len = length(wi);
     wi /= wi_len;
-    const vec3 f = eval_bsdf(hit_mat, wo, wi, normal);
+    // Whether it's forward facing shouldn't matter here
+    const vec3 f = eval_bsdf(hit_mat, wo, wi, normal, 1, true);
     const float cos_x = dot(normal, wi);
     const float g = abs(dot(light_n, -wi)) / (wi_len * wi_len);
     return f * Le * abs(cos_x) * g;
@@ -92,7 +93,7 @@ vec3 calc_L_with_visibility_check(const RestirReservoir r) {
     vec3 wi = light_pos - pos;
     const float wi_len = length(wi);
     wi /= wi_len;
-    const vec3 f = eval_bsdf(hit_mat, wo, wi, normal);
+    const vec3 f = eval_bsdf(hit_mat, wo, wi, normal, 1, true);
     const float cos_x = dot(normal, wi);
     const float g = abs(dot(light_n, -wi)) / (wi_len * wi_len);
     any_hit_payload.hit = 1;

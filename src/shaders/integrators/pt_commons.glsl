@@ -16,7 +16,7 @@ vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const 
     const vec3 p = offset_ray2(pos, n_s);
     float bsdf_pdf;
     float cos_x = dot(n_s, wi);
-    vec3 f = eval_bsdf_new(n_s, wo, mat, 1, side, wi, bsdf_pdf, cos_x);
+    vec3 f = eval_bsdf(n_s, wo, mat, 1, side, wi, bsdf_pdf);
     float pdf_light;
     any_hit_payload.hit = 1;
     traceRayEXT(tlas,
@@ -31,7 +31,7 @@ vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const 
     }
     if (get_light_type(record.flags) == LIGHT_AREA) {
         // Sample BSDF
-        f = sample_bsdf_new(n_s, wo, mat, 1, side, wi, bsdf_pdf, cos_x, seed);
+        f = sample_bsdf(n_s, wo, mat, 1, side, wi, bsdf_pdf, cos_x, seed);
         if (bsdf_pdf != 0) {
             traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, p, tmin, wi, tmax, 0);
             if (payload.material_idx == record.material_idx &&

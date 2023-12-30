@@ -87,7 +87,7 @@ void main() {
             float cos_x = dot(normal, wi);
             const float g = abs(cos_from_light) / (wi_len * wi_len);
             const vec3 f =
-                eval_bsdf(normal, wo, hit_mat, 1, side, wi, bsdf_pdf, cos_x);
+                eval_bsdf(normal, wo, hit_mat, 1, side, wi, bsdf_pdf);
 
             pdf_light *= 1 / pc.num_lights;
             // f * L * G / pdf
@@ -124,7 +124,7 @@ void main() {
                             gl_RayFlagsSkipClosestHitShaderEXT,
                         0xFF, 1, 0, 1, offset_ray2(pos, normal), 0, wi,
                         wi_len - EPS, 1);
-            vec3 f = eval_bsdf(hit_mat, wo, wi, normal);
+            vec3 f = eval_bsdf(hit_mat, wo, wi, normal, 1, side);
             const float cos_x = dot(normal, wi);
             const float g = abs(dot(light_n, -wi)) / (wi_len * wi_len);
             bool visible = any_hit_payload.hit == 0 && f != vec3(0);

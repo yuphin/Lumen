@@ -75,7 +75,7 @@ void main() {
                         sppm_data.d[idx].material_idx, sppm_data.d[idx].uv);
                     vec3 f =
                         eval_bsdf(mat, sppm_data.d[idx].wo, photons.d[h].wi,
-                                  sppm_data.d[idx].n_s);
+                                  sppm_data.d[idx].n_s, 1, sppm_data.d[idx].side == 1);
                     vec3 phi = photons.d[h].photon_count *
                                photons.d[h].throughput * f *
                                sppm_data.d[idx].throughput;

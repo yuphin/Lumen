@@ -84,7 +84,7 @@ void main() {
         // Sample direction & update throughput
         float pdf, cos_theta;
 
-        const vec3 f = sample_bsdf_new(n_s, wo, hit_mat, 1 /*radiance=cam*/, side,
+        const vec3 f = sample_bsdf(n_s, wo, hit_mat, 1 /*radiance=cam*/, side,
                                    direction, pdf, cos_theta, seed);
         if (pdf == 0) {
             break;
