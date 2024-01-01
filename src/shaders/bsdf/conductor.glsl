@@ -26,7 +26,7 @@ vec3 sample_conductor(const Material mat, const vec3 wo, out vec3 wi, out float 
 		pdf_w = 1.0;
 		cos_theta = wi.z;
 		vec3 F = fresnel_conductor(cos_theta, mat.albedo, mat.eta);
-		return F / cos_theta;
+		return F / abs(cos_theta);
 	}
 	float D;
 	vec3 h = sample_ggx_vndf_isotropic(vec2(alpha), wo, xi, pdf_w, D);

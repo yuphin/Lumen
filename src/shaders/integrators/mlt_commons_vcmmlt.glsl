@@ -1,5 +1,5 @@
-#ifndef MLT2_COMMONS
-#define MLT2_COMMONS
+#ifndef MLT_COMMONS_VCMMLT
+#define MLT_COMMONS_VCMMLT
 uint mlt_get_next() { return mlt_sampler.num_light_samples++; }
 
 uint mlt_get_sample_count() { return mlt_sampler.num_light_samples; }

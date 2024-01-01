@@ -492,7 +492,7 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
     const Material mat =
         load_material(light_vtx(s - 1).material_idx, light_vtx(s - 1).uv);
     const vec3 wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
-    const vec3 f = eval_bsdf(mat, wo, dir, light_vtx(s - 1).n_s, ight_vtx(s - 1).mode, ight_vtx(s - 1).side == 1);
+    const vec3 f = eval_bsdf(mat, wo, dir, light_vtx(s - 1).n_s, light_vtx(s - 1).mode, light_vtx(s - 1).side == 1);
     if (f == vec3(0)) {
         return L;
     }

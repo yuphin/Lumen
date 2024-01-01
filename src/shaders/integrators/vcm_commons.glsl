@@ -11,7 +11,7 @@
 #if VC_MLT == 1
 #include "mlt_commons.glsl"
 #elif VCM_MLT == 1
-#include "mlt2_commons.glsl"
+#include "mlt_commons_vcmmlt.glsl"
 #endif
 
 vec3 normalize_grid(vec3 p, vec3 min_bnds, vec3 max_bnds) {

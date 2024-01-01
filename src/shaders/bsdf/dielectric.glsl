@@ -40,14 +40,14 @@ vec3 sample_dielectric(const Material mat, const vec3 wo, out vec3 wi, const uin
 		if (is_reflection) {
 			wi = vec3(-wo.x, -wo.y, wo.z);
 			cos_theta = wi.z;
-			f = vec3(F) / (cos_theta);
+			f = vec3(F) / abs(cos_theta);
 			pdf_w = pr / (pr + pt);
 		} else {
 			if (!refract(vec3(0, 0, 1), wo, forward_facing, mat.ior, mode, wi, f)) {
 				return vec3(0);
 			}
 			cos_theta = wi.z;
-			f = f * (1.0 - F) / cos_theta;
+			f = f * (1.0 - F) / abs(cos_theta);
 			pdf_w = pt / (pr + pt);
 		}
 		return f;

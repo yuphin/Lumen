@@ -87,6 +87,11 @@ float fresnel_schlick(float f0, float f90, float ns) {
 	return f0 + (f90 - f0) * pow(max(1.0 - ns, 0), 5.0f);
 }
 
+vec3 fresnel_schlick(vec3 f0, vec3 f90, float ns) {
+	// Makes sure that (1.0 - n_s) >= 0
+	return f0 + (f90 - f0) * pow(max(1.0 - ns, 0), 5.0f);
+}
+
 
 // Cos-weighted hemisphere sampling with explicit normal
 vec3 sample_hemisphere(vec2 xi, vec3 n, out float phi) {

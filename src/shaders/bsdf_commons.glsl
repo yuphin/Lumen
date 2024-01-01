@@ -5,6 +5,7 @@
 #include "bsdf/glass.glsl"
 #include "bsdf/dielectric.glsl"
 #include "bsdf/conductor.glsl"
+#include "bsdf/principled.glsl"
 
 bool is_specular(Material mat) { return (mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0; }
 
