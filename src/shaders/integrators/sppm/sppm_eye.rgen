@@ -55,7 +55,7 @@ void main() {
     vec3 phi_total = vec3(0);
     uint M = 0;
     bool specular = false;
-    bool glossy = false;
+    bool surface_recorded = false;
     for (int d = 0;; d++) {
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction,
                     tmax, 0);
@@ -64,10 +64,13 @@ void main() {
             sppm_data.d[pixel_idx].col += throughput * pc.sky_col;
             break;
         }
+        if(d >= pc.max_depth - 1) {
+            break;
+        }
         const uint mat_idx = payload.material_idx;
         const vec2 mat_uv = payload.uv;
         const Material hit_mat = load_material(mat_idx, mat_uv);
-        if (d == 0 || specular) {
+        if (d == 0 || (specular && !surface_recorded)) {
             sppm_data.d[pixel_idx].col += throughput * hit_mat.emissive_factor;
         }
         const vec3 wo = -direction;
@@ -83,23 +86,19 @@ void main() {
         float cos_wo = dot(wo, n_s);
         const vec3 pos = payload.pos;
         origin.xyz = offset_ray(pos, n_g);
-        if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
+        specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
+        if (!surface_recorded && !specular) {
             const float light_pick_pdf = 1. / pc.light_triangle_count;
             sppm_data.d[pixel_idx].col +=
                 throughput *
-                uniform_sample_light(seed, hit_mat, pos, side, n_s, wo,
-                                     specular) /
+                uniform_sample_light(seed, hit_mat, pos, side, n_s, wo) /
                 light_pick_pdf;
         }
 
-        specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
-        glossy = hit_mat.bsdf_type == BSDF_TYPE_GLOSSY;
 
         const bool mat_diffuse = (hit_mat.bsdf_type & BSDF_TYPE_DIFFUSE) != 0;
-        const bool mat_specular = specular;
-        if (mat_diffuse ||
-            ((glossy || specular) && d == pc.max_depth - 1)) {
-
+        if (!surface_recorded && mat_diffuse) {
+            surface_recorded = true;
             sppm_data.d[pixel_idx].wo = wo;
             sppm_data.d[pixel_idx].p = pos;
             sppm_data.d[pixel_idx].material_idx = mat_idx;
@@ -108,8 +107,6 @@ void main() {
             sppm_data.d[pixel_idx].n_s = n_s;
             sppm_data.d[pixel_idx].path_len = d;
             sppm_data.d[pixel_idx].side = uint(side);
-
-            break;
         }
         float pdf, cos_theta;
         const vec3 f_sampled = sample_bsdf(n_s, wo, hit_mat, 1, side,
