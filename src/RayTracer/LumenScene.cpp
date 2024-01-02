@@ -300,6 +300,7 @@ void LumenScene::load_scene(const std::string& path) {
 				mat.specular = get_or_default_f(bsdf, "specular", 0.5);
 				mat.sheen = get_or_default_f(bsdf, "sheen", 0);
 				mat.spec_trans = get_or_default_f(bsdf, "spec_trans", 0);
+				mat.flatness = get_or_default_f(bsdf, "flatness", 0.0);
 				mat.bsdf_props = BSDF_FLAG_REFLECTION | BSDF_FLAG_TRANSMISSION;
 				if (mat.roughness > 0.0) {
 					mat.bsdf_props |= BSDF_FLAG_GLOSSY;

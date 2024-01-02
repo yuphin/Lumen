@@ -1,6 +1,7 @@
 #ifndef PRINCIPLED_GLSL
 #define PRINCIPLED_GLSL
 #include "microfacet_commons.glsl"
+#include "diffuse.glsl"
 
 // Disney BSDF: https://blog.selfshadow.com/publications/s2015-shading-course/burley/s2015_pbs_disney_bsdf_notes.pdf
 // https://github.dev/schuttejoe/Selas/blob/dev/Source/Core/Shading/Disney.cpp
@@ -28,31 +29,41 @@ void initialize_sampling_pdfs(const Material mat, out float p_spec, out float p_
 	p_clearcloat = clearcoat_weight * norm;
 }
 
-vec3 calc_tint(vec3 albedo) {
-	float lum = luminance(albedo);
-	return lum > 0 ? albedo / lum : vec3(1);
+vec3 eval_disney_diffuse(Material mat, vec3 wo, vec3 wi) {
+	vec3 h = normalize(wi + wo);
+
+	float f_wi, f_wo;
+	float disney_f = disney_fresnel(wi, wo, mat.roughness, f_wi, f_wo);
+	float alpha = mat.roughness * mat.roughness;
+
+	float ss = 0;
+
+	// Retro-reflection
+	float rr = 2.0 * alpha * wi.z * wi.z;
+	float f_retro = rr * (f_wi + f_wo * f_wi * f_wo * (rr - 1.0));
+
+	float f_diff = (1.0 - 0.5 * f_wi) * (1.0 - 0.5 * f_wo);
+	if (mat.flatness > 0.0) {
+		float fss90 = 0.5 * rr;
+		float h_dot_wi_sqr = dot(h, wi);
+		h_dot_wi_sqr *= h_dot_wi_sqr;
+
+		float f_ss = mix(1.0, fss90, f_wi) * mix(1.0, fss90, f_wo);
+		ss = 1.25 * (f_ss * (1.0 / (wi.z + wo.z) - 0.5) + 0.5);
+	}
+	float ss_approx_and_diff = mix(f_diff + f_retro, ss, mat.flatness);
+	return mat.albedo * ss_approx_and_diff * INV_PI;
 }
 
-float eta_to_schlick_R0(float eta) {
-	float val = (eta - 1.0) / (eta + 1.0);
-	return val * val;
-}
-
-// Always used in BRDF context
-vec3 disney_fresnel(const Material mat, vec3 wo, vec3 h, vec3 wi, float eta) {
-	// Always equivalent to dot(wi, h)
-	float wo_dot_h = dot(wo, h);
-	vec3 tint = calc_tint(mat.albedo);
-
-	vec3 R0 = eta_to_schlick_R0(eta) * mix(vec3(1.0), calc_tint(mat.albedo), mat.specular_tint);
-
-	R0 = mix(R0, mat.albedo, mat.metallic);
-
-	// Eta already accounts for which face it corresponds to. Therefore forward_facing is set to true
-	float fr_dielectric = fresnel_dielectric(wo_dot_h, eta, true);
-	vec3 fr_metallic = fresnel_schlick(R0, vec3(1), wo_dot_h);
-
-	return mix(vec3(fr_dielectric), fr_metallic, mat.metallic);
+// In addition to diffuse, this includes retro reflection, fake subsurface and sheen
+vec3 sample_disney_diffuse(Material mat, vec3 wo, out vec3 wi, out float pdf_w, out float cos_theta, vec2 xi) {
+	wi = sample_hemisphere(xi);
+	cos_theta = wi.z;
+	pdf_w = cos_theta * INV_PI;
+	if (min(wi.z, wo.z) <= 0.0) {
+		return vec3(0);
+	}
+	return eval_disney_diffuse(mat, wo, wi);
 }
 
 vec3 sample_principled_brdf(const Material mat, const vec3 wo, inout vec3 wi, inout float pdf_w, inout float cos_theta,
@@ -68,7 +79,7 @@ vec3 sample_principled_brdf(const Material mat, const vec3 wo, inout vec3 wi, in
 		wi = vec3(-wo.x, -wo.y, wo.z);
 		pdf_w = 1.0;
 		cos_theta = wi.z;
-		vec3 F = disney_fresnel(mat, wo, vec3(0,0,1), wi, eta);
+		vec3 F = disney_fresnel(mat, wo, vec3(0, 0, 1), wi, eta);
 		return F / abs(cos_theta);
 	}
 	vec3 h = sample_ggx_vndf_isotropic(vec2(alpha), wo, xi, pdf_w, D);
@@ -82,35 +93,6 @@ vec3 sample_principled_brdf(const Material mat, const vec3 wo, inout vec3 wi, in
 	pdf_w /= (4.0 * dot(wo, h));
 	cos_theta = wi.z;
 	return 0.25 * D * F * G_GGX_correlated_isotropic(alpha, wo, wi) / (wi.z * wo.z);
-}
-
-vec3 sample_principled(const Material mat, const vec3 wo, out vec3 wi, const uint mode, const bool forward_facing,
-					   out float pdf_w, out float cos_theta, vec2 xi) {
-	wi = vec3(0);
-	pdf_w = 0.0;
-	cos_theta = 0.0;
-
-	if (wo.z <= 0.0) {
-		return vec3(0);
-	}
-	float p_spec, p_diff, p_clearcoat, p_spec_trans;
-	initialize_sampling_pdfs(mat, p_spec, p_diff, p_clearcoat, p_spec_trans);
-
-	float alpha = mat.roughness * mat.roughness;
-
-	float eta = forward_facing ? mat.ior : 1.0 / mat.ior;
-
-	vec3 f = vec3(0);
-	if (xi.x < p_spec) {
-		xi.x /= p_spec;
-		f = sample_principled_brdf(mat, wo, wi, pdf_w, cos_theta, xi, eta);
-	} else if (xi.x > p_spec && xi.x <= (p_spec + p_clearcoat)) {
-		xi.x /= (p_spec + p_clearcoat);
-	} else if (xi.x > (p_spec + p_clearcoat) && xi.x <= (p_spec + p_clearcoat + p_diff)) {
-		xi.x /= (p_spec + p_clearcoat + p_diff);
-	} else if (p_spec_trans >= 0.0) {
-	}
-	return f;
 }
 
 vec3 eval_principled_brdf(Material mat, vec3 wo, vec3 wi, inout float pdf_w, inout float pdf_rev_w, bool forward_facing,
@@ -158,6 +140,38 @@ float eval_principled_brdf_pdf(Material mat, vec3 wo, vec3 wi) {
 	return eval_vndf_pdf_isotropic(alpha, wo, h) / (4.0 * dot(wo, h));
 }
 
+
+vec3 sample_principled(const Material mat, const vec3 wo, out vec3 wi, const uint mode, const bool forward_facing,
+					   out float pdf_w, out float cos_theta, vec2 xi) {
+	wi = vec3(0);
+	pdf_w = 0.0;
+	cos_theta = 0.0;
+
+	if (wo.z <= 0.0) {
+		return vec3(0);
+	}
+	float p_spec, p_diff, p_clearcoat, p_spec_trans;
+	initialize_sampling_pdfs(mat, p_spec, p_diff, p_clearcoat, p_spec_trans);
+
+	float alpha = mat.roughness * mat.roughness;
+
+	float eta = forward_facing ? mat.ior : 1.0 / mat.ior;
+
+	vec3 f = vec3(0);
+	if (xi.x < p_spec) {
+		xi.x /= p_spec;
+		f = sample_principled_brdf(mat, wo, wi, pdf_w, cos_theta, xi, eta);
+	} else if (xi.x > p_spec && xi.x <= (p_spec + p_clearcoat)) {
+		xi.x /= (p_spec + p_clearcoat);
+	} else if (xi.x > (p_spec + p_clearcoat) && xi.x <= (p_spec + p_clearcoat + p_diff)) {
+		xi.x /= (p_spec + p_clearcoat + p_diff);
+		f = sample_disney_diffuse(mat, wo, wi, pdf_w, cos_theta, xi);
+	} else if (p_spec_trans >= 0.0) {
+	}
+	return f;
+}
+
+
 vec3 eval_principled(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float pdf_rev_w, bool forward_facing,
 					 uint mode, bool eval_reverse_pdf) {
 	pdf_w = 0.0;
@@ -167,11 +181,18 @@ vec3 eval_principled(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 	float p_spec, p_diff, p_clearcoat, p_spec_trans;
 	initialize_sampling_pdfs(mat, p_spec, p_diff, p_clearcoat, p_spec_trans);
 
+	vec3 f = vec3(0);
 	if (p_spec > 0) {
-		return eval_principled_brdf(mat, wo, wi, pdf_w, pdf_rev_w, forward_facing, mode, eval_reverse_pdf);
+		f += eval_principled_brdf(mat, wo, wi, pdf_w, pdf_rev_w, forward_facing, mode, eval_reverse_pdf);
 	}
 
-	return vec3(0);
+	if(p_diff > 0 && min(wi.z, wo.z) > 0) {
+		pdf_w = wi.z * INV_PI;
+		pdf_rev_w  = pdf_w;
+		f += eval_disney_diffuse(mat, wo, wi);
+	}
+
+	return f;
 }
 
 float eval_principled_pdf(Material mat, vec3 wo, vec3 wi, bool forward_facing) {
@@ -179,10 +200,14 @@ float eval_principled_pdf(Material mat, vec3 wo, vec3 wi, bool forward_facing) {
 	float p_spec, p_diff, p_clearcoat, p_spec_trans;
 	initialize_sampling_pdfs(mat, p_spec, p_diff, p_clearcoat, p_spec_trans);
 	if (p_spec > 0) {
-		return eval_principled_brdf_pdf(mat, wo, wi);
+		pdf += eval_principled_brdf_pdf(mat, wo, wi);
 	}
 
-	return 0;
+	if(p_diff > 0 && min(wi.z, wo.z) > 0) {
+		pdf += eval_disney_diffuse_pdf(wo, wi);
+	}
+
+	return pdf;
 }
 
 #endif

@@ -77,11 +77,6 @@ float fresnel_conductor(float cos_i, float eta, float k) {
 	return 0.5f * (rs + rs * rp);
 }
 
-vec3 fresnel_conductor(float cos_i, vec3 eta, vec3 k) {
-	return vec3(fresnel_conductor(cos_i, eta.x, k.x), fresnel_conductor(cos_i, eta.y, k.y),
-				fresnel_conductor(cos_i, eta.z, k.z));
-}
-
 float fresnel_schlick(float f0, float f90, float ns) {
 	// Makes sure that (1.0 - n_s) >= 0
 	return f0 + (f90 - f0) * pow(max(1.0 - ns, 0), 5.0f);
@@ -91,6 +86,59 @@ vec3 fresnel_schlick(vec3 f0, vec3 f90, float ns) {
 	// Makes sure that (1.0 - n_s) >= 0
 	return f0 + (f90 - f0) * pow(max(1.0 - ns, 0), 5.0f);
 }
+
+
+float eta_to_schlick_R0(float eta) {
+	float val = (eta - 1.0) / (eta + 1.0);
+	return val * val;
+}
+
+// Disney BSDF: https://blog.selfshadow.com/publications/s2015-shading-course/burley/s2015_pbs_disney_bsdf_notes.pdf
+// Frostbite: https://seblagarde.files.wordpress.com/2015/07/course_notes_moving_frostbite_to_pbr_v32.pdf
+float disney_fresnel(vec3 wi, vec3 wo, float roughness, out float f_wi, out float f_wo) {
+	vec3 h = normalize(wi + wo);
+	float wo_dot_h = dot(wo, h);
+	float fd90 = 0.5 + 2.0 * wo_dot_h * wo_dot_h * roughness;
+	float fd0 = 1.f;
+	f_wi = fresnel_schlick(fd0, fd90, wi.z);
+	f_wo = fresnel_schlick(fd0, fd90, wo.z);
+	return f_wi * f_wo;
+}
+
+float disney_fresnel(vec3 wi, vec3 wo, float roughness) {
+	float unused1, unused2;
+	return disney_fresnel(wi, wo, roughness, unused1, unused2);
+}
+
+
+
+vec3 calc_tint(vec3 albedo) {
+	float lum = luminance(albedo);
+	return lum > 0 ? albedo / lum : vec3(1);
+}
+
+// Always used in BRDF context
+vec3 disney_fresnel(const Material mat, vec3 wo, vec3 h, vec3 wi, float eta) {
+	// Always equivalent to dot(wi, h)
+	float wo_dot_h = dot(wo, h);
+	vec3 tint = calc_tint(mat.albedo);
+
+	vec3 R0 = eta_to_schlick_R0(eta) * mix(vec3(1.0), calc_tint(mat.albedo), mat.specular_tint);
+
+	R0 = mix(R0, mat.albedo, mat.metallic);
+
+	// Eta already accounts for which face it corresponds to. Therefore forward_facing is set to true
+	float fr_dielectric = fresnel_dielectric(wo_dot_h, eta, true);
+	vec3 fr_metallic = fresnel_schlick(R0, vec3(1), wo_dot_h);
+
+	return mix(vec3(fr_dielectric), fr_metallic, mat.metallic);
+}
+
+vec3 fresnel_conductor(float cos_i, vec3 eta, vec3 k) {
+	return vec3(fresnel_conductor(cos_i, eta.x, k.x), fresnel_conductor(cos_i, eta.y, k.y),
+				fresnel_conductor(cos_i, eta.z, k.z));
+}
+
 
 
 // Cos-weighted hemisphere sampling with explicit normal

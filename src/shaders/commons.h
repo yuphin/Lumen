@@ -237,6 +237,7 @@ struct Material {
 	float clearcoat_gloss;
 	float sheen;
 	float subsurface;
+	float flatness;
 };
 
 // Scene buffer addresses

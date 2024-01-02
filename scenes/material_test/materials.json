@@ -82,6 +82,19 @@
             "spec_trans": 0.0,
             "specular_tint" : 0.5
         },
+
+        {
+            "name": "Principled2",
+            "refs": [
+                "sphere9"
+            ],
+            "type": "principled",
+            "albedo": [1,0,1],
+            "roughness" : 1.0,
+            "metallic" : 0.0,
+            "spec_trans": 0.0,
+            "specular_tint" : 0.0
+        },
         {
             "albedo": [
                 0.725,
@@ -91,7 +104,6 @@
             "name": "Other Walls",
             "refs": [
                 "back_wall",
-                "sphere4",
                 "sphere5",
                 "sphere6",
                 "sphere10",
