@@ -226,7 +226,6 @@ struct Material {
 	int texture_id;
 	
 	float roughness;
-
 	float diffuse_trans;
 	float spec_trans;
 	float metallic;

@@ -290,17 +290,20 @@ void LumenScene::load_scene(const std::string& path) {
 				Material& mat = materials[bsdf_idx];
 				mat.bsdf_type = BSDF_TYPE_PRINCIPLED;
 				mat.albedo = get_or_default_v(bsdf, "albedo", glm::vec3(1));
-				mat.metallic = get_or_default_f(bsdf, "metallic", 0);
-				mat.roughness = get_or_default_f(bsdf, "roughness", 0.5);
-				mat.specular_tint = get_or_default_f(bsdf, "specular_tint", 0);
-				mat.sheen_tint = get_or_default_f(bsdf, "sheen_tint", 0.5);
-				mat.clearcoat = get_or_default_f(bsdf, "clearcoat", 0);
-				mat.clearcoat_gloss = get_or_default_f(bsdf, "clearcoat_gloss", 1);
-				mat.subsurface = get_or_default_f(bsdf, "subsurface", 0);
-				mat.specular = get_or_default_f(bsdf, "specular", 0.5);
-				mat.sheen = get_or_default_f(bsdf, "sheen", 0);
-				mat.spec_trans = get_or_default_f(bsdf, "spec_trans", 0);
-				mat.flatness = get_or_default_f(bsdf, "flatness", 0.0);
+				mat.ior =  get_or_default_f(bsdf, "ior", 1.0f);
+				mat.roughness = get_or_default_f(bsdf, "roughness", 0.5f);
+				mat.diffuse_trans = get_or_default_f(bsdf, "diffuse_transmission", 0.0f);
+				mat.spec_trans = get_or_default_f(bsdf, "specular_transmission", 0.0f);
+				mat.metallic = get_or_default_f(bsdf, "metallic", 0.0f);
+				mat.specular_tint = get_or_default_f(bsdf, "specular_tint", 0.0f);
+				mat.sheen_tint = get_or_default_f(bsdf, "sheen_tint", 0.5f);
+				mat.specular = get_or_default_f(bsdf, "specular", 0.5f);
+				mat.clearcoat = get_or_default_f(bsdf, "clearcoat", 0.0f);
+				mat.clearcoat_gloss = get_or_default_f(bsdf, "clearcoat_gloss", 1.0f);
+				mat.subsurface = get_or_default_f(bsdf, "subsurface", 0.0f);
+				mat.flatness = get_or_default_f(bsdf, "flatness", 0.0f);
+				mat.sheen = get_or_default_f(bsdf, "sheen", 0.0f);
+			
 				mat.bsdf_props = BSDF_FLAG_REFLECTION | BSDF_FLAG_TRANSMISSION;
 				if (mat.roughness > 0.0) {
 					mat.bsdf_props |= BSDF_FLAG_GLOSSY;
