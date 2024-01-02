@@ -286,12 +286,6 @@ void LumenScene::load_scene(const std::string& path) {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_SPECULAR;
 				}
 			} else if (bsdf["type"] == "principled") {
-				materials[bsdf_idx].bsdf_type = BSDF_TYPE_PRINCIPLED;
-				materials[bsdf_idx].bsdf_props = BSDF_FLAG_GLOSSY;
-				const auto& metalness = bsdf["metalness"];
-				materials[bsdf_idx].metalness = glm::vec3({metalness[0], metalness[1], metalness[2]});
-				materials[bsdf_idx].roughness = bsdf["roughness"];
-			} else if (bsdf["type"] == "principled") {
 #if ENABLE_PRINCIPLED
 				Material& mat = materials[bsdf_idx];
 				mat.bsdf_type = BSDF_TYPE_PRINCIPLED;
@@ -305,7 +299,13 @@ void LumenScene::load_scene(const std::string& path) {
 				mat.subsurface = get_or_default_f(bsdf, "subsurface", 0);
 				mat.specular = get_or_default_f(bsdf, "specular", 0.5);
 				mat.sheen = get_or_default_f(bsdf, "sheen", 0);
-				mat.bsdf_props = BSDF_FLAG_GLOSSY;
+				mat.spec_trans = get_or_default_f(bsdf, "spec_trans", 0);
+				mat.bsdf_props = BSDF_FLAG_REFLECTION | BSDF_FLAG_TRANSMISSION;
+				if (mat.roughness > 0.0) {
+					mat.bsdf_props |= BSDF_FLAG_GLOSSY;
+				} else {
+					mat.bsdf_props |= BSDF_FLAG_SPECULAR;
+				}
 #endif
 			}
 

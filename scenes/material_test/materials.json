@@ -69,6 +69,19 @@
             "roughness" : 0.2,
             "reflectance" : [1,1,0]
         },
+
+        {
+            "name": "Principled1",
+            "refs": [
+                "sphere9"
+            ],
+            "type": "principled",
+            "albedo": [0,0,1],
+            "roughness" : 0.1,
+            "metallic" : 0.5,
+            "spec_trans": 0.0,
+            "specular_tint" : 0.5
+        },
         {
             "albedo": [
                 0.725,
@@ -81,7 +94,6 @@
                 "sphere4",
                 "sphere5",
                 "sphere6",
-                "sphere9",
                 "sphere10",
                 "sphere11",
                 "sphere12"

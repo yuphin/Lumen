@@ -55,14 +55,22 @@ vec3 disney_fresnel(const Material mat, vec3 wo, vec3 h, vec3 wi, float eta) {
 	return mix(vec3(fr_dielectric), fr_metallic, mat.metallic);
 }
 
-vec3 sample_disney_brdf(const Material mat, const vec3 wo, inout vec3 wi, inout float pdf_w, inout float cos_theta,
-						const vec2 xi, float eta) {
+vec3 sample_principled_brdf(const Material mat, const vec3 wo, inout vec3 wi, inout float pdf_w, inout float cos_theta,
+							const vec2 xi, float eta) {
 	bool has_reflection = bsdf_has_property(mat.bsdf_props, BSDF_FLAG_REFLECTION);
 	if ((!has_reflection)) {
 		return vec3(0);
 	}
 	float D;
 	float alpha = mat.roughness * mat.roughness;
+
+	if (bsdf_is_delta(alpha)) {
+		wi = vec3(-wo.x, -wo.y, wo.z);
+		pdf_w = 1.0;
+		cos_theta = wi.z;
+		vec3 F = disney_fresnel(mat, wo, vec3(0,0,1), wi, eta);
+		return F / abs(cos_theta);
+	}
 	vec3 h = sample_ggx_vndf_isotropic(vec2(alpha), wo, xi, pdf_w, D);
 
 	wi = reflect(-wo, h);
@@ -95,7 +103,7 @@ vec3 sample_principled(const Material mat, const vec3 wo, out vec3 wi, const uin
 	vec3 f = vec3(0);
 	if (xi.x < p_spec) {
 		xi.x /= p_spec;
-		sample_disney_brdf(mat, wo, wi, pdf_w, cos_theta, xi, eta);
+		f = sample_principled_brdf(mat, wo, wi, pdf_w, cos_theta, xi, eta);
 	} else if (xi.x > p_spec && xi.x <= (p_spec + p_clearcoat)) {
 		xi.x /= (p_spec + p_clearcoat);
 	} else if (xi.x > (p_spec + p_clearcoat) && xi.x <= (p_spec + p_clearcoat + p_diff)) {
@@ -105,12 +113,75 @@ vec3 sample_principled(const Material mat, const vec3 wo, out vec3 wi, const uin
 	return f;
 }
 
+vec3 eval_principled_brdf(Material mat, vec3 wo, vec3 wi, inout float pdf_w, inout float pdf_rev_w, bool forward_facing,
+						  uint mode, bool eval_reverse_pdf) {
+	float alpha = mat.roughness * mat.roughness;
+	if (bsdf_is_delta(alpha)) {
+		return vec3(0);
+	}
+	if (wo.z * wi.z < 0) {
+		return vec3(0);
+	}
+	if (wo.z == 0 || wi.z == 0) {
+		return vec3(0);
+	}
+	vec3 h = normalize(wo + wo);
+	float jacobian = 1.0 / (4.0 * dot(wo, h));
+	float D;
+	pdf_w = eval_vndf_pdf_isotropic(alpha, wo, h, D) / jacobian;
+	float eta = forward_facing ? mat.ior : 1.0 / mat.ior;
+	if (eval_reverse_pdf) {
+		pdf_rev_w = eval_vndf_pdf_isotropic(alpha, wi, h) / jacobian;
+	}
+	vec3 F = disney_fresnel(mat, wo, h, wi, eta);
+	return 0.25 * D * F * G_GGX_correlated_isotropic(alpha, wo, wi) / (wi.z * wo.z);
+}
+
+float eval_principled_brdf_pdf(Material mat, vec3 wo, vec3 wi) {
+	float alpha = mat.roughness * mat.roughness;
+
+	if (bsdf_is_delta(alpha)) {
+		return 0.0;
+	}
+
+	if (wo.z * wi.z < 0) {
+		return 0.0;
+	}
+	if (wo.z == 0 || wi.z == 0) {
+		return 0.0;
+	}
+
+	vec3 h = normalize(wo + wo);
+	// Make sure h is oriented towards the normal
+	h *= float(sign(h.z));
+
+	return eval_vndf_pdf_isotropic(alpha, wo, h) / (4.0 * dot(wo, h));
+}
+
 vec3 eval_principled(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float pdf_rev_w, bool forward_facing,
 					 uint mode, bool eval_reverse_pdf) {
+	pdf_w = 0.0;
+	pdf_rev_w = 0.0;
+	float alpha = mat.roughness * mat.roughness;
+
+	float p_spec, p_diff, p_clearcoat, p_spec_trans;
+	initialize_sampling_pdfs(mat, p_spec, p_diff, p_clearcoat, p_spec_trans);
+
+	if (p_spec > 0) {
+		return eval_principled_brdf(mat, wo, wi, pdf_w, pdf_rev_w, forward_facing, mode, eval_reverse_pdf);
+	}
+
 	return vec3(0);
 }
 
 float eval_principled_pdf(Material mat, vec3 wo, vec3 wi, bool forward_facing) {
+	float pdf = 0.0;
+	float p_spec, p_diff, p_clearcoat, p_spec_trans;
+	initialize_sampling_pdfs(mat, p_spec, p_diff, p_clearcoat, p_spec_trans);
+	if (p_spec > 0) {
+		return eval_principled_brdf_pdf(mat, wo, wi);
+	}
+
 	return 0;
 }
 
