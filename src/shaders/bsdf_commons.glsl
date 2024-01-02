@@ -44,6 +44,9 @@ float bsdf_pdf(const Material mat, const vec3 n_s, vec3 wo, vec3 wi, bool forwar
 		case BSDF_TYPE_CONDUCTOR: {
 			return eval_conductor_pdf(mat, wo, wi);
 		} break;
+		case BSDF_TYPE_PRINCIPLED: {
+			return eval_principled_pdf(mat, wo, wi, forward_facing);
+		} break;
 		default:  // Unknown
 			break;
 	}
@@ -75,6 +78,9 @@ vec3 sample_bsdf(vec3 n_s, vec3 wo, const Material mat, const uint mode, const b
 		} break;
 		case BSDF_TYPE_CONDUCTOR: {
 			f = sample_conductor(mat, wo, wi, pdf_w, cos_theta, rands);
+		} break;
+		case BSDF_TYPE_PRINCIPLED: {
+			f = sample_principled(mat, wo, wi, mode, forward_facing, pdf_w, cos_theta, rands);
 		} break;
 		default:  // Unknown
 			break;
@@ -113,6 +119,9 @@ vec3 eval_bsdf(const vec3 n_s, vec3 wo, const Material mat, const uint mode, con
 		} break;
 		case BSDF_TYPE_CONDUCTOR: {
 			f = eval_conductor(mat, wo, wi, pdf_w, pdf_rev_w, eval_reverse);
+		} break;
+		case BSDF_TYPE_PRINCIPLED: {
+			f = eval_principled(mat, wo, wi, pdf_w, pdf_rev_w, forward_facing, mode, eval_reverse);
 		} break;
 		default:  // Unknown
 			break;

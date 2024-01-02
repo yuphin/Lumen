@@ -285,16 +285,16 @@ void LumenScene::load_scene(const std::string& path) {
 				} else {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_SPECULAR;
 				}
-			} else if (bsdf["type"] == "glossy") {
-				materials[bsdf_idx].bsdf_type = BSDF_TYPE_GLOSSY;
+			} else if (bsdf["type"] == "principled") {
+				materials[bsdf_idx].bsdf_type = BSDF_TYPE_PRINCIPLED;
 				materials[bsdf_idx].bsdf_props = BSDF_FLAG_GLOSSY;
 				const auto& metalness = bsdf["metalness"];
 				materials[bsdf_idx].metalness = glm::vec3({metalness[0], metalness[1], metalness[2]});
 				materials[bsdf_idx].roughness = bsdf["roughness"];
-			} else if (bsdf["type"] == "disney") {
-#if ENABLE_DISNEY
+			} else if (bsdf["type"] == "principled") {
+#if ENABLE_PRINCIPLED
 				Material& mat = materials[bsdf_idx];
-				mat.bsdf_type = BSDF_TYPE_DISNEY;
+				mat.bsdf_type = BSDF_TYPE_PRINCIPLED;
 				mat.albedo = get_or_default_v(bsdf, "albedo", glm::vec3(1));
 				mat.metallic = get_or_default_f(bsdf, "metallic", 0);
 				mat.roughness = get_or_default_f(bsdf, "roughness", 0.5);
@@ -431,9 +431,9 @@ void LumenScene::load_scene(const std::string& path) {
 			i++;
 		}
 
-		auto make_default_disney = [](Material& m) {
-#if ENABLE_DISNEY
-			m.bsdf_type = BSDF_TYPE_DISNEY;
+		auto make_default_principled = [](Material& m) {
+#if ENABLE_PRINCIPLED
+			m.bsdf_type = BSDF_TYPE_PRINCIPLED;
 			m.bsdf_props = BSDF_FLAG_GLOSSY;
 			m.albedo = vec3(1.0);
 			m.metallic = 0;
@@ -456,9 +456,9 @@ void LumenScene::load_scene(const std::string& path) {
 			} else {
 				materials[i].texture_id = -1;
 			}
-#if ENABLE_DISNEY
-			make_default_disney(materials[i]);
-			// Assume Disney for other materials for now
+#if ENABLE_PRINCIPLED
+			make_default_principled(materials[i]);
+			// Assume Principled for other materials for now
 			if (m_bsdf.type == "diffuse") {
 				materials[i].albedo = m_bsdf.albedo;
 			} else if (m_bsdf.type == "roughconductor") {

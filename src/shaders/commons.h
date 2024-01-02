@@ -13,10 +13,9 @@
 #define BSDF_TYPE_DIFFUSE 1 << 0
 #define BSDF_TYPE_MIRROR 1 << 1
 #define BSDF_TYPE_GLASS 1 << 2
-#define BSDF_TYPE_GLOSSY 1 << 3
-#define BSDF_TYPE_DISNEY 1 << 4
-#define BSDF_TYPE_DIELECTRIC 1 << 5
-#define BSDF_TYPE_CONDUCTOR 1 << 6
+#define BSDF_TYPE_DIELECTRIC 1 << 3
+#define BSDF_TYPE_CONDUCTOR 1 << 4
+#define BSDF_TYPE_PRINCIPLED 1 << 5
 #define BSDF_NONE -1
 
 // BSDF Props
@@ -161,7 +160,7 @@ using uvec2 = glm::uvec2;
 
 #endif
 
-#define ENABLE_DISNEY 1
+#define ENABLE_PRINCIPLED 1
 
 struct PCPost {
 	uint enable_tonemapping;

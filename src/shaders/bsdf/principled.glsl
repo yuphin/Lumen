@@ -48,6 +48,7 @@ vec3 disney_fresnel(const Material mat, vec3 wo, vec3 h, vec3 wi, float eta) {
 
 	R0 = mix(R0, mat.albedo, mat.metallic);
 
+	// Eta already accounts for which face it corresponds to. Therefore forward_facing is set to true
 	float fr_dielectric = fresnel_dielectric(wo_dot_h, eta, true);
 	vec3 fr_metallic = fresnel_schlick(R0, vec3(1), wo_dot_h);
 
@@ -55,7 +56,7 @@ vec3 disney_fresnel(const Material mat, vec3 wo, vec3 h, vec3 wi, float eta) {
 }
 
 vec3 sample_disney_brdf(const Material mat, const vec3 wo, inout vec3 wi, inout float pdf_w, inout float cos_theta,
-						const vec2 xi) {
+						const vec2 xi, float eta) {
 	bool has_reflection = bsdf_has_property(mat.bsdf_props, BSDF_FLAG_REFLECTION);
 	if ((!has_reflection)) {
 		return vec3(0);
@@ -63,10 +64,20 @@ vec3 sample_disney_brdf(const Material mat, const vec3 wo, inout vec3 wi, inout 
 	float D;
 	float alpha = mat.roughness * mat.roughness;
 	vec3 h = sample_ggx_vndf_isotropic(vec2(alpha), wo, xi, pdf_w, D);
+
+	wi = reflect(-wo, h);
+	// Make sure the reflection lies in the same hemisphere
+	if (wo.z * wi.z < 0) {
+		return vec3(0);
+	}
+	vec3 F = disney_fresnel(mat, wo, h, wi, eta);
+	pdf_w /= (4.0 * dot(wo, h));
+	cos_theta = wi.z;
+	return 0.25 * D * F * G_GGX_correlated_isotropic(alpha, wo, wi) / (wi.z * wo.z);
 }
 
-vec3 sample_disney(const Material mat, const vec3 wo, out vec3 wi, const uint mode, const bool forward_facing,
-				   out float pdf_w, out float cos_theta, vec2 xi) {
+vec3 sample_principled(const Material mat, const vec3 wo, out vec3 wi, const uint mode, const bool forward_facing,
+					   out float pdf_w, out float cos_theta, vec2 xi) {
 	wi = vec3(0);
 	pdf_w = 0.0;
 	cos_theta = 0.0;
@@ -84,6 +95,7 @@ vec3 sample_disney(const Material mat, const vec3 wo, out vec3 wi, const uint mo
 	vec3 f = vec3(0);
 	if (xi.x < p_spec) {
 		xi.x /= p_spec;
+		sample_disney_brdf(mat, wo, wi, pdf_w, cos_theta, xi, eta);
 	} else if (xi.x > p_spec && xi.x <= (p_spec + p_clearcoat)) {
 		xi.x /= (p_spec + p_clearcoat);
 	} else if (xi.x > (p_spec + p_clearcoat) && xi.x <= (p_spec + p_clearcoat + p_diff)) {
@@ -91,6 +103,15 @@ vec3 sample_disney(const Material mat, const vec3 wo, out vec3 wi, const uint mo
 	} else if (p_spec_trans >= 0.0) {
 	}
 	return f;
+}
+
+vec3 eval_principled(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float pdf_rev_w, bool forward_facing,
+					 uint mode, bool eval_reverse_pdf) {
+	return vec3(0);
+}
+
+float eval_principled_pdf(Material mat, vec3 wo, vec3 wi, bool forward_facing) {
+	return 0;
 }
 
 #endif
