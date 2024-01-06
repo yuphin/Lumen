@@ -237,16 +237,20 @@ void LumenScene::load_scene(const std::string& path) {
 			}
 
 			if (bsdf["type"] == "diffuse") {
+				bsdf_types |= BSDF_TYPE_DIFFUSE;
 				materials[bsdf_idx].bsdf_type = BSDF_TYPE_DIFFUSE;
 				materials[bsdf_idx].bsdf_props = BSDF_FLAG_DIFFUSE_REFLECTION;
 			} else if (bsdf["type"] == "mirror") {
+				bsdf_types |= BSDF_TYPE_MIRROR;
 				materials[bsdf_idx].bsdf_type = BSDF_TYPE_MIRROR;
 				materials[bsdf_idx].bsdf_props = BSDF_FLAG_SPECULAR_REFLECTION;
 			} else if (bsdf["type"] == "glass") {
+				bsdf_types |= BSDF_TYPE_GLASS;
 				materials[bsdf_idx].bsdf_type = BSDF_TYPE_GLASS;
 				materials[bsdf_idx].bsdf_props = BSDF_FLAG_SPECULAR | BSDF_FLAG_TRANSMISSION;
 				materials[bsdf_idx].ior = bsdf["ior"];
 			} else if (bsdf["type"] == "dielectric") {
+				bsdf_types |= BSDF_TYPE_DIELECTRIC;
 				materials[bsdf_idx].bsdf_type = BSDF_TYPE_DIELECTRIC;
 				auto ior = bsdf["ior"];
 				auto roughness = bsdf["roughness"];
@@ -266,6 +270,7 @@ void LumenScene::load_scene(const std::string& path) {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_SPECULAR;
 				}
 			} else if (bsdf["type"] == "conductor") {
+				bsdf_types |= BSDF_TYPE_CONDUCTOR;
 				materials[bsdf_idx].bsdf_type = BSDF_TYPE_CONDUCTOR;
 				auto roughness = bsdf["roughness"];
 				auto reflectivity = bsdf["reflectivity"];
@@ -286,7 +291,7 @@ void LumenScene::load_scene(const std::string& path) {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_SPECULAR;
 				}
 			} else if (bsdf["type"] == "principled") {
-#if ENABLE_PRINCIPLED
+				bsdf_types |= BSDF_TYPE_PRINCIPLED;
 				Material& mat = materials[bsdf_idx];
 				mat.bsdf_type = BSDF_TYPE_PRINCIPLED;
 				mat.albedo = get_or_default_v(bsdf, "albedo", glm::vec3(1));
@@ -310,7 +315,6 @@ void LumenScene::load_scene(const std::string& path) {
 				} else {
 					mat.bsdf_props |= BSDF_FLAG_SPECULAR;
 				}
-#endif
 			}
 
 			for (auto& ref : refs) {
@@ -436,7 +440,6 @@ void LumenScene::load_scene(const std::string& path) {
 		}
 
 		auto make_default_principled = [](Material& m) {
-#if ENABLE_PRINCIPLED
 			m.bsdf_type = BSDF_TYPE_PRINCIPLED;
 			m.bsdf_props = BSDF_FLAG_GLOSSY;
 			m.albedo = vec3(1.0);
@@ -449,7 +452,6 @@ void LumenScene::load_scene(const std::string& path) {
 			m.subsurface = 0;
 			m.specular = 0.5;
 			m.sheen = 0;
-#endif
 		};
 		i = 0;
 		materials.resize(mitsuba_parser.bsdfs.size());
@@ -460,28 +462,32 @@ void LumenScene::load_scene(const std::string& path) {
 			} else {
 				materials[i].texture_id = -1;
 			}
-#if ENABLE_PRINCIPLED
 			make_default_principled(materials[i]);
 			// Assume Principled for other materials for now
 			if (m_bsdf.type == "diffuse") {
+				bsdf_types |= BSDF_TYPE_DIFFUSE;
 				materials[i].albedo = m_bsdf.albedo;
 			} else if (m_bsdf.type == "roughconductor") {
+				bsdf_types |= BSDF_TYPE_CONDUCTOR;
 				materials[i].metallic = 1;
 				materials[i].roughness = m_bsdf.roughness;
 				materials[i].albedo = m_bsdf.albedo;
 			} else if (m_bsdf.type == "roughplastic") {
+				bsdf_types |= BSDF_TYPE_DIELECTRIC;
 				materials[i].subsurface = 0.1f;
 				materials[i].albedo = m_bsdf.albedo;
 				materials[i].roughness = m_bsdf.roughness;
+				materials[i].bsdf_type = BSDF_TYPE_CONDUCTOR;
 			} else if (m_bsdf.type == "conductor") {
-				materials[i].bsdf_type = BSDF_TYPE_MIRROR;
+				bsdf_types |= BSDF_TYPE_CONDUCTOR;
+				materials[i].bsdf_type = BSDF_TYPE_CONDUCTOR;
 				materials[i].bsdf_props = BSDF_FLAG_SPECULAR_REFLECTION;
 			} else if (m_bsdf.type == "glass") {
+				bsdf_types |= BSDF_TYPE_GLASS;
 				materials[i].bsdf_type = BSDF_TYPE_GLASS;
 				materials[i].bsdf_props = BSDF_FLAG_SPECULAR_TRANSMISSION;
 				materials[i].ior = m_bsdf.ior;
 			}
-#endif
 			i++;
 		}
 		compute_scene_dimensions();

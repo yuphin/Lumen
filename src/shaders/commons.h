@@ -160,8 +160,6 @@ using uvec2 = glm::uvec2;
 
 #endif
 
-#define ENABLE_PRINCIPLED 1
-
 struct PCPost {
 	uint enable_tonemapping;
 	uint enable_bloom;

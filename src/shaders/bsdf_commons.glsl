@@ -29,24 +29,36 @@ float bsdf_pdf(const Material mat, const vec3 n_s, vec3 wo, vec3 wi, bool forwar
 	wo = to_local(wo, T, B, n_s);
 	wi = to_local(wi, T, B, n_s);
 	switch (mat.bsdf_type) {
+#ifdef ENABLE_DIFFUSE
 		case BSDF_TYPE_DIFFUSE: {
 			return eval_diffuse_pdf(mat, wo, wi);
 		} break;
+#endif
+#ifdef ENABLE_MIRROR
 		case BSDF_TYPE_MIRROR: {
 			return eval_mirror_pdf();
 		} break;
+#endif
+#ifdef ENABLE_GLASS
 		case BSDF_TYPE_GLASS: {
 			return eval_glass_pdf();
 		} break;
+#endif
+#ifdef ENABLE_DIELECTRIC
 		case BSDF_TYPE_DIELECTRIC: {
 			return eval_dielectric_pdf(mat, wo, wi, forward_facing);
 		} break;
+#endif
+#ifdef ENABLE_CONDUCTOR
 		case BSDF_TYPE_CONDUCTOR: {
 			return eval_conductor_pdf(mat, wo, wi);
 		} break;
+#endif
+#ifdef ENABLE_PRINCIPLED
 		case BSDF_TYPE_PRINCIPLED: {
 			return eval_principled_pdf(mat, wo, wi, forward_facing);
 		} break;
+#endif
 		default:  // Unknown
 			break;
 	}
@@ -64,24 +76,36 @@ vec3 sample_bsdf(vec3 n_s, vec3 wo, const Material mat, const uint mode, const b
 	branchless_onb(n_s, T, B);
 	wo = to_local(wo, T, B, n_s);
 	switch (mat.bsdf_type) {
+#ifdef ENABLE_DIFFUSE
 		case BSDF_TYPE_DIFFUSE: {
 			f = sample_diffuse(mat, wo, wi, pdf_w, cos_theta, rands.xy);
 		} break;
+#endif
+#ifdef ENABLE_MIRROR
 		case BSDF_TYPE_MIRROR: {
 			f = sample_mirror(vec3(0, 0, 1), wo, wi, pdf_w, cos_theta);
 		} break;
+#endif
+#ifdef ENABLE_GLASS
 		case BSDF_TYPE_GLASS: {
 			f = sample_glass(mat, vec3(0, 0, 1), wo, wi, pdf_w, cos_theta, mode, forward_facing);
 		} break;
+#endif
+#ifdef ENABLE_DIELECTRIC
 		case BSDF_TYPE_DIELECTRIC: {
 			f = sample_dielectric(mat, wo, wi, mode, forward_facing, pdf_w, cos_theta, rands.xy);
 		} break;
+#endif
+#ifdef ENABLE_CONDUCTOR
 		case BSDF_TYPE_CONDUCTOR: {
 			f = sample_conductor(mat, wo, wi, pdf_w, cos_theta, rands.xy);
 		} break;
+#endif
+#ifdef ENABLE_PRINCIPLED
 		case BSDF_TYPE_PRINCIPLED: {
 			f = sample_principled(mat, wo, wi, mode, forward_facing, pdf_w, cos_theta, rands);
 		} break;
+#endif
 		default:  // Unknown
 			break;
 	}
@@ -105,24 +129,36 @@ vec3 eval_bsdf(const vec3 n_s, vec3 wo, const Material mat, const uint mode, con
 	wo = to_local(wo, T, B, n_s);
 	wi = to_local(wi, T, B, n_s);
 	switch (mat.bsdf_type) {
+#ifdef ENABLE_DIFFUSE
 		case BSDF_TYPE_DIFFUSE: {
 			f = eval_diffuse(mat, wo, wi, pdf_w, pdf_rev_w);
 		} break;
+#endif
+#ifdef ENABLE_MIRROR
 		case BSDF_TYPE_MIRROR: {
 			f = eval_mirror(pdf_w, pdf_rev_w);
 		} break;
+#endif
+#ifdef ENABLE_GLASS
 		case BSDF_TYPE_GLASS: {
 			f = eval_glass(pdf_w, pdf_rev_w);
 		} break;
+#endif
+#ifdef ENABLE_DIELECTRIC
 		case BSDF_TYPE_DIELECTRIC: {
 			f = eval_dielectric(mat, wo, wi, pdf_w, pdf_rev_w, forward_facing, mode, eval_reverse);
 		} break;
+#endif
+#ifdef ENABLE_CONDUCTOR
 		case BSDF_TYPE_CONDUCTOR: {
 			f = eval_conductor(mat, wo, wi, pdf_w, pdf_rev_w, eval_reverse);
 		} break;
+#endif
+#ifdef ENABLE_PRINCIPLED
 		case BSDF_TYPE_PRINCIPLED: {
 			f = eval_principled(mat, wo, wi, pdf_w, pdf_rev_w, forward_facing, mode, eval_reverse);
 		} break;
+#endif
 		default:  // Unknown
 			break;
 	}

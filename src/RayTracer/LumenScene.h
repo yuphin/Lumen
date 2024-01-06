@@ -65,7 +65,9 @@ class LumenScene {
 
 	uint32_t dir_light_idx = -1;
 	void create_scene_config(const std::string& integrator_name);
+	inline bool has_bsdf_type(uint32_t flag) {return (bsdf_types & flag) != 0;}
 
    private:
+	uint32_t bsdf_types = 0;
 	void compute_scene_dimensions();
 };

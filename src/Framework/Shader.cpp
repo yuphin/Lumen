@@ -371,7 +371,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 						buffer_ptr_hash_map[ptr_id] = container_name + '_' + ptr_name;	//+ '_' + pointee_type_name;
 					}
 				}
-			
+
 			} break;
 		}
 		assert(insn + word_count <= code + code_size);
@@ -463,19 +463,23 @@ static std::unordered_map<std::string, shaderc_shader_kind> mstages = {
 	{"rmiss", shaderc_miss_shader},
 };
 
-static std::vector<uint32_t> compile_file(const std::string& source_name, shaderc_shader_kind kind, const std::string& source, 
-										  RenderPass* pass, bool optimize = false) {
+static std::vector<uint32_t> compile_file(const std::string& source_name, shaderc_shader_kind kind,
+										  const std::string& source, RenderPass* pass, bool optimize = false) {
 	shaderc::Compiler compiler;
 	shaderc::CompileOptions options;
 
-	for (const auto& macro : pass->macro_defines) {
-		if (macro.has_val) {
-			options.AddMacroDefinition(macro.name, std::to_string(macro.val));
-			
-		} else if(!macro.name.empty()) {
-			options.AddMacroDefinition(macro.name);
+	auto add_macros = [&options](const std::vector<ShaderMacro>& macros) {
+		for (const auto& macro : macros) {
+			if (macro.has_val) {
+				options.AddMacroDefinition(macro.name, std::to_string(macro.val));
+
+			} else if (!macro.name.empty()) {
+				options.AddMacroDefinition(macro.name);
+			}
 		}
-	}
+	};
+	add_macros(pass->macro_defines);
+	add_macros(pass->rg->global_macro_defines);
 	if (optimize) {
 		options.SetOptimizationLevel(shaderc_optimization_level_size);
 	}
@@ -519,7 +523,7 @@ int Shader::compile(RenderPass* pass) {
 		return str.substr(0, fnd);
 	};
 	const auto& str = buffer.str();
-	 // Compiling
+	// Compiling
 	binary = compile_file(filename, mstages[get_ext(filename)], str, pass);
 	parse_shader(*this, binary.data(), binary.size(), pass);
 	return 0;

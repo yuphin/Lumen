@@ -1,5 +1,6 @@
 #include "LumenPCH.h"
 #include "Integrator.h"
+#include "shaders/commons.h"
 #include <Framework/Window.h>
 #include <stb_image/stb_image.h>
 
@@ -183,6 +184,13 @@ void Integrator::init() {
 	settings.base_extent = {(uint32_t)instance->width, (uint32_t)instance->height, 1};
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	output_tex.create_empty_texture("Color Output", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL);
+
+	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_DIFFUSE", lumen_scene->has_bsdf_type(BSDF_TYPE_DIFFUSE)));
+	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_MIRROR", lumen_scene->has_bsdf_type(BSDF_TYPE_MIRROR)));
+	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_GLASS", lumen_scene->has_bsdf_type(BSDF_TYPE_GLASS)));
+	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_DIELECTRIC", lumen_scene->has_bsdf_type(BSDF_TYPE_DIELECTRIC)));
+	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_CONDUCTOR", lumen_scene->has_bsdf_type(BSDF_TYPE_CONDUCTOR)));
+	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_PRINCIPLED", lumen_scene->has_bsdf_type(BSDF_TYPE_PRINCIPLED)));
 }
 
 bool Integrator::gui() {

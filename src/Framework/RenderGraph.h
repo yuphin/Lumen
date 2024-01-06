@@ -1,6 +1,7 @@
 #pragma once
 #include "../LumenPCH.h"
 #include "CommandBuffer.h"
+#include "Framework/RenderGraphTypes.h"
 #include "Pipeline.h"
 #include "Shader.h"
 #include "Texture.h"
@@ -46,6 +47,7 @@ class RenderGraph {
 	std::unordered_map<std::string, Shader> shader_cache;
 	RenderGraphSettings settings;
 	std::mutex shader_map_mutex;
+	std::vector<ShaderMacro> global_macro_defines;
 
    private:
 	struct BufferSyncResources {
@@ -240,19 +242,30 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	std::string name_with_macros = name;
 	std::string macro_string;
 
-	if (!settings.macros.empty()) {
+	std::vector<ShaderMacro> combined_macros;
+	if (!settings.macros.empty() || !global_macro_defines.empty()) {
 		macro_string += '(';
 	}
-	for (size_t i = 0; i < settings.macros.size(); i++) {
-		if (i > 0) {
-			macro_string += ',';
+
+	auto populate_macros = [](const std::vector<ShaderMacro>& macros, std::string& macro_string, bool& prev_nonempty) {
+		for (size_t i = 0; i < macros.size(); i++) {
+			if(!macros[i].name.empty()){
+				if (prev_nonempty) {
+					macro_string += ",";
+				}
+				macro_string += macros[i].name;
+				prev_nonempty = true;
+			}
+			if (macros[i].has_val) {
+				macro_string += "=" + std::to_string(macros[i].val);
+			}
 		}
-		macro_string += settings.macros[i].name;
-		if (settings.macros[i].has_val) {
-			macro_string += "=" + std::to_string(settings.macros[i].val);
-		}
-	}
-	if (!settings.macros.empty()) {
+	};
+	bool prev_nonempty = false;
+	populate_macros(settings.macros, macro_string, prev_nonempty);
+	populate_macros(global_macro_defines, macro_string, prev_nonempty);
+	
+	if (!settings.macros.empty() || !global_macro_defines.empty()) {
 		macro_string += ')';
 	}
 	if (macro_string == "()") {
