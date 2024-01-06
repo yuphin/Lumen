@@ -86,14 +86,45 @@
         {
             "name": "Principled2",
             "refs": [
-                "sphere9"
+                "sphere4"
             ],
             "type": "principled",
             "albedo": [1,0,1],
-            "roughness" : 1.0,
-            "metallic" : 0.0,
+            "roughness" : 0.2,
+            "metallic" : 0.5,
             "spec_trans": 0.0,
             "specular_tint" : 0.0
+        },
+
+        {
+            "name": "Principled3",
+            "refs": [
+                "sphere10"
+            ],
+            "type": "principled",
+            "albedo": [1,0,1],
+            "roughness" : 0.2,
+            "metallic" : 0.0,
+            "spec_trans": 0.0,
+            "specular_tint" : 0.0,
+            "clearcoat" : 0.0,
+            "clearcoat_gloss" : 0.0
+        },
+
+        {
+            "name": "Principled3",
+            "refs": [
+                "sphere5"
+            ],
+            "type": "principled",
+            "albedo": [1,0,1],
+            "ior" : 1.52,
+            "roughness" : 0.2,
+            "metallic" : 0.0,
+            "specular_transmission": 0.8,
+            "specular_tint" : 0.0,
+            "clearcoat" : 0.0,
+            "clearcoat_gloss" : 0.0
         },
         {
             "albedo": [
@@ -104,9 +135,7 @@
             "name": "Other Walls",
             "refs": [
                 "back_wall",
-                "sphere5",
                 "sphere6",
-                "sphere10",
                 "sphere11",
                 "sphere12"
             ],

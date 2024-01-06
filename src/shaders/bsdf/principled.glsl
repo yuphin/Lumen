@@ -2,10 +2,11 @@
 #define PRINCIPLED_GLSL
 #include "microfacet_commons.glsl"
 #include "diffuse.glsl"
+#include "dielectric.glsl"
 
 // Resources and references:
 // Disney BSDF 2012:
-// https://blog.selfshadow.com/publications/s2012-shading-course/burley/s2012_pbs_disney_brdf_notes_v3.pdf Disney BSDF
+// https://blog.selfshadow.com/publications/s2012-shading-course/burley/s2012_pbs_disney_brdf_notes_v3.pdf
 // Disney BSDF 2015:
 // https://blog.selfshadow.com/publications/s2015-shading-course/burley/s2015_pbs_disney_bsdf_notes.pdf
 // https://github.dev/schuttejoe/Selas/blob/dev/Source/Core/Shading/Disney.cpp
@@ -17,11 +18,11 @@
 void initialize_sampling_pdfs(const Material mat, out float p_spec, out float p_diff, out float p_clearcloat,
 							  out float p_spec_trans) {
 	float metallic_brdf = mat.metallic * (1.0 - mat.spec_trans);
-	float specular_brdf = mat.spec_trans;
+	float specular_bsdf = (1.0 - mat.metallic) * mat.spec_trans;
 	float dielectric_brdf = (1.0 - mat.spec_trans) * (1.0 - mat.metallic);
 
 	float specular_weight = metallic_brdf + dielectric_brdf;
-	float transmission_weight = specular_brdf;
+	float transmission_weight = specular_bsdf;
 	float diffuse_weight = dielectric_brdf;
 	float clearcoat_weight = clamp(mat.clearcoat, 0.0, 1.0);
 
@@ -232,8 +233,12 @@ vec3 sample_principled(const Material mat, const vec3 wo, out vec3 wi, const uin
 		xi.x /= (p_spec + p_clearcoat + p_diff);
 		f = sample_disney_diffuse(mat, wo, wi, pdf_w, cos_theta, xi);
 		p_lobe = p_diff;
-	} else if (p_spec_trans >= 0.0) {
+	} else if (p_spec_trans >= 0.0 && xi.x <= (p_spec + p_clearcoat + p_diff + p_spec_trans)) {
+		xi.x /= (p_spec + p_clearcoat + p_diff + p_spec_trans);
+		f = sample_dielectric(mat, wo, wi, mode, forward_facing, pdf_w, cos_theta, xi);
+		p_lobe = p_spec_trans;
 	}
+
 	pdf_w *= p_lobe;
 	return f;
 }
@@ -250,6 +255,9 @@ vec3 eval_principled(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 	vec3 f = vec3(0);
 	float pdf = 0;
 	float pdf_rev = 0;
+
+	float brdf_weight = (1.0 - mat.spec_trans) * (1.0 - mat.metallic);
+	float bsdf_weight =  (1.0 - mat.metallic) * mat.spec_trans;
 	if (p_spec > 0) {
 		f += eval_principled_brdf(mat, wo, wi, pdf, pdf_rev, forward_facing, mode, eval_reverse_pdf);
 		pdf *= p_spec;
@@ -262,7 +270,7 @@ vec3 eval_principled(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 		if (p_diff > 0) {
 			pdf_w += p_diff * (wi.z * INV_PI);
 			pdf_rev_w += pdf_w;
-			f += calc_disney_diffuse_factor(mat, wo, wi);
+			f += brdf_weight * calc_disney_diffuse_factor(mat, wo, wi);
 		}
 		if (p_clearcoat > 0) {
 			f += eval_clearcoat(mat, wo, wi, pdf, pdf_rev);
@@ -271,6 +279,14 @@ vec3 eval_principled(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 			pdf_w += pdf;
 			pdf_rev_w += pdf_rev;
 		}
+	}
+
+	if(p_spec_trans > 0) {
+		f += bsdf_weight * eval_dielectric(mat, wo, wi, pdf, pdf_rev, forward_facing, mode, eval_reverse_pdf);
+		pdf *= p_spec_trans;
+		pdf_rev *= p_spec_trans;
+		pdf_w += pdf;
+		pdf_rev_w += pdf_rev;
 	}
 	return f;
 }
@@ -290,6 +306,9 @@ float eval_principled_pdf(Material mat, vec3 wo, vec3 wi, bool forward_facing) {
 		if (p_clearcoat > 0) {
 			pdf += p_clearcoat * eval_clearcoat_pdf(mat, wo, wi);
 		}
+	}
+	if(p_spec_trans > 0) {
+		pdf += p_spec_trans * eval_dielectric_pdf(mat, wo, wi, forward_facing);
 	}
 	return pdf;
 }
