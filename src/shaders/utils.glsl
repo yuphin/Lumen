@@ -48,10 +48,11 @@ struct TriangleRecord {
 };
 
 struct LightRecord {
-	uint material_idx;
 	uint light_idx;
-	uint triangle_idx;
 	uint flags;
+	vec2 bary;
+	uint triangle_idx;
+	float triangle_area;
 };
 
 #define pow5(x) (((x) * (x)) * ((x) * (x)) * (x))
