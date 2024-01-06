@@ -54,7 +54,7 @@ float bsdf_pdf(const Material mat, const vec3 n_s, vec3 wo, vec3 wi, bool forwar
 }
 
 vec3 sample_bsdf(vec3 n_s, vec3 wo, const Material mat, const uint mode, const bool forward_facing, out vec3 wi,
-				 out float pdf_w, out float cos_theta, vec2 rands) {
+				 out float pdf_w, out float cos_theta, vec3 rands) {
 	vec3 f = vec3(0);
 	pdf_w = 0;
 	cos_theta = 0;
@@ -65,7 +65,7 @@ vec3 sample_bsdf(vec3 n_s, vec3 wo, const Material mat, const uint mode, const b
 	wo = to_local(wo, T, B, n_s);
 	switch (mat.bsdf_type) {
 		case BSDF_TYPE_DIFFUSE: {
-			f = sample_diffuse(mat, wo, wi, pdf_w, cos_theta, rands);
+			f = sample_diffuse(mat, wo, wi, pdf_w, cos_theta, rands.xy);
 		} break;
 		case BSDF_TYPE_MIRROR: {
 			f = sample_mirror(vec3(0, 0, 1), wo, wi, pdf_w, cos_theta);
@@ -74,10 +74,10 @@ vec3 sample_bsdf(vec3 n_s, vec3 wo, const Material mat, const uint mode, const b
 			f = sample_glass(mat, vec3(0, 0, 1), wo, wi, pdf_w, cos_theta, mode, forward_facing);
 		} break;
 		case BSDF_TYPE_DIELECTRIC: {
-			f = sample_dielectric(mat, wo, wi, mode, forward_facing, pdf_w, cos_theta, rands);
+			f = sample_dielectric(mat, wo, wi, mode, forward_facing, pdf_w, cos_theta, rands.xy);
 		} break;
 		case BSDF_TYPE_CONDUCTOR: {
-			f = sample_conductor(mat, wo, wi, pdf_w, cos_theta, rands);
+			f = sample_conductor(mat, wo, wi, pdf_w, cos_theta, rands.xy);
 		} break;
 		case BSDF_TYPE_PRINCIPLED: {
 			f = sample_principled(mat, wo, wi, mode, forward_facing, pdf_w, cos_theta, rands);
@@ -91,7 +91,7 @@ vec3 sample_bsdf(vec3 n_s, vec3 wo, const Material mat, const uint mode, const b
 
 vec3 sample_bsdf(vec3 n_s, vec3 wo, const Material mat, const uint mode, const bool forward_facing, out vec3 wi,
 				 out float pdf_w, out float cos_theta, inout uvec4 seed) {
-	vec2 rands = rand2(seed);
+	vec3 rands = rand3(seed);
 	return sample_bsdf(n_s, wo, mat, mode, forward_facing, wi, pdf_w, cos_theta, rands);
 }
 

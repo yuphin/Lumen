@@ -15,23 +15,31 @@
 // https://github.dev/mitsuba-renderer/mitsuba3
 // Nvidia Falcor (StandardBSDF)
 
-void initialize_sampling_pdfs(const Material mat, out float p_spec, out float p_diff, out float p_clearcloat,
-							  out float p_spec_trans) {
-	float metallic_brdf = mat.metallic * (1.0 - mat.spec_trans);
-	float specular_bsdf = (1.0 - mat.metallic) * mat.spec_trans;
-	float dielectric_brdf = (1.0 - mat.spec_trans) * (1.0 - mat.metallic);
+void initialize_sampling_probs(const Material mat, float F_dielectric, bool forward_facing, out float p_spec_reflect, out float p_diff,
+							   out float p_clearcoat, out float p_spec_trans) {
+	
 
-	float specular_weight = metallic_brdf + dielectric_brdf;
-	float transmission_weight = specular_bsdf;
-	float diffuse_weight = dielectric_brdf;
-	float clearcoat_weight = clamp(mat.clearcoat, 0.0, 1.0);
 
-	float norm = 1.0 / (specular_weight + transmission_weight + diffuse_weight + clearcoat_weight);
+	float brdf_weight = (1.0 - mat.spec_trans) * (1.0 - mat.metallic);
+	float bsdf_weight = (1.0 - mat.metallic) * mat.spec_trans;
 
-	p_spec = specular_weight * norm;
-	p_spec_trans = transmission_weight * norm;
-	p_diff = diffuse_weight * norm;
-	p_clearcloat = clearcoat_weight * norm;
+	// Note: forward_facing == false indicates the ray is inside the material
+
+	// Outside: 1.0 - microfacet transmission -> microfacet reflection
+	// Inside: microfacet reflection
+	p_spec_reflect = forward_facing ? (1.0 - bsdf_weight * (1.0 - F_dielectric)) : F_dielectric;
+	// Outside: microfacet transmission
+	// Inside: microfacet transmission
+	p_spec_trans =  forward_facing ? (bsdf_weight * (1.0 - F_dielectric)) : (1.0 - F_dielectric);
+	
+	p_diff = forward_facing ? brdf_weight : 0.0;
+	p_clearcoat = forward_facing ? 0.25 * clamp(mat.clearcoat, 0.0, 1.0) : 0.0;
+
+	float norm = 1.0 / (p_spec_reflect + p_spec_trans + p_diff + p_clearcoat);
+	p_spec_reflect *= norm;
+	p_diff *= norm;
+	p_clearcoat *= norm;
+	p_spec_trans *= norm;
 }
 
 vec3 calc_disney_diffuse_factor(Material mat, vec3 wo, vec3 wi) {
@@ -203,7 +211,7 @@ float eval_principled_brdf_pdf(Material mat, vec3 wo, vec3 wi) {
 }
 
 vec3 sample_principled(const Material mat, const vec3 wo, out vec3 wi, const uint mode, const bool forward_facing,
-					   out float pdf_w, out float cos_theta, vec2 xi) {
+					   out float pdf_w, out float cos_theta, vec3 xi) {
 	wi = vec3(0);
 	pdf_w = 0.0;
 	cos_theta = 0.0;
@@ -212,7 +220,9 @@ vec3 sample_principled(const Material mat, const vec3 wo, out vec3 wi, const uin
 		return vec3(0);
 	}
 	float p_spec, p_diff, p_clearcoat, p_spec_trans;
-	initialize_sampling_pdfs(mat, p_spec, p_diff, p_clearcoat, p_spec_trans);
+
+	float F = fresnel_dielectric(wo.z, mat.ior, forward_facing);
+	initialize_sampling_probs(mat, F, forward_facing, p_spec, p_diff, p_clearcoat, p_spec_trans);
 
 	float alpha = mat.roughness * mat.roughness;
 
@@ -221,24 +231,19 @@ vec3 sample_principled(const Material mat, const vec3 wo, out vec3 wi, const uin
 	vec3 f = vec3(0);
 
 	float p_lobe = 0.0;
-	if (xi.x < p_spec) {
-		xi.x /= p_spec;
-		f = sample_principled_brdf(mat, wo, wi, pdf_w, cos_theta, xi, eta);
+	if (xi.z < p_spec) {
+		f = sample_principled_brdf(mat, wo, wi, pdf_w, cos_theta, xi.xy, eta);
 		p_lobe = p_spec;
-	} else if (xi.x > p_spec && xi.x <= (p_spec + p_clearcoat)) {
-		f = sample_clearcoat(mat, wo, wi, pdf_w, cos_theta, xi);
-		xi.x /= (p_spec + p_clearcoat);
+	} else if (xi.z > p_spec && xi.z <= (p_spec + p_clearcoat)) {
+		f = sample_clearcoat(mat, wo, wi, pdf_w, cos_theta, xi.xy);
 		p_lobe = p_clearcoat;
-	} else if (xi.x > (p_spec + p_clearcoat) && xi.x <= (p_spec + p_clearcoat + p_diff)) {
-		xi.x /= (p_spec + p_clearcoat + p_diff);
-		f = sample_disney_diffuse(mat, wo, wi, pdf_w, cos_theta, xi);
+	} else if (xi.z > (p_spec + p_clearcoat) && xi.z <= (p_spec + p_clearcoat + p_diff)) {
+		f = sample_disney_diffuse(mat, wo, wi, pdf_w, cos_theta, xi.xy);
 		p_lobe = p_diff;
-	} else if (p_spec_trans >= 0.0 && xi.x <= (p_spec + p_clearcoat + p_diff + p_spec_trans)) {
-		xi.x /= (p_spec + p_clearcoat + p_diff + p_spec_trans);
-		f = sample_dielectric(mat, wo, wi, mode, forward_facing, pdf_w, cos_theta, xi);
+	} else if (p_spec_trans >= 0.0 && xi.z <= (p_spec + p_clearcoat + p_diff + p_spec_trans)) {
+		f = sample_dielectric(mat, wo, wi, mode, forward_facing, pdf_w, cos_theta, xi.xy);
 		p_lobe = p_spec_trans;
 	}
-
 	pdf_w *= p_lobe;
 	return f;
 }
@@ -250,14 +255,15 @@ vec3 eval_principled(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 	float alpha = mat.roughness * mat.roughness;
 
 	float p_spec, p_diff, p_clearcoat, p_spec_trans;
-	initialize_sampling_pdfs(mat, p_spec, p_diff, p_clearcoat, p_spec_trans);
+	float F = fresnel_dielectric(wo.z, mat.ior, forward_facing);
+	initialize_sampling_probs(mat, F, forward_facing, p_spec, p_diff, p_clearcoat, p_spec_trans);
 
 	vec3 f = vec3(0);
 	float pdf = 0;
 	float pdf_rev = 0;
 
 	float brdf_weight = (1.0 - mat.spec_trans) * (1.0 - mat.metallic);
-	float bsdf_weight =  (1.0 - mat.metallic) * mat.spec_trans;
+	float bsdf_weight = (1.0 - mat.metallic) * mat.spec_trans;
 	if (p_spec > 0) {
 		f += eval_principled_brdf(mat, wo, wi, pdf, pdf_rev, forward_facing, mode, eval_reverse_pdf);
 		pdf *= p_spec;
@@ -281,7 +287,7 @@ vec3 eval_principled(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 		}
 	}
 
-	if(p_spec_trans > 0) {
+	if (p_spec_trans > 0) {
 		f += bsdf_weight * eval_dielectric(mat, wo, wi, pdf, pdf_rev, forward_facing, mode, eval_reverse_pdf);
 		pdf *= p_spec_trans;
 		pdf_rev *= p_spec_trans;
@@ -294,7 +300,8 @@ vec3 eval_principled(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 float eval_principled_pdf(Material mat, vec3 wo, vec3 wi, bool forward_facing) {
 	float pdf = 0.0;
 	float p_spec, p_diff, p_clearcoat, p_spec_trans;
-	initialize_sampling_pdfs(mat, p_spec, p_diff, p_clearcoat, p_spec_trans);
+	float F = fresnel_dielectric(wo.z, mat.ior, forward_facing);
+	initialize_sampling_probs(mat, F, forward_facing, p_spec, p_diff, p_clearcoat, p_spec_trans);
 	if (p_spec > 0) {
 		pdf += p_spec * eval_principled_brdf_pdf(mat, wo, wi);
 	}
@@ -307,7 +314,7 @@ float eval_principled_pdf(Material mat, vec3 wo, vec3 wi, bool forward_facing) {
 			pdf += p_clearcoat * eval_clearcoat_pdf(mat, wo, wi);
 		}
 	}
-	if(p_spec_trans > 0) {
+	if (p_spec_trans > 0) {
 		pdf += p_spec_trans * eval_dielectric_pdf(mat, wo, wi, forward_facing);
 	}
 	return pdf;
