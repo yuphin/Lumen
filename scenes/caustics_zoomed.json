@@ -22,7 +22,7 @@
                 1,
                 1
             ],
-            "type": "glass"
+            "type": "dielectric"
         },
         {
             "name": "Ring",
@@ -30,17 +30,13 @@
                 "ring"
             ],
             "albedo": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "metalness" : [
                 0.95,
                 0.92,
                 0.06
             ],
+             "metallic" : 1,
             "roughness": 0.1,
-            "type": "glossy"
+            "type": "principled"
         },
        
         {
@@ -82,13 +78,9 @@
             "refs": [
                 "floor"
             ],
-            "metalness" : [
-                1,
-                1,
-                1
-            ],
+             "metallic" : 0,
             "roughness": 0.05,
-            "type": "glossy"
+            "type": "principled"
         }
        
     ],

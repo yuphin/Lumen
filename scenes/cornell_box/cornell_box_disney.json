@@ -30,7 +30,7 @@
             "refs": [
                 "mirror_sphere"
             ],
-            "type": "disney"
+            "type": "principled"
         },
         {
             "albedo": [
