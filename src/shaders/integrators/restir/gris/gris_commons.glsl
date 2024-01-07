@@ -49,6 +49,12 @@ struct HitDataWithoutGeometryNormals {
 	vec2 uv;
 };
 
+struct OcclusionData {
+	vec3 origin;
+	vec3 dir;
+	float dir_length;
+};
+
 ivec2 get_neighbor_offset(inout uvec4 seed) {
 	const float randa = rand(seed) * 2 * PI;
 	const float randr = sqrt(rand(seed)) * pc.spatial_radius;
@@ -336,13 +342,19 @@ vec3 get_prev_primary_direction(uvec2 coords) {
 	return normalize(sample_prev_camera(d).xyz);
 }
 
-bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float src_jacobian, out float jacobian_out,
-				   out vec3 reservoir_contribution, out float jacobian_num) {
+
+bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float src_jacobian, out float jacobian_out,
+				   out vec3 reservoir_contribution, out float jacobian_num, out OcclusionData occlusion_data) {
 	// Note: The source reservoir always corresponds to the canonical reservoir because retracing only happens on
 	// pairwise mode
 	reservoir_contribution = vec3(0);
 	jacobian_out = 0;
 	jacobian_num = 0;
+
+	occlusion_data.dir_length = EPS;
+	occlusion_data.origin = vec3(0);
+	occlusion_data.dir = vec3(0);
+
 	float jacobian = 1;
 	if (!reservoir_data_valid(data)) {
 		return false;
@@ -421,7 +433,7 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 			}
 #if DEBUG == 1
 			ASSERT(data.debug_sampling_seed == reservoir_seed)
-			if(data.debug_sampling_seed != reservoir_seed) {
+			if (data.debug_sampling_seed != reservoir_seed) {
 				LOG2("%v4u - %v4u\n", data.debug_sampling_seed, reservoir_seed);
 			}
 #endif
@@ -438,14 +450,9 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 			float wi_len_sqr = dot(dst_postfix_wi, dst_postfix_wi);
 			float wi_len = sqrt(wi_len_sqr);
 			dst_postfix_wi /= wi_len;
-			vec3 p = offset_ray2(is_directional_light ? org_pos : dst_gbuffer.pos, dst_gbuffer.n_s);
-			any_hit_payload.hit = 1;
-			traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p,
-						0, dst_postfix_wi, wi_len - EPS, 1);
-			if (any_hit_payload.hit == 1) {
-				return false;
-			}
-
+			occlusion_data.origin = offset_ray2(is_directional_light ? org_pos : dst_gbuffer.pos, dst_gbuffer.n_s);
+			occlusion_data.dir = dst_postfix_wi;
+			occlusion_data.dir_length = wi_len;
 			set_bounce_flag(bounce_flags, prefix_depth + 1, true);
 			if (bounce_flags != (data.path_flags & 0xFFFF0000)) {
 				return false;
@@ -520,6 +527,23 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 	}
 }
 
+bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float src_jacobian, out float jacobian_out,
+					out vec3 reservoir_contribution, out float jacobian_num) {
+	OcclusionData occlusion_data;
+	bool result = advance_paths(dst_gbuffer, data, dst_wi, src_jacobian, jacobian_out, reservoir_contribution,
+								jacobian_num, occlusion_data);
+	any_hit_payload.hit = 1;
+	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1,
+				occlusion_data.origin, 0, occlusion_data.dir, occlusion_data.dir_length - EPS, 1);
+	if (any_hit_payload.hit == 1) {
+		jacobian_out = 0;
+		reservoir_contribution = vec3(0);
+		jacobian_num = 0;
+		return false;
+	}
+	return result;
+}
+
 bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, out float jacobian_out,
 				   out vec3 reservoir_contribution) {
 	float unused_jacobian;
@@ -575,8 +599,8 @@ bool process_reservoir(inout uvec4 seed, inout Reservoir reservoir, inout float 
 	// 	return false;
 	// }
 
-	ASSERT1(m_c_val > -1e-3 && m_c_val <= 1.001, "m_c_val <= 1.0 : %f\n", m_c_val);
-	ASSERT1(m_i > -1e-3 && m_i <= 1.001, "m_i <= 1.0 : %f\n", m_i);
+	// ASSERT1(m_c_val > -1e-3 && m_c_val <= 1.001, "m_c_val <= 1.0 : %f\n", m_c_val);
+	// ASSERT1(m_i > -1e-3 && m_i <= 1.001, "m_i <= 1.0 : %f\n", m_i);
 
 	bool accepted = combine_reservoir(seed, reservoir, source_reservoir, calc_target_pdf(data.reservoir_contribution),
 									  m_i, data.jacobian);

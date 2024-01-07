@@ -190,7 +190,7 @@ void Integrator::init() {
 	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_GLASS", lumen_scene->has_bsdf_type(BSDF_TYPE_GLASS)));
 	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_DIELECTRIC", lumen_scene->has_bsdf_type(BSDF_TYPE_DIELECTRIC)));
 	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_CONDUCTOR", lumen_scene->has_bsdf_type(BSDF_TYPE_CONDUCTOR)));
-	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_PRINCIPLED", true));
+	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_PRINCIPLED", lumen_scene->has_bsdf_type(BSDF_TYPE_PRINCIPLED)));
 }
 
 bool Integrator::gui() {
