@@ -13,15 +13,9 @@ class ReSTIRPT : public Integrator {
 	virtual bool gui() override;
 
    private:
-	enum class StreamingMethod {
-		INDIVIDUAL_CONTRIBUTIONS,
-		SPLITTING_AT_RECONNECTION
-	};
+	enum class StreamingMethod { INDIVIDUAL_CONTRIBUTIONS, SPLITTING_AT_RECONNECTION };
 
-	enum class MISMethod {
-		TALBOT,
-		PAIRWISE
-	};
+	enum class MISMethod { TALBOT, PAIRWISE };
 	Buffer direct_lighting_buffer;
 	Buffer gris_gbuffer;
 	Buffer gris_prev_gbuffer;
@@ -44,6 +38,7 @@ class ReSTIRPT : public Integrator {
 	bool enable_permutation_sampling = false;
 	bool enable_atmosphere = false;
 	bool enable_defensive_formulation = true;
+	bool enable_occlusion = true;
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.00f;
 	float gris_separator = 1.0f;

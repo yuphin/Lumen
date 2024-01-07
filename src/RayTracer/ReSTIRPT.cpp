@@ -127,6 +127,7 @@ void ReSTIRPT::render() {
 	pc_ray.permutation_sampling = uint(enable_permutation_sampling);
 	pc_ray.gris_separator = gris_separator;
 	pc_ray.canonical_only = canonical_only;
+	pc_ray.enable_occlusion = enable_occlusion;
 
 	const std::initializer_list<ResourceBinding> common_bindings = {output_tex, scene_ubo_buffer, scene_desc_buffer,
 																	mesh_lights_buffer};
@@ -322,6 +323,7 @@ bool ReSTIRPT::gui() {
 		return result;
 	}
 	result |= ImGui::SliderFloat("GRIS / Default", &gris_separator, 0.0f, 1.0f);
+	result |= ImGui::Checkbox("Enable occlusion", &enable_occlusion);
 	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
 	result |= ImGui::Checkbox("Debug pixels", &pixel_debug);
 	result |= ImGui::Checkbox("Enable defensive formulation", &enable_defensive_formulation);

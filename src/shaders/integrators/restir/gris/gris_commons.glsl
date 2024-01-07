@@ -532,14 +532,16 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 	OcclusionData occlusion_data;
 	bool result = advance_paths(dst_gbuffer, data, dst_wi, src_jacobian, jacobian_out, reservoir_contribution,
 								jacobian_num, occlusion_data);
-	any_hit_payload.hit = 1;
-	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1,
-				occlusion_data.origin, 0, occlusion_data.dir, occlusion_data.dir_length - EPS, 1);
-	if (any_hit_payload.hit == 1) {
-		jacobian_out = 0;
-		reservoir_contribution = vec3(0);
-		jacobian_num = 0;
-		return false;
+	if(pc.enable_occlusion == 1) {
+		any_hit_payload.hit = 1;
+		traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1,
+					occlusion_data.origin, 0, occlusion_data.dir, occlusion_data.dir_length - EPS, 1);
+		if (any_hit_payload.hit == 1) {
+			jacobian_out = 0;
+			reservoir_contribution = vec3(0);
+			jacobian_num = 0;
+			return false;
+		}
 	}
 	return result;
 }

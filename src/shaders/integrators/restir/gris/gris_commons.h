@@ -39,6 +39,7 @@ struct PCReSTIRPT {
 	uint permutation_sampling;
 	uint canonical_only;
 	float gris_separator;
+	uint enable_occlusion;
 };
 
 
