@@ -157,73 +157,26 @@ vec3 get_hitdata_pos_only(vec2 attribs, uint instance_idx, uint triangle_idx) {
 	return vec3(to_world * vec4(vtx[0].pos * bary.x + vtx[1].pos * bary.y + vtx[2].pos * bary.z, 1.0));
 }
 
-vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 wo, bool trace, out vec3 light_pos,
-			out bool is_directional_light) {
+vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 wo, out LightRecord record,
+			inout vec3 light_dir_or_pdf, out bool is_directional_light) {
+	float pdf_light_w;
 	float pdf_light_a;
-	float pdf_light_w;
 	vec3 wi = vec3(0);
 	float wi_len = 0;
-	LightRecord record;
 	float cos_from_light;
 	vec4 rands = vec4(rand(seed), rand(seed), rand(seed), rand(seed));
-	const vec3 Le =
-		sample_light_Li(rands, pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
+	vec3 Le = sample_light_Li(rands, pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
 	const vec3 p = offset_ray2(pos, n_s);
 	float light_bsdf_pdf;
 	float cos_x = dot(n_s, wi);
 	vec3 f_light = eval_bsdf(n_s, wo, hit_mat, 1, side, wi, light_bsdf_pdf);
 	any_hit_payload.hit = 1;
-	bool visible;
-
-	if (!trace) {
-		visible = true;
-	} else {
-		traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0,
-					wi, wi_len - EPS, 1);
-		visible = any_hit_payload.hit == 0;
-	}
+	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0, wi,
+				wi_len - EPS, 1);
+	bool visible = any_hit_payload.hit == 0;
 	is_directional_light = get_light_type(record.flags) == LIGHT_DIRECTIONAL;
-	if (is_directional_light) {
-		light_pos = wi * wi_len;
-	} else {
-		light_pos = pos + wi * wi_len;
-	}
 
-	const float light_pick_pdf = 1. / pc.light_triangle_count;
-	if (visible && pdf_light_w > 0) {
-		const float mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + light_bsdf_pdf / pdf_light_w);
-		return mis_weight * f_light * abs(cos_x) * Le / (light_pick_pdf * pdf_light_w);
-	}
-	return vec3(0);
-}
-
-vec3 do_nee2(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 wo, bool trace, out vec3 light_pos,
-			 out bool is_directional_light, out LightRecord record, out vec3 Le, out float pdf_light_a) {
-	float pdf_light_w;
-	vec3 wi = vec3(0);
-	float wi_len = 0;
-	float cos_from_light;
-	vec4 rands = vec4(rand(seed), rand(seed), rand(seed), rand(seed));
-	Le = sample_light_Li(rands, pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
-	const vec3 p = offset_ray2(pos, n_s);
-	float light_bsdf_pdf;
-	float cos_x = dot(n_s, wi);
-	vec3 f_light = eval_bsdf(n_s, wo, hit_mat, 1, side, wi, light_bsdf_pdf);
-	any_hit_payload.hit = 1;
-	bool visible;
-	if (!trace) {
-		visible = true;
-	} else {
-		traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0,
-					wi, wi_len - EPS, 1);
-		visible = any_hit_payload.hit == 0;
-	}
-	is_directional_light = get_light_type(record.flags) == LIGHT_DIRECTIONAL;
-	if (is_directional_light) {
-		light_pos = wi * wi_len;
-	} else {
-		light_pos = pos + wi * wi_len;
-	}
+	light_dir_or_pdf = is_directional_light ? wi * wi_len : vec3(pdf_light_a, vec2(0));
 
 	const float light_pick_pdf = 1. / pc.light_triangle_count;
 	if (visible && pdf_light_w > 0) {
@@ -231,12 +184,6 @@ vec3 do_nee2(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, 
 		return mis_weight * f_light * abs(cos_x) * Le / (light_pick_pdf * pdf_light_w);
 	}
 	return vec3(0);
-}
-
-vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 wo, bool trace) {
-	vec3 unused_pos;
-	bool unused_bool;
-	return do_nee(seed, pos, hit_mat, side, n_s, wo, trace, unused_pos, unused_bool);
 }
 
 void init_gbuffer(out GBuffer gbuffer) {
@@ -432,7 +379,9 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 			ASSERT(data.debug_sampling_seed == reservoir_seed)
 #endif
 
-			vec3 dst_postfix_wi = (rc_type == RECONNECTION_TYPE_NEE && is_directional_light) ? data.rc_Li : (rc_gbuffer.pos - dst_gbuffer.pos);
+			vec3 dst_postfix_wi = (rc_type == RECONNECTION_TYPE_NEE && is_directional_light)
+									  ? data.rc_Li
+									  : (rc_gbuffer.pos - dst_gbuffer.pos);
 
 			float wi_len_sqr = dot(dst_postfix_wi, dst_postfix_wi);
 			float wi_len = sqrt(wi_len_sqr);
@@ -456,8 +405,6 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 				uvec2 rc_coords = uvec2(data.rc_coords / gl_LaunchSizeEXT.y, data.rc_coords % gl_LaunchSizeEXT.y);
 				uvec4 reconnection_seed = init_rng(rc_coords, gl_LaunchSizeEXT.xy, data.seed_helpers.x, data.rc_seed);
 				ASSERT(reconnection_seed == data.debug_seed);
-				vec3 Li =
-					do_nee(reconnection_seed, dst_gbuffer.pos, dst_hit_mat, dst_side, dst_gbuffer.n_s, dst_wo, false);
 				float pdf_light_w = data.rc_Li.x * wi_len_sqr / abs(dot(rc_gbuffer.n_s, dst_postfix_wi));
 				float mis_weight =
 					is_light_delta(light.light_flags) ? 1.0 : 1.0 / (1.0 + dst_postfix_pdf / pdf_light_w);

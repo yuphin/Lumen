@@ -52,7 +52,6 @@ struct LightRecord {
 	uint flags;
 	vec2 bary;
 	uint triangle_idx;
-	float triangle_area;
 };
 
 #define pow5(x) (((x) * (x)) * ((x) * (x)) * (x))
