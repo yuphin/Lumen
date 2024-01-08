@@ -467,26 +467,47 @@ void LumenScene::load_scene(const std::string& path) {
 			if (m_bsdf.type == "diffuse") {
 				bsdf_types |= BSDF_TYPE_DIFFUSE;
 				materials[i].albedo = m_bsdf.albedo;
+				materials[i].bsdf_type = BSDF_TYPE_DIFFUSE;
+				materials[i].bsdf_props = BSDF_FLAG_DIFFUSE_REFLECTION;
 			} else if (m_bsdf.type == "roughconductor") {
-				bsdf_types |= BSDF_TYPE_CONDUCTOR;
+				bsdf_types |= BSDF_TYPE_PRINCIPLED;
 				materials[i].metallic = 1;
 				materials[i].roughness = m_bsdf.roughness;
 				materials[i].albedo = m_bsdf.albedo;
+				materials[i].bsdf_props = BSDF_FLAG_REFLECTION;
 			} else if (m_bsdf.type == "roughplastic") {
-				bsdf_types |= BSDF_TYPE_DIELECTRIC;
+				bsdf_types |= BSDF_TYPE_PRINCIPLED;
 				materials[i].subsurface = 0.1f;
 				materials[i].albedo = m_bsdf.albedo;
 				materials[i].roughness = m_bsdf.roughness;
-				materials[i].bsdf_type = BSDF_TYPE_CONDUCTOR;
+				materials[i].bsdf_props = BSDF_FLAG_DIFFUSE;
+			} else if (m_bsdf.type == "plastic") {
+				bsdf_types |= BSDF_TYPE_PRINCIPLED;
+				materials[i].ior = m_bsdf.ior;
+				materials[i].albedo = m_bsdf.albedo;
+				materials[i].bsdf_props = BSDF_FLAG_DIFFUSE_TRANSMISSION;
+			} else if (m_bsdf.type == "roughdielectric") {
+				bsdf_types |= BSDF_TYPE_PRINCIPLED;
+				materials[i].roughness = m_bsdf.roughness;
+				materials[i].ior = m_bsdf.ior;
+				materials[i].bsdf_props = BSDF_FLAG_DIFFUSE_TRANSMISSION;
+			} else if (m_bsdf.type == "dielectric") {
+				bsdf_types |= BSDF_TYPE_DIELECTRIC;
+				materials[i].albedo = m_bsdf.albedo;
+				materials[i].ior = m_bsdf.ior;
+				materials[i].bsdf_type = BSDF_TYPE_DIELECTRIC;
+				materials[i].bsdf_props = BSDF_FLAG_TRANSMISSION;
 			} else if (m_bsdf.type == "conductor") {
-				bsdf_types |= BSDF_TYPE_CONDUCTOR;
-				materials[i].bsdf_type = BSDF_TYPE_CONDUCTOR;
-				materials[i].bsdf_props = BSDF_FLAG_SPECULAR_REFLECTION;
+				bsdf_types |= BSDF_TYPE_MIRROR;
+				materials[i].bsdf_type = BSDF_TYPE_MIRROR;
+				materials[i].bsdf_props = BSDF_FLAG_REFLECTION;
 			} else if (m_bsdf.type == "glass") {
 				bsdf_types |= BSDF_TYPE_GLASS;
 				materials[i].bsdf_type = BSDF_TYPE_GLASS;
 				materials[i].bsdf_props = BSDF_FLAG_SPECULAR_TRANSMISSION;
 				materials[i].ior = m_bsdf.ior;
+			} else {
+				bsdf_types |= BSDF_TYPE_PRINCIPLED;
 			}
 			i++;
 		}
