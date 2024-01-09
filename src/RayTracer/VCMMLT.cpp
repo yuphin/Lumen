@@ -7,7 +7,7 @@ void VCMMLT::init() {
 	Integrator::init();
 	mutation_count =
 		int(instance->width * instance->height * config->mutations_per_pixel / float(config->num_mlt_threads));
-	light_path_rand_count = std::max(7 + 2 * config->path_length, 3 + 6 * config->path_length);
+	light_path_rand_count = std::max(7 + 3 * config->path_length, 3 + 7 * config->path_length);
 
 	// MLTVCM buffers
 	bootstrap_buffer.create(&instance->vkb.ctx,

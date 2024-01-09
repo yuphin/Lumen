@@ -7,8 +7,8 @@ void SMLT::init() {
 	num_mlt_threads = config->num_mlt_threads;
 	num_bootstrap_samples = config->num_bootstrap_samples;
 	mutation_count = int(instance->width * instance->height * mutations_per_pixel / float(num_mlt_threads));
-	light_path_rand_count = 6 + 2 * config->path_length;
-	cam_path_rand_count = 3 + 6 * config->path_length;
+	light_path_rand_count = 6 + 3 * config->path_length;
+	cam_path_rand_count = 3 + 7 * config->path_length;
 
 	bootstrap_buffer.create(&instance->vkb.ctx,
 							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |

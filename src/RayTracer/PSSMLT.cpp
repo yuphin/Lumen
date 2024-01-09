@@ -4,8 +4,8 @@
 
 void PSSMLT::init() {
 	Integrator::init();
-	light_path_rand_count = 7 + 2 * config->path_length;
-	cam_path_rand_count = 2 + 2 * config->path_length;
+	light_path_rand_count = 6 + 3 * config->path_length;
+	cam_path_rand_count = 2 + 3 * config->path_length;
 	connect_path_rand_count = 4 * config->path_length;
 
 	// MLTVCM buffers

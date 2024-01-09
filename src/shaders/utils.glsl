@@ -19,6 +19,7 @@ struct HitPayload {
 	vec2 uv;
 	uint material_idx;
 	uint triangle_idx;
+	uint instance_idx;
 	float area;
 	float dist;
 	uint hit_kind;
@@ -52,6 +53,7 @@ struct LightRecord {
 	uint flags;
 	vec2 bary;
 	uint triangle_idx;
+	uint instance_idx;
 };
 
 #define pow5(x) (((x) * (x)) * ((x) * (x)) * (x))

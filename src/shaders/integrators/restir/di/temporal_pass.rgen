@@ -71,8 +71,6 @@ void main() {
 
         for (int i = 0; i < light_samples; i++) {
             const uvec4 light_seed = seed;
-            const vec4 rands =
-                vec4(rand(seed), rand(seed), rand(seed), rand(seed));
             vec3 wi;
             float wi_len;
             float pdf_light;
@@ -80,7 +78,7 @@ void main() {
             float cos_from_light;
             vec3 light_pos, light_n;
             const vec3 Le = sample_light_Li(
-                rands, payload.pos, pc.num_lights, wi, wi_len, light_n,
+                rand4(seed), payload.pos, pc.num_lights, wi, wi_len, light_n,
                 light_pos, pdf_light, cos_from_light, record);
 
             float bsdf_pdf;

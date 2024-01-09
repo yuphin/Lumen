@@ -46,8 +46,12 @@ void main() {
     vec3 wi, pos, n;
     float pdf_pos, pdf_dir;
     float cos_theta;
+
+    vec4 rands_pos = rand4(seed);
+    vec2 rands_dir = rand2(seed);
+
     const vec3 Le =
-        sample_light_Le(seed, pc.num_lights, pc.light_triangle_count,
+        sample_light_Le(rands_pos, rands_dir, pc.num_lights, pc.light_triangle_count,
                         cos_theta, light_record, pos, wi, n, pdf_pos, pdf_dir);
  
     float abs_cos_light = abs(dot(n, wi));

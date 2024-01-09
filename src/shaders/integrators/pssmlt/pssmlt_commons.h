@@ -15,5 +15,6 @@ struct MLTPathVertex {
 	float pdf_rev;
 	uint coords;
 	float pdf_fwd;
-	vec2 pad;
+	uint side;
+	uint mode;
 };

@@ -73,7 +73,7 @@ void Integrator::init() {
 			light.light_flags = LIGHT_AREA;
 			// Is finite
 			light.light_flags |= 1 << 4;
-			;
+			light.L = mef;
 			lights.emplace_back(light);
 			total_light_triangle_cnt += light.num_triangles;
 		}
@@ -185,12 +185,18 @@ void Integrator::init() {
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	output_tex.create_empty_texture("Color Output", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL);
 
-	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_DIFFUSE", lumen_scene->has_bsdf_type(BSDF_TYPE_DIFFUSE)));
-	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_MIRROR", lumen_scene->has_bsdf_type(BSDF_TYPE_MIRROR)));
-	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_GLASS", lumen_scene->has_bsdf_type(BSDF_TYPE_GLASS)));
-	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_DIELECTRIC", lumen_scene->has_bsdf_type(BSDF_TYPE_DIELECTRIC)));
-	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_CONDUCTOR", lumen_scene->has_bsdf_type(BSDF_TYPE_CONDUCTOR)));
-	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_PRINCIPLED", lumen_scene->has_bsdf_type(BSDF_TYPE_PRINCIPLED)));
+	// instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_DIFFUSE", lumen_scene->has_bsdf_type(BSDF_TYPE_DIFFUSE)));
+	// instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_MIRROR", lumen_scene->has_bsdf_type(BSDF_TYPE_MIRROR)));
+	// instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_GLASS", lumen_scene->has_bsdf_type(BSDF_TYPE_GLASS)));
+	// instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_DIELECTRIC", lumen_scene->has_bsdf_type(BSDF_TYPE_DIELECTRIC)));
+	// instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_CONDUCTOR", lumen_scene->has_bsdf_type(BSDF_TYPE_CONDUCTOR)));
+	// instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_PRINCIPLED", lumen_scene->has_bsdf_type(BSDF_TYPE_PRINCIPLED)));
+	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_DIFFUSE", true));
+	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_MIRROR", true));
+	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_GLASS", true));
+	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_DIELECTRIC", true));
+	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_CONDUCTOR", true));
+	instance->vkb.rg->global_macro_defines.push_back(ShaderMacro("ENABLE_PRINCIPLED", true));
 }
 
 bool Integrator::gui() {
