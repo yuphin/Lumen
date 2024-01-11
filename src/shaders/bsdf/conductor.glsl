@@ -21,7 +21,7 @@ vec3 sample_conductor(const Material mat, const vec3 wo, out vec3 wi, out float 
 		return vec3(0);
 	}
 	// Perfect reflection/transmission
-	if (bsdf_is_delta(alpha)) {
+	if (bsdf_is_effectively_delta(alpha)) {
 		wi = vec3(-wo.x, -wo.y, wo.z);
 		pdf_w = 1.0;
 		cos_theta = wi.z;
@@ -46,7 +46,7 @@ vec3 eval_conductor(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float p
 	pdf_w = 0;
 	pdf_rev_w = 0;
 	float alpha = mat.roughness * mat.roughness;
-	if (bsdf_is_delta(alpha)) {
+	if (bsdf_is_effectively_delta(alpha)) {
 		return vec3(0);
 	}
 	if (wo.z * wi.z < 0) {
@@ -73,7 +73,7 @@ vec3 eval_conductor(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float p
 
 float eval_conductor_pdf(Material mat, vec3 wo, vec3 wi) {
 	float alpha = mat.roughness * mat.roughness;
-	if (bsdf_is_delta(alpha)) {
+	if (bsdf_is_effectively_delta(alpha)) {
 		return 0.0;
 	}
 	if (wo.z * wi.z < 0) {

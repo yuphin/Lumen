@@ -97,7 +97,7 @@ vec3 sample_principled_brdf(const Material mat, const vec3 wo, inout vec3 wi, in
 	float D;
 	float alpha = mat.roughness * mat.roughness;
 
-	if (bsdf_is_delta(alpha)) {
+	if (bsdf_is_effectively_delta(alpha)) {
 		wi = vec3(-wo.x, -wo.y, wo.z);
 		pdf_w = 1.0;
 		cos_theta = wi.z;
@@ -168,7 +168,7 @@ vec3 eval_principled_brdf(Material mat, vec3 wo, vec3 wi, out float pdf_w, out f
 	pdf_w = 0;
 	pdf_rev_w = 0;
 	float alpha = mat.roughness * mat.roughness;
-	if (bsdf_is_delta(alpha)) {
+	if (bsdf_is_effectively_delta(alpha)) {
 		return vec3(0);
 	}
 	if (wo.z * wi.z < 0) {
@@ -192,7 +192,7 @@ vec3 eval_principled_brdf(Material mat, vec3 wo, vec3 wi, out float pdf_w, out f
 float eval_principled_brdf_pdf(Material mat, vec3 wo, vec3 wi) {
 	float alpha = mat.roughness * mat.roughness;
 
-	if (bsdf_is_delta(alpha)) {
+	if (bsdf_is_effectively_delta(alpha)) {
 		return 0.0;
 	}
 

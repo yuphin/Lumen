@@ -264,7 +264,7 @@ void LumenScene::load_scene(const std::string& path) {
 				if (reflection.is_null() || bool(reflection)) {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_REFLECTION;
 				}
-				if (materials[bsdf_idx].ior != 1.0 && materials[bsdf_idx].roughness > 0.0) {
+				if (materials[bsdf_idx].ior != 1.0 && materials[bsdf_idx].roughness > 0.08) {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_GLOSSY;
 				} else {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_SPECULAR;
@@ -285,7 +285,7 @@ void LumenScene::load_scene(const std::string& path) {
 											  glm::sqrt(glm::max(glm::vec3(1.0f) - reflectance_val, 0.0f));
 				}
 				materials[bsdf_idx].bsdf_props = BSDF_FLAG_REFLECTION;
-				if (materials[bsdf_idx].roughness > 0.0) {
+				if (materials[bsdf_idx].roughness > 0.08) {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_GLOSSY;
 				} else {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_SPECULAR;
@@ -310,7 +310,7 @@ void LumenScene::load_scene(const std::string& path) {
 				mat.sheen = get_or_default_f(bsdf, "sheen", 0.0f);
 			
 				mat.bsdf_props = BSDF_FLAG_REFLECTION | BSDF_FLAG_TRANSMISSION;
-				if (mat.roughness > 0.0) {
+				if (mat.roughness > 0.08) {
 					mat.bsdf_props |= BSDF_FLAG_GLOSSY;
 				} else {
 					mat.bsdf_props |= BSDF_FLAG_SPECULAR;

@@ -17,7 +17,7 @@ vec3 sample_dielectric(const Material mat, const vec3 wo, out vec3 wi, const uin
 	bool has_reflection = bsdf_has_property(mat.bsdf_props, BSDF_FLAG_REFLECTION);
 	bool has_transmission = bsdf_has_property(mat.bsdf_props, BSDF_FLAG_TRANSMISSION);
 	// Perfect reflection/transmission
-	if (mat.ior == 1.0 || bsdf_is_delta(alpha)) {
+	if (mat.ior == 1.0 || bsdf_is_effectively_delta(alpha)) {
 		float F = fresnel_dielectric(wo.z, mat.ior, forward_facing);
 
 		ASSERT1(F <= 1, "%f\n", F);
