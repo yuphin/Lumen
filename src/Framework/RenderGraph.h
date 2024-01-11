@@ -249,6 +249,9 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 
 	auto populate_macros = [](const std::vector<ShaderMacro>& macros, std::string& macro_string, bool& prev_nonempty) {
 		for (size_t i = 0; i < macros.size(); i++) {
+			if(!macros[i].visible) {
+				continue;
+			}
 			if(!macros[i].name.empty()){
 				if (prev_nonempty) {
 					macro_string += ",";
