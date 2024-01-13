@@ -25,12 +25,12 @@ vec3 sample_conductor(const Material mat, const vec3 wo, out vec3 wi, out float 
 		wi = vec3(-wo.x, -wo.y, wo.z);
 		pdf_w = 1.0;
 		cos_theta = wi.z;
-		vec3 F = fresnel_conductor(cos_theta, mat.albedo, mat.eta);
+		vec3 F = fresnel_conductor(cos_theta, mat.albedo, mat.k);
 		return F / abs(cos_theta);
 	}
 	float D;
 	vec3 h = sample_ggx_vndf_isotropic(vec2(alpha), wo, xi, pdf_w, D);
-	vec3 F = fresnel_conductor(dot(wo, h), mat.albedo, mat.eta);
+	vec3 F = fresnel_conductor(dot(wo, h), mat.albedo, mat.k);
 
 	wi = reflect(-wo, h);
 	// Make sure the reflection lies in the same hemisphere
@@ -67,7 +67,7 @@ vec3 eval_conductor(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float p
 		pdf_rev_w = eval_vndf_pdf_isotropic(alpha, wi, h) / jacobian;
 	}
 
-	vec3 F = fresnel_conductor(dot(wo, h), mat.albedo, mat.eta);
+	vec3 F = fresnel_conductor(dot(wo, h), mat.albedo, mat.k);
 	return 0.25 * D * F * G_GGX_correlated_isotropic(alpha, wo, wi) / (wi.z * wo.z);
 }
 

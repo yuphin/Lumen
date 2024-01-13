@@ -217,10 +217,8 @@ struct Material {
 	float ior;
 	vec3 emissive_factor;
 	uint bsdf_type;
-	vec3 metalness;
 	uint bsdf_props;
-	// TODO: Organize
-	vec3 eta;
+	vec3 k;
 	int texture_id;
 	
 	float roughness;

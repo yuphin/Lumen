@@ -271,18 +271,38 @@ void LumenScene::load_scene(const std::string& path) {
 				}
 			} else if (bsdf["type"] == "conductor") {
 				bsdf_types |= BSDF_TYPE_CONDUCTOR;
-				materials[bsdf_idx].bsdf_type = BSDF_TYPE_CONDUCTOR;
+				Material& mat = materials[bsdf_idx];
+				mat.bsdf_type = BSDF_TYPE_CONDUCTOR;
 				auto roughness = bsdf["roughness"];
-				auto reflectivity = bsdf["reflectivity"];
-				auto edge_tint = bsdf["edge_tint"];
 				auto reflectance = bsdf["reflectance"];
-				materials[bsdf_idx].roughness = roughness.is_null() ? 0.0f : float(roughness);
+
+				mat.roughness = roughness.is_null() ? 0.0f : float(roughness);
+
+				// In conductor context, albedo is used as eta (i.e the IOR)
+				// k is the absorption coefficient
 				if (!reflectance.is_null()) {
 					auto reflectance_val =
 						glm::clamp(glm::vec3(reflectance[0], reflectance[1], reflectance[2]), 0.0f, 0.9999f);
-					materials[bsdf_idx].albedo = glm::vec3(1.0);
-					materials[bsdf_idx].eta = 2.0f * glm::sqrt(reflectance_val) /
-											  glm::sqrt(glm::max(glm::vec3(1.0f) - reflectance_val, 0.0f));
+					mat.albedo = glm::vec3(1.0);
+					mat.k = 2.0f * glm::sqrt(reflectance_val) /
+							glm::sqrt(glm::max(glm::vec3(1.0f) - reflectance_val, 0.0f));
+				}
+				auto reflectivity = bsdf["reflectivity"];
+				auto edge_tint = bsdf["edge_tint"];
+				if (!edge_tint.is_null()) {
+					// Apply the mappings from https://jcgt.org/published/0003/04/03/paper.pdf
+					auto edge_tint_vec = glm::vec3{edge_tint[0], edge_tint[1], edge_tint[2]};
+					auto reflectivity_vec = glm::vec3{reflectivity[0], reflectivity[1], reflectivity[2]};
+					mat.albedo = edge_tint_vec * (1.0f - reflectivity_vec) / (1.0f + reflectivity_vec) +
+								 (1.0f - edge_tint_vec) * (1.0f + glm::sqrt(reflectivity_vec)) /
+									 (1.0f - glm::sqrt(reflectivity_vec));
+					auto intermediate_term = reflectivity_vec * (mat.albedo + 1.0f);
+					auto intermediate_term2 = mat.albedo - 1.0f;
+					mat.k =
+						glm::sqrt(1.0f / (1.0f - reflectivity_vec) *
+								  (intermediate_term * intermediate_term - intermediate_term2 * intermediate_term2));
+				}
+				if (!reflectivity.is_null()) {
 				}
 				materials[bsdf_idx].bsdf_props = BSDF_FLAG_REFLECTION;
 				if (materials[bsdf_idx].roughness > 0.08) {
@@ -295,7 +315,7 @@ void LumenScene::load_scene(const std::string& path) {
 				Material& mat = materials[bsdf_idx];
 				mat.bsdf_type = BSDF_TYPE_PRINCIPLED;
 				mat.albedo = get_or_default_v(bsdf, "albedo", glm::vec3(1));
-				mat.ior =  get_or_default_f(bsdf, "ior", 1.0f);
+				mat.ior = get_or_default_f(bsdf, "ior", 1.0f);
 				mat.roughness = get_or_default_f(bsdf, "roughness", 0.5f);
 				mat.diffuse_trans = get_or_default_f(bsdf, "diffuse_transmission", 0.0f);
 				mat.spec_trans = get_or_default_f(bsdf, "specular_transmission", 0.0f);
@@ -309,7 +329,7 @@ void LumenScene::load_scene(const std::string& path) {
 				mat.flatness = get_or_default_f(bsdf, "flatness", 0.0f);
 				mat.sheen = get_or_default_f(bsdf, "sheen", 0.0f);
 				mat.anisotropy = get_or_default_f(bsdf, "anisotropy", 0.0f);
-			
+
 				mat.bsdf_props = BSDF_FLAG_REFLECTION | BSDF_FLAG_TRANSMISSION;
 				if (mat.roughness > 0.08) {
 					mat.bsdf_props |= BSDF_FLAG_GLOSSY;

@@ -126,6 +126,50 @@
             "clearcoat" : 0.0,
             "clearcoat_gloss" : 0.0
         },
+
+        {
+            "name": "Principled4",
+            "refs": [
+                "sphere11"
+            ],
+            "type": "principled",
+            "albedo": [1,1,1],
+            "ior" : 1.00,
+            "roughness" : 0.2,
+            "metallic" : 1.0,
+            "specular_transmission": 0.8,
+            "specular_tint" : 0.0,
+            "clearcoat" : 0.0,
+            "clearcoat_gloss" : 0.0,
+            "anisotropy" : 1.0
+        },
+
+        {
+            "name": "Principled5",
+            "refs": [
+                "sphere6"
+            ],
+            "type": "principled",
+            "albedo": [1,1,1],
+            "ior" : 1.00,
+            "roughness" : 0.2,
+            "metallic" : 1.0,
+            "specular_transmission": 0.0,
+            "specular_tint" : 0.0,
+            "clearcoat" : 0.0,
+            "clearcoat_gloss" : 0.0,
+            "anisotropy" : 0.0
+        },
+        {
+            "name": "Conductor",
+            "refs": [
+                "sphere12"
+            ],
+            "type": "conductor",
+            "roughness" : 0.2,
+            "reflectivity" : [0.95652,0.79155,0.40800],
+            "edge_tint" : [0.95706,0.86370,0.61991]
+        },
         {
             "albedo": [
                 0.725,
@@ -134,10 +178,7 @@
             ],
             "name": "Other Walls",
             "refs": [
-                "back_wall",
-                "sphere6",
-                "sphere11",
-                "sphere12"
+                "back_wall"
             ],
             "type": "diffuse"
         },
