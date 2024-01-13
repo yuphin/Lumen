@@ -111,7 +111,7 @@ void main() {
         float pdf, cos_theta;
         const vec3 f_sampled = sample_bsdf(n_s, wo, hit_mat, 1, side,
                                            direction, pdf, cos_theta, seed);
-        if (pdf == 0 || f_sampled == vec3(0)) {
+        if (pdf < 1e-20 || dot(f_sampled, f_sampled) < 1e-20) {
             break;
         }
         throughput *= f_sampled * abs(cos_theta) / pdf;

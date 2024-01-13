@@ -11,7 +11,7 @@ struct MitsubaParser {
 		glm::vec3 albedo = glm::vec3(1);
 		glm::vec3 emissive_factor = glm::vec3(0);
 		float roughness = 0;
-		float ior;
+		float ior = 1.0f;
 	};
 
 	struct MitsubaIntegrator {

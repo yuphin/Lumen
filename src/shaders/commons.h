@@ -227,7 +227,6 @@ struct Material {
 	float metallic;
 	float specular_tint;
 	float sheen_tint;
-	float specular;
 	float clearcoat;
 	float clearcoat_gloss;
 	float sheen;
