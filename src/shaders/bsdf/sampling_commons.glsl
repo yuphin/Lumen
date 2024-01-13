@@ -27,7 +27,7 @@ bool refract(vec3 n_s, vec3 wo, bool forward_facing, float eta, uint mode, out v
 	inv_eta = forward_facing ? 1.0 / eta : eta;
 	const float sin2_t = inv_eta * inv_eta * (1. - cos_i * cos_i);
 	if (sin2_t >= 1.) {
-#if 1
+#if 0
 		return false;
 #else
 		wi = reflect(-wo, n_s);
