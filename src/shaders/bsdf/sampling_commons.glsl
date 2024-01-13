@@ -16,6 +16,7 @@ bool bsdf_is_delta(float alpha) { return alpha == 0.0; }
 // This prevents numerical problems with the GGX distribution
 // In PBRTv4 it's 1e-4, in Falcor it's 6.4e-3
 bool bsdf_is_effectively_delta(float alpha) { return alpha <= 0.0064; }
+bool bsdf_is_effectively_delta(vec2 alpha) { return min(alpha.x, alpha.y) <= 0.0064; }
 
 // Note: eta (relative IOR) is nu_i / nu_o
 bool refract(vec3 n_s, vec3 wo, bool forward_facing, float eta, uint mode, out vec3 wi, out vec3 f, out float inv_eta) {

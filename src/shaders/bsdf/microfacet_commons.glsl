@@ -17,8 +17,8 @@ float Smith_lambda_anisotropic(vec3 w, vec2 alpha) {
 	if (isinf(tan_sqr)) {
 		return 0.0;
 	}
-	vec2 phi_sqr = sin_sqr == 0.0 ? vec2(1.0, 0.0) : clamp(vec2(w.x * w.x, w.y * w.y), 0.0, 1.0) / sin_sqr;
-	float alpha_sqr = dot(phi_sqr, alpha * alpha);
+	vec2 cos_phi_sqr = sin_sqr == 0.0 ? vec2(1.0, 0.0) : clamp(vec2(w.x * w.x, w.y * w.y), 0.0, 1.0) / sin_sqr;
+	float alpha_sqr = dot(cos_phi_sqr, alpha * alpha);
 	return 0.5 * (sqrt(1.0 + alpha_sqr * tan_sqr) - 1);
 }
 
@@ -82,12 +82,18 @@ float eval_vndf_pdf_isotropic(float alpha, vec3 wo, vec3 h) {
 }
 
 float eval_vndf_pdf_anisotropic(vec2 alpha, vec3 wo, vec3 h, out float D) {
+	D = 0.0;
 	if (wo.z <= 0) {
 		return 0.0;
 	}
 	float G1 = G1_GGX_anisotropic(wo, alpha);
 	D = D_GGX_anisotropic(alpha, h);
 	return G1 * D * max(0.0, dot(wo, h)) / abs(wo.z);
+}
+
+float eval_vndf_pdf_anisotropic(vec2 alpha, vec3 wo, vec3 h)  {
+	float unused_D;
+	return eval_vndf_pdf_anisotropic(alpha, wo, h, unused_D);
 }
 
 vec3 sample_ggx_vndf_common(vec2 alpha, vec3 wo, vec2 xi) {

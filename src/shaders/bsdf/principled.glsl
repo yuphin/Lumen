@@ -4,6 +4,8 @@
 #include "diffuse.glsl"
 #include "dielectric.glsl"
 
+#define ANISOTROPIC 1
+
 // Resources and references:
 // Disney BSDF 2012:
 // https://blog.selfshadow.com/publications/s2012-shading-course/burley/s2012_pbs_disney_brdf_notes_v3.pdf
@@ -15,11 +17,14 @@
 // https://github.dev/mitsuba-renderer/mitsuba3
 // Nvidia Falcor (StandardBSDF)
 
-void initialize_sampling_probs(const Material mat, float F_dielectric, bool forward_facing, out float p_spec_reflect, out float p_diff,
-							   out float p_clearcoat, out float p_spec_trans) {
-	
+vec2 calc_anisotropy(float roughness, float anisotropic) {
+	float aspect = sqrt(1.0 - 0.9 * anisotropic);
+	float roughness_sqr = roughness * roughness;
+	return vec2(max(0.001, roughness_sqr / aspect), max(0.001, roughness_sqr * aspect));
+}
 
-
+void initialize_sampling_probs(const Material mat, float F_dielectric, bool forward_facing, out float p_spec_reflect,
+							   out float p_diff, out float p_clearcoat, out float p_spec_trans) {
 	float brdf_weight = (1.0 - mat.spec_trans) * (1.0 - mat.metallic);
 	float bsdf_weight = (1.0 - mat.metallic) * mat.spec_trans;
 
@@ -30,8 +35,8 @@ void initialize_sampling_probs(const Material mat, float F_dielectric, bool forw
 	p_spec_reflect = forward_facing ? (1.0 - bsdf_weight * (1.0 - F_dielectric)) : F_dielectric;
 	// Outside: microfacet transmission
 	// Inside: microfacet transmission
-	p_spec_trans =  forward_facing ? (bsdf_weight * (1.0 - F_dielectric)) : (1.0 - F_dielectric);
-	
+	p_spec_trans = forward_facing ? (bsdf_weight * (1.0 - F_dielectric)) : (1.0 - F_dielectric);
+
 	p_diff = forward_facing ? brdf_weight : 0.0;
 	p_clearcoat = forward_facing ? 0.25 * clamp(mat.clearcoat, 0.0, 1.0) : 0.0;
 
@@ -47,12 +52,12 @@ vec3 calc_disney_diffuse_factor(Material mat, vec3 wo, vec3 wi) {
 
 	float f_wi, f_wo;
 	float disney_f = disney_fresnel(wi, wo, mat.roughness, f_wi, f_wo);
-	float alpha = mat.roughness * mat.roughness;
+	float roughness_sqr = mat.roughness * mat.roughness;
 
 	float ss = 0;
 
 	// Retro-reflection
-	float rr = 2.0 * alpha * wi.z * wi.z;
+	float rr = 2.0 * roughness_sqr * wi.z * wi.z;
 	float f_retro = rr * (f_wi + f_wo * f_wi * f_wo * (rr - 1.0));
 
 	float f_diff = (1.0 - 0.5 * f_wi) * (1.0 - 0.5 * f_wo);
@@ -95,7 +100,11 @@ vec3 sample_principled_brdf(const Material mat, const vec3 wo, inout vec3 wi, in
 		return vec3(0);
 	}
 	float D;
+#if ANISOTROPIC
+	vec2 alpha = calc_anisotropy(mat.roughness, mat.anisotropy);
+#else
 	float alpha = mat.roughness * mat.roughness;
+#endif
 
 	if (bsdf_is_effectively_delta(alpha)) {
 		wi = vec3(-wo.x, -wo.y, wo.z);
@@ -104,7 +113,11 @@ vec3 sample_principled_brdf(const Material mat, const vec3 wo, inout vec3 wi, in
 		vec3 F = disney_fresnel(mat, wo, vec3(0, 0, 1), wi, eta);
 		return F / abs(cos_theta);
 	}
+#if ANISOTROPIC
+	vec3 h = sample_ggx_vndf_anisotropic(alpha, wo, xi, pdf_w, D);
+#else
 	vec3 h = sample_ggx_vndf_isotropic(vec2(alpha), wo, xi, pdf_w, D);
+#endif
 
 	wi = reflect(-wo, h);
 	// Make sure the reflection lies in the same hemisphere
@@ -114,7 +127,11 @@ vec3 sample_principled_brdf(const Material mat, const vec3 wo, inout vec3 wi, in
 	vec3 F = disney_fresnel(mat, wo, h, wi, eta);
 	pdf_w /= (4.0 * dot(wo, h));
 	cos_theta = wi.z;
+#if ANISOTROPIC
+	return 0.25 * D * F * G_GGX_correlated_anisotropic(alpha, wo, wi) / (wi.z * wo.z);
+#else
 	return 0.25 * D * F * G_GGX_correlated_isotropic(alpha, wo, wi) / (wi.z * wo.z);
+#endif
 }
 
 // For clearcoat: We sample the GGX distribution directly and use fixed roughness values (0.25)
@@ -167,7 +184,12 @@ vec3 eval_principled_brdf(Material mat, vec3 wo, vec3 wi, out float pdf_w, out f
 						  uint mode, bool eval_reverse_pdf) {
 	pdf_w = 0;
 	pdf_rev_w = 0;
+
+#if ANISOTROPIC
+	vec2 alpha = calc_anisotropy(mat.roughness, mat.anisotropy);
+#else
 	float alpha = mat.roughness * mat.roughness;
+#endif
 	if (bsdf_is_effectively_delta(alpha)) {
 		return vec3(0);
 	}
@@ -180,17 +202,33 @@ vec3 eval_principled_brdf(Material mat, vec3 wo, vec3 wi, out float pdf_w, out f
 	vec3 h = normalize(wo + wo);
 	float jacobian = 1.0 / (4.0 * dot(wo, h));
 	float D;
+#if ANISOTROPIC
+	pdf_w = eval_vndf_pdf_anisotropic(alpha, wo, h, D) / jacobian;
+#else
 	pdf_w = eval_vndf_pdf_isotropic(alpha, wo, h, D) / jacobian;
+#endif
 	float eta = forward_facing ? mat.ior : 1.0 / mat.ior;
 	if (eval_reverse_pdf) {
+#if ANISOTROPIC
+		pdf_rev_w = eval_vndf_pdf_anisotropic(alpha, wi, h) / jacobian;
+#else
 		pdf_rev_w = eval_vndf_pdf_isotropic(alpha, wi, h) / jacobian;
+#endif
 	}
 	vec3 F = disney_fresnel(mat, wo, h, wi, eta);
+#if ANISOTROPIC
+	return 0.25 * D * F * G_GGX_correlated_anisotropic(alpha, wo, wi) / (wi.z * wo.z);
+#else
 	return 0.25 * D * F * G_GGX_correlated_isotropic(alpha, wo, wi) / (wi.z * wo.z);
+#endif
 }
 
 float eval_principled_brdf_pdf(Material mat, vec3 wo, vec3 wi) {
+#if ANISOTROPIC
+	vec2 alpha = calc_anisotropy(mat.roughness, mat.anisotropy);
+#else
 	float alpha = mat.roughness * mat.roughness;
+#endif
 
 	if (bsdf_is_effectively_delta(alpha)) {
 		return 0.0;
@@ -206,8 +244,11 @@ float eval_principled_brdf_pdf(Material mat, vec3 wo, vec3 wi) {
 	vec3 h = normalize(wo + wo);
 	// Make sure h is oriented towards the normal
 	h *= float(sign(h.z));
-
+#if ANISOTROPIC
+	return eval_vndf_pdf_anisotropic(alpha, wo, h) / (4.0 * dot(wo, h));
+#else
 	return eval_vndf_pdf_isotropic(alpha, wo, h) / (4.0 * dot(wo, h));
+#endif
 }
 
 vec3 sample_principled(const Material mat, const vec3 wo, out vec3 wi, const uint mode, const bool forward_facing,
@@ -224,12 +265,9 @@ vec3 sample_principled(const Material mat, const vec3 wo, out vec3 wi, const uin
 	float F = fresnel_dielectric(wo.z, mat.ior, forward_facing);
 	initialize_sampling_probs(mat, F, forward_facing, p_spec, p_diff, p_clearcoat, p_spec_trans);
 
-	float alpha = mat.roughness * mat.roughness;
-
 	float eta = forward_facing ? mat.ior : 1.0 / mat.ior;
 
 	vec3 f = vec3(0);
-
 	float p_lobe = 0.0;
 	if (xi.z < p_spec) {
 		f = sample_principled_brdf(mat, wo, wi, pdf_w, cos_theta, xi.xy, eta);
