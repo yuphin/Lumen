@@ -233,6 +233,7 @@ struct Material {
 	float subsurface;
 	float flatness;
 	float anisotropy;
+	uint thin;
 };
 
 // Scene buffer addresses

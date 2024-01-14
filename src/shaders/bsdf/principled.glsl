@@ -166,7 +166,7 @@ vec3 eval_clearcoat(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float p
 	pdf_w = 0;
 	pdf_rev_w = 0;
 	const float alpha_2 = 0.25 * 0.25;
-	vec3 h = normalize(wo + wo);
+	vec3 h = normalize(wo + wi);
 	float D;
 	float f_clearcoat = calc_clearcoat_factor(mat, wo, wi, h, D);
 	pdf_w = D / (4.0 * dot(wo, h));
@@ -175,7 +175,7 @@ vec3 eval_clearcoat(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float p
 	return vec3(f_clearcoat);
 }
 float eval_clearcoat_pdf(Material mat, vec3 wo, vec3 wi) {
-	vec3 h = normalize(wo + wo);
+	vec3 h = normalize(wo + wi);
 	float D = D_GGX_isotropic(mix(0.1, 0.001, mat.clearcoat_gloss), h.z);
 	return D / (4.0 * dot(wo, h));
 }
@@ -199,7 +199,7 @@ vec3 eval_principled_brdf(Material mat, vec3 wo, vec3 wi, out float pdf_w, out f
 	if (wo.z == 0 || wi.z == 0) {
 		return vec3(0);
 	}
-	vec3 h = normalize(wo + wo);
+	vec3 h = normalize(wo + wi);
 	float jacobian = 1.0 / (4.0 * dot(wo, h));
 	float D;
 #if ANISOTROPIC
@@ -241,7 +241,7 @@ float eval_principled_brdf_pdf(Material mat, vec3 wo, vec3 wi) {
 		return 0.0;
 	}
 
-	vec3 h = normalize(wo + wo);
+	vec3 h = normalize(wo + wi);
 	// Make sure h is oriented towards the normal
 	h *= float(sign(h.z));
 #if ANISOTROPIC

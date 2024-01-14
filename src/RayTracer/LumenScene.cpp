@@ -73,6 +73,11 @@ struct Bbox {
 	glm::vec3 m_max{std::numeric_limits<float>::lowest()};
 };
 
+static void reflectance_to_conductor_eta_k(const glm::vec3& reflectance, glm::vec3& eta, glm::vec3& k) {
+	eta = glm::vec3(1.0f);
+	k = 2.0f * glm::sqrt(reflectance) / glm::sqrt(glm::max(glm::vec3(1.0f) - reflectance, 0.001f));
+};
+
 using json = nlohmann::json;
 void LumenScene::load_scene(const std::string& path) {
 	auto ends_with = [](const std::string& str, const std::string& end) -> bool {
@@ -214,6 +219,10 @@ void LumenScene::load_scene(const std::string& path) {
 			return json[prop].is_null() ? val : glm::vec3{json[prop][0], json[prop][1], json[prop][2]};
 		};
 
+		auto get_or_default_u = [](json& json, const std::string& prop, uint32_t val) -> uint32_t {
+			return json[prop].is_null() ? val : (uint32_t)json[prop];;
+		};
+
 		for (auto& bsdf : bsdfs_arr) {
 			materials[bsdf_idx].texture_id = -1;
 			auto& refs = bsdf["refs"];
@@ -269,6 +278,7 @@ void LumenScene::load_scene(const std::string& path) {
 				} else {
 					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_SPECULAR;
 				}
+				materials[bsdf_idx].thin = get_or_default_u(bsdf, "thin", 0);
 			} else if (bsdf["type"] == "conductor") {
 				bsdf_types |= BSDF_TYPE_CONDUCTOR;
 				Material& mat = materials[bsdf_idx];
@@ -283,9 +293,7 @@ void LumenScene::load_scene(const std::string& path) {
 				if (!reflectance.is_null()) {
 					auto reflectance_val =
 						glm::clamp(glm::vec3(reflectance[0], reflectance[1], reflectance[2]), 0.0f, 0.9999f);
-					mat.albedo = glm::vec3(1.0);
-					mat.k = 2.0f * glm::sqrt(reflectance_val) /
-							glm::sqrt(glm::max(glm::vec3(1.0f) - reflectance_val, 0.0f));
+					reflectance_to_conductor_eta_k(reflectance_val, mat.albedo, mat.k);
 				}
 				auto reflectivity = bsdf["reflectivity"];
 				auto edge_tint = bsdf["edge_tint"];
@@ -328,6 +336,7 @@ void LumenScene::load_scene(const std::string& path) {
 				mat.flatness = get_or_default_f(bsdf, "flatness", 0.0f);
 				mat.sheen = get_or_default_f(bsdf, "sheen", 0.0f);
 				mat.anisotropy = get_or_default_f(bsdf, "anisotropy", 0.0f);
+				mat.thin = get_or_default_u(bsdf, "thin", 0);
 
 				mat.bsdf_props = BSDF_FLAG_REFLECTION | BSDF_FLAG_TRANSMISSION;
 				if (mat.roughness > 0.08) {
@@ -460,17 +469,14 @@ void LumenScene::load_scene(const std::string& path) {
 		}
 
 		auto make_default_principled = [](Material& m) {
-			m.bsdf_type = BSDF_TYPE_PRINCIPLED;
-			m.bsdf_props = BSDF_FLAG_GLOSSY;
-			m.albedo = vec3(1.0);
 			m.metallic = 0;
-			m.roughness = 0.5;
 			m.specular_tint = 0;
-			m.sheen_tint = 0.5;
+			m.sheen_tint = 0.0;
 			m.clearcoat = 0;
-			m.clearcoat_gloss = 1;
+			m.clearcoat_gloss = 0;
 			m.subsurface = 0;
 			m.sheen = 0;
+			m.thin = 0;
 		};
 		i = 0;
 		materials.resize(mitsuba_parser.bsdfs.size());
@@ -484,28 +490,40 @@ void LumenScene::load_scene(const std::string& path) {
 			Material& mat = materials[i];
 			make_default_principled(mat);
 			mat.albedo = m_bsdf.albedo;
+			mat.roughness = m_bsdf.roughness;
 			// Assume Principled for other materials for now
 			if (m_bsdf.type == "diffuse") {
 				bsdf_types |= BSDF_TYPE_DIFFUSE;
 				mat.bsdf_type = BSDF_TYPE_DIFFUSE;
 				mat.bsdf_props = BSDF_FLAG_DIFFUSE_REFLECTION;
-			} else if (m_bsdf.type == "roughconductor" || m_bsdf.type == "roughplastic" ||
-					   m_bsdf.type == "roughdielectric" || m_bsdf.type == "dielectric" || m_bsdf.type == "conductor") {
+			} else if (m_bsdf.type == "roughplastic" || m_bsdf.type == "roughdielectric" ||
+					   m_bsdf.type == "dielectric" || m_bsdf.type == "plastic") {
 				bsdf_types |= BSDF_TYPE_PRINCIPLED;
 				mat.bsdf_type = BSDF_TYPE_PRINCIPLED;
 				mat.bsdf_props = BSDF_FLAG_REFLECTION | BSDF_FLAG_TRANSMISSION;
-				mat.roughness = m_bsdf.roughness;
 				mat.ior = m_bsdf.ior;
 				if (mat.roughness > 0.08) {
 					mat.bsdf_props |= BSDF_FLAG_GLOSSY;
 				} else {
 					mat.bsdf_props |= BSDF_FLAG_SPECULAR;
 				}
-				if (m_bsdf.type == "roughplastic") {
+				if (m_bsdf.type == "roughplastic" || m_bsdf.type == "plastic") {
+					// The roughplastic in Mitsuba is not compatible with the Disney principled model
+					mat.metallic = 1.0;
 					mat.subsurface = 0.1f;
+					mat.spec_trans = 0.5;
+					mat.thin = 1;
 				}
-				if (m_bsdf.type == "conductor" || m_bsdf.type == "roughconductor") {
-					mat.metallic = 1;
+
+			} else if (m_bsdf.type == "conductor" || m_bsdf.type == "roughconductor") {
+				bsdf_types |= BSDF_TYPE_CONDUCTOR;
+				mat.bsdf_type = BSDF_TYPE_CONDUCTOR;
+				reflectance_to_conductor_eta_k(m_bsdf.albedo, mat.albedo, mat.k);
+				mat.bsdf_props = BSDF_FLAG_REFLECTION;
+				if (mat.roughness > 0.08) {
+					mat.bsdf_props |= BSDF_FLAG_GLOSSY;
+				} else {
+					mat.bsdf_props |= BSDF_FLAG_SPECULAR;
 				}
 			} else if (m_bsdf.type == "glass") {
 				bsdf_types |= BSDF_TYPE_GLASS;

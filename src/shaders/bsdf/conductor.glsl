@@ -55,7 +55,7 @@ vec3 eval_conductor(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float p
 	if (wo.z == 0 || wi.z == 0) {
 		return vec3(0);
 	}
-	vec3 h = normalize(wo + wo);
+	vec3 h = normalize(wo + wi);
 	// Make sure h is oriented towards the normal
 	h *= float(sign(h.z));
 
@@ -82,7 +82,7 @@ float eval_conductor_pdf(Material mat, vec3 wo, vec3 wi) {
 	if (wo.z == 0 || wi.z == 0) {
 		return 0.0;
 	}
-	vec3 h = normalize(wo + wo);
+	vec3 h = normalize(wo + wi);
 	// Make sure h is oriented towards the normal
 	h *= float(sign(h.z));
 

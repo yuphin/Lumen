@@ -44,7 +44,8 @@ void MitsubaParser::parse(const std::string& path) {
 				for (const auto& prop : obj->properties()) {
 					// Get reflectance
 					if (prop.second.type() == PT_COLOR) {
-						if (prop.first.find("reflectance") == std::string::npos) {
+						if (prop.first.find("reflectance") == std::string::npos &&
+							prop.first.find("specularReflectance") == std::string::npos) {
 							continue;
 						}
 						// Assume RGB for the moment
@@ -73,7 +74,8 @@ void MitsubaParser::parse(const std::string& path) {
 					for (const auto& prop : p->properties()) {
 						// Get reflectance
 						if (prop.second.type() == PT_COLOR) {
-							if (prop.first.find("reflectance") == std::string::npos) {
+							if (prop.first.find("reflectance") == std::string::npos &&
+								prop.first.find("specularReflectance") == std::string::npos) {
 								continue;
 							}
 							// Assume RGB for the moment

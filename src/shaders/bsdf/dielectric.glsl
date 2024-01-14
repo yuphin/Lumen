@@ -2,6 +2,11 @@
 #define DIELECTRIC_GLSL
 #include "microfacet_commons.glsl"
 
+// Based on Disney's principled BSDF
+float modify_thin_roughness(float ior, float roughness) {
+	return clamp((0.65f * ior - 0.35f) * roughness, 0.0, 1.0);
+}
+
 vec3 sample_dielectric(const Material mat, const vec3 wo, out vec3 wi, const uint mode, const bool forward_facing,
 					   out float pdf_w, out float cos_theta, const vec2 xi) {
 	wi = vec3(0);
@@ -12,12 +17,13 @@ vec3 sample_dielectric(const Material mat, const vec3 wo, out vec3 wi, const uin
 		return vec3(0);
 	}
 
-	float alpha = mat.roughness * mat.roughness;
+	float roughness = mat.thin == 1 ? modify_thin_roughness(mat.ior, mat.roughness) : mat.roughness;
+	float alpha = roughness * roughness;
 
 	bool has_reflection = bsdf_has_property(mat.bsdf_props, BSDF_FLAG_REFLECTION);
 	bool has_transmission = bsdf_has_property(mat.bsdf_props, BSDF_FLAG_TRANSMISSION);
 	// Perfect reflection/transmission
-	if (mat.ior == 1.0 || bsdf_is_effectively_delta(alpha)) {
+	if ((mat.ior == 1.0 && mat.thin == 0) || bsdf_is_effectively_delta(alpha)) {
 		float F = fresnel_dielectric(wo.z, mat.ior, forward_facing);
 
 		ASSERT1(F <= 1, "%f\n", F);
@@ -76,8 +82,17 @@ vec3 sample_dielectric(const Material mat, const vec3 wo, out vec3 wi, const uin
 		pdf_w = pdf_w * (pr / (pr + pt)) / (4.0 * abs(dot(wo, h)));
 		f = vec3(0.25 * D * F * G_GGX_correlated_isotropic(alpha, wo, wi) / (wi.z * wo.z));
 	} else {
+		vec3 base_col;
 		float possibly_modified_inv_eta;
-		bool tir = !refract(h, wo, forward_facing, mat.ior, mode, wi, f, possibly_modified_inv_eta);
+		bool tir = false;
+		if (mat.thin == 1) {
+			wi = reflect(-wo, h);
+			base_col = sqrt(mat.albedo);
+			possibly_modified_inv_eta = mat.ior;
+		} else {
+			tir = !refract(h, wo, forward_facing, mat.ior, mode, wi, f, possibly_modified_inv_eta);
+			base_col = mat.albedo;
+		}
 		if (wo.z * wi.z > 0 || wi.z > 0 || tir) {
 			return vec3(0);
 		}
@@ -85,8 +100,7 @@ vec3 sample_dielectric(const Material mat, const vec3 wo, out vec3 wi, const uin
 		jacobian_denom = jacobian_denom * jacobian_denom;
 		float jacobian = abs(dot(wi, h)) / jacobian_denom;
 		pdf_w = pdf_w * (pt / (pr + pt)) * jacobian;
-
-		f = f * (1.0 - F) * D * G_GGX_correlated_isotropic(alpha, wo, wi) *
+		f = base_col * f * (1.0 - F) * D * G_GGX_correlated_isotropic(alpha, wo, wi) *
 			abs(dot(wi, h) * dot(wo, h) / (wi.z * wo.z * jacobian_denom));
 	}
 	cos_theta = wi.z;
@@ -97,7 +111,8 @@ vec3 eval_dielectric(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 					 uint mode, bool eval_reverse_pdf) {
 	pdf_w = 0.0;
 	pdf_rev_w = 0.0;
-	float alpha = mat.roughness * mat.roughness;
+	float roughness = mat.thin == 1 ? modify_thin_roughness(mat.ior, mat.roughness) : mat.roughness;
+	float alpha = roughness * roughness;
 	if (alpha == 0 || mat.ior == 1) {
 		return vec3(0);
 	}
@@ -152,7 +167,8 @@ vec3 eval_dielectric(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 
 		float jacobian = abs(dot(wi, h)) / jacobian_denom;
 
-		vec3 f = vec3(D * G * (1.0 - F) * abs(dot(wi, h) * dot(wo, h) / (wi.z * wo.z * jacobian_denom)));
+		vec3 base_col = mat.thin == 1 ? sqrt(mat.albedo) : mat.albedo;
+		vec3 f = base_col * D * G * (1.0 - F) * abs(dot(wi, h) * dot(wo, h) / (wi.z * wo.z * jacobian_denom));
 		if (mode == 1) {
 			f /= (eta * eta);
 		}
@@ -173,7 +189,8 @@ vec3 eval_dielectric(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 }
 
 float eval_dielectric_pdf(Material mat, vec3 wo, vec3 wi, bool forward_facing) {
-	float alpha = mat.roughness * mat.roughness;
+	float roughness = mat.thin == 1 ? modify_thin_roughness(mat.ior, mat.roughness) : mat.roughness;
+	float alpha = roughness * roughness;
 	if (alpha == 0 || mat.ior == 1) {
 		return 0.0;
 	}
