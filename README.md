@@ -19,7 +19,7 @@
  - FFT Convolution Bloom
 
 ### Engine
- - Lambertian, mirror, glass, glossy and optionally Disney BSDF
+ - Diffuse, mirror, glass, conductor, dielectric and  Disney Principled BSDF
  - Spot (point), polygonal and directional lights
  - JSON-based scene system
  - Modified Mitsuba parser
