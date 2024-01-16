@@ -40,6 +40,10 @@ void MitsubaParser::parse(const std::string& path) {
 			case OT_BSDF: {
 				MitsubaBSDF bsdf;
 				bsdf.name = obj->id();
+				while ((obj->pluginType() == "twosided" || obj->pluginType() == "mask") &&
+					   obj->anonymousChildren().size()) {
+					obj = obj->anonymousChildren()[0].get();
+				}
 				bsdf.type = obj->pluginType();
 				for (const auto& prop : obj->properties()) {
 					// Get reflectance
@@ -59,32 +63,28 @@ void MitsubaParser::parse(const std::string& path) {
 						bsdf.ior = prop.second.getNumber();
 					}
 				}
-				for (const auto& bsdf_child : obj->anonymousChildren()) {
-					Object* p = bsdf_child.get();
-					bsdf.type = p->pluginType();
-					for (const auto& named_child : p->namedChildren()) {
-						if (named_child.second.get()->type() == OT_TEXTURE) {
-							for (const auto& texture_prop : named_child.second.get()->properties()) {
-								if (texture_prop.first == "filename") {
-									bsdf.texture = texture_prop.second.getString();
-								}
+				for (const auto& named_child : obj->namedChildren()) {
+					if (named_child.second.get()->type() == OT_TEXTURE) {
+						for (const auto& texture_prop : named_child.second.get()->properties()) {
+							if (texture_prop.first == "filename") {
+								bsdf.texture = texture_prop.second.getString();
 							}
 						}
 					}
-					for (const auto& prop : p->properties()) {
-						// Get reflectance
-						if (prop.second.type() == PT_COLOR) {
-							if (prop.first.find("reflectance") == std::string::npos &&
-								prop.first.find("specularReflectance") == std::string::npos) {
-								continue;
-							}
-							// Assume RGB for the moment
-							bsdf.albedo = glm::vec3(
-								{prop.second.getColor().r, prop.second.getColor().g, prop.second.getColor().b});
+				}
+				for (const auto& prop : obj->properties()) {
+					// Get reflectance
+					if (prop.second.type() == PT_COLOR) {
+						if (prop.first.find("reflectance") == std::string::npos &&
+							prop.first.find("specularReflectance") == std::string::npos) {
+							continue;
 						}
-						if (prop.first == "alpha") {
-							bsdf.roughness = std::sqrt(prop.second.getNumber());
-						}
+						// Assume RGB for the moment
+						bsdf.albedo =
+							glm::vec3({prop.second.getColor().r, prop.second.getColor().g, prop.second.getColor().b});
+					}
+					if (prop.first == "alpha") {
+						bsdf.roughness = std::sqrt(prop.second.getNumber());
 					}
 				}
 				bsdfs.push_back(bsdf);
