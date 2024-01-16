@@ -16,7 +16,7 @@ Texture2D::Texture2D(const std::string& name, VulkanContext* ctx, VkImage image,
 	this->format = format;
 	this->aspect_flags = aspect_flags;
 	this->usage_flags = usage_flags;
-	this->base_extent = VkExtent3D{extent.width, extent.height};
+	this->base_extent = VkExtent3D{extent.width, extent.height, 1};
 	if (!name.empty()) {
 		this->name = name;
 		DebugMarker::set_resource_name(ctx->device, (uint64_t)img, name.c_str(), VK_OBJECT_TYPE_IMAGE);
