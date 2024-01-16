@@ -745,6 +745,6 @@
 		<vector name="sunDirection" x="-0.865804" y="0.916766" z="-0.276929" />
 		<vector name="sunColor" x="0.98" y="0.82" z="0.30" />
 		<vector name="skyColor" x="0.53" y="0.8" z="0.92" />
-		<float name="sunScale" value="0.1" />
+		<float name="sunScale" value="0.5" />
 	</emitter>
 </scene>

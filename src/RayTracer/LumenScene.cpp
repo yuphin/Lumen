@@ -507,6 +507,10 @@ void LumenScene::load_scene(const std::string& path) {
 				} else {
 					mat.bsdf_props |= BSDF_FLAG_SPECULAR;
 				}
+				if(m_bsdf.type == "roughdielectric" || m_bsdf.type == "dielectric") {
+					mat.spec_trans = 1.0;
+					mat.metallic = 0.0;
+				}
 				if (m_bsdf.type == "roughplastic" || m_bsdf.type == "plastic") {
 					// The roughplastic in Mitsuba is not compatible with the Disney principled model
 					mat.metallic = 1.0;
