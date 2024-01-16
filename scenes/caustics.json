@@ -29,14 +29,10 @@
             "refs": [
                 "ring"
             ],
-            "albedo": [
-                0.95,
-                0.92,
-                0.06
-            ],
-             "metallic" : 1,
+            "reflectivity" : [0.95652,0.79155,0.40800],
+            "edge_tint" : [0.95706,0.86370,0.61991],
             "roughness": 0.1,
-            "type": "principled"
+            "type": "conductor"
         },
        
         {
@@ -78,9 +74,9 @@
             "refs": [
                 "floor"
             ],
-             "metallic" : 0,
-            "roughness": 0.05,
-            "type": "principled"
+            "roughness" : 0.5,
+            "reflectance" : [1,1,1],
+            "type": "conductor"
         }
        
     ],
