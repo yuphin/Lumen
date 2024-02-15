@@ -123,6 +123,7 @@ int bdpt_random_walk_eye(const int max_depth, vec3 throughput,
         prev = b - 1;
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, ray_pos, tmin, wi, tmax, 0);
         if (payload.material_idx == -1) {
+            throughput *= shade_atmosphere(pc.dir_light_idx, pc.sky_col, ray_pos, wi, tmax);
             vtx_assign(b, throughput, throughput);
             vtx_assign(b, pdf_fwd, pdf_fwd);
             b++;

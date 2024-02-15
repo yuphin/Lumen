@@ -54,6 +54,7 @@ void BDPT::render() {
 	pc_ray.sky_col = lumen_scene->config->sky_col;
 	pc_ray.total_light_area = total_light_area;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	pc_ray.dir_light_idx = lumen_scene->dir_light_idx;
 	pc_ray.frame_num = frame_num;
 	instance->vkb.rg
 		->add_rt("BDPT",
