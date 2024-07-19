@@ -4,6 +4,9 @@
 #include "Buffer.h"
 #include "Pipeline.h"
 #include "RayTracer/LumenScene.h"
+
+namespace lumen::vk {
+	
 uint32_t find_memory_type(VkPhysicalDevice* physical_device, uint32_t type_filter, VkMemoryPropertyFlags props);
 
 void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image, VkImageLayout old_layout,
@@ -27,10 +30,6 @@ inline VkTransformMatrixKHR to_vk_matrix(const glm::mat4& mat) {
 VkPipelineStageFlags get_pipeline_stage(PassType pass_type, VkAccessFlags access_flags);
 VkImageLayout get_image_layout(VkDescriptorType type);
 
-template <class T>
-constexpr T align_up(T x, size_t a) noexcept {
-	return T((x + (T(a) - 1)) & ~T(a - 1));
-}
 
 inline VkBufferMemoryBarrier buffer_barrier(VkBuffer buffer, VkAccessFlags src_accesss, VkAccessFlags dst_access) {
 	VkBufferMemoryBarrier result = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
@@ -180,3 +179,5 @@ inline void insert(VkDevice device, VkCommandBuffer cmd, const char* name, glm::
 	}
 }
 }  // namespace DebugMarker
+
+}  // namespace lumen

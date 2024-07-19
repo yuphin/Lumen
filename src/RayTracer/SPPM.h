@@ -3,7 +3,7 @@
 #include "shaders/integrators/sppm/sppm_commons.h"
 class SPPM : public Integrator {
    public:
-	SPPM(LumenInstance* scene, LumenScene* lumen_scene)
+	SPPM(lumen::LumenInstance* scene, LumenScene* lumen_scene)
 		: Integrator(scene, lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), SPPMConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
@@ -16,13 +16,13 @@ class SPPM : public Integrator {
 	VkDescriptorSetLayout desc_set_layout{};
 	VkDescriptorSet desc_set;
 
-	Buffer sppm_data_buffer;
-	Buffer atomic_data_buffer;
-	Buffer photon_buffer;
-	Buffer residual_buffer;
-	Buffer counter_buffer;
-	Buffer hash_buffer;
-	Buffer tmp_col_buffer;
+	lumen::Buffer sppm_data_buffer;
+	lumen::Buffer atomic_data_buffer;
+	lumen::Buffer photon_buffer;
+	lumen::Buffer residual_buffer;
+	lumen::Buffer counter_buffer;
+	lumen::Buffer hash_buffer;
+	lumen::Buffer tmp_col_buffer;
 
 	SPPMConfig* config;
 };

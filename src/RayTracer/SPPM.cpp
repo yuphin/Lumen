@@ -6,29 +6,27 @@ void SPPM::init() {
 	sppm_data_buffer.create("SPPM Data", &instance->vkb.ctx,
 							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-							instance->width * instance->height * sizeof(SPPMData));
+							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * sizeof(SPPMData));
 
 	atomic_data_buffer.create("Atomic Data", &instance->vkb.ctx,
 							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(AtomicData));
+							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(AtomicData));
 
 	photon_buffer.create("Photon Buffer", &instance->vkb.ctx,
 						 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 						 10 * instance->width * instance->height * sizeof(PhotonHash));
 	residual_buffer.create("Residual Buffer", &instance->vkb.ctx,
 						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						   instance->width * instance->height * 4 * sizeof(float));
+						   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * 4 * sizeof(float));
 
 	counter_buffer.create("Counter Buffer", &instance->vkb.ctx,
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(int));
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(int));
 
 	SceneDesc desc;
 	desc.index_addr = index_buffer.get_device_address();
@@ -42,9 +40,9 @@ void SPPM::init() {
 	desc.photon_addr = photon_buffer.get_device_address();
 	desc.residual_addr = residual_buffer.get_device_address();
 	desc.counter_addr = counter_buffer.get_device_address();
-	scene_desc_buffer.create(
-		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
+	scene_desc_buffer.create(&instance->vkb.ctx,
+							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
 	frame_num = 0;
 
@@ -61,7 +59,7 @@ void SPPM::init() {
 }
 
 void SPPM::render() {
-	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
@@ -84,19 +82,20 @@ void SPPM::render() {
 	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name, const std::string& reduce_name,
 						 const std::string& reduce_shader_name) {
 		uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
-		instance->vkb.rg->add_compute(op_name, {.shader = Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
+		instance->vkb.rg->add_compute(op_name, {.shader = lumen::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
 			.push_constants(&pc_ray)
 			.bind(scene_desc_buffer)
 			.zero({residual_buffer, counter_buffer});
 		while (num_wgs != 1) {
-			instance->vkb.rg->add_compute(reduce_name, {.shader = Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
+			instance->vkb.rg
+				->add_compute(reduce_name, {.shader = lumen::Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
 				.push_constants(&pc_ray)
 				.bind(scene_desc_buffer);
 			num_wgs = (uint32_t)(num_wgs + 1023) / 1024;
 		}
 	};
 
-	const std::initializer_list<ResourceBinding> rt_bindings = {
+	const std::initializer_list<lumen::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
 		scene_desc_buffer,
@@ -127,7 +126,7 @@ void SPPM::render() {
 			  "src/shaders/integrators/sppm/reduce_min.comp");
 	instance->vkb.rg
 		->add_compute("Bounds Calculation",
-					  {.shader = Shader("src/shaders/integrators/sppm/calc_bounds.comp"), .dims = {1, 1, 1}})
+					  {.shader = lumen::Shader("src/shaders/integrators/sppm/calc_bounds.comp"), .dims = {1, 1, 1}})
 		.bind(scene_desc_buffer);
 	// Trace from light
 	instance->vkb.rg
@@ -148,7 +147,7 @@ void SPPM::render() {
 	// Gather
 	instance->vkb.rg
 		->add_compute("Gather",
-					  {.shader = Shader("src/shaders/integrators/sppm/gather.comp"),
+					  {.shader = lumen::Shader("src/shaders/integrators/sppm/gather.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(scene_desc_buffer)
@@ -156,7 +155,7 @@ void SPPM::render() {
 	// Composite
 	instance->vkb.rg
 		->add_compute("Composite",
-					  {.shader = Shader("src/shaders/integrators/sppm/composite.comp"),
+					  {.shader = lumen::Shader("src/shaders/integrators/sppm/composite.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, scene_desc_buffer});
@@ -175,8 +174,8 @@ bool SPPM::update() {
 void SPPM::destroy() {
 	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
-	std::vector<Buffer*> buffer_list = {&sppm_data_buffer, &atomic_data_buffer, &photon_buffer, &residual_buffer,
-										&counter_buffer,   &hash_buffer,		&tmp_col_buffer};
+	std::vector<lumen::Buffer*> buffer_list = {&sppm_data_buffer, &atomic_data_buffer, &photon_buffer, &residual_buffer,
+											   &counter_buffer,	  &hash_buffer,		   &tmp_col_buffer};
 	for (auto b : buffer_list) {
 		b->destroy();
 	}

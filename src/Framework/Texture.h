@@ -1,6 +1,7 @@
 #pragma once
 #include "../LumenPCH.h"
 
+namespace lumen {
 struct TextureSettings {
 	VkFormat format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -35,7 +36,7 @@ class Texture {
 	uint32_t mip_levels = 1;
 	// uint32_t array_layers = 1;
 	// VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
-	 VkExtent3D base_extent = { 0, 0, 0 };
+	VkExtent3D base_extent = {0, 0, 0};
 	// VkImageType image_type = VK_IMAGE_TYPE_2D;
 	VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	bool sampler_allocated = false;
@@ -75,3 +76,5 @@ class Texture2D : public Texture {
 
    private:
 };
+
+}  // namespace lumen

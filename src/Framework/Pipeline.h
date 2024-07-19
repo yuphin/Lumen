@@ -6,6 +6,8 @@
 #include "Texture.h"
 #include "SBTWrapper.h"
 #include "RenderGraphTypes.h"
+
+namespace lumen {
 struct Pipeline;
 
 struct PipelineTrace {
@@ -24,31 +26,17 @@ struct Pipeline {
 	void create_rt_pipeline(const RTPassSettings& settings, const std::vector<uint32_t>& descriptor_counts);
 	void create_compute_pipeline(const ComputePassSettings& settings, const std::vector<uint32_t>& descriptor_counts);
 	const std::array<VkStridedDeviceAddressRegionKHR, 4> get_rt_regions();
-	// void track_for_changes();
-	//  Manually called after the pipeline is reloaded
 	void refresh();
-	struct {
-		VkPipelineShaderStageCreateInfo vert_shader_CI;
-		VkPipelineShaderStageCreateInfo frag_shader_CI;
-		VkPipelineInputAssemblyStateCreateInfo input_asssembly_CI;
-		VkPipelineViewportStateCreateInfo viewport_state;
-		VkPipelineRasterizationStateCreateInfo rasterizer;
-		VkPipelineMultisampleStateCreateInfo multisampling;
-		VkPipelineColorBlendAttachmentState color_blend_attachment;
-		VkPipelineColorBlendStateCreateInfo color_blend;
-		VkPipelineLayoutCreateInfo pipeline_layout_CI;
-		VkPipelineDynamicStateCreateInfo dynamic_state_CI;
-		VkGraphicsPipelineCreateInfo pipeline_CI;
-	} gfx_cis;
+
 	std::unordered_map<std::string, std::filesystem::file_time_type> paths;
 	VkPipeline handle = VK_NULL_HANDLE;
 	VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
 	VkDescriptorSetLayout set_layout = VK_NULL_HANDLE;
 	VkDescriptorSetLayout tlas_layout = VK_NULL_HANDLE;
 	/*
-	Potentially 1 descriptor pool for a pass where we have to keep the
-	TLAS descriptor, because we can't push its descriptor with a template as
-   of Vulkan 1.3
+		Potentially 1 descriptor pool for a pass where we have to keep the
+		TLAS descriptor, because we can't push its descriptor with a template as
+		of Vulkan 1.3
 	*/
 	VkDescriptorPool tlas_descriptor_pool = nullptr;
 	VkDescriptorSet tlas_descriptor_set = nullptr;
@@ -72,3 +60,5 @@ struct Pipeline {
 	uint32_t binding_mask;
 	VulkanContext* ctx;
 };
+
+}  // namespace lumen

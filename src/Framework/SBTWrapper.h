@@ -20,6 +20,7 @@
 #include "Buffer.h"
 #pragma once
 
+namespace lumen {
 class SBTWrapper {
    public:
 	enum GroupType { eRaygen, eMiss, eHit, eCallable };
@@ -65,3 +66,5 @@ class SBTWrapper {
 	uint32_t m_handle_alignment{0};
 	uint32_t m_queue_idx{0};
 };
+
+}  // namespace lumen

@@ -1,5 +1,7 @@
 #include "../LumenPCH.h"
 #include "ThreadPool.h"
+
+namespace lumen {
 std::atomic_bool ThreadPool::done;
 std::queue<std::function<void()>> ThreadPool::work_queue;
 std::mutex ThreadPool::queue_mutex;
@@ -39,3 +41,5 @@ void ThreadPool::destroy() {
 		thread.join();
 	}
 }
+
+}  // namespace lumen

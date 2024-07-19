@@ -7,7 +7,7 @@ void Logger::init() {
 	s_logger->set_level(spdlog::level::trace);
 #if defined _MSC_VER
 	auto logger_sink = dynamic_cast<spdlog::sinks::stdout_color_sink_mt*>(s_logger->sinks().back().get());
-	logger_sink->set_color(spdlog::level::trace, logger_sink->GREEN);
+	logger_sink->set_color(spdlog::level::trace, FOREGROUND_GREEN);
 #endif
 }
 

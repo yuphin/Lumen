@@ -11,8 +11,7 @@ void Path::init() {
 	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
 	scene_desc_buffer.create("Scene Desc", &instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc,
-							 true);
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
 	frame_num = 0;
 
@@ -24,7 +23,7 @@ void Path::init() {
 }
 
 void Path::render() {
-	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.num_lights = (int)lights.size();
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;

@@ -1,7 +1,11 @@
 #pragma once
+#include "Framework/Logger.h"
 #include <volk/volk.h>
 #include <GLFW/glfw3.h>
 #include <optional>
+#include <vector>
+
+namespace lumen {
 struct AccelKHR;
 
 // Utils
@@ -80,7 +84,7 @@ inline void check(std::array<VkResult, Size> results, const char* msg = 0) {
 	}
 }
 
-inline VkDebugUtilsMessengerCreateInfoEXT debug_messenger_CI(PFN_vkDebugUtilsMessengerCallbackEXT debug_callback) {
+inline VkDebugUtilsMessengerCreateInfoEXT debug_messenger(PFN_vkDebugUtilsMessengerCallbackEXT debug_callback) {
 	VkDebugUtilsMessengerCreateInfoEXT CI = {};
 	CI.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
 	CI.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
@@ -114,7 +118,7 @@ inline VkCommandBufferAllocateInfo command_buffer_allocate_info(VkCommandPool co
 	return commandBufferAllocateInfo;
 }
 
-inline VkCommandPoolCreateInfo command_pool_CI(VkCommandPoolCreateFlags flags = 0) {
+inline VkCommandPoolCreateInfo command_pool(VkCommandPoolCreateFlags flags = 0) {
 	VkCommandPoolCreateInfo cmdPoolCreateInfo{};
 	cmdPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	cmdPoolCreateInfo.flags = flags;
@@ -142,7 +146,7 @@ inline VkRenderPassBeginInfo render_pass_begin_info() {
 	return renderPassBeginInfo;
 }
 
-inline VkRenderPassCreateInfo render_pass_CI() {
+inline VkRenderPassCreateInfo render_pass() {
 	VkRenderPassCreateInfo renderPassCreateInfo{};
 	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	return renderPassCreateInfo;
@@ -174,7 +178,7 @@ inline VkMemoryBarrier memory_barrier() {
 	return memoryBarrier;
 }
 
-inline VkImageCreateInfo image_create_info(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent) {
+inline VkImageCreateInfo image(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent) {
 	VkImageCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	info.pNext = nullptr;
@@ -193,39 +197,39 @@ inline VkImageCreateInfo image_create_info(VkFormat format, VkImageUsageFlags us
 	return info;
 }
 
-inline VkSamplerCreateInfo sampler_create_info() {
+inline VkSamplerCreateInfo sampler() {
 	VkSamplerCreateInfo samplerCreateInfo{};
 	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 	samplerCreateInfo.maxAnisotropy = 1.0f;
 	return samplerCreateInfo;
 }
 
-inline VkImageViewCreateInfo image_view_CI() {
+inline VkImageViewCreateInfo image_view() {
 	VkImageViewCreateInfo imageViewCreateInfo{};
 	imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	return imageViewCreateInfo;
 }
 
-inline VkFramebufferCreateInfo framebuffer_create_info() {
+inline VkFramebufferCreateInfo framebuffer() {
 	VkFramebufferCreateInfo framebufferCreateInfo{};
 	framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	return framebufferCreateInfo;
 }
 
-inline VkSemaphoreCreateInfo semaphore_create_info() {
+inline VkSemaphoreCreateInfo semaphore() {
 	VkSemaphoreCreateInfo semaphoreCreateInfo{};
 	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 	return semaphoreCreateInfo;
 }
 
-inline VkFenceCreateInfo fence_create_info(VkFenceCreateFlags flags = 0) {
+inline VkFenceCreateInfo fence(VkFenceCreateFlags flags = 0) {
 	VkFenceCreateInfo fenceCreateInfo{};
 	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceCreateInfo.flags = flags;
 	return fenceCreateInfo;
 }
 
-inline VkEventCreateInfo event_create_info() {
+inline VkEventCreateInfo event() {
 	VkEventCreateInfo eventCreateInfo{};
 	eventCreateInfo.sType = VK_STRUCTURE_TYPE_EVENT_CREATE_INFO;
 	return eventCreateInfo;
@@ -268,13 +272,13 @@ inline VkRect2D rect2D(int32_t width, int32_t height, int32_t offsetX, int32_t o
 	return rect2D;
 }
 
-inline VkBufferCreateInfo buffer_create_info() {
+inline VkBufferCreateInfo buffer() {
 	VkBufferCreateInfo bufCreateInfo{};
 	bufCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	return bufCreateInfo;
 }
 
-inline VkBufferCreateInfo buffer_create_info(VkBufferUsageFlags usage, VkDeviceSize size, VkSharingMode sharing_mode) {
+inline VkBufferCreateInfo buffer(VkBufferUsageFlags usage, VkDeviceSize size, VkSharingMode sharing_mode) {
 	VkBufferCreateInfo buffer_CI{};
 	buffer_CI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	buffer_CI.usage = usage;
@@ -283,7 +287,7 @@ inline VkBufferCreateInfo buffer_create_info(VkBufferUsageFlags usage, VkDeviceS
 	return buffer_CI;
 }
 
-inline VkBufferCreateInfo buffer_create_info(VkBufferUsageFlags usage, VkDeviceSize size) {
+inline VkBufferCreateInfo buffer(VkBufferUsageFlags usage, VkDeviceSize size) {
 	VkBufferCreateInfo buffer_CI{};
 	buffer_CI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	buffer_CI.usage = usage;
@@ -291,8 +295,8 @@ inline VkBufferCreateInfo buffer_create_info(VkBufferUsageFlags usage, VkDeviceS
 	return buffer_CI;
 }
 
-inline VkDescriptorPoolCreateInfo descriptor_pool_CI(size_t poolSizeCount, VkDescriptorPoolSize* pPoolSizes,
-													 size_t maxSets) {
+inline VkDescriptorPoolCreateInfo descriptor_pool(size_t poolSizeCount, VkDescriptorPoolSize* pPoolSizes,
+												  size_t maxSets) {
 	VkDescriptorPoolCreateInfo descriptorPoolInfo{};
 	descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	descriptorPoolInfo.poolSizeCount = static_cast<uint32_t>(poolSizeCount);
@@ -301,8 +305,7 @@ inline VkDescriptorPoolCreateInfo descriptor_pool_CI(size_t poolSizeCount, VkDes
 	return descriptorPoolInfo;
 }
 
-inline VkDescriptorPoolCreateInfo descriptor_pool_CI(const std::vector<VkDescriptorPoolSize>& poolSizes,
-													 size_t maxSets) {
+inline VkDescriptorPoolCreateInfo descriptor_pool(const std::vector<VkDescriptorPoolSize>& poolSizes, size_t maxSets) {
 	VkDescriptorPoolCreateInfo descriptorPoolInfo{};
 	descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	descriptorPoolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
@@ -328,8 +331,8 @@ inline VkDescriptorSetLayoutBinding descriptor_set_layout_binding(VkDescriptorTy
 	return setLayoutBinding;
 }
 
-inline VkDescriptorSetLayoutCreateInfo descriptor_set_layout_CI(const VkDescriptorSetLayoutBinding* pBindings,
-																size_t bindingCount) {
+inline VkDescriptorSetLayoutCreateInfo descriptor_set_layout(const VkDescriptorSetLayoutBinding* pBindings,
+															 size_t bindingCount) {
 	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
 	descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	descriptorSetLayoutCreateInfo.pBindings = pBindings;
@@ -337,7 +340,7 @@ inline VkDescriptorSetLayoutCreateInfo descriptor_set_layout_CI(const VkDescript
 	return descriptorSetLayoutCreateInfo;
 }
 
-inline VkDescriptorSetLayoutCreateInfo descriptor_set_layout_CI(
+inline VkDescriptorSetLayoutCreateInfo descriptor_set_layout(
 	const std::vector<VkDescriptorSetLayoutBinding>& bindings) {
 	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
 	descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -346,8 +349,8 @@ inline VkDescriptorSetLayoutCreateInfo descriptor_set_layout_CI(
 	return descriptorSetLayoutCreateInfo;
 }
 
-inline VkPipelineLayoutCreateInfo pipeline_layout_CI(const VkDescriptorSetLayout* pSetLayouts,
-													 uint32_t setLayoutCount = 1) {
+inline VkPipelineLayoutCreateInfo pipeline_layout(const VkDescriptorSetLayout* pSetLayouts,
+												  uint32_t setLayoutCount = 1) {
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
 	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutCreateInfo.setLayoutCount = setLayoutCount;
@@ -355,7 +358,7 @@ inline VkPipelineLayoutCreateInfo pipeline_layout_CI(const VkDescriptorSetLayout
 	return pipelineLayoutCreateInfo;
 }
 
-inline VkPipelineLayoutCreateInfo pipeline_layout_CI(uint32_t setLayoutCount = 1) {
+inline VkPipelineLayoutCreateInfo pipeline_layout(uint32_t setLayoutCount = 1) {
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
 	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutCreateInfo.setLayoutCount = setLayoutCount;
@@ -440,13 +443,13 @@ inline VkVertexInputAttributeDescription vertex_input_attribute_description(uint
 	return vInputAttribDescription;
 }
 
-inline VkPipelineVertexInputStateCreateInfo pipeline_vertex_input_state_CI() {
+inline VkPipelineVertexInputStateCreateInfo pipeline_vertex_input_state() {
 	VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo{};
 	pipelineVertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	return pipelineVertexInputStateCreateInfo;
 }
 
-inline VkPipelineInputAssemblyStateCreateInfo pipeline_vertex_input_assembly_state_CI(
+inline VkPipelineInputAssemblyStateCreateInfo pipeline_vertex_input_assembly_state(
 	VkPrimitiveTopology topology, VkPipelineInputAssemblyStateCreateFlags flags, VkBool32 primitiveRestartEnable) {
 	VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo{};
 	pipelineInputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -456,7 +459,7 @@ inline VkPipelineInputAssemblyStateCreateInfo pipeline_vertex_input_assembly_sta
 	return pipelineInputAssemblyStateCreateInfo;
 }
 
-inline VkPipelineRasterizationStateCreateInfo pipeline_rasterization_state_CI(
+inline VkPipelineRasterizationStateCreateInfo pipeline_rasterization_state(
 	VkPolygonMode polygonMode, VkCullModeFlags cullMode, VkFrontFace frontFace,
 	VkPipelineRasterizationStateCreateFlags flags = 0) {
 	VkPipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo{};
@@ -478,7 +481,7 @@ inline VkPipelineColorBlendAttachmentState pipeline_color_blend_attachment_state
 	return pipelineColorBlendAttachmentState;
 }
 
-inline VkPipelineColorBlendStateCreateInfo pipeline_color_blend_state_CI(
+inline VkPipelineColorBlendStateCreateInfo pipeline_color_blend_state(
 	uint32_t attachmentCount, const VkPipelineColorBlendAttachmentState* pAttachments) {
 	VkPipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo{};
 	pipelineColorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -487,9 +490,8 @@ inline VkPipelineColorBlendStateCreateInfo pipeline_color_blend_state_CI(
 	return pipelineColorBlendStateCreateInfo;
 }
 
-inline VkPipelineDepthStencilStateCreateInfo pipeline_depth_stencil_CI(VkBool32 depthTestEnable,
-																	   VkBool32 depthWriteEnable,
-																	   VkCompareOp depthCompareOp) {
+inline VkPipelineDepthStencilStateCreateInfo pipeline_depth_stencil(VkBool32 depthTestEnable, VkBool32 depthWriteEnable,
+																	VkCompareOp depthCompareOp) {
 	VkPipelineDepthStencilStateCreateInfo pipelineDepthStencilStateCreateInfo{};
 	pipelineDepthStencilStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	pipelineDepthStencilStateCreateInfo.depthTestEnable = depthTestEnable;
@@ -499,8 +501,8 @@ inline VkPipelineDepthStencilStateCreateInfo pipeline_depth_stencil_CI(VkBool32 
 	return pipelineDepthStencilStateCreateInfo;
 }
 
-inline VkPipelineViewportStateCreateInfo pipeline_viewport_state_CI(uint32_t viewportCount, uint32_t scissorCount,
-																	VkPipelineViewportStateCreateFlags flags = 0) {
+inline VkPipelineViewportStateCreateInfo pipeline_viewport_state(uint32_t viewportCount, uint32_t scissorCount,
+																 VkPipelineViewportStateCreateFlags flags = 0) {
 	VkPipelineViewportStateCreateInfo pipelineViewportStateCreateInfo{};
 	pipelineViewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 	pipelineViewportStateCreateInfo.viewportCount = viewportCount;
@@ -509,7 +511,7 @@ inline VkPipelineViewportStateCreateInfo pipeline_viewport_state_CI(uint32_t vie
 	return pipelineViewportStateCreateInfo;
 }
 
-inline VkPipelineMultisampleStateCreateInfo pipeline_multisample_state_CI(
+inline VkPipelineMultisampleStateCreateInfo pipeline_multisample_state(
 	VkSampleCountFlagBits rasterizationSamples, VkPipelineMultisampleStateCreateFlags flags = 0) {
 	VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo{};
 	pipelineMultisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -518,9 +520,9 @@ inline VkPipelineMultisampleStateCreateInfo pipeline_multisample_state_CI(
 	return pipelineMultisampleStateCreateInfo;
 }
 
-inline VkPipelineDynamicStateCreateInfo pipeline_dynamic_state_CI(const VkDynamicState* pDynamicStates,
-																  uint32_t dynamicStateCount,
-																  VkPipelineDynamicStateCreateFlags flags = 0) {
+inline VkPipelineDynamicStateCreateInfo pipeline_dynamic_state(const VkDynamicState* pDynamicStates,
+															   uint32_t dynamicStateCount,
+															   VkPipelineDynamicStateCreateFlags flags = 0) {
 	VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo{};
 	pipelineDynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	pipelineDynamicStateCreateInfo.pDynamicStates = pDynamicStates;
@@ -529,8 +531,8 @@ inline VkPipelineDynamicStateCreateInfo pipeline_dynamic_state_CI(const VkDynami
 	return pipelineDynamicStateCreateInfo;
 }
 
-inline VkPipelineDynamicStateCreateInfo pipeline_dynamic_state_CI(const std::vector<VkDynamicState>& pDynamicStates,
-																  VkPipelineDynamicStateCreateFlags flags = 0) {
+inline VkPipelineDynamicStateCreateInfo pipeline_dynamic_state(const std::vector<VkDynamicState>& pDynamicStates,
+															   VkPipelineDynamicStateCreateFlags flags = 0) {
 	VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo{};
 	pipelineDynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	pipelineDynamicStateCreateInfo.pDynamicStates = pDynamicStates.data();
@@ -539,15 +541,15 @@ inline VkPipelineDynamicStateCreateInfo pipeline_dynamic_state_CI(const std::vec
 	return pipelineDynamicStateCreateInfo;
 }
 
-inline VkPipelineTessellationStateCreateInfo pipeline_tesellation_state_CI(uint32_t patchControlPoints) {
+inline VkPipelineTessellationStateCreateInfo pipeline_tesellation_state(uint32_t patchControlPoints) {
 	VkPipelineTessellationStateCreateInfo pipelineTessellationStateCreateInfo{};
 	pipelineTessellationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
 	pipelineTessellationStateCreateInfo.patchControlPoints = patchControlPoints;
 	return pipelineTessellationStateCreateInfo;
 }
 
-inline VkGraphicsPipelineCreateInfo graphics_pipeline_CI(VkPipelineLayout layout, VkRenderPass renderPass,
-														 VkPipelineCreateFlags flags = 0) {
+inline VkGraphicsPipelineCreateInfo graphics_pipeline(VkPipelineLayout layout, VkRenderPass renderPass,
+													  VkPipelineCreateFlags flags = 0) {
 	VkGraphicsPipelineCreateInfo pipelineCreateInfo{};
 	pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	pipelineCreateInfo.layout = layout;
@@ -558,7 +560,7 @@ inline VkGraphicsPipelineCreateInfo graphics_pipeline_CI(VkPipelineLayout layout
 	return pipelineCreateInfo;
 }
 
-inline VkGraphicsPipelineCreateInfo graphics_pipeline_CI() {
+inline VkGraphicsPipelineCreateInfo graphics_pipeline() {
 	VkGraphicsPipelineCreateInfo pipelineCreateInfo{};
 	pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	pipelineCreateInfo.basePipelineIndex = -1;
@@ -566,7 +568,7 @@ inline VkGraphicsPipelineCreateInfo graphics_pipeline_CI() {
 	return pipelineCreateInfo;
 }
 
-inline VkComputePipelineCreateInfo compute_pipeline_CI(VkPipelineLayout layout, VkPipelineCreateFlags flags = 0) {
+inline VkComputePipelineCreateInfo compute_pipeline(VkPipelineLayout layout, VkPipelineCreateFlags flags = 0) {
 	VkComputePipelineCreateInfo computePipelineCreateInfo{};
 	computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 	computePipelineCreateInfo.layout = layout;
@@ -700,3 +702,5 @@ inline VkRenderingAttachmentInfo rendering_attachment_info(VkImageLayout image_l
 }
 
 }  // namespace vk
+
+}  // namespace lumen

@@ -126,12 +126,10 @@ void main() {
 
 		if (connectable_vertex_found) {
 			postfix_depth++;
+		} else if (depth > 0) {
+			set_bounce_flag(reconnection_data.path_flags, depth, constraints_satisfied);
 		} else {
-			if (depth > 0) {
-				set_bounce_flag(reconnection_data.path_flags, depth, constraints_satisfied);
-			} else {
-				set_bounce_flag(reconnection_data.path_flags, 0, curr_rough);
-			}
+			set_bounce_flag(reconnection_data.path_flags, 0, curr_rough);
 		}
 
 		if (was_connectable && prev_rough && constraints_satisfied) {

@@ -7,31 +7,30 @@ void ReSTIR::init() {
 	g_buffer.create("G-Buffer", &instance->vkb.ctx,
 					VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 						VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 					instance->width * instance->height * sizeof(RestirGBufferData));
 
 	temporal_reservoir_buffer.create("Temporal Reservoirs", &instance->vkb.ctx,
 									 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 										 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-									 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+									 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 									 instance->width * instance->height * sizeof(RestirReservoir));
 
 	passthrough_reservoir_buffer.create("Passthrough Buffer", &instance->vkb.ctx,
 										VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 											VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 										instance->width * instance->height * sizeof(RestirReservoir));
 
 	spatial_reservoir_buffer.create("Spatial Reservoirs", &instance->vkb.ctx,
 									VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 										VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-									VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+									VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 									instance->width * instance->height * sizeof(RestirReservoir));
 
 	tmp_col_buffer.create("Temporary Color", &instance->vkb.ctx,
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						  instance->width * instance->height * sizeof(float) * 3);
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * sizeof(float) * 3);
 
 	SceneDesc desc;
 	desc.index_addr = index_buffer.get_device_address();
@@ -45,9 +44,9 @@ void ReSTIR::init() {
 	desc.spatial_reservoir_addr = spatial_reservoir_buffer.get_device_address();
 	desc.passthrough_reservoir_addr = passthrough_reservoir_buffer.get_device_address();
 	desc.color_storage_addr = tmp_col_buffer.get_device_address();
-	scene_desc_buffer.create(
-		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
+	scene_desc_buffer.create(&instance->vkb.ctx,
+							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
 	pc_ray.total_light_area = 0;
 
@@ -67,7 +66,7 @@ void ReSTIR::init() {
 }
 
 void ReSTIR::render() {
-	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.num_lights = (int)lights.size();
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
@@ -79,7 +78,7 @@ void ReSTIR::render() {
 	pc_ray.enable_accumulation = enable_accumulation;
 	pc_ray.frame_num = frame_num;
 
-	const std::initializer_list<ResourceBinding> rt_bindings = {
+	const std::initializer_list<lumen::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
 		scene_desc_buffer,
@@ -162,7 +161,7 @@ bool ReSTIR::gui() {
 void ReSTIR::destroy() {
 	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
-	std::vector<Buffer*> buffer_list = {
+	std::vector<lumen::Buffer*> buffer_list = {
 		&g_buffer,		 &temporal_reservoir_buffer,	&spatial_reservoir_buffer,
 		&tmp_col_buffer, &passthrough_reservoir_buffer,
 	};

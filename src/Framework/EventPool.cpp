@@ -1,6 +1,7 @@
 #include "../LumenPCH.h"
 #include "EventPool.h"
 
+namespace lumen {
 VkEvent EventPool::get_event(VkDevice device, VkCommandBuffer cmd) {
 	// Note: Render graph may be executed with a command buffer that has VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 	// Still, it looks like the VkCommandBuffer id is still the same across each frame.
@@ -37,3 +38,5 @@ void EventPool::cleanup(VkDevice device) {
 	}
 	events_map.clear();
 }
+
+}  // namespace lumen

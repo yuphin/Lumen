@@ -3,7 +3,7 @@
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-
+namespace lumen {
 class Camera {
    public:
 	enum class CameraType { FPS, LookAt };
@@ -13,17 +13,17 @@ class Camera {
 	inline void set_direction(const glm::vec3& dir) { this->direction = dir; }
 	inline void set_rotation(const glm::vec3& rot) { this->rotation = rot; }
 	inline void translate(float dx, float dy, float dz) {
-		this->position.x += dx;
-		this->position.y += dy;
-		this->position.z += dz;
+		position.x += dx;
+		position.y += dy;
+		position.z += dz;
 	}
 
 	inline void translate(const glm::vec3& delta) { this->position += delta; }
 
 	inline void rotate(float rx, float ry, float rz) {
-		this->rotation.x += rx;
-		this->rotation.y += ry;
-		this->rotation.z += rz;
+		rotation.x += rx;
+		rotation.y += ry;
+		rotation.z += rz;
 	}
 
 	inline void rotate(const glm::vec3& delta) { this->rotation += delta; }
@@ -44,6 +44,7 @@ class Camera {
 	float cam_near, cam_far;
 	CameraType type = CameraType::FPS;
 	glm::vec3 position{}, rotation{}, direction{};
+
    private:
 };
 
@@ -70,8 +71,8 @@ class PerspectiveCamera : public Camera {
 		: fov(fov), aspect_ratio(aspect_ratio), Camera(cam_near, cam_far) {
 		left = right = top = bot = -1;
 		make_projection_matrix(true);
-		this->set_position(pos);
-		this->set_direction(dir);
+		set_position(pos);
+		set_direction(dir);
 		view = glm::lookAtLH(position, position + direction, glm::vec3(0, 1, 0));
 		glm::vec3 scale;
 		glm::quat q;
@@ -125,3 +126,5 @@ class PerspectiveCamera : public Camera {
 	float fov{}, aspect_ratio{};
 	float left{}, right{}, top{}, bot{};
 };
+
+}  // namespace lumen

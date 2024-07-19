@@ -5,6 +5,7 @@
 #include "VkUtils.h"
 #include <numeric>
 
+namespace lumen {
 uint32_t VertexLayout::stride() {
 	uint32_t res = 0;
 	for (auto& component : components) {
@@ -109,7 +110,6 @@ VkShaderModule VulkanBase::create_shader(const std::vector<char>& code) {
 	return shaderModule;
 }
 
-
 VkResult VulkanBase::vkExt_create_debug_messenger(VkInstance instance,
 												  const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
 												  const VkAllocationCallbacks* pAllocator,
@@ -150,7 +150,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverity
 }
 
 void VulkanBase::setup_debug_messenger() {
-	auto ci = vk::debug_messenger_CI(debug_callback);
+	auto ci = vk::debug_messenger(debug_callback);
 
 	vk::check(vkExt_create_debug_messenger(ctx.instance, &ci, nullptr, &ctx.debug_messenger),
 			  "Failed to set up debug messenger!");
@@ -237,7 +237,7 @@ void VulkanBase::create_instance() {
 	if (enable_validation_layers) {
 		instance_CI.enabledLayerCount = static_cast<uint32_t>(validation_layers_lst.size());
 		instance_CI.ppEnabledLayerNames = validation_layers_lst.data();
-		VkDebugUtilsMessengerCreateInfoEXT debug_CI = vk::debug_messenger_CI(debug_callback);
+		VkDebugUtilsMessengerCreateInfoEXT debug_CI = vk::debug_messenger(debug_callback);
 		instance_CI.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debug_CI;
 	} else {
 		instance_CI.enabledLayerCount = 0;
@@ -483,7 +483,7 @@ void VulkanBase::create_swapchain() {
 	swapchain_CI.imageArrayLayers = 1;
 	swapchain_CI.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-	this->swapchain_format = surface_format.format;
+	swapchain_format = surface_format.format;
 
 	QueueFamilyIndices indices = find_queue_families(ctx.physical_device);
 	uint32_t queue_family_indices_arr[] = {indices.gfx_family.value(), indices.present_family.value()};
@@ -518,7 +518,7 @@ void VulkanBase::create_swapchain() {
 
 void VulkanBase::create_command_pools() {
 	QueueFamilyIndices queue_family_idxs = find_queue_families(ctx.physical_device);
-	VkCommandPoolCreateInfo pool_info = vk::command_pool_CI(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+	VkCommandPoolCreateInfo pool_info = vk::command_pool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 	pool_info.queueFamilyIndex = queue_family_idxs.gfx_family.value();
 	const auto processor_count = std::thread::hardware_concurrency();
 	ctx.cmd_pools.resize(processor_count);
@@ -597,9 +597,9 @@ void VulkanBase::create_sync_primitives() {
 	in_flight_fences.resize(MAX_FRAMES_IN_FLIGHT);
 	images_in_flight.resize(swapchain_images.size(), VK_NULL_HANDLE);
 
-	VkSemaphoreCreateInfo semaphore_info = vk::semaphore_create_info();
+	VkSemaphoreCreateInfo semaphore_info = vk::semaphore();
 
-	VkFenceCreateInfo fence_info = vk::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
+	VkFenceCreateInfo fence_info = vk::fence(VK_FENCE_CREATE_SIGNALED_BIT);
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		vk::check<3>({vkCreateSemaphore(ctx.device, &semaphore_info, nullptr, &image_available_sem[i]),
@@ -652,9 +652,9 @@ AccelKHR VulkanBase::create_acceleration(VkAccelerationStructureCreateInfoKHR& a
 	// Allocating the buffer to hold the acceleration structure
 	Buffer accel_buff;
 	accel_buff.create(
-		"Blas Buffer",
-		&ctx, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, accel.size);
+		"Blas Buffer", &ctx,
+		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, accel.size);
 	// Setting the buffer
 	result_accel.buffer = accel_buff;
 	accel.buffer = result_accel.buffer.handle;
@@ -773,7 +773,7 @@ void VulkanBase::cmd_create_tlas(VkCommandBuffer cmdBuf, uint32_t countInstance,
 
 	// Allocate the scratch memory
 	scratchBuffer.create(&ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, size_info.buildScratchSize);
+						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, size_info.buildScratchSize);
 	VkBufferDeviceAddressInfo bufferInfo{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, scratchBuffer.handle};
 	VkDeviceAddress scratchAddress = vkGetBufferDeviceAddress(ctx.device, &bufferInfo);
 
@@ -839,7 +839,7 @@ void VulkanBase::build_blas(const std::vector<BlasInput>& input, VkBuildAccelera
 	// acceleration structure builder
 	Buffer scratch_buffer;
 	scratch_buffer.create(&ctx, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, max_scratch_size);
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, max_scratch_size);
 	VkBufferDeviceAddressInfo buffer_info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, scratch_buffer.handle};
 	VkDeviceAddress scratchAddress = vkGetBufferDeviceAddress(ctx.device, &buffer_info);
 
@@ -1016,7 +1016,7 @@ void VulkanBase::build_tlas(std::vector<VkAccelerationStructureInstanceKHR>& ins
 	instances_buf.create(&ctx,
 						 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 						 sizeof(VkAccelerationStructureInstanceKHR) * instances.size(), instances.data(), true);
 	VkBufferDeviceAddressInfo buffer_info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, instances_buf.handle};
 	VkDeviceAddress instBufferAddr = vkGetBufferDeviceAddress(ctx.device, &buffer_info);
@@ -1039,3 +1039,5 @@ void VulkanBase::build_tlas(std::vector<VkAccelerationStructureInstanceKHR>& ins
 	instances_buf.destroy();
 	scratch_buffer.destroy();
 }
+
+}  // namespace lumen

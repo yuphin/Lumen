@@ -4,6 +4,7 @@
 #include "VkUtils.h"
 #include <unordered_set>
 
+namespace lumen {
 #define DIRTY_CHECK(x) \
 	if (!(x)) {        \
 		return *this;  \
@@ -103,7 +104,7 @@ void RenderPass::transition_resources() {
 			if (!bound_resource.active) {
 				if (bound_resource.tex) {
 					descriptor_infos[i] =
-						bound_resource.tex->descriptor(get_image_layout(pipeline->descriptor_types[i]));
+						bound_resource.tex->descriptor(vk::get_image_layout(pipeline->descriptor_types[i]));
 				} else {
 					descriptor_infos[i] = bound_resources[i].get_descriptor_info();
 				}
@@ -585,7 +586,7 @@ void RenderPass::finalize() {
 					// Create descriptor pool and sets
 					if (!pass->pipeline->tlas_descriptor_pool) {
 						auto pool_size = vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1);
-						auto descriptor_pool_ci = vk::descriptor_pool_CI(1, &pool_size, 1);
+						auto descriptor_pool_ci = vk::descriptor_pool(1, &pool_size, 1);
 
 						vk::check(vkCreateDescriptorPool(pass->rg->ctx->device, &descriptor_pool_ci, nullptr,
 														 &pass->pipeline->tlas_descriptor_pool),
@@ -637,7 +638,7 @@ void RenderPass::write_impl(Buffer& buffer, VkAccessFlags access_flags) {
 }
 
 void RenderPass::write_impl(Texture2D& tex, VkAccessFlags access_flags) {
-	VkImageLayout target_layout = get_target_img_layout(tex, access_flags);
+	VkImageLayout target_layout = vk::get_target_img_layout(tex, access_flags);
 	register_dependencies(tex, target_layout);
 	rg->img_resource_map[tex.img] = pass_idx;
 }
@@ -650,7 +651,7 @@ void RenderPass::read_impl(Buffer& buffer, VkAccessFlags access_flags) {
 }
 
 void RenderPass::read_impl(Texture2D& tex) {
-	VkImageLayout target_layout = get_target_img_layout(tex, VK_ACCESS_SHADER_READ_BIT);
+	VkImageLayout target_layout = vk::get_target_img_layout(tex, VK_ACCESS_SHADER_READ_BIT);
 	register_dependencies(tex, target_layout);
 	rg->img_resource_map[tex.img] = pass_idx;
 }
@@ -666,7 +667,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	if (use_events) {
 		wait_events.reserve(wait_signals_buffer.size());
 	}
-	DebugMarker::begin_region(rg->ctx->device, cmd, name.c_str(), glm::vec4(1.0f, 0.78f, 0.05f, 1.0f));
+	vk::DebugMarker::begin_region(rg->ctx->device, cmd, name.c_str(), glm::vec4(1.0f, 0.78f, 0.05f, 1.0f));
 	// Wait: Buffer
 	auto& buffer_sync = rg->buffer_sync_resources[pass_idx];
 	auto& img_sync = rg->img_sync_resources[pass_idx];
@@ -676,9 +677,9 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			LUMEN_ASSERT(rg->passes[v.opposing_pass_idx].set_signals_buffer[k].event, "Event can't be null");
 		}
 		buffer_sync.buffer_bariers[i] =
-			buffer_barrier2(k, v.src_access_flags, v.dst_access_flags,
-							get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, v.src_access_flags),
-							get_pipeline_stage(type, v.dst_access_flags));
+			vk::buffer_barrier2(k, v.src_access_flags, v.dst_access_flags,
+								vk::get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, v.src_access_flags),
+								vk::get_pipeline_stage(type, v.dst_access_flags));
 		buffer_sync.dependency_infos[i] = vk::dependency_info(1, &buffer_sync.buffer_bariers[i]);
 		if (use_events) {
 			wait_events.push_back(rg->passes[v.opposing_pass_idx].set_signals_buffer[k].event);
@@ -708,10 +709,10 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
 		buffer_memory_barriers.reserve(buffer_barriers.size());
 		for (auto& barrier : buffer_barriers) {
-			auto curr_stage = get_pipeline_stage(type, barrier.src_access_flags);
-			auto dst_stage = get_pipeline_stage(type, barrier.dst_access_flags);
-			buffer_memory_barriers.push_back(buffer_barrier2(barrier.buffer, barrier.src_access_flags,
-															 barrier.dst_access_flags, curr_stage, dst_stage));
+			auto curr_stage = vk::get_pipeline_stage(type, barrier.src_access_flags);
+			auto dst_stage = vk::get_pipeline_stage(type, barrier.dst_access_flags);
+			buffer_memory_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
+																 barrier.dst_access_flags, curr_stage, dst_stage));
 		}
 		auto dependency_info =
 			vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
@@ -727,11 +728,11 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		}
 		auto src_access_flags = vk::access_flags_for_img_layout(v.old_layout);
 		auto dst_access_flags = vk::access_flags_for_img_layout(v.new_layout);
-		auto src_stage = get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, src_access_flags);
-		auto dst_stage = get_pipeline_stage(type, dst_access_flags);
+		auto src_stage = vk::get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, src_access_flags);
+		auto dst_stage = vk::get_pipeline_stage(type, dst_access_flags);
 		img_sync.img_barriers[i] =
-			image_barrier2(k, src_access_flags, dst_access_flags, v.old_layout, v.new_layout, v.image_aspect, src_stage,
-						   dst_stage, rg->ctx->indices.gfx_family.value());
+			vk::image_barrier2(k, src_access_flags, dst_access_flags, v.old_layout, v.new_layout, v.image_aspect,
+							   src_stage, dst_stage, rg->ctx->indices.gfx_family.value());
 		img_sync.dependency_infos[i] = vk::dependency_info(1, &img_sync.img_barriers[i]);
 		if (use_events) {
 			wait_events.push_back(rg->passes[v.opposing_pass_idx].set_signals_img[k].event);
@@ -874,9 +875,9 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		std::vector<VkBufferMemoryBarrier2> post_execution_buffer_memory_barriers;
 		post_execution_buffer_memory_barriers.reserve(post_execution_buffer_barriers.size());
 		for (auto& barrier : post_execution_buffer_barriers) {
-			auto curr_stage = get_pipeline_stage(type, barrier.src_access_flags);
-			auto dst_stage = get_pipeline_stage(type, barrier.dst_access_flags);
-			post_execution_buffer_memory_barriers.push_back(buffer_barrier2(
+			auto curr_stage = vk::get_pipeline_stage(type, barrier.src_access_flags);
+			auto dst_stage = vk::get_pipeline_stage(type, barrier.dst_access_flags);
+			post_execution_buffer_memory_barriers.push_back(vk::buffer_barrier2(
 				barrier.buffer, barrier.src_access_flags, barrier.dst_access_flags, curr_stage, dst_stage));
 		}
 		auto dependency_info = vk::dependency_info((uint32_t)post_execution_buffer_memory_barriers.size(),
@@ -924,9 +925,9 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	// Set: Buffer
 	for (const auto& [k, v] : set_signals_buffer) {
 		LUMEN_ASSERT(v.event == nullptr, "VkEvent should be null in the setter");
-		VkBufferMemoryBarrier2 mem_barrier =
-			buffer_barrier2(k, v.src_access_flags, v.dst_access_flags, get_pipeline_stage(type, v.src_access_flags),
-							get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, v.dst_access_flags));
+		VkBufferMemoryBarrier2 mem_barrier = vk::buffer_barrier2(
+			k, v.src_access_flags, v.dst_access_flags, vk::get_pipeline_stage(type, v.src_access_flags),
+			vk::get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, v.dst_access_flags));
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);
 
 		if (use_events) {
@@ -940,11 +941,11 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		LUMEN_ASSERT(v.event == nullptr, "VkEvent should be null in the setter");
 		auto src_access_flags = vk::access_flags_for_img_layout(v.old_layout);
 		auto dst_access_flags = vk::access_flags_for_img_layout(v.new_layout);
-		auto mem_barrier = image_barrier2(k, vk::access_flags_for_img_layout(v.old_layout),
-										  vk::access_flags_for_img_layout(v.new_layout), v.old_layout, v.new_layout,
-										  v.image_aspect, get_pipeline_stage(type, src_access_flags),
-										  get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, dst_access_flags),
-										  rg->ctx->indices.gfx_family.value());
+		auto mem_barrier = vk::image_barrier2(
+			k, vk::access_flags_for_img_layout(v.old_layout), vk::access_flags_for_img_layout(v.new_layout),
+			v.old_layout, v.new_layout, v.image_aspect, vk::get_pipeline_stage(type, src_access_flags),
+			vk::get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, dst_access_flags),
+			rg->ctx->indices.gfx_family.value());
 
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);
 		if (use_events) {
@@ -952,7 +953,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			vkCmdSetEvent2(cmd, set_signals_img[k].event, &dependency_info);
 		}
 	}
-	DebugMarker::end_region(rg->ctx->device, cmd);
+	vk::DebugMarker::end_region(rg->ctx->device, cmd);
 }
 
 void RenderGraph::run(VkCommandBuffer cmd) {
@@ -1208,3 +1209,5 @@ void RenderGraph::set_pipelines_dirty() {
 		v.dirty = true;
 	}
 }
+
+}  // namespace lumen

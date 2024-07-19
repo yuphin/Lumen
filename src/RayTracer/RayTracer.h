@@ -15,7 +15,7 @@
 #include "DDGI.h"
 #include "PostFX.h"
 
-class RayTracer : public LumenInstance {
+class RayTracer : public lumen::LumenInstance {
    public:
 	RayTracer(int width, int height, bool debug, int, char*[]);
 	void init(Window*) override;
@@ -44,19 +44,19 @@ class RayTracer : public LumenInstance {
 	RTUtilsDesc rt_utils_desc;
 	RTUtilsPC rt_utils_pc;
 
-	Buffer gt_img_buffer;
-	Buffer output_img_buffer;
-	Buffer output_img_buffer_cpu;
-	Buffer residual_buffer;
-	Buffer counter_buffer;
-	Buffer rmse_val_buffer;
-	Buffer rt_utils_desc_buffer;
+	lumen::Buffer gt_img_buffer;
+	lumen::Buffer output_img_buffer;
+	lumen::Buffer output_img_buffer_cpu;
+	lumen::Buffer residual_buffer;
+	lumen::Buffer counter_buffer;
+	lumen::Buffer rmse_val_buffer;
+	lumen::Buffer rt_utils_desc_buffer;
 
-	Texture2D reference_tex;
-	Texture2D target_tex;
+	lumen::Texture2D reference_tex;
+	lumen::Texture2D target_tex;
 
-	Buffer fft_buffers[2];
-	Buffer fft_cpu_buffers[2];
+	lumen::Buffer fft_buffers[2];
+	lumen::Buffer fft_cpu_buffers[2];
 	std::string scene_name;
 	LumenScene scene;
 

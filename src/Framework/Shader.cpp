@@ -4,6 +4,13 @@
 #include <spirv_cross/spirv.h>
 #include <spirv_cross/spirv_glsl.hpp>
 
+#if USE_SHADERC
+#include <shaderc/shaderc.hpp>
+#include <glslc/file_includer.h>
+#include <libshaderc_util/file_finder.h>
+#endif	//  USE_SHADERC
+
+namespace lumen {
 enum class ResourceType { UniformBuffer, StorageBuffer, StorageImage, SampledImage, AccelarationStructure };
 
 static std::unordered_map<ResourceType, VkDescriptorType> descriptor_Type_map = {
@@ -453,9 +460,6 @@ static void parse_shader(Shader& shader, const uint32_t* code, size_t code_size,
 }
 
 #if USE_SHADERC
-#include <shaderc/shaderc.hpp>
-#include <glslc/file_includer.h>
-#include <libshaderc_util/file_finder.h>
 
 static std::unordered_map<std::string, shaderc_shader_kind> mstages = {
 	{"vert", shaderc_vertex_shader}, {"frag", shaderc_fragment_shader}, {"comp", shaderc_compute_shader},
@@ -571,3 +575,4 @@ VkShaderModule Shader::create_vk_shader_module(const VkDevice& device) const {
 	}
 	return shader_module;
 }
+}  // namespace lumen

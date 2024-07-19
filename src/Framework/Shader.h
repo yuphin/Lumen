@@ -3,6 +3,7 @@
 #include "CommonTypes.h"
 #include "Buffer.h"
 
+namespace lumen {
 class RenderPass;
 
 struct Shader {
@@ -32,3 +33,5 @@ struct Shader {
 	std::unordered_map<Buffer*, BufferStatus> buffer_status_map;
 	std::unordered_map<uint32_t, BindingStatus> resource_binding_map;
 };
+
+}  // namespace lumen

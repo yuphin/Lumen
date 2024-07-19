@@ -9,20 +9,20 @@
 
 class PostFX {
 public:
-	void init(LumenInstance& instance);
-	void render(Texture2D& input, Texture2D& output);
+	void init(lumen::LumenInstance& instance);
+	void render(lumen::Texture2D& input, lumen::Texture2D& output);
 	bool gui();
 	void destroy();
 
 private:
-	Texture2D kernel_ping;
-	Texture2D kernel_pong;
-	Texture2D fft_ping_padded;
-	Texture2D fft_pong_padded;
+	lumen::Texture2D kernel_ping;
+	lumen::Texture2D kernel_pong;
+	lumen::Texture2D fft_ping_padded;
+	lumen::Texture2D fft_pong_padded;
 	VkSampler img_sampler;
 
-	VulkanContext* ctx = nullptr;
-	RenderGraph* rg = nullptr;
+	lumen::VulkanContext* ctx = nullptr;
+	lumen::RenderGraph* rg = nullptr;
 	PCPost pc_post_settings;
 	bool enable_tonemapping = false;
 	bool enable_bloom = false;

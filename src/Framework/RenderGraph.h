@@ -8,6 +8,7 @@
 #include "EventPool.h"
 #include "RenderGraphTypes.h"
 
+namespace lumen {
 #define TO_STR(V) (#V)
 
 #define REGISTER_BUFFER_WITH_ADDRESS(struct_type, struct_name, field_name, buffer_ptr, rg) \
@@ -249,10 +250,10 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 
 	auto populate_macros = [](const std::vector<ShaderMacro>& macros, std::string& macro_string, bool& prev_nonempty) {
 		for (size_t i = 0; i < macros.size(); i++) {
-			if(!macros[i].visible) {
+			if (!macros[i].visible) {
 				continue;
 			}
-			if(!macros[i].name.empty()){
+			if (!macros[i].name.empty()) {
 				if (prev_nonempty) {
 					macro_string += ",";
 				}
@@ -267,7 +268,7 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	bool prev_nonempty = false;
 	populate_macros(settings.macros, macro_string, prev_nonempty);
 	populate_macros(global_macro_defines, macro_string, prev_nonempty);
-	
+
 	if (!settings.macros.empty() || !global_macro_defines.empty()) {
 		macro_string += ')';
 	}
@@ -349,3 +350,5 @@ inline RenderPass& RenderPass::push_constants(T* data) {
 	memcpy(push_constant_data, data, sizeof(T));
 	return *this;
 }
+
+}  // namespace lumen

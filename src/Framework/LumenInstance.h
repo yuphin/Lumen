@@ -7,6 +7,8 @@
 #include "VulkanBase.h"
 #include "Window.h"
 #include <glm/glm.hpp>
+
+namespace lumen {
 class LumenInstance {
    public:
 	LumenInstance(int width, int height, int debug) : width(width), height(height), debug(debug), vkb(debug){};
@@ -18,3 +20,5 @@ class LumenInstance {
 	virtual void cleanup() = 0;
 	Window* window = nullptr;
 };
+
+}  // namespace lumen

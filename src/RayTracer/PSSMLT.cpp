@@ -12,77 +12,71 @@ void PSSMLT::init() {
 	bootstrap_buffer.create("Bootstrap Buffer", &instance->vkb.ctx,
 							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							config->num_bootstrap_samples * sizeof(BootstrapSample));
 
 	cdf_buffer.create("CDF", &instance->vkb.ctx,
 					  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 						  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-					  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-					  config->num_bootstrap_samples * sizeof(float));
+					  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_bootstrap_samples * sizeof(float));
 
 	bootstrap_cpu.create("Boostrap - CPU", &instance->vkb.ctx,
 						 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-						 VK_SHARING_MODE_EXCLUSIVE, config->num_bootstrap_samples * sizeof(BootstrapSample));
+						 config->num_bootstrap_samples * sizeof(BootstrapSample));
 
 	cdf_cpu.create("CDF - CPU", &instance->vkb.ctx,
 				   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 				   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-				   VK_SHARING_MODE_EXCLUSIVE, config->num_bootstrap_samples * sizeof(float));
+				   config->num_bootstrap_samples * sizeof(float));
 
 	cdf_sum_buffer.create("CDF Sums", &instance->vkb.ctx,
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(float));
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(float));
 
 	seeds_buffer.create("RNG Seeds", &instance->vkb.ctx,
 						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						config->num_mlt_threads * sizeof(SeedData));
+						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * sizeof(SeedData));
 
 	light_primary_samples_buffer.create("Primary Samples - Light", &instance->vkb.ctx,
 										VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 											VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 										config->num_mlt_threads * light_path_rand_count * sizeof(PrimarySample));
 
 	cam_primary_samples_buffer.create("Primary Samples - Camera", &instance->vkb.ctx,
 									  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 										  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 									  config->num_mlt_threads * cam_path_rand_count * sizeof(PrimarySample));
 
-	connection_primary_samples_buffer.create("Primary Samples - Connection", &instance->vkb.ctx,
-											 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-												 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-												 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-											 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-											 config->num_mlt_threads * connect_path_rand_count * sizeof(PrimarySample));
+	connection_primary_samples_buffer.create(
+		"Primary Samples - Connection", &instance->vkb.ctx,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * connect_path_rand_count * sizeof(PrimarySample));
 
 	mlt_samplers_buffer.create("MLT Samplers", &instance->vkb.ctx,
 							   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-							   config->num_mlt_threads * sizeof(MLTSampler));
+							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * sizeof(MLTSampler));
 
 	mlt_col_buffer.create("MLT Color Buffer", &instance->vkb.ctx,
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						  instance->width * instance->height * 3 * sizeof(float));
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * 3 * sizeof(float));
 
 	chain_stats_buffer.create("Chain Stats", &instance->vkb.ctx,
 							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-							  config->num_mlt_threads * sizeof(ChainData));
+							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * sizeof(ChainData));
 
 	splat_buffer.create("Splat Buffer", &instance->vkb.ctx,
 						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 						config->num_mlt_threads *
 							(config->path_length * (static_cast<unsigned long long>(config->path_length) + 1)) *
 							sizeof(Splat));
@@ -90,7 +84,7 @@ void PSSMLT::init() {
 	past_splat_buffer.create("Past Splats Buffer", &instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							 config->num_mlt_threads *
 								 (config->path_length * (static_cast<unsigned long long>(config->path_length) + 1)) *
 								 sizeof(Splat));
@@ -98,13 +92,13 @@ void PSSMLT::init() {
 	light_path_buffer.create("Light Paths", &instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							 path_size * (config->path_length + 1) * sizeof(MLTPathVertex));
 
 	camera_path_buffer.create("Camera Paths", &instance->vkb.ctx,
 							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							  path_size * (config->path_length + 1) * sizeof(MLTPathVertex));
 
 	int size = 0;
@@ -122,9 +116,9 @@ void PSSMLT::init() {
 	do {
 		int num_blocks = std::max(1, (int)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
-			block_sums[i++].create(
-				&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, num_blocks * sizeof(float));
+			block_sums[i++].create(&instance->vkb.ctx,
+								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, num_blocks * sizeof(float));
 		}
 		arr_size = num_blocks;
 	} while (arr_size > 1);
@@ -171,9 +165,9 @@ void PSSMLT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_path_addr, &light_path_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, camera_path_addr, &camera_path_buffer, instance->vkb.rg);
 
-	scene_desc_buffer.create(
-		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
+	scene_desc_buffer.create(&instance->vkb.ctx,
+							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 	pc_ray.total_light_area = 0;
 
 	frame_num = 0;
@@ -201,12 +195,12 @@ void PSSMLT::render() {
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
 	pc_ray.frame_num = frame_num;
 
-	std::initializer_list<ResourceBinding> rt_bindings = {
+	std::initializer_list<lumen::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
 		scene_desc_buffer,
 	};
-	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	// Start bootstrap sampling
 	instance->vkb.rg
 		->add_rt("PSSMLT - Bootstrap Sampling",
@@ -231,7 +225,7 @@ void PSSMLT::render() {
 	// Calculate CDF
 	instance->vkb.rg
 		->add_compute("Calculate CDF",
-					  {.shader = Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
+					  {.shader = lumen::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
 					   .dims = {(uint32_t)std::ceil(config->num_bootstrap_samples / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(scene_desc_buffer);
@@ -274,7 +268,7 @@ void PSSMLT::render() {
 
 	// Select seeds
 	instance->vkb.rg
-		->add_compute("Select Seeds", {.shader = Shader("src/shaders/integrators/pssmlt/select_seeds.comp"),
+		->add_compute("Select Seeds", {.shader = lumen::Shader("src/shaders/integrators/pssmlt/select_seeds.comp"),
 									   .dims = {(uint32_t)std::ceil(config->num_mlt_threads / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(scene_desc_buffer);
@@ -346,7 +340,7 @@ void PSSMLT::render() {
 	// Compositions
 	instance->vkb.rg
 		->add_compute("Composition",
-					  {.shader = Shader("src/shaders/integrators/pssmlt/composite.comp"),
+					  {.shader = lumen::Shader("src/shaders/integrators/pssmlt/composite.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, scene_desc_buffer});
@@ -361,23 +355,24 @@ bool PSSMLT::update() {
 	return updated;
 }
 
-void PSSMLT::prefix_scan(int level, int num_elems, int& counter, RenderGraph* rg) {
+void PSSMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGraph* rg) {
 	const bool scan_sums = level > 0;
 	int num_wgs = std::max(1, (int)ceil(num_elems / (2 * 1024.0f)));
 	int num_grids = num_wgs - int((num_elems % 2048) != 0);
 	pc_compute.num_elems = num_elems;
 	auto scan = [&](int num_wgs, int idx) {
 		++counter;
-		rg->add_compute("PrefixScan - Scan", {.shader = Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
-											  .dims = {(uint32_t)num_wgs, 1, 1}})
+		rg->add_compute("PrefixScan - Scan",
+						{.shader = lumen::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
+						 .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(scene_desc_buffer);
 	};
 	auto uniform_add = [&](int num_wgs, int output_idx) {
 		++counter;
-		rg->add_compute(
-			  "PrefixScan - Uniform Add",
-			  {.shader = Shader("src/shaders/integrators/pssmlt/uniform_add.comp"), .dims = {(uint32_t)num_wgs, 1, 1}})
+		rg->add_compute("PrefixScan - Uniform Add",
+						{.shader = lumen::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"),
+						 .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(scene_desc_buffer);
 	};
@@ -429,20 +424,20 @@ void PSSMLT::prefix_scan(int level, int num_elems, int& counter, RenderGraph* rg
 
 void PSSMLT::destroy() {
 	Integrator::destroy();
-	std::vector<Buffer*> buffer_list = {&bootstrap_buffer,
-										&cdf_buffer,
-										&cdf_sum_buffer,
-										&seeds_buffer,
-										&mlt_samplers_buffer,
-										&light_primary_samples_buffer,
-										&cam_primary_samples_buffer,
-										&connection_primary_samples_buffer,
-										&mlt_col_buffer,
-										&chain_stats_buffer,
-										&splat_buffer,
-										&past_splat_buffer,
-										&light_path_buffer,
-										&camera_path_buffer};
+	std::vector<lumen::Buffer*> buffer_list = {&bootstrap_buffer,
+											   &cdf_buffer,
+											   &cdf_sum_buffer,
+											   &seeds_buffer,
+											   &mlt_samplers_buffer,
+											   &light_primary_samples_buffer,
+											   &cam_primary_samples_buffer,
+											   &connection_primary_samples_buffer,
+											   &mlt_col_buffer,
+											   &chain_stats_buffer,
+											   &splat_buffer,
+											   &past_splat_buffer,
+											   &light_path_buffer,
+											   &camera_path_buffer};
 	for (auto b : buffer_list) {
 		b->destroy();
 	}

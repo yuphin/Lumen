@@ -4,6 +4,7 @@
 #include "CommandBuffer.h"
 #include "ThreadPool.h"
 
+namespace lumen::vk {
 uint32_t find_memory_type(VkPhysicalDevice* physical_device, uint32_t type_filter, VkMemoryPropertyFlags props) {
 	VkPhysicalDeviceMemoryProperties mem_props;
 	vkGetPhysicalDeviceMemoryProperties(*physical_device, &mem_props);
@@ -194,7 +195,7 @@ void transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout o
 
 VkImageView create_image_view(VkDevice device, const VkImage& img, VkFormat format, VkImageAspectFlags flags) {
 	VkImageView image_view;
-	VkImageViewCreateInfo image_view_CI = vk::image_view_CI();
+	VkImageViewCreateInfo image_view_CI = vk::image_view();
 	image_view_CI.image = img;
 	image_view_CI.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	image_view_CI.format = format;
@@ -286,7 +287,6 @@ VkImageLayout get_image_layout(VkDescriptorType type) {
 	return VK_IMAGE_LAYOUT_GENERAL;
 }
 
-
 VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format, VkImageUsageFlags usage, bool mipmaps) {
 	VkImageCreateInfo ici = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
 	ici.imageType = VK_IMAGE_TYPE_2D;
@@ -301,23 +301,6 @@ VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format, VkImage
 	return ici;
 }
 
-uint32_t get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types) {
-	uint32_t binding_mask = 0;
-	for (const auto& shader : shaders) {
-		for (uint32_t i = 0; i < 32; ++i) {
-			if (shader.binding_mask & (1 << i)) {
-				if (binding_mask & (1 << i)) {
-					LUMEN_ASSERT(descriptor_types[i] == shader.descriptor_types[i],
-								 "Binding mask mismatch on shader {}", shader.filename.c_str());
-				} else {
-					descriptor_types[i] = shader.descriptor_types[i];
-					binding_mask |= 1 << i;
-				}
-			}
-		}
-	}
-	return binding_mask;
-}
 
 VkImageLayout get_target_img_layout(const Texture2D& tex, VkAccessFlags access_flags) {
 	if ((tex.usage_flags & VK_IMAGE_USAGE_SAMPLED_BIT) && access_flags == VK_ACCESS_SHADER_READ_BIT) {
@@ -325,3 +308,5 @@ VkImageLayout get_target_img_layout(const Texture2D& tex, VkAccessFlags access_f
 	}
 	return VK_IMAGE_LAYOUT_GENERAL;
 }
+
+}  // namespace lumen

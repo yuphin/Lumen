@@ -3,7 +3,7 @@
 #include "shaders/integrators/ddgi/ddgi_commons.h"
 class DDGI : public Integrator {
    public:
-	DDGI(LumenInstance* scene, LumenScene* lumen_scene)
+	DDGI(lumen::LumenInstance* scene, LumenScene* lumen_scene)
 		: Integrator(scene, lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), DDGIConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
@@ -14,23 +14,22 @@ class DDGI : public Integrator {
 	void update_ddgi_uniforms();
 
 	DDGIUniforms ddgi_ubo;
-	Buffer ddgi_ubo_buffer;
-	Buffer direct_lighting_buffer;
-	Buffer probe_offsets_buffer;
+	lumen::Buffer ddgi_ubo_buffer;
+	lumen::Buffer direct_lighting_buffer;
+	lumen::Buffer probe_offsets_buffer;
+	lumen::Buffer g_buffer;
 
-	Buffer g_buffer;
-
-	Texture2D irr_texes[2];
-	Texture2D depth_texes[2];
-	Buffer ddgi_output_buffer;
+	lumen::Texture2D irr_texes[2];
+	lumen::Texture2D depth_texes[2];
+	lumen::Buffer ddgi_output_buffer;
 
 	struct {
-		Texture2D radiance_tex;
-		Texture2D dir_depth_tex;
+		lumen::Texture2D radiance_tex;
+		lumen::Texture2D dir_depth_tex;
 	} rt;
 
 	struct {
-		Texture2D tex;
+		lumen::Texture2D tex;
 	} output;
 
 	float hysteresis = 0.98f;

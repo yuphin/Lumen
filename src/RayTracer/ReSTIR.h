@@ -3,7 +3,7 @@
 #include "shaders/integrators/restir/di/restirdi_commons.h"
 class ReSTIR : public Integrator {
    public:
-	ReSTIR(LumenInstance* scene, LumenScene* lumen_scene)
+	ReSTIR(lumen::LumenInstance* scene, LumenScene* lumen_scene)
 		: Integrator(scene, lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), ReSTIRConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
@@ -12,11 +12,11 @@ class ReSTIR : public Integrator {
 	virtual void destroy() override;
 
    private:
-	Buffer g_buffer;
-	Buffer passthrough_reservoir_buffer;
-	Buffer temporal_reservoir_buffer;
-	Buffer spatial_reservoir_buffer;
-	Buffer tmp_col_buffer;
+	lumen::Buffer g_buffer;
+	lumen::Buffer passthrough_reservoir_buffer;
+	lumen::Buffer temporal_reservoir_buffer;
+	lumen::Buffer spatial_reservoir_buffer;
+	lumen::Buffer tmp_col_buffer;
 	PCReSTIR pc_ray{};
 	bool do_spatiotemporal = false;
 	bool enable_accumulation = false;

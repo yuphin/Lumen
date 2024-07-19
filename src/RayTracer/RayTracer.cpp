@@ -80,7 +80,7 @@ void RayTracer::init(Window* window) {
 	integrator->init();
 	post_fx.init(*instance);
 	init_resources();
-	LUMEN_TRACE("Memory usage {} MB", get_memory_usage(vk_ctx.physical_device) * 1e-6);
+	LUMEN_TRACE("Memory usage {} MB", lumen::vk::get_memory_usage(vk_ctx.physical_device) * 1e-6);
 }
 
 void RayTracer::init_resources() {
@@ -88,31 +88,28 @@ void RayTracer::init_resources() {
 	output_img_buffer.create("Output Image Buffer", &instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-							 instance->width * instance->height * 4 * 4);
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * 4 * 4);
 
 	output_img_buffer_cpu.create("Output Image CPU", &instance->vkb.ctx,
 								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-								 VK_SHARING_MODE_EXCLUSIVE, instance->width * instance->height * 4 * 4);
+								 instance->width * instance->height * 4 * 4);
 	residual_buffer.create("RMSE Residual", &instance->vkb.ctx,
 						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						   instance->width * instance->height * 4);
+						   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * 4);
 
 	counter_buffer.create("RMSE Counter", &instance->vkb.ctx,
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(int));
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(int));
 
 	rmse_val_buffer.create("RMSE Value", &instance->vkb.ctx,
 						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-						   VK_SHARING_MODE_EXCLUSIVE, sizeof(float));
+						   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, sizeof(float));
 
-	TextureSettings settings;
+	lumen::TextureSettings settings;
 	settings.usage_flags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
 						   VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	settings.base_extent = {(uint32_t)instance->width, (uint32_t)instance->height, 1};
@@ -130,7 +127,7 @@ void RayTracer::init_resources() {
 		auto gt_size = width * height * 4 * sizeof(float);
 		gt_img_buffer.create("Ground Truth Image", &instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, gt_size, data, true);
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, gt_size, data, true);
 		desc.gt_img_addr = gt_img_buffer.get_device_address();
 		free(data);
 	}
@@ -147,9 +144,9 @@ void RayTracer::init_resources() {
 }
 
 void RayTracer::cleanup_resources() {
-	std::vector<Buffer*> buffer_list = {&output_img_buffer, &output_img_buffer_cpu, &residual_buffer,
-										&counter_buffer,	&rmse_val_buffer,		&rt_utils_desc_buffer};
-	std::vector<Texture2D*> tex_list = {&reference_tex, &target_tex};
+	std::vector<lumen::Buffer*> buffer_list = {&output_img_buffer, &output_img_buffer_cpu, &residual_buffer,
+											   &counter_buffer,	   &rmse_val_buffer,	   &rt_utils_desc_buffer};
+	std::vector<lumen::Texture2D*> tex_list = {&reference_tex, &target_tex};
 	if (load_reference) {
 		buffer_list.push_back(&gt_img_buffer);
 	}
@@ -170,7 +167,7 @@ void RayTracer::update() {
 
 void RayTracer::render(uint32_t i) {
 	integrator->render();
-	Texture2D* input_tex = nullptr;
+	lumen::Texture2D* input_tex = nullptr;
 	if (comparison_mode && img_captured) {
 		input_tex = comparison_img_toggle ? &target_tex : &reference_tex;
 	} else {
@@ -180,10 +177,11 @@ void RayTracer::render(uint32_t i) {
 	render_debug_utils();
 
 	auto cmdbuf = vkb.ctx.command_buffers[i];
-	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
+	VkCommandBufferBeginInfo begin_info =
+		lumen::vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	lumen::vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
 	vkb.rg->run(cmdbuf);
-	vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
+	lumen::vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
 }
 
 void RayTracer::render_debug_utils() {
@@ -206,13 +204,13 @@ void RayTracer::render_debug_utils() {
 		auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name,
 							 const std::string& reduce_name, const std::string& reduce_shader_name) {
 			uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
-			instance->vkb.rg->add_compute(op_name, {.shader = Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
+			instance->vkb.rg->add_compute(op_name, {.shader = lumen::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
 				.push_constants(&rt_utils_pc)
 				.bind(rt_utils_desc_buffer)
 				.zero({residual_buffer, counter_buffer});
 			while (num_wgs != 1) {
 				instance->vkb.rg
-					->add_compute(reduce_name, {.shader = Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
+					->add_compute(reduce_name, {.shader = lumen::Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
 					.push_constants(&rt_utils_pc)
 					.bind(rt_utils_desc_buffer);
 				num_wgs = (num_wgs + 1023) / 1024;
@@ -223,7 +221,8 @@ void RayTracer::render_debug_utils() {
 		op_reduce("OpReduce: RMSE", "src/shaders/rmse/calc_rmse.comp", "OpReduce: Reduce RMSE",
 				  "src/shaders/rmse/reduce_rmse.comp");
 		instance->vkb.rg
-			->add_compute("Calculate RMSE", {.shader = Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1}})
+			->add_compute("Calculate RMSE",
+						  {.shader = lumen::Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1}})
 			.push_constants(&rt_utils_pc)
 			.bind(rt_utils_desc_buffer);
 	}
@@ -274,7 +273,7 @@ bool RayTracer::gui() {
 	ImGui::Text("General settings:");
 	ImGui::PopStyleColor();
 	ImGui::Text("Frame %d time %.2f ms ( %.2f FPS )", integrator->frame_num, cpu_avg_time, 1000 / cpu_avg_time);
-	ImGui::Text("Memory Usage: %.2f MB", get_memory_usage(vk_ctx.physical_device) * 1e-6);
+	ImGui::Text("Memory Usage: %.2f MB", lumen::vk::get_memory_usage(vk_ctx.physical_device) * 1e-6);
 	bool updated = false;
 	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
 	if (show_cam_stats) {

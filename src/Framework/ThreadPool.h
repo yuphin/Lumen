@@ -1,6 +1,7 @@
 #pragma once
 #include "../LumenPCH.h"
 
+namespace lumen {
 class ThreadPool {
    public:
 	template <typename FunctionType, typename... Args>
@@ -32,3 +33,5 @@ auto ThreadPool::submit(FunctionType&& f, Args&&... args) {
 	cv.notify_one();
 	return result;
 }
+
+}  // namespace lumen

@@ -11,67 +11,65 @@ void VCM::init() {
 	photon_buffer.create("Photon Buffer", &instance->vkb.ctx,
 						 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 						 10 * instance->width * instance->height * sizeof(VCMPhotonHash));
 
 	vcm_light_vertices_buffer.create(
 		"VCM Light Vertices", &instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		instance->width * instance->height * (config->path_length + 1) * sizeof(VCMVertex));
 
 	light_path_cnt_buffer.create("Light Path Count", &instance->vkb.ctx,
 								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 								 instance->width * instance->height * sizeof(float));
 
 	color_storage_buffer.create("Color Storage", &instance->vkb.ctx,
 								VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 								instance->width * instance->height * 3 * sizeof(float));
 
 	vcm_reservoir_buffer.create("VCM Reservoirs", &instance->vkb.ctx,
 								VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 								instance->width * instance->height * sizeof(VCMReservoir));
 
 	light_samples_buffer.create("Light Samples", &instance->vkb.ctx,
 								VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 								instance->width * instance->height * sizeof(VCMRestirData));
 
 	should_resample_buffer.create("Should Resample", &instance->vkb.ctx,
 								  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, 4);
+								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 4);
 
 	light_state_buffer.create("Light States", &instance->vkb.ctx,
 							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							  instance->width * instance->height * sizeof(LightState));
 
 	angle_struct_buffer.create("Angle Struct", &instance->vkb.ctx,
 							   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								   VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-							   max_samples * sizeof(AngleStruct));
+							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, max_samples * sizeof(AngleStruct));
 
 	angle_struct_cpu_buffer.create(&instance->vkb.ctx,
 								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 									   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 								   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-								   VK_SHARING_MODE_EXCLUSIVE, max_samples * sizeof(AngleStruct));
+								   max_samples * sizeof(AngleStruct));
 
 	avg_buffer.create("Average", &instance->vkb.ctx,
 					  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 						  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-					  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-					  VK_SHARING_MODE_EXCLUSIVE, sizeof(AvgStruct));
+					  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, sizeof(AvgStruct));
 
 	SceneDesc desc;
 	desc.index_addr = index_buffer.get_device_address();
@@ -92,9 +90,9 @@ void VCM::init() {
 	desc.angle_struct_addr = angle_struct_buffer.get_device_address();
 	desc.avg_addr = avg_buffer.get_device_address();
 
-	scene_desc_buffer.create(
-		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
+	scene_desc_buffer.create(&instance->vkb.ctx,
+							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 	pc_ray.total_light_area = 0;
 
 	frame_num = 0;
@@ -117,7 +115,7 @@ void VCM::init() {
 }
 
 void VCM::render() {
-	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	const float ppm_base_radius = 0.25f;
 	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
@@ -135,7 +133,7 @@ void VCM::render() {
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.max_angle_samples = max_samples;
 	pc_ray.light_triangle_count = total_light_triangle_cnt;
-	const std::initializer_list<ResourceBinding> rt_bindings = {
+	const std::initializer_list<lumen::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
 		scene_desc_buffer,
@@ -148,7 +146,7 @@ void VCM::render() {
 	auto& prepare_pass =
 		instance->vkb.rg
 			->add_compute("Init Reservoirs",
-						  {.shader = Shader("src/shaders/integrators/vcm/init_reservoirs.comp"),
+						  {.shader = lumen::Shader("src/shaders/integrators/vcm/init_reservoirs.comp"),
 						   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 			.push_constants(&pc_ray)
 			.bind(scene_desc_buffer)
@@ -180,7 +178,7 @@ void VCM::render() {
 	// Check resampling
 	instance->vkb.rg
 		->add_compute("Check Reservoirs",
-					  {.shader = Shader("src/shaders/integrators/vcm/check_reservoirs.comp"),
+					  {.shader = lumen::Shader("src/shaders/integrators/vcm/check_reservoirs.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(scene_desc_buffer)
@@ -223,7 +221,7 @@ void VCM::render() {
 	// Select a reservoir sample
 	instance->vkb.rg
 		->add_compute("Select Reservoir",
-					  {.shader = Shader("src/shaders/integrators/vcm/select_reservoirs.comp"),
+					  {.shader = lumen::Shader("src/shaders/integrators/vcm/select_reservoirs.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.bind(scene_desc_buffer)
 		.push_constants(&pc_ray);
@@ -231,7 +229,7 @@ void VCM::render() {
 	// Update temporal reservoirs with the selected sample
 	instance->vkb.rg
 		->add_compute("Update Reservoirs",
-					  {.shader = Shader("src/shaders/integrators/vcm/update_reservoirs.comp"),
+					  {.shader = lumen::Shader("src/shaders/integrators/vcm/update_reservoirs.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.bind(scene_desc_buffer)
 		.push_constants(&pc_ray);
@@ -270,17 +268,17 @@ bool VCM::update() {
 void VCM::destroy() {
 	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
-	std::vector<Buffer*> buffer_list = {&photon_buffer,
-										&vcm_light_vertices_buffer,
-										&light_path_cnt_buffer,
-										&color_storage_buffer,
-										&vcm_reservoir_buffer,
-										&light_samples_buffer,
-										&light_state_buffer,
-										&should_resample_buffer,
-										&angle_struct_buffer,
-										&angle_struct_cpu_buffer,
-										&avg_buffer};
+	std::vector<lumen::Buffer*> buffer_list = {&photon_buffer,
+											   &vcm_light_vertices_buffer,
+											   &light_path_cnt_buffer,
+											   &color_storage_buffer,
+											   &vcm_reservoir_buffer,
+											   &light_samples_buffer,
+											   &light_state_buffer,
+											   &should_resample_buffer,
+											   &angle_struct_buffer,
+											   &angle_struct_cpu_buffer,
+											   &avg_buffer};
 	for (auto b : buffer_list) {
 		b->destroy();
 	}

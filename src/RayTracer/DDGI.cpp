@@ -19,7 +19,7 @@ void DDGI::init() {
 
 		// Samplers
 		{
-			VkSamplerCreateInfo sampler_ci = vk::sampler_create_info();
+			VkSamplerCreateInfo sampler_ci = lumen::vk::sampler();
 			sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 			sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 			sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
@@ -32,14 +32,14 @@ void DDGI::init() {
 			sampler_ci.compareOp = VK_COMPARE_OP_ALWAYS;
 			sampler_ci.minLod = 0.f;
 			sampler_ci.maxLod = FLT_MAX;
-			vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &bilinear_sampler),
+			lumen::vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &bilinear_sampler),
 					  "Could not create image sampler");
 			sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			sampler_ci.minFilter = VK_FILTER_NEAREST;
 			sampler_ci.magFilter = VK_FILTER_NEAREST;
-			vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &nearest_sampler),
+			lumen::vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &nearest_sampler),
 					  "Could not create image sampler");
 		}
 
@@ -47,7 +47,7 @@ void DDGI::init() {
 		const int irradiance_height = (IRRADIANCE_SIDE_LENGTH + 2) * probe_counts.z;
 		const int depth_width = (DEPTH_SIDE_LENGTH + 2) * probe_counts.x * probe_counts.y;
 		const int depth_height = (DEPTH_SIDE_LENGTH + 2) * probe_counts.z;
-		TextureSettings settings;
+		lumen::TextureSettings settings;
 		// Irradiance and depth
 		num_probes = probe_counts.x * probe_counts.y * probe_counts.z;
 		for (int i = 0; i < 2; i++) {
@@ -64,7 +64,7 @@ void DDGI::init() {
 		}
 		// RT
 		{
-			TextureSettings settings;
+			lumen::TextureSettings settings;
 			settings.base_extent = {(uint32_t)rays_per_probe, (uint32_t)num_probes, 1};
 			settings.format = VK_FORMAT_R16G16B16A16_SFLOAT;
 			settings.usage_flags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -83,22 +83,22 @@ void DDGI::init() {
 	g_buffer.create("GBuffer", &instance->vkb.ctx,
 					VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 						VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 					instance->width * instance->height * sizeof(GBufferData));
 
 	direct_lighting_buffer.create("Direct Lighting", &instance->vkb.ctx,
 								  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 								  instance->width * instance->height * sizeof(glm::vec3));
 
 	ddgi_ubo_buffer.create("DDGI UBO", &instance->vkb.ctx, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 						   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-						   VK_SHARING_MODE_EXCLUSIVE, sizeof(DDGIUniforms));
+						    sizeof(DDGIUniforms));
 
 	probe_offsets_buffer.create("Probe Offsets", &instance->vkb.ctx,
 								VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 								sizeof(vec4) * num_probes);
 
 	SceneDesc desc;
@@ -120,7 +120,7 @@ void DDGI::init() {
 
 	scene_desc_buffer.create(
 		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
 	update_ddgi_uniforms();
 	pc_ray.total_light_area = 0;
@@ -149,7 +149,7 @@ void DDGI::render() {
 		pc_ray.probe_rotation = glm::mat4_cast(
 			glm::angleAxis(2.0f * glm::pi<float>() * rands.x, glm::normalize(glm::vec3(rands.y, rands.z, rands.w))));
 	}
-	const std::initializer_list<ResourceBinding> rt_bindings = {
+	const std::initializer_list<lumen::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
 		scene_desc_buffer,
@@ -194,7 +194,7 @@ void DDGI::render() {
 	uint32_t wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 31) / 32;
 	instance->vkb.rg
 		->add_compute("Classify Probes",
-					  {.shader = Shader("src/shaders/integrators/ddgi/classify.comp"), .dims = {wg_x}})
+					  {.shader = lumen::Shader("src/shaders/integrators/ddgi/classify.comp"), .dims = {wg_x}})
 		.push_constants(&pc_ray)
 		.bind({scene_ubo_buffer, scene_desc_buffer, ddgi_ubo_buffer, rt.radiance_tex, rt.dir_depth_tex});
 	// Update probes & borders
@@ -205,7 +205,7 @@ void DDGI::render() {
 		auto update_probe = [&](bool is_irr) {
 			instance->vkb.rg
 				->add_compute(is_irr ? "Update Irradiance" : "Update Depth",
-							  {.shader = Shader(is_irr ? "src/shaders/integrators/ddgi/update_irradiance.comp"
+							  {.shader = lumen::Shader(is_irr ? "src/shaders/integrators/ddgi/update_irradiance.comp"
 													   : "src/shaders/integrators/ddgi/update_depth.comp"),
 							   .dims = {wg_x, wg_y}})
 				.push_constants(&pc_ray)
@@ -219,7 +219,7 @@ void DDGI::render() {
 		wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 3) * 13 / 4;
 		instance->vkb.rg
 			->add_compute("Update Borders",
-						  {.shader = Shader("src/shaders/integrators/ddgi/update_borders.comp"), .dims = {wg_x}})
+						  {.shader = lumen::Shader("src/shaders/integrators/ddgi/update_borders.comp"), .dims = {wg_x}})
 			.push_constants(&pc_ray)
 			.bind({irr_texes[!ping_pong], depth_texes[!ping_pong], ddgi_ubo_buffer});
 	}
@@ -228,7 +228,7 @@ void DDGI::render() {
 	uint32_t wg_y = (instance->height + 31) / 32;
 	instance->vkb.rg
 		->add_compute("Sample Probes",
-					  {.shader = Shader("src/shaders/integrators/ddgi/sample.comp"), .dims = {wg_x, wg_y}})
+					  {.shader = lumen::Shader("src/shaders/integrators/ddgi/sample.comp"), .dims = {wg_x, wg_y}})
 		.push_constants(&pc_ray)
 		.bind({scene_ubo_buffer, scene_desc_buffer, output.tex, irr_texes[ping_pong], depth_texes[ping_pong],
 			   ddgi_ubo_buffer});
@@ -237,7 +237,7 @@ void DDGI::render() {
 		// 13 WGs process 4 probes (wg = 32 threads)
 		wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 31) / 32;
 		instance->vkb.rg
-			->add_compute("Relocate", {.shader = Shader("src/shaders/integrators/ddgi/relocate.comp"), .dims = {wg_x}})
+			->add_compute("Relocate", {.shader = lumen::Shader("src/shaders/integrators/ddgi/relocate.comp"), .dims = {wg_x}})
 			.push_constants(&pc_ray)
 			.bind({scene_ubo_buffer, scene_desc_buffer, ddgi_ubo_buffer, rt.dir_depth_tex});
 	}
@@ -245,7 +245,7 @@ void DDGI::render() {
 	wg_x = (instance->width + 31) / 32;
 	wg_y = (instance->height + 31) / 32;
 	instance->vkb.rg
-		->add_compute("DDGI Output", {.shader = Shader("src/shaders/integrators/ddgi/out.comp"), .dims = {wg_x, wg_y}})
+		->add_compute("DDGI Output", {.shader = lumen::Shader("src/shaders/integrators/ddgi/out.comp"), .dims = {wg_x, wg_y}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, scene_ubo_buffer, scene_desc_buffer, output.tex});
 	frame_idx++;
@@ -285,9 +285,9 @@ void DDGI::update_ddgi_uniforms() {
 void DDGI::destroy() {
 	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
-	std::vector<Buffer*> buffer_list = {&g_buffer, &direct_lighting_buffer, &ddgi_ubo_buffer, &probe_offsets_buffer};
+	std::vector<lumen::Buffer*> buffer_list = {&g_buffer, &direct_lighting_buffer, &ddgi_ubo_buffer, &probe_offsets_buffer};
 
-	std::vector<Texture*> tex_list = {&rt.radiance_tex, &rt.dir_depth_tex, &output.tex};
+	std::vector<lumen::Texture*> tex_list = {&rt.radiance_tex, &rt.dir_depth_tex, &output.tex};
 
 	for (auto b : buffer_list) {
 		b->destroy();

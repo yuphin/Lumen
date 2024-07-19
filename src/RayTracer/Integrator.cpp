@@ -9,21 +9,21 @@ void Integrator::init() {
 	prop2.pNext = &rt_props;
 	vkGetPhysicalDeviceProperties2(instance->vkb.ctx.physical_device, &prop2);
 
-	LumenInstance* instance = this->instance;
+	lumen::LumenInstance* instance = this->instance;
 	Window* window = instance->window;
 
 	if (lumen_scene->config->cam_settings.pos != vec3(0)) {
-		camera = std::unique_ptr<PerspectiveCamera>(new PerspectiveCamera(
+		camera = std::unique_ptr<lumen::PerspectiveCamera>(new lumen::PerspectiveCamera(
 			lumen_scene->config->cam_settings.fov, 0.01f, 1000.0f, (float)instance->width / instance->height,
 			lumen_scene->config->cam_settings.dir, lumen_scene->config->cam_settings.pos));
 	} else {
 		// Assume the camera matrix is given
-		camera = std::unique_ptr<PerspectiveCamera>(
-			new PerspectiveCamera(lumen_scene->config->cam_settings.fov, lumen_scene->config->cam_settings.cam_matrix,
-								  0.01f, 1000.0f, (float)instance->width / instance->height));
+		camera = std::unique_ptr<lumen::PerspectiveCamera>(new lumen::PerspectiveCamera(
+			lumen_scene->config->cam_settings.fov, lumen_scene->config->cam_settings.cam_matrix, 0.01f, 1000.0f,
+			(float)instance->width / instance->height));
 	}
 
-	Camera* cam_ptr = camera.get();
+	lumen::Camera* cam_ptr = camera.get();
 	instance->window->add_mouse_click_callback(
 		[cam_ptr, this, window](MouseAction button, KeyAction action, double x, double y) {
 			if (ImGui::GetIO().WantCaptureMouse) {
@@ -98,30 +98,28 @@ void Integrator::init() {
 
 	scene_ubo_buffer.create("Scene UBO", &instance->vkb.ctx, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 							VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-							VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneUBO));
+							sizeof(SceneUBO));
 	update_uniform_buffers();
 
 	vertex_buffer.create("Vertex Buffer", &instance->vkb.ctx,
 						 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 							 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, vertex_buf_size,
-						 lumen_scene->positions.data(), true);
+						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertex_buf_size, lumen_scene->positions.data(), true);
 	index_buffer.create("Index Buffer", &instance->vkb.ctx,
 						VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 							VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, idx_buf_size,
-						lumen_scene->indices.data(), true);
+						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, idx_buf_size, lumen_scene->indices.data(), true);
 
 	materials_buffer.create("Materials Buffer", &instance->vkb.ctx,
 							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-							lumen_scene->materials.size() * sizeof(Material), lumen_scene->materials.data(), true);
+							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, lumen_scene->materials.size() * sizeof(Material),
+							lumen_scene->materials.data(), true);
 	prim_lookup_buffer.create("Prim Lookup Buffer", &instance->vkb.ctx,
 							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-							  prim_lookup.size() * sizeof(PrimMeshInfo), prim_lookup.data(), true);
+							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, prim_lookup.size() * sizeof(PrimMeshInfo),
+							  prim_lookup.data(), true);
 
 	std::vector<Vertex> vertices;
 	vertices.reserve(lumen_scene->positions.size());
@@ -135,22 +133,22 @@ void Integrator::init() {
 
 	compact_vertices_buffer.create("Compact Vertices Buffer", &instance->vkb.ctx,
 								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-								   vertices.size() * sizeof(vertices[0]), vertices.data(), true);
+								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertices.size() * sizeof(vertices[0]),
+								   vertices.data(), true);
 
 	// Create a sampler for textures
-	VkSamplerCreateInfo sampler_ci = vk::sampler_create_info();
+	VkSamplerCreateInfo sampler_ci = lumen::vk::sampler();
 	sampler_ci.minFilter = VK_FILTER_LINEAR;
 	sampler_ci.magFilter = VK_FILTER_LINEAR;
 	sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	sampler_ci.maxLod = FLT_MAX;
-	vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &texture_sampler),
-			  "Could not create image sampler");
+	lumen::vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &texture_sampler),
+					 "Could not create image sampler");
 
 	auto add_default_texture = [this, instance]() {
 		std::array<uint8_t, 4> nil = {0, 0, 0, 0};
 		scene_textures.resize(1);
-		auto ci = make_img2d_ci(VkExtent2D{1, 1});
+		auto ci = lumen::vk::make_img2d_ci(VkExtent2D{1, 1});
 		scene_textures[0].load_from_data(&instance->vkb.ctx, nil.data(), 4, ci, texture_sampler,
 										 VK_IMAGE_USAGE_SAMPLED_BIT, false);
 	};
@@ -166,7 +164,7 @@ void Integrator::init() {
 
 			auto size = x * y * 4;
 			auto img_dims = VkExtent2D{(uint32_t)x, (uint32_t)y};
-			auto ci = make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+			auto ci = lumen::vk::make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 			scene_textures[i].load_from_data(&instance->vkb.ctx, data, size, ci, texture_sampler,
 											 VK_IMAGE_USAGE_SAMPLED_BIT, false);
 			stbi_image_free(data);
@@ -177,7 +175,7 @@ void Integrator::init() {
 	create_blas();
 	create_tlas();
 	// Create offscreen image for output
-	TextureSettings settings;
+	lumen::TextureSettings settings;
 	settings.usage_flags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
 						   VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
 						   VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -186,17 +184,17 @@ void Integrator::init() {
 	output_tex.create_empty_texture("Color Output", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL);
 
 	instance->vkb.rg->global_macro_defines.push_back(
-		ShaderMacro("ENABLE_DIFFUSE", lumen_scene->has_bsdf_type(BSDF_TYPE_DIFFUSE), /* visible = */ false));
+		lumen::ShaderMacro("ENABLE_DIFFUSE", lumen_scene->has_bsdf_type(BSDF_TYPE_DIFFUSE), /* visible = */ false));
 	instance->vkb.rg->global_macro_defines.push_back(
-		ShaderMacro("ENABLE_MIRROR", lumen_scene->has_bsdf_type(BSDF_TYPE_MIRROR), /* visible = */ false));
+		lumen::ShaderMacro("ENABLE_MIRROR", lumen_scene->has_bsdf_type(BSDF_TYPE_MIRROR), /* visible = */ false));
 	instance->vkb.rg->global_macro_defines.push_back(
-		ShaderMacro("ENABLE_GLASS", lumen_scene->has_bsdf_type(BSDF_TYPE_GLASS), /* visible = */ false));
+		lumen::ShaderMacro("ENABLE_GLASS", lumen_scene->has_bsdf_type(BSDF_TYPE_GLASS), /* visible = */ false));
+	instance->vkb.rg->global_macro_defines.push_back(lumen::ShaderMacro(
+		"ENABLE_DIELECTRIC", lumen_scene->has_bsdf_type(BSDF_TYPE_DIELECTRIC), /* visible = */ false));
 	instance->vkb.rg->global_macro_defines.push_back(
-		ShaderMacro("ENABLE_DIELECTRIC", lumen_scene->has_bsdf_type(BSDF_TYPE_DIELECTRIC), /* visible = */ false));
-	instance->vkb.rg->global_macro_defines.push_back(
-		ShaderMacro("ENABLE_CONDUCTOR", lumen_scene->has_bsdf_type(BSDF_TYPE_CONDUCTOR), /* visible = */ false));
-	instance->vkb.rg->global_macro_defines.push_back(
-		ShaderMacro("ENABLE_PRINCIPLED", lumen_scene->has_bsdf_type(BSDF_TYPE_PRINCIPLED), /* visible = */ false));
+		lumen::ShaderMacro("ENABLE_CONDUCTOR", lumen_scene->has_bsdf_type(BSDF_TYPE_CONDUCTOR), /* visible = */ false));
+	instance->vkb.rg->global_macro_defines.push_back(lumen::ShaderMacro(
+		"ENABLE_PRINCIPLED", lumen_scene->has_bsdf_type(BSDF_TYPE_PRINCIPLED), /* visible = */ false));
 }
 
 bool Integrator::gui() {
@@ -208,11 +206,11 @@ bool Integrator::gui() {
 }
 
 void Integrator::create_blas() {
-	std::vector<BlasInput> blas_inputs;
+	std::vector<lumen::BlasInput> blas_inputs;
 	auto vertex_address = vertex_buffer.get_device_address();
 	auto idx_address = index_buffer.get_device_address();
 	for (auto& prim_mesh : lumen_scene->prim_meshes) {
-		BlasInput geo = to_vk_geometry(prim_mesh, vertex_address, idx_address);
+		lumen::BlasInput geo = lumen::vk::to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({geo});
 	}
 	instance->vkb.build_blas(blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
@@ -226,7 +224,7 @@ void Integrator::create_tlas() {
 	const auto& vertices = lumen_scene->positions;
 	for (const auto& pm : lumen_scene->prim_meshes) {
 		VkAccelerationStructureInstanceKHR ray_inst{};
-		ray_inst.transform = to_vk_matrix(pm.world_matrix);
+		ray_inst.transform = lumen::vk::to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
 		ray_inst.accelerationStructureReference = instance->vkb.get_blas_device_address(pm.prim_idx);
 		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
@@ -255,8 +253,8 @@ void Integrator::create_tlas() {
 	}
 	if (lights.size()) {
 		mesh_lights_buffer.create(&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-								  lights.size() * sizeof(Light), lights.data(), true);
+								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, lights.size() * sizeof(Light), lights.data(),
+								  true);
 	}
 
 	total_light_area += total_light_triangle_area;
@@ -337,9 +335,9 @@ bool Integrator::update() {
 }
 
 void Integrator::destroy() {
-	std::vector<Buffer*> buffer_list = {&vertex_buffer,			 &index_buffer,		 &materials_buffer,
-										&prim_lookup_buffer,	 &scene_desc_buffer, &scene_ubo_buffer,
-										&compact_vertices_buffer};
+	std::vector<lumen::Buffer*> buffer_list = {&vertex_buffer,			&index_buffer,		&materials_buffer,
+											   &prim_lookup_buffer,		&scene_desc_buffer, &scene_ubo_buffer,
+											   &compact_vertices_buffer};
 	if (lights.size()) {
 		buffer_list.push_back(&mesh_lights_buffer);
 	}

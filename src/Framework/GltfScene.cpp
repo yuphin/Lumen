@@ -9,6 +9,7 @@
 #include <sstream>
 #include "Logger.h"
 
+namespace lumen {
 #define EXTENSION_ATTRIB_IRAY "NV_attributes_iray"
 
 struct Bbox {
@@ -783,3 +784,5 @@ void GltfScene::check_required_extensions(const tinygltf::Model& tmodel) {
 		}
 	}
 }
+
+}  // namespace lumen

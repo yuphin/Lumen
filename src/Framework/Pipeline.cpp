@@ -2,8 +2,27 @@
 #include "Pipeline.h"
 #include "VkUtils.h"
 
-Pipeline::Pipeline(VulkanContext* ctx, const std::string& name)
-	: ctx(ctx),name(name) {}
+namespace lumen {
+	
+static uint32_t get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types) {
+	uint32_t binding_mask = 0;
+	for (const auto& shader : shaders) {
+		for (uint32_t i = 0; i < 32; ++i) {
+			if (shader.binding_mask & (1 << i)) {
+				if (binding_mask & (1 << i)) {
+					LUMEN_ASSERT(descriptor_types[i] == shader.descriptor_types[i],
+								 "Binding mask mismatch on shader {}", shader.filename.c_str());
+				} else {
+					descriptor_types[i] = shader.descriptor_types[i];
+					binding_mask |= 1 << i;
+				}
+			}
+		}
+	}
+	return binding_mask;
+}
+
+Pipeline::Pipeline(VulkanContext* ctx, const std::string& name) : ctx(ctx), name(name) {}
 
 void Pipeline::reload() {}
 
@@ -54,15 +73,15 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 	}
 
 	VkPipelineInputAssemblyStateCreateInfo input_asssembly_CI =
-		vk::pipeline_vertex_input_assembly_state_CI(settings.topology, 0, VK_FALSE);
-	VkPipelineViewportStateCreateInfo viewport_state = vk::pipeline_viewport_state_CI(1, 1, 0);
+		vk::pipeline_vertex_input_assembly_state(settings.topology, 0, VK_FALSE);
+	VkPipelineViewportStateCreateInfo viewport_state = vk::pipeline_viewport_state(1, 1, 0);
 	VkPipelineRasterizationStateCreateInfo rasterizer =
-		vk::pipeline_rasterization_state_CI(settings.polygon_mode, settings.cull_mode, settings.front_face);
+		vk::pipeline_rasterization_state(settings.polygon_mode, settings.cull_mode, settings.front_face);
 	rasterizer.lineWidth = 1.0f;
 	rasterizer.depthClampEnable = VK_FALSE;
 	rasterizer.rasterizerDiscardEnable = VK_FALSE;
 	rasterizer.depthBiasEnable = VK_FALSE;
-	VkPipelineMultisampleStateCreateInfo multisampling = vk::pipeline_multisample_state_CI(VK_SAMPLE_COUNT_1_BIT);
+	VkPipelineMultisampleStateCreateInfo multisampling = vk::pipeline_multisample_state(VK_SAMPLE_COUNT_1_BIT);
 	multisampling.sampleShadingEnable = VK_FALSE;
 
 	std::vector<VkPipelineColorBlendAttachmentState> blend_attachment_states;
@@ -82,7 +101,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 	}
 
 	VkPipelineColorBlendStateCreateInfo color_blend =
-		vk::pipeline_color_blend_state_CI((uint32_t)blend_attachment_states.size(), blend_attachment_states.data());
+		vk::pipeline_color_blend_state((uint32_t)blend_attachment_states.size(), blend_attachment_states.data());
 	color_blend.logicOpEnable = VK_FALSE;
 	color_blend.logicOp = VK_LOGIC_OP_COPY;
 	color_blend.blendConstants[0] = 0.0f;
@@ -91,7 +110,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 	color_blend.blendConstants[3] = 0.0f;
 	std::vector<VkDynamicState> dynamic_enables = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
 	VkPipelineDynamicStateCreateInfo dynamic_state_CI =
-		vk::pipeline_dynamic_state_CI(dynamic_enables.data(), static_cast<uint32_t>(dynamic_enables.size()));
+		vk::pipeline_dynamic_state(dynamic_enables.data(), static_cast<uint32_t>(dynamic_enables.size()));
 
 	std::vector<VkVertexInputBindingDescription> binding_descs;
 	std::vector<VkVertexInputAttributeDescription> attribute_descs;
@@ -110,7 +129,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 		binding_descs.push_back(binding_desc);
 		attribute_descs.push_back(attribute_desc);
 	}
-	auto vertex_input_state = vk::pipeline_vertex_input_state_CI();
+	auto vertex_input_state = vk::pipeline_vertex_input_state();
 	vertex_input_state.vertexAttributeDescriptionCount = (uint32_t)attribute_descs.size();
 	vertex_input_state.pVertexAttributeDescriptions = attribute_descs.data();
 	vertex_input_state.vertexBindingDescriptionCount = (uint32_t)binding_descs.size();
@@ -131,9 +150,9 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 		.pColorAttachmentFormats = output_formats.data(),
 		.depthAttachmentFormat = depth_format};
 
-	auto depth_stencil_state_ci = vk::pipeline_depth_stencil_CI(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+	auto depth_stencil_state_ci = vk::pipeline_depth_stencil(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
 
-	VkGraphicsPipelineCreateInfo pipeline_CI = vk::graphics_pipeline_CI();
+	VkGraphicsPipelineCreateInfo pipeline_CI = vk::graphics_pipeline();
 	pipeline_CI.pNext = nullptr;
 	pipeline_CI.stageCount = (uint32_t)stages.size();
 	pipeline_CI.pStages = stages.data();
@@ -157,7 +176,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 		vkDestroyShaderModule(ctx->device, stage.module, nullptr);
 	}
 	if (!name.empty()) {
-		DebugMarker::set_resource_name(ctx->device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
+		vk::DebugMarker::set_resource_name(ctx->device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
 	}
 }
 
@@ -260,7 +279,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 	sbt_wrapper.setup(ctx, ctx->indices.gfx_family.value(), ctx->rt_props);
 	sbt_wrapper.create(handle, pipeline_CI);
 	if (!name.empty()) {
-		DebugMarker::set_resource_name(ctx->device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
+		vk::DebugMarker::set_resource_name(ctx->device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
 	}
 	for (auto& stage : stages) {
 		vkDestroyShaderModule(ctx->device, stage.module, nullptr);
@@ -307,7 +326,7 @@ void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
 	vk::check(vkCreateComputePipelines(ctx->device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle));
 	vkDestroyShaderModule(ctx->device, compute_shader_module, nullptr);
 	if (!name.empty()) {
-		DebugMarker::set_resource_name(ctx->device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
+		vk::DebugMarker::set_resource_name(ctx->device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
 	}
 }
 
@@ -518,3 +537,4 @@ void Pipeline::create_update_template(const std::vector<Shader>& shaders,
 	template_create_info.pipelineLayout = pipeline_layout;
 	vk::check(vkCreateDescriptorUpdateTemplate(ctx->device, &template_create_info, nullptr, &update_template));
 }
+}  // namespace lumen

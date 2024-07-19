@@ -1,6 +1,7 @@
 #pragma once
 #include "../LumenPCH.h"
 
+namespace lumen {
 class CommandBuffer {
    public:
 	CommandBuffer(VulkanContext* ctx, bool begin = false, VkCommandBufferUsageFlags begin_flags = 0,
@@ -18,3 +19,5 @@ class CommandBuffer {
 	QueueType type;
 	uint32_t curr_tid;
 };
+
+}  // namespace lumen

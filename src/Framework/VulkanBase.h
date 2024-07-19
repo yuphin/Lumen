@@ -5,6 +5,7 @@
 #include "Event.h"
 #include "RenderGraph.h"
 
+namespace lumen {
 class RenderGraph;
 
 struct BuildAccelerationStructure {
@@ -116,3 +117,5 @@ struct VulkanBase {
 	);
 	VkDescriptorPool imgui_pool = 0;
 };
+
+}  // namespace lumen

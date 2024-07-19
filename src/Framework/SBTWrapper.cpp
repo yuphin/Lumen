@@ -3,6 +3,13 @@
 #include "VkUtils.h"
 #include "CommandBuffer.h"
 
+namespace lumen {
+
+template <class T>
+static constexpr T align_up(T x, size_t a) noexcept {
+	return T((x + (T(a) - 1)) & ~T(a - 1));
+}
+
 void SBTWrapper::setup(VulkanContext* ctx, uint32_t family_idx,
 					   const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rt_props) {
 	m_ctx = ctx;
@@ -121,8 +128,7 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 	auto mem_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	for (uint32_t i = 0; i < 4; i++) {
 		if (!stage[i].empty()) {
-			m_buffer[i].create(m_ctx, usage_flags, mem_flags, VK_SHARING_MODE_EXCLUSIVE, stage[i].size(),
-							   stage[i].data(), true);
+			m_buffer[i].create(m_ctx, usage_flags, mem_flags, stage[i].size(), stage[i].data(), true);
 		}
 	}
 }
@@ -144,3 +150,5 @@ const std::array<VkStridedDeviceAddressRegionKHR, 4> SBTWrapper::get_regions() {
 														   get_region(eCallable)};
 	return regions;
 }
+
+}  // namespace lumen

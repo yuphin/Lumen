@@ -4,7 +4,7 @@
 using namespace RestirPT;
 class ReSTIRPT : public Integrator {
    public:
-	ReSTIRPT(LumenInstance* scene, LumenScene* lumen_scene)
+	ReSTIRPT(lumen::LumenInstance* scene, LumenScene* lumen_scene)
 		: Integrator(scene, lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), ReSTIRPTConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
@@ -16,15 +16,15 @@ class ReSTIRPT : public Integrator {
 	enum class StreamingMethod { INDIVIDUAL_CONTRIBUTIONS, SPLITTING_AT_RECONNECTION };
 
 	enum class MISMethod { TALBOT, PAIRWISE };
-	Buffer direct_lighting_buffer;
-	Buffer gris_gbuffer;
-	Buffer gris_prev_gbuffer;
-	Buffer gris_reservoir_ping_buffer;
-	Buffer gris_reservoir_pong_buffer;
-	Buffer prefix_contribution_buffer;
-	Buffer reconnection_buffer;
-	Buffer transformations_buffer;
-	Buffer debug_vis_buffer;
+	lumen::Buffer direct_lighting_buffer;
+	lumen::Buffer gris_gbuffer;
+	lumen::Buffer gris_prev_gbuffer;
+	lumen::Buffer gris_reservoir_ping_buffer;
+	lumen::Buffer gris_reservoir_pong_buffer;
+	lumen::Buffer prefix_contribution_buffer;
+	lumen::Buffer reconnection_buffer;
+	lumen::Buffer transformations_buffer;
+	lumen::Buffer debug_vis_buffer;
 	PCReSTIRPT pc_ray{};
 	bool enable_accumulation = false;
 	bool direct_lighting = false;

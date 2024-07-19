@@ -2,6 +2,7 @@
 #include "../LumenPCH.h"
 #include "Pipeline.h"
 
+namespace lumen {
 enum class LumenEvent { SHADER_RELOAD };
 
 struct PipelineTrace;
@@ -17,3 +18,5 @@ struct EventHandler {
 	static bool consume_event(LumenEvent event);
 	static bool signaled(LumenEvent event);
 };
+
+}  // namespace lumen

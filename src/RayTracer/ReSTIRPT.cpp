@@ -14,55 +14,52 @@ void ReSTIRPT::init() {
 	gris_gbuffer.create("GRIS GBuffer", &instance->vkb.ctx,
 						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						instance->width * instance->height * sizeof(GBuffer));
+						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * sizeof(GBuffer));
 
 	gris_prev_gbuffer.create("GRIS Previous GBuffer", &instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-							 instance->width * instance->height * sizeof(GBuffer));
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * sizeof(GBuffer));
 
 	direct_lighting_buffer.create("GRIS Direct Lighting", &instance->vkb.ctx,
 								  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 								  instance->width * instance->height * sizeof(glm::vec3));
 
 	gris_reservoir_ping_buffer.create("GRIS Reservoirs Ping", &instance->vkb.ctx,
 									  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 										  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 									  instance->width * instance->height * sizeof(Reservoir));
 
 	gris_reservoir_pong_buffer.create("GRIS Reservoirs Pong", &instance->vkb.ctx,
 									  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 										  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 									  instance->width * instance->height * sizeof(Reservoir));
 
 	prefix_contribution_buffer.create("Prefix Contributions", &instance->vkb.ctx,
 									  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 										  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 									  instance->width * instance->height * sizeof(glm::vec3));
 
 	debug_vis_buffer.create("Debug Vis", &instance->vkb.ctx,
 							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-							instance->width * instance->height * sizeof(uint32_t));
+							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * sizeof(uint32_t));
 
 	reconnection_buffer.create(
 		"Reservoir Connection", &instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		instance->width * instance->height * sizeof(ReconnectionData) * (num_spatial_samples + 1));
 	transformations_buffer.create("Transformations Buffer", &instance->vkb.ctx,
 								  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-								  transformations.size() * sizeof(glm::mat4), transformations.data(), true);
+								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, transformations.size() * sizeof(glm::mat4),
+								  transformations.data(), true);
 
 	SceneDesc desc;
 	desc.index_addr = index_buffer.get_device_address();
@@ -76,9 +73,9 @@ void ReSTIRPT::init() {
 	desc.gris_direct_lighting_addr = direct_lighting_buffer.get_device_address();
 	desc.prefix_contributions_addr = prefix_contribution_buffer.get_device_address();
 	desc.debug_vis_addr = debug_vis_buffer.get_device_address();
-	scene_desc_buffer.create(
-		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
+	scene_desc_buffer.create(&instance->vkb.ctx,
+							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
 	pc_ray.total_light_area = 0;
 
@@ -99,7 +96,7 @@ void ReSTIRPT::init() {
 }
 
 void ReSTIRPT::render() {
-	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true);
+	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true);
 	pc_ray.num_lights = (int)lights.size();
 	pc_ray.prev_random_num = pc_ray.general_seed;
 	pc_ray.sampling_seed = rand() % UINT_MAX;
@@ -129,11 +126,11 @@ void ReSTIRPT::render() {
 	pc_ray.canonical_only = canonical_only;
 	pc_ray.enable_occlusion = enable_occlusion;
 
-	const std::initializer_list<ResourceBinding> common_bindings = {output_tex, scene_ubo_buffer, scene_desc_buffer,
-																	mesh_lights_buffer};
+	const std::initializer_list<lumen::ResourceBinding> common_bindings = {output_tex, scene_ubo_buffer,
+																		   scene_desc_buffer, mesh_lights_buffer};
 
-	const std::array<Buffer*, 2> reservoir_buffers = {&gris_reservoir_ping_buffer, &gris_reservoir_pong_buffer};
-	const std::array<Buffer*, 2> gbuffers = {&gris_prev_gbuffer, &gris_gbuffer};
+	const std::array<lumen::Buffer*, 2> reservoir_buffers = {&gris_reservoir_ping_buffer, &gris_reservoir_pong_buffer};
+	const std::array<lumen::Buffer*, 2> gbuffers = {&gris_prev_gbuffer, &gris_gbuffer};
 
 	int ping = pc_ray.total_frame_num % 2;
 	int pong = ping ^ 1;
@@ -150,7 +147,8 @@ void ReSTIRPT::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/integrators/restir/gris/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .macros = {{"STREAMING_MODE", int(streaming_method)}, ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
+					 .macros = {{"STREAMING_MODE", int(streaming_method)},
+								lumen::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
 					 .dims = {instance->width, instance->height},
 				 })
 		.push_constants(&pc_ray)
@@ -250,7 +248,8 @@ void ReSTIRPT::render() {
 											 {"src/shaders/ray_shadow.rmiss"},
 											 {"src/shaders/integrators/restir/gris/ray.rchit"},
 											 {"src/shaders/ray.rahit"}},
-								 .macros = {ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS", enable_defensive_formulation)},
+								 .macros = {lumen::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS",
+															   enable_defensive_formulation)},
 								 .dims = {instance->width, instance->height},
 							 })
 					.push_constants(&pc_ray)
@@ -265,9 +264,9 @@ void ReSTIRPT::render() {
 			if (pixel_debug || (gris_separator < 1.0f && gris_separator > 0.0f)) {
 				uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
 				instance->vkb.rg
-					->add_compute(
-						"GRIS - Debug Visualiation",
-						{.shader = Shader("src/shaders/integrators/restir/gris/debug_vis.comp"), .dims = {num_wgs}})
+					->add_compute("GRIS - Debug Visualiation",
+								  {.shader = lumen::Shader("src/shaders/integrators/restir/gris/debug_vis.comp"),
+								   .dims = {num_wgs}})
 					.push_constants(&pc_ray)
 					.bind({output_tex, scene_ubo_buffer, scene_desc_buffer});
 			}
@@ -289,7 +288,7 @@ bool ReSTIRPT::update() {
 void ReSTIRPT::destroy() {
 	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
-	std::vector<Buffer*> buffer_list = {
+	std::vector<lumen::Buffer*> buffer_list = {
 		&gris_gbuffer,			 &gris_reservoir_ping_buffer, &gris_reservoir_pong_buffer,
 		&direct_lighting_buffer, &transformations_buffer,	  &prefix_contribution_buffer,
 		&reconnection_buffer,	 &gris_prev_gbuffer,		  &debug_vis_buffer};
@@ -351,7 +350,7 @@ bool ReSTIRPT::gui() {
 			"Reservoir Connection", &instance->vkb.ctx,
 			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			instance->width * instance->height * sizeof(ReconnectionData) * (num_spatial_samples + 1));
 	}
 	return result;

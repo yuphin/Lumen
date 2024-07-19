@@ -1,5 +1,7 @@
 #pragma once
 #include "../LumenPCH.h"
+
+namespace lumen {
 class EventPool {
    public:
 	struct Events {
@@ -14,3 +16,5 @@ class EventPool {
    private:
 	std::unordered_map<VkCommandBuffer, Events> events_map;
 };
+
+}  // namespace lumen

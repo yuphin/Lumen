@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
 	int width = 1920;
 	int height = 1080;
 	Logger::init();
-	ThreadPool::init();
+	lumen::ThreadPool::init();
 	Window window(width, height, fullscreen);
 	{
 		RayTracer app(width, height, enable_debug, argc, argv);
@@ -27,6 +27,6 @@ int main(int argc, char* argv[]) {
 		app.cleanup();
 	}
 
-	ThreadPool::destroy();
+	lumen::ThreadPool::destroy();
 	return 0;
 }

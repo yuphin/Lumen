@@ -1,6 +1,7 @@
 #include "LumenPCH.h"
 #include "Event.h"
 
+namespace lumen {
 std::unordered_map<LumenEvent, bool> EventHandler::event_table = {};
 std::vector<PipelineTrace> EventHandler::obsolete_pipelines = {};
 std::vector<uint32_t> EventHandler::event_histogram = {};
@@ -21,3 +22,5 @@ bool EventHandler::consume_event(LumenEvent event) {
 }
 
 bool EventHandler::signaled(LumenEvent event) { return event_histogram[(int)event] > 0; }
+
+}  // namespace lumen

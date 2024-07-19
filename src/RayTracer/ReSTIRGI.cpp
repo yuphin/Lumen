@@ -7,31 +7,30 @@ void ReSTIRGI::init() {
 	restir_samples_buffer.create("ReSTIR Samples", &instance->vkb.ctx,
 								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 								 instance->width * instance->height * sizeof(ReservoirSample));
 
 	restir_samples_old_buffer.create("Old ReSTIR Samples", &instance->vkb.ctx,
 									 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 										 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-									 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+									 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 									 instance->width * instance->height * sizeof(ReservoirSample));
 
 	temporal_reservoir_buffer.create("Temporal Reservoirs", &instance->vkb.ctx,
 									 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 										 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-									 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+									 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 									 2 * instance->width * instance->height * sizeof(Reservoir));
 
 	spatial_reservoir_buffer.create("Spatial Reservoirs", &instance->vkb.ctx,
 									VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 										VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-									VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+									VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 									2 * instance->width * instance->height * sizeof(Reservoir));
 
 	tmp_col_buffer.create("Temp Color", &instance->vkb.ctx,
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						  instance->width * instance->height * sizeof(float) * 3);
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * sizeof(float) * 3);
 
 	SceneDesc desc;
 	desc.index_addr = index_buffer.get_device_address();
@@ -45,9 +44,9 @@ void ReSTIRGI::init() {
 	desc.temporal_reservoir_addr = temporal_reservoir_buffer.get_device_address();
 	desc.spatial_reservoir_addr = spatial_reservoir_buffer.get_device_address();
 	desc.color_storage_addr = tmp_col_buffer.get_device_address();
-	scene_desc_buffer.create(
-		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
+	scene_desc_buffer.create(&instance->vkb.ctx,
+							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
 	pc_ray.total_light_area = 0;
 
@@ -69,7 +68,7 @@ void ReSTIRGI::init() {
 }
 
 void ReSTIRGI::render() {
-	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.num_lights = (int)lights.size();
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
@@ -80,7 +79,7 @@ void ReSTIRGI::render() {
 	pc_ray.enable_accumulation = enable_accumulation;
 	pc_ray.frame_num = frame_num;
 
-	const std::initializer_list<ResourceBinding> rt_bindings = {
+	const std::initializer_list<lumen::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
 		scene_desc_buffer,
@@ -143,7 +142,7 @@ void ReSTIRGI::render() {
 	// Output
 	instance->vkb.rg
 		->add_compute("Output",
-					  {.shader = Shader("src/shaders/integrators/restir/gi/output.comp"),
+					  {.shader = lumen::Shader("src/shaders/integrators/restir/gi/output.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, scene_desc_buffer});
@@ -172,8 +171,8 @@ bool ReSTIRGI::gui() {
 void ReSTIRGI::destroy() {
 	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
-	std::vector<Buffer*> buffer_list = {&restir_samples_buffer, &restir_samples_old_buffer, &temporal_reservoir_buffer,
-										&spatial_reservoir_buffer, &tmp_col_buffer};
+	std::vector<lumen::Buffer*> buffer_list = {&restir_samples_buffer, &restir_samples_old_buffer,
+											   &temporal_reservoir_buffer, &spatial_reservoir_buffer, &tmp_col_buffer};
 	for (auto b : buffer_list) {
 		b->destroy();
 	}

@@ -8,11 +8,13 @@
 #include "Texture.h"
 #include "CommonTypes.h"
 
+namespace lumen {
 class RenderGraph;
 class RenderPass;
 
 struct ShaderMacro {
-	ShaderMacro(const std::string& name, int val, bool visible) : name(name), val(val), has_val(true), visible(visible) {}
+	ShaderMacro(const std::string& name, int val, bool visible)
+		: name(name), val(val), has_val(true), visible(visible) {}
 	ShaderMacro(const std::string& name, int val) : name(name), val(val), has_val(true) {}
 	ShaderMacro(const std::string& name, bool enable) {
 		if (enable) {
@@ -130,3 +132,4 @@ struct ImageSyncDescriptor {
 	VkImageAspectFlags image_aspect;
 	VkEvent event = nullptr;
 };
+}  // namespace lumen

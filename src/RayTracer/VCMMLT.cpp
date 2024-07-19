@@ -13,109 +13,103 @@ void VCMMLT::init() {
 	bootstrap_buffer.create(&instance->vkb.ctx,
 							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							config->num_bootstrap_samples * sizeof(BootstrapSample));
 
 	cdf_buffer.create(&instance->vkb.ctx,
 					  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 						  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-					  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-					  config->num_bootstrap_samples * 4);
+					  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_bootstrap_samples * 4);
 
 	bootstrap_cpu.create(&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-						 VK_SHARING_MODE_EXCLUSIVE, config->num_bootstrap_samples * sizeof(BootstrapSample));
+						 config->num_bootstrap_samples * sizeof(BootstrapSample));
 
 	cdf_cpu.create(&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 				   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-				   VK_SHARING_MODE_EXCLUSIVE, config->num_bootstrap_samples * 4);
+				   config->num_bootstrap_samples * 4);
 
 	cdf_sum_buffer.create(&instance->vkb.ctx,
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(float));
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(float));
 
 	seeds_buffer.create(&instance->vkb.ctx,
 						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						config->num_mlt_threads * sizeof(VCMMLTSeedData));
+						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * sizeof(VCMMLTSeedData));
 
 	light_primary_samples_buffer.create(&instance->vkb.ctx,
 										VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 											VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 										config->num_mlt_threads * light_path_rand_count * sizeof(PrimarySample) * 2);
 
 	mlt_samplers_buffer.create(&instance->vkb.ctx,
 							   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							   config->num_mlt_threads * sizeof(VCMMLTSampler) * 2);
 
 	mlt_col_buffer.create(&instance->vkb.ctx,
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						  instance->width * instance->height * 3 * sizeof(float));
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * 3 * sizeof(float));
 
 	chain_stats_buffer.create(&instance->vkb.ctx,
 							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, 2 * sizeof(ChainData));
+							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 2 * sizeof(ChainData));
 
 	splat_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		config->num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat) * 2);
 
 	past_splat_buffer.create(
 		&instance->vkb.ctx,
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		config->num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat) * 2);
 
 	light_path_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							 instance->width * instance->height * (config->path_length + 1) * sizeof(VCMVertex));
 
 	light_path_cnt_buffer.create(&instance->vkb.ctx,
 								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 								 instance->width * instance->height * sizeof(float));
 
 	tmp_col_buffer.create(&instance->vkb.ctx,
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-						  instance->width * instance->height * sizeof(float) * 3);
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * sizeof(float) * 3);
 
 	photon_buffer.create(&instance->vkb.ctx,
 						 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
+						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 						 10 * instance->width * instance->height * sizeof(VCMPhotonHash));
 
 	mlt_atomicsum_buffer.create(&instance->vkb.ctx,
 								VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-								config->num_mlt_threads * sizeof(SumData) * 2);
+								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * sizeof(SumData) * 2);
 
 	mlt_residual_buffer.create(&instance->vkb.ctx,
 							   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE,
-							   config->num_mlt_threads * sizeof(SumData));
+							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * sizeof(SumData));
 
 	counter_buffer.create(&instance->vkb.ctx,
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(int));
+						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(int));
 
 	int size = 0;
 	int arr_size = config->num_bootstrap_samples;
@@ -134,7 +128,7 @@ void VCMMLT::init() {
 		if (num_blocks > 1) {
 			block_sums[i++].create(&instance->vkb.ctx,
 								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, num_blocks * 4);
+								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, num_blocks * 4);
 		}
 		arr_size = num_blocks;
 	} while (arr_size > 1);
@@ -188,9 +182,9 @@ void VCMMLT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, &mlt_residual_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
 
-	scene_desc_buffer.create(
-		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_SHARING_MODE_EXCLUSIVE, sizeof(SceneDesc), &desc, true);
+	scene_desc_buffer.create(&instance->vkb.ctx,
+							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 	pc_ray.total_light_area = 0;
 
 	frame_num = 0;
@@ -204,10 +198,10 @@ void VCMMLT::init() {
 void VCMMLT::render() {
 	LUMEN_TRACE("Rendering sample {}...", sample_cnt++);
 	const float ppm_base_radius = 0.25f;
-	CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
 	VkClearValue clear_depth = {1.0f, 0};
-	VkViewport viewport = vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
+	VkViewport viewport = lumen::vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
 	VkClearValue clear_values[] = {clear_color, clear_depth};
 	pc_ray.num_lights = int(lights.size());
 	pc_ray.time = rand() % UINT_MAX;
@@ -243,16 +237,17 @@ void VCMMLT::render() {
 						 const std::string& reduce_shader_name, const std::vector<uint32_t> spec_data) {
 		uint32_t num_wgs = uint32_t((config->num_mlt_threads + 1023) / 1024);
 		instance->vkb.rg
-			->add_compute(op_name,
-						  {.shader = Shader(op_shader_name), .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
+			->add_compute(
+				op_name,
+				{.shader = lumen::Shader(op_shader_name), .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
 			.push_constants(&pc_ray)
 			.bind(scene_desc_buffer)
 			.zero({mlt_residual_buffer, counter_buffer});
 		while (num_wgs != 1) {
 			instance->vkb.rg
-				->add_compute(
-					reduce_name,
-					{.shader = Shader(reduce_shader_name), .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
+				->add_compute(reduce_name, {.shader = lumen::Shader(reduce_shader_name),
+											.specialization_data = spec_data,
+											.dims = {num_wgs, 1, 1}})
 				.push_constants(&pc_ray)
 				.bind(scene_desc_buffer);
 			num_wgs = (uint32_t)(num_wgs + 1023) / 1024;
@@ -264,7 +259,7 @@ void VCMMLT::render() {
 		op_reduce("OpReduce: Sum1", "src/shaders/integrators/vcmmlt/sum.comp", "OpReduce: Reduce Sum1",
 				  "src/shaders/integrators/vcmmlt/reduce_sum.comp", {1});
 	};
-	std::initializer_list<ResourceBinding> rt_bindings = {
+	std::initializer_list<lumen::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
 		scene_desc_buffer,
@@ -319,13 +314,13 @@ void VCMMLT::render() {
 	// Calculate CDF
 	instance->vkb.rg
 		->add_compute("Calculate CDF",
-					  {.shader = Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
+					  {.shader = lumen::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
 					   .dims = {(uint32_t)std::ceil(config->num_bootstrap_samples / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(scene_desc_buffer);
 	// Select seeds
 	instance->vkb.rg
-		->add_compute("Select Seeds", {.shader = Shader("src/shaders/integrators/vcmmlt/select_seeds.comp"),
+		->add_compute("Select Seeds", {.shader = lumen::Shader("src/shaders/integrators/vcmmlt/select_seeds.comp"),
 									   .dims = {(uint32_t)std::ceil(config->num_mlt_threads / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(scene_desc_buffer);
@@ -355,7 +350,7 @@ void VCMMLT::render() {
 	// Calculate normalization factor
 	instance->vkb.rg
 		->add_compute("Calculate Normalization",
-					  {.shader = Shader("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
+					  {.shader = lumen::Shader("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(scene_desc_buffer);
 	instance->vkb.rg->run_and_submit(cmd);
@@ -385,8 +380,9 @@ void VCMMLT::render() {
 			sum_up_chain_data();
 			// Normalization
 			instance->vkb.rg
-				->add_compute("Calculate Normalization",
-							  {.shader = Shader("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
+				->add_compute(
+					"Calculate Normalization",
+					{.shader = lumen::Shader("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
 				.push_constants(&pc_ray)
 				.bind(scene_desc_buffer);
 		};
@@ -415,7 +411,7 @@ void VCMMLT::render() {
 	// Compositions
 	instance->vkb.rg
 		->add_compute("Composition",
-					  {.shader = Shader("src/shaders/integrators/vcmmlt/composite.comp"),
+					  {.shader = lumen::Shader("src/shaders/integrators/vcmmlt/composite.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, scene_desc_buffer});
@@ -440,23 +436,24 @@ bool VCMMLT::update() {
 	return updated;
 }
 
-void VCMMLT::prefix_scan(int level, int num_elems, int& counter, RenderGraph* rg) {
+void VCMMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGraph* rg) {
 	const bool scan_sums = level > 0;
 	int num_wgs = std::max(1, (int)ceil(num_elems / (2 * 1024.0f)));
 	int num_grids = num_wgs - int((num_elems % 2048) != 0);
 	pc_compute.num_elems = num_elems;
 	auto scan = [&](int num_wgs, int idx) {
 		++counter;
-		rg->add_compute("PrefixScan - Scan", {.shader = Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
-											  .dims = {(uint32_t)num_wgs, 1, 1}})
+		rg->add_compute("PrefixScan - Scan",
+						{.shader = lumen::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
+						 .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(scene_desc_buffer);
 	};
 	auto uniform_add = [&](int num_wgs, int output_idx) {
 		++counter;
-		rg->add_compute(
-			  "PrefixScan - Uniform Add",
-			  {.shader = Shader("src/shaders/integrators/pssmlt/uniform_add.comp"), .dims = {(uint32_t)num_wgs, 1, 1}})
+		rg->add_compute("PrefixScan - Uniform Add",
+						{.shader = lumen::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"),
+						 .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(scene_desc_buffer);
 	};
@@ -509,12 +506,13 @@ void VCMMLT::prefix_scan(int level, int num_elems, int& counter, RenderGraph* rg
 void VCMMLT::destroy() {
 	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
-	std::vector<Buffer*> buffer_list = {&bootstrap_buffer,	  &cdf_buffer,			&cdf_sum_buffer,
-										&seeds_buffer,		  &mlt_samplers_buffer, &light_primary_samples_buffer,
-										&mlt_col_buffer,	  &chain_stats_buffer,	&splat_buffer,
-										&past_splat_buffer,	  &light_path_buffer,	&light_path_cnt_buffer,
-										&tmp_col_buffer,	  &photon_buffer,		&mlt_atomicsum_buffer,
-										&mlt_residual_buffer, &counter_buffer};
+	std::vector<lumen::Buffer*> buffer_list = {
+		&bootstrap_buffer,	  &cdf_buffer,			&cdf_sum_buffer,
+		&seeds_buffer,		  &mlt_samplers_buffer, &light_primary_samples_buffer,
+		&mlt_col_buffer,	  &chain_stats_buffer,	&splat_buffer,
+		&past_splat_buffer,	  &light_path_buffer,	&light_path_cnt_buffer,
+		&tmp_col_buffer,	  &photon_buffer,		&mlt_atomicsum_buffer,
+		&mlt_residual_buffer, &counter_buffer};
 	for (auto b : buffer_list) {
 		b->destroy();
 	}
