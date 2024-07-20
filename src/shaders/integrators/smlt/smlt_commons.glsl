@@ -45,8 +45,6 @@ PrimarySamples light_primary_samples =
     PrimarySamples(scene_desc.light_primary_samples_addr);
 PrimarySamples cam_primary_samples =
     PrimarySamples(scene_desc.cam_primary_samples_addr);
-PrimarySamples prim_samples[2] =
-    PrimarySamples[](light_primary_samples, cam_primary_samples);
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
@@ -73,8 +71,14 @@ uint prim_sample_idxs[2] =
 PathCnt light_path_cnts = PathCnt(scene_desc.path_cnt_addr);
 
 #define mlt_sampler mlt_samplers.d[mlt_sampler_idx]
-#define primary_sample(i)                                                      \
-    prim_samples[mlt_sampler.type].d[prim_sample_idxs[mlt_sampler.type] + i]
+PrimarySample get_primary_sample(uint i) {
+    if(mlt_sampler.type == 0) {
+        return light_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i];
+    } else {
+        return cam_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i];
+    }
+}
+
 
 bool large_step, save_radiance;
 uvec4 mlt_seed;
