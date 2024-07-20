@@ -159,7 +159,6 @@ void SPPM::render() {
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, scene_desc_buffer});
-	instance->vkb.rg->run_and_submit(cmd);
 }
 
 bool SPPM::update() {

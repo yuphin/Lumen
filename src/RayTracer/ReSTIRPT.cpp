@@ -273,7 +273,6 @@ void ReSTIRPT::render() {
 		}
 	}
 	pc_ray.total_frame_num++;
-	instance->vkb.rg->run_and_submit(cmd);
 }
 
 bool ReSTIRPT::update() {

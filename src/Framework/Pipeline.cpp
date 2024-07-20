@@ -275,7 +275,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 	pipeline_CI.maxPipelineRayRecursionDepth = settings.recursion_depth;
 	pipeline_CI.layout = pipeline_layout;
 	pipeline_CI.flags = 0;
-	vkCreateRayTracingPipelinesKHR(ctx->device, {}, {}, 1, &pipeline_CI, nullptr, &handle);
+	vk::check(vkCreateRayTracingPipelinesKHR(ctx->device, {}, {}, 1, &pipeline_CI, nullptr, &handle), "Failed to create RT pipeline");
 	sbt_wrapper.setup(ctx, ctx->indices.gfx_family.value(), ctx->rt_props);
 	sbt_wrapper.create(handle, pipeline_CI);
 	if (!name.empty()) {

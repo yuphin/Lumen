@@ -16,10 +16,6 @@ void RenderPass::register_dependencies(Buffer& buffer, VkAccessFlags dst_access_
 				   (rg->buffer_resource_map[buffer.handle].second == dst_access_flags))) {
 		return;
 	}
-	RenderPass& opposing_pass = rg->passes[rg->buffer_resource_map[buffer.handle].first];
-	if (opposing_pass.submitted) {
-		return;
-	}
 	// Invariant : Pass with lower index should be the setter
 	// Set current pass dependencies
 	auto src_access_flags = rg->buffer_resource_map[buffer.handle].second;
@@ -27,21 +23,28 @@ void RenderPass::register_dependencies(Buffer& buffer, VkAccessFlags dst_access_
 		dst_access_flags |= VK_ACCESS_TRANSFER_WRITE_BIT;
 	}
 
-	if (opposing_pass.pass_idx < pass_idx) {
-		if (wait_signals_buffer.find(buffer.handle) == wait_signals_buffer.end()) {
-			wait_signals_buffer[buffer.handle] = BufferSyncDescriptor{
-				.src_access_flags = src_access_flags,
-				.dst_access_flags = dst_access_flags,
-				.opposing_pass_idx = opposing_pass.pass_idx,
-			};
+	auto opposing_pass_idx = rg->buffer_resource_map[buffer.handle].first;
+	if (opposing_pass_idx < rg->passes.size()) {
+		RenderPass& opposing_pass = rg->passes[opposing_pass_idx];
+		if (opposing_pass_idx < rg->passes.size() && opposing_pass.pass_idx < pass_idx) {
+			if (wait_signals_buffer.find(buffer.handle) == wait_signals_buffer.end()) {
+				wait_signals_buffer[buffer.handle] = BufferSyncDescriptor{
+					.src_access_flags = src_access_flags,
+					.dst_access_flags = dst_access_flags,
+					.opposing_pass_idx = opposing_pass.pass_idx,
+				};
+			}
+			// Set source pass dependencies (Signalling pass)
+			if (opposing_pass.set_signals_buffer.find(buffer.handle) == opposing_pass.set_signals_buffer.end()) {
+				opposing_pass.set_signals_buffer[buffer.handle] =
+					BufferSyncDescriptor{.src_access_flags = src_access_flags,
+										 .dst_access_flags = dst_access_flags,
+										 .opposing_pass_idx = pass_idx};
+			}
+		} else if(src_access_flags != dst_access_flags) {
+			buffer_barriers.push_back({buffer.handle, src_access_flags, dst_access_flags});
 		}
-		// Set source pass dependencies (Signalling pass)
-		if (opposing_pass.set_signals_buffer.find(buffer.handle) == opposing_pass.set_signals_buffer.end()) {
-			opposing_pass.set_signals_buffer[buffer.handle] = BufferSyncDescriptor{.src_access_flags = src_access_flags,
-																				   .dst_access_flags = dst_access_flags,
-																				   .opposing_pass_idx = pass_idx};
-		}
-	} else {
+	} else if(src_access_flags != dst_access_flags) {
 		buffer_barriers.push_back({buffer.handle, src_access_flags, dst_access_flags});
 	}
 }
@@ -69,12 +72,9 @@ void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout)
 	if (tex.layout == VK_IMAGE_LAYOUT_UNDEFINED || !resource_exists) {
 		layout_transitions.push_back({&tex, tex.layout, dst_layout});
 		tex.layout = dst_layout;
-	} else {
+	} else if (img_resource->second < rg->passes.size()) {
 		RenderPass& opposing_pass = rg->passes[img_resource->second];
-		if (opposing_pass.submitted) {
-			return;
-		}
-		if (opposing_pass.pass_idx < pass_idx && opposing_pass.pass_idx >= rg->beginning_pass_idx) {
+		if (opposing_pass.pass_idx < pass_idx) {
 			// Set current pass dependencies (Waiting pass)
 			if (wait_signals_img.find(tex.img) == wait_signals_img.end()) {
 				wait_signals_img[tex.img] = ImageSyncDescriptor{.old_layout = tex.layout,
@@ -90,23 +90,28 @@ void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout)
 																			 .image_aspect = tex.aspect_flags};
 			}
 			tex.layout = dst_layout;
-		} else {
+		} else if(tex.layout != dst_layout) {
+			// Means the opposing pass has already executed
 			layout_transitions.push_back({&tex, tex.layout, dst_layout});
 			tex.layout = dst_layout;
 		}
+	} else if(tex.layout != dst_layout) {
+		// Means the opposing pass has already executed
+		layout_transitions.push_back({&tex, tex.layout, dst_layout});
+		tex.layout = dst_layout;
 	}
 }
 
 void RenderPass::transition_resources() {
 	if (rg->settings.shader_inference) {
-		for (auto i = 0; i < bound_resources.size(); i++) {
-			auto& bound_resource = bound_resources[i];
+		for (auto i = 0; i < pipeline_storage->bound_resources.size(); i++) {
+			auto& bound_resource = pipeline_storage->bound_resources[i];
 			if (!bound_resource.active) {
 				if (bound_resource.tex) {
 					descriptor_infos[i] =
 						bound_resource.tex->descriptor(vk::get_image_layout(pipeline->descriptor_types[i]));
 				} else {
-					descriptor_infos[i] = bound_resources[i].get_descriptor_info();
+					descriptor_infos[i] = pipeline_storage->bound_resources[i].get_descriptor_info();
 				}
 				continue;
 			}
@@ -123,9 +128,9 @@ void RenderPass::transition_resources() {
 					read_impl(*bound_resource.tex);
 				}
 			}
-			descriptor_infos[i] = bound_resources[i].get_descriptor_info();
+			descriptor_infos[i] = pipeline_storage->bound_resources[i].get_descriptor_info();
 		}
-		for (auto [buffer, status] : affected_buffer_pointers) {
+		for (auto [buffer, status] : pipeline_storage->affected_buffer_pointers) {
 			if (status.write) {
 				write_impl(*buffer, VK_ACCESS_SHADER_WRITE_BIT);
 			} else if (status.read) {
@@ -145,8 +150,8 @@ void RenderPass::transition_resources() {
 		for (auto& tex : explicit_tex_writes) {
 			write_impl(*tex);
 		}
-		for (int i = 0; i < bound_resources.size(); i++) {
-			descriptor_infos[i] = bound_resources[i].get_descriptor_info();
+		for (int i = 0; i < pipeline_storage->bound_resources.size(); i++) {
+			descriptor_infos[i] = pipeline_storage->bound_resources[i].get_descriptor_info();
 		}
 	}
 	for (const Resource& resource : resource_zeros) {
@@ -175,89 +180,6 @@ void RenderPass::transition_resources() {
 	}
 }
 
-void RenderGraph::update_pass_indices(uint32_t num_encountered_inactive_passes,
-									  std::unordered_map<uint32_t, uint32_t> inactive_passes_map) {
-	std::unordered_map<uint32_t, uint32_t> modified_pass_idxs;	// Stores new offsets
-	std::unordered_set<uint32_t> passes_encountered;
-	std::unordered_map<uint32_t, std::vector<RenderPass>::iterator> duplicate_pass_idxs;
-	for (auto it = passes.begin() + beginning_pass_idx; it != passes.end();) {
-		if (!it->active && (it->pass_idx < ending_pass_idx)) {
-			bool is_duplicate = passes_encountered.find(it->pass_idx) != passes_encountered.end();
-			if (!is_duplicate) {
-				modified_pass_idxs[it->pass_idx] = INVALID_PASS_IDX;
-				it = passes.erase(it);
-			} else {
-				// Note: We assume that only 1 duplicate pass index can be formed
-				duplicate_pass_idxs[it->pass_idx] = it;
-				it++;
-			}
-		} else {
-			auto pass_it = inactive_passes_map.find(it->pass_idx);
-			uint32_t new_pass_idx = it->pass_idx;
-			if (pass_it != inactive_passes_map.end()) {
-				new_pass_idx -= pass_it->second;
-			} else if (it->pass_idx >= ending_pass_idx) {
-				new_pass_idx -= num_encountered_inactive_passes;
-			}
-			if (it->pass_idx != new_pass_idx) {
-				modified_pass_idxs[it->pass_idx] = new_pass_idx;
-				it->pass_idx = new_pass_idx;
-			}
-			passes_encountered.insert(it->pass_idx);
-			++it;
-		}
-	}
-
-	// Modify the pass indices in pipeline_cache
-	for (auto& [name, storage] : pipeline_cache) {
-		bool should_remove = false;
-		for (auto pass_it = storage.pass_idxs.begin(); pass_it != storage.pass_idxs.end();) {
-			if (auto duplicate_pass = duplicate_pass_idxs.find(*pass_it);
-				duplicate_pass != duplicate_pass_idxs.end() && duplicate_pass->second->name == name) {
-				pass_it = storage.pass_idxs.erase(pass_it);
-				continue;
-			}
-			if (auto it = modified_pass_idxs.find(*pass_it); it != modified_pass_idxs.end()) {
-				if (it->second == INVALID_PASS_IDX) {
-					pass_it = storage.pass_idxs.erase(pass_it);
-					continue;
-				} else {
-					*pass_it = it->second;
-				}
-			}
-			++pass_it;
-		}
-	}
-	// Modify the pass indices in registered resources
-	for (auto buffer_it = buffer_resource_map.begin(); buffer_it != buffer_resource_map.end();) {
-		if (auto it = modified_pass_idxs.find(buffer_it->second.first); it != modified_pass_idxs.end()) {
-			if (it->second == INVALID_PASS_IDX) {
-				buffer_it = buffer_resource_map.erase(buffer_it);
-				continue;
-			} else {
-				buffer_it->second.first = it->second;
-			}
-		}
-		++buffer_it;
-	}
-	for (auto img_it = img_resource_map.begin(); img_it != img_resource_map.end();) {
-		if (auto it = modified_pass_idxs.find(img_it->second); it != modified_pass_idxs.end()) {
-			if (it->second == INVALID_PASS_IDX) {
-				img_it = img_resource_map.erase(img_it);
-				continue;
-			} else {
-				img_it->second = it->second;
-			}
-		}
-		++img_it;
-	}
-
-	for (auto& [_, duplicate_pass] : duplicate_pass_idxs) {
-		passes.erase(duplicate_pass);
-	}
-	ending_pass_idx = ending_pass_idx - num_encountered_inactive_passes;
-}
-
 static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_shaders) {
 	// todo: make resource processing in order
 	auto process_bindless_resources = [pass](const Shader& shader) {
@@ -266,19 +188,19 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 		}
 		for (auto& [k, v] : shader.buffer_status_map) {
 			if (v.read) {
-				pass->affected_buffer_pointers[k].read = v.read;
+				pass->pipeline_storage->affected_buffer_pointers[k].read = v.read;
 			}
 			if (v.write) {
-				pass->affected_buffer_pointers[k].write = v.write;
+				pass->pipeline_storage->affected_buffer_pointers[k].write = v.write;
 			}
 		}
 	};
 	auto process_bindings = [pass](const Shader& shader) {
 		for (auto& [k, v] : shader.resource_binding_map) {
-			assert(k < pass->bound_resources.size());
-			pass->bound_resources[k].active = v.active;
-			pass->bound_resources[k].read = v.read;
-			pass->bound_resources[k].write = v.write;
+			assert(k < pass->pipeline_storage->bound_resources.size());
+			pass->pipeline_storage->bound_resources[k].active = v.active;
+			pass->pipeline_storage->bound_resources[k].read = v.read;
+			pass->pipeline_storage->bound_resources[k].write = v.write;
 		}
 	};
 	switch (pass->type) {
@@ -359,7 +281,7 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 					}
 				}
 				// shader->compile(pass);
-				pass->affected_buffer_pointers = shader->buffer_status_map;
+				pass->pipeline_storage->affected_buffer_pointers = shader->buffer_status_map;
 				process_bindings(*shader);
 			}
 		} break;
@@ -370,7 +292,7 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 
 RenderGraph::RenderGraph(VulkanContext* ctx) : ctx(ctx) { pipeline_tasks.reserve(32); }
 
-RenderPass& RenderGraph::current_pass() { return passes[ending_pass_idx - 1]; }
+RenderPass& RenderGraph::current_pass() { return passes[passes.size() - 1]; }
 
 RenderPass& RenderGraph::add_rt(const std::string& name, const RTPassSettings& settings) {
 	return add_pass_impl(name, settings);
@@ -385,11 +307,11 @@ RenderPass& RenderGraph::add_compute(const std::string& name, const ComputePassS
 }
 
 RenderPass& RenderPass::bind(const ResourceBinding& binding) {
-	if (next_binding_idx >= bound_resources.size()) {
-		bound_resources.push_back(binding);
+	if (next_binding_idx >= pipeline_storage->bound_resources.size()) {
+		pipeline_storage->bound_resources.push_back(binding);
 		descriptor_counts.push_back(1);
 	} else {
-		bound_resources[next_binding_idx].replace(binding);
+		pipeline_storage->bound_resources[next_binding_idx].replace(binding);
 	}
 	next_binding_idx++;
 	return *this;
@@ -403,48 +325,45 @@ RenderPass& RenderPass::bind(std::initializer_list<ResourceBinding> bindings) {
 }
 
 RenderPass& RenderPass::bind_texture_with_sampler(Texture2D& tex, VkSampler sampler) {
-	if (next_binding_idx >= bound_resources.size()) {
-		bound_resources.emplace_back(tex, sampler);
+	if (next_binding_idx >= pipeline_storage->bound_resources.size()) {
+		pipeline_storage->bound_resources.emplace_back(tex, sampler);
 		descriptor_counts.push_back(1);
 	} else {
-		bound_resources[next_binding_idx].replace(tex, sampler);
+		pipeline_storage->bound_resources[next_binding_idx].replace(tex, sampler);
 	}
 	next_binding_idx++;
 	return *this;
 }
 
 RenderPass& RenderPass::bind_texture_array(std::vector<Texture2D>& textures, bool force_update) {
-	DIRTY_CHECK(!cached_in_rendergraph || rg->recording || force_update);
-	if (next_binding_idx >= bound_resources.size()) {
+	if (next_binding_idx >= pipeline_storage->bound_resources.size()) {
 		for (auto& texture : textures) {
-			bound_resources.emplace_back(texture);
+			pipeline_storage->bound_resources.emplace_back(texture);
 		}
 		descriptor_counts.push_back((uint32_t)textures.size());
 	} else {
 		for (auto i = 0; i < textures.size(); i++) {
-			bound_resources[next_binding_idx + i].replace(textures[i]);
+			pipeline_storage->bound_resources[next_binding_idx + i].replace(textures[i]);
 		}
 	}
 	return *this;
 }
 
 RenderPass& RenderPass::bind_buffer_array(std::vector<Buffer>& buffers, bool force_update) {
-	DIRTY_CHECK(!cached_in_rendergraph || rg->recording || force_update);
-	if (next_binding_idx >= bound_resources.size()) {
+	if (next_binding_idx >= pipeline_storage->bound_resources.size()) {
 		for (auto& buffer : buffers) {
-			bound_resources.emplace_back(buffer);
+			pipeline_storage->bound_resources.emplace_back(buffer);
 		}
 		descriptor_counts.push_back((uint32_t)buffers.size());
 	} else {
 		for (auto i = 0; i < buffers.size(); i++) {
-			bound_resources[next_binding_idx + i].replace(buffers[i]);
+			pipeline_storage->bound_resources[next_binding_idx + i].replace(buffers[i]);
 		}
 	}
 	return *this;
 }
 
 RenderPass& RenderPass::bind_tlas(const AccelKHR& tlas) {
-	DIRTY_CHECK(!pipeline->handle || rg->recording || rg->reload_shaders);
 	pipeline->tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
 	pipeline->tlas_info.accelerationStructureCount = 1;
 	pipeline->tlas_info.pAccelerationStructures = &tlas.accel;
@@ -552,7 +471,6 @@ RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<Textur
 }
 
 RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
-	// TODO: Extend this if check upon extending this function
 	resource_copies.push_back({src, dst});
 	return *this;
 }
@@ -757,7 +675,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	}
 
 	// Push descriptors
-	if (bound_resources.size()) {
+	if (pipeline_storage->bound_resources.size()) {
 		vkCmdPushDescriptorSetWithTemplateKHR(cmd, pipeline->update_template, pipeline->pipeline_layout, 0,
 											  descriptor_infos);
 	}
@@ -961,8 +879,8 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	img_sync_resources.resize(passes.size());
 
 	// Compile shaders and process resources
-	const bool recording_or_reload = recording || reload_shaders;
-	if (!pass_idxs_with_shader_compilation_overrides.empty() || recording_or_reload) {
+	const bool recording_or_reload = dirty_pass_encountered || reload_shaders;
+	if (recording_or_reload) {
 		auto cmp = [](const std::pair<Shader*, RenderPass*>& a, const std::pair<Shader*, RenderPass*>& b) {
 			return a.first->name_with_macros < b.first->name_with_macros;
 		};
@@ -970,34 +888,25 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		std::unordered_map<RenderPass*, std::vector<Shader*>> unique_shaders;
 		std::unordered_map<RenderPass*, std::vector<Shader*>> existing_shaders;
 
-		auto process_pass = [&](uint32_t i) {
-			if (passes[i].gfx_settings) {
-				for (auto& shader : passes[i].gfx_settings->shaders) {
-					if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
-						existing_shaders[&passes[i]].push_back(&shader);
-					}
-				}
-			} else if (passes[i].rt_settings) {
-				for (auto& shader : passes[i].rt_settings->shaders) {
-					if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
-						existing_shaders[&passes[i]].push_back(&shader);
-					}
-				}
-			} else {
-				if (!unique_shaders_set.insert({&passes[i].compute_settings->shader, &passes[i]}).second) {
-					existing_shaders[&passes[i]].push_back(&passes[i].compute_settings->shader);
-				}
-			}
-		};
 		if (recording_or_reload) {
-			// Recording or reload -> The pass is active by default
-			for (auto i = beginning_pass_idx; i < ending_pass_idx; i++) {
-				process_pass(i);
-			}
-		} else {
-			// Iterate over overridden passes
-			for (auto i : pass_idxs_with_shader_compilation_overrides) {
-				process_pass(i);
+			for (auto i = 0; i < passes.size(); i++) {
+				if (passes[i].gfx_settings) {
+					for (auto& shader : passes[i].gfx_settings->shaders) {
+						if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
+							existing_shaders[&passes[i]].push_back(&shader);
+						}
+					}
+				} else if (passes[i].rt_settings) {
+					for (auto& shader : passes[i].rt_settings->shaders) {
+						if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
+							existing_shaders[&passes[i]].push_back(&shader);
+						}
+					}
+				} else {
+					if (!unique_shaders_set.insert({&passes[i].compute_settings->shader, &passes[i]}).second) {
+						existing_shaders[&passes[i]].push_back(&passes[i].compute_settings->shader);
+					}
+				}
 			}
 		}
 
@@ -1022,68 +931,8 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		}
 	}
 
-	if (!pass_idxs_with_shader_compilation_overrides.empty()) {
-		RenderPass* beginning_pass = &passes[beginning_pass_idx];
-		RenderPass* ending_pass = ending_pass_idx < passes.size() ? &passes[ending_pass_idx] : nullptr;
-		std::sort(passes.begin(), passes.end(),
-				  [](const RenderPass& pass1, const RenderPass& pass2) { return pass1.pass_idx < pass2.pass_idx; });
-		for (auto i = 0; i < passes.size(); i++) {
-			if (&passes[i] == beginning_pass) {
-				beginning_pass_idx = i;
-			}
-			if (ending_pass != nullptr && &passes[i] == ending_pass) {
-				ending_pass_idx = i;
-			}
-		}
-		// Remove duplicate passes
-		uint32_t prev_inactive_pass_idx = -1;
-		uint32_t num_erased_count = 0;
-		for (auto it = passes.begin() + beginning_pass_idx; it != passes.end();) {
-			if (!it->active) {
-				prev_inactive_pass_idx = it->pass_idx;
-			} else if (prev_inactive_pass_idx == it->pass_idx) {
-				auto prev_it = it - 1;
-				auto& storage = pipeline_cache[prev_it->name];
-				for (auto pass_it = storage.pass_idxs.begin(); pass_it != storage.pass_idxs.end();) {
-					if (*pass_it == prev_it->pass_idx) {
-						pass_it = storage.pass_idxs.erase(pass_it);
-					} else {
-						++pass_it;
-					}
-				}
-				it = passes.erase(prev_it);
-				num_erased_count++;
-			}
-			// Undo index modifications
-			if (it->index_changed_due_to_prior_insertion) {
-				it->pass_idx -= num_erased_count;
-				auto& storage = pipeline_cache[it->name];
-				for (uint32_t i = 0; i < storage.offset_idx; i++) {
-					storage.pass_idxs[i] = it->pass_idx;
-				}
-			}
-			++it;
-		}
-		update_pass_indices();
-		pass_idxs_with_shader_compilation_overrides.clear();
-	}
-
-	uint32_t rem_passes = ending_pass_idx - beginning_pass_idx;
-	uint32_t num_encountered_inactive_passes = 0;
-	uint32_t i = beginning_pass_idx;
-	std::unordered_map<uint32_t, uint32_t> inactive_passes_map;
-	while (rem_passes > 0) {
-		if (passes[i].active) {
-			if (num_encountered_inactive_passes > 0) {
-				inactive_passes_map[i] = num_encountered_inactive_passes;
-			}
-			passes[i].finalize();
-
-		} else if (passes[i].pass_idx >= beginning_pass_idx && passes[i].pass_idx < ending_pass_idx) {
-			++num_encountered_inactive_passes;
-		}
-		rem_passes--;
-		i++;
+	for (auto i = 0; i < passes.size(); i++) {
+		passes[i].finalize();
 	}
 
 	if (pipeline_tasks.size()) {
@@ -1102,87 +951,37 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		}
 		pipeline_tasks.clear();
 	}
-	i = beginning_pass_idx;
-	rem_passes = ending_pass_idx - beginning_pass_idx;
 
-	while (rem_passes > 0) {
-		rem_passes--;
-		if (!passes[i].active) {
-			i++;
-			continue;
-		}
+	for (auto i = 0; i < passes.size(); i++) {
 		buffer_sync_resources[i].buffer_bariers.resize(passes[i].wait_signals_buffer.size());
 		buffer_sync_resources[i].dependency_infos.resize(passes[i].wait_signals_buffer.size());
 		img_sync_resources[i].img_barriers.resize(passes[i].wait_signals_img.size());
 		img_sync_resources[i].dependency_infos.resize(passes[i].wait_signals_img.size());
 		passes[i].run(cmd);
-		i++;
-	}
-	if (num_encountered_inactive_passes > 0) {
-		update_pass_indices(num_encountered_inactive_passes, inactive_passes_map);
 	}
 }
 
 void RenderGraph::reset() {
-	pass_idxs_with_shader_compilation_overrides.clear();
 	event_pool.reset_events(ctx->device);
 
-	for (auto& [k, v] : pipeline_cache) {
-		v.offset_idx = 0;
-	}
-
-	for (int i = 0; i < passes.size(); i++) {
-		passes[i].set_signals_buffer.clear();
-		passes[i].wait_signals_buffer.clear();
-		passes[i].set_signals_img.clear();
-		passes[i].wait_signals_img.clear();
-		passes[i].layout_transitions.clear();
-		passes[i].resource_zeros.clear();
-		passes[i].resource_copies.clear();
-		passes[i].buffer_barriers.clear();
-		passes[i].post_execution_buffer_barriers.clear();
-		passes[i].disable_execution = false;
-		passes[i].active = false;
-		passes[i].cached_in_rendergraph = false;
-		passes[i].index_changed_due_to_prior_insertion = false;
-		passes[i].next_binding_idx = 0;
-		if (!settings.shader_inference) {
-			passes[i].explicit_buffer_reads.clear();
-			passes[i].explicit_buffer_writes.clear();
-			passes[i].explicit_tex_reads.clear();
-			passes[i].explicit_tex_writes.clear();
-		}
-		passes[i].record_override = false;
-		passes[i].submitted = false;
-	}
-
-	recording = false;
+	passes.clear();
 	if (pipeline_tasks.size()) {
 		pipeline_tasks.clear();
 	}
 	buffer_sync_resources.clear();
 	img_sync_resources.clear();
-	beginning_pass_idx = ending_pass_idx = 0;
 	reload_shaders = false;
 }
 
 void RenderGraph::submit(CommandBuffer& cmd) {
 	cmd.submit();
-	uint32_t i = beginning_pass_idx;
-	uint32_t rem_passes = ending_pass_idx - beginning_pass_idx;
-	while (rem_passes > 0) {
-		if (passes[i].active) {
-			passes[i].submitted = true;
-		}
-		rem_passes--;
-		i++;
-	}
-	beginning_pass_idx = ending_pass_idx;
+	passes.clear();
 }
 
 void RenderGraph::run_and_submit(CommandBuffer& cmd) {
 	run(cmd.handle);
 	submit(cmd);
+	dirty_pass_encountered = false;
 }
 
 void RenderGraph::destroy() {
@@ -1196,7 +995,6 @@ void RenderGraph::destroy() {
 	for (const auto& [k, v] : pipeline_cache) {
 		v.pipeline->cleanup();
 	}
-	recording = true;
 	buffer_resource_map.clear();
 	img_resource_map.clear();
 	registered_buffer_pointers.clear();
