@@ -113,6 +113,7 @@ vec3 sample_bsdf(vec3 n_s, vec3 wo, const Material mat, const uint mode, const b
 	return f;
 }
 
+// Consumes seed 3 times -> seed.w is increemented by 3
 vec3 sample_bsdf(vec3 n_s, vec3 wo, const Material mat, const uint mode, const bool forward_facing, out vec3 wi,
 				 out float pdf_w, out float cos_theta, inout uvec4 seed) {
 	vec3 rands = rand3(seed);

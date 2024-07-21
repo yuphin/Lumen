@@ -41,10 +41,10 @@ void RenderPass::register_dependencies(Buffer& buffer, VkAccessFlags dst_access_
 										 .dst_access_flags = dst_access_flags,
 										 .opposing_pass_idx = pass_idx};
 			}
-		} else if(src_access_flags != dst_access_flags) {
+		} else if (src_access_flags != dst_access_flags) {
 			buffer_barriers.push_back({buffer.handle, src_access_flags, dst_access_flags});
 		}
-	} else if(src_access_flags != dst_access_flags) {
+	} else if (src_access_flags != dst_access_flags) {
 		buffer_barriers.push_back({buffer.handle, src_access_flags, dst_access_flags});
 	}
 }
@@ -90,12 +90,12 @@ void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout)
 																			 .image_aspect = tex.aspect_flags};
 			}
 			tex.layout = dst_layout;
-		} else if(tex.layout != dst_layout) {
+		} else if (tex.layout != dst_layout) {
 			// Means the opposing pass has already executed
 			layout_transitions.push_back({&tex, tex.layout, dst_layout});
 			tex.layout = dst_layout;
 		}
-	} else if(tex.layout != dst_layout) {
+	} else if (tex.layout != dst_layout) {
 		// Means the opposing pass has already executed
 		layout_transitions.push_back({&tex, tex.layout, dst_layout});
 		tex.layout = dst_layout;
@@ -108,8 +108,8 @@ void RenderPass::transition_resources() {
 			auto& bound_resource = pipeline_storage->bound_resources[i];
 			if (!bound_resource.active) {
 				if (bound_resource.tex) {
-					descriptor_infos[i] =
-						bound_resource.tex->descriptor(vk::get_image_layout(pipeline->descriptor_types[i]));
+					descriptor_infos[i] = bound_resource.tex->descriptor(
+						vk::get_image_layout(pipeline_storage->pipeline->descriptor_types[i]));
 				} else {
 					descriptor_infos[i] = pipeline_storage->bound_resources[i].get_descriptor_info();
 				}
@@ -365,9 +365,9 @@ RenderPass& RenderPass::bind_buffer_array(std::vector<Buffer>& buffers, bool for
 }
 
 RenderPass& RenderPass::bind_tlas(const AccelKHR& tlas) {
-	pipeline->tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
-	pipeline->tlas_info.accelerationStructureCount = 1;
-	pipeline->tlas_info.pAccelerationStructures = &tlas.accel;
+	pipeline_storage->pipeline->tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
+	pipeline_storage->pipeline->tlas_info.accelerationStructureCount = 1;
+	pipeline_storage->pipeline->tlas_info.pAccelerationStructures = &tlas.accel;
 	return *this;
 }
 
@@ -477,16 +477,12 @@ RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 }
 
 void RenderPass::finalize() {
-	if (pipeline->handle) {
-		return;
-	}
-
 	// Create pipelines/push descriptor templates
 	if (!is_pipeline_cached) {
 		switch (type) {
 			case PassType::Graphics: {
 				auto func = [](RenderPass* pass) {
-					pass->pipeline->create_gfx_pipeline(*pass->gfx_settings, pass->descriptor_counts,
+					pass->pipeline_storage->pipeline->create_gfx_pipeline(*pass->gfx_settings, pass->descriptor_counts,
 														pass->gfx_settings->color_outputs,
 														pass->gfx_settings->depth_output);
 				};
@@ -499,25 +495,25 @@ void RenderPass::finalize() {
 			}
 			case PassType::RT: {
 				auto func = [](RenderPass* pass) {
-					pass->pipeline->create_rt_pipeline(*pass->rt_settings, pass->descriptor_counts);
+					pass->pipeline_storage->pipeline->create_rt_pipeline(*pass->rt_settings, pass->descriptor_counts);
 					// Create descriptor pool and sets
-					if (!pass->pipeline->tlas_descriptor_pool) {
+					if (!pass->pipeline_storage->pipeline->tlas_descriptor_pool) {
 						auto pool_size = vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1);
 						auto descriptor_pool_ci = vk::descriptor_pool(1, &pool_size, 1);
 
 						vk::check(vkCreateDescriptorPool(pass->rg->ctx->device, &descriptor_pool_ci, nullptr,
-														 &pass->pipeline->tlas_descriptor_pool),
+														 &pass->pipeline_storage->pipeline->tlas_descriptor_pool),
 								  "Failed to create descriptor pool");
 						VkDescriptorSetAllocateInfo set_allocate_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-						set_allocate_info.descriptorPool = pass->pipeline->tlas_descriptor_pool;
+						set_allocate_info.descriptorPool = pass->pipeline_storage->pipeline->tlas_descriptor_pool;
 						set_allocate_info.descriptorSetCount = 1;
-						set_allocate_info.pSetLayouts = &pass->pipeline->tlas_layout;
+						set_allocate_info.pSetLayouts = &pass->pipeline_storage->pipeline->tlas_layout;
 						vkAllocateDescriptorSets(pass->rg->ctx->device, &set_allocate_info,
-												 &pass->pipeline->tlas_descriptor_set);
+												 &pass->pipeline_storage->pipeline->tlas_descriptor_set);
 					}
-					auto descriptor_write = vk::write_descriptor_set(pass->pipeline->tlas_descriptor_set,
-																	 VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0,
-																	 &pass->pipeline->tlas_info);
+					auto descriptor_write = vk::write_descriptor_set(
+						pass->pipeline_storage->pipeline->tlas_descriptor_set,
+						VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0, &pass->pipeline_storage->pipeline->tlas_info);
 					vkUpdateDescriptorSets(pass->rg->ctx->device, 1, &descriptor_write, 0, nullptr);
 				};
 				if (rg->multithreaded_pipeline_compilation) {
@@ -529,7 +525,8 @@ void RenderPass::finalize() {
 			}
 			case PassType::Compute: {
 				auto func = [](RenderPass* pass) {
-					pass->pipeline->create_compute_pipeline(*pass->compute_settings, pass->descriptor_counts);
+					pass->pipeline_storage->pipeline->create_compute_pipeline(*pass->compute_settings,
+																			  pass->descriptor_counts);
 				};
 				if (rg->multithreaded_pipeline_compilation) {
 					rg->pipeline_tasks.push_back({func, pass_idx});
@@ -541,8 +538,6 @@ void RenderPass::finalize() {
 			default:
 				break;
 		}
-	} else {
-		rg->pipeline_tasks.push_back({nullptr, pass_idx});
 	}
 }
 
@@ -672,40 +667,41 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 	// Push descriptors
 	if (pipeline_storage->bound_resources.size()) {
-		vkCmdPushDescriptorSetWithTemplateKHR(cmd, pipeline->update_template, pipeline->pipeline_layout, 0,
-											  descriptor_infos);
+		vkCmdPushDescriptorSetWithTemplateKHR(cmd, pipeline_storage->pipeline->update_template,
+											  pipeline_storage->pipeline->pipeline_layout, 0, descriptor_infos);
 	}
 	// Push constants
-	if (pipeline->push_constant_size) {
-		vkCmdPushConstants(cmd, pipeline->pipeline_layout, pipeline->pc_stages, 0, pipeline->push_constant_size,
-						   push_constant_data);
+	if (pipeline_storage->pipeline->push_constant_size) {
+		vkCmdPushConstants(cmd, pipeline_storage->pipeline->pipeline_layout, pipeline_storage->pipeline->pc_stages, 0,
+						   pipeline_storage->pipeline->push_constant_size, push_constant_data);
 	}
 	// Run
 	if (!disable_execution) {
 		switch (type) {
 			case PassType::RT: {
-				LUMEN_ASSERT(pipeline->tlas_descriptor_set, "TLAS descriptor set cannot be NULL!");
+				LUMEN_ASSERT(pipeline_storage->pipeline->tlas_descriptor_set, "TLAS descriptor set cannot be NULL!");
 				// This doesnt work because we can't push TLAS descriptor with
 				// template...
 				// vkCmdPushDescriptorSetWithTemplateKHR(cmd,
 				// pipeline->rt_update_template, pipeline->pipeline_layout, 0,
 				// &tlas_buffer.descriptor);
-				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->pipeline_layout, 1, 1,
-										&pipeline->tlas_descriptor_set, 0, nullptr);
+				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+										pipeline_storage->pipeline->pipeline_layout, 1, 1,
+										&pipeline_storage->pipeline->tlas_descriptor_set, 0, nullptr);
 
-				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->handle);
+				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline_storage->pipeline->handle);
 
 				if (rt_settings->pass_func) {
 					rt_settings->pass_func(cmd, *this);
 				} else {
-					auto& regions = pipeline->get_rt_regions();
+					auto& regions = pipeline_storage->pipeline->get_rt_regions();
 					auto& dims = rt_settings->dims;
 					vkCmdTraceRaysKHR(cmd, &regions[0], &regions[1], &regions[2], &regions[3], dims.x, dims.y, dims.z);
 				}
 				break;
 			}
 			case PassType::Compute: {
-				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->handle);
+				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_storage->pipeline->handle);
 
 				if (compute_settings->pass_func) {
 					compute_settings->pass_func(cmd, *this);
@@ -718,7 +714,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			case PassType::Graphics: {
 				auto& color_outputs = gfx_settings->color_outputs;
 				auto& depth_output = gfx_settings->depth_output;
-				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->handle);
+				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_storage->pipeline->handle);
 
 				auto& width = gfx_settings->width;
 				auto& height = gfx_settings->height;

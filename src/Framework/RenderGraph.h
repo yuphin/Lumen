@@ -3,6 +3,7 @@
 #include "../LumenPCH.h"
 #include "CommandBuffer.h"
 #include "Framework/RenderGraphTypes.h"
+#include "Framework/VulkanStructs.h"
 #include "Pipeline.h"
 #include "Shader.h"
 #include "Texture.h"
@@ -105,10 +106,10 @@ class RenderGraph {
 
 class RenderPass {
    public:
-	RenderPass(PassType type, Pipeline* pipeline, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
-			   const GraphicsPassSettings& gfx_settings, const std::string& macro_string, PipelineStorage* pipeline_storage, bool cached = false)
+	RenderPass(PassType type, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
+			   const GraphicsPassSettings& gfx_settings, const std::string& macro_string,
+			   PipelineStorage* pipeline_storage, bool cached = false)
 		: type(type),
-		  pipeline(pipeline),
 		  name(name),
 		  rg(rg),
 		  pass_idx(pass_idx),
@@ -121,10 +122,10 @@ class RenderPass {
 		}
 	}
 
-	RenderPass(PassType type, Pipeline* pipeline, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
-			   const RTPassSettings& rt_settings, const std::string& macro_string, PipelineStorage* pipeline_storage, bool cached = false)
+	RenderPass(PassType type, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
+			   const RTPassSettings& rt_settings, const std::string& macro_string, PipelineStorage* pipeline_storage,
+			   bool cached = false)
 		: type(type),
-		  pipeline(pipeline),
 		  name(name),
 		  rg(rg),
 		  pass_idx(pass_idx),
@@ -137,10 +138,10 @@ class RenderPass {
 		}
 	}
 
-	RenderPass(PassType type, Pipeline* pipeline, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
-			   const ComputePassSettings& compute_settings, const std::string& macro_string, PipelineStorage* pipeline_storage, bool cached = false)
+	RenderPass(PassType type, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
+			   const ComputePassSettings& compute_settings, const std::string& macro_string,
+			   PipelineStorage* pipeline_storage, bool cached = false)
 		: type(type),
-		  pipeline(pipeline),
 		  name(name),
 		  rg(rg),
 		  pass_idx(pass_idx),
@@ -209,7 +210,6 @@ class RenderPass {
 	void transition_resources();
 
 	std::string name;
-	Pipeline* pipeline;
 	int next_binding_idx = 0;
 	std::vector<uint32_t> descriptor_counts;
 	void* push_constant_data = nullptr;
@@ -245,7 +245,6 @@ class RenderPass {
 
 template <typename Settings>
 inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Settings& settings) {
-	Pipeline* pipeline;
 	PipelineStorage* pipeline_storage;
 	bool cached = false;
 
@@ -292,15 +291,17 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 		detail::hash_combine(hash, spec_data);
 	}
 
-	if (auto cache_it = pipeline_cache.find(hash); cache_it != pipeline_cache.end()) {
-		pipeline = cache_it->second.pipeline.get();
+	if (auto cache_it = pipeline_cache.find(hash); cache_it != pipeline_cache.end() && !reload_shaders) {
 		pipeline_storage = &cache_it->second;
 		cached = true;
 	} else {
-		auto res = pipeline_cache.insert({hash, PipelineStorage(std::make_unique<Pipeline>(ctx, name_with_macros))});
-		pipeline = res.first->second.pipeline.get();
-		pipeline_storage = &res.first->second;
 		dirty_pass_encountered = true;
+		if (cache_it != pipeline_cache.end()) {
+			vkDeviceWaitIdle(ctx->device);
+			cache_it->second.pipeline->cleanup();
+		}
+		pipeline_cache[hash] = PipelineStorage(std::make_unique<Pipeline>(ctx, name_with_macros));
+		pipeline_storage = &pipeline_cache[hash];
 	}
 	PassType type;
 	if constexpr (std::is_same_v<ComputePassSettings, Settings>) {
@@ -310,7 +311,8 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	} else {
 		type = PassType::RT;
 	}
-	return passes.emplace_back(type, pipeline, name_with_macros, this, passes.size(), settings, macro_string, pipeline_storage, cached);
+	return passes.emplace_back(type, name_with_macros, this, passes.size(), settings, macro_string, pipeline_storage,
+							   cached);
 }
 
 template <typename T>

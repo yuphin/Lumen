@@ -412,8 +412,6 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 				reservoir_contribution *= light.L * mis_weight / (light_pick_pdf * pdf_light_w);
 				LOG_CLICKED2("NEE: %d - %d\n", prefix_depth, (data.path_flags) >> 16);
 			} else {
-				ASSERT(rc_type != RECONNECTION_TYPE_NEE);
-
 				float g = abs(dot(dst_postfix_wi, rc_gbuffer.n_s)) / wi_len_sqr;
 
 				ASSERT(rc_type == RECONNECTION_TYPE_DEFAULT || rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC);

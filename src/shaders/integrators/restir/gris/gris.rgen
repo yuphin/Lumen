@@ -36,7 +36,6 @@ void main() {
 	vec3 throughput = vec3(1);
 	vec3 direct_lighting = vec3(0);
 	float bsdf_pdf_val = 1;
-	int depth;
 
 	// GRIS variables
 	bool connectable_vertex_found = false;
@@ -69,9 +68,7 @@ void main() {
 	// Record initial seed after direct light sampling
 	ASSERT(sampling_seed.w == 0);
 
-	bool debug_bool = false;
-
-	for (depth = 0;; depth++) {
+	for (int depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.instance_idx != -1;
 
@@ -119,9 +116,6 @@ void main() {
 
 		bool far_constaint_satisfied =
 			length(gbuffer.pos - origin.xyz) > pc.min_vertex_distance_ratio * pc.scene_extent;
-		if (!far_constaint_satisfied) {
-			debug_bool = true;
-		}
 		bool constraints_satisfied = curr_rough && far_constaint_satisfied;
 
 		if (connectable_vertex_found) {
@@ -147,7 +141,7 @@ void main() {
 			prefix_depth = depth - 1;
 			// Seed is not relevant here
 			reconnection_data.rc_seed = -1;
-			// Partially fill in the contribution data
+			// Partially fill in the contribution data (For STREAMING_MODE_SPLIT)
 			reconnection_data.reservoir_contribution = throughput;
 			vec3 to_prev = origin.xyz - gbuffer.pos;
 			reconnection_data.rc_partial_jacobian = abs(dot(n_s, wo)) * rc_partial_jacobian / dot(to_prev, to_prev);
