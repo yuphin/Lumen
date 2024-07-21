@@ -72,11 +72,11 @@ void VCM::init() {
 					  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, sizeof(AvgStruct));
 
 	SceneDesc desc;
-	desc.index_addr = index_buffer.get_device_address();
+	desc.index_addr = lumen_scene->index_buffer.get_device_address();
 
-	desc.material_addr = materials_buffer.get_device_address();
-	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
-	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer.get_device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer.get_device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer.get_device_address();
 	// VCM
 	desc.photon_addr = photon_buffer.get_device_address();
 	desc.vcm_vertices_addr = vcm_light_vertices_buffer.get_device_address();
@@ -90,7 +90,7 @@ void VCM::init() {
 	desc.angle_struct_addr = angle_struct_buffer.get_device_address();
 	desc.avg_addr = avg_buffer.get_device_address();
 
-	scene_desc_buffer.create(&instance->vkb.ctx,
+	lumen_scene->scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 	pc_ray.total_light_area = 0;
@@ -101,7 +101,7 @@ void VCM::init() {
 	pc_ray.size_y = instance->height;
 
 	assert(instance->vkb.rg->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, &photon_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_vertices_addr, &vcm_light_vertices_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, path_cnt_addr, &light_path_cnt_buffer, instance->vkb.rg);
@@ -117,7 +117,7 @@ void VCM::init() {
 void VCM::render() {
 	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	const float ppm_base_radius = 0.25f;
-	pc_ray.num_lights = int(lights.size());
+	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;
@@ -132,11 +132,11 @@ void VCM::render() {
 	pc_ray.do_spatiotemporal = do_spatiotemporal;
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.max_angle_samples = max_samples;
-	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	const std::initializer_list<lumen::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
-		scene_desc_buffer,
+		lumen_scene->scene_desc_buffer,
 	};
 	const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
 	const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
@@ -149,7 +149,7 @@ void VCM::render() {
 						  {.shader = lumen::Shader("src/shaders/integrators/vcm/init_reservoirs.comp"),
 						   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 			.push_constants(&pc_ray)
-			.bind(scene_desc_buffer)
+			.bind(lumen_scene->scene_desc_buffer)
 			.zero(photon_buffer, config->enable_vm);
 
 	if (!do_spatiotemporal) {
@@ -171,8 +171,8 @@ void VCM::render() {
 				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
-		.bind(mesh_lights_buffer)
-		.bind_texture_array(scene_textures)
+		.bind(lumen_scene->mesh_lights_buffer)
+		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 
 	// Check resampling
@@ -181,7 +181,7 @@ void VCM::render() {
 					  {.shader = lumen::Shader("src/shaders/integrators/vcm/check_reservoirs.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
-		.bind(scene_desc_buffer)
+		.bind(lumen_scene->scene_desc_buffer)
 		.zero(should_resample_buffer);
 	pc_ray.random_num = rand() % UINT_MAX;
 	// Spawn light rays
@@ -198,8 +198,8 @@ void VCM::render() {
 		.push_constants(&pc_ray)
 		.zero(light_state_buffer)
 		.bind(rt_bindings)
-		.bind(mesh_lights_buffer)
-		.bind_texture_array(scene_textures)
+		.bind(lumen_scene->mesh_lights_buffer)
+		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	pc_ray.random_num = rand() % UINT_MAX;
 	// Trace spawned rays
@@ -215,15 +215,15 @@ void VCM::render() {
 				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
-		.bind(mesh_lights_buffer)
-		.bind_texture_array(scene_textures)
+		.bind(lumen_scene->mesh_lights_buffer)
+		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	// Select a reservoir sample
 	instance->vkb.rg
 		->add_compute("Select Reservoir",
 					  {.shader = lumen::Shader("src/shaders/integrators/vcm/select_reservoirs.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
-		.bind(scene_desc_buffer)
+		.bind(lumen_scene->scene_desc_buffer)
 		.push_constants(&pc_ray);
 
 	// Update temporal reservoirs with the selected sample
@@ -231,7 +231,7 @@ void VCM::render() {
 		->add_compute("Update Reservoirs",
 					  {.shader = lumen::Shader("src/shaders/integrators/vcm/update_reservoirs.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
-		.bind(scene_desc_buffer)
+		.bind(lumen_scene->scene_desc_buffer)
 		.push_constants(&pc_ray);
 	// Trace rays from eye
 	instance->vkb.rg
@@ -246,8 +246,8 @@ void VCM::render() {
 				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
-		.bind(mesh_lights_buffer)
-		.bind_texture_array(scene_textures)
+		.bind(lumen_scene->mesh_lights_buffer)
+		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 
 	if (!do_spatiotemporal) {

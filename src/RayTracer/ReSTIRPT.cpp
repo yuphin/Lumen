@@ -62,18 +62,18 @@ void ReSTIRPT::init() {
 								  transformations.data(), true);
 
 	SceneDesc desc;
-	desc.index_addr = index_buffer.get_device_address();
+	desc.index_addr = lumen_scene->index_buffer.get_device_address();
 
-	desc.material_addr = materials_buffer.get_device_address();
-	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
-	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
-	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer.get_device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer.get_device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer.get_device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer.get_device_address();
 	// ReSTIR PT (GRIS)
 	desc.transformations_addr = transformations_buffer.get_device_address();
 	desc.gris_direct_lighting_addr = direct_lighting_buffer.get_device_address();
 	desc.prefix_contributions_addr = prefix_contribution_buffer.get_device_address();
 	desc.debug_vis_addr = debug_vis_buffer.get_device_address();
-	scene_desc_buffer.create(&instance->vkb.ctx,
+	lumen_scene->scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
@@ -86,10 +86,10 @@ void ReSTIRPT::init() {
 	pc_ray.size_y = instance->height;
 	pc_ray.buffer_idx = 0;
 	assert(instance->vkb.rg->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, &gris_reservoir_ping_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, &direct_lighting_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, &compact_vertices_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, &lumen_scene->compact_vertices_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, debug_vis_addr, &debug_vis_buffer, instance->vkb.rg);
 
 	path_length = config->path_length;
@@ -97,15 +97,15 @@ void ReSTIRPT::init() {
 
 void ReSTIRPT::render() {
 	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true);
-	pc_ray.num_lights = (int)lights.size();
+	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
 	pc_ray.prev_random_num = pc_ray.general_seed;
 	pc_ray.sampling_seed = rand() % UINT_MAX;
 	pc_ray.seed2 = rand() % UINT_MAX;
 	pc_ray.seed3 = rand() % UINT_MAX;
 	pc_ray.max_depth = path_length;
 	pc_ray.sky_col = config->sky_col;
-	pc_ray.total_light_area = total_light_area;
-	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	pc_ray.total_light_area = lumen_scene->total_light_area;
+	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.dir_light_idx = lumen_scene->dir_light_idx;
 	pc_ray.enable_accumulation = enable_accumulation;
 	pc_ray.num_spatial_samples = num_spatial_samples;
@@ -127,7 +127,7 @@ void ReSTIRPT::render() {
 	pc_ray.enable_occlusion = enable_occlusion;
 
 	const std::initializer_list<lumen::ResourceBinding> common_bindings = {output_tex, scene_ubo_buffer,
-																		   scene_desc_buffer, mesh_lights_buffer};
+																		   lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer};
 
 	const std::array<lumen::Buffer*, 2> reservoir_buffers = {&gris_reservoir_ping_buffer, &gris_reservoir_pong_buffer};
 	const std::array<lumen::Buffer*, 2> gbuffers = {&gris_prev_gbuffer, &gris_gbuffer};
@@ -156,7 +156,7 @@ void ReSTIRPT::render() {
 		.bind(common_bindings)
 		.bind(*reservoir_buffers[WRITE_OR_CURR_IDX])
 		.bind(*gbuffers[pong])
-		.bind_texture_array(scene_textures)
+		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	pc_ray.general_seed = rand() % UINT_MAX;
 	if (enable_gris) {
@@ -178,7 +178,7 @@ void ReSTIRPT::render() {
 			.bind(*reservoir_buffers[READ_OR_PREV_IDX])
 			.bind(*gbuffers[pong])
 			.bind(*gbuffers[ping])
-			.bind_texture_array(scene_textures)
+			.bind_texture_array(lumen_scene->scene_textures)
 			.bind_tlas(instance->vkb.tlas)
 			.skip_execution(!should_do_temporal);
 		pc_ray.seed2 = rand() % UINT_MAX;
@@ -199,7 +199,7 @@ void ReSTIRPT::render() {
 					.bind(*reservoir_buffers[WRITE_OR_CURR_IDX])
 					.bind(*reservoir_buffers[READ_OR_PREV_IDX])
 					.bind(*gbuffers[pong])
-					.bind_texture_array(scene_textures)
+					.bind_texture_array(lumen_scene->scene_textures)
 					.bind_tlas(instance->vkb.tlas);
 			} else {
 				// Retrace
@@ -218,7 +218,7 @@ void ReSTIRPT::render() {
 					.bind(reconnection_buffer)
 					.bind(*reservoir_buffers[WRITE_OR_CURR_IDX])
 					.bind(*gbuffers[pong])
-					.bind_texture_array(scene_textures)
+					.bind_texture_array(lumen_scene->scene_textures)
 					.bind_tlas(instance->vkb.tlas);
 				// Validate
 				instance->vkb.rg
@@ -236,7 +236,7 @@ void ReSTIRPT::render() {
 					.bind(reconnection_buffer)
 					.bind(*reservoir_buffers[WRITE_OR_CURR_IDX])
 					.bind(*gbuffers[pong])
-					.bind_texture_array(scene_textures)
+					.bind_texture_array(lumen_scene->scene_textures)
 					.bind_tlas(instance->vkb.tlas);
 
 				// Spatial Reuse
@@ -258,7 +258,7 @@ void ReSTIRPT::render() {
 					.bind(*reservoir_buffers[WRITE_OR_CURR_IDX])
 					.bind(*reservoir_buffers[READ_OR_PREV_IDX])
 					.bind(*gbuffers[pong])
-					.bind_texture_array(scene_textures)
+					.bind_texture_array(lumen_scene->scene_textures)
 					.bind_tlas(instance->vkb.tlas);
 			}
 			if (pixel_debug || (gris_separator < 1.0f && gris_separator > 0.0f)) {
@@ -268,7 +268,7 @@ void ReSTIRPT::render() {
 								  {.shader = lumen::Shader("src/shaders/integrators/restir/gris/debug_vis.comp"),
 								   .dims = {num_wgs}})
 					.push_constants(&pc_ray)
-					.bind({output_tex, scene_ubo_buffer, scene_desc_buffer});
+					.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer});
 			}
 		}
 	}

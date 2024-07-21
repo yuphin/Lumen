@@ -34,6 +34,8 @@ class RayTracer : public lumen::LumenInstance {
 	void render_debug_utils();
 	void create_integrator(int integrator_idx);
 	bool gui();
+	void create_blas();
+	void create_tlas();
 	bool initialized = false;
 	bool rt_initialized = false;
 	float cpu_avg_time = 0;

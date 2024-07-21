@@ -102,23 +102,23 @@ void DDGI::init() {
 								sizeof(vec4) * num_probes);
 
 	SceneDesc desc;
-	desc.index_addr = index_buffer.get_device_address();
+	desc.index_addr = lumen_scene->index_buffer.get_device_address();
 
-	desc.material_addr = materials_buffer.get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer.get_device_address();
 	// DDGI
-	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
-	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer.get_device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer.get_device_address();
 	desc.direct_lighting_addr = direct_lighting_buffer.get_device_address();
 	desc.probe_offsets_addr = probe_offsets_buffer.get_device_address();
 	desc.g_buffer_addr = g_buffer.get_device_address();
 
 	assert(instance->vkb.rg->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, direct_lighting_addr, &direct_lighting_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, probe_offsets_addr, &probe_offsets_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, &g_buffer, instance->vkb.rg);
 
-	scene_desc_buffer.create(
+	lumen_scene->scene_desc_buffer.create(
 		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
@@ -136,8 +136,8 @@ void DDGI::render() {
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;
 	pc_ray.first_frame = first_frame;
-	pc_ray.total_light_area = total_light_area;
-	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	pc_ray.total_light_area = lumen_scene->total_light_area;
+	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.frame_num = frame_num;
 	bool ping_pong = bool(frame_idx % 2);  // ping_pong true = read
 	// Generate random orientation for probes
@@ -152,7 +152,7 @@ void DDGI::render() {
 	const std::initializer_list<lumen::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
-		scene_desc_buffer,
+		lumen_scene->scene_desc_buffer,
 	};
 	// Trace Primary rays and fill G buffer
 	instance->vkb.rg
@@ -169,8 +169,8 @@ void DDGI::render() {
 		.push_constants(&pc_ray)
 		.zero(g_buffer)
 		.bind(rt_bindings)
-		.bind(mesh_lights_buffer)
-		.bind_texture_array(scene_textures)
+		.bind(lumen_scene->mesh_lights_buffer)
+		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	// Trace rays from probes
 	uint32_t grid_size = probe_counts.x * probe_counts.y * probe_counts.z;
@@ -187,8 +187,8 @@ void DDGI::render() {
 				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
-		.bind({mesh_lights_buffer, ddgi_ubo_buffer, rt.radiance_tex, rt.dir_depth_tex})
-		.bind_texture_array(scene_textures)
+		.bind({lumen_scene->mesh_lights_buffer, ddgi_ubo_buffer, rt.radiance_tex, rt.dir_depth_tex})
+		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	// Classify
 	uint32_t wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 31) / 32;
@@ -196,7 +196,7 @@ void DDGI::render() {
 		->add_compute("Classify Probes",
 					  {.shader = lumen::Shader("src/shaders/integrators/ddgi/classify.comp"), .dims = {wg_x}})
 		.push_constants(&pc_ray)
-		.bind({scene_ubo_buffer, scene_desc_buffer, ddgi_ubo_buffer, rt.radiance_tex, rt.dir_depth_tex});
+		.bind({scene_ubo_buffer, lumen_scene->scene_desc_buffer, ddgi_ubo_buffer, rt.radiance_tex, rt.dir_depth_tex});
 	// Update probes & borders
 	{
 		// Probes
@@ -209,7 +209,7 @@ void DDGI::render() {
 													   : "src/shaders/integrators/ddgi/update_depth.comp"),
 							   .dims = {wg_x, wg_y}})
 				.push_constants(&pc_ray)
-				.bind({scene_desc_buffer, irr_texes[!ping_pong], depth_texes[!ping_pong], irr_texes[ping_pong],
+				.bind({lumen_scene->scene_desc_buffer, irr_texes[!ping_pong], depth_texes[!ping_pong], irr_texes[ping_pong],
 					   depth_texes[ping_pong], ddgi_ubo_buffer, rt.radiance_tex, rt.dir_depth_tex});
 		};
 		update_probe(true);
@@ -230,7 +230,7 @@ void DDGI::render() {
 		->add_compute("Sample Probes",
 					  {.shader = lumen::Shader("src/shaders/integrators/ddgi/sample.comp"), .dims = {wg_x, wg_y}})
 		.push_constants(&pc_ray)
-		.bind({scene_ubo_buffer, scene_desc_buffer, output.tex, irr_texes[ping_pong], depth_texes[ping_pong],
+		.bind({scene_ubo_buffer, lumen_scene->scene_desc_buffer, output.tex, irr_texes[ping_pong], depth_texes[ping_pong],
 			   ddgi_ubo_buffer});
 	// Relocate
 	if (total_frame_idx < 5) {
@@ -239,7 +239,7 @@ void DDGI::render() {
 		instance->vkb.rg
 			->add_compute("Relocate", {.shader = lumen::Shader("src/shaders/integrators/ddgi/relocate.comp"), .dims = {wg_x}})
 			.push_constants(&pc_ray)
-			.bind({scene_ubo_buffer, scene_desc_buffer, ddgi_ubo_buffer, rt.dir_depth_tex});
+			.bind({scene_ubo_buffer, lumen_scene->scene_desc_buffer, ddgi_ubo_buffer, rt.dir_depth_tex});
 	}
 	// Output
 	wg_x = (instance->width + 31) / 32;
@@ -247,7 +247,7 @@ void DDGI::render() {
 	instance->vkb.rg
 		->add_compute("DDGI Output", {.shader = lumen::Shader("src/shaders/integrators/ddgi/out.comp"), .dims = {wg_x, wg_y}})
 		.push_constants(&pc_ray)
-		.bind({output_tex, scene_ubo_buffer, scene_desc_buffer, output.tex});
+		.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, output.tex});
 	frame_idx++;
 	total_frame_idx++;
 	first_frame = false;

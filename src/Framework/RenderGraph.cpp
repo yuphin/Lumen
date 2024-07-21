@@ -130,7 +130,8 @@ void RenderPass::transition_resources() {
 			}
 			descriptor_infos[i] = pipeline_storage->bound_resources[i].get_descriptor_info();
 		}
-		for (auto [buffer, status] : pipeline_storage->affected_buffer_pointers) {
+		for (const auto& [buffer_str, status] : pipeline_storage->affected_buffer_pointers) {
+			auto buffer = rg->registered_buffer_pointers[buffer_str];
 			if (status.write) {
 				write_impl(*buffer, VK_ACCESS_SHADER_WRITE_BIT);
 			} else if (status.read) {
@@ -477,8 +478,6 @@ RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 
 void RenderPass::finalize() {
 	if (pipeline->handle) {
-		// Handle resource transitions
-		transition_resources();
 		return;
 	}
 
@@ -541,9 +540,6 @@ void RenderPass::finalize() {
 			}
 			default:
 				break;
-		}
-		if (!rg->multithreaded_pipeline_compilation) {
-			transition_resources();
 		}
 	} else {
 		rg->pipeline_tasks.push_back({nullptr, pass_idx});
@@ -946,10 +942,14 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		for (auto& future : futures) {
 			future.wait();
 		}
-		for (auto& [_, idx] : pipeline_tasks) {
-			passes[idx].transition_resources();
-		}
+		// for (auto& [_, idx] : pipeline_tasks) {
+		// 	passes[idx].transition_resources();
+		// }
 		pipeline_tasks.clear();
+	}
+
+	for (auto i = 0; i < passes.size(); i++) {
+		passes[i].transition_resources();
 	}
 
 	for (auto i = 0; i < passes.size(); i++) {

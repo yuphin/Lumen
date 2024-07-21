@@ -13,7 +13,7 @@ RayTracer* RayTracer::instance = nullptr;
 bool load_reference = false;
 bool calc_rmse = false;
 
-RayTracer::RayTracer(int width, int height, bool debug, int argc, char* argv[]) : LumenInstance(width, height, debug) {
+RayTracer::RayTracer(int width, int height, bool debug, int argc, char* argv[]) : LumenInstance(width, height, debug), scene(this) {
 	this->instance = this;
 	parse_args(argc, argv);
 }
@@ -67,7 +67,6 @@ void RayTracer::init(Window* window) {
 	vkb.init_imgui();
 	initialized = true;
 
-	scene.load_scene(scene_name);
 
 	// Enable shader reflections for the render graph
 	vkb.rg->settings.shader_inference = enable_shader_inference;
@@ -76,6 +75,7 @@ void RayTracer::init(Window* window) {
 	// so this is turned off and pipeline barriers are used instead
 	vkb.rg->settings.use_events = use_events;
 
+	scene.load_scene(scene_name);
 	create_integrator(int(scene.config->integrator_type));
 	integrator->init();
 	post_fx.init(*instance);
@@ -141,6 +141,9 @@ void RayTracer::init_resources() {
 	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, &rmse_val_buffer, instance->vkb.rg);
+
+	create_blas();
+	create_tlas();
 }
 
 void RayTracer::cleanup_resources() {
@@ -278,10 +281,10 @@ bool RayTracer::gui() {
 	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
 	if (show_cam_stats) {
 		ImGui::PushItemWidth(170);
-		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[0]), 0.05f);
-		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[1]), 0.05f);
-		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[2]), 0.05f);
-		ImGui::DragFloat4("", glm::value_ptr(integrator->camera->camera[3]), 0.05f);
+		ImGui::DragFloat4("", glm::value_ptr(scene.camera->camera[0]), 0.05f);
+		ImGui::DragFloat4("", glm::value_ptr(scene.camera->camera[1]), 0.05f);
+		ImGui::DragFloat4("", glm::value_ptr(scene.camera->camera[2]), 0.05f);
+		ImGui::DragFloat4("", glm::value_ptr(scene.camera->camera[3]), 0.05f);
 	}
 	if (ImGui::Button("Reload shaders (F5)")) {
 		vkb.rg->reload_shaders = true;
@@ -326,8 +329,6 @@ bool RayTracer::gui() {
 		updated = true;
 		vkDeviceWaitIdle(vkb.ctx.device);
 		integrator->destroy();
-		vkb.cleanup_app_data();
-		post_fx.destroy();
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, &output_img_buffer, instance->vkb.rg);
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
@@ -345,13 +346,40 @@ bool RayTracer::gui() {
 		scene.config->cam_settings = prev_cam_settings;
 
 		scene.config->sky_col = prev_sky_col;
-
 		create_integrator(curr_integrator_idx);
 		integrator->init();
-		post_fx.init(*instance);
 	}
 
 	return updated;
+}
+
+void RayTracer::create_blas() {
+	std::vector<lumen::BlasInput> blas_inputs;
+	auto vertex_address = scene.vertex_buffer.get_device_address();
+	auto idx_address = scene.index_buffer.get_device_address();
+	for (auto& prim_mesh : scene.prim_meshes) {
+		lumen::BlasInput geo = lumen::vk::to_vk_geometry(prim_mesh, vertex_address, idx_address);
+		blas_inputs.push_back({geo});
+	}
+	instance->vkb.build_blas(blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+}
+
+void RayTracer::create_tlas() {
+	std::vector<VkAccelerationStructureInstanceKHR> tlas;
+	
+	const auto& indices = scene.indices;
+	const auto& vertices = scene.positions;
+	for (const auto& pm : scene.prim_meshes) {
+		VkAccelerationStructureInstanceKHR ray_inst{};
+		ray_inst.transform = lumen::vk::to_vk_matrix(pm.world_matrix);
+		ray_inst.instanceCustomIndex = pm.prim_idx;
+		ray_inst.accelerationStructureReference = instance->vkb.get_blas_device_address(pm.prim_idx);
+		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+		ray_inst.mask = 0xFF;
+		ray_inst.instanceShaderBindingTableRecordOffset = 0;  // We will use the same hit group for all objects
+		tlas.emplace_back(ray_inst);
+	}
+	instance->vkb.build_tlas(tlas, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 float RayTracer::draw_frame() {
@@ -445,6 +473,7 @@ void RayTracer::cleanup() {
 		cleanup_resources();
 		integrator->destroy();
 		post_fx.destroy();
+		scene.destroy();
 		vkb.destroy_imgui();
 		vkb.cleanup();
 	}

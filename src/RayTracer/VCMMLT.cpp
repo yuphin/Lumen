@@ -134,11 +134,11 @@ void VCMMLT::init() {
 	} while (arr_size > 1);
 
 	SceneDesc desc;
-	desc.index_addr = index_buffer.get_device_address();
+	desc.index_addr = lumen_scene->index_buffer.get_device_address();
 
-	desc.material_addr = materials_buffer.get_device_address();
-	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
-	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer.get_device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer.get_device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer.get_device_address();
 	// VCMMLT
 	desc.bootstrap_addr = bootstrap_buffer.get_device_address();
 	desc.cdf_addr = cdf_buffer.get_device_address();
@@ -162,7 +162,7 @@ void VCMMLT::init() {
 	desc.counter_addr = counter_buffer.get_device_address();
 
 	assert(instance->vkb.rg->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, &bootstrap_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, &cdf_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, &cdf_sum_buffer, instance->vkb.rg);
@@ -182,7 +182,7 @@ void VCMMLT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, &mlt_residual_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
 
-	scene_desc_buffer.create(&instance->vkb.ctx,
+	lumen_scene->scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 	pc_ray.total_light_area = 0;
@@ -203,7 +203,7 @@ void VCMMLT::render() {
 	VkClearValue clear_depth = {1.0f, 0};
 	VkViewport viewport = lumen::vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
 	VkClearValue clear_values[] = {clear_color, clear_depth};
-	pc_ray.num_lights = int(lights.size());
+	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;
@@ -221,8 +221,8 @@ void VCMMLT::render() {
 	const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
 	const int base_grid_res = int(max_comp / pc_ray.radius);
 	pc_ray.grid_res = glm::max(ivec3(diam * float(base_grid_res) / max_comp), ivec3(1));
-	pc_ray.total_light_area = total_light_area;
-	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	pc_ray.total_light_area = lumen_scene->total_light_area;
+	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	auto get_pipeline_postfix = [&](const std::vector<uint32_t>& spec_consts) {
 		std::string res = "-";
 		if (spec_consts[0] == 1) {
@@ -241,7 +241,7 @@ void VCMMLT::render() {
 				op_name,
 				{.shader = lumen::Shader(op_shader_name), .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
 			.push_constants(&pc_ray)
-			.bind(scene_desc_buffer)
+			.bind(lumen_scene->scene_desc_buffer)
 			.zero({mlt_residual_buffer, counter_buffer});
 		while (num_wgs != 1) {
 			instance->vkb.rg
@@ -249,7 +249,7 @@ void VCMMLT::render() {
 											.specialization_data = spec_data,
 											.dims = {num_wgs, 1, 1}})
 				.push_constants(&pc_ray)
-				.bind(scene_desc_buffer);
+				.bind(lumen_scene->scene_desc_buffer);
 			num_wgs = (uint32_t)(num_wgs + 1023) / 1024;
 		}
 	};
@@ -262,7 +262,7 @@ void VCMMLT::render() {
 	std::initializer_list<lumen::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
-		scene_desc_buffer,
+		lumen_scene->scene_desc_buffer,
 	};
 	std::vector<uint32_t> spec_consts;
 	if (!light_first) {
@@ -288,8 +288,8 @@ void VCMMLT::render() {
 		.zero({chain_stats_buffer, mlt_atomicsum_buffer})
 		.zero(photon_buffer, use_vm)
 		.bind(rt_bindings)
-		.bind(mesh_lights_buffer)
-		.bind_texture_array(scene_textures)
+		.bind(lumen_scene->mesh_lights_buffer)
+		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	// Start bootstrap sampling
 	pipeline_name = "VCMMLT - Bootstrap " + pipeline_postfix;
@@ -306,8 +306,8 @@ void VCMMLT::render() {
 				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
-		.bind(mesh_lights_buffer)
-		.bind_texture_array(scene_textures)
+		.bind(lumen_scene->mesh_lights_buffer)
+		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	int counter = 0;
 	prefix_scan(0, config->num_bootstrap_samples, counter, instance->vkb.rg.get());
@@ -317,13 +317,13 @@ void VCMMLT::render() {
 					  {.shader = lumen::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
 					   .dims = {(uint32_t)std::ceil(config->num_bootstrap_samples / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
-		.bind(scene_desc_buffer);
+		.bind(lumen_scene->scene_desc_buffer);
 	// Select seeds
 	instance->vkb.rg
 		->add_compute("Select Seeds", {.shader = lumen::Shader("src/shaders/integrators/vcmmlt/select_seeds.comp"),
 									   .dims = {(uint32_t)std::ceil(config->num_mlt_threads / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
-		.bind(scene_desc_buffer);
+		.bind(lumen_scene->scene_desc_buffer);
 	// Fill in the samplers for mutations
 	{
 		// Fill
@@ -341,8 +341,8 @@ void VCMMLT::render() {
 					 })
 			.push_constants(&pc_ray)
 			.bind(rt_bindings)
-			.bind(mesh_lights_buffer)
-			.bind_texture_array(scene_textures)
+			.bind(lumen_scene->mesh_lights_buffer)
+			.bind_texture_array(lumen_scene->scene_textures)
 			.bind_tlas(instance->vkb.tlas);
 		// Sum up chain stats
 		sum_up_chain_data();
@@ -352,7 +352,7 @@ void VCMMLT::render() {
 		->add_compute("Calculate Normalization",
 					  {.shader = lumen::Shader("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
 		.push_constants(&pc_ray)
-		.bind(scene_desc_buffer);
+		.bind(lumen_scene->scene_desc_buffer);
 	instance->vkb.rg->run_and_submit(cmd);
 	// Start mutations
 	{
@@ -374,8 +374,8 @@ void VCMMLT::render() {
 				.push_constants(&pc_ray)
 				.zero(mlt_atomicsum_buffer)
 				.bind(rt_bindings)
-				.bind(mesh_lights_buffer)
-				.bind_texture_array(scene_textures)
+				.bind(lumen_scene->mesh_lights_buffer)
+				.bind_texture_array(lumen_scene->scene_textures)
 				.bind_tlas(instance->vkb.tlas);
 			sum_up_chain_data();
 			// Normalization
@@ -384,7 +384,7 @@ void VCMMLT::render() {
 					"Calculate Normalization",
 					{.shader = lumen::Shader("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
 				.push_constants(&pc_ray)
-				.bind(scene_desc_buffer);
+				.bind(lumen_scene->scene_desc_buffer);
 		};
 		const uint32_t iter_cnt = 100;
 		const uint32_t freq = mutation_count / iter_cnt;
@@ -414,7 +414,7 @@ void VCMMLT::render() {
 					  {.shader = lumen::Shader("src/shaders/integrators/vcmmlt/composite.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
-		.bind({output_tex, scene_desc_buffer});
+		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }
 
 bool VCMMLT::gui() {
@@ -447,7 +447,7 @@ void VCMMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGr
 						{.shader = lumen::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
 						 .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
-			.bind(scene_desc_buffer);
+			.bind(lumen_scene->scene_desc_buffer);
 	};
 	auto uniform_add = [&](int num_wgs, int output_idx) {
 		++counter;
@@ -455,7 +455,7 @@ void VCMMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGr
 						{.shader = lumen::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"),
 						 .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
-			.bind(scene_desc_buffer);
+			.bind(lumen_scene->scene_desc_buffer);
 	};
 	if (num_wgs > 1) {
 		pc_compute.base_idx = 0;

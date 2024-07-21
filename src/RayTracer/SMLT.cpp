@@ -137,11 +137,11 @@ void SMLT::init() {
 	} while (arr_size > 1);
 
 	SceneDesc desc;
-	desc.index_addr = index_buffer.get_device_address();
+	desc.index_addr = lumen_scene->index_buffer.get_device_address();
 
-	desc.material_addr = materials_buffer.get_device_address();
-	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
-	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer.get_device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer.get_device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer.get_device_address();
 	// SMLT
 	desc.bootstrap_addr = bootstrap_buffer.get_device_address();
 	desc.cdf_addr = cdf_buffer.get_device_address();
@@ -164,7 +164,7 @@ void SMLT::init() {
 	desc.light_splat_cnts_addr = light_splat_cnts_buffer.get_device_address();
 
 	assert(instance->vkb.rg->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, &bootstrap_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, &cdf_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, &cdf_sum_buffer, instance->vkb.rg);
@@ -187,7 +187,7 @@ void SMLT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_splats_addr, &light_splats_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_splat_cnts_addr, &light_splat_cnts_buffer, instance->vkb.rg);
 
-	scene_desc_buffer.create(&instance->vkb.ctx,
+	lumen_scene->scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
@@ -209,7 +209,7 @@ void SMLT::render() {
 	VkClearValue clear_depth = {1.0f, 0};
 	VkViewport viewport = lumen::vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
 	VkClearValue clear_values[] = {clear_color, clear_depth};
-	pc_ray.num_lights = int(lights.size());
+	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;
@@ -218,14 +218,14 @@ void SMLT::render() {
 	pc_ray.cam_rand_count = cam_path_rand_count;
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.num_bootstrap_samples = num_bootstrap_samples;
-	pc_ray.total_light_area = total_light_area;
-	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	pc_ray.total_light_area = lumen_scene->total_light_area;
+	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.frame_num = frame_num;
 
 	const std::initializer_list<lumen::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
-		scene_desc_buffer,
+		lumen_scene->scene_desc_buffer,
 	};
 
 	// Start bootstrap sampling
@@ -244,8 +244,8 @@ void SMLT::render() {
 					 })
 			.push_constants(&pc_ray)
 			.bind(rt_bindings)
-			.bind(mesh_lights_buffer)
-			.bind_texture_array(scene_textures)
+			.bind(lumen_scene->mesh_lights_buffer)
+			.bind_texture_array(lumen_scene->scene_textures)
 			.bind_tlas(instance->vkb.tlas);
 		// Eye
 		instance->vkb.rg
@@ -261,8 +261,8 @@ void SMLT::render() {
 					 })
 			.push_constants(&pc_ray)
 			.bind(rt_bindings)
-			.bind(mesh_lights_buffer)
-			.bind_texture_array(scene_textures)
+			.bind(lumen_scene->mesh_lights_buffer)
+			.bind_texture_array(lumen_scene->scene_textures)
 			.bind_tlas(instance->vkb.tlas);
 	}
 	int counter = 0;
@@ -272,7 +272,7 @@ void SMLT::render() {
 		->add_compute("Calculate CDF", {.shader = lumen::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
 										.dims = {(uint32_t)std::ceil(num_bootstrap_samples / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
-		.bind(scene_desc_buffer);
+		.bind(lumen_scene->scene_desc_buffer);
 #if 0
 	// Debugging code
 	bootstrap_buffer.copy(bootstrap_cpu, cmd.handle);
@@ -313,7 +313,7 @@ void SMLT::render() {
 		->add_compute("Select Seeds", {.shader = lumen::Shader("src/shaders/integrators/pssmlt/select_seeds.comp"),
 									   .dims = {(uint32_t)std::ceil(num_mlt_threads / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
-		.bind(scene_desc_buffer);
+		.bind(lumen_scene->scene_desc_buffer);
 	// Fill in the samplers for mutations
 	{
 		// Light
@@ -330,8 +330,8 @@ void SMLT::render() {
 			.push_constants(&pc_ray)
 			.zero(mlt_samplers_buffer)
 			.bind(rt_bindings)
-			.bind(mesh_lights_buffer)
-			.bind_texture_array(scene_textures)
+			.bind(lumen_scene->mesh_lights_buffer)
+			.bind_texture_array(lumen_scene->scene_textures)
 			.bind_tlas(instance->vkb.tlas);
 		// Eye
 		instance->vkb.rg
@@ -347,8 +347,8 @@ void SMLT::render() {
 			.push_constants(&pc_ray)
 			.zero(mlt_samplers_buffer)
 			.bind(rt_bindings)
-			.bind(mesh_lights_buffer)
-			.bind_texture_array(scene_textures)
+			.bind(lumen_scene->mesh_lights_buffer)
+			.bind_texture_array(lumen_scene->scene_textures)
 			.bind_tlas(instance->vkb.tlas);
 	}
 	instance->vkb.rg->run_and_submit(cmd);
@@ -370,8 +370,8 @@ void SMLT::render() {
 						 })
 				.push_constants(&pc_ray)
 				.bind(rt_bindings)
-				.bind(mesh_lights_buffer)
-				.bind_texture_array(scene_textures)
+				.bind(lumen_scene->mesh_lights_buffer)
+				.bind_texture_array(lumen_scene->scene_textures)
 				.bind_tlas(instance->vkb.tlas);
 			// Eye
 			instance->vkb.rg
@@ -386,8 +386,8 @@ void SMLT::render() {
 						 })
 				.push_constants(&pc_ray)
 				.bind(rt_bindings)
-				.bind(mesh_lights_buffer)
-				.bind_texture_array(scene_textures)
+				.bind(lumen_scene->mesh_lights_buffer)
+				.bind_texture_array(lumen_scene->scene_textures)
 				.bind_tlas(instance->vkb.tlas);
 		};
 		const uint32_t iter_cnt = 100;
@@ -419,7 +419,7 @@ void SMLT::render() {
 					  {.shader = lumen::Shader("src/shaders/integrators/pssmlt/composite.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
-		.bind({output_tex, scene_desc_buffer});
+		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }
 
 bool SMLT::update() {
@@ -442,7 +442,7 @@ void SMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGrap
 						{.shader = lumen::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
 						 .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
-			.bind(scene_desc_buffer);
+			.bind(lumen_scene->scene_desc_buffer);
 	};
 	auto uniform_add = [&](int num_wgs, int output_idx) {
 		++counter;
@@ -450,7 +450,7 @@ void SMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGrap
 						{.shader = lumen::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"),
 						 .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
-			.bind(scene_desc_buffer);
+			.bind(lumen_scene->scene_desc_buffer);
 	};
 	if (num_wgs > 1) {
 		pc_compute.base_idx = 0;

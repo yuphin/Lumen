@@ -204,7 +204,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 					assert(buffer_ptr_hash_map.find(ptr_var_id) != buffer_ptr_hash_map.end());
 					const auto& res = buffer_ptr_hash_map[ptr_var_id];
 					if (pass->rg->registered_buffer_pointers.find(res) != pass->rg->registered_buffer_pointers.end()) {
-						shader.buffer_status_map[pass->rg->registered_buffer_pointers[res]].write = true;
+						shader.buffer_status_map[res].write = true;
 					}
 				}
 			} else if (load_map.find(access_chain.base_ptr_id) != load_map.end()) {
@@ -212,7 +212,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 				// If it has loads, it should be a buffer pointer
 				const auto& res = buffer_ptr_hash_map[load_map[access_chain.base_ptr_id]];
 				if (pass->rg->registered_buffer_pointers.find(res) != pass->rg->registered_buffer_pointers.end()) {
-					shader.buffer_status_map[pass->rg->registered_buffer_pointers[res]].write = true;
+					shader.buffer_status_map[res].write = true;
 				}
 			}
 		}
@@ -312,7 +312,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 								const auto& res = buffer_ptr_hash_map[load_map[access_chain.base_ptr_id]];
 								if (pass->rg->registered_buffer_pointers.find(res) !=
 									pass->rg->registered_buffer_pointers.end()) {
-									shader.buffer_status_map[pass->rg->registered_buffer_pointers[res]].read = true;
+									shader.buffer_status_map[res].read = true;
 								}
 							}
 						}
@@ -323,7 +323,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 					// bindless images in the future
 					const auto& res = buffer_ptr_hash_map[ptr_var_id];
 					if (pass->rg->registered_buffer_pointers.find(res) != pass->rg->registered_buffer_pointers.end()) {
-						shader.buffer_status_map[pass->rg->registered_buffer_pointers[res]].read = true;
+						shader.buffer_status_map[res].read = true;
 					}
 				}
 

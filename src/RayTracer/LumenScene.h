@@ -1,9 +1,13 @@
 #pragma once
 #include "../LumenPCH.h"
 #include <tiny_obj_loader.h>
+#include "Framework/LumenInstance.h"
 #include "shaders/commons.h"
 #include "Framework/MitsubaParser.h"
 #include "SceneConfig.h"
+#include "Framework/Buffer.h"
+#include "Framework/Texture.h"
+#include "Framework/Camera.h"
 
 struct MeshData {
 	std::vector<glm::vec3> positions;
@@ -26,7 +30,6 @@ struct LumenPrimMesh {
 	glm::mat4 world_matrix;
 	glm::vec3 min_pos;
 	glm::vec3 max_pos;
-
 };
 
 struct LumenLight {
@@ -40,7 +43,9 @@ struct LumenLight {
 
 class LumenScene {
    public:
+   LumenScene(lumen::LumenInstance* instance) : instance(instance) {}
 	void load_scene(const std::string& path);
+	void destroy();
 	std::vector<glm::vec3> positions;
 	std::vector<uint32_t> indices;
 	std::vector<glm::vec3> normals;
@@ -54,6 +59,20 @@ class LumenScene {
 	std::vector<std::string> textures;
 	std::vector<LumenLight> lights;
 
+	std::vector<Light> gpu_lights;
+	lumen::Buffer index_buffer;
+	lumen::Buffer vertex_buffer;
+	lumen::Buffer compact_vertices_buffer;
+	lumen::Buffer materials_buffer;
+	lumen::Buffer prim_lookup_buffer;
+	lumen::Buffer scene_desc_buffer;
+	lumen::Buffer mesh_lights_buffer;
+	std::vector<lumen::Texture2D> scene_textures;
+	std::unique_ptr<lumen::Camera> camera;
+
+	uint32_t total_light_triangle_cnt = 0;
+	float total_light_area = 0;
+
 	struct Dimensions {
 		glm::vec3 min = glm::vec3(std::numeric_limits<float>::max());
 		glm::vec3 max = glm::vec3(std::numeric_limits<float>::min());
@@ -65,9 +84,14 @@ class LumenScene {
 
 	uint32_t dir_light_idx = -1;
 	void create_scene_config(const std::string& integrator_name);
-	inline bool has_bsdf_type(uint32_t flag) {return (bsdf_types & flag) != 0;}
+	inline bool has_bsdf_type(uint32_t flag) { return (bsdf_types & flag) != 0; }
 
    private:
 	uint32_t bsdf_types = 0;
 	void compute_scene_dimensions();
+	void load_lumen_scene(const std::string& path);
+	void load_mitsuba_scene(const std::string& path);
+	void add_default_texture();
+	lumen::LumenInstance* instance;
+	VkSampler texture_sampler;
 };

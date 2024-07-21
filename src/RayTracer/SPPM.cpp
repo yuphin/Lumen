@@ -29,18 +29,18 @@ void SPPM::init() {
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(int));
 
 	SceneDesc desc;
-	desc.index_addr = index_buffer.get_device_address();
+	desc.index_addr = lumen_scene->index_buffer.get_device_address();
 
-	desc.material_addr = materials_buffer.get_device_address();
-	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
-	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer.get_device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer.get_device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer.get_device_address();
 	// SPPM
 	desc.sppm_data_addr = sppm_data_buffer.get_device_address();
 	desc.atomic_data_addr = atomic_data_buffer.get_device_address();
 	desc.photon_addr = photon_buffer.get_device_address();
 	desc.residual_addr = residual_buffer.get_device_address();
 	desc.counter_addr = counter_buffer.get_device_address();
-	scene_desc_buffer.create(&instance->vkb.ctx,
+	lumen_scene->scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
@@ -50,7 +50,7 @@ void SPPM::init() {
 	pc_ray.size_y = instance->height;
 
 	assert(instance->vkb.rg->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, sppm_data_addr, &sppm_data_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, atomic_data_addr, &atomic_data_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, &photon_buffer, instance->vkb.rg);
@@ -60,13 +60,13 @@ void SPPM::init() {
 
 void SPPM::render() {
 	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	pc_ray.num_lights = int(lights.size());
+	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;
 	pc_ray.random_num = rand() % UINT_MAX;
-	pc_ray.total_light_area = total_light_area;
-	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	pc_ray.total_light_area = lumen_scene->total_light_area;
+	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.frame_num = frame_num;
 	// PPM related constants
 	if (config->base_radius < 1e-7f) {
@@ -84,13 +84,13 @@ void SPPM::render() {
 		uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
 		instance->vkb.rg->add_compute(op_name, {.shader = lumen::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
 			.push_constants(&pc_ray)
-			.bind(scene_desc_buffer)
+			.bind(lumen_scene->scene_desc_buffer)
 			.zero({residual_buffer, counter_buffer});
 		while (num_wgs != 1) {
 			instance->vkb.rg
 				->add_compute(reduce_name, {.shader = lumen::Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
 				.push_constants(&pc_ray)
-				.bind(scene_desc_buffer);
+				.bind(lumen_scene->scene_desc_buffer);
 			num_wgs = (uint32_t)(num_wgs + 1023) / 1024;
 		}
 	};
@@ -98,7 +98,7 @@ void SPPM::render() {
 	const std::initializer_list<lumen::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
-		scene_desc_buffer,
+		lumen_scene->scene_desc_buffer,
 	};
 
 	// Trace rays from eye
@@ -116,8 +116,8 @@ void SPPM::render() {
 		.zero(photon_buffer)
 		.zero(sppm_data_buffer, /*cond=*/pc_ray.frame_num == 0)
 		.bind(rt_bindings)
-		.bind(mesh_lights_buffer)
-		.bind_texture_array(scene_textures)
+		.bind(lumen_scene->mesh_lights_buffer)
+		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	// Calculate scene bbox given the calculated radius
 	op_reduce("OpReduce: Max", "src/shaders/integrators/sppm/max.comp", "OpReduce: Reduce Max",
@@ -127,7 +127,7 @@ void SPPM::render() {
 	instance->vkb.rg
 		->add_compute("Bounds Calculation",
 					  {.shader = lumen::Shader("src/shaders/integrators/sppm/calc_bounds.comp"), .dims = {1, 1, 1}})
-		.bind(scene_desc_buffer);
+		.bind(lumen_scene->scene_desc_buffer);
 	// Trace from light
 	instance->vkb.rg
 		->add_rt("SPPM - Light",
@@ -141,8 +141,8 @@ void SPPM::render() {
 				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
-		.bind(mesh_lights_buffer)
-		.bind_texture_array(scene_textures)
+		.bind(lumen_scene->mesh_lights_buffer)
+		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 	// Gather
 	instance->vkb.rg
@@ -150,15 +150,15 @@ void SPPM::render() {
 					  {.shader = lumen::Shader("src/shaders/integrators/sppm/gather.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
-		.bind(scene_desc_buffer)
-		.bind_texture_array(scene_textures);
+		.bind(lumen_scene->scene_desc_buffer)
+		.bind_texture_array(lumen_scene->scene_textures);
 	// Composite
 	instance->vkb.rg
 		->add_compute("Composite",
 					  {.shader = lumen::Shader("src/shaders/integrators/sppm/composite.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
-		.bind({output_tex, scene_desc_buffer});
+		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }
 
 bool SPPM::update() {

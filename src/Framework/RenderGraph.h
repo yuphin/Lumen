@@ -43,7 +43,7 @@ class RenderPass;
 struct PipelineStorage {
 	std::unique_ptr<Pipeline> pipeline;
 	std::vector<ResourceBinding> bound_resources;
-	std::unordered_map<Buffer*, BufferStatus> affected_buffer_pointers;
+	std::unordered_map<std::string, BufferStatus> affected_buffer_pointers;
 	bool dirty = false;
 };
 
@@ -93,7 +93,7 @@ class RenderGraph {
 	std::unordered_map<VkBuffer, std::pair<uint32_t, VkAccessFlags>>
 		buffer_resource_map;								 // Buffer handle - { Write Pass Idx, Access Type }
 	std::unordered_map<VkImage, uint32_t> img_resource_map;	 // Tex2D handle - Pass Idx
-	const bool multithreaded_pipeline_compilation = false;
+	const bool multithreaded_pipeline_compilation = true;
 	static const uint32_t INVALID_PASS_IDX = UINT_MAX;
 
 	template <typename Settings>

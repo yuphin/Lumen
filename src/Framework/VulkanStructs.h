@@ -590,7 +590,6 @@ inline VkBindSparseInfo bind_sparse_info() {
 	return bindSparseInfo;
 }
 
-/** @brief Initialize a map entry for a shader specialization constant */
 inline VkSpecializationMapEntry specializaiton_map_entry(uint32_t constantID, uint32_t offset, size_t size) {
 	VkSpecializationMapEntry specializationMapEntry{};
 	specializationMapEntry.constantID = constantID;
@@ -599,8 +598,6 @@ inline VkSpecializationMapEntry specializaiton_map_entry(uint32_t constantID, ui
 	return specializationMapEntry;
 }
 
-/** @brief Initialize a specialization constant info structure to pass to a
- * shader stage */
 inline VkSpecializationInfo specialization_info(const std::vector<VkSpecializationMapEntry>& mapEntries,
 												size_t dataSize, const void* data) {
 	VkSpecializationInfo specializationInfo{};

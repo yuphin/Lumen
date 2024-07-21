@@ -124,11 +124,11 @@ void PSSMLT::init() {
 	} while (arr_size > 1);
 
 	SceneDesc desc;
-	desc.index_addr = index_buffer.get_device_address();
+	desc.index_addr = lumen_scene->index_buffer.get_device_address();
 
-	desc.material_addr = materials_buffer.get_device_address();
-	desc.prim_info_addr = prim_lookup_buffer.get_device_address();
-	desc.compact_vertices_addr = compact_vertices_buffer.get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer.get_device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer.get_device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer.get_device_address();
 	// PSSMLT
 	desc.bootstrap_addr = bootstrap_buffer.get_device_address();
 	desc.cdf_addr = cdf_buffer.get_device_address();
@@ -146,7 +146,7 @@ void PSSMLT::init() {
 	desc.camera_path_addr = camera_path_buffer.get_device_address();
 
 	assert(instance->vkb.rg->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &prim_lookup_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, &bootstrap_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, &cdf_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, &cdf_sum_buffer, instance->vkb.rg);
@@ -165,7 +165,7 @@ void PSSMLT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_path_addr, &light_path_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, camera_path_addr, &camera_path_buffer, instance->vkb.rg);
 
-	scene_desc_buffer.create(&instance->vkb.ctx,
+	lumen_scene->scene_desc_buffer.create(&instance->vkb.ctx,
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 	pc_ray.total_light_area = 0;
@@ -181,7 +181,7 @@ void PSSMLT::init() {
 }
 
 void PSSMLT::render() {
-	pc_ray.num_lights = int(lights.size());
+	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;
@@ -191,14 +191,14 @@ void PSSMLT::render() {
 	pc_ray.connection_rand_count = connect_path_rand_count;
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.num_bootstrap_samples = config->num_bootstrap_samples;
-	pc_ray.total_light_area = total_light_area;
-	pc_ray.light_triangle_count = total_light_triangle_cnt;
+	pc_ray.total_light_area = lumen_scene->total_light_area;
+	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.frame_num = frame_num;
 
 	std::initializer_list<lumen::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
-		scene_desc_buffer,
+		lumen_scene->scene_desc_buffer,
 	};
 	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	// Start bootstrap sampling
@@ -216,8 +216,8 @@ void PSSMLT::render() {
 		.push_constants(&pc_ray)
 		.zero({light_path_buffer, camera_path_buffer})
 		.bind(rt_bindings)
-		.bind(mesh_lights_buffer)
-		.bind_texture_array(scene_textures)
+		.bind(lumen_scene->mesh_lights_buffer)
+		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 
 	int counter = 0;
@@ -228,7 +228,7 @@ void PSSMLT::render() {
 					  {.shader = lumen::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
 					   .dims = {(uint32_t)std::ceil(config->num_bootstrap_samples / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
-		.bind(scene_desc_buffer);
+		.bind(lumen_scene->scene_desc_buffer);
 
 #if 0
 	// Debugging code
@@ -271,7 +271,7 @@ void PSSMLT::render() {
 		->add_compute("Select Seeds", {.shader = lumen::Shader("src/shaders/integrators/pssmlt/select_seeds.comp"),
 									   .dims = {(uint32_t)std::ceil(config->num_mlt_threads / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
-		.bind(scene_desc_buffer);
+		.bind(lumen_scene->scene_desc_buffer);
 
 	// Fill in the samplers for mutations
 	instance->vkb.rg
@@ -287,8 +287,8 @@ void PSSMLT::render() {
 		.push_constants(&pc_ray)
 		.zero({light_path_buffer, camera_path_buffer})
 		.bind(rt_bindings)
-		.bind(mesh_lights_buffer)
-		.bind_texture_array(scene_textures)
+		.bind(lumen_scene->mesh_lights_buffer)
+		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(instance->vkb.tlas);
 
 	instance->vkb.rg->run_and_submit(cmd);
@@ -310,8 +310,8 @@ void PSSMLT::render() {
 				.push_constants(&pc_ray)
 				.zero({light_path_buffer, camera_path_buffer})
 				.bind(rt_bindings)
-				.bind(mesh_lights_buffer)
-				.bind_texture_array(scene_textures)
+				.bind(lumen_scene->mesh_lights_buffer)
+				.bind_texture_array(lumen_scene->scene_textures)
 				.bind_tlas(instance->vkb.tlas);
 		};
 		const uint32_t iter_cnt = 100;
@@ -343,7 +343,7 @@ void PSSMLT::render() {
 					  {.shader = lumen::Shader("src/shaders/integrators/pssmlt/composite.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
-		.bind({output_tex, scene_desc_buffer});
+		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }
 
 bool PSSMLT::update() {
@@ -366,7 +366,7 @@ void PSSMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGr
 						{.shader = lumen::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
 						 .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
-			.bind(scene_desc_buffer);
+			.bind(lumen_scene->scene_desc_buffer);
 	};
 	auto uniform_add = [&](int num_wgs, int output_idx) {
 		++counter;
@@ -374,7 +374,7 @@ void PSSMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGr
 						{.shader = lumen::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"),
 						 .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
-			.bind(scene_desc_buffer);
+			.bind(lumen_scene->scene_desc_buffer);
 	};
 	if (num_wgs > 1) {
 		pc_compute.base_idx = 0;
