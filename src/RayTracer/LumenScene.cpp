@@ -1,5 +1,6 @@
 #include <LumenPCH.h>
 #include "Framework/VkUtils.h"
+#include "Framework/BBox.h"
 #include "LumenScene.h"
 #pragma warning(push, 0)
 #include <tinygltf/json.hpp>
@@ -8,7 +9,6 @@
 #include <stb_image/stb_image.h>
 #include "shaders/commons.h"
 #include <cctype>
-#include "BBox.h"
 
 static bool ends_with(const std::string& str, const std::string& end) {
 	if (end.size() > str.size()) return false;

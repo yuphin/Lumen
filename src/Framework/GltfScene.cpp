@@ -7,7 +7,7 @@
 #include <set>
 #include <sstream>
 #include "Logger.h"
-#include "BBox.h"
+#include "Framework/BBox.h"
 
 namespace lumen {
 #define EXTENSION_ATTRIB_IRAY "NV_attributes_iray"
