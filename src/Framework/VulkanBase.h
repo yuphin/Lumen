@@ -2,7 +2,6 @@
 #include "LumenPCH.h"
 #include <volk/volk.h>
 #include "Buffer.h"
-#include "Event.h"
 #include "RenderGraph.h"
 
 namespace lumen {

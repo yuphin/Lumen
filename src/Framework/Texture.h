@@ -18,9 +18,6 @@ class Texture {
    public:
 	Texture() = default;
 	Texture(VulkanContext*);
-	// Texture(VulkanContext*, VkFormat, VkImageTiling, VkImageUsageFlags,
-	//		uint32_t mip_levels, uint32_t array_layers, VkSampleCountFlagBits,
-	//		VkImageType);
 	void destroy();
 	inline void set_context(VulkanContext* ctx) { this->ctx = ctx; }
 	inline bool valid() { return img != VK_NULL_HANDLE; }
@@ -30,14 +27,10 @@ class Texture {
 	VkSampler sampler = VK_NULL_HANDLE;
 	VulkanContext* ctx;
 
-	// VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
 	VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
 	VkImageUsageFlags usage_flags = 0;
 	uint32_t mip_levels = 1;
-	// uint32_t array_layers = 1;
-	// VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
 	VkExtent3D base_extent = {0, 0, 0};
-	// VkImageType image_type = VK_IMAGE_TYPE_2D;
 	VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	bool sampler_allocated = false;
 	bool present = false;

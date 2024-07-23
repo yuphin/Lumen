@@ -932,23 +932,6 @@ uint32_t VulkanBase::prepare_frame() {
 
 	vk::check(vkResetCommandBuffer(ctx.command_buffers[image_idx], 0));
 	vkResetFences(ctx.device, 1, &in_flight_fences[current_frame]);
-
-	EventHandler::begin();
-	if (EventHandler::consume_event(LumenEvent::SHADER_RELOAD)) {
-		// We don't want any command buffers in flight, might change in the
-		// future
-		vkDeviceWaitIdle(ctx.device);
-		std::set<Pipeline*> refs;
-		for (auto& old_pipeline : EventHandler::obsolete_pipelines) {
-			vkDestroyPipeline(ctx.device, old_pipeline.handle, nullptr);
-			refs.emplace(old_pipeline.ref);
-		}
-		for (auto ref : refs) {
-			ref->refresh();
-		}
-		EventHandler::obsolete_pipelines.clear();
-		create_command_buffers();
-	}
 	images_in_flight[image_idx] = in_flight_fences[current_frame];
 	return image_idx;
 }

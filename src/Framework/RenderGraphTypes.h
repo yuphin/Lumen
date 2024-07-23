@@ -33,6 +33,9 @@ struct RenderGraphSettings {
 	bool use_events = false;
 };
 
+
+enum class PassType { Compute, RT, Graphics };
+
 struct GraphicsPassSettings {
 	std::vector<Shader> shaders;
 	const std::vector<ShaderMacro> macros = {};
@@ -54,6 +57,7 @@ struct GraphicsPassSettings {
 	std::vector<Texture2D*> color_outputs = {};
 	Texture2D* depth_output = nullptr;
 	std::function<void(VkCommandBuffer cmd, const RenderPass& pass)> pass_func;
+	PassType type = PassType::Graphics; 
 };
 
 struct RTPassSettings {
@@ -63,6 +67,7 @@ struct RTPassSettings {
 	std::vector<uint32_t> specialization_data = {};
 	dim3 dims;
 	std::function<void(VkCommandBuffer cmd, const RenderPass& pass)> pass_func;
+	PassType type = PassType::RT;
 };
 
 struct ComputePassSettings {
@@ -71,9 +76,9 @@ struct ComputePassSettings {
 	std::vector<uint32_t> specialization_data = {};
 	dim3 dims;
 	std::function<void(VkCommandBuffer cmd, const RenderPass& pass)> pass_func;
+	PassType type = PassType::Compute;
 };
 
-enum class PassType { Compute, RT, Graphics };
 
 struct ResourceBinding {
 	Buffer* buf = nullptr;

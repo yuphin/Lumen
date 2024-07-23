@@ -63,7 +63,7 @@ class RenderGraph {
 	void set_pipelines_dirty();
 	friend RenderPass;
 	bool reload_shaders = false;
-	EventPool event_pool;
+	vk::EventPool event_pool;
 	std::unordered_map<std::string, Buffer*> registered_buffer_pointers;
 	// Shader Name + Macro String -> Shader
 	std::unordered_map<std::string, Shader> shader_cache;

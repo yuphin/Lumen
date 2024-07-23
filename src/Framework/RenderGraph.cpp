@@ -2,7 +2,6 @@
 #include "Framework/RenderGraph.h"
 #include "RenderGraph.h"
 #include "VkUtils.h"
-#include <unordered_set>
 
 namespace lumen {
 #define DIRTY_CHECK(x) \

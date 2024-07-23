@@ -1,15 +1,6 @@
 #pragma once
-#include "../LumenPCH.h"
-#include "Framework/Camera.h"
-#include "Framework/CommandBuffer.h"
-#include "Framework/Pipeline.h"
 #include "Framework/LumenInstance.h"
-#include "Framework/Shader.h"
 #include "Framework/Texture.h"
-#include "Framework/VkUtils.h"
-#include "Framework/VulkanBase.h"
-#include "Framework/Window.h"
-#include "Framework/GltfScene.hpp"
 #include "shaders/commons.h"
 #include "LumenScene.h"
 class Integrator {

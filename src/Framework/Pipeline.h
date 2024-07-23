@@ -1,6 +1,5 @@
 #pragma once
 #include "../LumenPCH.h"
-#include "Event.h"
 #include "Shader.h"
 #include "Buffer.h"
 #include "Texture.h"
@@ -9,11 +8,6 @@
 
 namespace lumen {
 struct Pipeline;
-
-struct PipelineTrace {
-	VkPipeline handle;
-	Pipeline* ref;
-};
 
 struct Pipeline {
    public:
