@@ -77,7 +77,7 @@ void main() {
 			vec3 atmosphere_L = shade_atmosphere(pc.dir_light_idx, pc.sky_col, origin.xyz, direction, tmax);
 #else
 			vec3 atmosphere_L = pc.sky_col;
-#endif // ENABLE_ATMOSPHERE
+#endif	// ENABLE_ATMOSPHERE
 			vec3 contribution = throughput * atmosphere_L;
 			if (depth > 0) {
 				col += contribution;
@@ -89,7 +89,8 @@ void main() {
 				reconnection_data.rc_Li = postfix_throughput * atmosphere_L;
 				reconnection_data.reservoir_contribution = contribution;
 				reconnection_data.path_flags =
-					(reconnection_data.path_flags & 0xFFFF0000) | pack_path_flags(prefix_depth, depth - prefix_depth, RECONNECTION_TYPE_DEFAULT, false);
+					(reconnection_data.path_flags & 0xFFFF0000) |
+					pack_path_flags(prefix_depth, depth - prefix_depth, RECONNECTION_TYPE_DEFAULT, false);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
@@ -135,7 +136,7 @@ void main() {
 #if DEBUG == 1
 			reconnection_data.debug_sampling_seed = sampling_seed;
 			reconnection_data.debug_sampling_seed.w -= 3;
-#endif // DEBUG == 1
+#endif	// DEBUG == 1
 
 			connectable_vertex_found = true;
 			prefix_depth = depth - 1;
@@ -174,9 +175,11 @@ void main() {
 					reconnection_data.reservoir_contribution *= mis_weight;
 					reconnection_data.rc_seed = floatBitsToUint(pdf_light_w);
 				}
-				reconnection_data.path_flags = (reconnection_data.path_flags & 0xFFFF0000) | pack_path_flags(
-					prefix_depth, depth - prefix_depth,
-					was_connectable ? RECONNECTION_TYPE_EMISSIVE_AFTER_RC : RECONNECTION_TYPE_DEFAULT, side);
+				reconnection_data.path_flags =
+					(reconnection_data.path_flags & 0xFFFF0000) |
+					pack_path_flags(prefix_depth, depth - prefix_depth,
+									was_connectable ? RECONNECTION_TYPE_EMISSIVE_AFTER_RC : RECONNECTION_TYPE_DEFAULT,
+									side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
@@ -204,7 +207,8 @@ void main() {
 			uvec4 debug_seed = seed;
 			bool is_directional_light;
 			LightRecord light_record;
-			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, wo, light_record, reconnection_data.rc_Li, is_directional_light);
+			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, wo, light_record, reconnection_data.rc_Li,
+							 is_directional_light);
 			vec3 contribution = Li * throughput;
 			// At 0 depth, we let ReSTIR DI handle the direct lighting
 			bool nee_connectable = depth > 0 && connectable;
@@ -212,7 +216,8 @@ void main() {
 			// Stream the NEE path at the reconnection vertex
 			if (nee_connectable && any(greaterThan(Li, vec3(0)))) {
 				reconnection_data.rc_coords = rc_coords;
-				reconnection_data.rc_partial_jacobian = rc_partial_jacobian;
+				// reconnection_data.rc_partial_jacobian = rc_partial_jacobian;
+				reconnection_data.rc_partial_jacobian = 1;
 				reconnection_data.rc_barycentrics = light_record.bary;
 				reconnection_data.rc_primitive_instance_id = uvec2(light_record.triangle_idx, light_record.light_idx);
 #if DEBUG == 1
@@ -221,8 +226,10 @@ void main() {
 #endif
 				reconnection_data.rc_seed = rc_seed;
 				reconnection_data.reservoir_contribution = contribution;
-				reconnection_data.path_flags = (reconnection_data.path_flags & 0xFFFF0000) | pack_path_flags(depth, 1, RECONNECTION_TYPE_NEE, side) | uint(is_directional_light) << 14;
-				
+				reconnection_data.path_flags = (reconnection_data.path_flags & 0xFFFF0000) |
+											   pack_path_flags(depth, 1, RECONNECTION_TYPE_NEE, side) |
+											   uint(is_directional_light) << 14;
+
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				if (merged) {
@@ -241,7 +248,8 @@ void main() {
 				reconnection_data.rc_Li = postfix_throughput * Li;
 				reconnection_data.reservoir_contribution = contribution;
 				reconnection_data.path_flags =
-					(reconnection_data.path_flags & 0xFFFF0000) | pack_path_flags(prefix_depth, depth - prefix_depth + 1, RECONNECTION_TYPE_DEFAULT, side);
+					(reconnection_data.path_flags & 0xFFFF0000) |
+					pack_path_flags(prefix_depth, depth - prefix_depth + 1, RECONNECTION_TYPE_DEFAULT, side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 				valid_reservoir = valid_reservoir || merged;
@@ -272,7 +280,7 @@ void main() {
 			postfix_throughput *= f_cos / bsdf_pdf_val;
 		}
 
-		rc_partial_jacobian *= bsdf_pdf_val;
+		rc_partial_jacobian = bsdf_pdf_val;
 		if (pc.enable_rr == 1) {
 			float rr_scale = 1.0;
 			if (bsdf_has_property(hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION)) {
@@ -295,7 +303,8 @@ void main() {
 #if STREAMING_MODE == STREAMING_MODE_SPLIT
 		reconnection_data.rc_Li = postfix_L;
 		reconnection_data.reservoir_contribution *= postfix_L;
-		reconnection_data.path_flags = (reconnection_data.path_flags & 0xFFFF0000) | pack_path_flags(prefix_depth, postfix_depth, RECONNECTION_TYPE_DEFAULT, rc_side);
+		reconnection_data.path_flags = (reconnection_data.path_flags & 0xFFFF0000) |
+									   pack_path_flags(prefix_depth, postfix_depth, RECONNECTION_TYPE_DEFAULT, rc_side);
 		bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 									   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
 		valid_reservoir = valid_reservoir || merged;
@@ -306,7 +315,8 @@ void main() {
 			uint rc_postfix_length;
 			bool side;
 			bool is_directional_light;
-			unpack_path_flags(reservoir.data.path_flags, rc_type, rc_prefix_length, rc_postfix_length, side, is_directional_light);
+			unpack_path_flags(reservoir.data.path_flags, rc_type, rc_prefix_length, rc_postfix_length, side,
+							  is_directional_light);
 			ASSERT(reservoir.data.path_flags != 0);
 			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
 

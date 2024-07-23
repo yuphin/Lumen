@@ -164,7 +164,8 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	vec3 wi = vec3(0);
 	float wi_len = 0;
 	float cos_from_light;
-	vec3 Le = sample_light_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
+	vec3 Le =
+		sample_light_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
 	const vec3 p = offset_ray2(pos, n_s);
 	float light_bsdf_pdf;
 	float cos_x = dot(n_s, wi);
@@ -395,8 +396,9 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 
 			float rc_cos_x = dot(dst_gbuffer.n_s, dst_postfix_wi);
 			float dst_postfix_pdf;
-			vec3 dst_postfix_f =
-				eval_bsdf(dst_gbuffer.n_s, dst_wo, dst_hit_mat, 1, dst_side, dst_postfix_wi, dst_postfix_pdf);
+			float unused_rev_pdf;
+			vec3 dst_postfix_f = eval_bsdf(dst_gbuffer.n_s, dst_wo, dst_hit_mat, 1, dst_side, dst_postfix_wi,
+										   dst_postfix_pdf, unused_rev_pdf, false);
 			reservoir_contribution = prefix_throughput * abs(rc_cos_x) * dst_postfix_f;
 			if (rc_type == RECONNECTION_TYPE_NEE) {
 				// In this case directly re-use the NEE result
@@ -444,7 +446,7 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 			return false;
 		}
 
-		prefix_jacobian *= pdf;
+		// prefix_jacobian *= pdf;
 		prefix_throughput *= f * abs(cos_theta) / pdf;
 
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, dst_gbuffer.pos, tmin, dst_wi, tmax, 0);
