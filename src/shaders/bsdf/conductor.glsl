@@ -62,9 +62,9 @@ vec3 eval_conductor(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float p
 	float jacobian = 1.0 / (4.0 * dot(wo, h));
 
 	float D;
-	pdf_w = eval_vndf_pdf_isotropic(alpha, wo, h, D) / jacobian;
+	pdf_w = eval_vndf_pdf_isotropic(alpha, wo, h, D) * jacobian;
 	if (eval_reverse_pdf) {
-		pdf_rev_w = eval_vndf_pdf_isotropic(alpha, wi, h) / jacobian;
+		pdf_rev_w = eval_vndf_pdf_isotropic(alpha, wi, h) * jacobian;
 	}
 
 	vec3 F = fresnel_conductor(dot(wo, h), mat.albedo, mat.k);

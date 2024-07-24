@@ -203,16 +203,16 @@ vec3 eval_principled_brdf(Material mat, vec3 wo, vec3 wi, out float pdf_w, out f
 	float jacobian = 1.0 / (4.0 * dot(wo, h));
 	float D;
 #if ANISOTROPIC
-	pdf_w = eval_vndf_pdf_anisotropic(alpha, wo, h, D) / jacobian;
+	pdf_w = eval_vndf_pdf_anisotropic(alpha, wo, h, D) * jacobian;
 #else
-	pdf_w = eval_vndf_pdf_isotropic(alpha, wo, h, D) / jacobian;
+	pdf_w = eval_vndf_pdf_isotropic(alpha, wo, h, D) * jacobian;
 #endif
 	float eta = forward_facing ? mat.ior : 1.0 / mat.ior;
 	if (eval_reverse_pdf) {
 #if ANISOTROPIC
-		pdf_rev_w = eval_vndf_pdf_anisotropic(alpha, wi, h) / jacobian;
+		pdf_rev_w = eval_vndf_pdf_anisotropic(alpha, wi, h) * jacobian;
 #else
-		pdf_rev_w = eval_vndf_pdf_isotropic(alpha, wi, h) / jacobian;
+		pdf_rev_w = eval_vndf_pdf_isotropic(alpha, wi, h) * jacobian;
 #endif
 	}
 	vec3 F = disney_fresnel(mat, wo, h, wi, eta);
@@ -312,7 +312,7 @@ vec3 eval_principled(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 	bool upper_hemisphere = min(wi.z, wo.z) > 0;
 	if (upper_hemisphere) {
 		if (p_diff > 0) {
-			pdf_w += p_diff * (wi.z * INV_PI);
+			pdf_w += p_diff * eval_disney_diffuse_pdf(wo, wi);
 			pdf_rev_w += pdf_w;
 			f += brdf_weight * calc_disney_diffuse_factor(mat, wo, wi);
 		}
