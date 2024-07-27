@@ -70,6 +70,8 @@ void main() {
 	// Record initial seed after direct light sampling
 	ASSERT(sampling_seed.w == 0);
 
+	vec3 throughput_until_rc = vec3(1);
+
 	for (int depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.instance_idx != -1;
@@ -146,8 +148,11 @@ void main() {
 			prefix_depth = depth - 1;
 			// Seed is not relevant here
 			reconnection_data.rc_seed = -1;
+
+#if STREAMING_MODE == STREAMING_MODE_SPLIT
 			// Partially fill in the contribution data (For STREAMING_MODE_SPLIT)
-			reconnection_data.reservoir_contribution = throughput;
+			throughput_until_rc = throughput;
+#endif // STREAMING_MODE == STREAMING_MODE_SPLIT
 			vec3 to_prev = origin.xyz - gbuffer.pos;
 			reconnection_data.rc_partial_jacobian = abs(dot(n_s, wo)) * rc_partial_jacobian / dot(to_prev, to_prev);
 		}
@@ -265,7 +270,6 @@ void main() {
 				}
 
 			} else if (connectable_vertex_found) {
-#if STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 				reconnection_data.rc_Li = postfix_throughput * Li;
 				reconnection_data.reservoir_contribution = contribution;
 				reconnection_data.path_flags =
@@ -283,10 +287,12 @@ void main() {
 						reservoir.data.rc_partial_jacobian /= bsdf_pdf_val;
 					}
 				}
+#if STREAMING_MODE == STREAMING_MODE_SPLIT
+				else if(connectable_this_vertex){
+					postfix_L += Li * postfix_throughput;
+				}
+#endif	// STREAMING_MODE == STREAMING_MODE_SPLIT
 				valid_reservoir = valid_reservoir || merged;
-#else	// STREAMING_MODE != STREAMING_MODE_INDIVIDUAL
-				postfix_L += Li * postfix_throughput;
-#endif	// STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 			}
 
 			if (depth > 0) {
@@ -305,6 +311,11 @@ void main() {
 		if (connectable_vertex_found && !connectable_this_vertex) {
 			postfix_throughput *= f_cos / bsdf_pdf_val;
 		}
+#if STREAMING_MODE == STREAMING_MODE_SPLIT
+		else if(connectable_vertex_found) {
+			throughput_until_rc *= f_cos / bsdf_pdf_val;
+		}
+#endif // STREAMING_MODE == STREAMING_MODE_SPLIT
 
 		rc_partial_jacobian = bsdf_pdf_val;
 		if (pc.enable_rr == 1) {
@@ -328,7 +339,7 @@ void main() {
 	if (pc.enable_gris == 1 && connectable_vertex_found) {
 #if STREAMING_MODE == STREAMING_MODE_SPLIT
 		reconnection_data.rc_Li = postfix_L;
-		reconnection_data.reservoir_contribution *= postfix_L;
+		reconnection_data.reservoir_contribution = throughput_until_rc * postfix_L;
 		reconnection_data.path_flags = (reconnection_data.path_flags & 0xFFFF0000) |
 									   pack_path_flags(prefix_depth, postfix_depth, RECONNECTION_TYPE_DEFAULT, rc_side);
 		bool merged = stream_reservoir(seed, reservoir, reconnection_data,
@@ -352,7 +363,13 @@ void main() {
 
 
 			if(rc_type == RECONNECTION_TYPE_DEFAULT) {
-				ASSERT(reservoir.data.rc_wi != vec4(0));
+				bool rc_last_vertex = false;
+#if STREAMING_MODE == STREAMING_MODE_SPLIT
+				rc_last_vertex = rc_postfix_length <= 1;
+#endif // STREAMING_MODE == STREAMING_MODE_SPLIT
+				if(!rc_last_vertex) {
+					ASSERT(reservoir.data.rc_wi != vec4(0));
+				}
 			}
 		}
 	}
