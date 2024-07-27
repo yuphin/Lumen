@@ -47,6 +47,8 @@ void main() {
 	init_data(reconnection_data);
 	init_data(reservoir.data);
 
+	reconnection_data.rc_wi = vec4(0);
+
 	// Throughput after the reconnection vertex
 	vec3 postfix_throughput = vec3(1);
 	// Whether the normals at the reconnection vertex has been flipped
@@ -127,7 +129,9 @@ void main() {
 			set_bounce_flag(reconnection_data.path_flags, 0, curr_rough);
 		}
 
-		if (was_connectable && prev_rough && constraints_satisfied) {
+		const bool connectable_this_vertex = was_connectable && prev_rough && constraints_satisfied;
+
+		if (connectable_this_vertex) {
 			vec2 rc_barycentrics = payload.attribs;
 			uvec2 rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 			reconnection_data.rc_barycentrics = rc_barycentrics;
@@ -201,14 +205,30 @@ void main() {
 		}
 
 		last_vertex_specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
+
+		// Sample direction
+		float cos_theta;
+
+		const vec3 f =
+			sample_bsdf(n_s, wo, hit_mat, 1 /*radiance=cam*/, side, direction, bsdf_pdf_val, cos_theta, sampling_seed);
+
+		if (connectable_this_vertex) {
+			reconnection_data.rc_partial_jacobian *= bsdf_pdf_val;
+			reconnection_data.rc_wi.xyz = direction;
+		}
+
 		// NEE
 		if (!last_vertex_specular) {
 			uint rc_seed = seed.w;
 			uvec4 debug_seed = seed;
 			bool is_directional_light;
 			LightRecord light_record;
+			
+			vec3 Le;
+			vec3 nee_wi;
+			float nee_pdf_light_w;
 			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, wo, light_record, reconnection_data.rc_Li,
-							 is_directional_light);
+							 is_directional_light, Le, nee_wi, nee_pdf_light_w);
 			vec3 contribution = Li * throughput;
 			// At 0 depth, we let ReSTIR DI handle the direct lighting
 			bool nee_connectable = depth > 0 && connectable;
@@ -223,6 +243,7 @@ void main() {
 #if DEBUG == 1
 				reconnection_data.debug_seed = debug_seed;
 				reconnection_data.debug_sampling_seed = sampling_seed;
+				reconnection_data.debug_sampling_seed.w -= 3;
 #endif
 				reconnection_data.rc_seed = rc_seed;
 				reconnection_data.reservoir_contribution = contribution;
@@ -252,6 +273,16 @@ void main() {
 					pack_path_flags(prefix_depth, depth - prefix_depth + 1, RECONNECTION_TYPE_DEFAULT, side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
 											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
+				if(merged && connectable_this_vertex) {
+					ASSERT(postfix_throughput == vec3(1));
+					reservoir.data.rc_wi.xyz = nee_wi;
+					reservoir.data.rc_Li = Le;
+					reservoir.data.path_flags = (reservoir.data.path_flags & ~0x7u) | RECONNECTION_TYPE_NEE_AFTER_RC;
+					reservoir.data.rc_seed = floatBitsToUint(nee_pdf_light_w);
+					if(bsdf_pdf_val != 0) { 
+						reservoir.data.rc_partial_jacobian /= bsdf_pdf_val;
+					}
+				}
 				valid_reservoir = valid_reservoir || merged;
 #else	// STREAMING_MODE != STREAMING_MODE_INDIVIDUAL
 				postfix_L += Li * postfix_throughput;
@@ -266,17 +297,12 @@ void main() {
 		}
 		origin.xyz = offset_ray(gbuffer.pos, n_g);
 
-		// Sample direction
-		float cos_theta;
-
-		const vec3 f =
-			sample_bsdf(n_s, wo, hit_mat, 1 /*radiance=cam*/, side, direction, bsdf_pdf_val, cos_theta, sampling_seed);
 		if (bsdf_pdf_val == 0) {
 			break;
 		}
 		vec3 f_cos = f * abs(cos_theta);
 		throughput *= f_cos / bsdf_pdf_val;
-		if (connectable_vertex_found) {
+		if (connectable_vertex_found && !connectable_this_vertex) {
 			postfix_throughput *= f_cos / bsdf_pdf_val;
 		}
 
@@ -322,6 +348,11 @@ void main() {
 
 			if (rc_type != RECONNECTION_TYPE_NEE) {
 				ASSERT(reservoir_data_valid(reservoir.data));
+			}
+
+
+			if(rc_type == RECONNECTION_TYPE_DEFAULT) {
+				ASSERT(reservoir.data.rc_wi != vec4(0));
 			}
 		}
 	}

@@ -53,10 +53,11 @@ struct GrisData {
 	uvec4 debug_sampling_seed;
 	uvec4 debug_seed;
 #endif
+	vec4 rc_wi;
 	vec3 rc_Li;
 	uint rc_seed;
 	// Layout for the path flags
-	//1b is_directional_light | 1b side | 5b postfix_length| 5b prefix_length |3b is_nee/emissive_after_rc/emissive/default
+	// 1b is_directional_light | 1b side | 5b postfix_length| 5b prefix_length |3b is_nee/is_nee_postfix/emissive_after_rc/emissive/default
 	vec3 reservoir_contribution;
 	uint path_flags;
 	vec2 rc_barycentrics;

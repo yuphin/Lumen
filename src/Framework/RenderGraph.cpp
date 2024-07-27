@@ -879,24 +879,25 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		std::unordered_map<RenderPass*, std::vector<Shader*>> unique_shaders;
 		std::unordered_map<RenderPass*, std::vector<Shader*>> existing_shaders;
 
-		if (recording_or_reload) {
-			for (auto i = 0; i < passes.size(); i++) {
-				if (passes[i].gfx_settings) {
-					for (auto& shader : passes[i].gfx_settings->shaders) {
-						if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
-							existing_shaders[&passes[i]].push_back(&shader);
-						}
+		for (auto i = 0; i < passes.size(); i++) {
+			if(passes[i].is_pipeline_cached) {
+				continue;
+			}
+			if (passes[i].gfx_settings) {
+				for (auto& shader : passes[i].gfx_settings->shaders) {
+					if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
+						existing_shaders[&passes[i]].push_back(&shader);
 					}
-				} else if (passes[i].rt_settings) {
-					for (auto& shader : passes[i].rt_settings->shaders) {
-						if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
-							existing_shaders[&passes[i]].push_back(&shader);
-						}
+				}
+			} else if (passes[i].rt_settings) {
+				for (auto& shader : passes[i].rt_settings->shaders) {
+					if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
+						existing_shaders[&passes[i]].push_back(&shader);
 					}
-				} else {
-					if (!unique_shaders_set.insert({&passes[i].compute_settings->shader, &passes[i]}).second) {
-						existing_shaders[&passes[i]].push_back(&passes[i].compute_settings->shader);
-					}
+				}
+			} else {
+				if (!unique_shaders_set.insert({&passes[i].compute_settings->shader, &passes[i]}).second) {
+					existing_shaders[&passes[i]].push_back(&passes[i].compute_settings->shader);
 				}
 			}
 		}
@@ -971,12 +972,12 @@ void RenderGraph::reset() {
 void RenderGraph::submit(CommandBuffer& cmd) {
 	cmd.submit();
 	passes.clear();
+	dirty_pass_encountered = false;
 }
 
 void RenderGraph::run_and_submit(CommandBuffer& cmd) {
 	run(cmd.handle);
 	submit(cmd);
-	dirty_pass_encountered = false;
 }
 
 void RenderGraph::destroy() {

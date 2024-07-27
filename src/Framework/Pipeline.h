@@ -1,7 +1,6 @@
 #pragma once
 #include "../LumenPCH.h"
 #include "Shader.h"
-#include "Buffer.h"
 #include "Texture.h"
 #include "SBTWrapper.h"
 #include "RenderGraphTypes.h"
