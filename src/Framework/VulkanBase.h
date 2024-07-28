@@ -43,7 +43,7 @@ struct VulkanBase {
 	void init_imgui();
 	void destroy_imgui();
 	void cleanup_swapchain();
-	void recreate_swap_chain(VulkanContext&);
+	void recreate_swap_chain();
 	void add_device_extension(const char* name) { device_extensions.push_back(name); }
 	void build_blas(const std::vector<BlasInput>& input, VkBuildAccelerationStructureFlagsKHR flags);
 	void build_tlas(
@@ -82,7 +82,6 @@ struct VulkanBase {
 	std::vector<VkFence> in_flight_fences;
 	std::vector<VkFence> images_in_flight;
 	std::vector<VkQueueFamilyProperties> queue_families;
-	VulkanContext ctx;
 	std::unique_ptr<RenderGraph> rg;
 	VkFormat swapchain_format;
 

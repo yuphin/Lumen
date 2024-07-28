@@ -2,15 +2,14 @@
 #include "CommandBuffer.h"
 
 namespace lumen {
-CommandBuffer::CommandBuffer(VulkanContext* ctx, bool begin, VkCommandBufferUsageFlags begin_flags, QueueType type,
+CommandBuffer::CommandBuffer(bool begin, VkCommandBufferUsageFlags begin_flags, QueueType type,
 							 VkCommandBufferLevel level) {
-	this->ctx = ctx;
 	this->type = type;
 	std::unique_lock<std::mutex> cv_lock;
 	VulkanSyncronization::cv.wait(cv_lock, [&] { return VulkanSyncronization::available_command_pools > 0; });
 	curr_tid = --VulkanSyncronization::available_command_pools;
-	auto cmd_buf_allocate_info = vk::command_buffer_allocate_info(ctx->cmd_pools[curr_tid], level, 1);
-	vk::check(vkAllocateCommandBuffers(ctx->device, &cmd_buf_allocate_info, &handle),
+	auto cmd_buf_allocate_info = vk::command_buffer_allocate_info(VulkanContext::cmd_pools[curr_tid], level, 1);
+	vk::check(vkAllocateCommandBuffers(VulkanContext::device, &cmd_buf_allocate_info, &handle),
 			  "Could not allocate command buffer");
 	if (begin) {
 		auto begin_info = vk::command_buffer_begin_info(begin_flags);
@@ -41,15 +40,15 @@ void CommandBuffer::submit(bool wait_fences, bool queue_wait_idle) {
 	if (wait_fences) {
 		VkFenceCreateInfo fence_info = vk::fence();
 		VkFence fence;
-		vk::check(vkCreateFence(ctx->device, &fence_info, nullptr, &fence), "Fence creation error");
-		vk::check(vkQueueSubmit(ctx->queues[(int)type], 1, &submit_info, fence), "Queue submission error");
-		vk::check(vkWaitForFences(ctx->device, 1, &fence, VK_TRUE, 100000000000), "Fence wait error");
-		vkDestroyFence(ctx->device, fence, nullptr);
+		vk::check(vkCreateFence(VulkanContext::device, &fence_info, nullptr, &fence), "Fence creation error");
+		vk::check(vkQueueSubmit(VulkanContext::queues[(int)type], 1, &submit_info, fence), "Queue submission error");
+		vk::check(vkWaitForFences(VulkanContext::device, 1, &fence, VK_TRUE, 100000000000), "Fence wait error");
+		vkDestroyFence(VulkanContext::device, fence, nullptr);
 	} else {
-		vk::check(vkQueueSubmit(ctx->queues[(int)type], 1, &submit_info, VK_NULL_HANDLE), "Queue submission error");
+		vk::check(vkQueueSubmit(VulkanContext::queues[(int)type], 1, &submit_info, VK_NULL_HANDLE), "Queue submission error");
 	}
 	if (queue_wait_idle) {
-		vk::check(vkQueueWaitIdle(ctx->queues[(int)type]), "Queue wait error! Check previous submissions");
+		vk::check(vkQueueWaitIdle(VulkanContext::queues[(int)type]), "Queue wait error! Check previous submissions");
 	}
 	VulkanSyncronization::queue_mutex.unlock();
 }
@@ -63,7 +62,7 @@ CommandBuffer::~CommandBuffer() {
 		++VulkanSyncronization::available_command_pools;
 		VulkanSyncronization::cv.notify_one();
 	}
-	vkFreeCommandBuffers(ctx->device, ctx->cmd_pools[curr_tid], 1, &handle);
+	vkFreeCommandBuffers(VulkanContext::device, VulkanContext::cmd_pools[curr_tid], 1, &handle);
 }
 
 }  // namespace lumen

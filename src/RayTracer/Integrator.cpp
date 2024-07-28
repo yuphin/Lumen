@@ -39,9 +39,9 @@ void Integrator::init() {
 						   VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	settings.base_extent = {(uint32_t)instance->width, (uint32_t)instance->height, 1};
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	output_tex.create_empty_texture("Color Output", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL);
+	output_tex.create_empty_texture("Color Output", settings, VK_IMAGE_LAYOUT_GENERAL);
 
-	scene_ubo_buffer.create("Scene UBO", &instance->vkb.ctx, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+	scene_ubo_buffer.create("Scene UBO", VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 							VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 							sizeof(SceneUBO));
 

@@ -21,7 +21,6 @@ private:
 	lumen::Texture2D fft_pong_padded;
 	VkSampler img_sampler;
 
-	lumen::VulkanContext* ctx = nullptr;
 	lumen::RenderGraph* rg = nullptr;
 	PCPost pc_post_settings;
 	bool enable_tonemapping = false;

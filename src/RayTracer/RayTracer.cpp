@@ -21,7 +21,7 @@ RayTracer::RayTracer(int width, int height, bool debug, int argc, char* argv[]) 
 void RayTracer::init(Window* window) {
 	srand((uint32_t)time(NULL));
 	this->window = window;
-	vkb.ctx.window_ptr = window->get_window_ptr();
+	VulkanContext::window_ptr = window->get_window_ptr();
 	window->add_key_callback([this](KeyInput key, KeyAction action) {
 		if (instance->window->is_key_down(KeyInput::KEY_F10)) {
 			write_exr = true;
@@ -80,31 +80,31 @@ void RayTracer::init(Window* window) {
 	integrator->init();
 	post_fx.init(*instance);
 	init_resources();
-	LUMEN_TRACE("Memory usage {} MB", lumen::vk::get_memory_usage(vk_ctx.physical_device) * 1e-6);
+	LUMEN_TRACE("Memory usage {} MB", lumen::vk::get_memory_usage(VulkanContext::physical_device) * 1e-6);
 }
 
 void RayTracer::init_resources() {
 	RTUtilsDesc desc;
-	output_img_buffer.create("Output Image Buffer", &instance->vkb.ctx,
+	output_img_buffer.create("Output Image Buffer",
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * 4 * 4);
 
-	output_img_buffer_cpu.create("Output Image CPU", &instance->vkb.ctx,
+	output_img_buffer_cpu.create("Output Image CPU",
 								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 								 instance->width * instance->height * 4 * 4);
-	residual_buffer.create("RMSE Residual", &instance->vkb.ctx,
+	residual_buffer.create("RMSE Residual",
 						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * 4);
 
-	counter_buffer.create("RMSE Counter", &instance->vkb.ctx,
+	counter_buffer.create("RMSE Counter",
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(int));
 
-	rmse_val_buffer.create("RMSE Value", &instance->vkb.ctx,
+	rmse_val_buffer.create("RMSE Value",
 						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, sizeof(float));
@@ -114,8 +114,8 @@ void RayTracer::init_resources() {
 						   VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	settings.base_extent = {(uint32_t)instance->width, (uint32_t)instance->height, 1};
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	reference_tex.create_empty_texture("Reference Texture", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL);
-	target_tex.create_empty_texture("Target Texture", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL);
+	reference_tex.create_empty_texture("Reference Texture", settings, VK_IMAGE_LAYOUT_GENERAL);
+	target_tex.create_empty_texture("Target Texture", settings, VK_IMAGE_LAYOUT_GENERAL);
 
 	if (load_reference) {
 		// Load the ground truth image
@@ -125,7 +125,7 @@ void RayTracer::init_resources() {
 			LUMEN_ERROR("Could not load the reference image");
 		}
 		auto gt_size = width * height * 4 * sizeof(float);
-		gt_img_buffer.create("Ground Truth Image", &instance->vkb.ctx,
+		gt_img_buffer.create("Ground Truth Image",
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, gt_size, data, true);
 		desc.gt_img_addr = gt_img_buffer.get_device_address();
@@ -179,7 +179,7 @@ void RayTracer::render(uint32_t i) {
 	post_fx.render(*input_tex, vkb.swapchain_images[i]);
 	render_debug_utils();
 
-	auto cmdbuf = vkb.ctx.command_buffers[i];
+	auto cmdbuf = VulkanContext::command_buffers[i];
 	VkCommandBufferBeginInfo begin_info =
 		lumen::vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	lumen::vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
@@ -276,7 +276,7 @@ bool RayTracer::gui() {
 	ImGui::Text("General settings:");
 	ImGui::PopStyleColor();
 	ImGui::Text("Frame %d time %.2f ms ( %.2f FPS )", integrator->frame_num, cpu_avg_time, 1000 / cpu_avg_time);
-	ImGui::Text("Memory Usage: %.2f MB", lumen::vk::get_memory_usage(vk_ctx.physical_device) * 1e-6);
+	ImGui::Text("Memory Usage: %.2f MB", lumen::vk::get_memory_usage(VulkanContext::physical_device) * 1e-6);
 	bool updated = false;
 	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
 	if (show_cam_stats) {
@@ -327,7 +327,7 @@ bool RayTracer::gui() {
 
 	if (curr_integrator_idx != int(scene.config->integrator_type)) {
 		updated = true;
-		vkDeviceWaitIdle(vkb.ctx.device);
+		vkDeviceWaitIdle(VulkanContext::device);
 		integrator->destroy();
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, &output_img_buffer, instance->vkb.rg);
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);
@@ -467,8 +467,7 @@ void RayTracer::parse_args(int argc, char* argv[]) {
 	}
 }
 void RayTracer::cleanup() {
-	const auto device = vkb.ctx.device;
-	vkDeviceWaitIdle(device);
+	vkDeviceWaitIdle(VulkanContext::device);
 	if (initialized) {
 		cleanup_resources();
 		integrator->destroy();

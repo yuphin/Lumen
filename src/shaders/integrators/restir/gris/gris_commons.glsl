@@ -186,6 +186,17 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	return vec3(0);
 }
 
+vec2 to_spherical(const vec3 v) {
+    float phi = (v.z == 0.0 && v.x == 0.0) ? 0.0 : atan(v.z, v.x);
+    float theta = acos(clamp(v.y, -1.0, 1.0));
+    return vec2(phi, theta);
+}
+
+vec3 from_spherical(const vec2 v) {
+	float sin_theta = sin(v.y);
+	return vec3(sin_theta * cos(v.x), cos(v.y), sin_theta * sin(v.x));
+}
+
 void init_gbuffer(out GBuffer gbuffer) {
 	gbuffer.barycentrics = vec2(0);
 	gbuffer.primitive_instance_id = uvec2(-1);
@@ -400,8 +411,9 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 										   dst_postfix_pdf, unused_rev_pdf, false);
 			reservoir_contribution = prefix_throughput * abs(rc_cos_x) * dst_postfix_f;
 
-#if 1
+#if 0
 			// This line would be needed because reservoir_contribution being 0 means we may get reservoir_contribution turning into nans down the line
+			// However, it's turned off because ReSTIR handles nan propagation down the line
 			if(reservoir_contribution == vec3(0)) {
 				return false;
 			}
@@ -412,7 +424,9 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 				ASSERT(prefix_depth != 0);	// Can't process direct lighting
 				uvec2 rc_coords = uvec2(data.rc_coords / gl_LaunchSizeEXT.y, data.rc_coords % gl_LaunchSizeEXT.y);
 				uvec4 reconnection_seed = init_rng(rc_coords, gl_LaunchSizeEXT.xy, data.seed_helpers.x, data.rc_seed);
+#if DEBUG == 1
 				ASSERT(reconnection_seed == data.debug_seed);
+#endif
 				float pdf_light_w = data.rc_Li.x * wi_len_sqr / abs(dot(rc_gbuffer.n_s, dst_postfix_wi));
 				float mis_weight =
 					is_light_delta(light.light_flags) ? 1.0 : 1.0 / (1.0 + dst_postfix_pdf / pdf_light_w);
@@ -428,9 +442,11 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 
 				bool rc_post_side = face_forward(rc_gbuffer.n_s, rc_gbuffer.n_g, -dst_postfix_wi);
 
+
+				const vec3 rc_wi_post = from_spherical(data.rc_wi);
 				float rc_pdf_post;
 				vec3 rc_postfix_f = eval_bsdf(rc_gbuffer.n_s, -dst_postfix_wi, rc_hit_mat, 1, rc_post_side,
-											  data.rc_wi.xyz, rc_pdf_post, unused_rev_pdf, false);
+											  rc_wi_post, rc_pdf_post, unused_rev_pdf, false);
 
 				float mis_weight = 1.0;
 				if (rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
@@ -442,11 +458,11 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 				}
 
 				if(rc_type == RECONNECTION_TYPE_NEE_AFTER_RC) {
-					reservoir_contribution *= rc_postfix_f * abs(dot(rc_gbuffer.n_s, data.rc_wi.xyz)) / (light_pick_pdf * uintBitsToFloat(data.rc_seed));
+					reservoir_contribution *= rc_postfix_f * abs(dot(rc_gbuffer.n_s, rc_wi_post)) / (light_pick_pdf * uintBitsToFloat(data.rc_seed));
 
 				} else if(rc_type != RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
 					jacobian_num *= rc_pdf_post;
-					reservoir_contribution *= rc_postfix_f * abs(dot(rc_gbuffer.n_s, data.rc_wi.xyz)) / rc_pdf_post;
+					reservoir_contribution *= rc_postfix_f * abs(dot(rc_gbuffer.n_s, rc_wi_post)) / rc_pdf_post;
 				}
 				reservoir_contribution *= data.rc_Li * mis_weight / dst_postfix_pdf;
 				LOG_CLICKED4("Default: %d - %d - %d - %v3f\n", prefix_depth, rc_postfix_length, rc_type, reservoir_contribution);
@@ -534,7 +550,7 @@ bool process_reservoir(inout uvec4 seed, inout Reservoir reservoir, inout float 
 
 	bool result = false;
 
-	float neighbor_in_neighbor_pdf = calc_target_pdf(source_reservoir.data.reservoir_contribution);
+	float neighbor_in_neighbor_pdf = source_reservoir.data.reservoir_contribution;
 	float neighbor_in_canonical_pdf = calc_target_pdf(data.reservoir_contribution) * data.jacobian;
 
 	float m_i_num = source_reservoir.M * neighbor_in_neighbor_pdf;

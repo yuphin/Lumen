@@ -3,27 +3,27 @@
 
 void SPPM::init() {
 	Integrator::init();
-	sppm_data_buffer.create("SPPM Data", &instance->vkb.ctx,
+	sppm_data_buffer.create("SPPM Data",
 							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * sizeof(SPPMData));
 
-	atomic_data_buffer.create("Atomic Data", &instance->vkb.ctx,
+	atomic_data_buffer.create("Atomic Data",
 							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(AtomicData));
 
-	photon_buffer.create("Photon Buffer", &instance->vkb.ctx,
+	photon_buffer.create("Photon Buffer",
 						 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 						 10 * instance->width * instance->height * sizeof(PhotonHash));
-	residual_buffer.create("Residual Buffer", &instance->vkb.ctx,
+	residual_buffer.create("Residual Buffer",
 						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * 4 * sizeof(float));
 
-	counter_buffer.create("Counter Buffer", &instance->vkb.ctx,
+	counter_buffer.create("Counter Buffer",
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(int));
@@ -40,7 +40,7 @@ void SPPM::init() {
 	desc.photon_addr = photon_buffer.get_device_address();
 	desc.residual_addr = residual_buffer.get_device_address();
 	desc.counter_addr = counter_buffer.get_device_address();
-	lumen_scene->scene_desc_buffer.create(&instance->vkb.ctx,
+	lumen_scene->scene_desc_buffer.create(
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
@@ -59,7 +59,7 @@ void SPPM::init() {
 }
 
 void SPPM::render() {
-	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	lumen::CommandBuffer cmd( /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
@@ -171,7 +171,6 @@ bool SPPM::update() {
 }
 
 void SPPM::destroy() {
-	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
 	std::vector<lumen::Buffer*> buffer_list = {&sppm_data_buffer, &atomic_data_buffer, &photon_buffer, &residual_buffer,
 											   &counter_buffer,	  &hash_buffer,		   &tmp_col_buffer};
@@ -179,6 +178,6 @@ void SPPM::destroy() {
 		b->destroy();
 	}
 
-	if (desc_set_layout) vkDestroyDescriptorSetLayout(device, desc_set_layout, nullptr);
-	if (desc_pool) vkDestroyDescriptorPool(device, desc_pool, nullptr);
+	if (desc_set_layout) vkDestroyDescriptorSetLayout(VulkanContext::device, desc_set_layout, nullptr);
+	if (desc_pool) vkDestroyDescriptorPool(VulkanContext::device, desc_pool, nullptr);
 }

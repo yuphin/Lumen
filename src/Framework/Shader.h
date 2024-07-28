@@ -7,6 +7,8 @@ namespace lumen {
 class RenderPass;
 
 struct Shader {
+	Shader() = default;
+	Shader(const std::string& filename);
 	std::vector<uint32_t> binary;
 	std::string filename;
 	std::string name_with_macros;
@@ -20,8 +22,6 @@ struct Shader {
 	int local_size_z = 1;
 	bool uses_push_constants = false;
 	uint32_t push_constant_size = 0;
-	Shader();
-	Shader(const std::string& filename);
 	int compile(RenderPass* pass);
 	VkShaderModule create_vk_shader_module(const VkDevice& device) const;
 	struct BindingStatus {

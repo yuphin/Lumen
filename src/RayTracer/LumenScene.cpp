@@ -116,29 +116,29 @@ void LumenScene::load_scene(const std::string& path) {
 		}
 	}
 	if (gpu_lights.size()) {
-		mesh_lights_buffer.create("Mesh Lights Buffer", &instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		mesh_lights_buffer.create("Mesh Lights Buffer", VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, gpu_lights.size() * sizeof(Light),
 								  gpu_lights.data(), true);
 	}
 	total_light_area += total_light_triangle_area;
 
-	vertex_buffer.create("Vertex Buffer", &instance->vkb.ctx,
+	vertex_buffer.create("Vertex Buffer",
 						 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 							 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, positions.size() * sizeof(glm::vec3), positions.data(),
 						 true);
-	index_buffer.create("Index Buffer", &instance->vkb.ctx,
+	index_buffer.create("Index Buffer",
 						VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 							VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indices.size() * sizeof(uint32_t), indices.data(), true);
 
-	materials_buffer.create("Materials Buffer", &instance->vkb.ctx,
+	materials_buffer.create("Materials Buffer",
 							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, materials.size() * sizeof(Material), materials.data(),
 							true);
-	prim_lookup_buffer.create("Prim Lookup Buffer", &instance->vkb.ctx,
+	prim_lookup_buffer.create("Prim Lookup Buffer",
 							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, prim_lookup.size() * sizeof(PrimMeshInfo),
 							  prim_lookup.data(), true);
@@ -153,7 +153,7 @@ void LumenScene::load_scene(const std::string& path) {
 		vertices.push_back(v);
 	}
 
-	compact_vertices_buffer.create("Compact Vertices Buffer", &instance->vkb.ctx,
+	compact_vertices_buffer.create("Compact Vertices Buffer",
 								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertices.size() * sizeof(vertices[0]),
 								   vertices.data(), true);
@@ -164,7 +164,7 @@ void LumenScene::load_scene(const std::string& path) {
 	sampler_ci.magFilter = VK_FILTER_LINEAR;
 	sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	sampler_ci.maxLod = FLT_MAX;
-	lumen::vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &texture_sampler),
+	lumen::vk::check(vkCreateSampler(VulkanContext::device, &sampler_ci, nullptr, &texture_sampler),
 					 "Could not create image sampler");
 
 	if (!textures.size()) {
@@ -179,7 +179,7 @@ void LumenScene::load_scene(const std::string& path) {
 			auto size = x * y * 4;
 			auto img_dims = VkExtent2D{(uint32_t)x, (uint32_t)y};
 			auto ci = lumen::vk::make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-			scene_textures[i].load_from_data(&instance->vkb.ctx, data, size, ci, texture_sampler,
+			scene_textures[i].load_from_data( data, size, ci, texture_sampler,
 											 VK_IMAGE_USAGE_SAMPLED_BIT, false);
 			stbi_image_free(data);
 			i++;
@@ -657,7 +657,7 @@ void LumenScene::add_default_texture() {
 	std::array<uint8_t, 4> nil = {0, 0, 0, 0};
 	scene_textures.resize(1);
 	auto ci = lumen::vk::make_img2d_ci(VkExtent2D{1, 1});
-	scene_textures[0].load_from_data(&instance->vkb.ctx, nil.data(), 4, ci, texture_sampler, VK_IMAGE_USAGE_SAMPLED_BIT,
+	scene_textures[0].load_from_data( nil.data(), 4, ci, texture_sampler, VK_IMAGE_USAGE_SAMPLED_BIT,
 									 false);
 }
 
@@ -724,5 +724,5 @@ void LumenScene::destroy() {
 	for (auto& tex : scene_textures) {
 		tex.destroy();
 	}
-	vkDestroySampler(instance->vkb.ctx.device, texture_sampler, nullptr);
+	vkDestroySampler(VulkanContext::device, texture_sampler, nullptr);
 }

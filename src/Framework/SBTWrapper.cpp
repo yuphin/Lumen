@@ -10,9 +10,8 @@ static constexpr T align_up(T x, size_t a) noexcept {
 	return T((x + (T(a) - 1)) & ~T(a - 1));
 }
 
-void SBTWrapper::setup(VulkanContext* ctx, uint32_t family_idx,
+void SBTWrapper::setup(uint32_t family_idx,
 					   const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rt_props) {
-	m_ctx = ctx;
 	m_queue_idx = family_idx;
 	m_handle_size = rt_props.shaderGroupHandleSize;
 	m_handle_alignment = rt_props.shaderGroupHandleAlignment;
@@ -82,7 +81,7 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 	uint32_t sbtSize = total_group_cnt * m_handle_size;
 	std::vector<uint8_t> shader_handle_storage(sbtSize);
 
-	auto result = vkGetRayTracingShaderGroupHandlesKHR(m_ctx->device, rt_pipeline, 0, total_group_cnt, sbtSize,
+	auto result = vkGetRayTracingShaderGroupHandlesKHR(VulkanContext::device, rt_pipeline, 0, total_group_cnt, sbtSize,
 													   shader_handle_storage.data());
 	auto find_stride = [&](auto entry, auto& stride) {
 		stride = align_up(m_handle_size, m_handle_alignment);  // minimum stride
@@ -128,7 +127,7 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 	auto mem_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	for (uint32_t i = 0; i < 4; i++) {
 		if (!stage[i].empty()) {
-			m_buffer[i].create(m_ctx, usage_flags, mem_flags, stage[i].size(), stage[i].data(), true);
+			m_buffer[i].create(usage_flags, mem_flags, stage[i].size(), stage[i].data(), true);
 		}
 	}
 }
@@ -138,7 +137,7 @@ VkDeviceAddress SBTWrapper::get_address(GroupType t) {
 		return 0;
 	}
 	VkBufferDeviceAddressInfo i{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, m_buffer[t].handle};
-	return vkGetBufferDeviceAddress(m_ctx->device, &i);
+	return vkGetBufferDeviceAddress(VulkanContext::device, &i);
 }
 
 const VkStridedDeviceAddressRegionKHR SBTWrapper::get_region(GroupType t) {

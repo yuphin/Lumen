@@ -507,7 +507,6 @@ static std::vector<uint32_t> compile_file(const std::string& source_name, shader
 }
 #endif
 
-Shader::Shader() {}
 Shader::Shader(const std::string& filename) : filename(filename) {}
 int Shader::compile(RenderPass* pass) {
 	LUMEN_TRACE("Compiling shader: {0}", name_with_macros);

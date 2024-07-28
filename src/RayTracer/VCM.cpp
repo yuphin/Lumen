@@ -8,65 +8,65 @@ static bool written = false;
 const bool ray_guide = false;
 void VCM::init() {
 	Integrator::init();
-	photon_buffer.create("Photon Buffer", &instance->vkb.ctx,
+	photon_buffer.create("Photon Buffer",
 						 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 						 10 * instance->width * instance->height * sizeof(VCMPhotonHash));
 
 	vcm_light_vertices_buffer.create(
-		"VCM Light Vertices", &instance->vkb.ctx,
+		"VCM Light Vertices",
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		instance->width * instance->height * (config->path_length + 1) * sizeof(VCMVertex));
 
-	light_path_cnt_buffer.create("Light Path Count", &instance->vkb.ctx,
+	light_path_cnt_buffer.create("Light Path Count",
 								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 								 instance->width * instance->height * sizeof(float));
 
-	color_storage_buffer.create("Color Storage", &instance->vkb.ctx,
+	color_storage_buffer.create("Color Storage",
 								VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 								instance->width * instance->height * 3 * sizeof(float));
 
-	vcm_reservoir_buffer.create("VCM Reservoirs", &instance->vkb.ctx,
+	vcm_reservoir_buffer.create("VCM Reservoirs",
 								VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 								instance->width * instance->height * sizeof(VCMReservoir));
 
-	light_samples_buffer.create("Light Samples", &instance->vkb.ctx,
+	light_samples_buffer.create("Light Samples",
 								VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 								instance->width * instance->height * sizeof(VCMRestirData));
 
-	should_resample_buffer.create("Should Resample", &instance->vkb.ctx,
+	should_resample_buffer.create("Should Resample",
 								  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 4);
 
-	light_state_buffer.create("Light States", &instance->vkb.ctx,
+	light_state_buffer.create("Light States",
 							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							  instance->width * instance->height * sizeof(LightState));
 
-	angle_struct_buffer.create("Angle Struct", &instance->vkb.ctx,
+	angle_struct_buffer.create("Angle Struct",
 							   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								   VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, max_samples * sizeof(AngleStruct));
 
-	angle_struct_cpu_buffer.create(&instance->vkb.ctx,
+	angle_struct_cpu_buffer.create(
 								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 									   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 								   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 								   max_samples * sizeof(AngleStruct));
 
-	avg_buffer.create("Average", &instance->vkb.ctx,
+	avg_buffer.create("Average",
 					  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 						  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 					  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, sizeof(AvgStruct));
@@ -90,7 +90,7 @@ void VCM::init() {
 	desc.angle_struct_addr = angle_struct_buffer.get_device_address();
 	desc.avg_addr = avg_buffer.get_device_address();
 
-	lumen_scene->scene_desc_buffer.create(&instance->vkb.ctx,
+	lumen_scene->scene_desc_buffer.create(
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 	pc_ray.total_light_area = 0;
@@ -115,7 +115,7 @@ void VCM::init() {
 }
 
 void VCM::render() {
-	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	lumen::CommandBuffer cmd( /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	const float ppm_base_radius = 0.25f;
 	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
@@ -266,7 +266,6 @@ bool VCM::update() {
 	return updated;
 }
 void VCM::destroy() {
-	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
 	std::vector<lumen::Buffer*> buffer_list = {&photon_buffer,
 											   &vcm_light_vertices_buffer,
@@ -282,6 +281,6 @@ void VCM::destroy() {
 	for (auto b : buffer_list) {
 		b->destroy();
 	}
-	if (desc_set_layout) vkDestroyDescriptorSetLayout(device, desc_set_layout, nullptr);
-	if (desc_pool) vkDestroyDescriptorPool(device, desc_pool, nullptr);
+	if (desc_set_layout) vkDestroyDescriptorSetLayout(VulkanContext::device, desc_set_layout, nullptr);
+	if (desc_pool) vkDestroyDescriptorPool(VulkanContext::device, desc_pool, nullptr);
 }

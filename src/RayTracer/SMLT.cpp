@@ -10,68 +10,68 @@ void SMLT::init() {
 	light_path_rand_count = 6 + 3 * config->path_length;
 	cam_path_rand_count = 3 + 7 * config->path_length;
 
-	bootstrap_buffer.create(&instance->vkb.ctx,
+	bootstrap_buffer.create(
 							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, num_bootstrap_samples * sizeof(BootstrapSample));
 
-	cdf_buffer.create(&instance->vkb.ctx,
+	cdf_buffer.create(
 					  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 						  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 					  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, num_bootstrap_samples * 4);
 
-	bootstrap_cpu.create(&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	bootstrap_cpu.create( VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 						 num_bootstrap_samples * sizeof(BootstrapSample));
 
-	cdf_cpu.create(&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	cdf_cpu.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 				   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 				   num_bootstrap_samples * 4);
 
-	cdf_sum_buffer.create(&instance->vkb.ctx,
+	cdf_sum_buffer.create(
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(float));
 
-	seeds_buffer.create(&instance->vkb.ctx,
+	seeds_buffer.create(
 						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, num_mlt_threads * sizeof(SeedData));
 
-	light_primary_samples_buffer.create(&instance->vkb.ctx,
+	light_primary_samples_buffer.create(
 										VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 											VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 										num_mlt_threads * light_path_rand_count * sizeof(PrimarySample));
 
-	cam_primary_samples_buffer.create(&instance->vkb.ctx,
+	cam_primary_samples_buffer.create(
 									  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 										  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 									  num_mlt_threads * cam_path_rand_count * sizeof(PrimarySample));
 
-	mlt_samplers_buffer.create(&instance->vkb.ctx,
+	mlt_samplers_buffer.create(
 							   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, num_mlt_threads * sizeof(MLTSampler));
 
-	mlt_col_buffer.create(&instance->vkb.ctx,
+	mlt_col_buffer.create(
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * 3 * sizeof(float));
 
-	chain_stats_buffer.create(&instance->vkb.ctx,
+	chain_stats_buffer.create(
 							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, num_mlt_threads * sizeof(ChainData));
 
-	splat_buffer.create(&instance->vkb.ctx,
+	splat_buffer.create(
 						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 						num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat));
 
-	past_splat_buffer.create(&instance->vkb.ctx,
+	past_splat_buffer.create(
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -79,38 +79,38 @@ void SMLT::init() {
 
 	auto path_size = std::max(num_mlt_threads, num_bootstrap_samples);
 	light_path_buffer.create(
-		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, path_size * (config->path_length + 1) * sizeof(VCMVertex));
 
-	connected_lights_buffer.create(&instance->vkb.ctx,
+	connected_lights_buffer.create(
 								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, path_size * sizeof(uint32_t));
 
-	tmp_seeds_buffer.create(&instance->vkb.ctx,
+	tmp_seeds_buffer.create(
 							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, path_size * sizeof(SeedData));
 
-	light_path_cnt_buffer.create(&instance->vkb.ctx,
+	light_path_cnt_buffer.create(
 								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, path_size * sizeof(float));
 
-	light_splats_buffer.create(&instance->vkb.ctx,
+	light_splats_buffer.create(
 							   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							   path_size * (config->path_length * (config->path_length + 1)) * sizeof(Splat));
 
-	light_splat_cnts_buffer.create(&instance->vkb.ctx,
+	light_splat_cnts_buffer.create(
 								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, path_size * sizeof(float));
 	// ---- //
-	tmp_lum_buffer.create(&instance->vkb.ctx,
+	tmp_lum_buffer.create(
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, num_bootstrap_samples * sizeof(float));
 
-	prob_carryover_buffer.create(&instance->vkb.ctx,
+	prob_carryover_buffer.create(
 								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, num_mlt_threads * sizeof(uint32_t));
 
@@ -129,7 +129,7 @@ void SMLT::init() {
 	do {
 		int num_blocks = std::max(1, (int)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
-			block_sums[i++].create(&instance->vkb.ctx,
+			block_sums[i++].create(
 								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, num_blocks * 4);
 		}
@@ -187,7 +187,7 @@ void SMLT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_splats_addr, &light_splats_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_splat_cnts_addr, &light_splat_cnts_buffer, instance->vkb.rg);
 
-	lumen_scene->scene_desc_buffer.create(&instance->vkb.ctx,
+	lumen_scene->scene_desc_buffer.create(
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
@@ -204,7 +204,7 @@ void SMLT::init() {
 
 void SMLT::render() {
 	const float ppm_base_radius = 0.25f;
-	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	lumen::CommandBuffer cmd( /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
 	VkClearValue clear_depth = {1.0f, 0};
 	VkViewport viewport = lumen::vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
@@ -499,7 +499,6 @@ void SMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGrap
 }
 
 void SMLT::destroy() {
-	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
 	std::vector<lumen::Buffer*> buffer_list = {&bootstrap_buffer,
 											   &cdf_buffer,

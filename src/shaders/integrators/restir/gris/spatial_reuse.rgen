@@ -8,7 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
-#define SCENE_TEX_IDX 8
+#define SCENE_TEX_IDX 9
 #include "gris_commons.glsl"
 GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
 PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
@@ -16,6 +16,7 @@ layout(binding = 4, std430) readonly buffer PathReconnections { ReconnectionData
 layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir in_reservoirs[]; };
 layout(binding = 6, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
 layout(binding = 7, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
+layout(binding = 8, rgba16) uniform image2D canonical_contributions_tex;
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
 uvec4 seed2 = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
 
@@ -41,8 +42,7 @@ void main() {
 	int num_spatial_samples = pc.enable_spatial_reuse == 1 ? int(pc.num_spatial_samples) : 0;
 	vec3 curr_reservoir_contribution = vec3(0);
 
-	vec3 canonical_reservoir_contribution = canonical_reservoir.data.reservoir_contribution;
-	float canonical_in_canonical_pdf = calc_target_pdf(canonical_reservoir_contribution);
+	float canonical_in_canonical_pdf = canonical_reservoir.data.reservoir_contribution;
 	uint num_valid_samples = 0;
 	float curr_new_partial_jacobian = 0;
 
@@ -104,10 +104,12 @@ void main() {
 #endif	// ENABLE_DEFENSIVE_PAIRWISE_MIS
 
 	bool accepted = combine_reservoir(seed, reservoir, canonical_reservoir,
-									  calc_target_pdf(canonical_reservoir.data.reservoir_contribution), m_c, 1.0);
+									  canonical_reservoir.data.reservoir_contribution, m_c, 1.0);
 	if (accepted) {
-		curr_reservoir_contribution = canonical_reservoir.data.reservoir_contribution;
+		curr_reservoir_contribution = imageLoad(canonical_contributions_tex, ivec2(gl_LaunchIDEXT.xy)).xyz;
 		curr_new_partial_jacobian = canonical_reservoir.data.rc_partial_jacobian;
+	} else {
+		imageStore(canonical_contributions_tex, ivec2(gl_LaunchIDEXT.xy), vec4(curr_reservoir_contribution, 0));
 	}
 
 	calc_reservoir_W_with_mis(reservoir);
@@ -117,7 +119,7 @@ void main() {
 	reservoir.W /= max(num_valid_samples, 1);
 #endif	// ENABLE_DEFENSIVE_PAIRWISE_MIS
 
-	reservoir.data.reservoir_contribution = curr_reservoir_contribution;
+	reservoir.data.reservoir_contribution = calc_target_pdf(curr_reservoir_contribution);
 	reservoir.data.rc_partial_jacobian = curr_new_partial_jacobian;
 	out_reservoirs[pixel_idx] = reservoir;
 

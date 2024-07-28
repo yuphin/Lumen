@@ -6,13 +6,11 @@
 #include <stb_image/stb_image.h>
 
 namespace lumen {
-Texture2D::Texture2D(VulkanContext* ctx) : Texture(ctx) {}
 
-Texture2D::Texture2D(const std::string& name, VulkanContext* ctx, VkImage image, VkFormat format,
-					 VkImageUsageFlags usage_flags, VkImageAspectFlags aspect_flags, VkExtent2D extent, bool present)
-	: Texture(ctx) {
+Texture2D::Texture2D(const std::string& name, VkImage image, VkFormat format,
+					 VkImageUsageFlags usage_flags, VkImageAspectFlags aspect_flags, VkExtent2D extent, bool present) {
 	img = image;
-	img_view = vk::create_image_view(ctx->device, img, format);
+	img_view = vk::create_image_view(VulkanContext::device, img, format);
 	this->present = present;
 	this->format = format;
 	this->aspect_flags = aspect_flags;
@@ -20,7 +18,7 @@ Texture2D::Texture2D(const std::string& name, VulkanContext* ctx, VkImage image,
 	this->base_extent = VkExtent3D{extent.width, extent.height, 1};
 	if (!name.empty()) {
 		this->name = name;
-		vk::DebugMarker::set_resource_name(ctx->device, (uint64_t)img, name.c_str(), VK_OBJECT_TYPE_IMAGE);
+		vk::DebugMarker::set_resource_name(VulkanContext::device, (uint64_t)img, name.c_str(), VK_OBJECT_TYPE_IMAGE);
 	}
 }
 
@@ -87,13 +85,12 @@ VkDescriptorImageInfo Texture2D::descriptor() const {
 	return desc_info;
 }
 
-void Texture2D::load_from_data(VulkanContext* ctx, void* data, VkDeviceSize size, const VkImageCreateInfo& info,
+void Texture2D::load_from_data(void* data, VkDeviceSize size, const VkImageCreateInfo& info,
 							   VkSampler a_sampler, VkImageUsageFlags flags, bool generate_mipmaps) {
-	this->ctx = ctx;
 	aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT;
 	usage_flags = flags;
 	Buffer staging_buffer;
-	staging_buffer.create(ctx, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+	staging_buffer.create(VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, size, data);
 
 	// Need to do this check pre image creation
@@ -123,7 +120,7 @@ void Texture2D::load_from_data(VulkanContext* ctx, void* data, VkDeviceSize size
 	region.imageExtent.width = info.extent.width;
 	region.imageExtent.height = info.extent.height;
 	region.imageExtent.depth = 1;
-	CommandBuffer copy_cmd(ctx, true);
+	CommandBuffer copy_cmd(true);
 	vk::transition_image_layout(copy_cmd.handle, img, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 								subresource_range, aspect_flags);
 
@@ -138,17 +135,16 @@ void Texture2D::load_from_data(VulkanContext* ctx, void* data, VkDeviceSize size
 	}
 	copy_cmd.submit();
 	staging_buffer.destroy();
-	img_view = vk::create_image_view(ctx->device, img, info.format);
+	img_view = vk::create_image_view(VulkanContext::device, img, info.format);
 	this->sampler = a_sampler;
 
 	layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	base_extent = info.extent;
 }
 
-void Texture2D::create_empty_texture(const char* name, VulkanContext* ctx, const TextureSettings& settings,
+void Texture2D::create_empty_texture(const char* name, const TextureSettings& settings,
 									 VkImageLayout img_layout, VkSampler in_sampler /* 0*/,
 									 VkImageAspectFlags flags /*=VK_IMAGE_ASPECT_COLOR_BIT*/) {
-	this->ctx = ctx;
 	auto image_CI = vk::image(settings.format, settings.usage_flags, settings.base_extent);
 	image_CI.imageType = settings.image_type;
 	image_CI.mipLevels = settings.mip_levels;
@@ -158,9 +154,9 @@ void Texture2D::create_empty_texture(const char* name, VulkanContext* ctx, const
 	image_CI.samples = settings.sample_count;
 	image_CI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	create_image(image_CI);
-	img_view = vk::create_image_view(ctx->device, img, settings.format, flags);
+	img_view = vk::create_image_view(VulkanContext::device, img, settings.format, flags);
 	if (name) {
-		vk::DebugMarker::set_resource_name(ctx->device, (uint64_t)img, name, VK_OBJECT_TYPE_IMAGE);
+		vk::DebugMarker::set_resource_name(VulkanContext::device, (uint64_t)img, name, VK_OBJECT_TYPE_IMAGE);
 		this->name = name;
 	}
 	// Create a default sampler
@@ -178,14 +174,14 @@ void Texture2D::create_empty_texture(const char* name, VulkanContext* ctx, const
 		sampler_CI.compareOp = VK_COMPARE_OP_NEVER;
 		sampler_CI.minLod = 0.0f;
 		sampler_CI.maxLod = (float)settings.mip_levels;
-		sampler_CI.anisotropyEnable = ctx->supported_features.samplerAnisotropy;
+		sampler_CI.anisotropyEnable = VulkanContext::supported_features.samplerAnisotropy;
 		sampler_CI.maxAnisotropy =
-			ctx->supported_features.samplerAnisotropy ? ctx->device_properties.limits.maxSamplerAnisotropy : 1.0f;
+			VulkanContext::supported_features.samplerAnisotropy ? VulkanContext::device_properties.limits.maxSamplerAnisotropy : 1.0f;
 		sampler_CI.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		vk::check(vkCreateSampler(ctx->device, &sampler_CI, nullptr, &sampler), "Could not create image sampler");
+		vk::check(vkCreateSampler(VulkanContext::device, &sampler_CI, nullptr, &sampler), "Could not create image sampler");
 		if (name) {
 			std::string sampler_name = std::string("Sampler: ") + std::string(name);
-			vk::DebugMarker::set_resource_name(ctx->device, (uint64_t)sampler, sampler_name.c_str(),
+			vk::DebugMarker::set_resource_name(VulkanContext::device, (uint64_t)sampler, sampler_name.c_str(),
 											   VK_OBJECT_TYPE_SAMPLER);
 		}
 	} else {
@@ -197,7 +193,7 @@ void Texture2D::create_empty_texture(const char* name, VulkanContext* ctx, const
 		aspect_flags = flags;
 		usage_flags = settings.usage_flags;
 		present = settings.present;
-		CommandBuffer cmd(ctx, true);
+		CommandBuffer cmd(true);
 		transition(cmd.handle, img_layout);
 		cmd.submit();
 	}
@@ -205,26 +201,24 @@ void Texture2D::create_empty_texture(const char* name, VulkanContext* ctx, const
 	base_extent = settings.base_extent;
 }
 
-Texture::Texture(VulkanContext* ctx) : ctx(ctx) {}
-
 void Texture::create_image(const VkImageCreateInfo& info) {
-	vk::check(vkCreateImage(ctx->device, &info, nullptr, &img), "Failed to create image");
+	vk::check(vkCreateImage(VulkanContext::device, &info, nullptr, &img), "Failed to create image");
 
 	VkMemoryRequirements mem_req;
-	vkGetImageMemoryRequirements(ctx->device, img, &mem_req);
+	vkGetImageMemoryRequirements(VulkanContext::device, img, &mem_req);
 	auto alloc_info = vk::memory_allocate_info();
 	alloc_info.allocationSize = mem_req.size;
 	alloc_info.memoryTypeIndex =
-		vk::find_memory_type(&ctx->physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		vk::find_memory_type(&VulkanContext::physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-	vk::check(vkAllocateMemory(ctx->device, &alloc_info, nullptr, &img_mem), "Failed to allocate image memory");
-	vkBindImageMemory(ctx->device, img, img_mem, 0);
+	vk::check(vkAllocateMemory(VulkanContext::device, &alloc_info, nullptr, &img_mem), "Failed to allocate image memory");
+	vkBindImageMemory(VulkanContext::device, img, img_mem, 0);
 	base_extent = info.extent;
 }
 
 void Texture::cmd_generate_mipmaps(const VkImageCreateInfo& info, VkCommandBuffer cmd) {
 	VkFormatProperties format_properties;
-	vkGetPhysicalDeviceFormatProperties(ctx->physical_device, info.format, &format_properties);
+	vkGetPhysicalDeviceFormatProperties(VulkanContext::physical_device, info.format, &format_properties);
 	LUMEN_ASSERT((format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT),
 				 "Texture image format doesn't support linear blitting");
 
@@ -268,12 +262,12 @@ void Texture::cmd_generate_mipmaps(const VkImageCreateInfo& info, VkCommandBuffe
 
 void Texture::destroy() {
 	if (sampler_allocated) {
-		vkDestroySampler(ctx->device, sampler, nullptr);
+		vkDestroySampler(VulkanContext::device, sampler, nullptr);
 	}
-	vkDestroyImageView(ctx->device, img_view, nullptr);
+	vkDestroyImageView(VulkanContext::device, img_view, nullptr);
 	if (img_mem) {
-		vkDestroyImage(ctx->device, img, nullptr);
-		vkFreeMemory(ctx->device, img_mem, nullptr);
+		vkDestroyImage(VulkanContext::device, img, nullptr);
+		vkFreeMemory(VulkanContext::device, img_mem, nullptr);
 	}
 	img = VK_NULL_HANDLE;
 }

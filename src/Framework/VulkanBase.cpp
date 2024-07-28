@@ -58,7 +58,7 @@ QueueFamilyIndices VulkanBase::find_queue_families(VkPhysicalDevice device) {
 		}
 
 		VkBool32 present_support = false;
-		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, ctx.surface, &present_support);
+		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, VulkanContext::surface, &present_support);
 
 		if (present_support) {
 			indices.present_family = i;
@@ -78,22 +78,22 @@ VulkanBase::SwapChainSupportDetails VulkanBase::query_swapchain_support(VkPhysic
 
 	SwapChainSupportDetails details;
 
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, ctx.surface, &details.capabilities);
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, VulkanContext::surface, &details.capabilities);
 
 	uint32_t format_cnt;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(device, ctx.surface, &format_cnt, nullptr);
+	vkGetPhysicalDeviceSurfaceFormatsKHR(device, VulkanContext::surface, &format_cnt, nullptr);
 
 	if (format_cnt != 0) {
 		details.formats.resize(format_cnt);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(device, ctx.surface, &format_cnt, details.formats.data());
+		vkGetPhysicalDeviceSurfaceFormatsKHR(device, VulkanContext::surface, &format_cnt, details.formats.data());
 	}
 
 	uint32_t present_mode_cnt;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(device, ctx.surface, &present_mode_cnt, nullptr);
+	vkGetPhysicalDeviceSurfacePresentModesKHR(device, VulkanContext::surface, &present_mode_cnt, nullptr);
 
 	if (present_mode_cnt != 0) {
 		details.present_modes.resize(present_mode_cnt);
-		vkGetPhysicalDeviceSurfacePresentModesKHR(device, ctx.surface, &present_mode_cnt, details.present_modes.data());
+		vkGetPhysicalDeviceSurfacePresentModesKHR(device, VulkanContext::surface, &present_mode_cnt, details.present_modes.data());
 	}
 	return details;
 }
@@ -105,7 +105,7 @@ VkShaderModule VulkanBase::create_shader(const std::vector<char>& code) {
 	shader_module_CI.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
 	VkShaderModule shaderModule;
-	vk::check(vkCreateShaderModule(ctx.device, &shader_module_CI, nullptr, &shaderModule),
+	vk::check(vkCreateShaderModule(VulkanContext::device, &shader_module_CI, nullptr, &shaderModule),
 			  "Failed to create shader module!");
 	return shaderModule;
 }
@@ -152,7 +152,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverity
 void VulkanBase::setup_debug_messenger() {
 	auto ci = vk::debug_messenger(debug_callback);
 
-	vk::check(vkExt_create_debug_messenger(ctx.instance, &ci, nullptr, &ctx.debug_messenger),
+	vk::check(vkExt_create_debug_messenger(VulkanContext::instance, &ci, nullptr, &VulkanContext::debug_messenger),
 			  "Failed to set up debug messenger!");
 }
 void VulkanBase::cleanup_swapchain() {
@@ -165,17 +165,17 @@ void VulkanBase::cleanup_swapchain() {
 	// 6- Destroy image views
 	// 7- Destroy swapchain
 	// TODO
-	// for (auto framebuffer : ctx.swapchain_framebuffers) {
-	//	vkDestroyFramebuffer(ctx.device, framebuffer, nullptr);
+	// for (auto framebuffer : VulkanContext::swapchain_framebuffers) {
+	//	vkDestroyFramebuffer(VulkanContext::device, framebuffer, nullptr);
 	//}
-	vkDestroyDescriptorPool(ctx.device, imgui_pool, nullptr);
-	vkFreeCommandBuffers(ctx.device, ctx.cmd_pools[0], static_cast<uint32_t>(ctx.command_buffers.size()),
-						 ctx.command_buffers.data());
+	vkDestroyDescriptorPool(VulkanContext::device, imgui_pool, nullptr);
+	vkFreeCommandBuffers(VulkanContext::device, VulkanContext::cmd_pools[0], static_cast<uint32_t>(VulkanContext::command_buffers.size()),
+						 VulkanContext::command_buffers.data());
 	for (auto& swapchain_img : swapchain_images) {
 		swapchain_img.destroy();
 	}
 	swapchain_images.clear();
-	vkDestroySwapchainKHR(ctx.device, ctx.swapchain, nullptr);
+	vkDestroySwapchainKHR(VulkanContext::device, VulkanContext::swapchain, nullptr);
 }
 
 void VulkanBase::cleanup_app_data() {
@@ -183,12 +183,12 @@ void VulkanBase::cleanup_app_data() {
 	if (!blases.empty()) {
 		for (auto& b : blases) {
 			b.buffer.destroy();
-			vkDestroyAccelerationStructureKHR(ctx.device, b.accel, nullptr);
+			vkDestroyAccelerationStructureKHR(VulkanContext::device, b.accel, nullptr);
 		}
 	}
-	if (tlas.buffer.ctx) {
+	if (tlas.accel) {
 		tlas.buffer.destroy();
-		vkDestroyAccelerationStructureKHR(ctx.device, tlas.accel, nullptr);
+		vkDestroyAccelerationStructureKHR(VulkanContext::device, tlas.accel, nullptr);
 	}
 	blases.clear();
 }
@@ -198,22 +198,22 @@ void VulkanBase::cleanup() {
 	cleanup_swapchain();
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		vkDestroySemaphore(ctx.device, image_available_sem[i], nullptr);
-		vkDestroySemaphore(ctx.device, render_finished_sem[i], nullptr);
-		vkDestroyFence(ctx.device, in_flight_fences[i], nullptr);
+		vkDestroySemaphore(VulkanContext::device, image_available_sem[i], nullptr);
+		vkDestroySemaphore(VulkanContext::device, render_finished_sem[i], nullptr);
+		vkDestroyFence(VulkanContext::device, in_flight_fences[i], nullptr);
 	}
 
-	for (auto pool : ctx.cmd_pools) {
-		vkDestroyCommandPool(ctx.device, pool, nullptr);
+	for (auto pool : VulkanContext::cmd_pools) {
+		vkDestroyCommandPool(VulkanContext::device, pool, nullptr);
 	}
-	vkDestroySurfaceKHR(ctx.instance, ctx.surface, nullptr);
+	vkDestroySurfaceKHR(VulkanContext::instance, VulkanContext::surface, nullptr);
 
-	vkDestroyDevice(ctx.device, nullptr);
+	vkDestroyDevice(VulkanContext::device, nullptr);
 	if (enable_validation_layers) {
-		vkExt_destroy_debug_messenger(ctx.instance, ctx.debug_messenger, nullptr);
+		vkExt_destroy_debug_messenger(VulkanContext::instance, VulkanContext::debug_messenger, nullptr);
 	}
-	vkDestroyInstance(ctx.instance, nullptr);
-	glfwDestroyWindow(ctx.window_ptr);
+	vkDestroyInstance(VulkanContext::instance, nullptr);
+	glfwDestroyWindow(VulkanContext::window_ptr);
 	glfwTerminate();
 }
 
@@ -244,28 +244,28 @@ void VulkanBase::create_instance() {
 		instance_CI.pNext = nullptr;
 	}
 	vk::check(volkInitialize(), "Failed to initialize volk");
-	vk::check(vkCreateInstance(&instance_CI, nullptr, &ctx.instance), "Failed to create instance");
-	volkLoadInstance(ctx.instance);
+	vk::check(vkCreateInstance(&instance_CI, nullptr, &VulkanContext::instance), "Failed to create instance");
+	volkLoadInstance(VulkanContext::instance);
 	if (enable_validation_layers && !check_validation_layer_support()) {
 		LUMEN_ERROR("Validation layers requested, but not available!");
 	}
-	rg = std::make_unique<RenderGraph>(&ctx);
+	rg = std::make_unique<RenderGraph>();
 }
 
 void VulkanBase::create_surface() {
-	vk::check(glfwCreateWindowSurface(ctx.instance, ctx.window_ptr, nullptr, &ctx.surface),
+	vk::check(glfwCreateWindowSurface(VulkanContext::instance, VulkanContext::window_ptr, nullptr, &VulkanContext::surface),
 			  "Failed to create window surface");
 }
 
 void VulkanBase::pick_physical_device() {
 	uint32_t device_cnt = 0;
-	vkEnumeratePhysicalDevices(ctx.instance, &device_cnt, nullptr);
+	vkEnumeratePhysicalDevices(VulkanContext::instance, &device_cnt, nullptr);
 	if (device_cnt == 0) {
 		LUMEN_ERROR("Failed to find GPUs with Vulkan support");
 	}
 
 	std::vector<VkPhysicalDevice> devices(device_cnt);
-	vkEnumeratePhysicalDevices(ctx.instance, &device_cnt, devices.data());
+	vkEnumeratePhysicalDevices(VulkanContext::instance, &device_cnt, devices.data());
 
 	// Is device suitable?
 	auto is_suitable = [this](VkPhysicalDevice device) {
@@ -300,31 +300,31 @@ void VulkanBase::pick_physical_device() {
 	};
 	for (const auto& device : devices) {
 		if (is_suitable(device)) {
-			ctx.physical_device = device;
-			vkGetPhysicalDeviceFeatures(ctx.physical_device, &ctx.supported_features);
-			vkGetPhysicalDeviceProperties(ctx.physical_device, &ctx.device_properties);
-			vkGetPhysicalDeviceMemoryProperties(ctx.physical_device, &ctx.memory_properties);
+			VulkanContext::physical_device = device;
+			vkGetPhysicalDeviceFeatures(VulkanContext::physical_device, &VulkanContext::supported_features);
+			vkGetPhysicalDeviceProperties(VulkanContext::physical_device, &VulkanContext::device_properties);
+			vkGetPhysicalDeviceMemoryProperties(VulkanContext::physical_device, &VulkanContext::memory_properties);
 			break;
 		}
 	}
 
-	if (ctx.physical_device == VK_NULL_HANDLE) {
+	if (VulkanContext::physical_device == VK_NULL_HANDLE) {
 		LUMEN_ERROR("Failed to find a suitable GPU");
 	}
 	VkPhysicalDeviceProperties2 prop2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
-	prop2.pNext = &ctx.rt_props;
-	vkGetPhysicalDeviceProperties2(ctx.physical_device, &prop2);
+	prop2.pNext = &VulkanContext::rt_props;
+	vkGetPhysicalDeviceProperties2(VulkanContext::physical_device, &prop2);
 }
 
 void VulkanBase::create_logical_device() {
-	ctx.indices = find_queue_families(ctx.physical_device);
+	VulkanContext::queue_indices = find_queue_families(VulkanContext::physical_device);
 
 	std::vector<VkDeviceQueueCreateInfo> queue_CIs;
-	std::set<uint32_t> unique_queue_families = {ctx.indices.gfx_family.value(), ctx.indices.present_family.value(),
-												ctx.indices.compute_family.value()};
+	std::set<uint32_t> unique_queue_families = {VulkanContext::queue_indices.gfx_family.value(), VulkanContext::queue_indices.present_family.value(),
+												VulkanContext::queue_indices.compute_family.value()};
 
-	ctx.queues.resize(ctx.indices.gfx_family.has_value() + ctx.indices.present_family.has_value() +
-					  ctx.indices.compute_family.has_value());
+	VulkanContext::queues.resize(VulkanContext::queue_indices.gfx_family.has_value() + VulkanContext::queue_indices.present_family.has_value() +
+					  VulkanContext::queue_indices.compute_family.has_value());
 	float queue_priority = 1.0f;
 	for (uint32_t queue_family_idx : unique_queue_families) {
 		VkDeviceQueueCreateInfo queue_CI{};
@@ -409,17 +409,17 @@ void VulkanBase::create_logical_device() {
 		logical_device_CI.enabledLayerCount = 0;
 	}
 
-	vk::check(vkCreateDevice(ctx.physical_device, &logical_device_CI, nullptr, &ctx.device),
+	vk::check(vkCreateDevice(VulkanContext::physical_device, &logical_device_CI, nullptr, &VulkanContext::device),
 			  "Failed to create logical device");
 
-	// load_VK_EXTENSIONS(ctx.instance, vkGetInstanceProcAddr, ctx.device, vkGetDeviceProcAddr);
-	vkGetDeviceQueue(ctx.device, ctx.indices.gfx_family.value(), 0, &ctx.queues[(int)QueueType::GFX]);
-	vkGetDeviceQueue(ctx.device, ctx.indices.compute_family.value(), 0, &ctx.queues[(int)QueueType::COMPUTE]);
-	vkGetDeviceQueue(ctx.device, ctx.indices.present_family.value(), 0, &ctx.queues[(int)QueueType::PRESENT]);
+	// load_VK_EXTENSIONS(VulkanContext::instance, vkGetInstanceProcAddr, VulkanContext::device, vkGetDeviceProcAddr);
+	vkGetDeviceQueue(VulkanContext::device, VulkanContext::queue_indices.gfx_family.value(), 0, &VulkanContext::queues[(int)QueueType::GFX]);
+	vkGetDeviceQueue(VulkanContext::device, VulkanContext::queue_indices.compute_family.value(), 0, &VulkanContext::queues[(int)QueueType::COMPUTE]);
+	vkGetDeviceQueue(VulkanContext::device, VulkanContext::queue_indices.present_family.value(), 0, &VulkanContext::queues[(int)QueueType::PRESENT]);
 }
 
 void VulkanBase::create_swapchain() {
-	SwapChainSupportDetails swapchain_support = query_swapchain_support(ctx.physical_device);
+	SwapChainSupportDetails swapchain_support = query_swapchain_support(VulkanContext::physical_device);
 
 	// Pick surface format, present mode and extent(preferrably width and
 	// height):
@@ -452,7 +452,7 @@ void VulkanBase::create_swapchain() {
 			return capabilities.currentExtent;
 		} else {
 			int width, height;
-			glfwGetFramebufferSize(ctx.window_ptr, &width, &height);
+			glfwGetFramebufferSize(VulkanContext::window_ptr, &width, &height);
 
 			VkExtent2D actual_extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 
@@ -474,7 +474,7 @@ void VulkanBase::create_swapchain() {
 
 	VkSwapchainCreateInfoKHR swapchain_CI{};
 	swapchain_CI.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-	swapchain_CI.surface = ctx.surface;
+	swapchain_CI.surface = VulkanContext::surface;
 
 	swapchain_CI.minImageCount = image_cnt;
 	swapchain_CI.imageFormat = surface_format.format;
@@ -485,7 +485,7 @@ void VulkanBase::create_swapchain() {
 
 	swapchain_format = surface_format.format;
 
-	QueueFamilyIndices indices = find_queue_families(ctx.physical_device);
+	QueueFamilyIndices indices = find_queue_families(VulkanContext::physical_device);
 	uint32_t queue_family_indices_arr[] = {indices.gfx_family.value(), indices.present_family.value()};
 
 	if (indices.gfx_family != indices.present_family) {
@@ -503,27 +503,26 @@ void VulkanBase::create_swapchain() {
 
 	swapchain_CI.oldSwapchain = VK_NULL_HANDLE;
 
-	vk::check(vkCreateSwapchainKHR(ctx.device, &swapchain_CI, nullptr, &ctx.swapchain), "Failed to create swap chain!");
+	vk::check(vkCreateSwapchainKHR(VulkanContext::device, &swapchain_CI, nullptr, &VulkanContext::swapchain), "Failed to create swap chain!");
 
-	vkGetSwapchainImagesKHR(ctx.device, ctx.swapchain, &image_cnt, nullptr);
+	vkGetSwapchainImagesKHR(VulkanContext::device, VulkanContext::swapchain, &image_cnt, nullptr);
 	swapchain_images.reserve(image_cnt);
 	VkImage images[16] = {nullptr};
-	vkGetSwapchainImagesKHR(ctx.device, ctx.swapchain, &image_cnt, images);
+	vkGetSwapchainImagesKHR(VulkanContext::device, VulkanContext::swapchain, &image_cnt, images);
 	for (uint32_t i = 0; i < image_cnt; i++) {
-		swapchain_images.emplace_back("Swapchain Image #" + std::to_string(i), &ctx, images[i], surface_format.format,
+		swapchain_images.emplace_back("Swapchain Image #" + std::to_string(i), images[i], surface_format.format,
 									  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_ASPECT_COLOR_BIT, extent, true);
 	}
-	ctx.swapchain_extent = extent;
 }
 
 void VulkanBase::create_command_pools() {
-	QueueFamilyIndices queue_family_idxs = find_queue_families(ctx.physical_device);
+	QueueFamilyIndices queue_family_idxs = find_queue_families(VulkanContext::physical_device);
 	VkCommandPoolCreateInfo pool_info = vk::command_pool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 	pool_info.queueFamilyIndex = queue_family_idxs.gfx_family.value();
 	const auto processor_count = std::thread::hardware_concurrency();
-	ctx.cmd_pools.resize(processor_count);
+	VulkanContext::cmd_pools.resize(processor_count);
 	for (unsigned int i = 0; i < processor_count; i++) {
-		vk::check(vkCreateCommandPool(ctx.device, &pool_info, nullptr, &ctx.cmd_pools[i]),
+		vk::check(vkCreateCommandPool(VulkanContext::device, &pool_info, nullptr, &VulkanContext::cmd_pools[i]),
 				  "Failed to create command pool!");
 	}
 }
@@ -547,19 +546,19 @@ void VulkanBase::init_imgui() {
 	pool_info.maxSets = 1000;
 	pool_info.poolSizeCount = (uint32_t)std::size(pool_sizes);
 	pool_info.pPoolSizes = pool_sizes;
-	vk::check(vkCreateDescriptorPool(ctx.device, &pool_info, nullptr, &imgui_pool));
+	vk::check(vkCreateDescriptorPool(VulkanContext::device, &pool_info, nullptr, &imgui_pool));
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	// Setup Platform/Renderer backends
 	ImGui::StyleColorsDark();
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-	ImGui_ImplGlfw_InitForVulkan(ctx.window_ptr, true);
+	ImGui_ImplGlfw_InitForVulkan(VulkanContext::window_ptr, true);
 
 	ImGui_ImplVulkan_InitInfo init_info = {};
-	init_info.Instance = ctx.instance;
-	init_info.PhysicalDevice = ctx.physical_device;
-	init_info.Device = ctx.device;
-	init_info.Queue = ctx.queues[(int)QueueType::GFX];
+	init_info.Instance = VulkanContext::instance;
+	init_info.PhysicalDevice = VulkanContext::physical_device;
+	init_info.Device = VulkanContext::device;
+	init_info.Queue = VulkanContext::queues[(int)QueueType::GFX];
 	init_info.DescriptorPool = imgui_pool;
 	init_info.MinImageCount = 3;
 	init_info.ImageCount = 3;
@@ -569,9 +568,9 @@ void VulkanBase::init_imgui() {
 
 	ImGui_ImplVulkan_Init(&init_info, nullptr);
 
-	CommandBuffer cmd(&ctx, true);
+	CommandBuffer cmd(true);
 	ImGui_ImplVulkan_CreateFontsTexture(cmd.handle);
-	cmd.submit(ctx.queues[(int)QueueType::GFX]);
+	cmd.submit(VulkanContext::queues[(int)QueueType::GFX]);
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
@@ -582,12 +581,12 @@ void VulkanBase::destroy_imgui() {
 }
 
 void VulkanBase::create_command_buffers() {
-	ctx.command_buffers.resize(swapchain_images.size());
+	VulkanContext::command_buffers.resize(swapchain_images.size());
 	// TODO: Factor
 	// 0 is for the main thread
 	VkCommandBufferAllocateInfo alloc_info = vk::command_buffer_allocate_info(
-		ctx.cmd_pools[0], VK_COMMAND_BUFFER_LEVEL_PRIMARY, (uint32_t)ctx.command_buffers.size());
-	vk::check(vkAllocateCommandBuffers(ctx.device, &alloc_info, ctx.command_buffers.data()),
+		VulkanContext::cmd_pools[0], VK_COMMAND_BUFFER_LEVEL_PRIMARY, (uint32_t)VulkanContext::command_buffers.size());
+	vk::check(vkAllocateCommandBuffers(VulkanContext::device, &alloc_info, VulkanContext::command_buffers.data()),
 			  "Failed to allocate command buffers!");
 }
 
@@ -602,23 +601,23 @@ void VulkanBase::create_sync_primitives() {
 	VkFenceCreateInfo fence_info = vk::fence(VK_FENCE_CREATE_SIGNALED_BIT);
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		vk::check<3>({vkCreateSemaphore(ctx.device, &semaphore_info, nullptr, &image_available_sem[i]),
-					  vkCreateSemaphore(ctx.device, &semaphore_info, nullptr, &render_finished_sem[i]),
-					  vkCreateFence(ctx.device, &fence_info, nullptr, &in_flight_fences[i])},
+		vk::check<3>({vkCreateSemaphore(VulkanContext::device, &semaphore_info, nullptr, &image_available_sem[i]),
+					  vkCreateSemaphore(VulkanContext::device, &semaphore_info, nullptr, &render_finished_sem[i]),
+					  vkCreateFence(VulkanContext::device, &fence_info, nullptr, &in_flight_fences[i])},
 					 "Failed to create synchronization primitives for a frame");
 	}
 }
 
 // Called after window resize
-void VulkanBase::recreate_swap_chain(VulkanContext& ctx) {
+void VulkanBase::recreate_swap_chain() {
 	int width = 0, height = 0;
-	glfwGetFramebufferSize(ctx.window_ptr, &width, &height);
+	glfwGetFramebufferSize(VulkanContext::window_ptr, &width, &height);
 	while (width == 0 || height == 0) {
 		// Window is minimized
-		glfwGetFramebufferSize(ctx.window_ptr, &width, &height);
+		glfwGetFramebufferSize(VulkanContext::window_ptr, &width, &height);
 		glfwWaitEvents();
 	}
-	vkDeviceWaitIdle(ctx.device);
+	vkDeviceWaitIdle(VulkanContext::device);
 	cleanup_swapchain();
 	create_swapchain();
 	create_command_buffers();
@@ -652,14 +651,14 @@ AccelKHR VulkanBase::create_acceleration(VkAccelerationStructureCreateInfoKHR& a
 	// Allocating the buffer to hold the acceleration structure
 	Buffer accel_buff;
 	accel_buff.create(
-		"Blas Buffer", &ctx,
+		"Blas Buffer",
 		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, accel.size);
 	// Setting the buffer
 	result_accel.buffer = accel_buff;
 	accel.buffer = result_accel.buffer.handle;
 	// Create the acceleration structure
-	vkCreateAccelerationStructureKHR(ctx.device, &accel, nullptr, &result_accel.accel);
+	vkCreateAccelerationStructureKHR(VulkanContext::device, &accel, nullptr, &result_accel.accel);
 	return result_accel;
 }
 
@@ -670,7 +669,7 @@ void VulkanBase::cmd_compact_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> 
 
 	// Get the compacted size result back
 	std::vector<VkDeviceSize> compact_sizes(static_cast<uint32_t>(indices.size()));
-	vkGetQueryPoolResults(ctx.device, queryPool, 0, (uint32_t)compact_sizes.size(),
+	vkGetQueryPoolResults(VulkanContext::device, queryPool, 0, (uint32_t)compact_sizes.size(),
 						  compact_sizes.size() * sizeof(VkDeviceSize), compact_sizes.data(), sizeof(VkDeviceSize),
 						  VK_QUERY_RESULT_WAIT_BIT);
 
@@ -695,7 +694,7 @@ void VulkanBase::cmd_create_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> i
 								 std::vector<BuildAccelerationStructure>& buildAs, VkDeviceAddress scratchAddress,
 								 VkQueryPool queryPool) {
 	if (queryPool)	// For querying the compaction size
-		vkResetQueryPool(ctx.device, queryPool, 0, static_cast<uint32_t>(indices.size()));
+		vkResetQueryPool(VulkanContext::device, queryPool, 0, static_cast<uint32_t>(indices.size()));
 	uint32_t query_cnt{0};
 	for (const auto& idx : indices) {
 		// Actual allocation of buffer and acceleration structure.
@@ -755,7 +754,7 @@ void VulkanBase::cmd_create_tlas(VkCommandBuffer cmdBuf, uint32_t countInstance,
 	build_info.srcAccelerationStructure = VK_NULL_HANDLE;
 
 	VkAccelerationStructureBuildSizesInfoKHR size_info{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR};
-	vkGetAccelerationStructureBuildSizesKHR(ctx.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &build_info,
+	vkGetAccelerationStructureBuildSizesKHR(VulkanContext::device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &build_info,
 											&countInstance, &size_info);
 
 #ifdef VK_NV_ray_tracing_motion_blur
@@ -772,10 +771,10 @@ void VulkanBase::cmd_create_tlas(VkCommandBuffer cmdBuf, uint32_t countInstance,
 	}
 
 	// Allocate the scratch memory
-	scratchBuffer.create(&ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+	scratchBuffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, size_info.buildScratchSize);
 	VkBufferDeviceAddressInfo bufferInfo{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, scratchBuffer.handle};
-	VkDeviceAddress scratchAddress = vkGetBufferDeviceAddress(ctx.device, &bufferInfo);
+	VkDeviceAddress scratchAddress = vkGetBufferDeviceAddress(VulkanContext::device, &bufferInfo);
 
 	// Update build information
 	build_info.srcAccelerationStructure = update ? tlas.accel : VK_NULL_HANDLE;
@@ -825,7 +824,7 @@ void VulkanBase::build_blas(const std::vector<BlasInput>& input, VkBuildAccelera
 		for (auto tt = 0; tt < input[idx].as_build_offset_info.size(); tt++) {
 			maxPrimCount[tt] = input[idx].as_build_offset_info[tt].primitiveCount;	// Number of primitives/triangles
 		}
-		vkGetAccelerationStructureBuildSizesKHR(ctx.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+		vkGetAccelerationStructureBuildSizesKHR(VulkanContext::device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
 												&buildAs[idx].build_info, maxPrimCount.data(), &buildAs[idx].size_info);
 
 		// Extra info
@@ -838,10 +837,10 @@ void VulkanBase::build_blas(const std::vector<BlasInput>& input, VkBuildAccelera
 	// Allocate the scratch buffers holding the temporary data of the
 	// acceleration structure builder
 	Buffer scratch_buffer;
-	scratch_buffer.create(&ctx, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+	scratch_buffer.create(VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, max_scratch_size);
 	VkBufferDeviceAddressInfo buffer_info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, scratch_buffer.handle};
-	VkDeviceAddress scratchAddress = vkGetBufferDeviceAddress(ctx.device, &buffer_info);
+	VkDeviceAddress scratchAddress = vkGetBufferDeviceAddress(VulkanContext::device, &buffer_info);
 
 	// Allocate a query pool for storing the needed size for every BLAS
 	// compaction.
@@ -852,7 +851,7 @@ void VulkanBase::build_blas(const std::vector<BlasInput>& input, VkBuildAccelera
 		VkQueryPoolCreateInfo qpci{VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO};
 		qpci.queryCount = nb_blas;
 		qpci.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
-		vkCreateQueryPool(ctx.device, &qpci, nullptr, &queryPool);
+		vkCreateQueryPool(VulkanContext::device, &qpci, nullptr, &queryPool);
 	}
 	// Batching creation/compaction of BLAS to allow staying in restricted
 	// amount of memory
@@ -864,7 +863,7 @@ void VulkanBase::build_blas(const std::vector<BlasInput>& input, VkBuildAccelera
 		batchSize += buildAs[idx].size_info.accelerationStructureSize;
 		// Over the limit or last BLAS element
 		if (batchSize >= batchLimit || idx == nb_blas - 1) {
-			CommandBuffer cmdBuf(&ctx, true, 0, QueueType::GFX);
+			CommandBuffer cmdBuf(true, 0, QueueType::GFX);
 			cmd_create_blas(cmdBuf.handle, indices, buildAs, scratchAddress, queryPool);
 			cmdBuf.submit();
 			if (queryPool) {
@@ -872,7 +871,7 @@ void VulkanBase::build_blas(const std::vector<BlasInput>& input, VkBuildAccelera
 				cmdBuf.submit();
 				// Destroy the non-compacted version
 				for (auto i : indices) {
-					vkDestroyAccelerationStructureKHR(ctx.device, buildAs[i].cleanup_as.accel, nullptr);
+					vkDestroyAccelerationStructureKHR(VulkanContext::device, buildAs[i].cleanup_as.accel, nullptr);
 					buildAs[i].cleanup_as.buffer.destroy();
 				}
 			}
@@ -896,7 +895,7 @@ void VulkanBase::build_blas(const std::vector<BlasInput>& input, VkBuildAccelera
 		blases.emplace_back(b.as);
 	}
 	// Clean up
-	vkDestroyQueryPool(ctx.device, queryPool, nullptr);
+	vkDestroyQueryPool(VulkanContext::device, queryPool, nullptr);
 	scratch_buffer.destroy();
 }
 
@@ -905,33 +904,33 @@ VkDeviceAddress VulkanBase::get_blas_device_address(uint32_t blas_idx) {
 	VkAccelerationStructureDeviceAddressInfoKHR addr_info{
 		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
 	addr_info.accelerationStructure = blases[blas_idx].accel;
-	return vkGetAccelerationStructureDeviceAddressKHR(ctx.device, &addr_info);
+	return vkGetAccelerationStructureDeviceAddressKHR(VulkanContext::device, &addr_info);
 }
 
 uint32_t VulkanBase::prepare_frame() {
-	vk::check(vkWaitForFences(ctx.device, 1, &in_flight_fences[current_frame], VK_TRUE, 1000000000), "Timeout");
+	vk::check(vkWaitForFences(VulkanContext::device, 1, &in_flight_fences[current_frame], VK_TRUE, 1000000000), "Timeout");
 
 	uint32_t image_idx;
-	VkResult result = vkAcquireNextImageKHR(ctx.device, ctx.swapchain, UINT64_MAX, image_available_sem[current_frame],
+	VkResult result = vkAcquireNextImageKHR(VulkanContext::device, VulkanContext::swapchain, UINT64_MAX, image_available_sem[current_frame],
 											VK_NULL_HANDLE, &image_idx);
 	if (result == VK_NOT_READY) {
 		return UINT32_MAX;
 	} else if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
 		// Window resize
-		vkDeviceWaitIdle(ctx.device);
-		recreate_swap_chain(ctx);
+		vkDeviceWaitIdle(VulkanContext::device);
+		recreate_swap_chain();
 		cleanup_app_data();
-		rg = std::make_unique<RenderGraph>(&ctx);
+		rg = std::make_unique<RenderGraph>();
 		return UINT32_MAX;
 	} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
 		LUMEN_ERROR("Failed to acquire new swap chain image");
 	}
 	if (images_in_flight[image_idx] != VK_NULL_HANDLE) {
-		vkWaitForFences(ctx.device, 1, &images_in_flight[image_idx], VK_TRUE, UINT64_MAX);
+		vkWaitForFences(VulkanContext::device, 1, &images_in_flight[image_idx], VK_TRUE, UINT64_MAX);
 	}
 
-	vk::check(vkResetCommandBuffer(ctx.command_buffers[image_idx], 0));
-	vkResetFences(ctx.device, 1, &in_flight_fences[current_frame]);
+	vk::check(vkResetCommandBuffer(VulkanContext::command_buffers[image_idx], 0));
+	vkResetFences(VulkanContext::device, 1, &in_flight_fences[current_frame]);
 	images_in_flight[image_idx] = in_flight_fences[current_frame];
 	return image_idx;
 }
@@ -945,13 +944,13 @@ VkResult VulkanBase::submit_frame(uint32_t image_idx) {
 	submit_info.pWaitDstStageMask = wait_stages;
 
 	submit_info.commandBufferCount = 1;
-	submit_info.pCommandBuffers = &ctx.command_buffers[image_idx];
+	submit_info.pCommandBuffers = &VulkanContext::command_buffers[image_idx];
 
 	VkSemaphore signal_semaphores[] = {render_finished_sem[current_frame]};
 	submit_info.signalSemaphoreCount = 1;
 	submit_info.pSignalSemaphores = signal_semaphores;
 
-	vk::check(vkQueueSubmit(ctx.queues[(int)QueueType::GFX], 1, &submit_info, in_flight_fences[current_frame]),
+	vk::check(vkQueueSubmit(VulkanContext::queues[(int)QueueType::GFX], 1, &submit_info, in_flight_fences[current_frame]),
 			  "Failed to submit draw command buffer");
 	current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 	VkPresentInfoKHR present_info{};
@@ -960,18 +959,18 @@ VkResult VulkanBase::submit_frame(uint32_t image_idx) {
 	present_info.waitSemaphoreCount = 1;
 	present_info.pWaitSemaphores = signal_semaphores;
 
-	VkSwapchainKHR swapchains[] = {ctx.swapchain};
+	VkSwapchainKHR swapchains[] = {VulkanContext::swapchain};
 	present_info.swapchainCount = 1;
 	present_info.pSwapchains = swapchains;
 
 	present_info.pImageIndices = &image_idx;
 
-	VkResult result = vkQueuePresentKHR(ctx.queues[(int)QueueType::GFX], &present_info);
+	VkResult result = vkQueuePresentKHR(VulkanContext::queues[(int)QueueType::GFX], &present_info);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-		vkDeviceWaitIdle(ctx.device);
-		recreate_swap_chain(ctx);
+		vkDeviceWaitIdle(VulkanContext::device);
+		recreate_swap_chain();
 		cleanup_app_data();
-		rg = std::make_unique<RenderGraph>(&ctx);
+		rg = std::make_unique<RenderGraph>();
 		return result;
 	} else if (result != VK_SUCCESS) {
 		LUMEN_ERROR("Failed to present swap chain image");
@@ -996,14 +995,13 @@ void VulkanBase::build_tlas(std::vector<VkAccelerationStructureInstanceKHR>& ins
 	// the AS builder
 	Buffer instances_buf;  // Buffer of instances containing the matrices and
 						   // BLAS ids
-	instances_buf.create(&ctx,
-						 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	instances_buf.create(VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 						 sizeof(VkAccelerationStructureInstanceKHR) * instances.size(), instances.data(), true);
 	VkBufferDeviceAddressInfo buffer_info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, instances_buf.handle};
-	VkDeviceAddress instBufferAddr = vkGetBufferDeviceAddress(ctx.device, &buffer_info);
-	CommandBuffer cmd(&ctx, true, 0, QueueType::GFX);
+	VkDeviceAddress instBufferAddr = vkGetBufferDeviceAddress(VulkanContext::device, &buffer_info);
+	CommandBuffer cmd(true, 0, QueueType::GFX);
 	// Make sure the copy of the instance buffer are copied before triggering
 	// the acceleration structure build
 	VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};

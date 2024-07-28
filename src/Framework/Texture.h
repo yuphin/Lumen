@@ -17,15 +17,12 @@ struct TextureSettings {
 class Texture {
    public:
 	Texture() = default;
-	Texture(VulkanContext*);
 	void destroy();
-	inline void set_context(VulkanContext* ctx) { this->ctx = ctx; }
 	inline bool valid() { return img != VK_NULL_HANDLE; }
 	VkImage img = VK_NULL_HANDLE;
 	VkImageView img_view = VK_NULL_HANDLE;
 	VkDeviceMemory img_mem = VK_NULL_HANDLE;
 	VkSampler sampler = VK_NULL_HANDLE;
-	VulkanContext* ctx;
 
 	VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
 	VkImageUsageFlags usage_flags = 0;
@@ -45,18 +42,16 @@ class Texture {
 class Texture2D : public Texture {
    public:
 	Texture2D() = default;
-	Texture2D(VulkanContext*);
-
-	Texture2D(const std::string& name, VulkanContext* ctx, VkImage image, VkFormat format, VkImageUsageFlags flags,
+	Texture2D(const std::string& name, VkImage image, VkFormat format, VkImageUsageFlags flags,
 			  VkImageAspectFlags aspect_flags, VkExtent2D extent, bool present = true);
-	void load_from_data(VulkanContext* ctx, void* data, VkDeviceSize size, const VkImageCreateInfo& info,
+	void load_from_data(void* data, VkDeviceSize size, const VkImageCreateInfo& info,
 						VkSampler a_sampler, VkImageUsageFlags flags, bool generate_mipmaps = false);
-	void create_empty_texture(const char* name, VulkanContext* ctx, const TextureSettings& settings,
+	void create_empty_texture(const char* name, const TextureSettings& settings,
 							  VkImageLayout img_layout, VkSampler = 0,
 							  VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT);
-	inline void create_empty_texture(VulkanContext* ctx, const TextureSettings& settings, VkImageLayout img_layout,
+	inline void create_empty_texture(const TextureSettings& settings, VkImageLayout img_layout,
 									 VkSampler sampler = 0, VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT) {
-		return create_empty_texture("", ctx, settings, img_layout, sampler, flags);
+		return create_empty_texture("", settings, img_layout, sampler, flags);
 	}
 
 	void transition(VkCommandBuffer cmd, VkImageLayout new_layout);

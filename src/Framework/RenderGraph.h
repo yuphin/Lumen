@@ -50,7 +50,7 @@ struct PipelineStorage {
 
 class RenderGraph {
    public:
-	RenderGraph(VulkanContext* ctx);
+	RenderGraph();
 	RenderPass& current_pass();
 	RenderPass& add_rt(const std::string& name, const RTPassSettings& settings);
 	RenderPass& add_gfx(const std::string& name, const GraphicsPassSettings& settings);
@@ -81,7 +81,6 @@ class RenderGraph {
 		std::vector<VkDependencyInfo> dependency_infos;
 	};
 
-	VulkanContext* ctx = nullptr;
 	std::vector<RenderPass> passes;
 
 	// Pipeline Name + Macro String + Specialization Constants + Timestamp -> Pipeline
@@ -297,10 +296,10 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	} else {
 		dirty_pass_encountered = true;
 		if (cache_it != pipeline_cache.end()) {
-			vkDeviceWaitIdle(ctx->device);
+			vkDeviceWaitIdle(VulkanContext::device);
 			cache_it->second.pipeline->cleanup();
 		}
-		pipeline_cache[hash] = PipelineStorage(std::make_unique<Pipeline>(ctx, name_with_macros));
+		pipeline_cache[hash] = PipelineStorage(std::make_unique<Pipeline>(name_with_macros));
 		pipeline_storage = &pipeline_cache[hash];
 	}
 	PassType type;

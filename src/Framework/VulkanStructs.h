@@ -29,29 +29,6 @@ struct DescriptorInfo {
 	DescriptorInfo(const VkDescriptorBufferInfo& buffer) { this->buffer = buffer; }
 };
 
-struct VulkanContext {
-	GLFWwindow* window_ptr = nullptr;
-	VkInstance instance;
-	VkDebugUtilsMessengerEXT debug_messenger;
-	VkSurfaceKHR surface;
-	VkPhysicalDevice physical_device = VK_NULL_HANDLE;
-	VkDevice device;
-	// Swapchain related stuff
-	VkExtent2D swapchain_extent;
-	VkSwapchainKHR swapchain;
-	std::vector<VkCommandPool> cmd_pools;
-	std::vector<VkQueue> queues;
-	QueueFamilyIndices indices;
-	std::vector<VkCommandBuffer> command_buffers;
-	VkPhysicalDeviceFeatures supported_features;
-	VkPhysicalDeviceProperties device_properties;
-	VkPhysicalDeviceProperties2 device_properties2;
-	VkPhysicalDeviceMemoryProperties memory_properties;
-
-	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props{
-		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
-};
-
 enum class QueueType { GFX, COMPUTE, PRESENT };
 
 struct BlasInput {

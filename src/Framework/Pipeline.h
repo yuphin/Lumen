@@ -11,7 +11,7 @@ struct Pipeline;
 struct Pipeline {
    public:
 	enum class PipelineType { GFX = 0, RT = 1, COMPUTE = 2 };
-	Pipeline(VulkanContext* ctx, const std::string& name);
+	Pipeline(const std::string& name);
 	void reload();
 	void cleanup();
 	void create_gfx_pipeline(const GraphicsPassSettings& settings, const std::vector<uint32_t>& descriptor_counts,
@@ -51,7 +51,6 @@ struct Pipeline {
 	std::mutex mut;
 	std::condition_variable cv;
 	uint32_t binding_mask;
-	VulkanContext* ctx;
 };
 
 }  // namespace lumen

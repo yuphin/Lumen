@@ -7,7 +7,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
-#define SCENE_TEX_IDX 6
+#define SCENE_TEX_IDX 7
 #include "gris_commons.glsl"
 
 GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
@@ -15,6 +15,7 @@ PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix
 
 layout(binding = 4, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
 layout(binding = 5, std430) writeonly buffer OutGBuffer { GBuffer out_gbuffers[]; };
+layout(binding = 6, rgba16) writeonly uniform image2D canonical_contributions_tex;
 
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
 uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
@@ -47,7 +48,7 @@ void main() {
 	init_data(reconnection_data);
 	init_data(reservoir.data);
 
-	reconnection_data.rc_wi = vec4(0);
+	reconnection_data.rc_wi = vec2(0);
 
 	// Throughput after the reconnection vertex
 	vec3 postfix_throughput = vec3(1);
@@ -72,6 +73,8 @@ void main() {
 
 	vec3 throughput_until_rc = vec3(1);
 
+	vec3 selected_contribution = vec3(0);
+
 	for (int depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 		const bool found_isect = payload.instance_idx != -1;
@@ -91,12 +94,14 @@ void main() {
 			if (connectable_vertex_found) {
 #if STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 				reconnection_data.rc_Li = postfix_throughput * atmosphere_L;
-				reconnection_data.reservoir_contribution = contribution;
+				reconnection_data.reservoir_contribution = calc_target_pdf(contribution);
 				reconnection_data.path_flags =
 					(reconnection_data.path_flags & 0xFFFF0000) |
 					pack_path_flags(prefix_depth, depth - prefix_depth, RECONNECTION_TYPE_DEFAULT, false);
-				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
-											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
+				bool merged = stream_reservoir(seed, reservoir, reconnection_data, reconnection_data.reservoir_contribution, 1.0);
+				if(merged) {
+					selected_contribution = contribution;
+				}
 				valid_reservoir = valid_reservoir || merged;
 #else	// STREAMING_MODE != STREAMING_MODE_INDIVIDUAL
 				postfix_L += postfix_throughput * atmosphere_L;
@@ -179,18 +184,23 @@ void main() {
 				// If the previous vertex was the connection vertex, delay MIS computation to the shifting phase
 				vec3 partial_contrib_for_rc = (was_connectable ? hit_mat.emissive_factor : partial_contrib);
 				reconnection_data.rc_Li = postfix_throughput * partial_contrib_for_rc;
-				reconnection_data.reservoir_contribution = partial_contrib_for_rc * throughput;
+
+				vec3 contrib = partial_contrib_for_rc * throughput;
 				if (was_connectable) {
-					reconnection_data.reservoir_contribution *= mis_weight;
+					contrib *= mis_weight;
 					reconnection_data.rc_seed = floatBitsToUint(pdf_light_w);
 				}
+				reconnection_data.reservoir_contribution = calc_target_pdf(contrib);
 				reconnection_data.path_flags =
 					(reconnection_data.path_flags & 0xFFFF0000) |
 					pack_path_flags(prefix_depth, depth - prefix_depth,
 									was_connectable ? RECONNECTION_TYPE_EMISSIVE_AFTER_RC : RECONNECTION_TYPE_DEFAULT,
 									side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
-											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
+											   reconnection_data.reservoir_contribution, 1.0);
+				if(merged) {
+					selected_contribution = contrib;
+				}
 				valid_reservoir = valid_reservoir || merged;
 #else	// STREAMING_MODE != STREAMING_MODE_INDIVIDUAL
 				postfix_L += partial_contrib * postfix_throughput;
@@ -219,7 +229,7 @@ void main() {
 
 		if (connectable_this_vertex) {
 			reconnection_data.rc_partial_jacobian *= bsdf_pdf_val;
-			reconnection_data.rc_wi.xyz = direction;
+			reconnection_data.rc_wi = to_spherical(direction);
 		}
 
 		// NEE
@@ -251,15 +261,16 @@ void main() {
 				reconnection_data.debug_sampling_seed.w -= 3;
 #endif
 				reconnection_data.rc_seed = rc_seed;
-				reconnection_data.reservoir_contribution = contribution;
+				reconnection_data.reservoir_contribution = calc_target_pdf(contribution);
 				reconnection_data.path_flags = (reconnection_data.path_flags & 0xFFFF0000) |
 											   pack_path_flags(depth, 1, RECONNECTION_TYPE_NEE, side) |
 											   uint(is_directional_light) << 14;
 
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
-											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
+											   reconnection_data.reservoir_contribution, 1.0);
 				if (merged) {
 					set_bounce_flag(reservoir.data.path_flags, depth + 1, true);
+					selected_contribution = contribution;
 				}
 				valid_reservoir = valid_reservoir || merged;
 
@@ -271,15 +282,18 @@ void main() {
 
 			} else if (connectable_vertex_found) {
 				reconnection_data.rc_Li = postfix_throughput * Li;
-				reconnection_data.reservoir_contribution = contribution;
+				reconnection_data.reservoir_contribution = calc_target_pdf(contribution);
 				reconnection_data.path_flags =
 					(reconnection_data.path_flags & 0xFFFF0000) |
 					pack_path_flags(prefix_depth, depth - prefix_depth + 1, RECONNECTION_TYPE_DEFAULT, side);
 				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
-											   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
+											   reconnection_data.reservoir_contribution, 1.0);
+				if(merged) { 
+					selected_contribution = contribution;
+				}
 				if(merged && connectable_this_vertex) {
 					ASSERT(postfix_throughput == vec3(1));
-					reservoir.data.rc_wi.xyz = nee_wi;
+					reservoir.data.rc_wi = to_spherical(nee_wi);
 					reservoir.data.rc_Li = Le;
 					reservoir.data.path_flags = (reservoir.data.path_flags & ~0x7u) | RECONNECTION_TYPE_NEE_AFTER_RC;
 					reservoir.data.rc_seed = floatBitsToUint(nee_pdf_light_w);
@@ -339,11 +353,15 @@ void main() {
 	if (pc.enable_gris == 1 && connectable_vertex_found) {
 #if STREAMING_MODE == STREAMING_MODE_SPLIT
 		reconnection_data.rc_Li = postfix_L;
-		reconnection_data.reservoir_contribution = throughput_until_rc * postfix_L;
+		const vec3 contrib = throughput_until_rc * postfix_L;
+		reconnection_data.reservoir_contribution = calc_target_pdf(contrib);
 		reconnection_data.path_flags = (reconnection_data.path_flags & 0xFFFF0000) |
 									   pack_path_flags(prefix_depth, postfix_depth, RECONNECTION_TYPE_DEFAULT, rc_side);
 		bool merged = stream_reservoir(seed, reservoir, reconnection_data,
-									   calc_target_pdf(reconnection_data.reservoir_contribution), 1.0);
+									   reconnection_data.reservoir_contribution, 1.0);
+		if(merged) {
+			selected_contribution = contrib;
+		}
 		valid_reservoir = valid_reservoir || merged;
 #endif	// STREAMING_MODE == STREAMING_MODE_SPLIT
 		if (valid_reservoir) {
@@ -368,7 +386,7 @@ void main() {
 				rc_last_vertex = rc_postfix_length <= 1;
 #endif // STREAMING_MODE == STREAMING_MODE_SPLIT
 				if(!rc_last_vertex) {
-					ASSERT(reservoir.data.rc_wi != vec4(0));
+					ASSERT(reservoir.data.rc_wi != vec2(0));
 				}
 			}
 		}
@@ -386,7 +404,7 @@ void main() {
 		reservoir.data.seed_helpers = uvec2(pc.general_seed, pc.sampling_seed);
 		float uv_x = float(gl_LaunchIDEXT.x) / float(gl_LaunchSizeEXT.x);
 		if (pc.canonical_only == 1 || uv_x >= pc.gris_separator) {
-			col = prefix_col + reservoir.data.reservoir_contribution * reservoir.W;
+			col = prefix_col + selected_contribution * reservoir.W;
 			if (pc.direct_lighting == 1) {
 				col += direct_lighting;
 			}
@@ -421,6 +439,7 @@ void main() {
 			ASSERT(reservoir.data.path_flags == 0);
 		}
 
+		imageStore(canonical_contributions_tex, ivec2(gl_LaunchIDEXT.xy), vec4(selected_contribution, 1));
 		out_reservoirs[pixel_idx] = reservoir;
 		out_gbuffers[pixel_idx] = gbuffer_out;
 	}

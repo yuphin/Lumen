@@ -32,14 +32,14 @@ void DDGI::init() {
 			sampler_ci.compareOp = VK_COMPARE_OP_ALWAYS;
 			sampler_ci.minLod = 0.f;
 			sampler_ci.maxLod = FLT_MAX;
-			lumen::vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &bilinear_sampler),
+			lumen::vk::check(vkCreateSampler(VulkanContext::device, &sampler_ci, nullptr, &bilinear_sampler),
 					  "Could not create image sampler");
 			sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			sampler_ci.minFilter = VK_FILTER_NEAREST;
 			sampler_ci.magFilter = VK_FILTER_NEAREST;
-			lumen::vk::check(vkCreateSampler(instance->vkb.ctx.device, &sampler_ci, nullptr, &nearest_sampler),
+			lumen::vk::check(vkCreateSampler(VulkanContext::device, &sampler_ci, nullptr, &nearest_sampler),
 					  "Could not create image sampler");
 		}
 
@@ -55,11 +55,11 @@ void DDGI::init() {
 			settings.format = VK_FORMAT_R16G16B16A16_SFLOAT;
 			settings.usage_flags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 			irr_texes[i].create_empty_texture(std::string("DDGI Irradiance " + std::to_string(i)).c_str(),
-											  &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL, bilinear_sampler);
+											  settings, VK_IMAGE_LAYOUT_GENERAL, bilinear_sampler);
 			settings.base_extent = {(uint32_t)depth_width, (uint32_t)depth_height, 1};
 			settings.format = VK_FORMAT_R16G16_SFLOAT;
 			depth_texes[i].create_empty_texture(std::string("DDGI Depth " + std::to_string(i)).c_str(),
-												&instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL,
+												 settings, VK_IMAGE_LAYOUT_GENERAL,
 												bilinear_sampler);
 		}
 		// RT
@@ -68,34 +68,34 @@ void DDGI::init() {
 			settings.base_extent = {(uint32_t)rays_per_probe, (uint32_t)num_probes, 1};
 			settings.format = VK_FORMAT_R16G16B16A16_SFLOAT;
 			settings.usage_flags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-			rt.radiance_tex.create_empty_texture("DDGI Radiance", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL,
+			rt.radiance_tex.create_empty_texture("DDGI Radiance", settings, VK_IMAGE_LAYOUT_GENERAL,
 												 nearest_sampler);
-			rt.dir_depth_tex.create_empty_texture("DDGI Radiance & Tex", &instance->vkb.ctx, settings,
+			rt.dir_depth_tex.create_empty_texture("DDGI Radiance & Tex", settings,
 												  VK_IMAGE_LAYOUT_GENERAL, nearest_sampler);
 		}
 		// DDGI Output
 		settings.base_extent = {(uint32_t)instance->width, (uint32_t)instance->height, 1};
 		settings.format = VK_FORMAT_R16G16B16A16_SFLOAT;
 		settings.usage_flags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_SAMPLE_COUNT_1_BIT;
-		output.tex.create_empty_texture("DDGI Output", &instance->vkb.ctx, settings, VK_IMAGE_LAYOUT_GENERAL,
+		output.tex.create_empty_texture("DDGI Output", settings, VK_IMAGE_LAYOUT_GENERAL,
 										bilinear_sampler);
 	}
-	g_buffer.create("GBuffer", &instance->vkb.ctx,
+	g_buffer.create("GBuffer",
 					VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 						VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 					instance->width * instance->height * sizeof(GBufferData));
 
-	direct_lighting_buffer.create("Direct Lighting", &instance->vkb.ctx,
+	direct_lighting_buffer.create("Direct Lighting",
 								  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 								  instance->width * instance->height * sizeof(glm::vec3));
 
-	ddgi_ubo_buffer.create("DDGI UBO", &instance->vkb.ctx, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+	ddgi_ubo_buffer.create("DDGI UBO", VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 						   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 						    sizeof(DDGIUniforms));
 
-	probe_offsets_buffer.create("Probe Offsets", &instance->vkb.ctx,
+	probe_offsets_buffer.create("Probe Offsets",
 								VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -119,7 +119,7 @@ void DDGI::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, &g_buffer, instance->vkb.rg);
 
 	lumen_scene->scene_desc_buffer.create(
-		&instance->vkb.ctx, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
 	update_ddgi_uniforms();
@@ -283,7 +283,6 @@ void DDGI::update_ddgi_uniforms() {
 }
 
 void DDGI::destroy() {
-	const auto device = instance->vkb.ctx.device;
 	Integrator::destroy();
 	std::vector<lumen::Buffer*> buffer_list = {&g_buffer, &direct_lighting_buffer, &ddgi_ubo_buffer, &probe_offsets_buffer};
 
@@ -297,8 +296,8 @@ void DDGI::destroy() {
 		t->destroy();
 	}
 
-	vkDestroySampler(instance->vkb.ctx.device, bilinear_sampler, nullptr);
-	vkDestroySampler(instance->vkb.ctx.device, nearest_sampler, nullptr);
+	vkDestroySampler(VulkanContext::device, bilinear_sampler, nullptr);
+	vkDestroySampler(VulkanContext::device, nearest_sampler, nullptr);
 
 	for (auto& irr_tex : irr_texes) {
 		irr_tex.destroy();

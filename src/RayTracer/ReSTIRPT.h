@@ -1,4 +1,5 @@
 #pragma once
+#include "Framework/Texture.h"
 #include "Integrator.h"
 #include "shaders/integrators/restir/gris/gris_commons.h"
 using namespace RestirPT;
@@ -25,6 +26,7 @@ class ReSTIRPT : public Integrator {
 	lumen::Buffer reconnection_buffer;
 	lumen::Buffer transformations_buffer;
 	lumen::Buffer debug_vis_buffer;
+	lumen::Texture2D canonical_contributions_texture;
 	PCReSTIRPT pc_ray{};
 	bool enable_accumulation = false;
 	bool direct_lighting = false;

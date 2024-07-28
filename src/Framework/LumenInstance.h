@@ -13,7 +13,6 @@ class LumenInstance {
    public:
 	LumenInstance(int width, int height, int debug) : width(width), height(height), debug(debug), vkb(debug){};
 	VulkanBase vkb;
-	VulkanContext& vk_ctx = vkb.ctx;
 	uint32_t width, height, debug;
 	virtual void init(Window*) = 0;
 	virtual void update() = 0;

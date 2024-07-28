@@ -9,71 +9,71 @@ void PSSMLT::init() {
 	connect_path_rand_count = 4 * config->path_length;
 
 	// MLTVCM buffers
-	bootstrap_buffer.create("Bootstrap Buffer", &instance->vkb.ctx,
+	bootstrap_buffer.create("Bootstrap Buffer",
 							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							config->num_bootstrap_samples * sizeof(BootstrapSample));
 
-	cdf_buffer.create("CDF", &instance->vkb.ctx,
+	cdf_buffer.create("CDF",
 					  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 						  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 					  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_bootstrap_samples * sizeof(float));
 
-	bootstrap_cpu.create("Boostrap - CPU", &instance->vkb.ctx,
+	bootstrap_cpu.create("Boostrap - CPU",
 						 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 						 config->num_bootstrap_samples * sizeof(BootstrapSample));
 
-	cdf_cpu.create("CDF - CPU", &instance->vkb.ctx,
+	cdf_cpu.create("CDF - CPU",
 				   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 				   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 				   config->num_bootstrap_samples * sizeof(float));
 
-	cdf_sum_buffer.create("CDF Sums", &instance->vkb.ctx,
+	cdf_sum_buffer.create("CDF Sums",
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(float));
 
-	seeds_buffer.create("RNG Seeds", &instance->vkb.ctx,
+	seeds_buffer.create("RNG Seeds",
 						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * sizeof(SeedData));
 
-	light_primary_samples_buffer.create("Primary Samples - Light", &instance->vkb.ctx,
+	light_primary_samples_buffer.create("Primary Samples - Light",
 										VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 											VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 										config->num_mlt_threads * light_path_rand_count * sizeof(PrimarySample));
 
-	cam_primary_samples_buffer.create("Primary Samples - Camera", &instance->vkb.ctx,
+	cam_primary_samples_buffer.create("Primary Samples - Camera",
 									  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 										  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 									  config->num_mlt_threads * cam_path_rand_count * sizeof(PrimarySample));
 
 	connection_primary_samples_buffer.create(
-		"Primary Samples - Connection", &instance->vkb.ctx,
+		"Primary Samples - Connection",
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * connect_path_rand_count * sizeof(PrimarySample));
 
-	mlt_samplers_buffer.create("MLT Samplers", &instance->vkb.ctx,
+	mlt_samplers_buffer.create("MLT Samplers",
 							   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * sizeof(MLTSampler));
 
-	mlt_col_buffer.create("MLT Color Buffer", &instance->vkb.ctx,
+	mlt_col_buffer.create("MLT Color Buffer",
 						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * 3 * sizeof(float));
 
-	chain_stats_buffer.create("Chain Stats", &instance->vkb.ctx,
+	chain_stats_buffer.create("Chain Stats",
 							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * sizeof(ChainData));
 
-	splat_buffer.create("Splat Buffer", &instance->vkb.ctx,
+	splat_buffer.create("Splat Buffer",
 						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -81,7 +81,7 @@ void PSSMLT::init() {
 							(config->path_length * (static_cast<unsigned long long>(config->path_length) + 1)) *
 							sizeof(Splat));
 
-	past_splat_buffer.create("Past Splats Buffer", &instance->vkb.ctx,
+	past_splat_buffer.create("Past Splats Buffer",
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -89,13 +89,13 @@ void PSSMLT::init() {
 								 (config->path_length * (static_cast<unsigned long long>(config->path_length) + 1)) *
 								 sizeof(Splat));
 	auto path_size = std::max(config->num_mlt_threads, config->num_bootstrap_samples);
-	light_path_buffer.create("Light Paths", &instance->vkb.ctx,
+	light_path_buffer.create("Light Paths",
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							 path_size * (config->path_length + 1) * sizeof(MLTPathVertex));
 
-	camera_path_buffer.create("Camera Paths", &instance->vkb.ctx,
+	camera_path_buffer.create("Camera Paths",
 							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -116,7 +116,7 @@ void PSSMLT::init() {
 	do {
 		int num_blocks = std::max(1, (int)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
-			block_sums[i++].create(&instance->vkb.ctx,
+			block_sums[i++].create(
 								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, num_blocks * sizeof(float));
 		}
@@ -165,7 +165,7 @@ void PSSMLT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_path_addr, &light_path_buffer, instance->vkb.rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, camera_path_addr, &camera_path_buffer, instance->vkb.rg);
 
-	lumen_scene->scene_desc_buffer.create(&instance->vkb.ctx,
+	lumen_scene->scene_desc_buffer.create(
 							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 	pc_ray.total_light_area = 0;
@@ -200,7 +200,7 @@ void PSSMLT::render() {
 		scene_ubo_buffer,
 		lumen_scene->scene_desc_buffer,
 	};
-	lumen::CommandBuffer cmd(&instance->vkb.ctx, /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	lumen::CommandBuffer cmd( /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	// Start bootstrap sampling
 	instance->vkb.rg
 		->add_rt("PSSMLT - Bootstrap Sampling",

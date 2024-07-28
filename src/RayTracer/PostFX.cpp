@@ -2,7 +2,6 @@
 #include "PostFX.h"
 
 void PostFX::init(lumen::LumenInstance& instance) {
-	ctx = &instance.vk_ctx;
 	rg = instance.vkb.rg.get();
 
 	VkSamplerCreateInfo sampler_ci = lumen::vk::sampler();
@@ -13,8 +12,8 @@ void PostFX::init(lumen::LumenInstance& instance) {
 
 	sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 	sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-	lumen::vk::check(vkCreateSampler(instance.vkb.ctx.device, &sampler_ci, nullptr, &img_sampler),
-			  "Could not create image sampler");
+	lumen::vk::check(vkCreateSampler(VulkanContext::device, &sampler_ci, nullptr, &img_sampler),
+			 "Could not create image sampler");
 	// Load the kernel
 	const char* img_name_kernel = "assets/kernels/Octagonal512.exr";
 	int width, height;
@@ -22,8 +21,8 @@ void PostFX::init(lumen::LumenInstance& instance) {
 	auto img_dims = VkExtent2D{(uint32_t)width, (uint32_t)height};
 	auto ci = lumen::vk::make_img2d_ci(img_dims, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 	lumen::Texture2D kernel_org;
-	kernel_org.load_from_data(&instance.vkb.ctx, data, width * height * 4 * sizeof(float), ci, img_sampler,
-							  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, false);
+	kernel_org.load_from_data(data, width * height * 4 * sizeof(float), ci, img_sampler,
+							 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, false);
 	if (data) {
 		free(data);
 	}
@@ -37,12 +36,12 @@ void PostFX::init(lumen::LumenInstance& instance) {
 
 	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	settings.usage_flags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
-	fft_ping_padded.create_empty_texture("FFT - Ping", ctx, settings, VK_IMAGE_LAYOUT_GENERAL, img_sampler);
-	fft_pong_padded.create_empty_texture("FFT - Pong", ctx, settings, VK_IMAGE_LAYOUT_GENERAL, img_sampler);
-	kernel_ping.create_empty_texture("Kernel - Ping", ctx, settings, VK_IMAGE_LAYOUT_GENERAL, img_sampler);
-	kernel_pong.create_empty_texture("Kernel - Pong", ctx, settings, VK_IMAGE_LAYOUT_GENERAL, img_sampler);
+	fft_ping_padded.create_empty_texture("FFT - Ping", settings, VK_IMAGE_LAYOUT_GENERAL, img_sampler);
+	fft_pong_padded.create_empty_texture("FFT - Pong", settings, VK_IMAGE_LAYOUT_GENERAL, img_sampler);
+	kernel_ping.create_empty_texture("Kernel - Ping", settings, VK_IMAGE_LAYOUT_GENERAL, img_sampler);
+	kernel_pong.create_empty_texture("Kernel - Pong", settings, VK_IMAGE_LAYOUT_GENERAL, img_sampler);
 
-	lumen::CommandBuffer cmd(ctx, true);
+	lumen::CommandBuffer cmd(true);
 
 	// Copy the original kernel image to the padded texture
 	uint32_t pad_width = (kernel_org.base_extent.width + 31) / 32;
@@ -63,11 +62,11 @@ void PostFX::init(lumen::LumenInstance& instance) {
 	const int RADIX_X = (31 - std::countl_zero(fft_ping_padded.base_extent.width)) % 2 ? 2 : 4;
 	const int RADIX_Y = (31 - std::countl_zero(fft_ping_padded.base_extent.height)) % 2 ? 2 : 4;
 	const std::vector<lumen::ShaderMacro> macros_x = RADIX_X == 2
-												  ? std::vector<lumen::ShaderMacro>{{"KERNEL_GENERATION"}}
-												  : std::vector<lumen::ShaderMacro>{{"KERNEL_GENERATION"}, {"RADIX", RADIX_X}};
+												 ? std::vector<lumen::ShaderMacro>{{"KERNEL_GENERATION"}}
+												 : std::vector<lumen::ShaderMacro>{{"KERNEL_GENERATION"}, {"RADIX", RADIX_X}};
 	const std::vector<lumen::ShaderMacro> macros_y = RADIX_Y == 2
-												  ? std::vector<lumen::ShaderMacro>{{"KERNEL_GENERATION"}}
-												  : std::vector<lumen::ShaderMacro>{{"KERNEL_GENERATION"}, {"RADIX", RADIX_Y}};
+												 ? std::vector<lumen::ShaderMacro>{{"KERNEL_GENERATION"}}
+												 : std::vector<lumen::ShaderMacro>{{"KERNEL_GENERATION"}, {"RADIX", RADIX_Y}};
 	rg->add_compute("FFT - Horizontal", {.shader = lumen::Shader("src/shaders/bloom/fft.comp"),
 										 .macros = macros_x,
 										 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 0},
@@ -76,9 +75,9 @@ void PostFX::init(lumen::LumenInstance& instance) {
 		.bind(kernel_pong);
 	vertical = true;
 	rg->add_compute("FFT - Vertical", {.shader = lumen::Shader("src/shaders/bloom/fft.comp"),
-									   .macros = macros_y,
-									   .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 0},
-									   .dims = {dim_x, 1, 1}})
+									  .macros = macros_y,
+									  .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 0},
+									  .dims = {dim_x, 1, 1}})
 		.bind_texture_with_sampler(kernel_ping, img_sampler)
 		.bind(kernel_pong);
 	rg->run_and_submit(cmd);
@@ -118,9 +117,9 @@ void PostFX::render(lumen::Texture2D& input, lumen::Texture2D& output) {
 			.bind_texture_with_sampler(kernel_pong, img_sampler);
 		vertical = true;
 		rg->add_compute("FFT - Vertical", {.shader = lumen::Shader("src/shaders/bloom/fft.comp"),
-										   .macros = macros_y,
-										   .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 0},
-										   .dims = {dim_x, 1, 1}})
+										  .macros = macros_y,
+										  .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 0},
+										  .dims = {dim_x, 1, 1}})
 			.bind_texture_with_sampler(fft_ping_padded, img_sampler)
 			.bind(fft_pong_padded)
 			.bind_texture_with_sampler(kernel_pong, img_sampler);
@@ -192,5 +191,5 @@ void PostFX::destroy() {
 	for (auto t : tex_list) {
 		t->destroy();
 	}
-	vkDestroySampler(ctx->device, img_sampler, 0);
+	vkDestroySampler(VulkanContext::device, img_sampler, 0);
 }

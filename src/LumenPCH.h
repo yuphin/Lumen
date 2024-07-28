@@ -49,7 +49,7 @@
 #include <unordered_set>
 
 #pragma warning(push,0)
-#include "Framework/VulkanStructs.h"
+#include "Framework/VulkanContext.h"
 #include <GLFW/glfw3.h>
 #include <imgui/imgui.h>
 #include "imgui/imgui_impl_glfw.h"

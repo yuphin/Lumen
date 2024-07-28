@@ -25,7 +25,7 @@ class SBTWrapper {
    public:
 	enum GroupType { eRaygen, eMiss, eHit, eCallable };
 
-	void setup(VulkanContext* ctx, uint32_t family_idx,
+	void setup(uint32_t family_idx,
 			   const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rt_props);
 	void destroy();
 	void create(VkPipeline rtPipeline, VkRayTracingPipelineCreateInfoKHR pipeline_info = {},
@@ -53,8 +53,6 @@ class SBTWrapper {
 	VkDeviceAddress get_address(GroupType t);
 	const VkStridedDeviceAddressRegionKHR get_region(GroupType t);
 	const std::array<VkStridedDeviceAddressRegionKHR, 4> get_regions();
-
-	VulkanContext* m_ctx = nullptr;
 
    private:
 	using entry = std::unordered_map<uint32_t, std::vector<uint8_t>>;

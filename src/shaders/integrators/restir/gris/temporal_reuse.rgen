@@ -8,7 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
-#define SCENE_TEX_IDX 8
+#define SCENE_TEX_IDX 9
 #include "gris_commons.glsl"
 GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
 PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
@@ -16,6 +16,7 @@ layout(binding = 4, std430) buffer OutReservoirs { Reservoir curr_reservoirs[]; 
 layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir prev_reservoirs[]; };
 layout(binding = 6, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
 layout(binding = 7, std430) readonly buffer PrevGBuffer { GBuffer prev_gbuffers[]; };
+layout(binding = 8, rgba16) uniform image2D canonical_contributions_tex;
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed3);
 
 ivec2 get_permuted_coords(inout uvec4 seed, ivec2 coords) {
@@ -48,7 +49,7 @@ void main() {
 	}
 
 	float m_c = 0;
-	float canonical_in_canonical_pdf = calc_target_pdf(canonical_reservoir.data.reservoir_contribution);
+	float canonical_in_canonical_pdf = canonical_reservoir.data.reservoir_contribution;
 	vec3 curr_reservoir_contribution = vec3(0);
 	bool prev_accepted = false;
 	float new_jacobian;
@@ -84,14 +85,16 @@ void main() {
 	m_c = m_c == 0 ? 1.0 : m_c;
 	bool canonical = combine_reservoir(seed, reservoir, canonical_reservoir, canonical_in_canonical_pdf, m_c, 1.0);
 	if (canonical) {
-		curr_reservoir_contribution = canonical_reservoir.data.reservoir_contribution;
+		curr_reservoir_contribution = imageLoad(canonical_contributions_tex, ivec2(gl_LaunchIDEXT.xy)).xyz;
+	} else {
+		imageStore(canonical_contributions_tex, ivec2(gl_LaunchIDEXT.xy), vec4(curr_reservoir_contribution, 0));
 	}
 	float target_pdf = calc_target_pdf(curr_reservoir_contribution);
 	calc_reservoir_W_with_mis(reservoir);
 
 	if (prev_accepted && !canonical) {
 		reservoir.data.rc_partial_jacobian = new_jacobian;
-		reservoir.data.reservoir_contribution = curr_reservoir_contribution;
+		reservoir.data.reservoir_contribution = calc_target_pdf(curr_reservoir_contribution);
 	}
 
 	curr_reservoirs[pixel_idx] = reservoir;
