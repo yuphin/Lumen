@@ -315,7 +315,7 @@ void main() {
 				direct_lighting += contribution;
 			}
 		}
-		bool is_transmission = bsdf_has_property(hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION);
+		const bool is_transmission = bsdf_has_property(hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION);
 		origin.xyz = offset_ray(gbuffer.pos, n_g, is_transmission);
 
 		if (bsdf_pdf_val == 0) {
@@ -335,7 +335,7 @@ void main() {
 		rc_partial_jacobian = bsdf_pdf_val;
 		if (pc.enable_rr == 1) {
 			float rr_scale = 1.0;
-			if (bsdf_has_property(hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION)) {
+			if (is_transmission) {
 				rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
 			}
 			if (depth > RR_MIN_DEPTH) {

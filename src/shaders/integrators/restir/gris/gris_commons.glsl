@@ -430,7 +430,7 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 				float mis_weight =
 					is_light_delta(light.light_flags) ? 1.0 : 1.0 / (1.0 + dst_postfix_pdf / pdf_light_w);
 				reservoir_contribution *= light.L * mis_weight / (light_pick_pdf * pdf_light_w);
-				// LOG_CLICKED3("NEE: %d - %d = %v3f\n", prefix_depth, (data.path_flags) >> 16, reservoir_contribution);
+				LOG_CLICKED3("NEE: %d - %d = %v3f\n", prefix_depth, (data.path_flags) >> 16, reservoir_contribution);
 				jacobian = 1;
 			} else {
 				const bool connection_to_nee_vertex = rc_postfix_length == 2;
@@ -464,7 +464,7 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 					reservoir_contribution *= rc_postfix_f * abs(dot(rc_gbuffer.n_s, rc_wi_post)) / rc_pdf_post;
 				}
 				reservoir_contribution *= data.rc_Li * mis_weight / dst_postfix_pdf;
-				// LOG_CLICKED4("Default: %d - %d - %d - %v3f\n", prefix_depth, rc_postfix_length, rc_type, reservoir_contribution);
+				LOG_CLICKED4("Default: %d - %d - %d - %v3f\n", prefix_depth, rc_postfix_length, rc_type, reservoir_contribution);
 				jacobian = jacobian_num / src_jacobian;
 			}
 			if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {
