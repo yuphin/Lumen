@@ -83,9 +83,17 @@ vec3 offset_ray(const vec3 p, const vec3 n) {
 				abs(p.z) < origin ? p.z + float_scale * n.z : p_i.z);
 }
 
+vec3 offset_ray(const vec3 p, const vec3 n, bool flip) {
+	return flip ? offset_ray(p, -n) : offset_ray(p, n);
+}
+
 vec3 offset_ray2(const vec3 p, const vec3 n) {
 	const float float_scale = 2.0f / 65536.0f;
 	return p + float_scale * n;
+}
+
+vec3 offset_ray2(const vec3 p, const vec3 n, bool flip) { 
+	return flip ? offset_ray2(p, -n) : offset_ray2(p, n);
 }
 
 float luminance(vec3 rgb) { return dot(rgb, vec3(0.2126f, 0.7152f, 0.0722f)); }

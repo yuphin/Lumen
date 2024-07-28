@@ -80,14 +80,14 @@ HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx, out floa
 
 	gbuffer.pos = vec3(to_world * vec4(vtx[0].pos * bary.x + vtx[1].pos * bary.y + vtx[2].pos * bary.z, 1.0));
 	gbuffer.n_s =
-		vec3(tsp_inv_to_world * vec4(vtx[0].normal * bary.x + vtx[1].normal * bary.y + vtx[2].normal * bary.z, 1.0));
+		normalize(vec3(tsp_inv_to_world * vec4(vtx[0].normal * bary.x + vtx[1].normal * bary.y + vtx[2].normal * bary.z, 1.0)));
 	const vec3 e0 = vtx[2].pos - vtx[0].pos;
 	const vec3 e1 = vtx[1].pos - vtx[0].pos;
 
 	const vec4 e0t = to_world * vec4(vtx[2].pos - vtx[0].pos, 0);
 	const vec4 e1t = to_world * vec4(vtx[1].pos - vtx[0].pos, 0);
 	area = 0.5 * length(cross(vec3(e0t), vec3(e1t)));
-	gbuffer.n_g = (tsp_inv_to_world * vec4(cross(e0, e1), 0)).xyz;
+	gbuffer.n_g = normalize((tsp_inv_to_world * vec4(cross(e0, e1), 0)).xyz);
 	gbuffer.uv = vtx[0].uv0 * bary.x + vtx[1].uv0 * bary.y + vtx[2].uv0 * bary.z;
 	gbuffer.material_idx = pinfo.material_index;
 	return gbuffer;
@@ -261,8 +261,7 @@ float calc_target_pdf(vec3 f) { return luminance(f); }
 
 bool is_rough(in Material mat) {
 	// Only check if it's diffuse for now
-	// return (mat.bsdf_type & BSDF_TYPE_DIFFUSE) != 0 || mat.roughness > 0.2;
-	return (mat.bsdf_type & BSDF_TYPE_DIFFUSE) != 0 || mat.roughness > 0.2;
+	return (mat.bsdf_type & BSDF_TYPE_DIFFUSE) != 0 || mat.roughness > 0.25;
 }
 
 uint offset(const uint pingpong) { return pingpong * pc.size_x * pc.size_y; }
@@ -357,9 +356,9 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 		vec3 dst_wo = -dst_wi;
 		bool dst_side = face_forward(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo);
 		org_pos = dst_gbuffer.pos;
-		dst_gbuffer.pos = offset_ray(dst_gbuffer.pos, dst_gbuffer.n_g);
-
 		Material dst_hit_mat = load_material(dst_gbuffer.material_idx, dst_gbuffer.uv);
+		bool is_transmission = bsdf_has_property(dst_hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION);
+		dst_gbuffer.pos = offset_ray(dst_gbuffer.pos, dst_gbuffer.n_g, is_transmission);
 
 		if (rc_type != RECONNECTION_TYPE_NEE) {
 			float rc_wi_len = length(rc_gbuffer.pos - dst_gbuffer.pos);
@@ -431,7 +430,7 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 				float mis_weight =
 					is_light_delta(light.light_flags) ? 1.0 : 1.0 / (1.0 + dst_postfix_pdf / pdf_light_w);
 				reservoir_contribution *= light.L * mis_weight / (light_pick_pdf * pdf_light_w);
-				LOG_CLICKED3("NEE: %d - %d = %v3f\n", prefix_depth, (data.path_flags) >> 16, reservoir_contribution);
+				// LOG_CLICKED3("NEE: %d - %d = %v3f\n", prefix_depth, (data.path_flags) >> 16, reservoir_contribution);
 				jacobian = 1;
 			} else {
 				const bool connection_to_nee_vertex = rc_postfix_length == 2;
@@ -465,7 +464,7 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 					reservoir_contribution *= rc_postfix_f * abs(dot(rc_gbuffer.n_s, rc_wi_post)) / rc_pdf_post;
 				}
 				reservoir_contribution *= data.rc_Li * mis_weight / dst_postfix_pdf;
-				LOG_CLICKED4("Default: %d - %d - %d - %v3f\n", prefix_depth, rc_postfix_length, rc_type, reservoir_contribution);
+				// LOG_CLICKED4("Default: %d - %d - %d - %v3f\n", prefix_depth, rc_postfix_length, rc_type, reservoir_contribution);
 				jacobian = jacobian_num / src_jacobian;
 			}
 			if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {

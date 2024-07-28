@@ -315,7 +315,8 @@ void main() {
 				direct_lighting += contribution;
 			}
 		}
-		origin.xyz = offset_ray(gbuffer.pos, n_g);
+		bool is_transmission = bsdf_has_property(hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION);
+		origin.xyz = offset_ray(gbuffer.pos, n_g, is_transmission);
 
 		if (bsdf_pdf_val == 0) {
 			break;

@@ -354,7 +354,7 @@ void LumenScene::load_lumen_scene(const std::string& path) {
 		} else if (bsdf["type"] == "glass") {
 			bsdf_types |= BSDF_TYPE_GLASS;
 			materials[bsdf_idx].bsdf_type = BSDF_TYPE_GLASS;
-			materials[bsdf_idx].bsdf_props = BSDF_FLAG_SPECULAR | BSDF_FLAG_TRANSMISSION;
+			materials[bsdf_idx].bsdf_props = BSDF_FLAG_SPECULAR_TRANSMISSION;
 			materials[bsdf_idx].ior = bsdf["ior"];
 		} else if (bsdf["type"] == "dielectric") {
 			bsdf_types |= BSDF_TYPE_DIELECTRIC;
@@ -435,7 +435,12 @@ void LumenScene::load_lumen_scene(const std::string& path) {
 			mat.anisotropy = get_or_default_f(bsdf, "anisotropy", 0.0f);
 			mat.thin = get_or_default_u(bsdf, "thin", 0);
 
-			mat.bsdf_props = BSDF_FLAG_REFLECTION | BSDF_FLAG_TRANSMISSION;
+			if(mat.roughness < 1.0f) {
+				mat.bsdf_props |= BSDF_FLAG_REFLECTION;
+			}
+			if(mat.spec_trans > 0.0f) {
+				mat.bsdf_props |= BSDF_FLAG_TRANSMISSION;
+			}
 			if (mat.roughness > 0.08) {
 				mat.bsdf_props |= BSDF_FLAG_GLOSSY;
 			} else {
@@ -599,8 +604,13 @@ void LumenScene::load_mitsuba_scene(const std::string& path) {
 				   m_bsdf.type == "plastic") {
 			bsdf_types |= BSDF_TYPE_PRINCIPLED;
 			mat.bsdf_type = BSDF_TYPE_PRINCIPLED;
-			mat.bsdf_props = BSDF_FLAG_REFLECTION | BSDF_FLAG_TRANSMISSION;
 			mat.ior = m_bsdf.ior;
+			if(mat.roughness < 1.0) {
+				mat.bsdf_props |= BSDF_FLAG_DIFFUSE_REFLECTION;
+			}
+			if(mat.ior != 1.0) {
+				mat.bsdf_props |= BSDF_FLAG_TRANSMISSION;
+			}
 			if (mat.roughness > 0.08) {
 				mat.bsdf_props |= BSDF_FLAG_GLOSSY;
 			} else {
