@@ -104,14 +104,14 @@ struct ResourceBinding {
 		this->sampler = sampler;
 	}
 
-	inline DescriptorInfo get_descriptor_info() {
+	inline vk::DescriptorInfo get_descriptor_info() {
 		if (tex) {
 			if (sampler) {
-				return DescriptorInfo(tex->descriptor(sampler));
+				return vk::DescriptorInfo(tex->descriptor(sampler));
 			}
-			return DescriptorInfo(tex->descriptor());
+			return vk::DescriptorInfo(tex->descriptor());
 		}
-		return DescriptorInfo(buf->descriptor);
+		return vk::DescriptorInfo(buf->descriptor);
 	}
 };
 

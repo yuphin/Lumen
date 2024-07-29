@@ -1,20 +1,29 @@
 
 #pragma once
 #include "VulkanStructs.h"
-namespace VulkanContext {
-	extern GLFWwindow* window_ptr;
-	extern VkInstance instance;
-	extern VkDebugUtilsMessengerEXT debug_messenger;
-	extern VkSurfaceKHR surface;
-	extern VkPhysicalDevice physical_device;
-	extern VkDevice device;
-	extern VkSwapchainKHR swapchain;
-	extern std::vector<VkCommandPool> cmd_pools;
-	extern std::vector<VkQueue> queues;
-	extern lumen::QueueFamilyIndices queue_indices;
-	extern std::vector<VkCommandBuffer> command_buffers;
-	extern VkPhysicalDeviceFeatures supported_features;
-	extern VkPhysicalDeviceProperties device_properties;
-	extern VkPhysicalDeviceMemoryProperties memory_properties;
-	extern VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props;
+
+namespace vk {
+
+struct VulkanContext {
+	GLFWwindow* window_ptr = nullptr;
+	VkInstance instance;
+	VkDebugUtilsMessengerEXT debug_messenger;
+	VkSurfaceKHR surface;
+	VkPhysicalDevice physical_device;
+	VkDevice device;
+	// Swapchain related stuff
+	VkSwapchainKHR swapchain;
+	std::vector<VkCommandPool> cmd_pools;
+	std::vector<VkQueue> queues;
+	QueueFamilyIndices queue_indices;
+	std::vector<VkCommandBuffer> command_buffers;
+	VkPhysicalDeviceFeatures supported_features;
+	VkPhysicalDeviceProperties device_properties;
+	VkPhysicalDeviceMemoryProperties memory_properties;
+	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props{
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
 };
+
+VulkanContext& context();
+
+};	// namespace vk

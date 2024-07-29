@@ -45,7 +45,7 @@ struct VulkanBase {
 	void cleanup_swapchain();
 	void recreate_swap_chain();
 	void add_device_extension(const char* name) { device_extensions.push_back(name); }
-	void build_blas(const std::vector<BlasInput>& input, VkBuildAccelerationStructureFlagsKHR flags);
+	void build_blas(const std::vector<vk::BlasInput>& input, VkBuildAccelerationStructureFlagsKHR flags);
 	void build_tlas(
 		std::vector<VkAccelerationStructureInstanceKHR>& instances,
 		VkBuildAccelerationStructureFlagsKHR flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
@@ -61,7 +61,7 @@ struct VulkanBase {
 	};
 	bool check_validation_layer_support();
 	std::vector<const char*> get_req_extensions();
-	QueueFamilyIndices find_queue_families(VkPhysicalDevice device);
+	vk::QueueFamilyIndices find_queue_families(VkPhysicalDevice device);
 	VkResult vkExt_create_debug_messenger(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
 										  const VkAllocationCallbacks* pAllocator,
 										  VkDebugUtilsMessengerEXT* pDebugMessenger);

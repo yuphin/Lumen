@@ -5,10 +5,8 @@
 #include <optional>
 #include <vector>
 
-namespace lumen {
-struct AccelKHR;
+namespace vk {
 
-// Utils
 struct QueueFamilyIndices {
 	std::optional<uint32_t> gfx_family;
 	std::optional<uint32_t> present_family;
@@ -37,8 +35,6 @@ struct BlasInput {
 	std::vector<VkAccelerationStructureBuildRangeInfoKHR> as_build_offset_info;
 	VkBuildAccelerationStructureFlagsKHR flags{0};
 };
-
-namespace vk {
 
 enum class LumenStage { L_STAGE_VERTEX, L_STAGE_FRAGMENT };
 enum class Component { L_POSITION, L_NORMAL, L_COLOR, L_UV, L_TANGENT };
@@ -676,5 +672,3 @@ inline VkRenderingAttachmentInfo rendering_attachment_info(VkImageLayout image_l
 }
 
 }  // namespace vk
-
-}  // namespace lumen

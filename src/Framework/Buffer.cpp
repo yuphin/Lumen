@@ -27,29 +27,29 @@ void Buffer::create(const char* name, VkBufferUsageFlags usage,
 
 		copy_region.size = size;
 		vkCmdCopyBuffer(copy_cmd.handle, staging_buffer.handle, this->handle, 1, &copy_region);
-		copy_cmd.submit(VulkanContext::queues[0]);
+		copy_cmd.submit(vk::context().queues[0]);
 		staging_buffer.destroy();
 	} else {
 		// Create the buffer handle
 		VkBufferCreateInfo buffer_CI = vk::buffer(usage, size, sharing_mode);
-		vk::check(vkCreateBuffer(VulkanContext::device, &buffer_CI, nullptr, &this->handle), "Failed to create vertex buffer!");
+		vk::check(vkCreateBuffer(vk::context().device, &buffer_CI, nullptr, &this->handle), "Failed to create vertex buffer!");
 
 		// Create the memory backing up the buffer handle
 		VkMemoryRequirements mem_reqs;
 		VkMemoryAllocateInfo mem_alloc_info = vk::memory_allocate_info();
-		vkGetBufferMemoryRequirements(VulkanContext::device, this->handle, &mem_reqs);
+		vkGetBufferMemoryRequirements(vk::context().device, this->handle, &mem_reqs);
 
 		mem_alloc_info.allocationSize = mem_reqs.size;
 		// Find a memory type index that fits the properties of the buffer
 		mem_alloc_info.memoryTypeIndex =
-			vk::find_memory_type(&VulkanContext::physical_device, mem_reqs.memoryTypeBits, mem_property_flags);
+			vk::find_memory_type(&vk::context().physical_device, mem_reqs.memoryTypeBits, mem_property_flags);
 
 		VkMemoryAllocateFlagsInfo flags_info{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
 		if (usage_flags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
 			flags_info.flags |= VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
 			mem_alloc_info.pNext = &flags_info;
 		}
-		vk::check(vkAllocateMemory(VulkanContext::device, &mem_alloc_info, nullptr, &this->buffer_memory),
+		vk::check(vkAllocateMemory(vk::context().device, &mem_alloc_info, nullptr, &this->buffer_memory),
 				  "Failed to allocate buffer memory!");
 
 		alignment = mem_reqs.alignment;
@@ -74,7 +74,7 @@ void Buffer::create(const char* name, VkBufferUsageFlags usage,
 		bind();
 	}
 	if (name) {
-		vk::DebugMarker::set_resource_name(VulkanContext::device, (uint64_t)handle, name, VK_OBJECT_TYPE_BUFFER);
+		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)handle, name, VK_OBJECT_TYPE_BUFFER);
 		this->name = name;
 	}
 }
@@ -84,7 +84,7 @@ void Buffer::flush(VkDeviceSize size, VkDeviceSize offset) {
 	mapped_range.memory = buffer_memory;
 	mapped_range.offset = offset;
 	mapped_range.size = size;
-	vk::check(vkFlushMappedMemoryRanges(VulkanContext::device, 1, &mapped_range), "Failed to flush mapped memory ranges");
+	vk::check(vkFlushMappedMemoryRanges(vk::context().device, 1, &mapped_range), "Failed to flush mapped memory ranges");
 }
 
 void Buffer::invalidate(VkDeviceSize size, VkDeviceSize offset) {
@@ -93,7 +93,7 @@ void Buffer::invalidate(VkDeviceSize size, VkDeviceSize offset) {
 	mapped_range.memory = buffer_memory;
 	mapped_range.offset = offset;
 	mapped_range.size = size;
-	vk::check(vkInvalidateMappedMemoryRanges(VulkanContext::device, 1, &mapped_range),
+	vk::check(vkInvalidateMappedMemoryRanges(vk::context().device, 1, &mapped_range),
 			  "Failed to invalidate mapped memory range");
 }
 
@@ -116,24 +116,24 @@ void Buffer::copy(Buffer& dst_buffer, VkCommandBuffer cmdbuf) {
 }
 
 void Buffer::destroy() {
-		if (handle) vkDestroyBuffer(VulkanContext::device, handle, nullptr);
-		if (buffer_memory) vkFreeMemory(VulkanContext::device, buffer_memory, nullptr);
+		if (handle) vkDestroyBuffer(vk::context().device, handle, nullptr);
+		if (buffer_memory) vkFreeMemory(vk::context().device, buffer_memory, nullptr);
 	}
 
 	void Buffer::bind(VkDeviceSize offset/*=0*/) {
-		vk::check(vkBindBufferMemory(VulkanContext::device, handle, buffer_memory, offset));
+		vk::check(vkBindBufferMemory(vk::context().device, handle, buffer_memory, offset));
 	}
 
 	 void Buffer::map(VkDeviceSize size/*= VK_WHOLE_SIZE*/, VkDeviceSize offset/*= 0*/) {
-		vk::check(vkMapMemory(VulkanContext::device, buffer_memory, offset, size, 0, &data), "Unable to map memory");
+		vk::check(vkMapMemory(vk::context().device, buffer_memory, offset, size, 0, &data), "Unable to map memory");
 	}
 
-	void Buffer::unmap() { vkUnmapMemory(VulkanContext::device, buffer_memory); }
+	void Buffer::unmap() { vkUnmapMemory(vk::context().device, buffer_memory); }
 
 	 VkDeviceAddress Buffer::get_device_address() {
 		VkBufferDeviceAddressInfo info = {VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
 		info.buffer = handle;
-		return vkGetBufferDeviceAddress(VulkanContext::device, &info);
+		return vkGetBufferDeviceAddress(vk::context().device, &info);
 	}
 
 	void Buffer::create(VkBufferUsageFlags flags, VkMemoryPropertyFlags mem_property_flags,

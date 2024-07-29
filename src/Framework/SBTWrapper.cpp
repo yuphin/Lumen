@@ -81,7 +81,7 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 	uint32_t sbtSize = total_group_cnt * m_handle_size;
 	std::vector<uint8_t> shader_handle_storage(sbtSize);
 
-	auto result = vkGetRayTracingShaderGroupHandlesKHR(VulkanContext::device, rt_pipeline, 0, total_group_cnt, sbtSize,
+	auto result = vkGetRayTracingShaderGroupHandlesKHR(vk::context().device, rt_pipeline, 0, total_group_cnt, sbtSize,
 													   shader_handle_storage.data());
 	auto find_stride = [&](auto entry, auto& stride) {
 		stride = align_up(m_handle_size, m_handle_alignment);  // minimum stride
@@ -137,7 +137,7 @@ VkDeviceAddress SBTWrapper::get_address(GroupType t) {
 		return 0;
 	}
 	VkBufferDeviceAddressInfo i{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, m_buffer[t].handle};
-	return vkGetBufferDeviceAddress(VulkanContext::device, &i);
+	return vkGetBufferDeviceAddress(vk::context().device, &i);
 }
 
 const VkStridedDeviceAddressRegionKHR SBTWrapper::get_region(GroupType t) {

@@ -500,20 +500,20 @@ void RenderPass::finalize() {
 						auto pool_size = vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1);
 						auto descriptor_pool_ci = vk::descriptor_pool(1, &pool_size, 1);
 
-						vk::check(vkCreateDescriptorPool(VulkanContext::device, &descriptor_pool_ci, nullptr,
+						vk::check(vkCreateDescriptorPool(vk::context().device, &descriptor_pool_ci, nullptr,
 														 &pass->pipeline_storage->pipeline->tlas_descriptor_pool),
 								  "Failed to create descriptor pool");
 						VkDescriptorSetAllocateInfo set_allocate_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
 						set_allocate_info.descriptorPool = pass->pipeline_storage->pipeline->tlas_descriptor_pool;
 						set_allocate_info.descriptorSetCount = 1;
 						set_allocate_info.pSetLayouts = &pass->pipeline_storage->pipeline->tlas_layout;
-						vkAllocateDescriptorSets(VulkanContext::device, &set_allocate_info,
+						vkAllocateDescriptorSets(vk::context().device, &set_allocate_info,
 												 &pass->pipeline_storage->pipeline->tlas_descriptor_set);
 					}
 					auto descriptor_write = vk::write_descriptor_set(
 						pass->pipeline_storage->pipeline->tlas_descriptor_set,
 						VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0, &pass->pipeline_storage->pipeline->tlas_info);
-					vkUpdateDescriptorSets(VulkanContext::device, 1, &descriptor_write, 0, nullptr);
+					vkUpdateDescriptorSets(vk::context().device, 1, &descriptor_write, 0, nullptr);
 				};
 				if (rg->multithreaded_pipeline_compilation) {
 					rg->pipeline_tasks.push_back({func, pass_idx});
@@ -575,7 +575,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	if (use_events) {
 		wait_events.reserve(wait_signals_buffer.size());
 	}
-	vk::DebugMarker::begin_region(VulkanContext::device, cmd, name.c_str(), glm::vec4(1.0f, 0.78f, 0.05f, 1.0f));
+	vk::DebugMarker::begin_region(vk::context().device, cmd, name.c_str(), glm::vec4(1.0f, 0.78f, 0.05f, 1.0f));
 	// Wait: Buffer
 	auto& buffer_sync = rg->buffer_sync_resources[pass_idx];
 	auto& img_sync = rg->img_sync_resources[pass_idx];
@@ -640,7 +640,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		auto dst_stage = vk::get_pipeline_stage(type, dst_access_flags);
 		img_sync.img_barriers[i] =
 			vk::image_barrier2(k, src_access_flags, dst_access_flags, v.old_layout, v.new_layout, v.image_aspect,
-							   src_stage, dst_stage, VulkanContext::queue_indices.gfx_family.value());
+							   src_stage, dst_stage, vk::context().queue_indices.gfx_family.value());
 		img_sync.dependency_infos[i] = vk::dependency_info(1, &img_sync.img_barriers[i]);
 		if (use_events) {
 			wait_events.push_back(rg->passes[v.opposing_pass_idx].set_signals_img[k].event);
@@ -840,7 +840,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);
 
 		if (use_events) {
-			set_signals_buffer[k].event = rg->event_pool.get_event( VulkanContext::device, cmd);
+			set_signals_buffer[k].event = rg->event_pool.get_event( vk::context().device, cmd);
 			vkCmdSetEvent2(cmd, set_signals_buffer[k].event, &dependency_info);
 		}
 	}
@@ -854,15 +854,15 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			k, vk::access_flags_for_img_layout(v.old_layout), vk::access_flags_for_img_layout(v.new_layout),
 			v.old_layout, v.new_layout, v.image_aspect, vk::get_pipeline_stage(type, src_access_flags),
 			vk::get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, dst_access_flags),
-			 VulkanContext::queue_indices.gfx_family.value());
+			 vk::context().queue_indices.gfx_family.value());
 
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);
 		if (use_events) {
-			set_signals_img[k].event = rg->event_pool.get_event( VulkanContext::device, cmd);
+			set_signals_img[k].event = rg->event_pool.get_event( vk::context().device, cmd);
 			vkCmdSetEvent2(cmd, set_signals_img[k].event, &dependency_info);
 		}
 	}
-	vk::DebugMarker::end_region( VulkanContext::device, cmd);
+	vk::DebugMarker::end_region( vk::context().device, cmd);
 }
 
 void RenderGraph::run(VkCommandBuffer cmd) {
@@ -958,7 +958,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 }
 
 void RenderGraph::reset() {
-	event_pool.reset_events(VulkanContext::device);
+	event_pool.reset_events(vk::context().device);
 
 	passes.clear();
 	if (pipeline_tasks.size()) {
@@ -982,7 +982,7 @@ void RenderGraph::run_and_submit(CommandBuffer& cmd) {
 
 void RenderGraph::destroy() {
 	passes.clear();
-	event_pool.cleanup(VulkanContext::device);
+	event_pool.cleanup(vk::context().device);
 	for (auto& pass : passes) {
 		if (pass.push_constant_data) {
 			free(pass.push_constant_data);

@@ -159,12 +159,12 @@ void LumenScene::load_scene(const std::string& path) {
 								   vertices.data(), true);
 
 	// Create a sampler for textures
-	VkSamplerCreateInfo sampler_ci = lumen::vk::sampler();
+	VkSamplerCreateInfo sampler_ci = vk::sampler();
 	sampler_ci.minFilter = VK_FILTER_LINEAR;
 	sampler_ci.magFilter = VK_FILTER_LINEAR;
 	sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	sampler_ci.maxLod = FLT_MAX;
-	lumen::vk::check(vkCreateSampler(VulkanContext::device, &sampler_ci, nullptr, &texture_sampler),
+	vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &texture_sampler),
 					 "Could not create image sampler");
 
 	if (!textures.size()) {
@@ -178,7 +178,7 @@ void LumenScene::load_scene(const std::string& path) {
 
 			auto size = x * y * 4;
 			auto img_dims = VkExtent2D{(uint32_t)x, (uint32_t)y};
-			auto ci = lumen::vk::make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+			auto ci = vk::make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 			scene_textures[i].load_from_data( data, size, ci, texture_sampler,
 											 VK_IMAGE_USAGE_SAMPLED_BIT, false);
 			stbi_image_free(data);
@@ -666,7 +666,7 @@ void LumenScene::load_mitsuba_scene(const std::string& path) {
 void LumenScene::add_default_texture() {
 	std::array<uint8_t, 4> nil = {0, 0, 0, 0};
 	scene_textures.resize(1);
-	auto ci = lumen::vk::make_img2d_ci(VkExtent2D{1, 1});
+	auto ci = vk::make_img2d_ci(VkExtent2D{1, 1});
 	scene_textures[0].load_from_data( nil.data(), 4, ci, texture_sampler, VK_IMAGE_USAGE_SAMPLED_BIT,
 									 false);
 }
@@ -734,5 +734,5 @@ void LumenScene::destroy() {
 	for (auto& tex : scene_textures) {
 		tex.destroy();
 	}
-	vkDestroySampler(VulkanContext::device, texture_sampler, nullptr);
+	vkDestroySampler(vk::context().device, texture_sampler, nullptr);
 }

@@ -66,7 +66,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 	for (const auto& shader : settings.shaders) {
 		VkPipelineShaderStageCreateInfo stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
 		stage.stage = shader.stage;
-		stage.module = shader.create_vk_shader_module(VulkanContext::device);
+		stage.module = shader.create_vk_shader_module(vk::context().device);
 		stage.pName = "main";
 		stage.pSpecializationInfo = &specialization_info;
 		stages.push_back(stage);
@@ -170,13 +170,13 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 	pipeline_CI.basePipelineHandle = VK_NULL_HANDLE;
 	pipeline_CI.pDepthStencilState = &depth_stencil_state_ci;
 
-	vk::check(vkCreateGraphicsPipelines(VulkanContext::device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle),
+	vk::check(vkCreateGraphicsPipelines(vk::context().device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle),
 			  "Failed to create pipeline");
 	for (auto& stage : stages) {
-		vkDestroyShaderModule(VulkanContext::device, stage.module, nullptr);
+		vkDestroyShaderModule(vk::context().device, stage.module, nullptr);
 	}
 	if (!name.empty()) {
-		vk::DebugMarker::set_resource_name(VulkanContext::device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
+		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
 	}
 }
 
@@ -217,7 +217,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 		group.generalShader = VK_SHADER_UNUSED_KHR;
 		group.intersectionShader = VK_SHADER_UNUSED_KHR;
 
-		stage.module = shader.create_vk_shader_module(VulkanContext::device);
+		stage.module = shader.create_vk_shader_module(vk::context().device);
 		stage.stage = shader.stage;
 		switch (shader.stage) {
 			case VK_SHADER_STAGE_RAYGEN_BIT_KHR:
@@ -275,14 +275,14 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 	pipeline_CI.maxPipelineRayRecursionDepth = settings.recursion_depth;
 	pipeline_CI.layout = pipeline_layout;
 	pipeline_CI.flags = 0;
-	vk::check(vkCreateRayTracingPipelinesKHR(VulkanContext::device, {}, {}, 1, &pipeline_CI, nullptr, &handle), "Failed to create RT pipeline");
-	sbt_wrapper.setup(VulkanContext::queue_indices.gfx_family.value(), VulkanContext::rt_props);
+	vk::check(vkCreateRayTracingPipelinesKHR(vk::context().device, {}, {}, 1, &pipeline_CI, nullptr, &handle), "Failed to create RT pipeline");
+	sbt_wrapper.setup(vk::context().queue_indices.gfx_family.value(), vk::context().rt_props);
 	sbt_wrapper.create(handle, pipeline_CI);
 	if (!name.empty()) {
-		vk::DebugMarker::set_resource_name(VulkanContext::device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
+		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
 	}
 	for (auto& stage : stages) {
-		vkDestroyShaderModule(VulkanContext::device, stage.module, nullptr);
+		vkDestroyShaderModule(vk::context().device, stage.module, nullptr);
 	}
 }
 
@@ -299,7 +299,7 @@ void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
 	}
 	create_update_template({settings.shader}, descriptor_counts);
 
-	auto compute_shader_module = settings.shader.create_vk_shader_module(VulkanContext::device);
+	auto compute_shader_module = settings.shader.create_vk_shader_module(vk::context().device);
 	VkPipelineShaderStageCreateInfo shader_stage_ci = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
 	shader_stage_ci.pName = "main";
 	shader_stage_ci.stage = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -323,10 +323,10 @@ void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
 	pipeline_CI.stage = shader_stage_ci;
 	pipeline_CI.flags |= VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
 	pipeline_CI.layout = pipeline_layout;
-	vk::check(vkCreateComputePipelines(VulkanContext::device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle));
-	vkDestroyShaderModule(VulkanContext::device, compute_shader_module, nullptr);
+	vk::check(vkCreateComputePipelines(vk::context().device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle));
+	vkDestroyShaderModule(vk::context().device, compute_shader_module, nullptr);
 	if (!name.empty()) {
-		vk::DebugMarker::set_resource_name(VulkanContext::device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
+		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
 	}
 }
 
@@ -334,30 +334,30 @@ const std::array<VkStridedDeviceAddressRegionKHR, 4> Pipeline::get_rt_regions() 
 
 void Pipeline::cleanup() {
 	if (handle) {
-		vkDestroyPipeline(VulkanContext::device, handle, nullptr);
+		vkDestroyPipeline(vk::context().device, handle, nullptr);
 	}
 	// Note: pipeline layout is usually given externally, but in the case
 	// of compute shaders, it's allocated internally
 	if (pipeline_layout) {
-		vkDestroyPipelineLayout(VulkanContext::device, pipeline_layout, nullptr);
+		vkDestroyPipelineLayout(vk::context().device, pipeline_layout, nullptr);
 	}
 
 	if (set_layout) {
-		vkDestroyDescriptorSetLayout(VulkanContext::device, set_layout, nullptr);
+		vkDestroyDescriptorSetLayout(vk::context().device, set_layout, nullptr);
 	}
 
 	if (tlas_layout) {
-		vkDestroyDescriptorSetLayout(VulkanContext::device, tlas_layout, nullptr);
+		vkDestroyDescriptorSetLayout(vk::context().device, tlas_layout, nullptr);
 	}
 
 	sbt_wrapper.destroy();
 
 	if (tlas_descriptor_pool) {
-		vkDestroyDescriptorPool(VulkanContext::device, tlas_descriptor_pool, nullptr);
+		vkDestroyDescriptorPool(vk::context().device, tlas_descriptor_pool, nullptr);
 	}
 
 	if (update_template) {
-		vkDestroyDescriptorUpdateTemplate(VulkanContext::device, update_template, nullptr);
+		vkDestroyDescriptorUpdateTemplate(vk::context().device, update_template, nullptr);
 	}
 
 	running = false;
@@ -393,7 +393,7 @@ void Pipeline::create_set_layout(const std::vector<Shader>& shaders, const std::
 	set_create_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
 	set_create_info.bindingCount = uint32_t(set_bindings.size());
 	set_create_info.pBindings = set_bindings.data();
-	vk::check(vkCreateDescriptorSetLayout(VulkanContext::device, &set_create_info, nullptr, &set_layout));
+	vk::check(vkCreateDescriptorSetLayout(vk::context().device, &set_create_info, nullptr, &set_layout));
 	// Create the set layout for TLAS
 	if (type == PipelineType::RT) {
 		VkDescriptorSetLayoutBinding binding = {};
@@ -408,7 +408,7 @@ void Pipeline::create_set_layout(const std::vector<Shader>& shaders, const std::
 		set_create_info.flags = 0;
 		set_create_info.bindingCount = 1;
 		set_create_info.pBindings = &binding;
-		vk::check(vkCreateDescriptorSetLayout(VulkanContext::device, &set_create_info, nullptr, &tlas_layout));
+		vk::check(vkCreateDescriptorSetLayout(vk::context().device, &set_create_info, nullptr, &tlas_layout));
 	}
 }
 
@@ -433,7 +433,7 @@ void Pipeline::create_pipeline_layout(const std::vector<Shader>& shaders,
 		create_info.pushConstantRangeCount = (uint32_t)pcrs.size();
 		create_info.pPushConstantRanges = pcrs.data();
 	}
-	vk::check(vkCreatePipelineLayout(VulkanContext::device, &create_info, nullptr, &pipeline_layout));
+	vk::check(vkCreatePipelineLayout(vk::context().device, &create_info, nullptr, &pipeline_layout));
 }
 
 void Pipeline::create_update_template(const std::vector<Shader>& shaders,
@@ -533,6 +533,6 @@ void Pipeline::create_update_template(const std::vector<Shader>& shaders,
 	template_create_info.descriptorSetLayout = nullptr;
 	template_create_info.pipelineBindPoint = get_bind_point();
 	template_create_info.pipelineLayout = pipeline_layout;
-	vk::check(vkCreateDescriptorUpdateTemplate(VulkanContext::device, &template_create_info, nullptr, &update_template));
+	vk::check(vkCreateDescriptorUpdateTemplate(vk::context().device, &template_create_info, nullptr, &update_template));
 }
 }  // namespace lumen

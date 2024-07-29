@@ -19,7 +19,7 @@ void DDGI::init() {
 
 		// Samplers
 		{
-			VkSamplerCreateInfo sampler_ci = lumen::vk::sampler();
+			VkSamplerCreateInfo sampler_ci = vk::sampler();
 			sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 			sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 			sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
@@ -32,14 +32,14 @@ void DDGI::init() {
 			sampler_ci.compareOp = VK_COMPARE_OP_ALWAYS;
 			sampler_ci.minLod = 0.f;
 			sampler_ci.maxLod = FLT_MAX;
-			lumen::vk::check(vkCreateSampler(VulkanContext::device, &sampler_ci, nullptr, &bilinear_sampler),
+			vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &bilinear_sampler),
 					  "Could not create image sampler");
 			sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			sampler_ci.minFilter = VK_FILTER_NEAREST;
 			sampler_ci.magFilter = VK_FILTER_NEAREST;
-			lumen::vk::check(vkCreateSampler(VulkanContext::device, &sampler_ci, nullptr, &nearest_sampler),
+			vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &nearest_sampler),
 					  "Could not create image sampler");
 		}
 
@@ -296,8 +296,8 @@ void DDGI::destroy() {
 		t->destroy();
 	}
 
-	vkDestroySampler(VulkanContext::device, bilinear_sampler, nullptr);
-	vkDestroySampler(VulkanContext::device, nearest_sampler, nullptr);
+	vkDestroySampler(vk::context().device, bilinear_sampler, nullptr);
+	vkDestroySampler(vk::context().device, nearest_sampler, nullptr);
 
 	for (auto& irr_tex : irr_texes) {
 		irr_tex.destroy();

@@ -5,7 +5,7 @@ namespace lumen {
 class CommandBuffer {
    public:
 	CommandBuffer(bool begin = false, VkCommandBufferUsageFlags begin_flags = 0,
-				  QueueType type = QueueType::GFX, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+				  vk::QueueType type = vk::QueueType::GFX, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 	~CommandBuffer();
 	void begin(VkCommandBufferUsageFlags begin_flags = 0);
 	void submit(bool wait_fences = true, bool queue_wait_idle = true);
@@ -15,7 +15,7 @@ class CommandBuffer {
    private:
 	enum class CommandBufferState { RECORDING, STOPPED };
 	CommandBufferState state = CommandBufferState::STOPPED;
-	QueueType type;
+	vk::QueueType type;
 	uint32_t curr_tid;
 };
 

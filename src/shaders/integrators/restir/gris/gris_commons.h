@@ -1,7 +1,7 @@
-// #define DISABLE_LOGGING
+#define DISABLE_LOGGING
 #include "../../../commons.h"
 
-#define DEBUG 1
+#define DEBUG 0
 
 NAMESPACE_BEGIN(RestirPT)
 

@@ -21,7 +21,7 @@ RayTracer::RayTracer(int width, int height, bool debug, int argc, char* argv[]) 
 void RayTracer::init(Window* window) {
 	srand((uint32_t)time(NULL));
 	this->window = window;
-	VulkanContext::window_ptr = window->get_window_ptr();
+	vk::context().window_ptr = window->get_window_ptr();
 	window->add_key_callback([this](KeyInput key, KeyAction action) {
 		if (instance->window->is_key_down(KeyInput::KEY_F10)) {
 			write_exr = true;
@@ -80,7 +80,7 @@ void RayTracer::init(Window* window) {
 	integrator->init();
 	post_fx.init(*instance);
 	init_resources();
-	LUMEN_TRACE("Memory usage {} MB", lumen::vk::get_memory_usage(VulkanContext::physical_device) * 1e-6);
+	LUMEN_TRACE("Memory usage {} MB", vk::get_memory_usage(vk::context().physical_device) * 1e-6);
 }
 
 void RayTracer::init_resources() {
@@ -179,12 +179,12 @@ void RayTracer::render(uint32_t i) {
 	post_fx.render(*input_tex, vkb.swapchain_images[i]);
 	render_debug_utils();
 
-	auto cmdbuf = VulkanContext::command_buffers[i];
+	auto cmdbuf = vk::context().command_buffers[i];
 	VkCommandBufferBeginInfo begin_info =
-		lumen::vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	lumen::vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
+		vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
 	vkb.rg->run(cmdbuf);
-	lumen::vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
+	vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
 }
 
 void RayTracer::render_debug_utils() {
@@ -276,7 +276,7 @@ bool RayTracer::gui() {
 	ImGui::Text("General settings:");
 	ImGui::PopStyleColor();
 	ImGui::Text("Frame %d time %.2f ms ( %.2f FPS )", integrator->frame_num, cpu_avg_time, 1000 / cpu_avg_time);
-	ImGui::Text("Memory Usage: %.2f MB", lumen::vk::get_memory_usage(VulkanContext::physical_device) * 1e-6);
+	ImGui::Text("Memory Usage: %.2f MB", vk::get_memory_usage(vk::context().physical_device) * 1e-6);
 	bool updated = false;
 	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
 	if (show_cam_stats) {
@@ -327,7 +327,7 @@ bool RayTracer::gui() {
 
 	if (curr_integrator_idx != int(scene.config->integrator_type)) {
 		updated = true;
-		vkDeviceWaitIdle(VulkanContext::device);
+		vkDeviceWaitIdle(vk::context().device);
 		integrator->destroy();
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, &output_img_buffer, instance->vkb.rg);
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);
@@ -354,11 +354,11 @@ bool RayTracer::gui() {
 }
 
 void RayTracer::create_blas() {
-	std::vector<lumen::BlasInput> blas_inputs;
+	std::vector<vk::BlasInput> blas_inputs;
 	auto vertex_address = scene.vertex_buffer.get_device_address();
 	auto idx_address = scene.index_buffer.get_device_address();
 	for (auto& prim_mesh : scene.prim_meshes) {
-		lumen::BlasInput geo = lumen::vk::to_vk_geometry(prim_mesh, vertex_address, idx_address);
+		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({geo});
 	}
 	instance->vkb.build_blas(blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
@@ -371,7 +371,7 @@ void RayTracer::create_tlas() {
 	const auto& vertices = scene.positions;
 	for (const auto& pm : scene.prim_meshes) {
 		VkAccelerationStructureInstanceKHR ray_inst{};
-		ray_inst.transform = lumen::vk::to_vk_matrix(pm.world_matrix);
+		ray_inst.transform = vk::to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
 		ray_inst.accelerationStructureReference = instance->vkb.get_blas_device_address(pm.prim_idx);
 		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
@@ -467,7 +467,7 @@ void RayTracer::parse_args(int argc, char* argv[]) {
 	}
 }
 void RayTracer::cleanup() {
-	vkDeviceWaitIdle(VulkanContext::device);
+	vkDeviceWaitIdle(vk::context().device);
 	if (initialized) {
 		cleanup_resources();
 		integrator->destroy();

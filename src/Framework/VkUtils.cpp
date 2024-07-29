@@ -4,7 +4,7 @@
 #include "CommandBuffer.h"
 #include "ThreadPool.h"
 
-namespace lumen::vk {
+namespace vk {
 uint32_t find_memory_type(VkPhysicalDevice* physical_device, uint32_t type_filter, VkMemoryPropertyFlags props) {
 	VkPhysicalDeviceMemoryProperties mem_props;
 	vkGetPhysicalDeviceMemoryProperties(*physical_device, &mem_props);
@@ -250,16 +250,16 @@ BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertexAddress, VkD
 	return input;
 }
 
-VkPipelineStageFlags get_pipeline_stage(PassType pass_type, VkAccessFlags access_flags) {
+VkPipelineStageFlags get_pipeline_stage(lumen::PassType pass_type, VkAccessFlags access_flags) {
 	VkPipelineStageFlags res = 0;
 	switch (pass_type) {
-		case PassType::Compute:
+		case lumen::PassType::Compute:
 			res = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 			break;
-		case PassType::Graphics:
+		case lumen::PassType::Graphics:
 			res = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
 			break;
-		case PassType::RT:
+		case lumen::PassType::RT:
 			res = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
 			break;
 		default:
@@ -301,12 +301,11 @@ VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format, VkImage
 	return ici;
 }
 
-
-VkImageLayout get_target_img_layout(const Texture2D& tex, VkAccessFlags access_flags) {
+VkImageLayout get_target_img_layout(const lumen::Texture2D& tex, VkAccessFlags access_flags) {
 	if ((tex.usage_flags & VK_IMAGE_USAGE_SAMPLED_BIT) && access_flags == VK_ACCESS_SHADER_READ_BIT) {
 		return VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
 	}
 	return VK_IMAGE_LAYOUT_GENERAL;
 }
 
-}  // namespace lumen
+}  // namespace vk

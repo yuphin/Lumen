@@ -178,6 +178,6 @@ void SPPM::destroy() {
 		b->destroy();
 	}
 
-	if (desc_set_layout) vkDestroyDescriptorSetLayout(VulkanContext::device, desc_set_layout, nullptr);
-	if (desc_pool) vkDestroyDescriptorPool(VulkanContext::device, desc_pool, nullptr);
+	if (desc_set_layout) vkDestroyDescriptorSetLayout(vk::context().device, desc_set_layout, nullptr);
+	if (desc_pool) vkDestroyDescriptorPool(vk::context().device, desc_pool, nullptr);
 }

@@ -5,8 +5,8 @@
 #include "Pipeline.h"
 #include "RayTracer/LumenScene.h"
 
-namespace lumen::vk {
-	
+namespace vk {
+
 uint32_t find_memory_type(VkPhysicalDevice* physical_device, uint32_t type_filter, VkMemoryPropertyFlags props);
 
 void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image, VkImageLayout old_layout,
@@ -27,9 +27,8 @@ inline VkTransformMatrixKHR to_vk_matrix(const glm::mat4& mat) {
 	return out_matrix;
 }
 
-VkPipelineStageFlags get_pipeline_stage(PassType pass_type, VkAccessFlags access_flags);
+VkPipelineStageFlags get_pipeline_stage(lumen::PassType pass_type, VkAccessFlags access_flags);
 VkImageLayout get_image_layout(VkDescriptorType type);
-
 
 inline VkBufferMemoryBarrier buffer_barrier(VkBuffer buffer, VkAccessFlags src_accesss, VkAccessFlags dst_access) {
 	VkBufferMemoryBarrier result = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
@@ -136,9 +135,9 @@ inline uint32_t calc_mip_levels(VkExtent2D extent) {
 VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format = VK_FORMAT_R8G8B8A8_UNORM,
 								VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT, bool mipmaps = false);
 
-uint32_t get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types);
+uint32_t get_bindings_for_shader_set(const std::vector<lumen::Shader>& shaders, VkDescriptorType* descriptor_types);
 
-VkImageLayout get_target_img_layout(const Texture2D& tex, VkAccessFlags access_flags);
+VkImageLayout get_target_img_layout(const lumen::Texture2D& tex, VkAccessFlags access_flags);
 
 namespace DebugMarker {
 inline void set_resource_name(VkDevice device, uint64_t obj, const char* name, VkObjectType type) {
@@ -180,4 +179,4 @@ inline void insert(VkDevice device, VkCommandBuffer cmd, const char* name, glm::
 }
 }  // namespace DebugMarker
 
-}  // namespace lumen
+}  // namespace vk

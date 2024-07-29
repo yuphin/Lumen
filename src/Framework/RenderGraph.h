@@ -226,7 +226,7 @@ class RenderPass {
 	std::unordered_map<VkImage, ImageSyncDescriptor> set_signals_img;
 	std::unordered_map<VkImage, ImageSyncDescriptor> wait_signals_img;
 
-	DescriptorInfo descriptor_infos[32] = {};
+	vk::DescriptorInfo descriptor_infos[32] = {};
 
 	std::vector<std::tuple<Texture2D*, VkImageLayout, VkImageLayout>> layout_transitions;
 
@@ -296,7 +296,7 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	} else {
 		dirty_pass_encountered = true;
 		if (cache_it != pipeline_cache.end()) {
-			vkDeviceWaitIdle(VulkanContext::device);
+			vkDeviceWaitIdle(vk::context().device);
 			cache_it->second.pipeline->cleanup();
 		}
 		pipeline_cache[hash] = PipelineStorage(std::make_unique<Pipeline>(name_with_macros));

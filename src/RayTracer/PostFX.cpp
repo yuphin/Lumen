@@ -4,7 +4,7 @@
 void PostFX::init(lumen::LumenInstance& instance) {
 	rg = instance.vkb.rg.get();
 
-	VkSamplerCreateInfo sampler_ci = lumen::vk::sampler();
+	VkSamplerCreateInfo sampler_ci = vk::sampler();
 	sampler_ci.minFilter = VK_FILTER_NEAREST;
 	sampler_ci.magFilter = VK_FILTER_NEAREST;
 	sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
@@ -12,14 +12,14 @@ void PostFX::init(lumen::LumenInstance& instance) {
 
 	sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 	sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-	lumen::vk::check(vkCreateSampler(VulkanContext::device, &sampler_ci, nullptr, &img_sampler),
+	vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &img_sampler),
 			 "Could not create image sampler");
 	// Load the kernel
 	const char* img_name_kernel = "assets/kernels/Octagonal512.exr";
 	int width, height;
 	float* data = load_exr(img_name_kernel, width, height);
 	auto img_dims = VkExtent2D{(uint32_t)width, (uint32_t)height};
-	auto ci = lumen::vk::make_img2d_ci(img_dims, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+	auto ci = vk::make_img2d_ci(img_dims, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 	lumen::Texture2D kernel_org;
 	kernel_org.load_from_data(data, width * height * 4 * sizeof(float), ci, img_sampler,
 							 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, false);
@@ -191,5 +191,5 @@ void PostFX::destroy() {
 	for (auto t : tex_list) {
 		t->destroy();
 	}
-	vkDestroySampler(VulkanContext::device, img_sampler, 0);
+	vkDestroySampler(vk::context().device, img_sampler, 0);
 }

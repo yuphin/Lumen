@@ -361,7 +361,7 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::SliderFloat("Min reconnection distance ratio", &min_vertex_distance_ratio, 0.0f, 1.0f);
 
 	if (spatial_samples_changed && num_spatial_samples > 0) {
-		vkDeviceWaitIdle(VulkanContext::device);
+		vkDeviceWaitIdle(vk::context().device);
 		reconnection_buffer.destroy();
 		reconnection_buffer.create(
 			"Reservoir Connection",
