@@ -21,8 +21,8 @@ class Integrator {
 	lumen::LumenInstance* instance;
 	LumenScene* lumen_scene;
 	lumen::Buffer scene_ubo_buffer;
-	vk::AccelKHR tlas;
-	std::vector<vk::AccelKHR> blases;
+	vk::BVH tlas;
+	std::vector<vk::BVH> blases;
 
 	private:
 	void create_accel();

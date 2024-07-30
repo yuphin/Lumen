@@ -363,7 +363,7 @@ RenderPass& RenderPass::bind_buffer_array(std::vector<Buffer>& buffers, bool for
 	return *this;
 }
 
-RenderPass& RenderPass::bind_tlas(const vk::AccelKHR& tlas) {
+RenderPass& RenderPass::bind_tlas(const vk::BVH& tlas) {
 	pipeline_storage->pipeline->tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
 	pipeline_storage->pipeline->tlas_info.accelerationStructureCount = 1;
 	pipeline_storage->pipeline->tlas_info.pAccelerationStructures = &tlas.accel;
@@ -482,8 +482,8 @@ void RenderPass::finalize() {
 			case PassType::Graphics: {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline_storage->pipeline->create_gfx_pipeline(*pass->gfx_settings, pass->descriptor_counts,
-														pass->gfx_settings->color_outputs,
-														pass->gfx_settings->depth_output);
+																		  pass->gfx_settings->color_outputs,
+																		  pass->gfx_settings->depth_output);
 				};
 				if (rg->multithreaded_pipeline_compilation) {
 					rg->pipeline_tasks.push_back({func, pass_idx});
@@ -840,7 +840,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);
 
 		if (use_events) {
-			set_signals_buffer[k].event = rg->event_pool.get_event( vk::context().device, cmd);
+			set_signals_buffer[k].event = rg->event_pool.get_event(vk::context().device, cmd);
 			vkCmdSetEvent2(cmd, set_signals_buffer[k].event, &dependency_info);
 		}
 	}
@@ -854,15 +854,15 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			k, vk::access_flags_for_img_layout(v.old_layout), vk::access_flags_for_img_layout(v.new_layout),
 			v.old_layout, v.new_layout, v.image_aspect, vk::get_pipeline_stage(type, src_access_flags),
 			vk::get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, dst_access_flags),
-			 vk::context().queue_indices.gfx_family.value());
+			vk::context().queue_indices.gfx_family.value());
 
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);
 		if (use_events) {
-			set_signals_img[k].event = rg->event_pool.get_event( vk::context().device, cmd);
+			set_signals_img[k].event = rg->event_pool.get_event(vk::context().device, cmd);
 			vkCmdSetEvent2(cmd, set_signals_img[k].event, &dependency_info);
 		}
 	}
-	vk::DebugMarker::end_region( vk::context().device, cmd);
+	vk::DebugMarker::end_region(vk::context().device, cmd);
 }
 
 void RenderGraph::run(VkCommandBuffer cmd) {
@@ -880,7 +880,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		std::unordered_map<RenderPass*, std::vector<Shader*>> existing_shaders;
 
 		for (auto i = 0; i < passes.size(); i++) {
-			if(passes[i].is_pipeline_cached) {
+			if (passes[i].is_pipeline_cached) {
 				continue;
 			}
 			if (passes[i].gfx_settings) {

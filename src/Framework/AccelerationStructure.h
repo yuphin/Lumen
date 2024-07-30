@@ -5,7 +5,7 @@
 #include "Buffer.h"
 namespace vk {
 
-struct AccelKHR {
+struct BVH {
 	VkAccelerationStructureKHR accel = VK_NULL_HANDLE;
 	lumen::Buffer buffer;
 
@@ -23,9 +23,9 @@ struct BlasInput {
 	std::vector<VkAccelerationStructureBuildRangeInfoKHR> as_build_offset_info;
 	VkBuildAccelerationStructureFlagsKHR flags{0};
 };
-void build_blas(std::vector<AccelKHR>& blases, const std::vector<BlasInput>& input,
+void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
 				VkBuildAccelerationStructureFlagsKHR flags);
-void build_tlas(AccelKHR& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
+void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
 				VkBuildAccelerationStructureFlagsKHR flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
 				bool update = false);
 }  // namespace vk

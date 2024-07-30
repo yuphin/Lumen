@@ -1,3 +1,4 @@
+#include "Framework/RenderGraph.h"
 #include "LumenPCH.h"
 #include <tinyexr.h>
 #define TINYGLTF_IMPLEMENTATION
@@ -123,8 +124,7 @@ void RayTracer::init_resources() {
 	desc.counter_addr = counter_buffer.get_device_address();
 	desc.rmse_val_addr = rmse_val_buffer.get_device_address();
 
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, &output_img_buffer,
-								 VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, &output_img_buffer, VulkanBase::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer, VulkanBase::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, &counter_buffer, VulkanBase::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, &rmse_val_buffer, VulkanBase::render_graph());
@@ -132,7 +132,7 @@ void RayTracer::init_resources() {
 
 void RayTracer::cleanup_resources() {
 	std::vector<Buffer*> buffer_list = {&output_img_buffer, &output_img_buffer_cpu, &residual_buffer,
-											   &counter_buffer,	   &rmse_val_buffer,	   &rt_utils_desc_buffer};
+										&counter_buffer,	&rmse_val_buffer,		&rt_utils_desc_buffer};
 	std::vector<Texture2D*> tex_list = {&reference_tex, &target_tex};
 	if (load_reference) {
 		buffer_list.push_back(&gt_img_buffer);
@@ -208,8 +208,7 @@ void RayTracer::render_debug_utils() {
 		op_reduce("OpReduce: RMSE", "src/shaders/rmse/calc_rmse.comp", "OpReduce: Reduce RMSE",
 				  "src/shaders/rmse/reduce_rmse.comp");
 		VulkanBase::render_graph()
-			->add_compute("Calculate RMSE",
-						  {.shader = Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1}})
+			->add_compute("Calculate RMSE", {.shader = Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1}})
 			.push_constants(&rt_utils_pc)
 			.bind(rt_utils_desc_buffer);
 	}
@@ -313,14 +312,11 @@ bool RayTracer::gui() {
 		updated = true;
 		vkDeviceWaitIdle(vk::context().device);
 		integrator->destroy();
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, &output_img_buffer,
-									 VulkanBase::render_graph());
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer,
-									 VulkanBase::render_graph());
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, &counter_buffer,
-									 VulkanBase::render_graph());
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, &rmse_val_buffer,
-									 VulkanBase::render_graph());
+		RenderGraph* rg = VulkanBase::render_graph();
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, &output_img_buffer, rg);
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer, rg);
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, &counter_buffer, rg);
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, &rmse_val_buffer, rg);
 
 		auto prev_cam_settings = scene.config->cam_settings;
 

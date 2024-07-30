@@ -1,3 +1,4 @@
+#include "Framework/RenderGraph.h"
 #include "LumenPCH.h"
 #include "ReSTIRGI.h"
 
@@ -28,8 +29,7 @@ void ReSTIRGI::init() {
 									VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 									2 * instance->width * instance->height * sizeof(Reservoir));
 
-	tmp_col_buffer.create("Temp Color",
-						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+	tmp_col_buffer.create("Temp Color", VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * sizeof(float) * 3);
 
 	SceneDesc desc;
@@ -45,8 +45,8 @@ void ReSTIRGI::init() {
 	desc.spatial_reservoir_addr = spatial_reservoir_buffer.get_device_address();
 	desc.color_storage_addr = tmp_col_buffer.get_device_address();
 	lumen_scene->scene_desc_buffer.create(
-							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
 	pc_ray.total_light_area = 0;
 
@@ -57,14 +57,13 @@ void ReSTIRGI::init() {
 	pc_ray.size_y = instance->height;
 	pc_ray.world_radius = lumen_scene->m_dimensions.radius;
 	assert(lumen::VulkanBase::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, restir_samples_addr, &restir_samples_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, restir_samples_old_addr, &restir_samples_old_buffer,
-								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, temporal_reservoir_addr, &temporal_reservoir_buffer,
-								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, spatial_reservoir_addr, &spatial_reservoir_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, &tmp_col_buffer, lumen::VulkanBase::render_graph());
+	lumen::RenderGraph* rg = lumen::VulkanBase::render_graph();
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, restir_samples_addr, &restir_samples_buffer, rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, restir_samples_old_addr, &restir_samples_old_buffer, rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, temporal_reservoir_addr, &temporal_reservoir_buffer, rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, spatial_reservoir_addr, &spatial_reservoir_buffer, rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, &tmp_col_buffer, rg);
 }
 
 void ReSTIRGI::render() {

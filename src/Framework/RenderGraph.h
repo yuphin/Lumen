@@ -34,7 +34,6 @@ inline void hash_combine(std::size_t& seed, const T& v, Rest... rest) {
 #define REGISTER_BUFFER(X, Y) ((X) < (Y) ? (X) : (Y))
 #define REGISTER_IMAGE(X, Y) ((X) < (Y) ? (X) : (Y))
 
-
 class RenderGraph;
 class RenderPass;
 
@@ -153,7 +152,7 @@ class RenderPass {
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
 	RenderPass& bind_texture_array(std::vector<Texture2D>& texes, bool force_update = false);
 	RenderPass& bind_buffer_array(std::vector<Buffer>& buffers, bool force_update = false);
-	RenderPass& bind_tlas(const vk::AccelKHR& tlas);
+	RenderPass& bind_tlas(const vk::BVH& tlas);
 
 	RenderPass& write(Texture2D& tex);
 	RenderPass& write(Buffer& buffer);
