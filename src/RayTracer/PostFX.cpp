@@ -1,8 +1,8 @@
+#include "Framework/RenderGraph.h"
 #include "LumenPCH.h"
 #include "PostFX.h"
 
 void PostFX::init(lumen::LumenInstance& instance) {
-	rg = instance.vkb.rg.get();
 
 	VkSamplerCreateInfo sampler_ci = vk::sampler();
 	sampler_ci.minFilter = VK_FILTER_NEAREST;
@@ -46,6 +46,8 @@ void PostFX::init(lumen::LumenInstance& instance) {
 	// Copy the original kernel image to the padded texture
 	uint32_t pad_width = (kernel_org.base_extent.width + 31) / 32;
 	uint32_t pad_height = (kernel_org.base_extent.height + 31) / 32;
+
+	lumen::RenderGraph* rg = lumen::VulkanBase::render_graph();
 	rg->add_compute("Pad Kernel", {.shader = lumen::Shader("src/shaders/bloom/pad.comp"), .dims = {pad_width, pad_height, 1}})
 		.bind_texture_with_sampler(kernel_org, img_sampler)
 		.bind(kernel_ping);
@@ -85,10 +87,12 @@ void PostFX::init(lumen::LumenInstance& instance) {
 }
 
 void PostFX::render(lumen::Texture2D& input, lumen::Texture2D& output) {
+	lumen::RenderGraph* rg = lumen::VulkanBase::render_graph();
 	// Copy the original image to the padded texture
 	if (enable_bloom) {
 		uint32_t pad_width = (fft_ping_padded.base_extent.width + 31) / 32;
 		uint32_t pad_height = (fft_ping_padded.base_extent.height + 31) / 32;
+
 		rg->add_compute("Pad Image",
 						{.shader = lumen::Shader("src/shaders/bloom/pad.comp"), .dims = {pad_width, pad_height, 1}})
 			.bind_texture_with_sampler(input, img_sampler)

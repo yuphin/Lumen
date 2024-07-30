@@ -107,26 +107,6 @@ inline VkCommandBufferBeginInfo command_buffer_begin_info(VkCommandBufferUsageFl
 	return cmdBufferBeginInfo;
 }
 
-inline VkCommandBufferInheritanceInfo command_buffer_inheritance_info() {
-	VkCommandBufferInheritanceInfo cmdBufferInheritanceInfo{};
-	cmdBufferInheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
-	return cmdBufferInheritanceInfo;
-}
-
-inline VkRenderPassBeginInfo render_pass_begin_info() {
-	VkRenderPassBeginInfo renderPassBeginInfo{};
-	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	return renderPassBeginInfo;
-}
-
-inline VkRenderPassCreateInfo render_pass() {
-	VkRenderPassCreateInfo renderPassCreateInfo{};
-	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	return renderPassCreateInfo;
-}
-
-/** @brief Initialize an image memory barrier with no image transfer ownership
- */
 inline VkImageMemoryBarrier image_memory_barrier() {
 	VkImageMemoryBarrier imageMemoryBarrier{};
 	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -135,20 +115,12 @@ inline VkImageMemoryBarrier image_memory_barrier() {
 	return imageMemoryBarrier;
 }
 
-/** @brief Initialize a buffer memory barrier with no image transfer ownership
- */
 inline VkBufferMemoryBarrier buffer_memory_barrier() {
 	VkBufferMemoryBarrier bufferMemoryBarrier{};
 	bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 	bufferMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	bufferMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	return bufferMemoryBarrier;
-}
-
-inline VkMemoryBarrier memory_barrier() {
-	VkMemoryBarrier memoryBarrier{};
-	memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-	return memoryBarrier;
 }
 
 inline VkImageCreateInfo image(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent) {
@@ -563,23 +535,6 @@ inline VkBindSparseInfo bind_sparse_info() {
 	return bindSparseInfo;
 }
 
-inline VkSpecializationMapEntry specializaiton_map_entry(uint32_t constantID, uint32_t offset, size_t size) {
-	VkSpecializationMapEntry specializationMapEntry{};
-	specializationMapEntry.constantID = constantID;
-	specializationMapEntry.offset = offset;
-	specializationMapEntry.size = size;
-	return specializationMapEntry;
-}
-
-inline VkSpecializationInfo specialization_info(const std::vector<VkSpecializationMapEntry>& mapEntries,
-												size_t dataSize, const void* data) {
-	VkSpecializationInfo specializationInfo{};
-	specializationInfo.mapEntryCount = static_cast<uint32_t>(mapEntries.size());
-	specializationInfo.pMapEntries = mapEntries.data();
-	specializationInfo.dataSize = dataSize;
-	specializationInfo.pData = data;
-	return specializationInfo;
-}
 
 inline VkAccessFlags access_flags_for_img_layout(VkImageLayout layout) {
 	switch (layout) {
@@ -603,31 +558,6 @@ inline VkAccessFlags access_flags_for_img_layout(VkImageLayout layout) {
 	}
 }
 
-inline VkPipelineStageFlags pipeline_stage_for_img_layout(VkImageLayout layout) {
-	switch (layout) {
-		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
-			return VK_PIPELINE_STAGE_TRANSFER_BIT;
-		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-			return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-			return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;	// We do this to allow
-														// queue other than
-														// graphic return
-														// VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-			return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;	// We do this to allow
-														// queue other than
-														// graphic return
-														// VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		case VK_IMAGE_LAYOUT_PREINITIALIZED:
-			return VK_PIPELINE_STAGE_HOST_BIT;
-		case VK_IMAGE_LAYOUT_UNDEFINED:
-			return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-		default:
-			return VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	}
-}
 
 inline VkDependencyInfo dependency_info(int cnt, const VkBufferMemoryBarrier2* p_buffer_memory_barriers) {
 	VkDependencyInfo res = {VK_STRUCTURE_TYPE_DEPENDENCY_INFO};

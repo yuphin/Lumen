@@ -100,18 +100,18 @@ void VCM::init() {
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 
-	assert(instance->vkb.rg->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, &photon_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_vertices_addr, &vcm_light_vertices_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, path_cnt_addr, &light_path_cnt_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, &color_storage_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_reservoir_addr, &vcm_reservoir_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_samples_addr, &light_samples_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, should_resample_addr, &should_resample_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_state_addr, &light_state_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, angle_struct_addr, &angle_struct_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, avg_addr, &avg_buffer, instance->vkb.rg);
+	assert(lumen::VulkanBase::render_graph()->settings.shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, &photon_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_vertices_addr, &vcm_light_vertices_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, path_cnt_addr, &light_path_cnt_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, &color_storage_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_reservoir_addr, &vcm_reservoir_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_samples_addr, &light_samples_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, should_resample_addr, &should_resample_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_state_addr, &light_state_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, angle_struct_addr, &angle_struct_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, avg_addr, &avg_buffer, lumen::VulkanBase::render_graph());
 }
 
 void VCM::render() {
@@ -144,7 +144,7 @@ void VCM::render() {
 	pc_ray.grid_res = glm::max(ivec3(diam * float(base_grid_res) / max_comp), ivec3(1));
 	// Prepare
 	auto& prepare_pass =
-		instance->vkb.rg
+		lumen::VulkanBase::render_graph()
 			->add_compute("Init Reservoirs",
 						  {.shader = lumen::Shader("src/shaders/integrators/vcm/init_reservoirs.comp"),
 						   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
@@ -159,7 +159,7 @@ void VCM::render() {
 	}
 
 	// Do resampling
-	instance->vkb.rg
+	lumen::VulkanBase::render_graph()
 		->add_rt("Resample",
 				 {
 					 .shaders = {{"src/shaders/integrators/vcm/vcm_sample.rgen"},
@@ -173,10 +173,10 @@ void VCM::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(instance->vkb.tlas);
+		.bind_tlas(tlas);
 
 	// Check resampling
-	instance->vkb.rg
+	lumen::VulkanBase::render_graph()
 		->add_compute("Check Reservoirs",
 					  {.shader = lumen::Shader("src/shaders/integrators/vcm/check_reservoirs.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
@@ -185,7 +185,7 @@ void VCM::render() {
 		.zero(should_resample_buffer);
 	pc_ray.random_num = rand() % UINT_MAX;
 	// Spawn light rays
-	instance->vkb.rg
+	lumen::VulkanBase::render_graph()
 		->add_rt("VCM - Spawn Light",
 				 {
 					 .shaders = {{"src/shaders/integrators/vcm/vcm_spawn_light.rgen"},
@@ -200,10 +200,10 @@ void VCM::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(instance->vkb.tlas);
+		.bind_tlas(tlas);
 	pc_ray.random_num = rand() % UINT_MAX;
 	// Trace spawned rays
-	instance->vkb.rg
+	lumen::VulkanBase::render_graph()
 		->add_rt("VCM - Trace Light",
 				 {
 					 .shaders = {{"src/shaders/integrators/vcm/vcm_light.rgen"},
@@ -217,9 +217,9 @@ void VCM::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(instance->vkb.tlas);
+		.bind_tlas(tlas);
 	// Select a reservoir sample
-	instance->vkb.rg
+	lumen::VulkanBase::render_graph()
 		->add_compute("Select Reservoir",
 					  {.shader = lumen::Shader("src/shaders/integrators/vcm/select_reservoirs.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
@@ -227,14 +227,14 @@ void VCM::render() {
 		.push_constants(&pc_ray);
 
 	// Update temporal reservoirs with the selected sample
-	instance->vkb.rg
+	lumen::VulkanBase::render_graph()
 		->add_compute("Update Reservoirs",
 					  {.shader = lumen::Shader("src/shaders/integrators/vcm/update_reservoirs.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.bind(lumen_scene->scene_desc_buffer)
 		.push_constants(&pc_ray);
 	// Trace rays from eye
-	instance->vkb.rg
+	lumen::VulkanBase::render_graph()
 		->add_rt("VCM - Trace Eye",
 				 {
 					 .shaders = {{"src/shaders/integrators/vcm/vcm_eye.rgen"},
@@ -248,13 +248,13 @@ void VCM::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(instance->vkb.tlas);
+		.bind_tlas(tlas);
 
 	if (!do_spatiotemporal) {
 		do_spatiotemporal = true;
 	}
 	pc_ray.total_frame_num++;
-	instance->vkb.rg->run_and_submit(cmd);
+	lumen::VulkanBase::render_graph()->run_and_submit(cmd);
 }
 
 bool VCM::update() {

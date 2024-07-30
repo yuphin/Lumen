@@ -1,3 +1,4 @@
+#include "Framework/RenderGraph.h"
 #include "LumenPCH.h"
 #include "VCMMLT.h"
 static bool use_vm = false;
@@ -10,104 +11,89 @@ void VCMMLT::init() {
 	light_path_rand_count = std::max(7 + 3 * config->path_length, 3 + 7 * config->path_length);
 
 	// MLTVCM buffers
-	bootstrap_buffer.create(
-							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	bootstrap_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							config->num_bootstrap_samples * sizeof(BootstrapSample));
 
-	cdf_buffer.create(
-					  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	cdf_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 						  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 					  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_bootstrap_samples * 4);
 
-	bootstrap_cpu.create( VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	bootstrap_cpu.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 						 config->num_bootstrap_samples * sizeof(BootstrapSample));
 
-	cdf_cpu.create( VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	cdf_cpu.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 				   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 				   config->num_bootstrap_samples * 4);
 
-	cdf_sum_buffer.create(
-						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	cdf_sum_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(float));
 
-	seeds_buffer.create(
-						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	seeds_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * sizeof(VCMMLTSeedData));
 
-	light_primary_samples_buffer.create(
-										VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	light_primary_samples_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 											VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 										config->num_mlt_threads * light_path_rand_count * sizeof(PrimarySample) * 2);
 
-	mlt_samplers_buffer.create(
-							   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	mlt_samplers_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							   config->num_mlt_threads * sizeof(VCMMLTSampler) * 2);
 
-	mlt_col_buffer.create(
-						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	mlt_col_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * 3 * sizeof(float));
 
-	chain_stats_buffer.create(
-							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	chain_stats_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 2 * sizeof(ChainData));
 
 	splat_buffer.create(
-		
+
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		config->num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat) * 2);
 
 	past_splat_buffer.create(
-		
+
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		config->num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat) * 2);
 
-	light_path_buffer.create(
-							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+	light_path_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 							 instance->width * instance->height * (config->path_length + 1) * sizeof(VCMVertex));
 
-	light_path_cnt_buffer.create(
-								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	light_path_cnt_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 								 instance->width * instance->height * sizeof(float));
 
-	tmp_col_buffer.create(
-						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+	tmp_col_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * sizeof(float) * 3);
 
-	photon_buffer.create(
-						 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	photon_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 						 10 * instance->width * instance->height * sizeof(VCMPhotonHash));
 
-	mlt_atomicsum_buffer.create(
-								VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	mlt_atomicsum_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * sizeof(SumData) * 2);
 
-	mlt_residual_buffer.create(
-							   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	mlt_residual_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * sizeof(SumData));
 
-	counter_buffer.create(
-						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	counter_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(int));
 
@@ -126,8 +112,7 @@ void VCMMLT::init() {
 	do {
 		int num_blocks = std::max(1, (int)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
-			block_sums[i++].create(
-								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+			block_sums[i++].create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, num_blocks * 4);
 		}
 		arr_size = num_blocks;
@@ -161,30 +146,39 @@ void VCMMLT::init() {
 	desc.residual_addr = mlt_residual_buffer.get_device_address();
 	desc.counter_addr = counter_buffer.get_device_address();
 
-	assert(instance->vkb.rg->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, &bootstrap_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, &cdf_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, &cdf_sum_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, seeds_addr, &seeds_buffer, instance->vkb.rg);
+	assert(lumen::VulkanBase::render_graph()->settings.shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer,
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, &bootstrap_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, &cdf_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, &cdf_sum_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, seeds_addr, &seeds_buffer, lumen::VulkanBase::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_primary_samples_addr, &light_primary_samples_buffer,
-								 instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_samplers_addr, &mlt_samplers_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_col_addr, &mlt_col_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, chain_stats_addr, &chain_stats_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, splat_addr, &splat_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, past_splat_addr, &past_splat_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_vertices_addr, &light_path_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, path_cnt_addr, &light_path_cnt_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, &tmp_col_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, &photon_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_atomicsum_addr, &mlt_atomicsum_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, &mlt_residual_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_samplers_addr, &mlt_samplers_buffer,
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_col_addr, &mlt_col_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, chain_stats_addr, &chain_stats_buffer,
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, splat_addr, &splat_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, past_splat_addr, &past_splat_buffer,
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_vertices_addr, &light_path_buffer,
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, path_cnt_addr, &light_path_cnt_buffer,
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, &tmp_col_buffer,
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, &photon_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_atomicsum_addr, &mlt_atomicsum_buffer,
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, &mlt_residual_buffer,
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, &counter_buffer, lumen::VulkanBase::render_graph());
 
 	lumen_scene->scene_desc_buffer.create(
-							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 	pc_ray.total_light_area = 0;
 
 	frame_num = 0;
@@ -198,7 +192,7 @@ void VCMMLT::init() {
 void VCMMLT::render() {
 	LUMEN_TRACE("Rendering sample {}...", sample_cnt++);
 	const float ppm_base_radius = 0.25f;
-	lumen::CommandBuffer cmd( /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	lumen::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
 	VkClearValue clear_depth = {1.0f, 0};
 	VkViewport viewport = vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
@@ -223,6 +217,8 @@ void VCMMLT::render() {
 	pc_ray.grid_res = glm::max(ivec3(diam * float(base_grid_res) / max_comp), ivec3(1));
 	pc_ray.total_light_area = lumen_scene->total_light_area;
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
+
+	lumen::RenderGraph* rg = lumen::VulkanBase::render_graph();
 	auto get_pipeline_postfix = [&](const std::vector<uint32_t>& spec_consts) {
 		std::string res = "-";
 		if (spec_consts[0] == 1) {
@@ -236,18 +232,16 @@ void VCMMLT::render() {
 	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name, const std::string& reduce_name,
 						 const std::string& reduce_shader_name, const std::vector<uint32_t> spec_data) {
 		uint32_t num_wgs = uint32_t((config->num_mlt_threads + 1023) / 1024);
-		instance->vkb.rg
-			->add_compute(
-				op_name,
-				{.shader = lumen::Shader(op_shader_name), .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
+		rg->add_compute(
+			  op_name,
+			  {.shader = lumen::Shader(op_shader_name), .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
 			.push_constants(&pc_ray)
 			.bind(lumen_scene->scene_desc_buffer)
 			.zero({mlt_residual_buffer, counter_buffer});
 		while (num_wgs != 1) {
-			instance->vkb.rg
-				->add_compute(reduce_name, {.shader = lumen::Shader(reduce_shader_name),
-											.specialization_data = spec_data,
-											.dims = {num_wgs, 1, 1}})
+			rg->add_compute(reduce_name, {.shader = lumen::Shader(reduce_shader_name),
+										  .specialization_data = spec_data,
+										  .dims = {num_wgs, 1, 1}})
 				.push_constants(&pc_ray)
 				.bind(lumen_scene->scene_desc_buffer);
 			num_wgs = (uint32_t)(num_wgs + 1023) / 1024;
@@ -273,87 +267,81 @@ void VCMMLT::render() {
 	std::string pipeline_postfix = get_pipeline_postfix(spec_consts);
 	// Shoot rays
 	std::string pipeline_name = "VCMMLT - Trace " + pipeline_postfix;
-	instance->vkb.rg
-		->add_rt(pipeline_name,
-				 {
-					 .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_eye.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
-					 .specialization_data = spec_consts,
-					 .dims = {instance->width * instance->height},
-				 })
+	rg->add_rt(pipeline_name,
+			   {
+				   .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_eye.rgen"},
+							   {"src/shaders/ray.rmiss"},
+							   {"src/shaders/ray_shadow.rmiss"},
+							   {"src/shaders/ray.rchit"},
+							   {"src/shaders/ray.rahit"}},
+				   .specialization_data = spec_consts,
+				   .dims = {instance->width * instance->height},
+			   })
 		.push_constants(&pc_ray)
 		.zero({chain_stats_buffer, mlt_atomicsum_buffer})
 		.zero(photon_buffer, use_vm)
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(instance->vkb.tlas);
+		.bind_tlas(tlas);
 	// Start bootstrap sampling
 	pipeline_name = "VCMMLT - Bootstrap " + pipeline_postfix;
-	instance->vkb.rg
-		->add_rt(pipeline_name,
-				 {
-					 .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_seed.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
-					 .specialization_data = spec_consts,
-					 .dims = {(uint32_t)config->num_bootstrap_samples},
-				 })
+	rg->add_rt(pipeline_name,
+			   {
+				   .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_seed.rgen"},
+							   {"src/shaders/ray.rmiss"},
+							   {"src/shaders/ray_shadow.rmiss"},
+							   {"src/shaders/ray.rchit"},
+							   {"src/shaders/ray.rahit"}},
+				   .specialization_data = spec_consts,
+				   .dims = {(uint32_t)config->num_bootstrap_samples},
+			   })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(instance->vkb.tlas);
+		.bind_tlas(tlas);
 	int counter = 0;
-	prefix_scan(0, config->num_bootstrap_samples, counter, instance->vkb.rg.get());
+	prefix_scan(0, config->num_bootstrap_samples, counter, rg);
 	// Calculate CDF
-	instance->vkb.rg
-		->add_compute("Calculate CDF",
-					  {.shader = lumen::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
-					   .dims = {(uint32_t)std::ceil(config->num_bootstrap_samples / float(1024.0f)), 1, 1}})
+	rg->add_compute("Calculate CDF",
+					{.shader = lumen::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
+					 .dims = {(uint32_t)std::ceil(config->num_bootstrap_samples / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer);
 	// Select seeds
-	instance->vkb.rg
-		->add_compute("Select Seeds", {.shader = lumen::Shader("src/shaders/integrators/vcmmlt/select_seeds.comp"),
-									   .dims = {(uint32_t)std::ceil(config->num_mlt_threads / float(1024.0f)), 1, 1}})
+	rg->add_compute("Select Seeds", {.shader = lumen::Shader("src/shaders/integrators/vcmmlt/select_seeds.comp"),
+									 .dims = {(uint32_t)std::ceil(config->num_mlt_threads / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer);
 	// Fill in the samplers for mutations
 	{
 		// Fill
 		std::string pipeline_name = "VCMMLT - Preprocess " + pipeline_postfix;
-		instance->vkb.rg
-			->add_rt(pipeline_name,
-					 {
-						 .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_preprocess.rgen"},
-									 {"src/shaders/ray.rmiss"},
-									 {"src/shaders/ray_shadow.rmiss"},
-									 {"src/shaders/ray.rchit"},
-									 {"src/shaders/ray.rahit"}},
-						 .specialization_data = spec_consts,
-						 .dims = {(uint32_t)config->num_mlt_threads},
-					 })
+		rg->add_rt(pipeline_name,
+				   {
+					   .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_preprocess.rgen"},
+								   {"src/shaders/ray.rmiss"},
+								   {"src/shaders/ray_shadow.rmiss"},
+								   {"src/shaders/ray.rchit"},
+								   {"src/shaders/ray.rahit"}},
+					   .specialization_data = spec_consts,
+					   .dims = {(uint32_t)config->num_mlt_threads},
+				   })
 			.push_constants(&pc_ray)
 			.bind(rt_bindings)
 			.bind(lumen_scene->mesh_lights_buffer)
 			.bind_texture_array(lumen_scene->scene_textures)
-			.bind_tlas(instance->vkb.tlas);
+			.bind_tlas(tlas);
 		// Sum up chain stats
 		sum_up_chain_data();
 	}
 	// Calculate normalization factor
-	instance->vkb.rg
-		->add_compute("Calculate Normalization",
-					  {.shader = lumen::Shader("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
+	rg->add_compute("Calculate Normalization",
+					{.shader = lumen::Shader("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer);
-	instance->vkb.rg->run_and_submit(cmd);
+	rg->run_and_submit(cmd);
 	// Start mutations
 	{
 		std::string pipeline_name = "VCMMLT - Mutate " + pipeline_postfix;
@@ -361,28 +349,26 @@ void VCMMLT::render() {
 			pc_ray.random_num = rand() % UINT_MAX;
 			pc_ray.mutation_counter = i;
 			// Mutate
-			instance->vkb.rg
-				->add_rt(pipeline_name,
-						 {
-							 .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_mutate.rgen"},
-										 {"src/shaders/ray.rmiss"},
-										 {"src/shaders/ray_shadow.rmiss"},
-										 {"src/shaders/ray.rchit"},
-										 {"src/shaders/ray.rahit"}},
-							 .dims = {(uint32_t)config->num_mlt_threads},
-						 })
+			rg->add_rt(pipeline_name,
+					   {
+						   .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_mutate.rgen"},
+									   {"src/shaders/ray.rmiss"},
+									   {"src/shaders/ray_shadow.rmiss"},
+									   {"src/shaders/ray.rchit"},
+									   {"src/shaders/ray.rahit"}},
+						   .dims = {(uint32_t)config->num_mlt_threads},
+					   })
 				.push_constants(&pc_ray)
 				.zero(mlt_atomicsum_buffer)
 				.bind(rt_bindings)
 				.bind(lumen_scene->mesh_lights_buffer)
 				.bind_texture_array(lumen_scene->scene_textures)
-				.bind_tlas(instance->vkb.tlas);
+				.bind_tlas(tlas);
 			sum_up_chain_data();
 			// Normalization
-			instance->vkb.rg
-				->add_compute(
-					"Calculate Normalization",
-					{.shader = lumen::Shader("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
+			rg->add_compute(
+				  "Calculate Normalization",
+				  {.shader = lumen::Shader("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
 				.push_constants(&pc_ray)
 				.bind(lumen_scene->scene_desc_buffer);
 		};
@@ -395,8 +381,8 @@ void VCMMLT::render() {
 			for (int i = 0; i < iter_cnt; i++) {
 				mutate(cnt++);
 			}
-			instance->vkb.rg->run(cmd.handle);
-			instance->vkb.rg->submit(cmd);
+			rg->run(cmd.handle);
+			rg->submit(cmd);
 		}
 		const uint32_t rem = mutation_count % iter_cnt;
 		if (rem) {
@@ -404,15 +390,14 @@ void VCMMLT::render() {
 			for (uint32_t i = 0; i < rem; i++) {
 				mutate(cnt++);
 			}
-			instance->vkb.rg->run(cmd.handle);
-			instance->vkb.rg->submit(cmd);
+			rg->run(cmd.handle);
+			rg->submit(cmd);
 		}
 	}
 	// Compositions
-	instance->vkb.rg
-		->add_compute("Composition",
-					  {.shader = lumen::Shader("src/shaders/integrators/vcmmlt/composite.comp"),
-					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
+	rg->add_compute("Composition",
+					{.shader = lumen::Shader("src/shaders/integrators/vcmmlt/composite.comp"),
+					 .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }

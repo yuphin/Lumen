@@ -49,13 +49,13 @@ void SPPM::init() {
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 
-	assert(instance->vkb.rg->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, sppm_data_addr, &sppm_data_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, atomic_data_addr, &atomic_data_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, &photon_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
+	assert(lumen::VulkanBase::render_graph()->settings.shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, sppm_data_addr, &sppm_data_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, atomic_data_addr, &atomic_data_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, &photon_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, &residual_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, &counter_buffer, lumen::VulkanBase::render_graph());
 }
 
 void SPPM::render() {
@@ -82,12 +82,12 @@ void SPPM::render() {
 	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name, const std::string& reduce_name,
 						 const std::string& reduce_shader_name) {
 		uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
-		instance->vkb.rg->add_compute(op_name, {.shader = lumen::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
+		lumen::VulkanBase::render_graph()->add_compute(op_name, {.shader = lumen::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
 			.push_constants(&pc_ray)
 			.bind(lumen_scene->scene_desc_buffer)
 			.zero({residual_buffer, counter_buffer});
 		while (num_wgs != 1) {
-			instance->vkb.rg
+			lumen::VulkanBase::render_graph()
 				->add_compute(reduce_name, {.shader = lumen::Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
 				.push_constants(&pc_ray)
 				.bind(lumen_scene->scene_desc_buffer);
@@ -102,7 +102,7 @@ void SPPM::render() {
 	};
 
 	// Trace rays from eye
-	instance->vkb.rg
+	lumen::VulkanBase::render_graph()
 		->add_rt("SPPM - Eye",
 				 {
 					 .shaders = {{"src/shaders/integrators/sppm/sppm_eye.rgen"},
@@ -118,18 +118,18 @@ void SPPM::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(instance->vkb.tlas);
+		.bind_tlas(tlas);
 	// Calculate scene bbox given the calculated radius
 	op_reduce("OpReduce: Max", "src/shaders/integrators/sppm/max.comp", "OpReduce: Reduce Max",
 			  "src/shaders/integrators/sppm/reduce_max.comp");
 	op_reduce("OpReduce: Min", "src/shaders/integrators/sppm/min.comp", "OpReduce: Reduce Min",
 			  "src/shaders/integrators/sppm/reduce_min.comp");
-	instance->vkb.rg
+	lumen::VulkanBase::render_graph()
 		->add_compute("Bounds Calculation",
 					  {.shader = lumen::Shader("src/shaders/integrators/sppm/calc_bounds.comp"), .dims = {1, 1, 1}})
 		.bind(lumen_scene->scene_desc_buffer);
 	// Trace from light
-	instance->vkb.rg
+	lumen::VulkanBase::render_graph()
 		->add_rt("SPPM - Light",
 				 {
 					 .shaders = {{"src/shaders/integrators/sppm/sppm_light.rgen"},
@@ -143,9 +143,9 @@ void SPPM::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(instance->vkb.tlas);
+		.bind_tlas(tlas);
 	// Gather
-	instance->vkb.rg
+	lumen::VulkanBase::render_graph()
 		->add_compute("Gather",
 					  {.shader = lumen::Shader("src/shaders/integrators/sppm/gather.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
@@ -153,7 +153,7 @@ void SPPM::render() {
 		.bind(lumen_scene->scene_desc_buffer)
 		.bind_texture_array(lumen_scene->scene_textures);
 	// Composite
-	instance->vkb.rg
+	lumen::VulkanBase::render_graph()
 		->add_compute("Composite",
 					  {.shader = lumen::Shader("src/shaders/integrators/sppm/composite.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})

@@ -17,9 +17,9 @@ void Path::init() {
 
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
-	assert(instance->vkb.rg->settings.shader_inference == true);
+	assert(lumen::VulkanBase::render_graph()->settings.shader_inference == true);
 	// For shader resource dependency inference, use this macro to register a buffer address to the rendergraph
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, instance->vkb.rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, lumen::VulkanBase::render_graph());
 }
 
 void Path::render() {
@@ -32,7 +32,7 @@ void Path::render() {
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.dir_light_idx = lumen_scene->dir_light_idx;
 	pc_ray.frame_num = frame_num;
-	instance->vkb.rg
+	lumen::VulkanBase::render_graph()
 		->add_rt("Path",
 				 {
 					 .shaders = {{"src/shaders/integrators/path/path.rgen"},
@@ -51,8 +51,8 @@ void Path::render() {
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
 		//.write(output_tex) // Needed if the automatic shader inference is disabled
-		.bind_tlas(instance->vkb.tlas);
-	instance->vkb.rg->run_and_submit(cmd);
+		.bind_tlas(tlas);
+	lumen::VulkanBase::render_graph()->run_and_submit(cmd);
 }
 
 bool Path::update() {

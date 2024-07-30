@@ -98,12 +98,12 @@ void ReSTIRPT::init() {
 	pc_ray.size_y = instance->height;
 	pc_ray.buffer_idx = 0;
 	
-	assert(instance->vkb.rg->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, &gris_reservoir_ping_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, &direct_lighting_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, &lumen_scene->compact_vertices_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, debug_vis_addr, &debug_vis_buffer, instance->vkb.rg);
+	assert(lumen::VulkanBase::render_graph()->settings.shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, &gris_reservoir_ping_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, &direct_lighting_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, &lumen_scene->compact_vertices_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, debug_vis_addr, &debug_vis_buffer, lumen::VulkanBase::render_graph());
 
 	path_length = config->path_length;
 }
@@ -152,7 +152,7 @@ void ReSTIRPT::render() {
 	constexpr int READ_OR_PREV_IDX = 0;
 
 	// Trace rays
-	instance->vkb.rg
+	lumen::VulkanBase::render_graph()
 		->add_rt("GRIS - Generate Samples",
 				 {
 					 .shaders = {{"src/shaders/integrators/restir/gris/gris.rgen"},
@@ -171,12 +171,12 @@ void ReSTIRPT::render() {
 		.bind(*gbuffers[pong])
 		.bind(canonical_contributions_texture)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(instance->vkb.tlas);
+		.bind_tlas(tlas);
 	pc_ray.general_seed = rand() % UINT_MAX;
 	if (enable_gris) {
 		bool should_do_temporal = enable_temporal_reuse && pc_ray.total_frame_num > 0;
 		// Temporal Reuse
-		instance->vkb.rg
+		lumen::VulkanBase::render_graph()
 			->add_rt("GRIS - Temporal Reuse",
 					 {
 						 .shaders = {{"src/shaders/integrators/restir/gris/temporal_reuse.rgen"},
@@ -194,12 +194,12 @@ void ReSTIRPT::render() {
 			.bind(*gbuffers[ping])
 			.bind(canonical_contributions_texture)
 			.bind_texture_array(lumen_scene->scene_textures)
-			.bind_tlas(instance->vkb.tlas)
+			.bind_tlas(tlas)
 			.skip_execution(!should_do_temporal);
 		pc_ray.seed2 = rand() % UINT_MAX;
 		if (!canonical_only) {
 			if (mis_method == MISMethod::TALBOT) {
-				instance->vkb.rg
+				lumen::VulkanBase::render_graph()
 					->add_rt("GRIS - Spatial Reuse - Talbot",
 							 {
 								 .shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen"},
@@ -216,10 +216,10 @@ void ReSTIRPT::render() {
 					.bind(*gbuffers[pong])
 					.bind(canonical_contributions_texture)
 					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_tlas(instance->vkb.tlas);
+					.bind_tlas(tlas);
 			} else {
 				// Retrace
-				instance->vkb.rg
+				lumen::VulkanBase::render_graph()
 					->add_rt("GRIS - Retrace Reservoirs",
 							 {
 								 .shaders = {{"src/shaders/integrators/restir/gris/retrace_paths.rgen"},
@@ -235,9 +235,9 @@ void ReSTIRPT::render() {
 					.bind(*reservoir_buffers[WRITE_OR_CURR_IDX])
 					.bind(*gbuffers[pong])
 					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_tlas(instance->vkb.tlas);
+					.bind_tlas(tlas);
 				// Validate
-				instance->vkb.rg
+				lumen::VulkanBase::render_graph()
 					->add_rt("GRIS - Validate Samples",
 							 {
 								 .shaders = {{"src/shaders/integrators/restir/gris/validate_samples.rgen"},
@@ -253,10 +253,10 @@ void ReSTIRPT::render() {
 					.bind(*reservoir_buffers[WRITE_OR_CURR_IDX])
 					.bind(*gbuffers[pong])
 					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_tlas(instance->vkb.tlas);
+					.bind_tlas(tlas);
 
 				// Spatial Reuse
-				instance->vkb.rg
+				lumen::VulkanBase::render_graph()
 					->add_rt("GRIS - Spatial Reuse",
 							 {
 								 .shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse.rgen"},
@@ -276,11 +276,11 @@ void ReSTIRPT::render() {
 					.bind(*gbuffers[pong])
 					.bind(canonical_contributions_texture)
 					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_tlas(instance->vkb.tlas);
+					.bind_tlas(tlas);
 			}
 			if (pixel_debug || (gris_separator < 1.0f && gris_separator > 0.0f)) {
 				uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
-				instance->vkb.rg
+				lumen::VulkanBase::render_graph()
 					->add_compute("GRIS - Debug Visualiation",
 								  {.shader = lumen::Shader("src/shaders/integrators/restir/gris/debug_vis.comp"),
 								   .dims = {num_wgs}})

@@ -1,3 +1,5 @@
+#include "Framework/RenderGraph.h"
+#include "Framework/VulkanBase.h"
 #include "LumenPCH.h"
 #include "ReSTIR.h"
 
@@ -45,8 +47,8 @@ void ReSTIR::init() {
 	desc.passthrough_reservoir_addr = passthrough_reservoir_buffer.get_device_address();
 	desc.color_storage_addr = tmp_col_buffer.get_device_address();
 	lumen_scene->scene_desc_buffer.create(
-							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
 	pc_ray.total_light_area = 0;
 
@@ -54,19 +56,19 @@ void ReSTIR::init() {
 
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
-	assert(instance->vkb.rg->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, &g_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, temporal_reservoir_addr, &temporal_reservoir_buffer,
-								 instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, spatial_reservoir_addr, &spatial_reservoir_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, passthrough_reservoir_addr, &passthrough_reservoir_buffer,
-								 instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, &tmp_col_buffer, instance->vkb.rg);
+
+	lumen::RenderGraph* rg = lumen::VulkanBase::render_graph();
+	assert(rg->settings.shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, &g_buffer, rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, temporal_reservoir_addr, &temporal_reservoir_buffer, rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, spatial_reservoir_addr, &spatial_reservoir_buffer, rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, passthrough_reservoir_addr, &passthrough_reservoir_buffer, rg);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, &tmp_col_buffer, rg);
 }
 
 void ReSTIR::render() {
-	lumen::CommandBuffer cmd( /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	lumen::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
@@ -84,17 +86,18 @@ void ReSTIR::render() {
 		lumen_scene->scene_desc_buffer,
 	};
 
+	lumen::RenderGraph* rg = lumen::VulkanBase::render_graph();
+
 	// Temporal pass + path tracing
-	instance->vkb.rg
-		->add_rt("ReSTIR - Temporal Pass",
-				 {
-					 .shaders = {{"src/shaders/integrators/restir/di/temporal_pass.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
-					 .dims = {instance->width, instance->height},
-				 })
+	rg->add_rt("ReSTIR - Temporal Pass",
+			   {
+				   .shaders = {{"src/shaders/integrators/restir/di/temporal_pass.rgen"},
+							   {"src/shaders/ray.rmiss"},
+							   {"src/shaders/ray_shadow.rmiss"},
+							   {"src/shaders/ray.rchit"},
+							   {"src/shaders/ray.rahit"}},
+				   .dims = {instance->width, instance->height},
+			   })
 		.push_constants(&pc_ray)
 		.zero(g_buffer)
 		.zero(spatial_reservoir_buffer)
@@ -102,45 +105,43 @@ void ReSTIR::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(instance->vkb.tlas);
+		.bind_tlas(tlas);
 	// Spatial pass
-	instance->vkb.rg
-		->add_rt("ReSTIR - Spatial Pass",
-				 {
-					 .shaders = {{"src/shaders/integrators/restir/di/spatial_pass.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
-					 .dims = {instance->width, instance->height},
-				 })
+	rg->add_rt("ReSTIR - Spatial Pass",
+			   {
+				   .shaders = {{"src/shaders/integrators/restir/di/spatial_pass.rgen"},
+							   {"src/shaders/ray.rmiss"},
+							   {"src/shaders/ray_shadow.rmiss"},
+							   {"src/shaders/ray.rchit"},
+							   {"src/shaders/ray.rahit"}},
+				   .dims = {instance->width, instance->height},
+			   })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(instance->vkb.tlas);
+		.bind_tlas(tlas);
 
 	// Output
-	instance->vkb.rg
-		->add_rt("ReSTIR - Output",
-				 {
-					 .shaders = {{"src/shaders/integrators/restir/di/output.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
-					 .dims = {instance->width, instance->height},
-				 })
+	rg->add_rt("ReSTIR - Output",
+			   {
+				   .shaders = {{"src/shaders/integrators/restir/di/output.rgen"},
+							   {"src/shaders/ray.rmiss"},
+							   {"src/shaders/ray_shadow.rmiss"},
+							   {"src/shaders/ray.rchit"},
+							   {"src/shaders/ray.rahit"}},
+				   .dims = {instance->width, instance->height},
+			   })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(instance->vkb.tlas);
+		.bind_tlas(tlas);
 
 	if (!do_spatiotemporal) {
 		do_spatiotemporal = true;
 	}
-	instance->vkb.rg->run_and_submit(cmd);
+	rg->run_and_submit(cmd);
 }
 
 bool ReSTIR::update() {

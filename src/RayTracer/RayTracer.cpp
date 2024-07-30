@@ -13,7 +13,8 @@ RayTracer* RayTracer::instance = nullptr;
 bool load_reference = false;
 bool calc_rmse = false;
 
-RayTracer::RayTracer(int width, int height, bool debug, int argc, char* argv[]) : LumenInstance(width, height, debug), scene(this) {
+RayTracer::RayTracer(int width, int height, bool debug, int argc, char* argv[])
+	: LumenInstance(width, height, debug), scene(this) {
 	this->instance = this;
 	parse_args(argc, argv);
 }
@@ -28,9 +29,9 @@ void RayTracer::init(Window* window) {
 		} else if (instance->window->is_key_down(KeyInput::KEY_F11)) {
 			comparison_mode ^= true;
 		} else if (instance->window->is_key_down(KeyInput::KEY_F5)) {
-			vkb.rg->reload_shaders = true;
-			vkb.rg->shader_cache.clear();
-			vkb.rg->set_pipelines_dirty();
+			lumen::VulkanBase::render_graph()->reload_shaders = true;
+			lumen::VulkanBase::render_graph()->shader_cache.clear();
+			lumen::VulkanBase::render_graph()->set_pipelines_dirty();
 			integrator->updated = true;
 		} else if (instance->window->is_key_down(KeyInput::KEY_F6)) {
 			capture_ref_img = true;
@@ -44,36 +45,32 @@ void RayTracer::init(Window* window) {
 	});
 
 	// Init with ray tracing extensions
-	vkb.add_device_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-	vkb.add_device_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
-	vkb.add_device_extension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-	vkb.add_device_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
-	vkb.add_device_extension(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
-	vkb.add_device_extension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
-	vkb.add_device_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
-	vkb.add_device_extension(VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_EXTENSION_NAME);
+	lumen::VulkanBase::add_device_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+	lumen::VulkanBase::add_device_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+	lumen::VulkanBase::add_device_extension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+	lumen::VulkanBase::add_device_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+	lumen::VulkanBase::add_device_extension(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
+	lumen::VulkanBase::add_device_extension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
+	lumen::VulkanBase::add_device_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
+	lumen::VulkanBase::add_device_extension(VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_EXTENSION_NAME);
 
-	vkb.create_instance();
-	if (vkb.enable_validation_layers) {
-		vkb.setup_debug_messenger();
-	}
-	vkb.create_surface();
-	vkb.pick_physical_device();
-	vkb.create_logical_device();
-	vkb.create_swapchain();
-	vkb.create_command_pools();
-	vkb.create_command_buffers();
-	vkb.create_sync_primitives();
-	vkb.init_imgui();
+	lumen::VulkanBase::create_instance();
+	lumen::VulkanBase::create_surface();
+	lumen::VulkanBase::pick_physical_device();
+	lumen::VulkanBase::create_logical_device();
+	lumen::VulkanBase::create_swapchain();
+	lumen::VulkanBase::create_command_pools();
+	lumen::VulkanBase::create_command_buffers();
+	lumen::VulkanBase::create_sync_primitives();
+	lumen::VulkanBase::init_imgui();
 	initialized = true;
 
-
 	// Enable shader reflections for the render graph
-	vkb.rg->settings.shader_inference = enable_shader_inference;
+	lumen::VulkanBase::render_graph()->settings.shader_inference = enable_shader_inference;
 	// Disable event based synchronization
 	// Currently the event API that comes with Vulkan 1.3 is buggy on NVIDIA drivers
 	// so this is turned off and pipeline barriers are used instead
-	vkb.rg->settings.use_events = use_events;
+	lumen::VulkanBase::render_graph()->settings.use_events = use_events;
 
 	scene.load_scene(scene_name);
 	create_integrator(int(scene.config->integrator_type));
@@ -137,13 +134,11 @@ void RayTracer::init_resources() {
 	desc.counter_addr = counter_buffer.get_device_address();
 	desc.rmse_val_addr = rmse_val_buffer.get_device_address();
 
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, &output_img_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, &rmse_val_buffer, instance->vkb.rg);
-
-	create_blas();
-	create_tlas();
+	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, &output_img_buffer,
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, &counter_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, &rmse_val_buffer, lumen::VulkanBase::render_graph());
 }
 
 void RayTracer::cleanup_resources() {
@@ -176,25 +171,24 @@ void RayTracer::render(uint32_t i) {
 	} else {
 		input_tex = &integrator->output_tex;
 	}
-	post_fx.render(*input_tex, vkb.swapchain_images[i]);
+	post_fx.render(*input_tex, lumen::VulkanBase::swapchain_images()[i]);
 	render_debug_utils();
 
 	auto cmdbuf = vk::context().command_buffers[i];
-	VkCommandBufferBeginInfo begin_info =
-		vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
-	vkb.rg->run(cmdbuf);
+	lumen::VulkanBase::render_graph()->run(cmdbuf);
 	vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
 }
 
 void RayTracer::render_debug_utils() {
 	if (write_exr) {
-		instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer_cpu);
+		lumen::VulkanBase::render_graph()->current_pass().copy(integrator->output_tex, output_img_buffer_cpu);
 	} else if (capture_ref_img) {
-		instance->vkb.rg->current_pass().copy(integrator->output_tex, reference_tex);
+		lumen::VulkanBase::render_graph()->current_pass().copy(integrator->output_tex, reference_tex);
 
 	} else if (capture_target_img) {
-		instance->vkb.rg->current_pass().copy(integrator->output_tex, target_tex);
+		lumen::VulkanBase::render_graph()->current_pass().copy(integrator->output_tex, target_tex);
 	}
 
 	if (capture_ref_img || capture_target_img) {
@@ -207,23 +201,24 @@ void RayTracer::render_debug_utils() {
 		auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name,
 							 const std::string& reduce_name, const std::string& reduce_shader_name) {
 			uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
-			instance->vkb.rg->add_compute(op_name, {.shader = lumen::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
+			lumen::VulkanBase::render_graph()
+				->add_compute(op_name, {.shader = lumen::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
 				.push_constants(&rt_utils_pc)
 				.bind(rt_utils_desc_buffer)
 				.zero({residual_buffer, counter_buffer});
 			while (num_wgs != 1) {
-				instance->vkb.rg
+				lumen::VulkanBase::render_graph()
 					->add_compute(reduce_name, {.shader = lumen::Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
 					.push_constants(&rt_utils_pc)
 					.bind(rt_utils_desc_buffer);
 				num_wgs = (num_wgs + 1023) / 1024;
 			}
 		};
-		instance->vkb.rg->current_pass().copy(integrator->output_tex, output_img_buffer);
+		lumen::VulkanBase::render_graph()->current_pass().copy(integrator->output_tex, output_img_buffer);
 		// Calculate RMSE
 		op_reduce("OpReduce: RMSE", "src/shaders/rmse/calc_rmse.comp", "OpReduce: Reduce RMSE",
 				  "src/shaders/rmse/reduce_rmse.comp");
-		instance->vkb.rg
+		lumen::VulkanBase::render_graph()
 			->add_compute("Calculate RMSE",
 						  {.shader = lumen::Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1}})
 			.push_constants(&rt_utils_pc)
@@ -287,9 +282,9 @@ bool RayTracer::gui() {
 		ImGui::DragFloat4("", glm::value_ptr(scene.camera->camera[3]), 0.05f);
 	}
 	if (ImGui::Button("Reload shaders (F5)")) {
-		vkb.rg->reload_shaders = true;
-		vkb.rg->shader_cache.clear();
-		vkb.rg->set_pipelines_dirty();
+		lumen::VulkanBase::render_graph()->reload_shaders = true;
+		lumen::VulkanBase::render_graph()->shader_cache.clear();
+		lumen::VulkanBase::render_graph()->set_pipelines_dirty();
 		updated |= true;
 	}
 	ImGui::Checkbox("Comparison mode (F11)", &comparison_mode);
@@ -329,10 +324,14 @@ bool RayTracer::gui() {
 		updated = true;
 		vkDeviceWaitIdle(vk::context().device);
 		integrator->destroy();
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, &output_img_buffer, instance->vkb.rg);
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer, instance->vkb.rg);
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, &counter_buffer, instance->vkb.rg);
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, &rmse_val_buffer, instance->vkb.rg);
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, &output_img_buffer,
+									 lumen::VulkanBase::render_graph());
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer,
+									 lumen::VulkanBase::render_graph());
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, &counter_buffer,
+									 lumen::VulkanBase::render_graph());
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, &rmse_val_buffer,
+									 lumen::VulkanBase::render_graph());
 
 		auto prev_cam_settings = scene.config->cam_settings;
 
@@ -353,53 +352,24 @@ bool RayTracer::gui() {
 	return updated;
 }
 
-void RayTracer::create_blas() {
-	std::vector<vk::BlasInput> blas_inputs;
-	auto vertex_address = scene.vertex_buffer.get_device_address();
-	auto idx_address = scene.index_buffer.get_device_address();
-	for (auto& prim_mesh : scene.prim_meshes) {
-		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh, vertex_address, idx_address);
-		blas_inputs.push_back({geo});
-	}
-	instance->vkb.build_blas(blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
-}
-
-void RayTracer::create_tlas() {
-	std::vector<VkAccelerationStructureInstanceKHR> tlas;
-	
-	const auto& indices = scene.indices;
-	const auto& vertices = scene.positions;
-	for (const auto& pm : scene.prim_meshes) {
-		VkAccelerationStructureInstanceKHR ray_inst{};
-		ray_inst.transform = vk::to_vk_matrix(pm.world_matrix);
-		ray_inst.instanceCustomIndex = pm.prim_idx;
-		ray_inst.accelerationStructureReference = instance->vkb.get_blas_device_address(pm.prim_idx);
-		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-		ray_inst.mask = 0xFF;
-		ray_inst.instanceShaderBindingTableRecordOffset = 0;  // We will use the same hit group for all objects
-		tlas.emplace_back(ray_inst);
-	}
-	instance->vkb.build_tlas(tlas, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
-}
-
 float RayTracer::draw_frame() {
 	if (cnt == 0) {
 		start = clock();
 	}
 
 	auto resize_func = [this]() {
-		vkb.rg->settings.shader_inference = enable_shader_inference;
-		vkb.rg->settings.use_events = use_events;
+		lumen::VulkanBase::render_graph()->settings.shader_inference = enable_shader_inference;
+		lumen::VulkanBase::render_graph()->settings.use_events = use_events;
 		glfwGetWindowSize(window->get_window_ptr(), (int*)&width, (int*)&height);
 		cleanup_resources();
 		integrator->destroy();
 		post_fx.destroy();
-		vkb.destroy_imgui();
+		lumen::VulkanBase::destroy_imgui();
 
 		integrator->init();
 		post_fx.init(*instance);
 		init_resources();
-		vkb.init_imgui();
+		lumen::VulkanBase::init_imgui();
 		integrator->updated = true;
 	};
 	auto t_begin = glfwGetTime() * 1000;
@@ -420,7 +390,7 @@ float RayTracer::draw_frame() {
 		return (float)t_diff;
 	}
 
-	uint32_t image_idx = vkb.prepare_frame();
+	uint32_t image_idx = lumen::VulkanBase::prepare_frame();
 
 	if (image_idx == UINT32_MAX) {
 		resize_func();
@@ -429,11 +399,11 @@ float RayTracer::draw_frame() {
 		return (float)t_diff;
 	}
 	render(image_idx);
-	VkResult result = vkb.submit_frame(image_idx);
+	VkResult result = lumen::VulkanBase::submit_frame(image_idx);
 	if (result != VK_SUCCESS) {
 		resize_func();
 	} else {
-		vkb.rg->reset();
+		lumen::VulkanBase::render_graph()->reset();
 	}
 
 	auto now = clock();
@@ -473,7 +443,7 @@ void RayTracer::cleanup() {
 		integrator->destroy();
 		post_fx.destroy();
 		scene.destroy();
-		vkb.destroy_imgui();
-		vkb.cleanup();
+		lumen::VulkanBase::destroy_imgui();
+		lumen::VulkanBase::cleanup();
 	}
 }

@@ -3,6 +3,7 @@
 #include "Framework/Texture.h"
 #include "shaders/commons.h"
 #include "LumenScene.h"
+#include "Framework/RenderGraph.h"
 class Integrator {
    public:
 	Integrator(lumen::LumenInstance* instance, LumenScene* lumen_scene) : instance(instance), lumen_scene(lumen_scene) {}
@@ -20,4 +21,9 @@ class Integrator {
 	lumen::LumenInstance* instance;
 	LumenScene* lumen_scene;
 	lumen::Buffer scene_ubo_buffer;
+	lumen::AccelKHR tlas;
+	std::vector<lumen::AccelKHR> blases;
+
+	private:
+	void create_accel();
 };

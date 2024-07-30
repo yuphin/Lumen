@@ -185,17 +185,17 @@ void LumenScene::load_scene(const std::string& path) {
 			i++;
 		}
 	}
-	instance->vkb.rg->global_macro_defines.push_back(
+	lumen::VulkanBase::render_graph()->global_macro_defines.push_back(
 		lumen::ShaderMacro("ENABLE_DIFFUSE", has_bsdf_type(BSDF_TYPE_DIFFUSE), /* visible = */ false));
-	instance->vkb.rg->global_macro_defines.push_back(
+	lumen::VulkanBase::render_graph()->global_macro_defines.push_back(
 		lumen::ShaderMacro("ENABLE_MIRROR", has_bsdf_type(BSDF_TYPE_MIRROR), /* visible = */ false));
-	instance->vkb.rg->global_macro_defines.push_back(
+	lumen::VulkanBase::render_graph()->global_macro_defines.push_back(
 		lumen::ShaderMacro("ENABLE_GLASS", has_bsdf_type(BSDF_TYPE_GLASS), /* visible = */ false));
-	instance->vkb.rg->global_macro_defines.push_back(
+	lumen::VulkanBase::render_graph()->global_macro_defines.push_back(
 		lumen::ShaderMacro("ENABLE_DIELECTRIC", has_bsdf_type(BSDF_TYPE_DIELECTRIC), /* visible = */ false));
-	instance->vkb.rg->global_macro_defines.push_back(
+	lumen::VulkanBase::render_graph()->global_macro_defines.push_back(
 		lumen::ShaderMacro("ENABLE_CONDUCTOR", has_bsdf_type(BSDF_TYPE_CONDUCTOR), /* visible = */ false));
-	instance->vkb.rg->global_macro_defines.push_back(
+	lumen::VulkanBase::render_graph()->global_macro_defines.push_back(
 		lumen::ShaderMacro("ENABLE_PRINCIPLED", has_bsdf_type(BSDF_TYPE_PRINCIPLED), /* visible = */ false));
 }
 

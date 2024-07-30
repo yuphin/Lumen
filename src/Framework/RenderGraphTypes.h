@@ -9,7 +9,6 @@
 #include "CommonTypes.h"
 
 namespace lumen {
-class RenderGraph;
 class RenderPass;
 
 struct ShaderMacro {

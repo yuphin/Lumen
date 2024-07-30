@@ -9,6 +9,7 @@
 #include "Texture.h"
 #include "EventPool.h"
 #include "RenderGraphTypes.h"
+#include "AccelerationStructure.h"
 
 namespace lumen {
 
@@ -33,10 +34,6 @@ inline void hash_combine(std::size_t& seed, const T& v, Rest... rest) {
 #define REGISTER_BUFFER(X, Y) ((X) < (Y) ? (X) : (Y))
 #define REGISTER_IMAGE(X, Y) ((X) < (Y) ? (X) : (Y))
 
-struct AccelKHR {
-	VkAccelerationStructureKHR accel = VK_NULL_HANDLE;
-	Buffer buffer;
-};
 
 class RenderGraph;
 class RenderPass;
