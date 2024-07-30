@@ -363,7 +363,7 @@ RenderPass& RenderPass::bind_buffer_array(std::vector<Buffer>& buffers, bool for
 	return *this;
 }
 
-RenderPass& RenderPass::bind_tlas(const AccelKHR& tlas) {
+RenderPass& RenderPass::bind_tlas(const vk::AccelKHR& tlas) {
 	pipeline_storage->pipeline->tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
 	pipeline_storage->pipeline->tlas_info.accelerationStructureCount = 1;
 	pipeline_storage->pipeline->tlas_info.pAccelerationStructures = &tlas.accel;

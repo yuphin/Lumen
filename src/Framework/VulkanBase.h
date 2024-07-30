@@ -1,26 +1,14 @@
 #pragma once
 #include "LumenPCH.h"
 #include <volk/volk.h>
-#include "Buffer.h"
 #include "RenderGraph.h"
-#include "AccelerationStructure.h"
 
 namespace lumen {
 
 namespace VulkanBase {
 
-void init(bool validation_layers);
-// Create VKInstance with current extensions
-void create_instance();
-void setup_debug_messenger();
-void create_surface();
-void pick_physical_device();
-void create_logical_device();
-void create_swapchain();
-void create_sync_primitives();
-void create_command_buffers();
-void create_command_pools();
 void init_imgui();
+void init(bool validation_layers);
 void destroy_imgui();
 void cleanup_swapchain();
 void recreate_swap_chain();

@@ -4,19 +4,20 @@
 #include "VkUtils.h"
 #include "Buffer.h"
 
+namespace vk {
 struct BuildAccelerationStructure {
 	VkAccelerationStructureBuildGeometryInfoKHR build_info{
 		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR};
 	VkAccelerationStructureBuildSizesInfoKHR size_info{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR};
 	const VkAccelerationStructureBuildRangeInfoKHR* range_info;
-	lumen::AccelKHR as;	 // result acceleration structure
-	lumen::AccelKHR cleanup_as;
+	AccelKHR as;	 // result acceleration structure
+	AccelKHR cleanup_as;
 };
 
 inline static bool has_flag(VkFlags item, VkFlags flag) { return (item & flag) == flag; }
 
-static lumen::AccelKHR create_acceleration(VkAccelerationStructureCreateInfoKHR& accel) {
-	lumen::AccelKHR result_accel;
+static AccelKHR create_acceleration(VkAccelerationStructureCreateInfoKHR& accel) {
+	AccelKHR result_accel;
 	// Allocating the buffer to hold the acceleration structure
 	lumen::Buffer accel_buff;
 	accel_buff.create(
@@ -31,7 +32,7 @@ static lumen::AccelKHR create_acceleration(VkAccelerationStructureCreateInfoKHR&
 	return result_accel;
 }
 
-void cmd_create_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> indices,
+static void cmd_create_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> indices,
 					 std::vector<BuildAccelerationStructure>& buildAs, VkDeviceAddress scratchAddress,
 					 VkQueryPool queryPool) {
 	if (queryPool)	// For querying the compaction size
@@ -72,7 +73,7 @@ void cmd_create_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> indices,
 static void cmd_compact_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> indices,
 							 std::vector<BuildAccelerationStructure>& buildAs, VkQueryPool queryPool) {
 	uint32_t query_cnt{0};
-	std::vector<lumen::AccelKHR> cleanupAS;	 // previous AS to destroy
+	std::vector<AccelKHR> cleanupAS;	 // previous AS to destroy
 
 	// Get the compacted size result back
 	std::vector<VkDeviceSize> compact_sizes(static_cast<uint32_t>(indices.size()));
@@ -97,7 +98,7 @@ static void cmd_compact_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> indic
 	}
 }
 
-static void cmd_create_tlas(lumen::AccelKHR& tlas, VkCommandBuffer cmdBuf, uint32_t countInstance,
+static void cmd_create_tlas(AccelKHR& tlas, VkCommandBuffer cmdBuf, uint32_t countInstance,
 							lumen::Buffer& scratchBuffer, VkDeviceAddress instBufferAddr,
 							VkBuildAccelerationStructureFlagsKHR flags, bool update) {
 	// Wraps a device pointer to the above uploaded instances.
@@ -158,7 +159,6 @@ static void cmd_create_tlas(lumen::AccelKHR& tlas, VkCommandBuffer cmdBuf, uint3
 	vkCmdBuildAccelerationStructuresKHR(cmdBuf, 1, &build_info, &pBuildOffsetInfo);
 }
 
-namespace vk {
 //--------------------------------------------------------------------------------------------------
 // Create all the BLAS from the vector of BlasInput
 // - There will be one BLAS per input-vector entry
@@ -168,7 +168,7 @@ namespace vk {
 //   and can be referenced by index.
 // - if flag has the 'Compact' flag, the BLAS will be compacted
 //
-void build_blas(std::vector<lumen::AccelKHR>& blases, const std::vector<BlasInput>& input,
+void build_blas(std::vector<AccelKHR>& blases, const std::vector<BlasInput>& input,
 				VkBuildAccelerationStructureFlagsKHR flags) {
 	uint32_t nb_blas = static_cast<uint32_t>(input.size());
 	VkDeviceSize as_total_size{0};	   // Memory size of all allocated BLAS
@@ -275,7 +275,7 @@ void build_blas(std::vector<lumen::AccelKHR>& blases, const std::vector<BlasInpu
 // - The resulting TLAS will be stored in m_tlas
 // - update is to rebuild the Tlas with updated matrices, flag must have the
 // 'allow_update'
-void build_tlas(lumen::AccelKHR& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
+void build_tlas(AccelKHR& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
 				VkBuildAccelerationStructureFlagsKHR flags, bool update) {
 	// Cannot call buildTlas twice except to update.
 	uint32_t count_instance = static_cast<uint32_t>(instances.size());

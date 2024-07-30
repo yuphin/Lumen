@@ -153,7 +153,7 @@ class RenderPass {
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
 	RenderPass& bind_texture_array(std::vector<Texture2D>& texes, bool force_update = false);
 	RenderPass& bind_buffer_array(std::vector<Buffer>& buffers, bool force_update = false);
-	RenderPass& bind_tlas(const AccelKHR& tlas);
+	RenderPass& bind_tlas(const vk::AccelKHR& tlas);
 
 	RenderPass& write(Texture2D& tex);
 	RenderPass& write(Buffer& buffer);
