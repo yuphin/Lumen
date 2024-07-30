@@ -29,12 +29,6 @@ struct DescriptorInfo {
 
 enum class QueueType { GFX, COMPUTE, PRESENT };
 
-struct BlasInput {
-	// Data used to build acceleration structure geometry
-	std::vector<VkAccelerationStructureGeometryKHR> as_geom;
-	std::vector<VkAccelerationStructureBuildRangeInfoKHR> as_build_offset_info;
-	VkBuildAccelerationStructureFlagsKHR flags{0};
-};
 
 enum class LumenStage { L_STAGE_VERTEX, L_STAGE_FRAGMENT };
 enum class Component { L_POSITION, L_NORMAL, L_COLOR, L_UV, L_TANGENT };

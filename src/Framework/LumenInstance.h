@@ -6,7 +6,6 @@
 #include "Texture.h"
 #include "VulkanBase.h"
 #include "Window.h"
-#include <glm/glm.hpp>
 
 namespace lumen {
 class LumenInstance {

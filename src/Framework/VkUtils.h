@@ -1,8 +1,5 @@
 #pragma once
 #include "LumenPCH.h"
-#include "GltfScene.hpp"
-#include "Buffer.h"
-#include "Pipeline.h"
 #include "RayTracer/LumenScene.h"
 
 namespace vk {

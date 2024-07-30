@@ -47,18 +47,8 @@
 */
 
 #pragma once
-#include <glm/ext.hpp>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/euler_angles.hpp>
-#include <glm/gtx/string_cast.hpp>
+
 #include <tinygltf/tiny_gltf.h>
-#include <algorithm>
-#include <map>
-#include <string>
-#include <unordered_map>
-#include <vector>
 
 namespace lumen {
 #define KHR_LIGHTS_PUNCTUAL_EXTENSION_NAME "KHR_lights_punctual"

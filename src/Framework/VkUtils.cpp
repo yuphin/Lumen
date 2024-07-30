@@ -1,8 +1,6 @@
 #include "../LumenPCH.h"
 #include "RayTracer/LumenScene.h"
 #include "VkUtils.h"
-#include "CommandBuffer.h"
-#include "ThreadPool.h"
 
 namespace vk {
 uint32_t find_memory_type(VkPhysicalDevice* physical_device, uint32_t type_filter, VkMemoryPropertyFlags props) {

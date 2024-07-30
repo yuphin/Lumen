@@ -1,7 +1,5 @@
 #pragma once
 #include "../LumenPCH.h"
-#include <glm/gtx/matrix_decompose.hpp>
-#include <glm/gtx/quaternion.hpp>
 
 namespace lumen {
 class Camera {

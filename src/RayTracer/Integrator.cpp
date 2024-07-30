@@ -138,7 +138,7 @@ void Integrator::create_accel() {
 		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({geo});
 	}
-	lumen::VulkanBase::build_blas(blases, blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+	vk::build_blas(blases, blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 
 	const auto& indices = lumen_scene->indices;
 	const auto& vertices = lumen_scene->positions;
@@ -154,7 +154,7 @@ void Integrator::create_accel() {
 		ray_inst.instanceShaderBindingTableRecordOffset = 0;  // We will use the same hit group for all objects
 		tlas_instances.emplace_back(ray_inst);
 	}
-	lumen::VulkanBase::build_tlas(tlas, tlas_instances, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+	vk::build_tlas(tlas, tlas_instances, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void Integrator::destroy() {

@@ -9,14 +9,6 @@ namespace lumen {
 
 namespace VulkanBase {
 
-struct BuildAccelerationStructure {
-	VkAccelerationStructureBuildGeometryInfoKHR build_info{
-		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR};
-	VkAccelerationStructureBuildSizesInfoKHR size_info{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR};
-	const VkAccelerationStructureBuildRangeInfoKHR* range_info;
-	AccelKHR as;  // result acceleration structure
-	AccelKHR cleanup_as;
-};
 void init(bool validation_layers);
 // Create VKInstance with current extensions
 void create_instance();
@@ -33,10 +25,7 @@ void destroy_imgui();
 void cleanup_swapchain();
 void recreate_swap_chain();
 void add_device_extension(const char* name);
-void build_blas(std::vector<AccelKHR>& blases, const std::vector<vk::BlasInput>& input, VkBuildAccelerationStructureFlagsKHR flags);
-void build_tlas(AccelKHR& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
-				VkBuildAccelerationStructureFlagsKHR flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
-				bool update = false);
+
 std::vector<Texture2D>& swapchain_images();
 uint32_t prepare_frame();
 VkResult submit_frame(uint32_t image_idx);
@@ -62,21 +51,6 @@ SwapChainSupportDetails query_swapchain_support(VkPhysicalDevice device);
 
 void cleanup_app_data();
 void cleanup();
-
-AccelKHR create_acceleration(VkAccelerationStructureCreateInfoKHR& accel);
-void cmd_compact_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> indices,
-					  std::vector<BuildAccelerationStructure>& buildAs, VkQueryPool queryPool);
-void cmd_create_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> indices,
-					 std::vector<BuildAccelerationStructure>& buildAs, VkDeviceAddress scratchAddress,
-					 VkQueryPool queryPool);
-
-void cmd_create_tlas(VkCommandBuffer cmdBuf,  // Command buffer
-					 uint32_t countInstance,  // number of instances
-					 Buffer& scratchBuffer,
-					 VkDeviceAddress instBufferAddr,			  // Buffer address of instances
-					 VkBuildAccelerationStructureFlagsKHR flags,  // Build creation flag
-					 bool update								  // Update == animation
-);
 };	// namespace VulkanBase
 
 }  // namespace lumen

@@ -1,5 +1,6 @@
 #include "../LumenPCH.h"
 #include "CommandBuffer.h"
+#include "VulkanSyncronization.h"
 
 namespace lumen {
 CommandBuffer::CommandBuffer(bool begin, VkCommandBufferUsageFlags begin_flags, vk::QueueType type,

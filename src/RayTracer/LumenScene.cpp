@@ -6,6 +6,8 @@
 #include <tinygltf/json.hpp>
 #pragma warning(pop)
 #include <tiny_obj_loader.h>
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image/stb_image.h>
 #include "shaders/commons.h"
 #include <cctype>
