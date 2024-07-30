@@ -1,6 +1,9 @@
 #include "../LumenPCH.h"
 #include "Logger.h"
-std::shared_ptr<spdlog::logger> Logger::s_logger;
+#include <memory>
+
+namespace Logger {
+std::shared_ptr<spdlog::logger> s_logger;
 void Logger::init() {
 	spdlog::set_pattern("%v%$");
 	s_logger = spdlog::stdout_color_mt("Lumen");
@@ -11,6 +14,9 @@ void Logger::init() {
 #endif
 }
 
-void Logger::set_printer_mode() { s_logger->set_pattern("%v%$"); }
+void set_printer_mode() { s_logger->set_pattern("%v%$"); }
 
-void Logger::set_default_mode() { s_logger->set_pattern("%n: %v%$"); }
+void set_default_mode() { s_logger->set_pattern("%n: %v%$"); }
+
+std::shared_ptr<spdlog::logger>& get() { return s_logger; }
+}  // namespace Logger

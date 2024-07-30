@@ -6,31 +6,27 @@
 #pragma warning(pop)
 #include <memory>
 #include <stdexcept>
-class Logger {
-   public:
-	static void init();
-	static void set_printer_mode();
-	static void set_default_mode();
-	inline static std::shared_ptr<spdlog::logger>& get_logger() { return s_logger; }
-
-   private:
-	static std::shared_ptr<spdlog::logger> s_logger;
+namespace Logger {
+	void init();
+	void set_printer_mode();
+	void set_default_mode();
+	std::shared_ptr<spdlog::logger>& get();
 };
 
-#define LUMEN_TRACE(...) Logger::get_logger()->trace(__VA_ARGS__)
+#define LUMEN_TRACE(...) Logger::get()->trace(__VA_ARGS__)
 #ifdef _DEBUG
-#define LUMEN_INFO(...) Logger::get_logger()->info(__VA_ARGS__)
+#define LUMEN_INFO(...) Logger::get()->info(__VA_ARGS__)
 #else
 #define LUMEN_INFO(...)
 #define VEX_INFO(...)
 #endif
-#define LUMEN_WARN(...) Logger::get_logger()->warn(__VA_ARGS__)
+#define LUMEN_WARN(...) Logger::get()->warn(__VA_ARGS__)
 #define LUMEN_ERROR(...)                                                \
 	{                                                                   \
-		Logger::get_logger()->error(__VA_ARGS__);                       \
+		Logger::get()->error(__VA_ARGS__);                       \
 		throw std::runtime_error("Error: " + std::string(__VA_ARGS__)); \
 	}
-#define LUMEN_CRITICAL(...) Logger::get_logger()->critical(__VA_ARGS__)
+#define LUMEN_CRITICAL(...) Logger::get()->critical(__VA_ARGS__)
 #ifdef _DEBUG
 #define LUMEN_ASSERT(x, ...)          \
 	{                                 \
