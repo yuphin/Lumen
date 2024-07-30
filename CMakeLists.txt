@@ -52,6 +52,10 @@ add_compile_definitions(TINYEXR_USE_MINIZ)  # enables usage of miniz for opening
 add_compile_definitions(USE_SHADERC)        # enables shader compilation via shaderc
 add_executable(Lumen ${src_files} ${shaders_src})
 
+# Add precompiled headers
+target_precompile_headers(Lumen PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/src/LumenPCH.h>")
+set_source_files_properties(${LIB_SRC} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+
 target_include_directories(Lumen PRIVATE ${Vulkan_INCLUDE_DIR};${structures_INCLUDE_DIR})
 if(WIN32)
     message("-- Adding vulkan library lib to search paths for the linker to find spirv libraries")
