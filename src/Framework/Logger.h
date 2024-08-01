@@ -4,8 +4,6 @@
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #pragma warning(pop)
-#include <memory>
-#include <stdexcept>
 namespace Logger {
 	void init();
 	void set_printer_mode();

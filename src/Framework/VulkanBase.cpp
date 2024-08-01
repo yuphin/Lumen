@@ -3,7 +3,6 @@
 #define VOLK_IMPLEMENTATION
 #include "VulkanBase.h"
 #include "CommandBuffer.h"
-#include "AccelerationStructure.h"
 
 namespace lumen {
 
@@ -517,6 +516,35 @@ static void create_command_pools() {
 	}
 }
 
+
+static void create_command_buffers() {
+	vk::context().command_buffers.resize(_swapchain_images.size());
+	// TODO: Factor
+	// 0 is for the main thread
+	VkCommandBufferAllocateInfo alloc_info = vk::command_buffer_allocate_info(
+		vk::context().cmd_pools[0], VK_COMMAND_BUFFER_LEVEL_PRIMARY, (uint32_t)vk::context().command_buffers.size());
+	vk::check(vkAllocateCommandBuffers(vk::context().device, &alloc_info, vk::context().command_buffers.data()),
+			  "Failed to allocate command buffers!");
+}
+
+static void create_sync_primitives() {
+	_image_available_sem.resize(MAX_FRAMES_IN_FLIGHT);
+	_render_finished_sem.resize(MAX_FRAMES_IN_FLIGHT);
+	_in_flight_fences.resize(MAX_FRAMES_IN_FLIGHT);
+	_images_in_flight.resize(_swapchain_images.size(), VK_NULL_HANDLE);
+
+	VkSemaphoreCreateInfo semaphore_info = vk::semaphore();
+
+	VkFenceCreateInfo fence_info = vk::fence(VK_FENCE_CREATE_SIGNALED_BIT);
+
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+		vk::check<3>({vkCreateSemaphore(vk::context().device, &semaphore_info, nullptr, &_image_available_sem[i]),
+					  vkCreateSemaphore(vk::context().device, &semaphore_info, nullptr, &_render_finished_sem[i]),
+					  vkCreateFence(vk::context().device, &fence_info, nullptr, &_in_flight_fences[i])},
+					 "Failed to create synchronization primitives for a frame");
+	}
+}
+
 void init_imgui() {
 	VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
 										 {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
@@ -572,6 +600,8 @@ void init(bool validation_layers) {
 	create_logical_device();
 	create_swapchain();
 	create_command_pools();
+	create_command_buffers();
+	create_sync_primitives();
 	init_imgui();
 }
 
@@ -581,33 +611,6 @@ void destroy_imgui() {
 	ImGui::DestroyContext();
 }
 
-static void create_command_buffers() {
-	vk::context().command_buffers.resize(_swapchain_images.size());
-	// TODO: Factor
-	// 0 is for the main thread
-	VkCommandBufferAllocateInfo alloc_info = vk::command_buffer_allocate_info(
-		vk::context().cmd_pools[0], VK_COMMAND_BUFFER_LEVEL_PRIMARY, (uint32_t)vk::context().command_buffers.size());
-	vk::check(vkAllocateCommandBuffers(vk::context().device, &alloc_info, vk::context().command_buffers.data()),
-			  "Failed to allocate command buffers!");
-}
-
-static void create_sync_primitives() {
-	_image_available_sem.resize(MAX_FRAMES_IN_FLIGHT);
-	_render_finished_sem.resize(MAX_FRAMES_IN_FLIGHT);
-	_in_flight_fences.resize(MAX_FRAMES_IN_FLIGHT);
-	_images_in_flight.resize(_swapchain_images.size(), VK_NULL_HANDLE);
-
-	VkSemaphoreCreateInfo semaphore_info = vk::semaphore();
-
-	VkFenceCreateInfo fence_info = vk::fence(VK_FENCE_CREATE_SIGNALED_BIT);
-
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		vk::check<3>({vkCreateSemaphore(vk::context().device, &semaphore_info, nullptr, &_image_available_sem[i]),
-					  vkCreateSemaphore(vk::context().device, &semaphore_info, nullptr, &_render_finished_sem[i]),
-					  vkCreateFence(vk::context().device, &fence_info, nullptr, &_in_flight_fences[i])},
-					 "Failed to create synchronization primitives for a frame");
-	}
-}
 
 // Called after window resize
 void recreate_swap_chain() {

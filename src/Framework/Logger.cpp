@@ -1,6 +1,5 @@
 #include "../LumenPCH.h"
 #include "Logger.h"
-#include <memory>
 
 namespace Logger {
 std::shared_ptr<spdlog::logger> s_logger;
