@@ -20,6 +20,7 @@ set(structures_INCLUDE_DIR
     "libs"
     "libs/spdlog/include"
     "libs/glfw/include"
+    "libs/vma/include"
     "libs/gli"
     "src"
 )
@@ -61,12 +62,12 @@ if(WIN32)
     message("-- Adding vulkan library lib to search paths for the linker to find spirv libraries")
     get_filename_component(vulkan_lib_folder ${Vulkan_LIBRARIES} DIRECTORY)
     target_link_directories(Lumen PRIVATE ${vulkan_lib_folder})
-    target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared glm
+    target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared glm GPUOpen::VulkanMemoryAllocator
     $<$<CONFIG:Debug>:spirv-cross-cored> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-core>
     $<$<CONFIG:Debug>:spirv-cross-glsld> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-glsl>)
     target_compile_definitions(Lumen PRIVATE _CRT_SECURE_NO_WARNINGS)
 else()
-    target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared spirv-cross-core spirv-cross-glsl glm)
+    target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared spirv-cross-core spirv-cross-glsl glm GPUOpen::VulkanMemoryAllocator)
 endif()
 
 if(MSVC)

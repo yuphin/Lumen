@@ -48,7 +48,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#pragma warning(push,0)
+#pragma warning(push, 0)
 #include "Framework/VulkanContext.h"
 #include <GLFW/glfw3.h>
 #include <imgui/imgui.h>
@@ -82,6 +82,7 @@
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "Framework/ThreadPool.h"
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>

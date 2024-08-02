@@ -31,5 +31,6 @@ cmake_dependent_option(GLFW_BUILD_WAYLAND "Build support for Wayland"
 add_subdirectory(glfw)
 add_subdirectory(volk SYSTEM)
 add_subdirectory(glm)
+add_subdirectory(vma)
 
 set(src_files "${src_files};${glslc_src};${libshaderc_util};${imgui_src};${mitsuba_src};${tinyxml_src};${miniz_src}" PARENT_SCOPE)
