@@ -15,25 +15,25 @@ class PSSMLT : public Integrator {
 	PCMLT pc_ray{};
 	PushConstantCompute pc_compute{};
 	// PSSMLT buffers
-	lumen::Buffer bootstrap_buffer;
-	lumen::Buffer cdf_buffer;
-	lumen::Buffer cdf_sum_buffer;
-	lumen::Buffer seeds_buffer;
-	lumen::Buffer mlt_samplers_buffer;
-	lumen::Buffer light_primary_samples_buffer;
-	lumen::Buffer cam_primary_samples_buffer;
-	lumen::Buffer connection_primary_samples_buffer;
-	lumen::Buffer mlt_col_buffer;
-	lumen::Buffer chain_stats_buffer;
-	lumen::Buffer splat_buffer;
-	lumen::Buffer past_splat_buffer;
-	lumen::Buffer light_path_buffer;
-	lumen::Buffer camera_path_buffer;
+	lumen::BufferOld bootstrap_buffer;
+	lumen::BufferOld cdf_buffer;
+	lumen::BufferOld cdf_sum_buffer;
+	lumen::BufferOld seeds_buffer;
+	lumen::BufferOld mlt_samplers_buffer;
+	lumen::BufferOld light_primary_samples_buffer;
+	lumen::BufferOld cam_primary_samples_buffer;
+	lumen::BufferOld connection_primary_samples_buffer;
+	lumen::BufferOld mlt_col_buffer;
+	lumen::BufferOld chain_stats_buffer;
+	lumen::BufferOld splat_buffer;
+	lumen::BufferOld past_splat_buffer;
+	lumen::BufferOld light_path_buffer;
+	lumen::BufferOld camera_path_buffer;
 
-	lumen::Buffer bootstrap_cpu;
-	lumen::Buffer cdf_cpu;
+	lumen::BufferOld bootstrap_cpu;
+	lumen::BufferOld cdf_cpu;
 
-	std::vector<lumen::Buffer> block_sums;
+	std::vector<lumen::BufferOld> block_sums;
 
 	int mutation_count;
 	int light_path_rand_count;

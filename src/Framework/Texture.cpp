@@ -7,8 +7,8 @@
 
 namespace lumen {
 
-Texture2D::Texture2D(const std::string& name, VkImage image, VkFormat format,
-					 VkImageUsageFlags usage_flags, VkImageAspectFlags aspect_flags, VkExtent2D extent, bool present) {
+Texture2D::Texture2D(const std::string& name, VkImage image, VkFormat format, VkImageUsageFlags usage_flags,
+					 VkImageAspectFlags aspect_flags, VkExtent2D extent, bool present) {
 	img = image;
 	img_view = vk::create_image_view(vk::context().device, img, format);
 	this->present = present;
@@ -85,11 +85,11 @@ VkDescriptorImageInfo Texture2D::descriptor() const {
 	return desc_info;
 }
 
-void Texture2D::load_from_data(void* data, VkDeviceSize size, const VkImageCreateInfo& info,
-							   VkSampler a_sampler, VkImageUsageFlags flags, bool generate_mipmaps) {
+void Texture2D::load_from_data(void* data, VkDeviceSize size, const VkImageCreateInfo& info, VkSampler a_sampler,
+							   VkImageUsageFlags flags, bool generate_mipmaps) {
 	aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT;
 	usage_flags = flags;
-	Buffer staging_buffer;
+	BufferOld staging_buffer;
 	staging_buffer.create(VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, size, data);
 
@@ -142,8 +142,8 @@ void Texture2D::load_from_data(void* data, VkDeviceSize size, const VkImageCreat
 	base_extent = info.extent;
 }
 
-void Texture2D::create_empty_texture(const char* name, const TextureSettings& settings,
-									 VkImageLayout img_layout, VkSampler in_sampler /* 0*/,
+void Texture2D::create_empty_texture(const char* name, const TextureSettings& settings, VkImageLayout img_layout,
+									 VkSampler in_sampler /* 0*/,
 									 VkImageAspectFlags flags /*=VK_IMAGE_ASPECT_COLOR_BIT*/) {
 	auto image_CI = vk::image(settings.format, settings.usage_flags, settings.base_extent);
 	image_CI.imageType = settings.image_type;
@@ -175,10 +175,12 @@ void Texture2D::create_empty_texture(const char* name, const TextureSettings& se
 		sampler_CI.minLod = 0.0f;
 		sampler_CI.maxLod = (float)settings.mip_levels;
 		sampler_CI.anisotropyEnable = vk::context().supported_features.samplerAnisotropy;
-		sampler_CI.maxAnisotropy =
-			vk::context().supported_features.samplerAnisotropy ? vk::context().device_properties.limits.maxSamplerAnisotropy : 1.0f;
+		sampler_CI.maxAnisotropy = vk::context().supported_features.samplerAnisotropy
+									   ? vk::context().device_properties.limits.maxSamplerAnisotropy
+									   : 1.0f;
 		sampler_CI.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		vk::check(vkCreateSampler(vk::context().device, &sampler_CI, nullptr, &sampler), "Could not create image sampler");
+		vk::check(vkCreateSampler(vk::context().device, &sampler_CI, nullptr, &sampler),
+				  "Could not create image sampler");
 		if (name) {
 			std::string sampler_name = std::string("Sampler: ") + std::string(name);
 			vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)sampler, sampler_name.c_str(),
@@ -208,10 +210,11 @@ void Texture::create_image(const VkImageCreateInfo& info) {
 	vkGetImageMemoryRequirements(vk::context().device, img, &mem_req);
 	auto alloc_info = vk::memory_allocate_info();
 	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex =
-		vk::find_memory_type(&vk::context().physical_device, mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	alloc_info.memoryTypeIndex = vk::find_memory_type(&vk::context().physical_device, mem_req.memoryTypeBits,
+													  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-	vk::check(vkAllocateMemory(vk::context().device, &alloc_info, nullptr, &img_mem), "Failed to allocate image memory");
+	vk::check(vkAllocateMemory(vk::context().device, &alloc_info, nullptr, &img_mem),
+			  "Failed to allocate image memory");
 	vkBindImageMemory(vk::context().device, img, img_mem, 0);
 	base_extent = info.extent;
 }
@@ -272,3 +275,15 @@ void Texture::destroy() {
 	img = VK_NULL_HANDLE;
 }
 }  // namespace lumen
+
+namespace vk {
+void create_texture(Texture* texture, const TextureDesc& desc) { 
+	texture->name = desc.name; 
+	texture->extent = desc.dimensions;
+	texture->format = desc.format;
+	texture->usage_flags = desc.usage;
+	texture->aspect_flags = desc.aspect;
+}
+void destroy_texture(Texture* texture) {}
+
+}  // namespace vk

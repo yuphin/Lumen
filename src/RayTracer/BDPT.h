@@ -13,8 +13,8 @@ class BDPT : public Integrator {
 
    private:
 	PCBDPT pc_ray{};
-	lumen::Buffer light_path_buffer;
-	lumen::Buffer camera_path_buffer;
-	lumen::Buffer color_storage_buffer;
+	lumen::BufferOld light_path_buffer;
+	lumen::BufferOld camera_path_buffer;
+	lumen::BufferOld color_storage_buffer;
 	BDPTConfig* config;
 };

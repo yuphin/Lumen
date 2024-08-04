@@ -57,7 +57,7 @@ class SBTWrapper {
    private:
 	using entry = std::unordered_map<uint32_t, std::vector<uint8_t>>;
 	std::array<std::vector<uint32_t>, 4> m_index;
-	std::array<Buffer, 4> m_buffer;
+	std::array<BufferOld, 4> m_buffer;
 	std::array<uint32_t, 4> m_stride{0, 0, 0, 0};
 	std::array<entry, 4> m_data;
 	uint32_t m_handle_size{0};

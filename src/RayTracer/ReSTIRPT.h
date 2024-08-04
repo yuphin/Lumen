@@ -17,15 +17,15 @@ class ReSTIRPT : public Integrator {
 	enum class StreamingMethod { INDIVIDUAL_CONTRIBUTIONS, SPLITTING_AT_RECONNECTION };
 
 	enum class MISMethod { TALBOT, PAIRWISE };
-	lumen::Buffer direct_lighting_buffer;
-	lumen::Buffer gris_gbuffer;
-	lumen::Buffer gris_prev_gbuffer;
-	lumen::Buffer gris_reservoir_ping_buffer;
-	lumen::Buffer gris_reservoir_pong_buffer;
-	lumen::Buffer prefix_contribution_buffer;
-	lumen::Buffer reconnection_buffer;
-	lumen::Buffer transformations_buffer;
-	lumen::Buffer debug_vis_buffer;
+	lumen::BufferOld direct_lighting_buffer;
+	lumen::BufferOld gris_gbuffer;
+	lumen::BufferOld gris_prev_gbuffer;
+	lumen::BufferOld gris_reservoir_ping_buffer;
+	lumen::BufferOld gris_reservoir_pong_buffer;
+	lumen::BufferOld prefix_contribution_buffer;
+	lumen::BufferOld reconnection_buffer;
+	lumen::BufferOld transformations_buffer;
+	lumen::BufferOld debug_vis_buffer;
 	lumen::Texture2D canonical_contributions_texture;
 	PCReSTIRPT pc_ray{};
 	bool enable_accumulation = false;

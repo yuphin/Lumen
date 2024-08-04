@@ -267,7 +267,7 @@ bool VCM::update() {
 }
 void VCM::destroy() {
 	Integrator::destroy();
-	std::vector<lumen::Buffer*> buffer_list = {&photon_buffer,
+	std::vector<lumen::BufferOld*> buffer_list = {&photon_buffer,
 											   &vcm_light_vertices_buffer,
 											   &light_path_cnt_buffer,
 											   &color_storage_buffer,

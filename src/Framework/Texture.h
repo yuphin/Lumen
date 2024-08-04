@@ -44,13 +44,12 @@ class Texture2D : public Texture {
 	Texture2D() = default;
 	Texture2D(const std::string& name, VkImage image, VkFormat format, VkImageUsageFlags flags,
 			  VkImageAspectFlags aspect_flags, VkExtent2D extent, bool present = true);
-	void load_from_data(void* data, VkDeviceSize size, const VkImageCreateInfo& info,
-						VkSampler a_sampler, VkImageUsageFlags flags, bool generate_mipmaps = false);
-	void create_empty_texture(const char* name, const TextureSettings& settings,
-							  VkImageLayout img_layout, VkSampler = 0,
-							  VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT);
-	inline void create_empty_texture(const TextureSettings& settings, VkImageLayout img_layout,
-									 VkSampler sampler = 0, VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT) {
+	void load_from_data(void* data, VkDeviceSize size, const VkImageCreateInfo& info, VkSampler a_sampler,
+						VkImageUsageFlags flags, bool generate_mipmaps = false);
+	void create_empty_texture(const char* name, const TextureSettings& settings, VkImageLayout img_layout,
+							  VkSampler = 0, VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT);
+	inline void create_empty_texture(const TextureSettings& settings, VkImageLayout img_layout, VkSampler sampler = 0,
+									 VkImageAspectFlags flags = VK_IMAGE_ASPECT_COLOR_BIT) {
 		return create_empty_texture("", settings, img_layout, sampler, flags);
 	}
 
@@ -66,3 +65,38 @@ class Texture2D : public Texture {
 };
 
 }  // namespace lumen
+
+namespace vk {
+struct TextureData {
+	void* data = nullptr;
+	VkDeviceSize size = 0;
+};
+struct TextureDesc {
+	std::string_view name;
+	VkImageUsageFlags usage;
+	VkImageAspectFlags aspect;
+	VkExtent3D dimensions;
+	VkFormat format;
+	struct {
+		void* data = nullptr;
+		VkDeviceSize size = 0;
+	} data;
+};
+struct Texture {
+	std::string_view name;
+	VkImage handle;
+	VkExtent3D extent;
+	VkImageView view;
+	VkSampler sampler;
+	VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
+	VkImageUsageFlags usage_flags = 0;
+	uint32_t mip_levels = 1;
+	VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+	VkImageAspectFlags aspect_flags;
+};
+
+void create_texture(Texture* texture, const TextureDesc& desc);
+void destroy_texture(Texture* texture);
+
+
+}  // namespace vk

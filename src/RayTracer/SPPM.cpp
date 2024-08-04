@@ -172,7 +172,7 @@ bool SPPM::update() {
 
 void SPPM::destroy() {
 	Integrator::destroy();
-	std::vector<lumen::Buffer*> buffer_list = {&sppm_data_buffer, &atomic_data_buffer, &photon_buffer, &residual_buffer,
+	std::vector<lumen::BufferOld*> buffer_list = {&sppm_data_buffer, &atomic_data_buffer, &photon_buffer, &residual_buffer,
 											   &counter_buffer,	  &hash_buffer,		   &tmp_col_buffer};
 	for (auto b : buffer_list) {
 		b->destroy();

@@ -16,13 +16,13 @@ class SPPM : public Integrator {
 	VkDescriptorSetLayout desc_set_layout{};
 	VkDescriptorSet desc_set;
 
-	lumen::Buffer sppm_data_buffer;
-	lumen::Buffer atomic_data_buffer;
-	lumen::Buffer photon_buffer;
-	lumen::Buffer residual_buffer;
-	lumen::Buffer counter_buffer;
-	lumen::Buffer hash_buffer;
-	lumen::Buffer tmp_col_buffer;
+	lumen::BufferOld sppm_data_buffer;
+	lumen::BufferOld atomic_data_buffer;
+	lumen::BufferOld photon_buffer;
+	lumen::BufferOld residual_buffer;
+	lumen::BufferOld counter_buffer;
+	lumen::BufferOld hash_buffer;
+	lumen::BufferOld tmp_col_buffer;
 
 	SPPMConfig* config;
 };

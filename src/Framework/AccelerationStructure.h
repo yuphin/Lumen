@@ -7,7 +7,7 @@ namespace vk {
 
 struct BVH {
 	VkAccelerationStructureKHR accel = VK_NULL_HANDLE;
-	lumen::Buffer buffer;
+	lumen::BufferOld buffer;
 
 	VkDeviceAddress get_blas_device_address() const {
 		VkAccelerationStructureDeviceAddressInfoKHR addr_info{

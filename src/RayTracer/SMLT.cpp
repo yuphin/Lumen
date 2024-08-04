@@ -474,7 +474,7 @@ void SMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGrap
 
 void SMLT::destroy() {
 	Integrator::destroy();
-	std::vector<lumen::Buffer*> buffer_list = {&bootstrap_buffer,
+	std::vector<lumen::BufferOld*> buffer_list = {&bootstrap_buffer,
 											   &cdf_buffer,
 											   &cdf_sum_buffer,
 											   &seeds_buffer,

@@ -19,7 +19,7 @@ inline static bool has_flag(VkFlags item, VkFlags flag) { return (item & flag) =
 static BVH create_acceleration(VkAccelerationStructureCreateInfoKHR& accel) {
 	BVH result_accel;
 	// Allocating the buffer to hold the acceleration structure
-	lumen::Buffer accel_buff;
+	lumen::BufferOld accel_buff;
 	accel_buff.create(
 		"Blas Buffer",
 		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -99,7 +99,7 @@ static void cmd_compact_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> indic
 }
 
 static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmdBuf, uint32_t countInstance,
-							lumen::Buffer& scratchBuffer, VkDeviceAddress instBufferAddr,
+							lumen::BufferOld& scratchBuffer, VkDeviceAddress instBufferAddr,
 							VkBuildAccelerationStructureFlagsKHR flags, bool update) {
 	// Wraps a device pointer to the above uploaded instances.
 	VkAccelerationStructureGeometryInstancesDataKHR instances_vk{
@@ -207,7 +207,7 @@ void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
 
 	// Allocate the scratch buffers holding the temporary data of the
 	// acceleration structure builder
-	lumen::Buffer scratch_buffer;
+	lumen::BufferOld scratch_buffer;
 	scratch_buffer.create(VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, max_scratch_size);
 	VkBufferDeviceAddressInfo buffer_info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, scratch_buffer.handle};
@@ -284,7 +284,7 @@ void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 
 	// Create a buffer holding the actual instance data (matrices++) for use by
 	// the AS builder
-	lumen::Buffer instances_buf;  // Buffer of instances containing the matrices and
+	lumen::BufferOld instances_buf;  // Buffer of instances containing the matrices and
 						   // BLAS ids
 	instances_buf.create(VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 							 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
@@ -302,7 +302,7 @@ void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 						 VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0,
 						 nullptr);
 
-	lumen::Buffer scratch_buffer;
+	lumen::BufferOld scratch_buffer;
 	// Creating the TLAS
 	cmd_create_tlas(tlas, cmd.handle, count_instance, scratch_buffer, instBufferAddr, flags, update);
 

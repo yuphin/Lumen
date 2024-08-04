@@ -15,17 +15,17 @@ class VCM : public Integrator {
 	VkDescriptorPool desc_pool{};
 	VkDescriptorSetLayout desc_set_layout{};
 	VkDescriptorSet desc_set;
-	lumen::Buffer photon_buffer;
-	lumen::Buffer vcm_light_vertices_buffer;
-	lumen::Buffer light_path_cnt_buffer;
-	lumen::Buffer color_storage_buffer;
-	lumen::Buffer vcm_reservoir_buffer;
-	lumen::Buffer light_samples_buffer;
-	lumen::Buffer should_resample_buffer;
-	lumen::Buffer light_state_buffer;
-	lumen::Buffer angle_struct_buffer;
-	lumen::Buffer angle_struct_cpu_buffer;
-	lumen::Buffer avg_buffer;
+	lumen::BufferOld photon_buffer;
+	lumen::BufferOld vcm_light_vertices_buffer;
+	lumen::BufferOld light_path_cnt_buffer;
+	lumen::BufferOld color_storage_buffer;
+	lumen::BufferOld vcm_reservoir_buffer;
+	lumen::BufferOld light_samples_buffer;
+	lumen::BufferOld should_resample_buffer;
+	lumen::BufferOld light_state_buffer;
+	lumen::BufferOld angle_struct_buffer;
+	lumen::BufferOld angle_struct_cpu_buffer;
+	lumen::BufferOld avg_buffer;
 	bool do_spatiotemporal = false;
 	uint32_t total_frame_cnt = 0;
 

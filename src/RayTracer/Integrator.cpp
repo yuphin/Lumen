@@ -158,7 +158,7 @@ void Integrator::create_accel() {
 }
 
 void Integrator::destroy() {
-	std::vector<lumen::Buffer*> buffer_list = {&scene_ubo_buffer, &lumen_scene->scene_desc_buffer};
+	std::vector<lumen::BufferOld*> buffer_list = {&scene_ubo_buffer, &lumen_scene->scene_desc_buffer};
 
 	for (auto b : buffer_list) {
 		b->destroy();

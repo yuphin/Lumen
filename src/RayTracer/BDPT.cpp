@@ -96,7 +96,7 @@ bool BDPT::update() {
 
 void BDPT::destroy() {
 	Integrator::destroy();
-	std::vector<lumen::Buffer*> buffer_list = {&light_path_buffer, &camera_path_buffer, &color_storage_buffer};
+	std::vector<lumen::BufferOld*> buffer_list = {&light_path_buffer, &camera_path_buffer, &color_storage_buffer};
 	for (auto b : buffer_list) {
 		b->destroy();
 	}

@@ -725,7 +725,7 @@ void LumenScene::compute_scene_dimensions() {
 }
 
 void LumenScene::destroy() {
-	std::vector<lumen::Buffer*> buffer_list = {&index_buffer,	   &vertex_buffer,		&compact_vertices_buffer,
+	std::vector<lumen::BufferOld*> buffer_list = {&index_buffer,	   &vertex_buffer,		&compact_vertices_buffer,
 											   &materials_buffer,  &prim_lookup_buffer};
 	if (gpu_lights.size()) {
 		buffer_list.push_back(&mesh_lights_buffer);

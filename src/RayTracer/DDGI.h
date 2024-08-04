@@ -14,14 +14,14 @@ class DDGI : public Integrator {
 	void update_ddgi_uniforms();
 
 	DDGIUniforms ddgi_ubo;
-	lumen::Buffer ddgi_ubo_buffer;
-	lumen::Buffer direct_lighting_buffer;
-	lumen::Buffer probe_offsets_buffer;
-	lumen::Buffer g_buffer;
+	lumen::BufferOld ddgi_ubo_buffer;
+	lumen::BufferOld direct_lighting_buffer;
+	lumen::BufferOld probe_offsets_buffer;
+	lumen::BufferOld g_buffer;
 
 	lumen::Texture2D irr_texes[2];
 	lumen::Texture2D depth_texes[2];
-	lumen::Buffer ddgi_output_buffer;
+	lumen::BufferOld ddgi_output_buffer;
 
 	struct {
 		lumen::Texture2D radiance_tex;

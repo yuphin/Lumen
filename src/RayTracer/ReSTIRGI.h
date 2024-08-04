@@ -12,11 +12,11 @@ class ReSTIRGI : public Integrator {
 	virtual void destroy() override;
 
    private:
-	lumen::Buffer restir_samples_buffer;
-	lumen::Buffer restir_samples_old_buffer;
-	lumen::Buffer temporal_reservoir_buffer;
-	lumen::Buffer spatial_reservoir_buffer;
-	lumen::Buffer tmp_col_buffer;
+	lumen::BufferOld restir_samples_buffer;
+	lumen::BufferOld restir_samples_old_buffer;
+	lumen::BufferOld temporal_reservoir_buffer;
+	lumen::BufferOld spatial_reservoir_buffer;
+	lumen::BufferOld tmp_col_buffer;
 	PCReSTIRGI pc_ray{};
 	bool do_spatiotemporal = false;
 	bool enable_accumulation = false;

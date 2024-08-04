@@ -1,19 +1,22 @@
 #include "../LumenPCH.h"
 #include "Buffer.h"
+#include <vulkan/vulkan_core.h>
 #include "CommandBuffer.h"
+#include "Framework/VulkanContext.h"
 #include "VkUtils.h"
 #include "VulkanContext.h"
+#include "DynamicResourceManager.h"
+#include "VulkanStructs.h"
 
 namespace lumen {
 
-void Buffer::create(const char* name, VkBufferUsageFlags usage,
-					VkMemoryPropertyFlags mem_property_flags, VkDeviceSize size, void* data, bool use_staging,
-					VkSharingMode sharing_mode) {
+void BufferOld::create(const char* name, VkBufferUsageFlags usage, VkMemoryPropertyFlags mem_property_flags,
+					   VkDeviceSize size, void* data, bool use_staging, VkSharingMode sharing_mode) {
 	this->mem_property_flags = mem_property_flags;
 	this->usage_flags = usage;
 
 	if (use_staging) {
-		Buffer staging_buffer;
+		BufferOld staging_buffer;
 
 		LUMEN_ASSERT(mem_property_flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, "Buffer creation error");
 		staging_buffer.create(VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -32,7 +35,8 @@ void Buffer::create(const char* name, VkBufferUsageFlags usage,
 	} else {
 		// Create the buffer handle
 		VkBufferCreateInfo buffer_CI = vk::buffer(usage, size, sharing_mode);
-		vk::check(vkCreateBuffer(vk::context().device, &buffer_CI, nullptr, &this->handle), "Failed to create vertex buffer!");
+		vk::check(vkCreateBuffer(vk::context().device, &buffer_CI, nullptr, &this->handle),
+				  "Failed to create vertex buffer!");
 
 		// Create the memory backing up the buffer handle
 		VkMemoryRequirements mem_reqs;
@@ -78,16 +82,17 @@ void Buffer::create(const char* name, VkBufferUsageFlags usage,
 		this->name = name;
 	}
 }
-void Buffer::flush(VkDeviceSize size, VkDeviceSize offset) {
+void BufferOld::flush(VkDeviceSize size, VkDeviceSize offset) {
 	VkMappedMemoryRange mapped_range = {};
 	mapped_range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
 	mapped_range.memory = buffer_memory;
 	mapped_range.offset = offset;
 	mapped_range.size = size;
-	vk::check(vkFlushMappedMemoryRanges(vk::context().device, 1, &mapped_range), "Failed to flush mapped memory ranges");
+	vk::check(vkFlushMappedMemoryRanges(vk::context().device, 1, &mapped_range),
+			  "Failed to flush mapped memory ranges");
 }
 
-void Buffer::invalidate(VkDeviceSize size, VkDeviceSize offset) {
+void BufferOld::invalidate(VkDeviceSize size, VkDeviceSize offset) {
 	VkMappedMemoryRange mapped_range = {};
 	mapped_range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
 	mapped_range.memory = buffer_memory;
@@ -97,13 +102,13 @@ void Buffer::invalidate(VkDeviceSize size, VkDeviceSize offset) {
 			  "Failed to invalidate mapped memory range");
 }
 
-void Buffer::prepare_descriptor(VkDeviceSize size, VkDeviceSize offset) {
+void BufferOld::prepare_descriptor(VkDeviceSize size, VkDeviceSize offset) {
 	descriptor.offset = offset;
 	descriptor.buffer = handle;
 	descriptor.range = size;
 }
 
-void Buffer::copy(Buffer& dst_buffer, VkCommandBuffer cmdbuf) {
+void BufferOld::copy(BufferOld& dst_buffer, VkCommandBuffer cmdbuf) {
 	VkBufferCopy copy_region;
 	copy_region.srcOffset = 0;
 	copy_region.dstOffset = 0;
@@ -115,30 +120,92 @@ void Buffer::copy(Buffer& dst_buffer, VkCommandBuffer cmdbuf) {
 						 VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
 }
 
-void Buffer::destroy() {
-		if (handle) vkDestroyBuffer(vk::context().device, handle, nullptr);
-		if (buffer_memory) vkFreeMemory(vk::context().device, buffer_memory, nullptr);
-	}
+void BufferOld::destroy() {
+	if (handle) vkDestroyBuffer(vk::context().device, handle, nullptr);
+	if (buffer_memory) vkFreeMemory(vk::context().device, buffer_memory, nullptr);
+}
 
-	void Buffer::bind(VkDeviceSize offset/*=0*/) {
-		vk::check(vkBindBufferMemory(vk::context().device, handle, buffer_memory, offset));
-	}
+void BufferOld::bind(VkDeviceSize offset /*=0*/) {
+	vk::check(vkBindBufferMemory(vk::context().device, handle, buffer_memory, offset));
+}
 
-	 void Buffer::map(VkDeviceSize size/*= VK_WHOLE_SIZE*/, VkDeviceSize offset/*= 0*/) {
-		vk::check(vkMapMemory(vk::context().device, buffer_memory, offset, size, 0, &data), "Unable to map memory");
-	}
+void BufferOld::map(VkDeviceSize size /*= VK_WHOLE_SIZE*/, VkDeviceSize offset /*= 0*/) {
+	vk::check(vkMapMemory(vk::context().device, buffer_memory, offset, size, 0, &data), "Unable to map memory");
+}
 
-	void Buffer::unmap() { vkUnmapMemory(vk::context().device, buffer_memory); }
+void BufferOld::unmap() { vkUnmapMemory(vk::context().device, buffer_memory); }
 
-	 VkDeviceAddress Buffer::get_device_address() {
-		VkBufferDeviceAddressInfo info = {VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
-		info.buffer = handle;
-		return vkGetBufferDeviceAddress(vk::context().device, &info);
-	}
+VkDeviceAddress BufferOld::get_device_address() {
+	VkBufferDeviceAddressInfo info = {VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
+	info.buffer = handle;
+	return vkGetBufferDeviceAddress(vk::context().device, &info);
+}
 
-	void Buffer::create(VkBufferUsageFlags flags, VkMemoryPropertyFlags mem_property_flags,
-					   VkDeviceSize size, void* data, bool use_staging,
-					   VkSharingMode sharing_mode) {
-		return create("", flags, mem_property_flags, size, data, use_staging, sharing_mode);
-					   }
+void BufferOld::create(VkBufferUsageFlags flags, VkMemoryPropertyFlags mem_property_flags, VkDeviceSize size,
+					   void* data, bool use_staging, VkSharingMode sharing_mode) {
+	return create("", flags, mem_property_flags, size, data, use_staging, sharing_mode);
+}
+
 }  // namespace lumen
+
+namespace vk {
+void create_buffer(Buffer* buffer, const BufferDesc& desc) {
+	buffer->name = desc.name;
+	buffer->size = desc.size;
+	buffer->usage_flags = desc.usage;
+	const bool is_uniform = (desc.usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) != 0;
+
+	VmaAllocationCreateInfo alloc_ci = {};
+	alloc_ci.usage = VMA_MEMORY_USAGE_AUTO;
+	if (int(desc.memory_type & BufferType::GPU_TO_CPU) != 0) {
+		alloc_ci.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+	} else if (int(desc.memory_type & BufferType::CPU_TO_GPU) != 0) {
+		alloc_ci.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+						  VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT;
+	}
+	if (desc.memory_type == BufferType::STAGING) {
+		alloc_ci.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+	} else if (desc.data && desc.memory_type == BufferType::GPU) {
+		// In case we need to copy data to the buffer
+		buffer->usage_flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	}
+	VkBufferCreateInfo buffer_ci = vk::buffer(buffer->usage_flags, buffer->size, VK_SHARING_MODE_EXCLUSIVE);
+	VmaAllocationInfo alloc_info;
+	vmaCreateBuffer(vk::context().allocator, &buffer_ci, &alloc_ci, &buffer->handle, &buffer->allocation, &alloc_info);
+	if (!buffer->name.empty()) {
+		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)buffer->handle, buffer->name.data(),
+										   VK_OBJECT_TYPE_BUFFER);
+	}
+	VkMemoryPropertyFlags mem_prop_flags;
+	vmaGetAllocationMemoryProperties(vk::context().allocator, buffer->allocation, &mem_prop_flags);
+	if (desc.data && (mem_prop_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) == 0) {
+		Buffer* staging_buffer = drm::get({.name = "Scratch Buffer",
+												  .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+												  .memory_type = BufferType::STAGING,
+												  .size = buffer->size,
+												  .data = desc.data});
+		lumen::CommandBuffer cmd(true);
+		VkBufferCopy copy_region = {
+			.size = buffer->size,
+		};
+		vkCmdCopyBuffer(cmd.handle, staging_buffer->handle, buffer->handle, 1, &copy_region);
+		cmd.submit(vk::context().queues[0]);
+		drm::destroy_buffer(staging_buffer);
+
+	} else if (desc.data) {
+		memcpy(alloc_info.pMappedData, desc.data, buffer->size);
+		vmaFlushAllocation(vk::context().allocator, buffer->allocation, 0, buffer->size);
+	}
+}
+
+VkDescriptorBufferInfo get_descriptor_buffer_info(const Buffer& buffer) {
+	VkDescriptorBufferInfo buffer_info = {};
+	buffer_info.buffer = buffer.handle;
+	buffer_info.offset = 0;
+	buffer_info.range = buffer.size;
+	return buffer_info;
+}
+
+void destroy_buffer(Buffer* buffer) { vmaDestroyBuffer(vk::context().allocator, buffer->handle, buffer->allocation); }
+
+}  // namespace vk

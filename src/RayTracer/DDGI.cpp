@@ -284,7 +284,7 @@ void DDGI::update_ddgi_uniforms() {
 
 void DDGI::destroy() {
 	Integrator::destroy();
-	std::vector<lumen::Buffer*> buffer_list = {&g_buffer, &direct_lighting_buffer, &ddgi_ubo_buffer, &probe_offsets_buffer};
+	std::vector<lumen::BufferOld*> buffer_list = {&g_buffer, &direct_lighting_buffer, &ddgi_ubo_buffer, &probe_offsets_buffer};
 
 	std::vector<lumen::Texture*> tex_list = {&rt.radiance_tex, &rt.dir_depth_tex, &output.tex};
 

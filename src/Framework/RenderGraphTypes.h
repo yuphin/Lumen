@@ -43,8 +43,8 @@ struct GraphicsPassSettings {
 	VkClearValue clear_color;
 	VkClearValue clear_depth_stencil;
 	VkCullModeFlags cull_mode = VK_CULL_MODE_FRONT_BIT;
-	std::vector<Buffer*> vertex_buffers = {};
-	Buffer* index_buffer = nullptr;
+	std::vector<BufferOld*> vertex_buffers = {};
+	BufferOld* index_buffer = nullptr;
 	std::vector<uint32_t> specialization_data = {};
 	std::vector<bool> blend_enables = {};
 	VkFrontFace front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
@@ -80,14 +80,14 @@ struct ComputePassSettings {
 
 
 struct ResourceBinding {
-	Buffer* buf = nullptr;
+	BufferOld* buf = nullptr;
 	Texture2D* tex = nullptr;
 	VkSampler sampler = nullptr;
 	bool read = false;
 	bool write = false;
 	bool active = false;
 
-	ResourceBinding(Buffer& buf) : buf(&buf) {}
+	ResourceBinding(BufferOld& buf) : buf(&buf) {}
 	ResourceBinding(Texture2D& tex) : tex(&tex) {}
 	ResourceBinding(Texture2D& tex, VkSampler sampler) : tex(&tex), sampler(sampler) {}
 	inline void replace(const ResourceBinding& binding) {
@@ -115,9 +115,9 @@ struct ResourceBinding {
 };
 
 struct Resource {
-	Buffer* buf = nullptr;
+	BufferOld* buf = nullptr;
 	Texture2D* tex = nullptr;
-	Resource(Buffer& buf) : buf(&buf) {}
+	Resource(BufferOld& buf) : buf(&buf) {}
 	Resource(Texture2D& tex) : tex(&tex) {}
 };
 

@@ -20,7 +20,7 @@ class Integrator {
 	SceneUBO scene_ubo{};
 	lumen::LumenInstance* instance;
 	LumenScene* lumen_scene;
-	lumen::Buffer scene_ubo_buffer;
+	lumen::BufferOld scene_ubo_buffer;
 	vk::BVH tlas;
 	std::vector<vk::BVH> blases;
 

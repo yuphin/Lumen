@@ -10,19 +10,10 @@
 #include "EventPool.h"
 #include "RenderGraphTypes.h"
 #include "AccelerationStructure.h"
+#include "Utils.h"
 
 namespace lumen {
 
-namespace detail {
-inline void hash_combine(std::size_t& seed) {}
-
-template <typename T, typename... Rest>
-inline void hash_combine(std::size_t& seed, const T& v, Rest... rest) {
-	std::hash<T> hasher;
-	seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-	hash_combine(seed, rest...);
-}
-}  // namespace detail
 
 #define TO_STR(V) (#V)
 
@@ -60,7 +51,7 @@ class RenderGraph {
 	friend RenderPass;
 	bool reload_shaders = false;
 	vk::EventPool event_pool;
-	std::unordered_map<std::string, Buffer*> registered_buffer_pointers;
+	std::unordered_map<std::string, BufferOld*> registered_buffer_pointers;
 	// Shader Name + Macro String -> Shader
 	std::unordered_map<std::string, Shader> shader_cache;
 	RenderGraphSettings settings;
@@ -151,25 +142,25 @@ class RenderPass {
 	RenderPass& bind_texture_with_sampler(Texture2D& tex, VkSampler sampler);
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
 	RenderPass& bind_texture_array(std::vector<Texture2D>& texes, bool force_update = false);
-	RenderPass& bind_buffer_array(std::vector<Buffer>& buffers, bool force_update = false);
+	RenderPass& bind_buffer_array(std::vector<BufferOld>& buffers, bool force_update = false);
 	RenderPass& bind_tlas(const vk::BVH& tlas);
 
 	RenderPass& write(Texture2D& tex);
-	RenderPass& write(Buffer& buffer);
+	RenderPass& write(BufferOld& buffer);
 	RenderPass& read(Texture2D& tex);
-	RenderPass& read(Buffer& buffer);
+	RenderPass& read(BufferOld& buffer);
 	RenderPass& read(ResourceBinding& resource);
-	RenderPass& read(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
+	RenderPass& read(std::initializer_list<std::reference_wrapper<BufferOld>> buffers);
 	RenderPass& read(std::initializer_list<std::reference_wrapper<Texture2D>> texes);
 	RenderPass& write(ResourceBinding& resource);
-	RenderPass& write(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
+	RenderPass& write(std::initializer_list<std::reference_wrapper<BufferOld>> buffers);
 	RenderPass& write(std::initializer_list<std::reference_wrapper<Texture2D>> texes);
 
 	RenderPass& skip_execution(bool condition = true);
 	template <typename T>
 	RenderPass& push_constants(T* data);
 	RenderPass& zero(const Resource& resource);
-	RenderPass& zero(std::initializer_list<std::reference_wrapper<Buffer>> buffers);
+	RenderPass& zero(std::initializer_list<std::reference_wrapper<BufferOld>> buffers);
 	RenderPass& zero(std::initializer_list<std::reference_wrapper<Texture2D>> textures);
 	RenderPass& zero(const Resource& resource, bool cond);
 	RenderPass& copy(const Resource& src, const Resource& dst);
@@ -187,20 +178,20 @@ class RenderPass {
 
    private:
 	// When the automatic inference isn't used
-	std::vector<Buffer*> explicit_buffer_writes;
-	std::vector<Buffer*> explicit_buffer_reads;
+	std::vector<BufferOld*> explicit_buffer_writes;
+	std::vector<BufferOld*> explicit_buffer_reads;
 	std::vector<Texture2D*> explicit_tex_writes;
 	std::vector<Texture2D*> explicit_tex_reads;
 
-	void write_impl(Buffer& buffer, VkAccessFlags access_flags);
+	void write_impl(BufferOld& buffer, VkAccessFlags access_flags);
 	void write_impl(Texture2D& tex, VkAccessFlags access_flags = VK_ACCESS_SHADER_WRITE_BIT);
-	void read_impl(Buffer& buffer);
-	void read_impl(Buffer& buffer, VkAccessFlags access_flags);
+	void read_impl(BufferOld& buffer);
+	void read_impl(BufferOld& buffer, VkAccessFlags access_flags);
 	void read_impl(Texture2D& tex);
-	void post_execution_barrier(Buffer& buffer, VkAccessFlags access_flags);
+	void post_execution_barrier(BufferOld& buffer, VkAccessFlags access_flags);
 
 	void run(VkCommandBuffer cmd);
-	void register_dependencies(Buffer& buffer, VkAccessFlags dst_access_flags);
+	void register_dependencies(BufferOld& buffer, VkAccessFlags dst_access_flags);
 	void register_dependencies(Texture2D& tex, VkImageLayout target_layout);
 	void transition_resources();
 
@@ -281,9 +272,9 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	name_with_macros += macro_string;
 
 	size_t hash = 0;
-	detail::hash_combine(hash, name_with_macros);
+	util::hash_combine(hash, name_with_macros);
 	for (uint32_t spec_data : settings.specialization_data) {
-		detail::hash_combine(hash, spec_data);
+		util::hash_combine(hash, spec_data);
 	}
 
 	if (auto cache_it = pipeline_cache.find(hash); cache_it != pipeline_cache.end() && !reload_shaders) {

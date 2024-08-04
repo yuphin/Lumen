@@ -1,8 +1,10 @@
+#include "Framework/Buffer.h"
 #include "Framework/VulkanStructs.h"
 #include "LumenPCH.h"
 #include "ReSTIRPT.h"
 #include <vulkan/vulkan_core.h>
 #include "imgui/imgui.h"
+#include "Framework/DynamicResourceManager.h"
 
 void ReSTIRPT::init() {
 	Integrator::init();
@@ -58,10 +60,9 @@ void ReSTIRPT::init() {
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		instance->width * instance->height * sizeof(ReconnectionData) * (num_spatial_samples + 1));
-	transformations_buffer.create("Transformations Buffer",
-								  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, transformations.size() * sizeof(glm::mat4),
-								  transformations.data(), true);
+	transformations_buffer.create(
+		"Transformations Buffer", VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, transformations.size() * sizeof(glm::mat4), transformations.data(), true);
 
 	SceneDesc desc;
 	desc.index_addr = lumen_scene->index_buffer.get_device_address();
@@ -75,19 +76,18 @@ void ReSTIRPT::init() {
 	desc.gris_direct_lighting_addr = direct_lighting_buffer.get_device_address();
 	desc.prefix_contributions_addr = prefix_contribution_buffer.get_device_address();
 	desc.debug_vis_addr = debug_vis_buffer.get_device_address();
-	
-	lumen_scene->scene_desc_buffer.create(
-							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
+	lumen_scene->scene_desc_buffer.create(
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
 
 	lumen::TextureSettings settings;
 	settings.base_extent = {instance->width, instance->height, 1};
 	settings.format = VK_FORMAT_R16G16B16A16_SFLOAT;
 	settings.usage_flags = VK_IMAGE_USAGE_STORAGE_BIT;
 
-	canonical_contributions_texture.create_empty_texture("Canonical Contributions Texture", 
-														settings, VK_IMAGE_LAYOUT_GENERAL);
+	canonical_contributions_texture.create_empty_texture("Canonical Contributions Texture", settings,
+														 VK_IMAGE_LAYOUT_GENERAL);
 
 	pc_ray.total_light_area = 0;
 
@@ -97,19 +97,23 @@ void ReSTIRPT::init() {
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 	pc_ray.buffer_idx = 0;
-	
+
 	assert(lumen::VulkanBase::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, &gris_reservoir_ping_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, &direct_lighting_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, &lumen_scene->compact_vertices_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer,
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, &gris_reservoir_ping_buffer,
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, &direct_lighting_buffer,
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, &lumen_scene->compact_vertices_buffer,
+								 lumen::VulkanBase::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, debug_vis_addr, &debug_vis_buffer, lumen::VulkanBase::render_graph());
 
 	path_length = config->path_length;
 }
 
 void ReSTIRPT::render() {
-	lumen::CommandBuffer cmd( /*start*/ true);
+	lumen::CommandBuffer cmd(/*start*/ true);
 	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
 	pc_ray.prev_random_num = pc_ray.general_seed;
 	pc_ray.sampling_seed = rand() % UINT_MAX;
@@ -139,11 +143,12 @@ void ReSTIRPT::render() {
 	pc_ray.canonical_only = canonical_only;
 	pc_ray.enable_occlusion = enable_occlusion;
 
-	const std::initializer_list<lumen::ResourceBinding> common_bindings = {output_tex, scene_ubo_buffer,
-																		   lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer};
+	const std::initializer_list<lumen::ResourceBinding> common_bindings = {
+		output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer};
 
-	const std::array<lumen::Buffer*, 2> reservoir_buffers = {&gris_reservoir_ping_buffer, &gris_reservoir_pong_buffer};
-	const std::array<lumen::Buffer*, 2> gbuffers = {&gris_prev_gbuffer, &gris_gbuffer};
+	const std::array<lumen::BufferOld*, 2> reservoir_buffers = {&gris_reservoir_ping_buffer,
+																&gris_reservoir_pong_buffer};
+	const std::array<lumen::BufferOld*, 2> gbuffers = {&gris_prev_gbuffer, &gris_gbuffer};
 
 	int ping = pc_ray.total_frame_num % 2;
 	int pong = ping ^ 1;
@@ -303,7 +308,7 @@ bool ReSTIRPT::update() {
 
 void ReSTIRPT::destroy() {
 	Integrator::destroy();
-	std::vector<lumen::Buffer*> buffer_list = {
+	std::vector<lumen::BufferOld*> buffer_list = {
 		&gris_gbuffer,			 &gris_reservoir_ping_buffer, &gris_reservoir_pong_buffer,
 		&direct_lighting_buffer, &transformations_buffer,	  &prefix_contribution_buffer,
 		&reconnection_buffer,	 &gris_prev_gbuffer,		  &debug_vis_buffer};

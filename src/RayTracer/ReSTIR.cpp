@@ -161,7 +161,7 @@ bool ReSTIR::gui() {
 
 void ReSTIR::destroy() {
 	Integrator::destroy();
-	std::vector<lumen::Buffer*> buffer_list = {
+	std::vector<lumen::BufferOld*> buffer_list = {
 		&g_buffer,		 &temporal_reservoir_buffer,	&spatial_reservoir_buffer,
 		&tmp_col_buffer, &passthrough_reservoir_buffer,
 	};

@@ -9,7 +9,7 @@ namespace lumen {
 		return *this;  \
 	}
 
-void RenderPass::register_dependencies(Buffer& buffer, VkAccessFlags dst_access_flags) {
+void RenderPass::register_dependencies(BufferOld& buffer, VkAccessFlags dst_access_flags) {
 	const bool found = rg->buffer_resource_map.find(buffer.handle) != rg->buffer_resource_map.end();
 	if (!found || (dst_access_flags == VK_ACCESS_SHADER_READ_BIT &&
 				   (rg->buffer_resource_map[buffer.handle].second == dst_access_flags))) {
@@ -349,7 +349,7 @@ RenderPass& RenderPass::bind_texture_array(std::vector<Texture2D>& textures, boo
 	return *this;
 }
 
-RenderPass& RenderPass::bind_buffer_array(std::vector<Buffer>& buffers, bool force_update) {
+RenderPass& RenderPass::bind_buffer_array(std::vector<BufferOld>& buffers, bool force_update) {
 	if (next_binding_idx >= pipeline_storage->bound_resources.size()) {
 		for (auto& buffer : buffers) {
 			pipeline_storage->bound_resources.emplace_back(buffer);
@@ -370,7 +370,7 @@ RenderPass& RenderPass::bind_tlas(const vk::BVH& tlas) {
 	return *this;
 }
 
-RenderPass& RenderPass::read(Buffer& buffer) {
+RenderPass& RenderPass::read(BufferOld& buffer) {
 	explicit_buffer_reads.push_back(&buffer);
 	return *this;
 }
@@ -387,8 +387,8 @@ RenderPass& RenderPass::read(std::initializer_list<std::reference_wrapper<Textur
 	return *this;
 }
 
-RenderPass& RenderPass::read(std::initializer_list<std::reference_wrapper<Buffer>> buffers) {
-	for (Buffer& buff : buffers) {
+RenderPass& RenderPass::read(std::initializer_list<std::reference_wrapper<BufferOld>> buffers) {
+	for (BufferOld& buff : buffers) {
 		read(buff);
 	}
 	return *this;
@@ -403,7 +403,7 @@ RenderPass& RenderPass::read(ResourceBinding& resource) {
 	return *this;
 }
 
-RenderPass& RenderPass::write(Buffer& buffer) {
+RenderPass& RenderPass::write(BufferOld& buffer) {
 	explicit_buffer_writes.push_back(&buffer);
 	return *this;
 }
@@ -413,8 +413,8 @@ RenderPass& RenderPass::write(Texture2D& tex) {
 	return *this;
 }
 
-RenderPass& RenderPass::write(std::initializer_list<std::reference_wrapper<Buffer>> buffers) {
-	for (Buffer& buff : buffers) {
+RenderPass& RenderPass::write(std::initializer_list<std::reference_wrapper<BufferOld>> buffers) {
+	for (BufferOld& buff : buffers) {
 		write(buff);
 	}
 	return *this;
@@ -456,8 +456,8 @@ RenderPass& RenderPass::zero(const Resource& resource, bool cond) {
 	return *this;
 }
 
-RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<Buffer>> buffers) {
-	for (Buffer& buf : buffers) {
+RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<BufferOld>> buffers) {
+	for (BufferOld& buf : buffers) {
 		zero(buf);
 	}
 	return *this;
@@ -540,7 +540,7 @@ void RenderPass::finalize() {
 	}
 }
 
-void RenderPass::write_impl(Buffer& buffer, VkAccessFlags access_flags) {
+void RenderPass::write_impl(BufferOld& buffer, VkAccessFlags access_flags) {
 	register_dependencies(buffer, access_flags);
 	rg->buffer_resource_map[buffer.handle] = {pass_idx, access_flags};
 }
@@ -551,9 +551,9 @@ void RenderPass::write_impl(Texture2D& tex, VkAccessFlags access_flags) {
 	rg->img_resource_map[tex.img] = pass_idx;
 }
 
-void RenderPass::read_impl(Buffer& buffer) { read_impl(buffer, VK_ACCESS_SHADER_READ_BIT); }
+void RenderPass::read_impl(BufferOld& buffer) { read_impl(buffer, VK_ACCESS_SHADER_READ_BIT); }
 
-void RenderPass::read_impl(Buffer& buffer, VkAccessFlags access_flags) {
+void RenderPass::read_impl(BufferOld& buffer, VkAccessFlags access_flags) {
 	register_dependencies(buffer, access_flags);
 	rg->buffer_resource_map[buffer.handle] = {pass_idx, access_flags};
 }
@@ -564,7 +564,7 @@ void RenderPass::read_impl(Texture2D& tex) {
 	rg->img_resource_map[tex.img] = pass_idx;
 }
 
-void RenderPass::post_execution_barrier(Buffer& buffer, VkAccessFlags access_flags) {
+void RenderPass::post_execution_barrier(BufferOld& buffer, VkAccessFlags access_flags) {
 	auto src_access_flags = rg->buffer_resource_map[buffer.handle].second;
 	post_execution_buffer_barriers.push_back({buffer.handle, src_access_flags, access_flags});
 }

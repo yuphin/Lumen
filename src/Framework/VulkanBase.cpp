@@ -1,5 +1,8 @@
+#include <vulkan/vulkan_core.h>
+#include "Framework/VulkanContext.h"
 #include "LumenPCH.h"
 #include "RenderGraph.h"
+#include "VulkanContext.h"
 #define VOLK_IMPLEMENTATION
 #include "VulkanBase.h"
 #include "CommandBuffer.h"
@@ -40,6 +43,7 @@ std::vector<const char*> get_req_extensions() {
 	if (_enable_validation_layers) {
 		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 	}
+	extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 	return extensions;
 }
 
@@ -186,6 +190,7 @@ void cleanup() {
 		vkDestroyCommandPool(vk::context().device, pool, nullptr);
 	}
 	vkDestroySurfaceKHR(vk::context().instance, vk::context().surface, nullptr);
+	vmaDestroyAllocator(vk::context().allocator);
 
 	vkDestroyDevice(vk::context().device, nullptr);
 	if (_enable_validation_layers) {
@@ -194,6 +199,61 @@ void cleanup() {
 	vkDestroyInstance(vk::context().instance, nullptr);
 	glfwDestroyWindow(vk::context().window_ptr);
 	glfwTerminate();
+}
+
+static void create_allocator() {
+	VmaVulkanFunctions vulkanFunctions = {};
+	vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+	vulkanFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
+	vulkanFunctions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
+	vulkanFunctions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
+	vulkanFunctions.vkAllocateMemory = vkAllocateMemory;
+	vulkanFunctions.vkFreeMemory = vkFreeMemory;
+	vulkanFunctions.vkMapMemory = vkMapMemory;
+	vulkanFunctions.vkUnmapMemory = vkUnmapMemory;
+	vulkanFunctions.vkFlushMappedMemoryRanges = vkFlushMappedMemoryRanges;
+	vulkanFunctions.vkInvalidateMappedMemoryRanges = vkInvalidateMappedMemoryRanges;
+	vulkanFunctions.vkBindBufferMemory = vkBindBufferMemory;
+	vulkanFunctions.vkBindImageMemory = vkBindImageMemory;
+	vulkanFunctions.vkGetBufferMemoryRequirements = vkGetBufferMemoryRequirements;
+	vulkanFunctions.vkGetImageMemoryRequirements = vkGetImageMemoryRequirements;
+	vulkanFunctions.vkCreateBuffer = vkCreateBuffer;
+	vulkanFunctions.vkDestroyBuffer = vkDestroyBuffer;
+	vulkanFunctions.vkCreateImage = vkCreateImage;
+	vulkanFunctions.vkDestroyImage = vkDestroyImage;
+	vulkanFunctions.vkCmdCopyBuffer = vkCmdCopyBuffer;
+#if VMA_DEDICATED_ALLOCATION || VMA_VULKAN_VERSION >= 1001000
+	vulkanFunctions.vkGetBufferMemoryRequirements2KHR = vkGetBufferMemoryRequirements2;
+	vulkanFunctions.vkGetImageMemoryRequirements2KHR = vkGetImageMemoryRequirements2;
+#endif
+#if VMA_BIND_MEMORY2 || VMA_VULKAN_VERSION >= 1001000
+	vulkanFunctions.vkBindBufferMemory2KHR = vkBindBufferMemory2KHR;
+	vulkanFunctions.vkBindImageMemory2KHR = vkBindImageMemory2KHR;
+#endif
+#if VMA_MEMORY_BUDGET || VMA_VULKAN_VERSION >= 1001000
+	vulkanFunctions.vkGetPhysicalDeviceMemoryProperties2KHR = vkGetPhysicalDeviceMemoryProperties2;
+#endif
+#if VMA_VULKAN_VERSION >= 1003000
+	vulkanFunctions.vkGetDeviceBufferMemoryRequirements = vkGetDeviceBufferMemoryRequirements;
+	vulkanFunctions.vkGetDeviceImageMemoryRequirements = vkGetDeviceImageMemoryRequirements;
+#endif
+
+	VmaAllocatorCreateInfo allocatorCreateInfo = {};
+	allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
+	//allocatorCreateInfo.flags |= VMA_ALLOCATOR_CREATE_KHR_DEDICATED_ALLOCATION_BIT;
+	//allocatorCreateInfo.flags |= VMA_ALLOCATOR_CREATE_KHR_BIND_MEMORY2_BIT;
+	//allocatorCreateInfo.flags |= VMA_ALLOCATOR_CREATE_KHR_DEDICATED_ALLOCATION_BIT;
+	allocatorCreateInfo.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+	//allocatorCreateInfo.flags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
+	//allocatorCreateInfo.flags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_PRIORITY_BIT;
+
+	allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
+	allocatorCreateInfo.physicalDevice = vk::context().physical_device;
+	allocatorCreateInfo.device = vk::context().device;
+	allocatorCreateInfo.instance = vk::context().instance;
+	allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
+
+	vmaCreateAllocator(&allocatorCreateInfo, &vk::context().allocator);
 }
 
 static void create_instance() {
@@ -500,7 +560,7 @@ static void create_swapchain() {
 	vkGetSwapchainImagesKHR(vk::context().device, vk::context().swapchain, &image_cnt, images);
 	for (uint32_t i = 0; i < image_cnt; i++) {
 		_swapchain_images.emplace_back("Swapchain Image #" + std::to_string(i), images[i], surface_format.format,
-									  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_ASPECT_COLOR_BIT, extent, true);
+									   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_ASPECT_COLOR_BIT, extent, true);
 	}
 }
 
@@ -515,7 +575,6 @@ static void create_command_pools() {
 				  "Failed to create command pool!");
 	}
 }
-
 
 static void create_command_buffers() {
 	vk::context().command_buffers.resize(_swapchain_images.size());
@@ -598,6 +657,7 @@ void init(bool validation_layers) {
 	create_surface();
 	pick_physical_device();
 	create_logical_device();
+	create_allocator();
 	create_swapchain();
 	create_command_pools();
 	create_command_buffers();
@@ -610,7 +670,6 @@ void destroy_imgui() {
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 }
-
 
 // Called after window resize
 void recreate_swap_chain() {
@@ -651,9 +710,6 @@ bool check_validation_layer_support() {
 	}
 	return true;
 }
-
-
-
 
 uint32_t prepare_frame() {
 	vk::check(vkWaitForFences(vk::context().device, 1, &_in_flight_fences[current_frame], VK_TRUE, 1000000000),
@@ -731,10 +787,7 @@ VkResult submit_frame(uint32_t image_idx) {
 
 RenderGraph* render_graph() { return _rg.get(); }
 
-
-std::vector<Texture2D>& swapchain_images() {
-	return _swapchain_images;
-}
+std::vector<Texture2D>& swapchain_images() { return _swapchain_images; }
 }  // namespace VulkanBase
 
 }  // namespace lumen

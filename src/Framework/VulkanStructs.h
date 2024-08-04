@@ -4,8 +4,21 @@
 #include <GLFW/glfw3.h>
 #include <optional>
 #include <vector>
+#include "Utils.h"
 
 namespace vk {
+
+struct SamplerHash {
+	size_t operator()(const VkSamplerCreateInfo& ci) const {
+		size_t hash = 0;
+		util::hash_combine(hash, ci.magFilter, ci.minFilter, ci.mipmapMode, ci.addressModeU, ci.addressModeV,
+						   ci.addressModeW, ci.mipLodBias, ci.anisotropyEnable, ci.maxAnisotropy, ci.compareEnable,
+						   ci.compareOp, ci.minLod, ci.maxLod, ci.borderColor, ci.unnormalizedCoordinates);
+
+		return hash;
+	}
+};
+
 
 struct QueueFamilyIndices {
 	std::optional<uint32_t> gfx_family;
@@ -28,7 +41,6 @@ struct DescriptorInfo {
 };
 
 enum class QueueType { GFX, COMPUTE, PRESENT };
-
 
 enum class LumenStage { L_STAGE_VERTEX, L_STAGE_FRAGMENT };
 enum class Component { L_POSITION, L_NORMAL, L_COLOR, L_UV, L_TANGENT };
@@ -529,7 +541,6 @@ inline VkBindSparseInfo bind_sparse_info() {
 	return bindSparseInfo;
 }
 
-
 inline VkAccessFlags access_flags_for_img_layout(VkImageLayout layout) {
 	switch (layout) {
 		case VK_IMAGE_LAYOUT_PREINITIALIZED:
@@ -551,7 +562,6 @@ inline VkAccessFlags access_flags_for_img_layout(VkImageLayout layout) {
 			return VkAccessFlags();
 	}
 }
-
 
 inline VkDependencyInfo dependency_info(int cnt, const VkBufferMemoryBarrier2* p_buffer_memory_barriers) {
 	VkDependencyInfo res = {VK_STRUCTURE_TYPE_DEPENDENCY_INFO};

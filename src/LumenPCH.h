@@ -79,6 +79,7 @@
 #include <regex>
 #include <algorithm>
 #include <numeric>
+#include <bit>
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "Framework/ThreadPool.h"

@@ -169,7 +169,7 @@ bool ReSTIRGI::gui() {
 
 void ReSTIRGI::destroy() {
 	Integrator::destroy();
-	std::vector<lumen::Buffer*> buffer_list = {&restir_samples_buffer, &restir_samples_old_buffer,
+	std::vector<lumen::BufferOld*> buffer_list = {&restir_samples_buffer, &restir_samples_old_buffer,
 											   &temporal_reservoir_buffer, &spatial_reservoir_buffer, &tmp_col_buffer};
 	for (auto b : buffer_list) {
 		b->destroy();

@@ -131,7 +131,7 @@ void RayTracer::init_resources() {
 }
 
 void RayTracer::cleanup_resources() {
-	std::vector<Buffer*> buffer_list = {&output_img_buffer, &output_img_buffer_cpu, &residual_buffer,
+	std::vector<BufferOld*> buffer_list = {&output_img_buffer, &output_img_buffer_cpu, &residual_buffer,
 										&counter_buffer,	&rmse_val_buffer,		&rt_utils_desc_buffer};
 	std::vector<Texture2D*> tex_list = {&reference_tex, &target_tex};
 	if (load_reference) {
