@@ -1,4 +1,5 @@
 #pragma once
+#include <vulkan/vulkan_core.h>
 #include "../LumenPCH.h"
 
 namespace lumen {
@@ -77,10 +78,20 @@ struct TextureDesc {
 	VkImageAspectFlags aspect;
 	VkExtent3D dimensions;
 	VkFormat format;
+	// Optional settings
 	struct {
 		void* data = nullptr;
 		VkDeviceSize size = 0;
 	} data;
+	VkImageType image_type = VK_IMAGE_TYPE_2D;
+	VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
+	bool calc_mips = false;
+	uint32_t num_mips = 1;
+	uint32_t array_layers = 1;
+	VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+	VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
+	VkFilter sampler_filter = VK_FILTER_LINEAR;
+	VkSamplerAddressMode sampler_address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 };
 struct Texture {
 	std::string_view name;
@@ -88,15 +99,16 @@ struct Texture {
 	VkExtent3D extent;
 	VkImageView view;
 	VkSampler sampler;
-	VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
-	VkImageUsageFlags usage_flags = 0;
-	uint32_t mip_levels = 1;
-	VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+	VkFormat format;
+	VkImageUsageFlags usage_flags;
+	VkImageLayout layout;
 	VkImageAspectFlags aspect_flags;
+	uint32_t mip_levels;
+	uint32_t array_layers;
+	VmaAllocation allocation = VK_NULL_HANDLE;
 };
 
 void create_texture(Texture* texture, const TextureDesc& desc);
 void destroy_texture(Texture* texture);
-
 
 }  // namespace vk

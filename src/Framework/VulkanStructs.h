@@ -2,6 +2,7 @@
 #include "Framework/Logger.h"
 #include <volk/volk.h>
 #include <GLFW/glfw3.h>
+#include <vulkan/vulkan_core.h>
 #include <optional>
 #include <vector>
 #include "Utils.h"
@@ -18,7 +19,6 @@ struct SamplerHash {
 		return hash;
 	}
 };
-
 
 struct QueueFamilyIndices {
 	std::optional<uint32_t> gfx_family;
@@ -129,23 +129,45 @@ inline VkBufferMemoryBarrier buffer_memory_barrier() {
 	return bufferMemoryBarrier;
 }
 
-inline VkImageCreateInfo image(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent) {
+inline VkImageCreateInfo image(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent,
+							   VkImageType image_type = VK_IMAGE_TYPE_2D, uint32_t mip_levels = 1,
+							   uint32_t array_layers = 1, VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
+							   VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL,
+							   VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED) {
 	VkImageCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	info.pNext = nullptr;
 
-	info.imageType = VK_IMAGE_TYPE_2D;
-
-	info.format = format;
+	info.imageType = image_type;
 	info.extent = extent;
-
-	info.mipLevels = 1;
-	info.arrayLayers = 1;
-	info.samples = VK_SAMPLE_COUNT_1_BIT;
-	info.tiling = VK_IMAGE_TILING_OPTIMAL;
+	info.mipLevels = mip_levels;
+	info.arrayLayers = array_layers;
+	info.format = format;
+	info.tiling = tiling;
 	info.usage = usageFlags;
-
+	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	info.samples = samples;
+	info.initialLayout = initial_layout;
 	return info;
+}
+
+inline VkImageViewCreateInfo image_view(VkImage img, VkFormat format,
+										VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT, uint32_t level_count = 1,
+										uint32_t layer_count = 1) {
+	VkImageViewCreateInfo image_view_CI = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+	image_view_CI.image = img;
+	image_view_CI.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	image_view_CI.format = format;
+	image_view_CI.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	image_view_CI.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	image_view_CI.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	image_view_CI.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	image_view_CI.subresourceRange.aspectMask = aspect;
+	image_view_CI.subresourceRange.baseMipLevel = 0;
+	image_view_CI.subresourceRange.levelCount = level_count;
+	image_view_CI.subresourceRange.baseArrayLayer = 0;
+	image_view_CI.subresourceRange.layerCount = layer_count;
+	return image_view_CI;
 }
 
 inline VkSamplerCreateInfo sampler() {

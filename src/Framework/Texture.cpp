@@ -1,11 +1,17 @@
 #include "../LumenPCH.h"
 #include "Texture.h"
 #include "CommandBuffer.h"
+#include "Framework/VulkanContext.h"
 #include "VkUtils.h"
+#include "VulkanContext.h"
+#include "VulkanStructs.h"
 #include <gli/gli.hpp>
 #include <stb_image/stb_image.h>
+#include <vulkan/vulkan_core.h>
+#include "PersistentResourceManager.h"
 
 namespace lumen {
+
 
 Texture2D::Texture2D(const std::string& name, VkImage image, VkFormat format, VkImageUsageFlags usage_flags,
 					 VkImageAspectFlags aspect_flags, VkExtent2D extent, bool present) {
@@ -277,12 +283,56 @@ void Texture::destroy() {
 }  // namespace lumen
 
 namespace vk {
-void create_texture(Texture* texture, const TextureDesc& desc) { 
-	texture->name = desc.name; 
+void create_texture(Texture* texture, const TextureDesc& desc) {
+	texture->name = desc.name;
 	texture->extent = desc.dimensions;
 	texture->format = desc.format;
 	texture->usage_flags = desc.usage;
 	texture->aspect_flags = desc.aspect;
+	texture->mip_levels =
+		desc.calc_mips ? calc_mip_levels(VkExtent2D(desc.dimensions.width, desc.dimensions.height)) : desc.num_mips;
+	texture->array_layers = desc.array_layers;
+
+	VkImageCreateInfo image_ci =
+		vk::image(texture->format, texture->usage_flags, texture->extent, desc.image_type, texture->mip_levels,
+				  desc.array_layers, desc.sample_count, desc.tiling, desc.initial_layout);
+	VmaAllocationCreateInfo alloc_ci = {};
+	alloc_ci.usage = VMA_MEMORY_USAGE_AUTO;
+
+	VmaAllocationInfo alloc_info;
+
+	vk::check(vmaCreateImage(vk::context().allocator, &image_ci, &alloc_ci, &texture->handle, &texture->allocation,
+							 &alloc_info));
+
+	if (!texture->name.empty()) {
+		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)texture->handle, texture->name.data(),
+										   VK_OBJECT_TYPE_IMAGE);
+	}
+	VkImageViewCreateInfo image_view_ci = vk::image_view(texture->handle, texture->format, texture->aspect_flags,
+														 texture->mip_levels, texture->array_layers);
+	vk::check(vkCreateImageView(vk::context().device, &image_view_ci, nullptr, &texture->view),
+			  "Failed to create image view!");
+
+	if (texture->usage_flags & VK_IMAGE_USAGE_SAMPLED_BIT) {
+		VkSamplerCreateInfo sampler_CI = vk::sampler();
+		sampler_CI.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		sampler_CI.magFilter = desc.sampler_filter;
+		sampler_CI.minFilter = desc.sampler_filter;
+		sampler_CI.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		sampler_CI.addressModeU = desc.sampler_address_mode;
+		sampler_CI.addressModeV = desc.sampler_address_mode;
+		sampler_CI.addressModeW = desc.sampler_address_mode;
+		sampler_CI.mipLodBias = 0.0f;
+		sampler_CI.compareOp = VK_COMPARE_OP_NEVER;
+		sampler_CI.minLod = 0.0f;
+		sampler_CI.maxLod = (float)texture->mip_levels;
+		sampler_CI.anisotropyEnable = vk::context().supported_features.samplerAnisotropy;
+		sampler_CI.maxAnisotropy = vk::context().supported_features.samplerAnisotropy
+									   ? vk::context().device_properties.limits.maxSamplerAnisotropy
+									   : 1.0f;
+		sampler_CI.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+		texture->sampler = prs::get(sampler_CI);
+	}
 }
 void destroy_texture(Texture* texture) {}
 
