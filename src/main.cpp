@@ -2,6 +2,7 @@
 #include "Framework/Window.h"
 //#include "RTScene.h"
 #include "RayTracer/RayTracer.h"
+#include <offsetAllocator/offsetAllocator.hpp>
 
 void window_size_callback(GLFWwindow* window, int width, int height) {}
 

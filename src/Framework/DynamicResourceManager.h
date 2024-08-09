@@ -1,10 +1,12 @@
 #pragma once
 #include "../LumenPCH.h"
 #include "Buffer.h"
+#include "Texture.h"
 
 namespace vk {
     struct Buffer;
     struct BufferDesc;
+    struct TextureDesc;
 
 }
 namespace lumen {

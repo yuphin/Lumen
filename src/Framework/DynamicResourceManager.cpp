@@ -52,6 +52,9 @@ vk::Buffer* get(const vk::BufferDesc& desc) {
     vk::create_buffer(buffer, desc);
     return buffer;
 }
+lumen::Texture* get(const vk::TextureDesc& desc) {
+    return nullptr;
+}
 
 void destroy_buffer(vk::Buffer* buffer) {
     vk::destroy_buffer(buffer);

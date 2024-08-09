@@ -79,6 +79,7 @@ struct TextureDesc {
 	VkExtent3D dimensions;
 	VkFormat format;
 	// Optional settings
+	VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	struct {
 		void* data = nullptr;
 		VkDeviceSize size = 0;
@@ -88,7 +89,6 @@ struct TextureDesc {
 	bool calc_mips = false;
 	uint32_t num_mips = 1;
 	uint32_t array_layers = 1;
-	VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
 	VkFilter sampler_filter = VK_FILTER_LINEAR;
 	VkSamplerAddressMode sampler_address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
