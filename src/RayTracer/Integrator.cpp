@@ -33,18 +33,21 @@ void Integrator::init() {
 			}
 		});
 
-	// Create offscreen image for output
-	lumen::TextureSettings settings;
-	settings.usage_flags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-						   VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-						   VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-	settings.base_extent = {(uint32_t)instance->width, (uint32_t)instance->height, 1};
-	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	output_tex.create_empty_texture("Color Output", settings, VK_IMAGE_LAYOUT_GENERAL);
+	output_tex = prm::get_texture({
+		.name = "Color Output",
+		.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
+				 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+		.dimensions = {instance->width, instance->height, 1},
+		.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+		.initial_layout = VK_IMAGE_LAYOUT_GENERAL,
+	});
 
-	scene_ubo_buffer.create("Scene UBO", VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-							VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-							sizeof(SceneUBO));
+	scene_ubo_buffer = prm::get_buffer({
+		.name = "Scene UBO",
+		.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		.memory_type = vk::BufferType::CPU_TO_GPU,
+		.size = sizeof(SceneUBO),
+	});
 
 	update_uniform_buffers();
 	create_accel();
@@ -69,7 +72,7 @@ void Integrator::update_uniform_buffers() {
 	scene_ubo.inv_projection = glm::inverse(lumen_scene->camera->projection);
 	scene_ubo.model = glm::mat4(1.0);
 	scene_ubo.light_pos = glm::vec4(3.0f, 2.5f, 1.0f, 1.0f);
-	memcpy(scene_ubo_buffer.data, &scene_ubo, sizeof(scene_ubo));
+	vk::write_buffer(scene_ubo_buffer, &scene_ubo, sizeof(scene_ubo));
 }
 
 bool Integrator::update() {
@@ -132,8 +135,8 @@ bool Integrator::update() {
 void Integrator::create_accel() {
 	std::vector<vk::BlasInput> blas_inputs;
 
-	auto vertex_address = lumen_scene->vertex_buffer.get_device_address();
-	auto idx_address = lumen_scene->index_buffer.get_device_address();
+	VkDeviceAddress vertex_address = lumen_scene->vertex_buffer->get_device_address();
+	VkDeviceAddress idx_address = lumen_scene->index_buffer->get_device_address();
 	for (auto& prim_mesh : lumen_scene->prim_meshes) {
 		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({geo});
@@ -158,20 +161,18 @@ void Integrator::create_accel() {
 }
 
 void Integrator::destroy() {
-	std::vector<lumen::BufferOld*> buffer_list = {&scene_ubo_buffer, &lumen_scene->scene_desc_buffer};
-
-	for (auto b : buffer_list) {
-		b->destroy();
+	auto buffer_list = {scene_ubo_buffer, lumen_scene->scene_desc_buffer};
+	for (vk::Buffer* b : buffer_list) {
+		prm::remove(b);
 	}
-	output_tex.destroy();
-
+	prm::remove(output_tex);
 	if (tlas.accel) {
-		tlas.buffer.destroy();
+		prm::remove(tlas.buffer);
 		vkDestroyAccelerationStructureKHR(vk::context().device, tlas.accel, nullptr);
 	}
 	if (!blases.empty()) {
 		for (auto& b : blases) {
-			b.buffer.destroy();
+			prm::remove(b.buffer);
 			vkDestroyAccelerationStructureKHR(vk::context().device, b.accel, nullptr);
 		}
 	}

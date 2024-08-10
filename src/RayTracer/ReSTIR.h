@@ -12,11 +12,11 @@ class ReSTIR : public Integrator {
 	virtual void destroy() override;
 
    private:
-	lumen::BufferOld g_buffer;
-	lumen::BufferOld passthrough_reservoir_buffer;
-	lumen::BufferOld temporal_reservoir_buffer;
-	lumen::BufferOld spatial_reservoir_buffer;
-	lumen::BufferOld tmp_col_buffer;
+	vk::Buffer* g_buffer;
+	vk::Buffer* passthrough_reservoir_buffer;
+	vk::Buffer* temporal_reservoir_buffer;
+	vk::Buffer* spatial_reservoir_buffer;
+	vk::Buffer* tmp_col_buffer;
 	PCReSTIR pc_ray{};
 	bool do_spatiotemporal = false;
 	bool enable_accumulation = false;

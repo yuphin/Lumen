@@ -16,29 +16,29 @@ class SMLT : public Integrator {
 	PushConstantCompute pc_compute{};
 
 	// SMLT buffers
-	lumen::BufferOld bootstrap_buffer;
-	lumen::BufferOld cdf_buffer;
-	lumen::BufferOld cdf_sum_buffer;
-	lumen::BufferOld seeds_buffer;
-	lumen::BufferOld mlt_samplers_buffer;
-	lumen::BufferOld light_primary_samples_buffer;
-	lumen::BufferOld cam_primary_samples_buffer;
-	lumen::BufferOld mlt_col_buffer;
-	lumen::BufferOld chain_stats_buffer;
-	lumen::BufferOld splat_buffer;
-	lumen::BufferOld past_splat_buffer;
-	lumen::BufferOld light_path_buffer;
-	lumen::BufferOld bootstrap_cpu;
-	lumen::BufferOld cdf_cpu;
-	std::vector<lumen::BufferOld> block_sums;
+	vk::Buffer* bootstrap_buffer;
+	vk::Buffer* cdf_buffer;
+	vk::Buffer* cdf_sum_buffer;
+	vk::Buffer* seeds_buffer;
+	vk::Buffer* mlt_samplers_buffer;
+	vk::Buffer* light_primary_samples_buffer;
+	vk::Buffer* cam_primary_samples_buffer;
+	vk::Buffer* mlt_col_buffer;
+	vk::Buffer* chain_stats_buffer;
+	vk::Buffer* splat_buffer;
+	vk::Buffer* past_splat_buffer;
+	vk::Buffer* light_path_buffer;
+	vk::Buffer* bootstrap_cpu;
+	vk::Buffer* cdf_cpu;
+	std::vector<vk::Buffer*> block_sums;
 
-	lumen::BufferOld connected_lights_buffer;
-	lumen::BufferOld tmp_seeds_buffer;
-	lumen::BufferOld tmp_lum_buffer;
-	lumen::BufferOld prob_carryover_buffer;
-	lumen::BufferOld light_path_cnt_buffer;
-	lumen::BufferOld light_splats_buffer;
-	lumen::BufferOld light_splat_cnts_buffer;
+	vk::Buffer* connected_lights_buffer;
+	vk::Buffer* tmp_seeds_buffer;
+	vk::Buffer* tmp_lum_buffer;
+	vk::Buffer* prob_carryover_buffer;
+	vk::Buffer* light_path_cnt_buffer;
+	vk::Buffer* light_splats_buffer;
+	vk::Buffer* light_splat_cnts_buffer;
 
 	float mutations_per_pixel;
 	int num_mlt_threads;

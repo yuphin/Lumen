@@ -14,7 +14,6 @@
 
 namespace lumen {
 
-
 #define TO_STR(V) (#V)
 
 #define REGISTER_BUFFER_WITH_ADDRESS(struct_type, struct_name, field_name, buffer_ptr, rg) \
@@ -51,7 +50,7 @@ class RenderGraph {
 	friend RenderPass;
 	bool reload_shaders = false;
 	vk::EventPool event_pool;
-	std::unordered_map<std::string, BufferOld*> registered_buffer_pointers;
+	std::unordered_map<std::string, vk::Buffer*> registered_buffer_pointers;
 	// Shader Name + Macro String -> Shader
 	std::unordered_map<std::string, Shader> shader_cache;
 	RenderGraphSettings settings;
@@ -139,29 +138,32 @@ class RenderPass {
 	}
 
 	RenderPass& bind(const ResourceBinding& binding);
-	RenderPass& bind_texture_with_sampler(Texture2D& tex, VkSampler sampler);
+	RenderPass& bind_texture_with_sampler(vk::Texture* tex, VkSampler sampler);
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
-	RenderPass& bind_texture_array(std::vector<Texture2D>& texes, bool force_update = false);
-	RenderPass& bind_buffer_array(std::vector<BufferOld>& buffers, bool force_update = false);
+	RenderPass& bind_texture_array(std::span<vk::Texture*> texes, bool force_update = false);
+	RenderPass& bind_buffer_array(std::span<vk::Buffer*> buffers, bool force_update = false);
 	RenderPass& bind_tlas(const vk::BVH& tlas);
 
-	RenderPass& write(Texture2D& tex);
-	RenderPass& write(BufferOld& buffer);
-	RenderPass& read(Texture2D& tex);
-	RenderPass& read(BufferOld& buffer);
+	RenderPass& read(vk::Texture* tex);
+	RenderPass& read(vk::Buffer* buffer);
+
+	RenderPass& write(vk::Texture* tex);
+	RenderPass& write(vk::Buffer* buffer);
+
 	RenderPass& read(ResourceBinding& resource);
-	RenderPass& read(std::initializer_list<std::reference_wrapper<BufferOld>> buffers);
-	RenderPass& read(std::initializer_list<std::reference_wrapper<Texture2D>> texes);
 	RenderPass& write(ResourceBinding& resource);
-	RenderPass& write(std::initializer_list<std::reference_wrapper<BufferOld>> buffers);
-	RenderPass& write(std::initializer_list<std::reference_wrapper<Texture2D>> texes);
+
+	RenderPass& read(std::initializer_list<vk::Buffer*> buffers);
+	RenderPass& read(std::initializer_list<vk::Texture*> texes);
+	RenderPass& write(std::initializer_list<vk::Buffer*> buffers);
+	RenderPass& write(std::initializer_list<vk::Texture*> texes);
 
 	RenderPass& skip_execution(bool condition = true);
 	template <typename T>
 	RenderPass& push_constants(T* data);
 	RenderPass& zero(const Resource& resource);
-	RenderPass& zero(std::initializer_list<std::reference_wrapper<BufferOld>> buffers);
-	RenderPass& zero(std::initializer_list<std::reference_wrapper<Texture2D>> textures);
+	RenderPass& zero(std::initializer_list<vk::Buffer*> buffers);
+	RenderPass& zero(std::initializer_list<vk::Texture*> textures);
 	RenderPass& zero(const Resource& resource, bool cond);
 	RenderPass& copy(const Resource& src, const Resource& dst);
 	void finalize();
@@ -178,21 +180,21 @@ class RenderPass {
 
    private:
 	// When the automatic inference isn't used
-	std::vector<BufferOld*> explicit_buffer_writes;
-	std::vector<BufferOld*> explicit_buffer_reads;
-	std::vector<Texture2D*> explicit_tex_writes;
-	std::vector<Texture2D*> explicit_tex_reads;
+	std::vector<vk::Buffer*> explicit_buffer_writes;
+	std::vector<vk::Buffer*> explicit_buffer_reads;
+	std::vector<vk::Texture*> explicit_tex_writes;
+	std::vector<vk::Texture*> explicit_tex_reads;
 
-	void write_impl(BufferOld& buffer, VkAccessFlags access_flags);
-	void write_impl(Texture2D& tex, VkAccessFlags access_flags = VK_ACCESS_SHADER_WRITE_BIT);
-	void read_impl(BufferOld& buffer);
-	void read_impl(BufferOld& buffer, VkAccessFlags access_flags);
-	void read_impl(Texture2D& tex);
-	void post_execution_barrier(BufferOld& buffer, VkAccessFlags access_flags);
+	void write_impl(vk::Buffer* buffer, VkAccessFlags access_flags);
+	void write_impl(vk::Texture* tex, VkAccessFlags access_flags = VK_ACCESS_SHADER_WRITE_BIT);
+	void read_impl(vk::Buffer* buffer);
+	void read_impl(vk::Buffer* buffer, VkAccessFlags access_flags);
+	void read_impl(vk::Texture* tex);
+	void post_execution_barrier(vk::Buffer* buffer, VkAccessFlags access_flags);
 
 	void run(VkCommandBuffer cmd);
-	void register_dependencies(BufferOld& buffer, VkAccessFlags dst_access_flags);
-	void register_dependencies(Texture2D& tex, VkImageLayout target_layout);
+	void register_dependencies(vk::Buffer* buffer, VkAccessFlags dst_access_flags);
+	void register_dependencies(vk::Texture* tex, VkImageLayout target_layout);
 	void transition_resources();
 
 	std::string name;
@@ -215,7 +217,7 @@ class RenderPass {
 
 	vk::DescriptorInfo descriptor_infos[32] = {};
 
-	std::vector<std::tuple<Texture2D*, VkImageLayout, VkImageLayout>> layout_transitions;
+	std::vector<std::tuple<vk::Texture*, VkImageLayout, VkImageLayout>> layout_transitions;
 
 	struct BufferBarrier {
 		VkBuffer buffer;

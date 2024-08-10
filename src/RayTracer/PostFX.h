@@ -10,15 +10,15 @@
 class PostFX {
 public:
 	void init(lumen::LumenInstance& instance);
-	void render(lumen::Texture2D& input, lumen::Texture2D& output);
+	void render(vk::Texture* input, vk::Texture* output);
 	bool gui();
 	void destroy();
 
 private:
-	lumen::Texture2D kernel_ping;
-	lumen::Texture2D kernel_pong;
-	lumen::Texture2D fft_ping_padded;
-	lumen::Texture2D fft_pong_padded;
+	vk::Texture* kernel_ping;
+	vk::Texture* kernel_pong;
+	vk::Texture* fft_ping_padded;
+	vk::Texture* fft_pong_padded;
 	VkSampler img_sampler;
 
 	PCPost pc_post_settings;

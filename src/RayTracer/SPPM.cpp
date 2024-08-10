@@ -3,46 +3,60 @@
 
 void SPPM::init() {
 	Integrator::init();
-	sppm_data_buffer.create("SPPM Data",
-							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * sizeof(SPPMData));
 
-	atomic_data_buffer.create("Atomic Data",
-							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	sppm_data_buffer =
+		prm::get_buffer({.name = "SPPM Data",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = instance->width * instance->height * sizeof(SPPMData)});
+
+	atomic_data_buffer =
+		prm::get_buffer({.name = "Atomic Data",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(AtomicData));
+						 .memory_type = vk::BufferType::GPU,
+						 .size = sizeof(AtomicData)});
 
-	photon_buffer.create("Photon Buffer",
-						 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-						 10 * instance->width * instance->height * sizeof(PhotonHash));
-	residual_buffer.create("Residual Buffer",
-						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * 4 * sizeof(float));
+	photon_buffer =
+		prm::get_buffer({.name = "Photon Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = 10 * instance->width * instance->height * sizeof(PhotonHash)});
 
-	counter_buffer.create("Counter Buffer",
-						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(int));
+	residual_buffer =
+		prm::get_buffer({.name = "Residual Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = instance->width * instance->height * 4 * sizeof(float)});
+
+	counter_buffer =
+		prm::get_buffer({.name = "Counter Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = sizeof(int)});
 
 	SceneDesc desc;
-	desc.index_addr = lumen_scene->index_buffer.get_device_address();
+	desc.index_addr = lumen_scene->index_buffer->get_device_address();
 
-	desc.material_addr = lumen_scene->materials_buffer.get_device_address();
-	desc.prim_info_addr = lumen_scene->prim_lookup_buffer.get_device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer.get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer->get_device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->get_device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->get_device_address();
 	// SPPM
-	desc.sppm_data_addr = sppm_data_buffer.get_device_address();
-	desc.atomic_data_addr = atomic_data_buffer.get_device_address();
-	desc.photon_addr = photon_buffer.get_device_address();
-	desc.residual_addr = residual_buffer.get_device_address();
-	desc.counter_addr = counter_buffer.get_device_address();
-	lumen_scene->scene_desc_buffer.create(
-							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
+	desc.sppm_data_addr = sppm_data_buffer->get_device_address();
+	desc.atomic_data_addr = atomic_data_buffer->get_device_address();
+	desc.photon_addr = photon_buffer->get_device_address();
+	desc.residual_addr = residual_buffer->get_device_address();
+	desc.counter_addr = counter_buffer->get_device_address();
+	lumen_scene->scene_desc_buffer =
+		prm::get_buffer({.name = "Scene Desc",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = sizeof(SceneDesc),
+						 .data = &desc});
 
 	frame_num = 0;
 
@@ -50,16 +64,18 @@ void SPPM::init() {
 	pc_ray.size_y = instance->height;
 
 	assert(lumen::VulkanBase::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, sppm_data_addr, &sppm_data_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, atomic_data_addr, &atomic_data_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, &photon_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, &residual_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, &counter_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, sppm_data_addr, sppm_data_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, atomic_data_addr, atomic_data_buffer,
+								 lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, photon_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, residual_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, counter_buffer, lumen::VulkanBase::render_graph());
 }
 
 void SPPM::render() {
-	lumen::CommandBuffer cmd( /*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	lumen::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
@@ -82,7 +98,8 @@ void SPPM::render() {
 	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name, const std::string& reduce_name,
 						 const std::string& reduce_shader_name) {
 		uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
-		lumen::VulkanBase::render_graph()->add_compute(op_name, {.shader = lumen::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
+		lumen::VulkanBase::render_graph()
+			->add_compute(op_name, {.shader = lumen::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
 			.push_constants(&pc_ray)
 			.bind(lumen_scene->scene_desc_buffer)
 			.zero({residual_buffer, counter_buffer});
@@ -172,10 +189,10 @@ bool SPPM::update() {
 
 void SPPM::destroy() {
 	Integrator::destroy();
-	std::vector<lumen::BufferOld*> buffer_list = {&sppm_data_buffer, &atomic_data_buffer, &photon_buffer, &residual_buffer,
-											   &counter_buffer,	  &hash_buffer,		   &tmp_col_buffer};
-	for (auto b : buffer_list) {
-		b->destroy();
+	auto buffer_list = {sppm_data_buffer, atomic_data_buffer, photon_buffer, residual_buffer,
+						counter_buffer,	  hash_buffer,		  tmp_col_buffer};
+	for (vk::Buffer* b : buffer_list) {
+		prm::remove(b);
 	}
 
 	if (desc_set_layout) vkDestroyDescriptorSetLayout(vk::context().device, desc_set_layout, nullptr);

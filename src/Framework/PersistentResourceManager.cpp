@@ -35,8 +35,6 @@ size_t get_page_size() {
 }
 }  // namespace os
 
-// Note: Persistent pool does not provide a resource release mechanism
-
 constexpr size_t RESERVE_SIZE = 1024ull * 1024 * 1024 * 1024 * 64;	// 64GB
 template <typename T>
 class PersistentPool {
@@ -54,6 +52,11 @@ class PersistentPool {
 		next_page = (uint8_t*)data_base + PAGE_SIZE;
 	}
 	T* get() {
+		if(!free_list.empty()) {
+			size_t idx = free_list.back();
+			free_list.pop_back();
+			return base_ptr + idx;
+		}
 		T* result = data_base;
 		page_current = data_base++;
 		while (page_current >= next_page) {
@@ -67,6 +70,11 @@ class PersistentPool {
 #endif
 		}
 		return data_base;
+	}
+
+	void remove(T* ptr) {
+		size_t idx = ptr - base_ptr;
+		free_list.push_back(idx);
 	}
 
 	void destroy() {
@@ -83,6 +91,7 @@ class PersistentPool {
 	T* data_base = nullptr;
 	void* page_current = nullptr;
 	void* next_page = nullptr;
+	std::vector<size_t> free_list;
 };
 
 namespace prm {
@@ -121,5 +130,13 @@ void replace_texture(vk::Texture* texture, const vk::TextureDesc& texture_desc) 
 void replace_buffer(vk::Buffer* buffer, const vk::BufferDesc& texture_desc) {
 	vk::destroy_buffer(buffer);
 	buffer = get_buffer(texture_desc);
+}
+void remove(vk::Buffer* buffer) {
+	vk::destroy_buffer(buffer);
+	_buffer_pool.remove(buffer);
+}
+void remove(vk::Texture* texture) {
+	vk::destroy_texture(texture);
+	_texture_pool.remove(texture);
 }
 }  // namespace prm

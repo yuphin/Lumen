@@ -16,7 +16,8 @@ namespace lumen {
 namespace drm {
 
 vk::Buffer* get(const vk::BufferDesc& desc);
-lumen::Texture* get(const vk::TextureDesc& desc);
-void destroy_buffer(vk::Buffer* buffer);
+vk::Texture* get(const vk::TextureDesc& desc);
+void destroy(vk::Buffer* buffer);
+void destroy(vk::Texture* tex);
 
 }  // namespace drm

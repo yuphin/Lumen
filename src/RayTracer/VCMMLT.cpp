@@ -11,91 +11,122 @@ void VCMMLT::init() {
 	light_path_rand_count = std::max(7 + 3 * config->path_length, 3 + 7 * config->path_length);
 
 	// MLTVCM buffers
-	bootstrap_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-							config->num_bootstrap_samples * sizeof(BootstrapSample));
+	bootstrap_buffer =
+		prm::get_buffer({.name = "Bootstrap Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = config->num_bootstrap_samples * sizeof(BootstrapSample)});
 
-	cdf_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-						  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-					  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_bootstrap_samples * 4);
+	cdf_buffer =
+		prm::get_buffer({.name = "CDF Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = VkDeviceSize(config->num_bootstrap_samples * 4)});
 
-	bootstrap_cpu.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-						 config->num_bootstrap_samples * sizeof(BootstrapSample));
-
-	cdf_cpu.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-				   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-				   config->num_bootstrap_samples * 4);
-
-	cdf_sum_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(float));
-
-	seeds_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * sizeof(VCMMLTSeedData));
-
-	light_primary_samples_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-											VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-										VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-										config->num_mlt_threads * light_path_rand_count * sizeof(PrimarySample) * 2);
-
-	mlt_samplers_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-							   config->num_mlt_threads * sizeof(VCMMLTSampler) * 2);
-
-	mlt_col_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * 3 * sizeof(float));
-
-	chain_stats_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+	cdf_sum_buffer =
+		prm::get_buffer({.name = "CDF Sum Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 2 * sizeof(ChainData));
+						 .memory_type = vk::BufferType::GPU,
+						 .size = sizeof(float)});
 
-	splat_buffer.create(
+	seeds_buffer =
+		prm::get_buffer({.name = "Seeds Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = config->num_mlt_threads * sizeof(VCMMLTSeedData)});
 
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		config->num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat) * 2);
+	light_primary_samples_buffer =
+		prm::get_buffer({.name = "Light Primary Samples Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = config->num_mlt_threads * light_path_rand_count * sizeof(PrimarySample) * 2});
 
-	past_splat_buffer.create(
+	mlt_samplers_buffer =
+		prm::get_buffer({.name = "MLT Samplers Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = config->num_mlt_threads * sizeof(VCMMLTSampler) * 2});
 
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		config->num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat) * 2);
+	mlt_col_buffer =
+		prm::get_buffer({.name = "MLT Col Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = instance->width * instance->height * 3 * sizeof(float)});
 
-	light_path_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-							 instance->width * instance->height * (config->path_length + 1) * sizeof(VCMVertex));
+	chain_stats_buffer =
+		prm::get_buffer({.name = "Chain Stats Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = 2 * sizeof(ChainData)});
 
-	light_path_cnt_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-									 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-								 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-								 instance->width * instance->height * sizeof(float));
+	splat_buffer = prm::get_buffer(
+		{.name = "Splat Buffer",
+		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+				  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		 .memory_type = vk::BufferType::GPU,
+		 .size = config->num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat) * 2});
 
-	tmp_col_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * sizeof(float) * 3);
+	past_splat_buffer = prm::get_buffer(
+		{.name = "Past Splat Buffer",
+		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+				  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		 .memory_type = vk::BufferType::GPU,
+		 .size = config->num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat) * 2});
 
-	photon_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-						 10 * instance->width * instance->height * sizeof(VCMPhotonHash));
+	light_path_buffer =
+		prm::get_buffer({.name = "Light Path Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = instance->width * instance->height * (config->path_length + 1) * sizeof(VCMVertex)});
 
-	mlt_atomicsum_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-									VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-								VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * sizeof(SumData) * 2);
+	light_path_cnt_buffer =
+		prm::get_buffer({.name = "Light Path Cnt Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = instance->width * instance->height * sizeof(float)});
 
-	mlt_residual_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, config->num_mlt_threads * sizeof(SumData));
+	tmp_col_buffer =
+		prm::get_buffer({.name = "Tmp Col Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = instance->width * instance->height * sizeof(float) * 3});
 
-	counter_buffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(int));
+	photon_buffer =
+		prm::get_buffer({.name = "Photon Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = 10 * instance->width * instance->height * sizeof(VCMPhotonHash)});
+
+	mlt_atomicsum_buffer =
+		prm::get_buffer({.name = "MLT Atomic Sum Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = config->num_mlt_threads * sizeof(SumData) * 2});
+
+	mlt_residual_buffer =
+		prm::get_buffer({.name = "MLT Residual Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = config->num_mlt_threads * sizeof(SumData)});
+
+	counter_buffer =
+		prm::get_buffer({.name = "Counter Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = sizeof(int)});
 
 	int size = 0;
 	int arr_size = config->num_bootstrap_samples;
@@ -112,73 +143,79 @@ void VCMMLT::init() {
 	do {
 		int num_blocks = std::max(1, (int)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
-			block_sums[i++].create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, num_blocks * 4);
+			block_sums[i++] = prm::get_buffer(
+				{.name = "Block Sum Buffer #" + std::to_string(i),
+				 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+				 .memory_type = vk::BufferType::GPU,
+				 .size = VkDeviceSize(num_blocks * 4)});
 		}
 		arr_size = num_blocks;
 	} while (arr_size > 1);
 
 	SceneDesc desc;
-	desc.index_addr = lumen_scene->index_buffer.get_device_address();
+	desc.index_addr = lumen_scene->index_buffer->get_device_address();
 
-	desc.material_addr = lumen_scene->materials_buffer.get_device_address();
-	desc.prim_info_addr = lumen_scene->prim_lookup_buffer.get_device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer.get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer->get_device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->get_device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->get_device_address();
 	// VCMMLT
-	desc.bootstrap_addr = bootstrap_buffer.get_device_address();
-	desc.cdf_addr = cdf_buffer.get_device_address();
-	desc.cdf_sum_addr = cdf_sum_buffer.get_device_address();
-	desc.seeds_addr = seeds_buffer.get_device_address();
-	desc.light_primary_samples_addr = light_primary_samples_buffer.get_device_address();
-	desc.mlt_samplers_addr = mlt_samplers_buffer.get_device_address();
-	desc.mlt_col_addr = mlt_col_buffer.get_device_address();
-	desc.chain_stats_addr = chain_stats_buffer.get_device_address();
-	desc.splat_addr = splat_buffer.get_device_address();
-	desc.past_splat_addr = past_splat_buffer.get_device_address();
+	desc.bootstrap_addr = bootstrap_buffer->get_device_address();
+	desc.cdf_addr = cdf_buffer->get_device_address();
+	desc.cdf_sum_addr = cdf_sum_buffer->get_device_address();
+	desc.seeds_addr = seeds_buffer->get_device_address();
+	desc.light_primary_samples_addr = light_primary_samples_buffer->get_device_address();
+	desc.mlt_samplers_addr = mlt_samplers_buffer->get_device_address();
+	desc.mlt_col_addr = mlt_col_buffer->get_device_address();
+	desc.chain_stats_addr = chain_stats_buffer->get_device_address();
+	desc.splat_addr = splat_buffer->get_device_address();
+	desc.past_splat_addr = past_splat_buffer->get_device_address();
 
-	desc.vcm_vertices_addr = light_path_buffer.get_device_address();
-	desc.path_cnt_addr = light_path_cnt_buffer.get_device_address();
+	desc.vcm_vertices_addr = light_path_buffer->get_device_address();
+	desc.path_cnt_addr = light_path_cnt_buffer->get_device_address();
 
-	desc.color_storage_addr = tmp_col_buffer.get_device_address();
-	desc.photon_addr = photon_buffer.get_device_address();
+	desc.color_storage_addr = tmp_col_buffer->get_device_address();
+	desc.photon_addr = photon_buffer->get_device_address();
 
-	desc.mlt_atomicsum_addr = mlt_atomicsum_buffer.get_device_address();
-	desc.residual_addr = mlt_residual_buffer.get_device_address();
-	desc.counter_addr = counter_buffer.get_device_address();
+	desc.mlt_atomicsum_addr = mlt_atomicsum_buffer->get_device_address();
+	desc.residual_addr = mlt_residual_buffer->get_device_address();
+	desc.counter_addr = counter_buffer->get_device_address();
 
 	assert(lumen::VulkanBase::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer,
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
 								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, &bootstrap_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, &cdf_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, &cdf_sum_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, seeds_addr, &seeds_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_primary_samples_addr, &light_primary_samples_buffer,
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, bootstrap_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, cdf_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, cdf_sum_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, seeds_addr, seeds_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_primary_samples_addr, light_primary_samples_buffer,
 								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_samplers_addr, &mlt_samplers_buffer,
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_samplers_addr, mlt_samplers_buffer,
 								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_col_addr, &mlt_col_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, chain_stats_addr, &chain_stats_buffer,
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_col_addr, mlt_col_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, chain_stats_addr, chain_stats_buffer,
 								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, splat_addr, &splat_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, past_splat_addr, &past_splat_buffer,
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, splat_addr, splat_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, past_splat_addr, past_splat_buffer,
 								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_vertices_addr, &light_path_buffer,
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_vertices_addr, light_path_buffer,
 								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, path_cnt_addr, &light_path_cnt_buffer,
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, path_cnt_addr, light_path_cnt_buffer,
 								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, &tmp_col_buffer,
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, tmp_col_buffer,
 								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, &photon_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_atomicsum_addr, &mlt_atomicsum_buffer,
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, photon_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_atomicsum_addr, mlt_atomicsum_buffer,
 								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, &mlt_residual_buffer,
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, mlt_residual_buffer,
 								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, &counter_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, counter_buffer, lumen::VulkanBase::render_graph());
 
-	lumen_scene->scene_desc_buffer.create(
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
+	lumen_scene->scene_desc_buffer =
+		prm::get_buffer({.name = "Scene Desc",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = sizeof(SceneDesc),
+						 .data = &desc});
 	pc_ray.total_light_area = 0;
 
 	frame_num = 0;
@@ -448,7 +485,7 @@ void VCMMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGr
 		pc_compute.n = 2 * 1024;
 		pc_compute.store_sum = 1;
 		pc_compute.scan_sums = int(scan_sums);
-		pc_compute.block_sum_addr = block_sums[level].get_device_address();
+		pc_compute.block_sum_addr = block_sums[level]->get_device_address();
 		scan(num_grids, level);
 		int rem = num_elems % (2 * 1024);
 		if (rem) {
@@ -463,9 +500,9 @@ void VCMMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGr
 		pc_compute.n = num_elems - rem;
 		pc_compute.store_sum = 1;
 		pc_compute.scan_sums = int(scan_sums);
-		pc_compute.block_sum_addr = block_sums[level].get_device_address();
+		pc_compute.block_sum_addr = block_sums[level]->get_device_address();
 		if (scan_sums) {
-			pc_compute.out_addr = block_sums[level - 1].get_device_address();
+			pc_compute.out_addr = block_sums[level - 1]->get_device_address();
 		}
 		uniform_add(num_grids, level - 1);
 		if (rem) {
@@ -482,7 +519,7 @@ void VCMMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGr
 		pc_compute.store_sum = 0;
 		pc_compute.scan_sums = bool(scan_sums);
 		if (scan_sums) {
-			pc_compute.block_sum_addr = block_sums[level - 1].get_device_address();
+			pc_compute.block_sum_addr = block_sums[level - 1]->get_device_address();
 		}
 		scan(num_wgs, level - 1);
 	}
@@ -490,23 +527,16 @@ void VCMMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGr
 
 void VCMMLT::destroy() {
 	Integrator::destroy();
-	std::vector<lumen::BufferOld*> buffer_list = {
-		&bootstrap_buffer,	  &cdf_buffer,			&cdf_sum_buffer,
-		&seeds_buffer,		  &mlt_samplers_buffer, &light_primary_samples_buffer,
-		&mlt_col_buffer,	  &chain_stats_buffer,	&splat_buffer,
-		&past_splat_buffer,	  &light_path_buffer,	&light_path_cnt_buffer,
-		&tmp_col_buffer,	  &photon_buffer,		&mlt_atomicsum_buffer,
-		&mlt_residual_buffer, &counter_buffer};
-	for (auto b : buffer_list) {
-		b->destroy();
+	auto buffer_list = {bootstrap_buffer,	 cdf_buffer,		  cdf_sum_buffer,
+						seeds_buffer,		 mlt_samplers_buffer, light_primary_samples_buffer,
+						mlt_col_buffer,		 chain_stats_buffer,  splat_buffer,
+						past_splat_buffer,	 light_path_buffer,	  light_path_cnt_buffer,
+						tmp_col_buffer,		 photon_buffer,		  mlt_atomicsum_buffer,
+						mlt_residual_buffer, counter_buffer};
+	for (vk::Buffer* b : buffer_list) {
+		prm::remove(b);
 	}
 	for (auto& b : block_sums) {
-		b.destroy();
-	}
-	if (bootstrap_cpu.size) {
-		bootstrap_cpu.destroy();
-	}
-	if (cdf_cpu.size) {
-		cdf_cpu.destroy();
+		prm::remove(b);
 	}
 }

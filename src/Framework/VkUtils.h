@@ -134,7 +134,7 @@ VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format = VK_FOR
 
 uint32_t get_bindings_for_shader_set(const std::vector<lumen::Shader>& shaders, VkDescriptorType* descriptor_types);
 
-VkImageLayout get_target_img_layout(const lumen::Texture2D& tex, VkAccessFlags access_flags);
+VkImageLayout get_target_img_layout(const vk::Texture* tex, VkAccessFlags access_flags);
 
 namespace DebugMarker {
 inline void set_resource_name(VkDevice device, uint64_t obj, const char* name, VkObjectType type) {

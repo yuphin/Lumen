@@ -44,19 +44,19 @@ class RayTracer : public lumen::LumenInstance {
 	RTUtilsDesc rt_utils_desc;
 	RTUtilsPC rt_utils_pc;
 
-	lumen::BufferOld gt_img_buffer;
-	lumen::BufferOld output_img_buffer;
-	lumen::BufferOld output_img_buffer_cpu;
-	lumen::BufferOld residual_buffer;
-	lumen::BufferOld counter_buffer;
-	lumen::BufferOld rmse_val_buffer;
-	lumen::BufferOld rt_utils_desc_buffer;
+	vk::Buffer* gt_img_buffer;
+	vk::Buffer* output_img_buffer;
+	vk::Buffer* output_img_buffer_cpu;
+	vk::Buffer* residual_buffer;
+	vk::Buffer* counter_buffer;
+	vk::Buffer* rmse_val_buffer;
+	vk::Buffer* rt_utils_desc_buffer;
 
-	lumen::Texture2D reference_tex;
-	lumen::Texture2D target_tex;
+	vk::Texture* reference_tex;
+	vk::Texture* target_tex;
 
-	lumen::BufferOld fft_buffers[2];
-	lumen::BufferOld fft_cpu_buffers[2];
+	vk::Buffer* fft_buffers[2];
+	vk::Buffer* fft_cpu_buffers[2];
 	std::string scene_name;
 	LumenScene scene;
 

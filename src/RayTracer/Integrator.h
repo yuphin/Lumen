@@ -4,6 +4,8 @@
 #include "shaders/commons.h"
 #include "LumenScene.h"
 #include "Framework/RenderGraph.h"
+#include "Framework/DynamicResourceManager.h"
+#include "Framework/PersistentResourceManager.h"
 class Integrator {
    public:
 	Integrator(lumen::LumenInstance* instance, LumenScene* lumen_scene) : instance(instance), lumen_scene(lumen_scene) {}
@@ -12,7 +14,7 @@ class Integrator {
 	virtual bool gui();
 	virtual bool update();
 	virtual void destroy();
-	lumen::Texture2D output_tex;
+	vk::Texture* output_tex;
 	bool updated = false;
 	uint frame_num = 0;
    protected:
@@ -20,7 +22,7 @@ class Integrator {
 	SceneUBO scene_ubo{};
 	lumen::LumenInstance* instance;
 	LumenScene* lumen_scene;
-	lumen::BufferOld scene_ubo_buffer;
+	vk::Buffer* scene_ubo_buffer;
 	vk::BVH tlas;
 	std::vector<vk::BVH> blases;
 

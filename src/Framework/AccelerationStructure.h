@@ -7,12 +7,11 @@ namespace vk {
 
 struct BVH {
 	VkAccelerationStructureKHR accel = VK_NULL_HANDLE;
-	lumen::BufferOld buffer;
+	vk::Buffer* buffer;
 
 	VkDeviceAddress get_blas_device_address() const {
 		VkAccelerationStructureDeviceAddressInfoKHR addr_info{
-			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
-		addr_info.accelerationStructure = accel;
+			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR, .accelerationStructure = accel};
 		return vkGetAccelerationStructureDeviceAddressKHR(vk::context().device, &addr_info);
 	}
 };

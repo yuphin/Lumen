@@ -4,7 +4,6 @@
 #include "ReSTIRPT.h"
 #include <vulkan/vulkan_core.h>
 #include "imgui/imgui.h"
-#include "Framework/DynamicResourceManager.h"
 
 void ReSTIRPT::init() {
 	Integrator::init();
@@ -15,79 +14,96 @@ void ReSTIRPT::init() {
 		transformations[pm.prim_idx] = pm.world_matrix;
 	}
 
-	gris_gbuffer.create("GRIS GBuffer",
-						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * sizeof(GBuffer));
+	gris_gbuffer =
+		prm::get_buffer({.name = "GRIS GBuffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = instance->width * instance->height * sizeof(GBuffer)});
 
-	gris_prev_gbuffer.create("GRIS Previous GBuffer",
-							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * sizeof(GBuffer));
+	gris_prev_gbuffer =
+		prm::get_buffer({.name = "GRIS Previous GBuffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = instance->width * instance->height * sizeof(GBuffer)});
 
-	direct_lighting_buffer.create("GRIS Direct Lighting",
-								  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-									  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-								  instance->width * instance->height * sizeof(glm::vec3));
+	direct_lighting_buffer =
+		prm::get_buffer({.name = "GRIS Direct Lighting",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = instance->width * instance->height * sizeof(glm::vec3)});
 
-	gris_reservoir_ping_buffer.create("GRIS Reservoirs Ping",
-									  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-										  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-									  instance->width * instance->height * sizeof(Reservoir));
+	gris_reservoir_ping_buffer =
+		prm::get_buffer({.name = "GRIS Reservoirs Ping",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = instance->width * instance->height * sizeof(Reservoir)});
 
-	gris_reservoir_pong_buffer.create("GRIS Reservoirs Pong",
-									  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-										  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-									  instance->width * instance->height * sizeof(Reservoir));
+	gris_reservoir_pong_buffer =
+		prm::get_buffer({.name = "GRIS Reservoirs Pong",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = instance->width * instance->height * sizeof(Reservoir)});
 
-	prefix_contribution_buffer.create("Prefix Contributions",
-									  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-										  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-									  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-									  instance->width * instance->height * sizeof(glm::vec3));
+	prefix_contribution_buffer =
+		prm::get_buffer({.name = "Prefix Contributions",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = instance->width * instance->height * sizeof(glm::vec3)});
 
-	debug_vis_buffer.create("Debug Vis",
-							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * sizeof(uint32_t));
+	debug_vis_buffer =
+		prm::get_buffer({.name = "Debug Vis",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = instance->width * instance->height * sizeof(uint32_t)});
+	reconnection_buffer = prm::get_buffer(
+		{.name = "Reservoir Connection",
+		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+				  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		 .memory_type = vk::BufferType::GPU,
+		 .size = instance->width * instance->height * sizeof(ReconnectionData) * (num_spatial_samples + 1)});
 
-	reconnection_buffer.create(
-		"Reservoir Connection",
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		instance->width * instance->height * sizeof(ReconnectionData) * (num_spatial_samples + 1));
-	transformations_buffer.create(
-		"Transformations Buffer", VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, transformations.size() * sizeof(glm::mat4), transformations.data(), true);
+	transformations_buffer = prm::get_buffer({
+		.name = "Transformations Buffer",
+		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		.memory_type = vk::BufferType::GPU,
+		.size = transformations.size() * sizeof(glm::mat4),
+		.data = transformations.data(),
+	});
 
 	SceneDesc desc;
-	desc.index_addr = lumen_scene->index_buffer.get_device_address();
+	desc.index_addr = lumen_scene->index_buffer->get_device_address();
 
-	desc.material_addr = lumen_scene->materials_buffer.get_device_address();
-	desc.prim_info_addr = lumen_scene->prim_lookup_buffer.get_device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer.get_device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer.get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer->get_device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->get_device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->get_device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->get_device_address();
 	// ReSTIR PT (GRIS)
-	desc.transformations_addr = transformations_buffer.get_device_address();
-	desc.gris_direct_lighting_addr = direct_lighting_buffer.get_device_address();
-	desc.prefix_contributions_addr = prefix_contribution_buffer.get_device_address();
-	desc.debug_vis_addr = debug_vis_buffer.get_device_address();
+	desc.transformations_addr = transformations_buffer->get_device_address();
+	desc.gris_direct_lighting_addr = direct_lighting_buffer->get_device_address();
+	desc.prefix_contributions_addr = prefix_contribution_buffer->get_device_address();
+	desc.debug_vis_addr = debug_vis_buffer->get_device_address();
 
-	lumen_scene->scene_desc_buffer.create(
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(SceneDesc), &desc, true);
+	lumen_scene->scene_desc_buffer =
+		prm::get_buffer({.name = "Scene Desc",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = sizeof(SceneDesc),
+						 .data = &desc});
 
-	lumen::TextureSettings settings;
-	settings.base_extent = {instance->width, instance->height, 1};
-	settings.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-	settings.usage_flags = VK_IMAGE_USAGE_STORAGE_BIT;
-
-	canonical_contributions_texture.create_empty_texture("Canonical Contributions Texture", settings,
-														 VK_IMAGE_LAYOUT_GENERAL);
+	canonical_contributions_texture = prm::get_texture({
+		.name = "Canonical Contributions Texture",
+		.usage = VK_IMAGE_USAGE_STORAGE_BIT,
+		.dimensions = {instance->width, instance->height, 1},
+		.format = VK_FORMAT_R16G16B16A16_SFLOAT,
+		.initial_layout = VK_IMAGE_LAYOUT_GENERAL,
+	});
 
 	pc_ray.total_light_area = 0;
 
@@ -99,15 +115,15 @@ void ReSTIRPT::init() {
 	pc_ray.buffer_idx = 0;
 
 	assert(lumen::VulkanBase::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, &lumen_scene->prim_lookup_buffer,
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
 								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, &gris_reservoir_ping_buffer,
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, gris_reservoir_ping_buffer,
 								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, &direct_lighting_buffer,
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, direct_lighting_buffer,
 								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, &lumen_scene->compact_vertices_buffer,
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, lumen_scene->compact_vertices_buffer,
 								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, debug_vis_addr, &debug_vis_buffer, lumen::VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, debug_vis_addr, debug_vis_buffer, lumen::VulkanBase::render_graph());
 
 	path_length = config->path_length;
 }
@@ -146,9 +162,8 @@ void ReSTIRPT::render() {
 	const std::initializer_list<lumen::ResourceBinding> common_bindings = {
 		output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer};
 
-	const std::array<lumen::BufferOld*, 2> reservoir_buffers = {&gris_reservoir_ping_buffer,
-																&gris_reservoir_pong_buffer};
-	const std::array<lumen::BufferOld*, 2> gbuffers = {&gris_prev_gbuffer, &gris_gbuffer};
+	const std::array<vk::Buffer*, 2> reservoir_buffers = {gris_reservoir_ping_buffer, gris_reservoir_pong_buffer};
+	const std::array<vk::Buffer*, 2> gbuffers = {gris_prev_gbuffer, gris_gbuffer};
 
 	int ping = pc_ray.total_frame_num % 2;
 	int pong = ping ^ 1;
@@ -172,8 +187,8 @@ void ReSTIRPT::render() {
 		.push_constants(&pc_ray)
 		.zero(debug_vis_buffer)
 		.bind(common_bindings)
-		.bind(*reservoir_buffers[WRITE_OR_CURR_IDX])
-		.bind(*gbuffers[pong])
+		.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
+		.bind(gbuffers[pong])
 		.bind(canonical_contributions_texture)
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
@@ -193,10 +208,10 @@ void ReSTIRPT::render() {
 					 })
 			.push_constants(&pc_ray)
 			.bind(common_bindings)
-			.bind(*reservoir_buffers[WRITE_OR_CURR_IDX])
-			.bind(*reservoir_buffers[READ_OR_PREV_IDX])
-			.bind(*gbuffers[pong])
-			.bind(*gbuffers[ping])
+			.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
+			.bind(reservoir_buffers[READ_OR_PREV_IDX])
+			.bind(gbuffers[pong])
+			.bind(gbuffers[ping])
 			.bind(canonical_contributions_texture)
 			.bind_texture_array(lumen_scene->scene_textures)
 			.bind_tlas(tlas)
@@ -216,9 +231,9 @@ void ReSTIRPT::render() {
 							 })
 					.push_constants(&pc_ray)
 					.bind(common_bindings)
-					.bind(*reservoir_buffers[WRITE_OR_CURR_IDX])
-					.bind(*reservoir_buffers[READ_OR_PREV_IDX])
-					.bind(*gbuffers[pong])
+					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
+					.bind(reservoir_buffers[READ_OR_PREV_IDX])
+					.bind(gbuffers[pong])
 					.bind(canonical_contributions_texture)
 					.bind_texture_array(lumen_scene->scene_textures)
 					.bind_tlas(tlas);
@@ -237,8 +252,8 @@ void ReSTIRPT::render() {
 					.push_constants(&pc_ray)
 					.bind(common_bindings)
 					.bind(reconnection_buffer)
-					.bind(*reservoir_buffers[WRITE_OR_CURR_IDX])
-					.bind(*gbuffers[pong])
+					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
+					.bind(gbuffers[pong])
 					.bind_texture_array(lumen_scene->scene_textures)
 					.bind_tlas(tlas);
 				// Validate
@@ -255,8 +270,8 @@ void ReSTIRPT::render() {
 					.push_constants(&pc_ray)
 					.bind(common_bindings)
 					.bind(reconnection_buffer)
-					.bind(*reservoir_buffers[WRITE_OR_CURR_IDX])
-					.bind(*gbuffers[pong])
+					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
+					.bind(gbuffers[pong])
 					.bind_texture_array(lumen_scene->scene_textures)
 					.bind_tlas(tlas);
 
@@ -276,9 +291,9 @@ void ReSTIRPT::render() {
 					.push_constants(&pc_ray)
 					.bind(common_bindings)
 					.bind(reconnection_buffer)
-					.bind(*reservoir_buffers[WRITE_OR_CURR_IDX])
-					.bind(*reservoir_buffers[READ_OR_PREV_IDX])
-					.bind(*gbuffers[pong])
+					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
+					.bind(reservoir_buffers[READ_OR_PREV_IDX])
+					.bind(gbuffers[pong])
 					.bind(canonical_contributions_texture)
 					.bind_texture_array(lumen_scene->scene_textures)
 					.bind_tlas(tlas);
@@ -308,14 +323,13 @@ bool ReSTIRPT::update() {
 
 void ReSTIRPT::destroy() {
 	Integrator::destroy();
-	std::vector<lumen::BufferOld*> buffer_list = {
-		&gris_gbuffer,			 &gris_reservoir_ping_buffer, &gris_reservoir_pong_buffer,
-		&direct_lighting_buffer, &transformations_buffer,	  &prefix_contribution_buffer,
-		&reconnection_buffer,	 &gris_prev_gbuffer,		  &debug_vis_buffer};
-	for (auto b : buffer_list) {
-		b->destroy();
+	auto buffer_list = {gris_gbuffer,			gris_reservoir_ping_buffer, gris_reservoir_pong_buffer,
+						direct_lighting_buffer, transformations_buffer,		prefix_contribution_buffer,
+						reconnection_buffer,	gris_prev_gbuffer,			debug_vis_buffer};
+	for (vk::Buffer* b : buffer_list) {
+		prm::remove(b);
 	}
-	canonical_contributions_texture.destroy();
+	prm::remove(canonical_contributions_texture);
 }
 
 bool ReSTIRPT::gui() {
@@ -367,13 +381,13 @@ bool ReSTIRPT::gui() {
 
 	if (spatial_samples_changed && num_spatial_samples > 0) {
 		vkDeviceWaitIdle(vk::context().device);
-		reconnection_buffer.destroy();
-		reconnection_buffer.create(
-			"Reservoir Connection",
-			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-				VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			instance->width * instance->height * sizeof(ReconnectionData) * (num_spatial_samples + 1));
+		prm::replace_buffer(
+			reconnection_buffer,
+			{.name = "Reservoir Connection",
+			 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+					  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			 .memory_type = vk::BufferType::GPU,
+			 .size = instance->width * instance->height * sizeof(ReconnectionData) * (num_spatial_samples + 1)});
 	}
 	return result;
 }

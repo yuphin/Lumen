@@ -9,48 +9,48 @@ namespace lumen {
 		return *this;  \
 	}
 
-void RenderPass::register_dependencies(BufferOld& buffer, VkAccessFlags dst_access_flags) {
-	const bool found = rg->buffer_resource_map.find(buffer.handle) != rg->buffer_resource_map.end();
+void RenderPass::register_dependencies(vk::Buffer* buffer, VkAccessFlags dst_access_flags) {
+	const bool found = rg->buffer_resource_map.find(buffer->handle) != rg->buffer_resource_map.end();
 	if (!found || (dst_access_flags == VK_ACCESS_SHADER_READ_BIT &&
-				   (rg->buffer_resource_map[buffer.handle].second == dst_access_flags))) {
+				   (rg->buffer_resource_map[buffer->handle].second == dst_access_flags))) {
 		return;
 	}
 	// Invariant : Pass with lower index should be the setter
 	// Set current pass dependencies
-	auto src_access_flags = rg->buffer_resource_map[buffer.handle].second;
+	auto src_access_flags = rg->buffer_resource_map[buffer->handle].second;
 	if (src_access_flags & VK_ACCESS_TRANSFER_WRITE_BIT) {
 		dst_access_flags |= VK_ACCESS_TRANSFER_WRITE_BIT;
 	}
 
-	auto opposing_pass_idx = rg->buffer_resource_map[buffer.handle].first;
+	auto opposing_pass_idx = rg->buffer_resource_map[buffer->handle].first;
 	if (opposing_pass_idx < rg->passes.size()) {
 		RenderPass& opposing_pass = rg->passes[opposing_pass_idx];
 		if (opposing_pass_idx < rg->passes.size() && opposing_pass.pass_idx < pass_idx) {
-			if (wait_signals_buffer.find(buffer.handle) == wait_signals_buffer.end()) {
-				wait_signals_buffer[buffer.handle] = BufferSyncDescriptor{
+			if (wait_signals_buffer.find(buffer->handle) == wait_signals_buffer.end()) {
+				wait_signals_buffer[buffer->handle] = BufferSyncDescriptor{
 					.src_access_flags = src_access_flags,
 					.dst_access_flags = dst_access_flags,
 					.opposing_pass_idx = opposing_pass.pass_idx,
 				};
 			}
 			// Set source pass dependencies (Signalling pass)
-			if (opposing_pass.set_signals_buffer.find(buffer.handle) == opposing_pass.set_signals_buffer.end()) {
-				opposing_pass.set_signals_buffer[buffer.handle] =
+			if (opposing_pass.set_signals_buffer.find(buffer->handle) == opposing_pass.set_signals_buffer.end()) {
+				opposing_pass.set_signals_buffer[buffer->handle] =
 					BufferSyncDescriptor{.src_access_flags = src_access_flags,
 										 .dst_access_flags = dst_access_flags,
 										 .opposing_pass_idx = pass_idx};
 			}
 		} else if (src_access_flags != dst_access_flags) {
-			buffer_barriers.push_back({buffer.handle, src_access_flags, dst_access_flags});
+			buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
 		}
 	} else if (src_access_flags != dst_access_flags) {
-		buffer_barriers.push_back({buffer.handle, src_access_flags, dst_access_flags});
+		buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
 	}
 }
 
-void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout) {
-	const bool has_storage_bit = (tex.usage_flags & VK_IMAGE_USAGE_STORAGE_BIT) == VK_IMAGE_USAGE_STORAGE_BIT;
-	const bool eq_layouts = tex.layout == dst_layout;
+void RenderPass::register_dependencies(vk::Texture* tex, VkImageLayout dst_layout) {
+	const bool has_storage_bit = (tex->usage_flags & VK_IMAGE_USAGE_STORAGE_BIT) == VK_IMAGE_USAGE_STORAGE_BIT;
+	const bool eq_layouts = tex->layout == dst_layout;
 	// Note: Currently, the following optimization doesn't work for this:
 	// if (eq_layouts && (!has_storage_bit || dst_layout == VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL)) {
 	// The reason is that when both src and dst layout are VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, it's possible that prior
@@ -63,41 +63,41 @@ void RenderPass::register_dependencies(Texture2D& tex, VkImageLayout dst_layout)
 	if (eq_layouts && !has_storage_bit) {
 		return;
 	}
-	auto img_resource = rg->img_resource_map.find(tex.img);
+	auto img_resource = rg->img_resource_map.find(tex->handle);
 	const bool resource_exists = img_resource != rg->img_resource_map.end();
-	if (has_storage_bit && tex.layout == dst_layout && !resource_exists) {
+	if (has_storage_bit && tex->layout == dst_layout && !resource_exists) {
 		return;
 	}
-	if (tex.layout == VK_IMAGE_LAYOUT_UNDEFINED || !resource_exists) {
-		layout_transitions.push_back({&tex, tex.layout, dst_layout});
-		tex.layout = dst_layout;
+	if (tex->layout == VK_IMAGE_LAYOUT_UNDEFINED || !resource_exists) {
+		layout_transitions.push_back({tex, tex->layout, dst_layout});
+		tex->layout = dst_layout;
 	} else if (img_resource->second < rg->passes.size()) {
 		RenderPass& opposing_pass = rg->passes[img_resource->second];
 		if (opposing_pass.pass_idx < pass_idx) {
 			// Set current pass dependencies (Waiting pass)
-			if (wait_signals_img.find(tex.img) == wait_signals_img.end()) {
-				wait_signals_img[tex.img] = ImageSyncDescriptor{.old_layout = tex.layout,
-																.new_layout = dst_layout,
-																.opposing_pass_idx = opposing_pass.pass_idx,
-																.image_aspect = tex.aspect_flags};
+			if (wait_signals_img.find(tex->handle) == wait_signals_img.end()) {
+				wait_signals_img[tex->handle] = ImageSyncDescriptor{.old_layout = tex->layout,
+																	.new_layout = dst_layout,
+																	.opposing_pass_idx = opposing_pass.pass_idx,
+																	.image_aspect = tex->aspect_flags};
 			}
 			// Set source pass dependencies (Signalling pass)
-			if (opposing_pass.set_signals_img.find(tex.img) == opposing_pass.set_signals_img.end()) {
-				opposing_pass.set_signals_img[tex.img] = ImageSyncDescriptor{.old_layout = tex.layout,
-																			 .new_layout = dst_layout,
-																			 .opposing_pass_idx = pass_idx,
-																			 .image_aspect = tex.aspect_flags};
+			if (opposing_pass.set_signals_img.find(tex->handle) == opposing_pass.set_signals_img.end()) {
+				opposing_pass.set_signals_img[tex->handle] = ImageSyncDescriptor{.old_layout = tex->layout,
+																				 .new_layout = dst_layout,
+																				 .opposing_pass_idx = pass_idx,
+																				 .image_aspect = tex->aspect_flags};
 			}
-			tex.layout = dst_layout;
-		} else if (tex.layout != dst_layout) {
+			tex->layout = dst_layout;
+		} else if (tex->layout != dst_layout) {
 			// Means the opposing pass has already executed
-			layout_transitions.push_back({&tex, tex.layout, dst_layout});
-			tex.layout = dst_layout;
+			layout_transitions.push_back({tex, tex->layout, dst_layout});
+			tex->layout = dst_layout;
 		}
-	} else if (tex.layout != dst_layout) {
+	} else if (tex->layout != dst_layout) {
 		// Means the opposing pass has already executed
-		layout_transitions.push_back({&tex, tex.layout, dst_layout});
-		tex.layout = dst_layout;
+		layout_transitions.push_back({tex, tex->layout, dst_layout});
+		tex->layout = dst_layout;
 	}
 }
 
@@ -107,8 +107,8 @@ void RenderPass::transition_resources() {
 			auto& bound_resource = pipeline_storage->bound_resources[i];
 			if (!bound_resource.active) {
 				if (bound_resource.tex) {
-					descriptor_infos[i] = bound_resource.tex->descriptor(
-						vk::get_image_layout(pipeline_storage->pipeline->descriptor_types[i]));
+					descriptor_infos[i] = vk::get_texture_descriptor(
+						bound_resource.tex, vk::get_image_layout(pipeline_storage->pipeline->descriptor_types[i]));
 				} else {
 					descriptor_infos[i] = pipeline_storage->bound_resources[i].get_descriptor_info();
 				}
@@ -116,39 +116,39 @@ void RenderPass::transition_resources() {
 			}
 			if (bound_resource.write) {
 				if (bound_resource.buf) {
-					write_impl(*bound_resource.buf, VK_ACCESS_SHADER_WRITE_BIT);
+					write_impl(bound_resource.buf, VK_ACCESS_SHADER_WRITE_BIT);
 				} else {
-					write_impl(*bound_resource.tex);
+					write_impl(bound_resource.tex);
 				}
 			} else if (bound_resource.read) {
 				if (bound_resource.buf) {
-					read_impl(*bound_resource.buf);
+					read_impl(bound_resource.buf);
 				} else {
-					read_impl(*bound_resource.tex);
+					read_impl(bound_resource.tex);
 				}
 			}
 			descriptor_infos[i] = pipeline_storage->bound_resources[i].get_descriptor_info();
 		}
 		for (const auto& [buffer_str, status] : pipeline_storage->affected_buffer_pointers) {
-			auto buffer = rg->registered_buffer_pointers[buffer_str];
+			vk::Buffer* buffer = rg->registered_buffer_pointers[buffer_str];
 			if (status.write) {
-				write_impl(*buffer, VK_ACCESS_SHADER_WRITE_BIT);
+				write_impl(buffer, VK_ACCESS_SHADER_WRITE_BIT);
 			} else if (status.read) {
-				read_impl(*buffer);
+				read_impl(buffer);
 			}
 		}
 	} else {
-		for (auto& buf : explicit_buffer_reads) {
-			read_impl(*buf);
+		for (vk::Buffer* buf : explicit_buffer_reads) {
+			read_impl(buf);
 		}
-		for (auto& buf : explicit_buffer_writes) {
-			write_impl(*buf, VK_ACCESS_SHADER_WRITE_BIT);
+		for (vk::Buffer* buf : explicit_buffer_writes) {
+			write_impl(buf, VK_ACCESS_SHADER_WRITE_BIT);
 		}
-		for (auto& tex : explicit_tex_reads) {
-			read_impl(*tex);
+		for (vk::Texture* tex : explicit_tex_reads) {
+			read_impl(tex);
 		}
-		for (auto& tex : explicit_tex_writes) {
-			write_impl(*tex);
+		for (vk::Texture* tex : explicit_tex_writes) {
+			write_impl(tex);
 		}
 		for (int i = 0; i < pipeline_storage->bound_resources.size(); i++) {
 			descriptor_infos[i] = pipeline_storage->bound_resources[i].get_descriptor_info();
@@ -156,25 +156,25 @@ void RenderPass::transition_resources() {
 	}
 	for (const Resource& resource : resource_zeros) {
 		if (resource.buf) {
-			write_impl(*resource.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
+			write_impl(resource.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
 		} else {
-			write_impl(*resource.tex);
+			write_impl(resource.tex);
 		}
 	}
 
 	for (const auto& [src, dst] : resource_copies) {
 		if (src.tex) {
 			if (dst.buf) {
-				write_impl(*dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
+				write_impl(dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
 			} else {
-				write_impl(*dst.tex, VK_ACCESS_TRANSFER_WRITE_BIT);
+				write_impl(dst.tex, VK_ACCESS_TRANSFER_WRITE_BIT);
 			}
 		} else {  // buffer
-			read_impl(*src.buf, VK_ACCESS_TRANSFER_READ_BIT);
+			read_impl(src.buf, VK_ACCESS_TRANSFER_READ_BIT);
 			if (dst.buf) {
-				write_impl(*dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
+				write_impl(dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
 			} else {
-				write_impl(*dst.tex, VK_ACCESS_TRANSFER_WRITE_BIT);
+				write_impl(dst.tex, VK_ACCESS_TRANSFER_WRITE_BIT);
 			}
 		}
 	}
@@ -323,8 +323,7 @@ RenderPass& RenderPass::bind(std::initializer_list<ResourceBinding> bindings) {
 	}
 	return *this;
 }
-
-RenderPass& RenderPass::bind_texture_with_sampler(Texture2D& tex, VkSampler sampler) {
+RenderPass& RenderPass::bind_texture_with_sampler(vk::Texture* tex, VkSampler sampler) {
 	if (next_binding_idx >= pipeline_storage->bound_resources.size()) {
 		pipeline_storage->bound_resources.emplace_back(tex, sampler);
 		descriptor_counts.push_back(1);
@@ -335,7 +334,7 @@ RenderPass& RenderPass::bind_texture_with_sampler(Texture2D& tex, VkSampler samp
 	return *this;
 }
 
-RenderPass& RenderPass::bind_texture_array(std::vector<Texture2D>& textures, bool force_update) {
+RenderPass& RenderPass::bind_texture_array(std::span<vk::Texture*> textures, bool force_update) {
 	if (next_binding_idx >= pipeline_storage->bound_resources.size()) {
 		for (auto& texture : textures) {
 			pipeline_storage->bound_resources.emplace_back(texture);
@@ -349,7 +348,7 @@ RenderPass& RenderPass::bind_texture_array(std::vector<Texture2D>& textures, boo
 	return *this;
 }
 
-RenderPass& RenderPass::bind_buffer_array(std::vector<BufferOld>& buffers, bool force_update) {
+RenderPass& RenderPass::bind_buffer_array(std::span<vk::Buffer*> buffers, bool force_update) {
 	if (next_binding_idx >= pipeline_storage->bound_resources.size()) {
 		for (auto& buffer : buffers) {
 			pipeline_storage->bound_resources.emplace_back(buffer);
@@ -370,25 +369,25 @@ RenderPass& RenderPass::bind_tlas(const vk::BVH& tlas) {
 	return *this;
 }
 
-RenderPass& RenderPass::read(BufferOld& buffer) {
-	explicit_buffer_reads.push_back(&buffer);
+RenderPass& RenderPass::read(vk::Buffer* buffer) {
+	explicit_buffer_reads.push_back(buffer);
 	return *this;
 }
 
-RenderPass& RenderPass::read(Texture2D& tex) {
-	explicit_tex_reads.push_back(&tex);
+RenderPass& RenderPass::read(vk::Texture* tex) {
+	explicit_tex_reads.push_back(tex);
 	return *this;
 }
 
-RenderPass& RenderPass::read(std::initializer_list<std::reference_wrapper<Texture2D>> texes) {
-	for (Texture2D& tex : texes) {
+RenderPass& RenderPass::read(std::initializer_list<vk::Texture*> texes) {
+	for (vk::Texture* tex : texes) {
 		read(tex);
 	}
 	return *this;
 }
 
-RenderPass& RenderPass::read(std::initializer_list<std::reference_wrapper<BufferOld>> buffers) {
-	for (BufferOld& buff : buffers) {
+RenderPass& RenderPass::read(std::initializer_list<vk::Buffer*> buffers) {
+	for (vk::Buffer* buff : buffers) {
 		read(buff);
 	}
 	return *this;
@@ -396,32 +395,32 @@ RenderPass& RenderPass::read(std::initializer_list<std::reference_wrapper<Buffer
 
 RenderPass& RenderPass::read(ResourceBinding& resource) {
 	if (resource.tex) {
-		read(*resource.tex);
+		read(resource.tex);
 	} else {
-		read(*resource.buf);
+		read(resource.buf);
 	}
 	return *this;
 }
 
-RenderPass& RenderPass::write(BufferOld& buffer) {
-	explicit_buffer_writes.push_back(&buffer);
+RenderPass& RenderPass::write(vk::Buffer* buffer) {
+	explicit_buffer_writes.push_back(buffer);
 	return *this;
 }
 
-RenderPass& RenderPass::write(Texture2D& tex) {
-	explicit_tex_writes.push_back(&tex);
+RenderPass& RenderPass::write(vk::Texture* tex) {
+	explicit_tex_writes.push_back(tex);
 	return *this;
 }
 
-RenderPass& RenderPass::write(std::initializer_list<std::reference_wrapper<BufferOld>> buffers) {
-	for (BufferOld& buff : buffers) {
-		write(buff);
+RenderPass& RenderPass::write(std::initializer_list<vk::Buffer*> buffers) {
+	for (vk::Buffer* buf : buffers) {
+		write(buf);
 	}
 	return *this;
 }
 
-RenderPass& RenderPass::write(std::initializer_list<std::reference_wrapper<Texture2D>> texes) {
-	for (Texture2D& tex : texes) {
+RenderPass& RenderPass::write(std::initializer_list<vk::Texture*> texes) {
+	for (vk::Texture* tex : texes) {
 		write(tex);
 	}
 	return *this;
@@ -429,9 +428,9 @@ RenderPass& RenderPass::write(std::initializer_list<std::reference_wrapper<Textu
 
 RenderPass& RenderPass::write(ResourceBinding& resource) {
 	if (resource.tex) {
-		write(*resource.tex);
+		write(resource.tex);
 	} else {
-		write(*resource.buf);
+		write(resource.buf);
 	}
 	return *this;
 }
@@ -456,15 +455,15 @@ RenderPass& RenderPass::zero(const Resource& resource, bool cond) {
 	return *this;
 }
 
-RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<BufferOld>> buffers) {
-	for (BufferOld& buf : buffers) {
+RenderPass& RenderPass::zero(std::initializer_list<vk::Buffer*> buffers) {
+	for (vk::Buffer* buf : buffers) {
 		zero(buf);
 	}
 	return *this;
 }
 
-RenderPass& RenderPass::zero(std::initializer_list<std::reference_wrapper<Texture2D>> textures) {
-	for (Texture2D& tex : textures) {
+RenderPass& RenderPass::zero(std::initializer_list<vk::Texture*> textures) {
+	for (vk::Texture* tex : textures) {
 		zero(tex);
 	}
 	return *this;
@@ -540,33 +539,33 @@ void RenderPass::finalize() {
 	}
 }
 
-void RenderPass::write_impl(BufferOld& buffer, VkAccessFlags access_flags) {
+void RenderPass::write_impl(vk::Buffer* buffer, VkAccessFlags access_flags) {
 	register_dependencies(buffer, access_flags);
-	rg->buffer_resource_map[buffer.handle] = {pass_idx, access_flags};
+	rg->buffer_resource_map[buffer->handle] = {pass_idx, access_flags};
 }
 
-void RenderPass::write_impl(Texture2D& tex, VkAccessFlags access_flags) {
+void RenderPass::write_impl(vk::Texture* tex, VkAccessFlags access_flags) {
 	VkImageLayout target_layout = vk::get_target_img_layout(tex, access_flags);
 	register_dependencies(tex, target_layout);
-	rg->img_resource_map[tex.img] = pass_idx;
+	rg->img_resource_map[tex->handle] = pass_idx;
 }
 
-void RenderPass::read_impl(BufferOld& buffer) { read_impl(buffer, VK_ACCESS_SHADER_READ_BIT); }
+void RenderPass::read_impl(vk::Buffer* buffer) { read_impl(buffer, VK_ACCESS_SHADER_READ_BIT); }
 
-void RenderPass::read_impl(BufferOld& buffer, VkAccessFlags access_flags) {
+void RenderPass::read_impl(vk::Buffer* buffer, VkAccessFlags access_flags) {
 	register_dependencies(buffer, access_flags);
-	rg->buffer_resource_map[buffer.handle] = {pass_idx, access_flags};
+	rg->buffer_resource_map[buffer->handle] = {pass_idx, access_flags};
 }
 
-void RenderPass::read_impl(Texture2D& tex) {
+void RenderPass::read_impl(vk::Texture* tex) {
 	VkImageLayout target_layout = vk::get_target_img_layout(tex, VK_ACCESS_SHADER_READ_BIT);
 	register_dependencies(tex, target_layout);
-	rg->img_resource_map[tex.img] = pass_idx;
+	rg->img_resource_map[tex->handle] = pass_idx;
 }
 
-void RenderPass::post_execution_barrier(BufferOld& buffer, VkAccessFlags access_flags) {
-	auto src_access_flags = rg->buffer_resource_map[buffer.handle].second;
-	post_execution_buffer_barriers.push_back({buffer.handle, src_access_flags, access_flags});
+void RenderPass::post_execution_barrier(vk::Buffer* buffer, VkAccessFlags access_flags) {
+	auto src_access_flags = rg->buffer_resource_map[buffer->handle].second;
+	post_execution_buffer_barriers.push_back({buffer->handle, src_access_flags, access_flags});
 }
 
 void RenderPass::run(VkCommandBuffer cmd) {
@@ -661,7 +660,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 	// Transition layouts inside the pass
 	for (auto& [tex, old_layout, dst_layout] : layout_transitions) {
-		tex->force_transition(cmd, old_layout, dst_layout);
+		vk::force_transition_texture(tex, cmd, old_layout, dst_layout);
 	}
 
 	// Push descriptors
@@ -736,17 +735,17 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				}
 				std::vector<VkRenderingAttachmentInfo> rendering_attachments;
 				rendering_attachments.reserve(color_outputs.size());
-				for (Texture2D* color_output : color_outputs) {
-					color_output->transition(cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+				for (vk::Texture* color_output : color_outputs) {
+					vk::transition_texture(color_output, cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 					rendering_attachments.push_back(vk::rendering_attachment_info(
-						color_output->img_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ATTACHMENT_LOAD_OP_CLEAR,
+						color_output->view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ATTACHMENT_LOAD_OP_CLEAR,
 						VK_ATTACHMENT_STORE_OP_STORE, gfx_settings->clear_color));
 				}
 				VkRenderingAttachmentInfo depth_stencil_attachment;
 				if (depth_output) {
-					depth_output->transition(cmd, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+					vk::transition_texture(depth_output, cmd, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 					depth_stencil_attachment = vk::rendering_attachment_info(
-						depth_output->img_view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_ATTACHMENT_LOAD_OP_CLEAR,
+						depth_output->view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_ATTACHMENT_LOAD_OP_CLEAR,
 						VK_ATTACHMENT_STORE_OP_STORE, gfx_settings->clear_depth_stencil);
 				}
 
@@ -764,13 +763,12 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				}
 
 				// Present
-				for (Texture2D* color_output : color_outputs) {
-					if (color_output->present) {
-						color_output->transition(cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+				for (vk::Texture* color_output : color_outputs) {
+					// If the texture is a swapchain image, it should be presented
+					bool should_present = color_output->allocation == VK_NULL_HANDLE;
+					if (should_present) {
+						vk::transition_texture(color_output, cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 					}
-				}
-				if (depth_output && depth_output->present) {
-					depth_output->transition(cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 				}
 				break;
 			}
@@ -803,24 +801,24 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				region.imageSubresource.mipLevel = 0;
 				region.imageSubresource.baseArrayLayer = 0;
 				region.imageSubresource.layerCount = 1;
-				region.imageExtent = src.tex->base_extent;
+				region.imageExtent = src.tex->extent;
 				VkImageLayout old_layout = src.tex->layout;
-				src.tex->transition(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-				vkCmdCopyImageToBuffer(cmd, src.tex->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst.buf->handle, 1,
+				vk::transition_texture(src.tex, cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+				vkCmdCopyImageToBuffer(cmd, src.tex->handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst.buf->handle, 1,
 									   &region);
-				src.tex->transition(cmd, old_layout);
+				vk::transition_texture(src.tex, cmd, old_layout);
 			} else {
 				LUMEN_ASSERT(src.tex->aspect_flags == dst.tex->aspect_flags, "Aspect flags mismatch");
 				VkImageCopy region = {};
 				VkImageLayout old_layout = src.tex->layout;
-				src.tex->transition(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-				dst.tex->transition(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+				vk::transition_texture(src.tex, cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+				vk::transition_texture(dst.tex, cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 				region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 				region.srcSubresource.layerCount = 1;
 				region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 				region.dstSubresource.layerCount = 1;
-				region.extent = src.tex->base_extent;
-				vkCmdCopyImage(cmd, src.tex->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst.tex->img,
+				region.extent = src.tex->extent;
+				vkCmdCopyImage(cmd, src.tex->handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst.tex->handle,
 							   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 			}
 		} else {  // buffer

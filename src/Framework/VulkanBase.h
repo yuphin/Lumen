@@ -14,7 +14,7 @@ void cleanup_swapchain();
 void recreate_swap_chain();
 void add_device_extension(const char* name);
 
-std::vector<Texture2D>& swapchain_images();
+std::vector<vk::Texture*>& swapchain_images();
 uint32_t prepare_frame();
 VkResult submit_frame(uint32_t image_idx);
 

@@ -15,7 +15,7 @@ struct Pipeline {
 	void reload();
 	void cleanup();
 	void create_gfx_pipeline(const GraphicsPassSettings& settings, const std::vector<uint32_t>& descriptor_counts,
-							 std::vector<Texture2D*> color_outputs, Texture2D* depth_output);
+							 std::vector<vk::Texture*> color_outputs, vk::Texture* depth_output);
 	void create_rt_pipeline(const RTPassSettings& settings, const std::vector<uint32_t>& descriptor_counts);
 	void create_compute_pipeline(const ComputePassSettings& settings, const std::vector<uint32_t>& descriptor_counts);
 	const std::array<VkStridedDeviceAddressRegionKHR, 4> get_rt_regions();

@@ -6,6 +6,7 @@
 #define VOLK_IMPLEMENTATION
 #include "VulkanBase.h"
 #include "CommandBuffer.h"
+#include "PersistentResourceManager.h"
 
 namespace lumen {
 
@@ -27,7 +28,7 @@ std::vector<VkQueueFamilyProperties> _queue_families;
 std::unique_ptr<RenderGraph> _rg;
 VkFormat _swapchain_format;
 
-std::vector<Texture2D> _swapchain_images;
+std::vector<vk::Texture*> _swapchain_images;
 
 bool _enable_validation_layers;
 
@@ -167,8 +168,8 @@ void cleanup_swapchain() {
 	vkFreeCommandBuffers(vk::context().device, vk::context().cmd_pools[0],
 						 static_cast<uint32_t>(vk::context().command_buffers.size()),
 						 vk::context().command_buffers.data());
-	for (auto& swapchain_img : _swapchain_images) {
-		swapchain_img.destroy();
+	for (vk::Texture* swapchain_img : _swapchain_images) {
+		prm::remove(swapchain_img);
 	}
 	_swapchain_images.clear();
 	vkDestroySwapchainKHR(vk::context().device, vk::context().swapchain, nullptr);
@@ -322,7 +323,7 @@ static void pick_physical_device() {
 			std::vector<VkExtensionProperties> available_extensions(extension_cnt);
 			vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_cnt, available_extensions.data());
 
-			std::set<std::string> required_extensions(_device_extensions.begin(), _device_extensions.end());
+			std::unordered_set<std::string> required_extensions(_device_extensions.begin(), _device_extensions.end());
 
 			for (const auto& extension : available_extensions) {
 				required_extensions.erase(extension.extensionName);
@@ -363,9 +364,9 @@ static void create_logical_device() {
 	vk::context().queue_indices = find_queue_families(vk::context().physical_device);
 
 	std::vector<VkDeviceQueueCreateInfo> queue_CIs;
-	std::set<uint32_t> unique_queue_families = {vk::context().queue_indices.gfx_family.value(),
-												vk::context().queue_indices.present_family.value(),
-												vk::context().queue_indices.compute_family.value()};
+	std::unordered_set<uint32_t> unique_queue_families = {vk::context().queue_indices.gfx_family.value(),
+														  vk::context().queue_indices.present_family.value(),
+														  vk::context().queue_indices.compute_family.value()};
 
 	vk::context().queues.resize(vk::context().queue_indices.gfx_family.has_value() +
 								vk::context().queue_indices.present_family.has_value() +
@@ -554,13 +555,19 @@ static void create_swapchain() {
 	vk::check(vkCreateSwapchainKHR(vk::context().device, &swapchain_CI, nullptr, &vk::context().swapchain),
 			  "Failed to create swap chain!");
 
+	std::vector<VkImage> images;
 	vkGetSwapchainImagesKHR(vk::context().device, vk::context().swapchain, &image_cnt, nullptr);
 	_swapchain_images.reserve(image_cnt);
-	VkImage images[16] = {nullptr};
-	vkGetSwapchainImagesKHR(vk::context().device, vk::context().swapchain, &image_cnt, images);
+	images.resize(image_cnt);
+	vkGetSwapchainImagesKHR(vk::context().device, vk::context().swapchain, &image_cnt, images.data());
 	for (uint32_t i = 0; i < image_cnt; i++) {
-		_swapchain_images.emplace_back("Swapchain Image #" + std::to_string(i), images[i], surface_format.format,
-									   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_ASPECT_COLOR_BIT, extent, true);
+		_swapchain_images.emplace_back(prm::get_texture({
+			.name = "Swapchain Image #" + std::to_string(i),
+			.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+			.dimensions = {extent.width, extent.height, 1},
+			.format = surface_format.format,
+			.image = images[i],
+		}));
 	}
 }
 
@@ -787,7 +794,7 @@ VkResult submit_frame(uint32_t image_idx) {
 
 RenderGraph* render_graph() { return _rg.get(); }
 
-std::vector<Texture2D>& swapchain_images() { return _swapchain_images; }
+std::vector<vk::Texture*>& swapchain_images() { return _swapchain_images; }
 }  // namespace VulkanBase
 
 }  // namespace lumen

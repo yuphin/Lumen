@@ -60,14 +60,14 @@ class LumenScene {
 	std::vector<LumenLight> lights;
 
 	std::vector<Light> gpu_lights;
-	lumen::BufferOld index_buffer;
-	lumen::BufferOld vertex_buffer;
-	lumen::BufferOld compact_vertices_buffer;
-	lumen::BufferOld materials_buffer;
-	lumen::BufferOld prim_lookup_buffer;
-	lumen::BufferOld scene_desc_buffer;
-	lumen::BufferOld mesh_lights_buffer;
-	std::vector<lumen::Texture2D> scene_textures;
+	vk::Buffer* index_buffer;
+	vk::Buffer* vertex_buffer;
+	vk::Buffer* compact_vertices_buffer;
+	vk::Buffer* materials_buffer;
+	vk::Buffer* prim_lookup_buffer;
+	vk::Buffer* scene_desc_buffer;
+	vk::Buffer* mesh_lights_buffer;
+	std::vector<vk::Texture*> scene_textures;
 	std::unique_ptr<lumen::Camera> camera;
 
 	uint32_t total_light_triangle_cnt = 0;

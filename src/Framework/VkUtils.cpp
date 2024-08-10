@@ -299,8 +299,8 @@ VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format, VkImage
 	return ici;
 }
 
-VkImageLayout get_target_img_layout(const lumen::Texture2D& tex, VkAccessFlags access_flags) {
-	if ((tex.usage_flags & VK_IMAGE_USAGE_SAMPLED_BIT) && access_flags == VK_ACCESS_SHADER_READ_BIT) {
+VkImageLayout get_target_img_layout(const vk::Texture* tex, VkAccessFlags access_flags) {
+	if ((tex->usage_flags & VK_IMAGE_USAGE_SAMPLED_BIT) && access_flags == VK_ACCESS_SHADER_READ_BIT) {
 		return VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
 	}
 	return VK_IMAGE_LAYOUT_GENERAL;

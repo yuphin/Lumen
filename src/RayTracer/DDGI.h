@@ -14,26 +14,26 @@ class DDGI : public Integrator {
 	void update_ddgi_uniforms();
 
 	DDGIUniforms ddgi_ubo;
-	lumen::BufferOld ddgi_ubo_buffer;
-	lumen::BufferOld direct_lighting_buffer;
-	lumen::BufferOld probe_offsets_buffer;
-	lumen::BufferOld g_buffer;
+	vk::Buffer* ddgi_ubo_buffer;
+	vk::Buffer* direct_lighting_buffer;
+	vk::Buffer* probe_offsets_buffer;
+	vk::Buffer* g_buffer;
 
-	lumen::Texture2D irr_texes[2];
-	lumen::Texture2D depth_texes[2];
-	lumen::BufferOld ddgi_output_buffer;
+	vk::Texture* irr_texes[2];
+	vk::Texture* depth_texes[2];
+	vk::Buffer* ddgi_output_buffer;
 
 	struct {
-		lumen::Texture2D radiance_tex;
-		lumen::Texture2D dir_depth_tex;
+		vk::Texture* radiance_tex;
+		vk::Texture* dir_depth_tex;
 	} rt;
 
 	struct {
-		lumen::Texture2D tex;
+		vk::Texture* tex;
 	} output;
 
 	float hysteresis = 0.98f;
-	int rays_per_probe = 256;
+	uint32_t rays_per_probe = 256;
 	float depth_sharpness = 50.0f;
 	float normal_bias = 0.1f;
 	float view_bias = 0.1f;

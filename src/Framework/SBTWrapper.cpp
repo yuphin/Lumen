@@ -2,6 +2,7 @@
 #include "SBTWrapper.h"
 #include "VkUtils.h"
 #include "CommandBuffer.h"
+#include "PersistentResourceManager.h"
 
 namespace lumen {
 
@@ -10,16 +11,15 @@ static constexpr T align_up(T x, size_t a) noexcept {
 	return T((x + (T(a) - 1)) & ~T(a - 1));
 }
 
-void SBTWrapper::setup(uint32_t family_idx,
-					   const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rt_props) {
+void SBTWrapper::setup(uint32_t family_idx, const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rt_props) {
 	m_queue_idx = family_idx;
 	m_handle_size = rt_props.shaderGroupHandleSize;
 	m_handle_alignment = rt_props.shaderGroupHandleAlignment;
 }
 
 void SBTWrapper::destroy() {
-	for (auto& b : m_buffer) {
-		b.destroy();
+	for (vk::Buffer* b : m_buffer) {
+		prm::remove(b);
 	}
 	for (auto& i : m_index) i = {};
 }
@@ -56,8 +56,8 @@ void SBTWrapper::add_indices(VkRayTracingPipelineCreateInfoKHR pipeline_infos,
 }
 void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKHR pipeline_info /*= {}*/,
 						const std::vector<VkRayTracingPipelineCreateInfoKHR>& create_infos /*= {}*/) {
-	for (auto& b : m_buffer) {
-		b.destroy();
+	for (vk::Buffer* b : m_buffer) {
+		prm::remove(b);
 	}
 
 	uint32_t total_group_cnt{0};
@@ -123,20 +123,24 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 	copy_handles(stage[eHit], m_index[eHit], m_stride[eHit], m_data[eHit]);
 	copy_handles(stage[eCallable], m_index[eCallable], m_stride[eCallable], m_data[eCallable]);
 
-	auto usage_flags = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
+	VkBufferUsageFlags usage_flags = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
 	auto mem_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	for (uint32_t i = 0; i < 4; i++) {
 		if (!stage[i].empty()) {
-			m_buffer[i].create(usage_flags, mem_flags, stage[i].size(), stage[i].data(), true);
+			m_buffer[i] = prm::get_buffer(
+				{.usage = usage_flags,
+				 .memory_type = vk::BufferType::GPU,
+				 .size = stage[i].size(),
+				 .data = stage[i].data()});
 		}
 	}
 }
 
 VkDeviceAddress SBTWrapper::get_address(GroupType t) {
-	if (!m_buffer[t].size) {
+	if (!m_buffer[t]->size) {
 		return 0;
 	}
-	VkBufferDeviceAddressInfo i{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, m_buffer[t].handle};
+	VkBufferDeviceAddressInfo i{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, m_buffer[t]->handle};
 	return vkGetBufferDeviceAddress(vk::context().device, &i);
 }
 

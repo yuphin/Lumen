@@ -11,6 +11,7 @@
 #include <stb_image/stb_image.h>
 #include "shaders/commons.h"
 #include <cctype>
+#include "Framework/PersistentResourceManager.h"
 
 static bool ends_with(const std::string& str, const std::string& end) {
 	if (end.size() > str.size()) return false;
@@ -118,32 +119,46 @@ void LumenScene::load_scene(const std::string& path) {
 		}
 	}
 	if (gpu_lights.size()) {
-		mesh_lights_buffer.create("Mesh Lights Buffer", VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-								  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, gpu_lights.size() * sizeof(Light),
-								  gpu_lights.data(), true);
+		// mesh_lights_buffer.create("Mesh Lights Buffer", VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		// 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, gpu_lights.size() * sizeof(Light),
+		// 						  gpu_lights.data(), true);
+
+		mesh_lights_buffer = prm::get_buffer({.name = "Mesh Lights Buffer",
+											  .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+											  .memory_type = vk::BufferType::GPU,
+											  .size = gpu_lights.size() * sizeof(Light),
+											  .data = gpu_lights.data()});
 	}
 	total_light_area += total_light_triangle_area;
+	vertex_buffer = prm::get_buffer({.name = "Vertex Buffer",
+									 .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+											  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+											  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+									 .memory_type = vk::BufferType::GPU,
+									 .size = positions.size() * sizeof(glm::vec3),
+									 .data = positions.data()});
 
-	vertex_buffer.create("Vertex Buffer",
-						 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-							 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, positions.size() * sizeof(glm::vec3), positions.data(),
-						 true);
-	index_buffer.create("Index Buffer",
-						VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-							VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indices.size() * sizeof(uint32_t), indices.data(), true);
+	index_buffer = prm::get_buffer({.name = "Index Buffer",
+									.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+											 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+											 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+									.memory_type = vk::BufferType::GPU,
+									.size = indices.size() * sizeof(uint32_t),
+									.data = indices.data()});
 
-	materials_buffer.create("Materials Buffer",
-							VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, materials.size() * sizeof(Material), materials.data(),
-							true);
-	prim_lookup_buffer.create("Prim Lookup Buffer",
-							  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, prim_lookup.size() * sizeof(PrimMeshInfo),
-							  prim_lookup.data(), true);
+	materials_buffer =
+		prm::get_buffer({.name = "Materials Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = materials.size() * sizeof(Material),
+						 .data = materials.data()});
+
+	prim_lookup_buffer =
+		prm::get_buffer({.name = "Prim Lookup Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = prim_lookup.size() * sizeof(PrimMeshInfo),
+						 .data = prim_lookup.data()});
 
 	std::vector<Vertex> vertices;
 	vertices.reserve(positions.size());
@@ -154,11 +169,12 @@ void LumenScene::load_scene(const std::string& path) {
 		v.uv0 = texcoords0[i];
 		vertices.push_back(v);
 	}
-
-	compact_vertices_buffer.create("Compact Vertices Buffer",
-								   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-								   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertices.size() * sizeof(vertices[0]),
-								   vertices.data(), true);
+	compact_vertices_buffer =
+		prm::get_buffer({.name = "Compact Vertices Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = vertices.size() * sizeof(vertices[0]),
+						 .data = vertices.data()});
 
 	// Create a sampler for textures
 	VkSamplerCreateInfo sampler_ci = vk::sampler();
@@ -167,7 +183,7 @@ void LumenScene::load_scene(const std::string& path) {
 	sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	sampler_ci.maxLod = FLT_MAX;
 	vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &texture_sampler),
-					 "Could not create image sampler");
+			  "Could not create image sampler");
 
 	if (!textures.size()) {
 		add_default_texture();
@@ -177,12 +193,11 @@ void LumenScene::load_scene(const std::string& path) {
 		for (const auto& texture_path : textures) {
 			int x, y, n;
 			unsigned char* data = stbi_load(texture_path.c_str(), &x, &y, &n, 4);
-
-			auto size = x * y * 4;
-			auto img_dims = VkExtent2D{(uint32_t)x, (uint32_t)y};
-			auto ci = vk::make_img2d_ci(img_dims, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_USAGE_SAMPLED_BIT, false);
-			scene_textures[i].load_from_data( data, size, ci, texture_sampler,
-											 VK_IMAGE_USAGE_SAMPLED_BIT, false);
+			scene_textures[i] = prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT,
+												  .dimensions = {(uint32_t)x, (uint32_t)y, 1},
+												  .format = VK_FORMAT_R8G8B8A8_SRGB,
+												  .data = {.data = data, .size = size_t(x * y * 4)},
+												  .sampler = texture_sampler});
 			stbi_image_free(data);
 			i++;
 		}
@@ -437,10 +452,10 @@ void LumenScene::load_lumen_scene(const std::string& path) {
 			mat.anisotropy = get_or_default_f(bsdf, "anisotropy", 0.0f);
 			mat.thin = get_or_default_u(bsdf, "thin", 0);
 
-			if(mat.roughness < 1.0f) {
+			if (mat.roughness < 1.0f) {
 				mat.bsdf_props |= BSDF_FLAG_REFLECTION;
 			}
-			if(mat.spec_trans > 0.0f) {
+			if (mat.spec_trans > 0.0f) {
 				mat.bsdf_props |= BSDF_FLAG_TRANSMISSION;
 			}
 			if (mat.roughness > 0.08) {
@@ -607,10 +622,10 @@ void LumenScene::load_mitsuba_scene(const std::string& path) {
 			bsdf_types |= BSDF_TYPE_PRINCIPLED;
 			mat.bsdf_type = BSDF_TYPE_PRINCIPLED;
 			mat.ior = m_bsdf.ior;
-			if(mat.roughness < 1.0) {
+			if (mat.roughness < 1.0) {
 				mat.bsdf_props |= BSDF_FLAG_DIFFUSE_REFLECTION;
 			}
-			if(mat.ior != 1.0) {
+			if (mat.ior != 1.0) {
 				mat.bsdf_props |= BSDF_FLAG_TRANSMISSION;
 			}
 			if (mat.roughness > 0.08) {
@@ -669,8 +684,11 @@ void LumenScene::add_default_texture() {
 	std::array<uint8_t, 4> nil = {0, 0, 0, 0};
 	scene_textures.resize(1);
 	auto ci = vk::make_img2d_ci(VkExtent2D{1, 1});
-	scene_textures[0].load_from_data( nil.data(), 4, ci, texture_sampler, VK_IMAGE_USAGE_SAMPLED_BIT,
-									 false);
+	scene_textures[0] = prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT,
+										  .dimensions = {1, 1, 1},
+										  .format = VK_FORMAT_R8G8B8A8_SRGB,
+										  .data = {.data = nil.data(), .size = 4},
+										  .sampler = texture_sampler});
 }
 
 void LumenScene::create_scene_config(const std::string& integrator_name) {
@@ -725,16 +743,16 @@ void LumenScene::compute_scene_dimensions() {
 }
 
 void LumenScene::destroy() {
-	std::vector<lumen::BufferOld*> buffer_list = {&index_buffer,	   &vertex_buffer,		&compact_vertices_buffer,
-											   &materials_buffer,  &prim_lookup_buffer};
+	std::vector<vk::Buffer*> buffer_list = {index_buffer, vertex_buffer, compact_vertices_buffer, materials_buffer,
+											prim_lookup_buffer};
 	if (gpu_lights.size()) {
-		buffer_list.push_back(&mesh_lights_buffer);
+		buffer_list.push_back(mesh_lights_buffer);
 	}
-	for (auto b : buffer_list) {
-		b->destroy();
+	for (vk::Buffer* b : buffer_list) {
+		prm::remove(b);
 	}
-	for (auto& tex : scene_textures) {
-		tex.destroy();
+	for (vk::Texture* tex : scene_textures) {
+		prm::remove(tex);
 	}
 	vkDestroySampler(vk::context().device, texture_sampler, nullptr);
 }

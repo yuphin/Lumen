@@ -72,37 +72,49 @@ void RayTracer::init(Window* window) {
 
 void RayTracer::init_resources() {
 	RTUtilsDesc desc;
-	output_img_buffer.create("Output Image Buffer",
-							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * 4 * 4);
 
-	output_img_buffer_cpu.create("Output Image CPU",
-								 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-								 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-								 instance->width * instance->height * 4 * 4);
-	residual_buffer.create("RMSE Residual",
-						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instance->width * instance->height * 4);
+	output_img_buffer =
+		prm::get_buffer({.name = "Output Image Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = instance->width * instance->height * 4 * 4});
 
-	counter_buffer.create("RMSE Counter",
-						  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sizeof(int));
+	output_img_buffer_cpu =
+		prm::get_buffer({.name = "Output Image CPU",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU_TO_CPU,
+						 .size = instance->width * instance->height * 4 * 4});
 
-	rmse_val_buffer.create("RMSE Value",
-						   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							   VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, sizeof(float));
+	residual_buffer =
+		prm::get_buffer({.name = "RMSE Residual",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = instance->width * instance->height * 4});
 
-	TextureSettings settings;
-	settings.usage_flags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-						   VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-	settings.base_extent = {(uint32_t)instance->width, (uint32_t)instance->height, 1};
-	settings.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	reference_tex.create_empty_texture("Reference Texture", settings, VK_IMAGE_LAYOUT_GENERAL);
-	target_tex.create_empty_texture("Target Texture", settings, VK_IMAGE_LAYOUT_GENERAL);
+	counter_buffer =
+		prm::get_buffer({.name = "RMSE Counter",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = sizeof(int)});
+
+	rmse_val_buffer =
+		prm::get_buffer({.name = "RMSE Value",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU_TO_CPU,
+						 .size = sizeof(float)});
+	auto texture_desc = vk::TextureDesc{.name = "Reference Texture",
+										.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+												 VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+										.dimensions = {instance->width, instance->height, 1},
+										.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+										.initial_layout = VK_IMAGE_LAYOUT_GENERAL};
+	reference_tex = prm::get_texture(texture_desc);
+	texture_desc.name = "Target Texture";
+	target_tex = prm::get_texture(texture_desc);
 
 	if (load_reference) {
 		// Load the ground truth image
@@ -111,37 +123,39 @@ void RayTracer::init_resources() {
 		if (!data) {
 			LUMEN_ERROR("Could not load the reference image");
 		}
-		auto gt_size = width * height * 4 * sizeof(float);
-		gt_img_buffer.create("Ground Truth Image",
-							 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, gt_size, data, true);
-		desc.gt_img_addr = gt_img_buffer.get_device_address();
+		gt_img_buffer =
+			prm::get_buffer({.name = "Ground Truth Image",
+							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							 .memory_type = vk::BufferType::GPU,
+							 .size = width * height * 4 * sizeof(float),
+							 .data = data});
+		desc.gt_img_addr = gt_img_buffer->get_device_address();
 		free(data);
 	}
 
-	desc.out_img_addr = output_img_buffer.get_device_address();
-	desc.residual_addr = residual_buffer.get_device_address();
-	desc.counter_addr = counter_buffer.get_device_address();
-	desc.rmse_val_addr = rmse_val_buffer.get_device_address();
+	desc.out_img_addr = output_img_buffer->get_device_address();
+	desc.residual_addr = residual_buffer->get_device_address();
+	desc.counter_addr = counter_buffer->get_device_address();
+	desc.rmse_val_addr = rmse_val_buffer->get_device_address();
 
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, &output_img_buffer, VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer, VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, &counter_buffer, VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, &rmse_val_buffer, VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, output_img_buffer, VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, residual_buffer, VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, counter_buffer, VulkanBase::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, rmse_val_buffer, VulkanBase::render_graph());
 }
 
 void RayTracer::cleanup_resources() {
-	std::vector<BufferOld*> buffer_list = {&output_img_buffer, &output_img_buffer_cpu, &residual_buffer,
-										&counter_buffer,	&rmse_val_buffer,		&rt_utils_desc_buffer};
-	std::vector<Texture2D*> tex_list = {&reference_tex, &target_tex};
+	std::vector<vk::Buffer*> buffer_list = {output_img_buffer, output_img_buffer_cpu, residual_buffer,
+											counter_buffer,	   rmse_val_buffer,		  rt_utils_desc_buffer};
+	std::vector<vk::Texture*> tex_list = {reference_tex, target_tex};
 	if (load_reference) {
-		buffer_list.push_back(&gt_img_buffer);
+		buffer_list.push_back(gt_img_buffer);
 	}
-	for (auto b : buffer_list) {
-		b->destroy();
+	for (vk::Buffer* b : buffer_list) {
+		prm::remove(b);
 	}
 	for (auto t : tex_list) {
-		t->destroy();
+		prm::remove(t);
 	}
 }
 
@@ -154,13 +168,13 @@ void RayTracer::update() {
 
 void RayTracer::render(uint32_t i) {
 	integrator->render();
-	Texture2D* input_tex = nullptr;
+	vk::Texture* input_tex = nullptr;
 	if (comparison_mode && img_captured) {
-		input_tex = comparison_img_toggle ? &target_tex : &reference_tex;
+		input_tex = comparison_img_toggle ? target_tex : reference_tex;
 	} else {
-		input_tex = &integrator->output_tex;
+		input_tex = integrator->output_tex;
 	}
-	post_fx.render(*input_tex, VulkanBase::swapchain_images()[i]);
+	post_fx.render(input_tex, VulkanBase::swapchain_images()[i]);
 	render_debug_utils();
 
 	auto cmdbuf = vk::context().command_buffers[i];
@@ -313,10 +327,10 @@ bool RayTracer::gui() {
 		vkDeviceWaitIdle(vk::context().device);
 		integrator->destroy();
 		RenderGraph* rg = VulkanBase::render_graph();
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, &output_img_buffer, rg);
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, &residual_buffer, rg);
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, &counter_buffer, rg);
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, &rmse_val_buffer, rg);
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, output_img_buffer, rg);
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, residual_buffer, rg);
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, counter_buffer, rg);
+		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, rmse_val_buffer, rg);
 
 		auto prev_cam_settings = scene.config->cam_settings;
 
@@ -396,13 +410,13 @@ float RayTracer::draw_frame() {
 
 	if (write_exr) {
 		write_exr = false;
-		save_exr((float*)output_img_buffer_cpu.data, instance->width, instance->height, "out.exr");
+		save_exr((float*)vk::read_buffer(output_img_buffer_cpu), instance->width, instance->height, "out.exr");
 	}
 	bool time_limit = (abs(diff / CLOCKS_PER_SEC - 5)) < 0.1;
 	calc_rmse = time_limit;
 
 	if (calc_rmse && has_gt) {
-		float rmse = *(float*)rmse_val_buffer.data;
+		float rmse = *(float*)vk::read_buffer(rmse_val_buffer);
 		LUMEN_TRACE("RMSE {}", rmse * 1e6);
 		start = now;
 	}

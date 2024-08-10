@@ -3,38 +3,38 @@
 #include "EnumFlags.h"
 #include "VulkanContext.h"
 
-namespace lumen {
-class BufferOld {
-   public:
-	void create(const char* name, VkBufferUsageFlags, VkMemoryPropertyFlags, VkDeviceSize, void* data = nullptr,
-				bool use_staging = false, VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE);
-	void create(VkBufferUsageFlags flags, VkMemoryPropertyFlags mem_property_flags, VkDeviceSize size,
-				void* data = nullptr, bool use_staging = false, VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE);
-	void bind(VkDeviceSize offset = 0);
-	void map(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
-	void unmap();
-	VkDeviceAddress get_device_address();
+// namespace lumen {
+// class BufferOld {
+//    public:
+// 	void create(const char* name, VkBufferUsageFlags, VkMemoryPropertyFlags, VkDeviceSize, void* data = nullptr,
+// 				bool use_staging = false, VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE);
+// 	void create(VkBufferUsageFlags flags, VkMemoryPropertyFlags mem_property_flags, VkDeviceSize size,
+// 				void* data = nullptr, bool use_staging = false, VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE);
+// 	void bind(VkDeviceSize offset = 0);
+// 	void map(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+// 	void unmap();
+// 	VkDeviceAddress get_device_address();
 
-	void flush(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
-	void invalidate(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
-	void copy(BufferOld& dst_buffer, VkCommandBuffer cmdbuf);
-	void destroy();
+// 	void flush(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+// 	void invalidate(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+// 	void copy(BufferOld& dst_buffer, VkCommandBuffer cmdbuf);
+// 	void destroy();
 
-	VkBuffer handle{};
-	VkDeviceMemory buffer_memory = VK_NULL_HANDLE;
-	void* data = nullptr;
-	VkDescriptorBufferInfo descriptor = {};
-	VkDeviceSize size = 0;
-	VkDeviceSize alignment = 0;
-	VkBufferUsageFlags usage_flags = 0;
-	VkMemoryPropertyFlags mem_property_flags = 0;
-	std::string name;
+// 	VkBuffer handle{};
+// 	VkDeviceMemory buffer_memory = VK_NULL_HANDLE;
+// 	void* data = nullptr;
+// 	VkDescriptorBufferInfo descriptor = {};
+// 	VkDeviceSize size = 0;
+// 	VkDeviceSize alignment = 0;
+// 	VkBufferUsageFlags usage_flags = 0;
+// 	VkMemoryPropertyFlags mem_property_flags = 0;
+// 	std::string name;
 
-   private:
-	void prepare_descriptor(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
-};
+//    private:
+// 	void prepare_descriptor(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+// };
 
-}  // namespace lumen
+// }  // namespace lumen
 
 namespace vk {
 
@@ -54,7 +54,7 @@ enum class BufferType { GPU = 1 << 0, GPU_TO_CPU = 1 << 1, CPU_TO_GPU = 1 << 2, 
 DEFINE_ENUM_FLAGS(BufferType)
 
 struct BufferDesc {
-	std::string_view name;
+	std::string_view name = "";
 	VkBufferUsageFlags usage;
 	BufferType memory_type;
 	VkDeviceSize size;
@@ -67,10 +67,17 @@ struct Buffer {
 	VkDeviceSize size = 0;
 	VkBufferUsageFlags usage_flags = 0;
 	VmaAllocation allocation = VK_NULL_HANDLE;
+
+	VkDeviceAddress get_device_address() const {
+		VkBufferDeviceAddressInfo info = {.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = handle};
+		return vkGetBufferDeviceAddress(vk::context().device, &info);
+	}
 };
 
 void create_buffer(Buffer* buffer, const BufferDesc& desc);
-VkDescriptorBufferInfo get_descriptor_buffer_info(const Buffer& buffer);
+VkDescriptorBufferInfo get_buffer_descriptor(const Buffer* buffer);
 void destroy_buffer(Buffer* buffer);
+void write_buffer(Buffer* buffer, void* data, size_t size);
+void* read_buffer(Buffer* buffer);
 
 }  // namespace vk

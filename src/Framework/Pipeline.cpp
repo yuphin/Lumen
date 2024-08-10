@@ -3,7 +3,7 @@
 #include "VkUtils.h"
 
 namespace lumen {
-	
+
 static uint32_t get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types) {
 	uint32_t binding_mask = 0;
 	for (const auto& shader : shaders) {
@@ -33,7 +33,7 @@ void Pipeline::refresh() {
 }
 
 void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const std::vector<uint32_t>& descriptor_counts,
-								   std::vector<Texture2D*> color_outputs, Texture2D* depth_output) {
+								   std::vector<vk::Texture*> color_outputs, vk::Texture* depth_output) {
 	LUMEN_ASSERT(color_outputs.size(), "No color outputs for GFX pipeline");
 	type = PipelineType::GFX;
 	binding_mask = get_bindings_for_shader_set(settings.shaders, descriptor_types);
@@ -138,7 +138,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 	VkFormat depth_format = VK_FORMAT_UNDEFINED;
 	std::vector<VkFormat> output_formats;
 	output_formats.reserve(color_outputs.size());
-	for (Texture2D* color_output : color_outputs) {
+	for (vk::Texture* color_output : color_outputs) {
 		output_formats.push_back(color_output->format);
 	}
 	if (depth_output) {
@@ -176,7 +176,8 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 		vkDestroyShaderModule(vk::context().device, stage.module, nullptr);
 	}
 	if (!name.empty()) {
-		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
+		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)handle, name.c_str(),
+										   VK_OBJECT_TYPE_PIPELINE);
 	}
 }
 
@@ -275,11 +276,13 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 	pipeline_CI.maxPipelineRayRecursionDepth = settings.recursion_depth;
 	pipeline_CI.layout = pipeline_layout;
 	pipeline_CI.flags = 0;
-	vk::check(vkCreateRayTracingPipelinesKHR(vk::context().device, {}, {}, 1, &pipeline_CI, nullptr, &handle), "Failed to create RT pipeline");
+	vk::check(vkCreateRayTracingPipelinesKHR(vk::context().device, {}, {}, 1, &pipeline_CI, nullptr, &handle),
+			  "Failed to create RT pipeline");
 	sbt_wrapper.setup(vk::context().queue_indices.gfx_family.value(), vk::context().rt_props);
 	sbt_wrapper.create(handle, pipeline_CI);
 	if (!name.empty()) {
-		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
+		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)handle, name.c_str(),
+										   VK_OBJECT_TYPE_PIPELINE);
 	}
 	for (auto& stage : stages) {
 		vkDestroyShaderModule(vk::context().device, stage.module, nullptr);
@@ -326,7 +329,8 @@ void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
 	vk::check(vkCreateComputePipelines(vk::context().device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle));
 	vkDestroyShaderModule(vk::context().device, compute_shader_module, nullptr);
 	if (!name.empty()) {
-		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
+		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)handle, name.c_str(),
+										   VK_OBJECT_TYPE_PIPELINE);
 	}
 }
 

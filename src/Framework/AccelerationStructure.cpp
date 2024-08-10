@@ -2,7 +2,8 @@
 #include "LumenPCH.h"
 #include "AccelerationStructure.h"
 #include "VkUtils.h"
-#include "Buffer.h"
+#include "PersistentResourceManager.h"
+#include "DynamicResourceManager.h"
 
 namespace vk {
 struct BuildAccelerationStructure {
@@ -19,22 +20,21 @@ inline static bool has_flag(VkFlags item, VkFlags flag) { return (item & flag) =
 static BVH create_acceleration(VkAccelerationStructureCreateInfoKHR& accel) {
 	BVH result_accel;
 	// Allocating the buffer to hold the acceleration structure
-	lumen::BufferOld accel_buff;
-	accel_buff.create(
-		"Blas Buffer",
-		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, accel.size);
 	// Setting the buffer
-	result_accel.buffer = accel_buff;
-	accel.buffer = result_accel.buffer.handle;
+	result_accel.buffer = prm::get_buffer(
+		{.name = "Blas Buffer",
+		 .usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		 .memory_type = vk::BufferType::GPU,
+		 .size = accel.size});
+	accel.buffer = result_accel.buffer->handle;
 	// Create the acceleration structure
 	vkCreateAccelerationStructureKHR(vk::context().device, &accel, nullptr, &result_accel.accel);
 	return result_accel;
 }
 
 static void cmd_create_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> indices,
-					 std::vector<BuildAccelerationStructure>& buildAs, VkDeviceAddress scratchAddress,
-					 VkQueryPool queryPool) {
+							std::vector<BuildAccelerationStructure>& buildAs, VkDeviceAddress scratchAddress,
+							VkQueryPool queryPool) {
 	if (queryPool)	// For querying the compaction size
 		vkResetQueryPool(vk::context().device, queryPool, 0, static_cast<uint32_t>(indices.size()));
 	uint32_t query_cnt{0};
@@ -98,13 +98,12 @@ static void cmd_compact_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> indic
 	}
 }
 
-static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmdBuf, uint32_t countInstance,
-							lumen::BufferOld& scratchBuffer, VkDeviceAddress instBufferAddr,
-							VkBuildAccelerationStructureFlagsKHR flags, bool update) {
+static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmdBuf, uint32_t countInstance, vk::Buffer** scratch_buffer,
+							VkDeviceAddress inst_buffer_addr, VkBuildAccelerationStructureFlagsKHR flags, bool update) {
 	// Wraps a device pointer to the above uploaded instances.
 	VkAccelerationStructureGeometryInstancesDataKHR instances_vk{
 		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR};
-	instances_vk.data.deviceAddress = instBufferAddr;
+	instances_vk.data.deviceAddress = inst_buffer_addr;
 
 	// Put the above into a VkAccelerationStructureGeometryKHR. We need to put
 	// the instances struct in a union and label it as instance data.
@@ -141,15 +140,16 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmdBuf, uint32_t countIns
 	}
 
 	// Allocate the scratch memory
-	scratchBuffer.create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, size_info.buildScratchSize);
-	VkBufferDeviceAddressInfo bufferInfo{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, scratchBuffer.handle};
-	VkDeviceAddress scratchAddress = vkGetBufferDeviceAddress(vk::context().device, &bufferInfo);
-
+	*scratch_buffer = drm::get({
+		.name = "TLAS Scratch Buffer",
+		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		.memory_type = vk::BufferType::STAGING,
+		.size = size_info.buildScratchSize,
+	});
 	// Update build information
 	build_info.srcAccelerationStructure = update ? tlas.accel : VK_NULL_HANDLE;
 	build_info.dstAccelerationStructure = tlas.accel;
-	build_info.scratchData.deviceAddress = scratchAddress;
+	build_info.scratchData.deviceAddress = (*scratch_buffer)->get_device_address();
 
 	// Build Offsets info: n instances
 	VkAccelerationStructureBuildRangeInfoKHR buildOffsetInfo{countInstance, 0, 0, 0};
@@ -207,11 +207,12 @@ void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
 
 	// Allocate the scratch buffers holding the temporary data of the
 	// acceleration structure builder
-	lumen::BufferOld scratch_buffer;
-	scratch_buffer.create(VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, max_scratch_size);
-	VkBufferDeviceAddressInfo buffer_info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, scratch_buffer.handle};
-	VkDeviceAddress scratchAddress = vkGetBufferDeviceAddress(context().device, &buffer_info);
+	vk::Buffer* scratch_buffer = drm::get({
+		.name = "BLAS Scratch Buffer",
+		.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		.memory_type = vk::BufferType::GPU,
+		.size = max_scratch_size,
+	});
 
 	// Allocate a query pool for storing the needed size for every BLAS
 	// compaction.
@@ -235,7 +236,7 @@ void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
 		// Over the limit or last BLAS element
 		if (batchSize >= batchLimit || idx == nb_blas - 1) {
 			lumen::CommandBuffer cmdBuf(true, 0, QueueType::GFX);
-			cmd_create_blas(cmdBuf.handle, indices, buildAs, scratchAddress, queryPool);
+			cmd_create_blas(cmdBuf.handle, indices, buildAs, scratch_buffer->get_device_address(), queryPool);
 			cmdBuf.submit();
 			if (queryPool) {
 				cmd_compact_blas(cmdBuf.handle, indices, buildAs, queryPool);
@@ -243,7 +244,7 @@ void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
 				// Destroy the non-compacted version
 				for (auto i : indices) {
 					vkDestroyAccelerationStructureKHR(context().device, buildAs[i].cleanup_as.accel, nullptr);
-					buildAs[i].cleanup_as.buffer.destroy();
+					prm::remove(buildAs[i].cleanup_as.buffer);
 				}
 			}
 			// Reset
@@ -267,7 +268,7 @@ void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
 	}
 	// Clean up
 	vkDestroyQueryPool(context().device, queryPool, nullptr);
-	scratch_buffer.destroy();
+	drm::destroy(scratch_buffer);
 }
 
 // Build TLAS from an array of VkAccelerationStructureInstanceKHR
@@ -284,14 +285,14 @@ void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 
 	// Create a buffer holding the actual instance data (matrices++) for use by
 	// the AS builder
-	lumen::BufferOld instances_buf;  // Buffer of instances containing the matrices and
-						   // BLAS ids
-	instances_buf.create(VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-							 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-						 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-						 sizeof(VkAccelerationStructureInstanceKHR) * instances.size(), instances.data(), true);
-	VkBufferDeviceAddressInfo buffer_info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, instances_buf.handle};
-	VkDeviceAddress instBufferAddr = vkGetBufferDeviceAddress(context().device, &buffer_info);
+	vk::Buffer* instances_buf = drm::get({
+		.name = "TLAS Instances Buffer",
+		.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+				 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+		.memory_type = vk::BufferType::GPU,
+		.size = sizeof(VkAccelerationStructureInstanceKHR) * instances.size(),
+		.data = instances.data(),
+	});
 	lumen::CommandBuffer cmd(true, 0, QueueType::GFX);
 	// Make sure the copy of the instance buffer are copied before triggering
 	// the acceleration structure build
@@ -302,14 +303,15 @@ void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 						 VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0,
 						 nullptr);
 
-	lumen::BufferOld scratch_buffer;
+	vk::Buffer* scratch_buffer;
 	// Creating the TLAS
-	cmd_create_tlas(tlas, cmd.handle, count_instance, scratch_buffer, instBufferAddr, flags, update);
+	cmd_create_tlas(tlas, cmd.handle, count_instance, &scratch_buffer, instances_buf->get_device_address(), flags,
+					update);
 
 	// Finalizing and destroying temporary data
 	cmd.submit();
-	instances_buf.destroy();
-	scratch_buffer.destroy();
+	drm::destroy(instances_buf);
+	drm::destroy(scratch_buffer);
 }
 
 }  // namespace vk
