@@ -137,7 +137,7 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 }
 
 VkDeviceAddress SBTWrapper::get_address(GroupType t) {
-	if (!m_buffer[t]->size) {
+	if (!m_buffer[t] || !m_buffer[t]->size) {
 		return 0;
 	}
 	VkBufferDeviceAddressInfo i{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, m_buffer[t]->handle};

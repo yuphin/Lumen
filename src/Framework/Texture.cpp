@@ -358,14 +358,14 @@ void create_texture(Texture* texture, const TextureDesc& desc) {
 	texture->mip_levels =
 		desc.calc_mips ? calc_mip_levels(VkExtent2D(desc.dimensions.width, desc.dimensions.height)) : desc.num_mips;
 	texture->array_layers = desc.array_layers;
+	texture->layout = VK_IMAGE_LAYOUT_UNDEFINED;
 	if (desc.calc_mips) {
 		texture->usage_flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	}
 	VkImageCreateInfo image_ci;
 	if (!desc.image) {
-		image_ci =
-			vk::image(texture->format, texture->usage_flags, texture->extent, desc.image_type, texture->mip_levels,
-					  desc.array_layers, desc.sample_count, desc.tiling, desc.initial_layout);
+		image_ci = vk::image(texture->format, texture->usage_flags, texture->extent, desc.image_type,
+							 texture->mip_levels, desc.array_layers, desc.sample_count, desc.tiling, texture->layout);
 		VmaAllocationCreateInfo alloc_ci = {};
 		alloc_ci.usage = VMA_MEMORY_USAGE_AUTO;
 
@@ -373,6 +373,8 @@ void create_texture(Texture* texture, const TextureDesc& desc) {
 
 		vk::check(vmaCreateImage(vk::context().allocator, &image_ci, &alloc_ci, &texture->handle, &texture->allocation,
 								 &alloc_info));
+	} else {
+		texture->handle = desc.image;
 	}
 
 	if (!texture->name.empty()) {
@@ -403,6 +405,12 @@ void create_texture(Texture* texture, const TextureDesc& desc) {
 		texture->sampler = prm::get_sampler(sampler_CI);
 	}
 
+	VkImageSubresourceRange subresource_range;
+	subresource_range.aspectMask = texture->aspect_flags;
+	subresource_range.baseArrayLayer = 0;
+	subresource_range.layerCount = 1;
+	subresource_range.baseMipLevel = 0;
+	subresource_range.levelCount = texture->mip_levels;
 	if (desc.data.data) {
 		Buffer* staging_buffer = drm::get({.name = "Scratch Buffer",
 										   .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -411,12 +419,6 @@ void create_texture(Texture* texture, const TextureDesc& desc) {
 										   .data = desc.data.data});
 		// Copy from staging buffer to image
 		lumen::CommandBuffer copy_cmd(true);
-		VkImageSubresourceRange subresource_range;
-		subresource_range.aspectMask = texture->aspect_flags;
-		subresource_range.baseArrayLayer = 0;
-		subresource_range.layerCount = 1;
-		subresource_range.baseMipLevel = 0;
-		subresource_range.levelCount = texture->mip_levels;
 
 		VkBufferImageCopy region{};
 		region.bufferOffset = 0;
@@ -439,11 +441,20 @@ void create_texture(Texture* texture, const TextureDesc& desc) {
 		} else {
 			transition_image_layout(copy_cmd.handle, texture->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 									VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresource_range, texture->aspect_flags);
-			texture->layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		}
+		texture->layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		copy_cmd.submit();
 		drm::destroy(staging_buffer);
 	}
+
+	if (desc.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED) {
+		lumen::CommandBuffer cmd(true);
+		transition_image_layout(cmd.handle, texture->handle, texture->layout, desc.initial_layout, subresource_range,
+								texture->aspect_flags);
+		cmd.submit();
+		texture->layout = desc.initial_layout;
+	}
+
 	VkImageViewCreateInfo image_view_ci = vk::image_view(texture->handle, texture->format, texture->aspect_flags,
 														 texture->mip_levels, texture->array_layers);
 	vk::check(vkCreateImageView(vk::context().device, &image_view_ci, nullptr, &texture->view),

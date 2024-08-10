@@ -21,7 +21,7 @@ void PostFX::init(lumen::LumenInstance& instance) {
 	float* data = load_exr(img_name_kernel, width, height);
 	auto img_dims = VkExtent2D{(uint32_t)width, (uint32_t)height};
 	vk::Texture* kernel_org = drm::get({.name = "Kernel",
-												.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+												.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 												.dimensions = {(uint32_t)width, (uint32_t)height, 1},
 												.format = VK_FORMAT_R32G32B32A32_SFLOAT,
 												.data = {.data = data, .size = width * height * 4 * sizeof(float)},

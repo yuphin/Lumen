@@ -52,7 +52,7 @@ class PersistentPool {
 		next_page = (uint8_t*)data_base + PAGE_SIZE;
 	}
 	T* get() {
-		if(!free_list.empty()) {
+		if (!free_list.empty()) {
 			size_t idx = free_list.back();
 			free_list.pop_back();
 			return base_ptr + idx;
@@ -132,10 +132,12 @@ void replace_buffer(vk::Buffer* buffer, const vk::BufferDesc& texture_desc) {
 	buffer = get_buffer(texture_desc);
 }
 void remove(vk::Buffer* buffer) {
+	if (!buffer) return;
 	vk::destroy_buffer(buffer);
 	_buffer_pool.remove(buffer);
 }
 void remove(vk::Texture* texture) {
+	if (!texture) return;
 	vk::destroy_texture(texture);
 	_texture_pool.remove(texture);
 }

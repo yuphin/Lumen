@@ -684,7 +684,7 @@ void LumenScene::add_default_texture() {
 	std::array<uint8_t, 4> nil = {0, 0, 0, 0};
 	scene_textures.resize(1);
 	auto ci = vk::make_img2d_ci(VkExtent2D{1, 1});
-	scene_textures[0] = prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT,
+	scene_textures[0] = prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 										  .dimensions = {1, 1, 1},
 										  .format = VK_FORMAT_R8G8B8A8_SRGB,
 										  .data = {.data = nil.data(), .size = 4},
