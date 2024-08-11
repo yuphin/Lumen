@@ -191,6 +191,7 @@ void cleanup() {
 		vkDestroyCommandPool(vk::context().device, pool, nullptr);
 	}
 	vkDestroySurfaceKHR(vk::context().instance, vk::context().surface, nullptr);
+	prm::destroy();
 	vmaDestroyAllocator(vk::context().allocator);
 
 	vkDestroyDevice(vk::context().device, nullptr);

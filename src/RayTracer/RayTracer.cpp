@@ -71,8 +71,6 @@ void RayTracer::init(Window* window) {
 }
 
 void RayTracer::init_resources() {
-	RTUtilsDesc desc;
-
 	output_img_buffer =
 		prm::get_buffer({.name = "Output Image Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
@@ -116,6 +114,7 @@ void RayTracer::init_resources() {
 	texture_desc.name = "Target Texture";
 	target_tex = prm::get_texture(texture_desc);
 
+	RTUtilsDesc rt_utils_desc;
 	if (load_reference) {
 		// Load the ground truth image
 		int width, height;
@@ -129,14 +128,21 @@ void RayTracer::init_resources() {
 							 .memory_type = vk::BufferType::GPU,
 							 .size = width * height * 4 * sizeof(float),
 							 .data = data});
-		desc.gt_img_addr = gt_img_buffer->get_device_address();
+		rt_utils_desc.gt_img_addr = gt_img_buffer->get_device_address();
 		free(data);
 	}
 
-	desc.out_img_addr = output_img_buffer->get_device_address();
-	desc.residual_addr = residual_buffer->get_device_address();
-	desc.counter_addr = counter_buffer->get_device_address();
-	desc.rmse_val_addr = rmse_val_buffer->get_device_address();
+	rt_utils_desc.out_img_addr = output_img_buffer->get_device_address();
+	rt_utils_desc.residual_addr = residual_buffer->get_device_address();
+	rt_utils_desc.counter_addr = counter_buffer->get_device_address();
+	rt_utils_desc.rmse_val_addr = rmse_val_buffer->get_device_address();
+
+	rt_utils_desc_buffer =
+		prm::get_buffer({.name = "RT Utils Desc",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = sizeof(RTUtilsDesc),
+						 .data = &rt_utils_desc});
 
 	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, output_img_buffer, VulkanBase::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, residual_buffer, VulkanBase::render_graph());
@@ -164,6 +170,12 @@ void RayTracer::update() {
 	cpu_avg_time = (1.0f - 1.0f / (cnt)) * cpu_avg_time + frame_time / (float)cnt;
 	cpu_avg_time = 0.95f * cpu_avg_time + 0.05f * frame_time;
 	integrator->update();
+#if 0
+	char* stats = nullptr;
+	vmaBuildStatsString(vk::context().allocator, &stats, VK_TRUE);
+	printf("Stats--\n");
+	LUMEN_TRACE("{}", stats);
+#endif
 }
 
 void RayTracer::render(uint32_t i) {

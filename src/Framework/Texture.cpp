@@ -464,6 +464,7 @@ void destroy_texture(Texture* texture) {
 	if (texture->allocation) {
 		vmaDestroyImage(vk::context().allocator, texture->handle, texture->allocation);
 	}
+	vkDestroyImageView(vk::context().device, texture->view, nullptr);
 }
 
 VkDescriptorImageInfo get_texture_descriptor(const Texture* tex, VkSampler sampler, VkImageLayout layout) {

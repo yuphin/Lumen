@@ -110,6 +110,8 @@ VkSampler get_sampler(const VkSamplerCreateInfo& sampler_create_info) {
 	}
 	vk::check(vkCreateSampler(vk::context().device, &sampler_create_info, nullptr, &result.first->second),
 			  "Could not create a sampler");
+	vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)result.first->second, "Sampler",
+									   VK_OBJECT_TYPE_SAMPLER);
 	return result.first->second;
 }
 vk::Texture* get_texture(const vk::TextureDesc& texture_desc) {
@@ -140,5 +142,14 @@ void remove(vk::Texture* texture) {
 	if (!texture) return;
 	vk::destroy_texture(texture);
 	_texture_pool.remove(texture);
+}
+
+void destroy() {
+	_buffer_pool.destroy();
+	_texture_pool.destroy();
+	for (auto& [_, sampler] : _sampler_cache) {
+		vkDestroySampler(vk::context().device, sampler, nullptr);
+	}
+	_sampler_cache.clear();
 }
 }  // namespace prm

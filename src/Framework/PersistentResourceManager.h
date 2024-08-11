@@ -13,4 +13,5 @@ void replace_buffer(vk::Buffer* buffer, const vk::BufferDesc& texture_desc);
 
 void remove(vk::Buffer* buffer);
 void remove(vk::Texture* texture);
+void destroy();
 }
