@@ -125,14 +125,6 @@ vk::Buffer* get_buffer(const vk::BufferDesc& texture_desc) {
 	return buffer;
 }
 
-void replace_texture(vk::Texture* texture, const vk::TextureDesc& texture_desc) {
-	vk::destroy_texture(texture);
-	texture = get_texture(texture_desc);
-}
-void replace_buffer(vk::Buffer* buffer, const vk::BufferDesc& texture_desc) {
-	vk::destroy_buffer(buffer);
-	buffer = get_buffer(texture_desc);
-}
 void remove(vk::Buffer* buffer) {
 	if (!buffer) return;
 	vk::destroy_buffer(buffer);

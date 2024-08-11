@@ -381,8 +381,8 @@ bool ReSTIRPT::gui() {
 
 	if (spatial_samples_changed && num_spatial_samples > 0) {
 		vkDeviceWaitIdle(vk::context().device);
-		prm::replace_buffer(
-			reconnection_buffer,
+		prm::remove(reconnection_buffer);
+		reconnection_buffer = prm::get_buffer(
 			{.name = "Reservoir Connection",
 			 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 					  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
