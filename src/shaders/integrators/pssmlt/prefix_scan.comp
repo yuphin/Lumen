@@ -31,6 +31,9 @@ BlockSums block_sums = BlockSums(pc.block_sum_addr);
 #define CONFLICT_FREE_OFFSET(index) ((index) >> LOG_NUM_BANKS)
 shared float s_data[2048 + 64];
 void main() {
+    if(gl_GlobalInvocationID.x >= pc.num_elems) {
+        return;
+    }
     uint tid, ai, bi, mem_ai, mem_bi, bank_offset_a, bank_offset_b;
     // Load data into shared memory
     tid = gl_LocalInvocationID.x;

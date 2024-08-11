@@ -4,7 +4,13 @@
 PrimarySample get_primary_sample(uint i) {
     if(mlt_sampler.type == 0) {
         return light_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i];
-    } else {
+    } 
+#if BDPT_MLT == 1
+	else if (mlt_sampler.type == 2) {
+		return connection_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i];
+	}
+#endif
+	else {
         return cam_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i];
     }
 }
@@ -101,7 +107,13 @@ float mlt_rand(inout uvec4 seed, bool large_step) {
 
 	if (mlt_sampler_type == 0) {
 		light_primary_samples.d[prim_sample_idxs[mlt_sampler_type] + cnt] = primary_sample;
-	} else {
+	} 
+#if BDPT_MLT == 1
+	else if (mlt_sampler_type == 2) {
+		connection_primary_samples.d[prim_sample_idxs[mlt_sampler_type] + cnt] = primary_sample;
+	}
+#endif
+	else {
 		cam_primary_samples.d[prim_sample_idxs[mlt_sampler_type] + cnt] = primary_sample;
 	}
 	return primary_sample.val;
