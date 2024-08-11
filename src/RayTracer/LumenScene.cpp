@@ -193,7 +193,7 @@ void LumenScene::load_scene(const std::string& path) {
 		for (const auto& texture_path : textures) {
 			int x, y, n;
 			unsigned char* data = stbi_load(texture_path.c_str(), &x, &y, &n, 4);
-			scene_textures[i] = prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT,
+			scene_textures[i] = prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 												  .dimensions = {(uint32_t)x, (uint32_t)y, 1},
 												  .format = VK_FORMAT_R8G8B8A8_SRGB,
 												  .data = {.data = data, .size = size_t(x * y * 4)},

@@ -190,7 +190,7 @@ bool SPPM::update() {
 void SPPM::destroy() {
 	Integrator::destroy();
 	auto buffer_list = {sppm_data_buffer, atomic_data_buffer, photon_buffer, residual_buffer,
-						counter_buffer,	  hash_buffer,		  tmp_col_buffer};
+						counter_buffer};
 	for (vk::Buffer* b : buffer_list) {
 		prm::remove(b);
 	}

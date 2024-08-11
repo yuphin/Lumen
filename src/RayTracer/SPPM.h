@@ -21,8 +21,5 @@ class SPPM : public Integrator {
 	vk::Buffer* photon_buffer;
 	vk::Buffer* residual_buffer;
 	vk::Buffer* counter_buffer;
-	vk::Buffer* hash_buffer;
-	vk::Buffer* tmp_col_buffer;
-
 	SPPMConfig* config;
 };
