@@ -1,5 +1,14 @@
 #ifndef MLT_COMMONS
 #define MLT_COMMONS
+#define mlt_sampler mlt_samplers.d[mlt_sampler_idx]
+PrimarySample get_primary_sample(uint i) {
+    if(mlt_sampler.type == 0) {
+        return light_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i];
+    } else {
+        return cam_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i];
+    }
+}
+
 uint mlt_get_next() {
 	uint cnt;
 	if (mlt_sampler.type == 0) {

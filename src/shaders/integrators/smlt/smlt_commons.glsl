@@ -70,14 +70,7 @@ uint prim_sample_idxs[2] =
 
 PathCnt light_path_cnts = PathCnt(scene_desc.path_cnt_addr);
 
-#define mlt_sampler mlt_samplers.d[mlt_sampler_idx]
-PrimarySample get_primary_sample(uint i) {
-    if(mlt_sampler.type == 0) {
-        return light_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i];
-    } else {
-        return cam_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i];
-    }
-}
+
 
 
 bool large_step, save_radiance;
