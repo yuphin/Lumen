@@ -63,6 +63,7 @@ void RayTracer::init(Window* window) {
 	VulkanBase::render_graph()->settings.use_events = use_events;
 
 	scene.load_scene(scene_name);
+	create_accel();
 	create_integrator(int(scene.config->integrator_type));
 	integrator->init();
 	post_fx.init(*instance);
@@ -163,6 +164,18 @@ void RayTracer::cleanup_resources() {
 	for (auto t : tex_list) {
 		prm::remove(t);
 	}
+
+	if (tlas.accel) {
+		prm::remove(tlas.buffer);
+		vkDestroyAccelerationStructureKHR(vk::context().device, tlas.accel, nullptr);
+	}
+	if (!blases.empty()) {
+		for (auto& b : blases) {
+			prm::remove(b.buffer);
+			vkDestroyAccelerationStructureKHR(vk::context().device, b.accel, nullptr);
+		}
+	}
+	blases.clear();
 }
 
 void RayTracer::update() {
@@ -243,37 +256,37 @@ void RayTracer::render_debug_utils() {
 void RayTracer::create_integrator(int integrator_idx) {
 	switch (integrator_idx) {
 		case int(IntegratorType::Path):
-			integrator = std::make_unique<Path>(this, &scene);
+			integrator = std::make_unique<Path>(this, &scene, tlas);
 			break;
 		case int(IntegratorType::BDPT):
-			integrator = std::make_unique<BDPT>(this, &scene);
+			integrator = std::make_unique<BDPT>(this, &scene, tlas);
 			break;
 		case int(IntegratorType::SPPM):
-			integrator = std::make_unique<SPPM>(this, &scene);
+			integrator = std::make_unique<SPPM>(this, &scene, tlas);
 			break;
 		case int(IntegratorType::VCM):
-			integrator = std::make_unique<VCM>(this, &scene);
+			integrator = std::make_unique<VCM>(this, &scene, tlas);
 			break;
 		case int(IntegratorType::ReSTIR):
-			integrator = std::make_unique<ReSTIR>(this, &scene);
+			integrator = std::make_unique<ReSTIR>(this, &scene, tlas);
 			break;
 		case int(IntegratorType::ReSTIRGI):
-			integrator = std::make_unique<ReSTIRGI>(this, &scene);
+			integrator = std::make_unique<ReSTIRGI>(this, &scene, tlas);
 			break;
 		case int(IntegratorType::ReSTIRPT):
-			integrator = std::make_unique<ReSTIRPT>(this, &scene);
+			integrator = std::make_unique<ReSTIRPT>(this, &scene, tlas);
 			break;
 		case int(IntegratorType::PSSMLT):
-			integrator = std::make_unique<PSSMLT>(this, &scene);
+			integrator = std::make_unique<PSSMLT>(this, &scene, tlas);
 			break;
 		case int(IntegratorType::SMLT):
-			integrator = std::make_unique<SMLT>(this, &scene);
+			integrator = std::make_unique<SMLT>(this, &scene, tlas);
 			break;
 		case int(IntegratorType::VCMMLT):
-			integrator = std::make_unique<VCMMLT>(this, &scene);
+			integrator = std::make_unique<VCMMLT>(this, &scene, tlas);
 			break;
 		case int(IntegratorType::DDGI):
-			integrator = std::make_unique<DDGI>(this, &scene);
+			integrator = std::make_unique<DDGI>(this, &scene, tlas);
 			break;
 		default:
 			break;
@@ -361,6 +374,34 @@ bool RayTracer::gui() {
 	}
 
 	return updated;
+}
+
+void RayTracer::create_accel() {
+	std::vector<vk::BlasInput> blas_inputs;
+
+	VkDeviceAddress vertex_address = scene.vertex_buffer->get_device_address();
+	VkDeviceAddress idx_address = scene.index_buffer->get_device_address();
+	for (auto& prim_mesh : scene.prim_meshes) {
+		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh, vertex_address, idx_address);
+		blas_inputs.push_back({geo});
+	}
+	vk::build_blas(blases, blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+
+	const auto& indices = scene.indices;
+	const auto& vertices = scene.positions;
+	std::vector<VkAccelerationStructureInstanceKHR> tlas_instances;
+	for (const auto& pm : scene.prim_meshes) {
+		VkAccelerationStructureInstanceKHR ray_inst{};
+		ray_inst.transform = vk::to_vk_matrix(pm.world_matrix);
+		ray_inst.instanceCustomIndex = pm.prim_idx;
+		assert(pm.prim_idx < blases.size());
+		ray_inst.accelerationStructureReference = blases[pm.prim_idx].get_blas_device_address();
+		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+		ray_inst.mask = 0xFF;
+		ray_inst.instanceShaderBindingTableRecordOffset = 0;  // We will use the same hit group for all objects
+		tlas_instances.emplace_back(ray_inst);
+	}
+	vk::build_tlas(tlas, tlas_instances, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 float RayTracer::draw_frame() {

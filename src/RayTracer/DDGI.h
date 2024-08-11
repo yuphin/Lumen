@@ -3,8 +3,8 @@
 #include "shaders/integrators/ddgi/ddgi_commons.h"
 class DDGI : public Integrator {
    public:
-	DDGI(lumen::LumenInstance* scene, LumenScene* lumen_scene)
-		: Integrator(scene, lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), DDGIConfig)) {}
+	DDGI(lumen::LumenInstance* scene, LumenScene* lumen_scene, const vk::BVH& tlas)
+		: Integrator(scene, lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), DDGIConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;

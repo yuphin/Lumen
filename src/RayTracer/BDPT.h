@@ -4,8 +4,8 @@
 
 class BDPT : public Integrator {
    public:
-	BDPT(lumen::LumenInstance* scene, LumenScene* lumen_scene)
-		: Integrator(scene, lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), BDPTConfig)) {}
+	BDPT(lumen::LumenInstance* scene, LumenScene* lumen_scene, const vk::BVH& tlas)
+		: Integrator(scene, lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), BDPTConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
