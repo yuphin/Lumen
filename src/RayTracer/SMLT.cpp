@@ -309,6 +309,7 @@ void SMLT::render() {
 	prefix_scan(0, config->num_bootstrap_samples, counter, rg);
 	// Calculate CDF
 	rg->add_compute("Calculate CDF", {.shader = lumen::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
+									  .specialization_data = {(uint32_t)num_bootstrap_samples},
 									  .dims = {(uint32_t)std::ceil(num_bootstrap_samples / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer);
@@ -349,6 +350,7 @@ void SMLT::render() {
 #endif
 	// Select seeds
 	rg->add_compute("Select Seeds", {.shader = lumen::Shader("src/shaders/integrators/pssmlt/select_seeds.comp"),
+									 .specialization_data = {(uint32_t)num_mlt_threads},
 									 .dims = {(uint32_t)std::ceil(num_mlt_threads / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer);

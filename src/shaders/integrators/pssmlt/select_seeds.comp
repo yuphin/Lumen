@@ -15,6 +15,7 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BootstrapDat
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SeedsData { SeedData d[]; };
 layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDF { float d[]; };
+layout(constant_id = 0) const int NUM_MLT_THREADS = 0;
 BootstrapData bootstrap_data = BootstrapData(scene_desc.bootstrap_addr);
 SeedsData seeds_data = SeedsData(scene_desc.seeds_addr);
 CDF cdf_data = CDF(scene_desc.cdf_addr);
@@ -49,6 +50,9 @@ uint binary_search_cdf(float random_float) {
 }
 void main() {
     uint idx = gl_GlobalInvocationID.x;
+    if(idx >= NUM_MLT_THREADS) {
+        return;
+    }
     float random_float = rand(seed);
     uint lum_idx = binary_search_cdf(random_float);
     seeds_data.d[idx].chain_seed = bootstrap_data.d[lum_idx].seed;

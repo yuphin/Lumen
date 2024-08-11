@@ -58,8 +58,8 @@ class PersistentPool {
 			return base_ptr + idx;
 		}
 		T* result = data_base;
-		page_current = data_base++;
-		while (page_current >= next_page) {
+		page_current = ++data_base;
+		while((uint8_t*)next_page - (uint8_t*)page_current < sizeof(T)) {
 #if defined(_WIN32) || defined(_WIN64)
 			data_base = (T*)VirtualAlloc(next_page, PAGE_SIZE, MEM_COMMIT, PAGE_READWRITE);
 			next_page = (uint8_t*)data_base + PAGE_SIZE;

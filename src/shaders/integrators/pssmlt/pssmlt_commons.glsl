@@ -61,8 +61,15 @@ uint prim_sample_idxs[3] =
            connection_primary_sample_idx);
 
 #define mlt_sampler mlt_samplers.d[mlt_sampler_idx]
-#define primary_sample(i)                                                      \
-    prim_samples[mlt_sampler.type].d[prim_sample_idxs[mlt_sampler.type] + i]
+// #define primary_sample(i)                                                      \
+//     prim_samples[mlt_sampler.type].d[prim_sample_idxs[mlt_sampler.type] + i]
+PrimarySample get_primary_sample(uint i) {
+    if(mlt_sampler.type == 0) {
+        return light_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i];
+    } else {
+        return cam_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i];
+    }
+}
 
 #define BDPT_MLT 1
 bool large_step, save_radiance;

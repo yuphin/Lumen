@@ -23,6 +23,9 @@ CDFSum cdf_sum = CDFSum(scene_desc.cdf_sum_addr);
 void main() {
     ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.size_y,
                          gl_GlobalInvocationID.x % pc.size_y);
+    if(coords.x >= pc.size_x || coords.y >= pc.size_y) {
+        return;
+    }
     vec3 col = vec3(0);
     col += mlt_col.d[gl_GlobalInvocationID.x] * cdf_sum.d / pc.mutations_per_pixel;
     if(isnan(luminance(col))) {

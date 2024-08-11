@@ -16,10 +16,14 @@ layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BootstrapData { BootstrapSample d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDFSum { float d; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDF { float d[]; };
+layout(constant_id = 0) const int NUM_BOOSTRAP_SAMPLES = 0;
 CDFSum cdf_sum = CDFSum(scene_desc.cdf_sum_addr);
 CDF cdf_data = CDF(scene_desc.cdf_addr);
 void main() {
     uint idx = gl_GlobalInvocationID.x;
+    if(idx >= NUM_BOOSTRAP_SAMPLES) {
+        return;
+    }
     if (idx == 0) {
         cdf_sum.d = cdf_data.d[pc.num_bootstrap_samples - 1];
     }
