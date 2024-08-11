@@ -44,6 +44,7 @@ void create_buffer(Buffer* buffer, const BufferDesc& desc);
 VkDescriptorBufferInfo get_buffer_descriptor(const Buffer* buffer);
 void destroy_buffer(Buffer* buffer);
 void write_buffer(Buffer* buffer, void* data, size_t size);
-void* read_buffer(Buffer* buffer);
+void* map_buffer(Buffer* buffer);
+void unmap_buffer(Buffer* buffer);
 
 }  // namespace vk

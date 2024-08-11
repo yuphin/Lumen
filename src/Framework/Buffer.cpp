@@ -82,13 +82,16 @@ void write_buffer(Buffer* buffer, void* data, size_t size) {
 	vmaFlushAllocation(vk::context().allocator, buffer->allocation, 0, size);
 }
 
-void* read_buffer(Buffer* buffer) {
+void* map_buffer(Buffer* buffer) {
 	VkMemoryPropertyFlags mem_prop_flags;
 	vmaGetAllocationMemoryProperties(vk::context().allocator, buffer->allocation, &mem_prop_flags);
 	LUMEN_ASSERT((mem_prop_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0, "Buffer is not host visible");
 	void* memory;
 	vmaMapMemory(vk::context().allocator, buffer->allocation, &memory);
 	return memory;
+}
+void unmap_buffer(Buffer* buffer)  {
+	vmaUnmapMemory(vk::context().allocator, buffer->allocation);
 }
 
 }  // namespace vk
