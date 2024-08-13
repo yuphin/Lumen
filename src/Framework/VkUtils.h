@@ -24,7 +24,7 @@ inline VkTransformMatrixKHR to_vk_matrix(const glm::mat4& mat) {
 	return out_matrix;
 }
 
-VkPipelineStageFlags get_pipeline_stage(lumen::PassType pass_type, VkAccessFlags access_flags);
+VkPipelineStageFlags get_pipeline_stage(vk::PassType pass_type, VkAccessFlags access_flags);
 VkImageLayout get_image_layout(VkDescriptorType type);
 
 inline VkBufferMemoryBarrier buffer_barrier(VkBuffer buffer, VkAccessFlags src_accesss, VkAccessFlags dst_access) {
@@ -132,7 +132,7 @@ inline uint32_t calc_mip_levels(VkExtent2D extent) {
 VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format = VK_FORMAT_R8G8B8A8_UNORM,
 								VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT, bool mipmaps = false);
 
-uint32_t get_bindings_for_shader_set(const std::vector<lumen::Shader>& shaders, VkDescriptorType* descriptor_types);
+uint32_t get_bindings_for_shader_set(const std::vector<vk::Shader>& shaders, VkDescriptorType* descriptor_types);
 
 VkImageLayout get_target_img_layout(const vk::Texture* tex, VkAccessFlags access_flags);
 

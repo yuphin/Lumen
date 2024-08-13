@@ -3,9 +3,7 @@
 #include <volk/volk.h>
 #include "RenderGraph.h"
 
-namespace lumen {
-
-namespace VulkanBase {
+namespace vk {
 
 void init_imgui();
 void init(bool validation_layers);
@@ -14,11 +12,11 @@ void cleanup_swapchain();
 void recreate_swap_chain();
 void add_device_extension(const char* name);
 
-std::vector<vk::Texture*>& swapchain_images();
+std::vector<Texture*>& swapchain_images();
 uint32_t prepare_frame();
 VkResult submit_frame(uint32_t image_idx);
 
-RenderGraph* render_graph();
+lumen::RenderGraph* render_graph();
 
 struct SwapChainSupportDetails {
 	VkSurfaceCapabilitiesKHR capabilities = {};
@@ -27,7 +25,7 @@ struct SwapChainSupportDetails {
 };
 bool check_validation_layer_support();
 std::vector<const char*> get_req_extensions();
-vk::QueueFamilyIndices find_queue_families(VkPhysicalDevice device);
+QueueFamilyIndices find_queue_families(VkPhysicalDevice device);
 VkResult vkExt_create_debug_messenger(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
 									  const VkAllocationCallbacks* pAllocator,
 									  VkDebugUtilsMessengerEXT* pDebugMessenger);
@@ -39,6 +37,4 @@ SwapChainSupportDetails query_swapchain_support(VkPhysicalDevice device);
 
 void cleanup_app_data();
 void cleanup();
-};	// namespace VulkanBase
-
-}  // namespace lumen
+};	// namespace vk

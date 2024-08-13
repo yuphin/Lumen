@@ -2,7 +2,7 @@
 #include "Pipeline.h"
 #include "VkUtils.h"
 
-namespace lumen {
+namespace vk {
 
 static uint32_t get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types) {
 	uint32_t binding_mask = 0;
@@ -539,4 +539,4 @@ void Pipeline::create_update_template(const std::vector<Shader>& shaders,
 	template_create_info.pipelineLayout = pipeline_layout;
 	vk::check(vkCreateDescriptorUpdateTemplate(vk::context().device, &template_create_info, nullptr, &update_template));
 }
-}  // namespace lumen
+}  // namespace vk

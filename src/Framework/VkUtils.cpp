@@ -248,16 +248,16 @@ BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertexAddress, VkD
 	return input;
 }
 
-VkPipelineStageFlags get_pipeline_stage(lumen::PassType pass_type, VkAccessFlags access_flags) {
+VkPipelineStageFlags get_pipeline_stage(vk::PassType pass_type, VkAccessFlags access_flags) {
 	VkPipelineStageFlags res = 0;
 	switch (pass_type) {
-		case lumen::PassType::Compute:
+		case vk::PassType::Compute:
 			res = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 			break;
-		case lumen::PassType::Graphics:
+		case vk::PassType::Graphics:
 			res = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
 			break;
-		case lumen::PassType::RT:
+		case vk::PassType::RT:
 			res = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
 			break;
 		default:

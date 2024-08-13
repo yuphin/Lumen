@@ -43,19 +43,19 @@ void BDPT::init() {
 
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
-	assert(lumen::VulkanBase::render_graph()->settings.shader_inference == true);
+	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
-								 lumen::VulkanBase::render_graph());
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_path_addr, light_path_buffer,
-								 lumen::VulkanBase::render_graph());
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, camera_path_addr, camera_path_buffer,
-								 lumen::VulkanBase::render_graph());
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, color_storage_buffer,
-								 lumen::VulkanBase::render_graph());
+								 vk::render_graph());
 }
 
 void BDPT::render() {
-	lumen::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = lumen_scene->config->path_length;
@@ -63,7 +63,7 @@ void BDPT::render() {
 	pc_ray.total_light_area = lumen_scene->total_light_area;
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.frame_num = frame_num;
-	lumen::VulkanBase::render_graph()
+	vk::render_graph()
 		->add_rt("BDPT",
 				 {
 
@@ -90,7 +90,7 @@ void BDPT::render() {
 		.bind_tlas(tlas);
 	//.finalize();
 
-	lumen::VulkanBase::render_graph()->run_and_submit(cmd);
+	vk::render_graph()->run_and_submit(cmd);
 }
 
 bool BDPT::update() {

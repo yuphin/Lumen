@@ -48,15 +48,15 @@ void PostFX::init(lumen::LumenInstance& instance) {
 	empty_tex_desc.name = "Kernel - Pong";
 	kernel_pong = prm::get_texture(empty_tex_desc);
 
-	lumen::CommandBuffer cmd(true);
+	vk::CommandBuffer cmd(true);
 
 	// Copy the original kernel image to the padded texture
 	uint32_t pad_width = (kernel_org->extent.width + 31) / 32;
 	uint32_t pad_height = (kernel_org->extent.height + 31) / 32;
 
-	lumen::RenderGraph* rg = lumen::VulkanBase::render_graph();
+	lumen::RenderGraph* rg = vk::render_graph();
 	rg->add_compute("Pad Kernel",
-					{.shader = lumen::Shader("src/shaders/bloom/pad.comp"), .dims = {pad_width, pad_height, 1}})
+					{.shader = vk::Shader("src/shaders/bloom/pad.comp"), .dims = {pad_width, pad_height, 1}})
 		.bind_texture_with_sampler(kernel_org, img_sampler)
 		.bind(kernel_ping);
 
@@ -69,20 +69,20 @@ void PostFX::init(lumen::LumenInstance& instance) {
 
 	const int RADIX_X = (31 - std::countl_zero(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
 	const int RADIX_Y = (31 - std::countl_zero(fft_ping_padded->extent.height)) % 2 ? 2 : 4;
-	const std::vector<lumen::ShaderMacro> macros_x =
-		RADIX_X == 2 ? std::vector<lumen::ShaderMacro>{{"KERNEL_GENERATION"}}
-					 : std::vector<lumen::ShaderMacro>{{"KERNEL_GENERATION"}, {"RADIX", RADIX_X}};
-	const std::vector<lumen::ShaderMacro> macros_y =
-		RADIX_Y == 2 ? std::vector<lumen::ShaderMacro>{{"KERNEL_GENERATION"}}
-					 : std::vector<lumen::ShaderMacro>{{"KERNEL_GENERATION"}, {"RADIX", RADIX_Y}};
-	rg->add_compute("FFT - Horizontal", {.shader = lumen::Shader("src/shaders/bloom/fft.comp"),
+	const std::vector<vk::ShaderMacro> macros_x =
+		RADIX_X == 2 ? std::vector<vk::ShaderMacro>{{"KERNEL_GENERATION"}}
+					 : std::vector<vk::ShaderMacro>{{"KERNEL_GENERATION"}, {"RADIX", RADIX_X}};
+	const std::vector<vk::ShaderMacro> macros_y =
+		RADIX_Y == 2 ? std::vector<vk::ShaderMacro>{{"KERNEL_GENERATION"}}
+					 : std::vector<vk::ShaderMacro>{{"KERNEL_GENERATION"}, {"RADIX", RADIX_Y}};
+	rg->add_compute("FFT - Horizontal", {.shader = vk::Shader("src/shaders/bloom/fft.comp"),
 										 .macros = macros_x,
 										 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 0},
 										 .dims = {dim_y, 1, 1}})
 		.bind_texture_with_sampler(kernel_ping, img_sampler)
 		.bind(kernel_pong);
 	vertical = true;
-	rg->add_compute("FFT - Vertical", {.shader = lumen::Shader("src/shaders/bloom/fft.comp"),
+	rg->add_compute("FFT - Vertical", {.shader = vk::Shader("src/shaders/bloom/fft.comp"),
 									   .macros = macros_y,
 									   .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 0},
 									   .dims = {dim_x, 1, 1}})
@@ -93,14 +93,14 @@ void PostFX::init(lumen::LumenInstance& instance) {
 }
 
 void PostFX::render(vk::Texture* input, vk::Texture* output) {
-	lumen::RenderGraph* rg = lumen::VulkanBase::render_graph();
+	lumen::RenderGraph* rg = vk::render_graph();
 	// Copy the original image to the padded texture
 	if (enable_bloom) {
 		uint32_t pad_width = (fft_ping_padded->extent.width + 31) / 32;
 		uint32_t pad_height = (fft_ping_padded->extent.height + 31) / 32;
 
 		rg->add_compute("Pad Image",
-						{.shader = lumen::Shader("src/shaders/bloom/pad.comp"), .dims = {pad_width, pad_height, 1}})
+						{.shader = vk::Shader("src/shaders/bloom/pad.comp"), .dims = {pad_width, pad_height, 1}})
 			.bind_texture_with_sampler(input, img_sampler)
 			.bind(fft_ping_padded);
 		uint32_t wg_size_x = fft_ping_padded->extent.width;
@@ -112,11 +112,11 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 		bool vertical = false;
 		const int RADIX_X = (31 - std::countl_zero(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
 		const int RADIX_Y = (31 - std::countl_zero(fft_ping_padded->extent.height)) % 2 ? 2 : 4;
-		const std::vector<lumen::ShaderMacro> macros_x =
-			RADIX_X == 2 ? std::vector<lumen::ShaderMacro>{} : std::vector<lumen::ShaderMacro>{{"RADIX", RADIX_X}};
-		const std::vector<lumen::ShaderMacro> macros_y =
-			RADIX_Y == 2 ? std::vector<lumen::ShaderMacro>{} : std::vector<lumen::ShaderMacro>{{"RADIX", RADIX_Y}};
-		rg->add_compute("FFT - Horizontal", {.shader = lumen::Shader("src/shaders/bloom/fft.comp"),
+		const std::vector<vk::ShaderMacro> macros_x =
+			RADIX_X == 2 ? std::vector<vk::ShaderMacro>{} : std::vector<vk::ShaderMacro>{{"RADIX", RADIX_X}};
+		const std::vector<vk::ShaderMacro> macros_y =
+			RADIX_Y == 2 ? std::vector<vk::ShaderMacro>{} : std::vector<vk::ShaderMacro>{{"RADIX", RADIX_Y}};
+		rg->add_compute("FFT - Horizontal", {.shader = vk::Shader("src/shaders/bloom/fft.comp"),
 											 .macros = macros_x,
 											 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 0},
 											 .dims = {dim_y, 1, 1}})
@@ -124,7 +124,7 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 			.bind(fft_pong_padded)
 			.bind_texture_with_sampler(kernel_pong, img_sampler);
 		vertical = true;
-		rg->add_compute("FFT - Vertical", {.shader = lumen::Shader("src/shaders/bloom/fft.comp"),
+		rg->add_compute("FFT - Vertical", {.shader = vk::Shader("src/shaders/bloom/fft.comp"),
 										   .macros = macros_y,
 										   .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 0},
 										   .dims = {dim_x, 1, 1}})
@@ -132,7 +132,7 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 			.bind(fft_pong_padded)
 			.bind_texture_with_sampler(kernel_pong, img_sampler);
 		rg->add_compute("FFT - Vertical - Inverse",
-						{.shader = lumen::Shader("src/shaders/bloom/fft.comp"),
+						{.shader = vk::Shader("src/shaders/bloom/fft.comp"),
 						 .macros = macros_y,
 						 .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 1},
 						 .dims = {dim_x, 1, 1}})
@@ -141,7 +141,7 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 			.bind_texture_with_sampler(kernel_pong, img_sampler);
 		vertical = false;
 		rg->add_compute("FFT - Horizontal - Inverse",
-						{.shader = lumen::Shader("src/shaders/bloom/fft.comp"),
+						{.shader = vk::Shader("src/shaders/bloom/fft.comp"),
 						 .macros = macros_x,
 						 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 1},
 						 .dims = {dim_y, 1, 1}})

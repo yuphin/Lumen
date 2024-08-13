@@ -202,18 +202,18 @@ void LumenScene::load_scene(const std::string& path) {
 			i++;
 		}
 	}
-	lumen::VulkanBase::render_graph()->global_macro_defines.push_back(
-		lumen::ShaderMacro("ENABLE_DIFFUSE", has_bsdf_type(BSDF_TYPE_DIFFUSE), /* visible = */ false));
-	lumen::VulkanBase::render_graph()->global_macro_defines.push_back(
-		lumen::ShaderMacro("ENABLE_MIRROR", has_bsdf_type(BSDF_TYPE_MIRROR), /* visible = */ false));
-	lumen::VulkanBase::render_graph()->global_macro_defines.push_back(
-		lumen::ShaderMacro("ENABLE_GLASS", has_bsdf_type(BSDF_TYPE_GLASS), /* visible = */ false));
-	lumen::VulkanBase::render_graph()->global_macro_defines.push_back(
-		lumen::ShaderMacro("ENABLE_DIELECTRIC", has_bsdf_type(BSDF_TYPE_DIELECTRIC), /* visible = */ false));
-	lumen::VulkanBase::render_graph()->global_macro_defines.push_back(
-		lumen::ShaderMacro("ENABLE_CONDUCTOR", has_bsdf_type(BSDF_TYPE_CONDUCTOR), /* visible = */ false));
-	lumen::VulkanBase::render_graph()->global_macro_defines.push_back(
-		lumen::ShaderMacro("ENABLE_PRINCIPLED", has_bsdf_type(BSDF_TYPE_PRINCIPLED), /* visible = */ false));
+	vk::render_graph()->global_macro_defines.push_back(
+		vk::ShaderMacro("ENABLE_DIFFUSE", has_bsdf_type(BSDF_TYPE_DIFFUSE), /* visible = */ false));
+	vk::render_graph()->global_macro_defines.push_back(
+		vk::ShaderMacro("ENABLE_MIRROR", has_bsdf_type(BSDF_TYPE_MIRROR), /* visible = */ false));
+	vk::render_graph()->global_macro_defines.push_back(
+		vk::ShaderMacro("ENABLE_GLASS", has_bsdf_type(BSDF_TYPE_GLASS), /* visible = */ false));
+	vk::render_graph()->global_macro_defines.push_back(
+		vk::ShaderMacro("ENABLE_DIELECTRIC", has_bsdf_type(BSDF_TYPE_DIELECTRIC), /* visible = */ false));
+	vk::render_graph()->global_macro_defines.push_back(
+		vk::ShaderMacro("ENABLE_CONDUCTOR", has_bsdf_type(BSDF_TYPE_CONDUCTOR), /* visible = */ false));
+	vk::render_graph()->global_macro_defines.push_back(
+		vk::ShaderMacro("ENABLE_PRINCIPLED", has_bsdf_type(BSDF_TYPE_PRINCIPLED), /* visible = */ false));
 }
 
 void LumenScene::load_lumen_scene(const std::string& path) {

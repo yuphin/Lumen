@@ -167,31 +167,31 @@ void PSSMLT::init() {
 	desc.light_path_addr = light_path_buffer->get_device_address();
 	desc.camera_path_addr = camera_path_buffer->get_device_address();
 
-	assert(lumen::VulkanBase::render_graph()->settings.shader_inference == true);
+	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
-								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, bootstrap_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, cdf_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, cdf_sum_buffer, lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, seeds_addr, seeds_buffer, lumen::VulkanBase::render_graph());
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, bootstrap_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, cdf_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, cdf_sum_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, seeds_addr, seeds_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_primary_samples_addr, light_primary_samples_buffer,
-								 lumen::VulkanBase::render_graph());
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cam_primary_samples_addr, cam_primary_samples_buffer,
-								 lumen::VulkanBase::render_graph());
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, connection_primary_samples_addr, connection_primary_samples_buffer,
-								 lumen::VulkanBase::render_graph());
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_samplers_addr, mlt_samplers_buffer,
-								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_col_addr, mlt_col_buffer, lumen::VulkanBase::render_graph());
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_col_addr, mlt_col_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, chain_stats_addr, chain_stats_buffer,
-								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, splat_addr, splat_buffer, lumen::VulkanBase::render_graph());
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, splat_addr, splat_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, past_splat_addr, past_splat_buffer,
-								 lumen::VulkanBase::render_graph());
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_path_addr, light_path_buffer,
-								 lumen::VulkanBase::render_graph());
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, camera_path_addr, camera_path_buffer,
-								 lumen::VulkanBase::render_graph());
+								 vk::render_graph());
 
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",
@@ -231,9 +231,9 @@ void PSSMLT::render() {
 		scene_ubo_buffer,
 		lumen_scene->scene_desc_buffer,
 	};
-	lumen::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	// Start bootstrap sampling
-	lumen::VulkanBase::render_graph()
+	vk::render_graph()
 		->add_rt("PSSMLT - Bootstrap Sampling",
 				 {
 					 .shaders = {{"src/shaders/integrators/pssmlt/pssmlt_seed.rgen"},
@@ -252,11 +252,11 @@ void PSSMLT::render() {
 		.bind_tlas(tlas);
 
 	int counter = 0;
-	prefix_scan(0, config->num_bootstrap_samples, counter, lumen::VulkanBase::render_graph());
+	prefix_scan(0, config->num_bootstrap_samples, counter, vk::render_graph());
 	// Calculate CDF
-	lumen::VulkanBase::render_graph()
+	vk::render_graph()
 		->add_compute("Calculate CDF",
-					  {.shader = lumen::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
+					  {.shader = vk::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
 					   .specialization_data = {(uint32_t)config->num_bootstrap_samples},
 					   .dims = {(uint32_t)std::ceil(config->num_bootstrap_samples / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
@@ -298,10 +298,10 @@ void PSSMLT::render() {
 	return;
 #endif
 
-	lumen::RenderGraph* rg = lumen::VulkanBase::render_graph();
+	lumen::RenderGraph* rg = vk::render_graph();
 
 	// Select seeds
-	rg->add_compute("Select Seeds", {.shader = lumen::Shader("src/shaders/integrators/pssmlt/select_seeds.comp"),
+	rg->add_compute("Select Seeds", {.shader = vk::Shader("src/shaders/integrators/pssmlt/select_seeds.comp"),
 									 .specialization_data = {(uint32_t)config->num_mlt_threads},
 									 .dims = {(uint32_t)std::ceil(config->num_mlt_threads / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
@@ -371,7 +371,7 @@ void PSSMLT::render() {
 	}
 	// Compositions
 	rg->add_compute("Composition",
-					{.shader = lumen::Shader("src/shaders/integrators/pssmlt/composite.comp"),
+					{.shader = vk::Shader("src/shaders/integrators/pssmlt/composite.comp"),
 					 .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
@@ -394,7 +394,7 @@ void PSSMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGr
 	auto scan = [&](int num_wgs, int idx) {
 		++counter;
 		rg->add_compute("PrefixScan - Scan",
-						{.shader = lumen::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
+						{.shader = vk::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
 						 .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
@@ -402,7 +402,7 @@ void PSSMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGr
 	auto uniform_add = [&](int num_wgs, int output_idx) {
 		++counter;
 		rg->add_compute("PrefixScan - Uniform Add",
-						{.shader = lumen::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"),
+						{.shader = vk::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"),
 						 .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);

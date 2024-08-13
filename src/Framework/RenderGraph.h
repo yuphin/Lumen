@@ -28,9 +28,9 @@ class RenderGraph;
 class RenderPass;
 
 struct PipelineStorage {
-	std::unique_ptr<Pipeline> pipeline;
+	std::unique_ptr<vk::Pipeline> pipeline;
 	std::vector<ResourceBinding> bound_resources;
-	std::unordered_map<std::string, BufferStatus> affected_buffer_pointers;
+	std::unordered_map<std::string, vk::BufferStatus> affected_buffer_pointers;
 	bool dirty = false;
 };
 
@@ -38,24 +38,24 @@ class RenderGraph {
    public:
 	RenderGraph();
 	RenderPass& current_pass();
-	RenderPass& add_rt(const std::string& name, const RTPassSettings& settings);
-	RenderPass& add_gfx(const std::string& name, const GraphicsPassSettings& settings);
-	RenderPass& add_compute(const std::string& name, const ComputePassSettings& settings);
+	RenderPass& add_rt(const std::string& name, const vk::RTPassSettings& settings);
+	RenderPass& add_gfx(const std::string& name, const vk::GraphicsPassSettings& settings);
+	RenderPass& add_compute(const std::string& name, const vk::ComputePassSettings& settings);
 	void run(VkCommandBuffer cmd);
 	void reset();
-	void submit(CommandBuffer& cmd);
-	void run_and_submit(CommandBuffer& cmd);
+	void submit(vk::CommandBuffer& cmd);
+	void run_and_submit(vk::CommandBuffer& cmd);
 	void destroy();
 	void set_pipelines_dirty();
 	friend RenderPass;
 	bool reload_shaders = false;
 	vk::EventPool event_pool;
 	std::unordered_map<std::string, vk::Buffer*> registered_buffer_pointers;
-	// Shader Name + Macro String -> Shader
-	std::unordered_map<std::string, Shader> shader_cache;
+	// vk::Shader Name + Macro String -> vk::Shader
+	std::unordered_map<std::string, vk::Shader> shader_cache;
 	RenderGraphSettings settings;
 	std::mutex shader_map_mutex;
-	std::vector<ShaderMacro> global_macro_defines;
+	std::vector<vk::ShaderMacro> global_macro_defines;
 
    private:
 	struct BufferSyncResources {
@@ -69,7 +69,7 @@ class RenderGraph {
 
 	std::vector<RenderPass> passes;
 
-	// Pipeline Name + Macro String + Specialization Constants + Timestamp -> Pipeline
+	// vk::Pipeline Name + Macro String + Specialization Constants + Timestamp -> vk::Pipeline
 	std::unordered_map<size_t, PipelineStorage> pipeline_cache;
 	std::vector<std::pair<std::function<void(RenderPass*)>, uint32_t>> pipeline_tasks;
 	std::vector<std::function<void(RenderPass*)>> shader_tasks;
@@ -91,14 +91,14 @@ class RenderGraph {
 
 class RenderPass {
    public:
-	RenderPass(PassType type, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
-			   const GraphicsPassSettings& gfx_settings, const std::string& macro_string,
+	RenderPass(vk::PassType type, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
+			   const vk::GraphicsPassSettings& gfx_settings, const std::string& macro_string,
 			   PipelineStorage* pipeline_storage, bool cached = false)
 		: type(type),
 		  name(name),
 		  rg(rg),
 		  pass_idx(pass_idx),
-		  gfx_settings(std::make_unique<GraphicsPassSettings>(gfx_settings)),
+		  gfx_settings(std::make_unique<vk::GraphicsPassSettings>(gfx_settings)),
 		  macro_defines(gfx_settings.macros),
 		  pipeline_storage(pipeline_storage),
 		  is_pipeline_cached(cached) {
@@ -107,14 +107,14 @@ class RenderPass {
 		}
 	}
 
-	RenderPass(PassType type, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
-			   const RTPassSettings& rt_settings, const std::string& macro_string, PipelineStorage* pipeline_storage,
+	RenderPass(vk::PassType type, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
+			   const vk::RTPassSettings& rt_settings, const std::string& macro_string, PipelineStorage* pipeline_storage,
 			   bool cached = false)
 		: type(type),
 		  name(name),
 		  rg(rg),
 		  pass_idx(pass_idx),
-		  rt_settings(std::make_unique<RTPassSettings>(rt_settings)),
+		  rt_settings(std::make_unique<vk::RTPassSettings>(rt_settings)),
 		  macro_defines(rt_settings.macros),
 		  pipeline_storage(pipeline_storage),
 		  is_pipeline_cached(cached) {
@@ -123,14 +123,14 @@ class RenderPass {
 		}
 	}
 
-	RenderPass(PassType type, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
-			   const ComputePassSettings& compute_settings, const std::string& macro_string,
+	RenderPass(vk::PassType type, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
+			   const vk::ComputePassSettings& compute_settings, const std::string& macro_string,
 			   PipelineStorage* pipeline_storage, bool cached = false)
 		: type(type),
 		  name(name),
 		  rg(rg),
 		  pass_idx(pass_idx),
-		  compute_settings(std::make_unique<ComputePassSettings>(compute_settings)),
+		  compute_settings(std::make_unique<vk::ComputePassSettings>(compute_settings)),
 		  macro_defines(compute_settings.macros),
 		  pipeline_storage(pipeline_storage),
 		  is_pipeline_cached(cached) {
@@ -170,11 +170,11 @@ class RenderPass {
 	friend RenderGraph;
 
 	RenderGraph* rg;
-	std::vector<ShaderMacro> macro_defines;
-	std::unique_ptr<GraphicsPassSettings> gfx_settings = nullptr;
-	std::unique_ptr<RTPassSettings> rt_settings = nullptr;
-	std::unique_ptr<ComputePassSettings> compute_settings = nullptr;
-	PassType type;
+	std::vector<vk::ShaderMacro> macro_defines;
+	std::unique_ptr<vk::GraphicsPassSettings> gfx_settings = nullptr;
+	std::unique_ptr<vk::RTPassSettings> rt_settings = nullptr;
+	std::unique_ptr<vk::ComputePassSettings> compute_settings = nullptr;
+	vk::PassType type;
 	uint32_t pass_idx;
 	PipelineStorage* pipeline_storage = nullptr;
 
@@ -239,12 +239,12 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	std::string name_with_macros = name;
 	std::string macro_string;
 
-	std::vector<ShaderMacro> combined_macros;
+	std::vector<vk::ShaderMacro> combined_macros;
 	if (!settings.macros.empty() || !global_macro_defines.empty()) {
 		macro_string += '(';
 	}
 
-	auto populate_macros = [](const std::vector<ShaderMacro>& macros, std::string& macro_string, bool& prev_nonempty) {
+	auto populate_macros = [](const std::vector<vk::ShaderMacro>& macros, std::string& macro_string, bool& prev_nonempty) {
 		for (size_t i = 0; i < macros.size(); i++) {
 			if (!macros[i].visible) {
 				continue;
@@ -288,16 +288,16 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 			vkDeviceWaitIdle(vk::context().device);
 			cache_it->second.pipeline->cleanup();
 		}
-		pipeline_cache[hash] = PipelineStorage(std::make_unique<Pipeline>(name_with_macros));
+		pipeline_cache[hash] = PipelineStorage(std::make_unique<vk::Pipeline>(name_with_macros));
 		pipeline_storage = &pipeline_cache[hash];
 	}
-	PassType type;
-	if constexpr (std::is_same_v<ComputePassSettings, Settings>) {
-		type = PassType::Compute;
-	} else if constexpr (std::is_same_v<GraphicsPassSettings, Settings>) {
-		type = PassType::Graphics;
+	vk::PassType type;
+	if constexpr (std::is_same_v<vk::ComputePassSettings, Settings>) {
+		type = vk::PassType::Compute;
+	} else if constexpr (std::is_same_v<vk::GraphicsPassSettings, Settings>) {
+		type = vk::PassType::Graphics;
 	} else {
-		type = PassType::RT;
+		type = vk::PassType::RT;
 	}
 	return passes.emplace_back(type, name_with_macros, this, passes.size(), settings, macro_string, pipeline_storage,
 							   cached);

@@ -180,9 +180,9 @@ void RenderPass::transition_resources() {
 	}
 }
 
-static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_shaders) {
+static void build_shaders(RenderPass* pass, const std::vector<vk::Shader*>& active_shaders) {
 	// todo: make resource processing in order
-	auto process_bindless_resources = [pass](const Shader& shader) {
+	auto process_bindless_resources = [pass](const vk::Shader& shader) {
 		if (!pass->rg->settings.shader_inference) {
 			return;
 		}
@@ -195,7 +195,7 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 			}
 		}
 	};
-	auto process_bindings = [pass](const Shader& shader) {
+	auto process_bindings = [pass](const vk::Shader& shader) {
 		for (auto& [k, v] : shader.resource_binding_map) {
 			assert(k < pass->pipeline_storage->bound_resources.size());
 			pass->pipeline_storage->bound_resources[k].active = v.active;
@@ -204,8 +204,8 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 		}
 	};
 	switch (pass->type) {
-		case PassType::Graphics: {
-			std::vector<std::future<Shader*>> shader_tasks;
+		case vk::PassType::Graphics: {
+			std::vector<std::future<vk::Shader*>> shader_tasks;
 			shader_tasks.reserve(pass->gfx_settings->shaders.size());
 			for (auto& shader : active_shaders) {
 				pass->rg->shader_map_mutex.lock();
@@ -215,7 +215,7 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 					*shader = shader_it->second;
 				} else {
 					shader_tasks.push_back(ThreadPool::submit(
-						[pass](Shader* shader) {
+						[pass](vk::Shader* shader) {
 							shader->compile(pass);
 							return shader;
 						},
@@ -234,8 +234,8 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 				process_bindings(*shader);
 			}
 		} break;
-		case PassType::RT: {
-			std::vector<std::future<Shader*>> shader_tasks;
+		case vk::PassType::RT: {
+			std::vector<std::future<vk::Shader*>> shader_tasks;
 			shader_tasks.reserve(pass->rt_settings->shaders.size());
 			for (auto& shader : active_shaders) {
 				pass->rg->shader_map_mutex.lock();
@@ -245,7 +245,7 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 					*shader = shader_it->second;
 				} else {
 					shader_tasks.push_back(ThreadPool::submit(
-						[pass](Shader* shader) {
+						[pass](vk::Shader* shader) {
 							shader->compile(pass);
 							return shader;
 						},
@@ -266,7 +266,7 @@ static void build_shaders(RenderPass* pass, const std::vector<Shader*>& active_s
 			}
 
 		} break;
-		case PassType::Compute: {
+		case vk::PassType::Compute: {
 			for (auto& shader : active_shaders) {
 				pass->rg->shader_map_mutex.lock();
 				auto shader_it = pass->rg->shader_cache.find(shader->name_with_macros);
@@ -294,15 +294,15 @@ RenderGraph::RenderGraph() { pipeline_tasks.reserve(32); }
 
 RenderPass& RenderGraph::current_pass() { return passes[passes.size() - 1]; }
 
-RenderPass& RenderGraph::add_rt(const std::string& name, const RTPassSettings& settings) {
+RenderPass& RenderGraph::add_rt(const std::string& name, const vk::RTPassSettings& settings) {
 	return add_pass_impl(name, settings);
 }
 
-RenderPass& RenderGraph::add_gfx(const std::string& name, const GraphicsPassSettings& settings) {
+RenderPass& RenderGraph::add_gfx(const std::string& name, const vk::GraphicsPassSettings& settings) {
 	return add_pass_impl(name, settings);
 }
 
-RenderPass& RenderGraph::add_compute(const std::string& name, const ComputePassSettings& settings) {
+RenderPass& RenderGraph::add_compute(const std::string& name, const vk::ComputePassSettings& settings) {
 	return add_pass_impl(name, settings);
 }
 
@@ -478,7 +478,7 @@ void RenderPass::finalize() {
 	// Create pipelines/push descriptor templates
 	if (!is_pipeline_cached) {
 		switch (type) {
-			case PassType::Graphics: {
+			case vk::PassType::Graphics: {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline_storage->pipeline->create_gfx_pipeline(*pass->gfx_settings, pass->descriptor_counts,
 																		  pass->gfx_settings->color_outputs,
@@ -491,7 +491,7 @@ void RenderPass::finalize() {
 				}
 				break;
 			}
-			case PassType::RT: {
+			case vk::PassType::RT: {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline_storage->pipeline->create_rt_pipeline(*pass->rt_settings, pass->descriptor_counts);
 					// Create descriptor pool and sets
@@ -521,7 +521,7 @@ void RenderPass::finalize() {
 				}
 				break;
 			}
-			case PassType::Compute: {
+			case vk::PassType::Compute: {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline_storage->pipeline->create_compute_pipeline(*pass->compute_settings,
 																			  pass->descriptor_counts);
@@ -676,7 +676,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	// Run
 	if (!disable_execution) {
 		switch (type) {
-			case PassType::RT: {
+			case vk::PassType::RT: {
 				LUMEN_ASSERT(pipeline_storage->pipeline->tlas_descriptor_set, "TLAS descriptor set cannot be NULL!");
 				// This doesnt work because we can't push TLAS descriptor with
 				// template...
@@ -698,7 +698,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				}
 				break;
 			}
-			case PassType::Compute: {
+			case vk::PassType::Compute: {
 				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_storage->pipeline->handle);
 
 				if (compute_settings->pass_func) {
@@ -709,7 +709,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				}
 				break;
 			}
-			case PassType::Graphics: {
+			case vk::PassType::Graphics: {
 				auto& color_outputs = gfx_settings->color_outputs;
 				auto& depth_output = gfx_settings->depth_output;
 				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_storage->pipeline->handle);
@@ -870,12 +870,12 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	// Compile shaders and process resources
 	const bool recording_or_reload = dirty_pass_encountered || reload_shaders;
 	if (recording_or_reload) {
-		auto cmp = [](const std::pair<Shader*, RenderPass*>& a, const std::pair<Shader*, RenderPass*>& b) {
+		auto cmp = [](const std::pair<vk::Shader*, RenderPass*>& a, const std::pair<vk::Shader*, RenderPass*>& b) {
 			return a.first->name_with_macros < b.first->name_with_macros;
 		};
-		std::set<std::pair<Shader*, RenderPass*>, decltype(cmp)> unique_shaders_set;
-		std::unordered_map<RenderPass*, std::vector<Shader*>> unique_shaders;
-		std::unordered_map<RenderPass*, std::vector<Shader*>> existing_shaders;
+		std::set<std::pair<vk::Shader*, RenderPass*>, decltype(cmp)> unique_shaders_set;
+		std::unordered_map<RenderPass*, std::vector<vk::Shader*>> unique_shaders;
+		std::unordered_map<RenderPass*, std::vector<vk::Shader*>> existing_shaders;
 
 		for (auto i = 0; i < passes.size(); i++) {
 			if (passes[i].is_pipeline_cached) {
@@ -967,13 +967,13 @@ void RenderGraph::reset() {
 	reload_shaders = false;
 }
 
-void RenderGraph::submit(CommandBuffer& cmd) {
+void RenderGraph::submit(vk::CommandBuffer& cmd) {
 	cmd.submit();
 	passes.clear();
 	dirty_pass_encountered = false;
 }
 
-void RenderGraph::run_and_submit(CommandBuffer& cmd) {
+void RenderGraph::run_and_submit(vk::CommandBuffer& cmd) {
 	run(cmd.handle);
 	submit(cmd);
 }

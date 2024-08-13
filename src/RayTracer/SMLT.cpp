@@ -201,7 +201,7 @@ void SMLT::init() {
 	desc.light_splats_addr = light_splats_buffer->get_device_address();
 	desc.light_splat_cnts_addr = light_splat_cnts_buffer->get_device_address();
 
-	lumen::RenderGraph* rg = lumen::VulkanBase::render_graph();
+	lumen::RenderGraph* rg = vk::render_graph();
 	assert(rg->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, bootstrap_buffer, rg);
@@ -244,7 +244,7 @@ void SMLT::init() {
 
 void SMLT::render() {
 	const float ppm_base_radius = 0.25f;
-	lumen::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
 	VkClearValue clear_depth = {1.0f, 0};
 	VkViewport viewport = vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
@@ -268,7 +268,7 @@ void SMLT::render() {
 		lumen_scene->scene_desc_buffer,
 	};
 
-	lumen::RenderGraph* rg = lumen::VulkanBase::render_graph();
+	lumen::RenderGraph* rg = vk::render_graph();
 
 	// Start bootstrap sampling
 	{
@@ -308,7 +308,7 @@ void SMLT::render() {
 	int counter = 0;
 	prefix_scan(0, config->num_bootstrap_samples, counter, rg);
 	// Calculate CDF
-	rg->add_compute("Calculate CDF", {.shader = lumen::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
+	rg->add_compute("Calculate CDF", {.shader = vk::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
 									  .specialization_data = {(uint32_t)num_bootstrap_samples},
 									  .dims = {(uint32_t)std::ceil(num_bootstrap_samples / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
@@ -349,7 +349,7 @@ void SMLT::render() {
 	return;
 #endif
 	// Select seeds
-	rg->add_compute("Select Seeds", {.shader = lumen::Shader("src/shaders/integrators/pssmlt/select_seeds.comp"),
+	rg->add_compute("Select Seeds", {.shader = vk::Shader("src/shaders/integrators/pssmlt/select_seeds.comp"),
 									 .specialization_data = {(uint32_t)num_mlt_threads},
 									 .dims = {(uint32_t)std::ceil(num_mlt_threads / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
@@ -451,7 +451,7 @@ void SMLT::render() {
 	}
 	// Compositions
 	rg->add_compute("Composition",
-					{.shader = lumen::Shader("src/shaders/integrators/pssmlt/composite.comp"),
+					{.shader = vk::Shader("src/shaders/integrators/pssmlt/composite.comp"),
 					 .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
@@ -474,7 +474,7 @@ void SMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGrap
 	auto scan = [&](int num_wgs, int idx) {
 		++counter;
 		rg->add_compute("PrefixScan - Scan",
-						{.shader = lumen::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
+						{.shader = vk::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
 						 .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
@@ -482,7 +482,7 @@ void SMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGrap
 	auto uniform_add = [&](int num_wgs, int output_idx) {
 		++counter;
 		rg->add_compute("PrefixScan - Uniform Add",
-						{.shader = lumen::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"),
+						{.shader = vk::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"),
 						 .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);

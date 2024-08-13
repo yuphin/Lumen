@@ -46,7 +46,7 @@ void create_buffer(Buffer* buffer, const BufferDesc& desc) {
 										   .memory_type = BufferType::STAGING,
 										   .size = buffer->size,
 										   .data = desc.data});
-		lumen::CommandBuffer cmd(true);
+		vk::CommandBuffer cmd(true);
 		VkBufferCopy copy_region = {
 			.size = buffer->size,
 		};

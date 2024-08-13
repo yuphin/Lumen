@@ -5,6 +5,8 @@
 
 namespace lumen {
 class RenderPass;
+}
+namespace vk {
 
 struct Shader {
 	Shader() = default;
@@ -22,7 +24,7 @@ struct Shader {
 	int local_size_z = 1;
 	bool uses_push_constants = false;
 	uint32_t push_constant_size = 0;
-	int compile(RenderPass* pass);
+	int compile(lumen::RenderPass* pass);
 	VkShaderModule create_vk_shader_module(const VkDevice& device) const;
 	struct BindingStatus {
 		bool read = false;
@@ -34,4 +36,4 @@ struct Shader {
 	std::unordered_map<uint32_t, BindingStatus> resource_binding_map;
 };
 
-}  // namespace lumen
+}  // namespace vk

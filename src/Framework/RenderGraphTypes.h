@@ -8,9 +8,8 @@
 #include "Texture.h"
 #include "CommonTypes.h"
 
-namespace lumen {
-class RenderPass;
-
+namespace vk {
+enum class PassType { Compute, RT, Graphics };
 struct ShaderMacro {
 	ShaderMacro(const std::string& name, int val, bool visible)
 		: name(name), val(val), has_val(true), visible(visible) {}
@@ -26,17 +25,8 @@ struct ShaderMacro {
 	bool has_val = false;
 	bool visible = true;
 };
-
-struct RenderGraphSettings {
-	bool shader_inference = false;
-	bool use_events = false;
-};
-
-
-enum class PassType { Compute, RT, Graphics };
-
 struct GraphicsPassSettings {
-	std::vector<Shader> shaders;
+	std::vector<vk::Shader> shaders;
 	const std::vector<ShaderMacro> macros = {};
 	uint32_t width;
 	uint32_t height;
@@ -55,29 +45,37 @@ struct GraphicsPassSettings {
 	float line_width = 1.0;
 	std::vector<vk::Texture*> color_outputs = {};
 	vk::Texture* depth_output = nullptr;
-	std::function<void(VkCommandBuffer cmd, const RenderPass& pass)> pass_func;
-	PassType type = PassType::Graphics; 
+	std::function<void(VkCommandBuffer cmd, const lumen::RenderPass& pass)> pass_func;
+	PassType type = PassType::Graphics;
 };
 
 struct RTPassSettings {
-	std::vector<Shader> shaders;
+	std::vector<vk::Shader> shaders;
 	std::vector<ShaderMacro> macros = {};
 	uint32_t recursion_depth = 1;
 	std::vector<uint32_t> specialization_data = {};
-	dim3 dims;
-	std::function<void(VkCommandBuffer cmd, const RenderPass& pass)> pass_func;
+	lumen::dim3 dims;
+	std::function<void(VkCommandBuffer cmd, const lumen::RenderPass& pass)> pass_func;
 	PassType type = PassType::RT;
 };
 
 struct ComputePassSettings {
-	Shader shader;
+	vk::Shader shader;
 	std::vector<ShaderMacro> macros = {};
 	std::vector<uint32_t> specialization_data = {};
-	dim3 dims;
-	std::function<void(VkCommandBuffer cmd, const RenderPass& pass)> pass_func;
+	lumen::dim3 dims;
+	std::function<void(VkCommandBuffer cmd, const lumen::RenderPass& pass)> pass_func;
 	PassType type = PassType::Compute;
 };
 
+}  // namespace vk
+namespace lumen {
+class RenderPass;
+
+struct RenderGraphSettings {
+	bool shader_inference = false;
+	bool use_events = false;
+};
 
 struct ResourceBinding {
 	vk::Buffer* buf = nullptr;

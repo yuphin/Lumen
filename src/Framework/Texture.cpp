@@ -147,7 +147,7 @@ void create_texture(Texture* texture, const TextureDesc& desc) {
 										   .size = desc.data.size,
 										   .data = desc.data.data});
 		// Copy from staging buffer to image
-		lumen::CommandBuffer copy_cmd(true);
+		vk::CommandBuffer copy_cmd(true);
 
 		VkBufferImageCopy region{};
 		region.bufferOffset = 0;
@@ -177,7 +177,7 @@ void create_texture(Texture* texture, const TextureDesc& desc) {
 	}
 
 	if (desc.initial_layout != VK_IMAGE_LAYOUT_UNDEFINED) {
-		lumen::CommandBuffer cmd(true);
+		vk::CommandBuffer cmd(true);
 		transition_image_layout(cmd.handle, texture->handle, texture->layout, desc.initial_layout, subresource_range,
 								texture->aspect_flags);
 		cmd.submit();

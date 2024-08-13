@@ -114,22 +114,22 @@ void ReSTIRPT::init() {
 	pc_ray.size_y = instance->height;
 	pc_ray.buffer_idx = 0;
 
-	assert(lumen::VulkanBase::render_graph()->settings.shader_inference == true);
+	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
-								 lumen::VulkanBase::render_graph());
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, gris_reservoir_ping_buffer,
-								 lumen::VulkanBase::render_graph());
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, direct_lighting_buffer,
-								 lumen::VulkanBase::render_graph());
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, lumen_scene->compact_vertices_buffer,
-								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, debug_vis_addr, debug_vis_buffer, lumen::VulkanBase::render_graph());
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, debug_vis_addr, debug_vis_buffer, vk::render_graph());
 
 	path_length = config->path_length;
 }
 
 void ReSTIRPT::render() {
-	lumen::CommandBuffer cmd(/*start*/ true);
+	vk::CommandBuffer cmd(/*start*/ true);
 	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
 	pc_ray.prev_random_num = pc_ray.general_seed;
 	pc_ray.sampling_seed = rand() % UINT_MAX;
@@ -172,7 +172,7 @@ void ReSTIRPT::render() {
 	constexpr int READ_OR_PREV_IDX = 0;
 
 	// Trace rays
-	lumen::VulkanBase::render_graph()
+	vk::render_graph()
 		->add_rt("GRIS - Generate Samples",
 				 {
 					 .shaders = {{"src/shaders/integrators/restir/gris/gris.rgen"},
@@ -181,7 +181,7 @@ void ReSTIRPT::render() {
 								 {"src/shaders/integrators/restir/gris/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
 					 .macros = {{"STREAMING_MODE", int(streaming_method)},
-								lumen::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
+								vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
 					 .dims = {instance->width, instance->height},
 				 })
 		.push_constants(&pc_ray)
@@ -196,7 +196,7 @@ void ReSTIRPT::render() {
 	if (enable_gris) {
 		bool should_do_temporal = enable_temporal_reuse && pc_ray.total_frame_num > 0;
 		// Temporal Reuse
-		lumen::VulkanBase::render_graph()
+		vk::render_graph()
 			->add_rt("GRIS - Temporal Reuse",
 					 {
 						 .shaders = {{"src/shaders/integrators/restir/gris/temporal_reuse.rgen"},
@@ -219,7 +219,7 @@ void ReSTIRPT::render() {
 		pc_ray.seed2 = rand() % UINT_MAX;
 		if (!canonical_only) {
 			if (mis_method == MISMethod::TALBOT) {
-				lumen::VulkanBase::render_graph()
+				vk::render_graph()
 					->add_rt("GRIS - Spatial Reuse - Talbot",
 							 {
 								 .shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen"},
@@ -239,7 +239,7 @@ void ReSTIRPT::render() {
 					.bind_tlas(tlas);
 			} else {
 				// Retrace
-				lumen::VulkanBase::render_graph()
+				vk::render_graph()
 					->add_rt("GRIS - Retrace Reservoirs",
 							 {
 								 .shaders = {{"src/shaders/integrators/restir/gris/retrace_paths.rgen"},
@@ -257,7 +257,7 @@ void ReSTIRPT::render() {
 					.bind_texture_array(lumen_scene->scene_textures)
 					.bind_tlas(tlas);
 				// Validate
-				lumen::VulkanBase::render_graph()
+				vk::render_graph()
 					->add_rt("GRIS - Validate Samples",
 							 {
 								 .shaders = {{"src/shaders/integrators/restir/gris/validate_samples.rgen"},
@@ -276,7 +276,7 @@ void ReSTIRPT::render() {
 					.bind_tlas(tlas);
 
 				// Spatial Reuse
-				lumen::VulkanBase::render_graph()
+				vk::render_graph()
 					->add_rt("GRIS - Spatial Reuse",
 							 {
 								 .shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse.rgen"},
@@ -284,7 +284,7 @@ void ReSTIRPT::render() {
 											 {"src/shaders/ray_shadow.rmiss"},
 											 {"src/shaders/integrators/restir/gris/ray.rchit"},
 											 {"src/shaders/ray.rahit"}},
-								 .macros = {lumen::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS",
+								 .macros = {vk::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS",
 															   enable_defensive_formulation)},
 								 .dims = {instance->width, instance->height},
 							 })
@@ -300,9 +300,9 @@ void ReSTIRPT::render() {
 			}
 			if (pixel_debug || (gris_separator < 1.0f && gris_separator > 0.0f)) {
 				uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
-				lumen::VulkanBase::render_graph()
+				vk::render_graph()
 					->add_compute("GRIS - Debug Visualiation",
-								  {.shader = lumen::Shader("src/shaders/integrators/restir/gris/debug_vis.comp"),
+								  {.shader = vk::Shader("src/shaders/integrators/restir/gris/debug_vis.comp"),
 								   .dims = {num_wgs}})
 					.push_constants(&pc_ray)
 					.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer});

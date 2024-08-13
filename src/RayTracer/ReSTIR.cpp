@@ -64,7 +64,7 @@ void ReSTIR::init() {
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 
-	lumen::RenderGraph* rg = lumen::VulkanBase::render_graph();
+	lumen::RenderGraph* rg = vk::render_graph();
 	assert(rg->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, g_buffer, rg);
@@ -75,7 +75,7 @@ void ReSTIR::init() {
 }
 
 void ReSTIR::render() {
-	lumen::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
@@ -93,7 +93,7 @@ void ReSTIR::render() {
 		lumen_scene->scene_desc_buffer,
 	};
 
-	lumen::RenderGraph* rg = lumen::VulkanBase::render_graph();
+	lumen::RenderGraph* rg = vk::render_graph();
 
 	// Temporal pass + path tracing
 	rg->add_rt("ReSTIR - Temporal Pass",

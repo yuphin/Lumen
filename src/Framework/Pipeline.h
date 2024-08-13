@@ -5,7 +5,7 @@
 #include "SBTWrapper.h"
 #include "RenderGraphTypes.h"
 
-namespace lumen {
+namespace vk {
 struct Pipeline;
 
 struct Pipeline {
@@ -53,4 +53,4 @@ struct Pipeline {
 	uint32_t binding_mask;
 };
 
-}  // namespace lumen
+}  // namespace vk

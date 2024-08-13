@@ -2,7 +2,7 @@
 #include "CommandBuffer.h"
 #include "VulkanSyncronization.h"
 
-namespace lumen {
+namespace vk {
 CommandBuffer::CommandBuffer(bool begin, VkCommandBufferUsageFlags begin_flags, vk::QueueType type,
 							 VkCommandBufferLevel level) {
 	this->type = type;
@@ -46,7 +46,8 @@ void CommandBuffer::submit(bool wait_fences, bool queue_wait_idle) {
 		vk::check(vkWaitForFences(vk::context().device, 1, &fence, VK_TRUE, 100000000000), "Fence wait error");
 		vkDestroyFence(vk::context().device, fence, nullptr);
 	} else {
-		vk::check(vkQueueSubmit(vk::context().queues[(int)type], 1, &submit_info, VK_NULL_HANDLE), "Queue submission error");
+		vk::check(vkQueueSubmit(vk::context().queues[(int)type], 1, &submit_info, VK_NULL_HANDLE),
+				  "Queue submission error");
 	}
 	if (queue_wait_idle) {
 		vk::check(vkQueueWaitIdle(vk::context().queues[(int)type]), "Queue wait error! Check previous submissions");
@@ -66,4 +67,4 @@ CommandBuffer::~CommandBuffer() {
 	vkFreeCommandBuffers(vk::context().device, vk::context().cmd_pools[curr_tid], 1, &handle);
 }
 
-}  // namespace lumen
+}  // namespace vk

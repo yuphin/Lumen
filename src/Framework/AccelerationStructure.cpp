@@ -235,7 +235,7 @@ void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
 		batchSize += buildAs[idx].size_info.accelerationStructureSize;
 		// Over the limit or last BLAS element
 		if (batchSize >= batchLimit || idx == nb_blas - 1) {
-			lumen::CommandBuffer cmdBuf(true, 0, QueueType::GFX);
+			vk::CommandBuffer cmdBuf(true, 0, QueueType::GFX);
 			cmd_create_blas(cmdBuf.handle, indices, buildAs, scratch_buffer->get_device_address(), queryPool);
 			cmdBuf.submit();
 			if (queryPool) {
@@ -293,7 +293,7 @@ void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 		.size = sizeof(VkAccelerationStructureInstanceKHR) * instances.size(),
 		.data = instances.data(),
 	});
-	lumen::CommandBuffer cmd(true, 0, QueueType::GFX);
+	vk::CommandBuffer cmd(true, 0, QueueType::GFX);
 	// Make sure the copy of the instance buffer are copied before triggering
 	// the acceleration structure build
 	VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};

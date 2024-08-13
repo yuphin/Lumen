@@ -70,8 +70,8 @@ void ReSTIRGI::init() {
 	pc_ray.size_x = instance->width;
 	pc_ray.size_y = instance->height;
 	pc_ray.world_radius = lumen_scene->m_dimensions.radius;
-	assert(lumen::VulkanBase::render_graph()->settings.shader_inference == true);
-	lumen::RenderGraph* rg = lumen::VulkanBase::render_graph();
+	assert(vk::render_graph()->settings.shader_inference == true);
+	lumen::RenderGraph* rg = vk::render_graph();
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, restir_samples_addr, restir_samples_buffer, rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, restir_samples_old_addr, restir_samples_old_buffer, rg);
@@ -81,7 +81,7 @@ void ReSTIRGI::init() {
 }
 
 void ReSTIRGI::render() {
-	lumen::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
@@ -99,7 +99,7 @@ void ReSTIRGI::render() {
 	};
 
 	// Trace rays
-	lumen::VulkanBase::render_graph()
+	vk::render_graph()
 		->add_rt("ReSTIRGI - Generate Samples",
 				 {
 					 .shaders = {{"src/shaders/integrators/restir/gi/restir.rgen"},
@@ -120,7 +120,7 @@ void ReSTIRGI::render() {
 		.copy(restir_samples_buffer, restir_samples_old_buffer);
 
 	// Temporal reuse
-	lumen::VulkanBase::render_graph()
+	vk::render_graph()
 		->add_rt("ReSTIRGI - Temporal Reuse",
 				 {
 					 .shaders = {{"src/shaders/integrators/restir/gi/temporal_reuse.rgen"},
@@ -137,7 +137,7 @@ void ReSTIRGI::render() {
 		.bind_tlas(tlas);
 
 	// Spatial reuse
-	lumen::VulkanBase::render_graph()
+	vk::render_graph()
 		->add_rt("ReSTIRGI - Spatial Reuse",
 				 {
 					 .shaders = {{"src/shaders/integrators/restir/gi/spatial_reuse.rgen"},
@@ -153,9 +153,9 @@ void ReSTIRGI::render() {
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
 	// Output
-	lumen::VulkanBase::render_graph()
+	vk::render_graph()
 		->add_compute("Output",
-					  {.shader = lumen::Shader("src/shaders/integrators/restir/gi/output.comp"),
+					  {.shader = vk::Shader("src/shaders/integrators/restir/gi/output.comp"),
 					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
@@ -163,7 +163,7 @@ void ReSTIRGI::render() {
 		do_spatiotemporal = true;
 	}
 	pc_ray.total_frame_num++;
-	lumen::VulkanBase::render_graph()->run_and_submit(cmd);
+	vk::render_graph()->run_and_submit(cmd);
 }
 
 bool ReSTIRGI::update() {

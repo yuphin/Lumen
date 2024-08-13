@@ -20,13 +20,12 @@
 #include "Buffer.h"
 #pragma once
 
-namespace lumen {
+namespace vk {
 class SBTWrapper {
    public:
 	enum GroupType { eRaygen, eMiss, eHit, eCallable };
 
-	void setup(uint32_t family_idx,
-			   const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rt_props);
+	void setup(uint32_t family_idx, const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rt_props);
 	void destroy();
 	void create(VkPipeline rtPipeline, VkRayTracingPipelineCreateInfoKHR pipeline_info = {},
 				const std::vector<VkRayTracingPipelineCreateInfoKHR>& create_infos = {});
@@ -65,4 +64,4 @@ class SBTWrapper {
 	uint32_t m_queue_idx{0};
 };
 
-}  // namespace lumen
+}  // namespace vk

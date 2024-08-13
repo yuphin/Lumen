@@ -4,7 +4,7 @@
 #include "CommandBuffer.h"
 #include "PersistentResourceManager.h"
 
-namespace lumen {
+namespace vk {
 
 template <class T>
 static constexpr T align_up(T x, size_t a) noexcept {
@@ -154,4 +154,4 @@ const std::array<VkStridedDeviceAddressRegionKHR, 4> SBTWrapper::get_regions() {
 	return regions;
 }
 
-}  // namespace lumen
+}  // namespace vk

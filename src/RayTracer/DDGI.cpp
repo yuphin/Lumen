@@ -138,14 +138,14 @@ void DDGI::init() {
 	desc.probe_offsets_addr = probe_offsets_buffer->get_device_address();
 	desc.g_buffer_addr = g_buffer->get_device_address();
 
-	assert(lumen::VulkanBase::render_graph()->settings.shader_inference == true);
+	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
-								 lumen::VulkanBase::render_graph());
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, direct_lighting_addr, direct_lighting_buffer,
-								 lumen::VulkanBase::render_graph());
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, probe_offsets_addr, probe_offsets_buffer,
-								 lumen::VulkanBase::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, g_buffer, lumen::VulkanBase::render_graph());
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, g_buffer, vk::render_graph());
 
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",
@@ -187,7 +187,7 @@ void DDGI::render() {
 		lumen_scene->scene_desc_buffer,
 	};
 	// Trace Primary rays and fill G buffer
-	lumen::VulkanBase::render_graph()
+	vk::render_graph()
 		->add_rt("DDGI - GBuffer Pass",
 				 {
 					 .shaders = {{"src/shaders/integrators/ddgi/primary_rays.rgen"},
@@ -206,7 +206,7 @@ void DDGI::render() {
 		.bind_tlas(tlas);
 	// Trace rays from probes
 	uint32_t grid_size = probe_counts.x * probe_counts.y * probe_counts.z;
-	lumen::VulkanBase::render_graph()
+	vk::render_graph()
 		->add_rt("DDGI - Probe Trace",
 				 {
 					 .shaders = {{"src/shaders/integrators/ddgi/trace.rgen"},
@@ -224,9 +224,9 @@ void DDGI::render() {
 		.bind_tlas(tlas);
 	// Classify
 	uint32_t wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 31) / 32;
-	lumen::VulkanBase::render_graph()
+	vk::render_graph()
 		->add_compute("Classify Probes",
-					  {.shader = lumen::Shader("src/shaders/integrators/ddgi/classify.comp"), .dims = {wg_x}})
+					  {.shader = vk::Shader("src/shaders/integrators/ddgi/classify.comp"), .dims = {wg_x}})
 		.push_constants(&pc_ray)
 		.bind({scene_ubo_buffer, lumen_scene->scene_desc_buffer, ddgi_ubo_buffer, rt.radiance_tex, rt.dir_depth_tex});
 	// Update probes & borders
@@ -235,9 +235,9 @@ void DDGI::render() {
 		uint32_t wg_x = probe_counts.x * probe_counts.y;
 		uint32_t wg_y = probe_counts.z;
 		auto update_probe = [&](bool is_irr) {
-			lumen::VulkanBase::render_graph()
+			vk::render_graph()
 				->add_compute(is_irr ? "Update Irradiance" : "Update Depth",
-							  {.shader = lumen::Shader(is_irr ? "src/shaders/integrators/ddgi/update_irradiance.comp"
+							  {.shader = vk::Shader(is_irr ? "src/shaders/integrators/ddgi/update_irradiance.comp"
 															  : "src/shaders/integrators/ddgi/update_depth.comp"),
 							   .dims = {wg_x, wg_y}})
 				.push_constants(&pc_ray)
@@ -250,18 +250,18 @@ void DDGI::render() {
 		// Borders
 		// 13 WGs process 4 probes (wg = 32 threads)
 		wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 3) * 13 / 4;
-		lumen::VulkanBase::render_graph()
+		vk::render_graph()
 			->add_compute("Update Borders",
-						  {.shader = lumen::Shader("src/shaders/integrators/ddgi/update_borders.comp"), .dims = {wg_x}})
+						  {.shader = vk::Shader("src/shaders/integrators/ddgi/update_borders.comp"), .dims = {wg_x}})
 			.push_constants(&pc_ray)
 			.bind({irr_texes[!ping_pong], depth_texes[!ping_pong], ddgi_ubo_buffer});
 	}
 	// Sample probes & output into texture
 	wg_x = (instance->width + 31) / 32;
 	uint32_t wg_y = (instance->height + 31) / 32;
-	lumen::VulkanBase::render_graph()
+	vk::render_graph()
 		->add_compute("Sample Probes",
-					  {.shader = lumen::Shader("src/shaders/integrators/ddgi/sample.comp"), .dims = {wg_x, wg_y}})
+					  {.shader = vk::Shader("src/shaders/integrators/ddgi/sample.comp"), .dims = {wg_x, wg_y}})
 		.push_constants(&pc_ray)
 		.bind({scene_ubo_buffer, lumen_scene->scene_desc_buffer, output.tex, irr_texes[ping_pong],
 			   depth_texes[ping_pong], ddgi_ubo_buffer});
@@ -269,18 +269,18 @@ void DDGI::render() {
 	if (total_frame_idx < 5) {
 		// 13 WGs process 4 probes (wg = 32 threads)
 		wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 31) / 32;
-		lumen::VulkanBase::render_graph()
+		vk::render_graph()
 			->add_compute("Relocate",
-						  {.shader = lumen::Shader("src/shaders/integrators/ddgi/relocate.comp"), .dims = {wg_x}})
+						  {.shader = vk::Shader("src/shaders/integrators/ddgi/relocate.comp"), .dims = {wg_x}})
 			.push_constants(&pc_ray)
 			.bind({scene_ubo_buffer, lumen_scene->scene_desc_buffer, ddgi_ubo_buffer, rt.dir_depth_tex});
 	}
 	// Output
 	wg_x = (instance->width + 31) / 32;
 	wg_y = (instance->height + 31) / 32;
-	lumen::VulkanBase::render_graph()
+	vk::render_graph()
 		->add_compute("DDGI Output",
-					  {.shader = lumen::Shader("src/shaders/integrators/ddgi/out.comp"), .dims = {wg_x, wg_y}})
+					  {.shader = vk::Shader("src/shaders/integrators/ddgi/out.comp"), .dims = {wg_x, wg_y}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, output.tex});
 	frame_idx++;
