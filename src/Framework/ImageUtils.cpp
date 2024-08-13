@@ -1,8 +1,9 @@
 #include "LumenPCH.h"
-#include "LumenPCH.h"
 #include "ImageUtils.h"
 #define TINYEXR_IMPLEMENTATION
 #include <tinyexr.h>
+
+namespace ImageUtils {
 
 float* load_exr(const char* img_name, int& width, int& height) {
 	// Load the ground truth image
@@ -86,3 +87,4 @@ void save_exr(const float* rgb, int width, int height, const char* outfilename) 
 	free(header.pixel_types);
 	free(header.requested_pixel_types);
 }
+}  // namespace ImageUtils

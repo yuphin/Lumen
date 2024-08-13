@@ -18,7 +18,7 @@ void PostFX::init(lumen::LumenInstance& instance) {
 	// Load the kernel
 	const char* img_name_kernel = "assets/kernels/Octagonal512.exr";
 	int width, height;
-	float* data = load_exr(img_name_kernel, width, height);
+	float* data = ImageUtils::load_exr(img_name_kernel, width, height);
 	auto img_dims = VkExtent2D{(uint32_t)width, (uint32_t)height};
 	vk::Texture* kernel_org = drm::get({.name = "Kernel",
 												.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,

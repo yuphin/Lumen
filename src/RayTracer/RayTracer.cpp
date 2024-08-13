@@ -119,7 +119,7 @@ void RayTracer::init_resources() {
 	if (load_reference) {
 		// Load the ground truth image
 		int width, height;
-		float* data = load_exr("out.exr", width, height);
+		float* data = ImageUtils::load_exr("out.exr", width, height);
 		if (!data) {
 			LUMEN_ERROR("Could not load the reference image");
 		}
@@ -463,7 +463,7 @@ float RayTracer::draw_frame() {
 
 	if (write_exr) {
 		write_exr = false;
-		save_exr((float*)vk::map_buffer(output_img_buffer_cpu), instance->width, instance->height, "out.exr");
+		ImageUtils::save_exr((float*)vk::map_buffer(output_img_buffer_cpu), instance->width, instance->height, "out.exr");
 		vk::unmap_buffer(output_img_buffer_cpu);
 	}
 	bool time_limit = (abs(diff / CLOCKS_PER_SEC - 5)) < 0.1;
