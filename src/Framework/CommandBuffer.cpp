@@ -62,11 +62,17 @@ CommandBuffer::~CommandBuffer() {
 	if (state == CommandBufferState::RECORDING) {
 		LUMEN_WARN("Destroying command buffer in recording state.");
 		vk::check(vkEndCommandBuffer(handle), "Failed to end command buffer");
-		vkFreeCommandBuffers(vk::context().device, vk::context().cmd_pools[curr_tid], 1, &handle);
+		{
+			std::lock_guard<std::mutex> cmd_pool_lock(vk::context().cmd_mutexes[curr_tid]);
+			vkFreeCommandBuffers(vk::context().device, vk::context().cmd_pools[curr_tid], 1, &handle);
+		}
 		++VulkanSyncronization::available_command_pools;
 		VulkanSyncronization::cv.notify_one();
 	} else {
-		vkFreeCommandBuffers(vk::context().device, vk::context().cmd_pools[curr_tid], 1, &handle);
+		{
+			std::lock_guard<std::mutex> cmd_pool_lock(vk::context().cmd_mutexes[curr_tid]);
+			vkFreeCommandBuffers(vk::context().device, vk::context().cmd_pools[curr_tid], 1, &handle);
+		}
 		// Submitted -> available_command_pools is already incremented
 		VulkanSyncronization::cv.notify_one();
 	}
