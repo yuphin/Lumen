@@ -16,7 +16,6 @@ struct VulkanContext {
 	// Swapchain related stuff
 	VkSwapchainKHR swapchain;
 	std::vector<VkCommandPool> cmd_pools;
-	std::vector<std::mutex> cmd_mutexes;
 	std::vector<VkQueue> queues;
 	QueueFamilyIndices queue_indices;
 	std::vector<VkCommandBuffer> command_buffers;
