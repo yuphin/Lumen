@@ -9,34 +9,34 @@ void ReSTIR::init() {
 								.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 										 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								.memory_type = vk::BufferType::GPU,
-								.size = instance->width * instance->height * sizeof(RestirGBufferData)});
+								.size = Window::width() * Window::height()  * sizeof(RestirGBufferData)});
 
 	temporal_reservoir_buffer =
 		prm::get_buffer({.name = "Temporal Reservoirs",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * sizeof(RestirReservoir)});
+						 .size = Window::width() * Window::height()  * sizeof(RestirReservoir)});
 
 	passthrough_reservoir_buffer =
 		prm::get_buffer({.name = "Passthrough Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * sizeof(RestirReservoir)});
+						 .size = Window::width() * Window::height()  * sizeof(RestirReservoir)});
 
 	spatial_reservoir_buffer =
 		prm::get_buffer({.name = "Spatial Reservoirs",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * sizeof(RestirReservoir)});
+						 .size = Window::width() * Window::height()  * sizeof(RestirReservoir)});
 
 	tmp_col_buffer =
 		prm::get_buffer({.name = "Temporary Color",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * sizeof(float) * 3});
+						 .size = Window::width() * Window::height()  * sizeof(float) * 3});
 
 	SceneDesc desc;
 	desc.index_addr = lumen_scene->index_buffer->get_device_address();
@@ -61,8 +61,8 @@ void ReSTIR::init() {
 
 	frame_num = 0;
 
-	pc_ray.size_x = instance->width;
-	pc_ray.size_y = instance->height;
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 
 	lumen::RenderGraph* rg = vk::render_graph();
 	assert(rg->settings.shader_inference == true);
@@ -103,7 +103,7 @@ void ReSTIR::render() {
 							   {"src/shaders/ray_shadow.rmiss"},
 							   {"src/shaders/ray.rchit"},
 							   {"src/shaders/ray.rahit"}},
-				   .dims = {instance->width, instance->height},
+				   .dims = {Window::width(), Window::height() },
 			   })
 		.push_constants(&pc_ray)
 		.zero(g_buffer)
@@ -121,7 +121,7 @@ void ReSTIR::render() {
 							   {"src/shaders/ray_shadow.rmiss"},
 							   {"src/shaders/ray.rchit"},
 							   {"src/shaders/ray.rahit"}},
-				   .dims = {instance->width, instance->height},
+				   .dims = {Window::width(), Window::height() },
 			   })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
@@ -137,7 +137,7 @@ void ReSTIR::render() {
 							   {"src/shaders/ray_shadow.rmiss"},
 							   {"src/shaders/ray.rchit"},
 							   {"src/shaders/ray.rahit"}},
-				   .dims = {instance->width, instance->height},
+				   .dims = {Window::width(), Window::height() },
 			   })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)

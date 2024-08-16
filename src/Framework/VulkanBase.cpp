@@ -7,6 +7,7 @@
 #include "VulkanBase.h"
 #include "CommandBuffer.h"
 #include "PersistentResourceManager.h"
+#include "Window.h"
 
 namespace vk {
 
@@ -197,8 +198,6 @@ void cleanup() {
 		vkExt_destroy_debug_messenger(context().instance, context().debug_messenger, nullptr);
 	}
 	vkDestroyInstance(context().instance, nullptr);
-	glfwDestroyWindow(context().window_ptr);
-	glfwTerminate();
 }
 
 static void create_allocator() {
@@ -296,7 +295,7 @@ static void create_instance() {
 
 static void create_surface() {
 	check(
-		glfwCreateWindowSurface(context().instance, context().window_ptr, nullptr, &context().surface),
+		glfwCreateWindowSurface(context().instance, Window::get()->window_handle, nullptr, &context().surface),
 		"Failed to create window surface");
 }
 
@@ -500,7 +499,7 @@ static void create_swapchain() {
 			return capabilities.currentExtent;
 		} else {
 			int width, height;
-			glfwGetFramebufferSize(context().window_ptr, &width, &height);
+			glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
 
 			VkExtent2D actual_extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 
@@ -635,7 +634,7 @@ void init_imgui() {
 	// Setup Platform/Renderer backends
 	ImGui::StyleColorsDark();
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-	ImGui_ImplGlfw_InitForVulkan(context().window_ptr, true);
+	ImGui_ImplGlfw_InitForVulkan(Window::get()->window_handle, true);
 
 	ImGui_ImplVulkan_InitInfo init_info = {};
 	init_info.Instance = context().instance;
@@ -680,10 +679,10 @@ void destroy_imgui() {
 // Called after window resize
 void recreate_swap_chain() {
 	int width = 0, height = 0;
-	glfwGetFramebufferSize(context().window_ptr, &width, &height);
+	glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
 	while (width == 0 || height == 0) {
 		// Window is minimized
-		glfwGetFramebufferSize(context().window_ptr, &width, &height);
+		glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
 		glfwWaitEvents();
 	}
 	vkDeviceWaitIdle(context().device);

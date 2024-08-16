@@ -18,8 +18,8 @@ void Path::init() {
 
 	frame_num = 0;
 
-	pc_ray.size_x = instance->width;
-	pc_ray.size_y = instance->height;
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 	assert(vk::render_graph()->settings.shader_inference == true);
 	// For shader resource dependency inference, use this macro to register a buffer address to the rendergraph
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
@@ -44,7 +44,7 @@ void Path::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .dims = {instance->width, instance->height},
+					 .dims = {Window::width(), Window::height() },
 				 })
 		.push_constants(&pc_ray)
 		.bind({

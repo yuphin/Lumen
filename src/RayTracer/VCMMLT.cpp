@@ -7,7 +7,7 @@ static bool light_first = false;
 void VCMMLT::init() {
 	Integrator::init();
 	mutation_count =
-		int(instance->width * instance->height * config->mutations_per_pixel / float(config->num_mlt_threads));
+		int(Window::width() * Window::height()  * config->mutations_per_pixel / float(config->num_mlt_threads));
 	light_path_rand_count = std::max(7 + 3 * config->path_length, 3 + 7 * config->path_length);
 
 	// MLTVCM buffers
@@ -58,7 +58,7 @@ void VCMMLT::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * 3 * sizeof(float)});
+						 .size = Window::width() * Window::height()  * 3 * sizeof(float)});
 
 	chain_stats_buffer =
 		prm::get_buffer({.name = "Chain Stats Buffer",
@@ -85,27 +85,27 @@ void VCMMLT::init() {
 		prm::get_buffer({.name = "Light Path Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * (config->path_length + 1) * sizeof(VCMVertex)});
+						 .size = Window::width() * Window::height()  * (config->path_length + 1) * sizeof(VCMVertex)});
 
 	light_path_cnt_buffer =
 		prm::get_buffer({.name = "Light Path Cnt Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * sizeof(float)});
+						 .size = Window::width() * Window::height()  * sizeof(float)});
 
 	tmp_col_buffer =
 		prm::get_buffer({.name = "Tmp Col Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * sizeof(float) * 3});
+						 .size = Window::width() * Window::height()  * sizeof(float) * 3});
 
 	photon_buffer =
 		prm::get_buffer({.name = "Photon Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = 10 * instance->width * instance->height * sizeof(VCMPhotonHash)});
+						 .size = 10 * Window::width() * Window::height()  * sizeof(VCMPhotonHash)});
 
 	mlt_atomicsum_buffer =
 		prm::get_buffer({.name = "MLT Atomic Sum Buffer",
@@ -220,8 +220,8 @@ void VCMMLT::init() {
 
 	frame_num = 0;
 
-	pc_ray.size_x = instance->width;
-	pc_ray.size_y = instance->height;
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 	pc_ray.mutations_per_pixel = config->mutations_per_pixel;
 	pc_ray.num_mlt_threads = config->num_mlt_threads;
 }
@@ -230,10 +230,6 @@ void VCMMLT::render() {
 	LUMEN_TRACE("Rendering sample {}...", sample_cnt++);
 	const float ppm_base_radius = 0.25f;
 	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	VkClearValue clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
-	VkClearValue clear_depth = {1.0f, 0};
-	VkViewport viewport = vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
-	VkClearValue clear_values[] = {clear_color, clear_depth};
 	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
@@ -312,7 +308,7 @@ void VCMMLT::render() {
 							   {"src/shaders/ray.rchit"},
 							   {"src/shaders/ray.rahit"}},
 				   .specialization_data = spec_consts,
-				   .dims = {instance->width * instance->height},
+				   .dims = {Window::width() * Window::height() },
 			   })
 		.push_constants(&pc_ray)
 		.zero({chain_stats_buffer, mlt_atomicsum_buffer})
@@ -434,7 +430,7 @@ void VCMMLT::render() {
 	// Compositions
 	rg->add_compute("Composition",
 					{.shader = vk::Shader("src/shaders/integrators/vcmmlt/composite.comp"),
-					 .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
+					 .dims = {(uint32_t)std::ceil(Window::width() * Window::height()  / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }

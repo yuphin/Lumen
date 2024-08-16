@@ -7,7 +7,7 @@ void SMLT::init() {
 	mutations_per_pixel = config->mutations_per_pixel;
 	num_mlt_threads = config->num_mlt_threads;
 	num_bootstrap_samples = config->num_bootstrap_samples;
-	mutation_count = int(instance->width * instance->height * mutations_per_pixel / float(num_mlt_threads));
+	mutation_count = int(Window::width() * Window::height() * mutations_per_pixel / float(num_mlt_threads));
 	light_path_rand_count = 6 + 3 * config->path_length;
 	cam_path_rand_count = 3 + 7 * config->path_length;
 
@@ -75,7 +75,7 @@ void SMLT::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * 3 * sizeof(float)});
+						 .size = Window::width() * Window::height() * 3 * sizeof(float)});
 
 	chain_stats_buffer =
 		prm::get_buffer({.name = "Chain Stats Buffer",
@@ -234,9 +234,8 @@ void SMLT::init() {
 	pc_ray.total_light_area = 0;
 
 	frame_num = 0;
-
-	pc_ray.size_x = instance->width;
-	pc_ray.size_y = instance->height;
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 	pc_ray.mutations_per_pixel = mutations_per_pixel;
 	pc_ray.use_vc = 1;
 	pc_ray.use_vm = 0;
@@ -247,7 +246,7 @@ void SMLT::render() {
 	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	VkClearValue clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
 	VkClearValue clear_depth = {1.0f, 0};
-	VkViewport viewport = vk::viewport((float)instance->width, (float)instance->height, 0.0f, 1.0f);
+	VkViewport viewport = vk::viewport((float)Window::width(), (float)Window::height(), 0.0f, 1.0f);
 	VkClearValue clear_values[] = {clear_color, clear_depth};
 	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
@@ -452,7 +451,7 @@ void SMLT::render() {
 	// Compositions
 	rg->add_compute("Composition",
 					{.shader = vk::Shader("src/shaders/integrators/pssmlt/composite.comp"),
-					 .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
+					 .dims = {(uint32_t)std::ceil(Window::width() * Window::height() / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }
@@ -473,9 +472,8 @@ void SMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGrap
 	pc_compute.num_elems = num_elems;
 	auto scan = [&](int num_wgs, int idx) {
 		++counter;
-		rg->add_compute("PrefixScan - Scan",
-						{.shader = vk::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
-						 .dims = {(uint32_t)num_wgs, 1, 1}})
+		rg->add_compute("PrefixScan - Scan", {.shader = vk::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
+											  .dims = {(uint32_t)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
 	};

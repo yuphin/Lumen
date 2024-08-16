@@ -3,8 +3,8 @@
 #include "shaders/integrators/path/path_commons.h"
 class Path : public Integrator {
    public:
-	Path(lumen::LumenInstance* scene, LumenScene* lumen_scene, const vk::BVH& tlas)
-		: Integrator(scene, lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), PathConfig)) {}
+	Path(LumenScene* lumen_scene, const vk::BVH& tlas)
+		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), PathConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;

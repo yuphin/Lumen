@@ -8,7 +8,6 @@
 namespace vk {
 
 struct VulkanContext {
-	GLFWwindow* window_ptr = nullptr;
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debug_messenger;
 	VkSurfaceKHR surface;

@@ -8,8 +8,8 @@
 #include "Framework/PersistentResourceManager.h"
 class Integrator {
    public:
-	Integrator(lumen::LumenInstance* instance, LumenScene* lumen_scene, const vk::BVH& tlas)
-		: instance(instance), lumen_scene(lumen_scene), tlas(tlas) {}
+	Integrator(LumenScene* lumen_scene, const vk::BVH& tlas)
+		: lumen_scene(lumen_scene), tlas(tlas) {}
 	virtual void init();
 	virtual void render(){};
 	virtual bool gui();
@@ -22,8 +22,9 @@ class Integrator {
    protected:
 	void update_uniform_buffers();
 	SceneUBO scene_ubo{};
-	lumen::LumenInstance* instance;
-	LumenScene* lumen_scene;
-	vk::Buffer* scene_ubo_buffer;
+	// uint32_t Window::width() = UINT_MAX;
+	// uint32_t Window::height()  = UINT_MAX;
+	LumenScene* lumen_scene = nullptr;
+	vk::Buffer* scene_ubo_buffer = nullptr;
 	const vk::BVH& tlas;
 };

@@ -43,15 +43,15 @@ void LumenScene::load_scene(const std::string& path) {
 		load_mitsuba_scene(path);
 	}
 
+	const float aspect_ratio = (float)Window::width() / Window::height();
 	if (config->cam_settings.pos != vec3(0)) {
-		camera = std::unique_ptr<lumen::PerspectiveCamera>(new lumen::PerspectiveCamera(
-			config->cam_settings.fov, 0.01f, 1000.0f, (float)instance->width / instance->height,
-			config->cam_settings.dir, config->cam_settings.pos));
+		camera = std::unique_ptr<lumen::PerspectiveCamera>(
+			new lumen::PerspectiveCamera(config->cam_settings.fov, 0.01f, 1000.0f, aspect_ratio,
+										 config->cam_settings.dir, config->cam_settings.pos));
 	} else {
 		// Assume the camera matrix is given
-		camera = std::unique_ptr<lumen::PerspectiveCamera>(
-			new lumen::PerspectiveCamera(config->cam_settings.fov, config->cam_settings.cam_matrix, 0.01f, 1000.0f,
-										 (float)instance->width / instance->height));
+		camera = std::unique_ptr<lumen::PerspectiveCamera>(new lumen::PerspectiveCamera(
+			config->cam_settings.fov, config->cam_settings.cam_matrix, 0.01f, 1000.0f, aspect_ratio));
 	}
 
 	total_light_triangle_cnt = 0;

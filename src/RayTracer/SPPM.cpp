@@ -9,7 +9,7 @@ void SPPM::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * sizeof(SPPMData)});
+						 .size = Window::width() * Window::height()  * sizeof(SPPMData)});
 
 	atomic_data_buffer =
 		prm::get_buffer({.name = "Atomic Data",
@@ -23,14 +23,14 @@ void SPPM::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = 10 * instance->width * instance->height * sizeof(PhotonHash)});
+						 .size = 10 * Window::width() * Window::height()  * sizeof(PhotonHash)});
 
 	residual_buffer =
 		prm::get_buffer({.name = "Residual Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * 4 * sizeof(float)});
+						 .size = Window::width() * Window::height()  * 4 * sizeof(float)});
 
 	counter_buffer =
 		prm::get_buffer({.name = "Counter Buffer",
@@ -60,8 +60,8 @@ void SPPM::init() {
 
 	frame_num = 0;
 
-	pc_ray.size_x = instance->width;
-	pc_ray.size_y = instance->height;
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 
 	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
@@ -96,7 +96,7 @@ void SPPM::render() {
 	pc_ray.grid_res = glm::max(ivec3(diam * float(base_grid_res) / max_comp), ivec3(1));
 	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name, const std::string& reduce_name,
 						 const std::string& reduce_shader_name) {
-		uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
+		uint32_t num_wgs = uint32_t((Window::width() * Window::height()  + 1023) / 1024);
 		vk::render_graph()
 			->add_compute(op_name, {.shader = vk::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
 			.push_constants(&pc_ray)
@@ -126,7 +126,7 @@ void SPPM::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .dims = {instance->width, instance->height},
+					 .dims = {Window::width(), Window::height() },
 				 })
 		.push_constants(&pc_ray)
 		.zero(photon_buffer)
@@ -153,7 +153,7 @@ void SPPM::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .dims = {instance->width, instance->height},
+					 .dims = {Window::width(), Window::height() },
 				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
@@ -164,7 +164,7 @@ void SPPM::render() {
 	vk::render_graph()
 		->add_compute("Gather",
 					  {.shader = vk::Shader("src/shaders/integrators/sppm/gather.comp"),
-					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
+					   .dims = {(uint32_t)std::ceil(Window::width() * Window::height()  / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer)
 		.bind_texture_array(lumen_scene->scene_textures);
@@ -172,7 +172,7 @@ void SPPM::render() {
 	vk::render_graph()
 		->add_compute("Composite",
 					  {.shader = vk::Shader("src/shaders/integrators/sppm/composite.comp"),
-					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
+					   .dims = {(uint32_t)std::ceil(Window::width() * Window::height()  / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }

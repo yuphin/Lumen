@@ -9,7 +9,7 @@ void ReSTIRGI::init() {
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		.memory_type = vk::BufferType::GPU,
-		.size = instance->width * instance->height * sizeof(ReservoirSample),
+		.size = Window::width() * Window::height()  * sizeof(ReservoirSample),
 	});
 
 	restir_samples_old_buffer = prm::get_buffer({
@@ -17,7 +17,7 @@ void ReSTIRGI::init() {
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		.memory_type = vk::BufferType::GPU,
-		.size = instance->width * instance->height * sizeof(ReservoirSample),
+		.size = Window::width() * Window::height()  * sizeof(ReservoirSample),
 	});
 
 	temporal_reservoir_buffer = prm::get_buffer({
@@ -25,7 +25,7 @@ void ReSTIRGI::init() {
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		.memory_type = vk::BufferType::GPU,
-		.size = 2 * instance->width * instance->height * sizeof(Reservoir),
+		.size = 2 * Window::width() * Window::height()  * sizeof(Reservoir),
 	});
 
 	spatial_reservoir_buffer = prm::get_buffer({
@@ -33,14 +33,14 @@ void ReSTIRGI::init() {
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		.memory_type = vk::BufferType::GPU,
-		.size = 2 * instance->width * instance->height * sizeof(Reservoir),
+		.size = 2 * Window::width() * Window::height()  * sizeof(Reservoir),
 	});
 
 	tmp_col_buffer = prm::get_buffer({
 		.name = "Temp Color",
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		.memory_type = vk::BufferType::GPU,
-		.size = instance->width * instance->height * sizeof(float) * 3,
+		.size = Window::width() * Window::height()  * sizeof(float) * 3,
 	});
 
 	SceneDesc desc;
@@ -67,8 +67,8 @@ void ReSTIRGI::init() {
 	frame_num = 0;
 
 	pc_ray.total_frame_num = 0;
-	pc_ray.size_x = instance->width;
-	pc_ray.size_y = instance->height;
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 	pc_ray.world_radius = lumen_scene->m_dimensions.radius;
 	assert(vk::render_graph()->settings.shader_inference == true);
 	lumen::RenderGraph* rg = vk::render_graph();
@@ -107,7 +107,7 @@ void ReSTIRGI::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .dims = {instance->width, instance->height},
+					 .dims = {Window::width(), Window::height() },
 				 })
 		.push_constants(&pc_ray)
 		.zero(restir_samples_buffer)
@@ -128,7 +128,7 @@ void ReSTIRGI::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .dims = {instance->width, instance->height},
+					 .dims = {Window::width(), Window::height() },
 				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
@@ -145,7 +145,7 @@ void ReSTIRGI::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .dims = {instance->width, instance->height},
+					 .dims = {Window::width(), Window::height() },
 				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
@@ -156,7 +156,7 @@ void ReSTIRGI::render() {
 	vk::render_graph()
 		->add_compute("Output",
 					  {.shader = vk::Shader("src/shaders/integrators/restir/gi/output.comp"),
-					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
+					   .dims = {(uint32_t)std::ceil(Window::width() * Window::height()  / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
 	if (!do_spatiotemporal) {

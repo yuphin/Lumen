@@ -136,51 +136,12 @@ struct MouseInput {
 };
 
 using MouseClickCallback = std::function<void(MouseAction button, KeyAction action, double x, double y)>;
-using MouseMoveCallback = std::function<void(double delta_x, double delta_y,  double x, double y)>;
+using MouseMoveCallback = std::function<void(double delta_x, double delta_y, double x, double y)>;
 using MouseScrollCallback = std::function<void(double x, double y)>;
 using KeyCallback = std::function<void(KeyInput input, KeyAction action)>;
-class Window {
-   public:
-	Window(int width, int height, bool fullscreen);
-	void poll();
-	inline bool should_close() { return glfwWindowShouldClose(window_handle); }
-	inline bool is_key_down(KeyInput input) { return key_map[input] == KeyAction::PRESS; }
-	inline bool is_key_up(KeyInput input) { return key_map[input] == KeyAction::RELEASE; }
-	inline bool is_key_held(KeyInput input) {
-		return key_map[input] == KeyAction::PRESS || key_map[input] == KeyAction::REPEAT;
-	}
-	inline bool is_mouse_held(MouseAction mb) {
-		auto res = mouse_map.find(mb);
-		return res != mouse_map.end() && 
-			(res->second.action == KeyAction::PRESS || res->second.action == KeyAction::REPEAT );
-	}
-	inline bool is_mouse_down(MouseAction mb) { 
-		auto res = mouse_map.find(mb);
-		return res != mouse_map.end() && res->second.action ==  KeyAction::PRESS;
-	}
-	inline bool is_mouse_up(MouseAction mb) { 
-		auto res = mouse_map.find(mb);
-		return res != mouse_map.end() && res->second.action == KeyAction::RELEASE;
-	}
-	bool is_mouse_held(MouseAction mb, glm::ivec2& pos);
-	bool is_mouse_up(MouseAction mb, glm::ivec2& pos);
-	~Window();
-	inline GLFWwindow* get_window_ptr() { return window_handle; }
-	inline bool window_resized() { return resized; }
-	bool resized = false;
-	void add_mouse_click_callback(MouseClickCallback callback);
-	void add_mouse_move_callback(MouseMoveCallback callback);
-	void add_scroll_callback(MouseScrollCallback callback);
-	void add_key_callback(KeyCallback callback);
+namespace Window {
 
-   private:
-	GLFWwindow* window_handle;
-	static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
-	static void window_size_callback(GLFWwindow* window, int width, int height);
-	static void char_callback(GLFWwindow* window, uint32_t codepoint);
-	static void mouse_click_callback(GLFWwindow* window, int button, int action, int mods);
-	static void mouse_move_callback(GLFWwindow* window, double x, double y);
-	static void scroll_callback(GLFWwindow* window, double x, double y);
+struct Window {
 	std::unordered_map<KeyInput, KeyAction> key_map{};
 	std::unordered_map<MouseAction, MouseInput> mouse_map{};
 	std::vector<MouseClickCallback> mouse_click_callbacks;
@@ -191,4 +152,31 @@ class Window {
 	double mouse_prev_x, mouse_prev_y;
 	double mouse_delta_prev_x, mouse_delta_prev_y;
 	double mouse_last_x, mouse_last_y;
+	GLFWwindow* window_handle;
+	uint32_t window_width;
+	uint32_t window_height;
+	uint32_t viewport_width;
+	uint32_t viewport_height;
 };
+void init(int width, int height, bool fullscreen);
+Window* get();
+void update_window_size();
+void poll();
+bool should_close();
+bool is_key_down(KeyInput input);
+bool is_key_up(KeyInput input);
+bool is_key_held(KeyInput input);
+bool is_mouse_held(MouseAction mb);
+bool is_mouse_down(MouseAction mb);
+bool is_mouse_up(MouseAction mb);
+bool is_mouse_held(MouseAction mb, glm::ivec2& pos);
+bool is_mouse_up(MouseAction mb, glm::ivec2& pos);
+void destroy();
+void add_mouse_click_callback(MouseClickCallback callback);
+void add_mouse_move_callback(MouseMoveCallback callback);
+void add_scroll_callback(MouseScrollCallback callback);
+void add_key_callback(KeyCallback callback);
+uint32_t width();
+uint32_t height();
+
+};	// namespace Window

@@ -14,13 +14,14 @@
 #include "ReSTIRPT.h"
 #include "DDGI.h"
 #include "PostFX.h"
+#include "Framework/Window.h"
 
-class RayTracer : public lumen::LumenInstance {
+class RayTracer {
    public:
-	RayTracer(int width, int height, bool debug, int, char*[]);
-	void init(Window*) override;
-	void update() override;
-	void cleanup() override;
+	RayTracer(bool debug, int, char*[]);
+	void init();
+	void update();
+	void cleanup();
 	static RayTracer* instance;
 	inline static RayTracer* get() { return instance; }
 	bool resized = false;
@@ -62,6 +63,7 @@ class RayTracer : public lumen::LumenInstance {
 	LumenScene scene;
 
 	clock_t start;
+	bool debug = false;
 	bool write_exr = false;
 	bool has_gt = false;
 	bool show_cam_stats = false;

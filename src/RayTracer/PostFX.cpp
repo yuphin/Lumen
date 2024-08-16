@@ -4,7 +4,7 @@
 #include "Framework/PersistentResourceManager.h"
 #include "Framework/DynamicResourceManager.h"
 
-void PostFX::init(lumen::LumenInstance& instance) {
+void PostFX::init() {
 	VkSamplerCreateInfo sampler_ci = vk::sampler();
 	sampler_ci.minFilter = VK_FILTER_NEAREST;
 	sampler_ci.magFilter = VK_FILTER_NEAREST;
@@ -20,19 +20,20 @@ void PostFX::init(lumen::LumenInstance& instance) {
 	int width, height;
 	float* data = ImageUtils::load_exr(img_name_kernel, width, height);
 	auto img_dims = VkExtent2D{(uint32_t)width, (uint32_t)height};
-	vk::Texture* kernel_org = drm::get({.name = "Kernel",
-												.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-												.dimensions = {(uint32_t)width, (uint32_t)height, 1},
-												.format = VK_FORMAT_R32G32B32A32_SFLOAT,
-												.data = {.data = data, .size = width * height * 4 * sizeof(float)},
-												.sampler = img_sampler});
+	vk::Texture* kernel_org =
+		drm::get({.name = "Kernel",
+				  .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+				  .dimensions = {(uint32_t)width, (uint32_t)height, 1},
+				  .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+				  .data = {.data = data, .size = width * height * 4 * sizeof(float)},
+				  .sampler = img_sampler});
 
 	if (data) {
 		free(data);
 	}
 	// Compute padded sizes
-	uint32_t padded_width = 1 << uint32_t(ceil(log2(double(instance.width + kernel_org->extent.width))));
-	uint32_t padded_height = 1 << uint32_t(ceil(log2(double(instance.height + kernel_org->extent.height))));
+	uint32_t padded_width = 1 << uint32_t(ceil(log2(double(Window::width() + kernel_org->extent.width))));
+	uint32_t padded_height = 1 << uint32_t(ceil(log2(double(Window::height() + kernel_org->extent.height))));
 
 	auto empty_tex_desc = vk::TextureDesc{.name = "FFT - Ping",
 										  .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,

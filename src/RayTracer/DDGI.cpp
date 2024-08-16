@@ -91,7 +91,7 @@ void DDGI::init() {
 		output_tex = prm::get_texture({
 			.name = "DDGI Output",
 			.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-			.dimensions = {instance->width, instance->height, 1},
+			.dimensions = {Window::width(), Window::height(), 1},
 			.format = VK_FORMAT_R16G16B16A16_SFLOAT,
 			.initial_layout = VK_IMAGE_LAYOUT_GENERAL,
 			.sampler = bilinear_sampler,
@@ -102,14 +102,14 @@ void DDGI::init() {
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		.memory_type = vk::BufferType::GPU,
-		.size = instance->width * instance->height * sizeof(GBufferData),
+		.size = Window::width() * Window::height() * sizeof(GBufferData),
 	});
 
 	direct_lighting_buffer = prm::get_buffer({
 		.name = "Direct Lighting",
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		.memory_type = vk::BufferType::GPU,
-		.size = instance->width * instance->height * sizeof(glm::vec3),
+		.size = Window::width() * Window::height() * sizeof(glm::vec3),
 	});
 
 	ddgi_ubo_buffer = prm::get_buffer({
@@ -139,12 +139,9 @@ void DDGI::init() {
 	desc.g_buffer_addr = g_buffer->get_device_address();
 
 	assert(vk::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, direct_lighting_addr, direct_lighting_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, probe_offsets_addr, probe_offsets_buffer,
-								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, direct_lighting_addr, direct_lighting_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, probe_offsets_addr, probe_offsets_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, g_buffer, vk::render_graph());
 
 	lumen_scene->scene_desc_buffer =
@@ -159,8 +156,8 @@ void DDGI::init() {
 
 	frame_num = 0;
 
-	pc_ray.size_x = instance->width;
-	pc_ray.size_y = instance->height;
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 }
 
 void DDGI::render() {
@@ -196,7 +193,7 @@ void DDGI::render() {
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
 					 .specialization_data = {1},
-					 .dims = {(uint32_t)instance->width, (uint32_t)instance->height},
+					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc_ray)
 		.zero(g_buffer)
@@ -238,7 +235,7 @@ void DDGI::render() {
 			vk::render_graph()
 				->add_compute(is_irr ? "Update Irradiance" : "Update Depth",
 							  {.shader = vk::Shader(is_irr ? "src/shaders/integrators/ddgi/update_irradiance.comp"
-															  : "src/shaders/integrators/ddgi/update_depth.comp"),
+														   : "src/shaders/integrators/ddgi/update_depth.comp"),
 							   .dims = {wg_x, wg_y}})
 				.push_constants(&pc_ray)
 				.bind({lumen_scene->scene_desc_buffer, irr_texes[!ping_pong], depth_texes[!ping_pong],
@@ -257,8 +254,8 @@ void DDGI::render() {
 			.bind({irr_texes[!ping_pong], depth_texes[!ping_pong], ddgi_ubo_buffer});
 	}
 	// Sample probes & output into texture
-	wg_x = (instance->width + 31) / 32;
-	uint32_t wg_y = (instance->height + 31) / 32;
+	wg_x = (Window::width() + 31) / 32;
+	uint32_t wg_y = (Window::height() + 31) / 32;
 	vk::render_graph()
 		->add_compute("Sample Probes",
 					  {.shader = vk::Shader("src/shaders/integrators/ddgi/sample.comp"), .dims = {wg_x, wg_y}})
@@ -276,8 +273,8 @@ void DDGI::render() {
 			.bind({scene_ubo_buffer, lumen_scene->scene_desc_buffer, ddgi_ubo_buffer, rt.dir_depth_tex});
 	}
 	// Output
-	wg_x = (instance->width + 31) / 32;
-	wg_y = (instance->height + 31) / 32;
+	wg_x = (Window::width() + 31) / 32;
+	wg_y = (Window::height() + 31) / 32;
 	vk::render_graph()
 		->add_compute("DDGI Output",
 					  {.shader = vk::Shader("src/shaders/integrators/ddgi/out.comp"), .dims = {wg_x, wg_y}})

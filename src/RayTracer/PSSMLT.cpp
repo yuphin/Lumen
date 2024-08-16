@@ -80,7 +80,7 @@ void PSSMLT::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * 3 * sizeof(float)});
+						 .size = Window::width() * Window::height()  * 3 * sizeof(float)});
 
 	chain_stats_buffer =
 		prm::get_buffer({.name = "Chain Stats",
@@ -203,11 +203,11 @@ void PSSMLT::init() {
 
 	frame_num = 0;
 
-	pc_ray.size_x = instance->width;
-	pc_ray.size_y = instance->height;
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 
 	mutation_count =
-		int(instance->width * instance->height * config->mutations_per_pixel / float(config->num_mlt_threads));
+		int(Window::width() * Window::height()  * config->mutations_per_pixel / float(config->num_mlt_threads));
 	pc_ray.mutations_per_pixel = config->mutations_per_pixel;
 }
 
@@ -372,7 +372,7 @@ void PSSMLT::render() {
 	// Compositions
 	rg->add_compute("Composition",
 					{.shader = vk::Shader("src/shaders/integrators/pssmlt/composite.comp"),
-					 .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
+					 .dims = {(uint32_t)std::ceil(Window::width() * Window::height()  / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }

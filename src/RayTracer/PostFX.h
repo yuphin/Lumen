@@ -9,7 +9,7 @@
 
 class PostFX {
 public:
-	void init(lumen::LumenInstance& instance);
+	void init();
 	void render(vk::Texture* input, vk::Texture* output);
 	bool gui();
 	void destroy();

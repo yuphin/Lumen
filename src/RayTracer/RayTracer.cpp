@@ -11,33 +11,30 @@ RayTracer* RayTracer::instance = nullptr;
 bool load_reference = false;
 bool calc_rmse = false;
 
-RayTracer::RayTracer(int width, int height, bool debug, int argc, char* argv[])
-	: LumenInstance(width, height, debug), scene(this) {
-	this->instance = this;
+RayTracer::RayTracer(bool debug, int argc, char* argv[]) : debug(debug) {
+	instance = this;
 	parse_args(argc, argv);
 }
 
-void RayTracer::init(Window* window) {
+void RayTracer::init() {
 	srand((uint32_t)time(NULL));
-	this->window = window;
-	vk::context().window_ptr = window->get_window_ptr();
-	window->add_key_callback([this](KeyInput key, KeyAction action) {
-		if (instance->window->is_key_down(KeyInput::KEY_F10)) {
+	Window::add_key_callback([this](KeyInput key, KeyAction action) {
+		if (Window::is_key_down(KeyInput::KEY_F10)) {
 			write_exr = true;
-		} else if (instance->window->is_key_down(KeyInput::KEY_F11)) {
+		} else if (Window::is_key_down(KeyInput::KEY_F11)) {
 			comparison_mode ^= true;
-		} else if (instance->window->is_key_down(KeyInput::KEY_F5)) {
+		} else if (Window::is_key_down(KeyInput::KEY_F5)) {
 			vk::render_graph()->reload_shaders = true;
 			vk::render_graph()->shader_cache.clear();
 			vk::render_graph()->set_pipelines_dirty();
 			integrator->updated = true;
-		} else if (instance->window->is_key_down(KeyInput::KEY_F6)) {
+		} else if (Window::is_key_down(KeyInput::KEY_F6)) {
 			capture_ref_img = true;
-		} else if (instance->window->is_key_down(KeyInput::KEY_F7)) {
+		} else if (Window::is_key_down(KeyInput::KEY_F7)) {
 			capture_target_img = true;
-		} else if (comparison_mode && instance->window->is_key_down(KeyInput::KEY_LEFT)) {
+		} else if (comparison_mode && Window::is_key_down(KeyInput::KEY_LEFT)) {
 			comparison_img_toggle = false;
-		} else if (comparison_mode && instance->window->is_key_down(KeyInput::KEY_RIGHT)) {
+		} else if (comparison_mode && Window::is_key_down(KeyInput::KEY_RIGHT)) {
 			comparison_img_toggle = true;
 		}
 	});
@@ -66,31 +63,32 @@ void RayTracer::init(Window* window) {
 	create_accel();
 	create_integrator(int(scene.config->integrator_type));
 	integrator->init();
-	post_fx.init(*instance);
+	post_fx.init();
 	init_resources();
 	LUMEN_TRACE("Memory usage {} MB", vk::get_memory_usage(vk::context().physical_device) * 1e-6);
 }
 
 void RayTracer::init_resources() {
+	uint32_t viewport_size = Window::width() * Window::height();
 	output_img_buffer =
 		prm::get_buffer({.name = "Output Image Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * 4 * 4});
+						 .size = viewport_size * 4 * 4});
 
 	output_img_buffer_cpu =
 		prm::get_buffer({.name = "Output Image CPU",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU_TO_CPU,
-						 .size = instance->width * instance->height * 4 * 4});
+						 .size = viewport_size * 4 * 4});
 
 	residual_buffer =
 		prm::get_buffer({.name = "RMSE Residual",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * 4});
+						 .size = viewport_size * 4});
 
 	counter_buffer =
 		prm::get_buffer({.name = "RMSE Counter",
@@ -108,7 +106,7 @@ void RayTracer::init_resources() {
 	auto texture_desc = vk::TextureDesc{.name = "Reference Texture",
 										.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
 												 VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-										.dimensions = {instance->width, instance->height, 1},
+										.dimensions = {Window::width(), Window::height(), 1},
 										.format = VK_FORMAT_R32G32B32A32_SFLOAT,
 										.initial_layout = VK_IMAGE_LAYOUT_GENERAL};
 	reference_tex = prm::get_texture(texture_desc);
@@ -127,7 +125,7 @@ void RayTracer::init_resources() {
 			prm::get_buffer({.name = "Ground Truth Image",
 							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 .memory_type = vk::BufferType::GPU,
-							 .size = width * height * 4 * sizeof(float),
+							 .size = Window::width() * Window::height()  * 4 * sizeof(float),
 							 .data = data});
 		rt_utils_desc.gt_img_addr = gt_img_buffer->get_device_address();
 		free(data);
@@ -228,7 +226,7 @@ void RayTracer::render_debug_utils() {
 	if (calc_rmse && has_gt) {
 		auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name,
 							 const std::string& reduce_name, const std::string& reduce_shader_name) {
-			uint32_t num_wgs = uint32_t((instance->width * instance->height + 1023) / 1024);
+			uint32_t num_wgs = uint32_t((Window::width() * Window::height() + 1023) / 1024);
 			vk::render_graph()
 				->add_compute(op_name, {.shader = vk::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
 				.push_constants(&rt_utils_pc)
@@ -247,7 +245,8 @@ void RayTracer::render_debug_utils() {
 		op_reduce("OpReduce: RMSE", "src/shaders/rmse/calc_rmse.comp", "OpReduce: Reduce RMSE",
 				  "src/shaders/rmse/reduce_rmse.comp");
 		vk::render_graph()
-			->add_compute("Calculate RMSE", {.shader = vk::Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1}})
+			->add_compute("Calculate RMSE",
+						  {.shader = vk::Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1}})
 			.push_constants(&rt_utils_pc)
 			.bind(rt_utils_desc_buffer);
 	}
@@ -256,37 +255,37 @@ void RayTracer::render_debug_utils() {
 void RayTracer::create_integrator(int integrator_idx) {
 	switch (integrator_idx) {
 		case int(IntegratorType::Path):
-			integrator = std::make_unique<Path>(this, &scene, tlas);
+			integrator = std::make_unique<Path>(&scene, tlas);
 			break;
 		case int(IntegratorType::BDPT):
-			integrator = std::make_unique<BDPT>(this, &scene, tlas);
+			integrator = std::make_unique<BDPT>(&scene, tlas);
 			break;
 		case int(IntegratorType::SPPM):
-			integrator = std::make_unique<SPPM>(this, &scene, tlas);
+			integrator = std::make_unique<SPPM>(&scene, tlas);
 			break;
 		case int(IntegratorType::VCM):
-			integrator = std::make_unique<VCM>(this, &scene, tlas);
+			integrator = std::make_unique<VCM>(&scene, tlas);
 			break;
 		case int(IntegratorType::ReSTIR):
-			integrator = std::make_unique<ReSTIR>(this, &scene, tlas);
+			integrator = std::make_unique<ReSTIR>(&scene, tlas);
 			break;
 		case int(IntegratorType::ReSTIRGI):
-			integrator = std::make_unique<ReSTIRGI>(this, &scene, tlas);
+			integrator = std::make_unique<ReSTIRGI>(&scene, tlas);
 			break;
 		case int(IntegratorType::ReSTIRPT):
-			integrator = std::make_unique<ReSTIRPT>(this, &scene, tlas);
+			integrator = std::make_unique<ReSTIRPT>(&scene, tlas);
 			break;
 		case int(IntegratorType::PSSMLT):
-			integrator = std::make_unique<PSSMLT>(this, &scene, tlas);
+			integrator = std::make_unique<PSSMLT>(&scene, tlas);
 			break;
 		case int(IntegratorType::SMLT):
-			integrator = std::make_unique<SMLT>(this, &scene, tlas);
+			integrator = std::make_unique<SMLT>(&scene, tlas);
 			break;
 		case int(IntegratorType::VCMMLT):
-			integrator = std::make_unique<VCMMLT>(this, &scene, tlas);
+			integrator = std::make_unique<VCMMLT>(&scene, tlas);
 			break;
 		case int(IntegratorType::DDGI):
-			integrator = std::make_unique<DDGI>(this, &scene, tlas);
+			integrator = std::make_unique<DDGI>(&scene, tlas);
 			break;
 		default:
 			break;
@@ -412,14 +411,14 @@ float RayTracer::draw_frame() {
 	auto resize_func = [this]() {
 		vk::render_graph()->settings.shader_inference = enable_shader_inference;
 		vk::render_graph()->settings.use_events = use_events;
-		glfwGetWindowSize(window->get_window_ptr(), (int*)&width, (int*)&height);
+		Window::update_window_size();
 		cleanup_resources();
 		integrator->destroy();
 		post_fx.destroy();
 		vk::destroy_imgui();
 
 		integrator->init();
-		post_fx.init(*instance);
+		post_fx.init();
 		init_resources();
 		vk::init_imgui();
 		integrator->updated = true;
@@ -463,7 +462,7 @@ float RayTracer::draw_frame() {
 
 	if (write_exr) {
 		write_exr = false;
-		ImageUtils::save_exr((float*)vk::map_buffer(output_img_buffer_cpu), instance->width, instance->height, "out.exr");
+		ImageUtils::save_exr((float*)vk::map_buffer(output_img_buffer_cpu), Window::width(), Window::height(), "out.exr");
 		vk::unmap_buffer(output_img_buffer_cpu);
 	}
 	bool time_limit = (abs(diff / CLOCKS_PER_SEC - 5)) < 0.1;

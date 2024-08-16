@@ -6,28 +6,25 @@
 #include "Framework/VkUtils.h"
 
 void Integrator::init() {
-	lumen::LumenInstance* instance = this->instance;
-	Window* window = instance->window;
-
 	lumen::Camera* cam_ptr = lumen_scene->camera.get();
-	instance->window->add_mouse_click_callback(
-		[cam_ptr, this, window](MouseAction button, KeyAction action, double x, double y) {
+	Window::add_mouse_click_callback(
+		[cam_ptr, this](MouseAction button, KeyAction action, double x, double y) {
 			if (ImGui::GetIO().WantCaptureMouse) {
 				return;
 			}
-			if (updated && window->is_mouse_up(MouseAction::LEFT)) {
+			if (updated && Window::is_mouse_up(MouseAction::LEFT)) {
 				updated = true;
 			}
-			if (updated && window->is_mouse_down(MouseAction::LEFT)) {
+			if (updated && Window::is_mouse_down(MouseAction::LEFT)) {
 				updated = true;
 			}
 		});
-	instance->window->add_mouse_move_callback(
-		[window, cam_ptr, this](double delta_x, double delta_y, double x, double y) {
+	Window::add_mouse_move_callback(
+		[cam_ptr, this](double delta_x, double delta_y, double x, double y) {
 			if (ImGui::GetIO().WantCaptureMouse) {
 				return;
 			}
-			if (window->is_mouse_held(MouseAction::LEFT) && !window->is_key_held(KeyInput::KEY_TAB)) {
+			if (Window::is_mouse_held(MouseAction::LEFT) && !Window::is_key_held(KeyInput::KEY_TAB)) {
 				cam_ptr->rotate(0.05f * (float)delta_y, -0.05f * (float)delta_x, 0.0f);
 				updated = true;
 			}
@@ -37,7 +34,7 @@ void Integrator::init() {
 		.name = "Color Output",
 		.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
 				 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-		.dimensions = {instance->width, instance->height, 1},
+		.dimensions = {Window::width(), Window::height() , 1},
 		.format = VK_FORMAT_R32G32B32A32_SFLOAT,
 		.initial_layout = VK_IMAGE_LAYOUT_GENERAL,
 	});
@@ -77,7 +74,7 @@ void Integrator::update_uniform_buffers() {
 bool Integrator::update() {
 	float trans_speed = 0.01f;
 	glm::vec3 front;
-	if (instance->window->is_key_held(KeyInput::KEY_LEFT_SHIFT)) {
+	if (Window::is_key_held(KeyInput::KEY_LEFT_SHIFT)) {
 		trans_speed *= 4;
 	}
 
@@ -85,38 +82,38 @@ bool Integrator::update() {
 	front.y = sin(glm::radians(lumen_scene->camera->rotation.x));
 	front.z = cos(glm::radians(lumen_scene->camera->rotation.x)) * cos(glm::radians(lumen_scene->camera->rotation.y));
 	front = glm::normalize(-front);
-	if (instance->window->is_key_held(KeyInput::KEY_W)) {
+	if (Window::is_key_held(KeyInput::KEY_W)) {
 		lumen_scene->camera->position += front * trans_speed;
 		updated = true;
 	}
-	if (instance->window->is_key_held(KeyInput::KEY_A)) {
+	if (Window::is_key_held(KeyInput::KEY_A)) {
 		lumen_scene->camera->position -= glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * trans_speed;
 		updated = true;
 	}
-	if (instance->window->is_key_held(KeyInput::KEY_S)) {
+	if (Window::is_key_held(KeyInput::KEY_S)) {
 		lumen_scene->camera->position -= front * trans_speed;
 		updated = true;
 	}
-	if (instance->window->is_key_held(KeyInput::KEY_D)) {
+	if (Window::is_key_held(KeyInput::KEY_D)) {
 		lumen_scene->camera->position += glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * trans_speed;
 		updated = true;
 	}
-	if (instance->window->is_key_held(KeyInput::SPACE) || instance->window->is_key_held(KeyInput::KEY_E)) {
+	if (Window::is_key_held(KeyInput::SPACE) || Window::is_key_held(KeyInput::KEY_E)) {
 		// Right
 		auto right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
 		auto up = glm::cross(right, front);
 		lumen_scene->camera->position += up * trans_speed;
 		updated = true;
 	}
-	if (instance->window->is_key_held(KeyInput::KEY_LEFT_CONTROL) || instance->window->is_key_held(KeyInput::KEY_Q)) {
+	if (Window::is_key_held(KeyInput::KEY_LEFT_CONTROL) || Window::is_key_held(KeyInput::KEY_Q)) {
 		auto right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
 		auto up = glm::cross(right, front);
 		lumen_scene->camera->position -= up * trans_speed;
 		updated = true;
 	}
 
-	if (instance->window->is_mouse_held(MouseAction::LEFT, scene_ubo.clicked_pos) &&
-		instance->window->is_key_held(KeyInput::KEY_TAB)) {
+	if (Window::is_mouse_held(MouseAction::LEFT, scene_ubo.clicked_pos) &&
+		Window::is_key_held(KeyInput::KEY_TAB)) {
 		scene_ubo.debug_click = 1;
 	} else {
 		scene_ubo.debug_click = 0;

@@ -43,7 +43,7 @@ struct LumenLight {
 
 class LumenScene {
    public:
-   LumenScene(lumen::LumenInstance* instance) : instance(instance) {}
+   LumenScene() = default;
 	void load_scene(const std::string& path);
 	void destroy();
 	std::vector<glm::vec3> positions;
@@ -92,6 +92,5 @@ class LumenScene {
 	void load_lumen_scene(const std::string& path);
 	void load_mitsuba_scene(const std::string& path);
 	void add_default_texture();
-	lumen::LumenInstance* instance;
 	VkSampler texture_sampler;
 };

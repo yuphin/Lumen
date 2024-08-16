@@ -15,41 +15,41 @@ void VCM::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = 10 * instance->width * instance->height * sizeof(VCMPhotonHash)});
+						 .size = 10 * Window::width() * Window::height()  * sizeof(VCMPhotonHash)});
 
 	vcm_light_vertices_buffer =
 		prm::get_buffer({.name = "VCM Light Vertices",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * (config->path_length + 1) * sizeof(VCMVertex)});
+						 .size = Window::width() * Window::height()  * (config->path_length + 1) * sizeof(VCMVertex)});
 
 	light_path_cnt_buffer =
 		prm::get_buffer({.name = "Light Path Count",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * sizeof(float)});
+						 .size = Window::width() * Window::height()  * sizeof(float)});
 
 	color_storage_buffer =
 		prm::get_buffer({.name = "Color Storage",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * 3 * sizeof(float)});
+						 .size = Window::width() * Window::height()  * 3 * sizeof(float)});
 
 	vcm_reservoir_buffer =
 		prm::get_buffer({.name = "VCM Reservoirs",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * sizeof(VCMReservoir)});
+						 .size = Window::width() * Window::height()  * sizeof(VCMReservoir)});
 
 	light_samples_buffer =
 		prm::get_buffer({.name = "Light Samples",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * sizeof(VCMRestirData)});
+						 .size = Window::width() * Window::height()  * sizeof(VCMRestirData)});
 
 	should_resample_buffer =
 		prm::get_buffer({.name = "Should Resample",
@@ -63,7 +63,7 @@ void VCM::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * sizeof(LightState)});
+						 .size = Window::width() * Window::height()  * sizeof(LightState)});
 
 	angle_struct_buffer =
 		prm::get_buffer({.name = "Angle Struct",
@@ -106,8 +106,8 @@ void VCM::init() {
 
 	frame_num = 0;
 
-	pc_ray.size_x = instance->width;
-	pc_ray.size_y = instance->height;
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 
 	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
@@ -165,7 +165,7 @@ void VCM::render() {
 		vk::render_graph()
 			->add_compute("Init Reservoirs",
 						  {.shader = vk::Shader("src/shaders/integrators/vcm/init_reservoirs.comp"),
-						   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
+						   .dims = {(uint32_t)std::ceil(Window::width() * Window::height()  / float(1024.0f)), 1, 1}})
 			.push_constants(&pc_ray)
 			.bind(lumen_scene->scene_desc_buffer)
 			.zero(photon_buffer, config->enable_vm);
@@ -185,7 +185,7 @@ void VCM::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .dims = {instance->width, instance->height},
+					 .dims = {Window::width(), Window::height() },
 				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
@@ -197,7 +197,7 @@ void VCM::render() {
 	vk::render_graph()
 		->add_compute("Check Reservoirs",
 					  {.shader = vk::Shader("src/shaders/integrators/vcm/check_reservoirs.comp"),
-					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
+					   .dims = {(uint32_t)std::ceil(Window::width() * Window::height()  / float(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer)
 		.zero(should_resample_buffer);
@@ -211,7 +211,7 @@ void VCM::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .dims = {instance->width, instance->height},
+					 .dims = {Window::width(), Window::height() },
 				 })
 		.push_constants(&pc_ray)
 		.zero(light_state_buffer)
@@ -229,7 +229,7 @@ void VCM::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .dims = {instance->width, instance->height},
+					 .dims = {Window::width(), Window::height() },
 				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
@@ -240,7 +240,7 @@ void VCM::render() {
 	vk::render_graph()
 		->add_compute("Select Reservoir",
 					  {.shader = vk::Shader("src/shaders/integrators/vcm/select_reservoirs.comp"),
-					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
+					   .dims = {(uint32_t)std::ceil(Window::width() * Window::height()  / float(1024.0f)), 1, 1}})
 		.bind(lumen_scene->scene_desc_buffer)
 		.push_constants(&pc_ray);
 
@@ -248,7 +248,7 @@ void VCM::render() {
 	vk::render_graph()
 		->add_compute("Update Reservoirs",
 					  {.shader = vk::Shader("src/shaders/integrators/vcm/update_reservoirs.comp"),
-					   .dims = {(uint32_t)std::ceil(instance->width * instance->height / float(1024.0f)), 1, 1}})
+					   .dims = {(uint32_t)std::ceil(Window::width() * Window::height()  / float(1024.0f)), 1, 1}})
 		.bind(lumen_scene->scene_desc_buffer)
 		.push_constants(&pc_ray);
 	// Trace rays from eye
@@ -260,7 +260,7 @@ void VCM::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .dims = {instance->width, instance->height},
+					 .dims = {Window::width(), Window::height() },
 				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)

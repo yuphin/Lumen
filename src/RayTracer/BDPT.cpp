@@ -9,18 +9,18 @@ void BDPT::init() {
 		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		 .memory_type = vk::BufferType::GPU,
-		 .size = instance->width * instance->height * (lumen_scene->config->path_length + 1) * sizeof(PathVertex)});
+		 .size = Window::width() * Window::height()  * (lumen_scene->config->path_length + 1) * sizeof(PathVertex)});
 	camera_path_buffer = prm::get_buffer(
 		{.name = "Camera Path Buffer",
 		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		 .memory_type = vk::BufferType::GPU,
-		 .size = instance->width * instance->height * (lumen_scene->config->path_length + 1) * sizeof(PathVertex)});
+		 .size = Window::width() * Window::height()  * (lumen_scene->config->path_length + 1) * sizeof(PathVertex)});
 	color_storage_buffer =
 		prm::get_buffer({.name = "Color Storage Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = instance->width * instance->height * 3 * 4});
+						 .size = Window::width() * Window::height()  * 3 * 4});
 	SceneDesc desc;
 	desc.index_addr = lumen_scene->index_buffer->get_device_address();
 
@@ -41,8 +41,8 @@ void BDPT::init() {
 
 	frame_num = 0;
 
-	pc_ray.size_x = instance->width;
-	pc_ray.size_y = instance->height;
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
 								 vk::render_graph());
@@ -72,7 +72,7 @@ void BDPT::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .dims = {instance->width, instance->height},
+					 .dims = {Window::width(), Window::height() },
 				 })
 		.zero(light_path_buffer)
 		.zero(camera_path_buffer)

@@ -15,17 +15,17 @@ int main(int argc, char* argv[]) {
 	int height = 1080;
 	Logger::init();
 	lumen::ThreadPool::init();
-	Window window(width, height, fullscreen);
+	Window::init(width, height, fullscreen);
 	{
-		RayTracer app(width, height, enable_debug, argc, argv);
-		app.init(&window);
-		while (!window.should_close()) {
-			window.poll();
+		RayTracer app(enable_debug, argc, argv);
+		app.init();
+		while (!Window::should_close()) {
+			Window::poll();
 			app.update();
 		}
 		app.cleanup();
 	}
-
+	Window::destroy();
 	lumen::ThreadPool::destroy();
 	return 0;
 }
