@@ -129,7 +129,6 @@ void ReSTIRPT::init() {
 }
 
 void ReSTIRPT::render() {
-	vk::CommandBuffer cmd(/*start*/ true);
 	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
 	pc_ray.prev_random_num = pc_ray.general_seed;
 	pc_ray.sampling_seed = rand() % UINT_MAX;
