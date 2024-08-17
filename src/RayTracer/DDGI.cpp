@@ -88,7 +88,7 @@ void DDGI::init() {
 			});
 		}
 		// DDGI Output
-		output_tex = prm::get_texture({
+		output.tex = prm::get_texture({
 			.name = "DDGI Output",
 			.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 			.dimensions = {Window::width(), Window::height(), 1},

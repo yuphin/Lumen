@@ -26,8 +26,6 @@ class Integrator {
    protected:
 	void update_uniform_buffers();
 	SceneUBO scene_ubo{};
-	// uint32_t Window::width() = UINT_MAX;
-	// uint32_t Window::height()  = UINT_MAX;
 	LumenScene* lumen_scene = nullptr;
 	vk::Buffer* scene_ubo_buffer = nullptr;
 	const vk::BVH& tlas;
