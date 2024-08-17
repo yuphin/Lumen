@@ -1,7 +1,10 @@
 #pragma once
 #include "../LumenPCH.h"
 #include <tiny_obj_loader.h>
-#include "Framework/LumenInstance.h"
+#include "Framework/Camera.h"
+#include "Framework/VulkanBase.h"
+#include "Framework/Window.h"
+
 #include "shaders/commons.h"
 #include "Framework/MitsubaParser.h"
 #include "SceneConfig.h"

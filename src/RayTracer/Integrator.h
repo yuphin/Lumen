@@ -1,5 +1,10 @@
 #pragma once
-#include "Framework/LumenInstance.h"
+#include "Framework/Camera.h"
+#include "Framework/Pipeline.h"
+#include "Framework/Shader.h"
+#include "Framework/Texture.h"
+#include "Framework/VulkanBase.h"
+#include "Framework/Window.h"
 #include "Framework/Texture.h"
 #include "shaders/commons.h"
 #include "LumenScene.h"
@@ -8,8 +13,7 @@
 #include "Framework/PersistentResourceManager.h"
 class Integrator {
    public:
-	Integrator(LumenScene* lumen_scene, const vk::BVH& tlas)
-		: lumen_scene(lumen_scene), tlas(tlas) {}
+	Integrator(LumenScene* lumen_scene, const vk::BVH& tlas) : lumen_scene(lumen_scene), tlas(tlas) {}
 	virtual void init();
 	virtual void render(){};
 	virtual bool gui();

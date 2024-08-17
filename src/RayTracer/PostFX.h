@@ -2,7 +2,6 @@
 #include "LumenPCH.h"
 #include "Framework/Texture.h"
 #include "Framework/RenderGraph.h"
-#include "Framework/LumenInstance.h"
 #include "Framework/ImageUtils.h"
 #include "Framework/VkUtils.h"
 #include "shaders/commons.h"
