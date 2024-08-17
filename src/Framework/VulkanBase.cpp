@@ -573,10 +573,9 @@ static void create_command_pools() {
 	QueueFamilyIndices queue_family_idxs = find_queue_families(context().physical_device);
 	VkCommandPoolCreateInfo pool_info = command_pool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 	pool_info.queueFamilyIndex = queue_family_idxs.gfx_family.value();
-	const auto processor_count = std::thread::hardware_concurrency();
-	context().cmd_pools.resize(processor_count);
-	std::vector<std::mutex> cmd_mutexes(processor_count);
-	for (unsigned int i = 0; i < processor_count; i++) {
+	constexpr auto MAX_COMMAND_POOL_THREAD_COUNT = 64;
+	context().cmd_pools.resize(MAX_COMMAND_POOL_THREAD_COUNT);
+	for (unsigned int i = 0; i < MAX_COMMAND_POOL_THREAD_COUNT; i++) {
 		check(vkCreateCommandPool(context().device, &pool_info, nullptr, &context().cmd_pools[i]),
 				  "Failed to create command pool!");
 	}

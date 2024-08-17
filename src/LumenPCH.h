@@ -80,6 +80,7 @@
 #include <algorithm>
 #include <numeric>
 #include <bit>
+#include <semaphore>
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "Framework/ThreadPool.h"
