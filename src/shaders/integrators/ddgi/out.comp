@@ -34,9 +34,7 @@ void main() {
     const vec2 tex_coord = pixel_center / vec2(size);
     uint idx =
         pc.size_y * gl_GlobalInvocationID.x + gl_GlobalInvocationID.y;
-    // vec3 direct_lighting = imageLoad(image, ivec2(dims.xy)).xyz;
     vec3 col = direct_lighting.d[idx];
-    // vec3 indirect = gbumat_idx = payload.material_idx;ffer.d[idx].normal;
     col += gbuffer.d[idx].albedo / PI * texture(irr_img, tex_coord).xyz;
 
     imageStore(image, ivec2(dims.xy), vec4(col, 1.f));

@@ -44,13 +44,8 @@ void main() {
 		const Material hit_mat = load_material(payload.material_idx, payload.uv);
 		const vec3 wo = -direction;
 		vec3 n_s = payload.n_s;
-		bool side = true;
 		vec3 n_g = payload.n_g;
-		if (dot(payload.n_g, wo) < 0.) n_g = -n_g;
-		if (dot(n_g, payload.n_s) < 0) {
-			n_s = -n_s;
-			side = false;
-		}
+		bool side = face_forward(n_s, n_g, wo);
 		col += throughput * hit_mat.emissive_factor;
 		// Save to G buffer
 		gbuffer.d[pixel_idx].pos = payload.pos;

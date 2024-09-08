@@ -8,10 +8,12 @@ class DDGI : public Integrator {
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
+	virtual bool gui() override;
 	virtual void destroy() override;
 
    private:
 	void update_ddgi_uniforms();
+	void create_radiance_textures();
 
 	DDGIUniforms ddgi_ubo;
 	vk::Buffer* ddgi_ubo_buffer;
@@ -24,8 +26,8 @@ class DDGI : public Integrator {
 	vk::Buffer* ddgi_output_buffer;
 
 	struct {
-		vk::Texture* radiance_tex;
-		vk::Texture* dir_depth_tex;
+		vk::Texture* radiance_tex = nullptr;
+		vk::Texture* dir_depth_tex = nullptr;
 	} rt;
 
 	struct {
@@ -43,7 +45,8 @@ class DDGI : public Integrator {
 	float max_distance;
 	glm::ivec3 probe_counts;
 	glm::vec3 probe_start_position;
-
+	float tmax = 1e4f;
+	float tmin = 1e-3f;
 	PCDDGI pc_ray{};
 	VkSampler bilinear_sampler;
 	VkSampler nearest_sampler;

@@ -31,7 +31,9 @@ struct DDGIUniforms {
 	int depth_width;
 	int depth_height;
 	float min_frontface_dist;
-	float pad;
+	float tmin;
+	float tmax;
+	vec3 pad;
 };
 
 struct GBufferData {

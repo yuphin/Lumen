@@ -13,7 +13,12 @@ void ThreadPool::init() {
 	try {
 		threads.reserve(thread_count);
 		for (uint32_t i = 0; i < thread_count; i++) {
-			threads.emplace_back([] {
+			threads.emplace_back([i] {
+#ifdef _WIN32
+				wchar_t threadName[64];
+				swprintf(threadName, 64, L"LumenWorker %d", i);
+				SetThreadDescription(GetCurrentThread(), threadName);
+#endif
 				while (true) {
 					std::function<void()> task;
 					{

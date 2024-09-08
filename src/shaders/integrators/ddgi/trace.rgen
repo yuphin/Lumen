@@ -19,17 +19,17 @@ layout(push_constant) uniform _PushConstantRay { PCDDGI pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GBuffer { GBufferData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ProbeOffset { vec4 d[]; };
 const uint flags = gl_RayFlagsOpaqueEXT;
-const float tmin = 0.001;
-const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);  // X: Num rays, Y: Num probes
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.frame_num);
-#include "../pt_commons.glsl"
 layout(binding = 4) uniform _DDGIUniforms { DDGIUniforms ddgi_ubo; };
 layout(binding = 5, rgba16f) uniform image2D radiance_img;
 layout(binding = 6, rgba16f) uniform image2D dir_dist_img;
 GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
 ProbeOffset probe_offsets = ProbeOffset(scene_desc.probe_offsets_addr);
+float tmin = ddgi_ubo.tmin;
+float tmax = ddgi_ubo.tmax;
+#include "../pt_commons.glsl"
 
 vec3 grid_coord_to_position(ivec3 c) { return ddgi_ubo.probe_step * vec3(c) + ddgi_ubo.probe_start_position; }
 
@@ -59,6 +59,7 @@ vec3 probe_location(int index) {
 	return offset + grid_coord_to_position(probe_index_to_grid_coord(index));
 }
 
+// https://observablehq.com/@meetamit/fibonacci-lattices
 vec3 spherical_fibonacci(float i, float n) {
 	const float PHI = sqrt(5.0) * 0.5 + 0.5;
 #define madfrac(A, B) ((A) * (B)-floor((A) * (B)))
@@ -89,13 +90,8 @@ void main() {
 		const Material hit_mat = load_material(payload.material_idx, payload.uv);
 		const vec3 wo = -d;
 		vec3 n_s = payload.n_s;
-		bool side = true;
 		vec3 n_g = payload.n_g;
-		if (dot(payload.n_g, wo) < 0.) n_g = -n_g;
-		if (dot(n_g, payload.n_s) < 0) {
-			n_s = -n_s;
-			side = false;
-		}
+		bool side = face_forward(n_s, n_g, wo);
 
 		if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
 			const float light_pick_pdf = 1. / pc.light_triangle_count;

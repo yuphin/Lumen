@@ -19,55 +19,55 @@ void ReSTIRPT::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height()  * sizeof(GBuffer)});
+						 .size = Window::width() * Window::height() * sizeof(GBuffer)});
 
 	gris_prev_gbuffer =
 		prm::get_buffer({.name = "GRIS Previous GBuffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height()  * sizeof(GBuffer)});
+						 .size = Window::width() * Window::height() * sizeof(GBuffer)});
 
 	direct_lighting_buffer =
 		prm::get_buffer({.name = "GRIS Direct Lighting",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height()  * sizeof(glm::vec3)});
+						 .size = Window::width() * Window::height() * sizeof(glm::vec3)});
 
 	gris_reservoir_ping_buffer =
 		prm::get_buffer({.name = "GRIS Reservoirs Ping",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height()  * sizeof(Reservoir)});
+						 .size = Window::width() * Window::height() * sizeof(Reservoir)});
 
 	gris_reservoir_pong_buffer =
 		prm::get_buffer({.name = "GRIS Reservoirs Pong",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height()  * sizeof(Reservoir)});
+						 .size = Window::width() * Window::height() * sizeof(Reservoir)});
 
 	prefix_contribution_buffer =
 		prm::get_buffer({.name = "Prefix Contributions",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height()  * sizeof(glm::vec3)});
+						 .size = Window::width() * Window::height() * sizeof(glm::vec3)});
 
 	debug_vis_buffer =
 		prm::get_buffer({.name = "Debug Vis",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height()  * sizeof(uint32_t)});
+						 .size = Window::width() * Window::height() * sizeof(uint32_t)});
 	reconnection_buffer = prm::get_buffer(
 		{.name = "Reservoir Connection",
 		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		 .memory_type = vk::BufferType::GPU,
-		 .size = Window::width() * Window::height()  * sizeof(ReconnectionData) * (num_spatial_samples + 1)});
+		 .size = Window::width() * Window::height() * sizeof(ReconnectionData) * (num_spatial_samples + 1)});
 
 	transformations_buffer = prm::get_buffer({
 		.name = "Transformations Buffer",
@@ -100,7 +100,7 @@ void ReSTIRPT::init() {
 	canonical_contributions_texture = prm::get_texture({
 		.name = "Canonical Contributions Texture",
 		.usage = VK_IMAGE_USAGE_STORAGE_BIT,
-		.dimensions = {Window::width(), Window::height() , 1},
+		.dimensions = {Window::width(), Window::height(), 1},
 		.format = VK_FORMAT_R16G16B16A16_SFLOAT,
 		.initial_layout = VK_IMAGE_LAYOUT_GENERAL,
 	});
@@ -115,10 +115,8 @@ void ReSTIRPT::init() {
 	pc_ray.buffer_idx = 0;
 
 	assert(vk::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, gris_reservoir_ping_buffer,
-								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, gris_reservoir_ping_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, direct_lighting_buffer,
 								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, lumen_scene->compact_vertices_buffer,
@@ -181,7 +179,7 @@ void ReSTIRPT::render() {
 								 {"src/shaders/ray.rahit"}},
 					 .macros = {{"STREAMING_MODE", int(streaming_method)},
 								vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
-					 .dims = {Window::width(), Window::height() },
+					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc_ray)
 		.zero(debug_vis_buffer)
@@ -203,7 +201,7 @@ void ReSTIRPT::render() {
 									 {"src/shaders/ray_shadow.rmiss"},
 									 {"src/shaders/integrators/restir/gris/ray.rchit"},
 									 {"src/shaders/ray.rahit"}},
-						 .dims = {Window::width(), Window::height() },
+						 .dims = {Window::width(), Window::height()},
 					 })
 			.push_constants(&pc_ray)
 			.bind(common_bindings)
@@ -226,7 +224,7 @@ void ReSTIRPT::render() {
 											 {"src/shaders/ray_shadow.rmiss"},
 											 {"src/shaders/integrators/restir/gris/ray.rchit"},
 											 {"src/shaders/ray.rahit"}},
-								 .dims = {Window::width(), Window::height() },
+								 .dims = {Window::width(), Window::height()},
 							 })
 					.push_constants(&pc_ray)
 					.bind(common_bindings)
@@ -246,7 +244,7 @@ void ReSTIRPT::render() {
 											 {"src/shaders/ray_shadow.rmiss"},
 											 {"src/shaders/integrators/restir/gris/ray.rchit"},
 											 {"src/shaders/ray.rahit"}},
-								 .dims = {Window::width(), Window::height() },
+								 .dims = {Window::width(), Window::height()},
 							 })
 					.push_constants(&pc_ray)
 					.bind(common_bindings)
@@ -264,7 +262,7 @@ void ReSTIRPT::render() {
 											 {"src/shaders/ray_shadow.rmiss"},
 											 {"src/shaders/integrators/restir/gris/ray.rchit"},
 											 {"src/shaders/ray.rahit"}},
-								 .dims = {Window::width(), Window::height() },
+								 .dims = {Window::width(), Window::height()},
 							 })
 					.push_constants(&pc_ray)
 					.bind(common_bindings)
@@ -276,17 +274,17 @@ void ReSTIRPT::render() {
 
 				// Spatial Reuse
 				vk::render_graph()
-					->add_rt("GRIS - Spatial Reuse",
-							 {
-								 .shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse.rgen"},
-											 {"src/shaders/integrators/restir/gris/ray.rmiss"},
-											 {"src/shaders/ray_shadow.rmiss"},
-											 {"src/shaders/integrators/restir/gris/ray.rchit"},
-											 {"src/shaders/ray.rahit"}},
-								 .macros = {vk::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS",
-															   enable_defensive_formulation)},
-								 .dims = {Window::width(), Window::height() },
-							 })
+					->add_rt(
+						"GRIS - Spatial Reuse",
+						{
+							.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse.rgen"},
+										{"src/shaders/integrators/restir/gris/ray.rmiss"},
+										{"src/shaders/ray_shadow.rmiss"},
+										{"src/shaders/integrators/restir/gris/ray.rchit"},
+										{"src/shaders/ray.rahit"}},
+							.macros = {vk::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS", enable_defensive_formulation)},
+							.dims = {Window::width(), Window::height()},
+						})
 					.push_constants(&pc_ray)
 					.bind(common_bindings)
 					.bind(reconnection_buffer)
@@ -298,11 +296,11 @@ void ReSTIRPT::render() {
 					.bind_tlas(tlas);
 			}
 			if (pixel_debug || (gris_separator < 1.0f && gris_separator > 0.0f)) {
-				uint32_t num_wgs = uint32_t((Window::width() * Window::height()  + 1023) / 1024);
+				uint32_t num_wgs = uint32_t((Window::width() * Window::height() + 1023) / 1024);
 				vk::render_graph()
-					->add_compute("GRIS - Debug Visualiation",
-								  {.shader = vk::Shader("src/shaders/integrators/restir/gris/debug_vis.comp"),
-								   .dims = {num_wgs}})
+					->add_compute(
+						"GRIS - Debug Visualiation",
+						{.shader = vk::Shader("src/shaders/integrators/restir/gris/debug_vis.comp"), .dims = {num_wgs}})
 					.push_constants(&pc_ray)
 					.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer});
 			}
@@ -386,7 +384,7 @@ bool ReSTIRPT::gui() {
 			 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 					  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			 .memory_type = vk::BufferType::GPU,
-			 .size = Window::width() * Window::height()  * sizeof(ReconnectionData) * (num_spatial_samples + 1)});
+			 .size = Window::width() * Window::height() * sizeof(ReconnectionData) * (num_spatial_samples + 1)});
 	}
 	return result;
 }

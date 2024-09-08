@@ -25,7 +25,6 @@ vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const 
 		const float mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + bsdf_pdf / pdf_light_w);
 		res += mis_weight * f * abs(cos_x) * Le / pdf_light_w;
 	}
-    // LOG_CLICKED("%d\n", record.flags);
 	if (get_light_type(record.flags) == LIGHT_AREA) {
 		// Sample BSDF
 		f = sample_bsdf(n_s, wo, mat, 1, side, wi, bsdf_pdf, cos_x, seed);
