@@ -24,7 +24,6 @@ struct DDGIUniforms {
 	float max_distance;
 	float depth_sharpness;
 	float normal_bias;
-	float view_bias;
 	float backface_ratio;
 	int irradiance_width;
 	int irradiance_height;
@@ -45,6 +44,4 @@ struct GBufferData {
 	vec2 pad2;
 	vec3 albedo;
 	uint pad3;
-	vec3 n_g;
-	uint pad4;
 };

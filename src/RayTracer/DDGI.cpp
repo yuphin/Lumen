@@ -291,6 +291,7 @@ bool DDGI::gui() {
 	result |= rpp_changed;
 	result |= ImGui::SliderFloat("Ray max distance", &tmax, 0.0f, 1000.0f);
 	result |= ImGui::SliderFloat("Ray min distance", &tmin, 0.0f, 1000.0f);
+	result |= ImGui::SliderFloat("Normal bias", &normal_bias, 0.0f, 1.0f);
 	ImGui::Text("Probe dimensions: %dx%dx%d", probe_counts.x, probe_counts.y, probe_counts.z);
 	ImGui::Text("Probe distance: %f", probe_distance);
 	const uint32_t num_rays = rays_per_probe * probe_counts.x * probe_counts.y * probe_counts.z;
@@ -308,7 +309,6 @@ void DDGI::update_ddgi_uniforms() {
 	ddgi_ubo.max_distance = max_distance;
 	ddgi_ubo.depth_sharpness = depth_sharpness;
 	ddgi_ubo.normal_bias = normal_bias;
-	ddgi_ubo.view_bias = view_bias;
 	ddgi_ubo.irradiance_width = irr_texes[0]->extent.width;
 	ddgi_ubo.irradiance_height = irr_texes[0]->extent.height;
 	ddgi_ubo.depth_width = depth_texes[0]->extent.width;

@@ -73,15 +73,17 @@ vec2 texture_coord_from_direction_depth(vec3 dir, int probe_index, int full_text
 
 vec3 sample_irradiance(vec3 p, vec3 n, vec3 wo) {
 	vec3 p_orig = p;
-	// const vec3 bias_vec = (n * 0.2 + wo * 0.8) *
-	//                       (0.75 * ddgi_uniforms.probe_step) *
-	//                       ddgi_uniforms.normal_bias;
+
+#if 1
+	const vec3 bias_vec = (n * 0.2 + wo * 0.8) *
+	                      (0.75 * ddgi_uniforms.probe_step) *
+	                      ddgi_uniforms.normal_bias;
+#else
 	const vec3 bias_vec = (n + 3.0 * wo) * ddgi_uniforms.normal_bias;
-	// const vec3 bias_vec =
-	//     n * ddgi_uniforms.normal_bias + wo * ddgi_uniforms.view_bias;
+#endif
 	p = p + bias_vec;
-	ivec3 probe_coord = probe_coord_from_pos(p);
-	vec3 probe_pos = probe_coord_to_pos(probe_coord);
+	const ivec3 probe_coord = probe_coord_from_pos(p);
+	const vec3 probe_pos = probe_coord_to_pos(probe_coord);
 	const float energy_conservation = 0.85;
 	vec3 sum_irradiance = vec3(0.0);
 	float sum_weight = 0.0;
@@ -142,7 +144,7 @@ void main() {
 	const vec2 pixel_center = vec2(coords) + vec2(0.5);
 	const int linear_idx = int(gl_GlobalInvocationID.x * pc.size_y + gl_GlobalInvocationID.y);
 	vec3 p = gbuffer.d[linear_idx].pos;
-	vec3 n = gbuffer.d[linear_idx].n_g;
+	vec3 n = gbuffer.d[linear_idx].normal;
 	if (dot(n, n) == 0) {
 		return;
 	}

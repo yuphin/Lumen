@@ -50,7 +50,6 @@ void main() {
 		// Save to G buffer
 		gbuffer.d[pixel_idx].pos = payload.pos;
 		gbuffer.d[pixel_idx].normal = n_s;
-		gbuffer.d[pixel_idx].n_g = n_s;
 		gbuffer.d[pixel_idx].uv = payload.uv;
 		gbuffer.d[pixel_idx].mat_idx = payload.material_idx;
 		gbuffer.d[pixel_idx].albedo = hit_mat.albedo;
