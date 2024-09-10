@@ -8,7 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
-#define SCENE_TEX_IDX 7
+#define SCENE_TEX_IDX 9
 
 #include "ddgi_commons.h"
 #include "../../commons.glsl"
@@ -20,36 +20,39 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GBuffer { GB
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ProbeOffset { vec4 d[]; };
 const uint flags = gl_RayFlagsOpaqueEXT;
 #define RR_MIN_DEPTH 3
-uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);  // X: Num rays, Y: Num probes
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.frame_num);
-layout(binding = 4) uniform _DDGIUniforms { DDGIUniforms ddgi_ubo; };
+layout(binding = 4) uniform _DDGIUniforms { DDGIUniforms ddgi_uniforms; };
 layout(binding = 5, rgba16f) uniform image2D radiance_img;
 layout(binding = 6, rgba16f) uniform image2D dir_dist_img;
+layout(binding = 7) uniform sampler2D irr_img;
+layout(binding = 8) uniform sampler2D depth_img;
 GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
 ProbeOffset probe_offsets = ProbeOffset(scene_desc.probe_offsets_addr);
-float tmin = ddgi_ubo.tmin;
-float tmax = ddgi_ubo.tmax;
+float tmin = ddgi_uniforms.tmin;
+float tmax = ddgi_uniforms.tmax;
 #include "../pt_commons.glsl"
 
-vec3 grid_coord_to_position(ivec3 c) { return ddgi_ubo.probe_step * vec3(c) + ddgi_ubo.probe_start_position; }
+#include "ddgi_irradiance.glsl"
+
+vec3 grid_coord_to_position(ivec3 c) { return ddgi_uniforms.probe_step * vec3(c) + ddgi_uniforms.probe_start_position; }
 
 ivec3 probe_index_to_grid_coord(int index) {
 	ivec3 res;
 
-	res.x = index % ddgi_ubo.probe_counts.x;
-	res.y = (index % (ddgi_ubo.probe_counts.x * ddgi_ubo.probe_counts.y)) / ddgi_ubo.probe_counts.x;
-	res.z = index / (ddgi_ubo.probe_counts.x * ddgi_ubo.probe_counts.y);
+	res.x = index % ddgi_uniforms.probe_counts.x;
+	res.y = (index % (ddgi_uniforms.probe_counts.x * ddgi_uniforms.probe_counts.y)) / ddgi_uniforms.probe_counts.x;
+	res.z = index / (ddgi_uniforms.probe_counts.x * ddgi_uniforms.probe_counts.y);
 
 	// Assumes probe_counts are PoT.
 #if 0
-	res.x = index & (ddgi_ubo.probe_counts.x - 1);
+	res.x = index & (ddgi_uniforms.probe_counts.x - 1);
 	res.y =
 	    (index &
-	     ((ddgi_ubo.probe_counts.x * ddgi_ubo.probe_counts.y) - 1))
+	     ((ddgi_uniforms.probe_counts.x * ddgi_uniforms.probe_counts.y) - 1))
 	     >>
-	    findMSB(ddgi_ubo.probe_counts.x);
-	res.z = index >> findMSB(ddgi_ubo.probe_counts.x *
-	                         ddgi_ubo.probe_counts.y);
+	    findMSB(ddgi_uniforms.probe_counts.x);
+	res.z = index >> findMSB(ddgi_uniforms.probe_counts.x *
+	                         ddgi_uniforms.probe_counts.y);
 #endif
 	return res;
 }
@@ -74,7 +77,7 @@ void main() {
 	int ray_id = int(gl_LaunchIDEXT.x);
 	int probe_id = int(gl_LaunchIDEXT.y);
 	vec3 o = probe_location(probe_id);
-	vec3 d = normalize(mat3(pc.probe_rotation) * spherical_fibonacci(ray_id, ddgi_ubo.rays_per_probe));
+	vec3 d = normalize(mat3(pc.probe_rotation) * spherical_fibonacci(ray_id, ddgi_uniforms.rays_per_probe));
 	payload.dist = tmax;
 	traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, o, tmin, d, tmax, 0);
 	const bool found_isect = payload.material_idx != -1;
@@ -97,8 +100,11 @@ void main() {
 			const float light_pick_pdf = 1. / pc.light_triangle_count;
 			col += uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo) / light_pick_pdf;
 		}
+		if (pc.first_frame == 0 && pc.infinite_bounces == 1) {
+			vec3 irradiance = sample_irradiance(payload.pos, n_s, -d);
+			col += hit_mat.albedo / PI * irradiance;
+		}
 	}
-
 	imageStore(radiance_img, ivec2(gl_LaunchIDEXT.xy), vec4(col, 0.0f));
 	imageStore(dir_dist_img, ivec2(gl_LaunchIDEXT.xy), vec4(d, dist));
 }

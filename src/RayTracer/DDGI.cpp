@@ -148,10 +148,12 @@ void DDGI::render() {
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;
 	pc_ray.first_frame = first_frame;
+	pc_ray.infinite_bounces = infinite_bounces;
 	pc_ray.total_light_area = lumen_scene->total_light_area;
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.frame_num = frame_num;
-	bool ping_pong = bool(frame_idx % 2);  // ping_pong true = read
+	pc_ray.direct_lighting = direct_lighting;
+	const bool ping_pong = bool(frame_idx % 2);	 // ping_pong true = read
 	// Generate random orientation for probes
 	{
 		std::random_device rd;
@@ -199,7 +201,8 @@ void DDGI::render() {
 				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
-		.bind({lumen_scene->mesh_lights_buffer, ddgi_ubo_buffer, rt.radiance_tex, rt.dir_depth_tex})
+		.bind({lumen_scene->mesh_lights_buffer, ddgi_ubo_buffer, rt.radiance_tex, rt.dir_depth_tex,
+			   irr_texes[ping_pong], depth_texes[ping_pong]})
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
 	// Classify
@@ -244,8 +247,8 @@ void DDGI::render() {
 		->add_compute("Sample Probes",
 					  {.shader = vk::Shader("src/shaders/integrators/ddgi/sample.comp"), .dims = {wg_x, wg_y}})
 		.push_constants(&pc_ray)
-		.bind({scene_ubo_buffer, lumen_scene->scene_desc_buffer, output.tex, irr_texes[ping_pong],
-			   depth_texes[ping_pong], ddgi_ubo_buffer});
+		.bind({scene_ubo_buffer, lumen_scene->scene_desc_buffer, output.tex, irr_texes[!ping_pong],
+			   depth_texes[!ping_pong], ddgi_ubo_buffer, output_tex});
 	// Relocate
 	if (total_frame_idx < 5) {
 		// 13 WGs process 4 probes (wg = 32 threads)
@@ -256,14 +259,6 @@ void DDGI::render() {
 			.push_constants(&pc_ray)
 			.bind({scene_ubo_buffer, lumen_scene->scene_desc_buffer, ddgi_ubo_buffer, rt.dir_depth_tex});
 	}
-	// Output
-	wg_x = (Window::width() + 31) / 32;
-	wg_y = (Window::height() + 31) / 32;
-	vk::render_graph()
-		->add_compute("DDGI Output",
-					  {.shader = vk::Shader("src/shaders/integrators/ddgi/out.comp"), .dims = {wg_x, wg_y}})
-		.push_constants(&pc_ray)
-		.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, output.tex});
 	frame_idx++;
 	total_frame_idx++;
 	first_frame = false;
@@ -282,7 +277,7 @@ bool DDGI::gui() {
 	bool result = Integrator::gui();
 	result |= ImGui::SliderFloat("Hysteresis", &hysteresis, 0.0f, 1.0f);
 	bool rpp_changed = ImGui::SliderInt("Rays per probe", (int*)&rays_per_probe, 1, 4096);
-	if(rpp_changed && (rays_per_probe > 0)) {
+	if (rpp_changed && (rays_per_probe > 0)) {
 		vkDeviceWaitIdle(vk::context().device);
 		prm::remove(rt.radiance_tex);
 		prm::remove(rt.dir_depth_tex);
@@ -292,6 +287,8 @@ bool DDGI::gui() {
 	result |= ImGui::SliderFloat("Ray max distance", &tmax, 0.0f, 1000.0f);
 	result |= ImGui::SliderFloat("Ray min distance", &tmin, 0.0f, 1000.0f);
 	result |= ImGui::SliderFloat("Normal bias", &normal_bias, 0.0f, 1.0f);
+	result |= ImGui::Checkbox("Infinite bounces", &infinite_bounces);
+	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
 	ImGui::Text("Probe dimensions: %dx%dx%d", probe_counts.x, probe_counts.y, probe_counts.z);
 	ImGui::Text("Probe distance: %f", probe_distance);
 	const uint32_t num_rays = rays_per_probe * probe_counts.x * probe_counts.y * probe_counts.z;
@@ -320,24 +317,24 @@ void DDGI::update_ddgi_uniforms() {
 	vk::write_buffer(ddgi_ubo_buffer, &ddgi_ubo, sizeof(ddgi_ubo));
 }
 
-void DDGI::create_radiance_textures() { 
+void DDGI::create_radiance_textures() {
 	uint32_t num_probes = probe_counts.x * probe_counts.y * probe_counts.z;
 	rt.radiance_tex = prm::get_texture({
-				.name = "DDGI Radiance",
-				.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-				.dimensions = {rays_per_probe, num_probes, 1},
-				.format = VK_FORMAT_R16G16B16A16_SFLOAT,
-				.initial_layout = VK_IMAGE_LAYOUT_GENERAL,
-				.sampler = nearest_sampler,
-			});
-			rt.dir_depth_tex = prm::get_texture({
-				.name = "DDGI Radiance & Tex",
-				.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-				.dimensions = {rays_per_probe, num_probes, 1},
-				.format = VK_FORMAT_R16G16B16A16_SFLOAT,
-				.initial_layout = VK_IMAGE_LAYOUT_GENERAL,
-				.sampler = nearest_sampler,
-			});
+		.name = "DDGI Radiance",
+		.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+		.dimensions = {rays_per_probe, num_probes, 1},
+		.format = VK_FORMAT_R16G16B16A16_SFLOAT,
+		.initial_layout = VK_IMAGE_LAYOUT_GENERAL,
+		.sampler = nearest_sampler,
+	});
+	rt.dir_depth_tex = prm::get_texture({
+		.name = "DDGI Radiance & Tex",
+		.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+		.dimensions = {rays_per_probe, num_probes, 1},
+		.format = VK_FORMAT_R16G16B16A16_SFLOAT,
+		.initial_layout = VK_IMAGE_LAYOUT_GENERAL,
+		.sampler = nearest_sampler,
+	});
 }
 
 void DDGI::destroy() {

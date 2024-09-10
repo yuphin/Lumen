@@ -50,6 +50,8 @@ class DDGI : public Integrator {
 	VkSampler bilinear_sampler;
 	VkSampler nearest_sampler;
 	bool first_frame = true;
+	bool infinite_bounces = true;
+	bool direct_lighting = true;
 	uint32_t frame_idx = 0;
 	uint total_frame_idx = 0;
 

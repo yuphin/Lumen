@@ -13,6 +13,8 @@ struct PCDDGI {
 	int light_triangle_count;
 	uint dir_light_idx;
 	int first_frame;
+	int infinite_bounces;
+	int direct_lighting;
 };
 
 struct DDGIUniforms {
