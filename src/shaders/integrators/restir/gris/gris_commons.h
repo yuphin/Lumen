@@ -1,4 +1,4 @@
-#define DISABLE_LOGGING
+// #define DISABLE_LOGGING
 #include "../../../commons.h"
 
 #define DEBUG 0

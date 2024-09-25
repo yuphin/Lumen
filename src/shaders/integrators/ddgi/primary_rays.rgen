@@ -35,7 +35,7 @@ void main() {
 	vec3 direction = vec3(sample_camera(d));
 	vec3 throughput = vec3(1);
 	// Trace primary ray
-	traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
+	traceRayEXT(tlas, flags, 0x1, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
 	const bool found_isect = payload.material_idx != -1;
 	vec3 col = vec3(0);
 	if (!found_isect) {

@@ -5,8 +5,8 @@
 using namespace RestirPT;
 class ReSTIRPT : public Integrator {
    public:
-	ReSTIRPT(LumenScene* lumen_scene, const vk::BVH& tlas)
-		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), ReSTIRPTConfig)) {}
+	ReSTIRPT(LumenScene* lumen_scene)
+		: Integrator(lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), ReSTIRPTConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -29,14 +29,14 @@ class ReSTIRPT : public Integrator {
 	vk::Texture* canonical_contributions_texture;
 
 	PCReSTIRPT pc_ray{};
-	bool enable_accumulation = false;
-	bool direct_lighting = false;
+	bool enable_accumulation = true;
+	bool direct_lighting = true;
 	bool enable_rr = false;
 	bool enable_spatial_reuse = true;
 	bool canonical_only = false;
 	bool show_reconnection_radiance = false;
 	bool enable_temporal_reuse = true;
-	bool enable_gris = true;
+	bool enable_gris = false;
 	bool pixel_debug = false;
 	bool enable_permutation_sampling = false;
 	bool enable_atmosphere = false;

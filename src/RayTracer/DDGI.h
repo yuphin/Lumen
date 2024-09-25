@@ -3,17 +3,21 @@
 #include "shaders/integrators/ddgi/ddgi_commons.h"
 class DDGI : public Integrator {
    public:
-	DDGI(LumenScene* lumen_scene, const vk::BVH& tlas)
-		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), DDGIConfig)) {}
+	DDGI(LumenScene* lumen_scene)
+		: Integrator(lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), DDGIConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
 	virtual bool gui() override;
 	virtual void destroy() override;
-
+	virtual void create_accel() override;
    private:
 	void update_ddgi_uniforms();
 	void create_radiance_textures();
+
+	glm::vec3 probe_location(uint32_t index);
+	glm::ivec3 probe_index_to_grid_coord(uint32_t index);
+	glm::vec3 grid_coord_to_position(const glm::ivec3& grid_coord);
 
 	DDGIUniforms ddgi_ubo;
 	vk::Buffer* ddgi_ubo_buffer;
@@ -52,8 +56,15 @@ class DDGI : public Integrator {
 	bool first_frame = true;
 	bool infinite_bounces = true;
 	bool direct_lighting = true;
+	bool visualize_probes = false;
 	uint32_t frame_idx = 0;
 	uint total_frame_idx = 0;
 
 	DDGIConfig* config;
+	vk::Buffer* sphere_vertices_buffer;
+	vk::Buffer* sphere_indices_buffer;
+	vk::Buffer* sphere_desc_buffer;
+
+	std::vector<SphereVertex> sphere_vertices;
+	std::vector<uint32_t> sphere_indices;
 };

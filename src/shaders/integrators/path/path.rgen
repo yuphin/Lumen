@@ -25,97 +25,89 @@ uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.frame_num);
 
 void main() {
 #define JITTER 1
-    const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+	const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
 #if JITTER
-    vec2 rands = vec2(rand(seed), rand(seed)) - 0.5;
-    const vec2 in_uv = (pixel + rands) / vec2(gl_LaunchSizeEXT.xy);
+	vec2 rands = vec2(rand(seed), rand(seed)) - 0.5;
+	const vec2 in_uv = (pixel + rands) / vec2(gl_LaunchSizeEXT.xy);
 #else
-    const vec2 in_uv = (pixel) / vec2(gl_LaunchSizeEXT.xy);
+	const vec2 in_uv = (pixel) / vec2(gl_LaunchSizeEXT.xy);
 #endif
-    vec2 d = in_uv * 2.0 - 1.0;
-    vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
-    vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
-    vec3 direction = vec3(sample_camera(d));
+	vec2 d = in_uv * 2.0 - 1.0;
+	vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
+	vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
+	vec3 direction = vec3(sample_camera(d));
 
-    vec3 col = vec3(0);
-    vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
-                                               2. / gl_LaunchSizeEXT.y, 0, 1));
-    area_int /= (area_int.w);
-    const float cam_area = abs(area_int.x * area_int.y);
-    bool specular = false;
-    vec3 throughput = vec3(1);
-    int depth;
-    for (depth = 0;; depth++) {
-        traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction,
-                    tmax, 0);
-        const bool found_isect = payload.material_idx != -1;
-        if (depth >= pc.max_depth - 1) {
-            break;
-        }
-        if (!found_isect) {
-            col += throughput * shade_atmosphere(pc.dir_light_idx, pc.sky_col, origin.xyz, direction, tmax);
-            break;
-        }
+	vec3 col = vec3(0);
+	vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x, 2. / gl_LaunchSizeEXT.y, 0, 1));
+	area_int /= (area_int.w);
+	const float cam_area = abs(area_int.x * area_int.y);
+	bool last_specular = false;
+	vec3 throughput = vec3(1);
+	int depth;
+	for (depth = 0;; depth++) {
+		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
+		const bool found_isect = payload.material_idx != -1;
+		if (!found_isect) {
+			if (depth > 0 || pc.direct_lighting == 1) {
+				col += throughput * shade_atmosphere(pc.dir_light_idx, pc.sky_col, origin.xyz, direction, tmax);
+			}
+			break;
+		}
+		const Material hit_mat = load_material(payload.material_idx, payload.uv);
+		if ((depth == 0 && pc.direct_lighting == 1) || last_specular){
+			col += throughput * hit_mat.emissive_factor;
+		}
+		if (depth >= pc.max_depth - 1) {
+			break;
+		}
+		const vec3 wo = -direction;
+		vec3 n_s = payload.n_s;
+		bool side = true;
+		vec3 n_g = payload.n_g;
+		if (dot(payload.n_g, wo) < 0.) n_g = -n_g;
+		if (dot(n_g, payload.n_s) < 0) {
+			n_s = -n_s;
+			side = false;
+		}
+		float cos_wo = dot(wo, n_s);
+		origin.xyz = offset_ray(payload.pos, n_g);
+		last_specular = is_specular(hit_mat);
+		if (!last_specular) {
+			const float light_pick_pdf = 1. / pc.light_triangle_count;
+			if (depth > 0 || pc.direct_lighting == 1) {
+				col += throughput * uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo) / light_pick_pdf;
+			}
+		}
+		// Sample direction & update throughput
+		float pdf, cos_theta;
 
-        const Material hit_mat =
-            load_material(payload.material_idx, payload.uv);
-        if (depth == 0 || specular) {
-            col += throughput * hit_mat.emissive_factor;
-        }
-        const vec3 wo = -direction;
-        vec3 n_s = payload.n_s;
-        bool side = true;
-        vec3 n_g = payload.n_g;
-        if (dot(payload.n_g, wo) < 0.)
-            n_g = -n_g;
-        if (dot(n_g, payload.n_s) < 0) {
-            n_s = -n_s;
-            side = false;
-        }
-        float cos_wo = dot(wo, n_s);
-        origin.xyz = offset_ray(payload.pos, n_g);
-        specular = is_specular(hit_mat);
-        if (!specular) {
-            const float light_pick_pdf = 1. / pc.light_triangle_count;
-            col += throughput *
-                   uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo) /
-                   light_pick_pdf;
-        }
-        // Sample direction & update throughput
-        float pdf, cos_theta;
+		const vec3 f = sample_bsdf(n_s, wo, hit_mat, 1 /*radiance=cam*/, side, direction, pdf, cos_theta, seed);
+		if (pdf == 0) {
+			break;
+		}
+		throughput *= f * abs(cos_theta) / pdf;
 
-        const vec3 f = sample_bsdf(n_s, wo, hit_mat, 1 /*radiance=cam*/, side,
-                                   direction, pdf, cos_theta, seed);
-        if (pdf == 0) {
-            break;
-        }
-        throughput *= f * abs(cos_theta) / pdf;
-      
-        float rr_scale = 1.0;
-        if (bsdf_has_property(hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION)) {
-            rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
-        }
-        if (depth > RR_MIN_DEPTH) {
-            float rr_prob = min(0.95f, luminance(throughput) * rr_scale);
-            if (rr_prob == 0 || rr_prob < rand(seed))
-                break;
-            else
-                throughput /= rr_prob;
-        }
-    }
-    if (isnan(luminance(col))) {
-        return;
-    }
+		float rr_scale = 1.0;
+		if (bsdf_has_property(hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION)) {
+			rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
+		}
+		if (depth > RR_MIN_DEPTH) {
+			float rr_prob = min(0.95f, luminance(throughput) * rr_scale);
+			if (rr_prob == 0 || rr_prob < rand(seed))
+				break;
+			else
+				throughput /= rr_prob;
+		}
+	}
+	if (isnan(luminance(col))) {
+		return;
+	}
 
-    if (pc.frame_num > 0) {
-
-        float w = 1. / float(pc.frame_num + 1);
-        vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
-        // imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
-        imageStore(image, ivec2(gl_LaunchIDEXT.xy),
-                   vec4(mix(old_col, col, w), 1.f));
-    } else {
-
-        imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
-    }
+	if (pc.frame_num > 0) {
+		float w = 1. / float(pc.frame_num + 1);
+		vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
+	} else {
+		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+	}
 }

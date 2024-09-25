@@ -47,3 +47,13 @@ struct GBufferData {
 	vec3 albedo;
 	uint pad3;
 };
+
+struct ALIGN16 SphereDesc {
+	uint64_t index_addr;
+	uint64_t vertex_addr;
+};
+
+struct SphereVertex {
+	vec3 pos;
+	vec3 normal;
+};

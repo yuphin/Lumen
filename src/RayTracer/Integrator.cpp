@@ -136,5 +136,40 @@ void Integrator::destroy() {
 		prm::remove(b);
 	}
 	prm::remove(output_tex);
-	
+	if (tlas.accel) {
+		prm::remove(tlas.buffer);
+		vkDestroyAccelerationStructureKHR(vk::context().device, tlas.accel, nullptr);
+	}
+	if (!blases.empty()) {
+		for (auto& b : blases) {
+			prm::remove(b.buffer);
+			vkDestroyAccelerationStructureKHR(vk::context().device, b.accel, nullptr);
+		}
+	}
+	blases.clear();
+}
+
+void Integrator::create_accel() {
+	std::vector<vk::BlasInput> blas_inputs;
+
+	VkDeviceAddress vertex_address = lumen_scene->vertex_buffer->get_device_address();
+	VkDeviceAddress idx_address = lumen_scene->index_buffer->get_device_address();
+	for (auto& prim_mesh : lumen_scene->prim_meshes) {
+		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh, vertex_address, idx_address);
+		blas_inputs.push_back({geo});
+	}
+	vk::build_blas(blases, blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+	std::vector<VkAccelerationStructureInstanceKHR> tlas_instances;
+	for (const auto& pm : lumen_scene->prim_meshes) {
+		VkAccelerationStructureInstanceKHR ray_inst{};
+		ray_inst.transform = vk::to_vk_matrix(pm.world_matrix);
+		ray_inst.instanceCustomIndex = pm.prim_idx;
+		assert(pm.prim_idx < blases.size());
+		ray_inst.accelerationStructureReference = blases[pm.prim_idx].get_blas_device_address();
+		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+		ray_inst.mask = 0xFF;
+		ray_inst.instanceShaderBindingTableRecordOffset = 0;  // We will use the same hit group for all objects
+		tlas_instances.emplace_back(ray_inst);
+	}
+	vk::build_tlas(tlas, tlas_instances, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }

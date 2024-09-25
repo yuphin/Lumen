@@ -11,4 +11,5 @@ struct PCPath {
 	float total_light_area;
 	int light_triangle_count;
 	uint dir_light_idx;
+	uint direct_lighting;
 };

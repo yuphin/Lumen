@@ -34,7 +34,6 @@ class RayTracer {
 	void render_debug_utils();
 	void create_integrator(int integrator_idx);
 	bool gui();
-	void create_accel();
 	bool initialized = false;
 	bool rt_initialized = false;
 	float cpu_avg_time = 0;
@@ -75,6 +74,4 @@ class RayTracer {
 
 	const bool enable_shader_inference = true;
 	const bool use_events = true;
-	vk::BVH tlas;
-	std::vector<vk::BVH> blases;
 };

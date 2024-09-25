@@ -79,7 +79,7 @@ void main() {
 	vec3 o = probe_location(probe_id);
 	vec3 d = normalize(mat3(pc.probe_rotation) * spherical_fibonacci(ray_id, ddgi_uniforms.rays_per_probe));
 	payload.dist = tmax;
-	traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, o, tmin, d, tmax, 0);
+	traceRayEXT(tlas, flags, 0x1, 0, 0, 0, o, tmin, d, tmax, 0);
 	const bool found_isect = payload.material_idx != -1;
 	vec3 col = vec3(0);
 	float dist;

@@ -3,8 +3,8 @@
 #include "shaders/integrators/pssmlt/pssmlt_commons.h"
 class PSSMLT : public Integrator {
    public:
-	PSSMLT(LumenScene* lumen_scene, const vk::BVH& tlas)
-		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), PSSMLTConfig)) {}
+	PSSMLT(LumenScene* lumen_scene)
+		: Integrator(lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), PSSMLTConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;

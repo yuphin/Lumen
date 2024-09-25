@@ -3,8 +3,8 @@
 #include "shaders/integrators/smlt/smlt_commons.h"
 class SMLT : public Integrator {
    public:
-	SMLT(LumenScene* lumen_scene, const vk::BVH& tlas)
-		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), SMLTConfig)) {}
+	SMLT(LumenScene* lumen_scene)
+		: Integrator(lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), SMLTConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;

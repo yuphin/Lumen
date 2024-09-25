@@ -22,20 +22,21 @@ void Path::init() {
 	pc_ray.size_y = Window::height();
 	assert(vk::render_graph()->settings.shader_inference == true);
 	// For shader resource dependency inference, use this macro to register a buffer address to the rendergraph
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
-								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
+	path_length = config->path_length;
 }
 
 void Path::render() {
 	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = config->path_length;
+	pc_ray.max_depth = path_length;
 	pc_ray.sky_col = config->sky_col;
 	pc_ray.total_light_area = lumen_scene->total_light_area;
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.dir_light_idx = lumen_scene->dir_light_idx;
 	pc_ray.frame_num = frame_num;
+	pc_ray.direct_lighting = direct_lighting;
 	vk::render_graph()
 		->add_rt("Path",
 				 {
@@ -44,7 +45,7 @@ void Path::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .dims = {Window::width(), Window::height() },
+					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc_ray)
 		.bind({
@@ -69,3 +70,10 @@ bool Path::update() {
 }
 
 void Path::destroy() { Integrator::destroy(); }
+
+bool Path::gui() {
+	bool result = Integrator::gui();
+	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
+	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
+	return result;
+}

@@ -18,7 +18,7 @@ vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const 
 	vec3 f = eval_bsdf(n_s, wo, mat, 1, side, wi, bsdf_pdf);
 	float pdf_light;
 	any_hit_payload.hit = 1;
-	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0, wi,
+	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0x1, 1, 0, 1, p, 0, wi,
 				wi_len - EPS, 1);
 	visible = any_hit_payload.hit == 0;
 	if (visible && pdf_light_w > 0) {
@@ -29,7 +29,7 @@ vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const 
 		// Sample BSDF
 		f = sample_bsdf(n_s, wo, mat, 1, side, wi, bsdf_pdf, cos_x, seed);
 		if (bsdf_pdf != 0) {
-			traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, p, tmin, wi, tmax, 0);
+			traceRayEXT(tlas, flags, 0x1, 0, 0, 0, p, tmin, wi, tmax, 0);
 			if (payload.triangle_idx == record.triangle_idx && payload.instance_idx == record.instance_idx) {
 				const float wi_len = length(payload.pos - pos);
 				const float g = abs(dot(payload.n_s, -wi)) / (wi_len * wi_len);

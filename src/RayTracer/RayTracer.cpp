@@ -60,9 +60,9 @@ void RayTracer::init() {
 	vk::render_graph()->settings.use_events = use_events;
 
 	scene.load_scene(scene_name);
-	create_accel();
 	create_integrator(int(scene.config->integrator_type));
 	integrator->init();
+	integrator->create_accel();
 	post_fx.init();
 	init_resources();
 	LUMEN_TRACE("Memory usage {} MB", vk::get_memory_usage(vk::context().physical_device) * 1e-6);
@@ -162,18 +162,6 @@ void RayTracer::cleanup_resources() {
 	for (auto t : tex_list) {
 		prm::remove(t);
 	}
-
-	if (tlas.accel) {
-		prm::remove(tlas.buffer);
-		vkDestroyAccelerationStructureKHR(vk::context().device, tlas.accel, nullptr);
-	}
-	if (!blases.empty()) {
-		for (auto& b : blases) {
-			prm::remove(b.buffer);
-			vkDestroyAccelerationStructureKHR(vk::context().device, b.accel, nullptr);
-		}
-	}
-	blases.clear();
 }
 
 void RayTracer::update() {
@@ -255,37 +243,37 @@ void RayTracer::render_debug_utils() {
 void RayTracer::create_integrator(int integrator_idx) {
 	switch (integrator_idx) {
 		case int(IntegratorType::Path):
-			integrator = std::make_unique<Path>(&scene, tlas);
+			integrator = std::make_unique<Path>(&scene);
 			break;
 		case int(IntegratorType::BDPT):
-			integrator = std::make_unique<BDPT>(&scene, tlas);
+			integrator = std::make_unique<BDPT>(&scene);
 			break;
 		case int(IntegratorType::SPPM):
-			integrator = std::make_unique<SPPM>(&scene, tlas);
+			integrator = std::make_unique<SPPM>(&scene);
 			break;
 		case int(IntegratorType::VCM):
-			integrator = std::make_unique<VCM>(&scene, tlas);
+			integrator = std::make_unique<VCM>(&scene);
 			break;
 		case int(IntegratorType::ReSTIR):
-			integrator = std::make_unique<ReSTIR>(&scene, tlas);
+			integrator = std::make_unique<ReSTIR>(&scene);
 			break;
 		case int(IntegratorType::ReSTIRGI):
-			integrator = std::make_unique<ReSTIRGI>(&scene, tlas);
+			integrator = std::make_unique<ReSTIRGI>(&scene);
 			break;
 		case int(IntegratorType::ReSTIRPT):
-			integrator = std::make_unique<ReSTIRPT>(&scene, tlas);
+			integrator = std::make_unique<ReSTIRPT>(&scene);
 			break;
 		case int(IntegratorType::PSSMLT):
-			integrator = std::make_unique<PSSMLT>(&scene, tlas);
+			integrator = std::make_unique<PSSMLT>(&scene);
 			break;
 		case int(IntegratorType::SMLT):
-			integrator = std::make_unique<SMLT>(&scene, tlas);
+			integrator = std::make_unique<SMLT>(&scene);
 			break;
 		case int(IntegratorType::VCMMLT):
-			integrator = std::make_unique<VCMMLT>(&scene, tlas);
+			integrator = std::make_unique<VCMMLT>(&scene);
 			break;
 		case int(IntegratorType::DDGI):
-			integrator = std::make_unique<DDGI>(&scene, tlas);
+			integrator = std::make_unique<DDGI>(&scene);
 			break;
 		default:
 			break;
@@ -355,52 +343,20 @@ bool RayTracer::gui() {
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, residual_buffer, rg);
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, counter_buffer, rg);
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, rmse_val_buffer, rg);
-
-		auto prev_cam_settings = scene.config->cam_settings;
-
-		glm::vec3 prev_sky_col = scene.config->sky_col;
-
+		SceneConfig prev_scene_config = *scene.config;
 		auto integrator_str = std::string(settings[curr_integrator_idx]);
 		integrator_str.erase(std::remove_if(integrator_str.begin(), integrator_str.end(), ::isspace),
 							 integrator_str.end());
 		std::transform(integrator_str.begin(), integrator_str.end(), integrator_str.begin(), ::tolower);
 		scene.create_scene_config(integrator_str);
-		scene.config->cam_settings = prev_cam_settings;
-
-		scene.config->sky_col = prev_sky_col;
+		scene.config->cam_settings = prev_scene_config.cam_settings;
+		scene.config->sky_col = prev_scene_config.sky_col;
+		scene.config->path_length = prev_scene_config.path_length;
 		create_integrator(curr_integrator_idx);
 		integrator->init();
 	}
 
 	return updated;
-}
-
-void RayTracer::create_accel() {
-	std::vector<vk::BlasInput> blas_inputs;
-
-	VkDeviceAddress vertex_address = scene.vertex_buffer->get_device_address();
-	VkDeviceAddress idx_address = scene.index_buffer->get_device_address();
-	for (auto& prim_mesh : scene.prim_meshes) {
-		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh, vertex_address, idx_address);
-		blas_inputs.push_back({geo});
-	}
-	vk::build_blas(blases, blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
-
-	const auto& indices = scene.indices;
-	const auto& vertices = scene.positions;
-	std::vector<VkAccelerationStructureInstanceKHR> tlas_instances;
-	for (const auto& pm : scene.prim_meshes) {
-		VkAccelerationStructureInstanceKHR ray_inst{};
-		ray_inst.transform = vk::to_vk_matrix(pm.world_matrix);
-		ray_inst.instanceCustomIndex = pm.prim_idx;
-		assert(pm.prim_idx < blases.size());
-		ray_inst.accelerationStructureReference = blases[pm.prim_idx].get_blas_device_address();
-		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-		ray_inst.mask = 0xFF;
-		ray_inst.instanceShaderBindingTableRecordOffset = 0;  // We will use the same hit group for all objects
-		tlas_instances.emplace_back(ray_inst);
-	}
-	vk::build_tlas(tlas, tlas_instances, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 float RayTracer::draw_frame() {
