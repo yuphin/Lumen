@@ -20,7 +20,7 @@ struct Pipeline {
 	void create_compute_pipeline(const ComputePassSettings& settings, const std::vector<uint32_t>& descriptor_counts);
 	const std::array<VkStridedDeviceAddressRegionKHR, 4> get_rt_regions();
 	void refresh();
-	void create_rt_set_layout(const std::vector<Shader>& shaders);
+	void create_rt_set_layout(VkShaderStageFlags stage_flags);
 
 	std::unordered_map<std::string, std::filesystem::file_time_type> paths;
 	VkPipeline handle = VK_NULL_HANDLE;

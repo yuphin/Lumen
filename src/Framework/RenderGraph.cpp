@@ -482,6 +482,26 @@ RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 
 void RenderPass::finalize() {
 	// Create pipelines/push descriptor templates
+
+	auto update_rt_descriptors = [this]() {
+		auto pool_size = vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1);
+		auto descriptor_pool_ci = vk::descriptor_pool(1, &pool_size, 1);
+
+		vk::check(vkCreateDescriptorPool(vk::context().device, &descriptor_pool_ci, nullptr,
+										 &pipeline_storage->pipeline->tlas_descriptor_pool),
+				  "Failed to create descriptor pool");
+		VkDescriptorSetAllocateInfo set_allocate_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+		set_allocate_info.descriptorPool = pipeline_storage->pipeline->tlas_descriptor_pool;
+		set_allocate_info.descriptorSetCount = 1;
+		set_allocate_info.pSetLayouts = &pipeline_storage->pipeline->tlas_layout;
+		vkAllocateDescriptorSets(vk::context().device, &set_allocate_info,
+								 &pipeline_storage->pipeline->tlas_descriptor_set);
+
+		auto descriptor_write = vk::write_descriptor_set(pipeline_storage->pipeline->tlas_descriptor_set,
+														 VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0,
+														 &pipeline_storage->pipeline->tlas_info);
+		vkUpdateDescriptorSets(vk::context().device, 1, &descriptor_write, 0, nullptr);
+	};
 	if (!is_pipeline_cached) {
 		switch (type) {
 			case vk::PassType::Graphics: {
@@ -498,22 +518,11 @@ void RenderPass::finalize() {
 				break;
 			}
 			case vk::PassType::RT: {
-				auto func = [](RenderPass* pass) {
+				auto func = [update_rt_descriptors](RenderPass* pass) {
 					pass->pipeline_storage->pipeline->create_rt_pipeline(*pass->rt_settings, pass->descriptor_counts);
 					// Create descriptor pool and sets
 					if (!pass->pipeline_storage->pipeline->tlas_descriptor_pool) {
-						auto pool_size = vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1);
-						auto descriptor_pool_ci = vk::descriptor_pool(1, &pool_size, 1);
-
-						vk::check(vkCreateDescriptorPool(vk::context().device, &descriptor_pool_ci, nullptr,
-														 &pass->pipeline_storage->pipeline->tlas_descriptor_pool),
-								  "Failed to create descriptor pool");
-						VkDescriptorSetAllocateInfo set_allocate_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-						set_allocate_info.descriptorPool = pass->pipeline_storage->pipeline->tlas_descriptor_pool;
-						set_allocate_info.descriptorSetCount = 1;
-						set_allocate_info.pSetLayouts = &pass->pipeline_storage->pipeline->tlas_layout;
-						vkAllocateDescriptorSets(vk::context().device, &set_allocate_info,
-												 &pass->pipeline_storage->pipeline->tlas_descriptor_set);
+						update_rt_descriptors();
 					}
 					auto descriptor_write = vk::write_descriptor_set(
 						pass->pipeline_storage->pipeline->tlas_descriptor_set,
@@ -546,28 +555,16 @@ void RenderPass::finalize() {
 		vkDestroyDescriptorSetLayout(vk::context().device, pipeline_storage->pipeline->tlas_layout, nullptr);
 		vkDestroyDescriptorPool(vk::context().device, pipeline_storage->pipeline->tlas_descriptor_pool, nullptr);
 
-		std::vector<vk::Shader> shaders;
-		for(const auto& shader : rt_settings->shaders) {
-			shaders.push_back(rg->shader_cache[shader.name_with_macros]);
+		// Need to retrieve cached shaders' stage flags as we have the temporary shaders in the settings
+		VkShaderStageFlags stage_flags = 0;
+		for (const auto& temp_shader : rt_settings->shaders) {
+			auto find_it = rg->shader_cache.find(temp_shader.name_with_macros);
+			assert(find_it != rg->shader_cache.end());
+			const vk::Shader& shader = find_it->second;
+			stage_flags |= shader.stage;
 		}
-		pipeline_storage->pipeline->create_rt_set_layout(shaders);
-		auto pool_size = vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1);
-		auto descriptor_pool_ci = vk::descriptor_pool(1, &pool_size, 1);
-
-		vk::check(vkCreateDescriptorPool(vk::context().device, &descriptor_pool_ci, nullptr,
-										 &pipeline_storage->pipeline->tlas_descriptor_pool),
-				  "Failed to create descriptor pool");
-		VkDescriptorSetAllocateInfo set_allocate_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-		set_allocate_info.descriptorPool = pipeline_storage->pipeline->tlas_descriptor_pool;
-		set_allocate_info.descriptorSetCount = 1;
-		set_allocate_info.pSetLayouts = &pipeline_storage->pipeline->tlas_layout;
-		vkAllocateDescriptorSets(vk::context().device, &set_allocate_info,
-								 &pipeline_storage->pipeline->tlas_descriptor_set);
-
-		auto descriptor_write = vk::write_descriptor_set(pipeline_storage->pipeline->tlas_descriptor_set,
-														 VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0,
-														 &pipeline_storage->pipeline->tlas_info);
-		vkUpdateDescriptorSets(vk::context().device, 1, &descriptor_write, 0, nullptr);
+		pipeline_storage->pipeline->create_rt_set_layout(stage_flags);
+		update_rt_descriptors();
 	}
 }
 
