@@ -363,9 +363,15 @@ RenderPass& RenderPass::bind_buffer_array(std::span<vk::Buffer*> buffers, bool f
 }
 
 RenderPass& RenderPass::bind_tlas(const vk::BVH& tlas) {
-	pipeline_storage->pipeline->tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
-	pipeline_storage->pipeline->tlas_info.accelerationStructureCount = 1;
-	pipeline_storage->pipeline->tlas_info.pAccelerationStructures = &tlas.accel;
+	if (is_pipeline_cached && !tlas.updated) {
+		return *this;
+	}
+	rebuild_tlas_descriptors = is_pipeline_cached && tlas.updated;
+	vk::Pipeline* pipeline = pipeline_storage->pipeline.get();
+	LUMEN_ASSERT(type == vk::PassType::RT, "TLAS can only be bound to RT pipelines");
+	pipeline->tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
+	pipeline->tlas_info.accelerationStructureCount = 1;
+	pipeline->tlas_info.pAccelerationStructures = &tlas.accel;
 	return *this;
 }
 
@@ -536,6 +542,32 @@ void RenderPass::finalize() {
 			default:
 				break;
 		}
+	} else if (rebuild_tlas_descriptors) {
+		vkDestroyDescriptorSetLayout(vk::context().device, pipeline_storage->pipeline->tlas_layout, nullptr);
+		vkDestroyDescriptorPool(vk::context().device, pipeline_storage->pipeline->tlas_descriptor_pool, nullptr);
+
+		std::vector<vk::Shader> shaders;
+		for(const auto& shader : rt_settings->shaders) {
+			shaders.push_back(rg->shader_cache[shader.name_with_macros]);
+		}
+		pipeline_storage->pipeline->create_rt_set_layout(shaders);
+		auto pool_size = vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1);
+		auto descriptor_pool_ci = vk::descriptor_pool(1, &pool_size, 1);
+
+		vk::check(vkCreateDescriptorPool(vk::context().device, &descriptor_pool_ci, nullptr,
+										 &pipeline_storage->pipeline->tlas_descriptor_pool),
+				  "Failed to create descriptor pool");
+		VkDescriptorSetAllocateInfo set_allocate_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+		set_allocate_info.descriptorPool = pipeline_storage->pipeline->tlas_descriptor_pool;
+		set_allocate_info.descriptorSetCount = 1;
+		set_allocate_info.pSetLayouts = &pipeline_storage->pipeline->tlas_layout;
+		vkAllocateDescriptorSets(vk::context().device, &set_allocate_info,
+								 &pipeline_storage->pipeline->tlas_descriptor_set);
+
+		auto descriptor_write = vk::write_descriptor_set(pipeline_storage->pipeline->tlas_descriptor_set,
+														 VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0,
+														 &pipeline_storage->pipeline->tlas_info);
+		vkUpdateDescriptorSets(vk::context().device, 1, &descriptor_write, 0, nullptr);
 	}
 }
 

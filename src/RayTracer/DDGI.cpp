@@ -423,7 +423,7 @@ void DDGI::create_radiance_textures() {
 	});
 }
 
-void DDGI::create_accel() {
+void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 	std::vector<vk::BlasInput> blas_inputs;
 
 	VkDeviceAddress vertex_address = lumen_scene->vertex_buffer->get_device_address();

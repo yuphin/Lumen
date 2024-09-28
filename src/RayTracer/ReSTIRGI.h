@@ -3,8 +3,8 @@
 #include "shaders/integrators/restir/gi/restirgi_commons.h"
 class ReSTIRGI : public Integrator {
    public:
-	ReSTIRGI(LumenScene* lumen_scene)
-		: Integrator(lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), ReSTIRGIConfig)) {}
+	ReSTIRGI(LumenScene* lumen_scene, const vk::BVH& tlas)
+		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), ReSTIRGIConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;

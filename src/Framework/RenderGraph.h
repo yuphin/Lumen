@@ -203,6 +203,7 @@ class RenderPass {
 	void* push_constant_data = nullptr;
 	bool is_pipeline_cached = false;
 	bool record_override = true;
+	bool rebuild_tlas_descriptors = false;
 	/*
 		Note:
 		The assumption is that a SyncDescriptor is unique to a pass (either via

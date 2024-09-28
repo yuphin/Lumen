@@ -20,6 +20,7 @@ struct Pipeline {
 	void create_compute_pipeline(const ComputePassSettings& settings, const std::vector<uint32_t>& descriptor_counts);
 	const std::array<VkStridedDeviceAddressRegionKHR, 4> get_rt_regions();
 	void refresh();
+	void create_rt_set_layout(const std::vector<Shader>& shaders);
 
 	std::unordered_map<std::string, std::filesystem::file_time_type> paths;
 	VkPipeline handle = VK_NULL_HANDLE;
@@ -42,11 +43,12 @@ struct Pipeline {
 	std::string name;
 	uint32_t push_constant_size = 0;
 	VkDescriptorType descriptor_types[32] = {};
+	std::vector<uint32_t> descriptor_counts;
 
    private:
-	void create_set_layout(const std::vector<Shader>& shaders, const std::vector<uint32_t>& descriptor_counts);
 	void create_pipeline_layout(const std::vector<Shader>& shaders, const std::vector<uint32_t> push_const_sizes);
 	void create_update_template(const std::vector<Shader>& shaders, const std::vector<uint32_t>& descriptor_counts);
+	void create_set_layout(const std::vector<Shader>& shaders, const std::vector<uint32_t>& descriptor_counts);
 	bool tracking_stopped = true;
 	std::mutex mut;
 	std::condition_variable cv;

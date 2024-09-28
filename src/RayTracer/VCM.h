@@ -3,8 +3,8 @@
 #include "shaders/integrators/vcm/vcm_commons.h"
 class VCM : public Integrator {
    public:
-	VCM(LumenScene* lumen_scene)
-		: Integrator(lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), VCMConfig)) {}
+	VCM(LumenScene* lumen_scene, const vk::BVH& tlas)
+		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), VCMConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;

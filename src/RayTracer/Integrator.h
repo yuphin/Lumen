@@ -13,13 +13,13 @@
 #include "Framework/PersistentResourceManager.h"
 class Integrator {
    public:
-	Integrator(LumenScene* lumen_scene) : lumen_scene(lumen_scene) {}
+	Integrator(LumenScene* lumen_scene, const vk::BVH& tlas) : lumen_scene(lumen_scene), tlas(tlas) {}
 	virtual void init();
 	virtual void render(){};
 	virtual bool gui();
 	virtual bool update();
 	virtual void destroy();
-	virtual void create_accel();
+	virtual void create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases);
 	vk::Texture* output_tex;
 	bool updated = false;
 	uint frame_num = 0;
@@ -29,7 +29,5 @@ class Integrator {
 	SceneUBO scene_ubo{};
 	LumenScene* lumen_scene = nullptr;
 	vk::Buffer* scene_ubo_buffer = nullptr;
-	vk::BVH tlas;
-	std::vector<vk::BVH> blases;
-	
+	const vk::BVH& tlas;
 };

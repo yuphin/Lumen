@@ -312,6 +312,7 @@ void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 	cmd.submit();
 	drm::destroy(instances_buf);
 	drm::destroy(scratch_buffer);
+	tlas.updated = true;
 }
 
 }  // namespace vk

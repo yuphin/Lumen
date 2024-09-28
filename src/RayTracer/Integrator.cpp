@@ -136,20 +136,10 @@ void Integrator::destroy() {
 		prm::remove(b);
 	}
 	prm::remove(output_tex);
-	if (tlas.accel) {
-		prm::remove(tlas.buffer);
-		vkDestroyAccelerationStructureKHR(vk::context().device, tlas.accel, nullptr);
-	}
-	if (!blases.empty()) {
-		for (auto& b : blases) {
-			prm::remove(b.buffer);
-			vkDestroyAccelerationStructureKHR(vk::context().device, b.accel, nullptr);
-		}
-	}
-	blases.clear();
+
 }
 
-void Integrator::create_accel() {
+void Integrator::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 	std::vector<vk::BlasInput> blas_inputs;
 
 	VkDeviceAddress vertex_address = lumen_scene->vertex_buffer->get_device_address();

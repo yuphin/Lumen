@@ -3,14 +3,14 @@
 #include "shaders/integrators/ddgi/ddgi_commons.h"
 class DDGI : public Integrator {
    public:
-	DDGI(LumenScene* lumen_scene)
-		: Integrator(lumen_scene), config(CAST_CONFIG(lumen_scene->config.get(), DDGIConfig)) {}
+	DDGI(LumenScene* lumen_scene, const vk::BVH& tlas)
+		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), DDGIConfig)) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
 	virtual bool gui() override;
 	virtual void destroy() override;
-	virtual void create_accel() override;
+	virtual void create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) override;
    private:
 	void update_ddgi_uniforms();
 	void create_radiance_textures();

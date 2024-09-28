@@ -369,12 +369,30 @@ void Pipeline::cleanup() {
 	cv.wait(tracker_lk, [this] { return tracking_stopped; });
 }
 
+
+void Pipeline::create_rt_set_layout(const std::vector<Shader>& shaders) {
+	VkDescriptorSetLayoutBinding binding = {};
+	binding.binding = 0;
+	binding.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+	binding.descriptorCount = 1;
+	binding.pImmutableSamplers = nullptr;
+	binding.stageFlags = 0;
+	for (const Shader& shader : shaders) {
+		binding.stageFlags |= shader.stage;
+	}
+	VkDescriptorSetLayoutCreateInfo set_create_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+	set_create_info.flags = 0;
+	set_create_info.bindingCount = 1;
+	set_create_info.pBindings = &binding;
+	vk::check(vkCreateDescriptorSetLayout(vk::context().device, &set_create_info, nullptr, &tlas_layout));
+}
+
 void Pipeline::create_set_layout(const std::vector<Shader>& shaders, const std::vector<uint32_t>& descriptor_counts) {
 	std::vector<VkDescriptorSetLayoutBinding> set_bindings;
 
 	if (descriptor_counts.size()) {
 		int idx = 0;
-		for (uint32_t i = 0; i < 32; ++i)
+		for (uint32_t i = 0; i < 32; ++i) {
 			if (binding_mask & (1 << i)) {
 				VkDescriptorSetLayoutBinding binding = {};
 				binding.binding = i;
@@ -391,6 +409,7 @@ void Pipeline::create_set_layout(const std::vector<Shader>& shaders, const std::
 				set_bindings.push_back(binding);
 				idx++;
 			}
+		}
 	}
 
 	VkDescriptorSetLayoutCreateInfo set_create_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
@@ -400,19 +419,7 @@ void Pipeline::create_set_layout(const std::vector<Shader>& shaders, const std::
 	vk::check(vkCreateDescriptorSetLayout(vk::context().device, &set_create_info, nullptr, &set_layout));
 	// Create the set layout for TLAS
 	if (type == PipelineType::RT) {
-		VkDescriptorSetLayoutBinding binding = {};
-		binding.binding = 0;
-		binding.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-		binding.descriptorCount = 1;
-		binding.pImmutableSamplers = nullptr;
-		binding.stageFlags = 0;
-		for (const Shader& shader : shaders) {
-			binding.stageFlags |= shader.stage;
-		}
-		set_create_info.flags = 0;
-		set_create_info.bindingCount = 1;
-		set_create_info.pBindings = &binding;
-		vk::check(vkCreateDescriptorSetLayout(vk::context().device, &set_create_info, nullptr, &tlas_layout));
+		create_rt_set_layout(shaders);
 	}
 }
 

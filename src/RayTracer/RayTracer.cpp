@@ -62,7 +62,9 @@ void RayTracer::init() {
 	scene.load_scene(scene_name);
 	create_integrator(int(scene.config->integrator_type));
 	integrator->init();
-	integrator->create_accel();
+	if (!tlas.accel) {
+		integrator->create_accel(tlas, blases);
+	}
 	post_fx.init();
 	init_resources();
 	LUMEN_TRACE("Memory usage {} MB", vk::get_memory_usage(vk::context().physical_device) * 1e-6);
@@ -125,7 +127,7 @@ void RayTracer::init_resources() {
 			prm::get_buffer({.name = "Ground Truth Image",
 							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 .memory_type = vk::BufferType::GPU,
-							 .size = Window::width() * Window::height()  * 4 * sizeof(float),
+							 .size = Window::width() * Window::height() * 4 * sizeof(float),
 							 .data = data});
 		rt_utils_desc.gt_img_addr = gt_img_buffer->get_device_address();
 		free(data);
@@ -243,37 +245,37 @@ void RayTracer::render_debug_utils() {
 void RayTracer::create_integrator(int integrator_idx) {
 	switch (integrator_idx) {
 		case int(IntegratorType::Path):
-			integrator = std::make_unique<Path>(&scene);
+			integrator = std::make_unique<Path>(&scene, tlas);
 			break;
 		case int(IntegratorType::BDPT):
-			integrator = std::make_unique<BDPT>(&scene);
+			integrator = std::make_unique<BDPT>(&scene, tlas);
 			break;
 		case int(IntegratorType::SPPM):
-			integrator = std::make_unique<SPPM>(&scene);
+			integrator = std::make_unique<SPPM>(&scene, tlas);
 			break;
 		case int(IntegratorType::VCM):
-			integrator = std::make_unique<VCM>(&scene);
+			integrator = std::make_unique<VCM>(&scene, tlas);
 			break;
 		case int(IntegratorType::ReSTIR):
-			integrator = std::make_unique<ReSTIR>(&scene);
+			integrator = std::make_unique<ReSTIR>(&scene, tlas);
 			break;
 		case int(IntegratorType::ReSTIRGI):
-			integrator = std::make_unique<ReSTIRGI>(&scene);
+			integrator = std::make_unique<ReSTIRGI>(&scene, tlas);
 			break;
 		case int(IntegratorType::ReSTIRPT):
-			integrator = std::make_unique<ReSTIRPT>(&scene);
+			integrator = std::make_unique<ReSTIRPT>(&scene, tlas);
 			break;
 		case int(IntegratorType::PSSMLT):
-			integrator = std::make_unique<PSSMLT>(&scene);
+			integrator = std::make_unique<PSSMLT>(&scene, tlas);
 			break;
 		case int(IntegratorType::SMLT):
-			integrator = std::make_unique<SMLT>(&scene);
+			integrator = std::make_unique<SMLT>(&scene, tlas);
 			break;
 		case int(IntegratorType::VCMMLT):
-			integrator = std::make_unique<VCMMLT>(&scene);
+			integrator = std::make_unique<VCMMLT>(&scene, tlas);
 			break;
 		case int(IntegratorType::DDGI):
-			integrator = std::make_unique<DDGI>(&scene);
+			integrator = std::make_unique<DDGI>(&scene, tlas);
 			break;
 		default:
 			break;
@@ -337,6 +339,7 @@ bool RayTracer::gui() {
 	if (curr_integrator_idx != int(scene.config->integrator_type)) {
 		updated = true;
 		vkDeviceWaitIdle(vk::context().device);
+		bool was_custom_accel = typeid(*integrator) == typeid(DDGI);
 		integrator->destroy();
 		RenderGraph* rg = vk::render_graph();
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, output_img_buffer, rg);
@@ -353,7 +356,12 @@ bool RayTracer::gui() {
 		scene.config->sky_col = prev_scene_config.sky_col;
 		scene.config->path_length = prev_scene_config.path_length;
 		create_integrator(curr_integrator_idx);
+		bool is_custom_accel = typeid(*integrator) == typeid(DDGI);
 		integrator->init();
+		if(was_custom_accel || is_custom_accel) {
+			destroy_accel();
+			integrator->create_accel(tlas, blases);
+		}
 	}
 
 	return updated;
@@ -418,7 +426,8 @@ float RayTracer::draw_frame() {
 
 	if (write_exr) {
 		write_exr = false;
-		ImageUtils::save_exr((float*)vk::map_buffer(output_img_buffer_cpu), Window::width(), Window::height(), "out.exr");
+		ImageUtils::save_exr((float*)vk::map_buffer(output_img_buffer_cpu), Window::width(), Window::height(),
+							 "out.exr");
 		vk::unmap_buffer(output_img_buffer_cpu);
 	}
 	bool time_limit = (abs(diff / CLOCKS_PER_SEC - 5)) < 0.1;
@@ -433,6 +442,7 @@ float RayTracer::draw_frame() {
 	auto t_end = glfwGetTime() * 1000;
 	auto t_diff = t_end - t_begin;
 	cnt++;
+	tlas.updated = false;
 	return (float)t_diff;
 }
 
@@ -445,6 +455,20 @@ void RayTracer::parse_args(int argc, char* argv[]) {
 		}
 	}
 }
+void RayTracer::destroy_accel() {
+	if (tlas.accel) {
+		prm::remove(tlas.buffer);
+		vkDestroyAccelerationStructureKHR(vk::context().device, tlas.accel, nullptr);
+	}
+	if (!blases.empty()) {
+		for (auto& b : blases) {
+			prm::remove(b.buffer);
+			vkDestroyAccelerationStructureKHR(vk::context().device, b.accel, nullptr);
+		}
+	}
+	blases.clear();
+}
+
 void RayTracer::cleanup() {
 	vkDeviceWaitIdle(vk::context().device);
 	if (initialized) {
@@ -452,6 +476,7 @@ void RayTracer::cleanup() {
 		integrator->destroy();
 		post_fx.destroy();
 		scene.destroy();
+		destroy_accel();
 		vk::destroy_imgui();
 		vk::cleanup();
 	}
