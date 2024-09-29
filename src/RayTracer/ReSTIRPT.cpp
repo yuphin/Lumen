@@ -334,7 +334,11 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
 	result |= ImGui::Checkbox("Enable atmosphere", &enable_atmosphere);
 	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);
-	result |= ImGui::Checkbox("Enable GRIS", &enable_gris);
+	bool enable_gris_changed = ImGui::Checkbox("Enable GRIS", &enable_gris);
+	result |= enable_gris_changed;
+	if(enable_gris_changed) {
+		pc_ray.total_frame_num = 0;
+	}
 	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
 	result |= ImGui::Checkbox("Enable canonical-only mode", &canonical_only);
 	if (!enable_gris) {
