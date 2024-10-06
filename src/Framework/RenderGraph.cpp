@@ -987,6 +987,11 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 void RenderGraph::reset() {
 	event_pool.reset_events(vk::context().device);
 
+	for(auto& pass : passes) {
+		if (pass.push_constant_data) {
+			free(pass.push_constant_data);
+		}
+	}
 	passes.clear();
 	if (pipeline_tasks.size()) {
 		pipeline_tasks.clear();
@@ -998,6 +1003,11 @@ void RenderGraph::reset() {
 
 void RenderGraph::submit(vk::CommandBuffer& cmd) {
 	cmd.submit();
+	for(auto& pass : passes) {
+		if (pass.push_constant_data) {
+			free(pass.push_constant_data);
+		}
+	}
 	passes.clear();
 	dirty_pass_encountered = false;
 }
@@ -1008,13 +1018,13 @@ void RenderGraph::run_and_submit(vk::CommandBuffer& cmd) {
 }
 
 void RenderGraph::destroy() {
-	passes.clear();
 	event_pool.cleanup(vk::context().device);
 	for (auto& pass : passes) {
 		if (pass.push_constant_data) {
 			free(pass.push_constant_data);
 		}
 	}
+	passes.clear();
 	for (const auto& [k, v] : pipeline_cache) {
 		v.pipeline->cleanup();
 	}

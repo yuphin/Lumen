@@ -108,8 +108,8 @@ class RenderPass {
 	}
 
 	RenderPass(vk::PassType type, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
-			   const vk::RTPassSettings& rt_settings, const std::string& macro_string, PipelineStorage* pipeline_storage,
-			   bool cached = false)
+			   const vk::RTPassSettings& rt_settings, const std::string& macro_string,
+			   PipelineStorage* pipeline_storage, bool cached = false)
 		: type(type),
 		  name(name),
 		  rg(rg),
@@ -144,12 +144,6 @@ class RenderPass {
 	RenderPass& bind_buffer_array(std::span<vk::Buffer*> buffers, bool force_update = false);
 	RenderPass& bind_tlas(const vk::BVH& tlas);
 
-	RenderPass& read(vk::Texture* tex);
-	RenderPass& read(vk::Buffer* buffer);
-
-	RenderPass& write(vk::Texture* tex);
-	RenderPass& write(vk::Buffer* buffer);
-
 	RenderPass& read(ResourceBinding& resource);
 	RenderPass& write(ResourceBinding& resource);
 
@@ -179,11 +173,18 @@ class RenderPass {
 	PipelineStorage* pipeline_storage = nullptr;
 
    private:
+	RenderPass& read(vk::Texture* tex);
+	RenderPass& read(vk::Buffer* buffer);
+
+	RenderPass& write(vk::Texture* tex);
+	RenderPass& write(vk::Buffer* buffer);
+
 	// When the automatic inference isn't used
 	std::vector<vk::Buffer*> explicit_buffer_writes;
 	std::vector<vk::Buffer*> explicit_buffer_reads;
 	std::vector<vk::Texture*> explicit_tex_writes;
 	std::vector<vk::Texture*> explicit_tex_reads;
+	//
 
 	void write_impl(vk::Buffer* buffer, VkAccessFlags access_flags);
 	void write_impl(vk::Texture* tex, VkAccessFlags access_flags = VK_ACCESS_SHADER_WRITE_BIT);
@@ -245,7 +246,8 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 		macro_string += '(';
 	}
 
-	auto populate_macros = [](const std::vector<vk::ShaderMacro>& macros, std::string& macro_string, bool& prev_nonempty) {
+	auto populate_macros = [](const std::vector<vk::ShaderMacro>& macros, std::string& macro_string,
+							  bool& prev_nonempty) {
 		for (size_t i = 0; i < macros.size(); i++) {
 			if (!macros[i].visible) {
 				continue;
