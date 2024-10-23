@@ -1019,6 +1019,7 @@ void RenderGraph::run_and_submit(vk::CommandBuffer& cmd) {
 
 void RenderGraph::destroy() {
 	event_pool.cleanup(vk::context().device);
+	// TODO: This is bad. We need a custom allocator inside the Render Graoh
 	for (auto& pass : passes) {
 		if (pass.push_constant_data) {
 			free(pass.push_constant_data);
