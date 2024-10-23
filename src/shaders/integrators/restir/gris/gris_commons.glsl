@@ -79,8 +79,8 @@ HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx, out floa
 	vtx[2] = compact_vertices.d[ind.z];
 
 	gbuffer.pos = vec3(to_world * vec4(vtx[0].pos * bary.x + vtx[1].pos * bary.y + vtx[2].pos * bary.z, 1.0));
-	gbuffer.n_s =
-		normalize(vec3(tsp_inv_to_world * vec4(vtx[0].normal * bary.x + vtx[1].normal * bary.y + vtx[2].normal * bary.z, 1.0)));
+	gbuffer.n_s = normalize(
+		vec3(tsp_inv_to_world * vec4(vtx[0].normal * bary.x + vtx[1].normal * bary.y + vtx[2].normal * bary.z, 1.0)));
 	const vec3 e0 = vtx[2].pos - vtx[0].pos;
 	const vec3 e1 = vtx[1].pos - vtx[0].pos;
 
@@ -159,13 +159,13 @@ vec3 get_hitdata_pos_only(vec2 attribs, uint instance_idx, uint triangle_idx) {
 }
 
 vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 wo, out LightRecord record,
-			inout vec3 light_dir_or_pdf, out bool is_directional_light, out vec3 Le, out vec3 wi, out float pdf_light_w) {
+			inout vec3 light_dir_or_pdf, out bool is_directional_light, out vec3 Le, out vec3 wi,
+			out float pdf_light_w) {
 	float pdf_light_a;
 	wi = vec3(0);
 	float wi_len = 0;
 	float cos_from_light;
-	Le =
-		sample_light_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
+	Le = sample_light_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
 	const vec3 p = offset_ray2(pos, n_s);
 	float light_bsdf_pdf;
 	float cos_x = dot(n_s, wi);
@@ -187,9 +187,9 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 }
 
 vec2 to_spherical(const vec3 v) {
-    float phi = (v.z == 0.0 && v.x == 0.0) ? 0.0 : atan(v.z, v.x);
-    float theta = acos(clamp(v.y, -1.0, 1.0));
-    return vec2(phi, theta);
+	float phi = (v.z == 0.0 && v.x == 0.0) ? 0.0 : atan(v.z, v.x);
+	float theta = acos(clamp(v.y, -1.0, 1.0));
+	return vec2(phi, theta);
 }
 
 vec3 from_spherical(const vec2 v) {
@@ -332,11 +332,14 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 	if (rc_type != RECONNECTION_TYPE_NEE) {
 		rc_gbuffer =
 			get_hitdata(data.rc_barycentrics, data.rc_primitive_instance_id.y, data.rc_primitive_instance_id.x);
+		rc_hit_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
 	} else {
 		light = lights[data.rc_primitive_instance_id.y];
-		rc_gbuffer = get_hitdata(data.rc_barycentrics, light.prim_mesh_idx, data.rc_primitive_instance_id.x);
+		if (!is_directional_light) {
+			rc_gbuffer = get_hitdata(data.rc_barycentrics, light.prim_mesh_idx, data.rc_primitive_instance_id.x);
+			rc_hit_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
+		}
 	}
-	rc_hit_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
 
 	uint prefix_depth = 0;
 	vec3 prefix_throughput = vec3(1);
@@ -426,9 +429,17 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 #if DEBUG == 1
 				ASSERT(reconnection_seed == data.debug_seed);
 #endif
-				float pdf_light_w = data.rc_Li.x * wi_len_sqr / abs(dot(rc_gbuffer.n_s, dst_postfix_wi));
-				float mis_weight =
-					is_light_delta(light.light_flags) ? 1.0 : 1.0 / (1.0 + dst_postfix_pdf / pdf_light_w);
+				float pdf_light_w;
+				float mis_weight;
+
+				bool is_emissive_light = !is_light_delta(light.light_flags);
+				if (is_emissive_light) {
+					pdf_light_w = data.rc_Li.x * wi_len_sqr / abs(dot(rc_gbuffer.n_s, dst_postfix_wi));
+					mis_weight = 1.0 / (1.0 + dst_postfix_pdf / pdf_light_w);
+				} else {
+					pdf_light_w = 1.0;
+					mis_weight = 1.0;
+				}
 				reservoir_contribution *= light.L * mis_weight / (light_pick_pdf * pdf_light_w);
 				LOG_CLICKED3("NEE: %d - %d = %v3f\n", prefix_depth, (data.path_flags) >> 16, reservoir_contribution);
 				jacobian = 1;
@@ -436,35 +447,37 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 				const bool connection_to_nee_vertex = rc_postfix_length == 2;
 				float g = abs(dot(dst_postfix_wi, rc_gbuffer.n_s)) / wi_len_sqr;
 
-				ASSERT(rc_type == RECONNECTION_TYPE_DEFAULT || rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC || rc_type == RECONNECTION_TYPE_NEE_AFTER_RC);
+				ASSERT(rc_type == RECONNECTION_TYPE_DEFAULT || rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC ||
+					   rc_type == RECONNECTION_TYPE_NEE_AFTER_RC);
 				jacobian_num = dst_postfix_pdf * g;
 
 				bool rc_post_side = face_forward(rc_gbuffer.n_s, rc_gbuffer.n_g, -dst_postfix_wi);
 
-
 				const vec3 rc_wi_post = from_spherical(data.rc_wi);
 				float rc_pdf_post;
-				vec3 rc_postfix_f = eval_bsdf(rc_gbuffer.n_s, -dst_postfix_wi, rc_hit_mat, 1, rc_post_side,
-											  rc_wi_post, rc_pdf_post, unused_rev_pdf, false);
+				vec3 rc_postfix_f = eval_bsdf(rc_gbuffer.n_s, -dst_postfix_wi, rc_hit_mat, 1, rc_post_side, rc_wi_post,
+											  rc_pdf_post, unused_rev_pdf, false);
 
 				float mis_weight = 1.0;
 				if (rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
 					ASSERT(rc_postfix_length == 1);
 					mis_weight = 1.0 / (1 + uintBitsToFloat(data.rc_seed) / dst_postfix_pdf);
-				} else if(rc_type == RECONNECTION_TYPE_NEE_AFTER_RC) {
+				} else if (rc_type == RECONNECTION_TYPE_NEE_AFTER_RC) {
 					// TODO: Handle directional light
 					mis_weight = 1.0 / (1 + rc_pdf_post / uintBitsToFloat(data.rc_seed));
 				}
 
-				if(rc_type == RECONNECTION_TYPE_NEE_AFTER_RC) {
-					reservoir_contribution *= rc_postfix_f * abs(dot(rc_gbuffer.n_s, rc_wi_post)) / (light_pick_pdf * uintBitsToFloat(data.rc_seed));
+				if (rc_type == RECONNECTION_TYPE_NEE_AFTER_RC) {
+					reservoir_contribution *= rc_postfix_f * abs(dot(rc_gbuffer.n_s, rc_wi_post)) /
+											  (light_pick_pdf * uintBitsToFloat(data.rc_seed));
 
-				} else if(rc_type != RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
+				} else if (rc_type != RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
 					jacobian_num *= rc_pdf_post;
 					reservoir_contribution *= rc_postfix_f * abs(dot(rc_gbuffer.n_s, rc_wi_post)) / rc_pdf_post;
 				}
 				reservoir_contribution *= data.rc_Li * mis_weight / dst_postfix_pdf;
-				LOG_CLICKED4("Default: %d - %d - %d - %v3f\n", prefix_depth, rc_postfix_length, rc_type, reservoir_contribution);
+				LOG_CLICKED4("Default: %d - %d - %d - %v3f\n", prefix_depth, rc_postfix_length, rc_type,
+							 reservoir_contribution);
 				jacobian = jacobian_num / src_jacobian;
 			}
 			if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {

@@ -25,7 +25,6 @@ void main() {
 	const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
 	vec2 d = in_uv * 2.0 - 1.0;
 	vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
-	vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
 	vec3 direction = vec3(sample_camera(d));
 	vec3 col = vec3(0);
 
@@ -33,7 +32,7 @@ void main() {
 	init_gbuffer(gbuffer_out);
 
 	// General variables
-	bool last_vertex_specular = false;
+	bool vertex_specular = false;
 	vec3 throughput = vec3(1);
 	vec3 direct_lighting = vec3(0);
 	float bsdf_pdf_val = 1;
@@ -98,8 +97,9 @@ void main() {
 				reconnection_data.path_flags =
 					(reconnection_data.path_flags & 0xFFFF0000) |
 					pack_path_flags(prefix_depth, depth - prefix_depth, RECONNECTION_TYPE_DEFAULT, false);
-				bool merged = stream_reservoir(seed, reservoir, reconnection_data, reconnection_data.reservoir_contribution, 1.0);
-				if(merged) {
+				bool merged =
+					stream_reservoir(seed, reservoir, reconnection_data, reconnection_data.reservoir_contribution, 1.0);
+				if (merged) {
 					selected_contribution = contribution;
 				}
 				valid_reservoir = valid_reservoir || merged;
@@ -157,7 +157,7 @@ void main() {
 #if STREAMING_MODE == STREAMING_MODE_SPLIT
 			// Partially fill in the contribution data (For STREAMING_MODE_SPLIT)
 			throughput_until_rc = throughput;
-#endif // STREAMING_MODE == STREAMING_MODE_SPLIT
+#endif	// STREAMING_MODE == STREAMING_MODE_SPLIT
 			vec3 to_prev = origin.xyz - gbuffer.pos;
 			reconnection_data.rc_partial_jacobian = abs(dot(n_s, wo)) * rc_partial_jacobian / dot(to_prev, to_prev);
 		}
@@ -173,7 +173,7 @@ void main() {
 			float mis_weight = 1.0;
 			float g = abs(dot(-direction, n_s)) / (payload.dist * payload.dist);
 			float pdf_light_w = 1.0 / (g * triangle_area);
-			if (!last_vertex_specular) {
+			if (!vertex_specular) {
 				mis_weight = 1.0 / (1 + pdf_light_w / bsdf_pdf_val);
 			}
 			vec3 partial_contrib = mis_weight * hit_mat.emissive_factor;
@@ -196,9 +196,9 @@ void main() {
 					pack_path_flags(prefix_depth, depth - prefix_depth,
 									was_connectable ? RECONNECTION_TYPE_EMISSIVE_AFTER_RC : RECONNECTION_TYPE_DEFAULT,
 									side);
-				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
-											   reconnection_data.reservoir_contribution, 1.0);
-				if(merged) {
+				bool merged =
+					stream_reservoir(seed, reservoir, reconnection_data, reconnection_data.reservoir_contribution, 1.0);
+				if (merged) {
 					selected_contribution = contrib;
 				}
 				valid_reservoir = valid_reservoir || merged;
@@ -219,7 +219,7 @@ void main() {
 			break;
 		}
 
-		last_vertex_specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
+		vertex_specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
 
 		// Sample direction
 		float cos_theta;
@@ -233,12 +233,12 @@ void main() {
 		}
 
 		// NEE
-		if (!last_vertex_specular) {
+		if (!vertex_specular) {
 			uint rc_seed = seed.w;
 			uvec4 debug_seed = seed;
 			bool is_directional_light;
 			LightRecord light_record;
-			
+
 			vec3 Le;
 			vec3 nee_wi;
 			float nee_pdf_light_w;
@@ -266,8 +266,8 @@ void main() {
 											   pack_path_flags(depth, 1, RECONNECTION_TYPE_NEE, side) |
 											   uint(is_directional_light) << 14;
 
-				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
-											   reconnection_data.reservoir_contribution, 1.0);
+				bool merged =
+					stream_reservoir(seed, reservoir, reconnection_data, reconnection_data.reservoir_contribution, 1.0);
 				if (merged) {
 					set_bounce_flag(reservoir.data.path_flags, depth + 1, true);
 					selected_contribution = contribution;
@@ -286,23 +286,23 @@ void main() {
 				reconnection_data.path_flags =
 					(reconnection_data.path_flags & 0xFFFF0000) |
 					pack_path_flags(prefix_depth, depth - prefix_depth + 1, RECONNECTION_TYPE_DEFAULT, side);
-				bool merged = stream_reservoir(seed, reservoir, reconnection_data,
-											   reconnection_data.reservoir_contribution, 1.0);
-				if(merged) { 
+				bool merged =
+					stream_reservoir(seed, reservoir, reconnection_data, reconnection_data.reservoir_contribution, 1.0);
+				if (merged) {
 					selected_contribution = contribution;
 				}
-				if(merged && connectable_this_vertex) {
+				if (merged && connectable_this_vertex) {
 					ASSERT(postfix_throughput == vec3(1));
 					reservoir.data.rc_wi = to_spherical(nee_wi);
 					reservoir.data.rc_Li = Le;
 					reservoir.data.path_flags = (reservoir.data.path_flags & ~0x7u) | RECONNECTION_TYPE_NEE_AFTER_RC;
 					reservoir.data.rc_seed = floatBitsToUint(nee_pdf_light_w);
-					if(bsdf_pdf_val != 0) { 
+					if (bsdf_pdf_val != 0) {
 						reservoir.data.rc_partial_jacobian /= bsdf_pdf_val;
 					}
 				}
 #if STREAMING_MODE == STREAMING_MODE_SPLIT
-				else if(connectable_this_vertex){
+				else if (connectable_this_vertex) {
 					postfix_L += Li * postfix_throughput;
 				}
 #endif	// STREAMING_MODE == STREAMING_MODE_SPLIT
@@ -327,10 +327,10 @@ void main() {
 			postfix_throughput *= f_cos / bsdf_pdf_val;
 		}
 #if STREAMING_MODE == STREAMING_MODE_SPLIT
-		else if(connectable_vertex_found) {
+		else if (connectable_vertex_found) {
 			throughput_until_rc *= f_cos / bsdf_pdf_val;
 		}
-#endif // STREAMING_MODE == STREAMING_MODE_SPLIT
+#endif	// STREAMING_MODE == STREAMING_MODE_SPLIT
 
 		rc_partial_jacobian = bsdf_pdf_val;
 		if (pc.enable_rr == 1) {
@@ -358,9 +358,9 @@ void main() {
 		reconnection_data.reservoir_contribution = calc_target_pdf(contrib);
 		reconnection_data.path_flags = (reconnection_data.path_flags & 0xFFFF0000) |
 									   pack_path_flags(prefix_depth, postfix_depth, RECONNECTION_TYPE_DEFAULT, rc_side);
-		bool merged = stream_reservoir(seed, reservoir, reconnection_data,
-									   reconnection_data.reservoir_contribution, 1.0);
-		if(merged) {
+		bool merged =
+			stream_reservoir(seed, reservoir, reconnection_data, reconnection_data.reservoir_contribution, 1.0);
+		if (merged) {
 			selected_contribution = contrib;
 		}
 		valid_reservoir = valid_reservoir || merged;
@@ -380,13 +380,12 @@ void main() {
 				ASSERT(reservoir_data_valid(reservoir.data));
 			}
 
-
-			if(rc_type == RECONNECTION_TYPE_DEFAULT) {
+			if (rc_type == RECONNECTION_TYPE_DEFAULT) {
 				bool rc_last_vertex = false;
 #if STREAMING_MODE == STREAMING_MODE_SPLIT
 				rc_last_vertex = rc_postfix_length <= 1;
-#endif // STREAMING_MODE == STREAMING_MODE_SPLIT
-				if(!rc_last_vertex) {
+#endif	// STREAMING_MODE == STREAMING_MODE_SPLIT
+				if (!rc_last_vertex) {
 					ASSERT(reservoir.data.rc_wi != vec2(0));
 				}
 			}
