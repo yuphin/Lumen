@@ -85,7 +85,7 @@ void main() {
 			vec3 atmosphere_L = pc.sky_col;
 #endif	// ENABLE_ATMOSPHERE
 			vec3 contribution = throughput * atmosphere_L;
-			if (depth > 0) {
+			if (depth > 1) {
 				col += contribution;
 			} else {
 				direct_lighting += contribution;
@@ -106,6 +106,8 @@ void main() {
 #else	// STREAMING_MODE != STREAMING_MODE_INDIVIDUAL
 				postfix_L += postfix_throughput * atmosphere_L;
 #endif	// STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
+			} else if (depth > 1) {
+				prefix_col += contribution;
 			}
 			break;
 		}
@@ -420,17 +422,6 @@ void main() {
 		if (pc.canonical_only == 1) {
 			return;
 		}
-	}
-
-	if (pc.enable_gris == 0) {
-		if (pc.frame_num > 0) {
-			float w = 1. / float(pc.frame_num + 1);
-			vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
-			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
-		} else {
-			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
-		}
-	} else {
 		if (pc.direct_lighting == 1) {
 			direct_lighting_buffer.d[pixel_idx] = direct_lighting;
 		}
@@ -442,5 +433,13 @@ void main() {
 		imageStore(canonical_contributions_tex, ivec2(gl_LaunchIDEXT.xy), vec4(selected_contribution, 1));
 		out_reservoirs[pixel_idx] = reservoir;
 		out_gbuffers[pixel_idx] = gbuffer_out;
+	} else {
+		if (pc.frame_num > 0) {
+			float w = 1. / float(pc.frame_num + 1);
+			vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
+		} else {
+			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+		}
 	}
 }

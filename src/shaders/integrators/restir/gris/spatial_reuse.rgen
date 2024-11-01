@@ -25,16 +25,7 @@ DebugVisBuffer debug_vis = DebugVisBuffer(scene_desc.debug_vis_addr);
 
 // TODO: Maybe use an external buffer to supply spatial offsets?
 
-void main() {
-	GBuffer gbuffer = curr_gbuffers[pixel_idx];
-	Reservoir reservoir;
-	init_reservoir(reservoir);
-	if (!gbuffer_data_valid(gbuffer)) {
-		out_reservoirs[pixel_idx] = reservoir;
-		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(0));
-		return;
-	}
-
+vec3 do_spatial_reuse(GBuffer gbuffer, Reservoir reservoir) {
 	HitData canonical_gbuffer =
 		get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
 	Reservoir canonical_reservoir = in_reservoirs[pixel_idx];
@@ -89,8 +80,9 @@ void main() {
 		retrace_paths_and_evaluate(unpacked_neighbor_gbuffer, canonical_reservoir.data, primary_direction,
 								   gl_LaunchIDEXT.xy, data.target_pdf_in_neighbor);
 #endif
-		bool accepted = process_reservoir(seed, reservoir, m_c, canonical_reservoir, neighbor_reservoir, data,
-										   neighbor_coords, canonical_in_canonical_pdf, pc.num_spatial_samples, curr_reservoir_contribution);
+		bool accepted =
+			process_reservoir(seed, reservoir, m_c, canonical_reservoir, neighbor_reservoir, data, neighbor_coords,
+							  canonical_in_canonical_pdf, pc.num_spatial_samples, curr_reservoir_contribution);
 		if (accepted) {
 			curr_new_partial_jacobian = data.new_jacobian;
 			accepted_positions[num_accepted_positions++] = neighbor_pixel_idx;
@@ -134,9 +126,6 @@ void main() {
 	}
 
 	float uv_x = float(gl_LaunchIDEXT.x) / float(gl_LaunchSizeEXT.x);
-	if (uv_x >= pc.gris_separator) {
-		return;
-	}
 
 	vec3 col = vec3(0);
 	if (pc.direct_lighting == 1) {
@@ -152,7 +141,24 @@ void main() {
 			debug_vis.d[accepted_positions[i]] = 1;
 		}
 	}
+	return col;
+}
 
+void main() {
+	float uv_x = float(gl_LaunchIDEXT.x) / float(gl_LaunchSizeEXT.x);
+	if (uv_x >= pc.gris_separator) {
+		return;
+	}
+	GBuffer gbuffer = curr_gbuffers[pixel_idx];
+	Reservoir reservoir;
+	init_reservoir(reservoir);
+	vec3 col;
+	if (!gbuffer_data_valid(gbuffer)) {
+		out_reservoirs[pixel_idx] = reservoir;
+		col = direct_lighting_buffer.d[pixel_idx];
+	} else {
+		col = do_spatial_reuse(gbuffer, reservoir);
+	}
 	ivec2 neighbor_coords = ivec2(gl_LaunchIDEXT.xy);
 	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
 		imageStore(image, ivec2(neighbor_coords), vec4(col, 1.f));
