@@ -334,6 +334,7 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
 	result |= ImGui::Checkbox("Enable atmosphere", &enable_atmosphere);
 	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);
+	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
 	bool enable_gris_changed = ImGui::Checkbox("Enable GRIS", &enable_gris);
 	result |= enable_gris_changed;
 	if(enable_gris_changed) {
@@ -359,7 +360,6 @@ bool ReSTIRPT::gui() {
 	}
 	result |= ImGui::SliderFloat("GRIS / Default", &gris_separator, 0.0f, 1.0f);
 	result |= ImGui::Checkbox("Enable occlusion", &enable_occlusion);
-	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
 	result |= ImGui::Checkbox("Debug pixels", &pixel_debug);
 	result |= ImGui::Checkbox("Enable defensive formulation", &enable_defensive_formulation);
 	result |= ImGui::Checkbox("Enable permutation sampling", &enable_permutation_sampling);
