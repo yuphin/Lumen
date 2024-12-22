@@ -1,6 +1,5 @@
 #include "../LumenPCH.h"
 #include "CommandBuffer.h"
-#include "VulkanSyncronization.h"
 
 static uint32_t get_first_available_tid(uint64_t val) {
 #ifdef _MSC_VER
@@ -12,16 +11,24 @@ static uint32_t get_first_available_tid(uint64_t val) {
 #endif
 }
 namespace vk {
+
+namespace sync {
+	std::mutex queue_mutex;
+	std::mutex command_pool_mutex;
+	uint64_t available_command_pools = UINT64_MAX;
+	std::counting_semaphore<64> command_pool_semaphore{64};
+}
+
 CommandBuffer::CommandBuffer(bool begin, VkCommandBufferUsageFlags begin_flags, vk::QueueType type,
 							 VkCommandBufferLevel level) {
 	this->type = type;
 	std::unique_lock<std::mutex> cv_lock;
 
-	VulkanSyncronization::command_pool_semaphore.acquire();
+	sync::command_pool_semaphore.acquire();
 	{
-		std::scoped_lock lock(VulkanSyncronization::command_pool_mutex);
-		curr_tid = get_first_available_tid(VulkanSyncronization::available_command_pools);
-		VulkanSyncronization::available_command_pools &= ~(uint64_t(1) << curr_tid);
+		std::scoped_lock lock(sync::command_pool_mutex);
+		curr_tid = get_first_available_tid(sync::available_command_pools);
+		sync::available_command_pools &= ~(uint64_t(1) << curr_tid);
 	}
 	auto cmd_buf_allocate_info = vk::command_buffer_allocate_info(vk::context().cmd_pools[curr_tid], level, 1);
 	vk::check(vkAllocateCommandBuffers(vk::context().device, &cmd_buf_allocate_info, &handle),
@@ -36,11 +43,11 @@ CommandBuffer::CommandBuffer(bool begin, VkCommandBufferUsageFlags begin_flags, 
 void CommandBuffer::begin(VkCommandBufferUsageFlags begin_flags) {
 	LUMEN_ASSERT(state != CommandBufferState::RECORDING, "Command buffer is already recording");
 	std::unique_lock<std::mutex> cv_lock;
-	VulkanSyncronization::command_pool_semaphore.acquire();
+	sync::command_pool_semaphore.acquire();
 	if (curr_tid == -1) {
-		std::scoped_lock lock(VulkanSyncronization::command_pool_mutex);
-		curr_tid = get_first_available_tid(VulkanSyncronization::available_command_pools);
-		VulkanSyncronization::available_command_pools &= ~(uint64_t(1) << curr_tid);
+		std::scoped_lock lock(sync::command_pool_mutex);
+		curr_tid = get_first_available_tid(sync::available_command_pools);
+		sync::available_command_pools &= ~(uint64_t(1) << curr_tid);
 	}
 	auto begin_info = vk::command_buffer_begin_info(begin_flags);
 	vk::check(vkBeginCommandBuffer(handle, &begin_info), "Could not begin the command buffer");
@@ -53,7 +60,7 @@ void CommandBuffer::submit(bool wait_fences, bool queue_wait_idle) {
 	VkSubmitInfo submit_info = vk::submit_info();
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = &handle;
-	VulkanSyncronization::queue_mutex.lock();
+	sync::queue_mutex.lock();
 	if (wait_fences) {
 		VkFenceCreateInfo fence_info = vk::fence();
 		VkFence fence;
@@ -68,7 +75,7 @@ void CommandBuffer::submit(bool wait_fences, bool queue_wait_idle) {
 	if (queue_wait_idle) {
 		vk::check(vkQueueWaitIdle(vk::context().queues[(int)type]), "Queue wait error! Check previous submissions");
 	}
-	VulkanSyncronization::queue_mutex.unlock();
+	sync::queue_mutex.unlock();
 }
 
 CommandBuffer::~CommandBuffer() {
@@ -81,10 +88,10 @@ CommandBuffer::~CommandBuffer() {
 	}
 	vkFreeCommandBuffers(vk::context().device, vk::context().cmd_pools[curr_tid], 1, &handle);
 	{
-		std::scoped_lock lock(VulkanSyncronization::command_pool_mutex);
-		VulkanSyncronization::available_command_pools |= uint64_t(1) << curr_tid;
+		std::scoped_lock lock(sync::command_pool_mutex);
+		sync::available_command_pools |= uint64_t(1) << curr_tid;
 	}
-	VulkanSyncronization::command_pool_semaphore.release();
+	sync::command_pool_semaphore.release();
 }
 
 }  // namespace vk
