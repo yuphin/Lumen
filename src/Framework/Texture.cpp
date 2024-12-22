@@ -145,7 +145,8 @@ void create_texture(Texture* texture, const TextureDesc& desc) {
 										   .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 										   .memory_type = BufferType::STAGING,
 										   .size = desc.data.size,
-										   .data = desc.data.data});
+										   .data = desc.data.data,
+										   .dedicated_allocation = false});
 		// Copy from staging buffer to image
 		vk::CommandBuffer copy_cmd(true);
 

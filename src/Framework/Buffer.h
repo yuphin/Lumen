@@ -14,8 +14,10 @@ struct BufferDesc {
 	VkDeviceSize size;
 	void* data = nullptr;
 	// For now this is set to true by default
-	// Otherwise on state changes the previous memory data is *spilled*
+	// Otherwise on state changes the previous memory data is *spilled* to the persistent memory
 	// and some integrators assume that the memory is allocated from a dedicated pool 
+
+	// For buffers allocated from the DynamicResourceManager this can be explicitly set to false
 	bool dedicated_allocation = true;
 };
 

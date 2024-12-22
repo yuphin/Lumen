@@ -25,7 +25,8 @@ static BVH create_acceleration(VkAccelerationStructureCreateInfoKHR& accel) {
 		{.name = "Blas Buffer",
 		 .usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		 .memory_type = vk::BufferType::GPU,
-		 .size = accel.size});
+		 .size = accel.size,
+		 .dedicated_allocation = false});
 	accel.buffer = result_accel.buffer->handle;
 	// Create the acceleration structure
 	vkCreateAccelerationStructureKHR(vk::context().device, &accel, nullptr, &result_accel.accel);
@@ -140,12 +141,11 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmdBuf, uint32_t countIns
 	}
 
 	// Allocate the scratch memory
-	*scratch_buffer = drm::get({
-		.name = "TLAS Scratch Buffer",
-		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		.memory_type = vk::BufferType::STAGING,
-		.size = size_info.buildScratchSize,
-	});
+	*scratch_buffer = drm::get({.name = "TLAS Scratch Buffer",
+								.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+								.memory_type = vk::BufferType::STAGING,
+								.size = size_info.buildScratchSize,
+								.dedicated_allocation = false});
 	// Update build information
 	build_info.srcAccelerationStructure = update ? tlas.accel : VK_NULL_HANDLE;
 	build_info.dstAccelerationStructure = tlas.accel;
@@ -207,12 +207,12 @@ void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
 
 	// Allocate the scratch buffers holding the temporary data of the
 	// acceleration structure builder
-	vk::Buffer* scratch_buffer = drm::get({
-		.name = "BLAS Scratch Buffer",
-		.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-		.memory_type = vk::BufferType::GPU,
-		.size = max_scratch_size,
-	});
+	vk::Buffer* scratch_buffer =
+		drm::get({.name = "BLAS Scratch Buffer",
+				  .usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+				  .memory_type = vk::BufferType::GPU,
+				  .size = max_scratch_size,
+				  .dedicated_allocation = false});
 
 	// Allocate a query pool for storing the needed size for every BLAS
 	// compaction.
@@ -285,14 +285,13 @@ void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 
 	// Create a buffer holding the actual instance data (matrices++) for use by
 	// the AS builder
-	vk::Buffer* instances_buf = drm::get({
-		.name = "TLAS Instances Buffer",
-		.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-				 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-		.memory_type = vk::BufferType::GPU,
-		.size = sizeof(VkAccelerationStructureInstanceKHR) * instances.size(),
-		.data = instances.data(),
-	});
+	vk::Buffer* instances_buf = drm::get({.name = "TLAS Instances Buffer",
+										  .usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+												   VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+										  .memory_type = vk::BufferType::GPU,
+										  .size = sizeof(VkAccelerationStructureInstanceKHR) * instances.size(),
+										  .data = instances.data(),
+										  .dedicated_allocation = false});
 	vk::CommandBuffer cmd(true, 0, QueueType::GFX);
 	// Make sure the copy of the instance buffer are copied before triggering
 	// the acceleration structure build

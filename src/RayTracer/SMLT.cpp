@@ -243,7 +243,7 @@ void SMLT::init() {
 
 void SMLT::render() {
 	const float ppm_base_radius = 0.25f;
-	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	vk::CommandBuffer cmd(/*start*/ true);
 	VkClearValue clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
 	VkClearValue clear_depth = {1.0f, 0};
 	VkViewport viewport = vk::viewport((float)Window::width(), (float)Window::height(), 0.0f, 1.0f);

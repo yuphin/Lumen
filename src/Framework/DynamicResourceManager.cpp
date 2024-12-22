@@ -44,8 +44,8 @@ class DynamicPool {
 };
 
 namespace drm {
-DynamicPool<vk::Buffer> _buffer_pool;
-DynamicPool<vk::Texture> _texture_pool;
+thread_local DynamicPool<vk::Buffer> _buffer_pool;
+thread_local DynamicPool<vk::Texture> _texture_pool;
 
 vk::Buffer* get(const vk::BufferDesc& desc) {
 	auto buffer = _buffer_pool.get();

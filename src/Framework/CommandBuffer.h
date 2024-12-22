@@ -17,7 +17,7 @@ class CommandBuffer {
 	enum class CommandBufferState { RECORDING, STOPPED };
 	CommandBufferState state = CommandBufferState::STOPPED;
 	vk::QueueType type;
-	uint32_t curr_tid;
+	uint32_t curr_tid = -1;
 };
 
 }  // namespace vk

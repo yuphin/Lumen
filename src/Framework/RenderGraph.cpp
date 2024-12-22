@@ -490,12 +490,15 @@ void RenderPass::finalize() {
 		vk::check(vkCreateDescriptorPool(vk::context().device, &descriptor_pool_ci, nullptr,
 										 &pipeline_storage->pipeline->tlas_descriptor_pool),
 				  "Failed to create descriptor pool");
+		assert(pipeline_storage->pipeline->tlas_descriptor_pool != VK_NULL_HANDLE);
 		VkDescriptorSetAllocateInfo set_allocate_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
 		set_allocate_info.descriptorPool = pipeline_storage->pipeline->tlas_descriptor_pool;
 		set_allocate_info.descriptorSetCount = 1;
 		set_allocate_info.pSetLayouts = &pipeline_storage->pipeline->tlas_layout;
-		vkAllocateDescriptorSets(vk::context().device, &set_allocate_info,
-								 &pipeline_storage->pipeline->tlas_descriptor_set);
+		vk::check(vkAllocateDescriptorSets(vk::context().device, &set_allocate_info,
+								 &pipeline_storage->pipeline->tlas_descriptor_set));
+		assert(pipeline_storage->pipeline->tlas_descriptor_set != VK_NULL_HANDLE);
+		// LUMEN_TRACE("Creating TLAS descriptor set {} for pipeline {}", (uint64_t)pipeline_storage->pipeline->tlas_descriptor_set, (uint64_t)pipeline_storage->pipeline->handle);
 
 		auto descriptor_write = vk::write_descriptor_set(pipeline_storage->pipeline->tlas_descriptor_set,
 														 VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0,

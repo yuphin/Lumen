@@ -36,7 +36,7 @@ void create_buffer(Buffer* buffer, const BufferDesc& desc) {
 	}
 	VkBufferCreateInfo buffer_ci = vk::buffer(buffer->usage_flags, buffer->size, VK_SHARING_MODE_EXCLUSIVE);
 	VmaAllocationInfo alloc_info;
-	vmaCreateBuffer(vk::context().allocator, &buffer_ci, &alloc_ci, &buffer->handle, &buffer->allocation, &alloc_info);
+	vk::check(vmaCreateBuffer(vk::context().allocator, &buffer_ci, &alloc_ci, &buffer->handle, &buffer->allocation, &alloc_info));
 	if (!buffer->name.empty()) {
 		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)buffer->handle, buffer->name.data(),
 										   VK_OBJECT_TYPE_BUFFER);
@@ -48,7 +48,8 @@ void create_buffer(Buffer* buffer, const BufferDesc& desc) {
 										   .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 										   .memory_type = BufferType::STAGING,
 										   .size = buffer->size,
-										   .data = desc.data});
+										   .data = desc.data,
+										   .dedicated_allocation = false});
 		vk::CommandBuffer cmd(true);
 		VkBufferCopy copy_region = {
 			.size = buffer->size,
@@ -59,7 +60,7 @@ void create_buffer(Buffer* buffer, const BufferDesc& desc) {
 
 	} else if (desc.data) {
 		memcpy(alloc_info.pMappedData, desc.data, buffer->size);
-		vmaFlushAllocation(vk::context().allocator, buffer->allocation, 0, buffer->size);
+		vk::check(vmaFlushAllocation(vk::context().allocator, buffer->allocation, 0, buffer->size));
 	}
 }
 

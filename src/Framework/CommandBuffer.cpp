@@ -37,6 +37,7 @@ void CommandBuffer::begin(VkCommandBufferUsageFlags begin_flags) {
 	LUMEN_ASSERT(state != CommandBufferState::RECORDING, "Command buffer is already recording");
 	std::unique_lock<std::mutex> cv_lock;
 	VulkanSyncronization::command_pool_semaphore.acquire();
+	if(curr_tid == -1)
 	{
 		std::scoped_lock lock(VulkanSyncronization::command_pool_mutex);
 		curr_tid = get_first_available_tid(VulkanSyncronization::available_command_pools);
