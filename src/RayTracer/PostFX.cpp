@@ -43,7 +43,6 @@ void PostFX::init() {
 	fft_ping_padded = prm::get_texture(empty_tex_desc);
 	empty_tex_desc.name = "FFT - Pong";
 	fft_pong_padded = prm::get_texture(empty_tex_desc);
-	empty_tex_desc.name = "Kernel - Ping";
 	empty_tex_desc.name = "Kernel - Pong";
 	vk::Texture* kernel_ping = drm::get(empty_tex_desc);
 	kernel_pong = prm::get_texture(empty_tex_desc);

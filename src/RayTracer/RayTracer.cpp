@@ -354,7 +354,7 @@ bool RayTracer::gui() {
 		create_integrator(curr_integrator_idx);
 		bool is_custom_accel = typeid(*integrator) == typeid(DDGI);
 		integrator->init();
-		if(was_custom_accel || is_custom_accel) {
+		if (was_custom_accel || is_custom_accel) {
 			destroy_accel();
 			integrator->create_accel(tlas, blases);
 		}
@@ -369,8 +369,6 @@ float RayTracer::draw_frame() {
 	}
 
 	auto resize_func = [this]() {
-		vk::render_graph()->settings.shader_inference = enable_shader_inference;
-		vk::render_graph()->settings.use_events = use_events;
 		Window::update_window_size();
 		cleanup_resources();
 		integrator->destroy();
@@ -411,10 +409,10 @@ float RayTracer::draw_frame() {
 	}
 	render(image_idx);
 	VkResult result = vk::submit_frame(image_idx);
+	vk::render_graph()->reset();
+
 	if (result != VK_SUCCESS) {
 		resize_func();
-	} else {
-		vk::render_graph()->reset();
 	}
 
 	auto now = clock();

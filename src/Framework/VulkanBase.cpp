@@ -13,6 +13,12 @@ namespace vk {
 
 constexpr int MAX_FRAMES_IN_FLIGHT = 3;
 
+struct SwapChainSupportDetails {
+	VkSurfaceCapabilitiesKHR capabilities = {};
+	std::vector<VkSurfaceFormatKHR> formats;
+	std::vector<VkPresentModeKHR> present_modes;
+};
+
 const std::vector<const char*> _validation_layers_lst = {"VK_LAYER_KHRONOS_validation"};
 
 std::vector<const char*> _device_extensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
@@ -33,7 +39,7 @@ bool _enable_validation_layers;
 
 VkDescriptorPool _imgui_pool = 0;
 
-std::vector<const char*> get_req_extensions() {
+static std::vector<const char*> get_req_extensions() {
 	uint32_t glfwExtensionCount = 0;
 	const char** glfwExtensions;
 	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -46,7 +52,7 @@ std::vector<const char*> get_req_extensions() {
 	return extensions;
 }
 
-QueueFamilyIndices find_queue_families(VkPhysicalDevice device) {
+static QueueFamilyIndices find_queue_families(VkPhysicalDevice device) {
 	QueueFamilyIndices indices;
 	uint32_t queue_family_count = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, nullptr);
@@ -79,7 +85,7 @@ QueueFamilyIndices find_queue_families(VkPhysicalDevice device) {
 	return indices;
 }
 
-SwapChainSupportDetails query_swapchain_support(VkPhysicalDevice device) {
+static SwapChainSupportDetails query_swapchain_support(VkPhysicalDevice device) {
 	// Basically returns present modes and surface modes in a struct
 
 	SwapChainSupportDetails details;
@@ -105,9 +111,9 @@ SwapChainSupportDetails query_swapchain_support(VkPhysicalDevice device) {
 	return details;
 }
 
-VkResult vkExt_create_debug_messenger(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-									  const VkAllocationCallbacks* pAllocator,
-									  VkDebugUtilsMessengerEXT* pDebugMessenger) {
+static VkResult vkExt_create_debug_messenger(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
+											 const VkAllocationCallbacks* pAllocator,
+											 VkDebugUtilsMessengerEXT* pDebugMessenger) {
 	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
 
 	if (func != nullptr) {
@@ -117,8 +123,8 @@ VkResult vkExt_create_debug_messenger(VkInstance instance, const VkDebugUtilsMes
 	}
 }
 
-void vkExt_destroy_debug_messenger(VkInstance instance, VkDebugUtilsMessengerEXT debug_messenger,
-								   const VkAllocationCallbacks* pAllocator) {
+static void vkExt_destroy_debug_messenger(VkInstance instance, VkDebugUtilsMessengerEXT debug_messenger,
+										  const VkAllocationCallbacks* pAllocator) {
 	auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
 	if (func != nullptr) {
 		func(instance, debug_messenger, pAllocator);
@@ -147,56 +153,13 @@ static void setup_debug_messenger() {
 	auto ci = debug_messenger(debug_callback);
 
 	check(vkExt_create_debug_messenger(context().instance, &ci, nullptr, &context().debug_messenger),
-			  "Failed to set up debug messenger!");
+		  "Failed to set up debug messenger!");
 }
-void cleanup_swapchain() {
-	// Order:
-	// 1- Destroy Framebuffers
-	// 2- Destroy Commandbuffers
-	// 3- Destroy the pipelines
-	// 4- Destroy pipeline layout
-	// 5- Destroy render pass
-	// 6- Destroy image views
-	// 7- Destroy swapchain
-	// TODO
-	// for (auto framebuffer : context().swapchain_framebuffers) {
-	//	vkDestroyFramebuffer(context().device, framebuffer, nullptr);
-	//}
-	vkDestroyDescriptorPool(context().device, _imgui_pool, nullptr);
-	vkFreeCommandBuffers(context().device, context().cmd_pools[0],
-						 static_cast<uint32_t>(context().command_buffers.size()),
-						 context().command_buffers.data());
+static void cleanup_swapchain_images() {
 	for (Texture* swapchain_img : _swapchain_images) {
 		prm::remove(swapchain_img);
 	}
 	_swapchain_images.clear();
-	vkDestroySwapchainKHR(context().device, context().swapchain, nullptr);
-}
-
-void cleanup_app_data() { _rg->destroy(); }
-
-void cleanup() {
-	cleanup_app_data();
-	cleanup_swapchain();
-	vk::event_pool::cleanup();
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		vkDestroySemaphore(context().device, _image_available_sem[i], nullptr);
-		vkDestroySemaphore(context().device, _render_finished_sem[i], nullptr);
-		vkDestroyFence(context().device, _in_flight_fences[i], nullptr);
-	}
-
-	for (auto pool : context().cmd_pools) {
-		vkDestroyCommandPool(context().device, pool, nullptr);
-	}
-	vkDestroySurfaceKHR(context().instance, context().surface, nullptr);
-	prm::destroy();
-	vmaDestroyAllocator(context().allocator);
-
-	vkDestroyDevice(context().device, nullptr);
-	if (_enable_validation_layers) {
-		vkExt_destroy_debug_messenger(context().instance, context().debug_messenger, nullptr);
-	}
-	vkDestroyInstance(context().instance, nullptr);
 }
 
 static void create_allocator() {
@@ -254,48 +217,9 @@ static void create_allocator() {
 	vmaCreateAllocator(&allocatorCreateInfo, &context().allocator);
 }
 
-static void create_instance() {
-	VkApplicationInfo app_info{};
-	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	app_info.pApplicationName = "Lumen";
-	app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 1);
-	app_info.pEngineName = "Lumen Engine";
-	app_info.engineVersion = VK_MAKE_VERSION(1, 0, 1);
-	app_info.apiVersion = VK_API_VERSION_1_3;
-
-	VkInstanceCreateInfo instance_CI{};
-	instance_CI.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-	instance_CI.pApplicationInfo = &app_info;
-
-	auto extensions = get_req_extensions();
-	instance_CI.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-	instance_CI.ppEnabledExtensionNames = extensions.data();
-
-	if (_enable_validation_layers) {
-		instance_CI.enabledLayerCount = static_cast<uint32_t>(_validation_layers_lst.size());
-		instance_CI.ppEnabledLayerNames = _validation_layers_lst.data();
-		VkDebugUtilsMessengerCreateInfoEXT debug_CI = debug_messenger(debug_callback);
-		instance_CI.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debug_CI;
-	} else {
-		instance_CI.enabledLayerCount = 0;
-		instance_CI.pNext = nullptr;
-	}
-	check(volkInitialize(), "Failed to initialize volk");
-	check(vkCreateInstance(&instance_CI, nullptr, &context().instance), "Failed to create instance");
-	volkLoadInstance(context().instance);
-	if (_enable_validation_layers && !check_validation_layer_support()) {
-		LUMEN_ERROR("Validation layers requested, but not available!");
-	}
-	_rg = std::make_unique<lumen::RenderGraph>();
-	if (_enable_validation_layers) {
-		setup_debug_messenger();
-	}
-}
-
 static void create_surface() {
-	check(
-		glfwCreateWindowSurface(context().instance, Window::get()->window_handle, nullptr, &context().surface),
-		"Failed to create window surface");
+	check(glfwCreateWindowSurface(context().instance, Window::get()->window_handle, nullptr, &context().surface),
+		  "Failed to create window surface");
 }
 
 static void pick_physical_device() {
@@ -366,8 +290,8 @@ static void create_logical_device() {
 														  context().queue_indices.compute_family.value()};
 
 	context().queues.resize(context().queue_indices.gfx_family.has_value() +
-								context().queue_indices.present_family.has_value() +
-								context().queue_indices.compute_family.has_value());
+							context().queue_indices.present_family.has_value() +
+							context().queue_indices.compute_family.has_value());
 	float queue_priority = 1.0f;
 	for (uint32_t queue_family_idx : unique_queue_families) {
 		VkDeviceQueueCreateInfo queue_CI{};
@@ -453,9 +377,8 @@ static void create_logical_device() {
 	}
 
 	check(vkCreateDevice(context().physical_device, &logical_device_CI, nullptr, &context().device),
-			  "Failed to create logical device");
+		  "Failed to create logical device");
 
-	// load_VK_EXTENSIONS(context().instance, vkGetInstanceProcAddr, context().device, vkGetDeviceProcAddr);
 	vkGetDeviceQueue(context().device, context().queue_indices.gfx_family.value(), 0,
 					 &context().queues[(int)QueueType::GFX]);
 	vkGetDeviceQueue(context().device, context().queue_indices.compute_family.value(), 0,
@@ -464,12 +387,11 @@ static void create_logical_device() {
 					 &context().queues[(int)QueueType::PRESENT]);
 }
 
-static void create_swapchain() {
+static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 	SwapChainSupportDetails swapchain_support = query_swapchain_support(context().physical_device);
 
 	// Pick surface format, present mode and extent(preferrably width and
 	// height):
-
 	VkSurfaceFormatKHR surface_format = [](const std::vector<VkSurfaceFormatKHR>& available_formats) {
 		for (const auto& available_format : available_formats) {
 			// Preferrably SRGB32 for now
@@ -547,10 +469,10 @@ static void create_swapchain() {
 	swapchain_CI.presentMode = present_mode;
 	swapchain_CI.clipped = VK_TRUE;
 
-	swapchain_CI.oldSwapchain = VK_NULL_HANDLE;
+	swapchain_CI.oldSwapchain = old_swapchain;
 
 	check(vkCreateSwapchainKHR(context().device, &swapchain_CI, nullptr, &context().swapchain),
-			  "Failed to create swap chain!");
+		  "Failed to create swap chain!");
 
 	std::vector<VkImage> images;
 	vkGetSwapchainImagesKHR(context().device, context().swapchain, &image_cnt, nullptr);
@@ -576,7 +498,7 @@ static void create_command_pools() {
 	context().cmd_pools.resize(MAX_COMMAND_POOL_THREAD_COUNT);
 	for (unsigned int i = 0; i < MAX_COMMAND_POOL_THREAD_COUNT; i++) {
 		check(vkCreateCommandPool(context().device, &pool_info, nullptr, &context().cmd_pools[i]),
-				  "Failed to create command pool!");
+			  "Failed to create command pool!");
 	}
 }
 
@@ -587,7 +509,7 @@ static void create_command_buffers() {
 	VkCommandBufferAllocateInfo alloc_info = command_buffer_allocate_info(
 		context().cmd_pools[0], VK_COMMAND_BUFFER_LEVEL_PRIMARY, (uint32_t)context().command_buffers.size());
 	check(vkAllocateCommandBuffers(context().device, &alloc_info, context().command_buffers.data()),
-			  "Failed to allocate command buffers!");
+		  "Failed to allocate command buffers!");
 }
 
 static void create_sync_primitives() {
@@ -602,10 +524,100 @@ static void create_sync_primitives() {
 
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		check<3>({vkCreateSemaphore(context().device, &semaphore_info, nullptr, &_image_available_sem[i]),
-					  vkCreateSemaphore(context().device, &semaphore_info, nullptr, &_render_finished_sem[i]),
-					  vkCreateFence(context().device, &fence_info, nullptr, &_in_flight_fences[i])},
-					 "Failed to create synchronization primitives for a frame");
+				  vkCreateSemaphore(context().device, &semaphore_info, nullptr, &_render_finished_sem[i]),
+				  vkCreateFence(context().device, &fence_info, nullptr, &_in_flight_fences[i])},
+				 "Failed to create synchronization primitives for a frame");
 	}
+}
+
+// Called after window resize
+static void recreate_swap_chain() {
+	int width = 0, height = 0;
+	glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
+	while (width == 0 || height == 0) {
+		// Window is minimized
+		glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
+		glfwWaitEvents();
+	}
+	cleanup_swapchain_images();
+	VkSwapchainKHR old_swapchain = context().swapchain;
+	create_swapchain(old_swapchain);
+	vkDestroySwapchainKHR(context().device, old_swapchain, nullptr);
+}
+
+static bool check_validation_layer_support() {
+	uint32_t layer_cnt;
+	vkEnumerateInstanceLayerProperties(&layer_cnt, nullptr);
+
+	std::vector<VkLayerProperties> available_layers(layer_cnt);
+	vkEnumerateInstanceLayerProperties(&layer_cnt, available_layers.data());
+
+	for (const char* layer_name : _validation_layers_lst) {
+		bool layer_found = false;
+
+		for (const auto& layerProperties : available_layers) {
+			if (strcmp(layer_name, layerProperties.layerName) == 0) {
+				layer_found = true;
+				break;
+			}
+		}
+		if (!layer_found) {
+			return false;
+		}
+	}
+	return true;
+}
+
+static void create_instance() {
+	VkApplicationInfo app_info{};
+	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+	app_info.pApplicationName = "Lumen";
+	app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 1);
+	app_info.pEngineName = "Lumen Engine";
+	app_info.engineVersion = VK_MAKE_VERSION(1, 0, 1);
+	app_info.apiVersion = VK_API_VERSION_1_3;
+
+	VkInstanceCreateInfo instance_CI{};
+	instance_CI.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+	instance_CI.pApplicationInfo = &app_info;
+
+	auto extensions = get_req_extensions();
+	instance_CI.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+	instance_CI.ppEnabledExtensionNames = extensions.data();
+
+	if (_enable_validation_layers) {
+		instance_CI.enabledLayerCount = static_cast<uint32_t>(_validation_layers_lst.size());
+		instance_CI.ppEnabledLayerNames = _validation_layers_lst.data();
+		VkDebugUtilsMessengerCreateInfoEXT debug_CI = debug_messenger(debug_callback);
+		instance_CI.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debug_CI;
+	} else {
+		instance_CI.enabledLayerCount = 0;
+		instance_CI.pNext = nullptr;
+	}
+	check(volkInitialize(), "Failed to initialize volk");
+	check(vkCreateInstance(&instance_CI, nullptr, &context().instance), "Failed to create instance");
+	volkLoadInstance(context().instance);
+	if (_enable_validation_layers && !check_validation_layer_support()) {
+		LUMEN_ERROR("Validation layers requested, but not available!");
+	}
+	_rg = std::make_unique<lumen::RenderGraph>();
+	if (_enable_validation_layers) {
+		setup_debug_messenger();
+	}
+}
+
+void init(bool validation_layers) {
+	_enable_validation_layers = validation_layers;
+	create_instance();
+	create_surface();
+	pick_physical_device();
+	create_logical_device();
+	create_allocator();
+	create_swapchain();
+	create_command_pools();
+	create_command_buffers();
+	create_sync_primitives();
+	init_imgui();
 }
 
 void init_imgui() {
@@ -655,69 +667,19 @@ void init_imgui() {
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
-void init(bool validation_layers) {
-	_enable_validation_layers = validation_layers;
-	create_instance();
-	create_surface();
-	pick_physical_device();
-	create_logical_device();
-	create_allocator();
-	create_swapchain();
-	create_command_pools();
-	create_command_buffers();
-	create_sync_primitives();
-	init_imgui();
-}
-
 void destroy_imgui() {
+	vkDestroyDescriptorPool(context().device, _imgui_pool, nullptr);
 	ImGui_ImplVulkan_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 }
 
-// Called after window resize
-void recreate_swap_chain() {
-	int width = 0, height = 0;
-	glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
-	while (width == 0 || height == 0) {
-		// Window is minimized
-		glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
-		glfwWaitEvents();
-	}
-	vkDeviceWaitIdle(context().device);
-	cleanup_swapchain();
-	create_swapchain();
-	create_command_buffers();
-}
-
 void add_device_extension(const char* name) { _device_extensions.push_back(name); }
 
-bool check_validation_layer_support() {
-	uint32_t layer_cnt;
-	vkEnumerateInstanceLayerProperties(&layer_cnt, nullptr);
-
-	std::vector<VkLayerProperties> available_layers(layer_cnt);
-	vkEnumerateInstanceLayerProperties(&layer_cnt, available_layers.data());
-
-	for (const char* layer_name : _validation_layers_lst) {
-		bool layer_found = false;
-
-		for (const auto& layerProperties : available_layers) {
-			if (strcmp(layer_name, layerProperties.layerName) == 0) {
-				layer_found = true;
-				break;
-			}
-		}
-		if (!layer_found) {
-			return false;
-		}
-	}
-	return true;
-}
+std::vector<Texture*>& swapchain_images() { return _swapchain_images; }
 
 uint32_t prepare_frame() {
-	check(vkWaitForFences(context().device, 1, &_in_flight_fences[current_frame], VK_TRUE, 1000000000),
-			  "Timeout");
+	check(vkWaitForFences(context().device, 1, &_in_flight_fences[current_frame], VK_TRUE, ~0ull), "Timeout");
 
 	uint32_t image_idx;
 	VkResult result = vkAcquireNextImageKHR(context().device, context().swapchain, UINT64_MAX,
@@ -728,8 +690,6 @@ uint32_t prepare_frame() {
 		// Window resize
 		vkDeviceWaitIdle(context().device);
 		recreate_swap_chain();
-		cleanup_app_data();
-		_rg = std::make_unique<lumen::RenderGraph>();
 		return UINT32_MAX;
 	} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
 		LUMEN_ERROR("Failed to acquire new swap chain image");
@@ -759,9 +719,8 @@ VkResult submit_frame(uint32_t image_idx) {
 	submit_info.signalSemaphoreCount = 1;
 	submit_info.pSignalSemaphores = signal_semaphores;
 
-	check(
-		vkQueueSubmit(context().queues[(int)QueueType::GFX], 1, &submit_info, _in_flight_fences[current_frame]),
-		"Failed to submit draw command buffer");
+	check(vkQueueSubmit(context().queues[(int)QueueType::GFX], 1, &submit_info, _in_flight_fences[current_frame]),
+		  "Failed to submit draw command buffer");
 	current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 	VkPresentInfoKHR present_info{};
 	present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -779,8 +738,6 @@ VkResult submit_frame(uint32_t image_idx) {
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
 		vkDeviceWaitIdle(context().device);
 		recreate_swap_chain();
-		cleanup_app_data();
-		_rg = std::make_unique<lumen::RenderGraph>();
 		return result;
 	} else if (result != VK_SUCCESS) {
 		LUMEN_ERROR("Failed to present swap chain image");
@@ -791,5 +748,33 @@ VkResult submit_frame(uint32_t image_idx) {
 
 lumen::RenderGraph* render_graph() { return _rg.get(); }
 
-std::vector<Texture*>& swapchain_images() { return _swapchain_images; }
+void cleanup_app_data() { _rg->destroy(); }
+
+void cleanup() {
+	cleanup_app_data();
+	cleanup_swapchain_images();
+	vkDestroySwapchainKHR(context().device, context().swapchain, nullptr);
+	vk::event_pool::cleanup();
+	vkFreeCommandBuffers(context().device, context().cmd_pools[0],
+						 static_cast<uint32_t>(context().command_buffers.size()), context().command_buffers.data());
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+		vkDestroySemaphore(context().device, _image_available_sem[i], nullptr);
+		vkDestroySemaphore(context().device, _render_finished_sem[i], nullptr);
+		vkDestroyFence(context().device, _in_flight_fences[i], nullptr);
+	}
+
+	for (auto pool : context().cmd_pools) {
+		vkDestroyCommandPool(context().device, pool, nullptr);
+	}
+	vkDestroySurfaceKHR(context().instance, context().surface, nullptr);
+	prm::destroy();
+	vmaDestroyAllocator(context().allocator);
+
+	vkDestroyDevice(context().device, nullptr);
+	if (_enable_validation_layers) {
+		vkExt_destroy_debug_messenger(context().instance, context().debug_messenger, nullptr);
+	}
+	vkDestroyInstance(context().instance, nullptr);
+}
+
 }  // namespace vk

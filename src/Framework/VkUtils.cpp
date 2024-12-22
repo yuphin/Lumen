@@ -275,7 +275,7 @@ VkImageLayout get_image_layout(VkDescriptorType type) {
 		case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
 		case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
 		case VK_DESCRIPTOR_TYPE_SAMPLER:
-			return VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+			return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
 			return VK_IMAGE_LAYOUT_GENERAL;
 		default:
@@ -301,7 +301,7 @@ VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format, VkImage
 
 VkImageLayout get_target_img_layout(const vk::Texture* tex, VkAccessFlags access_flags) {
 	if ((tex->usage_flags & VK_IMAGE_USAGE_SAMPLED_BIT) && access_flags == VK_ACCESS_SHADER_READ_BIT) {
-		return VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+		return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	}
 	return VK_IMAGE_LAYOUT_GENERAL;
 }
