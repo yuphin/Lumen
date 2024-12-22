@@ -870,7 +870,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);
 
 		if (use_events) {
-			set_signals_buffer[k].event = rg->event_pool.get_event(vk::context().device, cmd);
+			set_signals_buffer[k].event = vk::event_pool::get_event(cmd);
 			vkCmdSetEvent2(cmd, set_signals_buffer[k].event, &dependency_info);
 		}
 	}
@@ -888,7 +888,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);
 		if (use_events) {
-			set_signals_img[k].event = rg->event_pool.get_event(vk::context().device, cmd);
+			set_signals_img[k].event = vk::event_pool::get_event(cmd);
 			vkCmdSetEvent2(cmd, set_signals_img[k].event, &dependency_info);
 		}
 	}
@@ -988,8 +988,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 }
 
 void RenderGraph::reset() {
-	event_pool.reset_events(vk::context().device);
-
+	vk::event_pool::reset_events();
 	for(auto& pass : passes) {
 		if (pass.push_constant_data) {
 			free(pass.push_constant_data);
@@ -1021,7 +1020,6 @@ void RenderGraph::run_and_submit(vk::CommandBuffer& cmd) {
 }
 
 void RenderGraph::destroy() {
-	event_pool.cleanup(vk::context().device);
 	// TODO: This is bad. We need a custom allocator inside the Render Graoh
 	for (auto& pass : passes) {
 		if (pass.push_constant_data) {

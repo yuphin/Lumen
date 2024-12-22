@@ -179,7 +179,7 @@ void cleanup_app_data() { _rg->destroy(); }
 void cleanup() {
 	cleanup_app_data();
 	cleanup_swapchain();
-
+	vk::event_pool::cleanup();
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		vkDestroySemaphore(context().device, _image_available_sem[i], nullptr);
 		vkDestroySemaphore(context().device, _render_finished_sem[i], nullptr);
