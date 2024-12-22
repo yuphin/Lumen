@@ -17,7 +17,6 @@ class ReSTIRPT : public Integrator {
 	enum class StreamingMethod { INDIVIDUAL_CONTRIBUTIONS, SPLITTING_AT_RECONNECTION };
 
 	enum class MISMethod { TALBOT, PAIRWISE };
-	vk::Buffer* direct_lighting_buffer;
 	vk::Buffer* gris_gbuffer;
 	vk::Buffer* gris_prev_gbuffer;
 	vk::Buffer* gris_reservoir_ping_buffer;
@@ -27,6 +26,7 @@ class ReSTIRPT : public Integrator {
 	vk::Buffer* transformations_buffer;
 	vk::Buffer* debug_vis_buffer;
 	vk::Texture* canonical_contributions_texture;
+	vk::Texture* direct_lighting_texture;
 
 	PCReSTIRPT pc_ray{};
 	bool enable_accumulation = false;

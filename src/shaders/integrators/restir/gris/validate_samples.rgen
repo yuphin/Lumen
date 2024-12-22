@@ -10,7 +10,6 @@
 
 #define SCENE_TEX_IDX 7
 #include "gris_commons.glsl"
-GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
 layout(binding = 4, std430) buffer PathReconnections { ReconnectionData reconnection_data[]; };
 layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir in_reservoirs[]; };
 layout(binding = 6, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };

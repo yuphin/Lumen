@@ -8,14 +8,14 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
-#define SCENE_TEX_IDX 8
+#define SCENE_TEX_IDX 9
 #include "gris_commons.glsl"
-GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
 PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
 layout(binding = 4, std430) readonly buffer InReservoirs { Reservoir in_reservoirs[]; };
 layout(binding = 5, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
 layout(binding = 6, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
 layout(binding = 7, rgba16) uniform image2D canonical_contributions_tex;
+layout(binding = 8, rgba32f) uniform image2D direct_lighting_img;
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.total_frame_num);
 
 #define MAX_SPATIAL_SAMPLES 12
@@ -152,7 +152,7 @@ void main() {
 
 	vec3 col = vec3(0);
 	if (pc.direct_lighting == 1) {
-		col += direct_lighting_buffer.d[pixel_idx];
+		col += imageLoad(direct_lighting_img, ivec2(gl_LaunchIDEXT.xy)).xyz;
 	}
 
 	col += final_contribution;

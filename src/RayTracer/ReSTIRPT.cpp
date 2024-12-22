@@ -28,13 +28,10 @@ void ReSTIRPT::init() {
 						 .memory_type = vk::BufferType::GPU,
 						 .size = Window::width() * Window::height() * sizeof(GBuffer)});
 
-	direct_lighting_buffer =
-		prm::get_buffer({.name = "GRIS Direct Lighting",
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height() * sizeof(glm::vec3)});
-
+	direct_lighting_texture = prm::get_texture({.name = "Direct Lighting Texture",
+												.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+												.dimensions = {Window::width(), Window::height(), 1},
+												.format = VK_FORMAT_R32G32B32A32_SFLOAT});
 	gris_reservoir_ping_buffer =
 		prm::get_buffer({.name = "GRIS Reservoirs Ping",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
@@ -86,7 +83,6 @@ void ReSTIRPT::init() {
 	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->get_device_address();
 	// ReSTIR PT (GRIS)
 	desc.transformations_addr = transformations_buffer->get_device_address();
-	desc.gris_direct_lighting_addr = direct_lighting_buffer->get_device_address();
 	desc.prefix_contributions_addr = prefix_contribution_buffer->get_device_address();
 	desc.debug_vis_addr = debug_vis_buffer->get_device_address();
 
@@ -117,8 +113,6 @@ void ReSTIRPT::init() {
 	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, gris_reservoir_ping_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_direct_lighting_addr, direct_lighting_buffer,
-								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, lumen_scene->compact_vertices_buffer,
 								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, debug_vis_addr, debug_vis_buffer, vk::render_graph());
@@ -187,6 +181,7 @@ void ReSTIRPT::render() {
 		.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
 		.bind(gbuffers[pong])
 		.bind(canonical_contributions_texture)
+		.bind(direct_lighting_texture)
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
 	pc_ray.general_seed = rand() % UINT_MAX;
@@ -232,6 +227,7 @@ void ReSTIRPT::render() {
 					.bind(reservoir_buffers[READ_OR_PREV_IDX])
 					.bind(gbuffers[pong])
 					.bind(canonical_contributions_texture)
+					.bind(direct_lighting_texture)
 					.bind_texture_array(lumen_scene->scene_textures)
 					.bind_tlas(tlas);
 			} else {
@@ -292,6 +288,7 @@ void ReSTIRPT::render() {
 					.bind(reservoir_buffers[READ_OR_PREV_IDX])
 					.bind(gbuffers[pong])
 					.bind(canonical_contributions_texture)
+					.bind(direct_lighting_texture)
 					.bind_texture_array(lumen_scene->scene_textures)
 					.bind_tlas(tlas);
 			}
@@ -320,13 +317,19 @@ bool ReSTIRPT::update() {
 
 void ReSTIRPT::destroy() {
 	Integrator::destroy();
-	auto buffer_list = {gris_gbuffer,			gris_reservoir_ping_buffer, gris_reservoir_pong_buffer,
-						direct_lighting_buffer, transformations_buffer,		prefix_contribution_buffer,
-						reconnection_buffer,	gris_prev_gbuffer,			debug_vis_buffer};
+	auto buffer_list = {gris_gbuffer,
+						gris_reservoir_ping_buffer,
+						gris_reservoir_pong_buffer,
+						transformations_buffer,
+						prefix_contribution_buffer,
+						reconnection_buffer,
+						gris_prev_gbuffer,
+						debug_vis_buffer};
 	for (vk::Buffer* b : buffer_list) {
 		prm::remove(b);
 	}
 	prm::remove(canonical_contributions_texture);
+	prm::remove(direct_lighting_texture);
 }
 
 bool ReSTIRPT::gui() {
@@ -337,7 +340,7 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
 	bool enable_gris_changed = ImGui::Checkbox("Enable GRIS", &enable_gris);
 	result |= enable_gris_changed;
-	if(enable_gris_changed) {
+	if (enable_gris_changed) {
 		pc_ray.total_frame_num = 0;
 	}
 	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);

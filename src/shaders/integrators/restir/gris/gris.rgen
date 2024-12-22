@@ -7,15 +7,15 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
-#define SCENE_TEX_IDX 7
+#define SCENE_TEX_IDX 8
 #include "gris_commons.glsl"
 
-GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
 PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
 
 layout(binding = 4, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
 layout(binding = 5, std430) writeonly buffer OutGBuffer { GBuffer out_gbuffers[]; };
 layout(binding = 6, rgba16) writeonly uniform image2D canonical_contributions_tex;
+layout(binding = 7, rgba32f) uniform image2D direct_lighting_img;
 
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
 uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
@@ -412,7 +412,9 @@ void main() {
 			}
 		}
 		if (pc.direct_lighting == 1) {
-			direct_lighting_buffer.d[pixel_idx] = direct_lighting;
+			imageStore(direct_lighting_img, ivec2(gl_LaunchIDEXT.xy), vec4(direct_lighting, 1));
+		} else {
+			imageStore(direct_lighting_img, ivec2(gl_LaunchIDEXT.xy), vec4(0));
 		}
 		if (!valid_reservoir) {
 			ASSERT(!reservoir_data_valid(reservoir.data));

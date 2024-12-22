@@ -10,7 +10,6 @@
 
 #define SCENE_TEX_IDX 9
 #include "gris_commons.glsl"
-GrisDirectLighting direct_lighting_buffer = GrisDirectLighting(scene_desc.gris_direct_lighting_addr);
 PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
 layout(binding = 4, std430) buffer OutReservoirs { Reservoir curr_reservoirs[]; };
 layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir prev_reservoirs[]; };
