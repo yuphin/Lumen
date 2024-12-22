@@ -37,8 +37,7 @@ void CommandBuffer::begin(VkCommandBufferUsageFlags begin_flags) {
 	LUMEN_ASSERT(state != CommandBufferState::RECORDING, "Command buffer is already recording");
 	std::unique_lock<std::mutex> cv_lock;
 	VulkanSyncronization::command_pool_semaphore.acquire();
-	if(curr_tid == -1)
-	{
+	if (curr_tid == -1) {
 		std::scoped_lock lock(VulkanSyncronization::command_pool_mutex);
 		curr_tid = get_first_available_tid(VulkanSyncronization::available_command_pools);
 		VulkanSyncronization::available_command_pools &= ~(uint64_t(1) << curr_tid);
@@ -58,7 +57,7 @@ void CommandBuffer::submit(bool wait_fences, bool queue_wait_idle) {
 	if (wait_fences) {
 		VkFenceCreateInfo fence_info = vk::fence();
 		VkFence fence;
-		vk::check(vkCreateFence(vk::context().device, &fence_info, nullptr, &fence), "Fence creation error");
+		vkCreateFence(vk::context().device, &fence_info, nullptr, &fence);
 		vk::check(vkQueueSubmit(vk::context().queues[(int)type], 1, &submit_info, fence), "Queue submission error");
 		vk::check(vkWaitForFences(vk::context().device, 1, &fence, VK_TRUE, 100000000000), "Fence wait error");
 		vkDestroyFence(vk::context().device, fence, nullptr);

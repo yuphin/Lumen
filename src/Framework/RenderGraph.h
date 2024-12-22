@@ -12,6 +12,9 @@
 #include "AccelerationStructure.h"
 #include "Utils.h"
 
+
+// TODO: Add RG caching to bindables
+// Namely, TLAS and scene textures
 namespace lumen {
 
 #define TO_STR(V) (#V)
