@@ -1,7 +1,7 @@
 #pragma once
 #include "Integrator.h"
 #include "shaders/integrators/vcmmlt/vcmmlt_commons.h"
-class VCMMLT : public Integrator {
+class VCMMLT final : public Integrator {
    public:
 	VCMMLT(LumenScene* lumen_scene, const vk::BVH& tlas)
 		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), VCMMLTConfig)) {}

@@ -513,8 +513,6 @@ void Pipeline::create_update_template(const std::vector<Shader>& shaders,
 				 "Descriptor size mismatch! Check shaders or the supplied descriptors.");
 	size_t offset = 0;
 	int idx = 0;
-	size_t tlas_offset = -1;
-	size_t tlas_idx = -1;
 	for (uint32_t i = 0; i < 32; ++i) {
 		if (binding_mask & (1 << i)) {
 			VkDescriptorUpdateTemplateEntry entry = {};
@@ -526,10 +524,6 @@ void Pipeline::create_update_template(const std::vector<Shader>& shaders,
 			entry.offset = offset;
 			entry.stride = desc_info_size;
 			entries.push_back(entry);
-			if (descriptor_types[i] == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR) {
-				tlas_offset = offset;
-				tlas_idx = i;
-			}
 			offset += desc_info_size;
 			idx++;
 		}

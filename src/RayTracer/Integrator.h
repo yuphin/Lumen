@@ -15,7 +15,7 @@ class Integrator {
    public:
 	Integrator(LumenScene* lumen_scene, const vk::BVH& tlas) : lumen_scene(lumen_scene), tlas(tlas) {}
 	virtual void init();
-	virtual void render(){};
+	virtual void render() = 0;
 	virtual bool gui();
 	virtual bool update();
 	virtual void destroy();

@@ -842,7 +842,6 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			} else {
 				LUMEN_ASSERT(src.tex->aspect_flags == dst.tex->aspect_flags, "Aspect flags mismatch");
 				VkImageCopy region = {};
-				VkImageLayout old_layout = src.tex->layout;
 				vk::transition_texture(src.tex, cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 				vk::transition_texture(dst.tex, cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 				region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;

@@ -348,9 +348,6 @@ void LumenScene::load_lumen_scene(const std::string& path) {
 		}
 		if (!bsdf["albedo"].is_null()) {
 			const auto& f = bsdf["albedo"];
-			float f0 = f[0];
-			float f1 = f[1];
-			float f2 = f[2];
 			materials[bsdf_idx].albedo = glm::vec3({f[0], f[1], f[2]});
 		} else {
 			materials[bsdf_idx].albedo = glm::vec3(1, 1, 1);
@@ -683,7 +680,6 @@ void LumenScene::load_mitsuba_scene(const std::string& path) {
 void LumenScene::add_default_texture() {
 	std::array<uint8_t, 4> nil = {0, 0, 0, 0};
 	scene_textures.resize(1);
-	auto ci = vk::make_img2d_ci(VkExtent2D{1, 1});
 	scene_textures[0] = prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 										  .dimensions = {1, 1, 1},
 										  .format = VK_FORMAT_R8G8B8A8_SRGB,

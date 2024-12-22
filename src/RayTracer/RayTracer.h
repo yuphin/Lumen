@@ -36,13 +36,11 @@ class RayTracer {
 	bool gui();
 	void destroy_accel();
 	bool initialized = false;
-	bool rt_initialized = false;
 	float cpu_avg_time = 0;
 	int cnt = 0;
 	std::unique_ptr<Integrator> integrator;
 	PostFX post_fx;
 
-	RTUtilsDesc rt_utils_desc;
 	RTUtilsPC rt_utils_pc;
 
 	vk::Buffer* gt_img_buffer;
@@ -56,8 +54,6 @@ class RayTracer {
 	vk::Texture* reference_tex;
 	vk::Texture* target_tex;
 
-	vk::Buffer* fft_buffers[2];
-	vk::Buffer* fft_cpu_buffers[2];
 	std::string scene_name;
 	LumenScene scene;
 

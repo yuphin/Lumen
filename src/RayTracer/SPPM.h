@@ -1,7 +1,7 @@
 #pragma once
 #include "Integrator.h"
 #include "shaders/integrators/sppm/sppm_commons.h"
-class SPPM : public Integrator {
+class SPPM final : public Integrator {
    public:
 	SPPM(LumenScene* lumen_scene, const vk::BVH& tlas)
 		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), SPPMConfig)) {}
@@ -14,7 +14,6 @@ class SPPM : public Integrator {
 	PCSPPM pc_ray{};
 	VkDescriptorPool desc_pool{};
 	VkDescriptorSetLayout desc_set_layout{};
-	VkDescriptorSet desc_set;
 
 	vk::Buffer* sppm_data_buffer;
 	vk::Buffer* atomic_data_buffer;

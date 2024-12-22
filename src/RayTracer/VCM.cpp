@@ -5,8 +5,6 @@
 #include <span>
 const int max_samples = 50000;
 static bool use_vc = true;
-static bool written = false;
-const bool ray_guide = false;
 void VCM::init() {
 	Integrator::init();
 
@@ -134,7 +132,6 @@ void VCM::init() {
 
 void VCM::render() {
 	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	const float ppm_base_radius = 0.25f;
 	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;

@@ -57,9 +57,7 @@ class PersistentPool {
 			free_list.pop_back();
 			return base_ptr + idx;
 		}
-		T* result = data_base;
-		page_current = ++data_base;
-		while((uint8_t*)next_page - (uint8_t*)page_current < sizeof(T)) {
+		while((uint8_t*)next_page - (uint8_t*)data_base < sizeof(T)) {
 #if defined(_WIN32) || defined(_WIN64)
 			data_base = (T*)VirtualAlloc(next_page, PAGE_SIZE, MEM_COMMIT, PAGE_READWRITE);
 			next_page = (uint8_t*)data_base + PAGE_SIZE;
@@ -69,7 +67,7 @@ class PersistentPool {
 			next_page = (uint8_t*)next_page + PAGE_SIZE;
 #endif
 		}
-		return data_base;
+		return data_base++;
 	}
 
 	void remove(T* ptr) {
@@ -80,7 +78,6 @@ class PersistentPool {
 	void destroy() {
 		VirtualFree(base_ptr, 0, MEM_RELEASE);
 		data_base = nullptr;
-		page_current = nullptr;
 		next_page = nullptr;
 		base_ptr = nullptr;
 	}
@@ -89,7 +86,6 @@ class PersistentPool {
 	const size_t PAGE_SIZE;
 	T* base_ptr = nullptr;
 	T* data_base = nullptr;
-	void* page_current = nullptr;
 	void* next_page = nullptr;
 	std::vector<size_t> free_list;
 };

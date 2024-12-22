@@ -242,12 +242,7 @@ void SMLT::init() {
 }
 
 void SMLT::render() {
-	const float ppm_base_radius = 0.25f;
 	vk::CommandBuffer cmd(/*start*/ true);
-	VkClearValue clear_color = {0.25f, 0.25f, 0.25f, 1.0f};
-	VkClearValue clear_depth = {1.0f, 0};
-	VkViewport viewport = vk::viewport((float)Window::width(), (float)Window::height(), 0.0f, 1.0f);
-	VkClearValue clear_values[] = {clear_color, clear_depth};
 	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;

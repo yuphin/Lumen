@@ -1,7 +1,7 @@
 #pragma once
 #include "Integrator.h"
 #include "shaders/integrators/path/path_commons.h"
-class Path : public Integrator {
+class Path final : public Integrator {
    public:
 	Path(LumenScene* lumen_scene, const vk::BVH& tlas)
 		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), PathConfig)) {}

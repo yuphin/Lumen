@@ -7,14 +7,13 @@
 #include "shaders/commons.h"
 
 class PostFX {
-public:
+   public:
 	void init();
 	void render(vk::Texture* input, vk::Texture* output);
 	bool gui();
 	void destroy();
 
-private:
-	vk::Texture* kernel_ping;
+   private:
 	vk::Texture* kernel_pong;
 	vk::Texture* fft_ping_padded;
 	vk::Texture* fft_pong_padded;

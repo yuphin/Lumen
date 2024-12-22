@@ -9,8 +9,8 @@ static void generate_uv_sphere(std::vector<uint32_t>& indices, std::vector<Spher
 							   uint32_t longitude, float radius = 0.1f) {
 	for (uint32_t lat = 0; lat <= latitude; ++lat) {
 		float theta = lat * glm::pi<float>() / latitude;
-		float sinTheta = sin(theta);
-		float cosTheta = cos(theta);
+		float sin_theta = sin(theta);
+		float cos_theta = cos(theta);
 
 		for (uint32_t lon = 0; lon <= longitude; ++lon) {
 			float phi = lon * 2.0f * glm::pi<float>() / longitude;
@@ -18,9 +18,9 @@ static void generate_uv_sphere(std::vector<uint32_t>& indices, std::vector<Spher
 			float cos_phi = cos(phi);
 
 			auto& vertex = positions.emplace_back();
-			vertex.pos.x = radius * sinTheta * cos_phi;
-			vertex.pos.y = radius * cosTheta;
-			vertex.pos.z = radius * sinTheta * sin_phi;
+			vertex.pos.x = radius * sin_theta * cos_phi;
+			vertex.pos.y = radius * cos_theta;
+			vertex.pos.z = radius * sin_theta * sin_phi;
 			vertex.normal = glm::normalize(vertex.pos);
 		}
 	}
@@ -434,17 +434,17 @@ void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 	}
 
 	{
-		VkDeviceAddress sphereVertexAddress = sphere_vertices_buffer->get_device_address();
-		VkDeviceAddress sphereIndexAddress = sphere_indices_buffer->get_device_address();
+		VkDeviceAddress sphere_vertex_addr = sphere_vertices_buffer->get_device_address();
+		VkDeviceAddress sphere_idx_addr = sphere_indices_buffer->get_device_address();
 
 		VkAccelerationStructureGeometryTrianglesDataKHR sphere_triangles{
 			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR};
 		sphere_triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-		sphere_triangles.vertexData.deviceAddress = sphereVertexAddress;
+		sphere_triangles.vertexData.deviceAddress = sphere_vertex_addr;
 		sphere_triangles.maxVertex = uint32_t(sphere_vertices.size());
 		sphere_triangles.vertexStride = sizeof(SphereVertex);
 		sphere_triangles.indexType = VK_INDEX_TYPE_UINT32;
-		sphere_triangles.indexData.deviceAddress = sphereIndexAddress;
+		sphere_triangles.indexData.deviceAddress = sphere_idx_addr;
 		sphere_triangles.transformData.deviceAddress = 0;  // No per-geometry transform
 
 		VkAccelerationStructureBuildRangeInfoKHR offset;

@@ -1,7 +1,7 @@
 #pragma once
 #include "Integrator.h"
 #include "shaders/integrators/pssmlt/pssmlt_commons.h"
-class PSSMLT : public Integrator {
+class PSSMLT final : public Integrator {
    public:
 	PSSMLT(LumenScene* lumen_scene, const vk::BVH& tlas)
 		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), PSSMLTConfig)) {}

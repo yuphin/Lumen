@@ -19,7 +19,6 @@ void PostFX::init() {
 	const char* img_name_kernel = "assets/kernels/Octagonal512.exr";
 	int width, height;
 	float* data = ImageUtils::load_exr(img_name_kernel, width, height);
-	auto img_dims = VkExtent2D{(uint32_t)width, (uint32_t)height};
 	vk::Texture* kernel_org =
 		drm::get({.name = "Kernel",
 				  .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
@@ -45,8 +44,8 @@ void PostFX::init() {
 	empty_tex_desc.name = "FFT - Pong";
 	fft_pong_padded = prm::get_texture(empty_tex_desc);
 	empty_tex_desc.name = "Kernel - Ping";
-	kernel_ping = prm::get_texture(empty_tex_desc);
 	empty_tex_desc.name = "Kernel - Pong";
+	vk::Texture* kernel_ping = drm::get(empty_tex_desc);
 	kernel_pong = prm::get_texture(empty_tex_desc);
 
 	vk::CommandBuffer cmd(true);
@@ -61,7 +60,6 @@ void PostFX::init() {
 		.bind_texture_with_sampler(kernel_org, img_sampler)
 		.bind(kernel_ping);
 
-	const bool FFT_SHARED_MEM = true;
 	uint32_t wg_size_x = fft_ping_padded->extent.width;
 	uint32_t wg_size_y = fft_ping_padded->extent.height;
 	auto dim_y = (uint32_t)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_x - 1) / wg_size_x;
@@ -91,6 +89,7 @@ void PostFX::init() {
 		.bind(kernel_pong);
 	rg->run_and_submit(cmd);
 	drm::destroy(kernel_org);
+	drm::destroy(kernel_ping);
 }
 
 void PostFX::render(vk::Texture* input, vk::Texture* output) {
@@ -161,8 +160,8 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 	rg->add_gfx("Post FX", {.shaders = {{"src/shaders/post.vert"}, {"src/shaders/post.frag"}},
 							.width = output->extent.width,
 							.height = output->extent.height,
-							.clear_color = {0.25f, 0.25f, 0.25f, 1.0f},
-							.clear_depth_stencil = {1.0f, 0},
+							.clear_color = {VkClearColorValue{{0.25f, 0.25f, 0.25f, 1.0f}}},
+							.clear_depth_stencil = {{{1.0f, 0}}},
 							.cull_mode = VK_CULL_MODE_NONE,
 							.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 							.color_outputs = {output},
@@ -184,10 +183,7 @@ bool PostFX::gui() {
 	ImGui::Text("PostFX Settings:");
 	ImGui::PopStyleColor();
 	ImGui::Checkbox("Enable ACES tonemapping", &enable_tonemapping);
-	bool bloom_check = ImGui::Checkbox("Enable bloom", &enable_bloom);
-	if (bloom_check) {
-		int a = 4;
-	}
+	ImGui::Checkbox("Enable bloom", &enable_bloom);
 	float exposure = log10f(bloom_exposure);
 	ImGui::SliderFloat("Bloom exposure", &exposure, -20.0f, 0.0f, "%.2f");
 	bloom_exposure = powf(10.0f, exposure);
@@ -196,7 +192,7 @@ bool PostFX::gui() {
 }
 
 void PostFX::destroy() {
-	std::vector<vk::Texture*> tex_list = {kernel_ping, kernel_pong, fft_ping_padded, fft_pong_padded};
+	std::vector<vk::Texture*> tex_list = {kernel_pong, fft_ping_padded, fft_pong_padded};
 	for (auto t : tex_list) {
 		prm::remove(t);
 	}

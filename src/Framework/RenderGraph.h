@@ -97,12 +97,12 @@ class RenderPass {
 			   const vk::GraphicsPassSettings& gfx_settings, const std::string& macro_string,
 			   PipelineStorage* pipeline_storage, bool cached = false)
 		: type(type),
-		  name(name),
 		  rg(rg),
 		  pass_idx(pass_idx),
 		  gfx_settings(std::make_unique<vk::GraphicsPassSettings>(gfx_settings)),
 		  macro_defines(gfx_settings.macros),
 		  pipeline_storage(pipeline_storage),
+		  name(name),
 		  is_pipeline_cached(cached) {
 		for (auto& shader : this->gfx_settings->shaders) {
 			shader.name_with_macros = shader.filename + macro_string;
@@ -113,12 +113,12 @@ class RenderPass {
 			   const vk::RTPassSettings& rt_settings, const std::string& macro_string,
 			   PipelineStorage* pipeline_storage, bool cached = false)
 		: type(type),
-		  name(name),
 		  rg(rg),
 		  pass_idx(pass_idx),
 		  rt_settings(std::make_unique<vk::RTPassSettings>(rt_settings)),
 		  macro_defines(rt_settings.macros),
 		  pipeline_storage(pipeline_storage),
+		  name(name),
 		  is_pipeline_cached(cached) {
 		for (auto& shader : this->rt_settings->shaders) {
 			shader.name_with_macros = shader.filename + macro_string;
@@ -129,12 +129,12 @@ class RenderPass {
 			   const vk::ComputePassSettings& compute_settings, const std::string& macro_string,
 			   PipelineStorage* pipeline_storage, bool cached = false)
 		: type(type),
-		  name(name),
 		  rg(rg),
 		  pass_idx(pass_idx),
 		  compute_settings(std::make_unique<vk::ComputePassSettings>(compute_settings)),
 		  macro_defines(compute_settings.macros),
 		  pipeline_storage(pipeline_storage),
+		  name(name),
 		  is_pipeline_cached(cached) {
 		this->compute_settings->shader.name_with_macros = compute_settings.shader.filename + macro_string;
 	}
@@ -165,47 +165,21 @@ class RenderPass {
 	void finalize();
 	friend RenderGraph;
 
+	vk::PassType type;
 	RenderGraph* rg;
-	std::vector<vk::ShaderMacro> macro_defines;
+	uint32_t pass_idx;
 	std::unique_ptr<vk::GraphicsPassSettings> gfx_settings = nullptr;
 	std::unique_ptr<vk::RTPassSettings> rt_settings = nullptr;
 	std::unique_ptr<vk::ComputePassSettings> compute_settings = nullptr;
-	vk::PassType type;
-	uint32_t pass_idx;
+	std::vector<vk::ShaderMacro> macro_defines;
 	PipelineStorage* pipeline_storage = nullptr;
 
    private:
-	RenderPass& read(vk::Texture* tex);
-	RenderPass& read(vk::Buffer* buffer);
-
-	RenderPass& write(vk::Texture* tex);
-	RenderPass& write(vk::Buffer* buffer);
-
-	// When the automatic inference isn't used
-	std::vector<vk::Buffer*> explicit_buffer_writes;
-	std::vector<vk::Buffer*> explicit_buffer_reads;
-	std::vector<vk::Texture*> explicit_tex_writes;
-	std::vector<vk::Texture*> explicit_tex_reads;
-	//
-
-	void write_impl(vk::Buffer* buffer, VkAccessFlags access_flags);
-	void write_impl(vk::Texture* tex, VkAccessFlags access_flags = VK_ACCESS_SHADER_WRITE_BIT);
-	void read_impl(vk::Buffer* buffer);
-	void read_impl(vk::Buffer* buffer, VkAccessFlags access_flags);
-	void read_impl(vk::Texture* tex);
-	void post_execution_barrier(vk::Buffer* buffer, VkAccessFlags access_flags);
-
-	void run(VkCommandBuffer cmd);
-	void register_dependencies(vk::Buffer* buffer, VkAccessFlags dst_access_flags);
-	void register_dependencies(vk::Texture* tex, VkImageLayout target_layout);
-	void transition_resources();
-
-	std::string name;
+   std::string name;
 	int next_binding_idx = 0;
 	std::vector<uint32_t> descriptor_counts;
 	void* push_constant_data = nullptr;
 	bool is_pipeline_cached = false;
-	bool record_override = true;
 	bool rebuild_tlas_descriptors = false;
 	/*
 		Note:
@@ -233,6 +207,32 @@ class RenderPass {
 	std::vector<BufferBarrier> buffer_barriers;
 	std::vector<BufferBarrier> post_execution_buffer_barriers;
 	bool disable_execution = false;
+	RenderPass& read(vk::Texture* tex);
+	RenderPass& read(vk::Buffer* buffer);
+
+	RenderPass& write(vk::Texture* tex);
+	RenderPass& write(vk::Buffer* buffer);
+
+	// When the automatic inference isn't used
+	std::vector<vk::Buffer*> explicit_buffer_writes;
+	std::vector<vk::Buffer*> explicit_buffer_reads;
+	std::vector<vk::Texture*> explicit_tex_writes;
+	std::vector<vk::Texture*> explicit_tex_reads;
+	//
+
+	void write_impl(vk::Buffer* buffer, VkAccessFlags access_flags);
+	void write_impl(vk::Texture* tex, VkAccessFlags access_flags = VK_ACCESS_SHADER_WRITE_BIT);
+	void read_impl(vk::Buffer* buffer);
+	void read_impl(vk::Buffer* buffer, VkAccessFlags access_flags);
+	void read_impl(vk::Texture* tex);
+	void post_execution_barrier(vk::Buffer* buffer, VkAccessFlags access_flags);
+
+	void run(VkCommandBuffer cmd);
+	void register_dependencies(vk::Buffer* buffer, VkAccessFlags dst_access_flags);
+	void register_dependencies(vk::Texture* tex, VkImageLayout target_layout);
+	void transition_resources();
+
+	
 };
 
 template <typename Settings>
@@ -304,7 +304,7 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	} else {
 		type = vk::PassType::RT;
 	}
-	return passes.emplace_back(type, name_with_macros, this, passes.size(), settings, macro_string, pipeline_storage,
+	return passes.emplace_back(type, name_with_macros, this, uint32_t(passes.size()), settings, macro_string, pipeline_storage,
 							   cached);
 }
 

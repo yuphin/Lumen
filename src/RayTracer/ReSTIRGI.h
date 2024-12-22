@@ -1,7 +1,7 @@
 #pragma once
 #include "Integrator.h"
 #include "shaders/integrators/restir/gi/restirgi_commons.h"
-class ReSTIRGI : public Integrator {
+class ReSTIRGI final : public Integrator {
    public:
 	ReSTIRGI(LumenScene* lumen_scene, const vk::BVH& tlas)
 		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), ReSTIRGIConfig)) {}

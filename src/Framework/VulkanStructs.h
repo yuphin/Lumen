@@ -49,16 +49,16 @@ struct SpecializationMapEntry {
 	LumenStage shader_stage;
 };
 inline void check(VkResult result, const char* msg = 0) {
-	if (result != VK_SUCCESS && msg) {
-		LUMEN_ERROR(msg);
+	if (result != VK_SUCCESS) {
+		LUMEN_ERROR(msg ? msg : "Vulkan Error");
 	}
 }
 
 template <std::size_t Size>
 inline void check(std::array<VkResult, Size> results, const char* msg = 0) {
 	for (const auto& result : results) {
-		if (result != VK_SUCCESS && msg) {
-			LUMEN_ERROR(msg);
+		if (result != VK_SUCCESS) {
+			LUMEN_ERROR(msg ? msg : "Vulkan Error");
 		}
 	}
 }

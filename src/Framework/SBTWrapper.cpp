@@ -71,8 +71,8 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 	uint32_t sbt_size = total_group_cnt * handle_size;
 	std::vector<uint8_t> shader_handle_storage(sbt_size);
 
-	auto result = vkGetRayTracingShaderGroupHandlesKHR(vk::context().device, rt_pipeline, 0, total_group_cnt, sbt_size,
-													   shader_handle_storage.data());
+	vk::check(vkGetRayTracingShaderGroupHandlesKHR(vk::context().device, rt_pipeline, 0, total_group_cnt, sbt_size,
+													   shader_handle_storage.data()));
 	auto find_stride = [&](const Entry& entry, uint32_t& stride) {
 		stride = align_up(handle_size, handle_alignment);  // minimum stride
 		for (auto& e : entry) {
@@ -120,7 +120,6 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 
 	VkBufferUsageFlags usage_flags =
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
-	auto mem_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	for (uint32_t i = 0; i < 4; i++) {
 		if (!stage[i].empty()) {
 			group_data[i].buffer = prm::get_buffer({.name = "SBT " + std::to_string(i),

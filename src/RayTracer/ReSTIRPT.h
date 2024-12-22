@@ -3,7 +3,7 @@
 #include "Integrator.h"
 #include "shaders/integrators/restir/gris/gris_commons.h"
 using namespace RestirPT;
-class ReSTIRPT : public Integrator {
+class ReSTIRPT final : public Integrator {
    public:
 	ReSTIRPT(LumenScene* lumen_scene, const vk::BVH& tlas)
 		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), ReSTIRPTConfig)) {}

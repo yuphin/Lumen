@@ -2,7 +2,7 @@
 #include "Integrator.h"
 #include "shaders/integrators/bdpt/bdpt_commons.h"
 
-class BDPT : public Integrator {
+class BDPT final : public Integrator {
    public:
 	BDPT(LumenScene* lumen_scene, const vk::BVH& tlas)
 		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), BDPTConfig)) {}

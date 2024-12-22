@@ -1,7 +1,7 @@
 #pragma once
 #include "Integrator.h"
 #include "shaders/integrators/vcm/vcm_commons.h"
-class VCM : public Integrator {
+class VCM final : public Integrator {
    public:
 	VCM(LumenScene* lumen_scene, const vk::BVH& tlas)
 		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), VCMConfig)) {}
@@ -14,7 +14,6 @@ class VCM : public Integrator {
 	PCVCM pc_ray{};
 	VkDescriptorPool desc_pool{};
 	VkDescriptorSetLayout desc_set_layout{};
-	VkDescriptorSet desc_set;
 	vk::Buffer* photon_buffer;
 	vk::Buffer* vcm_light_vertices_buffer;
 	vk::Buffer* light_path_cnt_buffer;
@@ -26,7 +25,6 @@ class VCM : public Integrator {
 	vk::Buffer* angle_struct_buffer;
 	vk::Buffer* avg_buffer;
 	bool do_spatiotemporal = false;
-	uint32_t total_frame_cnt = 0;
 
 	VCMConfig* config;
 };

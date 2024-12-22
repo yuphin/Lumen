@@ -12,13 +12,9 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 	}
 }
 
-static void window_size_callback(GLFWwindow* window, int width, int height) {
-	auto ptr = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
-}
+static void window_size_callback(GLFWwindow* window, int width, int height) {}
 
-static void char_callback(GLFWwindow* window, uint32_t codepoint) {
-	auto window_ptr = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
-}
+static void char_callback(GLFWwindow* window, uint32_t codepoint) {}
 
 static void mouse_click_callback(GLFWwindow* window, int button, int action, int mods) {
 	KeyAction callback_action;

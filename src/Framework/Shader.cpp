@@ -164,7 +164,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 	}
 	assert(code[0] == SpvMagicNumber);
 
-	uint32_t num_ids = code[3];
+	// uint32_t num_ids = code[3];
 
 	const uint32_t* insn = code + 5;
 
@@ -391,7 +391,7 @@ static void parse_shader(Shader& shader, const uint32_t* code, size_t code_size,
 	spirv_cross::ShaderResources resources = glsl.get_shader_resources();
 
 	auto reflect = [&shader, &glsl](const spirv_cross::Resource& resource, VkDescriptorType type) {
-		unsigned set = glsl.get_decoration(resource.id, spv::DecorationDescriptorSet);
+		// unsigned set = glsl.get_decoration(resource.id, spv::DecorationDescriptorSet);
 		unsigned binding = glsl.get_decoration(resource.id, spv::DecorationBinding);
 		shader.binding_mask |= 1 << binding;
 		shader.descriptor_types[binding] = type;
@@ -438,7 +438,7 @@ static void parse_shader(Shader& shader, const uint32_t* code, size_t code_size,
 	// Input attachments for vertex shader
 	if (shader.stage == VK_SHADER_STAGE_VERTEX_BIT) {
 		for (const auto& resource : resources.stage_inputs) {
-			auto attachment_idx = glsl.get_decoration(resource.id, spv::DecorationLocation);
+			// auto attachment_idx = glsl.get_decoration(resource.id, spv::DecorationLocation);
 			auto type = glsl.get_type(resource.type_id);
 			auto base_type = glsl.get_type(resource.base_type_id);
 			auto vec_size = type.vecsize;
@@ -520,11 +520,6 @@ int Shader::compile(lumen::RenderPass* pass) {
 		return str.substr(fnd + 1);
 	};
 	buffer << "\n";
-	auto get_path = [](const std::string& str) -> std::string {
-		auto fnd = str.rfind('/');
-		assert(fnd != std::string::npos);
-		return str.substr(0, fnd);
-	};
 	const auto& str = buffer.str();
 	// Compiling
 	binary = compile_file(filename, mstages[get_ext(filename)], str, pass);

@@ -328,7 +328,7 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel, const tinygltf::Prim
 	{
 		// POSITION
 		{
-			bool result = get_attribute<glm::vec3>(tmodel, tmesh, positions, "POSITION");
+			get_attribute<glm::vec3>(tmodel, tmesh, positions, "POSITION");
 
 			// Keeping the size of this primitive (Spec says this is required
 			// information)

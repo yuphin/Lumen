@@ -1,7 +1,7 @@
 #pragma once
 #include "Integrator.h"
 #include "shaders/integrators/smlt/smlt_commons.h"
-class SMLT : public Integrator {
+class SMLT final : public Integrator {
    public:
 	SMLT(LumenScene* lumen_scene, const vk::BVH& tlas)
 		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), SMLTConfig)) {}

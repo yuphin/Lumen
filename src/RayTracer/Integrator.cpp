@@ -8,7 +8,7 @@
 void Integrator::init() {
 	lumen::Camera* cam_ptr = lumen_scene->camera.get();
 	Window::add_mouse_click_callback(
-		[cam_ptr, this](MouseAction button, KeyAction action, double x, double y) {
+		[this](MouseAction button, KeyAction action, double x, double y) {
 			if (ImGui::GetIO().WantCaptureMouse) {
 				return;
 			}

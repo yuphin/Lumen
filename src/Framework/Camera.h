@@ -49,7 +49,7 @@ class Camera {
 class PerspectiveCamera : public Camera {
    public:
 	explicit PerspectiveCamera(float fov, float cam_near, float cam_far, float aspect_ratio, const glm::vec3& pos)
-		: fov(fov), aspect_ratio(aspect_ratio), Camera(cam_near, cam_far) {
+		: Camera(cam_near, cam_far), fov(fov), aspect_ratio(aspect_ratio) {
 		left = right = top = bot = -1;
 		make_projection_matrix(true);
 		set_position(pos);
@@ -57,7 +57,7 @@ class PerspectiveCamera : public Camera {
 	}
 	explicit PerspectiveCamera(float left, float right, float top, float bot, float cam_near, float cam_far,
 							   const glm::vec3& pos = glm::vec3(0.0f))
-		: left(left), right(right), top(top), bot(bot), Camera(cam_near, cam_far) {
+		: Camera(cam_near, cam_far), left(left), right(right), top(top), bot(bot) {
 		fov = aspect_ratio = -1;
 		make_projection_matrix();
 		set_position(pos);
@@ -66,7 +66,7 @@ class PerspectiveCamera : public Camera {
 
 	explicit PerspectiveCamera(float fov, float cam_near, float cam_far, float aspect_ratio, const glm::vec3& dir,
 							   const glm::vec3& pos)
-		: fov(fov), aspect_ratio(aspect_ratio), Camera(cam_near, cam_far) {
+		: Camera(cam_near, cam_far), fov(fov), aspect_ratio(aspect_ratio) {
 		left = right = top = bot = -1;
 		make_projection_matrix(true);
 		set_position(pos);
@@ -85,7 +85,7 @@ class PerspectiveCamera : public Camera {
 	}
 
 	explicit PerspectiveCamera(float fov, const glm::mat4 cam_matrix, float cam_near, float cam_far, float aspect_ratio)
-		: fov(fov), aspect_ratio(aspect_ratio), Camera(cam_near, cam_far) {
+		: Camera(cam_near, cam_far), fov(fov), aspect_ratio(aspect_ratio) {
 		left = right = top = bot = -1;
 		this->make_projection_matrix(true);
 		camera = cam_matrix;

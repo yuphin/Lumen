@@ -3,7 +3,7 @@
 
 namespace Logger {
 std::shared_ptr<spdlog::logger> s_logger;
-void Logger::init() {
+void init() {
 	spdlog::set_pattern("%v%$");
 	s_logger = spdlog::stdout_color_mt("Lumen");
 	s_logger->set_level(spdlog::level::trace);
