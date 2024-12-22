@@ -26,7 +26,6 @@ void RayTracer::init() {
 		} else if (Window::is_key_down(KeyInput::KEY_F5)) {
 			vk::render_graph()->reload_shaders = true;
 			vk::render_graph()->shader_cache.clear();
-			vk::render_graph()->set_pipelines_dirty();
 			integrator->updated = true;
 		} else if (Window::is_key_down(KeyInput::KEY_F6)) {
 			capture_ref_img = true;
@@ -298,7 +297,6 @@ bool RayTracer::gui() {
 	if (ImGui::Button("Reload shaders (F5)")) {
 		vk::render_graph()->reload_shaders = true;
 		vk::render_graph()->shader_cache.clear();
-		vk::render_graph()->set_pipelines_dirty();
 		updated |= true;
 	}
 	ImGui::Checkbox("Comparison mode (F11)", &comparison_mode);
@@ -440,7 +438,6 @@ float RayTracer::draw_frame() {
 	auto t_end = glfwGetTime() * 1000;
 	auto t_diff = t_end - t_begin;
 	cnt++;
-	tlas.updated = false;
 	return (float)t_diff;
 }
 

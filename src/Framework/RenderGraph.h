@@ -13,8 +13,6 @@
 #include "Utils.h"
 
 
-// TODO: Add RG caching to bindables
-// Namely, TLAS and scene textures
 namespace lumen {
 
 #define TO_STR(V) (#V)
@@ -34,7 +32,8 @@ struct PipelineStorage {
 	std::unique_ptr<vk::Pipeline> pipeline;
 	std::vector<ResourceBinding> bound_resources;
 	std::unordered_map<std::string, vk::BufferStatus> affected_buffer_pointers;
-	bool dirty = false;
+	bool update_as_descriptor = false;
+	bool update_scene_descriptor = false;
 };
 
 class RenderGraph {
@@ -49,7 +48,7 @@ class RenderGraph {
 	void submit(vk::CommandBuffer& cmd);
 	void run_and_submit(vk::CommandBuffer& cmd);
 	void destroy();
-	void set_pipelines_dirty();
+	void set_pipelines_dirty(bool mark_tlas_dirty, bool mark_scene_dirty);
 	friend RenderPass;
 	bool reload_shaders = false;
 	std::unordered_map<std::string, vk::Buffer*> registered_buffer_pointers;
@@ -180,7 +179,6 @@ class RenderPass {
 	std::vector<uint32_t> descriptor_counts;
 	void* push_constant_data = nullptr;
 	bool is_pipeline_cached = false;
-	bool rebuild_tlas_descriptors = false;
 	/*
 		Note:
 		The assumption is that a SyncDescriptor is unique to a pass (either via

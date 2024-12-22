@@ -363,10 +363,9 @@ RenderPass& RenderPass::bind_buffer_array(std::span<vk::Buffer*> buffers, bool f
 }
 
 RenderPass& RenderPass::bind_tlas(const vk::BVH& tlas) {
-	if (is_pipeline_cached && !tlas.updated) {
+	if (is_pipeline_cached) {
 		return *this;
 	}
-	rebuild_tlas_descriptors = is_pipeline_cached && tlas.updated;
 	vk::Pipeline* pipeline = pipeline_storage->pipeline.get();
 	LUMEN_ASSERT(type == vk::PassType::RT, "TLAS can only be bound to RT pipelines");
 	pipeline->tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
@@ -505,6 +504,7 @@ void RenderPass::finalize() {
 														 &pipeline_storage->pipeline->tlas_info);
 		vkUpdateDescriptorSets(vk::context().device, 1, &descriptor_write, 0, nullptr);
 	};
+	bool rebuild_tlas_descriptors = is_pipeline_cached && pipeline_storage->update_as_descriptor;
 	if (!is_pipeline_cached) {
 		switch (type) {
 			case vk::PassType::Graphics: {
@@ -568,6 +568,7 @@ void RenderPass::finalize() {
 		}
 		pipeline_storage->pipeline->create_rt_set_layout(stage_flags);
 		update_rt_descriptors();
+		pipeline_storage->update_as_descriptor = false;
 	}
 }
 
@@ -1036,9 +1037,12 @@ void RenderGraph::destroy() {
 	pipeline_cache.clear();
 }
 
-void RenderGraph::set_pipelines_dirty() {
+void RenderGraph::set_pipelines_dirty(bool mark_tlas_dirty, bool mark_scene_dirty) {
 	for (auto& [k, v] : pipeline_cache) {
-		v.dirty = true;
+		if(v.pipeline->type == vk::Pipeline::PipelineType::RT) {
+			v.update_as_descriptor = mark_tlas_dirty;
+		}
+		v.update_scene_descriptor = mark_scene_dirty;
 	}
 }
 

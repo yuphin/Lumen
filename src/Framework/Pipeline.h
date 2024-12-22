@@ -45,6 +45,9 @@ struct Pipeline {
 	VkDescriptorType descriptor_types[32] = {};
 	std::vector<uint32_t> descriptor_counts;
 
+	// In the future we may have multiple AS descriptors
+
+
    private:
 	void create_pipeline_layout(const std::vector<Shader>& shaders, const std::vector<uint32_t> push_const_sizes);
 	void create_update_template(const std::vector<Shader>& shaders, const std::vector<uint32_t>& descriptor_counts);

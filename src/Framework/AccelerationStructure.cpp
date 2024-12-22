@@ -311,7 +311,7 @@ void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 	cmd.submit();
 	drm::destroy(instances_buf);
 	drm::destroy(scratch_buffer);
-	tlas.updated = true;
+	vk::render_graph()->set_pipelines_dirty(true, false);
 }
 
 }  // namespace vk
