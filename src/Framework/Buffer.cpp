@@ -31,6 +31,9 @@ void create_buffer(Buffer* buffer, const BufferDesc& desc) {
 	if (buffer->usage_flags & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) {
 		alloc_ci.flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
 	}
+	if(desc.dedicated_allocation) {
+		alloc_ci.flags |= VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+	}
 	VkBufferCreateInfo buffer_ci = vk::buffer(buffer->usage_flags, buffer->size, VK_SHARING_MODE_EXCLUSIVE);
 	VmaAllocationInfo alloc_info;
 	vmaCreateBuffer(vk::context().allocator, &buffer_ci, &alloc_ci, &buffer->handle, &buffer->allocation, &alloc_info);

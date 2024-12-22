@@ -25,6 +25,10 @@ struct BufferDesc {
 	BufferType memory_type;
 	VkDeviceSize size;
 	void* data = nullptr;
+	// For now this is set to true by default
+	// Otherwise on state changes the previous memory data is *spilled*
+	// and some integrators assume that the memory is allocated from a dedicated pool 
+	bool dedicated_allocation = true;
 };
 
 struct Buffer {
