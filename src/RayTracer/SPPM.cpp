@@ -60,8 +60,6 @@ void SPPM::init() {
 
 	frame_num = 0;
 
-	pc_ray.size_x = Window::width();
-	pc_ray.size_y = Window::height();
 
 	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
@@ -75,6 +73,8 @@ void SPPM::init() {
 }
 
 void SPPM::render() {
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;

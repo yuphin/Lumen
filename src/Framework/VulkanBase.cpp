@@ -684,15 +684,8 @@ uint32_t prepare_frame() {
 	uint32_t image_idx;
 	VkResult result = vkAcquireNextImageKHR(context().device, context().swapchain, UINT64_MAX,
 											_image_available_sem[current_frame], VK_NULL_HANDLE, &image_idx);
-	if (result == VK_NOT_READY) {
+	if (result == VK_NOT_READY || result == VK_TIMEOUT || result == VK_SUBOPTIMAL_KHR) {
 		return UINT32_MAX;
-	} else if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-		// Window resize
-		vkDeviceWaitIdle(context().device);
-		recreate_swap_chain();
-		return UINT32_MAX;
-	} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-		LUMEN_ERROR("Failed to acquire new swap chain image");
 	}
 	if (_images_in_flight[image_idx] != VK_NULL_HANDLE) {
 		vkWaitForFences(context().device, 1, &_images_in_flight[image_idx], VK_TRUE, UINT64_MAX);

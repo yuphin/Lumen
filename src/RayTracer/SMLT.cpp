@@ -234,8 +234,6 @@ void SMLT::init() {
 	pc_ray.total_light_area = 0;
 
 	frame_num = 0;
-	pc_ray.size_x = Window::width();
-	pc_ray.size_y = Window::height();
 	pc_ray.mutations_per_pixel = mutations_per_pixel;
 	pc_ray.use_vc = 1;
 	pc_ray.use_vm = 0;
@@ -243,6 +241,8 @@ void SMLT::init() {
 
 void SMLT::render() {
 	vk::CommandBuffer cmd(/*start*/ true);
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;

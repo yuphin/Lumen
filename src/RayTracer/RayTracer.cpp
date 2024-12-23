@@ -51,9 +51,7 @@ void RayTracer::init() {
 
 	// Enable shader reflections for the render graph
 	vk::render_graph()->settings.shader_inference = enable_shader_inference;
-	// Disable event based synchronization
-	// Currently the event API that comes with Vulkan 1.3 is buggy on NVIDIA drivers
-	// so this is turned off and pipeline barriers are used instead
+	// Event based synchronization instead of barriers
 	vk::render_graph()->settings.use_events = use_events;
 
 	scene.load_scene(scene_name);
@@ -168,6 +166,7 @@ void RayTracer::update() {
 	cpu_avg_time = (1.0f - 1.0f / (cnt)) * cpu_avg_time + frame_time / (float)cnt;
 	cpu_avg_time = 0.95f * cpu_avg_time + 0.05f * frame_time;
 	integrator->update();
+	integrator->updated = false;
 #if 0
 	char* stats = nullptr;
 	vmaBuildStatsString(vk::context().allocator, &stats, VK_TRUE);
@@ -191,7 +190,7 @@ void RayTracer::render(uint32_t i) {
 	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
 	vk::render_graph()->run(cmdbuf);
-	vk::check(vkEndCommandBuffer(cmdbuf), "Failed to record command buffer");
+	vk::check(vkEndCommandBuffer(cmdbuf));
 }
 
 void RayTracer::render_debug_utils() {
@@ -369,7 +368,33 @@ float RayTracer::draw_frame() {
 	}
 
 	auto resize_func = [this]() {
+
+	};
+	auto t_begin = glfwGetTime() * 1000;
+	bool updated = false;
+	uint32_t image_idx = vk::prepare_frame();
+	if (image_idx == UINT32_MAX) {
+		auto t_end = glfwGetTime() * 1000;
+		auto t_diff = t_end - t_begin;
+		return (float)t_diff;
+	}
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+
+	bool gui_updated = gui();
+	gui_updated |= integrator->gui();
+	gui_updated |= post_fx.gui();
+	integrator->updated |= updated || gui_updated;
+	render(image_idx);
+	VkResult result = vk::submit_frame(image_idx);
+	if (result != VK_SUCCESS) {
+		vk::render_graph()->reset();
 		Window::update_window_size();
+		const float aspect_ratio = (float)Window::width() / Window::height();
+		scene.camera = std::unique_ptr<lumen::PerspectiveCamera>(
+			new lumen::PerspectiveCamera(scene.config->cam_settings.fov, 0.01f, 1000.0f, aspect_ratio,
+										 scene.config->cam_settings.dir, scene.config->cam_settings.pos));
 		cleanup_resources();
 		integrator->destroy();
 		post_fx.destroy();
@@ -380,39 +405,8 @@ float RayTracer::draw_frame() {
 		init_resources();
 		vk::init_imgui();
 		integrator->updated = true;
-	};
-	auto t_begin = glfwGetTime() * 1000;
-	bool updated = false;
-	ImGui_ImplVulkan_NewFrame();
-	ImGui_ImplGlfw_NewFrame();
-	ImGui::NewFrame();
-
-	bool gui_updated = gui();
-	gui_updated |= integrator->gui();
-	gui_updated |= post_fx.gui();
-
-	if (updated || gui_updated) {
-		ImGui::Render();
-		auto t_end = glfwGetTime() * 1000;
-		auto t_diff = t_end - t_begin;
-		integrator->updated = true;
-		return (float)t_diff;
-	}
-
-	uint32_t image_idx = vk::prepare_frame();
-
-	if (image_idx == UINT32_MAX) {
-		resize_func();
-		auto t_end = glfwGetTime() * 1000;
-		auto t_diff = t_end - t_begin;
-		return (float)t_diff;
-	}
-	render(image_idx);
-	VkResult result = vk::submit_frame(image_idx);
-	vk::render_graph()->reset();
-
-	if (result != VK_SUCCESS) {
-		resize_func();
+	} else {
+		vk::render_graph()->reset();
 	}
 
 	auto now = clock();

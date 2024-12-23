@@ -187,8 +187,7 @@ void create_texture(Texture* texture, const TextureDesc& desc) {
 
 	VkImageViewCreateInfo image_view_ci = vk::image_view(texture->handle, texture->format, texture->aspect_flags,
 														 texture->mip_levels, texture->array_layers);
-	vk::check(vkCreateImageView(vk::context().device, &image_view_ci, nullptr, &texture->view),
-			  "Failed to create image view!");
+	vk::check(vkCreateImageView(vk::context().device, &image_view_ci, nullptr, &texture->view));
 }
 void destroy_texture(Texture* texture) {
 	if (texture->allocation) {

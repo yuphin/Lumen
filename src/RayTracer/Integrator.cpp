@@ -119,14 +119,9 @@ bool Integrator::update() {
 		scene_ubo.debug_click = 0;
 	}
 
-	bool result = false;
-	if (updated) {
-		result = true;
-		updated = false;
-	}
+	
 	update_uniform_buffers();
-
-	return result;
+	return updated;
 }
 
 

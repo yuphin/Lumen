@@ -203,8 +203,6 @@ void PSSMLT::init() {
 
 	frame_num = 0;
 
-	pc_ray.size_x = Window::width();
-	pc_ray.size_y = Window::height();
 
 	mutation_count =
 		int(Window::width() * Window::height()  * config->mutations_per_pixel / float(config->num_mlt_threads));
@@ -212,6 +210,8 @@ void PSSMLT::init() {
 }
 
 void PSSMLT::render() {
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;

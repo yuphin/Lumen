@@ -182,8 +182,7 @@ void LumenScene::load_scene(const std::string& path) {
 	sampler_ci.magFilter = VK_FILTER_LINEAR;
 	sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	sampler_ci.maxLod = FLT_MAX;
-	vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &texture_sampler),
-			  "Could not create image sampler");
+	vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &texture_sampler));
 
 	if (!textures.size()) {
 		add_default_texture();

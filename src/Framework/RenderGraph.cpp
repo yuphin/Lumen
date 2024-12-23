@@ -487,17 +487,17 @@ void RenderPass::finalize() {
 		auto descriptor_pool_ci = vk::descriptor_pool(1, &pool_size, 1);
 
 		vk::check(vkCreateDescriptorPool(vk::context().device, &descriptor_pool_ci, nullptr,
-										 &pipeline_storage->pipeline->tlas_descriptor_pool),
-				  "Failed to create descriptor pool");
+										 &pipeline_storage->pipeline->tlas_descriptor_pool));
 		assert(pipeline_storage->pipeline->tlas_descriptor_pool != VK_NULL_HANDLE);
 		VkDescriptorSetAllocateInfo set_allocate_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
 		set_allocate_info.descriptorPool = pipeline_storage->pipeline->tlas_descriptor_pool;
 		set_allocate_info.descriptorSetCount = 1;
 		set_allocate_info.pSetLayouts = &pipeline_storage->pipeline->tlas_layout;
 		vk::check(vkAllocateDescriptorSets(vk::context().device, &set_allocate_info,
-								 &pipeline_storage->pipeline->tlas_descriptor_set));
+										   &pipeline_storage->pipeline->tlas_descriptor_set));
 		assert(pipeline_storage->pipeline->tlas_descriptor_set != VK_NULL_HANDLE);
-		// LUMEN_TRACE("Creating TLAS descriptor set {} for pipeline {}", (uint64_t)pipeline_storage->pipeline->tlas_descriptor_set, (uint64_t)pipeline_storage->pipeline->handle);
+		// LUMEN_TRACE("Creating TLAS descriptor set {} for pipeline {}",
+		// (uint64_t)pipeline_storage->pipeline->tlas_descriptor_set, (uint64_t)pipeline_storage->pipeline->handle);
 
 		auto descriptor_write = vk::write_descriptor_set(pipeline_storage->pipeline->tlas_descriptor_set,
 														 VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0,
@@ -989,7 +989,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 
 void RenderGraph::reset() {
 	vk::event_pool::reset_events();
-	for(auto& pass : passes) {
+	for (auto& pass : passes) {
 		if (pass.push_constant_data) {
 			free(pass.push_constant_data);
 		}
@@ -1005,7 +1005,7 @@ void RenderGraph::reset() {
 
 void RenderGraph::submit(vk::CommandBuffer& cmd) {
 	cmd.submit();
-	for(auto& pass : passes) {
+	for (auto& pass : passes) {
 		if (pass.push_constant_data) {
 			free(pass.push_constant_data);
 		}
@@ -1039,7 +1039,7 @@ void RenderGraph::destroy() {
 
 void RenderGraph::set_pipelines_dirty(bool mark_tlas_dirty, bool mark_scene_dirty) {
 	for (auto& [k, v] : pipeline_cache) {
-		if(v.pipeline->type == vk::Pipeline::PipelineType::RT) {
+		if (v.pipeline->type == vk::Pipeline::PipelineType::RT) {
 			v.update_as_descriptor = mark_tlas_dirty;
 		}
 		v.update_scene_descriptor = mark_scene_dirty;

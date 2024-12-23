@@ -69,15 +69,13 @@ void DDGI::init() {
 			sampler_ci.compareOp = VK_COMPARE_OP_ALWAYS;
 			sampler_ci.minLod = 0.f;
 			sampler_ci.maxLod = FLT_MAX;
-			vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &bilinear_sampler),
-					  "Could not create image sampler");
+			vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &bilinear_sampler));
 			sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			sampler_ci.minFilter = VK_FILTER_NEAREST;
 			sampler_ci.magFilter = VK_FILTER_NEAREST;
-			vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &nearest_sampler),
-					  "Could not create image sampler");
+			vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &nearest_sampler));
 		}
 
 		const uint32_t irradiance_width = (IRRADIANCE_SIDE_LENGTH + 2) * probe_counts.x * probe_counts.y;
@@ -208,11 +206,11 @@ void DDGI::init() {
 
 	frame_num = 0;
 
-	pc_ray.size_x = Window::width();
-	pc_ray.size_y = Window::height();
 }
 
 void DDGI::render() {
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;

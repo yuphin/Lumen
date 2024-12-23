@@ -61,8 +61,6 @@ void ReSTIR::init() {
 
 	frame_num = 0;
 
-	pc_ray.size_x = Window::width();
-	pc_ray.size_y = Window::height();
 
 	lumen::RenderGraph* rg = vk::render_graph();
 	assert(rg->settings.shader_inference == true);
@@ -76,6 +74,8 @@ void ReSTIR::init() {
 
 void ReSTIR::render() {
 	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;

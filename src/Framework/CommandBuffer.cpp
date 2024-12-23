@@ -13,11 +13,11 @@ static uint32_t get_first_available_tid(uint64_t val) {
 namespace vk {
 
 namespace sync {
-	std::mutex queue_mutex;
-	std::mutex command_pool_mutex;
-	uint64_t available_command_pools = UINT64_MAX;
-	std::counting_semaphore<64> command_pool_semaphore{64};
-}
+std::mutex queue_mutex;
+std::mutex command_pool_mutex;
+uint64_t available_command_pools = UINT64_MAX;
+std::counting_semaphore<64> command_pool_semaphore{64};
+}  // namespace sync
 
 CommandBuffer::CommandBuffer(bool begin, VkCommandBufferUsageFlags begin_flags, vk::QueueType type,
 							 VkCommandBufferLevel level) {
@@ -31,11 +31,10 @@ CommandBuffer::CommandBuffer(bool begin, VkCommandBufferUsageFlags begin_flags, 
 		sync::available_command_pools &= ~(uint64_t(1) << curr_tid);
 	}
 	auto cmd_buf_allocate_info = vk::command_buffer_allocate_info(vk::context().cmd_pools[curr_tid], level, 1);
-	vk::check(vkAllocateCommandBuffers(vk::context().device, &cmd_buf_allocate_info, &handle),
-			  "Could not allocate command buffer");
+	vk::check(vkAllocateCommandBuffers(vk::context().device, &cmd_buf_allocate_info, &handle));
 	if (begin) {
 		auto begin_info = vk::command_buffer_begin_info(begin_flags);
-		vk::check(vkBeginCommandBuffer(handle, &begin_info), "Could not begin the command buffer");
+		vk::check(vkBeginCommandBuffer(handle, &begin_info));
 		state = CommandBufferState::RECORDING;
 	}
 }
@@ -50,12 +49,12 @@ void CommandBuffer::begin(VkCommandBufferUsageFlags begin_flags) {
 		sync::available_command_pools &= ~(uint64_t(1) << curr_tid);
 	}
 	auto begin_info = vk::command_buffer_begin_info(begin_flags);
-	vk::check(vkBeginCommandBuffer(handle, &begin_info), "Could not begin the command buffer");
+	vk::check(vkBeginCommandBuffer(handle, &begin_info));
 	state = CommandBufferState::RECORDING;
 }
 
 void CommandBuffer::submit(bool wait_fences, bool queue_wait_idle) {
-	vk::check(vkEndCommandBuffer(handle), "Failed to end command buffer");
+	vk::check(vkEndCommandBuffer(handle));
 	state = CommandBufferState::STOPPED;
 	VkSubmitInfo submit_info = vk::submit_info();
 	submit_info.commandBufferCount = 1;
@@ -65,15 +64,14 @@ void CommandBuffer::submit(bool wait_fences, bool queue_wait_idle) {
 		VkFenceCreateInfo fence_info = vk::fence();
 		VkFence fence;
 		vkCreateFence(vk::context().device, &fence_info, nullptr, &fence);
-		vk::check(vkQueueSubmit(vk::context().queues[(int)type], 1, &submit_info, fence), "Queue submission error");
-		vk::check(vkWaitForFences(vk::context().device, 1, &fence, VK_TRUE, 100000000000), "Fence wait error");
+		vk::check(vkQueueSubmit(vk::context().queues[(int)type], 1, &submit_info, fence));
+		vk::check(vkWaitForFences(vk::context().device, 1, &fence, VK_TRUE, ~0ull));
 		vkDestroyFence(vk::context().device, fence, nullptr);
 	} else {
-		vk::check(vkQueueSubmit(vk::context().queues[(int)type], 1, &submit_info, VK_NULL_HANDLE),
-				  "Queue submission error");
+		vk::check(vkQueueSubmit(vk::context().queues[(int)type], 1, &submit_info, VK_NULL_HANDLE));
 	}
 	if (queue_wait_idle) {
-		vk::check(vkQueueWaitIdle(vk::context().queues[(int)type]), "Queue wait error! Check previous submissions");
+		vk::check(vkQueueWaitIdle(vk::context().queues[(int)type]));
 	}
 	sync::queue_mutex.unlock();
 }
@@ -84,7 +82,7 @@ CommandBuffer::~CommandBuffer() {
 	}
 	if (state == CommandBufferState::RECORDING) {
 		LUMEN_WARN("Destroying command buffer in recording state.");
-		vk::check(vkEndCommandBuffer(handle), "Failed to end command buffer");
+		vk::check(vkEndCommandBuffer(handle));
 	}
 	vkFreeCommandBuffers(vk::context().device, vk::context().cmd_pools[curr_tid], 1, &handle);
 	{

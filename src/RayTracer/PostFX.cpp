@@ -13,8 +13,7 @@ void PostFX::init() {
 
 	sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 	sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-	vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &img_sampler),
-			  "Could not create image sampler");
+	vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &img_sampler));
 	// Load the kernel
 	const char* img_name_kernel = "assets/kernels/Octagonal512.exr";
 	int width, height;

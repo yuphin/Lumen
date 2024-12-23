@@ -173,5 +173,5 @@ void update_window_size() {
 }
 
 uint32_t width() { return _window.viewport_width; }
-uint32_t height() { return _window.window_height; }
+uint32_t height() { return _window.viewport_height; }
 }  // namespace Window

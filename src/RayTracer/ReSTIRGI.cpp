@@ -67,8 +67,6 @@ void ReSTIRGI::init() {
 	frame_num = 0;
 
 	pc_ray.total_frame_num = 0;
-	pc_ray.size_x = Window::width();
-	pc_ray.size_y = Window::height();
 	pc_ray.world_radius = lumen_scene->m_dimensions.radius;
 	assert(vk::render_graph()->settings.shader_inference == true);
 	lumen::RenderGraph* rg = vk::render_graph();
@@ -82,6 +80,8 @@ void ReSTIRGI::init() {
 
 void ReSTIRGI::render() {
 	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;

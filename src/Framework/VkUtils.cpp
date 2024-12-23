@@ -206,7 +206,7 @@ VkImageView create_image_view(VkDevice device, const VkImage& img, VkFormat form
 	image_view_CI.subresourceRange.levelCount = 1;
 	image_view_CI.subresourceRange.baseArrayLayer = 0;
 	image_view_CI.subresourceRange.layerCount = 1;
-	vk::check(vkCreateImageView(device, &image_view_CI, nullptr, &image_view), "Failed to create image view!");
+	vk::check(vkCreateImageView(device, &image_view_CI, nullptr, &image_view));
 	return image_view;
 }
 

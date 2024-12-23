@@ -170,8 +170,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 	pipeline_CI.basePipelineHandle = VK_NULL_HANDLE;
 	pipeline_CI.pDepthStencilState = &depth_stencil_state_ci;
 
-	vk::check(vkCreateGraphicsPipelines(vk::context().device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle),
-			  "Failed to create pipeline");
+	vk::check(vkCreateGraphicsPipelines(vk::context().device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle));
 	for (auto& stage : stages) {
 		vkDestroyShaderModule(vk::context().device, stage.module, nullptr);
 	}
@@ -276,8 +275,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 	pipeline_CI.maxPipelineRayRecursionDepth = settings.recursion_depth;
 	pipeline_CI.layout = pipeline_layout;
 	pipeline_CI.flags = 0;
-	vk::check(vkCreateRayTracingPipelinesKHR(vk::context().device, {}, {}, 1, &pipeline_CI, nullptr, &handle),
-			  "Failed to create RT pipeline");
+	vk::check(vkCreateRayTracingPipelinesKHR(vk::context().device, {}, {}, 1, &pipeline_CI, nullptr, &handle));
 	sbt_wrapper.setup(vk::context().queue_indices.gfx_family.value(), vk::context().rt_props);
 	sbt_wrapper.create(handle, pipeline_CI);
 	if (!name.empty()) {

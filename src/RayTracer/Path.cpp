@@ -18,8 +18,6 @@ void Path::init() {
 
 	frame_num = 0;
 
-	pc_ray.size_x = Window::width();
-	pc_ray.size_y = Window::height();
 	assert(vk::render_graph()->settings.shader_inference == true);
 	// For shader resource dependency inference, use this macro to register a buffer address to the rendergraph
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
@@ -27,7 +25,8 @@ void Path::init() {
 }
 
 void Path::render() {
-	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = path_length;
@@ -57,7 +56,6 @@ void Path::render() {
 		.bind_texture_array(lumen_scene->scene_textures)
 		//.write(output_tex) // Needed if the automatic shader inference is disabled
 		.bind_tlas(tlas);
-	vk::render_graph()->run_and_submit(cmd);
 }
 
 bool Path::update() {

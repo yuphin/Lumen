@@ -41,8 +41,6 @@ void BDPT::init() {
 
 	frame_num = 0;
 
-	pc_ray.size_x = Window::width();
-	pc_ray.size_y = Window::height();
 	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
 								 vk::render_graph());
@@ -63,6 +61,8 @@ void BDPT::render() {
 	pc_ray.total_light_area = lumen_scene->total_light_area;
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.frame_num = frame_num;
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 	vk::render_graph()
 		->add_rt("BDPT",
 				 {

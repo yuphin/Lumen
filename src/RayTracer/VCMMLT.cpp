@@ -220,8 +220,6 @@ void VCMMLT::init() {
 
 	frame_num = 0;
 
-	pc_ray.size_x = Window::width();
-	pc_ray.size_y = Window::height();
 	pc_ray.mutations_per_pixel = config->mutations_per_pixel;
 	pc_ray.num_mlt_threads = config->num_mlt_threads;
 }
@@ -229,6 +227,8 @@ void VCMMLT::init() {
 void VCMMLT::render() {
 	LUMEN_TRACE("Rendering sample {}...", sample_cnt++);
 	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	pc_ray.size_x = Window::width();
+	pc_ray.size_y = Window::height();
 	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
