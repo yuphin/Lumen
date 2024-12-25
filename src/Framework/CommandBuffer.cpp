@@ -41,12 +41,15 @@ CommandBuffer::CommandBuffer(bool begin, VkCommandBufferUsageFlags begin_flags, 
 
 void CommandBuffer::begin(VkCommandBufferUsageFlags begin_flags) {
 	LUMEN_ASSERT(state != CommandBufferState::RECORDING, "Command buffer is already recording");
-	std::unique_lock<std::mutex> cv_lock;
-	sync::command_pool_semaphore.acquire();
 	if (curr_tid == -1) {
-		std::scoped_lock lock(sync::command_pool_mutex);
-		curr_tid = get_first_available_tid(sync::available_command_pools);
-		sync::available_command_pools &= ~(uint64_t(1) << curr_tid);
+		std::unique_lock<std::mutex> cv_lock;
+		sync::command_pool_semaphore.acquire();
+		{
+			std::scoped_lock lock(sync::command_pool_mutex);
+			curr_tid = get_first_available_tid(sync::available_command_pools);
+			sync::available_command_pools &= ~(uint64_t(1) << curr_tid);
+
+		}
 	}
 	auto begin_info = vk::command_buffer_begin_info(begin_flags);
 	vk::check(vkBeginCommandBuffer(handle, &begin_info));

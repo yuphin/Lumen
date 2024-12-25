@@ -226,7 +226,7 @@ void VCMMLT::init() {
 
 void VCMMLT::render() {
 	LUMEN_TRACE("Rendering sample {}...", sample_cnt++);
-	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+	vk::CommandBuffer cmd(/*start*/ true);
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
 	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());

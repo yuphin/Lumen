@@ -696,7 +696,7 @@ std::vector<Texture*>& swapchain_images() { return _swapchain_images; }
 
 uint32_t prepare_frame() {
 	check(vkWaitForFences(context().device, 1, &_in_flight_fences[current_frame], VK_TRUE, ~0ull), "Timeout");
-	GPUQueryManager::collect(current_frame);
+	GPUQueryManager::collect(uint32_t(current_frame));
 
 	uint32_t image_idx;
 	VkResult result = vkAcquireNextImageKHR(context().device, context().swapchain, UINT64_MAX,
