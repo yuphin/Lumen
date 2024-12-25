@@ -141,7 +141,9 @@ inline void set_resource_name(VkDevice device, uint64_t obj, const char* name, V
 #if _DEBUG
 	VkDebugUtilsObjectNameInfoEXT debug_utils_name{VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT, nullptr, type,
 												   obj, name};
-	vkSetDebugUtilsObjectNameEXT(device, &debug_utils_name);
+	if (vkSetDebugUtilsObjectNameEXT) {
+		vkSetDebugUtilsObjectNameEXT(device, &debug_utils_name);
+	}
 #endif
 }
 inline void begin_region(VkDevice device, VkCommandBuffer cmd, const char* name, glm::vec4 color) {
