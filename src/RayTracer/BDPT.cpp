@@ -53,7 +53,6 @@ void BDPT::init() {
 }
 
 void BDPT::render() {
-	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = lumen_scene->config->path_length;
@@ -89,8 +88,6 @@ void BDPT::render() {
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
 	//.finalize();
-
-	vk::render_graph()->run_and_submit(cmd);
 }
 
 bool BDPT::update() {

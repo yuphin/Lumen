@@ -46,7 +46,7 @@ void PostFX::init() {
 	vk::Texture* kernel_ping = drm::get(empty_tex_desc);
 	kernel_pong = prm::get_texture(empty_tex_desc);
 
-	vk::CommandBuffer cmd(true);
+	vk::CommandBuffer cmd(true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
 	// Copy the original kernel image to the padded texture
 	uint32_t pad_width = (kernel_org->extent.width + 31) / 32;

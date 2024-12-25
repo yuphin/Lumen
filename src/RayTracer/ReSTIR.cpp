@@ -73,7 +73,6 @@ void ReSTIR::init() {
 }
 
 void ReSTIR::render() {
-	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
 	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
@@ -148,7 +147,6 @@ void ReSTIR::render() {
 	if (!do_spatiotemporal) {
 		do_spatiotemporal = true;
 	}
-	rg->run_and_submit(cmd);
 }
 
 bool ReSTIR::update() {

@@ -129,7 +129,6 @@ void VCM::init() {
 }
 
 void VCM::render() {
-	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
 	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
@@ -269,7 +268,6 @@ void VCM::render() {
 		do_spatiotemporal = true;
 	}
 	pc_ray.total_frame_num++;
-	vk::render_graph()->run_and_submit(cmd);
 }
 
 bool VCM::update() {
