@@ -628,12 +628,12 @@ void init(bool validation_layers) {
 	create_command_buffers();
 	create_sync_primitives();
 	init_imgui();
-	context().query_pool_timestamps[0] = create_query_pool(VK_QUERY_TYPE_TIMESTAMP, 1024);
-	context().query_pool_timestamps[1] = create_query_pool(VK_QUERY_TYPE_TIMESTAMP, 1024);
-	context().query_pool_timestamps[2] = create_query_pool(VK_QUERY_TYPE_TIMESTAMP, 1024);
-	vkResetQueryPool(context().device, context().query_pool_timestamps[0], 0, 1024 );
-	vkResetQueryPool(context().device, context().query_pool_timestamps[1], 0, 1024 );
-	vkResetQueryPool(context().device, context().query_pool_timestamps[2], 0, 1024 );
+	context().query_pool_timestamps[0] = create_query_pool(VK_QUERY_TYPE_TIMESTAMP, 4096);
+	context().query_pool_timestamps[1] = create_query_pool(VK_QUERY_TYPE_TIMESTAMP, 4096);
+	context().query_pool_timestamps[2] = create_query_pool(VK_QUERY_TYPE_TIMESTAMP, 4096);
+	vkResetQueryPool(context().device, context().query_pool_timestamps[0], 0, 4096 );
+	vkResetQueryPool(context().device, context().query_pool_timestamps[1], 0, 4096 );
+	vkResetQueryPool(context().device, context().query_pool_timestamps[2], 0, 4096 );
 }
 
 void init_imgui() {

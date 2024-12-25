@@ -283,8 +283,8 @@ void RayTracer::create_integrator(int integrator_idx) {
 
 bool RayTracer::gui() {
 	auto& query_results = GPUQueryManager::get();
-	auto gpu_end = query_results.timestamps[query_results.size - 1];
-	auto gpu_start = query_results.timestamps[0];
+	uint64_t gpu_end = query_results.size > 0 ? query_results.timestamps[query_results.size - 1] : 0;
+	uint64_t gpu_start = query_results.size > 0 ? query_results.timestamps[0] : 0;
 	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
 	ImGui::Text("General settings:");
 	ImGui::PopStyleColor();

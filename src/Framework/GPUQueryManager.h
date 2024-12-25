@@ -5,8 +5,8 @@
 namespace GPUQueryManager {
 
 struct TimestampData {
-	std::string names[512];
-	uint64_t timestamps[1024];
+	std::string names[2048];
+	uint64_t timestamps[4096];
 	uint32_t size;
 };
 void begin(VkCommandBuffer cmd, const char* name);
