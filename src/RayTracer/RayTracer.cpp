@@ -424,9 +424,11 @@ float RayTracer::draw_frame() {
 	if (result != VK_SUCCESS) {
 		Window::update_window_size();
 		const float aspect_ratio = (float)Window::width() / Window::height();
-		scene.camera = std::unique_ptr<lumen::PerspectiveCamera>(
-			new lumen::PerspectiveCamera(scene.config->cam_settings.fov, 0.01f, 1000.0f, aspect_ratio,
-										 scene.config->cam_settings.dir, scene.config->cam_settings.pos));
+		const PerspectiveCamera* old_cam = (PerspectiveCamera*)scene.camera.get();
+		glm::vec3 old_rotation = old_cam->rotation;
+		scene.camera = std::unique_ptr<lumen::PerspectiveCamera>(new lumen::PerspectiveCamera(
+			old_cam->fov, 0.01f, 1000.0f, aspect_ratio, old_cam->direction, old_cam->position));
+		scene.camera->rotation = old_rotation;
 		cleanup_resources();
 		integrator->destroy();
 		post_fx.destroy();

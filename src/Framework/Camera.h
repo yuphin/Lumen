@@ -104,6 +104,7 @@ class PerspectiveCamera : public Camera {
 		this->set_position(pos);
 	}
 
+	float fov{}, aspect_ratio{};
    private:
 	void make_projection_matrix(bool use_fov = false) {
 		if (use_fov) {
@@ -121,7 +122,6 @@ class PerspectiveCamera : public Camera {
 		}
 	}
 
-	float fov{}, aspect_ratio{};
 	float left{}, right{}, top{}, bot{};
 };
 
