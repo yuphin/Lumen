@@ -1008,6 +1008,7 @@ void RenderGraph::reset() {
 
 void RenderGraph::submit(vk::CommandBuffer& cmd) {
 	cmd.submit();
+	GPUQueryManager::collect();
 	for (auto& pass : passes) {
 		if (pass.push_constant_data) {
 			free(pass.push_constant_data);

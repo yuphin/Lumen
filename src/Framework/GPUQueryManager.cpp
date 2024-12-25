@@ -20,6 +20,9 @@ void end(VkCommandBuffer cmd) {
 }
 
 void collect(uint32_t curr_frame_idx) {
+	if(_curr_query_idx == 0) {
+		return;
+	}
 	// Note: curr_frame_idx is the index of the command buffer that has finished its execution
 	vkGetQueryPoolResults(vk::context().device, vk::context().query_pool_timestamps[curr_frame_idx], 0, _curr_query_idx,
 						  sizeof(uint64_t) * _curr_query_idx, _data.timestamps, sizeof(uint64_t),
@@ -30,5 +33,8 @@ void collect(uint32_t curr_frame_idx) {
 	_data.size = _curr_query_idx;
 	_curr_query_idx = 0;
 }
+
+void collect() { collect(_curr_pool_idx); }
+
 const TimestampData& get() { return _data; }
 }  // namespace GPUQueryManager

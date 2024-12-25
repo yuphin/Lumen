@@ -12,5 +12,6 @@ struct TimestampData {
 void begin(VkCommandBuffer cmd, const char* name);
 void end(VkCommandBuffer cmd);
 void collect(uint32_t curr_frame_idx);
+void collect();
 const TimestampData& get();
 }  // namespace GPUQueryManager
