@@ -11,7 +11,6 @@
 
 namespace vk {
 
-constexpr int MAX_FRAMES_IN_FLIGHT = 3;
 
 struct SwapChainSupportDetails {
 	VkSurfaceCapabilitiesKHR capabilities = {};
@@ -336,6 +335,7 @@ static void create_logical_device() {
 	features12.runtimeDescriptorArray = true;
 	features12.shaderSampledImageArrayNonUniformIndexing = true;
 	features12.scalarBlockLayout = true;
+	features12.hostQueryReset = true;
 	if (1) {
 		dynamic_rendering_feature.dynamicRendering = true;
 		syncronization2_features.synchronization2 = true;
@@ -606,6 +606,16 @@ static void create_instance() {
 	}
 }
 
+static VkQueryPool create_query_pool(VkQueryType query_type, uint32_t count) {
+	VkQueryPoolCreateInfo create_info = { VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO };
+	create_info.queryType = query_type;
+	create_info.queryCount = count;
+
+	VkQueryPool query_pool;
+	vk::check(vkCreateQueryPool(context().device, &create_info, 0, &query_pool));
+	return query_pool;
+}
+
 void init(bool validation_layers) {
 	_enable_validation_layers = validation_layers;
 	create_instance();
@@ -618,6 +628,12 @@ void init(bool validation_layers) {
 	create_command_buffers();
 	create_sync_primitives();
 	init_imgui();
+	context().query_pool_timestamps[0] = create_query_pool(VK_QUERY_TYPE_TIMESTAMP, 1024);
+	context().query_pool_timestamps[1] = create_query_pool(VK_QUERY_TYPE_TIMESTAMP, 1024);
+	context().query_pool_timestamps[2] = create_query_pool(VK_QUERY_TYPE_TIMESTAMP, 1024);
+	vkResetQueryPool(context().device, context().query_pool_timestamps[0], 0, 1024 );
+	vkResetQueryPool(context().device, context().query_pool_timestamps[1], 0, 1024 );
+	vkResetQueryPool(context().device, context().query_pool_timestamps[2], 0, 1024 );
 }
 
 void init_imgui() {
@@ -680,6 +696,7 @@ std::vector<Texture*>& swapchain_images() { return _swapchain_images; }
 
 uint32_t prepare_frame() {
 	check(vkWaitForFences(context().device, 1, &_in_flight_fences[current_frame], VK_TRUE, ~0ull), "Timeout");
+	GPUQueryManager::collect(current_frame);
 
 	uint32_t image_idx;
 	VkResult result = vkAcquireNextImageKHR(context().device, context().swapchain, UINT64_MAX,
@@ -691,9 +708,9 @@ uint32_t prepare_frame() {
 		vkWaitForFences(context().device, 1, &_images_in_flight[image_idx], VK_TRUE, UINT64_MAX);
 	}
 
-	check(vkResetCommandBuffer(context().command_buffers[image_idx], 0));
 	vkResetFences(context().device, 1, &_in_flight_fences[current_frame]);
 	_images_in_flight[image_idx] = _in_flight_fences[current_frame];
+	check(vkResetCommandBuffer(context().command_buffers[image_idx], 0));
 	return image_idx;
 }
 
@@ -746,6 +763,9 @@ void cleanup_app_data() { _rg->destroy(); }
 void cleanup() {
 	cleanup_app_data();
 	cleanup_swapchain_images();
+	vkDestroyQueryPool(context().device, context().query_pool_timestamps[0], nullptr);
+	vkDestroyQueryPool(context().device, context().query_pool_timestamps[1], nullptr);
+	vkDestroyQueryPool(context().device, context().query_pool_timestamps[2], nullptr);
 	vkDestroySwapchainKHR(context().device, context().swapchain, nullptr);
 	vk::event_pool::cleanup();
 	vkFreeCommandBuffers(context().device, context().cmd_pools[0],

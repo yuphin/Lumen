@@ -6,6 +6,7 @@
 #include <vma/vk_mem_alloc.h>
 
 namespace vk {
+inline constexpr int MAX_FRAMES_IN_FLIGHT = 3;
 
 struct VulkanContext {
 	VkInstance instance;
@@ -25,6 +26,7 @@ struct VulkanContext {
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_props{
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
 	VmaAllocator allocator;
+	VkQueryPool query_pool_timestamps[3];
 };
 
 VulkanContext& context();

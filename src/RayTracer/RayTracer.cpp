@@ -19,6 +19,9 @@ RayTracer::RayTracer(bool debug, int argc, char* argv[]) : debug(debug) {
 void RayTracer::init() {
 	srand((uint32_t)time(NULL));
 	Window::add_key_callback([this](KeyInput key, KeyAction action) {
+		if (Window::is_key_down(KeyInput::KEY_F1)) {
+			show_ui = !show_ui;
+		}
 		if (Window::is_key_down(KeyInput::KEY_F10)) {
 			write_exr = true;
 		} else if (Window::is_key_down(KeyInput::KEY_F11)) {
@@ -279,10 +282,26 @@ void RayTracer::create_integrator(int integrator_idx) {
 }
 
 bool RayTracer::gui() {
+	auto& query_results = GPUQueryManager::get();
+	auto gpu_end = query_results.timestamps[query_results.size - 1];
+	auto gpu_start = query_results.timestamps[0];
 	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
 	ImGui::Text("General settings:");
 	ImGui::PopStyleColor();
-	ImGui::Text("Frame %d time %.2f ms ( %.2f FPS )", integrator->frame_num, cpu_avg_time, 1000 / cpu_avg_time);
+	ImGui::Text("Frame %d time (CPU) %.2f ms ( %.2f FPS )", integrator->frame_num, cpu_avg_time, 1000 / cpu_avg_time);
+	if (gpu_end != 0 && gpu_start != 0 && gpu_end > gpu_start) {
+		double frame_time_gpu = (gpu_end - gpu_start) * 1e-6;
+		ImGui::Text("Frame time (GPU) %.2f ms", frame_time_gpu);
+		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
+		ImGui::Text("Individual GPU timings:");
+		ImGui::PopStyleColor();
+		for (size_t i = 0; i < query_results.size; i += 2) {
+			auto begin = query_results.timestamps[i];
+			auto end = query_results.timestamps[i + 1];
+			double diff = (end - begin) * 1e-6;
+			ImGui::Text("%.3f ms: %s", diff, query_results.names[i >> 1].c_str());
+		}
+	}
 	ImGui::Text("Memory Usage: %.2f MB", vk::get_memory_usage(vk::context().physical_device) * 1e-6);
 	bool updated = false;
 	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
@@ -358,7 +377,6 @@ bool RayTracer::gui() {
 			integrator->create_accel(tlas, blases);
 		}
 	}
-
 	return updated;
 }
 
@@ -382,14 +400,28 @@ float RayTracer::draw_frame() {
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	bool gui_updated = gui();
-	gui_updated |= integrator->gui();
-	gui_updated |= post_fx.gui();
-	integrator->updated |= updated || gui_updated;
+	integrator->updated |= updated;
+	if (show_ui) {
+		ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Once);
+		ImGui::Begin("Debug (F1 to hide)", &show_ui);
+		bool gui_updated = gui();
+		gui_updated |= integrator->gui();
+		gui_updated |= post_fx.gui();
+		static bool show_imgui_demo = false;
+		if (ImGui::Button("Show ImGui Demo")) {
+			show_imgui_demo = !show_imgui_demo;
+		}
+		if (show_imgui_demo) {
+			ImGui::ShowDemoWindow(&show_imgui_demo);
+		}
+		ImGui::End();
+		integrator->updated |= gui_updated;
+	}
+
 	render(image_idx);
 	VkResult result = vk::submit_frame(image_idx);
+	vk::render_graph()->reset();
 	if (result != VK_SUCCESS) {
-		vk::render_graph()->reset();
 		Window::update_window_size();
 		const float aspect_ratio = (float)Window::width() / Window::height();
 		scene.camera = std::unique_ptr<lumen::PerspectiveCamera>(
@@ -405,8 +437,6 @@ float RayTracer::draw_frame() {
 		init_resources();
 		vk::init_imgui();
 		integrator->updated = true;
-	} else {
-		vk::render_graph()->reset();
 	}
 
 	auto now = clock();

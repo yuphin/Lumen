@@ -50,6 +50,7 @@
 
 #pragma warning(push, 0)
 #include "Framework/VulkanContext.h"
+#include "Framework/GPUQueryManager.h"
 #include <GLFW/glfw3.h>
 #include <imgui/imgui.h>
 #include "imgui/imgui_impl_glfw.h"

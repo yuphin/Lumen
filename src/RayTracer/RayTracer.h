@@ -68,6 +68,7 @@ class RayTracer {
 	bool capture_target_img = false;
 	bool comparison_img_toggle = false;
 	bool img_captured = false;
+	bool show_ui = true;
 
 	const bool enable_shader_inference = true;
 	const bool use_events = true;

@@ -2,6 +2,7 @@
 #include "Framework/RenderGraph.h"
 #include "RenderGraph.h"
 #include "VkUtils.h"
+#include "GPUQueryManager.h"
 
 namespace lumen {
 #define DIRTY_CHECK(x) \
@@ -608,6 +609,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		wait_events.reserve(wait_signals_buffer.size());
 	}
 	vk::DebugMarker::begin_region(vk::context().device, cmd, name.c_str(), glm::vec4(1.0f, 0.78f, 0.05f, 1.0f));
+	GPUQueryManager::begin(cmd, name.c_str());
 	// Wait: Buffer
 	auto& buffer_sync = rg->buffer_sync_resources[pass_idx];
 	auto& img_sync = rg->img_sync_resources[pass_idx];
@@ -893,6 +895,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		}
 	}
 	vk::DebugMarker::end_region(vk::context().device, cmd);
+	GPUQueryManager::end(cmd);
 }
 
 void RenderGraph::run(VkCommandBuffer cmd) {
