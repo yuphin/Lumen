@@ -1008,6 +1008,10 @@ void RenderGraph::reset() {
 
 void RenderGraph::submit(vk::CommandBuffer& cmd) {
 	cmd.submit();
+	// This flushes all the existing timestamps
+	// TODO: Maybe add a tracking mechanism inbetween frames per pass
+	// This entails adding a mapping between a pass and a timestamp
+	// Which enables us to get aggregate results for each pass per frame
 	GPUQueryManager::collect();
 	for (auto& pass : passes) {
 		if (pass.push_constant_data) {
