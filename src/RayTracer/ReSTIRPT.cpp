@@ -16,15 +16,13 @@ void ReSTIRPT::init() {
 
 	gris_gbuffer =
 		prm::get_buffer({.name = "GRIS GBuffer",
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
 						 .size = Window::width() * Window::height() * sizeof(GBuffer)});
 
 	gris_prev_gbuffer =
 		prm::get_buffer({.name = "GRIS Previous GBuffer",
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
 						 .size = Window::width() * Window::height() * sizeof(GBuffer)});
 
@@ -34,22 +32,19 @@ void ReSTIRPT::init() {
 												.format = VK_FORMAT_R32G32B32A32_SFLOAT});
 	gris_reservoir_ping_buffer =
 		prm::get_buffer({.name = "GRIS Reservoirs Ping",
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
 						 .size = Window::width() * Window::height() * sizeof(Reservoir)});
 
 	gris_reservoir_pong_buffer =
 		prm::get_buffer({.name = "GRIS Reservoirs Pong",
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
 						 .size = Window::width() * Window::height() * sizeof(Reservoir)});
 
 	prefix_contribution_buffer =
 		prm::get_buffer({.name = "Prefix Contributions",
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
 						 .size = Window::width() * Window::height() * sizeof(glm::vec3)});
 
@@ -61,8 +56,7 @@ void ReSTIRPT::init() {
 						 .size = Window::width() * Window::height() * sizeof(uint32_t)});
 	reconnection_buffer = prm::get_buffer(
 		{.name = "Reservoir Connection",
-		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-				  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		 .memory_type = vk::BufferType::GPU,
 		 .size = Window::width() * Window::height() * sizeof(ReconnectionData) * (num_spatial_samples + 1)});
 
