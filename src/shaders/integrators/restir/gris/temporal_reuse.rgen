@@ -41,7 +41,8 @@ void main() {
 	vec4 prev_pos = ubo.prev_view * vec4(canonical_gbuffer.pos, 1);
 	prev_pos /= prev_pos.z;
 	prev_pos = -ubo.prev_projection * prev_pos;
-	ivec2 prev_coords = ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
+	vec2 jitter =  pc.enable_temporal_jitter == 1 ? rand2(seed) - 0.5 : vec2(0);
+	ivec2 prev_coords = ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy + jitter);
 
 	if (pc.permutation_sampling == 1) {
 		prev_coords = get_permuted_coords(seed, prev_coords);

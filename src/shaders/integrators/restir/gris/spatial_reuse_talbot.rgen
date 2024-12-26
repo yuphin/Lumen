@@ -136,7 +136,7 @@ void main() {
 	out_reservoirs[pixel_idx] = reservoir;
 
 	vec3 final_contribution = vec3(0);
-	if (pc.show_reconnection_radiance == 1) {
+	if (pc.hide_reconnection_radiance == 1) {
 		final_contribution = vec3(0);
 	} else {
 		final_contribution = prefix_contributions.d[pixel_idx];

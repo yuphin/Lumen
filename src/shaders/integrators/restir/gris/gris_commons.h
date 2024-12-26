@@ -28,7 +28,7 @@ struct PCReSTIRPT {
 	uint direct_lighting;
 	uint enable_rr;
 	uint enable_spatial_reuse;
-	uint show_reconnection_radiance;
+	uint hide_reconnection_radiance;
 	float spatial_radius;
 	float min_vertex_distance_ratio;
 	uint path_length;
@@ -40,6 +40,7 @@ struct PCReSTIRPT {
 	uint canonical_only;
 	float gris_separator;
 	uint enable_occlusion;
+	uint enable_temporal_jitter;
 };
 
 

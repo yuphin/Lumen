@@ -121,6 +121,7 @@ void ReSTIRPT::init() {
 void ReSTIRPT::render() {
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
+	pc_ray.enable_temporal_jitter = uint(enable_temporal_jitter);
 	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
 	pc_ray.prev_random_num = pc_ray.general_seed;
 	pc_ray.sampling_seed = rand() % UINT_MAX;
@@ -139,7 +140,7 @@ void ReSTIRPT::render() {
 
 	pc_ray.spatial_radius = spatial_reuse_radius;
 	pc_ray.enable_spatial_reuse = enable_spatial_reuse;
-	pc_ray.show_reconnection_radiance = show_reconnection_radiance;
+	pc_ray.hide_reconnection_radiance = hide_reconnection_radiance;
 	pc_ray.min_vertex_distance_ratio = min_vertex_distance_ratio;
 	pc_ray.enable_gris = enable_gris;
 	pc_ray.frame_num = frame_num;
@@ -363,11 +364,12 @@ bool ReSTIRPT::gui() {
 	}
 	result |= ImGui::SliderFloat("GRIS / Default", &gris_separator, 0.0f, 1.0f);
 	result |= ImGui::Checkbox("Enable occlusion", &enable_occlusion);
+	result |= ImGui::Checkbox("Temporal jitter", &enable_temporal_jitter);
 	result |= ImGui::Checkbox("Debug pixels", &pixel_debug);
 	result |= ImGui::Checkbox("Enable defensive formulation", &enable_defensive_formulation);
 	result |= ImGui::Checkbox("Enable permutation sampling", &enable_permutation_sampling);
 	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
-	result |= ImGui::Checkbox("Show reconnection radiance", &show_reconnection_radiance);
+	result |= ImGui::Checkbox("Hide reconnection radiance", &hide_reconnection_radiance);
 	std::array<const char*, 2> mis_methods = {
 		"Talbot (Reconnection only)",
 		"Pairwise",

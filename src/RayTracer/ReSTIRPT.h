@@ -34,7 +34,7 @@ class ReSTIRPT final : public Integrator {
 	bool enable_rr = false;
 	bool enable_spatial_reuse = true;
 	bool canonical_only = false;
-	bool show_reconnection_radiance = false;
+	bool hide_reconnection_radiance = false;
 	bool enable_temporal_reuse = true;
 	bool enable_gris = true;
 	bool pixel_debug = false;
@@ -42,6 +42,7 @@ class ReSTIRPT final : public Integrator {
 	bool enable_atmosphere = false;
 	bool enable_defensive_formulation = true;
 	bool enable_occlusion = true;
+	bool enable_temporal_jitter = true;
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.00f;
 	float gris_separator = 1.0f;
