@@ -11,8 +11,8 @@ int main(int argc, char* argv[]) {
 	bool enable_debug = false;
 #endif
 	bool fullscreen = false;
-	int width = 1920;
-	int height = 1080;
+	int width = 1280;
+	int height = 720;
 	Logger::init();
 	lumen::ThreadPool::init();
 	Window::init(width, height, fullscreen);

@@ -1,9 +1,5 @@
-#include "Framework/Buffer.h"
-#include "Framework/VulkanStructs.h"
 #include "LumenPCH.h"
 #include "ReSTIRPT.h"
-#include <vulkan/vulkan_core.h>
-#include "imgui/imgui.h"
 
 void ReSTIRPT::init() {
 	Integrator::init();
@@ -67,7 +63,28 @@ void ReSTIRPT::init() {
 		.size = transformations.size() * sizeof(glm::mat4),
 		.data = transformations.data(),
 	});
+	photon_eye_buffer =
+		prm::get_buffer({.name = "Photon - Eye",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = Window::width() * Window::height() * sizeof(PhotonEyeData)});
 
+	caustic_photon_aabbs_buffer =
+		prm::get_buffer({.name = "Caustic Photon AABBs",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = Window::width() * Window::height() * sizeof(float) * 6});
+	caustic_photon_light_buffer =
+		prm::get_buffer({.name = "Caustic Photon - Light",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = Window::width() * Window::height() * sizeof(PhotonLightData)});
+	photon_count_buffer =
+		prm::get_buffer({.name = "Photon Counts",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = 4});
 	SceneDesc desc;
 	desc.index_addr = lumen_scene->index_buffer->get_device_address();
 
@@ -79,6 +96,10 @@ void ReSTIRPT::init() {
 	desc.transformations_addr = transformations_buffer->get_device_address();
 	desc.prefix_contributions_addr = prefix_contribution_buffer->get_device_address();
 	desc.debug_vis_addr = debug_vis_buffer->get_device_address();
+	desc.photon_eye_addr = photon_eye_buffer->get_device_address();
+	desc.caustic_photon_aabbs_addr = caustic_photon_aabbs_buffer->get_device_address();
+	desc.caustic_photon_light_addr = caustic_photon_light_buffer->get_device_address();
+	desc.photon_count_addr = photon_count_buffer->get_device_address();
 
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",
@@ -108,6 +129,12 @@ void ReSTIRPT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, lumen_scene->compact_vertices_buffer,
 								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, debug_vis_addr, debug_vis_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_eye_addr, photon_eye_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, caustic_photon_aabbs_addr, caustic_photon_aabbs_buffer,
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, caustic_photon_light_addr, caustic_photon_light_buffer,
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_count_addr, photon_count_buffer, vk::render_graph());
 
 	path_length = config->path_length;
 }
@@ -144,6 +171,7 @@ void ReSTIRPT::render() {
 	pc_ray.gris_separator = gris_separator;
 	pc_ray.canonical_only = canonical_only;
 	pc_ray.enable_occlusion = enable_occlusion;
+	pc_ray.photon_radius = photon_radius;
 
 	const std::initializer_list<lumen::ResourceBinding> common_bindings = {
 		output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer};
@@ -156,6 +184,41 @@ void ReSTIRPT::render() {
 
 	constexpr int WRITE_OR_CURR_IDX = 1;
 	constexpr int READ_OR_PREV_IDX = 0;
+
+	if (enable_photon_mapping) {
+		vk::render_graph()
+			->add_rt("PM - Trace First Diffuse",
+					 {
+						 .shaders = {{"src/shaders/integrators/restir/gris/pm_trace_eye.rgen"},
+									 {"src/shaders/integrators/restir/gris/ray.rmiss"},
+									 {"src/shaders/ray_shadow.rmiss"},
+									 {"src/shaders/integrators/restir/gris/ray.rchit"},
+									 {"src/shaders/ray.rahit"}},
+						 .macros = {vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
+						 .dims = {Window::width(), Window::height()},
+					 })
+			.push_constants(&pc_ray)
+			.bind(common_bindings)
+			.bind_texture_array(lumen_scene->scene_textures)
+			.bind_tlas(tlas);
+
+		vk::render_graph()
+			->add_rt("PM - Trace Photons",
+					 {
+						 .shaders = {{"src/shaders/integrators/restir/gris/pm_trace_photons.rgen"},
+									 {"src/shaders/integrators/restir/gris/ray.rmiss"},
+									 {"src/shaders/ray_shadow.rmiss"},
+									 {"src/shaders/integrators/restir/gris/ray.rchit"},
+									 {"src/shaders/ray.rahit"}},
+						 .macros = {vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
+						 .dims = {num_photons, 1},
+					 })
+			.push_constants(&pc_ray)
+			.bind(common_bindings)
+			.bind_texture_array(lumen_scene->scene_textures)
+			.zero(photon_count_buffer)
+			.bind_tlas(tlas);
+	}
 
 	// Trace rays
 	vk::render_graph()
@@ -179,6 +242,7 @@ void ReSTIRPT::render() {
 		.bind(direct_lighting_texture)
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
+
 	pc_ray.general_seed = rand() % UINT_MAX;
 	if (enable_gris) {
 		bool should_do_temporal = enable_temporal_reuse && pc_ray.total_frame_num > 0;
@@ -319,7 +383,11 @@ void ReSTIRPT::destroy() {
 						prefix_contribution_buffer,
 						reconnection_buffer,
 						gris_prev_gbuffer,
-						debug_vis_buffer};
+						debug_vis_buffer,
+						photon_eye_buffer,
+						caustic_photon_aabbs_buffer,
+						caustic_photon_light_buffer,
+						photon_count_buffer};
 	for (vk::Buffer* b : buffer_list) {
 		prm::remove(b);
 	}
@@ -378,6 +446,12 @@ bool ReSTIRPT::gui() {
 	result |= spatial_samples_changed;
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
 	result |= ImGui::SliderFloat("Min reconnection distance ratio", &min_vertex_distance_ratio, 0.0f, 1.0f);
+
+	result |= ImGui::Checkbox("Enable photon mapping", &enable_photon_mapping);
+	if (enable_photon_mapping) {
+		result |= ImGui::SliderInt("Num photons", (int*)&num_photons, 1, Window::width() * Window::height());
+		result |= ImGui::SliderFloat("Photon radius", &photon_radius, 0.0f, 0.1f);
+	}
 
 	if (spatial_samples_changed && num_spatial_samples > 0) {
 		vkDeviceWaitIdle(vk::context().device);

@@ -293,6 +293,10 @@ struct Material {
 	uint64_t prefix_contributions_addr;
 	uint64_t transformations_addr;
 	uint64_t debug_vis_addr;
+	uint64_t photon_eye_addr;
+	uint64_t caustic_photon_aabbs_addr;
+	uint64_t caustic_photon_light_addr;
+	uint64_t photon_count_addr;
 
 	// VCM Reservoir
 	uint64_t vcm_reservoir_addr;

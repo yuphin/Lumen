@@ -25,6 +25,10 @@ class ReSTIRPT final : public Integrator {
 	vk::Buffer* reconnection_buffer;
 	vk::Buffer* transformations_buffer;
 	vk::Buffer* debug_vis_buffer;
+	vk::Buffer* photon_eye_buffer;
+	vk::Buffer* caustic_photon_aabbs_buffer;
+	vk::Buffer* caustic_photon_light_buffer;
+	vk::Buffer* photon_count_buffer;
 	vk::Texture* canonical_contributions_texture;
 	vk::Texture* direct_lighting_texture;
 
@@ -43,11 +47,14 @@ class ReSTIRPT final : public Integrator {
 	bool enable_defensive_formulation = true;
 	bool enable_occlusion = true;
 	bool enable_temporal_jitter = true;
+	bool enable_photon_mapping = true;
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.00f;
 	float gris_separator = 1.0f;
+	float photon_radius = 0.03f;
 	uint32_t path_length = 0;
 	uint32_t num_spatial_samples = 1;
+	uint32_t num_photons = 1;
 	StreamingMethod streaming_method = StreamingMethod::INDIVIDUAL_CONTRIBUTIONS;
 	MISMethod mis_method = MISMethod::PAIRWISE;
 	ReSTIRPTConfig* config;

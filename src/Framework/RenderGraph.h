@@ -12,7 +12,6 @@
 #include "AccelerationStructure.h"
 #include "Utils.h"
 
-
 namespace lumen {
 
 #define TO_STR(V) (#V)
@@ -174,7 +173,7 @@ class RenderPass {
 	PipelineStorage* pipeline_storage = nullptr;
 
    private:
-   std::string name;
+	std::string name;
 	int next_binding_idx = 0;
 	std::vector<uint32_t> descriptor_counts;
 	void* push_constant_data = nullptr;
@@ -229,8 +228,6 @@ class RenderPass {
 	void register_dependencies(vk::Buffer* buffer, VkAccessFlags dst_access_flags);
 	void register_dependencies(vk::Texture* tex, VkImageLayout target_layout);
 	void transition_resources();
-
-	
 };
 
 template <typename Settings>
@@ -302,8 +299,8 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	} else {
 		type = vk::PassType::RT;
 	}
-	return passes.emplace_back(type, name_with_macros, this, uint32_t(passes.size()), settings, macro_string, pipeline_storage,
-							   cached);
+	return passes.emplace_back(type, name_with_macros, this, uint32_t(passes.size()), settings, macro_string,
+							   pipeline_storage, cached);
 }
 
 template <typename T>

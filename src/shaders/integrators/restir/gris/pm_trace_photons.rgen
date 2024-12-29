@@ -1,0 +1,83 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#include "gris_commons.glsl"
+
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonLightData { PhotonLightData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonAABBs { PhotonAABB d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonCounts { uint val; };
+CausticPhotonLightData photon_light_data = CausticPhotonLightData(scene_desc.caustic_photon_light_addr);
+CausticPhotonAABBs photon_aabbs = CausticPhotonAABBs(scene_desc.caustic_photon_aabbs_addr);
+PhotonCounts photon_counts = PhotonCounts(scene_desc.photon_count_addr);
+
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
+void main() {
+	LightRecord light_record;
+	vec3 wi, pos, n;
+	float pdf_pos, pdf_dir;
+	float cos_theta;
+
+	vec4 rands_pos = rand4(seed);
+	vec2 rands_dir = rand2(seed);
+
+	const vec3 Le = sample_light_Le(rands_pos, rands_dir, pc.num_lights, pc.light_triangle_count, cos_theta,
+									light_record, pos, wi, n, pdf_pos, pdf_dir);
+	float abs_cos_light = abs(dot(n, wi));
+	vec3 throughput;
+	if (abs_cos_light == 0 || pdf_dir <= 0) {
+		throughput = vec3(0);
+	} else {
+		throughput = Le * abs_cos_light / (pdf_dir * pdf_pos);
+	}
+
+	bool last_specular = false;
+	for (int d = 0; d < pc.max_depth; d++) {
+		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, pos, tmin, wi, tmax, 0);
+		bool found_isect = payload.instance_idx != -1;
+		if (!found_isect) {
+			break;
+		}
+
+		HitData gbuffer = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
+		const vec3 wo = -wi;
+		vec3 n_s = gbuffer.n_s;
+		vec3 n_g = gbuffer.n_g;
+		bool side = face_forward(n_s, n_g, wo);
+
+		float cos_wo = dot(wo, n_s);
+		Material hit_mat = load_material(gbuffer.material_idx, gbuffer.uv);
+
+		if (is_rough(hit_mat) && last_specular) {
+			uint photon_idx = atomicAdd(photon_counts.val, 1);
+			photon_aabbs.d[photon_idx].min = gbuffer.pos - pc.photon_radius;
+			photon_aabbs.d[photon_idx].max = gbuffer.pos + pc.photon_radius;
+
+			photon_light_data.d[photon_idx].barycentrics = payload.attribs;
+			photon_light_data.d[photon_idx].primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
+			photon_light_data.d[photon_idx].wi = to_spherical(wo);
+			photon_light_data.d[photon_idx].throughput = throughput;
+		}
+		last_specular = !is_rough(hit_mat);
+		pos = offset_ray(gbuffer.pos, n_g);
+		float pdf_dir, cos_theta;
+		const vec3 f = sample_bsdf(n_s, wo, hit_mat, 0, side, wi, pdf_dir, cos_theta, seed);
+		throughput *= f * abs(cos_theta) / pdf_dir;
+
+		if (f == vec3(0) || pdf_dir == 0) {
+			break;
+		}
+		if (d > RR_MIN_DEPTH) {
+			float rr_prob = min(0.95f, luminance(throughput));
+			if (rr_prob < rand(seed))
+				break;
+			else
+				throughput /= rr_prob;
+		}
+	}
+}

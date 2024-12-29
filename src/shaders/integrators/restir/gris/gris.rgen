@@ -16,6 +16,8 @@ layout(binding = 4, std430) writeonly buffer OutReservoirs { Reservoir out_reser
 layout(binding = 5, std430) writeonly buffer OutGBuffer { GBuffer out_gbuffers[]; };
 layout(binding = 6, rgba16) writeonly uniform image2D canonical_contributions_tex;
 layout(binding = 7, rgba32f) uniform image2D direct_lighting_img;
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonEyeDataBuffer { PhotonEyeData d[]; };
+PhotonEyeDataBuffer photon_eye_data = PhotonEyeDataBuffer(scene_desc.photon_eye_addr);
 
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
 uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
@@ -427,6 +429,25 @@ void main() {
 			out_gbuffers[pixel_idx] = gbuffer_out;
 		}
 	}
+
+#if 0
+	PhotonEyeData photon_eye = photon_eye_data.d[pixel_idx];
+	if (photon_eye.primitive_instance_id.x != -1) {
+		HitData photon_eye_gbuffer = get_hitdata(photon_eye.barycentrics, photon_eye.primitive_instance_id.x,
+												 photon_eye.primitive_instance_id.y);
+
+		Material photon_eye_hit_mat = load_material(photon_eye_gbuffer.material_idx, photon_eye_gbuffer.uv);
+
+		if (is_rough(photon_eye_hit_mat)) {
+			ASSERT(photon_eye.wo != vec2(0));
+			ASSERT(photon_eye.throughput != vec3(0));
+			// ASSERT(photon_eye.primitive_instance_id == gbuffer_out.primitive_instance_id);
+			if(photon_eye.primitive_instance_id != gbuffer_out.primitive_instance_id) {
+				LOG2("%v2u - %v2u\n", photon_eye.primitive_instance_id, gbuffer_out.primitive_instance_id);
+			}
+		}
+	}
+#endif
 
 	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
 		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));

@@ -1,0 +1,76 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#include "gris_commons.glsl"
+
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonEyeDataBuffer { PhotonEyeData d[]; };
+PhotonEyeDataBuffer photon_eye_data = PhotonEyeDataBuffer(scene_desc.photon_eye_addr);
+
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
+uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
+
+void init_photon_eye_data(inout PhotonEyeData data) {
+	data.barycentrics = vec2(0);
+	data.primitive_instance_id = uvec2(-1);
+	data.wo = vec2(0);
+	data.throughput = vec3(0);
+}
+
+// TODO: We can share the G-Buffer between GRIS and Eye-trace pass
+void main() {
+	const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+	const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
+	vec2 d = in_uv * 2.0 - 1.0;
+	vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
+	vec3 direction = vec3(sample_camera(d));
+	vec3 throughput = vec3(1);
+	PhotonEyeData photon_eye;
+	init_photon_eye_data(photon_eye);
+
+	for (int d = 0; d < pc.max_depth; d++) {
+		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
+		bool found_isect = payload.instance_idx != -1;
+		if (!found_isect) {
+			break;
+		}
+
+		HitData gbuffer = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
+		const vec3 wo = -direction;
+		vec3 n_s = gbuffer.n_s;
+		vec3 n_g = gbuffer.n_g;
+		bool side = face_forward(n_s, n_g, wo);
+
+		float cos_wo = dot(wo, n_s);
+		Material hit_mat = load_material(gbuffer.material_idx, gbuffer.uv);
+		if (is_rough(hit_mat)) {
+			photon_eye.barycentrics = payload.attribs;
+			photon_eye.primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
+			photon_eye.wo = to_spherical(wo);
+			photon_eye.throughput = throughput;
+			break;
+		}
+
+		origin.xyz = offset_ray(gbuffer.pos, n_g);
+		float pdf_dir, cos_theta;
+		const vec3 f = sample_bsdf(n_s, wo, hit_mat, 0, side, direction, pdf_dir, cos_theta, seed);
+		throughput *= f * abs(cos_theta) / pdf_dir;
+
+		if (f == vec3(0) || pdf_dir == 0) {
+			break;
+		}
+		if (d > RR_MIN_DEPTH) {
+			float rr_prob = min(0.95f, luminance(throughput));
+			if (rr_prob < rand(seed))
+				break;
+			else
+				throughput /= rr_prob;
+		}
+	}
+	photon_eye_data.d[pixel_idx] = photon_eye;
+}
