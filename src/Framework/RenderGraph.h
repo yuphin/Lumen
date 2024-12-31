@@ -30,6 +30,8 @@ class RenderPass;
 struct PipelineStorage {
 	std::unique_ptr<vk::Pipeline> pipeline;
 	std::vector<ResourceBinding> bound_resources;
+	// Max 2 AS bindings for now
+	std::array<const vk::BVH*, 2> as_bindings = {nullptr, nullptr};
 	std::unordered_map<std::string, vk::BufferStatus> affected_buffer_pointers;
 	bool update_as_descriptor = false;
 	bool update_scene_descriptor = false;
@@ -69,7 +71,7 @@ class RenderGraph {
 
 	std::vector<RenderPass> passes;
 
-	// vk::Pipeline Name + Macro String + Specialization Constants + Timestamp -> vk::Pipeline
+	// vk::Pipeline Name + Macro String + Specialization Constants -> vk::Pipeline
 	std::unordered_map<size_t, PipelineStorage> pipeline_cache;
 	std::vector<std::pair<std::function<void(RenderPass*)>, uint32_t>> pipeline_tasks;
 	std::vector<std::function<void(RenderPass*)>> shader_tasks;
@@ -142,24 +144,34 @@ class RenderPass {
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
 	RenderPass& bind_texture_array(std::span<vk::Texture*> texes, bool force_update = false);
 	RenderPass& bind_buffer_array(std::span<vk::Buffer*> buffers, bool force_update = false);
-	RenderPass& bind_tlas(const vk::BVH& tlas);
-
-	RenderPass& read(ResourceBinding& resource);
-	RenderPass& write(ResourceBinding& resource);
+	RenderPass& bind_as(const vk::BVH& tlas, bool sync = false);
 
 	RenderPass& read(std::initializer_list<vk::Buffer*> buffers);
 	RenderPass& read(std::initializer_list<vk::Texture*> texes);
+	RenderPass& read(ResourceBinding& resource);
+
 	RenderPass& write(std::initializer_list<vk::Buffer*> buffers);
 	RenderPass& write(std::initializer_list<vk::Texture*> texes);
+	RenderPass& write(ResourceBinding& resource);
 
 	RenderPass& skip_execution(bool condition = true);
+
 	template <typename T>
 	RenderPass& push_constants(T* data);
+
+	// Zero-ing happens before the pass runs
 	RenderPass& zero(const Resource& resource);
 	RenderPass& zero(std::initializer_list<vk::Buffer*> buffers);
 	RenderPass& zero(std::initializer_list<vk::Texture*> textures);
 	RenderPass& zero(const Resource& resource, bool cond);
+
+	// Copy happens after the pass runs
 	RenderPass& copy(const Resource& src, const Resource& dst);
+
+	// BLAS building happens after the pass runs
+	RenderPass& build_blas(std::vector<vk::BVH>& blases, const std::vector<vk::BlasInput>& blas_inputs,
+						   VkBuildAccelerationStructureFlagsKHR flags, const std::vector<vk::Buffer*>& source_buffers,
+						   vk::Buffer** scratch_buffer_ref);
 	void finalize();
 	friend RenderGraph;
 
@@ -178,6 +190,7 @@ class RenderPass {
 	std::vector<uint32_t> descriptor_counts;
 	void* push_constant_data = nullptr;
 	bool is_pipeline_cached = false;
+	bool disable_execution = false;
 	/*
 		Note:
 		The assumption is that a SyncDescriptor is unique to a pass (either via
@@ -194,16 +207,30 @@ class RenderPass {
 
 	std::vector<std::tuple<vk::Texture*, VkImageLayout, VkImageLayout>> layout_transitions;
 
+	std::vector<Resource> resource_zeros;
+	std::vector<std::pair<Resource, Resource>> resource_copies;
+
 	struct BufferBarrier {
 		VkBuffer buffer;
 		VkAccessFlags src_access_flags = VK_ACCESS_SHADER_WRITE_BIT;
 		VkAccessFlags dst_access_flags = VK_ACCESS_SHADER_READ_BIT;
 	};
-	std::vector<Resource> resource_zeros;
-	std::vector<std::pair<Resource, Resource>> resource_copies;
 	std::vector<BufferBarrier> buffer_barriers;
 	std::vector<BufferBarrier> post_execution_buffer_barriers;
-	bool disable_execution = false;
+
+	// For now, there is only one set of BLASes to build per pass
+	struct BlasBuildData {
+		// The owner is the caller of the build_blas function
+		vk::Buffer** scratch_buffer_ref = nullptr;
+		// For barrier placement
+		std::vector<vk::Buffer*> source_buffers;
+		std::vector<vk::BVH>* blases = nullptr;
+		std::vector<vk::BlasInput> blas_inputs;
+		VkBuildAccelerationStructureFlagsKHR flags;
+		inline bool is_valid() { return blases != nullptr; }
+	};
+	BlasBuildData blas_build_data;
+
 	RenderPass& read(vk::Texture* tex);
 	RenderPass& read(vk::Buffer* buffer);
 
@@ -217,17 +244,23 @@ class RenderPass {
 	std::vector<vk::Texture*> explicit_tex_reads;
 	//
 
-	void write_impl(vk::Buffer* buffer, VkAccessFlags access_flags);
-	void write_impl(vk::Texture* tex, VkAccessFlags access_flags = VK_ACCESS_SHADER_WRITE_BIT);
-	void read_impl(vk::Buffer* buffer);
-	void read_impl(vk::Buffer* buffer, VkAccessFlags access_flags);
-	void read_impl(vk::Texture* tex);
+	void transition_resources();
 	void post_execution_barrier(vk::Buffer* buffer, VkAccessFlags access_flags);
+	enum class BufferSyncFlags {
+		NONE = 0x0,
+		BUFFER_ZERO = 0x1,
+		BUFFER_COPY = 0x2,
+		BUFFER_TLAS_BUILD = 0x4,
+	};
+	void register_dependencies(const vk::Buffer* buffer, VkAccessFlags dst_access_flags,
+							   BufferSyncFlags flags = BufferSyncFlags::NONE);
+	void register_dependencies(vk::Texture* tex, VkImageLayout target_layout);
+	void write_impl(const vk::Buffer* buffer, VkAccessFlags access_flags, BufferSyncFlags flags = BufferSyncFlags::NONE);
+	void write_impl(vk::Texture* tex, VkAccessFlags access_flags = VK_ACCESS_SHADER_WRITE_BIT);
+	void read_impl(const vk::Buffer* buffer, VkAccessFlags access_flags = VK_ACCESS_SHADER_READ_BIT, BufferSyncFlags flags = BufferSyncFlags::NONE);
+	void read_impl(vk::Texture* tex);
 
 	void run(VkCommandBuffer cmd);
-	void register_dependencies(vk::Buffer* buffer, VkAccessFlags dst_access_flags);
-	void register_dependencies(vk::Texture* tex, VkImageLayout target_layout);
-	void transition_resources();
 };
 
 template <typename Settings>

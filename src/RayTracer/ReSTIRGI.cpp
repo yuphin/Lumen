@@ -115,7 +115,7 @@ void ReSTIRGI::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas)
+		.bind_as(tlas)
 		.copy(restir_samples_buffer, restir_samples_old_buffer);
 
 	// Temporal reuse
@@ -133,7 +133,7 @@ void ReSTIRGI::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
+		.bind_as(tlas);
 
 	// Spatial reuse
 	vk::render_graph()
@@ -150,7 +150,7 @@ void ReSTIRGI::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
+		.bind_as(tlas);
 	// Output
 	vk::render_graph()
 		->add_compute("Output",

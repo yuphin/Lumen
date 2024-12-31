@@ -187,7 +187,7 @@ void VCM::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
+		.bind_as(tlas);
 
 	// Check resampling
 	vk::render_graph()
@@ -214,7 +214,7 @@ void VCM::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
+		.bind_as(tlas);
 	pc_ray.random_num = rand() % UINT_MAX;
 	// Trace spawned rays
 	vk::render_graph()
@@ -231,7 +231,7 @@ void VCM::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
+		.bind_as(tlas);
 	// Select a reservoir sample
 	vk::render_graph()
 		->add_compute("Select Reservoir",
@@ -262,7 +262,7 @@ void VCM::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
+		.bind_as(tlas);
 
 	if (!do_spatiotemporal) {
 		do_spatiotemporal = true;

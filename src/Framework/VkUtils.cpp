@@ -111,7 +111,8 @@ void transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout o
 			source_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_UNDEFINED:
-			source_stage = VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
+			// TODO: Add custom source stage
+			source_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_PREINITIALIZED:
 			// Used for linear images
@@ -258,7 +259,12 @@ VkPipelineStageFlags get_pipeline_stage(vk::PassType pass_type, VkAccessFlags ac
 			res = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
 			break;
 		case vk::PassType::RT:
-			res = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+			if (access_flags &
+				(VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR)) {
+				res = VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
+			} else {
+				res = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+			}
 			break;
 		default:
 			res = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;

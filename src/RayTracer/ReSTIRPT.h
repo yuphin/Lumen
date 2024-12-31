@@ -29,6 +29,7 @@ class ReSTIRPT final : public Integrator {
 	vk::Buffer* caustic_photon_aabbs_buffer;
 	vk::Buffer* caustic_photon_light_buffer;
 	vk::Buffer* photon_count_buffer;
+	vk::Buffer* photon_bvh_scratch_buf;
 	vk::Texture* canonical_contributions_texture;
 	vk::Texture* direct_lighting_texture;
 
@@ -58,4 +59,6 @@ class ReSTIRPT final : public Integrator {
 	StreamingMethod streaming_method = StreamingMethod::INDIVIDUAL_CONTRIBUTIONS;
 	MISMethod mis_method = MISMethod::PAIRWISE;
 	ReSTIRPTConfig* config;
+
+	std::vector<vk::BVH> photon_bvh;
 };

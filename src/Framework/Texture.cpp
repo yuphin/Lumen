@@ -131,7 +131,8 @@ void create_texture(Texture* texture, const TextureDesc& desc) {
 									   ? vk::context().device_properties.limits.maxSamplerAnisotropy
 									   : 1.0f;
 		sampler_CI.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		texture->sampler = prm::get_sampler(sampler_CI);
+		// Can be called from multiple threads
+		texture->sampler = prm::get_sampler(sampler_CI, true);
 	}
 
 	VkImageSubresourceRange subresource_range;

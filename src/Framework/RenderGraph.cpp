@@ -10,23 +10,27 @@ namespace lumen {
 		return *this;  \
 	}
 
-void RenderPass::register_dependencies(vk::Buffer* buffer, VkAccessFlags dst_access_flags) {
+static bool is_read_flag(VkAccessFlags flags) {
+	return flags & (VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_MEMORY_READ_BIT |
+					VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_TRANSFER_READ_BIT);
+}
+
+void RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags dst_access_flags,
+									   BufferSyncFlags flags) {
+	// Invariant : Pass with lower index should be the setter
 	const bool found = rg->buffer_resource_map.find(buffer->handle) != rg->buffer_resource_map.end();
-	if (!found || (dst_access_flags == VK_ACCESS_SHADER_READ_BIT &&
-				   (rg->buffer_resource_map[buffer->handle].second == dst_access_flags))) {
+	if (!found || (is_read_flag(dst_access_flags) && is_read_flag(rg->buffer_resource_map[buffer->handle].second))) {
 		return;
 	}
-	// Invariant : Pass with lower index should be the setter
-	// Set current pass dependencies
 	auto src_access_flags = rg->buffer_resource_map[buffer->handle].second;
+
 	if (src_access_flags & VK_ACCESS_TRANSFER_WRITE_BIT) {
 		dst_access_flags |= VK_ACCESS_TRANSFER_WRITE_BIT;
 	}
-
 	auto opposing_pass_idx = rg->buffer_resource_map[buffer->handle].first;
 	if (opposing_pass_idx < rg->passes.size()) {
 		RenderPass& opposing_pass = rg->passes[opposing_pass_idx];
-		if (opposing_pass_idx < rg->passes.size() && opposing_pass.pass_idx < pass_idx) {
+		if (opposing_pass.pass_idx < pass_idx) {
 			if (wait_signals_buffer.find(buffer->handle) == wait_signals_buffer.end()) {
 				wait_signals_buffer[buffer->handle] = BufferSyncDescriptor{
 					.src_access_flags = src_access_flags,
@@ -41,11 +45,14 @@ void RenderPass::register_dependencies(vk::Buffer* buffer, VkAccessFlags dst_acc
 										 .dst_access_flags = dst_access_flags,
 										 .opposing_pass_idx = pass_idx};
 			}
-		} else if (src_access_flags != dst_access_flags) {
-			buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
+		} else if (opposing_pass.pass_idx == pass_idx) {
+			if (flags == BufferSyncFlags::BUFFER_COPY || flags == BufferSyncFlags::BUFFER_TLAS_BUILD) {
+				// Resource copies happens after the pass execution
+				post_execution_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
+			} else {
+				buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
+			}
 		}
-	} else if (src_access_flags != dst_access_flags) {
-		buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
 	}
 }
 
@@ -103,9 +110,18 @@ void RenderPass::register_dependencies(vk::Texture* tex, VkImageLayout dst_layou
 }
 
 void RenderPass::transition_resources() {
+
+	for (const Resource& resource : resource_zeros) {
+		if (resource.buf) {
+			write_impl(resource.buf, VK_ACCESS_TRANSFER_WRITE_BIT, BufferSyncFlags::BUFFER_ZERO);
+		} else {
+			write_impl(resource.tex);
+		}
+	}
+
 	if (rg->settings.shader_inference) {
 		for (auto i = 0; i < pipeline_storage->bound_resources.size(); i++) {
-			auto& bound_resource = pipeline_storage->bound_resources[i];
+			ResourceBinding& bound_resource = pipeline_storage->bound_resources[i];
 			if (!bound_resource.active) {
 				if (bound_resource.tex) {
 					descriptor_infos[i] = vk::get_texture_descriptor(
@@ -155,28 +171,34 @@ void RenderPass::transition_resources() {
 			descriptor_infos[i] = pipeline_storage->bound_resources[i].get_descriptor_info();
 		}
 	}
-	for (const Resource& resource : resource_zeros) {
-		if (resource.buf) {
-			write_impl(resource.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
-		} else {
-			write_impl(resource.tex);
+	for (size_t i = 0; i < pipeline_storage->as_bindings.size(); i++) {
+		if (pipeline_storage->as_bindings[i]) {
+			read_impl(pipeline_storage->as_bindings[i]->buffer, VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR,
+					  BufferSyncFlags::BUFFER_TLAS_BUILD);
 		}
 	}
 
 	for (const auto& [src, dst] : resource_copies) {
 		if (src.tex) {
+			// TODO: Add source texture dependencies
 			if (dst.buf) {
-				write_impl(dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
+				write_impl(dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT, BufferSyncFlags::BUFFER_COPY);
 			} else {
 				write_impl(dst.tex, VK_ACCESS_TRANSFER_WRITE_BIT);
 			}
 		} else {  // buffer
-			read_impl(src.buf, VK_ACCESS_TRANSFER_READ_BIT);
+			read_impl(src.buf, VK_ACCESS_TRANSFER_READ_BIT, BufferSyncFlags::BUFFER_COPY);
 			if (dst.buf) {
-				write_impl(dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT);
+				write_impl(dst.buf, VK_ACCESS_TRANSFER_WRITE_BIT, BufferSyncFlags::BUFFER_COPY);
 			} else {
 				write_impl(dst.tex, VK_ACCESS_TRANSFER_WRITE_BIT);
 			}
+		}
+	}
+
+	if (blas_build_data.is_valid()) {
+		for (vk::Buffer* buf : blas_build_data.source_buffers) {
+			write_impl(buf, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR, BufferSyncFlags::BUFFER_TLAS_BUILD);
 		}
 	}
 }
@@ -363,15 +385,22 @@ RenderPass& RenderPass::bind_buffer_array(std::span<vk::Buffer*> buffers, bool f
 	return *this;
 }
 
-RenderPass& RenderPass::bind_tlas(const vk::BVH& tlas) {
+RenderPass& RenderPass::bind_as(const vk::BVH& tlas, bool sync) {
+	LUMEN_ASSERT(type == vk::PassType::RT, "TLAS can only be bound to RT pipelines");
 	if (is_pipeline_cached) {
 		return *this;
 	}
 	vk::Pipeline* pipeline = pipeline_storage->pipeline.get();
-	LUMEN_ASSERT(type == vk::PassType::RT, "TLAS can only be bound to RT pipelines");
 	pipeline->tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
 	pipeline->tlas_info.accelerationStructureCount = 1;
 	pipeline->tlas_info.pAccelerationStructures = &tlas.accel;
+
+	if (!pipeline_storage->as_bindings[0]) {
+		pipeline_storage->as_bindings[0] = &tlas;
+	} else {
+		LUMEN_ASSERT(pipeline_storage->as_bindings[1] == nullptr, "Only two TLAS bindings are supported for now");
+		pipeline_storage->as_bindings[1] = &tlas;
+	}
 	return *this;
 }
 
@@ -480,6 +509,18 @@ RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 	return *this;
 }
 
+RenderPass& RenderPass::build_blas(std::vector<vk::BVH>& blases, const std::vector<vk::BlasInput>& blas_inputs,
+								   VkBuildAccelerationStructureFlagsKHR flags,
+								   const std::vector<vk::Buffer*>& source_buffers, vk::Buffer** scratch_buffer_ref) {
+	LUMEN_ASSERT(!blas_build_data.is_valid(), "Only one BLAS build per pass is supported");
+	blas_build_data.blases = &blases;
+	blas_build_data.blas_inputs = blas_inputs;
+	blas_build_data.flags = flags;
+	blas_build_data.source_buffers = source_buffers;
+	blas_build_data.scratch_buffer_ref = scratch_buffer_ref;
+	return *this;
+}
+
 void RenderPass::finalize() {
 	// Create pipelines/push descriptor templates
 
@@ -573,8 +614,8 @@ void RenderPass::finalize() {
 	}
 }
 
-void RenderPass::write_impl(vk::Buffer* buffer, VkAccessFlags access_flags) {
-	register_dependencies(buffer, access_flags);
+void RenderPass::write_impl(const vk::Buffer* buffer, VkAccessFlags access_flags, BufferSyncFlags flags) {
+	register_dependencies(buffer, access_flags, flags);
 	rg->buffer_resource_map[buffer->handle] = {pass_idx, access_flags};
 }
 
@@ -584,10 +625,8 @@ void RenderPass::write_impl(vk::Texture* tex, VkAccessFlags access_flags) {
 	rg->img_resource_map[tex->handle] = pass_idx;
 }
 
-void RenderPass::read_impl(vk::Buffer* buffer) { read_impl(buffer, VK_ACCESS_SHADER_READ_BIT); }
-
-void RenderPass::read_impl(vk::Buffer* buffer, VkAccessFlags access_flags) {
-	register_dependencies(buffer, access_flags);
+void RenderPass::read_impl(const vk::Buffer* buffer, VkAccessFlags access_flags, BufferSyncFlags flags) {
+	register_dependencies(buffer, access_flags, flags);
 	rg->buffer_resource_map[buffer->handle] = {pass_idx, access_flags};
 }
 
@@ -610,6 +649,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	}
 	vk::DebugMarker::begin_region(vk::context().device, cmd, name.c_str(), glm::vec4(1.0f, 0.78f, 0.05f, 1.0f));
 	GPUQueryManager::begin(cmd, name.c_str());
+
 	// Wait: Buffer
 	auto& buffer_sync = rg->buffer_sync_resources[pass_idx];
 	auto& img_sync = rg->img_sync_resources[pass_idx];

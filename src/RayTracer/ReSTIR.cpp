@@ -111,7 +111,7 @@ void ReSTIR::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
+		.bind_as(tlas);
 	// Spatial pass
 	rg->add_rt("ReSTIR - Spatial Pass",
 			   {
@@ -126,7 +126,7 @@ void ReSTIR::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
+		.bind_as(tlas);
 
 	// Output
 	rg->add_rt("ReSTIR - Output",
@@ -142,7 +142,7 @@ void ReSTIR::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
+		.bind_as(tlas);
 
 	if (!do_spatiotemporal) {
 		do_spatiotemporal = true;

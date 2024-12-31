@@ -71,7 +71,8 @@ void ReSTIRPT::init() {
 
 	caustic_photon_aabbs_buffer =
 		prm::get_buffer({.name = "Caustic Photon AABBs",
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
 						 .size = Window::width() * Window::height() * sizeof(float) * 6});
 	caustic_photon_light_buffer =
@@ -200,7 +201,24 @@ void ReSTIRPT::render() {
 			.push_constants(&pc_ray)
 			.bind(common_bindings)
 			.bind_texture_array(lumen_scene->scene_textures)
-			.bind_tlas(tlas);
+			.bind_as(tlas);
+
+		VkAccelerationStructureGeometryAabbsDataKHR aabbs_data{
+			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR};
+		aabbs_data.data.deviceAddress = caustic_photon_aabbs_buffer->get_device_address();
+
+		VkAccelerationStructureBuildRangeInfoKHR offset;
+		offset.primitiveCount = num_photons;
+
+		VkAccelerationStructureGeometryKHR as_geom{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
+		as_geom.geometryType = VK_GEOMETRY_TYPE_AABBS_KHR;
+		as_geom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+		as_geom.geometry.aabbs = aabbs_data;
+
+		std::vector<vk::BlasInput> photon_blas_inputs;
+		vk::BlasInput& photon_blas_input = photon_blas_inputs.emplace_back();
+		photon_blas_input.as_geom.push_back(as_geom);
+		photon_blas_input.as_build_offset_info.push_back(offset);
 
 		vk::render_graph()
 			->add_rt("PM - Trace Photons",
@@ -217,7 +235,10 @@ void ReSTIRPT::render() {
 			.bind(common_bindings)
 			.bind_texture_array(lumen_scene->scene_textures)
 			.zero(photon_count_buffer)
-			.bind_tlas(tlas);
+			.zero(caustic_photon_aabbs_buffer)
+			.build_blas(photon_bvh, photon_blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
+						{caustic_photon_aabbs_buffer}, &photon_bvh_scratch_buf)
+			.bind_as(tlas);
 	}
 
 	// Trace rays
@@ -241,7 +262,7 @@ void ReSTIRPT::render() {
 		.bind(canonical_contributions_texture)
 		.bind(direct_lighting_texture)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
+		.bind_as(tlas);
 
 	pc_ray.general_seed = rand() % UINT_MAX;
 	if (enable_gris) {
@@ -265,7 +286,7 @@ void ReSTIRPT::render() {
 			.bind(gbuffers[ping])
 			.bind(canonical_contributions_texture)
 			.bind_texture_array(lumen_scene->scene_textures)
-			.bind_tlas(tlas)
+			.bind_as(tlas)
 			.skip_execution(!should_do_temporal);
 		pc_ray.seed2 = rand() % UINT_MAX;
 		if (!canonical_only) {
@@ -288,7 +309,7 @@ void ReSTIRPT::render() {
 					.bind(canonical_contributions_texture)
 					.bind(direct_lighting_texture)
 					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_tlas(tlas);
+					.bind_as(tlas);
 			} else {
 				// Retrace
 				vk::render_graph()
@@ -307,7 +328,7 @@ void ReSTIRPT::render() {
 					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
 					.bind(gbuffers[pong])
 					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_tlas(tlas);
+					.bind_as(tlas);
 				// Validate
 				vk::render_graph()
 					->add_rt("GRIS - Validate Samples",
@@ -325,7 +346,7 @@ void ReSTIRPT::render() {
 					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
 					.bind(gbuffers[pong])
 					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_tlas(tlas);
+					.bind_as(tlas);
 
 				// Spatial Reuse
 				vk::render_graph()
@@ -349,7 +370,7 @@ void ReSTIRPT::render() {
 					.bind(canonical_contributions_texture)
 					.bind(direct_lighting_texture)
 					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_tlas(tlas);
+					.bind_as(tlas);
 			}
 			if (pixel_debug || (gris_separator < 1.0f && gris_separator > 0.0f)) {
 				uint32_t num_wgs = uint32_t((Window::width() * Window::height() + 1023) / 1024);

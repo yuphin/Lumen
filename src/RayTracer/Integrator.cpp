@@ -143,14 +143,14 @@ void Integrator::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({geo});
 	}
-	vk::build_blas(blases, blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+	vk::build_blas(blases, blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 	std::vector<VkAccelerationStructureInstanceKHR> tlas_instances;
 	for (const auto& pm : lumen_scene->prim_meshes) {
 		VkAccelerationStructureInstanceKHR ray_inst{};
 		ray_inst.transform = vk::to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
 		assert(pm.prim_idx < blases.size());
-		ray_inst.accelerationStructureReference = blases[pm.prim_idx].get_blas_device_address();
+		ray_inst.accelerationStructureReference = blases[pm.prim_idx].get_device_address();
 		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		ray_inst.mask = 0xFF;
 		ray_inst.instanceShaderBindingTableRecordOffset = 0;  // We will use the same hit group for all objects

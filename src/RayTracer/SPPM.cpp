@@ -134,7 +134,7 @@ void SPPM::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
+		.bind_as(tlas);
 	// Calculate scene bbox given the calculated radius
 	op_reduce("OpReduce: Max", "src/shaders/integrators/sppm/max.comp", "OpReduce: Reduce Max",
 			  "src/shaders/integrators/sppm/reduce_max.comp");
@@ -159,7 +159,7 @@ void SPPM::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
+		.bind_as(tlas);
 	// Gather
 	vk::render_graph()
 		->add_compute("Gather",

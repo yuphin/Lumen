@@ -10,9 +10,19 @@ int main(int argc, char* argv[]) {
 #else
 	bool enable_debug = false;
 #endif
+	for (int i = 0; i < argc; ++i) {
+		if (std::strcmp(argv[i], "--validation_enable") == 0 && i + 1 < argc) {
+			if (std::strcmp(argv[i + 1], "1") == 0) {
+				enable_debug = true;
+			} else if (std::strcmp(argv[i + 1], "0") == 0) {
+				enable_debug = false;
+			}
+			++i;
+		}
+	}
 	bool fullscreen = false;
-	int width = 1280;
-	int height = 720;
+	int width = 1920;
+	int height = 1080;
 	Logger::init();
 	lumen::ThreadPool::init();
 	Window::init(width, height, fullscreen);

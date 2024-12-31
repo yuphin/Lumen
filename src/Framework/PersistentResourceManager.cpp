@@ -51,13 +51,17 @@ class PersistentPool {
 		base_ptr = data_base;
 		next_page = (uint8_t*)data_base + PAGE_SIZE;
 	}
-	T* get() {
+	T* get(bool use_mutex) {
+		std::unique_lock<std::mutex> lock(mutex, std::defer_lock);
+		if (use_mutex) {
+			lock.lock();
+		}
 		if (!free_list.empty()) {
 			size_t idx = free_list.back();
 			free_list.pop_back();
 			return base_ptr + idx;
 		}
-		while((uint8_t*)next_page - (uint8_t*)data_base < sizeof(T)) {
+		while ((uint8_t*)next_page - (uint8_t*)data_base < sizeof(T)) {
 #if defined(_WIN32) || defined(_WIN64)
 			data_base = (T*)VirtualAlloc(next_page, PAGE_SIZE, MEM_COMMIT, PAGE_READWRITE);
 			next_page = (uint8_t*)data_base + PAGE_SIZE;
@@ -88,14 +92,21 @@ class PersistentPool {
 	T* data_base = nullptr;
 	void* next_page = nullptr;
 	std::vector<size_t> free_list;
+	std::mutex mutex;
 };
 
 namespace prm {
-std::unordered_map<VkSamplerCreateInfo, VkSampler, vk::SamplerHash> _sampler_cache;
 PersistentPool<vk::Buffer> _buffer_pool;
 PersistentPool<vk::Texture> _texture_pool;
 
-VkSampler get_sampler(const VkSamplerCreateInfo& sampler_create_info) {
+std::unordered_map<VkSamplerCreateInfo, VkSampler, vk::SamplerHash> _sampler_cache;
+std::mutex _sampler_cache_mutex;
+
+VkSampler get_sampler(const VkSamplerCreateInfo& sampler_create_info, bool use_mutex) {
+	std::unique_lock<std::mutex> lock(_sampler_cache_mutex, std::defer_lock);
+	if (use_mutex) {
+		lock.lock();
+	}
 	auto it = _sampler_cache.find(sampler_create_info);
 	if (it != _sampler_cache.end()) {
 		return it->second;
@@ -104,19 +115,21 @@ VkSampler get_sampler(const VkSamplerCreateInfo& sampler_create_info) {
 	if (!result.second) {
 		return VK_NULL_HANDLE;
 	}
+	lock.unlock();
 	vk::check(vkCreateSampler(vk::context().device, &sampler_create_info, nullptr, &result.first->second),
 			  "Could not create a sampler");
 	vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)result.first->second, "Sampler",
 									   VK_OBJECT_TYPE_SAMPLER);
 	return result.first->second;
 }
-vk::Texture* get_texture(const vk::TextureDesc& texture_desc) {
-	vk::Texture* texture = _texture_pool.get();
+vk::Texture* get_texture(const vk::TextureDesc& texture_desc, bool use_mutex) {
+	vk::Texture* texture = _texture_pool.get(use_mutex);
 	vk::create_texture(texture, texture_desc);
 	return texture;
 }
-vk::Buffer* get_buffer(const vk::BufferDesc& texture_desc) {
-	vk::Buffer* buffer = _buffer_pool.get();
+vk::Buffer* get_buffer(const vk::BufferDesc& texture_desc, bool use_mutex) {
+	vk::Buffer* buffer = _buffer_pool.get(use_mutex);
+	memset(buffer, 0, sizeof(vk::Buffer));
 	vk::create_buffer(buffer, texture_desc);
 	return buffer;
 }

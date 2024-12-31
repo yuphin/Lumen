@@ -205,7 +205,6 @@ void DDGI::init() {
 	pc_ray.total_light_area = 0;
 
 	frame_num = 0;
-
 }
 
 void DDGI::render() {
@@ -252,7 +251,7 @@ void DDGI::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
+		.bind_as(tlas);
 	// Trace rays from probes
 	uint32_t grid_size = probe_counts.x * probe_counts.y * probe_counts.z;
 	vk::render_graph()
@@ -271,7 +270,7 @@ void DDGI::render() {
 		.bind({lumen_scene->mesh_lights_buffer, ddgi_ubo_buffer, rt.radiance_tex, rt.dir_depth_tex,
 			   irr_texes[ping_pong], depth_texes[ping_pong]})
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
+		.bind_as(tlas);
 	// Classify
 	uint32_t wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 31) / 32;
 	vk::render_graph()
@@ -330,7 +329,7 @@ void DDGI::render() {
 			.push_constants(&pc_ray)
 			.bind({output_tex, scene_ubo_buffer, sphere_desc_buffer, lumen_scene->mesh_lights_buffer})
 			.bind_texture_array(lumen_scene->scene_textures)
-			.bind_tlas(tlas);
+			.bind_as(tlas);
 	}
 	// Relocate
 	if (total_frame_idx < 5) {
@@ -469,7 +468,7 @@ void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 		ray_inst.transform = vk::to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
 		assert(pm.prim_idx < blases.size());
-		ray_inst.accelerationStructureReference = blases[pm.prim_idx].get_blas_device_address();
+		ray_inst.accelerationStructureReference = blases[pm.prim_idx].get_device_address();
 		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		ray_inst.mask = 0x1;
 		ray_inst.instanceShaderBindingTableRecordOffset = 0;
@@ -487,7 +486,7 @@ void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 
 			sphere_inst.transform = vk::to_vk_matrix(transform);
 			sphere_inst.instanceCustomIndex = i;
-			sphere_inst.accelerationStructureReference = blases[sphere_blas_idx].get_blas_device_address();
+			sphere_inst.accelerationStructureReference = blases[sphere_blas_idx].get_device_address();
 			sphere_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 			sphere_inst.mask = 0x2;
 			sphere_inst.instanceShaderBindingTableRecordOffset = 0;
