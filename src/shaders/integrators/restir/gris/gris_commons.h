@@ -103,18 +103,14 @@ struct PhotonEyeData {
 
 struct PhotonAABB {
 	vec3 min;
-	float pad;
 	vec3 max;
-	float pad2;
 };
 
 struct PhotonLightData {
 	vec2 barycentrics;
 	uvec2 primitive_instance_id;
 	vec2 wi;
-	vec2 pad;
 	vec3 throughput;
-	float pad2;
 };
 
 NAMESPACE_END()

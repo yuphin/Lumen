@@ -29,9 +29,10 @@ class ReSTIRPT final : public Integrator {
 	vk::Buffer* caustic_photon_aabbs_buffer;
 	vk::Buffer* caustic_photon_light_buffer;
 	vk::Buffer* photon_count_buffer;
-	vk::Buffer* photon_bvh_scratch_buf;
 	vk::Texture* canonical_contributions_texture;
 	vk::Texture* direct_lighting_texture;
+
+	vk::Buffer* photon_bvh_scratch_buf = nullptr;
 
 	PCReSTIRPT pc_ray{};
 	bool enable_accumulation = false;
@@ -55,7 +56,7 @@ class ReSTIRPT final : public Integrator {
 	float photon_radius = 0.03f;
 	uint32_t path_length = 0;
 	uint32_t num_spatial_samples = 1;
-	uint32_t num_photons = 1;
+	uint32_t num_photons = 1000000;
 	StreamingMethod streaming_method = StreamingMethod::INDIVIDUAL_CONTRIBUTIONS;
 	MISMethod mis_method = MISMethod::PAIRWISE;
 	ReSTIRPTConfig* config;

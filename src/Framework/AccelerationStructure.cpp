@@ -168,7 +168,8 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, uint32_t primiti
 static std::vector<BuildAccelerationStructure> build_blas_impl(const std::vector<BlasInput>& input,
 															   VkBuildAccelerationStructureFlagsKHR flags,
 															   VkCommandBuffer external_cmd_buf,
-															   vk::Buffer** scratch_buffer_ref) {
+															   vk::Buffer** scratch_buffer_ref,
+															   bool export_scratch_buffer) {
 	uint32_t nb_blas = static_cast<uint32_t>(input.size());
 	VkDeviceSize as_total_size{0};	   // Memory size of all allocated BLAS
 	uint32_t nb_compactions{0};		   // Nb of BLAS requesting compaction
@@ -209,7 +210,8 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(const std::vector
 	// acceleration structure builder
 	bool scratch_buffer_created = false;
 	vk::Buffer* scratch_buffer = nullptr;
-	if (scratch_buffer_ref) {
+
+	if (export_scratch_buffer && *scratch_buffer_ref && (*scratch_buffer_ref)->size == max_scratch_size) {
 		scratch_buffer = *scratch_buffer_ref;
 	} else {
 		scratch_buffer_created = true;
@@ -219,6 +221,9 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(const std::vector
 					  .memory_type = vk::BufferType::GPU,
 					  .size = max_scratch_size,
 					  .dedicated_allocation = false});
+		if (export_scratch_buffer) {
+			*scratch_buffer_ref = scratch_buffer;
+		}
 	}
 
 	// Allocate a query pool for storing the needed size for every BLAS
@@ -280,15 +285,17 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(const std::vector
 	}
 	// Clean up
 	vkDestroyQueryPool(context().device, compaction_query_pool, nullptr);
-	if (scratch_buffer_created) {
+	if (scratch_buffer_created && !export_scratch_buffer) {
 		drm::destroy(scratch_buffer);
 	}
 	return build_as;
 }
 
 void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
-				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer) {
-	std::vector<BuildAccelerationStructure> build_as = build_blas_impl(input, flags, cmd_buf, scratch_buffer);
+				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer,
+				bool export_scratch_buffer) {
+	std::vector<BuildAccelerationStructure> build_as =
+		build_blas_impl(input, flags, cmd_buf, scratch_buffer, export_scratch_buffer);
 	for (auto& ba : build_as) {
 		blases.emplace_back(ba.as);
 	}

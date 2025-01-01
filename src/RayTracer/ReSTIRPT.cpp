@@ -72,7 +72,8 @@ void ReSTIRPT::init() {
 	caustic_photon_aabbs_buffer =
 		prm::get_buffer({.name = "Caustic Photon AABBs",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+								  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 						 .memory_type = vk::BufferType::GPU,
 						 .size = Window::width() * Window::height() * sizeof(float) * 6});
 	caustic_photon_light_buffer =
@@ -203,23 +204,6 @@ void ReSTIRPT::render() {
 			.bind_texture_array(lumen_scene->scene_textures)
 			.bind_as(tlas);
 
-		VkAccelerationStructureGeometryAabbsDataKHR aabbs_data{
-			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR};
-		aabbs_data.data.deviceAddress = caustic_photon_aabbs_buffer->get_device_address();
-
-		VkAccelerationStructureBuildRangeInfoKHR offset;
-		offset.primitiveCount = num_photons;
-
-		VkAccelerationStructureGeometryKHR as_geom{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
-		as_geom.geometryType = VK_GEOMETRY_TYPE_AABBS_KHR;
-		as_geom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
-		as_geom.geometry.aabbs = aabbs_data;
-
-		std::vector<vk::BlasInput> photon_blas_inputs;
-		vk::BlasInput& photon_blas_input = photon_blas_inputs.emplace_back();
-		photon_blas_input.as_geom.push_back(as_geom);
-		photon_blas_input.as_build_offset_info.push_back(offset);
-
 		vk::render_graph()
 			->add_rt("PM - Trace Photons",
 					 {
@@ -236,9 +220,37 @@ void ReSTIRPT::render() {
 			.bind_texture_array(lumen_scene->scene_textures)
 			.zero(photon_count_buffer)
 			.zero(caustic_photon_aabbs_buffer)
-			.build_blas(photon_bvh, photon_blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
-						{caustic_photon_aabbs_buffer}, &photon_bvh_scratch_buf)
+			// .build_blas(photon_bvh, photon_blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
+			// 			{caustic_photon_aabbs_buffer}, &photon_bvh_scratch_buf)
 			.bind_as(tlas);
+
+		if (frame_num == 10) {
+			vkDeviceWaitIdle(vk::context().device);
+			VkAccelerationStructureGeometryAabbsDataKHR aabbs_data{
+				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR};
+			aabbs_data.data.deviceAddress = caustic_photon_aabbs_buffer->get_device_address();
+			aabbs_data.stride = sizeof(float) * 6;
+
+			VkAccelerationStructureBuildRangeInfoKHR offset;
+			offset.firstVertex = 0;
+			offset.primitiveCount = num_photons;
+			offset.primitiveOffset = 0;
+			offset.transformOffset = 0;
+
+			VkAccelerationStructureGeometryKHR as_geom{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
+			as_geom.geometryType = VK_GEOMETRY_TYPE_AABBS_KHR;
+			as_geom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+			as_geom.geometry.aabbs = aabbs_data;
+
+			std::vector<vk::BlasInput> photon_blas_inputs;
+			vk::BlasInput& photon_blas_input = photon_blas_inputs.emplace_back();
+			photon_blas_input.as_geom.push_back(as_geom);
+			photon_blas_input.as_build_offset_info.push_back(offset);
+			std::vector<vk::BlasInput> blas_inputs = {photon_blas_inputs};
+			vk::CommandBuffer cmd(true);
+			vk::build_blas(photon_bvh, blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, cmd.handle, &photon_bvh_scratch_buf, true);
+			cmd.submit();
+		}
 	}
 
 	// Trace rays
@@ -414,6 +426,10 @@ void ReSTIRPT::destroy() {
 	}
 	prm::remove(canonical_contributions_texture);
 	prm::remove(direct_lighting_texture);
+
+	if (photon_bvh_scratch_buf) {
+		drm::destroy(photon_bvh_scratch_buf);
+	}
 }
 
 bool ReSTIRPT::gui() {

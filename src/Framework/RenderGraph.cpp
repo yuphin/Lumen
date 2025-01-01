@@ -3,6 +3,8 @@
 #include "RenderGraph.h"
 #include "VkUtils.h"
 #include "GPUQueryManager.h"
+#include "PersistentResourceManager.h"
+#include "DynamicResourceManager.h"
 
 namespace lumen {
 #define DIRTY_CHECK(x) \
@@ -110,7 +112,6 @@ void RenderPass::register_dependencies(vk::Texture* tex, VkImageLayout dst_layou
 }
 
 void RenderPass::transition_resources() {
-
 	for (const Resource& resource : resource_zeros) {
 		if (resource.buf) {
 			write_impl(resource.buf, VK_ACCESS_TRANSFER_WRITE_BIT, BufferSyncFlags::BUFFER_ZERO);
@@ -513,6 +514,7 @@ RenderPass& RenderPass::build_blas(std::vector<vk::BVH>& blases, const std::vect
 								   VkBuildAccelerationStructureFlagsKHR flags,
 								   const std::vector<vk::Buffer*>& source_buffers, vk::Buffer** scratch_buffer_ref) {
 	LUMEN_ASSERT(!blas_build_data.is_valid(), "Only one BLAS build per pass is supported");
+	// TODO: Need to assert that scratch_buffer_ref == nullptr in certain cases
 	blas_build_data.blases = &blases;
 	blas_build_data.blas_inputs = blas_inputs;
 	blas_build_data.flags = flags;
@@ -901,6 +903,21 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				vkCmdCopyBuffer(cmd, src.buf->handle, dst.buf->handle, 1, &copy_region);
 			}
 		}
+	}
+
+	if (blas_build_data.is_valid()) {
+		
+		vkDeviceWaitIdle(vk::context().device);
+		for (vk::BVH& blas : *blas_build_data.blases) {
+			if (blas.buffer) {
+				prm::remove(blas.buffer);
+				vkDestroyAccelerationStructureKHR(vk::context().device, blas.accel, nullptr);
+			}
+		}
+		GPUQueryManager::begin(cmd, "BLAS Build");
+		vk::build_blas(*blas_build_data.blases, blas_build_data.blas_inputs, blas_build_data.flags, cmd,
+					   blas_build_data.scratch_buffer_ref, true);
+		GPUQueryManager::end(cmd);
 	}
 
 	// Set: Buffer

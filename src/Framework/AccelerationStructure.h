@@ -7,7 +7,7 @@ namespace vk {
 
 struct BVH {
 	VkAccelerationStructureKHR accel = VK_NULL_HANDLE;
-	vk::Buffer* buffer;
+	vk::Buffer* buffer = nullptr;
 	// This is usually set to false
 	// Except when the BVH was generated within the render graph
 	bool needs_sync = false;
@@ -26,7 +26,8 @@ struct BlasInput {
 	VkBuildAccelerationStructureFlagsKHR flags{0};
 };
 void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
-				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer = VK_NULL_HANDLE, vk::Buffer** scratch_buffer = nullptr);
+				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd = VK_NULL_HANDLE,
+				vk::Buffer** scratch_buffer = nullptr, bool export_scratch_buffer = false);
 void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
 				VkBuildAccelerationStructureFlagsKHR flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
 				bool update = false);
