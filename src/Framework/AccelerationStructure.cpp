@@ -211,9 +211,12 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(const std::vector
 	bool scratch_buffer_created = false;
 	vk::Buffer* scratch_buffer = nullptr;
 
-	if (export_scratch_buffer && *scratch_buffer_ref && (*scratch_buffer_ref)->size == max_scratch_size) {
+	if (export_scratch_buffer && *scratch_buffer_ref && (*scratch_buffer_ref)->size >= max_scratch_size) {
 		scratch_buffer = *scratch_buffer_ref;
 	} else {
+		if (export_scratch_buffer &&*scratch_buffer_ref) {
+			drm::destroy(*scratch_buffer_ref);
+		}
 		scratch_buffer_created = true;
 		scratch_buffer =
 			drm::get({.name = "BLAS Scratch Buffer",

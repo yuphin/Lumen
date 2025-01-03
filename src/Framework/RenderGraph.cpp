@@ -906,7 +906,6 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	}
 
 	if (blas_build_data.is_valid()) {
-		
 		vkDeviceWaitIdle(vk::context().device);
 		for (vk::BVH& blas : *blas_build_data.blases) {
 			if (blas.buffer) {
@@ -914,10 +913,22 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				vkDestroyAccelerationStructureKHR(vk::context().device, blas.accel, nullptr);
 			}
 		}
+		blas_build_data.blases->clear();
 		GPUQueryManager::begin(cmd, "BLAS Build");
 		vk::build_blas(*blas_build_data.blases, blas_build_data.blas_inputs, blas_build_data.flags, cmd,
-					   blas_build_data.scratch_buffer_ref, true);
+					   blas_build_data.scratch_buffer_ref, /*export_scratch_buffer=*/true);
 		GPUQueryManager::end(cmd);
+#if 0
+		std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
+		auto curr_stage = VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
+		auto dst_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+		buffer_memory_barriers.push_back(vk::buffer_barrier2(
+			blas_build_data.blases->at(0).buffer->handle, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+			VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR, curr_stage, dst_stage));
+		auto dependency_info =
+			vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
+		vkCmdPipelineBarrier2(cmd, &dependency_info);
+#endif
 	}
 
 	// Set: Buffer
