@@ -61,5 +61,5 @@ class ReSTIRPT final : public Integrator {
 	MISMethod mis_method = MISMethod::PAIRWISE;
 	ReSTIRPTConfig* config;
 
-	std::vector<vk::BVH> photon_bvh;
+	std::array<vk::BVH, vk::MAX_FRAMES_IN_FLIGHT> photon_bvhs;
 };

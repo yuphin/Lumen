@@ -169,7 +169,7 @@ class RenderPass {
 	RenderPass& copy(const Resource& src, const Resource& dst);
 
 	// BLAS building happens after the pass runs
-	RenderPass& build_blas(std::vector<vk::BVH>& blases, const std::vector<vk::BlasInput>& blas_inputs,
+	RenderPass& build_blas(util::Slice<vk::BVH> blases, const std::vector<vk::BlasInput>& blas_inputs,
 						   VkBuildAccelerationStructureFlagsKHR flags, const std::vector<vk::Buffer*>& source_buffers,
 						   vk::Buffer** scratch_buffer_ref);
 	void finalize();
@@ -224,10 +224,10 @@ class RenderPass {
 		vk::Buffer** scratch_buffer_ref = nullptr;
 		// For barrier placement
 		std::vector<vk::Buffer*> source_buffers;
-		std::vector<vk::BVH>* blases = nullptr;
+		util::Slice<vk::BVH> blases;
 		std::vector<vk::BlasInput> blas_inputs;
 		VkBuildAccelerationStructureFlagsKHR flags;
-		inline bool is_valid() { return blases != nullptr; }
+		inline bool is_valid() { return !blases.empty(); }
 	};
 	BlasBuildData blas_build_data;
 
@@ -255,9 +255,11 @@ class RenderPass {
 	void register_dependencies(const vk::Buffer* buffer, VkAccessFlags dst_access_flags,
 							   BufferSyncFlags flags = BufferSyncFlags::NONE);
 	void register_dependencies(vk::Texture* tex, VkImageLayout target_layout);
-	void write_impl(const vk::Buffer* buffer, VkAccessFlags access_flags, BufferSyncFlags flags = BufferSyncFlags::NONE);
+	void write_impl(const vk::Buffer* buffer, VkAccessFlags access_flags,
+					BufferSyncFlags flags = BufferSyncFlags::NONE);
 	void write_impl(vk::Texture* tex, VkAccessFlags access_flags = VK_ACCESS_SHADER_WRITE_BIT);
-	void read_impl(const vk::Buffer* buffer, VkAccessFlags access_flags = VK_ACCESS_SHADER_READ_BIT, BufferSyncFlags flags = BufferSyncFlags::NONE);
+	void read_impl(const vk::Buffer* buffer, VkAccessFlags access_flags = VK_ACCESS_SHADER_READ_BIT,
+				   BufferSyncFlags flags = BufferSyncFlags::NONE);
 	void read_impl(vk::Texture* tex);
 
 	void run(VkCommandBuffer cmd);

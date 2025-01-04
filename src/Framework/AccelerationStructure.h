@@ -28,6 +28,9 @@ struct BlasInput {
 void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd = VK_NULL_HANDLE,
 				vk::Buffer** scratch_buffer = nullptr, bool export_scratch_buffer = false);
+void build_blas(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
+				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd = VK_NULL_HANDLE,
+				vk::Buffer** scratch_buffer = nullptr, bool export_scratch_buffer = false);
 void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
 				VkBuildAccelerationStructureFlagsKHR flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
 				bool update = false);

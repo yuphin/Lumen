@@ -303,9 +303,9 @@ bool RayTracer::gui() {
 				parent = parent->parent;
 			}
 			double elapsed_ms = GPUQueryManager::get_elapsed(data) * 1e-6;
-			std::string indent(scope, ' ');
-			std::string indented_name = indent + data.name;
-			ImGui::Text("%.3f ms: %s", elapsed_ms, indented_name.c_str());
+			std::string indent(scope * 2, ' ');	 // Indent by 2 spaces per depth
+			std::string indented_text = std::format("{}{:.2f} ms: {}", indent, elapsed_ms, data.name);
+			ImGui::Text("%s", indented_text.c_str());
 		}
 	}
 

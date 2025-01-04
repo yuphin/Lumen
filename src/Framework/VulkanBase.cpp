@@ -22,7 +22,6 @@ const std::vector<const char*> _validation_layers_lst = {"VK_LAYER_KHRONOS_valid
 
 std::vector<const char*> _device_extensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
-size_t current_frame = 0;
 // Sync primitives
 std::vector<VkSemaphore> _image_available_sem;
 std::vector<VkSemaphore> _render_finished_sem;
@@ -695,11 +694,11 @@ void add_device_extension(const char* name) { _device_extensions.push_back(name)
 std::vector<Texture*>& swapchain_images() { return _swapchain_images; }
 
 uint32_t prepare_frame() {
-	check(vkWaitForFences(context().device, 1, &_in_flight_fences[current_frame], VK_TRUE, ~0ull), "Timeout");
+	check(vkWaitForFences(context().device, 1, &_in_flight_fences[context().in_flight_frame_idx], VK_TRUE, ~0ull), "Timeout");
 
 	uint32_t image_idx;
 	VkResult result = vkAcquireNextImageKHR(context().device, context().swapchain, UINT64_MAX,
-											_image_available_sem[current_frame], VK_NULL_HANDLE, &image_idx);
+											_image_available_sem[context().in_flight_frame_idx], VK_NULL_HANDLE, &image_idx);
 	if (result == VK_NOT_READY || result == VK_TIMEOUT || result == VK_SUBOPTIMAL_KHR) {
 		return UINT32_MAX;
 	}
@@ -707,16 +706,16 @@ uint32_t prepare_frame() {
 		vkWaitForFences(context().device, 1, &_images_in_flight[image_idx], VK_TRUE, UINT64_MAX);
 	}
 
-	vkResetFences(context().device, 1, &_in_flight_fences[current_frame]);
-	_images_in_flight[image_idx] = _in_flight_fences[current_frame];
+	vkResetFences(context().device, 1, &_in_flight_fences[context().in_flight_frame_idx]);
+	_images_in_flight[image_idx] = _in_flight_fences[context().in_flight_frame_idx];
 	check(vkResetCommandBuffer(context().command_buffers[image_idx], 0));
-	GPUQueryManager::collect(uint32_t(current_frame));
+	GPUQueryManager::collect(uint32_t(context().in_flight_frame_idx));
 	return image_idx;
 }
 
 VkResult submit_frame(uint32_t image_idx) {
 	VkSubmitInfo submit_info = vk::submit_info();
-	VkSemaphore wait_semaphores[] = {_image_available_sem[current_frame]};
+	VkSemaphore wait_semaphores[] = {_image_available_sem[context().in_flight_frame_idx]};
 	VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 	submit_info.waitSemaphoreCount = 1;
 	submit_info.pWaitSemaphores = wait_semaphores;
@@ -725,13 +724,13 @@ VkResult submit_frame(uint32_t image_idx) {
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = &context().command_buffers[image_idx];
 
-	VkSemaphore signal_semaphores[] = {_render_finished_sem[current_frame]};
+	VkSemaphore signal_semaphores[] = {_render_finished_sem[context().in_flight_frame_idx]};
 	submit_info.signalSemaphoreCount = 1;
 	submit_info.pSignalSemaphores = signal_semaphores;
 
-	check(vkQueueSubmit(context().queues[(int)QueueType::GFX], 1, &submit_info, _in_flight_fences[current_frame]),
+	check(vkQueueSubmit(context().queues[(int)QueueType::GFX], 1, &submit_info, _in_flight_fences[context().in_flight_frame_idx]),
 		  "Failed to submit draw command buffer");
-	current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+	context().in_flight_frame_idx = (context().in_flight_frame_idx + 1) % MAX_FRAMES_IN_FLIGHT;
 	VkPresentInfoKHR present_info{};
 	present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 

@@ -188,16 +188,10 @@ void ReSTIRPT::render() {
 	constexpr int READ_OR_PREV_IDX = 0;
 
 	if (enable_photon_mapping) {
-		if (!photon_bvh.empty()) {
-			vkDeviceWaitIdle(vk::context().device);
-			for (vk::BVH& blas : photon_bvh) {
-				if (blas.buffer) {
-					prm::remove(blas.buffer);
-					vkDestroyAccelerationStructureKHR(vk::context().device, blas.accel, nullptr);
-				}
-			}
-			photon_bvh.clear();
-		}
+		auto in_flight_frame_idx = vk::context().in_flight_frame_idx;
+		vk::BVH& blas = photon_bvhs[in_flight_frame_idx];
+		prm::remove(blas.buffer);
+		vkDestroyAccelerationStructureKHR(vk::context().device, blas.accel, nullptr);
 
 		vk::render_graph()
 			->add_rt("PM - Trace First Diffuse",
@@ -252,8 +246,9 @@ void ReSTIRPT::render() {
 			.bind_texture_array(lumen_scene->scene_textures)
 			.zero(photon_count_buffer)
 			.zero(caustic_photon_aabbs_buffer)
-			.build_blas(photon_bvh, photon_blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR,
-						{caustic_photon_aabbs_buffer}, &photon_bvh_scratch_buf)
+			.build_blas(util::Slice(photon_bvhs.data() + in_flight_frame_idx, 1), photon_blas_inputs,
+						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, {caustic_photon_aabbs_buffer},
+						&photon_bvh_scratch_buf)
 			.bind_as(tlas);
 	}
 
@@ -436,7 +431,7 @@ void ReSTIRPT::destroy(bool resize) {
 		photon_bvh_scratch_buf = nullptr;
 	}
 	if (!resize) {
-		for (vk::BVH& bvh : photon_bvh) {
+		for (vk::BVH& bvh : photon_bvhs) {
 			prm::remove(bvh.buffer);
 			vkDestroyAccelerationStructureKHR(vk::context().device, bvh.accel, nullptr);
 		}

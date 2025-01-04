@@ -214,7 +214,7 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(const std::vector
 	if (export_scratch_buffer && *scratch_buffer_ref && (*scratch_buffer_ref)->size >= max_scratch_size) {
 		scratch_buffer = *scratch_buffer_ref;
 	} else {
-		if (export_scratch_buffer &&*scratch_buffer_ref) {
+		if (export_scratch_buffer && *scratch_buffer_ref) {
 			drm::destroy(*scratch_buffer_ref);
 		}
 		scratch_buffer_created = true;
@@ -301,6 +301,17 @@ void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
 		build_blas_impl(input, flags, cmd_buf, scratch_buffer, export_scratch_buffer);
 	for (auto& ba : build_as) {
 		blases.emplace_back(ba.as);
+	}
+}
+
+void build_blas(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
+				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer,
+				bool export_scratch_buffer) {
+	LUMEN_ASSERT(blases.size == input.size(), "Mismatch between input and output sizes");
+	std::vector<BuildAccelerationStructure> build_as =
+		build_blas_impl(input, flags, cmd_buf, scratch_buffer, export_scratch_buffer);
+	for (size_t i = 0; i < blases.size; i++) {
+		blases[i] = build_as[i].as;
 	}
 }
 

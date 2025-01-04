@@ -510,12 +510,13 @@ RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 	return *this;
 }
 
-RenderPass& RenderPass::build_blas(std::vector<vk::BVH>& blases, const std::vector<vk::BlasInput>& blas_inputs,
+RenderPass& RenderPass::build_blas(util::Slice<vk::BVH> blases, const std::vector<vk::BlasInput>& blas_inputs,
 								   VkBuildAccelerationStructureFlagsKHR flags,
 								   const std::vector<vk::Buffer*>& source_buffers, vk::Buffer** scratch_buffer_ref) {
 	LUMEN_ASSERT(!blas_build_data.is_valid(), "Only one BLAS build per pass is supported");
+	LUMEN_ASSERT(blases.size == blas_inputs.size(), "BLASes and inputs must have the same size");
 	// TODO: Need to assert that scratch_buffer_ref == nullptr in certain cases
-	blas_build_data.blases = &blases;
+	blas_build_data.blases = blases;
 	blas_build_data.blas_inputs = blas_inputs;
 	blas_build_data.flags = flags;
 	blas_build_data.source_buffers = source_buffers;
@@ -906,9 +907,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	}
 
 	if (blas_build_data.is_valid()) {
-		auto pass_name = name + " - BLAS Build";
-		GPUQueryManager::begin(cmd, pass_name.c_str());
-		vk::build_blas(*blas_build_data.blases, blas_build_data.blas_inputs, blas_build_data.flags, cmd,
+		GPUQueryManager::begin(cmd, "BLAS Build");
+		vk::build_blas(blas_build_data.blases, blas_build_data.blas_inputs, blas_build_data.flags, cmd,
 					   blas_build_data.scratch_buffer_ref, /*export_scratch_buffer=*/true);
 		GPUQueryManager::end(cmd);
 #if 0

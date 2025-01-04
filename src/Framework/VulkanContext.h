@@ -27,6 +27,7 @@ struct VulkanContext {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
 	VmaAllocator allocator;
 	VkQueryPool query_pool_timestamps[3];
+	size_t in_flight_frame_idx = 0;
 };
 
 VulkanContext& context();
