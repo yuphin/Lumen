@@ -8,7 +8,7 @@ class SPPM final : public Integrator {
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
-	virtual void destroy() override;
+	virtual void destroy(bool resize) override;
 
    private:
 	PCSPPM pc_ray{};

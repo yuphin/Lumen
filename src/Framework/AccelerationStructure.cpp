@@ -284,7 +284,7 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(const std::vector
 		LUMEN_TRACE("RT BLAS: reducing from: {} MB to: {} MB = ({}% smaller) \n", as_total_size * 1e-6,
 					compact_size * 1e-6, (as_total_size - compact_size) / float(as_total_size) * 100.f);
 	} else {
-		LUMEN_TRACE("RT BLAS: total size: {} MB\n", as_total_size * 1e-6);
+		// LUMEN_TRACE("RT BLAS: total size: {} MB\n", as_total_size * 1e-6);
 	}
 	// Clean up
 	vkDestroyQueryPool(context().device, compaction_query_pool, nullptr);

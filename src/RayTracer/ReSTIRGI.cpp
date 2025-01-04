@@ -179,8 +179,8 @@ bool ReSTIRGI::gui() {
 	return result;
 }
 
-void ReSTIRGI::destroy() {
-	Integrator::destroy();
+void ReSTIRGI::destroy(bool resize) {
+	Integrator::destroy(resize);
 	auto buffer_list = {restir_samples_buffer, restir_samples_old_buffer, temporal_reservoir_buffer,
 						spatial_reservoir_buffer, tmp_col_buffer};
 	for (vk::Buffer* b : buffer_list) {

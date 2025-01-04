@@ -9,7 +9,7 @@ class ReSTIRGI final : public Integrator {
 	virtual void render() override;
 	virtual bool update() override;
 	virtual bool gui() override;
-	virtual void destroy() override;
+	virtual void destroy(bool resize) override;
 
    private:
 	vk::Buffer* restir_samples_buffer;

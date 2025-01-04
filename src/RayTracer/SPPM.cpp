@@ -186,8 +186,8 @@ bool SPPM::update() {
 	return updated;
 }
 
-void SPPM::destroy() {
-	Integrator::destroy();
+void SPPM::destroy(bool resize) {
+	Integrator::destroy(resize);
 	auto buffer_list = {sppm_data_buffer, atomic_data_buffer, photon_buffer, residual_buffer,
 						counter_buffer};
 	for (vk::Buffer* b : buffer_list) {

@@ -164,8 +164,8 @@ bool ReSTIR::gui() {
 	return result;
 }
 
-void ReSTIR::destroy() {
-	Integrator::destroy();
+void ReSTIR::destroy(bool resize) {
+	Integrator::destroy(resize);
 	auto buffer_list = {
 		g_buffer, temporal_reservoir_buffer, spatial_reservoir_buffer, tmp_col_buffer, passthrough_reservoir_buffer,
 	};

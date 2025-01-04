@@ -99,8 +99,8 @@ bool BDPT::update() {
 	return updated;
 }
 
-void BDPT::destroy() {
-	Integrator::destroy();
+void BDPT::destroy(bool resize) {
+	Integrator::destroy(resize);
 	auto buffer_list = {light_path_buffer, camera_path_buffer, color_storage_buffer};
 	for (vk::Buffer* b : buffer_list) {
 		prm::remove(b);

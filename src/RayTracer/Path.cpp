@@ -67,7 +67,7 @@ bool Path::update() {
 	return updated;
 }
 
-void Path::destroy() { Integrator::destroy(); }
+void Path::destroy(bool resize) { Integrator::destroy(resize); }
 
 bool Path::gui() {
 	bool result = Integrator::gui();

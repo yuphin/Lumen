@@ -520,8 +520,8 @@ void VCMMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGr
 	}
 }
 
-void VCMMLT::destroy() {
-	Integrator::destroy();
+void VCMMLT::destroy(bool resize) {
+	Integrator::destroy(resize);
 	auto buffer_list = {bootstrap_buffer,	 cdf_buffer,		  cdf_sum_buffer,
 						seeds_buffer,		 mlt_samplers_buffer, light_primary_samples_buffer,
 						mlt_col_buffer,		 chain_stats_buffer,  splat_buffer,

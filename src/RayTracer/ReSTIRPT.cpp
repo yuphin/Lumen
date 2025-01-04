@@ -188,7 +188,17 @@ void ReSTIRPT::render() {
 	constexpr int READ_OR_PREV_IDX = 0;
 
 	if (enable_photon_mapping) {
-		
+		if (!photon_bvh.empty()) {
+			vkDeviceWaitIdle(vk::context().device);
+			for (vk::BVH& blas : photon_bvh) {
+				if (blas.buffer) {
+					prm::remove(blas.buffer);
+					vkDestroyAccelerationStructureKHR(vk::context().device, blas.accel, nullptr);
+				}
+			}
+			photon_bvh.clear();
+		}
+
 		vk::render_graph()
 			->add_rt("PM - Trace First Diffuse",
 					 {
@@ -245,35 +255,6 @@ void ReSTIRPT::render() {
 			.build_blas(photon_bvh, photon_blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR,
 						{caustic_photon_aabbs_buffer}, &photon_bvh_scratch_buf)
 			.bind_as(tlas);
-
-		// if (frame_num == 10) {
-		// 	vkDeviceWaitIdle(vk::context().device);
-		// 	VkAccelerationStructureGeometryAabbsDataKHR aabbs_data{
-		// 		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR};
-		// 	aabbs_data.data.deviceAddress = caustic_photon_aabbs_buffer->get_device_address();
-		// 	aabbs_data.stride = sizeof(float) * 6;
-
-		// 	VkAccelerationStructureBuildRangeInfoKHR offset;
-		// 	offset.firstVertex = 0;
-		// 	offset.primitiveCount = num_photons;
-		// 	offset.primitiveOffset = 0;
-		// 	offset.transformOffset = 0;
-
-		// 	VkAccelerationStructureGeometryKHR as_geom{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
-		// 	as_geom.geometryType = VK_GEOMETRY_TYPE_AABBS_KHR;
-		// 	as_geom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
-		// 	as_geom.geometry.aabbs = aabbs_data;
-
-		// 	std::vector<vk::BlasInput> photon_blas_inputs;
-		// 	vk::BlasInput& photon_blas_input = photon_blas_inputs.emplace_back();
-		// 	photon_blas_input.as_geom.push_back(as_geom);
-		// 	photon_blas_input.as_build_offset_info.push_back(offset);
-		// 	std::vector<vk::BlasInput> blas_inputs = {photon_blas_inputs};
-		// 	vk::CommandBuffer cmd(true);
-		// 	vk::build_blas(photon_bvh, blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR,
-		// 				   cmd.handle, &photon_bvh_scratch_buf, true);
-		// 	cmd.submit();
-		// }
 	}
 
 	// Trace rays
@@ -430,8 +411,8 @@ bool ReSTIRPT::update() {
 	return updated;
 }
 
-void ReSTIRPT::destroy() {
-	Integrator::destroy();
+void ReSTIRPT::destroy(bool resize) {
+	Integrator::destroy(resize);
 	auto buffer_list = {gris_gbuffer,
 						gris_reservoir_ping_buffer,
 						gris_reservoir_pong_buffer,
@@ -452,10 +433,13 @@ void ReSTIRPT::destroy() {
 
 	if (photon_bvh_scratch_buf) {
 		drm::destroy(photon_bvh_scratch_buf);
+		photon_bvh_scratch_buf = nullptr;
 	}
-	for(vk::BVH& bvh : photon_bvh) {
-		prm::remove(bvh.buffer);
-		vkDestroyAccelerationStructureKHR(vk::context().device, bvh.accel, nullptr);
+	if (!resize) {
+		for (vk::BVH& bvh : photon_bvh) {
+			prm::remove(bvh.buffer);
+			vkDestroyAccelerationStructureKHR(vk::context().device, bvh.accel, nullptr);
+		}
 	}
 }
 

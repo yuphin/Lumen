@@ -453,8 +453,8 @@ void PSSMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGr
 	}
 }
 
-void PSSMLT::destroy() {
-	Integrator::destroy();
+void PSSMLT::destroy(bool resize) {
+	Integrator::destroy(resize);
 	auto buffer_list = {bootstrap_buffer,
 						cdf_buffer,
 						cdf_sum_buffer,

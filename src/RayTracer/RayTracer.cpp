@@ -282,26 +282,33 @@ void RayTracer::create_integrator(int integrator_idx) {
 }
 
 bool RayTracer::gui() {
-	auto& query_results = GPUQueryManager::get();
-	uint64_t gpu_end = query_results.size > 0 ? query_results.timestamps[query_results.size - 1] : 0;
-	uint64_t gpu_start = query_results.size > 0 ? query_results.timestamps[0] : 0;
+	util::Slice<GPUQueryManager::TimestampData> query_results = GPUQueryManager::get();
 	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
 	ImGui::Text("General settings:");
 	ImGui::PopStyleColor();
 	ImGui::Text("Frame %d time (CPU) %.2f ms ( %.2f FPS )", integrator->frame_num, cpu_avg_time, 1000 / cpu_avg_time);
-	if (gpu_end != 0 && gpu_start != 0 && gpu_end > gpu_start) {
-		double frame_time_gpu = (gpu_end - gpu_start) * 1e-6;
-		ImGui::Text("Frame time (GPU) %.2f ms", frame_time_gpu);
+	double frame_time_gpu_ms = (GPUQueryManager::get_total_elapsed()) * 1e-6;
+	if (frame_time_gpu_ms > 0) {
+		ImGui::Text("Frame time (GPU) %.2f ms", frame_time_gpu_ms);
 		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
 		ImGui::Text("Individual GPU timings:");
 		ImGui::PopStyleColor();
-		for (size_t i = 0; i < query_results.size; i += 2) {
-			auto begin = query_results.timestamps[i];
-			auto end = query_results.timestamps[i + 1];
-			double diff = (end - begin) * 1e-6;
-			ImGui::Text("%.3f ms: %s", diff, query_results.names[i >> 1].c_str());
+		for (size_t i = 0; i < query_results.size; i++) {
+			const GPUQueryManager::TimestampData& data = query_results[i];
+			GPUQueryManager::TimestampData* parent = data.parent;
+			bool is_root = parent == nullptr;
+			uint32_t scope = 0;
+			while (parent != nullptr) {
+				scope++;
+				parent = parent->parent;
+			}
+			double elapsed_ms = GPUQueryManager::get_elapsed(data) * 1e-6;
+			std::string indent(scope, ' ');
+			std::string indented_name = indent + data.name;
+			ImGui::Text("%.3f ms: %s", elapsed_ms, indented_name.c_str());
 		}
 	}
+
 	ImGui::Text("Memory Usage: %.2f MB", vk::get_memory_usage(vk::context().physical_device) * 1e-6);
 	bool updated = false;
 	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
@@ -354,7 +361,7 @@ bool RayTracer::gui() {
 		updated = true;
 		vkDeviceWaitIdle(vk::context().device);
 		bool was_custom_accel = typeid(*integrator) == typeid(DDGI);
-		integrator->destroy();
+		integrator->destroy(/*resize=*/false);
 		RenderGraph* rg = vk::render_graph();
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, output_img_buffer, rg);
 		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, residual_buffer, rg);
@@ -385,9 +392,6 @@ float RayTracer::draw_frame() {
 		start = clock();
 	}
 
-	auto resize_func = [this]() {
-
-	};
 	auto t_begin = glfwGetTime() * 1000;
 	bool updated = false;
 	uint32_t image_idx = vk::prepare_frame();
@@ -430,7 +434,7 @@ float RayTracer::draw_frame() {
 			old_cam->fov, 0.01f, 1000.0f, aspect_ratio, old_cam->direction, old_cam->position));
 		scene.camera->rotation = old_rotation;
 		cleanup_resources();
-		integrator->destroy();
+		integrator->destroy(/*resize=*/true);
 		post_fx.destroy();
 		vk::destroy_imgui();
 
@@ -492,7 +496,7 @@ void RayTracer::cleanup() {
 	vkDeviceWaitIdle(vk::context().device);
 	if (initialized) {
 		cleanup_resources();
-		integrator->destroy();
+		integrator->destroy(/*resize=*/false);
 		post_fx.destroy();
 		scene.destroy();
 		destroy_accel();

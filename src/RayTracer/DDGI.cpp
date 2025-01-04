@@ -515,8 +515,8 @@ glm::vec3 DDGI::grid_coord_to_position(const glm::ivec3& grid_coord) {
 	return glm::vec3(grid_coord) * probe_distance + probe_start_position;
 }
 
-void DDGI::destroy() {
-	Integrator::destroy();
+void DDGI::destroy(bool resize) {
+	Integrator::destroy(resize);
 	auto buffer_list = {g_buffer,
 						direct_lighting_buffer,
 						ddgi_ubo_buffer,

@@ -125,7 +125,7 @@ bool Integrator::update() {
 }
 
 
-void Integrator::destroy() {
+void Integrator::destroy(bool resize) {
 	auto buffer_list = {scene_ubo_buffer, lumen_scene->scene_desc_buffer};
 	for (vk::Buffer* b : buffer_list) {
 		prm::remove(b);

@@ -8,7 +8,7 @@ class PSSMLT final : public Integrator {
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
-	virtual void destroy() override;
+	virtual void destroy(bool resize) override;
 
    private:
 	void prefix_scan(int level, int num_elems, int& counter, lumen::RenderGraph* rg);

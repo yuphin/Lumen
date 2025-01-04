@@ -278,8 +278,8 @@ bool VCM::update() {
 	}
 	return updated;
 }
-void VCM::destroy() {
-	Integrator::destroy();
+void VCM::destroy(bool resize) {
+	Integrator::destroy(resize);
 	auto buffer_list = {photon_buffer,		   vcm_light_vertices_buffer,
 						light_path_cnt_buffer, color_storage_buffer,
 						vcm_reservoir_buffer,  light_samples_buffer,

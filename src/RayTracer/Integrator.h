@@ -18,7 +18,7 @@ class Integrator {
 	virtual void render() = 0;
 	virtual bool gui();
 	virtual bool update();
-	virtual void destroy();
+	virtual void destroy(bool resize);
 	virtual void create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases);
 	vk::Texture* output_tex;
 	bool updated = false;

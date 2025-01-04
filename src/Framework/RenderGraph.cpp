@@ -906,15 +906,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	}
 
 	if (blas_build_data.is_valid()) {
-		vkDeviceWaitIdle(vk::context().device);
-		for (vk::BVH& blas : *blas_build_data.blases) {
-			if (blas.buffer) {
-				prm::remove(blas.buffer);
-				vkDestroyAccelerationStructureKHR(vk::context().device, blas.accel, nullptr);
-			}
-		}
-		blas_build_data.blases->clear();
-		GPUQueryManager::begin(cmd, "BLAS Build");
+		auto pass_name = name + " - BLAS Build";
+		GPUQueryManager::begin(cmd, pass_name.c_str());
 		vk::build_blas(*blas_build_data.blases, blas_build_data.blas_inputs, blas_build_data.flags, cmd,
 					   blas_build_data.scratch_buffer_ref, /*export_scratch_buffer=*/true);
 		GPUQueryManager::end(cmd);

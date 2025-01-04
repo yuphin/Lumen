@@ -526,8 +526,8 @@ void SMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGrap
 	}
 }
 
-void SMLT::destroy() {
-	Integrator::destroy();
+void SMLT::destroy(bool resize) {
+	Integrator::destroy(resize);
 	auto buffer_list = {bootstrap_buffer,
 						cdf_buffer,
 						cdf_sum_buffer,
