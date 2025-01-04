@@ -215,6 +215,11 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(const std::vector
 		scratch_buffer = *scratch_buffer_ref;
 	} else {
 		if (export_scratch_buffer && *scratch_buffer_ref) {
+			// Unfortunately this is needed here since multiple commands in flight may contend for the same scratch
+			// buffer. On application side this can be mitigated by triple buffering the scratch buffer But this is not
+			// always feasible.
+			LUMEN_WARN("BLAS Build: Waiting for device while resizing scratch buffer");
+			vkDeviceWaitIdle(context().device);
 			drm::destroy(*scratch_buffer_ref);
 		}
 		scratch_buffer_created = true;
