@@ -192,6 +192,7 @@ void ReSTIRPT::render() {
 		vk::BVH& blas = photon_bvhs[in_flight_frame_idx];
 		prm::remove(blas.buffer);
 		vkDestroyAccelerationStructureKHR(vk::context().device, blas.accel, nullptr);
+		blas.accel = VK_NULL_HANDLE;
 
 		vk::render_graph()
 			->add_rt("PM - Trace First Diffuse",

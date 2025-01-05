@@ -529,7 +529,6 @@ void RenderPass::finalize() {
 				}
 				accels[i] = pipeline_storage->as_bindings[i]->accel;
 				++num_accels;
-			} else {
 			}
 		}
 		pipeline_storage->pipeline->tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
