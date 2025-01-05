@@ -24,14 +24,6 @@ static uint32_t get_bindings_for_shader_set(const std::vector<Shader>& shaders, 
 
 Pipeline::Pipeline(const std::string& name) : name(name) {}
 
-void Pipeline::reload() {}
-
-void Pipeline::refresh() {
-	if (type == PipelineType::RT) {
-		sbt_wrapper.destroy();
-	}
-}
-
 void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const std::vector<uint32_t>& descriptor_counts,
 								   std::vector<vk::Texture*> color_outputs, vk::Texture* depth_output) {
 	LUMEN_ASSERT(color_outputs.size(), "No color outputs for GFX pipeline");
@@ -180,10 +172,11 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 	}
 }
 
-void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vector<uint32_t>& descriptor_counts) {
+void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vector<uint32_t>& descriptor_counts, uint32_t num_as_bindings) {
 	type = PipelineType::RT;
 	binding_mask = get_bindings_for_shader_set(settings.shaders, descriptor_types);
-	create_set_layout(settings.shaders, descriptor_counts);
+	uint32_t num_as_bindings_in_shader = 0;
+	VkShaderStageFlags binding_stage_flags = 0;
 	for (const auto& shader : settings.shaders) {
 		if (push_constant_size && shader.push_constant_size) {
 			LUMEN_ASSERT(push_constant_size == shader.push_constant_size,
@@ -192,9 +185,34 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 		if (shader.push_constant_size) {
 			push_constant_size = shader.push_constant_size;
 		}
+		num_as_bindings_in_shader = std::max(num_as_bindings_in_shader, shader.num_as_bindings);
+		binding_stage_flags |= shader.stage;
 	}
+	if (num_as_bindings_in_shader == 0) {
+		LUMEN_WARN("No AS bindings found in RT shaders for pipeline {}", name.c_str());
+	}
+	LUMEN_ASSERT(num_as_bindings_in_shader <= MAX_AS_BINDING_COUNT, "Max 2 AS bindings are supported");
+	create_set_layout(settings.shaders, descriptor_counts);
+	if(num_as_bindings == 2) {
+		int a = 4;
+	}
+	create_rt_set_layout(binding_stage_flags, num_as_bindings);
 	create_pipeline_layout(settings.shaders, {push_constant_size});
 	create_update_template(settings.shaders, descriptor_counts);
+
+	// Descriptor pool for AS descriptors
+	auto pool_size = vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, num_as_bindings);
+	auto descriptor_pool_ci = vk::descriptor_pool(1, &pool_size, 1);
+	vk::check(vkCreateDescriptorPool(vk::context().device, &descriptor_pool_ci, nullptr, &tlas_descriptor_pool));
+	VkDescriptorSetAllocateInfo set_allocate_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+	set_allocate_info.descriptorPool = tlas_descriptor_pool;
+	set_allocate_info.descriptorSetCount = 1;
+	set_allocate_info.pSetLayouts = &tlas_layout;
+	vk::check(vkAllocateDescriptorSets(vk::context().device, &set_allocate_info, &tlas_descriptor_set));
+
+	if (name == "GRIS - Retrace Reservoirs") {
+		int a = 4;
+	}
 
 	std::vector<VkSpecializationMapEntry> entries(settings.specialization_data.size());
 	for (int i = 0; i < entries.size(); i++) {
@@ -362,23 +380,28 @@ void Pipeline::cleanup() {
 		vkDestroyDescriptorUpdateTemplate(vk::context().device, update_template, nullptr);
 	}
 
-	running = false;
 	std::unique_lock<std::mutex> tracker_lk(mut);
 	cv.wait(tracker_lk, [this] { return tracking_stopped; });
 }
 
+void Pipeline::create_rt_set_layout(VkShaderStageFlags binding_stage_flags, uint32_t num_as_bindings) {
 
-void Pipeline::create_rt_set_layout(VkShaderStageFlags binding_stage_flags) {
-	VkDescriptorSetLayoutBinding binding = {};
-	binding.binding = 0;
-	binding.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-	binding.descriptorCount = 1;
-	binding.pImmutableSamplers = nullptr;
-	binding.stageFlags = binding_stage_flags;
+	std::vector<VkDescriptorSetLayoutBinding> set_bindings = {};
+
+	for(uint32_t i = 0; i < num_as_bindings; ++i) {
+		VkDescriptorSetLayoutBinding binding = {};
+		binding.binding = i;
+		binding.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+		binding.descriptorCount = 1;
+		binding.pImmutableSamplers = nullptr;
+		binding.stageFlags = binding_stage_flags;
+		set_bindings.push_back(binding);
+	}
+	
 	VkDescriptorSetLayoutCreateInfo set_create_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
 	set_create_info.flags = 0;
-	set_create_info.bindingCount = 1;
-	set_create_info.pBindings = &binding;
+	set_create_info.bindingCount = uint32_t(set_bindings.size());
+	set_create_info.pBindings = set_bindings.data();
 	vk::check(vkCreateDescriptorSetLayout(vk::context().device, &set_create_info, nullptr, &tlas_layout));
 }
 
@@ -412,14 +435,6 @@ void Pipeline::create_set_layout(const std::vector<Shader>& shaders, const std::
 	set_create_info.bindingCount = uint32_t(set_bindings.size());
 	set_create_info.pBindings = set_bindings.data();
 	vk::check(vkCreateDescriptorSetLayout(vk::context().device, &set_create_info, nullptr, &set_layout));
-	// Create the set layout for TLAS
-	VkShaderStageFlags binding_stage_flags = 0;
-	for (const Shader& shader : shaders) {
-		binding_stage_flags |= shader.stage;
-	}
-	if (type == PipelineType::RT) {
-		create_rt_set_layout(binding_stage_flags);
-	}
 }
 
 void Pipeline::create_pipeline_layout(const std::vector<Shader>& shaders,

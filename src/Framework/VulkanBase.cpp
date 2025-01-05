@@ -11,7 +11,6 @@
 
 namespace vk {
 
-
 struct SwapChainSupportDetails {
 	VkSurfaceCapabilitiesKHR capabilities = {};
 	std::vector<VkSurfaceFormatKHR> formats;
@@ -321,11 +320,16 @@ static void create_logical_device() {
 	VkPhysicalDeviceMaintenance4FeaturesKHR maintenance4_fts = {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES_KHR};
 
+	VkPhysicalDeviceRobustness2FeaturesEXT robustness2_fts = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT};
+	robustness2_fts.nullDescriptor = true;
+	robustness2_fts.pNext = nullptr;
+
 	atomic_fts.shaderBufferFloat32AtomicAdd = true;
 	atomic_fts.shaderBufferFloat32Atomics = true;
 	atomic_fts.shaderSharedFloat32AtomicAdd = true;
 	atomic_fts.shaderSharedFloat32Atomics = true;
-	atomic_fts.pNext = nullptr;
+	atomic_fts.pNext = &robustness2_fts;
 	accel_fts.accelerationStructure = true;
 	accel_fts.pNext = &atomic_fts;
 	rt_fts.rayTracingPipeline = true;
@@ -353,7 +357,6 @@ static void create_logical_device() {
 	//
 	device_features2.features.fragmentStoresAndAtomics = true;
 	device_features2.features.vertexPipelineStoresAndAtomics = true;
-	//
 
 	device_features2.pNext = &features12;
 
@@ -606,7 +609,7 @@ static void create_instance() {
 }
 
 static VkQueryPool create_query_pool(VkQueryType query_type, uint32_t count) {
-	VkQueryPoolCreateInfo create_info = { VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO };
+	VkQueryPoolCreateInfo create_info = {VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO};
 	create_info.queryType = query_type;
 	create_info.queryCount = count;
 
@@ -630,9 +633,9 @@ void init(bool validation_layers) {
 	context().query_pool_timestamps[0] = create_query_pool(VK_QUERY_TYPE_TIMESTAMP, 4096);
 	context().query_pool_timestamps[1] = create_query_pool(VK_QUERY_TYPE_TIMESTAMP, 4096);
 	context().query_pool_timestamps[2] = create_query_pool(VK_QUERY_TYPE_TIMESTAMP, 4096);
-	vkResetQueryPool(context().device, context().query_pool_timestamps[0], 0, 4096 );
-	vkResetQueryPool(context().device, context().query_pool_timestamps[1], 0, 4096 );
-	vkResetQueryPool(context().device, context().query_pool_timestamps[2], 0, 4096 );
+	vkResetQueryPool(context().device, context().query_pool_timestamps[0], 0, 4096);
+	vkResetQueryPool(context().device, context().query_pool_timestamps[1], 0, 4096);
+	vkResetQueryPool(context().device, context().query_pool_timestamps[2], 0, 4096);
 }
 
 void init_imgui() {
@@ -694,11 +697,13 @@ void add_device_extension(const char* name) { _device_extensions.push_back(name)
 std::vector<Texture*>& swapchain_images() { return _swapchain_images; }
 
 uint32_t prepare_frame() {
-	check(vkWaitForFences(context().device, 1, &_in_flight_fences[context().in_flight_frame_idx], VK_TRUE, ~0ull), "Timeout");
+	check(vkWaitForFences(context().device, 1, &_in_flight_fences[context().in_flight_frame_idx], VK_TRUE, ~0ull),
+		  "Timeout");
 
 	uint32_t image_idx;
-	VkResult result = vkAcquireNextImageKHR(context().device, context().swapchain, UINT64_MAX,
-											_image_available_sem[context().in_flight_frame_idx], VK_NULL_HANDLE, &image_idx);
+	VkResult result =
+		vkAcquireNextImageKHR(context().device, context().swapchain, UINT64_MAX,
+							  _image_available_sem[context().in_flight_frame_idx], VK_NULL_HANDLE, &image_idx);
 	if (result == VK_NOT_READY || result == VK_TIMEOUT || result == VK_SUBOPTIMAL_KHR) {
 		return UINT32_MAX;
 	}
@@ -728,7 +733,8 @@ VkResult submit_frame(uint32_t image_idx) {
 	submit_info.signalSemaphoreCount = 1;
 	submit_info.pSignalSemaphores = signal_semaphores;
 
-	check(vkQueueSubmit(context().queues[(int)QueueType::GFX], 1, &submit_info, _in_flight_fences[context().in_flight_frame_idx]),
+	check(vkQueueSubmit(context().queues[(int)QueueType::GFX], 1, &submit_info,
+						_in_flight_fences[context().in_flight_frame_idx]),
 		  "Failed to submit draw command buffer");
 	context().in_flight_frame_idx = (context().in_flight_frame_idx + 1) % MAX_FRAMES_IN_FLIGHT;
 	VkPresentInfoKHR present_info{};

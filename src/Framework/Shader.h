@@ -34,6 +34,7 @@ struct Shader {
 	std::vector<std::pair<VkFormat, uint32_t>> vertex_inputs;
 	std::unordered_map<std::string, BufferStatus> buffer_status_map;
 	std::unordered_map<uint32_t, BindingStatus> resource_binding_map;
+	uint32_t num_as_bindings = 0;
 };
 
 }  // namespace vk

@@ -162,6 +162,12 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 		auto binding = glsl.get_decoration(storage_buffer.id, spv::DecorationBinding);
 		shader.resource_binding_map[binding].active = true;
 	}
+
+	for(auto& as : active_resources.acceleration_structures) {
+		auto set = glsl.get_decoration(as.id, spv::DecorationDescriptorSet);
+		LUMEN_ASSERT(set == 1, "Acceleration structure must be in descriptor set 1");
+		shader.num_as_bindings++;
+	}
 	assert(code[0] == SpvMagicNumber);
 
 	// uint32_t num_ids = code[3];

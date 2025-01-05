@@ -273,7 +273,8 @@ void ReSTIRPT::render() {
 		.bind(canonical_contributions_texture)
 		.bind(direct_lighting_texture)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_as(tlas);
+		.bind_as(tlas)
+		.bind_as(photon_bvhs[vk::context().in_flight_frame_idx]);
 
 	pc_ray.general_seed = rand() % UINT_MAX;
 	if (enable_gris) {

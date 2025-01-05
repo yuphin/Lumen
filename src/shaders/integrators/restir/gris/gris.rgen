@@ -9,6 +9,7 @@
 #extension GL_EXT_shader_atomic_float : require
 #define SCENE_TEX_IDX 8
 #include "gris_commons.glsl"
+layout(set = 1, binding = 1) uniform accelerationStructureEXT photon_bvh;
 
 PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
 

@@ -30,8 +30,8 @@ class RenderPass;
 struct PipelineStorage {
 	std::unique_ptr<vk::Pipeline> pipeline;
 	std::vector<ResourceBinding> bound_resources;
-	// Max 2 AS bindings for now
-	std::array<const vk::BVH*, 2> as_bindings = {nullptr, nullptr};
+	std::vector<const vk::BVH*> as_bindings;
+	// std::array<const vk::BVH*, vk::MAX_AS_BINDING_COUNT> as_bindings = {nullptr, nullptr};
 	std::unordered_map<std::string, vk::BufferStatus> affected_buffer_pointers;
 	bool update_as_descriptor = false;
 	bool update_scene_descriptor = false;
@@ -250,7 +250,7 @@ class RenderPass {
 		NONE = 0x0,
 		BUFFER_ZERO = 0x1,
 		BUFFER_COPY = 0x2,
-		BUFFER_TLAS_BUILD = 0x4,
+		BUFFER_AS_BUILD = 0x4,
 	};
 	void register_dependencies(const vk::Buffer* buffer, VkAccessFlags dst_access_flags,
 							   BufferSyncFlags flags = BufferSyncFlags::NONE);

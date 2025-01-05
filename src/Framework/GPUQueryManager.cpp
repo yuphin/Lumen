@@ -59,9 +59,8 @@ void collect(uint32_t curr_frame_idx) {
 }
 
 void collect() { collect(_curr_pool_idx); }
-util::Slice<TimestampData> get() {
-	return util::Slice<TimestampData>(_data, _num_collected_timestamps);
-}
+void reset_data() { memset(_data, 0, sizeof(TimestampData) * 4096); }
+util::Slice<TimestampData> get() { return util::Slice<TimestampData>(_data, _num_collected_timestamps); }
 
 // Assumes that collect has been called
 uint64_t get_elapsed(const TimestampData& data) {
@@ -70,6 +69,5 @@ uint64_t get_elapsed(const TimestampData& data) {
 
 uint64_t get_total_elapsed() {
 	return _num_collected_queries == 0 ? 0 : _queries[_num_collected_queries - 1] - _queries[0];
-
 }
 }  // namespace GPUQueryManager

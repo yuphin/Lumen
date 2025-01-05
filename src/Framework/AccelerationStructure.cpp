@@ -26,7 +26,7 @@ static BVH create_acceleration(VkAccelerationStructureCreateInfoKHR& accel) {
 		 .usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		 .memory_type = vk::BufferType::GPU,
 		 .size = accel.size,
-		 .dedicated_allocation = false});
+		 .dedicated_allocation = true});
 	accel.buffer = result_accel.buffer->handle;
 	vkCreateAccelerationStructureKHR(vk::context().device, &accel, nullptr, &result_accel.accel);
 	return result_accel;
@@ -340,7 +340,7 @@ void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 										  .memory_type = vk::BufferType::GPU,
 										  .size = sizeof(VkAccelerationStructureInstanceKHR) * instances.size(),
 										  .data = instances.data(),
-										  .dedicated_allocation = false});
+										  .dedicated_allocation = true});
 	vk::CommandBuffer cmd(true, 0, QueueType::GFX);
 	// Make sure the copy of the instance buffer are copied before triggering
 	// the acceleration structure build

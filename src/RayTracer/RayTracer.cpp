@@ -48,6 +48,7 @@ void RayTracer::init() {
 	vk::add_device_extension(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
 	vk::add_device_extension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
 	vk::add_device_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
+	vk::add_device_extension(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
 
 	vk::init(debug);
 	initialized = true;
@@ -376,6 +377,7 @@ bool RayTracer::gui() {
 		scene.config->cam_settings = prev_scene_config.cam_settings;
 		scene.config->sky_col = prev_scene_config.sky_col;
 		scene.config->path_length = prev_scene_config.path_length;
+		GPUQueryManager::reset_data();
 		create_integrator(curr_integrator_idx);
 		bool is_custom_accel = typeid(*integrator) == typeid(DDGI);
 		integrator->init();

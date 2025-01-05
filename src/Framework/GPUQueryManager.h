@@ -15,6 +15,7 @@ void begin(VkCommandBuffer cmd, const char* name);
 void end(VkCommandBuffer cmd);
 void collect(uint32_t curr_frame_idx);
 void collect();
+void reset_data();
 
 util::Slice<TimestampData> get();
 uint64_t get_elapsed(const TimestampData& data);
