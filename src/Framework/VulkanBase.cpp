@@ -322,6 +322,7 @@ static void create_logical_device() {
 
 	VkPhysicalDeviceRobustness2FeaturesEXT robustness2_fts = {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT};
+
 	robustness2_fts.nullDescriptor = true;
 	robustness2_fts.pNext = nullptr;
 
@@ -331,6 +332,7 @@ static void create_logical_device() {
 	atomic_fts.shaderSharedFloat32Atomics = true;
 	atomic_fts.pNext = &robustness2_fts;
 	accel_fts.accelerationStructure = true;
+	accel_fts.descriptorBindingAccelerationStructureUpdateAfterBind = true;
 	accel_fts.pNext = &atomic_fts;
 	rt_fts.rayTracingPipeline = true;
 	rt_fts.pNext = &accel_fts;

@@ -17,6 +17,8 @@ struct BVH {
 			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR, .accelerationStructure = accel};
 		return vkGetAccelerationStructureDeviceAddressKHR(vk::context().device, &addr_info);
 	}
+
+	void destroy();
 };
 
 struct BlasInput {

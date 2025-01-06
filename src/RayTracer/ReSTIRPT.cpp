@@ -187,12 +187,11 @@ void ReSTIRPT::render() {
 	constexpr int WRITE_OR_CURR_IDX = 1;
 	constexpr int READ_OR_PREV_IDX = 0;
 
+	size_t in_flight_frame_idx = vk::context().in_flight_frame_idx;
+	size_t prev_frame_idx = (in_flight_frame_idx - 1) % vk::MAX_FRAMES_IN_FLIGHT;
 	if (enable_photon_mapping) {
-		auto in_flight_frame_idx = vk::context().in_flight_frame_idx;
-		vk::BVH& blas = photon_bvhs[in_flight_frame_idx];
-		prm::remove(blas.buffer);
-		vkDestroyAccelerationStructureKHR(vk::context().device, blas.accel, nullptr);
-		blas.accel = VK_NULL_HANDLE;
+		vk::BVH& blas = photon_blases[in_flight_frame_idx];
+		blas.destroy();
 
 		vk::render_graph()
 			->add_rt("PM - Trace First Diffuse",
@@ -247,7 +246,7 @@ void ReSTIRPT::render() {
 			.bind_texture_array(lumen_scene->scene_textures)
 			.zero(photon_count_buffer)
 			.zero(caustic_photon_aabbs_buffer)
-			.build_blas(util::Slice(photon_bvhs.data() + in_flight_frame_idx, 1), photon_blas_inputs,
+			.build_blas(util::Slice(photon_blases.data() + in_flight_frame_idx, 1), photon_blas_inputs,
 						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, {caustic_photon_aabbs_buffer},
 						&photon_bvh_scratch_buf)
 			.bind_as(tlas);
@@ -274,8 +273,8 @@ void ReSTIRPT::render() {
 		.bind(canonical_contributions_texture)
 		.bind(direct_lighting_texture)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_as(tlas)
-		.bind_as(photon_bvhs[vk::context().in_flight_frame_idx]);
+		.bind_as(tlas);
+		// .bind_as(photon_blases[prev_frame_idx], true);
 
 	pc_ray.general_seed = rand() % UINT_MAX;
 	if (enable_gris) {
@@ -433,9 +432,8 @@ void ReSTIRPT::destroy(bool resize) {
 		photon_bvh_scratch_buf = nullptr;
 	}
 	if (!resize) {
-		for (vk::BVH& bvh : photon_bvhs) {
-			prm::remove(bvh.buffer);
-			vkDestroyAccelerationStructureKHR(vk::context().device, bvh.accel, nullptr);
+		for (vk::BVH& bvh : photon_blases) {
+			bvh.destroy();
 		}
 	}
 }

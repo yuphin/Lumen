@@ -13,53 +13,53 @@ namespace lumen {
 	}
 
 static bool is_read_flag(VkAccessFlags flags) {
-	return flags & (VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_MEMORY_READ_BIT |
-					VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_TRANSFER_READ_BIT);
+	return flags &
+		   (VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR);
 }
 
 void RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags dst_access_flags,
 									   BufferSyncFlags flags) {
-	// Invariant : Pass with lower index should be the setter
+	// Invariant : Pass with lower index should be the setter before the cmd buffer submission
 	const bool found = rg->buffer_resource_map.find(buffer->handle) != rg->buffer_resource_map.end();
 	if (!found || (is_read_flag(dst_access_flags) && is_read_flag(rg->buffer_resource_map[buffer->handle].second))) {
 		return;
 	}
 	auto src_access_flags = rg->buffer_resource_map[buffer->handle].second;
-
-	if (src_access_flags & VK_ACCESS_TRANSFER_WRITE_BIT) {
-		dst_access_flags |= VK_ACCESS_TRANSFER_WRITE_BIT;
-	}
 	auto opposing_pass_idx = rg->buffer_resource_map[buffer->handle].first;
-	if (opposing_pass_idx < rg->passes.size()) {
+	// If this condition fails, that means the cmd buffer is already submitted last frame
+	// For single cmd buffer setup, ignoring the else condition would be fine
+	// However when multiple cmd buffers are in flight, we must still ensure the synchronization
+	if (opposing_pass_idx < rg->passes.size() && opposing_pass_idx < pass_idx) {
 		RenderPass& opposing_pass = rg->passes[opposing_pass_idx];
-		if (opposing_pass.pass_idx < pass_idx) {
-			if (wait_signals_buffer.find(buffer->handle) == wait_signals_buffer.end()) {
-				wait_signals_buffer[buffer->handle] = BufferSyncDescriptor{
-					.src_access_flags = src_access_flags,
-					.dst_access_flags = dst_access_flags,
-					.opposing_pass_idx = opposing_pass.pass_idx,
-				};
-			}
-			// Set source pass dependencies (Signalling pass)
-			if (opposing_pass.set_signals_buffer.find(buffer->handle) == opposing_pass.set_signals_buffer.end()) {
-				opposing_pass.set_signals_buffer[buffer->handle] =
-					BufferSyncDescriptor{.src_access_flags = src_access_flags,
-										 .dst_access_flags = dst_access_flags,
-										 .opposing_pass_idx = pass_idx};
-			}
-		} else if (opposing_pass.pass_idx == pass_idx) {
-			if (flags == BufferSyncFlags::BUFFER_COPY || flags == BufferSyncFlags::BUFFER_AS_BUILD) {
-				// Resource copies happens after the pass execution
-				post_execution_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
+		if (wait_signals_buffer.find(buffer->handle) == wait_signals_buffer.end()) {
+			wait_signals_buffer[buffer->handle] = BufferSyncDescriptor{
+				.src_access_flags = src_access_flags,
+				.dst_access_flags = dst_access_flags,
+				.opposing_pass_idx = opposing_pass.pass_idx,
+			};
+		}
+		// Set source pass dependencies (Signalling pass)
+		if (opposing_pass.set_signals_buffer.find(buffer->handle) == opposing_pass.set_signals_buffer.end()) {
+			opposing_pass.set_signals_buffer[buffer->handle] =
+				BufferSyncDescriptor{.src_access_flags = src_access_flags,
+									 .dst_access_flags = dst_access_flags,
+									 .opposing_pass_idx = pass_idx};
+		}
+		// } else if (opposing_pass.pass_idx == pass_idx) {
+	} else {
+		if (flags == BufferSyncFlags::BUFFER_COPY || flags == BufferSyncFlags::BUFFER_AS_BUILD) {
+			// Resource copies happens after the pass execution
+			post_execution_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
+		} else {
+			// if (flags == BufferSyncFlags::BUFFER_ZERO && src_access_flags == VK_ACCESS_TRANSFER_WRITE_BIT) {
+			if (flags == BufferSyncFlags::BUFFER_ZERO) {
+				// This case happens when there are no dependencies to the buffer being cleared inside the render
+				// graph in a frame Yet we have to ensure syncronization because there are multiple command buffers
+				// in flight
+				LUMEN_ASSERT(dst_access_flags == VK_ACCESS_TRANSFER_WRITE_BIT, "Invalid buffer zero flags");
+				prefill_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
 			} else {
-				if (flags == BufferSyncFlags::BUFFER_ZERO && src_access_flags == VK_ACCESS_TRANSFER_WRITE_BIT) {
-					// This case happens when there are no dependencies to the buffer being cleared inside the render graph in a frame
-					// Yet we have to ensure syncronization because there are multiple command buffers in flight
-					LUMEN_ASSERT(dst_access_flags == VK_ACCESS_TRANSFER_WRITE_BIT, "Invalid buffer zero flags");
-					prefill_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
-				} else {
-					buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
-				}
+				buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
 			}
 		}
 	}
@@ -180,9 +180,9 @@ void RenderPass::transition_resources() {
 		}
 	}
 
-	for (const vk::BVH* as : pipeline_storage->as_bindings) {
-		if (as && as->buffer) {
-			read_impl(as->buffer, VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR, BufferSyncFlags::BUFFER_AS_BUILD);
+	for (const vk::BVH& as : pipeline_storage->as_bindings) {
+		if (as.buffer) {
+			read_impl(as.buffer, VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR, BufferSyncFlags::BUFFER_AS_BUILD);
 		}
 	}
 
@@ -393,14 +393,21 @@ RenderPass& RenderPass::bind_buffer_array(std::span<vk::Buffer*> buffers, bool f
 	return *this;
 }
 
-RenderPass& RenderPass::bind_as(const vk::BVH& tlas, bool sync) {
+RenderPass& RenderPass::bind_as(const vk::BVH& tlas, bool update_descriptor) {
 	LUMEN_ASSERT(type == vk::PassType::RT, "TLAS can only be bound to RT pipelines");
-	if (is_pipeline_cached) {
-		return *this;
-	}
-	LUMEN_ASSERT(pipeline_storage->as_bindings.size() < vk::MAX_AS_BINDING_COUNT,
+	LUMEN_ASSERT(pipeline_storage->as_bindings.size() <= vk::MAX_AS_BINDING_COUNT &&
+					 next_as_binding_idx < vk::MAX_AS_BINDING_COUNT,
 				 "Only two TLAS bindings are supported for now");
-	pipeline_storage->as_bindings.push_back(&tlas);
+	if (next_as_binding_idx >= pipeline_storage->as_bindings.size()) {
+		pipeline_storage->as_bindings.push_back(tlas);
+	} else {
+		if (pipeline_storage->as_bindings[next_as_binding_idx].accel != tlas.accel) {
+			pipeline_storage->update_as_descriptor = true;
+		}
+		pipeline_storage->as_bindings[next_as_binding_idx] = tlas;
+	}
+	pipeline_storage->update_as_descriptor |= update_descriptor;
+	next_as_binding_idx++;
 	return *this;
 }
 
@@ -530,13 +537,11 @@ void RenderPass::finalize() {
 		VkAccelerationStructureKHR accels[vk::MAX_AS_BINDING_COUNT];
 		uint32_t num_accels = 0;
 		for (uint32_t i = 0; i < pipeline_storage->as_bindings.size(); i++) {
-			if (pipeline_storage->as_bindings[i]) {
-				if (!pipeline_storage->as_bindings[i]->accel) {
-					LUMEN_INFO("Using null descriptor inside {}", name);
-				}
-				accels[i] = pipeline_storage->as_bindings[i]->accel;
-				++num_accels;
+			if (!pipeline_storage->as_bindings[i].accel) {
+				LUMEN_INFO("Using null descriptor inside {}", name);
 			}
+			accels[i] = pipeline_storage->as_bindings[i].accel;
+			++num_accels;
 		}
 		pipeline_storage->pipeline->tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
 		pipeline_storage->pipeline->tlas_info.accelerationStructureCount = num_accels;
@@ -567,7 +572,6 @@ void RenderPass::finalize() {
 					pass->pipeline_storage->pipeline->create_rt_pipeline(
 						*pass->rt_settings, pass->descriptor_counts,
 						uint32_t(pass->pipeline_storage->as_bindings.size()));
-					// Update AS descriptors
 					update_rt_descriptors();
 				};
 				if (rg->multithreaded_pipeline_compilation) {
@@ -662,20 +666,24 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			vkCmdPipelineBarrier2(cmd, &info);
 		}
 	}
+	
+	// TODO: Combine barriers and signals
 
 	// Prefill buffer barriers
 	{
 		std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
-		buffer_memory_barriers.reserve(prefill_buffer_barriers.size());
-		for (auto& barrier : prefill_buffer_barriers) {
-			auto curr_stage = vk::get_pipeline_stage(type, barrier.src_access_flags);
-			auto dst_stage = vk::get_pipeline_stage(type, barrier.dst_access_flags);
-			buffer_memory_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
-																 barrier.dst_access_flags, curr_stage, dst_stage));
+		if (!prefill_buffer_barriers.empty()) {
+			buffer_memory_barriers.reserve(prefill_buffer_barriers.size());
+			for (auto& barrier : prefill_buffer_barriers) {
+				auto curr_stage = vk::get_pipeline_stage(type, barrier.src_access_flags);
+				auto dst_stage = vk::get_pipeline_stage(type, barrier.dst_access_flags);
+				buffer_memory_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
+																	 barrier.dst_access_flags, curr_stage, dst_stage));
+			}
+			auto dependency_info =
+				vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
+			vkCmdPipelineBarrier2(cmd, &dependency_info);
 		}
-		auto dependency_info =
-			vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
-		vkCmdPipelineBarrier2(cmd, &dependency_info);
 	}
 
 	// Zero out resources
@@ -688,16 +696,18 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	// Buffer barriers
 	{
 		std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
-		buffer_memory_barriers.reserve(buffer_barriers.size());
-		for (auto& barrier : buffer_barriers) {
-			auto curr_stage = vk::get_pipeline_stage(type, barrier.src_access_flags);
-			auto dst_stage = vk::get_pipeline_stage(type, barrier.dst_access_flags);
-			buffer_memory_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
-																 barrier.dst_access_flags, curr_stage, dst_stage));
+		if (!buffer_barriers.empty()) {
+			buffer_memory_barriers.reserve(buffer_barriers.size());
+			for (auto& barrier : buffer_barriers) {
+				auto curr_stage = vk::get_pipeline_stage(type, barrier.src_access_flags);
+				auto dst_stage = vk::get_pipeline_stage(type, barrier.dst_access_flags);
+				buffer_memory_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
+																	 barrier.dst_access_flags, curr_stage, dst_stage));
+			}
+			auto dependency_info =
+				vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
+			vkCmdPipelineBarrier2(cmd, &dependency_info);
 		}
-		auto dependency_info =
-			vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
-		vkCmdPipelineBarrier2(cmd, &dependency_info);
 	}
 
 	// Wait: Images
@@ -854,16 +864,18 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	// Post execution buffer barriers
 	{
 		std::vector<VkBufferMemoryBarrier2> post_execution_buffer_memory_barriers;
-		post_execution_buffer_memory_barriers.reserve(post_execution_buffer_barriers.size());
-		for (auto& barrier : post_execution_buffer_barriers) {
-			auto curr_stage = vk::get_pipeline_stage(type, barrier.src_access_flags);
-			auto dst_stage = vk::get_pipeline_stage(type, barrier.dst_access_flags);
-			post_execution_buffer_memory_barriers.push_back(vk::buffer_barrier2(
-				barrier.buffer, barrier.src_access_flags, barrier.dst_access_flags, curr_stage, dst_stage));
+		if (!post_execution_buffer_barriers.empty()) {
+			post_execution_buffer_memory_barriers.reserve(post_execution_buffer_barriers.size());
+			for (auto& barrier : post_execution_buffer_barriers) {
+				auto curr_stage = vk::get_pipeline_stage(type, barrier.src_access_flags);
+				auto dst_stage = vk::get_pipeline_stage(type, barrier.dst_access_flags);
+				post_execution_buffer_memory_barriers.push_back(vk::buffer_barrier2(
+					barrier.buffer, barrier.src_access_flags, barrier.dst_access_flags, curr_stage, dst_stage));
+			}
+			auto dependency_info = vk::dependency_info((uint32_t)post_execution_buffer_memory_barriers.size(),
+													   post_execution_buffer_memory_barriers.data());
+			vkCmdPipelineBarrier2(cmd, &dependency_info);
 		}
-		auto dependency_info = vk::dependency_info((uint32_t)post_execution_buffer_memory_barriers.size(),
-												   post_execution_buffer_memory_barriers.data());
-		vkCmdPipelineBarrier2(cmd, &dependency_info);
 	}
 
 	for (const auto& [src, dst] : resource_copies) {
@@ -1100,15 +1112,6 @@ void RenderGraph::destroy() {
 	registered_buffer_pointers.clear();
 	shader_cache.clear();
 	pipeline_cache.clear();
-}
-
-void RenderGraph::set_pipelines_dirty(bool mark_tlas_dirty, bool mark_scene_dirty) {
-	for (auto& [k, v] : pipeline_cache) {
-		if (v.pipeline->type == vk::Pipeline::PipelineType::RT) {
-			v.update_as_descriptor = mark_tlas_dirty;
-		}
-		v.update_scene_descriptor = mark_scene_dirty;
-	}
 }
 
 }  // namespace lumen

@@ -481,15 +481,9 @@ void RayTracer::parse_args(int argc, char* argv[]) {
 	}
 }
 void RayTracer::destroy_accel() {
-	if (tlas.accel) {
-		prm::remove(tlas.buffer);
-		vkDestroyAccelerationStructureKHR(vk::context().device, tlas.accel, nullptr);
-	}
-	if (!blases.empty()) {
-		for (auto& b : blases) {
-			prm::remove(b.buffer);
-			vkDestroyAccelerationStructureKHR(vk::context().device, b.accel, nullptr);
-		}
+	tlas.destroy();
+	for (vk::BVH& blas : blases) {
+		blas.destroy();
 	}
 	blases.clear();
 }

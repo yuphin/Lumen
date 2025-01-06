@@ -172,7 +172,8 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 	}
 }
 
-void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vector<uint32_t>& descriptor_counts, uint32_t num_as_bindings) {
+void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vector<uint32_t>& descriptor_counts,
+								  uint32_t num_as_bindings) {
 	type = PipelineType::RT;
 	binding_mask = get_bindings_for_shader_set(settings.shaders, descriptor_types);
 	uint32_t num_as_bindings_in_shader = 0;
@@ -193,9 +194,6 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 	}
 	LUMEN_ASSERT(num_as_bindings_in_shader <= MAX_AS_BINDING_COUNT, "Max 2 AS bindings are supported");
 	create_set_layout(settings.shaders, descriptor_counts);
-	if(num_as_bindings == 2) {
-		int a = 4;
-	}
 	create_rt_set_layout(binding_stage_flags, num_as_bindings);
 	create_pipeline_layout(settings.shaders, {push_constant_size});
 	create_update_template(settings.shaders, descriptor_counts);
@@ -203,6 +201,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 	// Descriptor pool for AS descriptors
 	auto pool_size = vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, num_as_bindings);
 	auto descriptor_pool_ci = vk::descriptor_pool(1, &pool_size, 1);
+	descriptor_pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 	vk::check(vkCreateDescriptorPool(vk::context().device, &descriptor_pool_ci, nullptr, &tlas_descriptor_pool));
 	VkDescriptorSetAllocateInfo set_allocate_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
 	set_allocate_info.descriptorPool = tlas_descriptor_pool;
@@ -385,10 +384,9 @@ void Pipeline::cleanup() {
 }
 
 void Pipeline::create_rt_set_layout(VkShaderStageFlags binding_stage_flags, uint32_t num_as_bindings) {
-
 	std::vector<VkDescriptorSetLayoutBinding> set_bindings = {};
 
-	for(uint32_t i = 0; i < num_as_bindings; ++i) {
+	for (uint32_t i = 0; i < num_as_bindings; ++i) {
 		VkDescriptorSetLayoutBinding binding = {};
 		binding.binding = i;
 		binding.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
@@ -397,11 +395,25 @@ void Pipeline::create_rt_set_layout(VkShaderStageFlags binding_stage_flags, uint
 		binding.stageFlags = binding_stage_flags;
 		set_bindings.push_back(binding);
 	}
-	
+
 	VkDescriptorSetLayoutCreateInfo set_create_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-	set_create_info.flags = 0;
+	set_create_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 	set_create_info.bindingCount = uint32_t(set_bindings.size());
 	set_create_info.pBindings = set_bindings.data();
+
+	VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags_ci = {
+		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO};
+	std::vector<VkDescriptorBindingFlags> binding_flags(num_as_bindings);
+	for (uint32_t i = 0; i < num_as_bindings; ++i) {
+		// binding_flags[i] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
+		binding_flags[i] = 0;
+	}
+	binding_flags_ci.bindingCount = num_as_bindings;
+	binding_flags_ci.pBindingFlags = binding_flags.data();
+	binding_flags_ci.pNext = nullptr;
+
+	set_create_info.pNext = &binding_flags_ci;
+
 	vk::check(vkCreateDescriptorSetLayout(vk::context().device, &set_create_info, nullptr, &tlas_layout));
 }
 

@@ -30,11 +30,10 @@ class RenderPass;
 struct PipelineStorage {
 	std::unique_ptr<vk::Pipeline> pipeline;
 	std::vector<ResourceBinding> bound_resources;
-	std::vector<const vk::BVH*> as_bindings;
+	std::vector<vk::BVH> as_bindings;
 	// std::array<const vk::BVH*, vk::MAX_AS_BINDING_COUNT> as_bindings = {nullptr, nullptr};
 	std::unordered_map<std::string, vk::BufferStatus> affected_buffer_pointers;
 	bool update_as_descriptor = false;
-	bool update_scene_descriptor = false;
 };
 
 class RenderGraph {
@@ -49,7 +48,6 @@ class RenderGraph {
 	void submit(vk::CommandBuffer& cmd);
 	void run_and_submit(vk::CommandBuffer& cmd);
 	void destroy();
-	void set_pipelines_dirty(bool mark_tlas_dirty, bool mark_scene_dirty);
 	friend RenderPass;
 	bool reload_shaders = false;
 	std::unordered_map<std::string, vk::Buffer*> registered_buffer_pointers;
@@ -144,7 +142,7 @@ class RenderPass {
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
 	RenderPass& bind_texture_array(std::span<vk::Texture*> texes, bool force_update = false);
 	RenderPass& bind_buffer_array(std::span<vk::Buffer*> buffers, bool force_update = false);
-	RenderPass& bind_as(const vk::BVH& tlas, bool sync = false);
+	RenderPass& bind_as(const vk::BVH& tlas, bool update_descriptor = false);
 
 	RenderPass& read(std::initializer_list<vk::Buffer*> buffers);
 	RenderPass& read(std::initializer_list<vk::Texture*> texes);
@@ -187,6 +185,7 @@ class RenderPass {
    private:
 	std::string name;
 	int next_binding_idx = 0;
+	int next_as_binding_idx = 0;
 	std::vector<uint32_t> descriptor_counts;
 	void* push_constant_data = nullptr;
 	bool is_pipeline_cached = false;

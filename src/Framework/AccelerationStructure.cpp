@@ -32,6 +32,19 @@ static BVH create_acceleration(VkAccelerationStructureCreateInfoKHR& accel) {
 	return result_accel;
 }
 
+void BVH::destroy() {
+	// Destroying AS implies having to update AS descriptors in the render graph with the new AS
+	if (accel) {
+		// vk::render_graph()->update_as_descriptors(*this);
+		vkDestroyAccelerationStructureKHR(vk::context().device, accel, nullptr);
+		accel = VK_NULL_HANDLE;
+	}
+	if (buffer) {
+		prm::remove(buffer);
+		buffer = nullptr;
+	}
+}
+
 static void cmd_create_blas(VkCommandBuffer cmd_buf, std::vector<uint32_t> indices,
 							std::vector<BuildAccelerationStructure>& build_as, VkDeviceAddress scratchAddress,
 							VkQueryPool query_pool) {
@@ -360,7 +373,6 @@ void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 	cmd.submit();
 	drm::destroy(instances_buf);
 	drm::destroy(scratch_buffer);
-	vk::render_graph()->set_pipelines_dirty(true, false);
 }
 
 }  // namespace vk
