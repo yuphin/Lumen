@@ -215,6 +215,7 @@ class RenderPass {
 		VkAccessFlags src_access_flags = VK_ACCESS_SHADER_WRITE_BIT;
 		VkAccessFlags dst_access_flags = VK_ACCESS_SHADER_READ_BIT;
 	};
+	std::vector<BufferBarrier> prefill_buffer_barriers;
 	std::vector<BufferBarrier> buffer_barriers;
 	std::vector<BufferBarrier> post_execution_buffer_barriers;
 

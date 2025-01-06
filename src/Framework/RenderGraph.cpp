@@ -52,7 +52,14 @@ void RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags d
 				// Resource copies happens after the pass execution
 				post_execution_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
 			} else {
-				buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
+				if (flags == BufferSyncFlags::BUFFER_ZERO && src_access_flags == VK_ACCESS_TRANSFER_WRITE_BIT) {
+					// This case happens when there are no dependencies to the buffer being cleared inside the render graph in a frame
+					// Yet we have to ensure syncronization because there are multiple command buffers in flight
+					LUMEN_ASSERT(dst_access_flags == VK_ACCESS_TRANSFER_WRITE_BIT, "Invalid buffer zero flags");
+					prefill_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
+				} else {
+					buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
+				}
 			}
 		}
 	}
@@ -654,6 +661,21 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		for (const auto& info : buffer_sync.dependency_infos) {
 			vkCmdPipelineBarrier2(cmd, &info);
 		}
+	}
+
+	// Prefill buffer barriers
+	{
+		std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
+		buffer_memory_barriers.reserve(prefill_buffer_barriers.size());
+		for (auto& barrier : prefill_buffer_barriers) {
+			auto curr_stage = vk::get_pipeline_stage(type, barrier.src_access_flags);
+			auto dst_stage = vk::get_pipeline_stage(type, barrier.dst_access_flags);
+			buffer_memory_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
+																 barrier.dst_access_flags, curr_stage, dst_stage));
+		}
+		auto dependency_info =
+			vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
+		vkCmdPipelineBarrier2(cmd, &dependency_info);
 	}
 
 	// Zero out resources
