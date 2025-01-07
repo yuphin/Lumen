@@ -251,7 +251,7 @@ void DDGI::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_as(tlas);
+		.bind_tlas(tlas);
 	// Trace rays from probes
 	uint32_t grid_size = probe_counts.x * probe_counts.y * probe_counts.z;
 	vk::render_graph()
@@ -270,7 +270,7 @@ void DDGI::render() {
 		.bind({lumen_scene->mesh_lights_buffer, ddgi_ubo_buffer, rt.radiance_tex, rt.dir_depth_tex,
 			   irr_texes[ping_pong], depth_texes[ping_pong]})
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_as(tlas);
+		.bind_tlas(tlas);
 	// Classify
 	uint32_t wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 31) / 32;
 	vk::render_graph()
@@ -329,7 +329,7 @@ void DDGI::render() {
 			.push_constants(&pc_ray)
 			.bind({output_tex, scene_ubo_buffer, sphere_desc_buffer, lumen_scene->mesh_lights_buffer})
 			.bind_texture_array(lumen_scene->scene_textures)
-			.bind_as(tlas);
+			.bind_tlas(tlas);
 	}
 	// Relocate
 	if (total_frame_idx < 5) {

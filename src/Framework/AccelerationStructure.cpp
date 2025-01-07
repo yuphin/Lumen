@@ -112,7 +112,8 @@ static void cmd_compact_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> indic
 	}
 }
 
-static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, uint32_t primitive_count, vk::Buffer** scratch_buffer,
+static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, uint32_t primitive_count,
+							vk::Buffer** scratch_buffer_ref, bool export_scratch_buffer,
 							VkDeviceAddress inst_buffer_addr, VkBuildAccelerationStructureFlagsKHR flags, bool update) {
 	// Wraps a device pointer to the above uploaded instances.
 	VkAccelerationStructureGeometryInstancesDataKHR instances_vk{
@@ -148,16 +149,27 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, uint32_t primiti
 		tlas = create_acceleration(create_info);
 	}
 
-	// Allocate the scratch memory
-	*scratch_buffer = drm::get({.name = "TLAS Scratch Buffer",
-								.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-								.memory_type = vk::BufferType::STAGING,
-								.size = size_info.buildScratchSize,
-								.dedicated_allocation = false});
+	if (!(export_scratch_buffer && *scratch_buffer_ref && (*scratch_buffer_ref)->size >= size_info.buildScratchSize)) {
+		if (export_scratch_buffer && *scratch_buffer_ref) {
+			// Unfortunately this is needed here since multiple commands in flight may contend for the same scratch
+			// buffer. On application side this can be mitigated by triple buffering the scratch buffer But this is not
+			// always feasible.
+			LUMEN_WARN("BLAS Build: Waiting for device while resizing scratch buffer");
+			vkDeviceWaitIdle(context().device);
+			drm::destroy(*scratch_buffer_ref);
+		}
+		*scratch_buffer_ref =
+			drm::get({.name = "TLAS Scratch Buffer",
+					  .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+					  .memory_type = vk::BufferType::STAGING,
+					  .size = size_info.buildScratchSize,
+					  .dedicated_allocation = false});
+	}
+
 	// Update build information
 	build_info.srcAccelerationStructure = update ? tlas.accel : VK_NULL_HANDLE;
 	build_info.dstAccelerationStructure = tlas.accel;
-	build_info.scratchData.deviceAddress = (*scratch_buffer)->get_device_address();
+	build_info.scratchData.deviceAddress = (*scratch_buffer_ref)->get_device_address();
 
 	// Build Offsets info: n instances
 	VkAccelerationStructureBuildRangeInfoKHR build_offset_info{primitive_count, 0, 0, 0};
@@ -181,8 +193,7 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, uint32_t primiti
 static std::vector<BuildAccelerationStructure> build_blas_impl(const std::vector<BlasInput>& input,
 															   VkBuildAccelerationStructureFlagsKHR flags,
 															   VkCommandBuffer external_cmd_buf,
-															   vk::Buffer** scratch_buffer_ref,
-															   bool export_scratch_buffer) {
+															   vk::Buffer** scratch_buffer_ref) {
 	uint32_t nb_blas = static_cast<uint32_t>(input.size());
 	VkDeviceSize as_total_size{0};	   // Memory size of all allocated BLAS
 	uint32_t nb_compactions{0};		   // Nb of BLAS requesting compaction
@@ -224,6 +235,7 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(const std::vector
 	bool scratch_buffer_created = false;
 	vk::Buffer* scratch_buffer = nullptr;
 
+	bool export_scratch_buffer = external_cmd_buf != VK_NULL_HANDLE;
 	if (export_scratch_buffer && *scratch_buffer_ref && (*scratch_buffer_ref)->size >= max_scratch_size) {
 		scratch_buffer = *scratch_buffer_ref;
 	} else {
@@ -313,21 +325,17 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(const std::vector
 }
 
 void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
-				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer,
-				bool export_scratch_buffer) {
-	std::vector<BuildAccelerationStructure> build_as =
-		build_blas_impl(input, flags, cmd_buf, scratch_buffer, export_scratch_buffer);
+				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer) {
+	std::vector<BuildAccelerationStructure> build_as = build_blas_impl(input, flags, cmd_buf, scratch_buffer);
 	for (auto& ba : build_as) {
 		blases.emplace_back(ba.as);
 	}
 }
 
 void build_blas(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
-				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer,
-				bool export_scratch_buffer) {
+				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer) {
 	LUMEN_ASSERT(blases.size == input.size(), "Mismatch between input and output sizes");
-	std::vector<BuildAccelerationStructure> build_as =
-		build_blas_impl(input, flags, cmd_buf, scratch_buffer, export_scratch_buffer);
+	std::vector<BuildAccelerationStructure> build_as = build_blas_impl(input, flags, cmd_buf, scratch_buffer);
 	for (size_t i = 0; i < blases.size; i++) {
 		blases[i] = build_as[i].as;
 	}
@@ -339,7 +347,8 @@ void build_blas(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
 // - update is to rebuild the Tlas with updated matrices, flag must have the
 // 'allow_update'
 void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
-				VkBuildAccelerationStructureFlagsKHR flags, bool update) {
+				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer_ref,
+				bool update) {
 	// Cannot call buildTlas twice except to update.
 	uint32_t count_instance = static_cast<uint32_t>(instances.size());
 
@@ -354,25 +363,32 @@ void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 										  .size = sizeof(VkAccelerationStructureInstanceKHR) * instances.size(),
 										  .data = instances.data(),
 										  .dedicated_allocation = true});
-	vk::CommandBuffer cmd(true, 0, QueueType::GFX);
 	// Make sure the copy of the instance buffer are copied before triggering
 	// the acceleration structure build
 	VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
 	barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 	barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
-	vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_TRANSFER_BIT,
-						 VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0,
-						 nullptr);
 
-	vk::Buffer* scratch_buffer;
-	// Creating the TLAS
-	cmd_create_tlas(tlas, cmd.handle, count_instance, &scratch_buffer, instances_buf->get_device_address(), flags,
-					update);
-
-	// Finalizing and destroying temporary data
-	cmd.submit();
+	if (cmd_buf) {
+		vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_TRANSFER_BIT,
+							 VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0,
+							 nullptr);
+		// Creating the TLAS
+		cmd_create_tlas(tlas, cmd_buf, count_instance, scratch_buffer_ref, /*export_scratch_buffer=*/true,
+						instances_buf->get_device_address(), flags, update);
+	} else {
+		vk::Buffer* scratch_buffer;
+		vk::CommandBuffer cmd(true, 0, QueueType::GFX);
+		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_TRANSFER_BIT,
+							 VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0,
+							 nullptr);
+		// Creating the TLAS
+		cmd_create_tlas(tlas, cmd.handle, count_instance, &scratch_buffer, /*export_scratch_buffer=*/false,
+						instances_buf->get_device_address(), flags, update);
+		cmd.submit();
+		drm::destroy(scratch_buffer);
+	}
 	drm::destroy(instances_buf);
-	drm::destroy(scratch_buffer);
 }
 
 }  // namespace vk

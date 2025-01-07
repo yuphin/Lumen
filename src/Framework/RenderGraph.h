@@ -142,7 +142,7 @@ class RenderPass {
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
 	RenderPass& bind_texture_array(std::span<vk::Texture*> texes, bool force_update = false);
 	RenderPass& bind_buffer_array(std::span<vk::Buffer*> buffers, bool force_update = false);
-	RenderPass& bind_as(const vk::BVH& tlas, bool update_descriptor = false);
+	RenderPass& bind_tlas(const vk::BVH& tlas, bool update_descriptor = false);
 
 	RenderPass& read(std::initializer_list<vk::Buffer*> buffers);
 	RenderPass& read(std::initializer_list<vk::Texture*> texes);
@@ -229,7 +229,12 @@ class RenderPass {
 		VkBuildAccelerationStructureFlagsKHR flags;
 		inline bool is_valid() { return !blases.empty(); }
 	};
+
+	struct TlasBuildData {
+
+	};
 	BlasBuildData blas_build_data;
+	TlasBuildData tlas_build_data;
 
 	RenderPass& read(vk::Texture* tex);
 	RenderPass& read(vk::Buffer* buffer);

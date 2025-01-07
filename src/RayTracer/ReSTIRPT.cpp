@@ -207,7 +207,7 @@ void ReSTIRPT::render() {
 			.push_constants(&pc_ray)
 			.bind(common_bindings)
 			.bind_texture_array(lumen_scene->scene_textures)
-			.bind_as(tlas);
+			.bind_tlas(tlas);
 
 		VkAccelerationStructureGeometryAabbsDataKHR aabbs_data{
 			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR};
@@ -249,7 +249,7 @@ void ReSTIRPT::render() {
 			.build_blas(util::Slice(photon_blases.data() + in_flight_frame_idx, 1), photon_blas_inputs,
 						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, {caustic_photon_aabbs_buffer},
 						&photon_bvh_scratch_buf)
-			.bind_as(tlas);
+			.bind_tlas(tlas);
 	}
 
 	// Trace rays
@@ -273,8 +273,8 @@ void ReSTIRPT::render() {
 		.bind(canonical_contributions_texture)
 		.bind(direct_lighting_texture)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_as(tlas);
-		// .bind_as(photon_blases[prev_frame_idx], true);
+		.bind_tlas(tlas);
+		// .bind_tlas(photon_blases[prev_frame_idx], true);
 
 	pc_ray.general_seed = rand() % UINT_MAX;
 	if (enable_gris) {
@@ -298,7 +298,7 @@ void ReSTIRPT::render() {
 			.bind(gbuffers[ping])
 			.bind(canonical_contributions_texture)
 			.bind_texture_array(lumen_scene->scene_textures)
-			.bind_as(tlas)
+			.bind_tlas(tlas)
 			.skip_execution(!should_do_temporal);
 		pc_ray.seed2 = rand() % UINT_MAX;
 		if (!canonical_only) {
@@ -321,7 +321,7 @@ void ReSTIRPT::render() {
 					.bind(canonical_contributions_texture)
 					.bind(direct_lighting_texture)
 					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_as(tlas);
+					.bind_tlas(tlas);
 			} else {
 				// Retrace
 				vk::render_graph()
@@ -340,7 +340,7 @@ void ReSTIRPT::render() {
 					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
 					.bind(gbuffers[pong])
 					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_as(tlas);
+					.bind_tlas(tlas);
 				// Validate
 				vk::render_graph()
 					->add_rt("GRIS - Validate Samples",
@@ -358,7 +358,7 @@ void ReSTIRPT::render() {
 					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
 					.bind(gbuffers[pong])
 					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_as(tlas);
+					.bind_tlas(tlas);
 
 				// Spatial Reuse
 				vk::render_graph()
@@ -382,7 +382,7 @@ void ReSTIRPT::render() {
 					.bind(canonical_contributions_texture)
 					.bind(direct_lighting_texture)
 					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_as(tlas);
+					.bind_tlas(tlas);
 			}
 			if (pixel_debug || (gris_separator < 1.0f && gris_separator > 0.0f)) {
 				uint32_t num_wgs = uint32_t((Window::width() * Window::height() + 1023) / 1024);

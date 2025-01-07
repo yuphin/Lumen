@@ -55,7 +55,7 @@ void Path::render() {
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
 		//.write(output_tex) // Needed if the automatic shader inference is disabled
-		.bind_as(tlas);
+		.bind_tlas(tlas);
 }
 
 bool Path::update() {

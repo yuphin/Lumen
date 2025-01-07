@@ -315,7 +315,7 @@ void VCMMLT::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_as(tlas);
+		.bind_tlas(tlas);
 	// Start bootstrap sampling
 	pipeline_name = "VCMMLT - Bootstrap " + pipeline_postfix;
 	rg->add_rt(pipeline_name,
@@ -332,7 +332,7 @@ void VCMMLT::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_as(tlas);
+		.bind_tlas(tlas);
 	int counter = 0;
 	prefix_scan(0, config->num_bootstrap_samples, counter, rg);
 	// Calculate CDF
@@ -364,7 +364,7 @@ void VCMMLT::render() {
 			.bind(rt_bindings)
 			.bind(lumen_scene->mesh_lights_buffer)
 			.bind_texture_array(lumen_scene->scene_textures)
-			.bind_as(tlas);
+			.bind_tlas(tlas);
 		// Sum up chain stats
 		sum_up_chain_data();
 	}
@@ -395,7 +395,7 @@ void VCMMLT::render() {
 				.bind(rt_bindings)
 				.bind(lumen_scene->mesh_lights_buffer)
 				.bind_texture_array(lumen_scene->scene_textures)
-				.bind_as(tlas);
+				.bind_tlas(tlas);
 			sum_up_chain_data();
 			// Normalization
 			rg->add_compute(

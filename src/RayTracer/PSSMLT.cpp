@@ -249,7 +249,7 @@ void PSSMLT::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_as(tlas);
+		.bind_tlas(tlas);
 
 	int counter = 0;
 	prefix_scan(0, config->num_bootstrap_samples, counter, vk::render_graph());
@@ -322,7 +322,7 @@ void PSSMLT::render() {
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_as(tlas);
+		.bind_tlas(tlas);
 
 	rg->run_and_submit(cmd);
 	// Start mutations
@@ -344,7 +344,7 @@ void PSSMLT::render() {
 				.bind(rt_bindings)
 				.bind(lumen_scene->mesh_lights_buffer)
 				.bind_texture_array(lumen_scene->scene_textures)
-				.bind_as(tlas);
+				.bind_tlas(tlas);
 		};
 		const uint32_t iter_cnt = 100;
 		const uint32_t freq = mutation_count / iter_cnt;

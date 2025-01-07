@@ -86,7 +86,7 @@ void BDPT::render() {
 		})
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_as(tlas);
+		.bind_tlas(tlas);
 	//.finalize();
 }
 

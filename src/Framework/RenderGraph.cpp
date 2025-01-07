@@ -393,7 +393,7 @@ RenderPass& RenderPass::bind_buffer_array(std::span<vk::Buffer*> buffers, bool f
 	return *this;
 }
 
-RenderPass& RenderPass::bind_as(const vk::BVH& tlas, bool update_descriptor) {
+RenderPass& RenderPass::bind_tlas(const vk::BVH& tlas, bool update_descriptor) {
 	LUMEN_ASSERT(type == vk::PassType::RT, "TLAS can only be bound to RT pipelines");
 	LUMEN_ASSERT(pipeline_storage->as_bindings.size() <= vk::MAX_AS_BINDING_COUNT &&
 					 next_as_binding_idx < vk::MAX_AS_BINDING_COUNT,
@@ -666,7 +666,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			vkCmdPipelineBarrier2(cmd, &info);
 		}
 	}
-	
+
 	// TODO: Combine barriers and signals
 
 	// Prefill buffer barriers
@@ -917,7 +917,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	if (blas_build_data.is_valid()) {
 		GPUQueryManager::begin(cmd, "BLAS Build");
 		vk::build_blas(blas_build_data.blases, blas_build_data.blas_inputs, blas_build_data.flags, cmd,
-					   blas_build_data.scratch_buffer_ref, /*export_scratch_buffer=*/true);
+					   blas_build_data.scratch_buffer_ref);
 		GPUQueryManager::end(cmd);
 #if 0
 		std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
