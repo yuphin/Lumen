@@ -33,8 +33,7 @@ class ReSTIRPT final : public Integrator {
 	vk::Texture* direct_lighting_texture;
 
 	vk::Buffer* photon_bvh_scratch_buf = nullptr;
-	vk::Buffer* photon_bvh_scratch_buf2 = nullptr;
-	vk::Buffer* photon_bvh_instances_buf = nullptr;
+	vk::Buffer* photon_bvh_instances_buf[3] = {nullptr, nullptr, nullptr};
 
 	PCReSTIRPT pc_ray{};
 	bool enable_accumulation = false;

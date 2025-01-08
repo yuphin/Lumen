@@ -129,15 +129,17 @@ void ReSTIRPT::init() {
 	// Set to 0, will be updated during BLAS build
 	tlas_instance.accelerationStructureReference = 0;
 
-	photon_bvh_instances_buf =
-		prm::get_buffer({.name = "Photon BVH Instances",
-						 .usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-						 .memory_type = vk::BufferType::CPU_TO_GPU,
-						 .size = sizeof(VkAccelerationStructureInstanceKHR),
-						 .create_mapped = true,
-						 .data = &tlas_instance,
-						 .dedicated_allocation = true});
+	for (int i = 0; i < vk::MAX_FRAMES_IN_FLIGHT; i++) {
+		photon_bvh_instances_buf[i] =
+			prm::get_buffer({.name = "Photon BVH Instances",
+							 .usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+									  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+							 .memory_type = vk::BufferType::CPU_TO_GPU,
+							 .size = sizeof(VkAccelerationStructureInstanceKHR),
+							 .create_mapped = true,
+							 .data = &tlas_instance,
+							 .dedicated_allocation = true});
+	}
 
 	pc_ray.total_light_area = 0;
 
@@ -216,8 +218,6 @@ void ReSTIRPT::render() {
 		photon_blas.destroy();
 		photon_tlas.destroy();
 
-		vk::CommandBuffer cmd(true);
-
 		vk::render_graph()
 			->add_rt("PM - Trace First Diffuse",
 					 {
@@ -234,8 +234,6 @@ void ReSTIRPT::render() {
 			.bind_texture_array(lumen_scene->scene_textures)
 			.bind_tlas(tlas);
 
-		vk::render_graph()->run_and_submit(cmd);
-		cmd.begin();
 		// For BLAS
 		VkAccelerationStructureGeometryAabbsDataKHR aabbs_data{
 			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR};
@@ -277,14 +275,11 @@ void ReSTIRPT::render() {
 			.build_blas(util::Slice(photon_blases.data() + in_flight_frame_idx, 1), photon_blas_inputs,
 						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, {caustic_photon_aabbs_buffer},
 						&photon_bvh_scratch_buf)
-			.build_tlas(photon_tlases[in_flight_frame_idx], photon_bvh_instances_buf, 1,
-						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, &photon_bvh_scratch_buf2,
+			.build_tlas(photon_tlases[in_flight_frame_idx], photon_bvh_instances_buf[in_flight_frame_idx], 1,
+						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, &photon_bvh_scratch_buf,
 						/*update_blas_address=*/true)
 			.bind_tlas(tlas);
-
-		vk::render_graph()->run_and_submit(cmd);
 	}
-
 
 	// Trace rays
 	vk::render_graph()
@@ -465,12 +460,17 @@ void ReSTIRPT::destroy(bool resize) {
 		drm::destroy(photon_bvh_scratch_buf);
 		photon_bvh_scratch_buf = nullptr;
 	}
-	if (photon_bvh_instances_buf) {
-		drm::destroy(photon_bvh_instances_buf);
-		photon_bvh_instances_buf = nullptr;
-	}
+	drm::destroy(photon_bvh_instances_buf[0]);
+	drm::destroy(photon_bvh_instances_buf[1]);
+	drm::destroy(photon_bvh_instances_buf[2]);
+	photon_bvh_instances_buf[0] = nullptr;
+	photon_bvh_instances_buf[1] = nullptr;
+	photon_bvh_instances_buf[2] = nullptr;
 	if (!resize) {
 		for (vk::BVH& bvh : photon_blases) {
+			bvh.destroy();
+		}
+		for(vk::BVH& bvh : photon_tlases) {
 			bvh.destroy();
 		}
 	}

@@ -939,17 +939,17 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		auto curr_stage = VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
 		auto dst_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 		buffer_memory_barriers.push_back(vk::buffer_barrier2(
-			blas_build_data.blases->at(0).buffer->handle, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+			blas_build_data.blases[0].buffer->handle, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
 			VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR, curr_stage, dst_stage));
 		auto dependency_info =
 			vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
 		vkCmdPipelineBarrier2(cmd, &dependency_info);
 #endif
 
-		if(tlas_build_data.update_blas_address) {
-			LUMEN_ASSERT(tlas_build_data.tlas, "TLAS reference is null"); 
+		if (tlas_build_data.update_blas_address) {
+			LUMEN_ASSERT(tlas_build_data.tlas, "TLAS reference is null");
 			void* instance_data = vk::map_buffer(tlas_build_data.instances_buf);
-			for(size_t i = 0; i < blas_build_data.blases.size; i++) {
+			for (size_t i = 0; i < blas_build_data.blases.size; i++) {
 				VkAccelerationStructureInstanceKHR* instance = (VkAccelerationStructureInstanceKHR*)instance_data + i;
 				instance->accelerationStructureReference = blas_build_data.blases[i].get_device_address();
 			}
@@ -959,10 +959,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 	if (tlas_build_data.is_valid()) {
 		GPUQueryManager::begin(cmd, "TLAS Build");
-		vkDeviceWaitIdle(vk::context().device);
 		vk::build_tlas(*tlas_build_data.tlas, tlas_build_data.instances_buf, tlas_build_data.instance_count,
 					   tlas_build_data.flags, cmd, tlas_build_data.scratch_buffer_ref);
-		vkDeviceWaitIdle(vk::context().device);
 		GPUQueryManager::end(cmd);
 	}
 
