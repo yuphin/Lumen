@@ -170,6 +170,10 @@ class RenderPass {
 	RenderPass& build_blas(util::Slice<vk::BVH> blases, const std::vector<vk::BlasInput>& blas_inputs,
 						   VkBuildAccelerationStructureFlagsKHR flags, const std::vector<vk::Buffer*>& source_buffers,
 						   vk::Buffer** scratch_buffer_ref);
+	RenderPass& build_tlas(vk::BVH& tlas, vk::Buffer* instances_buf, uint32_t instance_count,
+						   VkBuildAccelerationStructureFlagsKHR flags, vk::Buffer** scratch_buffer_ref,
+						   bool update_blas_address = false, bool update_blas = false);
+
 	void finalize();
 	friend RenderGraph;
 
@@ -231,7 +235,14 @@ class RenderPass {
 	};
 
 	struct TlasBuildData {
-
+		vk::BVH* tlas = nullptr;
+		vk::Buffer* instances_buf = nullptr;
+		vk::Buffer** scratch_buffer_ref = nullptr;
+		uint32_t instance_count = 0;
+		bool update_blas_address = false;
+		bool update_tlas = false;
+		VkBuildAccelerationStructureFlagsKHR flags;
+		inline bool is_valid() { return instance_count != 0; }
 	};
 	BlasBuildData blas_build_data;
 	TlasBuildData tlas_build_data;

@@ -12,6 +12,7 @@ struct BufferDesc {
 	VkBufferUsageFlags usage;
 	BufferType memory_type;
 	VkDeviceSize size;
+	bool create_mapped = false;
 	void* data = nullptr;
 	// For now this is set to true by default
 	// Otherwise on state changes the previous memory data is *spilled* to the persistent memory

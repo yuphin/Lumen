@@ -7,34 +7,32 @@
 
 void Integrator::init() {
 	lumen::Camera* cam_ptr = lumen_scene->camera.get();
-	Window::add_mouse_click_callback(
-		[this](MouseAction button, KeyAction action, double x, double y) {
-			if (ImGui::GetIO().WantCaptureMouse) {
-				return;
-			}
-			if (updated && Window::is_mouse_up(MouseAction::LEFT)) {
-				updated = true;
-			}
-			if (updated && Window::is_mouse_down(MouseAction::LEFT)) {
-				updated = true;
-			}
-		});
-	Window::add_mouse_move_callback(
-		[cam_ptr, this](double delta_x, double delta_y, double x, double y) {
-			if (ImGui::GetIO().WantCaptureMouse) {
-				return;
-			}
-			if (Window::is_mouse_held(MouseAction::LEFT) && !Window::is_key_held(KeyInput::KEY_TAB)) {
-				cam_ptr->rotate(0.05f * (float)delta_y, -0.05f * (float)delta_x, 0.0f);
-				updated = true;
-			}
-		});
+	Window::add_mouse_click_callback([this](MouseAction button, KeyAction action, double x, double y) {
+		if (ImGui::GetIO().WantCaptureMouse) {
+			return;
+		}
+		if (updated && Window::is_mouse_up(MouseAction::LEFT)) {
+			updated = true;
+		}
+		if (updated && Window::is_mouse_down(MouseAction::LEFT)) {
+			updated = true;
+		}
+	});
+	Window::add_mouse_move_callback([cam_ptr, this](double delta_x, double delta_y, double x, double y) {
+		if (ImGui::GetIO().WantCaptureMouse) {
+			return;
+		}
+		if (Window::is_mouse_held(MouseAction::LEFT) && !Window::is_key_held(KeyInput::KEY_TAB)) {
+			cam_ptr->rotate(0.05f * (float)delta_y, -0.05f * (float)delta_x, 0.0f);
+			updated = true;
+		}
+	});
 
 	output_tex = prm::get_texture({
 		.name = "Color Output",
 		.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
 				 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-		.dimensions = {Window::width(), Window::height() , 1},
+		.dimensions = {Window::width(), Window::height(), 1},
 		.format = VK_FORMAT_R32G32B32A32_SFLOAT,
 		.initial_layout = VK_IMAGE_LAYOUT_GENERAL,
 	});
@@ -112,18 +110,15 @@ bool Integrator::update() {
 		updated = true;
 	}
 
-	if (Window::is_mouse_held(MouseAction::LEFT, scene_ubo.clicked_pos) &&
-		Window::is_key_held(KeyInput::KEY_TAB)) {
+	if (Window::is_mouse_held(MouseAction::LEFT, scene_ubo.clicked_pos) && Window::is_key_held(KeyInput::KEY_TAB)) {
 		scene_ubo.debug_click = 1;
 	} else {
 		scene_ubo.debug_click = 0;
 	}
 
-	
 	update_uniform_buffers();
 	return updated;
 }
-
 
 void Integrator::destroy(bool resize) {
 	auto buffer_list = {scene_ubo_buffer, lumen_scene->scene_desc_buffer};
@@ -131,7 +126,6 @@ void Integrator::destroy(bool resize) {
 		prm::remove(b);
 	}
 	prm::remove(output_tex);
-
 }
 
 void Integrator::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
@@ -143,7 +137,9 @@ void Integrator::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh, vertex_address, idx_address);
 		blas_inputs.push_back({geo});
 	}
-	vk::build_blas(blases, blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
+	vk::build_blas(blases, blas_inputs,
+				   VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
+					   VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 	std::vector<VkAccelerationStructureInstanceKHR> tlas_instances;
 	for (const auto& pm : lumen_scene->prim_meshes) {
 		VkAccelerationStructureInstanceKHR ray_inst{};

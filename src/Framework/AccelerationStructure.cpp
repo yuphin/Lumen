@@ -18,11 +18,11 @@ struct BuildAccelerationStructure {
 
 inline static bool has_flag(VkFlags item, VkFlags flag) { return (item & flag) == flag; }
 
-static BVH create_acceleration(VkAccelerationStructureCreateInfoKHR& accel) {
+static BVH create_acceleration(VkAccelerationStructureCreateInfoKHR& accel, const char* name) {
 	BVH result_accel;
 	// TODO: Potential synchronization issue here if multiple threads contend
 	result_accel.buffer = prm::get_buffer(
-		{.name = "Blas Buffer",
+		{.name = name,
 		 .usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		 .memory_type = vk::BufferType::GPU,
 		 .size = accel.size,
@@ -57,7 +57,7 @@ static void cmd_create_blas(VkCommandBuffer cmd_buf, std::vector<uint32_t> indic
 		VkAccelerationStructureCreateInfoKHR as_ci{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
 		as_ci.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 		as_ci.size = build_as[idx].size_info.accelerationStructureSize;	 // Will be used to allocate memory.
-		build_as[idx].as = create_acceleration(as_ci);
+		build_as[idx].as = create_acceleration(as_ci, "BLAS buffer");
 		// BuildInfo #2 part
 		build_as[idx].build_info.dstAccelerationStructure = build_as[idx].as.accel;	 // Setting where the build lands
 		build_as[idx].build_info.scratchData.deviceAddress =
@@ -84,7 +84,7 @@ static void cmd_create_blas(VkCommandBuffer cmd_buf, std::vector<uint32_t> indic
 	}
 }
 
-static void cmd_compact_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> indices,
+static void cmd_compact_blas(VkCommandBuffer cmd_buf, std::vector<uint32_t> indices,
 							 std::vector<BuildAccelerationStructure>& build_as, VkQueryPool query_pool) {
 	uint32_t query_cnt{0};
 	std::vector<BVH> cleanupAS;	 // previous AS to destroy
@@ -102,13 +102,13 @@ static void cmd_compact_blas(VkCommandBuffer cmdBuf, std::vector<uint32_t> indic
 		VkAccelerationStructureCreateInfoKHR asCreateInfo{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
 		asCreateInfo.size = build_as[idx].size_info.accelerationStructureSize;
 		asCreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-		build_as[idx].as = create_acceleration(asCreateInfo);
+		build_as[idx].as = create_acceleration(asCreateInfo, "BLAS compact buffer");
 		// Copy the original BLAS to a compact version
 		VkCopyAccelerationStructureInfoKHR copyInfo{VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR};
 		copyInfo.src = build_as[idx].build_info.dstAccelerationStructure;
 		copyInfo.dst = build_as[idx].as.accel;
 		copyInfo.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR;
-		vkCmdCopyAccelerationStructureKHR(cmdBuf, &copyInfo);
+		vkCmdCopyAccelerationStructureKHR(cmd_buf, &copyInfo);
 	}
 }
 
@@ -146,7 +146,7 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, uint32_t primiti
 		VkAccelerationStructureCreateInfoKHR create_info{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
 		create_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
 		create_info.size = size_info.accelerationStructureSize;
-		tlas = create_acceleration(create_info);
+		tlas = create_acceleration(create_info, "TLAS buffer");
 	}
 
 	if (!(export_scratch_buffer && *scratch_buffer_ref && (*scratch_buffer_ref)->size >= size_info.buildScratchSize)) {
@@ -341,28 +341,10 @@ void build_blas(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
 	}
 }
 
-// Build TLAS from an array of VkAccelerationStructureInstanceKHR
-// - Use motion=true with VkAccelerationStructureMotionInstanceNV
-// - The resulting TLAS will be stored in m_tlas
-// - update is to rebuild the Tlas with updated matrices, flag must have the
-// 'allow_update'
-void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
-				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer_ref,
-				bool update) {
-	// Cannot call buildTlas twice except to update.
-	uint32_t count_instance = static_cast<uint32_t>(instances.size());
-
-	// Command buffer to create the TLAS
-
-	// Create a buffer holding the actual instance data (matrices++) for use by
-	// the AS builder
-	vk::Buffer* instances_buf = drm::get({.name = "TLAS Instances Buffer",
-										  .usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-												   VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-										  .memory_type = vk::BufferType::GPU,
-										  .size = sizeof(VkAccelerationStructureInstanceKHR) * instances.size(),
-										  .data = instances.data(),
-										  .dedicated_allocation = true});
+static void build_tlas_impl(BVH& tlas, util::Slice<VkAccelerationStructureInstanceKHR> instances,
+							VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf,
+							vk::Buffer** scratch_buffer_ref, vk::Buffer* instances_buf, uint32_t count_instance,
+							bool update) {
 	// Make sure the copy of the instance buffer are copied before triggering
 	// the acceleration structure build
 	VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
@@ -387,8 +369,56 @@ void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 						instances_buf->get_device_address(), flags, update);
 		cmd.submit();
 		drm::destroy(scratch_buffer);
+		drm::destroy(instances_buf);
 	}
+}
+
+// Build TLAS from an array of VkAccelerationStructureInstanceKHR
+// - Use motion=true with VkAccelerationStructureMotionInstanceNV
+// - The resulting TLAS will be stored in m_tlas
+// - update is to rebuild the Tlas with updated matrices, flag must have the
+// 'allow_update'
+void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
+				VkBuildAccelerationStructureFlagsKHR flags, bool update) {
+	uint32_t instance_count = static_cast<uint32_t>(instances.size());
+
+	vk::Buffer* instances_buf = drm::get({.name = "TLAS Instances Buffer",
+										  .usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+												   VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+										  .memory_type = vk::BufferType::GPU,
+										  .size = sizeof(VkAccelerationStructureInstanceKHR) * instances.size(),
+										  .data = instances.data(),
+										  .dedicated_allocation = true});
+	VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+	barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+
+	vk::Buffer* scratch_buffer;
+	vk::CommandBuffer cmd(true, 0, QueueType::GFX);
+	vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_TRANSFER_BIT,
+						 VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0,
+						 nullptr);
+	// Creating the TLAS
+	cmd_create_tlas(tlas, cmd.handle, instance_count, &scratch_buffer, /*export_scratch_buffer=*/false,
+					instances_buf->get_device_address(), flags, update);
+	cmd.submit();
+	drm::destroy(scratch_buffer);
 	drm::destroy(instances_buf);
+}
+
+void build_tlas(BVH& tlas, vk::Buffer* instances_buf, uint32_t instance_count,
+				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer_ref,
+				bool update) {
+	VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+	barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+
+	vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_TRANSFER_BIT,
+						 VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0,
+						 nullptr);
+	// Creating the TLAS
+	cmd_create_tlas(tlas, cmd_buf, instance_count, scratch_buffer_ref, /*export_scratch_buffer=*/true,
+					instances_buf->get_device_address(), flags, update);
 }
 
 }  // namespace vk

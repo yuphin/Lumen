@@ -530,6 +530,21 @@ RenderPass& RenderPass::build_blas(util::Slice<vk::BVH> blases, const std::vecto
 	return *this;
 }
 
+RenderPass& RenderPass::build_tlas(vk::BVH& tlas, vk::Buffer* instances_buf, uint32_t instance_count,
+								   VkBuildAccelerationStructureFlagsKHR flags, vk::Buffer** scratch_buffer_ref,
+								   bool update_blas_address, bool update_tlas) {
+	LUMEN_ASSERT(!tlas_build_data.is_valid(), "Only one TLAS build per pass is supported");
+
+	tlas_build_data.tlas = &tlas;
+	tlas_build_data.instance_count = instance_count;
+	tlas_build_data.flags = flags;
+	tlas_build_data.instances_buf = instances_buf;
+	tlas_build_data.scratch_buffer_ref = scratch_buffer_ref;
+	tlas_build_data.update_blas_address = update_blas_address;
+	tlas_build_data.update_tlas = update_tlas;
+	return *this;
+}
+
 void RenderPass::finalize() {
 	// Create pipelines/push descriptor templates
 
@@ -930,6 +945,25 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
 		vkCmdPipelineBarrier2(cmd, &dependency_info);
 #endif
+
+		if(tlas_build_data.update_blas_address) {
+			LUMEN_ASSERT(tlas_build_data.tlas, "TLAS reference is null"); 
+			void* instance_data = vk::map_buffer(tlas_build_data.instances_buf);
+			for(size_t i = 0; i < blas_build_data.blases.size; i++) {
+				VkAccelerationStructureInstanceKHR* instance = (VkAccelerationStructureInstanceKHR*)instance_data + i;
+				instance->accelerationStructureReference = blas_build_data.blases[i].get_device_address();
+			}
+			vk::unmap_buffer(tlas_build_data.instances_buf);
+		}
+	}
+
+	if (tlas_build_data.is_valid()) {
+		GPUQueryManager::begin(cmd, "TLAS Build");
+		vkDeviceWaitIdle(vk::context().device);
+		vk::build_tlas(*tlas_build_data.tlas, tlas_build_data.instances_buf, tlas_build_data.instance_count,
+					   tlas_build_data.flags, cmd, tlas_build_data.scratch_buffer_ref);
+		vkDeviceWaitIdle(vk::context().device);
+		GPUQueryManager::end(cmd);
 	}
 
 	// Set: Buffer

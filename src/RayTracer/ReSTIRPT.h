@@ -33,6 +33,8 @@ class ReSTIRPT final : public Integrator {
 	vk::Texture* direct_lighting_texture;
 
 	vk::Buffer* photon_bvh_scratch_buf = nullptr;
+	vk::Buffer* photon_bvh_scratch_buf2 = nullptr;
+	vk::Buffer* photon_bvh_instances_buf = nullptr;
 
 	PCReSTIRPT pc_ray{};
 	bool enable_accumulation = false;
@@ -62,4 +64,6 @@ class ReSTIRPT final : public Integrator {
 	ReSTIRPTConfig* config;
 
 	std::array<vk::BVH, vk::MAX_FRAMES_IN_FLIGHT> photon_blases;
+	std::array<vk::BVH, vk::MAX_FRAMES_IN_FLIGHT> photon_tlases;
+
 };

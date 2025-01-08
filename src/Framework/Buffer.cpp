@@ -31,12 +31,17 @@ void create_buffer(Buffer* buffer, const BufferDesc& desc) {
 	if (buffer->usage_flags & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) {
 		alloc_ci.flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
 	}
-	if(desc.dedicated_allocation) {
+	if (desc.dedicated_allocation) {
 		alloc_ci.flags |= VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+	}
+
+	if (desc.create_mapped) {
+		alloc_ci.flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
 	}
 	VkBufferCreateInfo buffer_ci = vk::buffer(buffer->usage_flags, buffer->size, VK_SHARING_MODE_EXCLUSIVE);
 	VmaAllocationInfo alloc_info;
-	vk::check(vmaCreateBuffer(vk::context().allocator, &buffer_ci, &alloc_ci, &buffer->handle, &buffer->allocation, &alloc_info));
+	vk::check(vmaCreateBuffer(vk::context().allocator, &buffer_ci, &alloc_ci, &buffer->handle, &buffer->allocation,
+							  &alloc_info));
 	if (!buffer->name.empty()) {
 		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)buffer->handle, buffer->name.data(),
 										   VK_OBJECT_TYPE_BUFFER);
@@ -94,8 +99,6 @@ void* map_buffer(Buffer* buffer) {
 	vmaMapMemory(vk::context().allocator, buffer->allocation, &memory);
 	return memory;
 }
-void unmap_buffer(Buffer* buffer)  {
-	vmaUnmapMemory(vk::context().allocator, buffer->allocation);
-}
+void unmap_buffer(Buffer* buffer) { vmaUnmapMemory(vk::context().allocator, buffer->allocation); }
 
 }  // namespace vk

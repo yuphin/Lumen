@@ -34,6 +34,9 @@ void build_blas(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd = VK_NULL_HANDLE,
 				vk::Buffer** scratch_buffer_ref = nullptr);
 void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
-				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd = VK_NULL_HANDLE,
-				vk::Buffer** scratch_buffer_ref = nullptr, bool update = false);
+				VkBuildAccelerationStructureFlagsKHR flags, bool update = false);
+void build_tlas(BVH& tlas, vk::Buffer* instances_buf, uint32_t instance_count,
+				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer_ref,
+				bool update = false);
+
 }  // namespace vk
