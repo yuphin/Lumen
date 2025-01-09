@@ -142,7 +142,7 @@ class RenderPass {
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
 	RenderPass& bind_texture_array(std::span<vk::Texture*> texes, bool force_update = false);
 	RenderPass& bind_buffer_array(std::span<vk::Buffer*> buffers, bool force_update = false);
-	RenderPass& bind_tlas(const vk::BVH& tlas, bool update_descriptor = false);
+	RenderPass& bind_tlas(const vk::BVH& tlas);
 
 	RenderPass& read(std::initializer_list<vk::Buffer*> buffers);
 	RenderPass& read(std::initializer_list<vk::Texture*> texes);
@@ -172,7 +172,7 @@ class RenderPass {
 						   vk::Buffer** scratch_buffer_ref);
 	RenderPass& build_tlas(vk::BVH& tlas, vk::Buffer* instances_buf, uint32_t instance_count,
 						   VkBuildAccelerationStructureFlagsKHR flags, vk::Buffer** scratch_buffer_ref,
-						   bool update_blas_address = false, bool update_blas = false);
+						   bool build_tlas_after_blas = false, bool update_blas = false);
 
 	void finalize();
 	friend RenderGraph;
@@ -239,7 +239,7 @@ class RenderPass {
 		vk::Buffer* instances_buf = nullptr;
 		vk::Buffer** scratch_buffer_ref = nullptr;
 		uint32_t instance_count = 0;
-		bool update_blas_address = false;
+		bool build_tlas_after_blas = false;
 		bool update_tlas = false;
 		VkBuildAccelerationStructureFlagsKHR flags;
 		inline bool is_valid() { return instance_count != 0; }

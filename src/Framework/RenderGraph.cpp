@@ -393,7 +393,7 @@ RenderPass& RenderPass::bind_buffer_array(std::span<vk::Buffer*> buffers, bool f
 	return *this;
 }
 
-RenderPass& RenderPass::bind_tlas(const vk::BVH& tlas, bool update_descriptor) {
+RenderPass& RenderPass::bind_tlas(const vk::BVH& tlas) {
 	LUMEN_ASSERT(type == vk::PassType::RT, "TLAS can only be bound to RT pipelines");
 	LUMEN_ASSERT(pipeline_storage->as_bindings.size() <= vk::MAX_AS_BINDING_COUNT &&
 					 next_as_binding_idx < vk::MAX_AS_BINDING_COUNT,
@@ -406,7 +406,6 @@ RenderPass& RenderPass::bind_tlas(const vk::BVH& tlas, bool update_descriptor) {
 		}
 		pipeline_storage->as_bindings[next_as_binding_idx] = tlas;
 	}
-	pipeline_storage->update_as_descriptor |= update_descriptor;
 	next_as_binding_idx++;
 	return *this;
 }
@@ -532,7 +531,7 @@ RenderPass& RenderPass::build_blas(util::Slice<vk::BVH> blases, const std::vecto
 
 RenderPass& RenderPass::build_tlas(vk::BVH& tlas, vk::Buffer* instances_buf, uint32_t instance_count,
 								   VkBuildAccelerationStructureFlagsKHR flags, vk::Buffer** scratch_buffer_ref,
-								   bool update_blas_address, bool update_tlas) {
+								   bool build_tlas_after_blas, bool update_tlas) {
 	LUMEN_ASSERT(!tlas_build_data.is_valid(), "Only one TLAS build per pass is supported");
 
 	tlas_build_data.tlas = &tlas;
@@ -540,7 +539,7 @@ RenderPass& RenderPass::build_tlas(vk::BVH& tlas, vk::Buffer* instances_buf, uin
 	tlas_build_data.flags = flags;
 	tlas_build_data.instances_buf = instances_buf;
 	tlas_build_data.scratch_buffer_ref = scratch_buffer_ref;
-	tlas_build_data.update_blas_address = update_blas_address;
+	tlas_build_data.build_tlas_after_blas = build_tlas_after_blas;
 	tlas_build_data.update_tlas = update_tlas;
 	return *this;
 }
@@ -565,6 +564,7 @@ void RenderPass::finalize() {
 														 VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0,
 														 &pipeline_storage->pipeline->tlas_info, num_accels);
 		vkUpdateDescriptorSets(vk::context().device, 1, &descriptor_write, 0, nullptr);
+		pipeline_storage->update_as_descriptor = false;
 	};
 	bool rebuild_tlas_descriptors = is_pipeline_cached && pipeline_storage->update_as_descriptor;
 	if (!is_pipeline_cached) {
@@ -613,7 +613,6 @@ void RenderPass::finalize() {
 		}
 	} else if (rebuild_tlas_descriptors) {
 		update_rt_descriptors();
-		pipeline_storage->update_as_descriptor = false;
 	}
 }
 
@@ -934,19 +933,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		vk::build_blas(blas_build_data.blases, blas_build_data.blas_inputs, blas_build_data.flags, cmd,
 					   blas_build_data.scratch_buffer_ref);
 		GPUQueryManager::end(cmd);
-#if 0
-		std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
-		auto curr_stage = VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
-		auto dst_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-		buffer_memory_barriers.push_back(vk::buffer_barrier2(
-			blas_build_data.blases[0].buffer->handle, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
-			VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR, curr_stage, dst_stage));
-		auto dependency_info =
-			vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
-		vkCmdPipelineBarrier2(cmd, &dependency_info);
-#endif
 
-		if (tlas_build_data.update_blas_address) {
+		if (tlas_build_data.build_tlas_after_blas) {
 			LUMEN_ASSERT(tlas_build_data.tlas, "TLAS reference is null");
 			void* instance_data = vk::map_buffer(tlas_build_data.instances_buf);
 			for (size_t i = 0; i < blas_build_data.blases.size; i++) {
@@ -954,6 +942,18 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				instance->accelerationStructureReference = blas_build_data.blases[i].get_device_address();
 			}
 			vk::unmap_buffer(tlas_build_data.instances_buf);
+#if 0
+			// TODO: Do we need a barrier here?
+			std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
+			auto curr_stage = VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
+			auto dst_stage = VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
+			buffer_memory_barriers.push_back(vk::buffer_barrier2(
+				blas_build_data.blases[0].buffer->handle, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+				VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR, curr_stage, dst_stage));
+			auto dependency_info =
+				vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
+			vkCmdPipelineBarrier2(cmd, &dependency_info);
+#endif
 		}
 	}
 
@@ -961,6 +961,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		GPUQueryManager::begin(cmd, "TLAS Build");
 		vk::build_tlas(*tlas_build_data.tlas, tlas_build_data.instances_buf, tlas_build_data.instance_count,
 					   tlas_build_data.flags, cmd, tlas_build_data.scratch_buffer_ref);
+		write_impl(tlas_build_data.tlas->buffer, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
 		GPUQueryManager::end(cmd);
 	}
 

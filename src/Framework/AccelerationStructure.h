@@ -8,10 +8,6 @@ namespace vk {
 struct BVH {
 	VkAccelerationStructureKHR accel = VK_NULL_HANDLE;
 	vk::Buffer* buffer = nullptr;
-	// This is usually set to false
-	// Except when the BVH was generated within the render graph
-	bool needs_sync = false;
-
 	inline VkDeviceAddress get_device_address() const {
 		VkAccelerationStructureDeviceAddressInfoKHR addr_info{
 			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR, .accelerationStructure = accel};

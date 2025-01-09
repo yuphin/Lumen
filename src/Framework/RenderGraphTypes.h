@@ -3,6 +3,7 @@
 #include <volk/volk.h>
 #include <vector>
 #include <functional>
+#include "Framework/AccelerationStructure.h"
 #include "Shader.h"
 #include "Buffer.h"
 #include "Texture.h"

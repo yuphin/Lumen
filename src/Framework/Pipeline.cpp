@@ -405,8 +405,8 @@ void Pipeline::create_rt_set_layout(VkShaderStageFlags binding_stage_flags, uint
 		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO};
 	std::vector<VkDescriptorBindingFlags> binding_flags(num_as_bindings);
 	for (uint32_t i = 0; i < num_as_bindings; ++i) {
-		// binding_flags[i] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
-		binding_flags[i] = 0;
+		binding_flags[i] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
+		// binding_flags[i] = 0;
 	}
 	binding_flags_ci.bindingCount = num_as_bindings;
 	binding_flags_ci.pBindingFlags = binding_flags.data();

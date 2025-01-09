@@ -216,7 +216,6 @@ void ReSTIRPT::render() {
 		vk::BVH& photon_blas = photon_blases[in_flight_frame_idx];
 		vk::BVH& photon_tlas = photon_tlases[in_flight_frame_idx];
 		photon_blas.destroy();
-		photon_tlas.destroy();
 
 		vk::render_graph()
 			->add_rt("PM - Trace First Diffuse",
@@ -277,7 +276,7 @@ void ReSTIRPT::render() {
 						&photon_bvh_scratch_buf)
 			.build_tlas(photon_tlases[in_flight_frame_idx], photon_bvh_instances_buf[in_flight_frame_idx], 1,
 						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, &photon_bvh_scratch_buf,
-						/*update_blas_address=*/true)
+						/*build_tlas_after_blas=*/true)
 			.bind_tlas(tlas);
 	}
 
@@ -302,8 +301,8 @@ void ReSTIRPT::render() {
 		.bind(canonical_contributions_texture)
 		.bind(direct_lighting_texture)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
-	// .bind_tlas(photon_blases[prev_frame_idx], true);
+		.bind_tlas(tlas)
+		.bind_tlas(photon_tlases[in_flight_frame_idx]);
 
 	pc_ray.general_seed = rand() % UINT_MAX;
 	if (enable_gris) {
@@ -470,7 +469,7 @@ void ReSTIRPT::destroy(bool resize) {
 		for (vk::BVH& bvh : photon_blases) {
 			bvh.destroy();
 		}
-		for(vk::BVH& bvh : photon_tlases) {
+		for (vk::BVH& bvh : photon_tlases) {
 			bvh.destroy();
 		}
 	}

@@ -142,7 +142,7 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, uint32_t primiti
 											&build_info, &primitive_count, &size_info);
 
 	// Create TLAS
-	if (update == false) {
+	if (update == false && tlas.accel == VK_NULL_HANDLE) {
 		VkAccelerationStructureCreateInfoKHR create_info{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
 		create_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
 		create_info.size = size_info.accelerationStructureSize;
@@ -341,38 +341,6 @@ void build_blas(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
 	}
 }
 
-static void build_tlas_impl(BVH& tlas, util::Slice<VkAccelerationStructureInstanceKHR> instances,
-							VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf,
-							vk::Buffer** scratch_buffer_ref, vk::Buffer* instances_buf, uint32_t count_instance,
-							bool update) {
-	// Make sure the copy of the instance buffer are copied before triggering
-	// the acceleration structure build
-	VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
-	barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-	barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
-
-	if (cmd_buf) {
-		vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_TRANSFER_BIT,
-							 VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0,
-							 nullptr);
-		// Creating the TLAS
-		cmd_create_tlas(tlas, cmd_buf, count_instance, scratch_buffer_ref, /*export_scratch_buffer=*/true,
-						instances_buf->get_device_address(), flags, update);
-	} else {
-		vk::Buffer* scratch_buffer;
-		vk::CommandBuffer cmd(true, 0, QueueType::GFX);
-		vkCmdPipelineBarrier(cmd.handle, VK_PIPELINE_STAGE_TRANSFER_BIT,
-							 VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0,
-							 nullptr);
-		// Creating the TLAS
-		cmd_create_tlas(tlas, cmd.handle, count_instance, &scratch_buffer, /*export_scratch_buffer=*/false,
-						instances_buf->get_device_address(), flags, update);
-		cmd.submit();
-		drm::destroy(scratch_buffer);
-		drm::destroy(instances_buf);
-	}
-}
-
 // Build TLAS from an array of VkAccelerationStructureInstanceKHR
 // - Use motion=true with VkAccelerationStructureMotionInstanceNV
 // - The resulting TLAS will be stored in m_tlas
@@ -389,6 +357,8 @@ void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 										  .size = sizeof(VkAccelerationStructureInstanceKHR) * instances.size(),
 										  .data = instances.data(),
 										  .dedicated_allocation = true});
+	// Make sure the copy of the instance buffer are copied before triggering
+	// the acceleration structure build
 	VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
 	barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 	barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
