@@ -433,13 +433,6 @@ static void parse_shader(Shader& shader, const uint32_t* code, size_t code_size,
 	for (const auto& resource : resources.sampled_images) {
 		reflect(resource, descriptor_Type_map[ResourceType::SampledImage]);
 	}
-	// Acceleration structure
-	if (resources.acceleration_structures.size()) {
-		resources.acceleration_structures[0];
-		auto set = glsl.get_decoration(resources.acceleration_structures[0].id, spv::DecorationDescriptorSet);
-		auto binding = glsl.get_decoration(resources.acceleration_structures[0].id, spv::DecorationBinding);
-		LUMEN_ASSERT(set == 1 && binding == 0, "Make sure the TLAS is bound to set 1, binding 0");
-	}
 
 	// Input attachments for vertex shader
 	if (shader.stage == VK_SHADER_STAGE_VERTEX_BIT) {

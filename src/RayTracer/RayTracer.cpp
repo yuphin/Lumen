@@ -49,6 +49,7 @@ void RayTracer::init() {
 	vk::add_device_extension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
 	vk::add_device_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
 	vk::add_device_extension(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+	vk::add_device_extension(VK_KHR_RAY_QUERY_EXTENSION_NAME);
 
 	vk::init(debug);
 	initialized = true;

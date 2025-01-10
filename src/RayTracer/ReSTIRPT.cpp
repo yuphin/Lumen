@@ -215,7 +215,6 @@ void ReSTIRPT::render() {
 	if (enable_photon_mapping) {
 		vk::BVH& photon_blas = photon_blases[in_flight_frame_idx];
 		vk::BVH& photon_tlas = photon_tlases[in_flight_frame_idx];
-		photon_blas.destroy();
 
 		vk::render_graph()
 			->add_rt("PM - Trace First Diffuse",
@@ -280,6 +279,30 @@ void ReSTIRPT::render() {
 			.bind_tlas(tlas);
 	}
 
+	if (photon_tlases[in_flight_frame_idx].accel) {
+		vk::render_graph()
+			->add_rt("Collect Photons",
+					 {
+						 .shaders = {{"src/shaders/integrators/restir/gris/collect_photons.rgen"},
+									 {"src/shaders/integrators/restir/gris/ray.rmiss"},
+									 {"src/shaders/ray_shadow.rmiss"},
+									 {"src/shaders/integrators/restir/gris/ray.rchit"},
+									 {"src/shaders/ray.rahit"}},
+						 .macros = {{"STREAMING_MODE", int(streaming_method)},
+									vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
+						 .dims = {Window::width(), Window::height()},
+					 })
+			.push_constants(&pc_ray)
+			.bind(common_bindings)
+			.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
+			.bind(gbuffers[pong])
+			.bind(canonical_contributions_texture)
+			.bind(direct_lighting_texture)
+			.bind_texture_array(lumen_scene->scene_textures)
+			.bind_tlas(tlas)
+			.bind_tlas(photon_tlases[in_flight_frame_idx]);
+	}
+
 	// Trace rays
 	vk::render_graph()
 		->add_rt("GRIS - Generate Samples",
@@ -301,8 +324,7 @@ void ReSTIRPT::render() {
 		.bind(canonical_contributions_texture)
 		.bind(direct_lighting_texture)
 		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas)
-		.bind_tlas(photon_tlases[in_flight_frame_idx]);
+		.bind_tlas(tlas);
 
 	pc_ray.general_seed = rand() % UINT_MAX;
 	if (enable_gris) {
@@ -457,15 +479,12 @@ void ReSTIRPT::destroy(bool resize) {
 
 	if (photon_bvh_scratch_buf) {
 		drm::destroy(photon_bvh_scratch_buf);
-		photon_bvh_scratch_buf = nullptr;
 	}
 	drm::destroy(photon_bvh_instances_buf[0]);
 	drm::destroy(photon_bvh_instances_buf[1]);
 	drm::destroy(photon_bvh_instances_buf[2]);
-	photon_bvh_instances_buf[0] = nullptr;
-	photon_bvh_instances_buf[1] = nullptr;
-	photon_bvh_instances_buf[2] = nullptr;
 	if (!resize) {
+		vkDeviceWaitIdle(vk::context().device);
 		for (vk::BVH& bvh : photon_blases) {
 			bvh.destroy();
 		}

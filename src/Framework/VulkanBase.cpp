@@ -322,9 +322,14 @@ static void create_logical_device() {
 
 	VkPhysicalDeviceRobustness2FeaturesEXT robustness2_fts = {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT};
+	
+	VkPhysicalDeviceRayQueryFeaturesKHR ray_query_fts = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
+	ray_query_fts.rayQuery = true;
+	ray_query_fts.pNext = nullptr;
 
 	robustness2_fts.nullDescriptor = true;
-	robustness2_fts.pNext = nullptr;
+	robustness2_fts.pNext = &ray_query_fts;
 
 	atomic_fts.shaderBufferFloat32AtomicAdd = true;
 	atomic_fts.shaderBufferFloat32Atomics = true;

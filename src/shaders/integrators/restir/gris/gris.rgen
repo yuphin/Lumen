@@ -1,4 +1,5 @@
 #version 460
+#extension GL_EXT_ray_query : require
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_scalar_block_layout : enable
@@ -9,7 +10,6 @@
 #extension GL_EXT_shader_atomic_float : require
 #define SCENE_TEX_IDX 8
 #include "gris_commons.glsl"
-layout(set = 1, binding = 1) uniform accelerationStructureEXT photon_bvh;
 
 PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
 
@@ -430,25 +430,6 @@ void main() {
 			out_gbuffers[pixel_idx] = gbuffer_out;
 		}
 	}
-
-#if 0
-	PhotonEyeData photon_eye = photon_eye_data.d[pixel_idx];
-	if (photon_eye.primitive_instance_id.x != -1) {
-		HitData photon_eye_gbuffer = get_hitdata(photon_eye.barycentrics, photon_eye.primitive_instance_id.x,
-												 photon_eye.primitive_instance_id.y);
-
-		Material photon_eye_hit_mat = load_material(photon_eye_gbuffer.material_idx, photon_eye_gbuffer.uv);
-
-		if (is_rough(photon_eye_hit_mat)) {
-			ASSERT(photon_eye.wo != vec2(0));
-			ASSERT(photon_eye.throughput != vec3(0));
-			// ASSERT(photon_eye.primitive_instance_id == gbuffer_out.primitive_instance_id);
-			if(photon_eye.primitive_instance_id != gbuffer_out.primitive_instance_id) {
-				LOG2("%v2u - %v2u\n", photon_eye.primitive_instance_id, gbuffer_out.primitive_instance_id);
-			}
-		}
-	}
-#endif
 
 	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
 		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));

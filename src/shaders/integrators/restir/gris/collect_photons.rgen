@@ -1,0 +1,50 @@
+#version 460
+#extension GL_EXT_ray_query : require
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#define SCENE_TEX_IDX 8
+#include "gris_commons.glsl"
+layout(set = 1, binding = 1) uniform accelerationStructureEXT photon_bvh;
+
+PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
+
+layout(binding = 4, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
+layout(binding = 5, std430) writeonly buffer OutGBuffer { GBuffer out_gbuffers[]; };
+layout(binding = 6, rgba16) writeonly uniform image2D canonical_contributions_tex;
+layout(binding = 7, rgba32f) uniform image2D direct_lighting_img;
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonEyeDataBuffer { PhotonEyeData d[]; };
+PhotonEyeDataBuffer photon_eye_data = PhotonEyeDataBuffer(scene_desc.photon_eye_addr);
+
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
+uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
+
+void main() {
+	PhotonEyeData photon_eye = photon_eye_data.d[pixel_idx];
+	if (photon_eye.primitive_instance_id.x != -1) {
+		HitData photon_eye_gbuffer = get_hitdata(photon_eye.barycentrics, photon_eye.primitive_instance_id.y,
+												 photon_eye.primitive_instance_id.x);
+		Material photon_eye_hit_mat = load_material(photon_eye_gbuffer.material_idx, photon_eye_gbuffer.uv);
+		ASSERT(is_rough(photon_eye_hit_mat));
+
+		rayQueryEXT ray_query;
+
+		// uint ray_flags = 0;//gl_RayFlagsTerminateOnFirstHitEXT;
+		uint ray_flags = gl_RayFlagsTerminateOnFirstHitEXT;
+		rayQueryInitializeEXT(ray_query, photon_bvh, ray_flags, 0xFF, photon_eye_gbuffer.pos, 1e-8,
+							  photon_eye_gbuffer.n_s, 1e8);
+
+		bool traverse = true;
+		while (traverse) {
+			traverse = rayQueryProceedEXT(ray_query);
+			if (!traverse) {
+				break;
+			}
+		}
+	}
+}

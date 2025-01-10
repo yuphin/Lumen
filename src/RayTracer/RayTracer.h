@@ -71,7 +71,7 @@ class RayTracer {
 	bool show_ui = true;
 
 	const bool enable_shader_inference = true;
-	const bool use_events = true;
+	const bool use_events = false;
 	vk::BVH tlas;
 	std::vector<vk::BVH> blases;
 };

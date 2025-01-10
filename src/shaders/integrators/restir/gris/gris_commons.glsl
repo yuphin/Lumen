@@ -8,6 +8,8 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GrisDirectLi
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PrefixContributions { vec3 d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Transformation { mat4 m[]; };
 
+#define LOG_GRIS 0
+
 Transformation transforms = Transformation(scene_desc.transformations_addr);
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
@@ -441,7 +443,9 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 					mis_weight = 1.0;
 				}
 				reservoir_contribution *= light.L * mis_weight / (light_pick_pdf * pdf_light_w);
+#if LOG_GRIS
 				LOG_CLICKED3("NEE: %d - %d = %v3f\n", prefix_depth, (data.path_flags) >> 16, reservoir_contribution);
+#endif
 				jacobian = 1;
 			} else {
 				const bool connection_to_nee_vertex = rc_postfix_length == 2;
@@ -476,8 +480,10 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 					reservoir_contribution *= rc_postfix_f * abs(dot(rc_gbuffer.n_s, rc_wi_post)) / rc_pdf_post;
 				}
 				reservoir_contribution *= data.rc_Li * mis_weight / dst_postfix_pdf;
+#if LOG_GRIS
 				LOG_CLICKED4("Default: %d - %d - %d - %v3f\n", prefix_depth, rc_postfix_length, rc_type,
 							 reservoir_contribution);
+#endif
 				jacobian = jacobian_num / src_jacobian;
 			}
 			if (isnan(jacobian) || isinf(jacobian) || jacobian == 0) {

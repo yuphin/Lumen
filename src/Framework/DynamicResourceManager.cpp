@@ -62,11 +62,13 @@ void destroy(vk::Buffer* buffer) {
 	if (buffer == nullptr) return;
 	vk::destroy_buffer(buffer);
 	_buffer_pool.remove(buffer);
+	buffer = nullptr;
 }
 void destroy(vk::Texture* tex) {
 	if (tex == nullptr) return;
 	vk::destroy_texture(tex);
 	_texture_pool.remove(tex);
+	tex = nullptr;
 }
 
 }  // namespace drm
