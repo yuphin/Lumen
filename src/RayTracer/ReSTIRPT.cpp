@@ -27,6 +27,11 @@ void ReSTIRPT::init() {
 												.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 												.dimensions = {Window::width(), Window::height(), 1},
 												.format = VK_FORMAT_R32G32B32A32_SFLOAT});
+
+	caustics_texture = prm::get_texture({.name = "Caustics Texture",
+										 .usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+										 .dimensions = {Window::width(), Window::height(), 1},
+										 .format = VK_FORMAT_R32G32B32A32_SFLOAT});
 	gris_reservoir_ping_buffer =
 		prm::get_buffer({.name = "GRIS Reservoirs Ping",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -197,6 +202,7 @@ void ReSTIRPT::render() {
 	pc_ray.canonical_only = canonical_only;
 	pc_ray.enable_occlusion = enable_occlusion;
 	pc_ray.photon_radius = photon_radius;
+	pc_ray.num_photons = num_photons;
 
 	const std::initializer_list<lumen::ResourceBinding> common_bindings = {
 		output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer};
@@ -297,12 +303,13 @@ void ReSTIRPT::render() {
 			.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
 			.bind(gbuffers[pong])
 			.bind(canonical_contributions_texture)
-			.bind(direct_lighting_texture)
+			.bind(caustics_texture)
 			.bind_texture_array(lumen_scene->scene_textures)
 			.bind_tlas(tlas)
 			.bind_tlas(photon_tlases[in_flight_frame_idx]);
 	}
 
+#if 0
 	// Trace rays
 	vk::render_graph()
 		->add_rt("GRIS - Generate Samples",
@@ -445,6 +452,7 @@ void ReSTIRPT::render() {
 			}
 		}
 	}
+#endif
 	pc_ray.total_frame_num++;
 }
 
@@ -476,6 +484,7 @@ void ReSTIRPT::destroy(bool resize) {
 	}
 	prm::remove(canonical_contributions_texture);
 	prm::remove(direct_lighting_texture);
+	prm::remove(caustics_texture);
 
 	if (photon_bvh_scratch_buf) {
 		drm::destroy(photon_bvh_scratch_buf);

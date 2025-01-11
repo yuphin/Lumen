@@ -42,6 +42,7 @@ struct PCReSTIRPT {
 	uint enable_occlusion;
 	uint enable_temporal_jitter;
 	float photon_radius;
+	uint num_photons;
 };
 
 struct GBuffer {
@@ -96,7 +97,8 @@ struct PhotonEyeData {
 	vec2 barycentrics;
 	uvec2 primitive_instance_id;
 	vec2 wo;
-	vec2 pad;
+	uint side;
+	uint pad;
 	vec3 throughput;
 	float pad2;
 };

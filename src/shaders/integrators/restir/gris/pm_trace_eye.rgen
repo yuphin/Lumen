@@ -53,6 +53,7 @@ void main() {
 			photon_eye.primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 			photon_eye.wo = to_spherical(wo);
 			photon_eye.throughput = throughput;
+			photon_eye.side = uint(side);
 			break;
 		}
 
