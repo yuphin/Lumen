@@ -282,6 +282,15 @@ void unpack_path_flags(uint packed_data, out uint reconnection_type, out uint pr
 	is_directional_light = ((packed_data >> 14) & 1) == 1;
 }
 
+uint pack_photon_flags(bool side, uint path_length) {
+	return (path_length & 0x1F) << 1 | uint(side);
+}
+
+void unpack_photon_flags(uint flags, out bool side, out uint path_length) {
+	side = (flags & 1) == 1;
+	path_length = (flags >> 1) & 0x1F;
+}
+
 void set_bounce_flag(inout uint flags, uint depth, bool constraints_satisfied) {
 	flags |= (uint(constraints_satisfied) << (16 + depth));
 }

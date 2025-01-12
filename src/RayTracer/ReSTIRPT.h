@@ -33,8 +33,8 @@ class ReSTIRPT final : public Integrator {
 	vk::Texture* direct_lighting_texture;
 	vk::Texture* caustics_texture;
 
+	vk::Buffer* photon_bvh_instances_buf;
 	vk::Buffer* photon_bvh_scratch_buf = nullptr;
-	vk::Buffer* photon_bvh_instances_buf = nullptr;
 
 	PCReSTIRPT pc_ray{};
 	bool enable_accumulation = false;
@@ -52,6 +52,7 @@ class ReSTIRPT final : public Integrator {
 	bool enable_occlusion = true;
 	bool enable_temporal_jitter = true;
 	bool enable_photon_mapping = true;
+	bool show_photon_gather = true;
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.00f;
 	float gris_separator = 1.0f;

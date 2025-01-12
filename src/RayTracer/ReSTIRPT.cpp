@@ -275,13 +275,38 @@ void ReSTIRPT::render() {
 						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, &photon_bvh_scratch_buf,
 						/*build_tlas_after_blas=*/true)
 			.bind_tlas(tlas);
+
+		if (photon_tlas.accel && show_photon_gather) {
+			vk::render_graph()
+				->add_rt("Collect Photons",
+						 {
+							 .shaders = {{"src/shaders/integrators/restir/gris/pm_collect_photons.rgen"},
+										 {"src/shaders/integrators/restir/gris/ray.rmiss"},
+										 {"src/shaders/ray_shadow.rmiss"},
+										 {"src/shaders/integrators/restir/gris/ray.rchit"},
+										 {"src/shaders/ray.rahit"}},
+							 .macros = {{"STREAMING_MODE", int(streaming_method)},
+										vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
+							 .dims = {Window::width(), Window::height()},
+						 })
+				.push_constants(&pc_ray)
+				.bind(common_bindings)
+				.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
+				.bind(gbuffers[pong])
+				.bind(canonical_contributions_texture)
+				.bind(caustics_texture)
+				.bind_texture_array(lumen_scene->scene_textures)
+				.bind_tlas(tlas)
+				.bind_tlas(photon_tlas);
+		}
 	}
 
-	if (photon_tlas.accel) {
+	if (!show_photon_gather || !enable_photon_mapping) {
+		// Trace rays
 		vk::render_graph()
-			->add_rt("Collect Photons",
+			->add_rt("GRIS - Generate Samples",
 					 {
-						 .shaders = {{"src/shaders/integrators/restir/gris/collect_photons.rgen"},
+						 .shaders = {{"src/shaders/integrators/restir/gris/gris.rgen"},
 									 {"src/shaders/integrators/restir/gris/ray.rmiss"},
 									 {"src/shaders/ray_shadow.rmiss"},
 									 {"src/shaders/integrators/restir/gris/ray.rchit"},
@@ -291,160 +316,136 @@ void ReSTIRPT::render() {
 						 .dims = {Window::width(), Window::height()},
 					 })
 			.push_constants(&pc_ray)
+			.zero(debug_vis_buffer)
 			.bind(common_bindings)
 			.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
 			.bind(gbuffers[pong])
 			.bind(canonical_contributions_texture)
-			.bind(caustics_texture)
+			.bind(direct_lighting_texture)
 			.bind_texture_array(lumen_scene->scene_textures)
-			.bind_tlas(tlas)
-			.bind_tlas(photon_tlas);
-	}
+			.bind_tlas(tlas);
 
-#if 0
-	// Trace rays
-	vk::render_graph()
-		->add_rt("GRIS - Generate Samples",
-				 {
-					 .shaders = {{"src/shaders/integrators/restir/gris/gris.rgen"},
-								 {"src/shaders/integrators/restir/gris/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/integrators/restir/gris/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
-					 .macros = {{"STREAMING_MODE", int(streaming_method)},
-								vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
-					 .dims = {Window::width(), Window::height()},
-				 })
-		.push_constants(&pc_ray)
-		.zero(debug_vis_buffer)
-		.bind(common_bindings)
-		.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
-		.bind(gbuffers[pong])
-		.bind(canonical_contributions_texture)
-		.bind(direct_lighting_texture)
-		.bind_texture_array(lumen_scene->scene_textures)
-		.bind_tlas(tlas);
+		pc_ray.general_seed = rand() % UINT_MAX;
+		if (enable_gris) {
+			bool should_do_temporal = enable_temporal_reuse && pc_ray.total_frame_num > 0;
+			// Temporal Reuse
+			vk::render_graph()
+				->add_rt("GRIS - Temporal Reuse",
+						 {
+							 .shaders = {{"src/shaders/integrators/restir/gris/temporal_reuse.rgen"},
+										 {"src/shaders/integrators/restir/gris/ray.rmiss"},
+										 {"src/shaders/ray_shadow.rmiss"},
+										 {"src/shaders/integrators/restir/gris/ray.rchit"},
+										 {"src/shaders/ray.rahit"}},
+							 .dims = {Window::width(), Window::height()},
+						 })
+				.push_constants(&pc_ray)
+				.bind(common_bindings)
+				.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
+				.bind(reservoir_buffers[READ_OR_PREV_IDX])
+				.bind(gbuffers[pong])
+				.bind(gbuffers[ping])
+				.bind(canonical_contributions_texture)
+				.bind_texture_array(lumen_scene->scene_textures)
+				.bind_tlas(tlas)
+				.skip_execution(!should_do_temporal);
+			pc_ray.seed2 = rand() % UINT_MAX;
+			if (!canonical_only) {
+				if (mis_method == MISMethod::TALBOT) {
+					vk::render_graph()
+						->add_rt("GRIS - Spatial Reuse - Talbot",
+								 {
+									 .shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen"},
+												 {"src/shaders/integrators/restir/gris/ray.rmiss"},
+												 {"src/shaders/ray_shadow.rmiss"},
+												 {"src/shaders/integrators/restir/gris/ray.rchit"},
+												 {"src/shaders/ray.rahit"}},
+									 .dims = {Window::width(), Window::height()},
+								 })
+						.push_constants(&pc_ray)
+						.bind(common_bindings)
+						.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
+						.bind(reservoir_buffers[READ_OR_PREV_IDX])
+						.bind(gbuffers[pong])
+						.bind(canonical_contributions_texture)
+						.bind(direct_lighting_texture)
+						.bind_texture_array(lumen_scene->scene_textures)
+						.bind_tlas(tlas);
+				} else {
+					// Retrace
+					vk::render_graph()
+						->add_rt("GRIS - Retrace Reservoirs",
+								 {
+									 .shaders = {{"src/shaders/integrators/restir/gris/retrace_paths.rgen"},
+												 {"src/shaders/integrators/restir/gris/ray.rmiss"},
+												 {"src/shaders/ray_shadow.rmiss"},
+												 {"src/shaders/integrators/restir/gris/ray.rchit"},
+												 {"src/shaders/ray.rahit"}},
+									 .dims = {Window::width(), Window::height()},
+								 })
+						.push_constants(&pc_ray)
+						.bind(common_bindings)
+						.bind(reconnection_buffer)
+						.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
+						.bind(gbuffers[pong])
+						.bind_texture_array(lumen_scene->scene_textures)
+						.bind_tlas(tlas);
+					// Validate
+					vk::render_graph()
+						->add_rt("GRIS - Validate Samples",
+								 {
+									 .shaders = {{"src/shaders/integrators/restir/gris/validate_samples.rgen"},
+												 {"src/shaders/integrators/restir/gris/ray.rmiss"},
+												 {"src/shaders/ray_shadow.rmiss"},
+												 {"src/shaders/integrators/restir/gris/ray.rchit"},
+												 {"src/shaders/ray.rahit"}},
+									 .dims = {Window::width(), Window::height()},
+								 })
+						.push_constants(&pc_ray)
+						.bind(common_bindings)
+						.bind(reconnection_buffer)
+						.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
+						.bind(gbuffers[pong])
+						.bind_texture_array(lumen_scene->scene_textures)
+						.bind_tlas(tlas);
 
-	pc_ray.general_seed = rand() % UINT_MAX;
-	if (enable_gris) {
-		bool should_do_temporal = enable_temporal_reuse && pc_ray.total_frame_num > 0;
-		// Temporal Reuse
-		vk::render_graph()
-			->add_rt("GRIS - Temporal Reuse",
-					 {
-						 .shaders = {{"src/shaders/integrators/restir/gris/temporal_reuse.rgen"},
-									 {"src/shaders/integrators/restir/gris/ray.rmiss"},
-									 {"src/shaders/ray_shadow.rmiss"},
-									 {"src/shaders/integrators/restir/gris/ray.rchit"},
-									 {"src/shaders/ray.rahit"}},
-						 .dims = {Window::width(), Window::height()},
-					 })
-			.push_constants(&pc_ray)
-			.bind(common_bindings)
-			.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
-			.bind(reservoir_buffers[READ_OR_PREV_IDX])
-			.bind(gbuffers[pong])
-			.bind(gbuffers[ping])
-			.bind(canonical_contributions_texture)
-			.bind_texture_array(lumen_scene->scene_textures)
-			.bind_tlas(tlas)
-			.skip_execution(!should_do_temporal);
-		pc_ray.seed2 = rand() % UINT_MAX;
-		if (!canonical_only) {
-			if (mis_method == MISMethod::TALBOT) {
-				vk::render_graph()
-					->add_rt("GRIS - Spatial Reuse - Talbot",
-							 {
-								 .shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen"},
-											 {"src/shaders/integrators/restir/gris/ray.rmiss"},
-											 {"src/shaders/ray_shadow.rmiss"},
-											 {"src/shaders/integrators/restir/gris/ray.rchit"},
-											 {"src/shaders/ray.rahit"}},
-								 .dims = {Window::width(), Window::height()},
-							 })
-					.push_constants(&pc_ray)
-					.bind(common_bindings)
-					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
-					.bind(reservoir_buffers[READ_OR_PREV_IDX])
-					.bind(gbuffers[pong])
-					.bind(canonical_contributions_texture)
-					.bind(direct_lighting_texture)
-					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_tlas(tlas);
-			} else {
-				// Retrace
-				vk::render_graph()
-					->add_rt("GRIS - Retrace Reservoirs",
-							 {
-								 .shaders = {{"src/shaders/integrators/restir/gris/retrace_paths.rgen"},
-											 {"src/shaders/integrators/restir/gris/ray.rmiss"},
-											 {"src/shaders/ray_shadow.rmiss"},
-											 {"src/shaders/integrators/restir/gris/ray.rchit"},
-											 {"src/shaders/ray.rahit"}},
-								 .dims = {Window::width(), Window::height()},
-							 })
-					.push_constants(&pc_ray)
-					.bind(common_bindings)
-					.bind(reconnection_buffer)
-					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
-					.bind(gbuffers[pong])
-					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_tlas(tlas);
-				// Validate
-				vk::render_graph()
-					->add_rt("GRIS - Validate Samples",
-							 {
-								 .shaders = {{"src/shaders/integrators/restir/gris/validate_samples.rgen"},
-											 {"src/shaders/integrators/restir/gris/ray.rmiss"},
-											 {"src/shaders/ray_shadow.rmiss"},
-											 {"src/shaders/integrators/restir/gris/ray.rchit"},
-											 {"src/shaders/ray.rahit"}},
-								 .dims = {Window::width(), Window::height()},
-							 })
-					.push_constants(&pc_ray)
-					.bind(common_bindings)
-					.bind(reconnection_buffer)
-					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
-					.bind(gbuffers[pong])
-					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_tlas(tlas);
-
-				// Spatial Reuse
-				vk::render_graph()
-					->add_rt(
-						"GRIS - Spatial Reuse",
-						{
-							.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse.rgen"},
-										{"src/shaders/integrators/restir/gris/ray.rmiss"},
-										{"src/shaders/ray_shadow.rmiss"},
-										{"src/shaders/integrators/restir/gris/ray.rchit"},
-										{"src/shaders/ray.rahit"}},
-							.macros = {vk::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS", enable_defensive_formulation)},
-							.dims = {Window::width(), Window::height()},
-						})
-					.push_constants(&pc_ray)
-					.bind(common_bindings)
-					.bind(reconnection_buffer)
-					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
-					.bind(reservoir_buffers[READ_OR_PREV_IDX])
-					.bind(gbuffers[pong])
-					.bind(canonical_contributions_texture)
-					.bind(direct_lighting_texture)
-					.bind_texture_array(lumen_scene->scene_textures)
-					.bind_tlas(tlas);
-			}
-			if (pixel_debug || (gris_separator < 1.0f && gris_separator > 0.0f)) {
-				uint32_t num_wgs = uint32_t((Window::width() * Window::height() + 1023) / 1024);
-				vk::render_graph()
-					->add_compute(
-						"GRIS - Debug Visualiation",
-						{.shader = vk::Shader("src/shaders/integrators/restir/gris/debug_vis.comp"), .dims = {num_wgs}})
-					.push_constants(&pc_ray)
-					.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer});
+					// Spatial Reuse
+					vk::render_graph()
+						->add_rt("GRIS - Spatial Reuse",
+								 {
+									 .shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse.rgen"},
+												 {"src/shaders/integrators/restir/gris/ray.rmiss"},
+												 {"src/shaders/ray_shadow.rmiss"},
+												 {"src/shaders/integrators/restir/gris/ray.rchit"},
+												 {"src/shaders/ray.rahit"}},
+									 .macros = {vk::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS",
+																enable_defensive_formulation)},
+									 .dims = {Window::width(), Window::height()},
+								 })
+						.push_constants(&pc_ray)
+						.bind(common_bindings)
+						.bind(reconnection_buffer)
+						.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
+						.bind(reservoir_buffers[READ_OR_PREV_IDX])
+						.bind(gbuffers[pong])
+						.bind(canonical_contributions_texture)
+						.bind(direct_lighting_texture)
+						.bind_texture_array(lumen_scene->scene_textures)
+						.bind_tlas(tlas);
+				}
+				if (pixel_debug || (gris_separator < 1.0f && gris_separator > 0.0f)) {
+					uint32_t num_wgs = uint32_t((Window::width() * Window::height() + 1023) / 1024);
+					vk::render_graph()
+						->add_compute("GRIS - Debug Visualiation",
+									  {.shader = vk::Shader("src/shaders/integrators/restir/gris/debug_vis.comp"),
+									   .dims = {num_wgs}})
+						.push_constants(&pc_ray)
+						.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer});
+				}
 			}
 		}
 	}
-#endif
+
 	pc_ray.total_frame_num++;
 }
 
@@ -481,7 +482,7 @@ void ReSTIRPT::destroy(bool resize) {
 	if (photon_bvh_scratch_buf) {
 		drm::destroy(photon_bvh_scratch_buf);
 	}
-	drm::destroy(photon_bvh_instances_buf);
+	prm::remove(photon_bvh_instances_buf);
 	if (!resize) {
 		vkDeviceWaitIdle(vk::context().device);
 		photon_tlas.destroy();
@@ -491,16 +492,16 @@ void ReSTIRPT::destroy(bool resize) {
 
 bool ReSTIRPT::gui() {
 	bool result = Integrator::gui();
+	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
 	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
 	result |= ImGui::Checkbox("Enable atmosphere", &enable_atmosphere);
 	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);
-	result |= ImGui::Checkbox("Enable accumulation", &enable_accumulation);
 	bool enable_gris_changed = ImGui::Checkbox("Enable GRIS", &enable_gris);
 	result |= enable_gris_changed;
 	if (enable_gris_changed) {
 		pc_ray.total_frame_num = 0;
 	}
-	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
+	result |= ImGui::SliderInt("Path length", (int*)&path_length, 1, 12);
 	result |= ImGui::Checkbox("Enable canonical-only mode", &canonical_only);
 	if (!enable_gris) {
 		return result;
@@ -547,6 +548,7 @@ bool ReSTIRPT::gui() {
 			ImGui::SliderInt("Num photons", (int*)&num_photons, 1, Window::width() * Window::height());
 		result |= num_photons_changed;
 		result |= ImGui::SliderFloat("Photon radius", &photon_radius, 0.0f, 0.1f);
+		result |= ImGui::Checkbox("Show photon gather", &show_photon_gather);
 		if (num_photons_changed) {
 			vkDeviceWaitIdle(vk::context().device);
 

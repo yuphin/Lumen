@@ -63,40 +63,55 @@ void main() {
 			}
 
 			int photon_idx = rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, false);
+			PhotonLightData photon_light = photon_light_data.d[photon_idx];
 
-			// PhotonAABB photon_aabb = photon_aabbs.d[photon_idx];
-			PhotonLightData photon_data = photon_light_data.d[photon_idx];
-
-			HitData photon_hitdata = get_hitdata(photon_data.barycentrics, photon_data.primitive_instance_id.y,
-												 photon_data.primitive_instance_id.x);
+			HitData photon_hitdata = get_hitdata(photon_light.barycentrics, photon_light.primitive_instance_id.y,
+												 photon_light.primitive_instance_id.x);
 
 			bool photon_nearby = photon_is_nearby(photon_eye_gbuffer.pos, photon_hitdata.pos, pc.photon_radius);
 			if (!photon_nearby) {
 				continue;
 			}
 
-			uint side = photon_eye.side;
+			bool eye_side;
+			uint eye_path_length;
+			bool unused;
+			uint photon_path_length;
+			unpack_photon_flags(photon_eye.flags, eye_side, eye_path_length);
+			unpack_photon_flags(photon_light.flags, unused, photon_path_length);
+
+			if(pc.max_depth < (eye_path_length + photon_path_length)) {
+				continue;
+			}
+
+			if(dot(photon_hitdata.n_s, photon_eye_gbuffer.n_s) < 0.5) {
+				continue;
+			}
+
 			vec3 wo = from_spherical(photon_eye.wo);
-			vec3 wi = from_spherical(photon_data.wi);
-			vec3 f = eval_bsdf(photon_eye_hit_mat, wo, wi, photon_eye_gbuffer.n_s, 1, side == 1);
-			phi += f * photon_data.throughput * photon_eye.throughput;
-			// LOG_CLICKED("AABB ID: %d\n", photon_idx);
+			vec3 wi = from_spherical(photon_light.wi);
+			if(dot(photon_eye_gbuffer.n_s, wi) <= 0) {
+				continue;
+			}
+
+			vec3 f = eval_bsdf(photon_eye_hit_mat, wo, wi, photon_eye_gbuffer.n_s, 1, eye_side);
+			phi += f * photon_light.throughput * photon_eye.throughput;
+			LOG_CLICKED3("(%d) - Path lengths: %d - %d\n", counter, eye_path_length, photon_path_length);
 			counter++;
 		}
-		// phi /= (PI * pc.photon_radius * pc.photon_radius * pc.num_photons);
 		phi /= (PI * pc.photon_radius * pc.photon_radius * pc.num_photons);
-		// phi /= (PI * pc.photon_radius * pc.photon_radius * photon_counts.val);
 
 		imageStore(caustics_texture, ivec2(gl_LaunchIDEXT.xy), vec4(phi, 1.f));
-		LOG_CLICKED("Num photons: %d\n", counter);
+		if (counter > 0) {
+			LOG_CLICKED("Num photons: %d\n", counter);
+		}
 		col = phi;
 	}
-	LOG_CLICKED("%v3f\n", col);
 	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
-			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
-		} else {
-			float w = 1. / float(pc.frame_num + 1);
-			vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
-			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
-		}
+		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+	} else {
+		float w = 1. / float(pc.frame_num + 1);
+		vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
+	}
 }

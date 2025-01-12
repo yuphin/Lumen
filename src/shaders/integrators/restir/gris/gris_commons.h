@@ -96,11 +96,10 @@ struct GrisHitPayload {
 struct PhotonEyeData {
 	vec2 barycentrics;
 	uvec2 primitive_instance_id;
-	vec2 wo;
-	uint side;
-	uint pad;
 	vec3 throughput;
-	float pad2;
+	//  5b eye path length | 1b side
+	uint flags; 
+	vec2 wo;
 };
 
 struct PhotonAABB {
@@ -113,6 +112,8 @@ struct PhotonLightData {
 	uvec2 primitive_instance_id;
 	vec2 wi;
 	vec3 throughput;
+	//  5b light path length | 1b side
+	uint flags;
 };
 
 NAMESPACE_END()

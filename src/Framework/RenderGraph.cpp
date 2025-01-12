@@ -45,13 +45,11 @@ void RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags d
 									 .dst_access_flags = dst_access_flags,
 									 .opposing_pass_idx = pass_idx};
 		}
-		// } else if (opposing_pass.pass_idx == pass_idx) {
 	} else {
 		if (flags == BufferSyncFlags::BUFFER_COPY || flags == BufferSyncFlags::BUFFER_AS_BUILD) {
 			// Resource copies happens after the pass execution
 			post_execution_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
 		} else {
-			// if (flags == BufferSyncFlags::BUFFER_ZERO && src_access_flags == VK_ACCESS_TRANSFER_WRITE_BIT) {
 			if (flags == BufferSyncFlags::BUFFER_ZERO) {
 				// This case happens when there are no dependencies to the buffer being cleared inside the render
 				// graph in a frame Yet we have to ensure syncronization because there are multiple command buffers
