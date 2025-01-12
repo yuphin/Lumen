@@ -134,17 +134,15 @@ void ReSTIRPT::init() {
 	// Set to 0, will be updated during BLAS build
 	tlas_instance.accelerationStructureReference = 0;
 
-	for (int i = 0; i < vk::MAX_FRAMES_IN_FLIGHT; i++) {
-		photon_bvh_instances_buf[i] =
-			prm::get_buffer({.name = "Photon BVH Instances",
-							 .usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-									  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-							 .memory_type = vk::BufferType::CPU_TO_GPU,
-							 .size = sizeof(VkAccelerationStructureInstanceKHR),
-							 .create_mapped = true,
-							 .data = &tlas_instance,
-							 .dedicated_allocation = true});
-	}
+	photon_bvh_instances_buf =
+		prm::get_buffer({.name = "Photon BVH Instance",
+						 .usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+						 .memory_type = vk::BufferType::CPU_TO_GPU,
+						 .size = sizeof(VkAccelerationStructureInstanceKHR),
+						 .create_mapped = true,
+						 .data = &tlas_instance,
+						 .dedicated_allocation = true});
 
 	pc_ray.total_light_area = 0;
 
@@ -215,13 +213,7 @@ void ReSTIRPT::render() {
 
 	constexpr int WRITE_OR_CURR_IDX = 1;
 	constexpr int READ_OR_PREV_IDX = 0;
-
-	size_t in_flight_frame_idx = vk::context().in_flight_frame_idx;
-	size_t prev_frame_idx = (in_flight_frame_idx - 1) % vk::MAX_FRAMES_IN_FLIGHT;
 	if (enable_photon_mapping) {
-		vk::BVH& photon_blas = photon_blases[in_flight_frame_idx];
-		vk::BVH& photon_tlas = photon_tlases[in_flight_frame_idx];
-
 		vk::render_graph()
 			->add_rt("PM - Trace First Diffuse",
 					 {
@@ -276,16 +268,16 @@ void ReSTIRPT::render() {
 			.bind_texture_array(lumen_scene->scene_textures)
 			.zero(photon_count_buffer)
 			.zero(caustic_photon_aabbs_buffer)
-			.build_blas(util::Slice(photon_blases.data() + in_flight_frame_idx, 1), photon_blas_inputs,
+			.build_blas(util::Slice(&photon_blas, 1), photon_blas_inputs,
 						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, {caustic_photon_aabbs_buffer},
 						&photon_bvh_scratch_buf)
-			.build_tlas(photon_tlases[in_flight_frame_idx], photon_bvh_instances_buf[in_flight_frame_idx], 1,
+			.build_tlas(photon_tlas, photon_bvh_instances_buf, 1,
 						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, &photon_bvh_scratch_buf,
 						/*build_tlas_after_blas=*/true)
 			.bind_tlas(tlas);
 	}
 
-	if (photon_tlases[in_flight_frame_idx].accel) {
+	if (photon_tlas.accel) {
 		vk::render_graph()
 			->add_rt("Collect Photons",
 					 {
@@ -306,7 +298,7 @@ void ReSTIRPT::render() {
 			.bind(caustics_texture)
 			.bind_texture_array(lumen_scene->scene_textures)
 			.bind_tlas(tlas)
-			.bind_tlas(photon_tlases[in_flight_frame_idx]);
+			.bind_tlas(photon_tlas);
 	}
 
 #if 0
@@ -489,17 +481,11 @@ void ReSTIRPT::destroy(bool resize) {
 	if (photon_bvh_scratch_buf) {
 		drm::destroy(photon_bvh_scratch_buf);
 	}
-	drm::destroy(photon_bvh_instances_buf[0]);
-	drm::destroy(photon_bvh_instances_buf[1]);
-	drm::destroy(photon_bvh_instances_buf[2]);
+	drm::destroy(photon_bvh_instances_buf);
 	if (!resize) {
 		vkDeviceWaitIdle(vk::context().device);
-		for (vk::BVH& bvh : photon_blases) {
-			bvh.destroy();
-		}
-		for (vk::BVH& bvh : photon_tlases) {
-			bvh.destroy();
-		}
+		photon_tlas.destroy();
+		photon_blas.destroy();
 	}
 }
 
@@ -557,8 +543,18 @@ bool ReSTIRPT::gui() {
 
 	result |= ImGui::Checkbox("Enable photon mapping", &enable_photon_mapping);
 	if (enable_photon_mapping) {
-		result |= ImGui::SliderInt("Num photons", (int*)&num_photons, 1, Window::width() * Window::height());
+		bool num_photons_changed =
+			ImGui::SliderInt("Num photons", (int*)&num_photons, 1, Window::width() * Window::height());
+		result |= num_photons_changed;
 		result |= ImGui::SliderFloat("Photon radius", &photon_radius, 0.0f, 0.1f);
+		if (num_photons_changed) {
+			vkDeviceWaitIdle(vk::context().device);
+
+			for (size_t i = 0; i < vk::MAX_FRAMES_IN_FLIGHT; i++) {
+				photon_blas.destroy();
+				photon_tlas.destroy();
+			}
+		}
 	}
 
 	if (spatial_samples_changed && num_spatial_samples > 0) {

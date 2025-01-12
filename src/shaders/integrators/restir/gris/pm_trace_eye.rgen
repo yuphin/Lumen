@@ -13,7 +13,7 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonEyeDat
 PhotonEyeDataBuffer photon_eye_data = PhotonEyeDataBuffer(scene_desc.photon_eye_addr);
 
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
-uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
+uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
 
 void init_photon_eye_data(inout PhotonEyeData data) {
 	data.barycentrics = vec2(0);

@@ -21,11 +21,13 @@ layout(binding = 7, rgba32f) uniform image2D caustics_texture;
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonEyeDataBuffer { PhotonEyeData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonAABBs { PhotonAABB d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonLightData { PhotonLightData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonCounts { uint val; };
 PhotonEyeDataBuffer photon_eye_data = PhotonEyeDataBuffer(scene_desc.photon_eye_addr);
 CausticPhotonAABBs photon_aabbs = CausticPhotonAABBs(scene_desc.caustic_photon_aabbs_addr);
 CausticPhotonLightData photon_light_data = CausticPhotonLightData(scene_desc.caustic_photon_light_addr);
+PhotonCounts photon_counts = PhotonCounts(scene_desc.photon_count_addr);
 
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
 uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
 
 bool photon_is_nearby(vec3 p, vec3 photon_p, float r) {
@@ -83,11 +85,13 @@ void main() {
 		}
 		// phi /= (PI * pc.photon_radius * pc.photon_radius * pc.num_photons);
 		phi /= (PI * pc.photon_radius * pc.photon_radius * pc.num_photons);
+		// phi /= (PI * pc.photon_radius * pc.photon_radius * photon_counts.val);
 
 		imageStore(caustics_texture, ivec2(gl_LaunchIDEXT.xy), vec4(phi, 1.f));
 		LOG_CLICKED("Num photons: %d\n", counter);
 		col = phi;
 	}
+	LOG_CLICKED("%v3f\n", col);
 	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
 			imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
 		} else {

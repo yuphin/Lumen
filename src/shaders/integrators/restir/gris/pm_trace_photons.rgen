@@ -16,7 +16,7 @@ CausticPhotonLightData photon_light_data = CausticPhotonLightData(scene_desc.cau
 CausticPhotonAABBs photon_aabbs = CausticPhotonAABBs(scene_desc.caustic_photon_aabbs_addr);
 PhotonCounts photon_counts = PhotonCounts(scene_desc.photon_count_addr);
 
-uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
+uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
 void main() {
 	LightRecord light_record;
 	vec3 wi, pos, n;
