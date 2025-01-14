@@ -202,8 +202,13 @@ void ReSTIRPT::render() {
 	pc_ray.gris_separator = gris_separator;
 	pc_ray.canonical_only = canonical_only;
 	pc_ray.enable_occlusion = enable_occlusion;
-	pc_ray.photon_radius = photon_radius;
 	pc_ray.num_photons = num_photons;
+	pc_ray.photon_radius = initial_photon_radius;
+
+	if(progressive_radius_reduction) {
+		pc_ray.photon_radius = curr_photon_radius * sqrtf(((float)frame_num + 2.0f / 3.0f) / ((float)frame_num + 1.0f));
+		curr_photon_radius = pc_ray.photon_radius;
+	}
 
 	const std::initializer_list<lumen::ResourceBinding> common_bindings = {
 		output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer};
@@ -457,6 +462,7 @@ bool ReSTIRPT::update() {
 	bool updated = Integrator::update();
 	if (updated) {
 		frame_num = 0;
+		curr_photon_radius = initial_photon_radius;
 	}
 	return updated;
 }
@@ -550,7 +556,9 @@ bool ReSTIRPT::gui() {
 		bool num_photons_changed =
 			ImGui::SliderInt("Num photons", (int*)&num_photons, 1, Window::width() * Window::height());
 		result |= num_photons_changed;
-		result |= ImGui::SliderFloat("Photon radius", &photon_radius, 0.0f, 0.1f);
+		result |= ImGui::SliderFloat("Initial photon radius", &initial_photon_radius, 0.0f, 0.1f);
+		result |= ImGui::Checkbox("Progressive radius reduction", &progressive_radius_reduction);
+		ImGui::Text("Current photon radius: %f", curr_photon_radius);
 		result |= ImGui::Checkbox("Show photon gather", &show_photon_gather);
 		if (num_photons_changed) {
 			vkDeviceWaitIdle(vk::context().device);

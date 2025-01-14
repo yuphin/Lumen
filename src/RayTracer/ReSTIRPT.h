@@ -53,10 +53,12 @@ class ReSTIRPT final : public Integrator {
 	bool enable_temporal_jitter = true;
 	bool enable_photon_mapping = true;
 	bool show_photon_gather = true;
+	bool progressive_radius_reduction = false;
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.00f;
 	float gris_separator = 1.0f;
-	float photon_radius = 0.03f;
+	float initial_photon_radius = 0.03f;
+	float curr_photon_radius = initial_photon_radius;
 	uint32_t path_length = 0;
 	uint32_t num_spatial_samples = 1;
 	uint32_t num_photons = 1000000;
