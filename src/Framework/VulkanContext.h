@@ -28,6 +28,7 @@ struct VulkanContext {
 	VmaAllocator allocator;
 	VkQueryPool query_pool_timestamps[3];
 	size_t in_flight_frame_idx = 0;
+	bool vsync_enabled = false;
 };
 
 VulkanContext& context();

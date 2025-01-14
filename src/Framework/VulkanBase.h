@@ -9,6 +9,7 @@ void init_imgui();
 void init(bool validation_layers);
 void destroy_imgui();
 void add_device_extension(const char* name);
+void recreate_swap_chain();
 std::vector<Texture*>& swapchain_images();
 uint32_t prepare_frame();
 VkResult submit_frame(uint32_t image_idx);

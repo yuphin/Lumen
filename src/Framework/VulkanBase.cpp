@@ -322,9 +322,8 @@ static void create_logical_device() {
 
 	VkPhysicalDeviceRobustness2FeaturesEXT robustness2_fts = {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT};
-	
-	VkPhysicalDeviceRayQueryFeaturesKHR ray_query_fts = {
-		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
+
+	VkPhysicalDeviceRayQueryFeaturesKHR ray_query_fts = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
 	ray_query_fts.rayQuery = true;
 	ray_query_fts.pNext = nullptr;
 
@@ -415,7 +414,8 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 	VkPresentModeKHR present_mode = [](const std::vector<VkPresentModeKHR>& present_modes) {
 		for (const auto& available_present_mode : present_modes) {
 			// For now we prefer Mailbox
-			if (available_present_mode == VK_PRESENT_MODE_MAILBOX_KHR) {
+			if (available_present_mode ==
+				(context().vsync_enabled ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_MAILBOX_KHR)) {
 				return available_present_mode;
 			}
 		}
@@ -537,21 +537,6 @@ static void create_sync_primitives() {
 				  vkCreateFence(context().device, &fence_info, nullptr, &_in_flight_fences[i])},
 				 "Failed to create synchronization primitives for a frame");
 	}
-}
-
-// Called after window resize
-static void recreate_swap_chain() {
-	int width = 0, height = 0;
-	glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
-	while (width == 0 || height == 0) {
-		// Window is minimized
-		glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
-		glfwWaitEvents();
-	}
-	cleanup_swapchain_images();
-	VkSwapchainKHR old_swapchain = context().swapchain;
-	create_swapchain(old_swapchain);
-	vkDestroySwapchainKHR(context().device, old_swapchain, nullptr);
 }
 
 static bool check_validation_layer_support() {
@@ -700,6 +685,21 @@ void destroy_imgui() {
 }
 
 void add_device_extension(const char* name) { _device_extensions.push_back(name); }
+
+// Called after window resize or manually
+void recreate_swap_chain() {
+	int width = 0, height = 0;
+	glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
+	while (width == 0 || height == 0) {
+		// Window is minimized
+		glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
+		glfwWaitEvents();
+	}
+	cleanup_swapchain_images();
+	VkSwapchainKHR old_swapchain = context().swapchain;
+	create_swapchain(old_swapchain);
+	vkDestroySwapchainKHR(context().device, old_swapchain, nullptr);
+}
 
 std::vector<Texture*>& swapchain_images() { return _swapchain_images; }
 

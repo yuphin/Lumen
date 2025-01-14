@@ -74,4 +74,5 @@ class RayTracer {
 	const bool use_events = false;
 	vk::BVH tlas;
 	std::vector<vk::BVH> blases;
+	bool recreate_swapchain = false;
 };

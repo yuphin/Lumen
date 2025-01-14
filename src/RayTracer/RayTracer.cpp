@@ -51,6 +51,8 @@ void RayTracer::init() {
 	vk::add_device_extension(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
 	vk::add_device_extension(VK_KHR_RAY_QUERY_EXTENSION_NAME);
 
+	vk::context().vsync_enabled = true;
+
 	vk::init(debug);
 	initialized = true;
 
@@ -321,6 +323,9 @@ bool RayTracer::gui() {
 		ImGui::DragFloat4("", glm::value_ptr(scene.camera->camera[2]), 0.05f);
 		ImGui::DragFloat4("", glm::value_ptr(scene.camera->camera[3]), 0.05f);
 	}
+	if(ImGui::Checkbox("Enable VSync", &vk::context().vsync_enabled)) {
+		recreate_swapchain = true;
+	}
 	if (ImGui::Button("Reload shaders (F5)")) {
 		vk::render_graph()->reload_shaders = true;
 		vk::render_graph()->shader_cache.clear();
@@ -446,6 +451,11 @@ float RayTracer::draw_frame() {
 		init_resources();
 		vk::init_imgui();
 		integrator->updated = true;
+	}
+
+	if(recreate_swapchain) {
+		vk::recreate_swap_chain();
+		recreate_swapchain = false;
 	}
 
 	auto now = clock();
