@@ -22,9 +22,13 @@ class Camera {
 		rotation.x += rx;
 		rotation.y += ry;
 		rotation.z += rz;
+		rotation = glm::fmod(rotation, glm::vec3(360.0f));
 	}
 
-	inline void rotate(const glm::vec3& delta) { this->rotation += delta; }
+	inline void rotate(const glm::vec3& delta) { 
+		this->rotation += delta; 
+		rotation = glm::fmod(rotation, glm::vec3(360.0f));
+	}
 	void update_view_matrix() {
 		constexpr glm::vec3 UP = glm::vec3(0, 1, 0);
 		constexpr glm::vec3 RIGHT = glm::vec3(1, 0, 0);
@@ -35,6 +39,7 @@ class Camera {
 		res = glm::rotate(res, glm::radians(rotation.x), RIGHT);
 		res = glm::rotate(res, glm::radians(rotation.z), FORWARD);
 		view = glm::inverse(res);
+		direction = glm::vec3(-view[0][2], -view[1][2], view[2][2]);
 		camera = res;
 	}
 	glm::mat4 projection{1.f};

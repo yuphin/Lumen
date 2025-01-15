@@ -474,8 +474,12 @@ void LumenScene::load_lumen_scene(const std::string& path) {
 	curr_config->cam_settings.fov = j["camera"]["fov"];
 	const auto& p = j["camera"]["position"];
 	const auto& d = j["camera"]["dir"];
+	const auto& r = j["camera"]["rotation"];
 	curr_config->cam_settings.pos = {p[0], p[1], p[2]};
 	curr_config->cam_settings.dir = {d[0], d[1], d[2]};
+	if(!r.is_null()) {
+		curr_config->cam_settings.rotation = {r[0], r[1], r[2]};
+	}
 	compute_scene_dimensions();
 	for (auto& light : lights_arr) {
 		const auto& pos = light["pos"];

@@ -317,13 +317,24 @@ bool RayTracer::gui() {
 	bool updated = false;
 	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
 	if (show_cam_stats) {
-		ImGui::PushItemWidth(170);
-		ImGui::DragFloat4("", glm::value_ptr(scene.camera->camera[0]), 0.05f);
-		ImGui::DragFloat4("", glm::value_ptr(scene.camera->camera[1]), 0.05f);
-		ImGui::DragFloat4("", glm::value_ptr(scene.camera->camera[2]), 0.05f);
-		ImGui::DragFloat4("", glm::value_ptr(scene.camera->camera[3]), 0.05f);
+		ImGui::Text("X - Right, Y - Up, -Z - Forward");
+		ImGui::Text("Camera position: %.2f %.2f %.2f", scene.camera->position.x, scene.camera->position.y,
+					scene.camera->position.z);
+		ImGui::Text("Camera rotation (degrees): X:%.2f Y:%.2f Z:%.2f", scene.camera->rotation.x,
+					scene.camera->rotation.y, scene.camera->rotation.z);
+		ImGui::Text("Camera direction:  %.2f %.2f %.2f", scene.camera->direction.x, scene.camera->direction.y,
+					scene.camera->direction.z);
+		if (ImGui::Button("Copy camera data to clipboard")) {
+			std::string cam_pos_str = std::format(
+				"    \"position\": "
+				"[{:.2f},{:.2f},{:.2f}],\n    \"rotation\":[{:.2f},{:.2f},{:.2f}],\n    \"dir\":[{:.2f},{:.2f},{:.2f}]",
+				scene.camera->position.x, scene.camera->position.y, scene.camera->position.z, scene.camera->rotation.x,
+				scene.camera->rotation.y, scene.camera->rotation.z, scene.camera->direction.x,
+				scene.camera->direction.y, scene.camera->direction.z);
+			glfwSetClipboardString(Window::get()->window_handle, cam_pos_str.c_str());
+		}
 	}
-	if(ImGui::Checkbox("Enable VSync", &vk::context().vsync_enabled)) {
+	if (ImGui::Checkbox("Enable VSync", &vk::context().vsync_enabled)) {
 		recreate_swapchain = true;
 	}
 	if (ImGui::Button("Reload shaders (F5)")) {
@@ -369,11 +380,6 @@ bool RayTracer::gui() {
 		vkDeviceWaitIdle(vk::context().device);
 		bool was_custom_accel = typeid(*integrator) == typeid(DDGI);
 		integrator->destroy(/*resize=*/false);
-		RenderGraph* rg = vk::render_graph();
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, output_img_buffer, rg);
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, residual_buffer, rg);
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, counter_buffer, rg);
-		REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, rmse_val_buffer, rg);
 		SceneConfig prev_scene_config = *scene.config;
 		auto integrator_str = std::string(settings[curr_integrator_idx]);
 		integrator_str.erase(std::remove_if(integrator_str.begin(), integrator_str.end(), ::isspace),
@@ -436,24 +442,17 @@ float RayTracer::draw_frame() {
 	if (result != VK_SUCCESS) {
 		Window::update_window_size();
 		const float aspect_ratio = (float)Window::width() / Window::height();
-		const PerspectiveCamera* old_cam = (PerspectiveCamera*)scene.camera.get();
-		glm::vec3 old_rotation = old_cam->rotation;
-		scene.camera = std::unique_ptr<lumen::PerspectiveCamera>(new lumen::PerspectiveCamera(
-			old_cam->fov, 0.01f, 1000.0f, aspect_ratio, old_cam->direction, old_cam->position));
-		scene.camera->rotation = old_rotation;
 		cleanup_resources();
 		integrator->destroy(/*resize=*/true);
 		post_fx.destroy();
-		vk::destroy_imgui();
 
 		integrator->init();
 		post_fx.init();
 		init_resources();
-		vk::init_imgui();
 		integrator->updated = true;
 	}
 
-	if(recreate_swapchain) {
+	if (recreate_swapchain) {
 		vk::recreate_swap_chain();
 		recreate_swapchain = false;
 	}

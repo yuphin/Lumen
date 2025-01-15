@@ -158,7 +158,7 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, uint32_t primiti
 			// Unfortunately this is needed here since multiple commands in flight may contend for the same scratch
 			// buffer. On application side this can be mitigated by triple buffering the scratch buffer But this is not
 			// always feasible.
-			LUMEN_WARN("BLAS Build: Waiting for device while resizing scratch buffer");
+			LUMEN_WARN("TLAS Build: Waiting for device while resizing scratch buffer");
 			vkDeviceWaitIdle(context().device);
 			drm::destroy(*scratch_buffer_ref);
 		}

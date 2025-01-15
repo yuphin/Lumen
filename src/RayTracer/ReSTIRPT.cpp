@@ -205,7 +205,7 @@ void ReSTIRPT::render() {
 	pc_ray.num_photons = num_photons;
 	pc_ray.photon_radius = initial_photon_radius;
 
-	if(progressive_radius_reduction) {
+	if (progressive_radius_reduction) {
 		pc_ray.photon_radius = curr_photon_radius * sqrtf(((float)frame_num + 2.0f / 3.0f) / ((float)frame_num + 1.0f));
 		curr_photon_radius = pc_ray.photon_radius;
 	}
@@ -488,14 +488,14 @@ void ReSTIRPT::destroy(bool resize) {
 	prm::remove(direct_lighting_texture);
 	prm::remove(caustics_texture);
 
-	if (photon_bvh_scratch_buf) {
-		drm::destroy(photon_bvh_scratch_buf);
-	}
 	prm::remove(photon_bvh_instances_buf);
 	if (!resize) {
 		vkDeviceWaitIdle(vk::context().device);
 		photon_tlas.destroy();
 		photon_blas.destroy();
+		if (photon_bvh_scratch_buf) {
+			drm::destroy(photon_bvh_scratch_buf);
+		}
 	}
 }
 
