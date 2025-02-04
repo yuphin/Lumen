@@ -321,7 +321,6 @@ vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights, o
 	return sample_light_Li(rands_pos, p, num_lights, unused_pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light,
 						   light_record, n, pos);
 }
-
 vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out vec3 wi, out float wi_len,
 					 out float pdf_pos_w, out float pdf_pos_dir_w, out float cos_from_light,
 					 out LightRecord light_record) {

@@ -512,6 +512,25 @@ bool ReSTIRPT::gui() {
 	}
 	result |= ImGui::SliderInt("Path length", (int*)&path_length, 1, 12);
 	result |= ImGui::Checkbox("Enable canonical-only mode", &canonical_only);
+
+	result |= ImGui::Checkbox("Enable photon mapping", &enable_photon_mapping);
+	if (enable_photon_mapping) {
+		bool num_photons_changed =
+			ImGui::SliderInt("Num photons", (int*)&num_photons, 1, Window::width() * Window::height());
+		result |= num_photons_changed;
+		result |= ImGui::SliderFloat("Initial photon radius", &initial_photon_radius, 0.0f, 0.1f);
+		result |= ImGui::Checkbox("Progressive radius reduction", &progressive_radius_reduction);
+		ImGui::Text("Current photon radius: %f", curr_photon_radius);
+		result |= ImGui::Checkbox("Show photon gather", &show_photon_gather);
+		if (num_photons_changed) {
+			vkDeviceWaitIdle(vk::context().device);
+
+			for (size_t i = 0; i < vk::MAX_FRAMES_IN_FLIGHT; i++) {
+				photon_blas.destroy();
+				photon_tlas.destroy();
+			}
+		}
+	}
 	if (!enable_gris) {
 		return result;
 	}
@@ -550,25 +569,6 @@ bool ReSTIRPT::gui() {
 	result |= spatial_samples_changed;
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
 	result |= ImGui::SliderFloat("Min reconnection distance ratio", &min_vertex_distance_ratio, 0.0f, 1.0f);
-
-	result |= ImGui::Checkbox("Enable photon mapping", &enable_photon_mapping);
-	if (enable_photon_mapping) {
-		bool num_photons_changed =
-			ImGui::SliderInt("Num photons", (int*)&num_photons, 1, Window::width() * Window::height());
-		result |= num_photons_changed;
-		result |= ImGui::SliderFloat("Initial photon radius", &initial_photon_radius, 0.0f, 0.1f);
-		result |= ImGui::Checkbox("Progressive radius reduction", &progressive_radius_reduction);
-		ImGui::Text("Current photon radius: %f", curr_photon_radius);
-		result |= ImGui::Checkbox("Show photon gather", &show_photon_gather);
-		if (num_photons_changed) {
-			vkDeviceWaitIdle(vk::context().device);
-
-			for (size_t i = 0; i < vk::MAX_FRAMES_IN_FLIGHT; i++) {
-				photon_blas.destroy();
-				photon_tlas.destroy();
-			}
-		}
-	}
 
 	if (spatial_samples_changed && num_spatial_samples > 0) {
 		vkDeviceWaitIdle(vk::context().device);

@@ -30,13 +30,28 @@ void main() {
 									light_record, pos, wi, n, pdf_pos, pdf_dir);
 	float abs_cos_light = abs(dot(n, wi));
 	vec3 throughput;
+
+	float eta_vm = PI * pc.photon_radius * pc.photon_radius * pc.num_photons;
+	float inv_pdf_dir = 1.0 / pdf_dir;
 	if (abs_cos_light == 0 || pdf_dir <= 0) {
 		throughput = vec3(0);
 	} else {
 		throughput = Le * abs_cos_light / (pdf_dir * pdf_pos);
 	}
 
-	bool last_specular = false;
+	// pdf_rev / pdf_fwd  = (pdf_pos) / (pdf_pos * pdf_dir) = 1 / pdf_dir
+	float d_vm = 1.0 / (pdf_dir * eta_vm);	// pdf_rev / pdf_fwd, r^2 / cos_from_next term missing, r^2 will cancel
+
+	bool finite = is_light_finite(light_record.flags);
+
+	if (!is_light_delta(light_record.flags)) {
+		// cos_from_this
+		d_vm *= (finite ? abs_cos_light : 1.0);
+	} else {
+		d_vm = 0;
+	}
+
+	bool last_rough = false;
 	for (int d = 0; d < pc.max_depth; d++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, pos, tmin, wi, tmax, 0);
 		bool found_isect = payload.instance_idx != -1;
@@ -45,6 +60,13 @@ void main() {
 		}
 
 		HitData gbuffer = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
+
+		vec3 to_prev = pos - gbuffer.pos;
+		float dist_sqr = dot(to_prev, to_prev);
+		to_prev /= sqrt(dist_sqr);
+		float cos_theta_wo = abs(dot(to_prev, gbuffer.n_s));
+		d_vm = cos_theta_wo > 0 ? d_vm / cos_theta_wo : 0;
+
 		const vec3 wo = -wi;
 		vec3 n_s = gbuffer.n_s;
 		vec3 n_g = gbuffer.n_g;
@@ -53,7 +75,7 @@ void main() {
 		float cos_wo = dot(wo, n_s);
 		Material hit_mat = load_material(gbuffer.material_idx, gbuffer.uv);
 
-		if (is_rough(hit_mat) && last_specular) {
+		if (is_rough(hit_mat) && last_rough) {
 			uint photon_idx = atomicAdd(photon_counts.val, 1);
 			photon_aabbs.d[photon_idx].min = gbuffer.pos - pc.photon_radius;
 			photon_aabbs.d[photon_idx].max = gbuffer.pos + pc.photon_radius;
@@ -65,12 +87,23 @@ void main() {
 			// side is not used
 			// Path length = Num of edges from light
 			photon_light_data.d[photon_idx].flags = pack_photon_flags(side, d + 1);
+			photon_light_data.d[photon_idx].d_vm = d_vm;
 		}
-		last_specular = !is_rough(hit_mat);
+		last_rough = !is_rough(hit_mat);
 		pos = offset_ray(gbuffer.pos, n_g);
 		float pdf_dir, cos_theta;
 		const vec3 f = sample_bsdf(n_s, wo, hit_mat, 0, side, wi, pdf_dir, cos_theta, seed);
-		throughput *= f * abs(cos_theta) / pdf_dir;
+		float abs_cos_theta = abs(cos_theta);
+		throughput *= f * abs_cos_theta / pdf_dir;
+
+		bool is_specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
+		d_vm *= abs_cos_theta;
+		if (!is_specular) {
+			// TODO: Is side correct here?
+			float pdf_rev = bsdf_pdf(hit_mat, n_s, wi, wo, side);
+			// pdf_rev / pdf_fwd
+			d_vm *= pdf_rev / pdf_dir;
+		}
 
 		if (f == vec3(0) || pdf_dir == 0) {
 			break;

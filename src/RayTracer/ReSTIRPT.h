@@ -44,7 +44,7 @@ class ReSTIRPT final : public Integrator {
 	bool canonical_only = false;
 	bool hide_reconnection_radiance = false;
 	bool enable_temporal_reuse = true;
-	bool enable_gris = true;
+	bool enable_gris = false;
 	bool pixel_debug = false;
 	bool enable_permutation_sampling = false;
 	bool enable_atmosphere = false;
@@ -52,7 +52,7 @@ class ReSTIRPT final : public Integrator {
 	bool enable_occlusion = true;
 	bool enable_temporal_jitter = true;
 	bool enable_photon_mapping = true;
-	bool show_photon_gather = true;
+	bool show_photon_gather = false;
 	bool progressive_radius_reduction = false;
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.00f;
@@ -61,7 +61,8 @@ class ReSTIRPT final : public Integrator {
 	float curr_photon_radius = initial_photon_radius;
 	uint32_t path_length = 0;
 	uint32_t num_spatial_samples = 1;
-	uint32_t num_photons = 1000000;
+	// uint32_t num_photons = 1280 * 720;
+	uint32_t num_photons = 1920 * 1080;
 	StreamingMethod streaming_method = StreamingMethod::INDIVIDUAL_CONTRIBUTIONS;
 	MISMethod mis_method = MISMethod::PAIRWISE;
 	ReSTIRPTConfig* config;

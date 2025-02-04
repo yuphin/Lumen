@@ -9,6 +9,7 @@ class VCM final : public Integrator {
 	virtual void render() override;
 	virtual bool update() override;
 	virtual void destroy(bool resize) override;
+	virtual bool gui() override;
 
    private:
 	PCVCM pc_ray{};

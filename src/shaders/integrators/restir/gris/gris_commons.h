@@ -110,10 +110,11 @@ struct PhotonAABB {
 struct PhotonLightData {
 	vec2 barycentrics;
 	uvec2 primitive_instance_id;
-	vec2 wi;
 	vec3 throughput;
 	//  5b light path length | 1b side
 	uint flags;
+	vec2 wi;
+	float d_vm;
 };
 
 NAMESPACE_END()

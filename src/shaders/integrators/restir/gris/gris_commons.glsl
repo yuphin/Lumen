@@ -64,6 +64,8 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
 }
 
+vec3 test_col = vec3(0);
+
 HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx, out float area) {
 	const PrimMeshInfo pinfo = prim_infos.d[instance_idx];
 	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
@@ -160,18 +162,23 @@ vec3 get_hitdata_pos_only(vec2 attribs, uint instance_idx, uint triangle_idx) {
 	return vec3(to_world * vec4(vtx[0].pos * bary.x + vtx[1].pos * bary.y + vtx[2].pos * bary.z, 1.0));
 }
 
-vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 wo, out LightRecord record,
+vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 wo, float d_vm, out LightRecord record,
 			inout vec3 light_dir_or_pdf, out bool is_directional_light, out vec3 Le, out vec3 wi,
 			out float pdf_light_w) {
 	float pdf_light_a;
 	wi = vec3(0);
 	float wi_len = 0;
 	float cos_from_light;
-	Le = sample_light_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
+
+	vec3 unused_n;
+	vec3 unused_pos;
+	float pdf_pos_a_dir_w;
+	Le = sample_light_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record, unused_n, unused_pos, pdf_pos_a_dir_w);
 	const vec3 p = offset_ray2(pos, n_s);
-	float light_bsdf_pdf;
+	float light_bsdf_pdf_fwd;
+	float light_bsdf_pdf_rev;
 	float cos_x = dot(n_s, wi);
-	vec3 f_light = eval_bsdf(n_s, wo, hit_mat, 1, side, wi, light_bsdf_pdf);
+	vec3 f_light = eval_bsdf(n_s, wo, hit_mat, 1, side, wi, light_bsdf_pdf_fwd, light_bsdf_pdf_rev);
 	any_hit_payload.hit = 1;
 	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0, wi,
 				wi_len - EPS, 1);
@@ -182,7 +189,16 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 
 	const float light_pick_pdf = 1. / pc.light_triangle_count;
 	if (visible && pdf_light_w > 0) {
-		float mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + light_bsdf_pdf / pdf_light_w);
+		float mis_light = is_light_delta(record.flags) ? 0 : light_bsdf_pdf_fwd / pdf_light_w;
+		// Normally light_pick_pdf would cancel out
+		// But in GRIS PT loop, we get the emissive contribution as we go. I.e we don't consider light_pick_pdf during connection 
+		float mis_eye = d_vm * light_bsdf_pdf_rev * pdf_pos_a_dir_w * cos_x * light_pick_pdf / (pdf_light_w * cos_from_light);
+		// if(mis_eye > 0) {
+		// 	LOG_CLICKED("MIS eye %f\n", mis_eye);
+		// 	test_col = vec3(1,0,0);
+		// }
+		// float mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + mis_light);
+		float mis_weight = 1 / (1 + mis_light + mis_eye);
 		return mis_weight * f_light * abs(cos_x) * Le / (light_pick_pdf * pdf_light_w);
 	}
 	return vec3(0);

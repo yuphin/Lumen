@@ -93,10 +93,14 @@ void main() {
 			if(dot(photon_eye_gbuffer.n_s, wi) <= 0) {
 				continue;
 			}
+			float cam_pdf_fwd;
+			vec3 f = eval_bsdf( photon_eye_gbuffer.n_s, wo, photon_eye_hit_mat, 1, eye_side, wi, cam_pdf_fwd);
 
-			vec3 f = eval_bsdf(photon_eye_hit_mat, wo, wi, photon_eye_gbuffer.n_s, 1, eye_side);
-			phi += f * photon_light.throughput * photon_eye.throughput;
-			LOG_CLICKED3("(%d) - Path lengths: %d - %d\n", counter, eye_path_length, photon_path_length);
+			float mis_weight = 1.0 / (1.0 + photon_light.d_vm * cam_pdf_fwd);
+			// float mis_weight = 1;
+			phi += mis_weight * f * photon_light.throughput * photon_eye.throughput;
+			// LOG_CLICKED4("(%d) - Path lengths: %d - %d / MIS: %f\n", counter, eye_path_length, photon_path_length, mis_weight);
+			// LOG_CLICKED3("%f - %f - %f\n", photon_light.d_vm, cam_pdf_fwd, mis_weight);
 			counter++;
 		}
 		phi /= (PI * pc.photon_radius * pc.photon_radius * pc.num_photons);

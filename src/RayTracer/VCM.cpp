@@ -291,3 +291,11 @@ void VCM::destroy(bool resize) {
 	if (desc_set_layout) vkDestroyDescriptorSetLayout(vk::context().device, desc_set_layout, nullptr);
 	if (desc_pool) vkDestroyDescriptorPool(vk::context().device, desc_pool, nullptr);
 }
+
+bool VCM::gui() {
+	bool result = Integrator::gui();
+	bool path_length_changed = ImGui::SliderInt("Path length", (int*)&config->path_length, 0, 12);
+	result |= path_length_changed;
+	result |= ImGui::Checkbox("Enable VM", &config->enable_vm);
+	return result;
+}
