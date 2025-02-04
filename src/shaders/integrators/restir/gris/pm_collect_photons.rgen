@@ -97,6 +97,8 @@ void main() {
 			vec3 f = eval_bsdf( photon_eye_gbuffer.n_s, wo, photon_eye_hit_mat, 1, eye_side, wi, cam_pdf_fwd);
 
 			float mis_weight = 1.0 / (1.0 + photon_light.d_vm * cam_pdf_fwd);
+
+			ASSERT(!isnan(mis_weight));
 			// float mis_weight = 1;
 			phi += mis_weight * f * photon_light.throughput * photon_eye.throughput;
 			// LOG_CLICKED4("(%d) - Path lengths: %d - %d / MIS: %f\n", counter, eye_path_length, photon_path_length, mis_weight);
@@ -105,17 +107,17 @@ void main() {
 		}
 		phi /= (PI * pc.photon_radius * pc.photon_radius * pc.num_photons);
 
-		imageStore(caustics_texture, ivec2(gl_LaunchIDEXT.xy), vec4(phi, 1.f));
 		if (counter > 0) {
 			LOG_CLICKED("Num photons: %d\n", counter);
 		}
 		col = phi;
 	}
-	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
-		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
-	} else {
-		float w = 1. / float(pc.frame_num + 1);
-		vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
-		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
-	}
+	imageStore(caustics_texture, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+	// if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
+	// 	imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
+	// } else {
+	// 	float w = 1. / float(pc.frame_num + 1);
+	// 	vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+	// 	imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
+	// }
 }

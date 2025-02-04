@@ -52,7 +52,7 @@ class ReSTIRPT final : public Integrator {
 	bool enable_occlusion = true;
 	bool enable_temporal_jitter = true;
 	bool enable_photon_mapping = true;
-	bool show_photon_gather = false;
+	bool enable_photon_gather = true;
 	bool progressive_radius_reduction = false;
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.00f;

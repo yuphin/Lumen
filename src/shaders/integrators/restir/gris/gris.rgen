@@ -8,7 +8,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
-#define SCENE_TEX_IDX 8
+#define SCENE_TEX_IDX 9
 #include "gris_commons.glsl"
 
 PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
@@ -17,6 +17,7 @@ layout(binding = 4, std430) writeonly buffer OutReservoirs { Reservoir out_reser
 layout(binding = 5, std430) writeonly buffer OutGBuffer { GBuffer out_gbuffers[]; };
 layout(binding = 6, rgba16) writeonly uniform image2D canonical_contributions_tex;
 layout(binding = 7, rgba32f) uniform image2D direct_lighting_img;
+layout(binding = 8, rgba32f) uniform image2D caustics_texture;
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonEyeDataBuffer { PhotonEyeData d[]; };
 PhotonEyeDataBuffer photon_eye_data = PhotonEyeDataBuffer(scene_desc.photon_eye_addr);
 
@@ -223,6 +224,7 @@ void main() {
 				mis_bsdf = 0;
 			}
 			float mis_weight = 1.0 / (1 + mis_bsdf + mis_light);
+			ASSERT(!isnan(mis_weight));
 			if (mis_light > 0) {
 				LOG_CLICKED("%f\n", mis_weight);
 				// test_col = vec3(1, 0, 0);
@@ -404,10 +406,12 @@ void main() {
 			debug_val = true;
 		}
 
+#ifdef ENABLE_PM
 		// Modify the throuhgput for SDS paths (for photon mapping)
 		if (was_connectable && !is_rough(hit_mat)) {
 			mis_factor_set = true;
 		}
+#endif // ENABLE_PM
 
 		if (connectable_vertex_found && !connectable_this_vertex) {
 			postfix_throughput *= f_cos / bsdf_pdf_fwd;
@@ -514,6 +518,11 @@ void main() {
 
 	// col = debug_col;
 	// col = test_col;
+
+	// col += imageLoad(caustics_texture, ivec2(gl_LaunchIDEXT.xy)).xyz;
+#ifdef ENABLE_PM
+	col += imageLoad(caustics_texture, ivec2(gl_LaunchIDEXT.xy)).xyz;
+#endif // ENABLE_PM
 
 	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
 		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));

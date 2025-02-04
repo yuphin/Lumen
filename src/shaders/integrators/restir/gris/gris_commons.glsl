@@ -199,6 +199,12 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 		// }
 		// float mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + mis_light);
 		float mis_weight = 1 / (1 + mis_light + mis_eye);
+		// float debug_val = d_vm * light_bsdf_pdf_rev * pdf_pos_a_dir_w * cos_x * light_pick_pdf / (pdf_light_w * cos_from_light); 
+		float debug_val = cos_from_light * pdf_light_w;
+		// ASSERT(!isnan(debug_val));
+		if(isnan(debug_val)) {
+			LOG2("%f - %f\n", cos_from_light, pdf_light_w);
+		}
 		return mis_weight * f_light * abs(cos_x) * Le / (light_pick_pdf * pdf_light_w);
 	}
 	return vec3(0);

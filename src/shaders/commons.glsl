@@ -248,7 +248,7 @@ vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights, o
 			cos_from_light = abs(dot(record.n_s, -wi));
 			L = light_mat.emissive_factor;
 			pdf_pos_a = record.triangle_pdf;
-			pdf_pos_w = pdf_pos_a * wi_len_sqr / cos_from_light;
+			pdf_pos_w = cos_from_light == 0 ? 0 : pdf_pos_a * wi_len_sqr / cos_from_light;
 			pdf_pos_dir_w = cos_from_light * INV_PI * record.triangle_pdf;
 			light_record.instance_idx = light.prim_mesh_idx;
 			n = record.n_s;

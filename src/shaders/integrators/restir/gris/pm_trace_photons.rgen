@@ -40,7 +40,9 @@ void main() {
 	}
 
 	// pdf_rev / pdf_fwd  = (pdf_pos) / (pdf_pos * pdf_dir) = 1 / pdf_dir
-	float d_vm = 1.0 / (pdf_dir * eta_vm);	// pdf_rev / pdf_fwd, r^2 / cos_from_next term missing, r^2 will cancel
+	// TODO: Check correctness
+	float light_pick_prob = 1.0 / pc.light_triangle_count;
+	float d_vm = 1.0 / (pdf_dir * light_pick_prob * eta_vm); // pdf_rev / pdf_fwd, r^2 / cos_from_next term missing, r^2 will cancel
 
 	bool finite = is_light_finite(light_record.flags);
 
