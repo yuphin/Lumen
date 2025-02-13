@@ -57,7 +57,7 @@ class ReSTIRPT final : public Integrator {
 	float spatial_reuse_radius = 32.0f;
 	float min_vertex_distance_ratio = 0.00f;
 	float gris_separator = 1.0f;
-	float initial_photon_radius = 0.03f;
+	float initial_photon_radius = 0.05f;
 	float curr_photon_radius = initial_photon_radius;
 	uint32_t path_length = 0;
 	uint32_t num_spatial_samples = 1;

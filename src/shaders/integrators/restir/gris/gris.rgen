@@ -198,6 +198,15 @@ void main() {
 
 		connectable = !connectable_vertex_found && curr_rough;
 
+		float cos_theta_wo = abs(dot(n_s, wo));
+		d_vm = cos_theta_wo > 0 ? d_vm / cos_theta_wo : 0;
+		if (mis_factor_set) {
+			ASSERT(debug_val == true);
+			if(depth == 2) {
+				// LOG_CLICKED2("Ok %d: %f\n", depth, d_vm);
+			}
+		}
+
 		if (depth == 0) {
 			// Fill in GBuffer
 			direct_lighting += throughput * hit_mat.emissive_factor;
@@ -211,25 +220,33 @@ void main() {
 			float mis_light;
 			if (mis_factor_set) {
 				float light_pick_prob = 1.0 / pc.light_triangle_count;
-				float pdf_light_dir = max(dot(n_s, wo), 0) / PI;
+				float cos_from_light = max(dot(n_s, wo), 0);
+				float pdf_light_dir = cos_from_light / PI;
 				// For photon mapping, multiplication by light pick prob. is necessary
-				mis_light = light_pick_prob * (1.0 / triangle_area) * pdf_light_dir * d_vm;
+				mis_light = cos_from_light == 0 ? 0 :  pdf_light_dir * (1.0 / triangle_area) * d_vm / cos_from_light;
+				// mis_light = 0;
 			} else {
 				mis_light = 0;
 			}
 
 			if (!vertex_specular) {
 				mis_bsdf = pdf_light_w / bsdf_pdf_fwd;
+				// mis_bsdf = 0;
 			} else {
 				mis_bsdf = 0;
 			}
 			float mis_weight = 1.0 / (1 + mis_bsdf + mis_light);
 			ASSERT(!isnan(mis_weight));
-			if (mis_light > 0) {
-				LOG_CLICKED("%f\n", mis_weight);
-				// test_col = vec3(1, 0, 0);
+			if(!mis_factor_set) {
+				// mis_weight = 0;
 			}
+
 			vec3 partial_contrib = mis_weight * hit_mat.emissive_factor;
+			// vec3 partial_contrib = 0 * hit_mat.emissive_factor;
+			if(mis_light > 0) {
+				// LOG_CLICKED2("BSDF: %f - %f\n", mis_light, mis_weight);
+				// test_col += partial_contrib * throughput;
+			}
 
 			if (connectable_vertex_found && depth > 1) {
 #if STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
@@ -286,20 +303,16 @@ void main() {
 
 		float bsdf_pdf_rev = bsdf_pdf(hit_mat, n_s, direction, wo, side);
 
-		if (mis_factor_set) {
-			ASSERT(debug_val == true);
-			float cos_theta_wo = abs(dot(n_s, wo));
-			d_vm = cos_theta_wo > 0 ? d_vm / cos_theta_wo : 0;
-			d_vm *= cos_theta;
-			if (!vertex_specular) {
-				d_vm *= bsdf_pdf_rev / bsdf_pdf_fwd;
-			}
-		}
-
+		
 		if (connectable_this_vertex) {
 			reconnection_data.rc_partial_jacobian *= bsdf_pdf_fwd;
 			reconnection_data.rc_wi = to_spherical(direction);
 		}
+
+		if(depth == 2) {
+				// LOG_CLICKED2("Now %d: %f\n", depth, d_vm);
+
+			}
 
 		// NEE
 		if (!vertex_specular) {
@@ -312,7 +325,7 @@ void main() {
 			vec3 nee_wi;
 			float nee_pdf_light_w;
 			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, wo, mis_factor_set ? d_vm : 0.0, light_record,
-							 reconnection_data.rc_Li, is_directional_light, Le, nee_wi, nee_pdf_light_w);
+							 reconnection_data.rc_Li, is_directional_light, Le, nee_wi, nee_pdf_light_w, depth);
 			vec3 contribution = Li * throughput;
 			// At 0 depth, we let ReSTIR DI handle the direct lighting
 			bool nee_connectable = depth > 0 && connectable;
@@ -387,6 +400,17 @@ void main() {
 				direct_lighting += contribution;
 			}
 		}
+
+		float abs_cos_theta = abs(cos_theta);
+		d_vm *= abs_cos_theta;
+		if (mis_factor_set) {
+			ASSERT(debug_val == true);
+			if (!vertex_specular) {
+				d_vm *= bsdf_pdf_rev / bsdf_pdf_fwd;
+			}
+			// LOG_CLICKED("First non-diffuse: %f\n", d_vm);
+		}
+
 		const bool is_transmission = bsdf_has_property(hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION);
 		origin.xyz = offset_ray(gbuffer.pos, n_g, is_transmission);
 
@@ -398,7 +422,7 @@ void main() {
 		if (!mis_factor_set && is_rough(hit_mat)) {
 			// d_vm = nu * cos_theta * bsdf_pdf_rev / bsdf_pdf_fwd;
 			// bsdf_pdf_fwd will cancel during vertex merging
-			d_vm = PI * pc.photon_radius * pc.photon_radius * pc.num_photons * cos_theta / bsdf_pdf_rev;
+			d_vm = PI * pc.photon_radius * pc.photon_radius * pc.num_photons * abs_cos_theta / bsdf_pdf_fwd;
 
 			// if(d_vm == 1.0) {
 			// 	LOG3("%f - %f - %f\n", cos_theta, bsdf_pdf_rev, bsdf_pdf_fwd);
@@ -411,7 +435,7 @@ void main() {
 		if (was_connectable && !is_rough(hit_mat)) {
 			mis_factor_set = true;
 		}
-#endif // ENABLE_PM
+#endif	// ENABLE_PM
 
 		if (connectable_vertex_found && !connectable_this_vertex) {
 			postfix_throughput *= f_cos / bsdf_pdf_fwd;
@@ -518,11 +542,12 @@ void main() {
 
 	// col = debug_col;
 	// col = test_col;
+	// col = vec3(0);
 
 	// col += imageLoad(caustics_texture, ivec2(gl_LaunchIDEXT.xy)).xyz;
 #ifdef ENABLE_PM
 	col += imageLoad(caustics_texture, ivec2(gl_LaunchIDEXT.xy)).xyz;
-#endif // ENABLE_PM
+#endif	// ENABLE_PM
 
 	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
 		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));

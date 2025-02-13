@@ -164,7 +164,7 @@ vec3 get_hitdata_pos_only(vec2 attribs, uint instance_idx, uint triangle_idx) {
 
 vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 wo, float d_vm, out LightRecord record,
 			inout vec3 light_dir_or_pdf, out bool is_directional_light, out vec3 Le, out vec3 wi,
-			out float pdf_light_w) {
+			out float pdf_light_w, int depth) {
 	float pdf_light_a;
 	wi = vec3(0);
 	float wi_len = 0;
@@ -174,10 +174,13 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	vec3 unused_pos;
 	float pdf_pos_a_dir_w;
 	Le = sample_light_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record, unused_n, unused_pos, pdf_pos_a_dir_w);
+
+	// TODO: Change sample_light_Li
+	float pdf_dir = pdf_pos_a_dir_w / pdf_light_a;
 	const vec3 p = offset_ray2(pos, n_s);
 	float light_bsdf_pdf_fwd;
 	float light_bsdf_pdf_rev;
-	float cos_x = dot(n_s, wi);
+	float cos_x = max(0, dot(n_s, wi));
 	vec3 f_light = eval_bsdf(n_s, wo, hit_mat, 1, side, wi, light_bsdf_pdf_fwd, light_bsdf_pdf_rev);
 	any_hit_payload.hit = 1;
 	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0, wi,
@@ -190,22 +193,32 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	const float light_pick_pdf = 1. / pc.light_triangle_count;
 	if (visible && pdf_light_w > 0) {
 		float mis_light = is_light_delta(record.flags) ? 0 : light_bsdf_pdf_fwd / pdf_light_w;
+		// float mis_light = 0;
+		
 		// Normally light_pick_pdf would cancel out
 		// But in GRIS PT loop, we get the emissive contribution as we go. I.e we don't consider light_pick_pdf during connection 
-		float mis_eye = d_vm * light_bsdf_pdf_rev * pdf_pos_a_dir_w * cos_x * light_pick_pdf / (pdf_light_w * cos_from_light);
-		// if(mis_eye > 0) {
-		// 	LOG_CLICKED("MIS eye %f\n", mis_eye);
-		// 	test_col = vec3(1,0,0);
-		// }
+		// float mis_eye = d_vm * light_bsdf_pdf_rev * cos_x * light_pick_pdf / (pdf_light_w  * cos_from_light);
+		// float mis_eye = d_vm * light_bsdf_pdf_rev * pdf_pos_a_dir_w * cos_x  / (pdf_light_w * cos_from_light);
+		ASSERT(d_vm >= 0);
+		float mis_eye = wi_len == 0 ? 0 : pdf_dir * light_bsdf_pdf_rev * cos_x * d_vm / (wi_len * wi_len);
+
+		ASSERT(mis_light >= 0);
+		ASSERT(mis_eye >= 0);
+		
 		// float mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + mis_light);
 		float mis_weight = 1 / (1 + mis_light + mis_eye);
 		// float debug_val = d_vm * light_bsdf_pdf_rev * pdf_pos_a_dir_w * cos_x * light_pick_pdf / (pdf_light_w * cos_from_light); 
-		float debug_val = cos_from_light * pdf_light_w;
-		// ASSERT(!isnan(debug_val));
-		if(isnan(debug_val)) {
-			LOG2("%f - %f\n", cos_from_light, pdf_light_w);
+		ASSERT(!isnan(mis_weight));
+		ASSERT(mis_weight >= 0);
+		if(mis_eye > 0) {
+			float mis_weight2 = 1 / (1 + mis_light);
+			LOG_CLICKED4("NEE: %f - %f - %f - %d\n", mis_weight, wi_len * wi_len, d_vm, depth);
+			test_col += mis_weight * f_light * abs(cos_x) * Le / (light_pick_pdf * pdf_light_w);
+		} else if(d_vm > 0){
+			LOG_CLICKED0("Nope\n");
 		}
 		return mis_weight * f_light * abs(cos_x) * Le / (light_pick_pdf * pdf_light_w);
+		// return 0 * f_light * abs(cos_x) * Le / (light_pick_pdf * pdf_light_w);
 	}
 	return vec3(0);
 }
