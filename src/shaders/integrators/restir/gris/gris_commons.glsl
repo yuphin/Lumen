@@ -200,7 +200,7 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 		// float mis_eye = d_vm * light_bsdf_pdf_rev * cos_x * light_pick_pdf / (pdf_light_w  * cos_from_light);
 		// float mis_eye = d_vm * light_bsdf_pdf_rev * pdf_pos_a_dir_w * cos_x  / (pdf_light_w * cos_from_light);
 		ASSERT(d_vm >= 0);
-		float mis_eye = wi_len == 0 ? 0 : pdf_dir * light_bsdf_pdf_rev * cos_x * d_vm / (wi_len * wi_len);
+		float mis_eye = wi_len == 0 ? 0 : pdf_dir * light_bsdf_pdf_rev * cos_x * d_vm / (wi_len * wi_len * light_pick_pdf);
 
 		ASSERT(mis_light >= 0);
 		ASSERT(mis_eye >= 0);

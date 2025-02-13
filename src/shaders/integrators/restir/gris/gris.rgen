@@ -223,7 +223,7 @@ void main() {
 				float cos_from_light = max(dot(n_s, wo), 0);
 				float pdf_light_dir = cos_from_light / PI;
 				// For photon mapping, multiplication by light pick prob. is necessary
-				mis_light = cos_from_light == 0 ? 0 :  pdf_light_dir * (1.0 / triangle_area) * d_vm / cos_from_light;
+				mis_light = cos_from_light == 0 ? 0 : pdf_light_dir * (1.0 / (triangle_area)) * d_vm / cos_from_light;
 				// mis_light = 0;
 			} else {
 				mis_light = 0;

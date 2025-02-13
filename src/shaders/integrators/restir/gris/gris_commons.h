@@ -114,8 +114,7 @@ struct PhotonLightData {
 	//  5b light path length | 1b side
 	uint flags;
 	vec2 wi;
-	float d_vm_bsdf;
-	float d_vm_nee;
+	float d_vm;
 };
 
 NAMESPACE_END()

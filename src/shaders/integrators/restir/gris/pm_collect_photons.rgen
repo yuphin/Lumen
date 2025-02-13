@@ -97,39 +97,19 @@ void main() {
 			float cam_pdf_rev;
 			vec3 f = eval_bsdf( photon_eye_gbuffer.n_s, wo, photon_eye_hit_mat, 1, eye_side, wi, cam_pdf_fwd, cam_pdf_rev);
 
-			float mis_weight = 1.0 / (1.0 + (photon_light.d_vm_nee + photon_light.d_vm_bsdf) * cam_pdf_fwd);
-			// float mis_weight = 1.0 / (1.0 + (photon_light.d_vm_bsdf) * cam_pdf_fwd);
-			// float mis_weight = 1;
-			// float mis_weight = 1.0 / (1.0 + (photon_light.d_vm_nee) * cam_pdf_fwd);
-			// float mis_weight = 1.0 / (1.0 + (photon_light.d_vm_nee) * cam_pdf_fwd);
-			// LOG_CLICKED2("MIS portion NEE %f BSDF %f\n", photon_light.d_vm_nee, photon_light.d_vm_bsdf);
-			// float mis_weight = 1.0 / (1.0 + (photon_light.d_vm_nee) * cam_pdf_fwd);
+			float mis_weight = 1.0 / (1.0 + photon_light.d_vm * cam_pdf_fwd);
 
-			ASSERT(photon_light.d_vm_nee >= 0);
-			ASSERT(photon_light.d_vm_bsdf >= 0);
+			ASSERT(photon_light.d_vm >= 0);
 			ASSERT(mis_weight >= 0);
 			ASSERT(!isnan(mis_weight));
 			phi += mis_weight * f * photon_light.throughput * photon_eye.throughput;
-			// LOG_CLICKED4("(%d) - Path lengths: %d - %d / MIS: %f\n", counter, eye_path_length, photon_path_length, mis_weight);
-			// LOG_CLICKED3("%f - %f - %f\n", photon_light.d_vm, cam_pdf_fwd, mis_weight);
 			counter++;
 		}
 		phi /= (PI * pc.photon_radius * pc.photon_radius * pc.num_photons);
 		if(isnan(phi.x) || isnan(phi.y) || isnan(phi.z)) {
 			phi = vec3(0);
 		}
-
-		if (counter > 0) {
-			// LOG_CLICKED("Num photons: %d\n", counter);
-		}
 		col = phi;
 	}
 	imageStore(caustics_texture, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
-	// if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
-	// 	imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
-	// } else {
-	// 	float w = 1. / float(pc.frame_num + 1);
-	// 	vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
-	// 	imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
-	// }
 }
