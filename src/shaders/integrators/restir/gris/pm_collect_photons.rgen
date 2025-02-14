@@ -99,7 +99,6 @@ void main() {
 
 			float mis_weight = 1.0 / (1.0 + photon_light.d_vm * cam_pdf_fwd);
 
-			ASSERT(photon_light.d_vm >= 0);
 			ASSERT(mis_weight >= 0);
 			ASSERT(!isnan(mis_weight));
 			phi += mis_weight * f * photon_light.throughput * photon_eye.throughput;

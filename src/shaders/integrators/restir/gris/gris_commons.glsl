@@ -189,7 +189,7 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	light_dir_or_pdf = is_directional_light ? wi * wi_len : vec3(pdf_light_a, vec2(0));
 
 	const float light_pick_pdf = 1. / pc.light_triangle_count;
-	if (visible && pdf_light_w > 0) {
+	if (visible && pdf_light_w > 0 && cos_x > 0) {
 		float mis_light = is_light_delta(record.flags) ? 0 : light_bsdf_pdf_fwd / pdf_light_w;
 		ASSERT(mis_light >= 0);
 #ifndef DISABLE_PM_MIS

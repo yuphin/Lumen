@@ -42,12 +42,9 @@ void main() {
 
 	float light_pick_prob = 1.0 / pc.light_triangle_count;
 
-	float d_vm_common = 1.0 / (pdf_dir * eta_vm);
-	// float d_vm_nee = 1.0 / (pdf_dir * eta_vm);
+	float d_vm_common = pdf_dir == 0 ? 0 : 1.0 / (pdf_dir * eta_vm);
 	float d_vm_nee = light_pick_prob;
 	float d_vm_bsdf =  light_pick_prob / pdf_pos;
-	// float d_vm_bsdf =  1.0 / (pdf_pos);
-	// float d_vm_bsdf = light_pick_prob / (pdf_pos * pdf_dir * eta_vm);
 
 	bool finite = is_light_finite(light_record.flags);
 
@@ -100,7 +97,9 @@ void main() {
 #ifdef DISABLE_PM_MIS
 			photon_light_data.d[photon_idx].d_vm = 0;
 #else
-			photon_light_data.d[photon_idx].d_vm = (d_vm_bsdf + d_vm_nee) * d_vm_common;
+			float d_vm = (d_vm_bsdf + d_vm_nee) * d_vm_common;
+			photon_light_data.d[photon_idx].d_vm = d_vm;
+			ASSERT(d_vm >= 0);
 #endif // DISABLE_PM_MIS
 		}
 		last_specular = !is_rough(hit_mat);
