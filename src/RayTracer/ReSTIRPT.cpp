@@ -268,7 +268,8 @@ void ReSTIRPT::render() {
 									 {"src/shaders/ray_shadow.rmiss"},
 									 {"src/shaders/integrators/restir/gris/ray.rchit"},
 									 {"src/shaders/ray.rahit"}},
-						 .macros = {vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
+						 .macros = {vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere),
+									vk::ShaderMacro("DISABLE_PM_MIS", !enable_pm_mis)},
 						 .dims = {num_photons, 1},
 					 })
 			.push_constants(&pc_ray)
@@ -320,7 +321,8 @@ void ReSTIRPT::render() {
 								 {"src/shaders/ray.rahit"}},
 					 .macros = {{"STREAMING_MODE", int(streaming_method)},
 								vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere),
-								vk::ShaderMacro("ENABLE_PM", enable_photon_gather)},
+								vk::ShaderMacro("DISABLE_PM_MIS", !enable_pm_mis),
+								vk::ShaderMacro("ENABLE_PM", enable_photon_gather && enable_photon_mapping)},
 					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc_ray)
@@ -522,6 +524,7 @@ bool ReSTIRPT::gui() {
 		result |= ImGui::Checkbox("Progressive radius reduction", &progressive_radius_reduction);
 		ImGui::Text("Current photon radius: %f", curr_photon_radius);
 		result |= ImGui::Checkbox("Enable photon gather", &enable_photon_gather);
+		result |= ImGui::Checkbox("MIS between NEE/BRDF/PM", &enable_pm_mis);
 		if (num_photons_changed) {
 			vkDeviceWaitIdle(vk::context().device);
 

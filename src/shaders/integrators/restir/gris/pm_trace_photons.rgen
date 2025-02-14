@@ -97,8 +97,11 @@ void main() {
 			// side is not used
 			// Path length = Num of edges from light
 			photon_light_data.d[photon_idx].flags = pack_photon_flags(side, d + 1);
+#ifdef DISABLE_PM_MIS
+			photon_light_data.d[photon_idx].d_vm = 0;
+#else
 			photon_light_data.d[photon_idx].d_vm = (d_vm_bsdf + d_vm_nee) * d_vm_common;
-			// photon_light_data.d[photon_idx].d_vm = (d_vm_bsdf) * d_vm_common;
+#endif // DISABLE_PM_MIS
 		}
 		last_specular = !is_rough(hit_mat);
 		pos = offset_ray(gbuffer.pos, n_g);

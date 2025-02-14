@@ -114,9 +114,6 @@ void main() {
 			vec3 contribution = throughput * atmosphere_L;
 			if (depth > 1) {
 				col += contribution;
-				if (mis_factor_set) {
-					debug_col += contribution;
-				}
 			} else {
 				direct_lighting += contribution;
 			}
@@ -202,9 +199,6 @@ void main() {
 		d_vm = cos_theta_wo > 0 ? d_vm / cos_theta_wo : 0;
 		if (mis_factor_set) {
 			ASSERT(debug_val == true);
-			if(depth == 2) {
-				// LOG_CLICKED2("Ok %d: %f\n", depth, d_vm);
-			}
 		}
 
 		if (depth == 0) {
@@ -217,36 +211,26 @@ void main() {
 			float pdf_light_w = 1.0 / (g * triangle_area);
 			float mis_bsdf;
 
-			float mis_light;
+			float mis_light = 0;
+#ifndef DISABLE_PM_MIS
 			if (mis_factor_set) {
 				float light_pick_prob = 1.0 / pc.light_triangle_count;
 				float cos_from_light = max(dot(n_s, wo), 0);
 				float pdf_light_dir = cos_from_light / PI;
 				// For photon mapping, multiplication by light pick prob. is necessary
 				mis_light = cos_from_light == 0 ? 0 : pdf_light_dir * (1.0 / (triangle_area)) * d_vm / cos_from_light;
-				// mis_light = 0;
-			} else {
-				mis_light = 0;
-			}
+			} 
+#endif // !DISABLE_PM_MIS
 
 			if (!vertex_specular) {
 				mis_bsdf = pdf_light_w / bsdf_pdf_fwd;
-				// mis_bsdf = 0;
 			} else {
 				mis_bsdf = 0;
 			}
 			float mis_weight = 1.0 / (1 + mis_bsdf + mis_light);
 			ASSERT(!isnan(mis_weight));
-			if(!mis_factor_set) {
-				// mis_weight = 0;
-			}
 
 			vec3 partial_contrib = mis_weight * hit_mat.emissive_factor;
-			// vec3 partial_contrib = 0 * hit_mat.emissive_factor;
-			if(mis_light > 0) {
-				// LOG_CLICKED2("BSDF: %f - %f\n", mis_light, mis_weight);
-				// test_col += partial_contrib * throughput;
-			}
 
 			if (connectable_vertex_found && depth > 1) {
 #if STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
@@ -281,6 +265,11 @@ void main() {
 			if (depth == 1) {
 				direct_lighting += partial_contrib * throughput;
 			} else {
+#ifdef DISABLE_PM_MIS
+				if(mis_factor_set) {
+					partial_contrib = vec3(0);
+				}
+#endif // DISABLE_PM_MIS
 				col += partial_contrib * throughput;
 				float lum = luminance(partial_contrib * throughput);
 				if (mis_factor_set && lum > 0) {
@@ -303,16 +292,10 @@ void main() {
 
 		float bsdf_pdf_rev = bsdf_pdf(hit_mat, n_s, direction, wo, side);
 
-		
 		if (connectable_this_vertex) {
 			reconnection_data.rc_partial_jacobian *= bsdf_pdf_fwd;
 			reconnection_data.rc_wi = to_spherical(direction);
 		}
-
-		if(depth == 2) {
-				// LOG_CLICKED2("Now %d: %f\n", depth, d_vm);
-
-			}
 
 		// NEE
 		if (!vertex_specular) {
@@ -392,6 +375,11 @@ void main() {
 			}
 
 			if (depth > 0) {
+#ifdef DISABLE_PM_MIS			
+				if(mis_factor_set) {
+					contribution = vec3(0);
+				}
+#endif // DISABLE_PM_MIS
 				col += contribution;
 				if (mis_factor_set) {
 					debug_col += contribution;
@@ -408,7 +396,6 @@ void main() {
 			if (!vertex_specular) {
 				d_vm *= bsdf_pdf_rev / bsdf_pdf_fwd;
 			}
-			// LOG_CLICKED("First non-diffuse: %f\n", d_vm);
 		}
 
 		const bool is_transmission = bsdf_has_property(hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION);
@@ -420,13 +407,7 @@ void main() {
 		vec3 f_cos = f * abs(cos_theta);
 		throughput *= f_cos / bsdf_pdf_fwd;
 		if (!mis_factor_set && is_rough(hit_mat)) {
-			// d_vm = nu * cos_theta * bsdf_pdf_rev / bsdf_pdf_fwd;
-			// bsdf_pdf_fwd will cancel during vertex merging
 			d_vm = PI * pc.photon_radius * pc.photon_radius * pc.num_photons * abs_cos_theta / bsdf_pdf_fwd;
-
-			// if(d_vm == 1.0) {
-			// 	LOG3("%f - %f - %f\n", cos_theta, bsdf_pdf_rev, bsdf_pdf_fwd);
-			// }
 			debug_val = true;
 		}
 
@@ -541,10 +522,6 @@ void main() {
 	}
 
 	// col = debug_col;
-	// col = test_col;
-	// col = vec3(0);
-
-	// col += imageLoad(caustics_texture, ivec2(gl_LaunchIDEXT.xy)).xyz;
 #ifdef ENABLE_PM
 	col += imageLoad(caustics_texture, ivec2(gl_LaunchIDEXT.xy)).xyz;
 #endif	// ENABLE_PM

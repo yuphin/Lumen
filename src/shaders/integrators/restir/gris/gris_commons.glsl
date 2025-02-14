@@ -64,8 +64,6 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
 }
 
-vec3 test_col = vec3(0);
-
 HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx, out float area) {
 	const PrimMeshInfo pinfo = prim_infos.d[instance_idx];
 	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
@@ -193,32 +191,18 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	const float light_pick_pdf = 1. / pc.light_triangle_count;
 	if (visible && pdf_light_w > 0) {
 		float mis_light = is_light_delta(record.flags) ? 0 : light_bsdf_pdf_fwd / pdf_light_w;
-		// float mis_light = 0;
-		
-		// Normally light_pick_pdf would cancel out
-		// But in GRIS PT loop, we get the emissive contribution as we go. I.e we don't consider light_pick_pdf during connection 
-		// float mis_eye = d_vm * light_bsdf_pdf_rev * cos_x * light_pick_pdf / (pdf_light_w  * cos_from_light);
-		// float mis_eye = d_vm * light_bsdf_pdf_rev * pdf_pos_a_dir_w * cos_x  / (pdf_light_w * cos_from_light);
-		ASSERT(d_vm >= 0);
-		float mis_eye = wi_len == 0 ? 0 : pdf_dir * light_bsdf_pdf_rev * cos_x * d_vm / (wi_len * wi_len * light_pick_pdf);
-
 		ASSERT(mis_light >= 0);
+#ifndef DISABLE_PM_MIS
+		float mis_eye = wi_len == 0 ? 0 : pdf_dir * light_bsdf_pdf_rev * cos_x * d_vm / (wi_len * wi_len * light_pick_pdf);
+		ASSERT(d_vm >= 0);
 		ASSERT(mis_eye >= 0);
-		
-		// float mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + mis_light);
+#else
+		float mis_eye = 0;
+#endif // !DISABLE_PM_MIS
 		float mis_weight = 1 / (1 + mis_light + mis_eye);
-		// float debug_val = d_vm * light_bsdf_pdf_rev * pdf_pos_a_dir_w * cos_x * light_pick_pdf / (pdf_light_w * cos_from_light); 
 		ASSERT(!isnan(mis_weight));
 		ASSERT(mis_weight >= 0);
-		if(mis_eye > 0) {
-			float mis_weight2 = 1 / (1 + mis_light);
-			LOG_CLICKED4("NEE: %f - %f - %f - %d\n", mis_weight, wi_len * wi_len, d_vm, depth);
-			test_col += mis_weight * f_light * abs(cos_x) * Le / (light_pick_pdf * pdf_light_w);
-		} else if(d_vm > 0){
-			LOG_CLICKED0("Nope\n");
-		}
 		return mis_weight * f_light * abs(cos_x) * Le / (light_pick_pdf * pdf_light_w);
-		// return 0 * f_light * abs(cos_x) * Le / (light_pick_pdf * pdf_light_w);
 	}
 	return vec3(0);
 }
