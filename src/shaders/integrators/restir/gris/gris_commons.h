@@ -117,4 +117,14 @@ struct PhotonLightData {
 	float d_vm;
 };
 
+struct PhotonReservoir {
+	vec3 flux;
+	uint M;
+	vec3 pos;
+	float W;
+	vec2 wi;
+	float w_sum;
+	float target_pdf;
+};
+
 NAMESPACE_END()

@@ -96,6 +96,19 @@ void ReSTIRPT::init() {
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BufferType::GPU,
 						 .size = 4});
+
+	caustics_reservoir_ping_buffer =
+		prm::get_buffer({.name = "Caustics Reservoirs Ping",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = Window::width() * Window::height() * sizeof(PhotonReservoir)});
+
+	caustics_reservoir_pong_buffer =
+		prm::get_buffer({.name = "Caustics Reservoirs Pong",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = Window::width() * Window::height() * sizeof(PhotonReservoir)});
+
 	SceneDesc desc;
 	desc.index_addr = lumen_scene->index_buffer->get_device_address();
 
@@ -214,6 +227,7 @@ void ReSTIRPT::render() {
 		output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer};
 
 	const std::array<vk::Buffer*, 2> reservoir_buffers = {gris_reservoir_ping_buffer, gris_reservoir_pong_buffer};
+	const std::array<vk::Buffer*, 2> photon_reservoir_buffers = {caustics_reservoir_ping_buffer, caustics_reservoir_pong_buffer};
 	const std::array<vk::Buffer*, 2> gbuffers = {gris_prev_gbuffer, gris_gbuffer};
 
 	int ping = pc_ray.total_frame_num % 2;
@@ -300,10 +314,11 @@ void ReSTIRPT::render() {
 						 })
 				.push_constants(&pc_ray)
 				.bind(common_bindings)
-				.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
 				.bind(gbuffers[pong])
 				.bind(canonical_contributions_texture)
 				.bind(caustics_texture)
+				.bind(photon_reservoir_buffers[ping])
+				.bind(photon_reservoir_buffers[pong])
 				.bind_texture_array(lumen_scene->scene_textures)
 				.bind_tlas(tlas)
 				.bind_tlas(photon_tlas);
@@ -482,7 +497,9 @@ void ReSTIRPT::destroy(bool resize) {
 						photon_eye_buffer,
 						caustic_photon_aabbs_buffer,
 						caustic_photon_light_buffer,
-						photon_count_buffer};
+						photon_count_buffer,
+						caustics_reservoir_ping_buffer,
+						caustics_reservoir_pong_buffer};
 	for (vk::Buffer* b : buffer_list) {
 		prm::remove(b);
 	}
@@ -579,7 +596,7 @@ bool ReSTIRPT::gui() {
 			 .memory_type = vk::BufferType::GPU,
 			 .size = Window::width() * Window::height() * sizeof(ReconnectionData) * (num_spatial_samples + 1)});
 	}
-	if(result) {
+	if (result) {
 		pc_ray.total_frame_num = 0;
 	}
 	return result;

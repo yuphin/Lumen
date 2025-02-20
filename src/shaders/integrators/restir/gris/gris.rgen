@@ -520,7 +520,6 @@ void main() {
 			out_gbuffers[pixel_idx] = gbuffer_out;
 		}
 	}
-
 	// col = debug_col;
 #ifdef ENABLE_PM
 	col += imageLoad(caustics_texture, ivec2(gl_LaunchIDEXT.xy)).xyz;

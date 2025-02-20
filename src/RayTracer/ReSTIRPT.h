@@ -36,6 +36,8 @@ class ReSTIRPT final : public Integrator {
 	vk::Buffer* photon_bvh_instances_buf;
 	vk::Buffer* photon_bvh_scratch_buf = nullptr;
 
+	vk::Buffer* caustics_reservoir_ping_buffer;
+	vk::Buffer* caustics_reservoir_pong_buffer;
 	PCReSTIRPT pc_ray{};
 	bool enable_accumulation = false;
 	bool direct_lighting = false;
