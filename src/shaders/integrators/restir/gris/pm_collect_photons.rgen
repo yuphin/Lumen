@@ -8,17 +8,16 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
-#define SCENE_TEX_IDX 9
+#define SCENE_TEX_IDX 8
 #include "gris_commons.glsl"
 layout(set = 1, binding = 1) uniform accelerationStructureEXT photon_bvh;
 
 PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
 
-layout(binding = 4, std430) writeonly buffer OutGBuffer { GBuffer out_gbuffers[]; };
-layout(binding = 5, rgba16) writeonly uniform image2D canonical_contributions_tex;
-layout(binding = 6, rgba32f) uniform image2D caustics_texture;
-layout(binding = 7, std430) readonly buffer PrevPhotonReservoirs { PhotonReservoir in_reservoirs[]; };
-layout(binding = 8, std430) writeonly buffer CurrPhotonReservoirs { PhotonReservoir out_reservoirs[]; };
+layout(binding = 4, rgba16) writeonly uniform image2D canonical_contributions_tex;
+layout(binding = 5, rgba32f) uniform image2D caustics_texture;
+layout(binding = 6, std430) readonly buffer PrevPhotonReservoirs { PhotonReservoir in_reservoirs[]; };
+layout(binding = 7, std430) writeonly buffer CurrPhotonReservoirs { PhotonReservoir out_reservoirs[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonEyeDataBuffer { PhotonEyeData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonAABBs { PhotonAABB d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonLightData { PhotonLightData d[]; };
@@ -38,8 +37,8 @@ bool photon_is_nearby(vec3 p, vec3 photon_p, float r) {
 
 vec3 get_center(PhotonAABB aabb) { return (aabb.min + aabb.max) * 0.5; }
 
-bool update_photon_reservoir(inout uvec4 seed, inout PhotonReservoir r_new, vec3 flux, vec3 pos, vec2 wi, float target_pdf,
-					  float inv_source_pdf) {
+bool update_photon_reservoir(inout uvec4 seed, inout PhotonReservoir r_new, vec3 flux, vec3 pos, vec2 wi,
+							 float target_pdf, float inv_source_pdf) {
 	float w_i = target_pdf * inv_source_pdf;
 	r_new.w_sum += w_i;
 	if (rand(seed) * r_new.w_sum < w_i) {
@@ -147,11 +146,11 @@ void main() {
 
 			vec3 contribution = mis_weight * f * photon_light.throughput * photon_eye.throughput;
 
-			bool merged = stream_photon_reservoir(seed, reservoir, photon_light.throughput, photon_hitdata.pos, photon_light.wi,
-									calc_target_pdf(contribution), 1.0);
+			bool merged = stream_photon_reservoir(seed, reservoir, photon_light.throughput, photon_hitdata.pos,
+												  photon_light.wi, calc_target_pdf(contribution), 1.0);
 			if (merged) {
 				selected_contribution = contribution;
-			}	
+			}
 			phi += contribution;
 			counter++;
 		}
@@ -161,18 +160,18 @@ void main() {
 		phi = reservoir.W * selected_contribution;
 		phi /= (PI * pc.photon_radius * pc.photon_radius * pc.num_photons);
 
+		if (pc.total_frame_num > 0) {
+			// TODO
+			// // Temporal reuse
+			// vec4 prev_pos = ubo.prev_view * vec4(photon_eye_gbuffer.pos, 1);
+			// prev_pos /= prev_pos.z;
+			// prev_pos = -ubo.prev_projection * prev_pos;
+			// ivec2 prev_coords = ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
 
-		// Temporal reuse
-		vec4 prev_pos = ubo.prev_view * vec4(photon_eye_gbuffer.pos, 1);
-		prev_pos /= prev_pos.z;
-		prev_pos = -ubo.prev_projection * prev_pos;
-		ivec2 prev_coords = ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
-
-		if (!(any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy)))) { 
-			
-
+			// if (!(any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy)))) {
+				
+			// }
 		}
-
 
 		if (isnan(phi.x) || isnan(phi.y) || isnan(phi.z)) {
 			phi = vec3(0);

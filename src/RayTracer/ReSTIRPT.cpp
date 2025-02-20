@@ -314,7 +314,6 @@ void ReSTIRPT::render() {
 						 })
 				.push_constants(&pc_ray)
 				.bind(common_bindings)
-				.bind(gbuffers[pong])
 				.bind(canonical_contributions_texture)
 				.bind(caustics_texture)
 				.bind(photon_reservoir_buffers[ping])
