@@ -100,6 +100,7 @@ struct PhotonEyeData {
 	//  5b eye path length | 1b side
 	uint flags; 
 	vec2 wo;
+	vec2 pad;
 };
 
 struct PhotonAABB {

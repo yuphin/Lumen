@@ -8,7 +8,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
-#define SCENE_TEX_IDX 8
+#define SCENE_TEX_IDX 10
 #include "gris_commons.glsl"
 layout(set = 1, binding = 1) uniform accelerationStructureEXT photon_bvh;
 
@@ -18,11 +18,11 @@ layout(binding = 4, rgba16) writeonly uniform image2D canonical_contributions_te
 layout(binding = 5, rgba32f) uniform image2D caustics_texture;
 layout(binding = 6, std430) readonly buffer PrevPhotonReservoirs { PhotonReservoir in_reservoirs[]; };
 layout(binding = 7, std430) writeonly buffer CurrPhotonReservoirs { PhotonReservoir out_reservoirs[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonEyeDataBuffer { PhotonEyeData d[]; };
+layout(binding = 8, std430) readonly buffer PrevPhotonEyeData { PhotonEyeData prev_photon_eye_data[]; };
+layout(binding = 9, std430) readonly buffer CurrPhotonEyeData { PhotonEyeData photon_eye_data[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonAABBs { PhotonAABB d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonLightData { PhotonLightData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonCounts { uint val; };
-PhotonEyeDataBuffer photon_eye_data = PhotonEyeDataBuffer(scene_desc.photon_eye_addr);
 CausticPhotonAABBs photon_aabbs = CausticPhotonAABBs(scene_desc.caustic_photon_aabbs_addr);
 CausticPhotonLightData photon_light_data = CausticPhotonLightData(scene_desc.caustic_photon_light_addr);
 PhotonCounts photon_counts = PhotonCounts(scene_desc.photon_count_addr);
@@ -74,7 +74,7 @@ void init_reservoir(out PhotonReservoir r) {
 }
 
 void main() {
-	PhotonEyeData photon_eye = photon_eye_data.d[pixel_idx];
+	PhotonEyeData photon_eye = photon_eye_data[pixel_idx];
 	vec3 col = vec3(0);
 	if (photon_eye.primitive_instance_id.x != -1) {
 		HitData photon_eye_gbuffer = get_hitdata(photon_eye.barycentrics, photon_eye.primitive_instance_id.y,
@@ -155,28 +155,57 @@ void main() {
 			counter++;
 		}
 
+		if (pc.total_frame_num > 0) {
+			// Temporal reuse
+			uint Z = reservoir.M;
+
+
+			vec4 prev_pos = ubo.prev_view * vec4(photon_eye_gbuffer.pos, 1);
+			prev_pos /= prev_pos.z;
+			prev_pos = -ubo.prev_projection * prev_pos;
+			ivec2 prev_coords = ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
+
+			if (!(any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy)))) {
+				PhotonEyeData prev_photon_eye_data = prev_photon_eye_data[prev_coords.x * pc.size_y + prev_coords.y];
+				if (prev_photon_eye_data.primitive_instance_id.x != -1) {
+					HitData prev_photon_eye_gbuffer =
+						get_hitdata(prev_photon_eye_data.barycentrics, prev_photon_eye_data.primitive_instance_id.y,
+									prev_photon_eye_data.primitive_instance_id.x);
+					Material prev_photon_eye_hit_mat =
+						load_material(prev_photon_eye_gbuffer.material_idx, prev_photon_eye_gbuffer.uv);
+
+					bool prev_eye_side;
+					uint prev_eye_path_length;
+					unpack_photon_flags(prev_photon_eye_data.flags, prev_eye_side, prev_eye_path_length);
+
+					PhotonReservoir prev_reservoir = in_reservoirs[prev_coords.x * pc.size_y + prev_coords.y];
+					vec3 wo_prev = from_spherical(prev_photon_eye_data.wo);
+					vec3 wi_prev = from_spherical(prev_reservoir.wi);
+
+					float cam_pdf_fwd_prev;
+					float cam_pdf_rev_prev;
+					vec3 f_prev = eval_bsdf(prev_photon_eye_gbuffer.n_s, wo_prev, prev_photon_eye_hit_mat, 1,
+											prev_eye_side, wi_prev, cam_pdf_fwd_prev, cam_pdf_rev_prev);
+					float mis_weight_prev = 1; // TODO
+					vec3 prev_contribution = f_prev * prev_reservoir.flux * prev_photon_eye_data.throughput;
+
+					prev_reservoir.M = min(20, prev_reservoir.M);
+
+					float prev_contribution_pdf = calc_target_pdf(prev_contribution);
+
+				}
+			}
+		}
 		reservoir.M = 1;
 		calc_photon_reservoir_W(reservoir);
 		phi = reservoir.W * selected_contribution;
 		phi /= (PI * pc.photon_radius * pc.photon_radius * pc.num_photons);
 
-		if (pc.total_frame_num > 0) {
-			// TODO
-			// // Temporal reuse
-			// vec4 prev_pos = ubo.prev_view * vec4(photon_eye_gbuffer.pos, 1);
-			// prev_pos /= prev_pos.z;
-			// prev_pos = -ubo.prev_projection * prev_pos;
-			// ivec2 prev_coords = ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
-
-			// if (!(any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy)))) {
-				
-			// }
-		}
-
 		if (isnan(phi.x) || isnan(phi.y) || isnan(phi.z)) {
 			phi = vec3(0);
 		}
 		col = phi;
+		out_reservoirs[pixel_idx] = reservoir;
 	}
 	imageStore(caustics_texture, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
 }

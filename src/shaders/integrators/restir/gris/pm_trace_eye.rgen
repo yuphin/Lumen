@@ -7,10 +7,10 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
+#define SCENE_TEX_IDX 5
 #include "gris_commons.glsl"
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonEyeDataBuffer { PhotonEyeData d[]; };
-PhotonEyeDataBuffer photon_eye_data = PhotonEyeDataBuffer(scene_desc.photon_eye_addr);
+layout(binding = 4, std430) writeonly buffer CurrPhotonEyeData { PhotonEyeData photon_eye_data[]; };
 
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
 uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
@@ -74,5 +74,5 @@ void main() {
 				throughput /= rr_prob;
 		}
 	}
-	photon_eye_data.d[pixel_idx] = photon_eye;
+	photon_eye_data[pixel_idx] = photon_eye;
 }

@@ -72,8 +72,14 @@ void ReSTIRPT::init() {
 		.size = transformations.size() * sizeof(glm::mat4),
 		.data = transformations.data(),
 	});
-	photon_eye_buffer =
-		prm::get_buffer({.name = "Photon - Eye",
+	photon_eye_buffer_ping =
+		prm::get_buffer({.name = "Photon - Eye - Ping",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BufferType::GPU,
+						 .size = Window::width() * Window::height() * sizeof(PhotonEyeData)});
+						 
+	photon_eye_buffer_pong =
+		prm::get_buffer({.name = "Photon - Eye - Pong",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
 						 .size = Window::width() * Window::height() * sizeof(PhotonEyeData)});
@@ -120,7 +126,7 @@ void ReSTIRPT::init() {
 	desc.transformations_addr = transformations_buffer->get_device_address();
 	desc.prefix_contributions_addr = prefix_contribution_buffer->get_device_address();
 	desc.debug_vis_addr = debug_vis_buffer->get_device_address();
-	desc.photon_eye_addr = photon_eye_buffer->get_device_address();
+	desc.photon_eye_addr = photon_eye_buffer_ping->get_device_address();
 	desc.caustic_photon_aabbs_addr = caustic_photon_aabbs_buffer->get_device_address();
 	desc.caustic_photon_light_addr = caustic_photon_light_buffer->get_device_address();
 	desc.photon_count_addr = photon_count_buffer->get_device_address();
@@ -173,7 +179,7 @@ void ReSTIRPT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, lumen_scene->compact_vertices_buffer,
 								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, debug_vis_addr, debug_vis_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_eye_addr, photon_eye_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_eye_addr, photon_eye_buffer_ping, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, caustic_photon_aabbs_addr, caustic_photon_aabbs_buffer,
 								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, caustic_photon_light_addr, caustic_photon_light_buffer,
@@ -228,6 +234,7 @@ void ReSTIRPT::render() {
 
 	const std::array<vk::Buffer*, 2> reservoir_buffers = {gris_reservoir_ping_buffer, gris_reservoir_pong_buffer};
 	const std::array<vk::Buffer*, 2> photon_reservoir_buffers = {caustics_reservoir_ping_buffer, caustics_reservoir_pong_buffer};
+	const std::array<vk::Buffer*, 2> photon_gbuffers = {photon_eye_buffer_ping, photon_eye_buffer_pong};
 	const std::array<vk::Buffer*, 2> gbuffers = {gris_prev_gbuffer, gris_gbuffer};
 
 	int ping = pc_ray.total_frame_num % 2;
@@ -249,6 +256,7 @@ void ReSTIRPT::render() {
 					 })
 			.push_constants(&pc_ray)
 			.bind(common_bindings)
+			.bind(photon_gbuffers[pong])
 			.bind_texture_array(lumen_scene->scene_textures)
 			.bind_tlas(tlas);
 
@@ -318,6 +326,8 @@ void ReSTIRPT::render() {
 				.bind(caustics_texture)
 				.bind(photon_reservoir_buffers[ping])
 				.bind(photon_reservoir_buffers[pong])
+				.bind(photon_gbuffers[ping])
+				.bind(photon_gbuffers[pong])
 				.bind_texture_array(lumen_scene->scene_textures)
 				.bind_tlas(tlas)
 				.bind_tlas(photon_tlas);
@@ -493,7 +503,8 @@ void ReSTIRPT::destroy(bool resize) {
 						reconnection_buffer,
 						gris_prev_gbuffer,
 						debug_vis_buffer,
-						photon_eye_buffer,
+						photon_eye_buffer_ping,
+						photon_eye_buffer_pong,
 						caustic_photon_aabbs_buffer,
 						caustic_photon_light_buffer,
 						photon_count_buffer,

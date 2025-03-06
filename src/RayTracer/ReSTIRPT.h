@@ -25,7 +25,10 @@ class ReSTIRPT final : public Integrator {
 	vk::Buffer* reconnection_buffer;
 	vk::Buffer* transformations_buffer;
 	vk::Buffer* debug_vis_buffer;
-	vk::Buffer* photon_eye_buffer;
+
+
+	vk::Buffer* photon_eye_buffer_ping;
+	vk::Buffer* photon_eye_buffer_pong;
 	vk::Buffer* caustic_photon_aabbs_buffer;
 	vk::Buffer* caustic_photon_light_buffer;
 	vk::Buffer* photon_count_buffer;
