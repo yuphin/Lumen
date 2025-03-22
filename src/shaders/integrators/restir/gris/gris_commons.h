@@ -126,6 +126,8 @@ struct PhotonReservoir {
 	vec2 wi;
 	float w_sum;
 	float target_pdf;
+	vec3 pad;
+	float d_vm;
 };
 
 NAMESPACE_END()

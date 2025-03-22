@@ -42,7 +42,7 @@ class ReSTIRPT final : public Integrator {
 	vk::Buffer* caustics_reservoir_ping_buffer;
 	vk::Buffer* caustics_reservoir_pong_buffer;
 	PCReSTIRPT pc_ray{};
-	bool enable_accumulation = false;
+	bool enable_accumulation = true;
 	bool direct_lighting = false;
 	bool enable_rr = false;
 	bool enable_spatial_reuse = true;
