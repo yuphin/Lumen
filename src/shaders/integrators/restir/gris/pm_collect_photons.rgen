@@ -192,19 +192,7 @@ void main() {
 			PhotonEyeData prev_photon_eye = prev_photon_eye[prev_coords.x * pc.size_y + prev_coords.y];
 			if (!(any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy))) &&
 				prev_photon_eye.primitive_instance_id.x != -1) {
-				// PhotonEyeData prev_photon_eye = prev_photon_eye[prev_coords.x * pc.size_y + prev_coords.y];
-				// HitData prev_photon_eye_gbuffer =
-				// 	get_hitdata(prev_photon_eye.barycentrics, prev_photon_eye.primitive_instance_id.y,
-				// 				prev_photon_eye.primitive_instance_id.x);
-				// Material prev_photon_eye_hit_mat =
-				// 	load_material(prev_photon_eye_gbuffer.material_idx, prev_photon_eye_gbuffer.uv);
-
-				// bool prev_eye_side;
-				// uint prev_eye_path_length;
-				// unpack_photon_flags(prev_photon_eye.flags, prev_eye_side, prev_eye_path_length);
-
 				PhotonReservoir prev_reservoir = in_reservoirs[prev_coords.x * pc.size_y + prev_coords.y];
-				// vec3 wo_prev = from_spherical(photon_eye.wo);
 				vec3 wi_prev = from_spherical(prev_reservoir.wi);
 
 				float cam_pdf_fwd_temp;
