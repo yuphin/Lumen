@@ -8,7 +8,20 @@
 #include <tiny_obj_loader.h>
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+
+// workaround for GCC intrinsics in Debug
+//   error: emmintrin.h:1229:10: error: the last argument must be an 8-bit immediate
+#ifdef __GNUC__
+#pragma GCC push_options
+#pragma GCC optimize ("O2")
+#endif
+
 #include <stb_image/stb_image.h>
+
+#ifdef __GNUC__
+#pragma GCC pop_options
+#endif
+
 #include "shaders/commons.h"
 #include <cctype>
 #include "Framework/PersistentResourceManager.h"
