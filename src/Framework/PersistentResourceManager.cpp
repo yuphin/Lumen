@@ -2,15 +2,17 @@
 
 #include "PersistentResourceManager.h"
 #include <vulkan/vulkan_core.h>
-#include <winnt.h>
 #include <unordered_map>
 #include "VulkanContext.h"
 #include "VkUtils.h"
 
-#if !defined(_WIN32) && !defined(_WIN64)
+#if defined(_WIN32) || defined(_WIN64)
+#include <winnt.h>
+#else
 #include <sys/mman.h>
 #include <unistd.h>
 #endif
+
 static bool operator==(const VkSamplerCreateInfo& lhs, const VkSamplerCreateInfo& rhs) {
 	// Compare the individual members of VkSamplerCreateInfo
 	return lhs.sType == rhs.sType && lhs.pNext == rhs.pNext && lhs.flags == rhs.flags &&
@@ -35,7 +37,7 @@ size_t get_page_size() {
 }
 }  // namespace os
 
-constexpr size_t RESERVE_SIZE = 1024ull * 1024 * 1024 * 1024 * 64;	// 64GB
+constexpr size_t RESERVE_SIZE = 1024ull * 1024 * 1024 * 64;	// 64GB
 template <typename T>
 class PersistentPool {
    public:
@@ -45,8 +47,8 @@ class PersistentPool {
 		data_base = (T*)VirtualAlloc(data_base, PAGE_SIZE, MEM_COMMIT, PAGE_READWRITE);
 #else
 		data_base = (T*)mmap(NULL, RESERVE_SIZE, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-		int result = mprotect(data_base, ALLOC_SIZE, PROT_READ | PROT_WRITE)
-			LUMEN_ASSERT(result == 0, "Could not allocate memory");
+		int result = mprotect(data_base, PAGE_SIZE, PROT_READ | PROT_WRITE);
+		LUMEN_ASSERT(result == 0, "Could not allocate memory");
 #endif
 		base_ptr = data_base;
 		next_page = (uint8_t*)data_base + PAGE_SIZE;
@@ -76,7 +78,11 @@ class PersistentPool {
 	}
 
 	void destroy() {
+#if defined(_WIN32) || defined(_WIN64)
 		VirtualFree(base_ptr, 0, MEM_RELEASE);
+#else
+		munmap(base_ptr, RESERVE_SIZE);
+#endif
 		data_base = nullptr;
 		next_page = nullptr;
 		base_ptr = nullptr;
