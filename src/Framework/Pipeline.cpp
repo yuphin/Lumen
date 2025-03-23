@@ -4,7 +4,7 @@
 
 namespace vk {
 
-static uint32_t get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types) {
+uint32_t get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types) {
 	uint32_t binding_mask = 0;
 	for (const auto& shader : shaders) {
 		for (uint32_t i = 0; i < 32; ++i) {
