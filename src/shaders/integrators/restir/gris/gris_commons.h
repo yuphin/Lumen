@@ -93,41 +93,33 @@ struct GrisHitPayload {
 	float dist;
 };
 
-struct PhotonEyeData {
+struct PhotonData {
 	vec2 barycentrics;
 	uvec2 primitive_instance_id;
 	vec3 throughput;
-	//  5b eye path length | 1b side
+	//  5b eye/light path length | 1b side
 	uint flags; 
-	vec2 wo;
-	vec2 pad;
+	vec2 dir;
+	float d_vm;
+	float pad;
 };
 
 struct PhotonAABB {
 	vec3 min;
 	vec3 max;
 };
-
-struct PhotonLightData {
+struct PhotonReservoir {
 	vec2 barycentrics;
 	uvec2 primitive_instance_id;
-	vec3 throughput;
-	//  5b light path length | 1b side
-	uint flags;
-	vec2 wi;
-	float d_vm;
-};
-
-struct PhotonReservoir {
 	vec3 flux;
 	uint M;
-	vec3 pos;
-	float W;
 	vec2 wi;
+	float W;
 	float w_sum;
 	float target_pdf;
-	vec3 pad;
 	float d_vm;
+	uint flags; 
+	float pad;
 };
 
 NAMESPACE_END()

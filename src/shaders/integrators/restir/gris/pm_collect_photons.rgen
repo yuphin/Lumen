@@ -18,13 +18,13 @@ layout(binding = 4, rgba16) writeonly uniform image2D canonical_contributions_te
 layout(binding = 5, rgba32f) uniform image2D caustics_texture;
 layout(binding = 6, std430) readonly buffer PrevPhotonReservoirs { PhotonReservoir in_reservoirs[]; };
 layout(binding = 7, std430) writeonly buffer CurrPhotonReservoirs { PhotonReservoir out_reservoirs[]; };
-layout(binding = 8, std430) readonly buffer PrevPhotonEyeData { PhotonEyeData prev_photon_eye[]; };
-layout(binding = 9, std430) readonly buffer CurrPhotonEyeData { PhotonEyeData photon_eye_data[]; };
+layout(binding = 8, std430) readonly buffer PrevPhotonData { PhotonData prev_photon_eye[]; };
+layout(binding = 9, std430) readonly buffer CurrPhotonData { PhotonData photon_eye_data[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonAABBs { PhotonAABB d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonLightData { PhotonLightData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonData { PhotonData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonCounts { uint val; };
 CausticPhotonAABBs photon_aabbs = CausticPhotonAABBs(scene_desc.caustic_photon_aabbs_addr);
-CausticPhotonLightData photon_light_data = CausticPhotonLightData(scene_desc.caustic_photon_light_addr);
+CausticPhotonData photon_light_data = CausticPhotonData(scene_desc.caustic_photon_light_addr);
 PhotonCounts photon_counts = PhotonCounts(scene_desc.photon_count_addr);
 
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
@@ -37,13 +37,14 @@ bool photon_is_nearby(vec3 p, vec3 photon_p, float r) {
 
 vec3 get_center(PhotonAABB aabb) { return (aabb.min + aabb.max) * 0.5; }
 
-bool update_photon_reservoir(inout uvec4 seed, inout PhotonReservoir r_new, vec3 flux, vec3 pos, vec2 wi, float d_vm,
-							 float target_pdf, float inv_source_pdf) {
+bool update_photon_reservoir(inout uvec4 seed, inout PhotonReservoir r_new, vec3 flux, vec2 barycentrics,
+							 uvec2 primitive_instance_id, vec2 wi, float d_vm, float target_pdf, float inv_source_pdf) {
 	float w_i = target_pdf * inv_source_pdf;
 	r_new.w_sum += w_i;
 	if (rand(seed) * r_new.w_sum < w_i) {
 		r_new.flux = flux;
-		r_new.pos = pos;
+		r_new.barycentrics = barycentrics;
+		r_new.primitive_instance_id = primitive_instance_id;
 		r_new.wi = wi;
 		r_new.target_pdf = target_pdf;
 		r_new.d_vm = d_vm;
@@ -53,28 +54,34 @@ bool update_photon_reservoir(inout uvec4 seed, inout PhotonReservoir r_new, vec3
 }
 
 bool combine_reservoir(inout uvec4 seed, inout PhotonReservoir target_reservoir, const PhotonReservoir input_reservoir,
-					   float target_pdf) {
-	float inv_source_pdf = input_reservoir.M * input_reservoir.W;
+					   float target_pdf, float mis_weight) {
 	target_reservoir.M += input_reservoir.M;
+	float inv_source_pdf = input_reservoir.W * mis_weight;
 	if (target_pdf <= 0.0) {
 		return false;
 	}
-	return update_photon_reservoir(seed, target_reservoir, input_reservoir.flux, input_reservoir.pos,
-								   input_reservoir.wi, input_reservoir.d_vm, target_pdf, inv_source_pdf);
+	return update_photon_reservoir(seed, target_reservoir, input_reservoir.flux, input_reservoir.barycentrics,
+								   input_reservoir.primitive_instance_id, input_reservoir.wi, input_reservoir.d_vm,
+								   target_pdf, inv_source_pdf);
 }
 
-bool stream_photon_reservoir(inout uvec4 seed, inout PhotonReservoir r_new, vec3 flux, vec3 pos, vec2 wi, float d_vm,
-							 float target_pdf, float inv_source_pdf) {
+bool stream_photon_reservoir(inout uvec4 seed, inout PhotonReservoir r_new, vec3 flux, vec2 barycentrics,
+							 uvec2 primitive_instance_id, vec2 wi, float d_vm, float target_pdf, float inv_source_pdf) {
 	r_new.M++;
 	if (target_pdf <= 0.0 || isnan(inv_source_pdf) || inv_source_pdf <= 0.0) {
 		return false;
 	}
-	return update_photon_reservoir(seed, r_new, flux, pos, wi, d_vm, target_pdf, inv_source_pdf);
+	return update_photon_reservoir(seed, r_new, flux, barycentrics, primitive_instance_id, wi, d_vm, target_pdf,
+								   inv_source_pdf);
 }
 
 void calc_photon_reservoir_W(inout PhotonReservoir r, float n, float d) {
 	float denom = r.target_pdf * d;
 	r.W = denom == 0.0 ? 0.0 : r.w_sum * n / denom;
+}
+
+void calc_photon_reservoir_W_with_mis(inout PhotonReservoir r) {
+	r.W = r.target_pdf == 0.0 ? 0.0 : r.w_sum / r.target_pdf;
 }
 
 void calc_photon_reservoir_W(inout PhotonReservoir r) {
@@ -88,37 +95,67 @@ void init_reservoir(out PhotonReservoir r) {
 	r.W = 0;
 	r.w_sum = 0;
 	r.target_pdf = 0;
+	r.d_vm = 0;
+	r.primitive_instance_id = uvec2(-1);
 }
 
+bool is_photon_valid(HitData cam_gbuffer, HitData photon_gbuffer, vec3 wi, uint eye_path_length,
+					 uint photon_path_length) {
+	// Check 1
+	if (!photon_is_nearby(cam_gbuffer.pos, photon_gbuffer.pos, pc.photon_radius)) {
+		return false;
+	}
+	// Check 2
+	if (pc.max_depth < (eye_path_length + photon_path_length)) {
+		return false;
+	}
+	// // Check 3
+	if (dot(photon_gbuffer.n_s, cam_gbuffer.n_s) < 0.5) {
+		return false;
+	}
+	// // Check 4
+	if (dot(cam_gbuffer.n_s, wi) <= 0) {
+		return false;
+	}
+	return true;
+}
+
+bool photon_data_valid(PhotonData photon) { return photon.primitive_instance_id.x != -1; }
+
+bool photon_reservoir_data_valid(PhotonReservoir reservoir) { return reservoir.primitive_instance_id.x != -1; }
+
 void main() {
-	PhotonEyeData photon_eye = photon_eye_data[pixel_idx];
+	PhotonData photon_eye = photon_eye_data[pixel_idx];
+	PhotonReservoir reservoir;
+	init_reservoir(reservoir);
+
 	vec3 col = vec3(0);
-	if (photon_eye.primitive_instance_id.x != -1) {
-		HitData photon_eye_gbuffer = get_hitdata(photon_eye.barycentrics, photon_eye.primitive_instance_id.y,
-												 photon_eye.primitive_instance_id.x);
-		Material photon_eye_hit_mat = load_material(photon_eye_gbuffer.material_idx, photon_eye_gbuffer.uv);
-		ASSERT(is_rough(photon_eye_hit_mat));
+	if (photon_data_valid(photon_eye)) {
+		HitData cam_gbuffer = get_hitdata(photon_eye.barycentrics, photon_eye.primitive_instance_id.y,
+										  photon_eye.primitive_instance_id.x);
+		Material cam_hit_mat = load_material(cam_gbuffer.material_idx, cam_gbuffer.uv);
+		ASSERT(is_rough(cam_hit_mat));
 
 		rayQueryEXT ray_query;
 
 		uint ray_flags = 0;
-		rayQueryInitializeEXT(ray_query, photon_bvh, ray_flags, 0xFF, photon_eye_gbuffer.pos, 0, photon_eye_gbuffer.n_s,
-							  1e-8);
+		rayQueryInitializeEXT(ray_query, photon_bvh, ray_flags, 0xFF, cam_gbuffer.pos, 0, cam_gbuffer.n_s, 1e-8);
 
 		bool traverse = true;
 		int counter = 0;
 
 		vec3 phi = vec3(0);
 
-		PhotonReservoir reservoir;
-		init_reservoir(reservoir);
+		PhotonReservoir canonical_reservoir;
+		init_reservoir(canonical_reservoir);
 
 		vec3 selected_contribution = vec3(0);
-		vec3 wo = from_spherical(photon_eye.wo);
+		vec3 wo = from_spherical(photon_eye.dir);
 
 		bool eye_side;
 		uint eye_path_length;
 		unpack_photon_flags(photon_eye.flags, eye_side, eye_path_length);
+
 		while (traverse) {
 			traverse = rayQueryProceedEXT(ray_query);
 			if (!traverse) {
@@ -126,39 +163,24 @@ void main() {
 			}
 
 			int photon_idx = rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, false);
-			PhotonLightData photon_light = photon_light_data.d[photon_idx];
+			PhotonData photon_light = photon_light_data.d[photon_idx];
 
-			HitData photon_hitdata = get_hitdata(photon_light.barycentrics, photon_light.primitive_instance_id.y,
+			HitData photon_gbuffer = get_hitdata(photon_light.barycentrics, photon_light.primitive_instance_id.y,
 												 photon_light.primitive_instance_id.x);
-
-			bool photon_nearby = photon_is_nearby(photon_eye_gbuffer.pos, photon_hitdata.pos, pc.photon_radius);
-			if (!photon_nearby) {
-				continue;
-			}
 
 			bool unused;
 			uint photon_path_length;
 
 			unpack_photon_flags(photon_light.flags, unused, photon_path_length);
 
-			// Check 1
-			if (pc.max_depth < (eye_path_length + photon_path_length)) {
-				continue;
-			}
-			// Check 2
-			if (dot(photon_hitdata.n_s, photon_eye_gbuffer.n_s) < 0.5) {
+			vec3 wi = from_spherical(photon_light.dir);
+			if (!is_photon_valid(cam_gbuffer, photon_gbuffer, wi, eye_path_length, photon_path_length)) {
 				continue;
 			}
 
-			vec3 wi = from_spherical(photon_light.wi);
-			// Check 3
-			if (dot(photon_eye_gbuffer.n_s, wi) <= 0) {
-				continue;
-			}
 			float cam_pdf_fwd;
 			float cam_pdf_rev;
-			vec3 f =
-				eval_bsdf(photon_eye_gbuffer.n_s, wo, photon_eye_hit_mat, 1, eye_side, wi, cam_pdf_fwd, cam_pdf_rev);
+			vec3 f = eval_bsdf(cam_gbuffer.n_s, wo, cam_hit_mat, 1, eye_side, wi, cam_pdf_fwd, cam_pdf_rev);
 
 			float mis_weight = 1.0 / (1.0 + photon_light.d_vm * cam_pdf_fwd);
 
@@ -167,9 +189,11 @@ void main() {
 
 			vec3 contribution = mis_weight * f * photon_light.throughput * photon_eye.throughput;
 
+			ASSERT(!isnan(photon_light.d_vm));
 			bool merged =
-				stream_photon_reservoir(seed, reservoir, photon_light.throughput, photon_hitdata.pos, photon_light.wi,
-										photon_light.d_vm, calc_target_pdf(contribution), 1.0);
+				stream_photon_reservoir(seed, canonical_reservoir, photon_light.throughput, photon_light.barycentrics,
+										photon_light.primitive_instance_id, photon_light.dir, photon_light.d_vm,
+										calc_target_pdf(contribution), 1.0);
 			if (merged) {
 				selected_contribution = contribution;
 			}
@@ -177,83 +201,118 @@ void main() {
 			counter++;
 		}
 
-		reservoir.M = 1;
-		calc_photon_reservoir_W(reservoir);
+		canonical_reservoir.M = 1;
+		calc_photon_reservoir_W(canonical_reservoir);
 
-		if (pc.total_frame_num > 0) {
+		float m_c = 1.0;
+		bool temp_accepted = false;
+		vec3 canonical_contribution = selected_contribution;
+		// Start from 3rd frame onwards because on 2nd frame we've just started collecting
+		if (pc.total_frame_num > 1) {
 			// Temporal reuse
-			uint Z = reservoir.M;
-
-			vec4 prev_pos = ubo.prev_view * vec4(photon_eye_gbuffer.pos, 1);
+			vec4 prev_pos = ubo.prev_view * vec4(cam_gbuffer.pos, 1);
 			prev_pos /= prev_pos.z;
 			prev_pos = -ubo.prev_projection * prev_pos;
 			ivec2 prev_coords = ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
 
-			PhotonEyeData prev_photon_eye = prev_photon_eye[prev_coords.x * pc.size_y + prev_coords.y];
-			if (!(any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy))) &&
-				prev_photon_eye.primitive_instance_id.x != -1) {
+			if (!(any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy)))) {
+				PhotonData prev_photon_eye = prev_photon_eye[prev_coords.x * pc.size_y + prev_coords.y];
 				PhotonReservoir prev_reservoir = in_reservoirs[prev_coords.x * pc.size_y + prev_coords.y];
-				vec3 wi_prev = from_spherical(prev_reservoir.wi);
+				// Always true as long as pc.total_frame_num > 1
+				if (photon_reservoir_data_valid(prev_reservoir)) {
+					ASSERT(photon_data_valid(prev_photon_eye));
+					HitData prev_photon_gbuffer =
+						get_hitdata(prev_reservoir.barycentrics, prev_reservoir.primitive_instance_id.y,
+									prev_reservoir.primitive_instance_id.x);
+					vec3 wi_prev = from_spherical(prev_reservoir.wi);
 
-				float cam_pdf_fwd_temp;
-				float cam_pdf_rev_temp;
-				vec3 f_temp = eval_bsdf(photon_eye_gbuffer.n_s, wo, photon_eye_hit_mat, 1, eye_side, wi_prev,
-										cam_pdf_fwd_temp, cam_pdf_rev_temp);
-				float mis_weight_temp = 1.0 / (1.0 + prev_reservoir.d_vm * cam_pdf_fwd_temp);
-				vec3 temp_contribution = mis_weight_temp * f_temp * prev_reservoir.flux * photon_eye.throughput;
+					float cam_pdf_fwd_temp;
+					float cam_pdf_rev_temp;
+					vec3 f_temp = eval_bsdf(cam_gbuffer.n_s, wo, cam_hit_mat, 1, eye_side, wi_prev, cam_pdf_fwd_temp,
+											cam_pdf_rev_temp);
+					float mis_weight_temp = 1.0 / (1.0 + prev_reservoir.d_vm * cam_pdf_fwd_temp);
+					vec3 temp_contribution = mis_weight_temp * f_temp * prev_reservoir.flux * photon_eye.throughput;
 
-				// Check 3 & Shift
-				prev_reservoir.M = min(20, prev_reservoir.M);
+					prev_reservoir.M = min(20, prev_reservoir.M);
 
-				float target_pdf = 0;
-				if (dot(wi_prev, photon_eye_gbuffer.n_s) > 0 &&
-					photon_is_nearby(photon_eye_gbuffer.pos, prev_reservoir.pos, pc.photon_radius)) {
-					target_pdf = calc_target_pdf(temp_contribution);
+					bool unused;
+					uint prev_photon_path_length;
+
+					unpack_photon_flags(prev_reservoir.flags, unused, prev_photon_path_length);
+
+					float target_pdf;
+					if (!is_photon_valid(cam_gbuffer, prev_photon_gbuffer, wi_prev, eye_path_length,
+										 prev_photon_path_length)) {
+						target_pdf = 0;
+					} else {
+						target_pdf = calc_target_pdf(temp_contribution);
+					}
+
+					float m_i_num = prev_reservoir.M * prev_reservoir.target_pdf;
+					float m_i_denom = m_i_num + target_pdf;
+					float m_i = m_i_denom == 0.0 ? 0.0 : m_i_num / m_i_denom;
+
+					temp_accepted = combine_reservoir(seed, reservoir, prev_reservoir, target_pdf, m_i);
+					if (temp_accepted) {
+						selected_contribution = temp_contribution;
+					}
+					ASSERT(!isnan(m_i));
+
+					// Bias correction
+					if (photon_reservoir_data_valid(canonical_reservoir)) {
+						HitData prev_cam_gbuffer =
+							get_hitdata(prev_photon_eye.barycentrics, prev_photon_eye.primitive_instance_id.y,
+										prev_photon_eye.primitive_instance_id.x);
+						Material prev_cam_hit_mat = load_material(prev_cam_gbuffer.material_idx, prev_cam_gbuffer.uv);
+						vec3 wo_prev = from_spherical(prev_photon_eye.dir);
+						vec3 wi = from_spherical(canonical_reservoir.wi);
+
+						bool eye_side_prev;
+						uint eye_path_length_prev;
+						unpack_photon_flags(prev_photon_eye.flags, eye_side_prev, eye_path_length_prev);
+
+						float cam_pdf_fwd_prev;
+						float cam_pdf_rev_prev;
+						vec3 f_prev = eval_bsdf(prev_cam_gbuffer.n_s, wo_prev, prev_cam_hit_mat, 1, eye_side_prev, wi,
+												cam_pdf_fwd_prev, cam_pdf_rev_prev);
+
+						float mis_weight_prev = 1.0 / (1.0 + canonical_reservoir.d_vm * cam_pdf_fwd_prev);
+						vec3 prev_contribution =
+							mis_weight_prev * f_prev * canonical_reservoir.flux * prev_photon_eye.throughput;
+
+						HitData canonical_photon_gbuffer =
+							get_hitdata(canonical_reservoir.barycentrics, canonical_reservoir.primitive_instance_id.y,
+										canonical_reservoir.primitive_instance_id.x);
+						uint canonical_photon_path_length;
+						unpack_photon_flags(canonical_reservoir.flags, unused, canonical_photon_path_length);
+						float target_pdf_in_neighbor;
+						if (!is_photon_valid(prev_cam_gbuffer, canonical_photon_gbuffer, wi, eye_path_length_prev,
+											 canonical_photon_path_length)) {
+							target_pdf_in_neighbor = 0;
+						} else {
+							target_pdf_in_neighbor = calc_target_pdf(prev_contribution);
+						}
+						ASSERT(!isnan(target_pdf_in_neighbor));
+						float m_c_num = prev_reservoir.M * target_pdf_in_neighbor;
+						float m_c_denom = m_c_num + canonical_reservoir.target_pdf;
+						float m_c_val = m_c_denom == 0.0 ? 0.0 : m_c_num / m_c_denom;
+						if (m_c_val > 0) {
+							m_c -= m_c_val;
+						}
+					}
 				}
-				bool accepted = combine_reservoir(seed, reservoir, prev_reservoir, target_pdf);
-				if (accepted) {
-					selected_contribution = temp_contribution;
-				}
-#if 1
-				// Bias correction
-				float curr = reservoir.target_pdf;
-				float sum = curr;
-				HitData prev_photon_eye_gbuffer =
-					get_hitdata(prev_photon_eye.barycentrics, prev_photon_eye.primitive_instance_id.y,
-								prev_photon_eye.primitive_instance_id.x);
-				Material photon_eye_prev_hit_mat =
-					load_material(prev_photon_eye_gbuffer.material_idx, prev_photon_eye_gbuffer.uv);
-				vec3 wo_prev = from_spherical(prev_photon_eye.wo);
-				vec3 wi = from_spherical(reservoir.wi);
-
-				bool eye_side_prev;
-				uint eye_path_length_prev;
-				unpack_photon_flags(prev_photon_eye.flags, eye_side_prev, eye_path_length_prev);
-
-				float cam_pdf_fwd_prev;
-				float cam_pdf_rev_prev;
-				vec3 f_prev = eval_bsdf(prev_photon_eye_gbuffer.n_s, wo_prev, photon_eye_prev_hit_mat, 1, eye_side_prev,
-										wi, cam_pdf_fwd_prev, cam_pdf_rev_prev);
-
-				float mis_weight_prev = 1.0 / (1.0 + reservoir.d_vm * cam_pdf_fwd_prev);
-				vec3 prev_contribution = mis_weight_prev * f_prev * reservoir.flux * prev_photon_eye.throughput;
-
-				float prev_target_pdf = 0;
-				if (dot(wi, prev_photon_eye_gbuffer.n_s) > 0 &&
-					photon_is_nearby(prev_photon_eye_gbuffer.pos, reservoir.pos, pc.photon_radius)) {
-					prev_target_pdf = calc_target_pdf(prev_contribution);
-				}
-
-				if (accepted) {
-					curr = prev_target_pdf;
-				}
-				sum += prev_target_pdf * prev_reservoir.M;
-				calc_photon_reservoir_W(reservoir, curr, sum);
-#else
-				calc_photon_reservoir_W(reservoir);
-#endif
 			}
 		}
+
+		ASSERT(!isnan(m_c));
+		LOG_CLICKED("m_c: %f\n", m_c);
+		bool canonical_accepted =
+			combine_reservoir(seed, reservoir, canonical_reservoir, canonical_reservoir.target_pdf, m_c);
+		if (canonical_accepted) {
+			selected_contribution = canonical_contribution;
+		}
+
+		calc_photon_reservoir_W_with_mis(reservoir);
 
 		phi = reservoir.W * selected_contribution;
 		phi /= (PI * pc.photon_radius * pc.photon_radius * pc.num_photons);
@@ -262,7 +321,7 @@ void main() {
 			phi = vec3(0);
 		}
 		col = phi;
-		out_reservoirs[pixel_idx] = reservoir;
 	}
+	out_reservoirs[pixel_idx] = reservoir;
 	imageStore(caustics_texture, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
 }

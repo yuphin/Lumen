@@ -10,15 +10,15 @@
 #define SCENE_TEX_IDX 5
 #include "gris_commons.glsl"
 
-layout(binding = 4, std430) writeonly buffer CurrPhotonEyeData { PhotonEyeData photon_eye_data[]; };
+layout(binding = 4, std430) writeonly buffer CurrPhotonData { PhotonData photon_eye_data[]; };
 
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
 uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
 
-void init_photon_eye_data(inout PhotonEyeData data) {
+void init_photon_eye_data(inout PhotonData data) {
 	data.barycentrics = vec2(0);
 	data.primitive_instance_id = uvec2(-1);
-	data.wo = vec2(0);
+	data.dir = vec2(0);
 	data.throughput = vec3(0);
 }
 
@@ -30,7 +30,7 @@ void main() {
 	vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
 	vec3 direction = vec3(sample_camera(d));
 	vec3 throughput = vec3(1);
-	PhotonEyeData photon_eye;
+	PhotonData photon_eye;
 	init_photon_eye_data(photon_eye);
 
 	for (int d = 0; d < pc.max_depth; d++) {
@@ -51,7 +51,7 @@ void main() {
 		if (is_rough(hit_mat)) {
 			photon_eye.barycentrics = payload.attribs;
 			photon_eye.primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
-			photon_eye.wo = to_spherical(wo);
+			photon_eye.dir = to_spherical(wo);
 			photon_eye.throughput = throughput;
 			// Path length = Num of edges from eye
 			photon_eye.flags = pack_photon_flags(side, d + 1);

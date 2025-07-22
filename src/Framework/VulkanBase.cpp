@@ -1,4 +1,3 @@
-#include <vulkan/vulkan_core.h>
 #include "Framework/VulkanContext.h"
 #include "LumenPCH.h"
 #include "RenderGraph.h"

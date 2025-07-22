@@ -18,8 +18,8 @@ layout(binding = 5, std430) writeonly buffer OutGBuffer { GBuffer out_gbuffers[]
 layout(binding = 6, rgba16) writeonly uniform image2D canonical_contributions_tex;
 layout(binding = 7, rgba32f) uniform image2D direct_lighting_img;
 layout(binding = 8, rgba32f) uniform image2D caustics_texture;
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonEyeDataBuffer { PhotonEyeData d[]; };
-PhotonEyeDataBuffer photon_eye_data = PhotonEyeDataBuffer(scene_desc.photon_eye_addr);
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonDataBuffer { PhotonData d[]; };
+PhotonDataBuffer photon_eye_data = PhotonDataBuffer(scene_desc.photon_eye_addr);
 
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
 uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
@@ -219,8 +219,8 @@ void main() {
 				float pdf_light_dir = cos_from_light / PI;
 				// For photon mapping, multiplication by light pick prob. is necessary
 				mis_light = cos_from_light == 0 ? 0 : pdf_light_dir * (1.0 / (triangle_area)) * d_vm / cos_from_light;
-			} 
-#endif // !DISABLE_PM_MIS
+			}
+#endif	// !DISABLE_PM_MIS
 
 			if (!vertex_specular) {
 				mis_bsdf = pdf_light_w / bsdf_pdf_fwd;
@@ -266,10 +266,10 @@ void main() {
 				direct_lighting += partial_contrib * throughput;
 			} else {
 #ifdef DISABLE_PM_MIS
-				if(mis_factor_set) {
+				if (mis_factor_set) {
 					partial_contrib = vec3(0);
 				}
-#endif // DISABLE_PM_MIS
+#endif	// DISABLE_PM_MIS
 				col += partial_contrib * throughput;
 				float lum = luminance(partial_contrib * throughput);
 				if (mis_factor_set && lum > 0) {
@@ -375,11 +375,11 @@ void main() {
 			}
 
 			if (depth > 0) {
-#ifdef DISABLE_PM_MIS			
-				if(mis_factor_set) {
+#ifdef DISABLE_PM_MIS
+				if (mis_factor_set) {
 					contribution = vec3(0);
 				}
-#endif // DISABLE_PM_MIS
+#endif	// DISABLE_PM_MIS
 				col += contribution;
 				if (mis_factor_set) {
 					debug_col += contribution;
@@ -520,7 +520,6 @@ void main() {
 			out_gbuffers[pixel_idx] = gbuffer_out;
 		}
 	}
-	// col = debug_col;
 #ifdef ENABLE_PM
 	col += imageLoad(caustics_texture, ivec2(gl_LaunchIDEXT.xy)).xyz;
 #endif	// ENABLE_PM

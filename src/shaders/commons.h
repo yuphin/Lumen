@@ -104,6 +104,7 @@ using uvec2 = glm::uvec2;
 	#define LOG1(str, val) debugPrintfEXT(str, val);
 	#define LOG2(str, val, val2) debugPrintfEXT(str, val, val2);
 	#define LOG3(str, val, val2, val3) debugPrintfEXT(str, val, val2, val3);
+	#define LOG4(str, val, val2, val3, val4) debugPrintfEXT(str, val, val2, val3, val4);
 
 	#define ASSERT_CLICKED_STR(cond, expected, str, val) \
 		if(ubo.debug_click == 1 && ivec2(gl_LaunchIDEXT.xy) == ubo.clicked_pos) { \

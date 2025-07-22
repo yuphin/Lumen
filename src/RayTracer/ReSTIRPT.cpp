@@ -76,13 +76,13 @@ void ReSTIRPT::init() {
 		prm::get_buffer({.name = "Photon - Eye - Ping",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height() * sizeof(PhotonEyeData)});
+						 .size = Window::width() * Window::height() * sizeof(PhotonData)});
 						 
 	photon_eye_buffer_pong =
 		prm::get_buffer({.name = "Photon - Eye - Pong",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height() * sizeof(PhotonEyeData)});
+						 .size = Window::width() * Window::height() * sizeof(PhotonData)});
 
 	caustic_photon_aabbs_buffer =
 		prm::get_buffer({.name = "Caustic Photon AABBs",
@@ -95,7 +95,7 @@ void ReSTIRPT::init() {
 		prm::get_buffer({.name = "Caustic Photon - Light",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height() * sizeof(PhotonLightData)});
+						 .size = Window::width() * Window::height() * sizeof(PhotonData)});
 	photon_count_buffer =
 		prm::get_buffer({.name = "Photon Counts",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |

@@ -445,7 +445,7 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 
 #if 0
 			// This line would be needed because reservoir_contribution being 0 means we may get reservoir_contribution turning into nans down the line
-			// However, it's turned off because ReSTIR handles nan propagation down the line
+			// However, it's turned off because ReSTIR handles NaN propagation down the line
 			if(reservoir_contribution == vec3(0)) {
 				return false;
 			}

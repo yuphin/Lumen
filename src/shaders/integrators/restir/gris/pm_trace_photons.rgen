@@ -9,10 +9,10 @@
 #extension GL_EXT_shader_atomic_float : require
 #include "gris_commons.glsl"
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonLightData { PhotonLightData d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonData { PhotonData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonAABBs { PhotonAABB d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonCounts { uint val; };
-CausticPhotonLightData photon_light_data = CausticPhotonLightData(scene_desc.caustic_photon_light_addr);
+CausticPhotonData photon_light_data = CausticPhotonData(scene_desc.caustic_photon_light_addr);
 CausticPhotonAABBs photon_aabbs = CausticPhotonAABBs(scene_desc.caustic_photon_aabbs_addr);
 PhotonCounts photon_counts = PhotonCounts(scene_desc.photon_count_addr);
 
@@ -89,7 +89,7 @@ void main() {
 
 			photon_light_data.d[photon_idx].barycentrics = payload.attribs;
 			photon_light_data.d[photon_idx].primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
-			photon_light_data.d[photon_idx].wi = to_spherical(wo);
+			photon_light_data.d[photon_idx].dir = to_spherical(wo);
 			photon_light_data.d[photon_idx].throughput = throughput;
 			// side is not used
 			// Path length = Num of edges from light
