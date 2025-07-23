@@ -208,7 +208,7 @@ void main() {
 		bool temp_accepted = false;
 		vec3 canonical_contribution = selected_contribution;
 		// Start from 3rd frame onwards because on 2nd frame we've just started collecting
-		if (pc.total_frame_num > 1) {
+		if (pc.pm_temporal_reuse == 1 && pc.total_frame_num > 1) {
 			// Temporal reuse
 			vec4 prev_pos = ubo.prev_view * vec4(cam_gbuffer.pos, 1);
 			prev_pos /= prev_pos.z;

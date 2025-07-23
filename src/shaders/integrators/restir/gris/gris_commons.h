@@ -43,6 +43,7 @@ struct PCReSTIRPT {
 	uint enable_temporal_jitter;
 	float photon_radius;
 	uint num_photons;
+	uint pm_temporal_reuse;
 };
 
 struct GBuffer {

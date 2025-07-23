@@ -77,7 +77,7 @@ void ReSTIRPT::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
 						 .size = Window::width() * Window::height() * sizeof(PhotonData)});
-						 
+
 	photon_eye_buffer_pong =
 		prm::get_buffer({.name = "Photon - Eye - Pong",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -223,6 +223,7 @@ void ReSTIRPT::render() {
 	pc_ray.enable_occlusion = enable_occlusion;
 	pc_ray.num_photons = num_photons;
 	pc_ray.photon_radius = initial_photon_radius;
+	pc_ray.pm_temporal_reuse = uint(enable_pm_temporal_reuse);
 
 	if (progressive_radius_reduction) {
 		pc_ray.photon_radius = curr_photon_radius * sqrtf(((float)frame_num + 2.0f / 3.0f) / ((float)frame_num + 1.0f));
@@ -233,7 +234,8 @@ void ReSTIRPT::render() {
 		output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer};
 
 	const std::array<vk::Buffer*, 2> reservoir_buffers = {gris_reservoir_ping_buffer, gris_reservoir_pong_buffer};
-	const std::array<vk::Buffer*, 2> photon_reservoir_buffers = {caustics_reservoir_ping_buffer, caustics_reservoir_pong_buffer};
+	const std::array<vk::Buffer*, 2> photon_reservoir_buffers = {caustics_reservoir_ping_buffer,
+																 caustics_reservoir_pong_buffer};
 	const std::array<vk::Buffer*, 2> photon_gbuffers = {photon_eye_buffer_ping, photon_eye_buffer_pong};
 	const std::array<vk::Buffer*, 2> gbuffers = {gris_prev_gbuffer, gris_gbuffer};
 
@@ -548,6 +550,7 @@ bool ReSTIRPT::gui() {
 		ImGui::Text("Current photon radius: %f", curr_photon_radius);
 		result |= ImGui::Checkbox("Enable photon gather", &enable_photon_gather);
 		result |= ImGui::Checkbox("MIS between NEE/BRDF/PM", &enable_pm_mis);
+		result |= ImGui::Checkbox("Enable PM temporal reuse", &enable_pm_temporal_reuse);
 		if (num_photons_changed) {
 			vkDeviceWaitIdle(vk::context().device);
 
