@@ -9,10 +9,8 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 #define SCENE_TEX_IDX 10
-#include "gris_commons.glsl"
+#include "pm_commons.glsl"
 layout(set = 1, binding = 1) uniform accelerationStructureEXT photon_bvh;
-
-PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
 
 layout(binding = 4, rgba16) writeonly uniform image2D canonical_contributions_tex;
 layout(binding = 5, rgba32f) uniform image2D caustics_texture;
@@ -29,100 +27,6 @@ PhotonCounts photon_counts = PhotonCounts(scene_desc.photon_count_addr);
 
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
 uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
-
-bool photon_is_nearby(vec3 p, vec3 photon_p, float r) {
-	vec3 diff = p - photon_p;
-	return dot(diff, diff) < r * r;
-}
-
-vec3 get_center(PhotonAABB aabb) { return (aabb.min + aabb.max) * 0.5; }
-
-bool update_photon_reservoir(inout uvec4 seed, inout PhotonReservoir r_new, vec3 flux, vec2 barycentrics,
-							 uvec2 primitive_instance_id, vec2 wi, float d_vm, float target_pdf, float inv_source_pdf) {
-	float w_i = target_pdf * inv_source_pdf;
-	r_new.w_sum += w_i;
-	if (rand(seed) * r_new.w_sum < w_i) {
-		r_new.flux = flux;
-		r_new.barycentrics = barycentrics;
-		r_new.primitive_instance_id = primitive_instance_id;
-		r_new.wi = wi;
-		r_new.target_pdf = target_pdf;
-		r_new.d_vm = d_vm;
-		return true;
-	}
-	return false;
-}
-
-bool combine_reservoir(inout uvec4 seed, inout PhotonReservoir target_reservoir, const PhotonReservoir input_reservoir,
-					   float target_pdf, float mis_weight) {
-	target_reservoir.M += input_reservoir.M;
-	float inv_source_pdf = input_reservoir.W * mis_weight;
-	if (target_pdf <= 0.0) {
-		return false;
-	}
-	return update_photon_reservoir(seed, target_reservoir, input_reservoir.flux, input_reservoir.barycentrics,
-								   input_reservoir.primitive_instance_id, input_reservoir.wi, input_reservoir.d_vm,
-								   target_pdf, inv_source_pdf);
-}
-
-bool stream_photon_reservoir(inout uvec4 seed, inout PhotonReservoir r_new, vec3 flux, vec2 barycentrics,
-							 uvec2 primitive_instance_id, vec2 wi, float d_vm, float target_pdf, float inv_source_pdf) {
-	r_new.M++;
-	if (target_pdf <= 0.0 || isnan(inv_source_pdf) || inv_source_pdf <= 0.0) {
-		return false;
-	}
-	return update_photon_reservoir(seed, r_new, flux, barycentrics, primitive_instance_id, wi, d_vm, target_pdf,
-								   inv_source_pdf);
-}
-
-void calc_photon_reservoir_W(inout PhotonReservoir r, float n, float d) {
-	float denom = r.target_pdf * d;
-	r.W = denom == 0.0 ? 0.0 : r.w_sum * n / denom;
-}
-
-void calc_photon_reservoir_W_with_mis(inout PhotonReservoir r) {
-	r.W = r.target_pdf == 0.0 ? 0.0 : r.w_sum / r.target_pdf;
-}
-
-void calc_photon_reservoir_W(inout PhotonReservoir r) {
-	float denom = r.target_pdf * r.M;
-	r.W = denom == 0.0 ? 0.0 : r.w_sum / denom;
-}
-
-void init_reservoir(out PhotonReservoir r) {
-	r.flux = vec3(0);
-	r.M = 0;
-	r.W = 0;
-	r.w_sum = 0;
-	r.target_pdf = 0;
-	r.d_vm = 0;
-	r.primitive_instance_id = uvec2(-1);
-}
-
-bool is_photon_valid(HitData cam_gbuffer, HitData photon_gbuffer, vec3 wi, uint eye_path_length,
-					 uint photon_path_length) {
-	// Check 1
-	if (!photon_is_nearby(cam_gbuffer.pos, photon_gbuffer.pos, pc.photon_radius)) {
-		return false;
-	}
-	// Check 2
-	if (pc.max_depth < (eye_path_length + photon_path_length)) {
-		return false;
-	}
-	// // Check 3
-	if (dot(photon_gbuffer.n_s, cam_gbuffer.n_s) < 0.5) {
-		return false;
-	}
-	// // Check 4
-	if (dot(cam_gbuffer.n_s, wi) <= 0) {
-		return false;
-	}
-	return true;
-}
-
-bool photon_data_valid(PhotonData photon) { return photon.primitive_instance_id.x != -1; }
-
-bool photon_reservoir_data_valid(PhotonReservoir reservoir) { return reservoir.primitive_instance_id.x != -1; }
 
 void main() {
 	PhotonData photon_eye = photon_eye_data[pixel_idx];
@@ -202,7 +106,8 @@ void main() {
 		}
 
 		canonical_reservoir.M = 1;
-		calc_photon_reservoir_W(canonical_reservoir);
+		// Works because M == 1
+		calc_photon_reservoir_W_with_mis(canonical_reservoir);
 
 		float m_c = 1.0;
 		bool temp_accepted = false;

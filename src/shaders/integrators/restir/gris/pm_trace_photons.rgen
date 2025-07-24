@@ -33,7 +33,6 @@ void main() {
 	vec3 throughput;
 
 	float eta_vm = PI * pc.photon_radius * pc.photon_radius * pc.num_photons;
-	float inv_pdf_dir = 1.0 / pdf_dir;
 	if (abs_cos_light == 0 || pdf_dir <= 0) {
 		throughput = vec3(0);
 	} else {
