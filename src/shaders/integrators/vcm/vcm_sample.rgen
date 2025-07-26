@@ -135,7 +135,7 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
     float pdf_pos, pdf_dir, phi, u, v;
     
     float cos_theta;
-    vec3 Le = sample_light_Le(
+    vec3 Le = sample_Le(
         rand4(seed), rand2(seed), pc.num_lights, pc.light_triangle_count, cos_theta, light_record,
         pos, wi, n, pdf_pos, pdf_dir, phi, record);
     if (pdf_dir <= EPS) {

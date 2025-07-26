@@ -28,7 +28,7 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 }
 
 HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx, out float area) {
-	const PrimMeshInfo pinfo = prim_infos.d[instance_idx];
+	const PrimInfo pinfo = prim_infos.d[instance_idx];
 	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
 	const ivec3 ind = ivec3(pinfo.vertex_offset) +
 					  ivec3(indices.i[index_offset + 0], indices.i[index_offset + 1], indices.i[index_offset + 2]);

@@ -77,7 +77,7 @@ void main() {
             LightRecord record;
             float cos_from_light;
             vec3 light_pos, light_n;
-            const vec3 Le = sample_light_Li(
+            const vec3 Le = sample_Li(
                 rand4(seed), payload.pos, pc.num_lights, wi, wi_len, light_n,
                 light_pos, pdf_light, cos_from_light, record);
 

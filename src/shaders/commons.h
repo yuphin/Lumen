@@ -335,13 +335,11 @@ struct FFTPC {
 };
 
 // Structure used for retrieving the primitive information in the closest hit
-struct PrimMeshInfo {
+struct PrimInfo {
 	uint index_offset;
 	uint vertex_offset;
 	uint material_index;
 	uint pad;
-	vec4 min_pos;
-	vec4 max_pos;
 };
 
 #endif

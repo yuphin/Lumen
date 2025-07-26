@@ -58,7 +58,7 @@ bool vcm_generate_light_sample(out LightState light_state) {
 	float pdf_pos, pdf_dir, pdf_emit, pdf_direct;
 	float cos_theta;
 	float u, v;
-	const vec3 Le = sample_light_Le(rand4(seed), rand2(seed), pc.num_lights, pc.light_triangle_count, cos_theta,
+	const vec3 Le = sample_Le(rand4(seed), rand2(seed), pc.num_lights, pc.light_triangle_count, cos_theta,
 									light_record, pos, wi, n, pdf_pos, pdf_dir);
 	if (pdf_dir <= 0) {
 		return false;

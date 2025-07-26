@@ -15,7 +15,7 @@ layout(binding = 3, scalar) readonly buffer Lights { Light lights[]; };
 layout(binding = SCENE_TEX_IDX) uniform sampler2D scene_textures[];
 
 layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimMeshInfo d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
@@ -109,7 +109,7 @@ float light_pdf_Le(uint light_flags, const vec3 n_s, const vec3 wi) {
 	}
 }
 
-TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands, uint triangle_idx, in mat4 world_matrix, out vec2 uv) {
+TriangleRecord sample_triangle(PrimInfo pinfo, vec2 rands, uint triangle_idx, in mat4 world_matrix, out vec2 uv) {
 	TriangleRecord result;
 	uint index_offset = pinfo.index_offset + 3 * triangle_idx;
 	uint vertex_offset = pinfo.vertex_offset;
@@ -148,7 +148,7 @@ TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands, uint triangle_idx
 	return result;
 }
 
-TriangleRecord sample_triangle(PrimMeshInfo pinfo, vec2 rands, uint triangle_idx, in mat4 world_matrix) {
+TriangleRecord sample_triangle(PrimInfo pinfo, vec2 rands, uint triangle_idx, in mat4 world_matrix) {
 	vec2 unused_bary;
 	return sample_triangle(pinfo, rands, triangle_idx, world_matrix, unused_bary);
 }
@@ -172,7 +172,7 @@ vec3 shade_atmosphere(uint dir_light_idx, vec3 sky_col, vec3 ray_origin, vec3 ra
 
 TriangleRecord sample_area_light(const vec4 rands, const int num_lights, const Light light, out uint triangle_idx,
 								 out uint material_idx) {
-	PrimMeshInfo pinfo = prim_infos.d[light.prim_mesh_idx];
+	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
 	material_idx = pinfo.material_index;
 	triangle_idx = uint(rands.y * light.num_triangles);
 	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
@@ -180,7 +180,7 @@ TriangleRecord sample_area_light(const vec4 rands, const int num_lights, const L
 
 TriangleRecord sample_area_light(const vec4 rands, const int num_lights, const Light light, out uint triangle_idx,
 								 out uint material_idx, out vec2 uv) {
-	PrimMeshInfo pinfo = prim_infos.d[light.prim_mesh_idx];
+	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
 	material_idx = pinfo.material_index;
 	triangle_idx = uint(rands.y * light.num_triangles);
 	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix, uv);
@@ -188,28 +188,28 @@ TriangleRecord sample_area_light(const vec4 rands, const int num_lights, const L
 
 TriangleRecord sample_area_light_with_idx(const vec4 rands, const int num_lights, const Light light,
 										  const uint triangle_idx, out uint material_idx) {
-	PrimMeshInfo pinfo = prim_infos.d[light.prim_mesh_idx];
+	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
 	material_idx = pinfo.material_index;
 	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
 }
 
 TriangleRecord sample_area_light(const vec4 rands, const Light light, out uint material_idx, out uint triangle_idx,
 								 out vec2 uv) {
-	PrimMeshInfo pinfo = prim_infos.d[light.prim_mesh_idx];
+	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
 	material_idx = pinfo.material_index;
 	triangle_idx = uint(rands.y * light.num_triangles);
 	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix, uv);
 }
 
 TriangleRecord sample_area_light(const vec4 rands, const Light light, out uint material_idx, out uint triangle_idx) {
-	PrimMeshInfo pinfo = prim_infos.d[light.prim_mesh_idx];
+	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
 	material_idx = pinfo.material_index;
 	triangle_idx = uint(rands.y * light.num_triangles);
 	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
 }
 
 TriangleRecord sample_area_light(const vec4 rands, const Light light) {
-	PrimMeshInfo pinfo = prim_infos.d[light.prim_mesh_idx];
+	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
 	uint triangle_idx = uint(rands.y * light.num_triangles);
 	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
 }
@@ -221,7 +221,7 @@ vec3 uniform_sample_cone(vec2 uv, float cos_max) {
 	return vec3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
 }
 
-vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out float pdf_pos_w, out vec3 wi,
+vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out float pdf_pos_w, out vec3 wi,
 					 out float wi_len, out float pdf_pos_a, out float cos_from_light, out LightRecord light_record,
 					 out vec3 n, out vec3 pos, out float pdf_pos_dir_w) {
 	light_record.light_idx = uint(rands_pos.x * num_lights);
@@ -299,39 +299,40 @@ vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights, o
 	return L;
 }
 
-vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out float pdf_pos_w, out vec3 wi,
+vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out float pdf_pos_w, out vec3 wi,
 					 out float wi_len, out float pdf_pos_a, out float cos_from_light, out LightRecord light_record,
 					 out vec3 n, out vec3 pos) {
 	float unused_pos_dir_w;
-	return sample_light_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light, light_record, n, pos, unused_pos_dir_w);
+	return sample_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light, light_record, n, pos, unused_pos_dir_w);
 }
 
-vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out float pdf_pos_w, out vec3 wi,
+vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out float pdf_pos_w, out vec3 wi,
 					 out float wi_len, out float pdf_pos_a, out float cos_from_light, out LightRecord light_record) {
 	vec3 unused_normal;
 	vec3 unused_pos;
-	return sample_light_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light, light_record,
+	return sample_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light, light_record,
 						   unused_normal, unused_pos);
 }
 
-vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out vec3 wi, out float wi_len,
+vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out vec3 wi, out float wi_len,
 					 out vec3 n, out vec3 pos, out float pdf_pos_a, out float cos_from_light,
 					 out LightRecord light_record) {
 	float unused_pdf_pos_w;
-	return sample_light_Li(rands_pos, p, num_lights, unused_pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light,
+	return sample_Li(rands_pos, p, num_lights, unused_pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light,
 						   light_record, n, pos);
 }
-vec3 sample_light_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out vec3 wi, out float wi_len,
+vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out vec3 wi, out float wi_len,
 					 out float pdf_pos_w, out float pdf_pos_dir_w, out float cos_from_light,
 					 out LightRecord light_record) {
 	float unused_pdf_pos_a;
 	vec3 unused_normal;
 	vec3 unused_pos;
-	return sample_light_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, unused_pdf_pos_a, cos_from_light,
+	return sample_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, unused_pdf_pos_a, cos_from_light,
 						   light_record, unused_normal, unused_pos, pdf_pos_dir_w);
 }
 
-vec3 sample_light_Le(vec4 rands_pos, vec2 rands_dir, const int num_lights, const int total_light,
+
+vec3 sample_Le(vec4 rands_pos, vec2 rands_dir, const int num_lights, const int total_light,
 					 out float cos_from_light, out LightRecord light_record, out vec3 pos, out vec3 wi, out vec3 n,
 					 out float pdf_pos_a, out float pdf_dir_w, out float phi, out TriangleRecord record) {
 	uint light_idx = uint(rands_pos.x * num_lights);
@@ -404,12 +405,12 @@ vec3 sample_light_Le(vec4 rands_pos, vec2 rands_dir, const int num_lights, const
 	return L;
 }
 
-vec3 sample_light_Le(vec4 rands_pos, vec2 rands_dir, const int num_lights, const int total_light,
+vec3 sample_Le(vec4 rands_pos, vec2 rands_dir, const int num_lights, const int total_light,
 					 out float cos_from_light, out LightRecord light_record, out vec3 pos, out vec3 wi, out vec3 n,
 					 out float pdf_pos_a, out float pdf_dir_w) {
 	float unused_phi;
 	TriangleRecord record;
-	return sample_light_Le(rands_pos, rands_dir, num_lights, total_light, cos_from_light, light_record, pos, wi, n,
+	return sample_Le(rands_pos, rands_dir, num_lights, total_light, cos_from_light, light_record, pos, wi, n,
 						   pdf_pos_a, pdf_dir_w, unused_phi, record);
 }
 

@@ -65,7 +65,7 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 }
 
 HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx, out float area) {
-	const PrimMeshInfo pinfo = prim_infos.d[instance_idx];
+	const PrimInfo pinfo = prim_infos.d[instance_idx];
 	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
 	const ivec3 ind = ivec3(pinfo.vertex_offset) +
 					  ivec3(indices.i[index_offset + 0], indices.i[index_offset + 1], indices.i[index_offset + 2]);
@@ -101,7 +101,7 @@ HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx) {
 }
 
 HitDataWithoutUVAndGeometryNormals get_hitdata_no_ng_uv(vec2 attribs, uint instance_idx, uint triangle_idx) {
-	const PrimMeshInfo pinfo = prim_infos.d[instance_idx];
+	const PrimInfo pinfo = prim_infos.d[instance_idx];
 	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
 	const ivec3 ind = ivec3(pinfo.vertex_offset) +
 					  ivec3(indices.i[index_offset + 0], indices.i[index_offset + 1], indices.i[index_offset + 2]);
@@ -122,7 +122,7 @@ HitDataWithoutUVAndGeometryNormals get_hitdata_no_ng_uv(vec2 attribs, uint insta
 }
 
 HitDataWithoutGeometryNormals get_hitdata_no_ng(vec2 attribs, uint instance_idx, uint triangle_idx) {
-	const PrimMeshInfo pinfo = prim_infos.d[instance_idx];
+	const PrimInfo pinfo = prim_infos.d[instance_idx];
 	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
 	const ivec3 ind = ivec3(pinfo.vertex_offset) +
 					  ivec3(indices.i[index_offset + 0], indices.i[index_offset + 1], indices.i[index_offset + 2]);
@@ -144,7 +144,7 @@ HitDataWithoutGeometryNormals get_hitdata_no_ng(vec2 attribs, uint instance_idx,
 }
 
 vec3 get_hitdata_pos_only(vec2 attribs, uint instance_idx, uint triangle_idx) {
-	const PrimMeshInfo pinfo = prim_infos.d[instance_idx];
+	const PrimInfo pinfo = prim_infos.d[instance_idx];
 	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
 	const ivec3 ind = ivec3(pinfo.vertex_offset) +
 					  ivec3(indices.i[index_offset + 0], indices.i[index_offset + 1], indices.i[index_offset + 2]);
@@ -171,9 +171,9 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	vec3 unused_n;
 	vec3 unused_pos;
 	float pdf_pos_a_dir_w;
-	Le = sample_light_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record, unused_n, unused_pos, pdf_pos_a_dir_w);
+	Le = sample_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record, unused_n, unused_pos, pdf_pos_a_dir_w);
 
-	// TODO: Change sample_light_Li
+	// TODO: Change sample_Li
 	float pdf_dir = pdf_pos_a_dir_w / pdf_light_a;
 	const vec3 p = offset_ray2(pos, n_s);
 	float light_bsdf_pdf_fwd;

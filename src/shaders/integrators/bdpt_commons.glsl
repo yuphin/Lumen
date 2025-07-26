@@ -213,7 +213,7 @@ int bdpt_generate_light_subpath(int max_depth) {
    
 #endif
     const vec3 Le =
-    sample_light_Le(rands_pos, rands_dir, pc.num_lights, pc.light_triangle_count,
+    sample_Le(rands_pos, rands_dir, pc.num_lights, pc.light_triangle_count,
                         cos_theta, light_record, pos, wi, n, pdf_pos, pdf_dir);
     if (pdf_dir <= 0) {
         return 0;
@@ -559,11 +559,11 @@ vec3 bdpt_connect(int s, int t) {
             mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step),
             mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step));
         const vec3 Le =
-            sample_light_Li(rands_pos, cam_vtx(t - 1).pos, pc.num_lights,
+            sample_Li(rands_pos, cam_vtx(t - 1).pos, pc.num_lights,
                             wi, wi_len, n, pos, pdf_pos_a, cos_y, record);
 #else
         const vec3 Le =
-            sample_light_Li(rand4(seed), cam_vtx(t - 1).pos, pc.num_lights, wi,
+            sample_Li(rand4(seed), cam_vtx(t - 1).pos, pc.num_lights, wi,
                             wi_len, n, pos, pdf_pos_a, cos_y, record);
 #endif
         const float cos_x = abs(dot(wi, cam_vtx(t - 1).n_s));

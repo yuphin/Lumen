@@ -16,7 +16,7 @@ layout(location = 0) rayPayloadInEXT HitPayload payload;
 
 layout(set = 0, binding = 2, scalar) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimMeshInfo prim_info[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo prim_info[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
@@ -28,7 +28,7 @@ void main() {
 	InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
 	CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
 
-	PrimMeshInfo pinfo = prim_infos.prim_info[gl_InstanceCustomIndexEXT];
+	PrimInfo pinfo = prim_infos.prim_info[gl_InstanceCustomIndexEXT];
 	// Getting the 'first index' for this mesh (offset of the mesh + offset of
 	// the triangle)
 	uint index_offset = pinfo.index_offset + 3 * gl_PrimitiveID;

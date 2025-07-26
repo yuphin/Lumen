@@ -92,7 +92,7 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state, out bool 
 	const vec4 rands_pos = rand4(seed);
 	const vec2 rands_dir = rand2(seed);
 #endif
-	const vec3 Le = sample_light_Le(rands_pos, rands_dir, pc.num_lights, pc.light_triangle_count, cos_theta,
+	const vec3 Le = sample_Le(rands_pos, rands_dir, pc.num_lights, pc.light_triangle_count, cos_theta,
 									light_record, pos, wi, n, pdf_pos, pdf_dir);
 	if (pdf_dir <= 0) {
 		return false;
@@ -155,21 +155,21 @@ vec3 vcm_connect_light(vec3 n_s, vec3 wo, Material mat, bool side, float eta_vm,
 	const vec4 rands_pos = vec4(mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step),
 								mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step));
 	const vec3 Le =
-		sample_light_Li(rands_pos, payload.pos, pc.num_lights, wi, wi_len, pdf_pos_w, pdf_pos_dir_w, cos_y, record);
+		sample_Li(rands_pos, payload.pos, pc.num_lights, wi, wi_len, pdf_pos_w, pdf_pos_dir_w, cos_y, record);
 #elif VCM_MLT == 1
 	vec3 Le;
 	if (SEEDING == 1) {
-		Le = sample_light_Li(rand4(seed), payload.pos, pc.num_lights, wi, wi_len, pdf_pos_w, pdf_pos_dir_w, cos_y,
+		Le = sample_Li(rand4(seed), payload.pos, pc.num_lights, wi, wi_len, pdf_pos_w, pdf_pos_dir_w, cos_y,
 							 record);
 	} else {
 		const vec4 rands_pos = vec4(mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step),
 									mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step));
 		Le =
-			sample_light_Li(rands_pos, payload.pos, pc.num_lights, wi, wi_len, pdf_pos_w, pdf_pos_dir_w, cos_y, record);
+			sample_Li(rands_pos, payload.pos, pc.num_lights, wi, wi_len, pdf_pos_w, pdf_pos_dir_w, cos_y, record);
 	}
 #else
 	const vec3 Le =
-		sample_light_Li(rand4(seed), payload.pos, pc.num_lights, wi, wi_len, pdf_pos_w, pdf_pos_dir_w, cos_y, record);
+		sample_Li(rand4(seed), payload.pos, pc.num_lights, wi, wi_len, pdf_pos_w, pdf_pos_dir_w, cos_y, record);
 #endif
 
 	const float cos_x = dot(wi, n_s);

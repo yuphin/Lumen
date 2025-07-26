@@ -56,15 +56,13 @@ void LumenScene::load_scene(const std::string& path) {
 
 	total_light_triangle_cnt = 0;
 	total_light_area = 0;
-	std::vector<PrimMeshInfo> prim_lookup;
+	std::vector<PrimInfo> prim_lookup;
 	uint32_t idx = 0;
 	for (auto& pm : prim_meshes) {
-		PrimMeshInfo m_info;
+		PrimInfo m_info;
 		m_info.index_offset = pm.first_idx;
 		m_info.vertex_offset = pm.vtx_offset;
 		m_info.material_index = pm.material_idx;
-		m_info.min_pos = glm::vec4(pm.min_pos, 0);
-		m_info.max_pos = glm::vec4(pm.max_pos, 0);
 		m_info.material_index = pm.material_idx;
 		prim_lookup.emplace_back(m_info);
 		auto& mef = materials[pm.material_idx].emissive_factor;
@@ -119,10 +117,6 @@ void LumenScene::load_scene(const std::string& path) {
 		}
 	}
 	if (gpu_lights.size()) {
-		// mesh_lights_buffer.create("Mesh Lights Buffer", VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-		// 						  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, gpu_lights.size() * sizeof(Light),
-		// 						  gpu_lights.data(), true);
-
 		mesh_lights_buffer = prm::get_buffer({.name = "Mesh Lights Buffer",
 											  .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 											  .memory_type = vk::BufferType::GPU,
@@ -157,7 +151,7 @@ void LumenScene::load_scene(const std::string& path) {
 		prm::get_buffer({.name = "Prim Lookup Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BufferType::GPU,
-						 .size = prim_lookup.size() * sizeof(PrimMeshInfo),
+						 .size = prim_lookup.size() * sizeof(PrimInfo),
 						 .data = prim_lookup.data()});
 
 	std::vector<Vertex> vertices;
@@ -477,7 +471,7 @@ void LumenScene::load_lumen_scene(const std::string& path) {
 	const auto& r = j["camera"]["rotation"];
 	curr_config->cam_settings.pos = {p[0], p[1], p[2]};
 	curr_config->cam_settings.dir = {d[0], d[1], d[2]};
-	if(!r.is_null()) {
+	if (!r.is_null()) {
 		curr_config->cam_settings.rotation = {r[0], r[1], r[2]};
 	}
 	compute_scene_dimensions();
