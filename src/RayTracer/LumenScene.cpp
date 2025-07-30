@@ -36,15 +36,548 @@ static void reflectance_to_conductor_eta_k(const glm::vec3& reflectance, glm::ve
 	k = 2.0f * glm::sqrt(reflectance) / glm::sqrt(glm::max(glm::vec3(1.0f) - reflectance, 0.001f));
 };
 
+static void insert_child(LumenNode* parent, LumenNode* child) {
+	if (!parent->child) {
+		parent->child = child;
+	} else {
+		LumenNode* sibling = parent->child;
+		while (sibling->next) {
+			sibling = sibling->next;
+		}
+		sibling->next = child;
+	}
+}
+
+static LumenNode* parse_file(std::vector<char>& buffer) {
+	LumenNode* root = new LumenNode();
+	root->key = "root";
+	LumenNode* stack[64];
+
+	char* line = buffer.data();
+	char* curr = line;
+
+	bool line_has_brackets = false;
+	int base_indent = 0;
+	int stack_size = 0;
+	char* ptr = nullptr;
+	while (*curr) {
+		if (*curr == '[') {
+			line_has_brackets = true;
+		}
+		if (!line_has_brackets && *curr == '\r') {
+			*curr = '\0';
+			curr++;
+		}
+		if (*curr == '\n') {
+			if (!line_has_brackets) {
+				*curr = '\0';
+			}
+			ptr = line;
+			int indent = 0;
+			bool list_item = false;
+			while (*ptr && (*ptr == ' ' || *ptr == '\t' || *ptr == '-')) {
+				char c = *ptr++;
+				if (c == '-') {
+					list_item = true;
+				}
+				indent++;
+			}
+			if (*ptr) {
+				if (indent > 0 && base_indent == 0) {
+					base_indent = indent;
+				}
+				int level = base_indent == 0 ? 0 : indent / base_indent;
+				if (level < stack_size) {
+					stack_size = level;
+				}
+				if (list_item) {
+					stack_size = level - 1;
+					LumenNode* temp = new LumenNode();
+					stack[stack_size++] = temp;
+					LUMEN_ASSERT(stack_size >= 2, "LumenNode list item level must be at least 2");
+					temp->key = "-";
+					temp->parent = stack[stack_size - 2];
+					insert_child(stack[stack_size - 2], temp);
+				}
+				LumenNode* node = new LumenNode();
+				LumenNode* prev = level > 0 ? stack[stack_size - 1] : root;
+				node->parent = prev;
+				char* colon = std::strchr(ptr, ':');
+				if (colon) {
+					*colon = '\0';
+				}
+				node->key = std::string_view(ptr);
+				if (colon) {
+					colon++;
+					while (*colon == ' ' || *colon == '\t') {
+						colon++;
+					}
+					if (*colon == '[') {
+						colon++;
+						node->num_list_items = 1;
+						curr = colon + 1;
+						for (; *curr != ']'; curr++) {
+							if (*curr == ',') {
+								node->num_list_items++;
+							}
+						}
+						*curr = '\0';
+					}
+					node->value = std::string_view(colon);
+				}
+
+				if (prev) {
+					insert_child(prev, node);
+				}
+				LUMEN_ASSERT(stack_size < 64, "LumenNode stack overflow");
+				stack[stack_size++] = node;
+			}
+			line = curr + 1;
+			list_item = false;
+			line_has_brackets = false;
+		}
+
+		curr++;
+	}
+
+	return root;
+}
+
+static LumenNode* get_node(LumenNode* node, const std::string_view name) {
+	if (!node) return nullptr;
+	if (node->key == name) return node;
+	for (LumenNode* child = node->child; child; child = child->next) {
+		LumenNode* found = get_node(child, name);
+		if (found) return found;
+	}
+	return nullptr;
+}
+
+static std::string_view get_str(LumenNode* node) { return node->value; }
+static std::string_view get_or_default_str(LumenNode* node, const std::string_view& val) {
+	if (!node || node->value.empty()) {
+		return val;
+	}
+	return node->value;
+}
+static int get_or_default_i(LumenNode* node, int val) {
+	if (!node || node->value.empty()) {
+		return val;
+	}
+	return std::atoi(node->value.data());
+}
+
+static float get_or_default_f(LumenNode* node, float val) {
+	if (!node || node->value.empty()) {
+		return val;
+	}
+	return (float)std::atof(node->value.data());
+}
+
+static std::vector<std::string_view> get_str_list(LumenNode* node) {
+	if (!node || node->value.empty() || node->num_list_items == 0) {
+		return {};
+	}
+	std::vector<std::string_view> result;
+	result.reserve(node->num_list_items);
+	char* ptr = (char*)node->value.data();
+	while (*ptr) {
+		while (std::isspace(*ptr)) {
+			ptr++;
+		}
+		char* start = ptr;
+		while (*ptr != ',' && *ptr != '\0') {
+			ptr++;
+		}
+		if (*ptr == ',') {
+			*ptr = '\0';
+			ptr++;
+		}
+		result.emplace_back(start);
+	}
+	return result;
+}
+
+static glm::vec3 get_or_default_v3(LumenNode* node, const glm::vec3& val) {
+	if (!node || node->value.empty()) {
+		return val;
+	}
+	glm::vec3 result;
+
+	char* ptr = (char*)node->value.data();
+	while (*ptr && *ptr != '(') {
+		ptr++;
+	}
+	int comma_count = 0;
+	char* start = ++ptr;
+	while (*ptr && *ptr != ')') {
+		if (*ptr == ',') {
+			*ptr = '\0';
+			result[comma_count++] = (float)std::atof(start);
+			start = ptr + 1;
+		}
+		ptr++;
+	}
+	LUMEN_ASSERT(comma_count == 2, "Expected 3 items in vec3");
+	result[comma_count++] = (float)std::atof(start);
+	return result;
+}
+
+static LumenNode* next_node(LumenNode* node) {
+	if (!node) return nullptr;
+	if (node->next) return node->next;
+	return nullptr;
+}
+
+static uint32_t get_child_count(LumenNode* node) {
+	if (!node || !node->child) return 0;
+	uint32_t count = 0;
+	LumenNode* child = node->child;
+	while (child) {
+		count++;
+		child = child->next;
+	}
+	return count;
+}
+
+void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
+	std::string path_root = path.substr(0, path.find_last_of("/\\") + 1);
+	LumenNode* integrator_node = get_node(root, "integrator");
+	LumenNode* bsdfs_node = get_node(root, "bsdfs");
+	LumenNode* camera_node = get_node(root, "camera");
+
+	std::string_view integrator_type = get_or_default_str(get_node(integrator_node, "type"), "path");
+
+	// TODO: Rework this function and return a pointer
+	create_scene_config(std::string(integrator_type));
+	SceneConfig* curr_config = config.get();
+
+	curr_config->path_length = get_or_default_i(get_node(integrator_node, "path_length"), 6);
+	curr_config->sky_col = get_or_default_v3(get_node(integrator_node, "sky_col"), glm::vec3(0.0f));
+	if (integrator_type == "sppm") {
+		((SPPMConfig*)curr_config)->base_radius = get_or_default_f(get_node(integrator_node, "base_radius"), 1);
+	} else if (integrator_type == "vcm") {
+		((VCMConfig*)curr_config)->enable_vm = get_or_default_i(get_node(integrator_node, "enable_vm"), 0) == 1;
+		((VCMConfig*)curr_config)->radius_factor = get_or_default_f(get_node(integrator_node, "radius_factor"), 1);
+	} else if (integrator_type == "pssmlt") {
+		((PSSMLTConfig*)curr_config)->mutations_per_pixel =
+			get_or_default_f(get_node(integrator_node, "mutations_per_pixel"), 0);
+		((PSSMLTConfig*)curr_config)->num_mlt_threads =
+			get_or_default_i(get_node(integrator_node, "num_mlt_threads"), 0);
+		((PSSMLTConfig*)curr_config)->num_bootstrap_samples =
+			get_or_default_i(get_node(integrator_node, "num_bootstrap_samples"), 0);
+	} else if (integrator_type == "smlt") {
+		((SMLTConfig*)curr_config)->mutations_per_pixel =
+			get_or_default_f(get_node(integrator_node, "mutations_per_pixel"), 0);
+		((SMLTConfig*)curr_config)->num_mlt_threads = get_or_default_i(get_node(integrator_node, "num_mlt_threads"), 0);
+		((SMLTConfig*)curr_config)->num_bootstrap_samples =
+			get_or_default_i(get_node(integrator_node, "num_bootstrap_samples"), 0);
+	} else if (integrator_type == "vcmmlt") {
+		((VCMMLTConfig*)curr_config)->mutations_per_pixel =
+			get_or_default_f(get_node(integrator_node, "mutations_per_pixel"), 0);
+		((VCMMLTConfig*)curr_config)->num_mlt_threads =
+			get_or_default_i(get_node(integrator_node, "num_mlt_threads"), 0);
+		((VCMMLTConfig*)curr_config)->num_bootstrap_samples =
+			get_or_default_i(get_node(integrator_node, "num_bootstrap_samples"), 0);
+		((VCMMLTConfig*)curr_config)->radius_factor = get_or_default_f(get_node(integrator_node, "radius_factor"), 1);
+		((VCMMLTConfig*)curr_config)->enable_vm = get_or_default_i(get_node(integrator_node, "enable_vm"), 0) == 1;
+		((VCMMLTConfig*)curr_config)->alternate = get_or_default_i(get_node(integrator_node, "alternate"), 0) == 1;
+		((VCMMLTConfig*)curr_config)->light_first = get_or_default_i(get_node(integrator_node, "light_first"), 0) == 1;
+	}
+
+	materials.resize(get_child_count(bsdfs_node));
+
+	std::unordered_map<std::string_view, uint32_t> material_map;
+	std::unordered_map<std::string_view, uint32_t> materials_to_objects;
+	std::unordered_map<std::string_view, uint32_t> texture_name_to_idx;
+
+	LumenNode* textures_node = get_node(root, "textures");
+
+
+	if(textures_node) {
+		for(LumenNode* texture_node = textures_node->child; texture_node; texture_node = next_node(texture_node)) {
+			std::string_view name = get_str(get_node(texture_node, "name"));
+			std::string_view file = get_str(get_node(texture_node, "file"));
+			LUMEN_ASSERT(!name.empty() && !file.empty(), "Texture name and file must be specified");
+			textures.push_back(path_root + std::string(file));
+			uint32_t idx = (uint32_t)textures.size() - 1;
+			texture_name_to_idx[name] = idx;
+		}
+	}
+
+	if (bsdfs_node) {
+		uint32_t bsdf_idx = 0;
+		for (LumenNode* bsdf_node = bsdfs_node->child; bsdf_node; bsdf_node = next_node(bsdf_node), bsdf_idx++) {
+			materials[bsdf_idx].albedo = get_or_default_v3(get_node(bsdf_node, "albedo"), glm::vec3(1.0f));
+			materials[bsdf_idx].emissive_factor =
+				get_or_default_v3(get_node(bsdf_node, "emissive_factor"), glm::vec3(0.0f));
+			materials[bsdf_idx].texture_id = -1;
+			std::string_view mat_name = get_str(get_node(bsdf_node, "name"));
+			if (!mat_name.empty()) {
+				material_map[mat_name] = bsdf_idx;
+			}
+
+			std::string_view texture_name = get_or_default_str(get_node(bsdf_node, "texture"), "");
+			if(!texture_name.empty()) {
+				auto it = texture_name_to_idx.find(texture_name);
+				if (it != texture_name_to_idx.end()) {
+					materials[bsdf_idx].texture_id = it->second;
+				} 
+			}
+
+
+			std::string_view type = get_or_default_str(get_node(bsdf_node, "type"), "diffuse");
+			if (type == "diffuse") {
+				bsdf_types |= BSDF_TYPE_DIFFUSE;
+				materials[bsdf_idx].bsdf_type = BSDF_TYPE_DIFFUSE;
+				materials[bsdf_idx].bsdf_props = BSDF_FLAG_DIFFUSE_REFLECTION;
+			} else if (type == "mirror") {
+				bsdf_types |= BSDF_TYPE_MIRROR;
+				materials[bsdf_idx].bsdf_type = BSDF_TYPE_MIRROR;
+				materials[bsdf_idx].bsdf_props = BSDF_FLAG_SPECULAR_REFLECTION;
+			} else if (type == "glass") {
+				bsdf_types |= BSDF_TYPE_GLASS;
+				materials[bsdf_idx].bsdf_type = BSDF_TYPE_GLASS;
+				materials[bsdf_idx].bsdf_props = BSDF_FLAG_SPECULAR_TRANSMISSION;
+				materials[bsdf_idx].ior = get_or_default_f(get_node(bsdf_node, "ior"), 1.0f);
+			} else if (type == "dielectric") {
+				bsdf_types |= BSDF_TYPE_DIELECTRIC;
+				materials[bsdf_idx].bsdf_type = BSDF_TYPE_DIELECTRIC;
+
+				materials[bsdf_idx].ior = get_or_default_f(get_node(bsdf_node, "ior"), 1.0f);
+				materials[bsdf_idx].roughness = get_or_default_f(get_node(bsdf_node, "roughness"), 0.0f);
+
+				LumenNode* transmission_node = get_node(bsdf_node, "transmission");
+				LumenNode* reflection_node = get_node(bsdf_node, "reflection");
+				bool transmission = !transmission_node || get_or_default_i(transmission_node, 1);
+				bool reflection = !reflection_node || get_or_default_i(reflection_node, 1);
+				if (transmission) {
+					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_TRANSMISSION;
+				}
+				if (reflection) {
+					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_REFLECTION;
+				}
+				if (materials[bsdf_idx].ior != 1.0f && materials[bsdf_idx].roughness > 0.08f) {
+					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_GLOSSY;
+				} else {
+					materials[bsdf_idx].bsdf_props |= BSDF_FLAG_SPECULAR;
+				}
+				materials[bsdf_idx].thin = get_or_default_i(get_node(bsdf_node, "thin"), 0);
+			} else if (type == "conductor") {
+				bsdf_types |= BSDF_TYPE_CONDUCTOR;
+				Material& mat = materials[bsdf_idx];
+				mat.bsdf_type = BSDF_TYPE_CONDUCTOR;
+				mat.roughness = get_or_default_f(get_node(bsdf_node, "roughness"), 0.0f);
+
+				// In conductor context, albedo is used as eta (i.e the IOR)
+				// k is the absorption coefficient
+				glm::vec3 reflectance_val =
+					glm::clamp(get_or_default_v3(get_node(bsdf_node, "reflectance"), glm::vec3(1.0f)), 0.0f, 0.9999f);
+				reflectance_to_conductor_eta_k(reflectance_val, mat.albedo, mat.k);
+
+				// Apply the mappings from https://jcgt.org/published/0003/04/03/paper.pdf
+				glm::vec3 edge_tint_vec = get_or_default_v3(get_node(bsdf_node, "edge_tint"), glm::vec3(1.0f));
+				glm::vec3 reflectivity_vec = get_or_default_v3(get_node(bsdf_node, "reflectivity"), glm::vec3(1.0f));
+				mat.albedo = edge_tint_vec * (1.0f - reflectivity_vec) / (1.0f + reflectivity_vec) +
+							 (1.0f - edge_tint_vec) * (1.0f + glm::sqrt(reflectivity_vec)) /
+								 (1.0f - glm::sqrt(reflectivity_vec));
+				auto intermediate_term = reflectivity_vec * (mat.albedo + 1.0f);
+				auto intermediate_term2 = mat.albedo - 1.0f;
+				mat.k = glm::sqrt(1.0f / (1.0f - reflectivity_vec) *
+								  (intermediate_term * intermediate_term - intermediate_term2 * intermediate_term2));
+
+				mat.bsdf_props = BSDF_FLAG_REFLECTION;
+				if (mat.roughness > 0.08f) {
+					mat.bsdf_props |= BSDF_FLAG_GLOSSY;
+				} else {
+					mat.bsdf_props |= BSDF_FLAG_SPECULAR;
+				}
+			} else if (type == "principled") {
+				bsdf_types |= BSDF_TYPE_PRINCIPLED;
+				Material& mat = materials[bsdf_idx];
+				mat.bsdf_type = BSDF_TYPE_PRINCIPLED;
+				mat.albedo = get_or_default_v3(get_node(bsdf_node, "albedo"), glm::vec3(1));
+				mat.ior = get_or_default_f(get_node(bsdf_node, "ior"), 1.0f);
+				mat.roughness = get_or_default_f(get_node(bsdf_node, "roughness"), 0.5f);
+				mat.diffuse_trans = get_or_default_f(get_node(bsdf_node, "diffuse_transmission"), 0.0f);
+				mat.spec_trans = get_or_default_f(get_node(bsdf_node, "specular_transmission"), 0.0f);
+				mat.metallic = get_or_default_f(get_node(bsdf_node, "metallic"), 0.0f);
+				mat.specular_tint = get_or_default_f(get_node(bsdf_node, "specular_tint"), 0.0f);
+				mat.sheen_tint = get_or_default_f(get_node(bsdf_node, "sheen_tint"), 0.5f);
+				mat.clearcoat = get_or_default_f(get_node(bsdf_node, "clearcoat"), 0.0f);
+				mat.clearcoat_gloss = get_or_default_f(get_node(bsdf_node, "clearcoat_gloss"), 1.0f);
+				mat.subsurface = get_or_default_f(get_node(bsdf_node, "subsurface"), 0.0f);
+				mat.flatness = get_or_default_f(get_node(bsdf_node, "flatness"), 0.0f);
+				mat.sheen = get_or_default_f(get_node(bsdf_node, "sheen"), 0.0f);
+				mat.anisotropy = get_or_default_f(get_node(bsdf_node, "anisotropy"), 0.0f);
+				mat.thin = get_or_default_i(get_node(bsdf_node, "thin"), 0);
+
+				if (mat.roughness < 1.0f) {
+					mat.bsdf_props |= BSDF_FLAG_REFLECTION;
+				}
+				if (mat.spec_trans > 0.0f) {
+					mat.bsdf_props |= BSDF_FLAG_TRANSMISSION;
+				}
+				if (mat.roughness > 0.08f) {
+					mat.bsdf_props |= BSDF_FLAG_GLOSSY;
+				} else {
+					mat.bsdf_props |= BSDF_FLAG_SPECULAR;
+				}
+			}
+		}
+	}
+
+	LumenNode* mesh_node = get_node(root, "mesh");
+	LUMEN_ASSERT(mesh_node, "Mesh node not found in Lumen scene");
+
+	LumenNode* materials_refs_node = get_node(mesh_node, "materials");
+	if (materials_refs_node) {
+		for (LumenNode* mat_ref_node = materials_refs_node->child; mat_ref_node;
+			 mat_ref_node = next_node(mat_ref_node)) {
+			std::string_view mat_name = get_str(get_node(mat_ref_node, "name"));
+			auto it = material_map.find(mat_name);
+			if (it != material_map.end()) {
+				uint32_t mat_idx = it->second;
+				std::vector<std::string_view> refs = get_str_list(get_node(mat_ref_node, "refs"));
+				for (const std::string_view ref : refs) {
+					materials_to_objects[ref] = mat_idx;
+				}
+			} else {
+				LUMEN_ERROR("Material {} not found in Lumen scene", mat_name.data());
+			}
+		}
+	}
+
+	// Load obj file
+	const std::string mesh_file = path_root + std::string(get_or_default_str(get_node(mesh_node, "name"), ""));
+	tinyobj::ObjReaderConfig reader_config;
+
+	tinyobj::ObjReader reader;
+	if (!reader.ParseFromFile(mesh_file, reader_config)) {
+		if (!reader.Error().empty()) {
+			LUMEN_ERROR("Failed to load Lumen scene mesh file: {}", mesh_file.c_str());
+		}
+	}
+
+	if (!reader.Warning().empty()) {
+		std::cout << "TinyObjReader: " << reader.Warning();
+	}
+
+	auto& attrib = reader.GetAttrib();
+	auto& shapes = reader.GetShapes();
+
+	prim_meshes.resize(shapes.size());
+	for (uint32_t shape_idx = 0; shape_idx < shapes.size(); shape_idx++) {
+		MeshData mesh_data;
+		prim_meshes[shape_idx].first_idx = (uint32_t)indices.size();
+		prim_meshes[shape_idx].vtx_offset = (uint32_t)positions.size();
+		prim_meshes[shape_idx].name = shapes[shape_idx].name;
+		prim_meshes[shape_idx].filename = mesh_file;
+		prim_meshes[shape_idx].idx_count = (uint32_t)shapes[shape_idx].mesh.indices.size();
+		prim_meshes[shape_idx].vtx_count = (uint32_t)shapes[shape_idx].mesh.num_face_vertices.size();
+		prim_meshes[shape_idx].prim_idx = shape_idx;
+
+		auto found = materials_to_objects.find(shapes[shape_idx].name);
+		if (found != materials_to_objects.end()) {
+			prim_meshes[shape_idx].material_idx = found->second;
+		} else {
+			prim_meshes[shape_idx].material_idx = 0;  // Default material
+		}
+
+		glm::vec3 min_vtx = glm::vec3(FLT_MAX);
+		glm::vec3 max_vtx = glm::vec3(-FLT_MAX);
+		uint32_t index_offset = 0;
+		uint32_t idx_val = 0;
+		for (uint32_t f = 0; f < shapes[shape_idx].mesh.num_face_vertices.size(); f++) {
+			for (uint32_t v = 0; v < 3; v++) {
+				tinyobj::index_t idx = shapes[shape_idx].mesh.indices[index_offset + v];
+				mesh_data.indices.push_back(idx_val++);
+				tinyobj::real_t vx = attrib.vertices[3 * uint32_t(idx.vertex_index) + 0];
+				tinyobj::real_t vy = attrib.vertices[3 * uint32_t(idx.vertex_index) + 1];
+				tinyobj::real_t vz = attrib.vertices[3 * uint32_t(idx.vertex_index) + 2];
+				mesh_data.positions.emplace_back(vx, vy, vz);
+				min_vtx = glm::min(mesh_data.positions[mesh_data.positions.size() - 1], min_vtx);
+				max_vtx = glm::max(mesh_data.positions[mesh_data.positions.size() - 1], max_vtx);
+				if (idx.normal_index >= 0) {
+					tinyobj::real_t nx = attrib.normals[3 * uint32_t(idx.normal_index) + 0];
+					tinyobj::real_t ny = attrib.normals[3 * uint32_t(idx.normal_index) + 1];
+					tinyobj::real_t nz = attrib.normals[3 * uint32_t(idx.normal_index) + 2];
+					mesh_data.normals.emplace_back(nx, ny, nz);
+				}
+				if (idx.texcoord_index >= 0) {
+					tinyobj::real_t tx = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 0];
+					tinyobj::real_t ty = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 1];
+					mesh_data.texcoords0.emplace_back(tx, ty);
+				}
+			}
+			index_offset += 3;
+		}
+		prim_meshes[shape_idx].min_pos = min_vtx;
+		prim_meshes[shape_idx].max_pos = max_vtx;
+		prim_meshes[shape_idx].world_matrix = glm::mat4(1);
+
+		positions.insert(positions.end(), std::make_move_iterator(mesh_data.positions.begin()),
+						 std::make_move_iterator(mesh_data.positions.end()));
+		indices.insert(indices.end(), std::make_move_iterator(mesh_data.indices.begin()),
+					   std::make_move_iterator(mesh_data.indices.end()));
+		normals.insert(normals.end(), std::make_move_iterator(mesh_data.normals.begin()),
+					   std::make_move_iterator(mesh_data.normals.end()));
+		tangents.insert(tangents.end(), std::make_move_iterator(mesh_data.tangents.begin()),
+						std::make_move_iterator(mesh_data.tangents.end()));
+		texcoords0.insert(texcoords0.end(), std::make_move_iterator(mesh_data.texcoords0.begin()),
+						  std::make_move_iterator(mesh_data.texcoords0.end()));
+		texcoords1.insert(texcoords1.end(), std::make_move_iterator(mesh_data.texcoords1.begin()),
+						  std::make_move_iterator(mesh_data.texcoords1.end()));
+		colors0.insert(colors0.end(), std::make_move_iterator(mesh_data.colors0.begin()),
+					   std::make_move_iterator(mesh_data.colors0.end()));
+		// TODO: Implement world transforms
+	}
+
+	curr_config->cam_settings = CameraSettings{
+		.fov = get_or_default_f(get_node(camera_node, "fov"), 90.0f),
+		.pos = get_or_default_v3(get_node(camera_node, "position"), glm::vec3(-1.0f)),
+		.rotation = get_or_default_v3(get_node(camera_node, "rotation"), glm::vec3(0.0f)),
+		.dir = get_or_default_v3(get_node(camera_node, "dir"), glm::vec3(0.0f, 0.0f, -1.0f)),
+	};
+	compute_scene_dimensions();
+	// TODO: Lights
+
+}
+
+void LumenScene::load_lumen_scene_new(const std::string& path) {
+	FILE* file = fopen(path.c_str(), "rb");
+	if (!file) {
+		LUMEN_ERROR("Failed to open Lumen scene file: {}", path.c_str());
+		return;
+	}
+	std::fseek(file, 0, SEEK_END);
+	size_t file_size = std::ftell(file);
+	std::rewind(file);
+	std::vector<char> buffer(file_size + 1);
+
+	if (std::fread(buffer.data(), 1, file_size, file) != file_size) {
+		LUMEN_ERROR("Failed to read Lumen scene file: {}", path.c_str());
+		return;
+	}
+	fclose(file);
+	LumenNode* root = parse_file(buffer);
+	parse_lumen_scene(path, root);
+}
+
 void LumenScene::load_scene(const std::string& path) {
 	if (ends_with(path, ".json")) {
 		load_lumen_scene(path);
 	} else if (ends_with(path, ".xml")) {
 		load_mitsuba_scene(path);
+	} else if (ends_with(path, ".scene")) {
+		load_lumen_scene_new(path);
+	} else {
+		LUMEN_ERROR("Unsupported scene file format: {}", path.c_str());
+		return;
 	}
 
 	const float aspect_ratio = (float)Window::width() / Window::height();
-	if (config->cam_settings.pos != vec3(0)) {
+	if (config->cam_settings.pos != vec3(-1)) {
 		camera = std::unique_ptr<lumen::PerspectiveCamera>(
 			new lumen::PerspectiveCamera(config->cam_settings.fov, 0.01f, 1000.0f, aspect_ratio,
 										 config->cam_settings.dir, config->cam_settings.pos));
@@ -273,6 +806,7 @@ void LumenScene::load_lumen_scene(const std::string& path) {
 		prim_meshes[s].first_idx = (uint32_t)indices.size();
 		prim_meshes[s].vtx_offset = (uint32_t)positions.size();
 		prim_meshes[s].name = shapes[s].name;
+		prim_meshes[s].filename = mesh_file;
 		prim_meshes[s].idx_count = (uint32_t)shapes[s].mesh.indices.size();
 		prim_meshes[s].vtx_count = (uint32_t)shapes[s].mesh.num_face_vertices.size();
 		prim_meshes[s].prim_idx = s;
@@ -544,6 +1078,7 @@ void LumenScene::load_mitsuba_scene(const std::string& path) {
 		prim_meshes[i].first_idx = (uint32_t)indices.size();
 		prim_meshes[i].vtx_offset = (uint32_t)positions.size();
 		prim_meshes[i].name = shapes[0].name;
+		prim_meshes[i].filename = mesh_file;
 		prim_meshes[i].idx_count = (uint32_t)shapes[0].mesh.indices.size();
 		prim_meshes[i].vtx_count = (uint32_t)shapes[0].mesh.num_face_vertices.size();
 		prim_meshes[i].prim_idx = i;

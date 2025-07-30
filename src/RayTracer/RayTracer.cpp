@@ -483,7 +483,7 @@ float RayTracer::draw_frame() {
 
 void RayTracer::parse_args(int argc, char* argv[]) {
 	scene_name = "scenes/caustics.json";
-	std::regex fn("(.*).(.json|.xml)");
+	std::regex fn("(.*).(.json|.xml|.scene)");
 	for (int i = 0; i < argc; i++) {
 		if (std::regex_match(argv[i], fn)) {
 			scene_name = argv[i];

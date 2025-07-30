@@ -209,10 +209,6 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 	set_allocate_info.pSetLayouts = &tlas_layout;
 	vk::check(vkAllocateDescriptorSets(vk::context().device, &set_allocate_info, &tlas_descriptor_set));
 
-	if (name == "GRIS - Retrace Reservoirs") {
-		int a = 4;
-	}
-
 	std::vector<VkSpecializationMapEntry> entries(settings.specialization_data.size());
 	for (int i = 0; i < entries.size(); i++) {
 		entries[i].constantID = i;

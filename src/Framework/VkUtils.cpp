@@ -211,18 +211,18 @@ VkImageView create_image_view(VkDevice device, const VkImage& img, VkFormat form
 	return image_view;
 }
 
-BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertexAddress, VkDeviceAddress indexAddress) {
+BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertex_address, VkDeviceAddress index_address) {
 	uint32_t maxPrimitiveCount = prim.idx_count / 3;
 
 	// Describe buffer as array of VertexObj.
 	VkAccelerationStructureGeometryTrianglesDataKHR triangles{
 		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR};
 	triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;  // vec3 vertex position data.
-	triangles.vertexData.deviceAddress = vertexAddress;
+	triangles.vertexData.deviceAddress = vertex_address;
 	triangles.vertexStride = sizeof(glm::vec3);
 	// Describe index data (32-bit unsigned int)
 	triangles.indexType = VK_INDEX_TYPE_UINT32;
-	triangles.indexData.deviceAddress = indexAddress;
+	triangles.indexData.deviceAddress = index_address;
 	// Indicate identity transform by setting transformData to null device
 	// pointer.
 	// triangles.transformData = {};

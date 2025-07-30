@@ -24,6 +24,7 @@ struct MeshData {
 
 struct LumenPrimMesh {
 	std::string name;
+	std::string filename;
 	uint32_t material_idx;
 	uint32_t vtx_offset;
 	uint32_t first_idx;
@@ -44,9 +45,18 @@ struct LumenLight {
 	bool enabled = true;
 };
 
+struct LumenNode {
+	std::string_view key = "";
+	std::string_view value = "";
+	LumenNode* parent = nullptr;
+	LumenNode* child = nullptr;
+	LumenNode* next = nullptr;
+	int num_list_items = 0;
+};
+
 class LumenScene {
    public:
-   LumenScene() = default;
+	LumenScene() = default;
 	void load_scene(const std::string& path);
 	void destroy();
 	std::vector<glm::vec3> positions;
@@ -94,6 +104,8 @@ class LumenScene {
 	void compute_scene_dimensions();
 	void load_lumen_scene(const std::string& path);
 	void load_mitsuba_scene(const std::string& path);
+	void load_lumen_scene_new(const std::string& path);
+	void parse_lumen_scene(const std::string& path, LumenNode* root);
 	void add_default_texture();
 	VkSampler texture_sampler;
 };

@@ -16,17 +16,6 @@ layout(set = 0, binding = 2, scalar) buffer SceneDesc_ {
 };
 layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo {
-    PrimInfo prim_info[];
-};
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Vertices { vec3 v[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Normals { vec3 n[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer TexCoords { vec2 t[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials {
-    Material m[];
-};
-
 void main() {
     payload.triangle_idx = gl_PrimitiveID;
     payload.instance_idx = gl_InstanceCustomIndexEXT;

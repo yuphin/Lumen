@@ -2,7 +2,6 @@
 
 #include "PersistentResourceManager.h"
 #include <vulkan/vulkan_core.h>
-#include <winnt.h>
 #include <unordered_map>
 #include "VulkanContext.h"
 #include "VkUtils.h"

@@ -198,6 +198,16 @@ struct Vertex {
 	vec2 uv0;
 };
 
+// struct EmissiveLight {
+// 	mat4 world_matrix;
+// 	vec3 pos;
+
+// };
+
+// struct AnalyticalLight {
+
+// }
+
 struct Light {
 	mat4 world_matrix;
 	vec3 pos;
