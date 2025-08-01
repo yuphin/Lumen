@@ -62,6 +62,7 @@ void RayTracer::init() {
 	vk::render_graph()->settings.use_events = use_events;
 
 	scene.load_scene(scene_name);
+	scene.write_lumen_scene();
 	create_integrator(int(scene.config->integrator_type));
 	integrator->init();
 	if (!tlas.accel) {

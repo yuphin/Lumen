@@ -10,7 +10,6 @@
 namespace lumen {
 #define EXTENSION_ATTRIB_IRAY "NV_attributes_iray"
 
-
 //--------------------------------------------------------------------------------------------------
 // Collect the value of all materials
 //

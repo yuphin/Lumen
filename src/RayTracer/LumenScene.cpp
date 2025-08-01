@@ -293,9 +293,8 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 
 	LumenNode* textures_node = get_node(root, "textures");
 
-
-	if(textures_node) {
-		for(LumenNode* texture_node = textures_node->child; texture_node; texture_node = next_node(texture_node)) {
+	if (textures_node) {
+		for (LumenNode* texture_node = textures_node->child; texture_node; texture_node = next_node(texture_node)) {
 			std::string_view name = get_str(get_node(texture_node, "name"));
 			std::string_view file = get_str(get_node(texture_node, "file"));
 			LUMEN_ASSERT(!name.empty() && !file.empty(), "Texture name and file must be specified");
@@ -315,16 +314,16 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 			std::string_view mat_name = get_str(get_node(bsdf_node, "name"));
 			if (!mat_name.empty()) {
 				material_map[mat_name] = bsdf_idx;
+				material_idx_to_name[bsdf_idx] = std::string(mat_name);
 			}
 
 			std::string_view texture_name = get_or_default_str(get_node(bsdf_node, "texture"), "");
-			if(!texture_name.empty()) {
+			if (!texture_name.empty()) {
 				auto it = texture_name_to_idx.find(texture_name);
 				if (it != texture_name_to_idx.end()) {
 					materials[bsdf_idx].texture_id = it->second;
-				} 
+				}
 			}
-
 
 			std::string_view type = get_or_default_str(get_node(bsdf_node, "type"), "diffuse");
 			if (type == "diffuse") {
@@ -541,7 +540,6 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 	};
 	compute_scene_dimensions();
 	// TODO: Lights
-
 }
 
 void LumenScene::load_lumen_scene_new(const std::string& path) {
@@ -740,6 +738,155 @@ void LumenScene::load_scene(const std::string& path) {
 		vk::ShaderMacro("ENABLE_CONDUCTOR", has_bsdf_type(BSDF_TYPE_CONDUCTOR), /* visible = */ false));
 	vk::render_graph()->global_macro_defines.push_back(
 		vk::ShaderMacro("ENABLE_PRINCIPLED", has_bsdf_type(BSDF_TYPE_PRINCIPLED), /* visible = */ false));
+}
+
+static void add_leaf_node(LumenNode* node, const std::string_view name, const std::string_view value) {
+	LUMEN_ASSERT(node, "Node cannot be null when adding field");
+	while (node->child) {
+		node = node->child;
+	}
+	node->child = new LumenNode();
+	node->child->key = name;
+	node->child->value = value;
+}
+
+static void add_child_node(LumenNode* parent, LumenNode* child) {
+	LUMEN_ASSERT(parent && child, "Parent and child nodes cannot be null when adding child node");
+	if (!parent->child) {
+		parent->child = child;
+	} else {
+		LumenNode* last_child = parent->child;
+		while (last_child->next) {
+			last_child = last_child->next;
+		}
+		last_child->next = child;
+	}
+}
+
+static void add_list_node(LumenNode* parent, LumenNode* list_node) {
+	LUMEN_ASSERT(parent && list_node, "Parent and list node cannot be null when adding list node");
+	if (!parent->child) {
+		parent->child = list_node;
+	} else {
+		LumenNode* last_child = parent->child;
+		while (last_child->next) {
+			last_child = last_child->next;
+		}
+		last_child->next = new LumenNode{.key = "-"};
+		last_child->next->child = list_node;
+	}
+}
+
+static std::string to_lower(const std::string& str) {
+	std::string lower_str = str;
+	for (char& c : lower_str) {
+		c = std::tolower(c);
+	}
+	return lower_str;
+}
+
+static std::string vec3_to_str(const glm::vec3& vec) {
+	return "v3f(" + std::to_string(vec.x) + ", " + std::to_string(vec.y) + ", " + std::to_string(vec.z) + ")";
+}
+
+static std::string_view get_material_type(const Material& mat) {
+	switch (mat.bsdf_type) {
+		case BSDF_TYPE_DIFFUSE:
+			return "diffuse";
+		case BSDF_TYPE_MIRROR:
+			return "mirror";
+		case BSDF_TYPE_GLASS:
+			return "glass";
+		case BSDF_TYPE_DIELECTRIC:
+			return "dielectric";
+		case BSDF_TYPE_CONDUCTOR:
+			return "conductor";
+		case BSDF_TYPE_PRINCIPLED:
+			return "principled";
+		default:
+			LUMEN_ERROR("Unknown material type: {}", mat.bsdf_type);
+			return "unknown";
+	}
+}
+
+void LumenScene::write_lumen_scene() {
+	std::ofstream out_file("scene.scene");
+
+	LumenNode* root = new LumenNode();
+	root->key = "scene";
+
+	LumenNode* integrator_node = new LumenNode{.key = "integrator"};
+	std::string integrator_name = to_lower(config->integrator_name);
+	add_leaf_node(integrator_node, "type", integrator_name);
+	std::string path_length = std::to_string(config->path_length);
+	add_leaf_node(integrator_node, "path_length", path_length);
+	std::string sky_col = vec3_to_str(config->sky_col);
+	add_leaf_node(integrator_node, "sky_col", sky_col);
+	if (integrator_name == "sppm") {
+		std::string base_radius = std::to_string(static_cast<SPPMConfig*>(config.get())->base_radius);
+		add_leaf_node(integrator_node, "base_radius", base_radius);
+	} else if (integrator_name == "vcm") {
+		std::string enable_vm = std::to_string(static_cast<VCMConfig*>(config.get())->enable_vm ? 1 : 0);
+		std::string radius_factor = std::to_string(static_cast<VCMConfig*>(config.get())->radius_factor);
+		add_leaf_node(integrator_node, "enable_vm", enable_vm);
+		add_leaf_node(integrator_node, "radius_factor", radius_factor);
+	} else if (integrator_name == "pssmlt") {
+		std::string mutations_per_pixel = std::to_string(static_cast<PSSMLTConfig*>(config.get())->mutations_per_pixel);
+		std::string num_mlt_threads = std::to_string(static_cast<PSSMLTConfig*>(config.get())->num_mlt_threads);
+		std::string num_bootstrap_samples = std::to_string(static_cast<PSSMLTConfig*>(config.get())->num_bootstrap_samples);
+		add_leaf_node(integrator_node, "mutations_per_pixel", mutations_per_pixel);
+		add_leaf_node(integrator_node, "num_mlt_threads", num_mlt_threads);
+		add_leaf_node(integrator_node, "num_bootstrap_samples", num_bootstrap_samples);
+	} else if (integrator_name == "smlt") {
+		std::string mutations_per_pixel = std::to_string(static_cast<SMLTConfig*>(config.get())->mutations_per_pixel);
+		std::string num_mlt_threads = std::to_string(static_cast<SMLTConfig*>(config.get())->num_mlt_threads);
+		std::string num_bootstrap_samples = std::to_string(static_cast<SMLTConfig*>(config.get())->num_bootstrap_samples);
+		add_leaf_node(integrator_node, "mutations_per_pixel", mutations_per_pixel);
+		add_leaf_node(integrator_node, "num_mlt_threads", num_mlt_threads);
+		add_leaf_node(integrator_node, "num_bootstrap_samples", num_bootstrap_samples);
+	} else if (integrator_name == "vcmmlt") {
+		std::string mutations_per_pixel = std::to_string(static_cast<VCMMLTConfig*>(config.get())->mutations_per_pixel);
+		std::string num_mlt_threads = std::to_string(static_cast<VCMMLTConfig*>(config.get())->num_mlt_threads);
+		std::string num_bootstrap_samples = std::to_string(static_cast<VCMMLTConfig*>(config.get())->num_bootstrap_samples);
+		std::string radius_factor = std::to_string(static_cast<VCMMLTConfig*>(config.get())->radius_factor);
+		std::string enable_vm = std::to_string(static_cast<VCMMLTConfig*>(config.get())->enable_vm ? 1 : 0);
+		std::string alternate = std::to_string(static_cast<VCMMLTConfig*>(config.get())->alternate ? 1 : 0);
+		std::string light_first = std::to_string(static_cast<VCMMLTConfig*>(config.get())->light_first ? 1 : 0);
+		add_leaf_node(integrator_node, "mutations_per_pixel", mutations_per_pixel);
+		add_leaf_node(integrator_node, "num_mlt_threads", num_mlt_threads);
+		add_leaf_node(integrator_node, "num_bootstrap_samples", num_bootstrap_samples);
+		add_leaf_node(integrator_node, "radius_factor", radius_factor);
+		add_leaf_node(integrator_node, "enable_vm", enable_vm);
+		add_leaf_node(integrator_node, "alternate", alternate);
+		add_leaf_node(integrator_node, "light_first", light_first);
+	}
+	LumenNode* textures_node = new LumenNode{.key = "textures"};
+
+	for (const std::string& texture_path : textures) {
+		LumenNode* texture_prop = new LumenNode{.key = "-"};
+		const std::string_view texture_path_view = texture_path;
+		const size_t last_slash = texture_path_view.find_last_of("/\\");
+		const std::string_view texture_file_str =
+			(last_slash != std::string::npos) ? texture_path_view.substr(last_slash + 1) : texture_path_view;
+		add_leaf_node(texture_prop, "file", texture_file_str);
+		add_leaf_node(texture_prop, "name", texture_file_str);
+		add_child_node(textures_node, texture_prop);
+	}
+
+	LumenNode* bsdfs_node = new LumenNode{.key = "bsdfs"};
+	for(uint32_t i = 0; i < materials.size(); i++) {
+		LumenNode* bsdf_prop = new LumenNode{.key = "-"};
+		const Material& mat = materials[i];
+		add_leaf_node(bsdf_prop, "name", material_idx_to_name[i]);
+		add_leaf_node(bsdf_prop, "type", get_material_type(mat));
+		std::string albedo = vec3_to_str(mat.albedo);
+		add_leaf_node(bsdf_prop, "albedo", albedo);
+		std::string emissive_factor = vec3_to_str(mat.emissive_factor);
+		add_leaf_node(bsdf_prop, "emissive_factor", emissive_factor);
+	
+		
+	}
+	// __debugbreak();
 }
 
 void LumenScene::load_lumen_scene(const std::string& path) {

@@ -58,6 +58,7 @@ class LumenScene {
    public:
 	LumenScene() = default;
 	void load_scene(const std::string& path);
+	void write_lumen_scene();
 	void destroy();
 	std::vector<glm::vec3> positions;
 	std::vector<uint32_t> indices;
@@ -82,6 +83,7 @@ class LumenScene {
 	vk::Buffer* mesh_lights_buffer;
 	std::vector<vk::Texture*> scene_textures;
 	std::unique_ptr<lumen::Camera> camera;
+	std::unordered_map<uint32_t, std::string> material_idx_to_name;
 
 	uint32_t total_light_triangle_cnt = 0;
 	float total_light_area = 0;
