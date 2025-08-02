@@ -1,5 +1,4 @@
 #pragma once
-#include "LumenPCH.h"
 #include "RayTracer/LumenScene.h"
 
 namespace vk {

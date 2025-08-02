@@ -1,5 +1,4 @@
 #include "Framework/RenderGraph.h"
-#include "Framework/VulkanBase.h"
 #include "LumenPCH.h"
 #include "ReSTIR.h"
 

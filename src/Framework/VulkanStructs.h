@@ -1,9 +1,5 @@
 #pragma once
-#include "Framework/Logger.h"
 #include <volk/volk.h>
-#include <GLFW/glfw3.h>
-#include <optional>
-#include <vector>
 #include "Utils.h"
 
 namespace vk {

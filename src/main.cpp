@@ -1,10 +1,14 @@
 #include "LumenPCH.h"
 #include "Framework/Window.h"
+#include "Framework/Arena.h"
 #include "RayTracer/RayTracer.h"
 
 void window_size_callback(GLFWwindow* window, int width, int height) {}
 
 int main(int argc, char* argv[]) {
+
+
+	return 0;
 #ifdef _DEBUG
 	bool enable_debug = true;
 #else

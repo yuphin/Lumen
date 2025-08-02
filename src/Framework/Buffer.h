@@ -1,11 +1,15 @@
 #pragma once
 #include "../LumenPCH.h"
-#include "EnumFlags.h"
 #include "VulkanContext.h"
 namespace vk {
 
 enum class BufferType { GPU = 1 << 0, GPU_TO_CPU = 1 << 1, CPU_TO_GPU = 1 << 2, STAGING = 1 << 3 };
 DEFINE_ENUM_FLAGS(BufferType)
+
+struct BufferStatus {
+	bool read = false;
+	bool write = false;
+};
 
 struct BufferDesc {
 	std::string_view name = "";

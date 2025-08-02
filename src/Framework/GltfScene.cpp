@@ -4,7 +4,6 @@
 #include <numeric>
 #include <set>
 #include <sstream>
-#include "Logger.h"
 #include "Framework/BBox.h"
 
 namespace lumen {
