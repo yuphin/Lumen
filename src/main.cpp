@@ -7,6 +7,20 @@ void window_size_callback(GLFWwindow* window, int width, int height) {}
 
 int main(int argc, char* argv[]) {
 
+	Logger::init();
+	Arena* arena = arena_create(MB(64), KB(64), 64);
+
+	void* data_a = arena->allocate(KB(1), KB(1));
+	void* data_b = arena->allocate(16, 128);
+
+	void* data_c = arena->allocate(4096, 64);
+	void* data_d = arena->allocate(2,8);
+
+	TempArena temp_arena = arena->temp();
+	void* temp_data_a = temp_arena.arena->allocate(64, 64);
+	temp_arena.pop();
+
+	__debugbreak();
 
 	return 0;
 #ifdef _DEBUG

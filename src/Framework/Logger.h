@@ -25,12 +25,12 @@ std::shared_ptr<spdlog::logger>& get();
 #define LUMEN_CRITICAL(...) Logger::get()->critical(__VA_ARGS__)
 #ifdef _DEBUG
 #define LUMEN_INFO(...) Logger::get()->info(__VA_ARGS__)
-#define LUMEN_ASSERT(x, ...)          \
-	{                                 \
-		if (!(x)) {                   \
+#define LUMEN_ASSERT(x, ...)              \
+	{                                     \
+		if (!(x)) {                       \
 			LUMEN_ERROR_LOG(__VA_ARGS__); \
-			assert(x);                \
-		}                             \
+			assert(x);                    \
+		}                                 \
 	}
 #else
 #define LUMEN_INFO(...)

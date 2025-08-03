@@ -1,5 +1,9 @@
 #pragma once
 
+#define KB(n) (((size_t)(n)) << 10)
+#define MB(n) (((size_t)(n)) << 20)
+#define GB(n) (((size_t)(n)) << 30)
+
 #define DEFINE_ENUM_FLAGS(T)                                                                                 \
 	inline constexpr T operator|(T Lhs, T Rhs) {                                                             \
 		return static_cast<T>(static_cast<std::underlying_type_t<T>>(Lhs) |                                  \
@@ -28,6 +32,20 @@
 	}
 
 namespace util {
+
+inline constexpr size_t align_pow2(size_t x, size_t align) { return (x + align - 1) & ~(align - 1); }
+
+inline constexpr uint32_t next_pow2(uint32_t x) {
+	if (x == 0) return 1;
+	--x;
+	x |= x >> 1;
+	x |= x >> 2;
+	x |= x >> 4;
+	x |= x >> 8;
+	x |= x >> 16;
+	return x + 1;
+}
+
 template <typename T, typename... Rest>
 inline void hash_combine(std::size_t& seed, const T& v) {
 	std::hash<T> hasher;

@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include "VulkanContext.h"
 #include "VkUtils.h"
+#include "OS.h"
 
 #if !defined(_WIN32) && !defined(_WIN64)
 #include <sys/mman.h>
@@ -21,18 +22,6 @@ static bool operator==(const VkSamplerCreateInfo& lhs, const VkSamplerCreateInfo
 		   lhs.maxLod == rhs.maxLod && lhs.borderColor == rhs.borderColor &&
 		   lhs.unnormalizedCoordinates == rhs.unnormalizedCoordinates;
 }
-
-namespace os {
-size_t get_page_size() {
-#if defined(_WIN32) || defined(_WIN64)
-	SYSTEM_INFO sys_info;
-	GetSystemInfo(&sys_info);
-	return sys_info.dwPageSize;
-#else
-	return sysconf(_SC_PAGE_SIZE);
-#endif
-}
-}  // namespace os
 
 constexpr size_t RESERVE_SIZE = 1024ull * 1024 * 1024 * 1024 * 64;	// 64GB
 template <typename T>
