@@ -16,15 +16,16 @@ int main(int argc, char* argv[]) {
 	void* data_c = arena->allocate(4096, 64);
 	void* data_d = arena->allocate(2, 8);
 
-	core::TempArena temp_arena = arena->temp();
-	core::Array<int> arr = core::array_create<int>(temp_arena.arena, 10);
+	{
+		core::ScratchArena temp_arena(arena);
+		core::Array<int> arr = core::array_create<int>(temp_arena.arena, 10);
 
-	for (int i = 0; i < 10; ++i) {
-		arr.push_back(i);
+		for (int i = 0; i < 10; ++i) {
+			arr.push_back(i);
+		}
+		arr.resize(MB(1));
+		memset(arr.data, 0, arr.size * sizeof(int));
 	}
-	arr.resize(MB(1));
-	memset(arr.data, 0, arr.size * sizeof(int));
-	temp_arena.pop();
 
 	__debugbreak();
 

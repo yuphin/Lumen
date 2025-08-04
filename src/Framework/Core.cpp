@@ -14,18 +14,27 @@ static void arena_pop(Arena* arena, size_t target_base) {
 	}
 	assert(last_arena);
 	size_t diff = last_arena->local_offset - target_base;
-	assert(diff >= 0 && diff <= last_arena->local_offset);
+	assert(diff <= last_arena->local_offset);
 	arena->local_offset -= diff;
 }
 
-void arena_ensure_committed(Arena *arena, size_t target_offset) {
+void arena_ensure_committed(Arena* arena, size_t target_offset) {
 	arena->local_offset = target_offset;
-    if (target_offset <= arena->end_committed) return;
-    size_t commit_size = util::align_pow2(target_offset - arena->end_committed, os::get_page_size());
-    bool commited = os::commit(arena->data + arena->end_committed, commit_size);
-    LUMEN_ASSERT(commited, "Could not commit memory for Arena");
-    arena->end_committed += commit_size;
+	if (target_offset <= arena->end_committed) return;
+	size_t commit_size = util::align_pow2(target_offset - arena->end_committed, os::get_page_size());
+	bool commited = os::commit(arena->data + arena->end_committed, commit_size);
+	LUMEN_ASSERT(commited, "Could not commit memory for Arena");
+	arena->end_committed += commit_size;
 }
+
+ScratchArena::ScratchArena(Arena* arena_) {
+	Arena* last_arena = nullptr;
+	for (Arena* arena = arena_; arena; last_arena = arena, arena = arena->next);
+	assert(last_arena);
+	arena = last_arena;
+	saved_base = last_arena->local_offset;
+}
+ScratchArena::~ScratchArena() { arena_pop(arena, saved_base); }
 
 void* Arena::allocate(size_t size, size_t alignment, Arena** arena_node) {
 	Arena* curr_arena = this;
@@ -64,17 +73,6 @@ void* Arena::allocate(size_t size, size_t alignment, Arena** arena_node) {
 }
 
 void Arena::clear() { arena_pop(this, 0); }
-
-TempArena Arena::temp() {
-	TempArena temp;
-	Arena* last_arena = nullptr;
-	for (Arena* arena = this; arena; last_arena = arena, arena = arena->next);
-	assert(last_arena);
-	temp.arena = last_arena;
-	temp.saved_base = last_arena->local_offset;
-	return temp;
-}
-void TempArena::pop() { arena_pop(arena, saved_base); }
 
 Arena* arena_create(size_t reserve_size, size_t commit_size, size_t header_alignment) {
 	const size_t page_size = os::get_page_size();

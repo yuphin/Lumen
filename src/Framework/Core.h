@@ -3,10 +3,12 @@
 
 namespace core {
 struct Arena;
-struct TempArena {
+struct ScratchArena {
 	Arena* arena;
 	size_t saved_base;
-	void pop();
+    ScratchArena() = delete;
+    ScratchArena(Arena* arena);
+    ~ScratchArena();
 };
 
 struct Arena {
@@ -17,7 +19,6 @@ struct Arena {
 	size_t end_committed;
 	void* allocate(size_t size, size_t alignment = 8, Arena** arena_node = nullptr);
 	void clear();
-	TempArena temp();
 };
 
 Arena* arena_create(size_t reserve_size = MB(64), size_t commit_size = KB(64), size_t header_alignment = -1);
@@ -40,6 +41,7 @@ struct Array {
 		LUMEN_ASSERT(aligned_required_size < diff,
 					 "Not enough space in Arena to allocate Array, consider increasing arena block size by {} bytes",
 					 aligned_required_size - diff);
+	    capacity = new_capacity;
 		arena_ensure_committed(arena_node, aligned_offset + aligned_required_size);
 	}
 
@@ -48,6 +50,16 @@ struct Array {
 			ensure_allocated(capacity == 0 ? 1 : 3 * (capacity >> 1));
 		}
 		data[size++] = value;
+	}
+
+	template <typename... Args>
+	T& emplace_back(Args&&... args) {
+		if (size >= capacity) {
+			ensure_allocated(capacity == 0 ? 1 : 3 * (capacity >> 1));
+		}
+		T* slot = &data[size++];
+		::new ((void*)slot) T(std::forward<Args>(args)...);
+		return *slot;
 	}
 
 	void clear() { size = 0; }
