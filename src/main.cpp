@@ -1,23 +1,29 @@
 #include "LumenPCH.h"
 #include "Framework/Window.h"
-#include "Framework/Arena.h"
+#include "Framework/Core.h"
 #include "RayTracer/RayTracer.h"
 
 void window_size_callback(GLFWwindow* window, int width, int height) {}
 
 int main(int argc, char* argv[]) {
-
 	Logger::init();
-	Arena* arena = arena_create(MB(64), KB(64), 64);
+	core::Arena* arena = core::arena_create(MB(8), 64);
 
-	void* data_a = arena->allocate(KB(1), KB(1));
+	void* data_a = arena->allocate(16, 64);
+
 	void* data_b = arena->allocate(16, 128);
 
 	void* data_c = arena->allocate(4096, 64);
-	void* data_d = arena->allocate(2,8);
+	void* data_d = arena->allocate(2, 8);
 
-	TempArena temp_arena = arena->temp();
-	void* temp_data_a = temp_arena.arena->allocate(64, 64);
+	core::TempArena temp_arena = arena->temp();
+	core::Array<int> arr = core::array_create<int>(temp_arena.arena, 10);
+
+	for (int i = 0; i < 10; ++i) {
+		arr.push_back(i);
+	}
+	arr.resize(MB(1));
+	memset(arr.data, 0, arr.size * sizeof(int));
 	temp_arena.pop();
 
 	__debugbreak();

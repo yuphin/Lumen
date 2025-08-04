@@ -1,26 +1,33 @@
 #include "../LumenPCH.h"
-#include "Arena.h"
+#include "Core.h"
 #include "OS.h"
 #include "Utils.h"
 
+namespace core {
 constexpr size_t HEADER_SIZE = sizeof(Arena);
 static constexpr size_t ALIGNED_HEADER_SIZE = util::next_pow2(HEADER_SIZE);
 
 static void arena_pop(Arena* arena, size_t target_base) {
 	Arena* last_arena = arena;
 	for (Arena* next_arena = arena->next; next_arena; last_arena = next_arena, next_arena = next_arena->next) {
-		assert(next_arena->global_offset >= target_base);
-        next_arena->local_offset = 0;
-		next_arena->global_offset = 0;
+		next_arena->local_offset = 0;
 	}
-    assert(last_arena);
-	size_t diff = last_arena->global_offset - target_base;
+	assert(last_arena);
+	size_t diff = last_arena->local_offset - target_base;
 	assert(diff >= 0 && diff <= last_arena->local_offset);
 	arena->local_offset -= diff;
-	arena->global_offset = target_base;
 }
 
-void* Arena::allocate(size_t size, size_t alignment) {
+void arena_ensure_committed(Arena *arena, size_t target_offset) {
+	arena->local_offset = target_offset;
+    if (target_offset <= arena->end_committed) return;
+    size_t commit_size = util::align_pow2(target_offset - arena->end_committed, os::get_page_size());
+    bool commited = os::commit(arena->data + arena->end_committed, commit_size);
+    LUMEN_ASSERT(commited, "Could not commit memory for Arena");
+    arena->end_committed += commit_size;
+}
+
+void* Arena::allocate(size_t size, size_t alignment, Arena** arena_node) {
 	Arena* curr_arena = this;
 	const size_t size_aligned = util::align_pow2(size, alignment);
 
@@ -40,7 +47,6 @@ void* Arena::allocate(size_t size, size_t alignment) {
 	}
 	if (last_block != nullptr) {
 		Arena* new_arena = arena_create(size_aligned, size_aligned, alignment);
-		new_arena->global_offset += end_reserved;
 		last_block->next = new_arena;
 		curr_arena = new_arena;
 
@@ -49,16 +55,11 @@ void* Arena::allocate(size_t size, size_t alignment) {
 	}
 
 	LUMEN_ASSERT(new_pos <= curr_arena->end_reserved, "New position must be within the reserved space of the arena");
-	if (new_pos > curr_arena->end_committed) {
-		size_t commit_size = util::align_pow2(new_pos - curr_arena->end_committed, os::get_page_size());
-		bool commited = os::commit(curr_arena->data + curr_arena->end_committed, commit_size);
-		LUMEN_ASSERT(commited, "Could not commit memory for Arena");
-		curr_arena->end_committed += commit_size;
-	}
+	arena_ensure_committed(curr_arena, new_pos);
 	void* result = curr_arena->data + local_offset_alligned;
-    size_t diff = new_pos - curr_arena->local_offset;
-	curr_arena->local_offset = new_pos;
-    curr_arena->global_offset += diff;
+	if (arena_node) {
+		*arena_node = curr_arena;
+	}
 	return result;
 }
 
@@ -68,14 +69,12 @@ TempArena Arena::temp() {
 	TempArena temp;
 	Arena* last_arena = nullptr;
 	for (Arena* arena = this; arena; last_arena = arena, arena = arena->next);
-    assert(last_arena);
+	assert(last_arena);
 	temp.arena = last_arena;
-	temp.saved_base = last_arena->global_offset;
+	temp.saved_base = last_arena->local_offset;
 	return temp;
 }
-void TempArena::pop() { 
-    arena_pop(arena, saved_base); 
-}
+void TempArena::pop() { arena_pop(arena, saved_base); }
 
 Arena* arena_create(size_t reserve_size, size_t commit_size, size_t header_alignment) {
 	const size_t page_size = os::get_page_size();
@@ -90,7 +89,8 @@ Arena* arena_create(size_t reserve_size, size_t commit_size, size_t header_align
 	reserve_size = util::align_pow2(reserve_size + HEADER_SIZE, page_size);
 	commit_size = util::align_pow2(commit_size + HEADER_SIZE, page_size);
 	void* base = os::reserve(reserve_size);
-	os::commit(base, commit_size);
+	bool commited = os::commit(base, commit_size);
+	assert(commited);
 	if (!base) {
 		LUMEN_ERROR("Could not allocate memory for Arena");
 	}
@@ -98,9 +98,9 @@ Arena* arena_create(size_t reserve_size, size_t commit_size, size_t header_align
 
 	arena->next = nullptr;
 	arena->data = (uint8_t*)base + header_alignment;
-	arena->global_offset = 0;
 	arena->local_offset = 0;
 	arena->end_reserved = reserve_size;
 	arena->end_committed = commit_size;
 	return arena;
 }
+}  // namespace core
