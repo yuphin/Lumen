@@ -2,6 +2,7 @@
 #include "LumenPCH.h"
 #include "ReSTIRPT.h"
 
+using namespace RestirPT;
 // TODO: Make sure that we handle the correct PDF computation in many light sampling (multiple lights with multiple
 // emissives)
 

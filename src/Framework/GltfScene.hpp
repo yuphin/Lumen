@@ -50,7 +50,6 @@
 
 #include <tinygltf/tiny_gltf.h>
 
-namespace lumen {
 #define KHR_LIGHTS_PUNCTUAL_EXTENSION_NAME "KHR_lights_punctual"
 
 // https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_pbrSpecularGlossiness/README.md
@@ -414,5 +413,3 @@ static bool get_attribute(const tinygltf::Model& tmodel, const tinygltf::Primiti
 inline bool has_extension(const tinygltf::ExtensionMap& extensions, const std::string& name) {
 	return extensions.find(name) != extensions.end();
 }
-
-}  // namespace lumen

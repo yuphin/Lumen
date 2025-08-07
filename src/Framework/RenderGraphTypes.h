@@ -49,11 +49,11 @@ struct ResourceBinding {
 	inline vk::DescriptorInfo get_descriptor_info() {
 		if (tex) {
 			if (sampler) {
-				return vk::DescriptorInfo(vk::get_texture_descriptor(tex, sampler));
+				return vk::DescriptorInfo(vk::texture_descriptor(tex, sampler));
 			}
-			return vk::DescriptorInfo(vk::get_texture_descriptor(tex));
+			return vk::DescriptorInfo(vk::texture_descriptor(tex));
 		}
-		return vk::DescriptorInfo(vk::get_buffer_descriptor(buf));
+		return vk::DescriptorInfo(vk::buffer_descriptor(buf));
 	}
 };
 

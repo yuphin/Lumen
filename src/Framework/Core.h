@@ -6,9 +6,9 @@ struct Arena;
 struct ScratchArena {
 	Arena* arena;
 	size_t saved_base;
-    ScratchArena() = delete;
-    ScratchArena(Arena* arena);
-    ~ScratchArena();
+	ScratchArena() = delete;
+	ScratchArena(Arena* arena);
+	~ScratchArena();
 };
 
 struct Arena {
@@ -41,7 +41,7 @@ struct Array {
 		LUMEN_ASSERT(aligned_required_size < diff,
 					 "Not enough space in Arena to allocate Array, consider increasing arena block size by {} bytes",
 					 aligned_required_size - diff);
-	    capacity = new_capacity;
+		capacity = new_capacity;
 		arena_ensure_committed(arena_node, aligned_offset + aligned_required_size);
 	}
 
@@ -96,6 +96,29 @@ Array<T> array_create(Arena* arena, size_t initial_capacity = 0) {
 	arr.capacity = initial_capacity;
 	arr.arena_node = arena_node;
 	return arr;
+}
+
+template <typename T1, typename T2, uint64_t (*hash_func)(const T1&)>
+struct HashMapLinear {
+	struct Entry {
+		uint64_t hash;
+		T1 key;
+		T2 value;
+	};
+
+	size_t size;
+	size_t capacity;
+	Arena* arena_node;
+
+
+	uint64_t hash(const T1& key) const { return hash_func(key); }
+};
+
+template <typename T1, typename T2, uint64_t (*hash_func)(const T1&)>
+HashMapLinear<T1, T2, hash_func> hash_map_create(Arena* arena) {
+	HashMapLinear<T1, T2, hash_func> map;
+	map.arena_node = arena;
+	return map;
 }
 
 }  // namespace core

@@ -6,7 +6,6 @@
 #include <sstream>
 #include "Framework/BBox.h"
 
-namespace lumen {
 #define EXTENSION_ATTRIB_IRAY "NV_attributes_iray"
 
 //--------------------------------------------------------------------------------------------------
@@ -715,5 +714,3 @@ void GltfScene::check_required_extensions(const tinygltf::Model& tmodel) {
 		}
 	}
 }
-
-}  // namespace lumen

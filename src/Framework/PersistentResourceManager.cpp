@@ -112,25 +112,25 @@ VkSampler get_sampler(const VkSamplerCreateInfo& sampler_create_info, bool use_m
 }
 vk::Texture* get_texture(const vk::TextureDesc& texture_desc, bool use_mutex) {
 	vk::Texture* texture = _texture_pool.get(use_mutex);
-	vk::create_texture(texture, texture_desc);
+	vk::texture_create(texture, texture_desc);
 	return texture;
 }
 vk::Buffer* get_buffer(const vk::BufferDesc& texture_desc, bool use_mutex) {
 	vk::Buffer* buffer = _buffer_pool.get(use_mutex);
 	memset(buffer, 0, sizeof(vk::Buffer));
-	vk::create_buffer(buffer, texture_desc);
+	vk::buffer_create(buffer, texture_desc);
 	return buffer;
 }
 
 void remove(vk::Buffer* buffer) {
 	if (!buffer) return;
-	vk::destroy_buffer(buffer);
+	vk::buffer_destroy(buffer);
 	_buffer_pool.remove(buffer);
 	buffer = nullptr;
 }
 void remove(vk::Texture* texture) {
 	if (!texture) return;
-	vk::destroy_texture(texture);
+	vk::texture_destroy(texture);
 	_texture_pool.remove(texture);
 	texture = nullptr;
 }

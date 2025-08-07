@@ -3,17 +3,6 @@
 #include "VkUtils.h"
 
 namespace vk {
-uint32_t find_memory_type(VkPhysicalDevice* physical_device, uint32_t type_filter, VkMemoryPropertyFlags props) {
-	VkPhysicalDeviceMemoryProperties mem_props;
-	vkGetPhysicalDeviceMemoryProperties(*physical_device, &mem_props);
-	for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++) {
-		if ((type_filter & (1 << i)) && (mem_props.memoryTypes[i].propertyFlags & props) == props) {
-			return i;
-		}
-	}
-	LUMEN_ASSERT(true, "Failed to find suitable memory type!");
-	return static_cast<uint32_t>(-1);
-}
 
 void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image, VkImageLayout old_layout,
 							 VkImageLayout new_layout, VkPipelineStageFlags source_stage,
@@ -191,26 +180,6 @@ void transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout o
 	auto dependency_info = vk::dependency_info(1, &img_barrier);
 	vkCmdPipelineBarrier2(cmd, &dependency_info);
 }
-
-VkImageView create_image_view(VkDevice device, const VkImage& img, VkFormat format, VkImageAspectFlags flags) {
-	VkImageView image_view;
-	VkImageViewCreateInfo image_view_CI = vk::image_view();
-	image_view_CI.image = img;
-	image_view_CI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	image_view_CI.format = format;
-	image_view_CI.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-	image_view_CI.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-	image_view_CI.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-	image_view_CI.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-	image_view_CI.subresourceRange.aspectMask = flags;
-	image_view_CI.subresourceRange.baseMipLevel = 0;
-	image_view_CI.subresourceRange.levelCount = 1;
-	image_view_CI.subresourceRange.baseArrayLayer = 0;
-	image_view_CI.subresourceRange.layerCount = 1;
-	vk::check(vkCreateImageView(device, &image_view_CI, nullptr, &image_view));
-	return image_view;
-}
-
 BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertex_address, VkDeviceAddress index_address) {
 	uint32_t maxPrimitiveCount = prim.idx_count / 3;
 
@@ -249,7 +218,7 @@ BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertex_address, Vk
 	return input;
 }
 
-VkPipelineStageFlags get_pipeline_stage(vk::PassType pass_type, VkAccessFlags access_flags) {
+VkPipelineStageFlags pipeline_stage_from_pass_type(vk::PassType pass_type, VkAccessFlags access_flags) {
 	VkPipelineStageFlags res = 0;
 	switch (pass_type) {
 		case vk::PassType::Compute:
@@ -276,7 +245,7 @@ VkPipelineStageFlags get_pipeline_stage(vk::PassType pass_type, VkAccessFlags ac
 	return res;
 }
 
-VkImageLayout get_image_layout(VkDescriptorType type) {
+VkImageLayout image_layout_from_descriptor_type(VkDescriptorType type) {
 	switch (type) {
 		case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
 		case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
@@ -291,21 +260,8 @@ VkImageLayout get_image_layout(VkDescriptorType type) {
 	return VK_IMAGE_LAYOUT_GENERAL;
 }
 
-VkImageCreateInfo make_img2d_ci(const VkExtent2D& size, VkFormat format, VkImageUsageFlags usage, bool mipmaps) {
-	VkImageCreateInfo ici = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
-	ici.imageType = VK_IMAGE_TYPE_2D;
-	ici.format = format;
-	ici.samples = VK_SAMPLE_COUNT_1_BIT;
-	ici.mipLevels = mipmaps ? calc_mip_levels(size) : 1;
-	ici.arrayLayers = 1;
-	ici.extent.width = size.width;
-	ici.extent.height = size.height;
-	ici.extent.depth = 1;
-	ici.usage = usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	return ici;
-}
 
-VkImageLayout get_target_img_layout(const vk::Texture* tex, VkAccessFlags access_flags) {
+VkImageLayout image_layout_from_tex(const vk::Texture* tex, VkAccessFlags access_flags) {
 	if ((tex->usage_flags & VK_IMAGE_USAGE_SAMPLED_BIT) && access_flags == VK_ACCESS_SHADER_READ_BIT) {
 		return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	}

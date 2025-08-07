@@ -7,9 +7,8 @@
 #include "VulkanContext.h"
 #include "DynamicResourceManager.h"
 #include "VulkanStructs.h"
-
 namespace vk {
-void create_buffer(Buffer* buffer, const BufferDesc& desc) {
+void buffer_create(Buffer* buffer, const BufferDesc& desc) {
 	buffer->name = desc.name;
 	buffer->size = desc.size;
 	buffer->usage_flags = desc.usage;
@@ -69,7 +68,7 @@ void create_buffer(Buffer* buffer, const BufferDesc& desc) {
 	}
 }
 
-VkDescriptorBufferInfo get_buffer_descriptor(const vk::Buffer* buffer) {
+VkDescriptorBufferInfo buffer_descriptor(const vk::Buffer* buffer) {
 	VkDescriptorBufferInfo buffer_info = {};
 	buffer_info.buffer = buffer->handle;
 	buffer_info.offset = 0;
@@ -77,7 +76,7 @@ VkDescriptorBufferInfo get_buffer_descriptor(const vk::Buffer* buffer) {
 	return buffer_info;
 }
 
-void destroy_buffer(Buffer* buffer) { vmaDestroyBuffer(vk::context().allocator, buffer->handle, buffer->allocation); }
+void buffer_destroy(Buffer* buffer) { vmaDestroyBuffer(vk::context().allocator, buffer->handle, buffer->allocation); }
 
 void write_buffer(Buffer* buffer, void* data, size_t size) {
 	VkMemoryPropertyFlags mem_prop_flags;
@@ -91,7 +90,7 @@ void write_buffer(Buffer* buffer, void* data, size_t size) {
 	vmaFlushAllocation(vk::context().allocator, buffer->allocation, 0, size);
 }
 
-void* map_buffer(Buffer* buffer) {
+void* buffer_map(Buffer* buffer) {
 	VkMemoryPropertyFlags mem_prop_flags;
 	vmaGetAllocationMemoryProperties(vk::context().allocator, buffer->allocation, &mem_prop_flags);
 	LUMEN_ASSERT((mem_prop_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0, "Buffer is not host visible");
@@ -99,6 +98,6 @@ void* map_buffer(Buffer* buffer) {
 	vmaMapMemory(vk::context().allocator, buffer->allocation, &memory);
 	return memory;
 }
-void unmap_buffer(Buffer* buffer) { vmaUnmapMemory(vk::context().allocator, buffer->allocation); }
+void buffer_unmap(Buffer* buffer) { vmaUnmapMemory(vk::context().allocator, buffer->allocation); }
 
 }  // namespace vk

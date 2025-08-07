@@ -39,11 +39,11 @@ struct Buffer {
 	}
 };
 
-void create_buffer(Buffer* buffer, const BufferDesc& desc);
-VkDescriptorBufferInfo get_buffer_descriptor(const Buffer* buffer);
-void destroy_buffer(Buffer* buffer);
+void buffer_create(Buffer* buffer, const BufferDesc& desc);
+VkDescriptorBufferInfo buffer_descriptor(const Buffer* buffer);
+void buffer_destroy(Buffer* buffer);
 void write_buffer(Buffer* buffer, void* data, size_t size);
-void* map_buffer(Buffer* buffer);
-void unmap_buffer(Buffer* buffer);
+void* buffer_map(Buffer* buffer);
+void buffer_unmap(Buffer* buffer);
 
 }  // namespace vk

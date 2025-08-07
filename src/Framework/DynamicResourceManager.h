@@ -9,10 +9,6 @@ namespace vk {
     struct TextureDesc;
 
 }
-namespace lumen {
-    class Texture;
-}
-
 namespace drm {
 
 vk::Buffer* get(const vk::BufferDesc& desc);

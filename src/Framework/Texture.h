@@ -44,14 +44,14 @@ struct Texture {
 	VmaAllocation allocation = VK_NULL_HANDLE;
 };
 
-void create_texture(Texture* texture, const TextureDesc& desc);
-void destroy_texture(Texture* texture);
+void texture_create(Texture* texture, const TextureDesc& desc);
+void texture_destroy(Texture* texture);
 
-VkDescriptorImageInfo get_texture_descriptor(const Texture* tex, VkSampler sampler, VkImageLayout layout);
-VkDescriptorImageInfo get_texture_descriptor(const Texture* tex, VkImageLayout layout);
-VkDescriptorImageInfo get_texture_descriptor(const Texture* tex, VkSampler sampler);
-VkDescriptorImageInfo get_texture_descriptor(const Texture* tex);
-void force_transition_texture(Texture* tex, VkCommandBuffer cmd, VkImageLayout old_layout, VkImageLayout new_layout);
-void transition_texture(Texture* tex, VkCommandBuffer cmd, VkImageLayout new_layout);
+VkDescriptorImageInfo texture_descriptor(const Texture* tex, VkSampler sampler, VkImageLayout layout);
+VkDescriptorImageInfo texture_descriptor(const Texture* tex, VkImageLayout layout);
+VkDescriptorImageInfo texture_descriptor(const Texture* tex, VkSampler sampler);
+VkDescriptorImageInfo texture_descriptor(const Texture* tex);
+void texture_force_transition(Texture* tex, VkCommandBuffer cmd, VkImageLayout old_layout, VkImageLayout new_layout);
+void texture_transition(Texture* tex, VkCommandBuffer cmd, VkImageLayout new_layout);
 
 }  // namespace vk

@@ -7,10 +7,6 @@
 #include "DynamicResourceManager.h"
 
 namespace lumen {
-#define DIRTY_CHECK(x) \
-	if (!(x)) {        \
-		return *this;  \
-	}
 
 static bool is_read_flag(VkAccessFlags flags) {
 	return flags &
@@ -130,8 +126,8 @@ void RenderPass::transition_resources() {
 			ResourceBinding& bound_resource = pipeline_storage->bound_resources[i];
 			if (!bound_resource.active) {
 				if (bound_resource.tex) {
-					descriptor_infos[i] = vk::get_texture_descriptor(
-						bound_resource.tex, vk::get_image_layout(pipeline_storage->pipeline->descriptor_types[i]));
+					descriptor_infos[i] = vk::texture_descriptor(
+						bound_resource.tex, vk::image_layout_from_descriptor_type(pipeline_storage->pipeline->descriptor_types[i]));
 				} else {
 					descriptor_infos[i] = pipeline_storage->bound_resources[i].get_descriptor_info();
 				}
@@ -620,7 +616,7 @@ void RenderPass::write_impl(const vk::Buffer* buffer, VkAccessFlags access_flags
 }
 
 void RenderPass::write_impl(vk::Texture* tex, VkAccessFlags access_flags) {
-	VkImageLayout target_layout = vk::get_target_img_layout(tex, access_flags);
+	VkImageLayout target_layout = vk::image_layout_from_tex(tex, access_flags);
 	register_dependencies(tex, target_layout);
 	rg->img_resource_map[tex->handle] = pass_idx;
 }
@@ -631,7 +627,7 @@ void RenderPass::read_impl(const vk::Buffer* buffer, VkAccessFlags access_flags,
 }
 
 void RenderPass::read_impl(vk::Texture* tex) {
-	VkImageLayout target_layout = vk::get_target_img_layout(tex, VK_ACCESS_SHADER_READ_BIT);
+	VkImageLayout target_layout = vk::image_layout_from_tex(tex, VK_ACCESS_SHADER_READ_BIT);
 	register_dependencies(tex, target_layout);
 	rg->img_resource_map[tex->handle] = pass_idx;
 }
@@ -660,8 +656,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		}
 		buffer_sync.buffer_bariers[i] =
 			vk::buffer_barrier2(k, v.src_access_flags, v.dst_access_flags,
-								vk::get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, v.src_access_flags),
-								vk::get_pipeline_stage(type, v.dst_access_flags));
+								vk::pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, v.src_access_flags),
+								vk::pipeline_stage_from_pass_type(type, v.dst_access_flags));
 		buffer_sync.dependency_infos[i] = vk::dependency_info(1, &buffer_sync.buffer_bariers[i]);
 		if (use_events) {
 			wait_events.push_back(rg->passes[v.opposing_pass_idx].set_signals_buffer[k].event);
@@ -687,8 +683,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		if (!prefill_buffer_barriers.empty()) {
 			buffer_memory_barriers.reserve(prefill_buffer_barriers.size());
 			for (auto& barrier : prefill_buffer_barriers) {
-				auto curr_stage = vk::get_pipeline_stage(type, barrier.src_access_flags);
-				auto dst_stage = vk::get_pipeline_stage(type, barrier.dst_access_flags);
+				auto curr_stage = vk::pipeline_stage_from_pass_type(type, barrier.src_access_flags);
+				auto dst_stage = vk::pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
 				buffer_memory_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
 																	 barrier.dst_access_flags, curr_stage, dst_stage));
 			}
@@ -711,8 +707,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		if (!buffer_barriers.empty()) {
 			buffer_memory_barriers.reserve(buffer_barriers.size());
 			for (auto& barrier : buffer_barriers) {
-				auto curr_stage = vk::get_pipeline_stage(type, barrier.src_access_flags);
-				auto dst_stage = vk::get_pipeline_stage(type, barrier.dst_access_flags);
+				auto curr_stage = vk::pipeline_stage_from_pass_type(type, barrier.src_access_flags);
+				auto dst_stage = vk::pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
 				buffer_memory_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
 																	 barrier.dst_access_flags, curr_stage, dst_stage));
 			}
@@ -731,8 +727,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		}
 		auto src_access_flags = vk::access_flags_for_img_layout(v.old_layout);
 		auto dst_access_flags = vk::access_flags_for_img_layout(v.new_layout);
-		auto src_stage = vk::get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, src_access_flags);
-		auto dst_stage = vk::get_pipeline_stage(type, dst_access_flags);
+		auto src_stage = vk::pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, src_access_flags);
+		auto dst_stage = vk::pipeline_stage_from_pass_type(type, dst_access_flags);
 		img_sync.img_barriers[i] =
 			vk::image_barrier2(k, src_access_flags, dst_access_flags, v.old_layout, v.new_layout, v.image_aspect,
 							   src_stage, dst_stage, vk::context().queue_indices.gfx_family.value());
@@ -756,7 +752,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 	// Transition layouts inside the pass
 	for (auto& [tex, old_layout, dst_layout] : layout_transitions) {
-		vk::force_transition_texture(tex, cmd, old_layout, dst_layout);
+		vk::texture_force_transition(tex, cmd, old_layout, dst_layout);
 	}
 
 	// Push descriptors
@@ -832,14 +828,14 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				std::vector<VkRenderingAttachmentInfo> rendering_attachments;
 				rendering_attachments.reserve(color_outputs.size());
 				for (vk::Texture* color_output : color_outputs) {
-					vk::transition_texture(color_output, cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+					vk::texture_transition(color_output, cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 					rendering_attachments.push_back(vk::rendering_attachment_info(
 						color_output->view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ATTACHMENT_LOAD_OP_CLEAR,
 						VK_ATTACHMENT_STORE_OP_STORE, gfx_settings->clear_color));
 				}
 				VkRenderingAttachmentInfo depth_stencil_attachment;
 				if (depth_output) {
-					vk::transition_texture(depth_output, cmd, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+					vk::texture_transition(depth_output, cmd, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 					depth_stencil_attachment = vk::rendering_attachment_info(
 						depth_output->view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_ATTACHMENT_LOAD_OP_CLEAR,
 						VK_ATTACHMENT_STORE_OP_STORE, gfx_settings->clear_depth_stencil);
@@ -863,7 +859,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 					// If the texture is a swapchain image, it should be presented
 					bool should_present = color_output->allocation == VK_NULL_HANDLE;
 					if (should_present) {
-						vk::transition_texture(color_output, cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+						vk::texture_transition(color_output, cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 					}
 				}
 				break;
@@ -879,8 +875,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		if (!post_execution_buffer_barriers.empty()) {
 			post_execution_buffer_memory_barriers.reserve(post_execution_buffer_barriers.size());
 			for (auto& barrier : post_execution_buffer_barriers) {
-				auto curr_stage = vk::get_pipeline_stage(type, barrier.src_access_flags);
-				auto dst_stage = vk::get_pipeline_stage(type, barrier.dst_access_flags);
+				auto curr_stage = vk::pipeline_stage_from_pass_type(type, barrier.src_access_flags);
+				auto dst_stage = vk::pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
 				post_execution_buffer_memory_barriers.push_back(vk::buffer_barrier2(
 					barrier.buffer, barrier.src_access_flags, barrier.dst_access_flags, curr_stage, dst_stage));
 			}
@@ -901,15 +897,15 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				region.imageSubresource.layerCount = 1;
 				region.imageExtent = src.tex->extent;
 				VkImageLayout old_layout = src.tex->layout;
-				vk::transition_texture(src.tex, cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+				vk::texture_transition(src.tex, cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 				vkCmdCopyImageToBuffer(cmd, src.tex->handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst.buf->handle, 1,
 									   &region);
-				vk::transition_texture(src.tex, cmd, old_layout);
+				vk::texture_transition(src.tex, cmd, old_layout);
 			} else {
 				LUMEN_ASSERT(src.tex->aspect_flags == dst.tex->aspect_flags, "Aspect flags mismatch");
 				VkImageCopy region = {};
-				vk::transition_texture(src.tex, cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-				vk::transition_texture(dst.tex, cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+				vk::texture_transition(src.tex, cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+				vk::texture_transition(dst.tex, cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 				region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 				region.srcSubresource.layerCount = 1;
 				region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -934,12 +930,12 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 		if (tlas_build_data.build_tlas_after_blas) {
 			LUMEN_ASSERT(tlas_build_data.tlas, "TLAS reference is null");
-			void* instance_data = vk::map_buffer(tlas_build_data.instances_buf);
+			void* instance_data = vk::buffer_map(tlas_build_data.instances_buf);
 			for (size_t i = 0; i < blas_build_data.blases.size; i++) {
 				VkAccelerationStructureInstanceKHR* instance = (VkAccelerationStructureInstanceKHR*)instance_data + i;
 				instance->accelerationStructureReference = blas_build_data.blases[i].get_device_address();
 			}
-			vk::unmap_buffer(tlas_build_data.instances_buf);
+			vk::buffer_unmap(tlas_build_data.instances_buf);
 #if 0
 			// TODO: Do we need a barrier here?
 			std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
@@ -967,8 +963,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	for (const auto& [k, v] : set_signals_buffer) {
 		LUMEN_ASSERT(v.event == nullptr, "VkEvent should be null in the setter");
 		VkBufferMemoryBarrier2 mem_barrier = vk::buffer_barrier2(
-			k, v.src_access_flags, v.dst_access_flags, vk::get_pipeline_stage(type, v.src_access_flags),
-			vk::get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, v.dst_access_flags));
+			k, v.src_access_flags, v.dst_access_flags, vk::pipeline_stage_from_pass_type(type, v.src_access_flags),
+			vk::pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, v.dst_access_flags));
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);
 
 		if (use_events) {
@@ -984,8 +980,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		auto dst_access_flags = vk::access_flags_for_img_layout(v.new_layout);
 		auto mem_barrier = vk::image_barrier2(
 			k, vk::access_flags_for_img_layout(v.old_layout), vk::access_flags_for_img_layout(v.new_layout),
-			v.old_layout, v.new_layout, v.image_aspect, vk::get_pipeline_stage(type, src_access_flags),
-			vk::get_pipeline_stage(rg->passes[v.opposing_pass_idx].type, dst_access_flags),
+			v.old_layout, v.new_layout, v.image_aspect, vk::pipeline_stage_from_pass_type(type, src_access_flags),
+			vk::pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, dst_access_flags),
 			vk::context().queue_indices.gfx_family.value());
 
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);

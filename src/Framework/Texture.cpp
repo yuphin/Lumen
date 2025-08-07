@@ -57,7 +57,7 @@ static void cmd_generate_mipmaps2(vk::Texture* texture, const VkImageCreateInfo&
 
 namespace vk {
 
-VkImageAspectFlags get_aspect_flags(VkFormat format) {
+static VkImageAspectFlags aspect_flags(VkFormat format) {
 	VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_NONE;
 	switch (format) {
 		case VK_FORMAT_S8_UINT:
@@ -78,12 +78,12 @@ VkImageAspectFlags get_aspect_flags(VkFormat format) {
 	}
 	return aspect_flags;
 }
-void create_texture(Texture* texture, const TextureDesc& desc) {
+void texture_create(Texture* texture, const TextureDesc& desc) {
 	texture->name = desc.name;
 	texture->extent = desc.dimensions;
 	texture->format = desc.format;
 	texture->usage_flags = desc.usage;
-	texture->aspect_flags = get_aspect_flags(texture->format);
+	texture->aspect_flags = aspect_flags(texture->format);
 	texture->mip_levels =
 		desc.calc_mips ? calc_mip_levels(VkExtent2D(desc.dimensions.width, desc.dimensions.height)) : desc.num_mips;
 	texture->array_layers = desc.array_layers;
@@ -190,21 +190,21 @@ void create_texture(Texture* texture, const TextureDesc& desc) {
 														 texture->mip_levels, texture->array_layers);
 	vk::check(vkCreateImageView(vk::context().device, &image_view_ci, nullptr, &texture->view));
 }
-void destroy_texture(Texture* texture) {
+void texture_destroy(Texture* texture) {
 	if (texture->allocation) {
 		vmaDestroyImage(vk::context().allocator, texture->handle, texture->allocation);
 	}
 	vkDestroyImageView(vk::context().device, texture->view, nullptr);
 }
 
-VkDescriptorImageInfo get_texture_descriptor(const Texture* tex, VkSampler sampler, VkImageLayout layout) {
+VkDescriptorImageInfo texture_descriptor(const Texture* tex, VkSampler sampler, VkImageLayout layout) {
 	VkDescriptorImageInfo desc_info;
 	desc_info.sampler = sampler;
 	desc_info.imageView = tex->view;
 	desc_info.imageLayout = layout;
 	return desc_info;
 }
-VkDescriptorImageInfo get_texture_descriptor(const Texture* tex, VkImageLayout layout) {
+VkDescriptorImageInfo texture_descriptor(const Texture* tex, VkImageLayout layout) {
 	// LUMEN_ASSERT(!present && sampler, "Sampler not found");
 	VkDescriptorImageInfo desc_info;
 	desc_info.sampler = tex->sampler;
@@ -212,14 +212,14 @@ VkDescriptorImageInfo get_texture_descriptor(const Texture* tex, VkImageLayout l
 	desc_info.imageLayout = layout;
 	return desc_info;
 }
-VkDescriptorImageInfo get_texture_descriptor(const Texture* tex, VkSampler sampler) {
+VkDescriptorImageInfo texture_descriptor(const Texture* tex, VkSampler sampler) {
 	VkDescriptorImageInfo desc_info;
 	desc_info.sampler = sampler;
 	desc_info.imageView = tex->view;
 	desc_info.imageLayout = tex->layout;
 	return desc_info;
 }
-VkDescriptorImageInfo get_texture_descriptor(const Texture* tex) {
+VkDescriptorImageInfo texture_descriptor(const Texture* tex) {
 	// LUMEN_ASSERT(!present && sampler, "Sampler not found");
 	VkDescriptorImageInfo desc_info;
 	desc_info.sampler = tex->sampler;
@@ -228,7 +228,7 @@ VkDescriptorImageInfo get_texture_descriptor(const Texture* tex) {
 	return desc_info;
 }
 
-void force_transition_texture(Texture* tex, VkCommandBuffer cmd, VkImageLayout old_layout, VkImageLayout new_layout) {
+void texture_force_transition(Texture* tex, VkCommandBuffer cmd, VkImageLayout old_layout, VkImageLayout new_layout) {
 	VkImageSubresourceRange subresource_range = {};
 	subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	subresource_range.baseArrayLayer = 0;
@@ -238,7 +238,7 @@ void force_transition_texture(Texture* tex, VkCommandBuffer cmd, VkImageLayout o
 	vk::transition_image_layout(cmd, tex->handle, old_layout, new_layout, subresource_range, tex->aspect_flags);
 }
 
-void transition_texture(Texture* tex, VkCommandBuffer cmd, VkImageLayout new_layout) {
+void texture_transition(Texture* tex, VkCommandBuffer cmd, VkImageLayout new_layout) {
 	if (tex->layout == new_layout) {
 		return;
 	}

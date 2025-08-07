@@ -463,16 +463,16 @@ float RayTracer::draw_frame() {
 
 	if (write_exr) {
 		write_exr = false;
-		ImageUtils::save_exr((float*)vk::map_buffer(output_img_buffer_cpu), Window::width(), Window::height(),
+		ImageUtils::save_exr((float*)vk::buffer_map(output_img_buffer_cpu), Window::width(), Window::height(),
 							 "out.exr");
-		vk::unmap_buffer(output_img_buffer_cpu);
+		vk::buffer_unmap(output_img_buffer_cpu);
 	}
 	bool time_limit = (abs(diff / CLOCKS_PER_SEC - 5)) < 0.1;
 	calc_rmse = time_limit;
 
 	if (calc_rmse && has_gt) {
-		float rmse = *(float*)vk::map_buffer(rmse_val_buffer);
-		vk::unmap_buffer(rmse_val_buffer);
+		float rmse = *(float*)vk::buffer_map(rmse_val_buffer);
+		vk::buffer_unmap(rmse_val_buffer);
 		LUMEN_TRACE("RMSE {}", rmse * 1e6);
 		start = now;
 	}

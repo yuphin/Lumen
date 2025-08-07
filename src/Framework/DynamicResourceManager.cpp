@@ -49,24 +49,24 @@ thread_local DynamicPool<vk::Texture> _texture_pool;
 
 vk::Buffer* get(const vk::BufferDesc& desc) {
 	auto buffer = _buffer_pool.get();
-	vk::create_buffer(buffer, desc);
+	vk::buffer_create(buffer, desc);
 	return buffer;
 }
 vk::Texture* get(const vk::TextureDesc& desc) {
 	auto tex = _texture_pool.get();
-	vk::create_texture(tex, desc);
+	vk::texture_create(tex, desc);
 	return tex;
 }
 
 void destroy(vk::Buffer* buffer) {
 	if (buffer == nullptr) return;
-	vk::destroy_buffer(buffer);
+	vk::buffer_destroy(buffer);
 	_buffer_pool.remove(buffer);
 	buffer = nullptr;
 }
 void destroy(vk::Texture* tex) {
 	if (tex == nullptr) return;
-	vk::destroy_texture(tex);
+	vk::texture_destroy(tex);
 	_texture_pool.remove(tex);
 	tex = nullptr;
 }
