@@ -1,4 +1,3 @@
-#include <LumenPCH.h>
 struct Bbox {
 	Bbox() = default;
 	Bbox(glm::vec3 _min, glm::vec3 _max) : m_min(_min), m_max(_max) {}

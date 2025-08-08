@@ -1,9 +1,9 @@
 
-#include "LumenPCH.h"
 #include "AccelerationStructure.h"
 #include "VkUtils.h"
 #include "PersistentResourceManager.h"
 #include "DynamicResourceManager.h"
+#include "Framework/CommandBuffer.h"
 
 namespace vk {
 static constexpr size_t BATCH_LIMIT = 256'000'000;	// 256 MB
@@ -57,11 +57,11 @@ static void cmd_create_blas(VkCommandBuffer cmd_buf, std::vector<uint32_t> indic
 		VkAccelerationStructureCreateInfoKHR as_ci{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
 		as_ci.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 		as_ci.size = build_as[idx].size_info.accelerationStructureSize;	 // Will be used to allocate memory.
-		if(!build_as[idx].as->accel) {
+		if (!build_as[idx].as->accel) {
 			*build_as[idx].as = create_acceleration(as_ci, "BLAS buffer");
 		}
 		// BuildInfo #2 part
-		build_as[idx].build_info.dstAccelerationStructure = build_as[idx].as->accel;	 // Setting where the build lands
+		build_as[idx].build_info.dstAccelerationStructure = build_as[idx].as->accel;  // Setting where the build lands
 		build_as[idx].build_info.scratchData.deviceAddress =
 			scratchAddress;	 // All build are using the same scratch buffer
 		// Building the bottom-level-acceleration-structure
@@ -106,7 +106,8 @@ static void cmd_compact_blas(VkCommandBuffer cmd_buf, std::vector<uint32_t> indi
 		asCreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 		*build_as[idx].as = create_acceleration(asCreateInfo, "BLAS compact buffer");
 
-		LUMEN_ASSERT(build_as[idx].as->accel != build_as[idx].cleanup_as.accel, "BLAS compacted AS is the same as the original AS");
+		LUMEN_ASSERT(build_as[idx].as->accel != build_as[idx].cleanup_as.accel,
+					 "BLAS compacted AS is the same as the original AS");
 		// Copy the original BLAS to a compact version
 		VkCopyAccelerationStructureInfoKHR copyInfo{VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR};
 		copyInfo.src = build_as[idx].build_info.dstAccelerationStructure;
@@ -395,6 +396,44 @@ void build_tlas(BVH& tlas, vk::Buffer* instances_buf, uint32_t instance_count,
 	// Creating the TLAS
 	cmd_create_tlas(tlas, cmd_buf, instance_count, scratch_buffer_ref, /*export_scratch_buffer=*/true,
 					instances_buf->get_device_address(), flags, update);
+}
+
+BlasInput to_vk_geometry(uint32_t vtx_count, uint32_t idx_count, uint32_t vtx_offset, uint32_t first_idx,
+						 VkDeviceAddress vertex_address, VkDeviceAddress index_address) {
+	uint32_t maxPrimitiveCount = idx_count / 3;
+
+	// Describe buffer as array of VertexObj.
+	VkAccelerationStructureGeometryTrianglesDataKHR triangles{
+		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR};
+	triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;  // vec3 vertex position data.
+	triangles.vertexData.deviceAddress = vertex_address;
+	triangles.vertexStride = sizeof(glm::vec3);
+	// Describe index data (32-bit unsigned int)
+	triangles.indexType = VK_INDEX_TYPE_UINT32;
+	triangles.indexData.deviceAddress = index_address;
+	// Indicate identity transform by setting transformData to null device
+	// pointer.
+	// triangles.transformData = {};
+	triangles.maxVertex = vtx_count;
+
+	// Identify the above data as containing opaque triangles.
+	VkAccelerationStructureGeometryKHR asGeom{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
+	asGeom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+	asGeom.flags = VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;	 // For AnyHit
+	asGeom.geometry.triangles = triangles;
+
+	VkAccelerationStructureBuildRangeInfoKHR offset;
+	offset.firstVertex = vtx_offset;
+	offset.primitiveCount = maxPrimitiveCount;
+	offset.primitiveOffset = first_idx * sizeof(uint32_t);
+	offset.transformOffset = 0;
+
+	// Our blas is made from only one geometry, but could be made of many
+	// geometries
+	BlasInput input;
+	input.as_geom.emplace_back(asGeom);
+	input.as_build_offset_info.emplace_back(offset);
+	return input;
 }
 
 }  // namespace vk

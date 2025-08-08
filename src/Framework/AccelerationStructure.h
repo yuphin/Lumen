@@ -1,7 +1,6 @@
 
 
 #pragma once
-#include "../LumenPCH.h"
 #include "Buffer.h"
 namespace vk {
 
@@ -35,4 +34,5 @@ void build_tlas(BVH& tlas, vk::Buffer* instances_buf, uint32_t instance_count,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer_ref,
 				bool update = false);
 
+BlasInput to_vk_geometry(uint32_t vtx_count, uint32_t idx_count, uint32_t vtx_offset, uint32_t first_idx, VkDeviceAddress vertex_address, VkDeviceAddress index_address);
 }  // namespace vk

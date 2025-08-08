@@ -1,5 +1,4 @@
 #include "Framework/RenderGraph.h"
-#include "LumenPCH.h"
 #include "ReSTIRGI.h"
 
 void ReSTIRGI::init() {
@@ -69,7 +68,7 @@ void ReSTIRGI::init() {
 	pc_ray.total_frame_num = 0;
 	pc_ray.world_radius = lumen_scene->m_dimensions.radius;
 	assert(vk::render_graph()->settings.shader_inference == true);
-	lumen::RenderGraph* rg = vk::render_graph();
+	lm::RenderGraph* rg = vk::render_graph();
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, restir_samples_addr, restir_samples_buffer, rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, restir_samples_old_addr, restir_samples_old_buffer, rg);
@@ -91,7 +90,7 @@ void ReSTIRGI::render() {
 	pc_ray.enable_accumulation = enable_accumulation;
 	pc_ray.frame_num = frame_num;
 
-	const std::initializer_list<lumen::ResourceBinding> rt_bindings = {
+	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
 		lumen_scene->scene_desc_buffer,

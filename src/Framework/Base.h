@@ -1,7 +1,6 @@
 
-#include "LumenPCH.h"
 
-namespace core {
+namespace lm {
 struct Arena;
 struct ScratchArena {
 	Arena* arena;
@@ -106,19 +105,27 @@ struct HashMapLinear {
 		T2 value;
 	};
 
-	size_t size;
-	size_t capacity;
-	Arena* arena_node;
-
+	Entry* data = nullptr;
+	size_t size = 0;
+	size_t capacity = 0;
+	Arena* arena_node = nullptr;
 
 	uint64_t hash(const T1& key) const { return hash_func(key); }
 };
 
+inline constexpr size_t HASH_MAP_LINEAR_MIN_CAPACITY = 32;
 template <typename T1, typename T2, uint64_t (*hash_func)(const T1&)>
 HashMapLinear<T1, T2, hash_func> hash_map_create(Arena* arena) {
+	using HashMapEntryType = typename HashMapLinear<T1, T2, hash_func>::Entry;
 	HashMapLinear<T1, T2, hash_func> map;
 	map.arena_node = arena;
+	map.size = map.capacity = HASH_MAP_LINEAR_MIN_CAPACITY;
+
+	Arena* arena_node;
+	map.data = (HashMapEntryType*)arena->allocate(HASH_MAP_LINEAR_MIN_CAPACITY * sizeof(HashMapEntryType),
+												  alignof(HashMapEntryType), &arena_node);
+	map.arena_node = arena_node;
 	return map;
 }
 
-}  // namespace core
+}  // namespace lm

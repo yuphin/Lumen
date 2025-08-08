@@ -1,5 +1,4 @@
 #pragma once
-#include "../LumenPCH.h"
 #include "VulkanContext.h"
 namespace vk {
 

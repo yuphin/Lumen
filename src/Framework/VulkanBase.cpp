@@ -1,4 +1,3 @@
-#include "LumenPCH.h"
 #include "Framework/VulkanContext.h"
 #include "RenderGraph.h"
 #include "VulkanContext.h"
@@ -26,7 +25,7 @@ std::vector<VkSemaphore> _render_finished_sem;
 std::vector<VkFence> _in_flight_fences;
 std::vector<VkFence> _images_in_flight;
 std::vector<VkQueueFamilyProperties> _queue_families;
-std::unique_ptr<lumen::RenderGraph> _rg;
+std::unique_ptr<lm::RenderGraph> _rg;
 VkFormat _swapchain_format;
 
 std::vector<Texture*> _swapchain_images;
@@ -593,7 +592,7 @@ static void create_instance() {
 	if (_enable_validation_layers && !check_validation_layer_support()) {
 		LUMEN_ERROR("Validation layers requested, but not available!");
 	}
-	_rg = std::make_unique<lumen::RenderGraph>();
+	_rg = std::make_unique<lm::RenderGraph>();
 	if (_enable_validation_layers) {
 		setup_debug_messenger();
 	}
@@ -767,7 +766,7 @@ VkResult submit_frame(uint32_t image_idx) {
 	return result;
 }
 
-lumen::RenderGraph* render_graph() { return _rg.get(); }
+lm::RenderGraph* render_graph() { return _rg.get(); }
 
 void cleanup_app_data() { _rg->destroy(); }
 

@@ -1,4 +1,3 @@
-#include "../LumenPCH.h"
 #include "Shader.h"
 #include "RenderGraph.h"
 #include <spirv_cross/spirv.h>
@@ -142,7 +141,7 @@ static bool is_buffer(uint32_t storage_class) {
 }
 
 static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::ShaderResources& resources, Shader& shader,
-						const uint32_t* code, size_t code_size, lumen::RenderPass* pass) {
+						const uint32_t* code, size_t code_size, lm::RenderPass* pass) {
 	// Update the resource status of image types
 	// Storage Image -> Write
 	// Sampled Image -> Read
@@ -392,7 +391,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 	}
 }
 
-static void parse_shader(Shader& shader, const uint32_t* code, size_t code_size, lumen::RenderPass* pass) {
+static void parse_shader(Shader& shader, const uint32_t* code, size_t code_size, lm::RenderPass* pass) {
 	spirv_cross::CompilerGLSL glsl(code, code_size);
 	spirv_cross::ShaderResources resources = glsl.get_shader_resources();
 
@@ -467,7 +466,7 @@ static std::unordered_map<std::string, shaderc_shader_kind> mstages = {
 };
 
 static std::vector<uint32_t> compile_file(const std::string& source_name, shaderc_shader_kind kind,
-										  const std::string& source, lumen::RenderPass* pass, bool optimize = false) {
+										  const std::string& source, lm::RenderPass* pass, bool optimize = false) {
 	shaderc::Compiler compiler;
 	shaderc::CompileOptions options;
 
@@ -507,7 +506,7 @@ static std::vector<uint32_t> compile_file(const std::string& source_name, shader
 #endif
 
 Shader::Shader(const std::string& filename) : filename(filename) {}
-int Shader::compile(lumen::RenderPass* pass) {
+int Shader::compile(lm::RenderPass* pass) {
 	LUMEN_TRACE("Compiling shader: {0}", name_with_macros);
 #if USE_SHADERC
 	std::ifstream fin(filename);
@@ -568,4 +567,4 @@ VkShaderModule Shader::create_vk_shader_module(const VkDevice& device) const {
 	}
 	return shader_module;
 }
-}  // namespace lumen
+}  // namespace lm

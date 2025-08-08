@@ -1,4 +1,3 @@
-#include "LumenPCH.h"
 #include "Integrator.h"
 #include "shaders/commons.h"
 #include <Framework/Window.h>
@@ -6,7 +5,7 @@
 #include "Framework/VkUtils.h"
 
 void Integrator::init() {
-	lumen::Camera* cam_ptr = lumen_scene->camera.get();
+	lm::Camera* cam_ptr = lumen_scene->camera.get();
 	Window::add_mouse_click_callback([this](MouseAction button, KeyAction action, double x, double y) {
 		if (ImGui::GetIO().WantCaptureMouse) {
 			return;
@@ -134,7 +133,8 @@ void Integrator::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 	VkDeviceAddress vertex_address = lumen_scene->vertex_buffer->get_device_address();
 	VkDeviceAddress idx_address = lumen_scene->index_buffer->get_device_address();
 	for (auto& prim_mesh : lumen_scene->prim_meshes) {
-		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh, vertex_address, idx_address);
+		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh.vtx_count, prim_mesh.idx_count, prim_mesh.vtx_offset,
+											   prim_mesh.first_idx, vertex_address, idx_address);
 		blas_inputs.push_back({geo});
 	}
 	vk::build_blas(blases, blas_inputs,

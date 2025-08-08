@@ -1,4 +1,3 @@
-#include "../LumenPCH.h"
 #include "RayTracer/LumenScene.h"
 #include "VkUtils.h"
 
@@ -180,70 +179,6 @@ void transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout o
 	auto dependency_info = vk::dependency_info(1, &img_barrier);
 	vkCmdPipelineBarrier2(cmd, &dependency_info);
 }
-BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertex_address, VkDeviceAddress index_address) {
-	uint32_t maxPrimitiveCount = prim.idx_count / 3;
-
-	// Describe buffer as array of VertexObj.
-	VkAccelerationStructureGeometryTrianglesDataKHR triangles{
-		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR};
-	triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;  // vec3 vertex position data.
-	triangles.vertexData.deviceAddress = vertex_address;
-	triangles.vertexStride = sizeof(glm::vec3);
-	// Describe index data (32-bit unsigned int)
-	triangles.indexType = VK_INDEX_TYPE_UINT32;
-	triangles.indexData.deviceAddress = index_address;
-	// Indicate identity transform by setting transformData to null device
-	// pointer.
-	// triangles.transformData = {};
-	triangles.maxVertex = prim.vtx_count;
-
-	// Identify the above data as containing opaque triangles.
-	VkAccelerationStructureGeometryKHR asGeom{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
-	asGeom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-	asGeom.flags = VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;	 // For AnyHit
-	asGeom.geometry.triangles = triangles;
-
-	VkAccelerationStructureBuildRangeInfoKHR offset;
-	offset.firstVertex = prim.vtx_offset;
-	offset.primitiveCount = maxPrimitiveCount;
-	offset.primitiveOffset = prim.first_idx * sizeof(uint32_t);
-	offset.transformOffset = 0;
-
-	// Our blas is made from only one geometry, but could be made of many
-	// geometries
-	BlasInput input;
-	input.as_geom.emplace_back(asGeom);
-	input.as_build_offset_info.emplace_back(offset);
-
-	return input;
-}
-
-VkPipelineStageFlags pipeline_stage_from_pass_type(vk::PassType pass_type, VkAccessFlags access_flags) {
-	VkPipelineStageFlags res = 0;
-	switch (pass_type) {
-		case vk::PassType::Compute:
-			res = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-			break;
-		case vk::PassType::Graphics:
-			res = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-			break;
-		case vk::PassType::RT:
-			if (access_flags &
-				(VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR)) {
-				res = VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
-			} else {
-				res = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
-			}
-			break;
-		default:
-			res = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-			break;
-	}
-	if ((access_flags & VK_ACCESS_TRANSFER_READ_BIT) || (access_flags & VK_ACCESS_TRANSFER_WRITE_BIT)) {
-		res |= VK_PIPELINE_STAGE_TRANSFER_BIT;
-	}
-	return res;
-}
 
 VkImageLayout image_layout_from_descriptor_type(VkDescriptorType type) {
 	switch (type) {
@@ -260,12 +195,5 @@ VkImageLayout image_layout_from_descriptor_type(VkDescriptorType type) {
 	return VK_IMAGE_LAYOUT_GENERAL;
 }
 
-
-VkImageLayout image_layout_from_tex(const vk::Texture* tex, VkAccessFlags access_flags) {
-	if ((tex->usage_flags & VK_IMAGE_USAGE_SAMPLED_BIT) && access_flags == VK_ACCESS_SHADER_READ_BIT) {
-		return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	}
-	return VK_IMAGE_LAYOUT_GENERAL;
-}
 
 }  // namespace vk

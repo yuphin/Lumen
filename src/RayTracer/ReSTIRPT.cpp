@@ -1,5 +1,4 @@
 #include "Framework/VkUtils.h"
-#include "LumenPCH.h"
 #include "ReSTIRPT.h"
 
 using namespace RestirPT;
@@ -231,7 +230,7 @@ void ReSTIRPT::render() {
 		curr_photon_radius = pc_ray.photon_radius;
 	}
 
-	const std::initializer_list<lumen::ResourceBinding> common_bindings = {
+	const std::initializer_list<lm::ResourceBinding> common_bindings = {
 		output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer};
 
 	const std::array<vk::Buffer*, 2> reservoir_buffers = {gris_reservoir_ping_buffer, gris_reservoir_pong_buffer};

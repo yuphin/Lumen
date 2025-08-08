@@ -11,7 +11,7 @@ class PSSMLT final : public Integrator {
 	virtual void destroy(bool resize) override;
 
    private:
-	void prefix_scan(int level, int num_elems, int& counter, lumen::RenderGraph* rg);
+	void prefix_scan(int level, int num_elems, int& counter, lm::RenderGraph* rg);
 	PCMLT pc_ray{};
 	PushConstantCompute pc_compute{};
 	// PSSMLT buffers

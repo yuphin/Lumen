@@ -1,5 +1,4 @@
 #pragma once
-#include "../LumenPCH.h"
 #include <tiny_obj_loader.h>
 #include "Framework/Camera.h"
 #include "Framework/VulkanBase.h"
@@ -82,7 +81,7 @@ class LumenScene {
 	vk::Buffer* scene_desc_buffer;
 	vk::Buffer* mesh_lights_buffer;
 	std::vector<vk::Texture*> scene_textures;
-	std::unique_ptr<lumen::Camera> camera;
+	std::unique_ptr<lm::Camera> camera;
 	std::unordered_map<uint32_t, std::string> material_idx_to_name;
 
 	uint32_t total_light_triangle_cnt = 0;

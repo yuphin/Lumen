@@ -1,5 +1,4 @@
 #pragma once
-#include "../LumenPCH.h"
 #include "Shader.h"
 #include "Texture.h"
 #include "SBTWrapper.h"

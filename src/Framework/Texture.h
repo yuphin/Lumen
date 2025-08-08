@@ -1,6 +1,5 @@
 #pragma once
 #include <vulkan/vulkan_core.h>
-#include "../LumenPCH.h"
 
 namespace vk {
 struct TextureData {
@@ -53,5 +52,6 @@ VkDescriptorImageInfo texture_descriptor(const Texture* tex, VkSampler sampler);
 VkDescriptorImageInfo texture_descriptor(const Texture* tex);
 void texture_force_transition(Texture* tex, VkCommandBuffer cmd, VkImageLayout old_layout, VkImageLayout new_layout);
 void texture_transition(Texture* tex, VkCommandBuffer cmd, VkImageLayout new_layout);
+VkImageLayout image_layout_from_tex(const Texture* tex, VkAccessFlags access_flags);
 
 }  // namespace vk

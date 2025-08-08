@@ -1,5 +1,4 @@
 #pragma once
-#include "../LumenPCH.h"
 
 enum class KeyInput {
 	SPACE = 32,

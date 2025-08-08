@@ -1,5 +1,4 @@
 #pragma once
-#include "LumenPCH.h"
 #include "Framework/ImageUtils.h"
 #include "Path.h"
 #include "BDPT.h"

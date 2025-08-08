@@ -1,8 +1,4 @@
-#include "LumenPCH.h"
 #include "VCM.h"
-#include <iostream>
-#include <fstream>
-#include <span>
 const int max_samples = 50000;
 static bool use_vc = true;
 void VCM::init() {
@@ -147,7 +143,7 @@ void VCM::render() {
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.max_angle_samples = max_samples;
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
-	const std::initializer_list<lumen::ResourceBinding> rt_bindings = {
+	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
 		lumen_scene->scene_desc_buffer,

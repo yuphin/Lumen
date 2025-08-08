@@ -1,4 +1,3 @@
-#include "LumenPCH.h"
 #include "Path.h"
 
 void Path::init() {

@@ -1,4 +1,3 @@
-#include "../LumenPCH.h"
 
 #include "PersistentResourceManager.h"
 #include <vulkan/vulkan_core.h>

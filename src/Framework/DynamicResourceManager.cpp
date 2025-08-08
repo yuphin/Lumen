@@ -1,4 +1,3 @@
-#include "../LumenPCH.h"
 
 #include "Buffer.h"
 #include "Texture.h"

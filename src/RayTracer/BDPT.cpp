@@ -1,4 +1,3 @@
-#include "../LumenPCH.h"
 #include "BDPT.h"
 
 void BDPT::init() {

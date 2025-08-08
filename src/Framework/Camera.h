@@ -1,7 +1,6 @@
 #pragma once
-#include "../LumenPCH.h"
 
-namespace lumen {
+namespace lm {
 class Camera {
    public:
 	enum class CameraType { FPS, LookAt };
@@ -25,8 +24,8 @@ class Camera {
 		rotation = glm::fmod(rotation, glm::vec3(360.0f));
 	}
 
-	inline void rotate(const glm::vec3& delta) { 
-		this->rotation += delta; 
+	inline void rotate(const glm::vec3& delta) {
+		this->rotation += delta;
 		rotation = glm::fmod(rotation, glm::vec3(360.0f));
 	}
 	void update_view_matrix() {
@@ -110,6 +109,7 @@ class PerspectiveCamera : public Camera {
 	}
 
 	float fov{}, aspect_ratio{};
+
    private:
 	void make_projection_matrix(bool use_fov = false) {
 		if (use_fov) {
@@ -130,4 +130,4 @@ class PerspectiveCamera : public Camera {
 	float left{}, right{}, top{}, bot{};
 };
 
-}  // namespace lumen
+}  // namespace lm

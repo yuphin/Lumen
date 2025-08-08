@@ -1,5 +1,4 @@
 #pragma once
-#include "../LumenPCH.h"
 
 class ThreadPool {
    public:

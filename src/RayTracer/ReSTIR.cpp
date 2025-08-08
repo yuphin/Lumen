@@ -1,5 +1,4 @@
 #include "Framework/RenderGraph.h"
-#include "LumenPCH.h"
 #include "ReSTIR.h"
 
 void ReSTIR::init() {
@@ -61,7 +60,7 @@ void ReSTIR::init() {
 	frame_num = 0;
 
 
-	lumen::RenderGraph* rg = vk::render_graph();
+	lm::RenderGraph* rg = vk::render_graph();
 	assert(rg->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, rg);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, g_buffer, rg);
@@ -85,13 +84,13 @@ void ReSTIR::render() {
 	pc_ray.enable_accumulation = enable_accumulation;
 	pc_ray.frame_num = frame_num;
 
-	const std::initializer_list<lumen::ResourceBinding> rt_bindings = {
+	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
 		lumen_scene->scene_desc_buffer,
 	};
 
-	lumen::RenderGraph* rg = vk::render_graph();
+	lm::RenderGraph* rg = vk::render_graph();
 
 	// Temporal pass + path tracing
 	rg->add_rt("ReSTIR - Temporal Pass",

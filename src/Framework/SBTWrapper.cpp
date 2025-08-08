@@ -1,4 +1,3 @@
-#include "../LumenPCH.h"
 #include "SBTWrapper.h"
 #include "VkUtils.h"
 #include "CommandBuffer.h"

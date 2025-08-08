@@ -1,4 +1,3 @@
-#include "../LumenPCH.h"
 #include "Texture.h"
 #include "CommandBuffer.h"
 #include "DynamicResourceManager.h"
@@ -6,9 +5,6 @@
 #include "VkUtils.h"
 #include "VulkanContext.h"
 #include "VulkanStructs.h"
-#include <gli/gli.hpp>
-#include <stb_image/stb_image.h>
-#include <vulkan/vulkan_core.h>
 #include "PersistentResourceManager.h"
 
 static void cmd_generate_mipmaps2(vk::Texture* texture, const VkImageCreateInfo& info, VkCommandBuffer cmd) {
@@ -250,6 +246,13 @@ void texture_transition(Texture* tex, VkCommandBuffer cmd, VkImageLayout new_lay
 	subresource_range.levelCount = tex->mip_levels;
 	vk::transition_image_layout(cmd, tex->handle, tex->layout, new_layout, subresource_range, tex->aspect_flags);
 	tex->layout = new_layout;
+}
+
+VkImageLayout image_layout_from_tex(const vk::Texture* tex, VkAccessFlags access_flags) {
+	if ((tex->usage_flags & VK_IMAGE_USAGE_SAMPLED_BIT) && access_flags == VK_ACCESS_SHADER_READ_BIT) {
+		return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	}
+	return VK_IMAGE_LAYOUT_GENERAL;
 }
 
 }  // namespace vk

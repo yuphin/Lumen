@@ -1,13 +1,9 @@
 #pragma once
-#include "RayTracer/LumenScene.h"
-
 namespace vk {
 
 void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image, VkImageLayout old_layout,
 							 VkImageLayout new_layout, VkImageSubresourceRange subresource_range,
 							 VkImageAspectFlags aspect_flags);
-
-BlasInput to_vk_geometry(LumenPrimMesh& prim, VkDeviceAddress vertex_address, VkDeviceAddress index_address);
 
 inline bool has_extension(std::string_view filename, std::string_view ext) { return filename.ends_with(ext); }
 
@@ -18,7 +14,6 @@ inline VkTransformMatrixKHR to_vk_matrix(const glm::mat4& mat) {
 	return out_matrix;
 }
 
-VkPipelineStageFlags pipeline_stage_from_pass_type(vk::PassType pass_type, VkAccessFlags access_flags);
 VkImageLayout image_layout_from_descriptor_type(VkDescriptorType type);
 
 inline VkBufferMemoryBarrier buffer_barrier(VkBuffer buffer, VkAccessFlags src_accesss, VkAccessFlags dst_access) {
@@ -122,10 +117,6 @@ inline VkDeviceSize get_memory_usage(VkPhysicalDevice physical_device) {
 inline uint32_t calc_mip_levels(VkExtent2D extent) {
 	return static_cast<uint32_t>(std::floor(std::log2(std::max(extent.width, extent.height)))) + 1;
 }
-
-uint32_t get_bindings_for_shader_set(const std::vector<vk::Shader>& shaders, VkDescriptorType* descriptor_types);
-
-VkImageLayout image_layout_from_tex(const vk::Texture* tex, VkAccessFlags access_flags);
 
 namespace DebugMarker {
 inline void set_resource_name(VkDevice device, uint64_t obj, const char* name, VkObjectType type) {

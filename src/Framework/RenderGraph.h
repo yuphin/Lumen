@@ -1,6 +1,4 @@
 #pragma once
-#include <memory>
-#include "../LumenPCH.h"
 #include "CommandBuffer.h"
 #include "Framework/RenderGraphTypes.h"
 #include "Framework/VulkanStructs.h"
@@ -12,7 +10,7 @@
 #include "AccelerationStructure.h"
 #include "Utils.h"
 
-namespace lumen {
+namespace lm {
 
 #define TO_STR(V) (#V)
 
@@ -363,4 +361,4 @@ inline RenderPass& RenderPass::push_constants(T* data) {
 	return *this;
 }
 
-}  // namespace lumen
+}  // namespace lm

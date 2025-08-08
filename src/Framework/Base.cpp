@@ -1,9 +1,8 @@
-#include "../LumenPCH.h"
-#include "Core.h"
+#include "Base.h"
 #include "OS.h"
 #include "Utils.h"
 
-namespace core {
+namespace lm {
 constexpr size_t HEADER_SIZE = sizeof(Arena);
 static constexpr size_t ALIGNED_HEADER_SIZE = util::next_pow2(HEADER_SIZE);
 
@@ -101,4 +100,4 @@ Arena* arena_create(size_t reserve_size, size_t commit_size, size_t header_align
 	arena->end_committed = commit_size;
 	return arena;
 }
-}  // namespace core
+}  // namespace lm

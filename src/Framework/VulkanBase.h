@@ -1,6 +1,4 @@
 #pragma once
-#include "LumenPCH.h"
-#include <volk/volk.h>
 #include "RenderGraph.h"
 
 namespace vk {
@@ -13,7 +11,7 @@ void recreate_swap_chain();
 std::vector<Texture*>& swapchain_images();
 uint32_t prepare_frame();
 VkResult submit_frame(uint32_t image_idx);
-lumen::RenderGraph* render_graph();
+lm::RenderGraph* render_graph();
 void cleanup_app_data();
 void cleanup();
 };	// namespace vk

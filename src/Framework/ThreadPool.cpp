@@ -1,4 +1,3 @@
-#include "../LumenPCH.h"
 #include "ThreadPool.h"
 
 std::atomic_bool ThreadPool::done;

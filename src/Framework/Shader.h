@@ -1,8 +1,7 @@
 #pragma once
-#include "../LumenPCH.h"
 #include "Buffer.h"
 
-namespace lumen {
+namespace lm {
 class RenderPass;
 }
 namespace vk {
@@ -23,7 +22,7 @@ struct Shader {
 	int local_size_z = 1;
 	bool uses_push_constants = false;
 	uint32_t push_constant_size = 0;
-	int compile(lumen::RenderPass* pass);
+	int compile(lm::RenderPass* pass);
 	VkShaderModule create_vk_shader_module(const VkDevice& device) const;
 	struct BindingStatus {
 		bool read = false;

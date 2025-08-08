@@ -1,5 +1,4 @@
 #include <Framework/RenderGraph.h>
-#include "LumenPCH.h"
 #include "PSSMLT.h"
 
 void PSSMLT::init() {
@@ -226,7 +225,7 @@ void PSSMLT::render() {
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.frame_num = frame_num;
 
-	std::initializer_list<lumen::ResourceBinding> rt_bindings = {
+	std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
 		lumen_scene->scene_desc_buffer,
@@ -298,7 +297,7 @@ void PSSMLT::render() {
 	return;
 #endif
 
-	lumen::RenderGraph* rg = vk::render_graph();
+	lm::RenderGraph* rg = vk::render_graph();
 
 	// Select seeds
 	rg->add_compute("Select Seeds", {.shader = vk::Shader("src/shaders/integrators/pssmlt/select_seeds.comp"),
@@ -386,7 +385,7 @@ bool PSSMLT::update() {
 	return updated;
 }
 
-void PSSMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGraph* rg) {
+void PSSMLT::prefix_scan(int level, int num_elems, int& counter, lm::RenderGraph* rg) {
 	const bool scan_sums = level > 0;
 	int num_wgs = std::max(1, (int)ceil(num_elems / (2 * 1024.0f)));
 	int num_grids = num_wgs - int((num_elems % 2048) != 0);

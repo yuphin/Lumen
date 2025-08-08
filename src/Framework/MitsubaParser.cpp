@@ -1,4 +1,3 @@
-#include "../LumenPCH.h"
 #include "MitsubaParser.h"
 #include <mitsuba_parser/tinyparser-mitsuba.h>
 

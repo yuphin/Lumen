@@ -38,7 +38,6 @@
 #define LIGHT_DIRECTIONAL 3
 
 #ifdef __cplusplus
-#include <glm/glm.hpp>
 // GLSL Type
 using vec2 = glm::vec2;
 using ivec3 = glm::ivec3;

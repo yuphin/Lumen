@@ -1,4 +1,3 @@
-#include "../LumenPCH.h"
 #include "Framework/RenderGraph.h"
 #include "RenderGraph.h"
 #include "VkUtils.h"
@@ -6,7 +5,34 @@
 #include "PersistentResourceManager.h"
 #include "DynamicResourceManager.h"
 
-namespace lumen {
+namespace lm {
+
+static VkPipelineStageFlags pipeline_stage_from_pass_type(vk::PassType pass_type, VkAccessFlags access_flags) {
+	VkPipelineStageFlags res = 0;
+	switch (pass_type) {
+		case vk::PassType::Compute:
+			res = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+			break;
+		case vk::PassType::Graphics:
+			res = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
+			break;
+		case vk::PassType::RT:
+			if (access_flags &
+				(VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR)) {
+				res = VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
+			} else {
+				res = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+			}
+			break;
+		default:
+			res = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+			break;
+	}
+	if ((access_flags & VK_ACCESS_TRANSFER_READ_BIT) || (access_flags & VK_ACCESS_TRANSFER_WRITE_BIT)) {
+		res |= VK_PIPELINE_STAGE_TRANSFER_BIT;
+	}
+	return res;
+}
 
 static bool is_read_flag(VkAccessFlags flags) {
 	return flags &
@@ -127,7 +153,8 @@ void RenderPass::transition_resources() {
 			if (!bound_resource.active) {
 				if (bound_resource.tex) {
 					descriptor_infos[i] = vk::texture_descriptor(
-						bound_resource.tex, vk::image_layout_from_descriptor_type(pipeline_storage->pipeline->descriptor_types[i]));
+						bound_resource.tex,
+						vk::image_layout_from_descriptor_type(pipeline_storage->pipeline->descriptor_types[i]));
 				} else {
 					descriptor_infos[i] = pipeline_storage->bound_resources[i].get_descriptor_info();
 				}
@@ -656,8 +683,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		}
 		buffer_sync.buffer_bariers[i] =
 			vk::buffer_barrier2(k, v.src_access_flags, v.dst_access_flags,
-								vk::pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, v.src_access_flags),
-								vk::pipeline_stage_from_pass_type(type, v.dst_access_flags));
+								pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, v.src_access_flags),
+								pipeline_stage_from_pass_type(type, v.dst_access_flags));
 		buffer_sync.dependency_infos[i] = vk::dependency_info(1, &buffer_sync.buffer_bariers[i]);
 		if (use_events) {
 			wait_events.push_back(rg->passes[v.opposing_pass_idx].set_signals_buffer[k].event);
@@ -683,8 +710,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		if (!prefill_buffer_barriers.empty()) {
 			buffer_memory_barriers.reserve(prefill_buffer_barriers.size());
 			for (auto& barrier : prefill_buffer_barriers) {
-				auto curr_stage = vk::pipeline_stage_from_pass_type(type, barrier.src_access_flags);
-				auto dst_stage = vk::pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
+				auto curr_stage = pipeline_stage_from_pass_type(type, barrier.src_access_flags);
+				auto dst_stage = pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
 				buffer_memory_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
 																	 barrier.dst_access_flags, curr_stage, dst_stage));
 			}
@@ -707,8 +734,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		if (!buffer_barriers.empty()) {
 			buffer_memory_barriers.reserve(buffer_barriers.size());
 			for (auto& barrier : buffer_barriers) {
-				auto curr_stage = vk::pipeline_stage_from_pass_type(type, barrier.src_access_flags);
-				auto dst_stage = vk::pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
+				auto curr_stage = pipeline_stage_from_pass_type(type, barrier.src_access_flags);
+				auto dst_stage = pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
 				buffer_memory_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
 																	 barrier.dst_access_flags, curr_stage, dst_stage));
 			}
@@ -727,8 +754,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		}
 		auto src_access_flags = vk::access_flags_for_img_layout(v.old_layout);
 		auto dst_access_flags = vk::access_flags_for_img_layout(v.new_layout);
-		auto src_stage = vk::pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, src_access_flags);
-		auto dst_stage = vk::pipeline_stage_from_pass_type(type, dst_access_flags);
+		auto src_stage = pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, src_access_flags);
+		auto dst_stage = pipeline_stage_from_pass_type(type, dst_access_flags);
 		img_sync.img_barriers[i] =
 			vk::image_barrier2(k, src_access_flags, dst_access_flags, v.old_layout, v.new_layout, v.image_aspect,
 							   src_stage, dst_stage, vk::context().queue_indices.gfx_family.value());
@@ -875,8 +902,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		if (!post_execution_buffer_barriers.empty()) {
 			post_execution_buffer_memory_barriers.reserve(post_execution_buffer_barriers.size());
 			for (auto& barrier : post_execution_buffer_barriers) {
-				auto curr_stage = vk::pipeline_stage_from_pass_type(type, barrier.src_access_flags);
-				auto dst_stage = vk::pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
+				auto curr_stage = pipeline_stage_from_pass_type(type, barrier.src_access_flags);
+				auto dst_stage = pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
 				post_execution_buffer_memory_barriers.push_back(vk::buffer_barrier2(
 					barrier.buffer, barrier.src_access_flags, barrier.dst_access_flags, curr_stage, dst_stage));
 			}
@@ -963,8 +990,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	for (const auto& [k, v] : set_signals_buffer) {
 		LUMEN_ASSERT(v.event == nullptr, "VkEvent should be null in the setter");
 		VkBufferMemoryBarrier2 mem_barrier = vk::buffer_barrier2(
-			k, v.src_access_flags, v.dst_access_flags, vk::pipeline_stage_from_pass_type(type, v.src_access_flags),
-			vk::pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, v.dst_access_flags));
+			k, v.src_access_flags, v.dst_access_flags, pipeline_stage_from_pass_type(type, v.src_access_flags),
+			pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, v.dst_access_flags));
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);
 
 		if (use_events) {
@@ -980,8 +1007,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		auto dst_access_flags = vk::access_flags_for_img_layout(v.new_layout);
 		auto mem_barrier = vk::image_barrier2(
 			k, vk::access_flags_for_img_layout(v.old_layout), vk::access_flags_for_img_layout(v.new_layout),
-			v.old_layout, v.new_layout, v.image_aspect, vk::pipeline_stage_from_pass_type(type, src_access_flags),
-			vk::pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, dst_access_flags),
+			v.old_layout, v.new_layout, v.image_aspect, pipeline_stage_from_pass_type(type, src_access_flags),
+			pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, dst_access_flags),
 			vk::context().queue_indices.gfx_family.value());
 
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);
@@ -1141,4 +1168,4 @@ void RenderGraph::destroy() {
 	pipeline_cache.clear();
 }
 
-}  // namespace lumen
+}  // namespace lm

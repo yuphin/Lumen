@@ -1,4 +1,3 @@
-#include "LumenPCH.h"
 #include "SPPM.h"
 
 void SPPM::init() {
@@ -111,7 +110,7 @@ void SPPM::render() {
 		}
 	};
 
-	const std::initializer_list<lumen::ResourceBinding> rt_bindings = {
+	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
 		lumen_scene->scene_desc_buffer,

@@ -1,8 +1,9 @@
 #include "Framework/RenderGraph.h"
-#include "LumenPCH.h"
 #include "PostFX.h"
 #include "Framework/PersistentResourceManager.h"
 #include "Framework/DynamicResourceManager.h"
+#include "Framework/Window.h"
+#include "Framework/VulkanBase.h"
 
 void PostFX::init() {
 	VkSamplerCreateInfo sampler_ci = vk::sampler();
@@ -52,7 +53,7 @@ void PostFX::init() {
 	uint32_t pad_width = (kernel_org->extent.width + 31) / 32;
 	uint32_t pad_height = (kernel_org->extent.height + 31) / 32;
 
-	lumen::RenderGraph* rg = vk::render_graph();
+	lm::RenderGraph* rg = vk::render_graph();
 	rg->add_compute("Pad Kernel",
 					{.shader = vk::Shader("src/shaders/bloom/pad.comp"), .dims = {pad_width, pad_height, 1}})
 		.bind_texture_with_sampler(kernel_org, img_sampler)
@@ -91,7 +92,7 @@ void PostFX::init() {
 }
 
 void PostFX::render(vk::Texture* input, vk::Texture* output) {
-	lumen::RenderGraph* rg = vk::render_graph();
+	lm::RenderGraph* rg = vk::render_graph();
 	// Copy the original image to the padded texture
 	if (enable_bloom) {
 		uint32_t pad_width = (fft_ping_padded->extent.width + 31) / 32;
@@ -164,7 +165,7 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 							.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 							.color_outputs = {output},
 							.pass_func =
-								[](VkCommandBuffer cmd, const lumen::RenderPass& render_pass) {
+								[](VkCommandBuffer cmd, const lm::RenderPass& render_pass) {
 									vkCmdDraw(cmd, 4, 1, 0, 0);
 									ImGui::Render();
 									ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);

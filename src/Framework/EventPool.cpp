@@ -1,4 +1,3 @@
-#include "../LumenPCH.h"
 #include "EventPool.h"
 
 namespace vk {

@@ -1,5 +1,4 @@
 #pragma once
-#include "LumenPCH.h"
 #include "Framework/Texture.h"
 #include "Framework/RenderGraph.h"
 #include "Framework/ImageUtils.h"

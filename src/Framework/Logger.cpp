@@ -1,4 +1,3 @@
-#include "../LumenPCH.h"
 #include "Logger.h"
 
 namespace Logger {

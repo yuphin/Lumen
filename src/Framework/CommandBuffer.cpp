@@ -1,4 +1,3 @@
-#include "../LumenPCH.h"
 #include "CommandBuffer.h"
 
 static uint32_t get_first_available_tid(uint64_t val) {
@@ -12,23 +11,21 @@ static uint32_t get_first_available_tid(uint64_t val) {
 }
 namespace vk {
 
-namespace sync {
 std::mutex queue_mutex;
 std::mutex command_pool_mutex;
 uint64_t available_command_pools = UINT64_MAX;
 std::counting_semaphore<64> command_pool_semaphore{64};
-}  // namespace sync
 
 CommandBuffer::CommandBuffer(bool begin, VkCommandBufferUsageFlags begin_flags, vk::QueueType type,
 							 VkCommandBufferLevel level) {
 	this->type = type;
 	std::unique_lock<std::mutex> cv_lock;
 
-	sync::command_pool_semaphore.acquire();
+	command_pool_semaphore.acquire();
 	{
-		std::scoped_lock lock(sync::command_pool_mutex);
-		curr_tid = get_first_available_tid(sync::available_command_pools);
-		sync::available_command_pools &= ~(uint64_t(1) << curr_tid);
+		std::scoped_lock lock(command_pool_mutex);
+		curr_tid = get_first_available_tid(available_command_pools);
+		available_command_pools &= ~(uint64_t(1) << curr_tid);
 	}
 	auto cmd_buf_allocate_info = vk::command_buffer_allocate_info(vk::context().cmd_pools[curr_tid], level, 1);
 	vk::check(vkAllocateCommandBuffers(vk::context().device, &cmd_buf_allocate_info, &handle));
@@ -43,12 +40,11 @@ void CommandBuffer::begin(VkCommandBufferUsageFlags begin_flags) {
 	LUMEN_ASSERT(state != CommandBufferState::RECORDING, "Command buffer is already recording");
 	if (curr_tid == -1) {
 		std::unique_lock<std::mutex> cv_lock;
-		sync::command_pool_semaphore.acquire();
+		command_pool_semaphore.acquire();
 		{
-			std::scoped_lock lock(sync::command_pool_mutex);
-			curr_tid = get_first_available_tid(sync::available_command_pools);
-			sync::available_command_pools &= ~(uint64_t(1) << curr_tid);
-
+			std::scoped_lock lock(command_pool_mutex);
+			curr_tid = get_first_available_tid(available_command_pools);
+			available_command_pools &= ~(uint64_t(1) << curr_tid);
 		}
 	}
 	auto begin_info = vk::command_buffer_begin_info(begin_flags);
@@ -62,7 +58,7 @@ void CommandBuffer::submit(bool wait_fences, bool queue_wait_idle) {
 	VkSubmitInfo submit_info = vk::submit_info();
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = &handle;
-	sync::queue_mutex.lock();
+	queue_mutex.lock();
 	if (wait_fences) {
 		VkFenceCreateInfo fence_info = vk::fence();
 		VkFence fence;
@@ -76,7 +72,7 @@ void CommandBuffer::submit(bool wait_fences, bool queue_wait_idle) {
 	if (queue_wait_idle) {
 		vk::check(vkQueueWaitIdle(vk::context().queues[(int)type]));
 	}
-	sync::queue_mutex.unlock();
+	queue_mutex.unlock();
 }
 
 CommandBuffer::~CommandBuffer() {
@@ -89,10 +85,10 @@ CommandBuffer::~CommandBuffer() {
 	}
 	vkFreeCommandBuffers(vk::context().device, vk::context().cmd_pools[curr_tid], 1, &handle);
 	{
-		std::scoped_lock lock(sync::command_pool_mutex);
-		sync::available_command_pools |= uint64_t(1) << curr_tid;
+		std::scoped_lock lock(command_pool_mutex);
+		available_command_pools |= uint64_t(1) << curr_tid;
 	}
-	sync::command_pool_semaphore.release();
+	command_pool_semaphore.release();
 }
 
 }  // namespace vk

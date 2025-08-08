@@ -1,4 +1,3 @@
-#include "../LumenPCH.h"
 #include "GPUQueryManager.h"
 
 namespace GPUQueryManager {

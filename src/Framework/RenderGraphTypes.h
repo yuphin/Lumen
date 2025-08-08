@@ -8,7 +8,7 @@
 #include "Buffer.h"
 #include "Texture.h"
 
-namespace lumen {
+namespace lm {
 class RenderPass;
 
 struct dim3 {
@@ -79,7 +79,7 @@ struct ImageSyncDescriptor {
 	VkImageAspectFlags image_aspect;
 	VkEvent event = nullptr;
 };
-}  // namespace lumen
+}  // namespace lm
 
 namespace vk {
 enum class PassType { Compute, RT, Graphics };
@@ -118,7 +118,7 @@ struct GraphicsPassSettings {
 	float line_width = 1.0;
 	std::vector<vk::Texture*> color_outputs = {};
 	vk::Texture* depth_output = nullptr;
-	std::function<void(VkCommandBuffer cmd, const lumen::RenderPass& pass)> pass_func;
+	std::function<void(VkCommandBuffer cmd, const lm::RenderPass& pass)> pass_func;
 	PassType type = PassType::Graphics;
 };
 
@@ -127,8 +127,8 @@ struct RTPassSettings {
 	std::vector<ShaderMacro> macros = {};
 	uint32_t recursion_depth = 1;
 	std::vector<uint32_t> specialization_data = {};
-	lumen::dim3 dims;
-	std::function<void(VkCommandBuffer cmd, const lumen::RenderPass& pass)> pass_func;
+	lm::dim3 dims;
+	std::function<void(VkCommandBuffer cmd, const lm::RenderPass& pass)> pass_func;
 	PassType type = PassType::RT;
 };
 
@@ -136,8 +136,8 @@ struct ComputePassSettings {
 	vk::Shader shader;
 	std::vector<ShaderMacro> macros = {};
 	std::vector<uint32_t> specialization_data = {};
-	lumen::dim3 dims;
-	std::function<void(VkCommandBuffer cmd, const lumen::RenderPass& pass)> pass_func;
+	lm::dim3 dims;
+	std::function<void(VkCommandBuffer cmd, const lm::RenderPass& pass)> pass_func;
 	PassType type = PassType::Compute;
 };
 

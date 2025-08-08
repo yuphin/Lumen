@@ -1,14 +1,7 @@
 #pragma once
-#include "Framework/Camera.h"
-#include "Framework/Pipeline.h"
-#include "Framework/Shader.h"
-#include "Framework/Texture.h"
-#include "Framework/VulkanBase.h"
-#include "Framework/Window.h"
 #include "Framework/Texture.h"
 #include "shaders/commons.h"
 #include "LumenScene.h"
-#include "Framework/RenderGraph.h"
 #include "Framework/DynamicResourceManager.h"
 #include "Framework/PersistentResourceManager.h"
 class Integrator {

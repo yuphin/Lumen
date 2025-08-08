@@ -1,11 +1,8 @@
 #include "Framework/RenderGraph.h"
-#include "LumenPCH.h"
 #include <tinyexr.h>
 #define TINYGLTF_IMPLEMENTATION
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "RayTracer.h"
-
-using namespace lumen;
 
 RayTracer* RayTracer::instance = nullptr;
 bool load_reference = false;

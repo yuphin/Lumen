@@ -1,5 +1,4 @@
 #include "Framework/RenderGraph.h"
-#include "LumenPCH.h"
 #include "VCMMLT.h"
 static bool use_vm = false;
 static float vcm_radius_factor = 0.025f;
@@ -250,7 +249,7 @@ void VCMMLT::render() {
 	pc_ray.total_light_area = lumen_scene->total_light_area;
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 
-	lumen::RenderGraph* rg = vk::render_graph();
+	lm::RenderGraph* rg = vk::render_graph();
 	auto get_pipeline_postfix = [&](const std::vector<uint32_t>& spec_consts) {
 		std::string res = "-";
 		if (spec_consts[0] == 1) {
@@ -285,7 +284,7 @@ void VCMMLT::render() {
 		op_reduce("OpReduce: Sum1", "src/shaders/integrators/vcmmlt/sum.comp", "OpReduce: Reduce Sum1",
 				  "src/shaders/integrators/vcmmlt/reduce_sum.comp", {1});
 	};
-	std::initializer_list<lumen::ResourceBinding> rt_bindings = {
+	std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		output_tex,
 		scene_ubo_buffer,
 		lumen_scene->scene_desc_buffer,
@@ -453,7 +452,7 @@ bool VCMMLT::update() {
 	return updated;
 }
 
-void VCMMLT::prefix_scan(int level, int num_elems, int& counter, lumen::RenderGraph* rg) {
+void VCMMLT::prefix_scan(int level, int num_elems, int& counter, lm::RenderGraph* rg) {
 	const bool scan_sums = level > 0;
 	int num_wgs = std::max(1, (int)ceil(num_elems / (2 * 1024.0f)));
 	int num_grids = num_wgs - int((num_elems % 2048) != 0);
