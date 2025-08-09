@@ -6,7 +6,6 @@
 #if USE_SHADERC
 #include <shaderc/shaderc.hpp>
 #include <glslc/file_includer.h>
-#include <libshaderc_util/file_finder.h>
 #endif	//  USE_SHADERC
 
 namespace vk {

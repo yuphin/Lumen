@@ -35,7 +35,8 @@ namespace util {
 
 inline constexpr size_t align_pow2(size_t x, size_t align) { return (x + align - 1) & ~(align - 1); }
 
-inline constexpr uint32_t next_pow2(uint32_t x) {
+template <typename T>
+inline constexpr T next_pow2(T x) {
 	if (x == 0) return 1;
 	--x;
 	x |= x >> 1;

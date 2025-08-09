@@ -1,5 +1,5 @@
 #include "Framework/Window.h"
-#include "Framework/Base.h"
+#include "Framework/HashMap.h"
 #include "RayTracer/RayTracer.h"
 
 #if 0
@@ -49,5 +49,32 @@ int main(int argc, char* argv[]) {
 
 	void* data_c = arena->allocate(4096, 64);
 	void* data_d = arena->allocate(2, 8);
+
+	lm::Array<int> arr = lm::array_create<int>(arena);
+	arr.push_back(5);
+	arr.push_back(10);
+	arr.push_back(15);
+	arr.push_back(20);
+	for(int val : arr) {
+		LUMEN_INFO("Array value: {}", val);
+	}
+
+	auto hm = lm::hash_map_create<int, int>(arena);
+
+	hm.insert(1, 100);
+	hm.insert(2, 200);
+	hm.insert(682, 800);
+
+	auto entry = hm.find(682);
+	assert(entry != nullptr);
+	auto entry2 = hm.find(3);
+	assert(entry2 == nullptr);
+	// LUMEN_INFO("Found entry: key = {}, value = {}", entry->key, entry->value);
+
+	for(auto& e : hm) {
+		LUMEN_INFO("HashMap entry: key = {}, value = {}", e.key, e.value);
+	}
+
+	__debugbreak();
 }
 #endif

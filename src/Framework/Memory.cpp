@@ -1,4 +1,4 @@
-#include "Base.h"
+#include "Memory.h"
 #include "OS.h"
 #include "Utils.h"
 
@@ -22,6 +22,7 @@ void arena_ensure_committed(Arena* arena, size_t target_offset) {
 	if (target_offset <= arena->end_committed) return;
 	size_t commit_size = util::align_pow2(target_offset - arena->end_committed, os::get_page_size());
 	bool commited = os::commit(arena->data + arena->end_committed, commit_size);
+	memset(arena->data + arena->end_committed, 0, commit_size);
 	LUMEN_ASSERT(commited, "Could not commit memory for Arena");
 	arena->end_committed += commit_size;
 }
