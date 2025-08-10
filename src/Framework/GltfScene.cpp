@@ -17,24 +17,24 @@ void GltfScene::import_materials(const tinygltf::Model& tmodel) {
 	for (auto& tmat : tmodel.materials) {
 		GltfMaterial gmat;
 
-		gmat.alpha_cutoff = static_cast<float>(tmat.alphaCutoff);
+		gmat.alpha_cutoff = static_cast<f32>(tmat.alphaCutoff);
 		gmat.alpha_mode = tmat.alphaMode == "MASK" ? 1 : (tmat.alphaMode == "BLEND" ? 2 : 0);
 		gmat.double_sided = tmat.doubleSided ? 1 : 0;
 		gmat.emissive_factor = glm::vec3(tmat.emissiveFactor[0], tmat.emissiveFactor[1], tmat.emissiveFactor[2]);
 		gmat.emissive_texture = tmat.emissiveTexture.index;
 		gmat.normal_texture = tmat.normalTexture.index;
-		gmat.normal_texture_scale = static_cast<float>(tmat.normalTexture.scale);
+		gmat.normal_texture_scale = static_cast<f32>(tmat.normalTexture.scale);
 		gmat.occlusion_texture = tmat.occlusionTexture.index;
-		gmat.occlusion_texture_strength = static_cast<float>(tmat.occlusionTexture.strength);
+		gmat.occlusion_texture_strength = static_cast<f32>(tmat.occlusionTexture.strength);
 
 		// PbrMetallicRoughness
 		auto& tpbr = tmat.pbrMetallicRoughness;
 		gmat.base_color_factor = glm::vec4(tpbr.baseColorFactor[0], tpbr.baseColorFactor[1], tpbr.baseColorFactor[2],
 										   tpbr.baseColorFactor[3]);
 		gmat.base_color_texture = tpbr.baseColorTexture.index;
-		gmat.metallic_factor = static_cast<float>(tpbr.metallicFactor);
+		gmat.metallic_factor = static_cast<f32>(tpbr.metallicFactor);
 		gmat.metallic_rougness_texture = tpbr.metallicRoughnessTexture.index;
-		gmat.roughness_factor = static_cast<float>(tpbr.roughnessFactor);
+		gmat.roughness_factor = static_cast<f32>(tpbr.roughnessFactor);
 
 		// KHR_materials_pbrSpecularGlossiness
 		if (tmat.extensions.find(KHR_MATERIALS_PBRSPECULARGLOSSINESS_EXTENSION_NAME) != tmat.extensions.end()) {
@@ -138,22 +138,22 @@ void GltfScene::import_drawable_nodes(const tinygltf::Model& tmodel, GltfAttribu
 	check_required_extensions(tmodel);
 
 	// Find the number of vertex(attributes) and index
-	// uint32_t nbVert{0};
-	uint32_t nbIndex{0};
-	uint32_t meshCnt{0};  // use for mesh to new meshes
-	uint32_t primCnt{0};  //  "   "  "  "
+	// u32 nbVert{0};
+	u32 nbIndex{0};
+	u32 meshCnt{0};  // use for mesh to new meshes
+	u32 primCnt{0};  //  "   "  "  "
 	for (const auto& mesh : tmodel.meshes) {
-		std::vector<uint32_t> vprim;
+		std::vector<u32> vprim;
 		for (const auto& primitive : mesh.primitives) {
 			if (primitive.mode != 4)  // Triangle
 				continue;
 			const auto& posAccessor = tmodel.accessors[primitive.attributes.find("POSITION")->second];
-			// nbVert += static_cast<uint32_t>(posAccessor.count);
+			// nbVert += static_cast<u32>(posAccessor.count);
 			if (primitive.indices > -1) {
 				const auto& indexAccessor = tmodel.accessors[primitive.indices];
-				nbIndex += static_cast<uint32_t>(indexAccessor.count);
+				nbIndex += static_cast<u32>(indexAccessor.count);
 			} else {
-				nbIndex += static_cast<uint32_t>(posAccessor.count);
+				nbIndex += static_cast<u32>(posAccessor.count);
 			}
 			vprim.emplace_back(primCnt++);
 		}
@@ -171,7 +171,7 @@ void GltfScene::import_drawable_nodes(const tinygltf::Model& tmodel, GltfAttribu
 	}
 
 	// Transforming the scene hierarchy to a flat list
-	int defaultScene = tmodel.defaultScene > -1 ? tmodel.defaultScene : 0;
+	i32 defaultScene = tmodel.defaultScene > -1 ? tmodel.defaultScene : 0;
 	const auto& tscene = tmodel.scenes[defaultScene];
 	for (auto nodeIdx : tscene.nodes) {
 		process_node(tmodel, nodeIdx, glm::mat4(1));
@@ -189,7 +189,7 @@ void GltfScene::import_drawable_nodes(const tinygltf::Model& tmodel, GltfAttribu
 //--------------------------------------------------------------------------------------------------
 //
 //
-void GltfScene::process_node(const tinygltf::Model& tmodel, int& nodeIdx, const glm::mat4& parentMatrix) {
+void GltfScene::process_node(const tinygltf::Model& tmodel, i32& nodeIdx, const glm::mat4& parentMatrix) {
 	const auto& tnode = tmodel.nodes[nodeIdx];
 
 	glm::mat4 matrix = get_local_matrix(tnode);
@@ -213,12 +213,12 @@ void GltfScene::process_node(const tinygltf::Model& tmodel, int& nodeIdx, const 
 		if (has_extension(tnode.extensions, EXTENSION_ATTRIB_IRAY)) {
 			auto& iray_ext = tnode.extensions.at(EXTENSION_ATTRIB_IRAY);
 			auto& attributes = iray_ext.Get("attributes");
-			for (size_t idx = 0; idx < attributes.ArrayLen(); idx++) {
-				auto& attrib = attributes.Get((int)idx);
+			for (u64 idx = 0; idx < attributes.ArrayLen(); idx++) {
+				auto& attrib = attributes.Get((i32)idx);
 				std::string att_name = attrib.Get("name").Get<std::string>();
 				auto& att_value = attrib.Get("value");
 				if (att_value.IsArray()) {
-					auto vec = get_vector<float>(att_value);
+					auto vec = get_vector<f32>(att_value);
 					if (att_name == "iview:position")
 						camera.eye = {vec[0], vec[1], vec[2]};
 					else if (att_name == "iview:interest")
@@ -234,7 +234,7 @@ void GltfScene::process_node(const tinygltf::Model& tmodel, int& nodeIdx, const 
 		GltfLight light;
 		const auto& ext = tnode.extensions.find(KHR_LIGHTS_PUNCTUAL_EXTENSION_NAME)->second;
 		auto light_idx = ext.Get("light").GetNumberAsInt();
-		light.light = tmodel.lights[(int)light_idx];
+		light.light = tmodel.lights[(i32)light_idx];
 		light.world_matrix = worldMatrix;
 		lights.emplace_back(light);
 	}
@@ -258,8 +258,8 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel, const tinygltf::Prim
 	GltfPrimMesh result_mesh;
 	result_mesh.name = name;
 	result_mesh.material_idx = std::max(0, tmesh.material);
-	result_mesh.vtx_offset = static_cast<uint32_t>(positions.size());
-	result_mesh.first_idx = static_cast<uint32_t>(indices.size());
+	result_mesh.vtx_offset = static_cast<u32>(positions.size());
+	result_mesh.first_idx = static_cast<u32>(indices.size());
 
 	// Create a key made of the attributes, to see if the primitive was already
 	// processed. If it is, we will re-use the cache, but allow the material and
@@ -286,13 +286,13 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel, const tinygltf::Prim
 		const tinygltf::BufferView& buffer_view = tmodel.bufferViews[index_accessor.bufferView];
 		const tinygltf::Buffer& buffer = tmodel.buffers[buffer_view.buffer];
 
-		result_mesh.idx_count = static_cast<uint32_t>(index_accessor.count);
+		result_mesh.idx_count = static_cast<u32>(index_accessor.count);
 
 		switch (index_accessor.componentType) {
 			case TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT: {
 				primitive_indices_32u.resize(index_accessor.count);
 				memcpy(primitive_indices_32u.data(), &buffer.data[index_accessor.byteOffset + buffer_view.byteOffset],
-					   index_accessor.count * sizeof(uint32_t));
+					   index_accessor.count * sizeof(u32));
 				indices.insert(indices.end(), primitive_indices_32u.begin(), primitive_indices_32u.end());
 				break;
 			}
@@ -306,7 +306,7 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel, const tinygltf::Prim
 			case TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE: {
 				primitive_indices_8u.resize(index_accessor.count);
 				memcpy(primitive_indices_8u.data(), &buffer.data[index_accessor.byteOffset + buffer_view.byteOffset],
-					   index_accessor.count * sizeof(uint8_t));
+					   index_accessor.count * sizeof(u8));
 				indices.insert(indices.end(), primitive_indices_8u.begin(), primitive_indices_8u.end());
 				break;
 			}
@@ -318,7 +318,7 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel, const tinygltf::Prim
 		// Primitive without indices, creating them
 		const auto& accessor = tmodel.accessors[tmesh.attributes.find("POSITION")->second];
 		for (auto i = 0; i < accessor.count; i++) indices.push_back(i);
-		result_mesh.idx_count = static_cast<uint32_t>(accessor.count);
+		result_mesh.idx_count = static_cast<u32>(accessor.count);
 	}
 
 	if (prim_mesh_cached == false)	// Need to add this primitive
@@ -330,7 +330,7 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel, const tinygltf::Prim
 			// Keeping the size of this primitive (Spec says this is required
 			// information)
 			const auto& accessor = tmodel.accessors[tmesh.attributes.find("POSITION")->second];
-			result_mesh.vtx_count = static_cast<uint32_t>(accessor.count);
+			result_mesh.vtx_count = static_cast<u32>(accessor.count);
 			if (!accessor.minValues.empty())
 				result_mesh.pos_min = glm::vec3(accessor.minValues[0], accessor.minValues[1], accessor.minValues[2]);
 			if (!accessor.maxValues.empty())
@@ -342,10 +342,10 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel, const tinygltf::Prim
 			if (!get_attribute<glm::vec3>(tmodel, tmesh, normals, "NORMAL")) {
 				// Need to compute the normals
 				std::vector<glm::vec3> geonormal(result_mesh.vtx_count);
-				for (size_t i = 0; i < result_mesh.idx_count; i += 3) {
-					uint32_t ind0 = indices[result_mesh.first_idx + i + 0];
-					uint32_t ind1 = indices[result_mesh.first_idx + i + 1];
-					uint32_t ind2 = indices[result_mesh.first_idx + i + 2];
+				for (u64 i = 0; i < result_mesh.idx_count; i += 3) {
+					u32 ind0 = indices[result_mesh.first_idx + i + 0];
+					u32 ind1 = indices[result_mesh.first_idx + i + 1];
+					u32 ind2 = indices[result_mesh.first_idx + i + 2];
 					const auto& pos0 = positions[ind0 + result_mesh.vtx_offset];
 					const auto& pos1 = positions[ind1 + result_mesh.vtx_offset];
 					const auto& pos2 = positions[ind2 + result_mesh.vtx_offset];
@@ -371,17 +371,17 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel, const tinygltf::Prim
 				//      resultMesh.vertexCount, nvmath::vec2f(0, 0));
 
 				// Cube map projection
-				for (uint32_t i = 0; i < result_mesh.vtx_count; i++) {
+				for (u32 i = 0; i < result_mesh.vtx_count; i++) {
 					const auto& pos = positions[result_mesh.vtx_offset + i];
-					float absx = fabs(pos.x);
-					float absy = fabs(pos.y);
-					float absz = fabs(pos.z);
+					f32 absx = fabs(pos.x);
+					f32 absy = fabs(pos.y);
+					f32 absz = fabs(pos.z);
 
-					int is_x_positive = pos.x > 0 ? 1 : 0;
-					int is_y_positive = pos.y > 0 ? 1 : 0;
-					int is_z_positive = pos.z > 0 ? 1 : 0;
+					i32 is_x_positive = pos.x > 0 ? 1 : 0;
+					i32 is_y_positive = pos.y > 0 ? 1 : 0;
+					i32 is_z_positive = pos.z > 0 ? 1 : 0;
 
-					float maxAxis, uc, vc;
+					f32 maxAxis, uc, vc;
 
 					// POSITIVE X
 					if (is_x_positive && absx >= absy && absx >= absz) {
@@ -433,8 +433,8 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel, const tinygltf::Prim
 					}
 
 					// Convert range from -1 to 1 to 0 to 1
-					float u = 0.5f * (uc / maxAxis + 1.0f);
-					float v = 0.5f * (vc / maxAxis + 1.0f);
+					f32 u = 0.5f * (uc / maxAxis + 1.0f);
+					f32 v = 0.5f * (vc / maxAxis + 1.0f);
 
 					texcoords0.emplace_back(u, v);
 				}
@@ -452,19 +452,19 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel, const tinygltf::Prim
 
 				// Current implementation
 				// http://foundationsofgameenginedev.com/FGED2-sample.pdf
-				for (size_t i = 0; i < result_mesh.idx_count; i += 3) {
+				for (u64 i = 0; i < result_mesh.idx_count; i += 3) {
 					// local index
-					uint32_t i0 = indices[result_mesh.first_idx + i + 0];
-					uint32_t i1 = indices[result_mesh.first_idx + i + 1];
-					uint32_t i2 = indices[result_mesh.first_idx + i + 2];
+					u32 i0 = indices[result_mesh.first_idx + i + 0];
+					u32 i1 = indices[result_mesh.first_idx + i + 1];
+					u32 i2 = indices[result_mesh.first_idx + i + 2];
 					assert(i0 < result_mesh.vtx_count);
 					assert(i1 < result_mesh.vtx_count);
 					assert(i2 < result_mesh.vtx_count);
 
 					// global index
-					uint32_t gi0 = i0 + result_mesh.vtx_offset;
-					uint32_t gi1 = i1 + result_mesh.vtx_offset;
-					uint32_t gi2 = i2 + result_mesh.vtx_offset;
+					u32 gi0 = i0 + result_mesh.vtx_offset;
+					u32 gi1 = i1 + result_mesh.vtx_offset;
+					u32 gi2 = i2 + result_mesh.vtx_offset;
 
 					const auto& p0 = positions[gi0];
 					const auto& p1 = positions[gi1];
@@ -480,8 +480,8 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel, const tinygltf::Prim
 					glm::vec2 duvE1 = uv1 - uv0;
 					glm::vec2 duvE2 = uv2 - uv0;
 
-					float r = 1.0F;
-					float a = duvE1.x * duvE2.y - duvE2.x * duvE1.y;
+					f32 r = 1.0F;
+					f32 a = duvE1.x * duvE2.y - duvE2.x * duvE1.y;
 					if (fabs(a) > 0)  // Catch degenerated UV
 					{
 						r = 1.0f / a;
@@ -499,7 +499,7 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel, const tinygltf::Prim
 					bitangent[i2] += b;
 				}
 
-				for (uint32_t a = 0; a < result_mesh.vtx_count; a++) {
+				for (u32 a = 0; a < result_mesh.vtx_count; a++) {
 					const auto& t = tangent[a];
 					const auto& b = bitangent[a];
 					const auto& n = normals[result_mesh.vtx_offset + a];
@@ -508,7 +508,7 @@ void GltfScene::process_mesh(const tinygltf::Model& tmodel, const tinygltf::Prim
 					glm::vec3 tangent = glm::normalize(t - (glm::dot(n, t) * n));
 
 					// Calculate handedness
-					float handedness = (glm::dot(glm::cross(n, t), b) < 0.0F) ? -1.0F : 1.0F;
+					f32 handedness = (glm::dot(glm::cross(n, t), b) < 0.0F) ? -1.0F : 1.0F;
 					tangents.emplace_back(tangent.x, tangent.y, tangent.z, handedness);
 				}
 			}
@@ -545,15 +545,15 @@ glm::mat4 get_local_matrix(const tinygltf::Node& tnode) {
 			glm::translate(mtranslation, glm::vec3(tnode.translation[0], tnode.translation[1], tnode.translation[2]));
 	if (!tnode.scale.empty()) mscale = glm::scale(mscale, glm::vec3(tnode.scale[0], tnode.scale[1], tnode.scale[2]));
 	if (!tnode.rotation.empty()) {
-		mrotation[0] = static_cast<float>(tnode.rotation[0]);
-		mrotation[1] = static_cast<float>(tnode.rotation[1]);
-		mrotation[2] = static_cast<float>(tnode.rotation[2]);
-		mrotation[3] = static_cast<float>(tnode.rotation[3]);
+		mrotation[0] = static_cast<f32>(tnode.rotation[0]);
+		mrotation[1] = static_cast<f32>(tnode.rotation[1]);
+		mrotation[2] = static_cast<f32>(tnode.rotation[2]);
+		mrotation[3] = static_cast<f32>(tnode.rotation[3]);
 		mrot = glm::toMat4(mrotation);
 	}
 	if (!tnode.matrix.empty()) {
-		float nodes[16];
-		for (int i = 0; i < 16; ++i) nodes[i] = static_cast<float>(tnode.matrix[i]);
+		f32 nodes[16];
+		for (i32 i = 0; i < 16; ++i) nodes[i] = static_cast<f32>(tnode.matrix[i]);
 		matrix = glm::make_mat4(nodes);
 	}
 	return mtranslation * mrot * mscale * matrix;
@@ -606,10 +606,10 @@ void GltfScene::compute_scene_dimensions() {
 	m_dimensions.radius = scnBbox.radius();
 }
 
-static uint32_t recursive_triangle_count(const tinygltf::Model& model, int node_idx,
-										 const std::vector<uint32_t>& mesh_triangle) {
+static u32 recursive_triangle_count(const tinygltf::Model& model, i32 node_idx,
+										 const std::vector<u32>& mesh_triangle) {
 	auto& node = model.nodes[node_idx];
-	uint32_t nb_triangles{0};
+	u32 nb_triangles{0};
 	for (const auto child : node.children) {
 		nb_triangles += recursive_triangle_count(model, child, mesh_triangle);
 	}
@@ -625,14 +625,14 @@ static uint32_t recursive_triangle_count(const tinygltf::Model& model, int node_
 GltfStats GltfScene::get_statistics(const tinygltf::Model& tinyModel) {
 	GltfStats stats;
 
-	stats.nb_cameras = static_cast<uint32_t>(tinyModel.cameras.size());
-	stats.nb_images = static_cast<uint32_t>(tinyModel.images.size());
-	stats.nb_textures = static_cast<uint32_t>(tinyModel.textures.size());
-	stats.nb_materials = static_cast<uint32_t>(tinyModel.materials.size());
-	stats.nb_samplers = static_cast<uint32_t>(tinyModel.samplers.size());
-	stats.nb_nodes = static_cast<uint32_t>(tinyModel.nodes.size());
-	stats.nb_meshes = static_cast<uint32_t>(tinyModel.meshes.size());
-	stats.nb_lights = static_cast<uint32_t>(tinyModel.lights.size());
+	stats.nb_cameras = static_cast<u32>(tinyModel.cameras.size());
+	stats.nb_images = static_cast<u32>(tinyModel.images.size());
+	stats.nb_textures = static_cast<u32>(tinyModel.textures.size());
+	stats.nb_materials = static_cast<u32>(tinyModel.materials.size());
+	stats.nb_samplers = static_cast<u32>(tinyModel.samplers.size());
+	stats.nb_nodes = static_cast<u32>(tinyModel.nodes.size());
+	stats.nb_meshes = static_cast<u32>(tinyModel.meshes.size());
+	stats.nb_lights = static_cast<u32>(tinyModel.lights.size());
 
 	// Computing the memory usage for images
 	for (const auto& image : tinyModel.images) {
@@ -640,16 +640,16 @@ GltfStats GltfScene::get_statistics(const tinygltf::Model& tinyModel) {
 	}
 
 	// Computing the number of triangles
-	std::vector<uint32_t> mesh_triangle(tinyModel.meshes.size());
-	uint32_t meshIdx{0};
+	std::vector<u32> mesh_triangle(tinyModel.meshes.size());
+	u32 meshIdx{0};
 	for (const auto& mesh : tinyModel.meshes) {
 		for (const auto& primitive : mesh.primitives) {
 			if (primitive.indices > -1) {
 				const tinygltf::Accessor& indexAccessor = tinyModel.accessors[primitive.indices];
-				mesh_triangle[meshIdx] += static_cast<uint32_t>(indexAccessor.count) / 3;
+				mesh_triangle[meshIdx] += static_cast<u32>(indexAccessor.count) / 3;
 			} else {
 				const auto& pos_accessor = tinyModel.accessors[primitive.attributes.find("POSITION")->second];
-				mesh_triangle[meshIdx] += static_cast<uint32_t>(pos_accessor.count) / 3;
+				mesh_triangle[meshIdx] += static_cast<u32>(pos_accessor.count) / 3;
 			}
 		}
 		meshIdx++;
@@ -685,7 +685,7 @@ void GltfScene::compute_camera() {
 			glm::vec4 perspective;
 			glm::decompose(camera.world_matrix, scale, rotation, translation, skew, perspective);
 			camera.eye = translation;
-			float distance = glm::length(m_dimensions.center - camera.eye);
+			f32 distance = glm::length(m_dimensions.center - camera.eye);
 			camera.center = {0, 0, -distance};
 			camera.center = camera.eye + (rotation * camera.center);
 			camera.up = {0, 1, 0};

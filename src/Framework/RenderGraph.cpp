@@ -4,6 +4,7 @@
 #include "GPUQueryManager.h"
 #include "PersistentResourceManager.h"
 #include "DynamicResourceManager.h"
+#include "Framework/ThreadPool.h"
 
 namespace lm {
 
@@ -196,7 +197,7 @@ void RenderPass::transition_resources() {
 		for (vk::Texture* tex : explicit_tex_writes) {
 			write_impl(tex);
 		}
-		for (int i = 0; i < pipeline_storage->bound_resources.size(); i++) {
+		for (i32 i = 0; i < pipeline_storage->bound_resources.size(); i++) {
 			descriptor_infos[i] = pipeline_storage->bound_resources[i].get_descriptor_info();
 		}
 	}
@@ -391,7 +392,7 @@ RenderPass& RenderPass::bind_texture_array(std::span<vk::Texture*> textures, boo
 		for (auto& texture : textures) {
 			pipeline_storage->bound_resources.emplace_back(texture);
 		}
-		descriptor_counts.push_back((uint32_t)textures.size());
+		descriptor_counts.push_back((u32)textures.size());
 	} else {
 		for (auto i = 0; i < textures.size(); i++) {
 			pipeline_storage->bound_resources[next_binding_idx + i].replace(textures[i]);
@@ -405,7 +406,7 @@ RenderPass& RenderPass::bind_buffer_array(std::span<vk::Buffer*> buffers, bool f
 		for (auto& buffer : buffers) {
 			pipeline_storage->bound_resources.emplace_back(buffer);
 		}
-		descriptor_counts.push_back((uint32_t)buffers.size());
+		descriptor_counts.push_back((u32)buffers.size());
 	} else {
 		for (auto i = 0; i < buffers.size(); i++) {
 			pipeline_storage->bound_resources[next_binding_idx + i].replace(buffers[i]);
@@ -550,7 +551,7 @@ RenderPass& RenderPass::build_blas(util::Slice<vk::BVH> blases, const std::vecto
 	return *this;
 }
 
-RenderPass& RenderPass::build_tlas(vk::BVH& tlas, vk::Buffer* instances_buf, uint32_t instance_count,
+RenderPass& RenderPass::build_tlas(vk::BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
 								   VkBuildAccelerationStructureFlagsKHR flags, vk::Buffer** scratch_buffer_ref,
 								   bool build_tlas_after_blas, bool update_tlas) {
 	LUMEN_ASSERT(!tlas_build_data.is_valid(), "Only one TLAS build per pass is supported");
@@ -570,8 +571,8 @@ void RenderPass::finalize() {
 
 	auto update_rt_descriptors = [this]() {
 		VkAccelerationStructureKHR accels[vk::MAX_AS_BINDING_COUNT];
-		uint32_t num_accels = 0;
-		for (uint32_t i = 0; i < pipeline_storage->as_bindings.size(); i++) {
+		u32 num_accels = 0;
+		for (u32 i = 0; i < pipeline_storage->as_bindings.size(); i++) {
 			if (!pipeline_storage->as_bindings[i].accel) {
 				LUMEN_INFO("Using null descriptor inside {}", name);
 			}
@@ -607,7 +608,7 @@ void RenderPass::finalize() {
 				auto func = [update_rt_descriptors](RenderPass* pass) {
 					pass->pipeline_storage->pipeline->create_rt_pipeline(
 						*pass->rt_settings, pass->descriptor_counts,
-						uint32_t(pass->pipeline_storage->as_bindings.size()));
+						u32(pass->pipeline_storage->as_bindings.size()));
 					update_rt_descriptors();
 				};
 				if (rg->multithreaded_pipeline_compilation) {
@@ -676,7 +677,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	// Wait: Buffer
 	auto& buffer_sync = rg->buffer_sync_resources[pass_idx];
 	auto& img_sync = rg->img_sync_resources[pass_idx];
-	int i = 0;
+	i32 i = 0;
 	for (const auto& [k, v] : wait_signals_buffer) {
 		if (use_events) {
 			LUMEN_ASSERT(rg->passes[v.opposing_pass_idx].set_signals_buffer[k].event, "Event can't be null");
@@ -692,8 +693,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		i++;
 	}
 	if (wait_events.size()) {
-		vkCmdWaitEvents2(cmd, (uint32_t)wait_events.size(), wait_events.data(), buffer_sync.dependency_infos.data());
-		for (int i = 0; i < wait_events.size(); i++) {
+		vkCmdWaitEvents2(cmd, (u32)wait_events.size(), wait_events.data(), buffer_sync.dependency_infos.data());
+		for (i32 i = 0; i < wait_events.size(); i++) {
 			vkCmdResetEvent2(cmd, wait_events[i], buffer_sync.buffer_bariers[i].dstStageMask);
 		}
 	} else if (!use_events) {
@@ -716,7 +717,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 																	 barrier.dst_access_flags, curr_stage, dst_stage));
 			}
 			auto dependency_info =
-				vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
+				vk::dependency_info((u32)buffer_memory_barriers.size(), buffer_memory_barriers.data());
 			vkCmdPipelineBarrier2(cmd, &dependency_info);
 		}
 	}
@@ -740,7 +741,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 																	 barrier.dst_access_flags, curr_stage, dst_stage));
 			}
 			auto dependency_info =
-				vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
+				vk::dependency_info((u32)buffer_memory_barriers.size(), buffer_memory_barriers.data());
 			vkCmdPipelineBarrier2(cmd, &dependency_info);
 		}
 	}
@@ -767,8 +768,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	}
 
 	if (wait_events.size()) {
-		vkCmdWaitEvents2(cmd, (uint32_t)wait_events.size(), wait_events.data(), img_sync.dependency_infos.data());
-		for (int i = 0; i < wait_events.size(); i++) {
+		vkCmdWaitEvents2(cmd, (u32)wait_events.size(), wait_events.data(), img_sync.dependency_infos.data());
+		for (i32 i = 0; i < wait_events.size(); i++) {
 			vkCmdResetEvent2(cmd, wait_events[i], img_sync.img_barriers[i].dstStageMask);
 		}
 	} else if (!use_events) {
@@ -835,7 +836,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 				auto& width = gfx_settings->width;
 				auto& height = gfx_settings->height;
-				VkViewport viewport = vk::viewport((float)width, (float)height, 0.0f, 1.0f);
+				VkViewport viewport = vk::viewport((f32)width, (f32)height, 0.0f, 1.0f);
 				VkRect2D scissor = vk::rect2D(width, height, 0, 0);
 				vkCmdSetViewport(cmd, 0, 1, &viewport);
 				vkCmdSetScissor(cmd, 0, 1, &scissor);
@@ -846,7 +847,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 					for (auto& buf : gfx_settings->vertex_buffers) {
 						vert_buffers[i] = buf->handle;
 					}
-					vkCmdBindVertexBuffers(cmd, 0, (uint32_t)vert_buffers.size(), vert_buffers.data(), offsets.data());
+					vkCmdBindVertexBuffers(cmd, 0, (u32)vert_buffers.size(), vert_buffers.data(), offsets.data());
 				}
 
 				if (gfx_settings->index_buffer) {
@@ -873,7 +874,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 					VkRenderingInfo render_info{.sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
 												.renderArea = {{0, 0}, {gfx_settings->width, gfx_settings->height}},
 												.layerCount = 1,
-												.colorAttachmentCount = (uint32_t)color_outputs.size(),
+												.colorAttachmentCount = (u32)color_outputs.size(),
 												.pColorAttachments = rendering_attachments.data(),
 												.pDepthAttachment = depth_output ? &depth_stencil_attachment : nullptr};
 					vkCmdBeginRendering(cmd, &render_info);
@@ -907,7 +908,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				post_execution_buffer_memory_barriers.push_back(vk::buffer_barrier2(
 					barrier.buffer, barrier.src_access_flags, barrier.dst_access_flags, curr_stage, dst_stage));
 			}
-			auto dependency_info = vk::dependency_info((uint32_t)post_execution_buffer_memory_barriers.size(),
+			auto dependency_info = vk::dependency_info((u32)post_execution_buffer_memory_barriers.size(),
 													   post_execution_buffer_memory_barriers.data());
 			vkCmdPipelineBarrier2(cmd, &dependency_info);
 		}
@@ -958,7 +959,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		if (tlas_build_data.build_tlas_after_blas) {
 			LUMEN_ASSERT(tlas_build_data.tlas, "TLAS reference is null");
 			void* instance_data = vk::buffer_map(tlas_build_data.instances_buf);
-			for (size_t i = 0; i < blas_build_data.blases.size; i++) {
+			for (u64 i = 0; i < blas_build_data.blases.size; i++) {
 				VkAccelerationStructureInstanceKHR* instance = (VkAccelerationStructureInstanceKHR*)instance_data + i;
 				instance->accelerationStructureReference = blas_build_data.blases[i].get_device_address();
 			}
@@ -972,7 +973,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				blas_build_data.blases[0].buffer->handle, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
 				VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR, curr_stage, dst_stage));
 			auto dependency_info =
-				vk::dependency_info((uint32_t)buffer_memory_barriers.size(), buffer_memory_barriers.data());
+				vk::dependency_info((u32)buffer_memory_barriers.size(), buffer_memory_barriers.data());
 			vkCmdPipelineBarrier2(cmd, &dependency_info);
 #endif
 		}

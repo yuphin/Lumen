@@ -28,33 +28,33 @@ struct input_map_hash {
 	}
 };
 
-static std::unordered_map<std::pair<spirv_cross::SPIRType::BaseType, uint32_t>, std::pair<VkFormat, uint32_t>,
+static std::unordered_map<std::pair<spirv_cross::SPIRType::BaseType, u32>, std::pair<VkFormat, u32>,
 						  input_map_hash>
 	vertex_input_map = {
-		{{spirv_cross::SPIRType::BaseType::Int, 1u}, {VK_FORMAT_R32_SINT, (uint32_t)sizeof(int)}},
-		{{spirv_cross::SPIRType::BaseType::Int, 2u}, {VK_FORMAT_R32G32_SINT, 2 * (uint32_t)sizeof(int)}},
-		{{spirv_cross::SPIRType::BaseType::Int, 3u}, {VK_FORMAT_R32G32B32_SINT, 3 * (uint32_t)sizeof(int)}},
-		{{spirv_cross::SPIRType::BaseType::Int, 4u}, {VK_FORMAT_R32G32B32A32_SINT, 4 * (uint32_t)sizeof(int)}},
-		{{spirv_cross::SPIRType::BaseType::Int, 1u}, {VK_FORMAT_R32_UINT, (uint32_t)sizeof(int)}},
-		{{spirv_cross::SPIRType::BaseType::UInt, 2u}, {VK_FORMAT_R32G32_UINT, 2 * (uint32_t)sizeof(int)}},
-		{{spirv_cross::SPIRType::BaseType::UInt, 3u}, {VK_FORMAT_R32G32B32_UINT, 3 * (uint32_t)sizeof(int)}},
-		{{spirv_cross::SPIRType::BaseType::UInt, 4u}, {VK_FORMAT_R32G32B32A32_UINT, 4 * (uint32_t)sizeof(int)}},
-		{{spirv_cross::SPIRType::BaseType::Short, 1u}, {VK_FORMAT_R16_SINT, (uint32_t)sizeof(int) / 2}},
-		{{spirv_cross::SPIRType::BaseType::Short, 2u}, {VK_FORMAT_R16G16_SINT, 2 * (uint32_t)sizeof(int) / 2}},
-		{{spirv_cross::SPIRType::BaseType::Short, 3u}, {VK_FORMAT_R16G16B16_SINT, 3 * (uint32_t)sizeof(int) / 2}},
-		{{spirv_cross::SPIRType::BaseType::Short, 4u}, {VK_FORMAT_R16G16B16A16_SINT, 4 * (uint32_t)sizeof(int) / 2}},
-		{{spirv_cross::SPIRType::BaseType::UShort, 1u}, {VK_FORMAT_R16_UINT, (uint32_t)sizeof(int) / 2}},
-		{{spirv_cross::SPIRType::BaseType::UShort, 2u}, {VK_FORMAT_R16G16_UINT, 2 * (uint32_t)sizeof(int) / 2}},
-		{{spirv_cross::SPIRType::BaseType::UShort, 3u}, {VK_FORMAT_R16G16B16_UINT, 3 * (uint32_t)sizeof(int) / 2}},
-		{{spirv_cross::SPIRType::BaseType::UShort, 4u}, {VK_FORMAT_R16G16B16A16_UINT, 4 * (uint32_t)sizeof(int) / 2}},
-		{{spirv_cross::SPIRType::BaseType::Float, 1u}, {VK_FORMAT_R32_SFLOAT, (uint32_t)sizeof(float)}},
-		{{spirv_cross::SPIRType::BaseType::Float, 2u}, {VK_FORMAT_R32G32_SFLOAT, 2 * (uint32_t)sizeof(float)}},
-		{{spirv_cross::SPIRType::BaseType::Float, 3u}, {VK_FORMAT_R32G32B32_SFLOAT, 3 * (uint32_t)sizeof(float)}},
-		{{spirv_cross::SPIRType::BaseType::Float, 4u}, {VK_FORMAT_R32G32B32A32_SFLOAT, 4 * (uint32_t)sizeof(float)}},
-		{{spirv_cross::SPIRType::BaseType::Half, 1u}, {VK_FORMAT_R16_SFLOAT, (uint32_t)sizeof(float) / 2}},
-		{{spirv_cross::SPIRType::BaseType::Half, 2u}, {VK_FORMAT_R16G16_SFLOAT, 2 * (uint32_t)sizeof(float) / 2}},
-		{{spirv_cross::SPIRType::BaseType::Half, 3u}, {VK_FORMAT_R16G16B16_SFLOAT, 3 * (uint32_t)sizeof(float) / 2}},
-		{{spirv_cross::SPIRType::BaseType::Half, 4u}, {VK_FORMAT_R16G16B16A16_SFLOAT, 4 * (uint32_t)sizeof(float) / 2}},
+		{{spirv_cross::SPIRType::BaseType::Int, 1u}, {VK_FORMAT_R32_SINT, (u32)sizeof(i32)}},
+		{{spirv_cross::SPIRType::BaseType::Int, 2u}, {VK_FORMAT_R32G32_SINT, 2 * (u32)sizeof(i32)}},
+		{{spirv_cross::SPIRType::BaseType::Int, 3u}, {VK_FORMAT_R32G32B32_SINT, 3 * (u32)sizeof(i32)}},
+		{{spirv_cross::SPIRType::BaseType::Int, 4u}, {VK_FORMAT_R32G32B32A32_SINT, 4 * (u32)sizeof(i32)}},
+		{{spirv_cross::SPIRType::BaseType::Int, 1u}, {VK_FORMAT_R32_UINT, (u32)sizeof(i32)}},
+		{{spirv_cross::SPIRType::BaseType::UInt, 2u}, {VK_FORMAT_R32G32_UINT, 2 * (u32)sizeof(i32)}},
+		{{spirv_cross::SPIRType::BaseType::UInt, 3u}, {VK_FORMAT_R32G32B32_UINT, 3 * (u32)sizeof(i32)}},
+		{{spirv_cross::SPIRType::BaseType::UInt, 4u}, {VK_FORMAT_R32G32B32A32_UINT, 4 * (u32)sizeof(i32)}},
+		{{spirv_cross::SPIRType::BaseType::Short, 1u}, {VK_FORMAT_R16_SINT, (u32)sizeof(i32) / 2}},
+		{{spirv_cross::SPIRType::BaseType::Short, 2u}, {VK_FORMAT_R16G16_SINT, 2 * (u32)sizeof(i32) / 2}},
+		{{spirv_cross::SPIRType::BaseType::Short, 3u}, {VK_FORMAT_R16G16B16_SINT, 3 * (u32)sizeof(i32) / 2}},
+		{{spirv_cross::SPIRType::BaseType::Short, 4u}, {VK_FORMAT_R16G16B16A16_SINT, 4 * (u32)sizeof(i32) / 2}},
+		{{spirv_cross::SPIRType::BaseType::UShort, 1u}, {VK_FORMAT_R16_UINT, (u32)sizeof(i32) / 2}},
+		{{spirv_cross::SPIRType::BaseType::UShort, 2u}, {VK_FORMAT_R16G16_UINT, 2 * (u32)sizeof(i32) / 2}},
+		{{spirv_cross::SPIRType::BaseType::UShort, 3u}, {VK_FORMAT_R16G16B16_UINT, 3 * (u32)sizeof(i32) / 2}},
+		{{spirv_cross::SPIRType::BaseType::UShort, 4u}, {VK_FORMAT_R16G16B16A16_UINT, 4 * (u32)sizeof(i32) / 2}},
+		{{spirv_cross::SPIRType::BaseType::Float, 1u}, {VK_FORMAT_R32_SFLOAT, (u32)sizeof(f32)}},
+		{{spirv_cross::SPIRType::BaseType::Float, 2u}, {VK_FORMAT_R32G32_SFLOAT, 2 * (u32)sizeof(f32)}},
+		{{spirv_cross::SPIRType::BaseType::Float, 3u}, {VK_FORMAT_R32G32B32_SFLOAT, 3 * (u32)sizeof(f32)}},
+		{{spirv_cross::SPIRType::BaseType::Float, 4u}, {VK_FORMAT_R32G32B32A32_SFLOAT, 4 * (u32)sizeof(f32)}},
+		{{spirv_cross::SPIRType::BaseType::Half, 1u}, {VK_FORMAT_R16_SFLOAT, (u32)sizeof(f32) / 2}},
+		{{spirv_cross::SPIRType::BaseType::Half, 2u}, {VK_FORMAT_R16G16_SFLOAT, 2 * (u32)sizeof(f32) / 2}},
+		{{spirv_cross::SPIRType::BaseType::Half, 3u}, {VK_FORMAT_R16G16B16_SFLOAT, 3 * (u32)sizeof(f32) / 2}},
+		{{spirv_cross::SPIRType::BaseType::Half, 4u}, {VK_FORMAT_R16G16B16A16_SFLOAT, 4 * (u32)sizeof(f32) / 2}},
 };
 
 static VkShaderStageFlagBits get_shader_stage(spv::ExecutionModel executionModel) {
@@ -85,10 +85,10 @@ static VkShaderStageFlagBits get_shader_stage(spv::ExecutionModel executionModel
 	}
 }
 
-static uint32_t get_pc_size(spirv_cross::CompilerGLSL& glsl, const spirv_cross::SPIRType& type) {
-	uint32_t num_types = (uint32_t)type.member_types.size();
-	uint32_t pc_size = 0;
-	for (uint32_t i = 0; i < num_types; i++) {
+static u32 get_pc_size(spirv_cross::CompilerGLSL& glsl, const spirv_cross::SPIRType& type) {
+	u32 num_types = (u32)type.member_types.size();
+	u32 pc_size = 0;
+	for (u32 i = 0; i < num_types; i++) {
 		auto member_type_id = type.member_types[i];
 		auto member_type_handle = glsl.get_type(member_type_id);
 		auto member_base_type = member_type_handle.basetype;
@@ -125,14 +125,14 @@ static uint32_t get_pc_size(spirv_cross::CompilerGLSL& glsl, const spirv_cross::
 	return pc_size;
 }
 
-static bool is_bound_buffer(uint32_t storage_class) {
+static bool is_bound_buffer(u32 storage_class) {
 	if (storage_class == spv::StorageClassStorageBuffer) {
 		return true;
 	}
 	return false;
 }
 
-static bool is_buffer(uint32_t storage_class) {
+static bool is_buffer(u32 storage_class) {
 	if (storage_class == spv::StorageClassStorageBuffer || storage_class == spv::StorageClassPhysicalStorageBuffer) {
 		return true;
 	}
@@ -140,7 +140,7 @@ static bool is_buffer(uint32_t storage_class) {
 }
 
 static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::ShaderResources& resources, Shader& shader,
-						const uint32_t* code, size_t code_size, lm::RenderPass* pass) {
+						const u32* code, u64 code_size, lm::RenderPass* pass) {
 	// Update the resource status of image types
 	// Storage Image -> Write
 	// Sampled Image -> Read
@@ -168,28 +168,28 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 	}
 	assert(code[0] == SpvMagicNumber);
 
-	// uint32_t num_ids = code[3];
+	// u32 num_ids = code[3];
 
-	const uint32_t* insn = code + 5;
+	const u32* insn = code + 5;
 
 	struct Variable {
-		uint32_t storage_class;
+		u32 storage_class;
 	};
 
 	struct AccessChain {
-		uint32_t base_ptr_id;
-		uint32_t base_idx;
-		uint32_t offset_idx;
+		u32 base_ptr_id;
+		u32 base_idx;
+		u32 offset_idx;
 	};
 
-	std::unordered_map<uint32_t, AccessChain> access_chain_map;
-	std::unordered_map<uint32_t, Variable> variable_map;
-	std::unordered_map<uint32_t, uint32_t> load_map;		  // Dst Id - Ptr Id
-	std::unordered_map<uint32_t, uint32_t> store_access_map;  //  Ptr Data from load_map
-	std::unordered_map<uint32_t, uint32_t> constant_map;
-	std::unordered_map<uint32_t, std::string> buffer_ptr_hash_map;
+	std::unordered_map<u32, AccessChain> access_chain_map;
+	std::unordered_map<u32, Variable> variable_map;
+	std::unordered_map<u32, u32> load_map;		  // Dst Id - Ptr Id
+	std::unordered_map<u32, u32> store_access_map;  //  Ptr Data from load_map
+	std::unordered_map<u32, u32> constant_map;
+	std::unordered_map<u32, std::string> buffer_ptr_hash_map;
 
-	auto store_helper = [&](uint32_t store_id) {
+	auto store_helper = [&](u32 store_id) {
 		if (access_chain_map.find(store_id) != access_chain_map.end()) {
 			const auto& access_chain = access_chain_map[store_id];
 			if (variable_map.find(access_chain.base_ptr_id) != variable_map.end()) {
@@ -244,7 +244,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 
 			case SpvOpVariable: {
 				assert(word_count >= 4);
-				uint32_t storage_class = insn[3];
+				u32 storage_class = insn[3];
 				auto type = glsl.get_type_from_variable(insn[2]);
 				if (storage_class != spv::StorageClassInput) {
 					variable_map[insn[2]] = Variable{.storage_class = storage_class};
@@ -252,8 +252,8 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 			} break;
 			case SpvOpAccessChain: {
 				assert(word_count >= 4);
-				uint32_t result_id = insn[2];
-				uint32_t base_ptr_id = insn[3];
+				u32 result_id = insn[2];
+				u32 base_ptr_id = insn[3];
 				auto base_idx = insn[4];
 				auto idx = insn[5];
 				access_chain_map[result_id] = {base_ptr_id, base_idx, idx};
@@ -270,13 +270,13 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 
 			case SpvOpLoad: {
 				assert(word_count >= 3);
-				uint32_t ptr_var_id = insn[3];
+				u32 ptr_var_id = insn[3];
 				auto result_type = glsl.get_type(insn[1]);
 
 				if (result_type.basetype == spirv_cross::SPIRType::UInt64) {
 					// We are loading a pointer, update register map
 					// Previous assumption also holds
-					uint32_t id = insn[3];
+					u32 id = insn[3];
 					if (access_chain_map.find(id) != access_chain_map.end()) {
 						const AccessChain& access_chain = access_chain_map[id];
 						auto storage_class = glsl.get_storage_class(access_chain.base_ptr_id);
@@ -350,13 +350,13 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 			case SpvOpAtomicOr:
 			case SpvOpAtomicXor:
 			case SpvOpAtomicIAdd: {
-				uint32_t store_id = insn[3];
+				u32 store_id = insn[3];
 				store_helper(store_id);
 			} break;
 
 			case SpvOpStore: {
 				assert(word_count >= 3);
-				uint32_t store_id = insn[1];
+				u32 store_id = insn[1];
 
 				store_helper(store_id);
 
@@ -366,7 +366,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 					std::string container_name;
 					std::string ptr_name;
 					std::string pointee_type_name;
-					const uint32_t ptr_id = insn[1];
+					const u32 ptr_id = insn[1];
 					auto var_name = glsl.get_name(ptr_id);
 					auto ptr_type = glsl.get_type_from_variable(ptr_id);
 					if (constant_map.find(access_chain.offset_idx) != constant_map.end()) {
@@ -390,7 +390,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 	}
 }
 
-static void parse_shader(Shader& shader, const uint32_t* code, size_t code_size, lm::RenderPass* pass) {
+static void parse_shader(Shader& shader, const u32* code, u64 code_size, lm::RenderPass* pass) {
 	spirv_cross::CompilerGLSL glsl(code, code_size);
 	spirv_cross::ShaderResources resources = glsl.get_shader_resources();
 
@@ -448,7 +448,7 @@ static void parse_shader(Shader& shader, const uint32_t* code, size_t code_size,
 				 "Only 1 push constant is supported per shader at the moment!");
 	if (resources.push_constant_buffers.size()) {
 		auto type = glsl.get_type(resources.push_constant_buffers[0].type_id);
-		uint32_t pc_size = get_pc_size(glsl, type);
+		u32 pc_size = get_pc_size(glsl, type);
 		shader.push_constant_size = pc_size;
 	}
 	if (pass->rg->settings.shader_inference) {
@@ -464,7 +464,7 @@ static std::unordered_map<std::string, shaderc_shader_kind> mstages = {
 	{"rmiss", shaderc_miss_shader},
 };
 
-static std::vector<uint32_t> compile_file(const std::string& source_name, shaderc_shader_kind kind,
+static std::vector<u32> compile_file(const std::string& source_name, shaderc_shader_kind kind,
 										  const std::string& source, lm::RenderPass* pass, bool optimize = false) {
 	shaderc::Compiler compiler;
 	shaderc::CompileOptions options;
@@ -497,7 +497,7 @@ static std::vector<uint32_t> compile_file(const std::string& source_name, shader
 
 	if (module.GetCompilationStatus() != shaderc_compilation_status_success) {
 		std::cerr << module.GetErrorMessage();
-		return std::vector<uint32_t>();
+		return std::vector<u32>();
 	}
 
 	return {module.cbegin(), module.cend()};
@@ -505,7 +505,7 @@ static std::vector<uint32_t> compile_file(const std::string& source_name, shader
 #endif
 
 Shader::Shader(const std::string& filename) : filename(filename) {}
-int Shader::compile(lm::RenderPass* pass) {
+i32 Shader::compile(lm::RenderPass* pass) {
 	LUMEN_TRACE("Compiling shader: {0}", name_with_macros);
 #if USE_SHADERC
 	std::ifstream fin(filename);
@@ -534,7 +534,7 @@ int Shader::compile(lm::RenderPass* pass) {
 #endif	//  NDEBUG
 
 	binary.clear();
-	int ret_val = std::system(str.data());
+	i32 ret_val = std::system(str.data());
 	std::ifstream bin(file_path, std::ios::ate | std::ios::binary);
 	if (!bin.good() && ret_val) {
 		LUMEN_ERROR(std::string("Shader compilation failed: " + filename).data());
@@ -543,7 +543,7 @@ int Shader::compile(lm::RenderPass* pass) {
 	} else if (ret_val) {
 		LUMEN_WARN(std::string("Shader compilation failed, resuming from old shader: " + filename).data());
 	}
-	size_t file_size = (size_t)bin.tellg();
+	u64 file_size = (u64)bin.tellg();
 	bin.seekg(0);
 	binary.resize(file_size / 4);
 	bin.read((char*)binary.data(), file_size);
@@ -557,7 +557,7 @@ VkShaderModule Shader::create_vk_shader_module(const VkDevice& device) const {
 	VkShaderModuleCreateInfo shader_module_CI{};
 	shader_module_CI.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	shader_module_CI.codeSize = binary.size() * 4;
-	shader_module_CI.pCode = (uint32_t*)binary.data();
+	shader_module_CI.pCode = (u32*)binary.data();
 	shader_module_CI.pNext = nullptr;
 
 	VkShaderModule shader_module;

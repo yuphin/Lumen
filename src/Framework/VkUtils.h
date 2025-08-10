@@ -86,7 +86,7 @@ inline VkImageMemoryBarrier2 image_barrier2(VkImage image, VkAccessFlags src_acc
 inline VkImageMemoryBarrier2 image_barrier2(VkImage image, VkAccessFlags src_accesss, VkAccessFlags dst_access,
 											VkImageLayout old_layout, VkImageLayout new_layout,
 											VkImageAspectFlags aspect_mask, VkPipelineStageFlags src_stage,
-											VkPipelineStageFlags dst_stage, uint32_t queue_idx) {
+											VkPipelineStageFlags dst_stage, u32 queue_idx) {
 	VkImageMemoryBarrier2 result = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
 
 	result.srcAccessMask = src_accesss;
@@ -114,8 +114,8 @@ inline VkDeviceSize get_memory_usage(VkPhysicalDevice physical_device) {
 	return budget_props.heapUsage[0];
 }
 
-inline uint32_t calc_mip_levels(VkExtent2D extent) {
-	return static_cast<uint32_t>(std::floor(std::log2(std::max(extent.width, extent.height)))) + 1;
+inline u32 calc_mip_levels(VkExtent2D extent) {
+	return static_cast<u32>(std::floor(std::log2(std::max(extent.width, extent.height)))) + 1;
 }
 
 namespace DebugMarker {
@@ -134,7 +134,7 @@ inline void begin_region(VkDevice device, VkCommandBuffer cmd, const char* name,
 	if (pfnCmdDebugMarkerBegin) {
 		VkDebugMarkerMarkerInfoEXT info = {};
 		info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
-		memcpy(info.color, &color[0], sizeof(float) * 4);
+		memcpy(info.color, &color[0], sizeof(f32) * 4);
 		info.pMarkerName = name;
 		pfnCmdDebugMarkerBegin(cmd, &info);
 	}
@@ -153,7 +153,7 @@ inline void insert(VkDevice device, VkCommandBuffer cmd, const char* name, glm::
 	if (pfnCmdDebugMarkerInsert) {
 		VkDebugMarkerMarkerInfoEXT info = {};
 		info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
-		memcpy(info.color, &color[0], sizeof(float) * 4);
+		memcpy(info.color, &color[0], sizeof(f32) * 4);
 		info.pMarkerName = name;
 		pfnCmdDebugMarkerInsert(cmd, &info);
 	}

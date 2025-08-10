@@ -7,7 +7,7 @@ void ReSTIRGI::init() {
 		.name = "ReSTIR Samples",
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		.memory_type = vk::BufferType::GPU,
+		.memory_type = vk::BUFFER_TYPE_GPU,
 		.size = Window::width() * Window::height()  * sizeof(ReservoirSample),
 	});
 
@@ -15,7 +15,7 @@ void ReSTIRGI::init() {
 		.name = "Old ReSTIR Samples",
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		.memory_type = vk::BufferType::GPU,
+		.memory_type = vk::BUFFER_TYPE_GPU,
 		.size = Window::width() * Window::height()  * sizeof(ReservoirSample),
 	});
 
@@ -23,7 +23,7 @@ void ReSTIRGI::init() {
 		.name = "Temporal Reservoirs",
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		.memory_type = vk::BufferType::GPU,
+		.memory_type = vk::BUFFER_TYPE_GPU,
 		.size = 2 * Window::width() * Window::height()  * sizeof(Reservoir),
 	});
 
@@ -31,15 +31,15 @@ void ReSTIRGI::init() {
 		.name = "Spatial Reservoirs",
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		.memory_type = vk::BufferType::GPU,
+		.memory_type = vk::BUFFER_TYPE_GPU,
 		.size = 2 * Window::width() * Window::height()  * sizeof(Reservoir),
 	});
 
 	tmp_col_buffer = prm::get_buffer({
 		.name = "Temp Color",
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		.memory_type = vk::BufferType::GPU,
-		.size = Window::width() * Window::height()  * sizeof(float) * 3,
+		.memory_type = vk::BUFFER_TYPE_GPU,
+		.size = Window::width() * Window::height()  * sizeof(f32) * 3,
 	});
 
 	SceneDesc desc;
@@ -57,7 +57,7 @@ void ReSTIRGI::init() {
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
 
@@ -80,7 +80,7 @@ void ReSTIRGI::init() {
 void ReSTIRGI::render() {
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
-	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
+	pc_ray.num_lights = (i32)lumen_scene->gpu_lights.size();
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;
@@ -154,7 +154,7 @@ void ReSTIRGI::render() {
 	vk::render_graph()
 		->add_compute("Output",
 					  {.shader = vk::Shader("src/shaders/integrators/restir/gi/output.comp"),
-					   .dims = {(uint32_t)std::ceil(Window::width() * Window::height()  / float(1024.0f)), 1, 1}})
+					   .dims = {(u32)std::ceil(Window::width() * Window::height()  / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
 	if (!do_spatiotemporal) {

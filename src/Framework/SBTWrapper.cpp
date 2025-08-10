@@ -6,11 +6,11 @@
 namespace vk {
 
 template <class T>
-static constexpr T align_up(T x, size_t a) noexcept {
+static constexpr T align_up(T x, u64 a) noexcept {
 	return T((x + (T(a) - 1)) & ~T(a - 1));
 }
 
-void SBTWrapper::setup(uint32_t family_idx, const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rt_props) {
+void SBTWrapper::setup(u32 family_idx, const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rt_props) {
 	queue_idx = family_idx;
 	handle_size = rt_props.shaderGroupHandleSize;
 	handle_alignment = rt_props.shaderGroupHandleAlignment;
@@ -27,9 +27,9 @@ void SBTWrapper::add_indices(VkRayTracingPipelineCreateInfoKHR info) {
 	for (auto& i : idx_array) {
 		i = {};
 	};
-	uint32_t stage_idx = 0;
-	uint32_t group_offset = stage_idx;
-	for (uint32_t g = 0; g < info.groupCount; g++) {
+	u32 stage_idx = 0;
+	u32 group_offset = stage_idx;
+	for (u32 g = 0; g < info.groupCount; g++) {
 		if (info.pGroups[g].type == VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR) {
 			if (info.pStages[stage_idx].stage == VK_SHADER_STAGE_RAYGEN_BIT_KHR) {
 				idx_array[GROUP_RAYGEN].push_back(g + group_offset);
@@ -54,8 +54,8 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 		prm::remove(group.buffer);
 	}
 
-	uint32_t total_group_cnt{0};
-	std::vector<uint32_t> group_cnt_per_input;
+	u32 total_group_cnt{0};
+	std::vector<u32> group_cnt_per_input;
 	if (pipeline_info.sType == VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR) {
 		add_indices(pipeline_info);
 		group_cnt_per_input.push_back(pipeline_info.groupCount);
@@ -67,16 +67,16 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 		total_group_cnt++;
 		group_cnt_per_input.push_back(total_group_cnt);
 	}
-	uint32_t sbt_size = total_group_cnt * handle_size;
-	std::vector<uint8_t> shader_handle_storage(sbt_size);
+	u32 sbt_size = total_group_cnt * handle_size;
+	std::vector<u8> shader_handle_storage(sbt_size);
 
 	vk::check(vkGetRayTracingShaderGroupHandlesKHR(vk::context().device, rt_pipeline, 0, total_group_cnt, sbt_size,
 												   shader_handle_storage.data()));
-	auto find_stride = [&](const Entry& entry, uint32_t& stride) {
+	auto find_stride = [&](const Entry& entry, u32& stride) {
 		stride = align_up(handle_size, handle_alignment);  // minimum stride
 		for (auto& e : entry) {
-			uint32_t data_handle_size =
-				align_up(static_cast<uint32_t>(handle_size + e.second.size() * sizeof(uint8_t)), handle_alignment);
+			u32 data_handle_size =
+				align_up(static_cast<u32>(handle_size + e.second.size() * sizeof(u8)), handle_alignment);
 			stride = std::max(stride, data_handle_size);
 		}
 	};
@@ -85,16 +85,16 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 	find_stride(group_data[GROUP_HIT].handle_alignment, group_data[GROUP_HIT].stride);
 	find_stride(group_data[GROUP_CALLABLE].handle_alignment, group_data[GROUP_CALLABLE].stride);
 
-	std::array<std::vector<uint8_t>, 4> stage;
-	stage[GROUP_RAYGEN] = std::vector<uint8_t>(group_data[GROUP_RAYGEN].stride * index_count(GROUP_RAYGEN));
-	stage[GROUP_MISS] = std::vector<uint8_t>(group_data[GROUP_MISS].stride * index_count(GROUP_MISS));
-	stage[GROUP_HIT] = std::vector<uint8_t>(group_data[GROUP_HIT].stride * index_count(GROUP_HIT));
-	stage[GROUP_CALLABLE] = std::vector<uint8_t>(group_data[GROUP_CALLABLE].stride * index_count(GROUP_CALLABLE));
+	std::array<std::vector<u8>, 4> stage;
+	stage[GROUP_RAYGEN] = std::vector<u8>(group_data[GROUP_RAYGEN].stride * index_count(GROUP_RAYGEN));
+	stage[GROUP_MISS] = std::vector<u8>(group_data[GROUP_MISS].stride * index_count(GROUP_MISS));
+	stage[GROUP_HIT] = std::vector<u8>(group_data[GROUP_HIT].stride * index_count(GROUP_HIT));
+	stage[GROUP_CALLABLE] = std::vector<u8>(group_data[GROUP_CALLABLE].stride * index_count(GROUP_CALLABLE));
 
-	auto copy_handles = [&](std::vector<uint8_t>& stage_buffer, std::vector<uint32_t>& indices, uint32_t stride,
+	auto copy_handles = [&](std::vector<u8>& stage_buffer, std::vector<u32>& indices, u32 stride,
 							auto& data) {
 		auto* pbuffer = stage_buffer.data();
-		for (uint32_t index = 0; index < static_cast<uint32_t>(indices.size()); index++) {
+		for (u32 index = 0; index < static_cast<u32>(indices.size()); index++) {
 			auto* pstart = pbuffer;
 			// Copy the handle
 			memcpy(pbuffer, shader_handle_storage.data() + (indices[index] * handle_size), handle_size);
@@ -102,7 +102,7 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 			auto it = data.find(index);
 			if (it != std::end(data)) {
 				pbuffer += handle_size;
-				memcpy(pbuffer, it->second.data(), it->second.size() * sizeof(uint8_t));
+				memcpy(pbuffer, it->second.data(), it->second.size() * sizeof(u8));
 			}
 			pbuffer = pstart + stride;	// Jumping to next group
 		}
@@ -119,12 +119,12 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 
 	VkBufferUsageFlags usage_flags =
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
-	for (uint32_t i = 0; i < 4; i++) {
+	for (u32 i = 0; i < 4; i++) {
 		if (!stage[i].empty()) {
 			// Can be called from multiple threads
 			group_data[i].buffer = prm::get_buffer({.name = "SBT " + std::to_string(i),
 													.usage = usage_flags,
-													.memory_type = vk::BufferType::GPU,
+													.memory_type = vk::BUFFER_TYPE_GPU,
 													.size = stage[i].size(),
 													.data = stage[i].data()},
 												   /*use_mutex=*/true);

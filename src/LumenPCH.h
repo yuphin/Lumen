@@ -43,19 +43,36 @@
 #define NODEFERWINDOWPOS
 #define NOMCX
 #endif
-#include "Framework/Logger.h"
+
+typedef signed char i8;
+typedef short i16;
+typedef int i32;
+typedef long long i64;
+typedef unsigned char u8;
+typedef unsigned short u16;
+typedef unsigned int u32;
+typedef unsigned long long u64;
+typedef float f32;
+typedef double f64;
+
+#define KB(n) (((u64)(n)) << 10)
+#define MB(n) (((u64)(n)) << 20)
+#define GB(n) (((u64)(n)) << 30)
+
 #include <assert.h>
 #include <unordered_map>
 #include <unordered_set>
 
-#pragma warning(push, 0)
-#include "Framework/VulkanContext.h"
-#include "Framework/GPUQueryManager.h"
+#include "Framework/Logger.h"
+#include <volk/volk.h>
+
+#define VMA_STATIC_VULKAN_FUNCTIONS 0
+#define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
+#include <vma/vk_mem_alloc.h>
 #include <GLFW/glfw3.h>
 #include <imgui/imgui.h>
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_vulkan.h"
-#pragma warning(pop)
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
@@ -85,7 +102,6 @@
 #include <random>
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include "Framework/ThreadPool.h"
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>

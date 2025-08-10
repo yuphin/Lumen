@@ -15,8 +15,8 @@ class DDGI final : public Integrator {
 	void update_ddgi_uniforms();
 	void create_radiance_textures();
 
-	glm::vec3 probe_location(uint32_t index);
-	glm::ivec3 probe_index_to_grid_coord(uint32_t index);
+	glm::vec3 probe_location(u32 index);
+	glm::ivec3 probe_index_to_grid_coord(u32 index);
 	glm::vec3 grid_coord_to_position(const glm::ivec3& grid_coord);
 
 	DDGIUniforms ddgi_ubo;
@@ -38,18 +38,18 @@ class DDGI final : public Integrator {
 		vk::Texture* tex;
 	} output;
 
-	float hysteresis = 0.98f;
-	uint32_t rays_per_probe = 256;
-	float depth_sharpness = 50.0f;
-	float normal_bias = 0.6f;
-	float backface_ratio = 0.1f;
-	float probe_distance = 0.5f;
-	float min_frontface_dist = 0.1f;
-	float max_distance;
+	f32 hysteresis = 0.98f;
+	u32 rays_per_probe = 256;
+	f32 depth_sharpness = 50.0f;
+	f32 normal_bias = 0.6f;
+	f32 backface_ratio = 0.1f;
+	f32 probe_distance = 0.5f;
+	f32 min_frontface_dist = 0.1f;
+	f32 max_distance;
 	glm::ivec3 probe_counts;
 	glm::vec3 probe_start_position;
-	float tmax = 1e4f;
-	float tmin = 1e-3f;
+	f32 tmax = 1e4f;
+	f32 tmin = 1e-3f;
 	PCDDGI pc_ray{};
 	VkSampler bilinear_sampler;
 	VkSampler nearest_sampler;
@@ -57,7 +57,7 @@ class DDGI final : public Integrator {
 	bool infinite_bounces = true;
 	bool direct_lighting = true;
 	bool visualize_probes = false;
-	uint32_t frame_idx = 0;
+	u32 frame_idx = 0;
 	uint total_frame_idx = 0;
 
 	DDGIConfig* config;
@@ -66,5 +66,5 @@ class DDGI final : public Integrator {
 	vk::Buffer* sphere_desc_buffer;
 
 	std::vector<SphereVertex> sphere_vertices;
-	std::vector<uint32_t> sphere_indices;
+	std::vector<u32> sphere_indices;
 };

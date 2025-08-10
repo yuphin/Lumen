@@ -9,13 +9,13 @@ struct MitsubaParser {
 		std::string texture = "";
 		glm::vec3 albedo = glm::vec3(1);
 		glm::vec3 emissive_factor = glm::vec3(0);
-		float roughness = 0;
-		float ior = 1.0f;
+		f32 roughness = 0;
+		f32 ior = 1.0f;
 	};
 
 	struct MitsubaIntegrator {
 		std::string type;
-		int depth;
+		i32 depth;
 		bool enable_vm = false;
 		glm::vec3 sky_col;
 	};
@@ -33,13 +33,13 @@ struct MitsubaParser {
 		std::string file = "";
 		// In case
 		std::string bsdf_ref = "";
-		int bsdf_idx = -1;
+		i32 bsdf_idx = -1;
 		MitsubaShape shape;
 		glm::mat4 transform = glm::mat4(1);
 	};
 
 	struct MitsubaCamera {
-		float fov;
+		f32 fov;
 		glm::mat4 cam_matrix;
 	};
 	void parse(const std::string& path);

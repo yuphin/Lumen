@@ -3,10 +3,10 @@
 
 namespace vk {
 
-static uint32_t get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types) {
-	uint32_t binding_mask = 0;
+static u32 get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types) {
+	u32 binding_mask = 0;
 	for (const auto& shader : shaders) {
-		for (uint32_t i = 0; i < 32; ++i) {
+		for (u32 i = 0; i < 32; ++i) {
 			if (shader.binding_mask & (1 << i)) {
 				if (binding_mask & (1 << i)) {
 					LUMEN_ASSERT(descriptor_types[i] == shader.descriptor_types[i],
@@ -23,7 +23,7 @@ static uint32_t get_bindings_for_shader_set(const std::vector<Shader>& shaders, 
 
 Pipeline::Pipeline(const std::string& name) : name(name) {}
 
-void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const std::vector<uint32_t>& descriptor_counts,
+void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const std::vector<u32>& descriptor_counts,
 								   std::vector<vk::Texture*> color_outputs, vk::Texture* depth_output) {
 	LUMEN_ASSERT(color_outputs.size(), "No color outputs for GFX pipeline");
 	type = PipelineType::GFX;
@@ -43,14 +43,14 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 
 	VkSpecializationInfo specialization_info = {};
 	std::vector<VkSpecializationMapEntry> entries(settings.specialization_data.size());
-	for (int i = 0; i < entries.size(); i++) {
+	for (i32 i = 0; i < entries.size(); i++) {
 		entries[i].constantID = i;
-		entries[i].size = sizeof(uint32_t);
-		entries[i].offset = i * sizeof(uint32_t);
+		entries[i].size = sizeof(u32);
+		entries[i].offset = i * sizeof(u32);
 	}
-	specialization_info.mapEntryCount = (uint32_t)entries.size();
+	specialization_info.mapEntryCount = (u32)entries.size();
 	specialization_info.pMapEntries = entries.data();
-	specialization_info.dataSize = settings.specialization_data.size() * sizeof(uint32_t);
+	specialization_info.dataSize = settings.specialization_data.size() * sizeof(u32);
 	specialization_info.pData = settings.specialization_data.data();
 
 	std::vector<VkPipelineShaderStageCreateInfo> stages;
@@ -92,7 +92,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 	}
 
 	VkPipelineColorBlendStateCreateInfo color_blend =
-		vk::pipeline_color_blend_state((uint32_t)blend_attachment_states.size(), blend_attachment_states.data());
+		vk::pipeline_color_blend_state((u32)blend_attachment_states.size(), blend_attachment_states.data());
 	color_blend.logicOpEnable = VK_FALSE;
 	color_blend.logicOp = VK_LOGIC_OP_COPY;
 	color_blend.blendConstants[0] = 0.0f;
@@ -101,19 +101,19 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 	color_blend.blendConstants[3] = 0.0f;
 	std::vector<VkDynamicState> dynamic_enables = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
 	VkPipelineDynamicStateCreateInfo dynamic_state_CI =
-		vk::pipeline_dynamic_state(dynamic_enables.data(), static_cast<uint32_t>(dynamic_enables.size()));
+		vk::pipeline_dynamic_state(dynamic_enables.data(), static_cast<u32>(dynamic_enables.size()));
 
 	std::vector<VkVertexInputBindingDescription> binding_descs;
 	std::vector<VkVertexInputAttributeDescription> attribute_descs;
-	size_t vert_shader_idx = 0;
-	for (int i = 0; i < settings.shaders.size(); i++) {
+	u64 vert_shader_idx = 0;
+	for (i32 i = 0; i < settings.shaders.size(); i++) {
 		if (settings.shaders[i].stage == VK_SHADER_STAGE_VERTEX_BIT) {
 			vert_shader_idx = i;
 			break;
 		}
 	}
 	auto& vert_shader = settings.shaders[vert_shader_idx];
-	int i = 0;
+	i32 i = 0;
 	for (auto& [format, size] : vert_shader.vertex_inputs) {
 		auto binding_desc = vk::vertex_input_binding_description(i, size, VK_VERTEX_INPUT_RATE_VERTEX);
 		auto attribute_desc = vk::vertex_input_attribute_description(i, i, format, 0);
@@ -121,9 +121,9 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 		attribute_descs.push_back(attribute_desc);
 	}
 	auto vertex_input_state = vk::pipeline_vertex_input_state();
-	vertex_input_state.vertexAttributeDescriptionCount = (uint32_t)attribute_descs.size();
+	vertex_input_state.vertexAttributeDescriptionCount = (u32)attribute_descs.size();
 	vertex_input_state.pVertexAttributeDescriptions = attribute_descs.data();
-	vertex_input_state.vertexBindingDescriptionCount = (uint32_t)binding_descs.size();
+	vertex_input_state.vertexBindingDescriptionCount = (u32)binding_descs.size();
 	vertex_input_state.pVertexBindingDescriptions = binding_descs.data();
 
 	VkFormat depth_format = VK_FORMAT_UNDEFINED;
@@ -137,7 +137,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 	}
 	VkPipelineRenderingCreateInfo pipeline_rendering_create_info{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-		.colorAttachmentCount = (uint32_t)output_formats.size(),
+		.colorAttachmentCount = (u32)output_formats.size(),
 		.pColorAttachmentFormats = output_formats.data(),
 		.depthAttachmentFormat = depth_format};
 
@@ -145,7 +145,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 
 	VkGraphicsPipelineCreateInfo pipeline_CI = vk::graphics_pipeline();
 	pipeline_CI.pNext = nullptr;
-	pipeline_CI.stageCount = (uint32_t)stages.size();
+	pipeline_CI.stageCount = (u32)stages.size();
 	pipeline_CI.pStages = stages.data();
 	pipeline_CI.pVertexInputState = &vertex_input_state;
 	pipeline_CI.pInputAssemblyState = &input_asssembly_CI;
@@ -171,11 +171,11 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 	}
 }
 
-void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vector<uint32_t>& descriptor_counts,
-								  uint32_t num_as_bindings) {
+void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vector<u32>& descriptor_counts,
+								  u32 num_as_bindings) {
 	type = PipelineType::RT;
 	binding_mask = get_bindings_for_shader_set(settings.shaders, descriptor_types);
-	uint32_t num_as_bindings_in_shader = 0;
+	u32 num_as_bindings_in_shader = 0;
 	VkShaderStageFlags binding_stage_flags = 0;
 	for (const auto& shader : settings.shaders) {
 		if (push_constant_size && shader.push_constant_size) {
@@ -209,10 +209,10 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 	vk::check(vkAllocateDescriptorSets(vk::context().device, &set_allocate_info, &tlas_descriptor_set));
 
 	std::vector<VkSpecializationMapEntry> entries(settings.specialization_data.size());
-	for (int i = 0; i < entries.size(); i++) {
+	for (i32 i = 0; i < entries.size(); i++) {
 		entries[i].constantID = i;
-		entries[i].size = sizeof(uint32_t);
-		entries[i].offset = i * sizeof(uint32_t);
+		entries[i].size = sizeof(u32);
+		entries[i].offset = i * sizeof(u32);
 	}
 
 	std::vector<VkPipelineShaderStageCreateInfo> stages;
@@ -221,7 +221,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 	VkPipelineShaderStageCreateInfo stage{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
 	stage.pName = "main";
 
-	int stage_idx = 0;
+	i32 stage_idx = 0;
 	for (const auto& shader : settings.shaders) {
 		VkRayTracingShaderGroupCreateInfoKHR group{VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR};
 		group.anyHitShader = VK_SHADER_UNUSED_KHR;
@@ -271,8 +271,8 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 
 	VkSpecializationInfo specialization_info = {};
 	if (!settings.specialization_data.empty()) {
-		specialization_info.dataSize = settings.specialization_data.size() * sizeof(uint32_t);
-		specialization_info.mapEntryCount = (uint32_t)settings.specialization_data.size();
+		specialization_info.dataSize = settings.specialization_data.size() * sizeof(u32);
+		specialization_info.mapEntryCount = (u32)settings.specialization_data.size();
 		specialization_info.pMapEntries = entries.data();
 		specialization_info.pData = settings.specialization_data.data();
 		for (auto& stage : stages) {
@@ -280,9 +280,9 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 		}
 	}
 	VkRayTracingPipelineCreateInfoKHR pipeline_CI = {VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR};
-	pipeline_CI.stageCount = static_cast<uint32_t>(stages.size());
+	pipeline_CI.stageCount = static_cast<u32>(stages.size());
 	pipeline_CI.pStages = stages.data();
-	pipeline_CI.groupCount = static_cast<uint32_t>(groups.size());
+	pipeline_CI.groupCount = static_cast<u32>(groups.size());
 	pipeline_CI.pGroups = groups.data();
 	pipeline_CI.maxPipelineRayRecursionDepth = settings.recursion_depth;
 	pipeline_CI.layout = pipeline_layout;
@@ -300,7 +300,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 }
 
 void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
-									   const std::vector<uint32_t>& descriptor_counts) {
+									   const std::vector<u32>& descriptor_counts) {
 	type = PipelineType::COMPUTE;
 	binding_mask = get_bindings_for_shader_set({settings.shader}, descriptor_types);
 	create_set_layout({settings.shader}, descriptor_counts);
@@ -321,13 +321,13 @@ void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
 	std::vector<VkSpecializationMapEntry> entries;
 	if (settings.specialization_data.size()) {
 		entries.resize(settings.specialization_data.size());
-		for (int i = 0; i < entries.size(); i++) {
+		for (i32 i = 0; i < entries.size(); i++) {
 			entries[i].constantID = i;
-			entries[i].size = sizeof(uint32_t);
-			entries[i].offset = i * sizeof(uint32_t);
+			entries[i].size = sizeof(u32);
+			entries[i].offset = i * sizeof(u32);
 		}
-		specialization_info.dataSize = settings.specialization_data.size() * sizeof(uint32_t);
-		specialization_info.mapEntryCount = (uint32_t)settings.specialization_data.size();
+		specialization_info.dataSize = settings.specialization_data.size() * sizeof(u32);
+		specialization_info.mapEntryCount = (u32)settings.specialization_data.size();
 		specialization_info.pMapEntries = entries.data();
 		specialization_info.pData = settings.specialization_data.data();
 		shader_stage_ci.pSpecializationInfo = &specialization_info;
@@ -378,10 +378,10 @@ void Pipeline::cleanup() {
 	cv.wait(tracker_lk, [this] { return tracking_stopped; });
 }
 
-void Pipeline::create_rt_set_layout(VkShaderStageFlags binding_stage_flags, uint32_t num_as_bindings) {
+void Pipeline::create_rt_set_layout(VkShaderStageFlags binding_stage_flags, u32 num_as_bindings) {
 	std::vector<VkDescriptorSetLayoutBinding> set_bindings = {};
 
-	for (uint32_t i = 0; i < num_as_bindings; ++i) {
+	for (u32 i = 0; i < num_as_bindings; ++i) {
 		VkDescriptorSetLayoutBinding binding = {};
 		binding.binding = i;
 		binding.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
@@ -393,13 +393,13 @@ void Pipeline::create_rt_set_layout(VkShaderStageFlags binding_stage_flags, uint
 
 	VkDescriptorSetLayoutCreateInfo set_create_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
 	set_create_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-	set_create_info.bindingCount = uint32_t(set_bindings.size());
+	set_create_info.bindingCount = u32(set_bindings.size());
 	set_create_info.pBindings = set_bindings.data();
 
 	VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags_ci = {
 		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO};
 	std::vector<VkDescriptorBindingFlags> binding_flags(num_as_bindings);
-	for (uint32_t i = 0; i < num_as_bindings; ++i) {
+	for (u32 i = 0; i < num_as_bindings; ++i) {
 		binding_flags[i] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
 		// binding_flags[i] = 0;
 	}
@@ -412,12 +412,12 @@ void Pipeline::create_rt_set_layout(VkShaderStageFlags binding_stage_flags, uint
 	vk::check(vkCreateDescriptorSetLayout(vk::context().device, &set_create_info, nullptr, &tlas_layout));
 }
 
-void Pipeline::create_set_layout(const std::vector<Shader>& shaders, const std::vector<uint32_t>& descriptor_counts) {
+void Pipeline::create_set_layout(const std::vector<Shader>& shaders, const std::vector<u32>& descriptor_counts) {
 	std::vector<VkDescriptorSetLayoutBinding> set_bindings;
 
 	if (descriptor_counts.size()) {
-		int idx = 0;
-		for (uint32_t i = 0; i < 32; ++i) {
+		i32 idx = 0;
+		for (u32 i = 0; i < 32; ++i) {
 			if (binding_mask & (1 << i)) {
 				VkDescriptorSetLayoutBinding binding = {};
 				binding.binding = i;
@@ -439,13 +439,13 @@ void Pipeline::create_set_layout(const std::vector<Shader>& shaders, const std::
 
 	VkDescriptorSetLayoutCreateInfo set_create_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
 	set_create_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
-	set_create_info.bindingCount = uint32_t(set_bindings.size());
+	set_create_info.bindingCount = u32(set_bindings.size());
 	set_create_info.pBindings = set_bindings.data();
 	vk::check(vkCreateDescriptorSetLayout(vk::context().device, &set_create_info, nullptr, &set_layout));
 }
 
 void Pipeline::create_pipeline_layout(const std::vector<Shader>& shaders,
-									  const std::vector<uint32_t> push_const_sizes) {
+									  const std::vector<u32> push_const_sizes) {
 	VkPipelineLayoutCreateInfo create_info = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
 	VkDescriptorSetLayout set_layouts[] = {set_layout, tlas_layout};
 	create_info.setLayoutCount = type == PipelineType::RT ? 2 : 1;
@@ -455,26 +455,26 @@ void Pipeline::create_pipeline_layout(const std::vector<Shader>& shaders,
 		if (shader.uses_push_constants) pc_stages |= shader.stage;
 
 	std::vector<VkPushConstantRange> pcrs;
-	for (uint32_t size : push_const_sizes) {
+	for (u32 size : push_const_sizes) {
 		VkPushConstantRange pcr = {};
 		pcr.size = size;
 		pcr.stageFlags = pc_stages;
 		pcrs.push_back(pcr);
 	}
 	if (pcrs.size()) {
-		create_info.pushConstantRangeCount = (uint32_t)pcrs.size();
+		create_info.pushConstantRangeCount = (u32)pcrs.size();
 		create_info.pPushConstantRanges = pcrs.data();
 	}
 	vk::check(vkCreatePipelineLayout(vk::context().device, &create_info, nullptr, &pipeline_layout));
 }
 
 void Pipeline::create_update_template(const std::vector<Shader>& shaders,
-									  const std::vector<uint32_t>& descriptor_counts) {
+									  const std::vector<u32>& descriptor_counts) {
 	if (descriptor_counts.empty()) {
 		return;
 	}
 	for (const auto& shader : shaders) {
-		for (uint32_t i = 0; i < 32; ++i) {
+		for (u32 i = 0; i < 32; ++i) {
 			if (shader.binding_mask & (1 << i)) {
 				if (binding_mask & (1 << i)) {
 					LUMEN_ASSERT(descriptor_types[i] == shader.descriptor_types[i], "Binding mask mismatch");
@@ -487,7 +487,7 @@ void Pipeline::create_update_template(const std::vector<Shader>& shaders,
 	}
 
 	// https://stackoverflow.com/questions/109023/how-to-count-the-number-of-set-bits-in-a-32-bit-integer
-	auto count_ones = [](uint32_t i) -> uint32_t {
+	auto count_ones = [](u32 i) -> u32 {
 		i = i - ((i >> 1) & 0x55555555);				 // add pairs of bits
 		i = (i & 0x33333333) + ((i >> 2) & 0x33333333);	 // quads
 		i = (i + (i >> 4)) & 0x0F0F0F0F;				 // groups of 8
@@ -509,7 +509,7 @@ void Pipeline::create_update_template(const std::vector<Shader>& shaders,
 
 			default:
 				LUMEN_ERROR("Unimplemented descriptor type!");
-				return (size_t)0;
+				return (u64)0;
 		}
 	};
 
@@ -531,9 +531,9 @@ void Pipeline::create_update_template(const std::vector<Shader>& shaders,
 	std::vector<VkDescriptorUpdateTemplateEntry> entries;
 	LUMEN_ASSERT(count_ones(binding_mask) == descriptor_counts.size(),
 				 "Descriptor size mismatch! Check shaders or the supplied descriptors.");
-	size_t offset = 0;
-	int idx = 0;
-	for (uint32_t i = 0; i < 32; ++i) {
+	u64 offset = 0;
+	i32 idx = 0;
+	for (u32 i = 0; i < 32; ++i) {
 		if (binding_mask & (1 << i)) {
 			VkDescriptorUpdateTemplateEntry entry = {};
 			entry.dstBinding = i;
@@ -552,7 +552,7 @@ void Pipeline::create_update_template(const std::vector<Shader>& shaders,
 	VkDescriptorUpdateTemplateCreateInfo template_create_info = {
 		VK_STRUCTURE_TYPE_DESCRIPTOR_UPDATE_TEMPLATE_CREATE_INFO};
 
-	template_create_info.descriptorUpdateEntryCount = uint32_t(entries.size());
+	template_create_info.descriptorUpdateEntryCount = u32(entries.size());
 	template_create_info.pDescriptorUpdateEntries = entries.data();
 
 	template_create_info.templateType = VK_DESCRIPTOR_UPDATE_TEMPLATE_TYPE_PUSH_DESCRIPTORS_KHR;

@@ -7,18 +7,18 @@ void BDPT::init() {
 		{.name = "Light Path Buffer",
 		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		 .memory_type = vk::BufferType::GPU,
+		 .memory_type = vk::BUFFER_TYPE_GPU,
 		 .size = Window::width() * Window::height() * (lumen_scene->config->path_length + 1) * sizeof(PathVertex)});
 	camera_path_buffer = prm::get_buffer(
 		{.name = "Camera Path Buffer",
 		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		 .memory_type = vk::BufferType::GPU,
+		 .memory_type = vk::BUFFER_TYPE_GPU,
 		 .size = Window::width() * Window::height() * (lumen_scene->config->path_length + 1) * sizeof(PathVertex)});
 	color_storage_buffer =
 		prm::get_buffer({.name = "Color Storage Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * 3 * 4});
 	SceneDesc desc;
 	desc.index_addr = lumen_scene->index_buffer->get_device_address();
@@ -34,7 +34,7 @@ void BDPT::init() {
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
 
@@ -48,7 +48,7 @@ void BDPT::init() {
 }
 
 void BDPT::render() {
-	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
+	pc_ray.num_lights = (i32)lumen_scene->gpu_lights.size();
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = lumen_scene->config->path_length;
 	pc_ray.sky_col = lumen_scene->config->sky_col;

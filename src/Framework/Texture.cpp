@@ -18,9 +18,9 @@ static void cmd_generate_mipmaps2(vk::Texture* texture, const VkImageCreateInfo&
 	subresource_range.baseArrayLayer = 0;
 	subresource_range.layerCount = 1;
 	subresource_range.levelCount = 1;
-	int mip_width = info.extent.width;
-	int mip_height = info.extent.height;
-	for (uint32_t i = 1; i < texture->mip_levels; i++) {
+	i32 mip_width = info.extent.width;
+	i32 mip_height = info.extent.height;
+	for (u32 i = 1; i < texture->mip_levels; i++) {
 		subresource_range.baseMipLevel = i - 1;
 		vk::transition_image_layout(cmd, texture->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 									VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, subresource_range, texture->aspect_flags);
@@ -121,7 +121,7 @@ void texture_create(Texture* texture, const TextureDesc& desc) {
 		sampler_CI.mipLodBias = 0.0f;
 		sampler_CI.compareOp = VK_COMPARE_OP_NEVER;
 		sampler_CI.minLod = 0.0f;
-		sampler_CI.maxLod = (float)texture->mip_levels;
+		sampler_CI.maxLod = (f32)texture->mip_levels;
 		sampler_CI.anisotropyEnable = vk::context().supported_features.samplerAnisotropy;
 		sampler_CI.maxAnisotropy = vk::context().supported_features.samplerAnisotropy
 									   ? vk::context().device_properties.limits.maxSamplerAnisotropy
@@ -140,7 +140,7 @@ void texture_create(Texture* texture, const TextureDesc& desc) {
 	if (desc.data.data) {
 		Buffer* staging_buffer = drm::get({.name = "Scratch Buffer",
 										   .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-										   .memory_type = BufferType::STAGING,
+										   .memory_type = BUFFER_TYPE_STAGING,
 										   .size = desc.data.size,
 										   .data = desc.data.data,
 										   .dedicated_allocation = false});

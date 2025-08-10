@@ -1,12 +1,12 @@
 #include "Framework/RenderGraph.h"
 #include "VCMMLT.h"
 static bool use_vm = false;
-static float vcm_radius_factor = 0.025f;
+static f32 vcm_radius_factor = 0.025f;
 static bool light_first = false;
 void VCMMLT::init() {
 	Integrator::init();
 	mutation_count =
-		int(Window::width() * Window::height()  * config->mutations_per_pixel / float(config->num_mlt_threads));
+		i32(Window::width() * Window::height()  * config->mutations_per_pixel / f32(config->num_mlt_threads));
 	light_path_rand_count = std::max(7 + 3 * config->path_length, 3 + 7 * config->path_length);
 
 	// MLTVCM buffers
@@ -14,138 +14,138 @@ void VCMMLT::init() {
 		prm::get_buffer({.name = "Bootstrap Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config->num_bootstrap_samples * sizeof(BootstrapSample)});
 
 	cdf_buffer =
 		prm::get_buffer({.name = "CDF Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = VkDeviceSize(config->num_bootstrap_samples * 4)});
 
 	cdf_sum_buffer =
 		prm::get_buffer({.name = "CDF Sum Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
-						 .size = sizeof(float)});
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = sizeof(f32)});
 
 	seeds_buffer =
 		prm::get_buffer({.name = "Seeds Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config->num_mlt_threads * sizeof(VCMMLTSeedData)});
 
 	light_primary_samples_buffer =
 		prm::get_buffer({.name = "Light Primary Samples Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config->num_mlt_threads * light_path_rand_count * sizeof(PrimarySample) * 2});
 
 	mlt_samplers_buffer =
 		prm::get_buffer({.name = "MLT Samplers Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config->num_mlt_threads * sizeof(VCMMLTSampler) * 2});
 
 	mlt_col_buffer =
 		prm::get_buffer({.name = "MLT Col Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height()  * 3 * sizeof(float)});
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = Window::width() * Window::height()  * 3 * sizeof(f32)});
 
 	chain_stats_buffer =
 		prm::get_buffer({.name = "Chain Stats Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = 2 * sizeof(ChainData)});
 
 	splat_buffer = prm::get_buffer(
 		{.name = "Splat Buffer",
 		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		 .memory_type = vk::BufferType::GPU,
+		 .memory_type = vk::BUFFER_TYPE_GPU,
 		 .size = config->num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat) * 2});
 
 	past_splat_buffer = prm::get_buffer(
 		{.name = "Past Splat Buffer",
 		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		 .memory_type = vk::BufferType::GPU,
+		 .memory_type = vk::BUFFER_TYPE_GPU,
 		 .size = config->num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat) * 2});
 
 	light_path_buffer =
 		prm::get_buffer({.name = "Light Path Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height()  * (config->path_length + 1) * sizeof(VCMVertex)});
 
 	light_path_cnt_buffer =
 		prm::get_buffer({.name = "Light Path Cnt Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height()  * sizeof(float)});
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = Window::width() * Window::height()  * sizeof(f32)});
 
 	tmp_col_buffer =
 		prm::get_buffer({.name = "Tmp Col Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height()  * sizeof(float) * 3});
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = Window::width() * Window::height()  * sizeof(f32) * 3});
 
 	photon_buffer =
 		prm::get_buffer({.name = "Photon Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = 10 * Window::width() * Window::height()  * sizeof(VCMPhotonHash)});
 
 	mlt_atomicsum_buffer =
 		prm::get_buffer({.name = "MLT Atomic Sum Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config->num_mlt_threads * sizeof(SumData) * 2});
 
 	mlt_residual_buffer =
 		prm::get_buffer({.name = "MLT Residual Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config->num_mlt_threads * sizeof(SumData)});
 
 	counter_buffer =
 		prm::get_buffer({.name = "Counter Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
-						 .size = sizeof(int)});
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = sizeof(i32)});
 
-	int size = 0;
-	int arr_size = config->num_bootstrap_samples;
+	i32 size = 0;
+	i32 arr_size = config->num_bootstrap_samples;
 	do {
-		int num_blocks = std::max(1, (int)ceil(arr_size / (2.0f * 1024)));
+		i32 num_blocks = std::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
 			size++;
 		}
 		arr_size = num_blocks;
 	} while (arr_size > 1);
 	block_sums.resize(size);
-	int i = 0;
+	i32 i = 0;
 	arr_size = config->num_bootstrap_samples;
 	do {
-		int num_blocks = std::max(1, (int)ceil(arr_size / (2.0f * 1024)));
+		i32 num_blocks = std::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
 			block_sums[i++] = prm::get_buffer(
 				{.name = "Block Sum Buffer #" + std::to_string(i),
 				 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-				 .memory_type = vk::BufferType::GPU,
+				 .memory_type = vk::BUFFER_TYPE_GPU,
 				 .size = VkDeviceSize(num_blocks * 4)});
 		}
 		arr_size = num_blocks;
@@ -212,7 +212,7 @@ void VCMMLT::init() {
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
 	pc_ray.total_light_area = 0;
@@ -228,7 +228,7 @@ void VCMMLT::render() {
 	vk::CommandBuffer cmd(/*start*/ true);
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
-	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
+	pc_ray.num_lights = i32(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;
@@ -239,18 +239,18 @@ void VCMMLT::render() {
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.num_bootstrap_samples = config->num_bootstrap_samples;
 	pc_ray.radius = lumen_scene->m_dimensions.radius * vcm_radius_factor / 100.f;
-	pc_ray.radius /= (float)pow((double)pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
+	pc_ray.radius /= (f32)pow((double)pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
 	pc_ray.min_bounds = lumen_scene->m_dimensions.min;
 	pc_ray.max_bounds = lumen_scene->m_dimensions.max;
 	const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
-	const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
-	const int base_grid_res = int(max_comp / pc_ray.radius);
-	pc_ray.grid_res = glm::max(ivec3(diam * float(base_grid_res) / max_comp), ivec3(1));
+	const f32 max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
+	const i32 base_grid_res = i32(max_comp / pc_ray.radius);
+	pc_ray.grid_res = glm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
 	pc_ray.total_light_area = lumen_scene->total_light_area;
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 
 	lm::RenderGraph* rg = vk::render_graph();
-	auto get_pipeline_postfix = [&](const std::vector<uint32_t>& spec_consts) {
+	auto get_pipeline_postfix = [&](const std::vector<u32>& spec_consts) {
 		std::string res = "-";
 		if (spec_consts[0] == 1) {
 			res += "SEED";
@@ -261,8 +261,8 @@ void VCMMLT::render() {
 		return res;
 	};
 	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name, const std::string& reduce_name,
-						 const std::string& reduce_shader_name, const std::vector<uint32_t> spec_data) {
-		uint32_t num_wgs = uint32_t((config->num_mlt_threads + 1023) / 1024);
+						 const std::string& reduce_shader_name, const std::vector<u32> spec_data) {
+		u32 num_wgs = u32((config->num_mlt_threads + 1023) / 1024);
 		rg->add_compute(
 			  op_name,
 			  {.shader = vk::Shader(op_shader_name), .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
@@ -275,7 +275,7 @@ void VCMMLT::render() {
 										  .dims = {num_wgs, 1, 1}})
 				.push_constants(&pc_ray)
 				.bind(lumen_scene->scene_desc_buffer);
-			num_wgs = (uint32_t)(num_wgs + 1023) / 1024;
+			num_wgs = (u32)(num_wgs + 1023) / 1024;
 		}
 	};
 	auto sum_up_chain_data = [&] {
@@ -289,7 +289,7 @@ void VCMMLT::render() {
 		scene_ubo_buffer,
 		lumen_scene->scene_desc_buffer,
 	};
-	std::vector<uint32_t> spec_consts;
+	std::vector<u32> spec_consts;
 	if (!light_first) {
 		spec_consts = {1, 0};
 	} else {
@@ -325,24 +325,24 @@ void VCMMLT::render() {
 							   {"src/shaders/ray.rchit"},
 							   {"src/shaders/ray.rahit"}},
 				   .specialization_data = spec_consts,
-				   .dims = {(uint32_t)config->num_bootstrap_samples},
+				   .dims = {(u32)config->num_bootstrap_samples},
 			   })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
 		.bind(lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
-	int counter = 0;
+	i32 counter = 0;
 	prefix_scan(0, config->num_bootstrap_samples, counter, rg);
 	// Calculate CDF
 	rg->add_compute("Calculate CDF",
 					{.shader = vk::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
-					 .dims = {(uint32_t)std::ceil(config->num_bootstrap_samples / float(1024.0f)), 1, 1}})
+					 .dims = {(u32)std::ceil(config->num_bootstrap_samples / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer);
 	// Select seeds
 	rg->add_compute("Select Seeds", {.shader = vk::Shader("src/shaders/integrators/vcmmlt/select_seeds.comp"),
-									 .dims = {(uint32_t)std::ceil(config->num_mlt_threads / float(1024.0f)), 1, 1}})
+									 .dims = {(u32)std::ceil(config->num_mlt_threads / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer);
 	// Fill in the samplers for mutations
@@ -357,7 +357,7 @@ void VCMMLT::render() {
 								   {"src/shaders/ray.rchit"},
 								   {"src/shaders/ray.rahit"}},
 					   .specialization_data = spec_consts,
-					   .dims = {(uint32_t)config->num_mlt_threads},
+					   .dims = {(u32)config->num_mlt_threads},
 				   })
 			.push_constants(&pc_ray)
 			.bind(rt_bindings)
@@ -376,7 +376,7 @@ void VCMMLT::render() {
 	// Start mutations
 	{
 		std::string pipeline_name = "VCMMLT - Mutate " + pipeline_postfix;
-		auto mutate = [&](uint32_t i) {
+		auto mutate = [&](u32 i) {
 			pc_ray.random_num = rand() % UINT_MAX;
 			pc_ray.mutation_counter = i;
 			// Mutate
@@ -387,7 +387,7 @@ void VCMMLT::render() {
 									   {"src/shaders/ray_shadow.rmiss"},
 									   {"src/shaders/ray.rchit"},
 									   {"src/shaders/ray.rahit"}},
-						   .dims = {(uint32_t)config->num_mlt_threads},
+						   .dims = {(u32)config->num_mlt_threads},
 					   })
 				.push_constants(&pc_ray)
 				.zero(mlt_atomicsum_buffer)
@@ -403,22 +403,22 @@ void VCMMLT::render() {
 				.push_constants(&pc_ray)
 				.bind(lumen_scene->scene_desc_buffer);
 		};
-		const uint32_t iter_cnt = 100;
-		const uint32_t freq = mutation_count / iter_cnt;
-		uint32_t cnt = 0;
-		for (uint32_t f = 0; f < freq; f++) {
+		const u32 iter_cnt = 100;
+		const u32 freq = mutation_count / iter_cnt;
+		u32 cnt = 0;
+		for (u32 f = 0; f < freq; f++) {
 			LUMEN_TRACE("Mutation: {} / {}", cnt, mutation_count);
 			cmd.begin();
-			for (int i = 0; i < iter_cnt; i++) {
+			for (i32 i = 0; i < iter_cnt; i++) {
 				mutate(cnt++);
 			}
 			rg->run(cmd.handle);
 			rg->submit(cmd);
 		}
-		const uint32_t rem = mutation_count % iter_cnt;
+		const u32 rem = mutation_count % iter_cnt;
 		if (rem) {
 			cmd.begin();
-			for (uint32_t i = 0; i < rem; i++) {
+			for (u32 i = 0; i < rem; i++) {
 				mutate(cnt++);
 			}
 			rg->run(cmd.handle);
@@ -428,7 +428,7 @@ void VCMMLT::render() {
 	// Compositions
 	rg->add_compute("Composition",
 					{.shader = vk::Shader("src/shaders/integrators/vcmmlt/composite.comp"),
-					 .dims = {(uint32_t)std::ceil(Window::width() * Window::height()  / float(1024.0f)), 1, 1}})
+					 .dims = {(u32)std::ceil(Window::width() * Window::height()  / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }
@@ -452,24 +452,24 @@ bool VCMMLT::update() {
 	return updated;
 }
 
-void VCMMLT::prefix_scan(int level, int num_elems, int& counter, lm::RenderGraph* rg) {
+void VCMMLT::prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg) {
 	const bool scan_sums = level > 0;
-	int num_wgs = std::max(1, (int)ceil(num_elems / (2 * 1024.0f)));
-	int num_grids = num_wgs - int((num_elems % 2048) != 0);
+	i32 num_wgs = std::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
+	i32 num_grids = num_wgs - i32((num_elems % 2048) != 0);
 	pc_compute.num_elems = num_elems;
-	auto scan = [&](int num_wgs, int idx) {
+	auto scan = [&](i32 num_wgs, i32 idx) {
 		++counter;
 		rg->add_compute("PrefixScan - Scan",
 						{.shader = vk::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
-						 .dims = {(uint32_t)num_wgs, 1, 1}})
+						 .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
 	};
-	auto uniform_add = [&](int num_wgs, int output_idx) {
+	auto uniform_add = [&](i32 num_wgs, i32 output_idx) {
 		++counter;
 		rg->add_compute("PrefixScan - Uniform Add",
 						{.shader = vk::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"),
-						 .dims = {(uint32_t)num_wgs, 1, 1}})
+						 .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
 	};
@@ -478,10 +478,10 @@ void VCMMLT::prefix_scan(int level, int num_elems, int& counter, lm::RenderGraph
 		pc_compute.block_idx = 0;
 		pc_compute.n = 2 * 1024;
 		pc_compute.store_sum = 1;
-		pc_compute.scan_sums = int(scan_sums);
+		pc_compute.scan_sums = i32(scan_sums);
 		pc_compute.block_sum_addr = block_sums[level]->get_device_address();
 		scan(num_grids, level);
-		int rem = num_elems % (2 * 1024);
+		i32 rem = num_elems % (2 * 1024);
 		if (rem) {
 			pc_compute.base_idx = num_elems - rem;
 			pc_compute.block_idx = num_wgs - 1;
@@ -493,7 +493,7 @@ void VCMMLT::prefix_scan(int level, int num_elems, int& counter, lm::RenderGraph
 		pc_compute.block_idx = 0;
 		pc_compute.n = num_elems - rem;
 		pc_compute.store_sum = 1;
-		pc_compute.scan_sums = int(scan_sums);
+		pc_compute.scan_sums = i32(scan_sums);
 		pc_compute.block_sum_addr = block_sums[level]->get_device_address();
 		if (scan_sums) {
 			pc_compute.out_addr = block_sums[level - 1]->get_device_address();
@@ -506,7 +506,7 @@ void VCMMLT::prefix_scan(int level, int num_elems, int& counter, lm::RenderGraph
 			uniform_add(1, level - 1);
 		}
 	} else {
-		int rem = num_elems % 2048;
+		i32 rem = num_elems % 2048;
 		pc_compute.n = rem == 0 ? 2048 : rem;
 		pc_compute.base_idx = 0;
 		pc_compute.block_idx = 0;

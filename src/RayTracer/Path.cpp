@@ -11,7 +11,7 @@ void Path::init() {
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
 
@@ -26,7 +26,7 @@ void Path::init() {
 void Path::render() {
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
-	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
+	pc_ray.num_lights = (i32)lumen_scene->gpu_lights.size();
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = path_length;
 	pc_ray.sky_col = config->sky_col;
@@ -70,7 +70,7 @@ void Path::destroy(bool resize) { Integrator::destroy(resize); }
 
 bool Path::gui() {
 	bool result = Integrator::gui();
-	result |= ImGui::SliderInt("Path length", (int*)&path_length, 0, 12);
+	result |= ImGui::SliderInt("Path length", (i32*)&path_length, 0, 12);
 	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
 	return result;
 }

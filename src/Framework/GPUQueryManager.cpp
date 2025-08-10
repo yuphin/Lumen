@@ -1,18 +1,19 @@
 #include "GPUQueryManager.h"
+#include "Framework/VulkanContext.h"
 
 namespace GPUQueryManager {
 
-uint32_t _curr_pool_idx = 0;
+u32 _curr_pool_idx = 0;
 
 uint64_t _queries[4096];
-uint32_t _curr_query_idx = 0;
-uint32_t _num_collected_queries = 0;
+u32 _curr_query_idx = 0;
+u32 _num_collected_queries = 0;
 
 TimestampData _data[4096];
-uint32_t _curr_timestamp_idx = 0;
-uint32_t _num_collected_timestamps = 0;
+u32 _curr_timestamp_idx = 0;
+u32 _num_collected_timestamps = 0;
 
-std::vector<uint32_t> _timestamp_stack;
+std::vector<u32> _timestamp_stack;
 
 void begin(VkCommandBuffer cmd, const char* name) {
 	LUMEN_ASSERT(_curr_query_idx < 4096, "Query pool exhausted");
@@ -42,7 +43,7 @@ void end(VkCommandBuffer cmd) {
 	_curr_query_idx++;
 }
 
-void collect(uint32_t curr_frame_idx) {
+void collect(u32 curr_frame_idx) {
 	_num_collected_timestamps = _curr_timestamp_idx;
 	_num_collected_queries = _curr_query_idx;
 	// Note: curr_frame_idx is the index of the command buffer that has finished its execution

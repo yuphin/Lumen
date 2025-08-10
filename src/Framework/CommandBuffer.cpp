@@ -1,12 +1,12 @@
 #include "CommandBuffer.h"
 
-static uint32_t get_first_available_tid(uint64_t val) {
+static u32 get_first_available_tid(uint64_t val) {
 #ifdef _MSC_VER
 	unsigned long index;
 	_BitScanForward64(&index, val);
-	return uint32_t(index);
+	return u32(index);
 #else
-	return uint32_t(__builtin_ctzll(val));
+	return u32(__builtin_ctzll(val));
 #endif
 }
 namespace vk {
@@ -63,14 +63,14 @@ void CommandBuffer::submit(bool wait_fences, bool queue_wait_idle) {
 		VkFenceCreateInfo fence_info = vk::fence();
 		VkFence fence;
 		vkCreateFence(vk::context().device, &fence_info, nullptr, &fence);
-		vk::check(vkQueueSubmit(vk::context().queues[(int)type], 1, &submit_info, fence));
+		vk::check(vkQueueSubmit(vk::context().queues[(i32)type], 1, &submit_info, fence));
 		vk::check(vkWaitForFences(vk::context().device, 1, &fence, VK_TRUE, ~0ull));
 		vkDestroyFence(vk::context().device, fence, nullptr);
 	} else {
-		vk::check(vkQueueSubmit(vk::context().queues[(int)type], 1, &submit_info, VK_NULL_HANDLE));
+		vk::check(vkQueueSubmit(vk::context().queues[(i32)type], 1, &submit_info, VK_NULL_HANDLE));
 	}
 	if (queue_wait_idle) {
-		vk::check(vkQueueWaitIdle(vk::context().queues[(int)type]));
+		vk::check(vkQueueWaitIdle(vk::context().queues[(i32)type]));
 	}
 	queue_mutex.unlock();
 }

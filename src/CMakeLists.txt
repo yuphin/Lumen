@@ -7,6 +7,10 @@ file(GLOB framework_src
     "Framework/*.h"
     "Framework/*.hpp"
     "Framework/*.inl"
+    "Framework/Base/*.cpp"
+    "Framework/Base/*.h"
+    "Framework/Base/*.hpp"
+    "Framework/Base/*.inl"
 )
 
 file(GLOB raytracing_src

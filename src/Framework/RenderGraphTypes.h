@@ -1,9 +1,4 @@
 #pragma once
-#include <cstdint>
-#include <volk/volk.h>
-#include <vector>
-#include <functional>
-#include "Framework/AccelerationStructure.h"
 #include "Shader.h"
 #include "Buffer.h"
 #include "Texture.h"
@@ -12,9 +7,9 @@ namespace lm {
 class RenderPass;
 
 struct dim3 {
-	uint32_t x = 1;
-	uint32_t y = 1;
-	uint32_t z = 1;
+	u32 x = 1;
+	u32 y = 1;
+	u32 z = 1;
 };
 
 struct RenderGraphSettings {
@@ -68,14 +63,14 @@ struct BufferSyncDescriptor {
 	// Read-after-write is the default dependency implicitly
 	VkAccessFlags src_access_flags = VK_ACCESS_SHADER_WRITE_BIT;
 	VkAccessFlags dst_access_flags = VK_ACCESS_SHADER_READ_BIT;
-	uint32_t opposing_pass_idx;
+	u32 opposing_pass_idx;
 	VkEvent event = nullptr;
 };
 
 struct ImageSyncDescriptor {
 	VkImageLayout old_layout;
 	VkImageLayout new_layout;
-	uint32_t opposing_pass_idx;
+	u32 opposing_pass_idx;
 	VkImageAspectFlags image_aspect;
 	VkEvent event = nullptr;
 };
@@ -84,9 +79,9 @@ struct ImageSyncDescriptor {
 namespace vk {
 enum class PassType { Compute, RT, Graphics };
 struct ShaderMacro {
-	ShaderMacro(const std::string& name, int val, bool visible)
+	ShaderMacro(const std::string& name, i32 val, bool visible)
 		: name(name), val(val), has_val(true), visible(visible) {}
-	ShaderMacro(const std::string& name, int val) : name(name), val(val), has_val(true) {}
+	ShaderMacro(const std::string& name, i32 val) : name(name), val(val), has_val(true) {}
 	ShaderMacro(const std::string& name, bool enable) {
 		if (enable) {
 			this->name = name;
@@ -94,28 +89,28 @@ struct ShaderMacro {
 	}
 	ShaderMacro(const std::string& name) : name(name) {}
 	std::string name = "";
-	int val = 0;
+	i32 val = 0;
 	bool has_val = false;
 	bool visible = true;
 };
 struct GraphicsPassSettings {
 	std::vector<vk::Shader> shaders;
 	const std::vector<ShaderMacro> macros = {};
-	uint32_t width;
-	uint32_t height;
+	u32 width;
+	u32 height;
 	VkClearValue clear_color;
 	VkClearValue clear_depth_stencil;
 	VkCullModeFlags cull_mode = VK_CULL_MODE_FRONT_BIT;
 	std::vector<vk::Buffer*> vertex_buffers = {};
 	vk::Buffer* index_buffer = nullptr;
-	std::vector<uint32_t> specialization_data = {};
+	std::vector<u32> specialization_data = {};
 	std::vector<bool> blend_enables = {};
 	VkFrontFace front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
 	VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
 	VkIndexType index_type = VK_INDEX_TYPE_UINT32;
-	float line_width = 1.0;
+	f32 line_width = 1.0;
 	std::vector<vk::Texture*> color_outputs = {};
 	vk::Texture* depth_output = nullptr;
 	std::function<void(VkCommandBuffer cmd, const lm::RenderPass& pass)> pass_func;
@@ -125,8 +120,8 @@ struct GraphicsPassSettings {
 struct RTPassSettings {
 	std::vector<vk::Shader> shaders;
 	std::vector<ShaderMacro> macros = {};
-	uint32_t recursion_depth = 1;
-	std::vector<uint32_t> specialization_data = {};
+	u32 recursion_depth = 1;
+	std::vector<u32> specialization_data = {};
 	lm::dim3 dims;
 	std::function<void(VkCommandBuffer cmd, const lm::RenderPass& pass)> pass_func;
 	PassType type = PassType::RT;
@@ -135,7 +130,7 @@ struct RTPassSettings {
 struct ComputePassSettings {
 	vk::Shader shader;
 	std::vector<ShaderMacro> macros = {};
-	std::vector<uint32_t> specialization_data = {};
+	std::vector<u32> specialization_data = {};
 	lm::dim3 dims;
 	std::function<void(VkCommandBuffer cmd, const lm::RenderPass& pass)> pass_func;
 	PassType type = PassType::Compute;

@@ -6,7 +6,7 @@
 #include "Framework/CommandBuffer.h"
 
 namespace vk {
-static constexpr size_t BATCH_LIMIT = 256'000'000;	// 256 MB
+static constexpr u64 BATCH_LIMIT = 256'000'000;	// 256 MB
 struct BuildAccelerationStructure {
 	VkAccelerationStructureBuildGeometryInfoKHR build_info{
 		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR};
@@ -24,7 +24,7 @@ static BVH create_acceleration(VkAccelerationStructureCreateInfoKHR& accel, cons
 	result_accel.buffer = prm::get_buffer(
 		{.name = name,
 		 .usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		 .memory_type = vk::BufferType::GPU,
+		 .memory_type = vk::BUFFER_TYPE_GPU,
 		 .size = accel.size,
 		 .dedicated_allocation = true});
 	accel.buffer = result_accel.buffer->handle;
@@ -45,13 +45,13 @@ void BVH::destroy() {
 	}
 }
 
-static void cmd_create_blas(VkCommandBuffer cmd_buf, std::vector<uint32_t> indices,
+static void cmd_create_blas(VkCommandBuffer cmd_buf, std::vector<u32> indices,
 							std::vector<BuildAccelerationStructure>& build_as, VkDeviceAddress scratchAddress,
 							VkQueryPool query_pool) {
 	if (query_pool) {
-		vkResetQueryPool(vk::context().device, query_pool, 0, static_cast<uint32_t>(indices.size()));
+		vkResetQueryPool(vk::context().device, query_pool, 0, static_cast<u32>(indices.size()));
 	}
-	uint32_t query_cnt{0};
+	u32 query_cnt{0};
 	for (const auto& idx : indices) {
 		// Actual allocation of buffer and acceleration structure.
 		VkAccelerationStructureCreateInfoKHR as_ci{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
@@ -86,14 +86,14 @@ static void cmd_create_blas(VkCommandBuffer cmd_buf, std::vector<uint32_t> indic
 	}
 }
 
-static void cmd_compact_blas(VkCommandBuffer cmd_buf, std::vector<uint32_t> indices,
+static void cmd_compact_blas(VkCommandBuffer cmd_buf, std::vector<u32> indices,
 							 std::vector<BuildAccelerationStructure>& build_as, VkQueryPool query_pool) {
-	uint32_t query_cnt{0};
+	u32 query_cnt{0};
 	std::vector<BVH> cleanupAS;	 // previous AS to destroy
 
 	// Get the compacted size result back
-	std::vector<VkDeviceSize> compact_sizes(static_cast<uint32_t>(indices.size()));
-	vkGetQueryPoolResults(vk::context().device, query_pool, 0, (uint32_t)compact_sizes.size(),
+	std::vector<VkDeviceSize> compact_sizes(static_cast<u32>(indices.size()));
+	vkGetQueryPoolResults(vk::context().device, query_pool, 0, (u32)compact_sizes.size(),
 						  compact_sizes.size() * sizeof(VkDeviceSize), compact_sizes.data(), sizeof(VkDeviceSize),
 						  VK_QUERY_RESULT_WAIT_BIT);
 
@@ -117,7 +117,7 @@ static void cmd_compact_blas(VkCommandBuffer cmd_buf, std::vector<uint32_t> indi
 	}
 }
 
-static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, uint32_t primitive_count,
+static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, u32 primitive_count,
 							vk::Buffer** scratch_buffer_ref, bool export_scratch_buffer,
 							VkDeviceAddress inst_buffer_addr, VkBuildAccelerationStructureFlagsKHR flags, bool update) {
 	// Wraps a device pointer to the above uploaded instances.
@@ -166,7 +166,7 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, uint32_t primiti
 		*scratch_buffer_ref =
 			drm::get({.name = "TLAS Scratch Buffer",
 					  .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-					  .memory_type = vk::BufferType::STAGING,
+					  .memory_type = vk::BUFFER_TYPE_STAGING,
 					  .size = size_info.buildScratchSize,
 					  .dedicated_allocation = false});
 	}
@@ -200,26 +200,26 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<Build
 															   VkBuildAccelerationStructureFlagsKHR flags,
 															   VkCommandBuffer external_cmd_buf,
 															   vk::Buffer** scratch_buffer_ref) {
-	uint32_t num_blases = static_cast<uint32_t>(input.size());
+	u32 num_blases = static_cast<u32>(input.size());
 	VkDeviceSize as_total_size{0};	   // Memory size of all allocated BLAS
-	uint32_t num_compactions{0};	   // Nb of BLAS requesting compaction
+	u32 num_compactions{0};	   // Nb of BLAS requesting compaction
 	VkDeviceSize max_scratch_size{0};  // Largest scratch size
 
 	// Preparing the information for the acceleration build commands.
-	for (uint32_t idx = 0; idx < num_blases; idx++) {
+	for (u32 idx = 0; idx < num_blases; idx++) {
 		// Filling partially the VkAccelerationStructureBuildGeometryInfoKHR for
 		// querying the build sizes.
 		build_as[idx].build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 		build_as[idx].build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
 		build_as[idx].build_info.flags = input[idx].flags | flags;
-		build_as[idx].build_info.geometryCount = static_cast<uint32_t>(input[idx].as_geom.size());
+		build_as[idx].build_info.geometryCount = static_cast<u32>(input[idx].as_geom.size());
 		build_as[idx].build_info.pGeometries = input[idx].as_geom.data();
 
 		// Build range information
 		build_as[idx].range_info = input[idx].as_build_offset_info.data();
 
 		// Finding sizes to create acceleration structures and scratch
-		std::vector<uint32_t> maxPrimCount(input[idx].as_build_offset_info.size());
+		std::vector<u32> maxPrimCount(input[idx].as_build_offset_info.size());
 		for (auto tt = 0; tt < input[idx].as_build_offset_info.size(); tt++) {
 			maxPrimCount[tt] = input[idx].as_build_offset_info[tt].primitiveCount;	// Number of primitives/triangles
 		}
@@ -255,7 +255,7 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<Build
 		scratch_buffer =
 			drm::get({.name = "BLAS Scratch Buffer",
 					  .usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-					  .memory_type = vk::BufferType::GPU,
+					  .memory_type = vk::BUFFER_TYPE_GPU,
 					  .size = max_scratch_size,
 					  .dedicated_allocation = false});
 		if (export_scratch_buffer) {
@@ -277,10 +277,10 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<Build
 	}
 	// Batching creation/compaction of BLAS to allow staying in restricted
 	// amount of memory
-	std::vector<uint32_t> indices;	// Indices of the BLAS to create
+	std::vector<u32> indices;	// Indices of the BLAS to create
 	VkDeviceSize batch_size{0};
 	VkDeviceSize batch_limit{BATCH_LIMIT};
-	for (uint32_t idx = 0; idx < num_blases; idx++) {
+	for (u32 idx = 0; idx < num_blases; idx++) {
 		indices.push_back(idx);
 		batch_size += build_as[idx].size_info.accelerationStructureSize;
 		// Over the limit or last BLAS element
@@ -316,7 +316,7 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<Build
 			std::accumulate(build_as.begin(), build_as.end(), 0ULL,
 							[](const auto& a, const auto& b) { return a + b.size_info.accelerationStructureSize; });
 		LUMEN_TRACE("RT BLAS: reducing from: {} MB to: {} MB = ({}% smaller) \n", as_total_size * 1e-6,
-					compact_size * 1e-6, (as_total_size - compact_size) / float(as_total_size) * 100.f);
+					compact_size * 1e-6, (as_total_size - compact_size) / f32(as_total_size) * 100.f);
 	} else {
 		// LUMEN_TRACE("RT BLAS: total size: {} MB\n", as_total_size * 1e-6);
 	}
@@ -332,7 +332,7 @@ void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer) {
 	std::vector<BuildAccelerationStructure> build_as(input.size());
 	blases.resize(input.size());
-	for (size_t i = 0; i < input.size(); i++) {
+	for (u64 i = 0; i < input.size(); i++) {
 		build_as[i].as = &blases[i];
 	}
 	build_blas_impl(build_as, input, flags, cmd_buf, scratch_buffer);
@@ -342,7 +342,7 @@ void build_blas(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer) {
 	LUMEN_ASSERT(blases.size == input.size(), "Mismatch between input and output sizes");
 	std::vector<BuildAccelerationStructure> build_as(input.size());
-	for (size_t i = 0; i < input.size(); i++) {
+	for (u64 i = 0; i < input.size(); i++) {
 		build_as[i].as = &blases[i];
 	}
 	build_blas_impl(build_as, input, flags, cmd_buf, scratch_buffer);
@@ -355,12 +355,12 @@ void build_blas(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
 // 'allow_update'
 void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
 				VkBuildAccelerationStructureFlagsKHR flags, bool update) {
-	uint32_t instance_count = static_cast<uint32_t>(instances.size());
+	u32 instance_count = static_cast<u32>(instances.size());
 
 	vk::Buffer* instances_buf = drm::get({.name = "TLAS Instances Buffer",
 										  .usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 												   VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-										  .memory_type = vk::BufferType::GPU,
+										  .memory_type = vk::BUFFER_TYPE_GPU,
 										  .size = sizeof(VkAccelerationStructureInstanceKHR) * instances.size(),
 										  .data = instances.data(),
 										  .dedicated_allocation = true});
@@ -383,7 +383,7 @@ void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 	drm::destroy(instances_buf);
 }
 
-void build_tlas(BVH& tlas, vk::Buffer* instances_buf, uint32_t instance_count,
+void build_tlas(BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer_ref,
 				bool update) {
 	VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
@@ -398,9 +398,9 @@ void build_tlas(BVH& tlas, vk::Buffer* instances_buf, uint32_t instance_count,
 					instances_buf->get_device_address(), flags, update);
 }
 
-BlasInput to_vk_geometry(uint32_t vtx_count, uint32_t idx_count, uint32_t vtx_offset, uint32_t first_idx,
+BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx,
 						 VkDeviceAddress vertex_address, VkDeviceAddress index_address) {
-	uint32_t maxPrimitiveCount = idx_count / 3;
+	u32 maxPrimitiveCount = idx_count / 3;
 
 	// Describe buffer as array of VertexObj.
 	VkAccelerationStructureGeometryTrianglesDataKHR triangles{
@@ -408,7 +408,7 @@ BlasInput to_vk_geometry(uint32_t vtx_count, uint32_t idx_count, uint32_t vtx_of
 	triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;  // vec3 vertex position data.
 	triangles.vertexData.deviceAddress = vertex_address;
 	triangles.vertexStride = sizeof(glm::vec3);
-	// Describe index data (32-bit unsigned int)
+	// Describe index data (32-bit unsigned i32)
 	triangles.indexType = VK_INDEX_TYPE_UINT32;
 	triangles.indexData.deviceAddress = index_address;
 	// Indicate identity transform by setting transformData to null device
@@ -425,7 +425,7 @@ BlasInput to_vk_geometry(uint32_t vtx_count, uint32_t idx_count, uint32_t vtx_of
 	VkAccelerationStructureBuildRangeInfoKHR offset;
 	offset.firstVertex = vtx_offset;
 	offset.primitiveCount = maxPrimitiveCount;
-	offset.primitiveOffset = first_idx * sizeof(uint32_t);
+	offset.primitiveOffset = first_idx * sizeof(u32);
 	offset.transformOffset = 0;
 
 	// Our blas is made from only one geometry, but could be made of many

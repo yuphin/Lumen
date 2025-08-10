@@ -1,12 +1,12 @@
 #pragma once
 #include <volk/volk.h>
-#include "Utils.h"
+#include "Base/Utils.h"
 
 namespace vk {
 
 struct SamplerHash {
-	size_t operator()(const VkSamplerCreateInfo& ci) const {
-		size_t hash = 0;
+	u64 operator()(const VkSamplerCreateInfo& ci) const {
+		u64 hash = 0;
 		util::hash_combine(hash, ci.magFilter, ci.minFilter, ci.mipmapMode, ci.addressModeU, ci.addressModeV,
 						   ci.addressModeW, ci.mipLodBias, ci.anisotropyEnable, ci.maxAnisotropy, ci.compareEnable,
 						   ci.compareOp, ci.minLod, ci.maxLod, ci.borderColor, ci.unnormalizedCoordinates);
@@ -16,9 +16,9 @@ struct SamplerHash {
 };
 
 struct QueueFamilyIndices {
-	std::optional<uint32_t> gfx_family;
-	std::optional<uint32_t> present_family;
-	std::optional<uint32_t> compute_family;
+	std::optional<u32> gfx_family;
+	std::optional<u32> present_family;
+	std::optional<u32> compute_family;
 
 	// TODO: Extend to other families
 	bool is_complete() { return (gfx_family.has_value() && present_family.has_value()) && compute_family.has_value(); }
@@ -115,7 +115,7 @@ inline void check(VkResult result, const char* msg = 0) {
 	}
 }
 
-template <std::size_t Size>
+template <u64 Size>
 inline void check(std::array<VkResult, Size> results, const char* msg = 0) {
 	for (const auto& result : results) {
 		if (result != VK_SUCCESS) {
@@ -149,7 +149,7 @@ inline VkMappedMemoryRange mapped_memory_range() {
 }
 
 inline VkCommandBufferAllocateInfo command_buffer_allocate_info(VkCommandPool commandPool, VkCommandBufferLevel level,
-																uint32_t bufferCount) {
+																u32 bufferCount) {
 	VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
 	commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	commandBufferAllocateInfo.commandPool = commandPool;
@@ -191,8 +191,8 @@ inline VkBufferMemoryBarrier buffer_memory_barrier() {
 }
 
 inline VkImageCreateInfo image(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent,
-							   VkImageType image_type = VK_IMAGE_TYPE_2D, uint32_t mip_levels = 1,
-							   uint32_t array_layers = 1, VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
+							   VkImageType image_type = VK_IMAGE_TYPE_2D, u32 mip_levels = 1,
+							   u32 array_layers = 1, VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
 							   VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL,
 							   VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED) {
 	VkImageCreateInfo info = {};
@@ -213,8 +213,8 @@ inline VkImageCreateInfo image(VkFormat format, VkImageUsageFlags usageFlags, Vk
 }
 
 inline VkImageViewCreateInfo image_view(VkImage img, VkFormat format,
-										VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT, uint32_t level_count = 1,
-										uint32_t layer_count = 1) {
+										VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT, u32 level_count = 1,
+										u32 layer_count = 1) {
 	VkImageViewCreateInfo image_view_CI = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
 	image_view_CI.image = img;
 	image_view_CI.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -275,7 +275,7 @@ inline VkSubmitInfo submit_info() {
 	return submitInfo;
 }
 
-inline VkViewport viewport(float width, float height, float minDepth, float maxDepth) {
+inline VkViewport viewport(f32 width, f32 height, f32 minDepth, f32 maxDepth) {
 	VkViewport viewport{};
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
@@ -286,7 +286,7 @@ inline VkViewport viewport(float width, float height, float minDepth, float maxD
 	return viewport;
 }
 
-inline VkViewport viewport2(float width, float height, float minDepth, float maxDepth) {
+inline VkViewport viewport2(f32 width, f32 height, f32 minDepth, f32 maxDepth) {
 	VkViewport viewport{};
 	viewport.x = 0.0f;
 	viewport.y = height;
@@ -329,48 +329,48 @@ inline VkBufferCreateInfo buffer(VkBufferUsageFlags usage, VkDeviceSize size) {
 	return buffer_CI;
 }
 
-inline VkDescriptorPoolCreateInfo descriptor_pool(size_t poolSizeCount, VkDescriptorPoolSize* pPoolSizes,
-												  size_t maxSets) {
+inline VkDescriptorPoolCreateInfo descriptor_pool(u64 poolSizeCount, VkDescriptorPoolSize* pPoolSizes,
+												  u64 maxSets) {
 	VkDescriptorPoolCreateInfo descriptorPoolInfo{};
 	descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	descriptorPoolInfo.poolSizeCount = static_cast<uint32_t>(poolSizeCount);
+	descriptorPoolInfo.poolSizeCount = static_cast<u32>(poolSizeCount);
 	descriptorPoolInfo.pPoolSizes = pPoolSizes;
-	descriptorPoolInfo.maxSets = static_cast<uint32_t>(maxSets);
+	descriptorPoolInfo.maxSets = static_cast<u32>(maxSets);
 	return descriptorPoolInfo;
 }
 
-inline VkDescriptorPoolCreateInfo descriptor_pool(const std::vector<VkDescriptorPoolSize>& poolSizes, size_t maxSets) {
+inline VkDescriptorPoolCreateInfo descriptor_pool(const std::vector<VkDescriptorPoolSize>& poolSizes, u64 maxSets) {
 	VkDescriptorPoolCreateInfo descriptorPoolInfo{};
 	descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	descriptorPoolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+	descriptorPoolInfo.poolSizeCount = static_cast<u32>(poolSizes.size());
 	descriptorPoolInfo.pPoolSizes = poolSizes.data();
-	descriptorPoolInfo.maxSets = static_cast<uint32_t>(maxSets);
+	descriptorPoolInfo.maxSets = static_cast<u32>(maxSets);
 	return descriptorPoolInfo;
 }
 
-inline VkDescriptorPoolSize descriptor_pool_size(VkDescriptorType type, size_t descriptorCount) {
+inline VkDescriptorPoolSize descriptor_pool_size(VkDescriptorType type, u64 descriptorCount) {
 	VkDescriptorPoolSize descriptorPoolSize{};
 	descriptorPoolSize.type = type;
-	descriptorPoolSize.descriptorCount = static_cast<uint32_t>(descriptorCount);
+	descriptorPoolSize.descriptorCount = static_cast<u32>(descriptorCount);
 	return descriptorPoolSize;
 }
 
 inline VkDescriptorSetLayoutBinding descriptor_set_layout_binding(VkDescriptorType type, VkShaderStageFlags stageFlags,
-																  uint32_t binding, size_t descriptorCount = 1) {
+																  u32 binding, u64 descriptorCount = 1) {
 	VkDescriptorSetLayoutBinding setLayoutBinding{};
 	setLayoutBinding.descriptorType = type;
 	setLayoutBinding.stageFlags = stageFlags;
 	setLayoutBinding.binding = binding;
-	setLayoutBinding.descriptorCount = static_cast<uint32_t>(descriptorCount);
+	setLayoutBinding.descriptorCount = static_cast<u32>(descriptorCount);
 	return setLayoutBinding;
 }
 
 inline VkDescriptorSetLayoutCreateInfo descriptor_set_layout(const VkDescriptorSetLayoutBinding* pBindings,
-															 size_t bindingCount) {
+															 u64 bindingCount) {
 	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
 	descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	descriptorSetLayoutCreateInfo.pBindings = pBindings;
-	descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(bindingCount);
+	descriptorSetLayoutCreateInfo.bindingCount = static_cast<u32>(bindingCount);
 	return descriptorSetLayoutCreateInfo;
 }
 
@@ -379,12 +379,12 @@ inline VkDescriptorSetLayoutCreateInfo descriptor_set_layout(
 	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
 	descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	descriptorSetLayoutCreateInfo.pBindings = bindings.data();
-	descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+	descriptorSetLayoutCreateInfo.bindingCount = static_cast<u32>(bindings.size());
 	return descriptorSetLayoutCreateInfo;
 }
 
 inline VkPipelineLayoutCreateInfo pipeline_layout(const VkDescriptorSetLayout* pSetLayouts,
-												  uint32_t setLayoutCount = 1) {
+												  u32 setLayoutCount = 1) {
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
 	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutCreateInfo.setLayoutCount = setLayoutCount;
@@ -392,7 +392,7 @@ inline VkPipelineLayoutCreateInfo pipeline_layout(const VkDescriptorSetLayout* p
 	return pipelineLayoutCreateInfo;
 }
 
-inline VkPipelineLayoutCreateInfo pipeline_layout(uint32_t setLayoutCount = 1) {
+inline VkPipelineLayoutCreateInfo pipeline_layout(u32 setLayoutCount = 1) {
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
 	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutCreateInfo.setLayoutCount = setLayoutCount;
@@ -401,12 +401,12 @@ inline VkPipelineLayoutCreateInfo pipeline_layout(uint32_t setLayoutCount = 1) {
 
 inline VkDescriptorSetAllocateInfo descriptor_set_allocate_info(VkDescriptorPool descriptorPool,
 																const VkDescriptorSetLayout* pSetLayouts,
-																size_t descriptorSetCount) {
+																u64 descriptorSetCount) {
 	VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
 	descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	descriptorSetAllocateInfo.descriptorPool = descriptorPool;
 	descriptorSetAllocateInfo.pSetLayouts = pSetLayouts;
-	descriptorSetAllocateInfo.descriptorSetCount = static_cast<uint32_t>(descriptorSetCount);
+	descriptorSetAllocateInfo.descriptorSetCount = static_cast<u32>(descriptorSetCount);
 	return descriptorSetAllocateInfo;
 }
 
@@ -419,8 +419,8 @@ inline VkDescriptorImageInfo descriptor_image_info(VkSampler sampler, VkImageVie
 	return descriptorImageInfo;
 }
 
-inline VkWriteDescriptorSet write_descriptor_set(VkDescriptorSet dstSet, VkDescriptorType type, uint32_t binding,
-												 VkDescriptorBufferInfo* bufferInfo, uint32_t descriptorCount = 1) {
+inline VkWriteDescriptorSet write_descriptor_set(VkDescriptorSet dstSet, VkDescriptorType type, u32 binding,
+												 VkDescriptorBufferInfo* bufferInfo, u32 descriptorCount = 1) {
 	VkWriteDescriptorSet writeDescriptorSet{};
 	writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	writeDescriptorSet.dstSet = dstSet;
@@ -431,8 +431,8 @@ inline VkWriteDescriptorSet write_descriptor_set(VkDescriptorSet dstSet, VkDescr
 	return writeDescriptorSet;
 }
 
-inline VkWriteDescriptorSet write_descriptor_set(VkDescriptorSet dstSet, VkDescriptorType type, uint32_t binding,
-												 VkDescriptorImageInfo* imageInfo, uint32_t descriptorCount = 1) {
+inline VkWriteDescriptorSet write_descriptor_set(VkDescriptorSet dstSet, VkDescriptorType type, u32 binding,
+												 VkDescriptorImageInfo* imageInfo, u32 descriptorCount = 1) {
 	VkWriteDescriptorSet writeDescriptorSet{};
 	writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	writeDescriptorSet.dstSet = dstSet;
@@ -444,9 +444,9 @@ inline VkWriteDescriptorSet write_descriptor_set(VkDescriptorSet dstSet, VkDescr
 	return writeDescriptorSet;
 }
 #if VK_KHR_acceleration_structure
-inline VkWriteDescriptorSet write_descriptor_set(VkDescriptorSet dstSet, VkDescriptorType type, uint32_t binding,
+inline VkWriteDescriptorSet write_descriptor_set(VkDescriptorSet dstSet, VkDescriptorType type, u32 binding,
 												 const VkWriteDescriptorSetAccelerationStructureKHR* pAccel,
-												 uint32_t descriptorCount = 1, uint32_t arrayElement = 0) {
+												 u32 descriptorCount = 1, u32 arrayElement = 0) {
 	VkWriteDescriptorSet writeDescriptorSet{};
 	writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	writeDescriptorSet.dstSet = dstSet;
@@ -458,7 +458,7 @@ inline VkWriteDescriptorSet write_descriptor_set(VkDescriptorSet dstSet, VkDescr
 	return writeDescriptorSet;
 }
 #endif
-inline VkVertexInputBindingDescription vertex_input_binding_description(uint32_t binding, uint32_t stride,
+inline VkVertexInputBindingDescription vertex_input_binding_description(u32 binding, u32 stride,
 																		VkVertexInputRate inputRate) {
 	VkVertexInputBindingDescription vInputBindDescription{};
 	vInputBindDescription.binding = binding;
@@ -467,8 +467,8 @@ inline VkVertexInputBindingDescription vertex_input_binding_description(uint32_t
 	return vInputBindDescription;
 }
 
-inline VkVertexInputAttributeDescription vertex_input_attribute_description(uint32_t binding, uint32_t location,
-																			VkFormat format, uint32_t offset) {
+inline VkVertexInputAttributeDescription vertex_input_attribute_description(u32 binding, u32 location,
+																			VkFormat format, u32 offset) {
 	VkVertexInputAttributeDescription vInputAttribDescription{};
 	vInputAttribDescription.location = location;
 	vInputAttribDescription.binding = binding;
@@ -516,7 +516,7 @@ inline VkPipelineColorBlendAttachmentState pipeline_color_blend_attachment_state
 }
 
 inline VkPipelineColorBlendStateCreateInfo pipeline_color_blend_state(
-	uint32_t attachmentCount, const VkPipelineColorBlendAttachmentState* pAttachments) {
+	u32 attachmentCount, const VkPipelineColorBlendAttachmentState* pAttachments) {
 	VkPipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo{};
 	pipelineColorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	pipelineColorBlendStateCreateInfo.attachmentCount = attachmentCount;
@@ -535,7 +535,7 @@ inline VkPipelineDepthStencilStateCreateInfo pipeline_depth_stencil(VkBool32 dep
 	return pipelineDepthStencilStateCreateInfo;
 }
 
-inline VkPipelineViewportStateCreateInfo pipeline_viewport_state(uint32_t viewportCount, uint32_t scissorCount,
+inline VkPipelineViewportStateCreateInfo pipeline_viewport_state(u32 viewportCount, u32 scissorCount,
 																 VkPipelineViewportStateCreateFlags flags = 0) {
 	VkPipelineViewportStateCreateInfo pipelineViewportStateCreateInfo{};
 	pipelineViewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -555,7 +555,7 @@ inline VkPipelineMultisampleStateCreateInfo pipeline_multisample_state(
 }
 
 inline VkPipelineDynamicStateCreateInfo pipeline_dynamic_state(const VkDynamicState* pDynamicStates,
-															   uint32_t dynamicStateCount,
+															   u32 dynamicStateCount,
 															   VkPipelineDynamicStateCreateFlags flags = 0) {
 	VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo{};
 	pipelineDynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -570,12 +570,12 @@ inline VkPipelineDynamicStateCreateInfo pipeline_dynamic_state(const std::vector
 	VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo{};
 	pipelineDynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	pipelineDynamicStateCreateInfo.pDynamicStates = pDynamicStates.data();
-	pipelineDynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(pDynamicStates.size());
+	pipelineDynamicStateCreateInfo.dynamicStateCount = static_cast<u32>(pDynamicStates.size());
 	pipelineDynamicStateCreateInfo.flags = flags;
 	return pipelineDynamicStateCreateInfo;
 }
 
-inline VkPipelineTessellationStateCreateInfo pipeline_tesellation_state(uint32_t patchControlPoints) {
+inline VkPipelineTessellationStateCreateInfo pipeline_tesellation_state(u32 patchControlPoints) {
 	VkPipelineTessellationStateCreateInfo pipelineTessellationStateCreateInfo{};
 	pipelineTessellationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
 	pipelineTessellationStateCreateInfo.patchControlPoints = patchControlPoints;
@@ -610,7 +610,7 @@ inline VkComputePipelineCreateInfo compute_pipeline(VkPipelineLayout layout, VkP
 	return computePipelineCreateInfo;
 }
 
-inline VkPushConstantRange push_constant_range(VkShaderStageFlags stageFlags, uint32_t size, uint32_t offset) {
+inline VkPushConstantRange push_constant_range(VkShaderStageFlags stageFlags, u32 size, u32 offset) {
 	VkPushConstantRange pushConstantRange{};
 	pushConstantRange.stageFlags = stageFlags;
 	pushConstantRange.offset = offset;
@@ -646,7 +646,7 @@ inline VkAccessFlags access_flags_for_img_layout(VkImageLayout layout) {
 	}
 }
 
-inline VkDependencyInfo dependency_info(int cnt, const VkBufferMemoryBarrier2* p_buffer_memory_barriers) {
+inline VkDependencyInfo dependency_info(i32 cnt, const VkBufferMemoryBarrier2* p_buffer_memory_barriers) {
 	VkDependencyInfo res = {VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
 	res.dependencyFlags = 0;
 	res.bufferMemoryBarrierCount = cnt;
@@ -654,7 +654,7 @@ inline VkDependencyInfo dependency_info(int cnt, const VkBufferMemoryBarrier2* p
 	return res;
 }
 
-inline VkDependencyInfo dependency_info(uint32_t cnt, const VkImageMemoryBarrier2* p_img_memory_barriers) {
+inline VkDependencyInfo dependency_info(u32 cnt, const VkImageMemoryBarrier2* p_img_memory_barriers) {
 	VkDependencyInfo res = {VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
 	res.dependencyFlags = 0;
 	res.imageMemoryBarrierCount = cnt;

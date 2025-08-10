@@ -167,10 +167,10 @@ struct GltfNode {
 };
 
 struct GltfPrimMesh {
-	uint32_t first_idx{0};
-	uint32_t idx_count{0};
-	uint32_t vtx_offset{0};
-	uint32_t vtx_count{0};
+	u32 first_idx{0};
+	u32 idx_count{0};
+	u32 vtx_offset{0};
+	u32 vtx_count{0};
 	int material_idx{0};
 
 	glm::vec3 pos_min{0, 0, 0};
@@ -179,17 +179,17 @@ struct GltfPrimMesh {
 };
 
 struct GltfStats {
-	uint32_t nb_cameras{0};
-	uint32_t nb_images{0};
-	uint32_t nb_textures{0};
-	uint32_t nb_materials{0};
-	uint32_t nb_samplers{0};
-	uint32_t nb_nodes{0};
-	uint32_t nb_meshes{0};
-	uint32_t nb_lights{0};
-	uint32_t image_mem{0};
-	uint32_t nb_unique_triangles{0};
-	uint32_t nb_triangles{0};
+	u32 nb_cameras{0};
+	u32 nb_images{0};
+	u32 nb_textures{0};
+	u32 nb_materials{0};
+	u32 nb_samplers{0};
+	u32 nb_nodes{0};
+	u32 nb_meshes{0};
+	u32 nb_lights{0};
+	u32 image_mem{0};
+	u32 nb_unique_triangles{0};
+	u32 nb_triangles{0};
 };
 
 struct GltfCamera {
@@ -208,7 +208,7 @@ struct GltfLight {
 	tinygltf::Light light;
 };
 
-enum class GltfAttributes : uint8_t {
+enum class GltfAttributes : u8 {
 	Position = 0,
 	Normal = 1,
 	Texcoord_0 = 2,
@@ -248,7 +248,7 @@ struct GltfScene {
 
 	// Attributes, all same length if valid
 	std::vector<glm::vec3> positions;
-	std::vector<uint32_t> indices;
+	std::vector<u32> indices;
 	std::vector<glm::vec3> normals;
 	std::vector<glm::vec4> tangents;
 	std::vector<glm::vec2> texcoords0;
@@ -275,10 +275,10 @@ struct GltfScene {
 					  const std::string& name);
 
 	// Temporary data
-	std::unordered_map<int, std::vector<uint32_t>> mesh_to_prim_meshes;
-	std::vector<uint32_t> primitive_indices_32u;
+	std::unordered_map<int, std::vector<u32>> mesh_to_prim_meshes;
+	std::vector<u32> primitive_indices_32u;
 	std::vector<uint16_t> primitive_indices_16u;
-	std::vector<uint8_t> primitive_indices_8u;
+	std::vector<u8> primitive_indices_8u;
 
 	std::unordered_map<std::string, GltfPrimMesh> cache_prim_mesh;
 
@@ -362,8 +362,8 @@ static bool get_attribute(const tinygltf::Model& tmodel, const tinygltf::Primiti
 			attrib_vec.insert(attrib_vec.end(), buf_data, buf_data + nb_elems);
 		} else {
 			// With stride, need to add one by one the element
-			auto buffer_byte = reinterpret_cast<const uint8_t*>(buf_data);
-			for (size_t i = 0; i < nb_elems; i++) {
+			auto buffer_byte = reinterpret_cast<const u8*>(buf_data);
+			for (u64 i = 0; i < nb_elems; i++) {
 				attrib_vec.push_back(*reinterpret_cast<const T*>(buffer_byte));
 				buffer_byte += buf_view.byteStride;
 			}
@@ -374,11 +374,11 @@ static bool get_attribute(const tinygltf::Model& tmodel, const tinygltf::Primiti
 		// VEC3 or VEC4
 		int nb_components = accessor.type == TINYGLTF_TYPE_VEC2 ? 2 : (accessor.type == TINYGLTF_TYPE_VEC3) ? 3 : 4;
 		// UNSIGNED_BYTE or UNSIGNED_SHORT
-		size_t stride_component = accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE ? 1 : 2;
+		u64 stride_component = accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE ? 1 : 2;
 
-		size_t byte_stride = buf_view.byteStride > 0 ? buf_view.byteStride : size_t(nb_components) * stride_component;
-		auto buffer_byte = reinterpret_cast<const uint8_t*>(buf_data);
-		for (size_t i = 0; i < nb_elems; i++) {
+		u64 byte_stride = buf_view.byteStride > 0 ? buf_view.byteStride : u64(nb_components) * stride_component;
+		auto buffer_byte = reinterpret_cast<const u8*>(buf_data);
+		for (u64 i = 0; i < nb_elems; i++) {
 			T vec_value;
 
 			auto buffer_byte_data = buffer_byte;

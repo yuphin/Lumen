@@ -3,7 +3,7 @@
 namespace Window {
 Window _window;
 
-static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+static void key_callback(GLFWwindow* window, i32 key, i32 scancode, i32 action, i32 mods) {
 	auto ptr = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
 	ptr->key_map[static_cast<KeyInput>(key)] = static_cast<KeyAction>(action);
 	for (auto& cb : ptr->key_callbacks) {
@@ -11,11 +11,11 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 	}
 }
 
-static void window_size_callback(GLFWwindow* window, int width, int height) {}
+static void window_size_callback(GLFWwindow* window, i32 width, i32 height) {}
 
-static void char_callback(GLFWwindow* window, uint32_t codepoint) {}
+static void char_callback(GLFWwindow* window, u32 codepoint) {}
 
-static void mouse_click_callback(GLFWwindow* window, int button, int action, int mods) {
+static void mouse_click_callback(GLFWwindow* window, i32 button, i32 action, i32 mods) {
 	KeyAction callback_action;
 
 	switch (action) {
@@ -87,7 +87,7 @@ static void scroll_callback(GLFWwindow* window, double x, double y) {
 	for (auto& cb : window_ptr->mouse_scroll_callbacks) cb(x, y);
 }
 
-void init(int width, int height, bool fullscreen) {
+void init(i32 width, i32 height, bool fullscreen) {
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	_window.window_handle =
@@ -163,7 +163,7 @@ bool is_mouse_up(MouseAction mb) {
 
 Window* get() { return &_window; }
 void update_window_size() {
-	int width, height;
+	i32 width, height;
 	glfwGetWindowSize(_window.window_handle, &width, &height);
 	_window.window_width = width;
 	_window.window_height = height;
@@ -171,6 +171,6 @@ void update_window_size() {
 	_window.viewport_height = height;
 }
 
-uint32_t width() { return _window.viewport_width; }
-uint32_t height() { return _window.viewport_height; }
+u32 width() { return _window.viewport_width; }
+u32 height() { return _window.viewport_height; }
 }  // namespace Window

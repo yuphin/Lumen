@@ -1,15 +1,17 @@
 #include "Framework/Window.h"
-#include "Framework/HashMap.h"
+#include "Framework/Base/HashMap.h"
 #include "RayTracer/RayTracer.h"
+#include "Framework/Base/String.h"
+#include "Framework/ThreadPool.h"
 
 #if 0
-int main(int argc, char* argv[]) {
+i32 main(i32 argc, char* argv[]) {
 #ifdef _DEBUG
 	bool enable_debug = true;
 #else
 	bool enable_debug = false;
 #endif
-	for (int i = 0; i < argc; ++i) {
+	for (i32 i = 0; i < argc; ++i) {
 		if (std::strcmp(argv[i], "--validation_enable") == 0 && i + 1 < argc) {
 			if (std::strcmp(argv[i + 1], "1") == 0) {
 				enable_debug = true;
@@ -20,8 +22,8 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	bool fullscreen = false;
-	int width = 1920;
-	int height = 1080;
+	i32 width = 1920;
+	i32 height = 1080;
 	Logger::init();
 	ThreadPool::init();
 	Window::init(width, height, fullscreen);
@@ -39,27 +41,20 @@ int main(int argc, char* argv[]) {
 	return 0;
 }
 #else
-int main(int argc, char* argv[]) {
+i32 main(i32 argc, char* argv[]) {
 	Logger::init();
-	lm::Arena* arena = lm::arena_create(MB(8), 64);
+	lm::Arena* arena = lm::arena_create(GB(1), MB(1));
 
-	void* data_a = arena->allocate(16, 64);
+	lm::Array<i32> arr = lm::array_create<i32>(arena);
 
-	void* data_b = arena->allocate(16, 128);
-
-	void* data_c = arena->allocate(4096, 64);
-	void* data_d = arena->allocate(2, 8);
-
-	lm::Array<int> arr = lm::array_create<int>(arena);
-	arr.push_back(5);
-	arr.push_back(10);
-	arr.push_back(15);
-	arr.push_back(20);
-	for(int val : arr) {
-		LUMEN_INFO("Array value: {}", val);
+	for (i32 i = 0; i < 100'000'000; i++) {
+		arr.push_back(i);
 	}
+	// for (i32 i = 0; i < 100; i++) {
+	// 	LUMEN_INFO("Array value: {}", arr[i]);
+	// }
 
-	auto hm = lm::hash_map_create<int, int>(arena);
+	auto hm = lm::hash_map_create<i32, i32>(arena);
 
 	hm.insert(1, 100);
 	hm.insert(2, 200);
@@ -71,10 +66,16 @@ int main(int argc, char* argv[]) {
 	assert(entry2 == nullptr);
 	// LUMEN_INFO("Found entry: key = {}, value = {}", entry->key, entry->value);
 
-	for(auto& e : hm) {
+	for (auto& e : hm) {
 		LUMEN_INFO("HashMap entry: key = {}, value = {}", e.key, e.value);
 	}
 
-	__debugbreak();
+	lm::String result = lm::str_from_number(arena, 62832387, true);
+	lm::String result2 = lm::str_from_f64(arena, 1421.363);
+
+	LUMEN_INFO("Result {}", result.data);
+	LUMEN_INFO("Result2 {}", lm::str_to_cstr(arena, result2).data);
+
+	// __debugbreak();
 }
 #endif

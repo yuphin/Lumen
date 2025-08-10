@@ -14,6 +14,6 @@ class Path final : public Integrator {
    private:
 	PCPath pc_ray{};
 	PathConfig* config;
-	uint32_t path_length = 0;
+	u32 path_length = 0;
 	bool direct_lighting = true;
 };

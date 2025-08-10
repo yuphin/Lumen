@@ -12,7 +12,7 @@ class VCMMLT final : public Integrator {
 	virtual void destroy(bool resize) override;
 
    private:
-	void prefix_scan(int level, int num_elems, int& counter, lm::RenderGraph* rg);
+	void prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg);
 	PCMLT pc_ray{};
 	PushConstantCompute pc_compute{};
 	// SMLT buffers
@@ -35,9 +35,9 @@ class VCMMLT final : public Integrator {
 	std::vector<vk::Buffer*> block_sums;
 
 	vk::Buffer* light_path_cnt_buffer;
-	int mutation_count;
-	int light_path_rand_count;
-	int sample_cnt = 0;
+	i32 mutation_count;
+	i32 light_path_rand_count;
+	i32 sample_cnt = 0;
 
 	VCMMLTConfig* config;
 };

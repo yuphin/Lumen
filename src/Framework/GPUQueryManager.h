@@ -1,19 +1,17 @@
 #pragma once
-#include <vulkan/vulkan_core.h>
-#include "Utils.h"
-#include <string>
+#include "Base/Utils.h"
 namespace GPUQueryManager {
 
 struct TimestampData {
 	std::string name;
 	TimestampData* parent = nullptr;
-	uint32_t start_timestamp_idx = 0;
-	uint32_t end_timestamp_idx = 0;
+	u32 start_timestamp_idx = 0;
+	u32 end_timestamp_idx = 0;
 };
 
 void begin(VkCommandBuffer cmd, const char* name);
 void end(VkCommandBuffer cmd);
-void collect(uint32_t curr_frame_idx);
+void collect(u32 curr_frame_idx);
 void collect();
 void reset_data();
 

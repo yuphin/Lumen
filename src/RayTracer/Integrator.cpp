@@ -1,7 +1,6 @@
 #include "Integrator.h"
 #include "shaders/commons.h"
 #include <Framework/Window.h>
-#include <stb_image/stb_image.h>
 #include "Framework/VkUtils.h"
 
 void Integrator::init() {
@@ -22,7 +21,7 @@ void Integrator::init() {
 			return;
 		}
 		if (Window::is_mouse_held(MouseAction::LEFT) && !Window::is_key_held(KeyInput::KEY_TAB)) {
-			cam_ptr->rotate(0.05f * (float)delta_y, -0.05f * (float)delta_x, 0.0f);
+			cam_ptr->rotate(0.05f * (f32)delta_y, -0.05f * (f32)delta_x, 0.0f);
 			updated = true;
 		}
 	});
@@ -39,7 +38,7 @@ void Integrator::init() {
 	scene_ubo_buffer = prm::get_buffer({
 		.name = "Scene UBO",
 		.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		.memory_type = vk::BufferType::CPU_TO_GPU,
+		.memory_type = vk::BUFFER_TYPE_CPU_TO_GPU,
 		.size = sizeof(SceneUBO),
 	});
 
@@ -69,7 +68,7 @@ void Integrator::update_uniform_buffers() {
 }
 
 bool Integrator::update() {
-	float trans_speed = 0.01f;
+	f32 trans_speed = 0.01f;
 	glm::vec3 front;
 	if (Window::is_key_held(KeyInput::KEY_LEFT_SHIFT)) {
 		trans_speed *= 4;

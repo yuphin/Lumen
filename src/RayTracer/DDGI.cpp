@@ -1,19 +1,19 @@
 #include "Framework/VkUtils.h"
 #include "DDGI.h"
-constexpr int IRRADIANCE_SIDE_LENGTH = 8;
-constexpr int DEPTH_SIDE_LENGTH = 16;
+constexpr i32 IRRADIANCE_SIDE_LENGTH = 8;
+constexpr i32 DEPTH_SIDE_LENGTH = 16;
 
-static void generate_uv_sphere(std::vector<uint32_t>& indices, std::vector<SphereVertex>& positions, uint32_t latitude,
-							   uint32_t longitude, float radius = 0.1f) {
-	for (uint32_t lat = 0; lat <= latitude; ++lat) {
-		float theta = lat * glm::pi<float>() / latitude;
-		float sin_theta = sin(theta);
-		float cos_theta = cos(theta);
+static void generate_uv_sphere(std::vector<u32>& indices, std::vector<SphereVertex>& positions, u32 latitude,
+							   u32 longitude, f32 radius = 0.1f) {
+	for (u32 lat = 0; lat <= latitude; ++lat) {
+		f32 theta = lat * glm::pi<f32>() / latitude;
+		f32 sin_theta = sin(theta);
+		f32 cos_theta = cos(theta);
 
-		for (uint32_t lon = 0; lon <= longitude; ++lon) {
-			float phi = lon * 2.0f * glm::pi<float>() / longitude;
-			float sin_phi = sin(phi);
-			float cos_phi = cos(phi);
+		for (u32 lon = 0; lon <= longitude; ++lon) {
+			f32 phi = lon * 2.0f * glm::pi<f32>() / longitude;
+			f32 sin_phi = sin(phi);
+			f32 cos_phi = cos(phi);
 
 			auto& vertex = positions.emplace_back();
 			vertex.pos.x = radius * sin_theta * cos_phi;
@@ -23,10 +23,10 @@ static void generate_uv_sphere(std::vector<uint32_t>& indices, std::vector<Spher
 		}
 	}
 
-	for (uint32_t lat = 0; lat < latitude; ++lat) {
-		for (uint32_t lon = 0; lon < longitude; ++lon) {
-			uint32_t first = (lat * (longitude + 1)) + lon;
-			uint32_t second = first + longitude + 1;
+	for (u32 lat = 0; lat < latitude; ++lat) {
+		for (u32 lon = 0; lon < longitude; ++lon) {
+			u32 first = (lat * (longitude + 1)) + lon;
+			u32 second = first + longitude + 1;
 
 			indices.push_back(first);
 			indices.push_back(second);
@@ -41,7 +41,7 @@ static void generate_uv_sphere(std::vector<uint32_t>& indices, std::vector<Spher
 
 void DDGI::init() {
 	Integrator::init();
-	uint32_t num_probes;
+	u32 num_probes;
 	// DDGI Resources
 	{
 		glm::vec3 min_pos = lumen_scene->m_dimensions.min - vec3(0.1f);
@@ -76,10 +76,10 @@ void DDGI::init() {
 			vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &nearest_sampler));
 		}
 
-		const uint32_t irradiance_width = (IRRADIANCE_SIDE_LENGTH + 2) * probe_counts.x * probe_counts.y;
-		const uint32_t irradiance_height = (IRRADIANCE_SIDE_LENGTH + 2) * probe_counts.z;
-		const uint32_t depth_width = (DEPTH_SIDE_LENGTH + 2) * probe_counts.x * probe_counts.y;
-		const uint32_t depth_height = (DEPTH_SIDE_LENGTH + 2) * probe_counts.z;
+		const u32 irradiance_width = (IRRADIANCE_SIDE_LENGTH + 2) * probe_counts.x * probe_counts.y;
+		const u32 irradiance_height = (IRRADIANCE_SIDE_LENGTH + 2) * probe_counts.z;
+		const u32 depth_width = (DEPTH_SIDE_LENGTH + 2) * probe_counts.x * probe_counts.y;
+		const u32 depth_height = (DEPTH_SIDE_LENGTH + 2) * probe_counts.z;
 		// Irradiance and depth
 		num_probes = probe_counts.x * probe_counts.y * probe_counts.z;
 
@@ -89,7 +89,7 @@ void DDGI::init() {
 			.name = "Sphere Vertex Buffer",
 			.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 					 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-			.memory_type = vk::BufferType::GPU,
+			.memory_type = vk::BUFFER_TYPE_GPU,
 			.size = sizeof(SphereVertex) * sphere_vertices.size(),
 			.data = sphere_vertices.data(),
 		});
@@ -98,8 +98,8 @@ void DDGI::init() {
 			.name = "Sphere Index Buffer",
 			.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 					 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-			.memory_type = vk::BufferType::GPU,
-			.size = sizeof(uint32_t) * sphere_indices.size(),
+			.memory_type = vk::BUFFER_TYPE_GPU,
+			.size = sizeof(u32) * sphere_indices.size(),
 			.data = sphere_indices.data(),
 		});
 
@@ -110,11 +110,11 @@ void DDGI::init() {
 		sphere_desc_buffer =
 			prm::get_buffer({.name = "Sphere Desc",
 							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							 .memory_type = vk::BufferType::GPU,
+							 .memory_type = vk::BUFFER_TYPE_GPU,
 							 .size = sizeof(SphereDesc),
 							 .data = &sphere_desc});
 
-		for (int i = 0; i < 2; i++) {
+		for (i32 i = 0; i < 2; i++) {
 			irr_texes[i] = prm::get_texture({
 				.name = "DDGI Irradiance " + std::to_string(i),
 				.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -149,21 +149,21 @@ void DDGI::init() {
 		.name = "GBuffer",
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		.memory_type = vk::BufferType::GPU,
+		.memory_type = vk::BUFFER_TYPE_GPU,
 		.size = Window::width() * Window::height() * sizeof(GBufferData),
 	});
 
 	direct_lighting_buffer = prm::get_buffer({
 		.name = "Direct Lighting",
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		.memory_type = vk::BufferType::GPU,
+		.memory_type = vk::BUFFER_TYPE_GPU,
 		.size = Window::width() * Window::height() * sizeof(glm::vec3),
 	});
 
 	ddgi_ubo_buffer = prm::get_buffer({
 		.name = "DDGI UBO",
 		.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		.memory_type = vk::BufferType::CPU_TO_GPU,
+		.memory_type = vk::BUFFER_TYPE_CPU_TO_GPU,
 		.size = sizeof(DDGIUniforms),
 	});
 
@@ -171,7 +171,7 @@ void DDGI::init() {
 		.name = "Probe Offsets",
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		.memory_type = vk::BufferType::GPU,
+		.memory_type = vk::BUFFER_TYPE_GPU,
 		.size = sizeof(vec4) * num_probes,
 	});
 
@@ -195,7 +195,7 @@ void DDGI::init() {
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
 
@@ -225,7 +225,7 @@ void DDGI::render() {
 		std::uniform_real_distribution<> dis(-1.0, 1.0);
 		glm::vec4 rands(0.5 * dis(gen) + 0.5, dis(gen), dis(gen), dis(gen));
 		pc_ray.probe_rotation = glm::mat4_cast(
-			glm::angleAxis(2.0f * glm::pi<float>() * rands.x, glm::normalize(glm::vec3(rands.y, rands.z, rands.w))));
+			glm::angleAxis(2.0f * glm::pi<f32>() * rands.x, glm::normalize(glm::vec3(rands.y, rands.z, rands.w))));
 	}
 	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		output_tex,
@@ -251,7 +251,7 @@ void DDGI::render() {
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
 	// Trace rays from probes
-	uint32_t grid_size = probe_counts.x * probe_counts.y * probe_counts.z;
+	u32 grid_size = probe_counts.x * probe_counts.y * probe_counts.z;
 	vk::render_graph()
 		->add_rt("DDGI - Probe Trace",
 				 {
@@ -261,7 +261,7 @@ void DDGI::render() {
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
 					 .specialization_data = {1},
-					 .dims = {(uint32_t)rays_per_probe, grid_size},
+					 .dims = {(u32)rays_per_probe, grid_size},
 				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
@@ -270,7 +270,7 @@ void DDGI::render() {
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
 	// Classify
-	uint32_t wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 31) / 32;
+	u32 wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 31) / 32;
 	vk::render_graph()
 		->add_compute("Classify Probes",
 					  {.shader = vk::Shader("src/shaders/integrators/ddgi/classify.comp"), .dims = {wg_x}})
@@ -279,8 +279,8 @@ void DDGI::render() {
 	// Update probes & borders
 	{
 		// Probes
-		uint32_t wg_x = probe_counts.x * probe_counts.y;
-		uint32_t wg_y = probe_counts.z;
+		u32 wg_x = probe_counts.x * probe_counts.y;
+		u32 wg_y = probe_counts.z;
 		auto update_probe = [&](bool is_irr) {
 			vk::render_graph()
 				->add_compute(
@@ -306,7 +306,7 @@ void DDGI::render() {
 	}
 	// Sample probes & output into texture
 	wg_x = (Window::width() + 31) / 32;
-	uint32_t wg_y = (Window::height() + 31) / 32;
+	u32 wg_y = (Window::height() + 31) / 32;
 	vk::render_graph()
 		->add_compute("Sample Probes",
 					  {.shader = vk::Shader("src/shaders/integrators/ddgi/sample.comp"), .dims = {wg_x, wg_y}})
@@ -356,7 +356,7 @@ bool DDGI::update() {
 bool DDGI::gui() {
 	bool result = Integrator::gui();
 	result |= ImGui::SliderFloat("Hysteresis", &hysteresis, 0.0f, 1.0f);
-	bool rpp_changed = ImGui::SliderInt("Rays per probe", (int*)&rays_per_probe, 1, 4096);
+	bool rpp_changed = ImGui::SliderInt("Rays per probe", (i32*)&rays_per_probe, 1, 4096);
 	if (rpp_changed && (rays_per_probe > 0)) {
 		vkDeviceWaitIdle(vk::context().device);
 		prm::remove(rt.radiance_tex);
@@ -372,9 +372,9 @@ bool DDGI::gui() {
 	result |= ImGui::Checkbox("Visualize probes", &visualize_probes);
 	ImGui::Text("Probe dimensions: %dx%dx%d", probe_counts.x, probe_counts.y, probe_counts.z);
 	ImGui::Text("Probe distance: %f", probe_distance);
-	const uint32_t num_rays = rays_per_probe * probe_counts.x * probe_counts.y * probe_counts.z;
+	const u32 num_rays = rays_per_probe * probe_counts.x * probe_counts.y * probe_counts.z;
 	ImGui::Text("Number of rays: %d", num_rays);
-	ImGui::Text("Rays per pixel: %f", (float)num_rays / (Window::width() * Window::height()));
+	ImGui::Text("Rays per pixel: %f", (f32)num_rays / (Window::width() * Window::height()));
 	return result;
 }
 
@@ -399,7 +399,7 @@ void DDGI::update_ddgi_uniforms() {
 }
 
 void DDGI::create_radiance_textures() {
-	uint32_t num_probes = probe_counts.x * probe_counts.y * probe_counts.z;
+	u32 num_probes = probe_counts.x * probe_counts.y * probe_counts.z;
 	rt.radiance_tex = prm::get_texture({
 		.name = "DDGI Radiance",
 		.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -437,7 +437,7 @@ void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR};
 		sphere_triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
 		sphere_triangles.vertexData.deviceAddress = sphere_vertex_addr;
-		sphere_triangles.maxVertex = uint32_t(sphere_vertices.size());
+		sphere_triangles.maxVertex = u32(sphere_vertices.size());
 		sphere_triangles.vertexStride = sizeof(SphereVertex);
 		sphere_triangles.indexType = VK_INDEX_TYPE_UINT32;
 		sphere_triangles.indexData.deviceAddress = sphere_idx_addr;
@@ -445,7 +445,7 @@ void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 
 		VkAccelerationStructureBuildRangeInfoKHR offset;
 		offset.firstVertex = 0;
-		offset.primitiveCount = uint32_t(sphere_indices.size()) / 3;
+		offset.primitiveCount = u32(sphere_indices.size()) / 3;
 		offset.primitiveOffset = 0;
 		offset.transformOffset = 0;
 
@@ -475,9 +475,9 @@ void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 	}
 
 	{
-		const uint32_t sphere_blas_idx = static_cast<uint32_t>(blases.size()) - 1;
-		uint32_t num_probes = probe_counts.x * probe_counts.y * probe_counts.z;
-		for (uint32_t i = 0; i < num_probes; ++i) {
+		const u32 sphere_blas_idx = static_cast<u32>(blases.size()) - 1;
+		u32 num_probes = probe_counts.x * probe_counts.y * probe_counts.z;
+		for (u32 i = 0; i < num_probes; ++i) {
 			VkAccelerationStructureInstanceKHR sphere_inst{};
 
 			glm::vec3 position = probe_location(i);
@@ -495,14 +495,14 @@ void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 	vk::build_tlas(tlas, tlas_instances, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
-glm::vec3 DDGI::probe_location(uint32_t index) {
+glm::vec3 DDGI::probe_location(u32 index) {
 	glm::ivec3 grid_coord = probe_index_to_grid_coord(index);
 	glm::vec3 grid_pos = grid_coord_to_position(grid_coord);
 	// TODO: Add offsets
 	return grid_pos;
 }
 
-glm::ivec3 DDGI::probe_index_to_grid_coord(uint32_t index) {
+glm::ivec3 DDGI::probe_index_to_grid_coord(u32 index) {
 	glm::ivec3 res;
 	res.x = index % probe_counts.x;
 	res.y = (index / probe_counts.x) % probe_counts.y;

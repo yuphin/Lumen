@@ -6,35 +6,35 @@ void ReSTIR::init() {
 	g_buffer = prm::get_buffer({.name = "G-Buffer",
 								.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 										 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-								.memory_type = vk::BufferType::GPU,
+								.memory_type = vk::BUFFER_TYPE_GPU,
 								.size = Window::width() * Window::height()  * sizeof(RestirGBufferData)});
 
 	temporal_reservoir_buffer =
 		prm::get_buffer({.name = "Temporal Reservoirs",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height()  * sizeof(RestirReservoir)});
 
 	passthrough_reservoir_buffer =
 		prm::get_buffer({.name = "Passthrough Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height()  * sizeof(RestirReservoir)});
 
 	spatial_reservoir_buffer =
 		prm::get_buffer({.name = "Spatial Reservoirs",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height()  * sizeof(RestirReservoir)});
 
 	tmp_col_buffer =
 		prm::get_buffer({.name = "Temporary Color",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height()  * sizeof(float) * 3});
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = Window::width() * Window::height()  * sizeof(f32) * 3});
 
 	SceneDesc desc;
 	desc.index_addr = lumen_scene->index_buffer->get_device_address();
@@ -51,7 +51,7 @@ void ReSTIR::init() {
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
 
@@ -73,7 +73,7 @@ void ReSTIR::init() {
 void ReSTIR::render() {
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
-	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
+	pc_ray.num_lights = (i32)lumen_scene->gpu_lights.size();
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;

@@ -17,22 +17,22 @@ void PostFX::init() {
 	vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &img_sampler));
 	// Load the kernel
 	const char* img_name_kernel = "assets/kernels/Octagonal512.exr";
-	int width, height;
-	float* data = ImageUtils::load_exr(img_name_kernel, width, height);
+	i32 width, height;
+	f32* data = ImageUtils::load_exr(img_name_kernel, width, height);
 	vk::Texture* kernel_org =
 		drm::get({.name = "Kernel",
 				  .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-				  .dimensions = {(uint32_t)width, (uint32_t)height, 1},
+				  .dimensions = {(u32)width, (u32)height, 1},
 				  .format = VK_FORMAT_R32G32B32A32_SFLOAT,
-				  .data = {.data = data, .size = width * height * 4 * sizeof(float)},
+				  .data = {.data = data, .size = width * height * 4 * sizeof(f32)},
 				  .sampler = img_sampler});
 
 	if (data) {
 		free(data);
 	}
 	// Compute padded sizes
-	uint32_t padded_width = 1 << uint32_t(ceil(log2(double(Window::width() + kernel_org->extent.width))));
-	uint32_t padded_height = 1 << uint32_t(ceil(log2(double(Window::height() + kernel_org->extent.height))));
+	u32 padded_width = 1 << u32(ceil(log2(double(Window::width() + kernel_org->extent.width))));
+	u32 padded_height = 1 << u32(ceil(log2(double(Window::height() + kernel_org->extent.height))));
 
 	auto empty_tex_desc = vk::TextureDesc{.name = "FFT - Ping",
 										  .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
@@ -50,8 +50,8 @@ void PostFX::init() {
 	vk::CommandBuffer cmd(true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
 	// Copy the original kernel image to the padded texture
-	uint32_t pad_width = (kernel_org->extent.width + 31) / 32;
-	uint32_t pad_height = (kernel_org->extent.height + 31) / 32;
+	u32 pad_width = (kernel_org->extent.width + 31) / 32;
+	u32 pad_height = (kernel_org->extent.height + 31) / 32;
 
 	lm::RenderGraph* rg = vk::render_graph();
 	rg->add_compute("Pad Kernel",
@@ -59,14 +59,14 @@ void PostFX::init() {
 		.bind_texture_with_sampler(kernel_org, img_sampler)
 		.bind(kernel_ping);
 
-	uint32_t wg_size_x = fft_ping_padded->extent.width;
-	uint32_t wg_size_y = fft_ping_padded->extent.height;
-	auto dim_y = (uint32_t)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_x - 1) / wg_size_x;
-	auto dim_x = (uint32_t)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_y - 1) / wg_size_y;
+	u32 wg_size_x = fft_ping_padded->extent.width;
+	u32 wg_size_y = fft_ping_padded->extent.height;
+	auto dim_y = (u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_x - 1) / wg_size_x;
+	auto dim_x = (u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_y - 1) / wg_size_y;
 	bool vertical = false;
 
-	const int RADIX_X = (31 - std::countl_zero(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
-	const int RADIX_Y = (31 - std::countl_zero(fft_ping_padded->extent.height)) % 2 ? 2 : 4;
+	const i32 RADIX_X = (31 - std::countl_zero(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
+	const i32 RADIX_Y = (31 - std::countl_zero(fft_ping_padded->extent.height)) % 2 ? 2 : 4;
 	const std::vector<vk::ShaderMacro> macros_x =
 		RADIX_X == 2 ? std::vector<vk::ShaderMacro>{{"KERNEL_GENERATION"}}
 					 : std::vector<vk::ShaderMacro>{{"KERNEL_GENERATION"}, {"RADIX", RADIX_X}};
@@ -75,14 +75,14 @@ void PostFX::init() {
 					 : std::vector<vk::ShaderMacro>{{"KERNEL_GENERATION"}, {"RADIX", RADIX_Y}};
 	rg->add_compute("FFT - Horizontal", {.shader = vk::Shader("src/shaders/bloom/fft.comp"),
 										 .macros = macros_x,
-										 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 0},
+										 .specialization_data = {wg_size_x / RADIX_X, u32(vertical), 0},
 										 .dims = {dim_y, 1, 1}})
 		.bind_texture_with_sampler(kernel_ping, img_sampler)
 		.bind(kernel_pong);
 	vertical = true;
 	rg->add_compute("FFT - Vertical", {.shader = vk::Shader("src/shaders/bloom/fft.comp"),
 									   .macros = macros_y,
-									   .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 0},
+									   .specialization_data = {wg_size_y / RADIX_Y, u32(vertical), 0},
 									   .dims = {dim_x, 1, 1}})
 		.bind_texture_with_sampler(kernel_ping, img_sampler)
 		.bind(kernel_pong);
@@ -95,29 +95,29 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 	lm::RenderGraph* rg = vk::render_graph();
 	// Copy the original image to the padded texture
 	if (enable_bloom) {
-		uint32_t pad_width = (fft_ping_padded->extent.width + 31) / 32;
-		uint32_t pad_height = (fft_ping_padded->extent.height + 31) / 32;
+		u32 pad_width = (fft_ping_padded->extent.width + 31) / 32;
+		u32 pad_height = (fft_ping_padded->extent.height + 31) / 32;
 
 		rg->add_compute("Pad Image",
 						{.shader = vk::Shader("src/shaders/bloom/pad.comp"), .dims = {pad_width, pad_height, 1}})
 			.bind_texture_with_sampler(input, img_sampler)
 			.bind(fft_ping_padded);
-		uint32_t wg_size_x = fft_ping_padded->extent.width;
-		uint32_t wg_size_y = fft_ping_padded->extent.height;
+		u32 wg_size_x = fft_ping_padded->extent.width;
+		u32 wg_size_y = fft_ping_padded->extent.height;
 		auto dim_y =
-			(uint32_t)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_x - 1) / wg_size_x;
+			(u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_x - 1) / wg_size_x;
 		auto dim_x =
-			(uint32_t)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_y - 1) / wg_size_y;
+			(u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_y - 1) / wg_size_y;
 		bool vertical = false;
-		const int RADIX_X = (31 - std::countl_zero(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
-		const int RADIX_Y = (31 - std::countl_zero(fft_ping_padded->extent.height)) % 2 ? 2 : 4;
+		const i32 RADIX_X = (31 - std::countl_zero(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
+		const i32 RADIX_Y = (31 - std::countl_zero(fft_ping_padded->extent.height)) % 2 ? 2 : 4;
 		const std::vector<vk::ShaderMacro> macros_x =
 			RADIX_X == 2 ? std::vector<vk::ShaderMacro>{} : std::vector<vk::ShaderMacro>{{"RADIX", RADIX_X}};
 		const std::vector<vk::ShaderMacro> macros_y =
 			RADIX_Y == 2 ? std::vector<vk::ShaderMacro>{} : std::vector<vk::ShaderMacro>{{"RADIX", RADIX_Y}};
 		rg->add_compute("FFT - Horizontal", {.shader = vk::Shader("src/shaders/bloom/fft.comp"),
 											 .macros = macros_x,
-											 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 0},
+											 .specialization_data = {wg_size_x / RADIX_X, u32(vertical), 0},
 											 .dims = {dim_y, 1, 1}})
 			.bind_texture_with_sampler(fft_ping_padded, img_sampler)
 			.bind(fft_pong_padded)
@@ -125,7 +125,7 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 		vertical = true;
 		rg->add_compute("FFT - Vertical", {.shader = vk::Shader("src/shaders/bloom/fft.comp"),
 										   .macros = macros_y,
-										   .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 0},
+										   .specialization_data = {wg_size_y / RADIX_Y, u32(vertical), 0},
 										   .dims = {dim_x, 1, 1}})
 			.bind_texture_with_sampler(fft_ping_padded, img_sampler)
 			.bind(fft_pong_padded)
@@ -133,7 +133,7 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 		rg->add_compute("FFT - Vertical - Inverse",
 						{.shader = vk::Shader("src/shaders/bloom/fft.comp"),
 						 .macros = macros_y,
-						 .specialization_data = {wg_size_y / RADIX_Y, uint32_t(vertical), 1},
+						 .specialization_data = {wg_size_y / RADIX_Y, u32(vertical), 1},
 						 .dims = {dim_x, 1, 1}})
 			.bind_texture_with_sampler(fft_ping_padded, img_sampler)
 			.bind(fft_pong_padded)
@@ -142,7 +142,7 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 		rg->add_compute("FFT - Horizontal - Inverse",
 						{.shader = vk::Shader("src/shaders/bloom/fft.comp"),
 						 .macros = macros_x,
-						 .specialization_data = {wg_size_x / RADIX_X, uint32_t(vertical), 1},
+						 .specialization_data = {wg_size_x / RADIX_X, u32(vertical), 1},
 						 .dims = {dim_y, 1, 1}})
 			.bind_texture_with_sampler(fft_ping_padded, img_sampler)
 			.bind(fft_pong_padded)
@@ -183,7 +183,7 @@ bool PostFX::gui() {
 	ImGui::PopStyleColor();
 	ImGui::Checkbox("Enable ACES tonemapping", &enable_tonemapping);
 	ImGui::Checkbox("Enable bloom", &enable_bloom);
-	float exposure = log10f(bloom_exposure);
+	f32 exposure = log10f(bloom_exposure);
 	ImGui::SliderFloat("Bloom exposure", &exposure, -20.0f, 0.0f, "%.2f");
 	bloom_exposure = powf(10.0f, exposure);
 	ImGui::SliderFloat("Bloom amount", &bloom_amount, 0.0f, 1.0f, "%.2f");

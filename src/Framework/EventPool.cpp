@@ -1,11 +1,11 @@
 #include "EventPool.h"
-
+#include "Framework/VulkanContext.h"
 namespace vk {
 
 namespace event_pool {
 struct Events {
 	std::vector<VkEvent> events;
-	size_t available_event_idx = -1;
+	u64 available_event_idx = -1;
 };
 std::unordered_map<VkCommandBuffer, Events> _events_map;
 

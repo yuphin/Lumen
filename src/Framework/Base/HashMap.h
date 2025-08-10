@@ -3,10 +3,10 @@
 #include "Hash.h"
 namespace lm {
 
-inline constexpr size_t HASH_MAP_LINEAR_MIN_CAPACITY = 32;
-inline constexpr size_t HASH_MAP_HASH_EMPTY = 0;
-inline constexpr size_t HASH_MAP_HASH_DELETED = 1;
-inline constexpr size_t HASH_MAP_LOAD_PERCENTAGE_THRESHOLD = 70;
+inline constexpr u64 HASH_MAP_LINEAR_MIN_CAPACITY = 32;
+inline constexpr u64 HASH_MAP_HASH_EMPTY = 0;
+inline constexpr u64 HASH_MAP_HASH_DELETED = 1;
+inline constexpr u64 HASH_MAP_LOAD_PERCENTAGE_THRESHOLD = 70;
 
 template <typename T>
 static inline uint64_t get_default_hash(const T& x) {
@@ -37,15 +37,15 @@ struct HashMapEntry {
 template <typename T1, typename T2, uint64_t (*hash_func)(const T1&)>
 struct HashMapLinear {
 	HashMapEntry<T1, T2>* data = nullptr;
-	size_t size = 0;
+	u64 size = 0;
 	// Also includes the deleted entries
-	size_t num_slots = 0;
-	size_t capacity = 0;
+	u64 num_slots = 0;
+	u64 capacity = 0;
 	Arena* arena_node = nullptr;
 
-	void resize(size_t new_capacity) {
+	void resize(u64 new_capacity) {
 		new_capacity = util::next_pow2(new_capacity);
-		arena_ensure_allocated<HashMapLinear>(arena_node, new_capacity, capacity, /*zero_initialize=*/true);
+		arena_ensure_allocated<HashMapEntry<T1, T2>>(arena_node, new_capacity, capacity, /*zero_initialize=*/true);
 		capacity = new_capacity;
 	}
 
@@ -59,9 +59,9 @@ struct HashMapLinear {
 			hash += HASH_MAP_HASH_DELETED + 1;
 		}
 
-		size_t index = hash & (capacity - 1);
+		u64 index = hash & (capacity - 1);
 
-		uint32_t probe_inc = 1;
+		u32 probe_inc = 1;
 		while (data[index].hash != HASH_MAP_HASH_EMPTY) {
 			const HashMapEntry<T1, T2>& entry = data[index];
 			if (entry.hash == HASH_MAP_HASH_DELETED) {
@@ -81,8 +81,8 @@ struct HashMapLinear {
 		if (hash <= HASH_MAP_HASH_DELETED) {
 			hash += HASH_MAP_HASH_DELETED + 1;
 		}
-		size_t index = hash & (capacity - 1);
-		uint32_t probe_inc = 1;
+		u64 index = hash & (capacity - 1);
+		u32 probe_inc = 1;
 
 		while (data[index].hash > HASH_MAP_HASH_DELETED) {
 			if (data[index].hash == hash && data[index].key == key) {
@@ -99,8 +99,8 @@ struct HashMapLinear {
 		if (hash <= HASH_MAP_HASH_DELETED) {
 			hash += HASH_MAP_HASH_DELETED + 1;
 		}
-		size_t index = hash & (capacity - 1);
-		uint32_t probe_inc = 1;
+		u64 index = hash & (capacity - 1);
+		u32 probe_inc = 1;
 
 		while (data[index].hash > HASH_MAP_HASH_DELETED) {
 			if (data[index].hash == hash && data[index].key == key) {
@@ -116,7 +116,7 @@ struct HashMapLinear {
 	struct Iterator {
 		HashMapLinear<T1, T2, hash_func>* map;
 		HashMapEntry<T1, T2>* entry;
-		size_t index;
+		u64 index;
 
 		bool operator==(const Iterator& other) {
 			return map == other.map && entry == other.entry && index == other.index;

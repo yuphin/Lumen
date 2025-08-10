@@ -1,6 +1,6 @@
 #pragma once
 
 namespace ImageUtils {
-float* load_exr(const char* img_name, int& width, int& height);
-void save_exr(const float* rgb, int width, int height, const char* outfilename);
+f32* load_exr(const char* img_name, i32& width, i32& height);
+void save_exr(const f32* rgb, i32 width, i32 height, const char* outfilename);
 }

@@ -1,5 +1,4 @@
 #pragma once
-#include <tiny_obj_loader.h>
 #include "Framework/Camera.h"
 #include "Framework/VulkanBase.h"
 #include "Framework/Window.h"
@@ -13,7 +12,7 @@
 
 struct MeshData {
 	std::vector<glm::vec3> positions;
-	std::vector<uint32_t> indices;
+	std::vector<u32> indices;
 	std::vector<glm::vec3> normals;
 	std::vector<glm::vec3> tangents;
 	std::vector<glm::vec2> texcoords0;
@@ -24,12 +23,12 @@ struct MeshData {
 struct LumenPrimMesh {
 	std::string name;
 	std::string filename;
-	uint32_t material_idx;
-	uint32_t vtx_offset;
-	uint32_t first_idx;
-	uint32_t idx_count;
-	uint32_t vtx_count;
-	uint32_t prim_idx;
+	u32 material_idx;
+	u32 vtx_offset;
+	u32 first_idx;
+	u32 idx_count;
+	u32 vtx_count;
+	u32 prim_idx;
 	glm::mat4 world_matrix;
 	glm::vec3 min_pos;
 	glm::vec3 max_pos;
@@ -39,8 +38,8 @@ struct LumenLight {
 	glm::vec3 pos;
 	glm::vec3 to;
 	glm::vec3 L;
-	uint32_t light_flags;
-	float world_radius;
+	u32 light_flags;
+	f32 world_radius;
 	bool enabled = true;
 };
 
@@ -50,7 +49,7 @@ struct LumenNode {
 	LumenNode* parent = nullptr;
 	LumenNode* child = nullptr;
 	LumenNode* next = nullptr;
-	int num_list_items = 0;
+	i32 num_list_items = 0;
 };
 
 class LumenScene {
@@ -60,7 +59,7 @@ class LumenScene {
 	void write_lumen_scene();
 	void destroy();
 	std::vector<glm::vec3> positions;
-	std::vector<uint32_t> indices;
+	std::vector<u32> indices;
 	std::vector<glm::vec3> normals;
 	std::vector<glm::vec3> tangents;
 	std::vector<glm::vec2> texcoords0;
@@ -82,26 +81,26 @@ class LumenScene {
 	vk::Buffer* mesh_lights_buffer;
 	std::vector<vk::Texture*> scene_textures;
 	std::unique_ptr<lm::Camera> camera;
-	std::unordered_map<uint32_t, std::string> material_idx_to_name;
+	std::unordered_map<u32, std::string> material_idx_to_name;
 
-	uint32_t total_light_triangle_cnt = 0;
-	float total_light_area = 0;
+	u32 total_light_triangle_cnt = 0;
+	f32 total_light_area = 0;
 
 	struct Dimensions {
-		glm::vec3 min = glm::vec3(std::numeric_limits<float>::max());
-		glm::vec3 max = glm::vec3(std::numeric_limits<float>::min());
+		glm::vec3 min = glm::vec3(std::numeric_limits<f32>::max());
+		glm::vec3 max = glm::vec3(std::numeric_limits<f32>::min());
 		glm::vec3 size{0.f};
 		glm::vec3 center{0.f};
-		float radius{0};
+		f32 radius{0};
 	} m_dimensions;
 	std::unique_ptr<SceneConfig> config;
 
-	uint32_t dir_light_idx = -1;
+	u32 dir_light_idx = -1;
 	void create_scene_config(const std::string& integrator_name);
-	inline bool has_bsdf_type(uint32_t flag) { return (bsdf_types & flag) != 0; }
+	inline bool has_bsdf_type(u32 flag) { return (bsdf_types & flag) != 0; }
 
    private:
-	uint32_t bsdf_types = 0;
+	u32 bsdf_types = 0;
 	void compute_scene_dimensions();
 	void load_lumen_scene(const std::string& path);
 	void load_mitsuba_scene(const std::string& path);

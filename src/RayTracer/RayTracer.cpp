@@ -1,20 +1,20 @@
 #include "Framework/RenderGraph.h"
+#include "Framework/GPUQueryManager.h"
 #include <tinyexr.h>
 #define TINYGLTF_IMPLEMENTATION
-#define TINYOBJLOADER_IMPLEMENTATION
 #include "RayTracer.h"
 
 RayTracer* RayTracer::instance = nullptr;
 bool load_reference = false;
 bool calc_rmse = false;
 
-RayTracer::RayTracer(bool debug, int argc, char* argv[]) : debug(debug) {
+RayTracer::RayTracer(bool debug, i32 argc, char* argv[]) : debug(debug) {
 	instance = this;
 	parse_args(argc, argv);
 }
 
 void RayTracer::init() {
-	srand((uint32_t)time(NULL));
+	srand((u32)time(NULL));
 	Window::add_key_callback([this](KeyInput key, KeyAction action) {
 		if (Window::is_key_down(KeyInput::KEY_F1)) {
 			show_ui = !show_ui;
@@ -60,7 +60,7 @@ void RayTracer::init() {
 
 	scene.load_scene(scene_name);
 	scene.write_lumen_scene();
-	create_integrator(int(scene.config->integrator_type));
+	create_integrator(i32(scene.config->integrator_type));
 	integrator->init();
 	if (!tlas.accel) {
 		integrator->create_accel(tlas, blases);
@@ -71,40 +71,40 @@ void RayTracer::init() {
 }
 
 void RayTracer::init_resources() {
-	uint32_t viewport_size = Window::width() * Window::height();
+	u32 viewport_size = Window::width() * Window::height();
 	output_img_buffer =
 		prm::get_buffer({.name = "Output Image Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = viewport_size * 4 * 4});
 
 	output_img_buffer_cpu =
 		prm::get_buffer({.name = "Output Image CPU",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU_TO_CPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
 						 .size = viewport_size * 4 * 4});
 
 	residual_buffer =
 		prm::get_buffer({.name = "RMSE Residual",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = viewport_size * 4});
 
 	counter_buffer =
 		prm::get_buffer({.name = "RMSE Counter",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
-						 .size = sizeof(int)});
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = sizeof(i32)});
 
 	rmse_val_buffer =
 		prm::get_buffer({.name = "RMSE Value",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU_TO_CPU,
-						 .size = sizeof(float)});
+						 .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
+						 .size = sizeof(f32)});
 	auto texture_desc = vk::TextureDesc{.name = "Reference Texture",
 										.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
 												 VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
@@ -118,16 +118,16 @@ void RayTracer::init_resources() {
 	RTUtilsDesc rt_utils_desc;
 	if (load_reference) {
 		// Load the ground truth image
-		int width, height;
-		float* data = ImageUtils::load_exr("out.exr", width, height);
+		i32 width, height;
+		f32* data = ImageUtils::load_exr("out.exr", width, height);
 		if (!data) {
 			LUMEN_ERROR("Could not load the reference image");
 		}
 		gt_img_buffer =
 			prm::get_buffer({.name = "Ground Truth Image",
 							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-							 .memory_type = vk::BufferType::GPU,
-							 .size = Window::width() * Window::height() * 4 * sizeof(float),
+							 .memory_type = vk::BUFFER_TYPE_GPU,
+							 .size = Window::width() * Window::height() * 4 * sizeof(f32),
 							 .data = data});
 		rt_utils_desc.gt_img_addr = gt_img_buffer->get_device_address();
 		free(data);
@@ -141,7 +141,7 @@ void RayTracer::init_resources() {
 	rt_utils_desc_buffer =
 		prm::get_buffer({.name = "RT Utils Desc",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(RTUtilsDesc),
 						 .data = &rt_utils_desc});
 
@@ -167,8 +167,8 @@ void RayTracer::cleanup_resources() {
 }
 
 void RayTracer::update() {
-	float frame_time = draw_frame();
-	cpu_avg_time = (1.0f - 1.0f / (cnt)) * cpu_avg_time + frame_time / (float)cnt;
+	f32 frame_time = draw_frame();
+	cpu_avg_time = (1.0f - 1.0f / (cnt)) * cpu_avg_time + frame_time / (f32)cnt;
 	cpu_avg_time = 0.95f * cpu_avg_time + 0.05f * frame_time;
 	integrator->update();
 	integrator->updated = false;
@@ -180,7 +180,7 @@ void RayTracer::update() {
 #endif
 }
 
-void RayTracer::render(uint32_t i) {
+void RayTracer::render(u32 i) {
 	integrator->render();
 	vk::Texture* input_tex = nullptr;
 	if (comparison_mode && img_captured) {
@@ -217,7 +217,7 @@ void RayTracer::render_debug_utils() {
 	if (calc_rmse && has_gt) {
 		auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name,
 							 const std::string& reduce_name, const std::string& reduce_shader_name) {
-			uint32_t num_wgs = uint32_t((Window::width() * Window::height() + 1023) / 1024);
+			u32 num_wgs = u32((Window::width() * Window::height() + 1023) / 1024);
 			vk::render_graph()
 				->add_compute(op_name, {.shader = vk::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
 				.push_constants(&rt_utils_pc)
@@ -243,39 +243,39 @@ void RayTracer::render_debug_utils() {
 	}
 }
 
-void RayTracer::create_integrator(int integrator_idx) {
+void RayTracer::create_integrator(i32 integrator_idx) {
 	switch (integrator_idx) {
-		case int(IntegratorType::Path):
+		case i32(IntegratorType::Path):
 			integrator = std::make_unique<Path>(&scene, tlas);
 			break;
-		case int(IntegratorType::BDPT):
+		case i32(IntegratorType::BDPT):
 			integrator = std::make_unique<BDPT>(&scene, tlas);
 			break;
-		case int(IntegratorType::SPPM):
+		case i32(IntegratorType::SPPM):
 			integrator = std::make_unique<SPPM>(&scene, tlas);
 			break;
-		case int(IntegratorType::VCM):
+		case i32(IntegratorType::VCM):
 			integrator = std::make_unique<VCM>(&scene, tlas);
 			break;
-		case int(IntegratorType::ReSTIR):
+		case i32(IntegratorType::ReSTIR):
 			integrator = std::make_unique<ReSTIR>(&scene, tlas);
 			break;
-		case int(IntegratorType::ReSTIRGI):
+		case i32(IntegratorType::ReSTIRGI):
 			integrator = std::make_unique<ReSTIRGI>(&scene, tlas);
 			break;
-		case int(IntegratorType::ReSTIRPT):
+		case i32(IntegratorType::ReSTIRPT):
 			integrator = std::make_unique<ReSTIRPT>(&scene, tlas);
 			break;
-		case int(IntegratorType::PSSMLT):
+		case i32(IntegratorType::PSSMLT):
 			integrator = std::make_unique<PSSMLT>(&scene, tlas);
 			break;
-		case int(IntegratorType::SMLT):
+		case i32(IntegratorType::SMLT):
 			integrator = std::make_unique<SMLT>(&scene, tlas);
 			break;
-		case int(IntegratorType::VCMMLT):
+		case i32(IntegratorType::VCMMLT):
 			integrator = std::make_unique<VCMMLT>(&scene, tlas);
 			break;
-		case int(IntegratorType::DDGI):
+		case i32(IntegratorType::DDGI):
 			integrator = std::make_unique<DDGI>(&scene, tlas);
 			break;
 		default:
@@ -295,11 +295,11 @@ bool RayTracer::gui() {
 		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
 		ImGui::Text("Individual GPU timings:");
 		ImGui::PopStyleColor();
-		for (size_t i = 0; i < query_results.size; i++) {
+		for (u64 i = 0; i < query_results.size; i++) {
 			const GPUQueryManager::TimestampData& data = query_results[i];
 			GPUQueryManager::TimestampData* parent = data.parent;
 			bool is_root = parent == nullptr;
-			uint32_t scope = 0;
+			u32 scope = 0;
 			while (parent != nullptr) {
 				scope++;
 				parent = parent->parent;
@@ -344,7 +344,7 @@ bool RayTracer::gui() {
 	if (comparison_mode && img_captured) {
 		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
 		const char* texts[] = {"Showing: Reference Image", "Showing: Target Image"};
-		ImGui::Text("%s\n", texts[uint32_t(comparison_img_toggle)]);
+		ImGui::Text("%s\n", texts[u32(comparison_img_toggle)]);
 		ImGui::PopStyleColor();
 	}
 	if (ImGui::Button("Capture reference image (F6)")) {
@@ -357,9 +357,9 @@ bool RayTracer::gui() {
 	const char* settings[] = {"Path",	"BDPT",	  "SPPM",	   "VCM",		"PSSMLT", "SMLT",
 							  "VCMMLT", "ReSTIR", "ReSTIR GI", "ReSTIR PT", "DDGI"};
 
-	static int curr_integrator_idx = int(scene.config->integrator_type);
+	static i32 curr_integrator_idx = i32(scene.config->integrator_type);
 	if (ImGui::BeginCombo("Select Integrator", settings[curr_integrator_idx])) {
-		for (int n = 0; n < IM_ARRAYSIZE(settings); n++) {
+		for (i32 n = 0; n < IM_ARRAYSIZE(settings); n++) {
 			const bool selected = curr_integrator_idx == n;
 			if (ImGui::Selectable(settings[n], selected)) {
 				curr_integrator_idx = n;
@@ -373,7 +373,7 @@ bool RayTracer::gui() {
 		ImGui::EndCombo();
 	}
 
-	if (curr_integrator_idx != int(scene.config->integrator_type)) {
+	if (curr_integrator_idx != i32(scene.config->integrator_type)) {
 		updated = true;
 		vkDeviceWaitIdle(vk::context().device);
 		bool was_custom_accel = typeid(*integrator) == typeid(DDGI);
@@ -399,18 +399,18 @@ bool RayTracer::gui() {
 	return updated;
 }
 
-float RayTracer::draw_frame() {
+f32 RayTracer::draw_frame() {
 	if (cnt == 0) {
 		start = clock();
 	}
 
 	auto t_begin = glfwGetTime() * 1000;
 	bool updated = false;
-	uint32_t image_idx = vk::prepare_frame();
+	u32 image_idx = vk::prepare_frame();
 	if (image_idx == UINT32_MAX) {
 		auto t_end = glfwGetTime() * 1000;
 		auto t_diff = t_end - t_begin;
-		return (float)t_diff;
+		return (f32)t_diff;
 	}
 	ImGui_ImplVulkan_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
@@ -439,7 +439,7 @@ float RayTracer::draw_frame() {
 	vk::render_graph()->reset();
 	if (result != VK_SUCCESS) {
 		Window::update_window_size();
-		const float aspect_ratio = (float)Window::width() / Window::height();
+		const f32 aspect_ratio = (f32)Window::width() / Window::height();
 		cleanup_resources();
 		integrator->destroy(/*resize=*/true);
 		post_fx.destroy();
@@ -456,11 +456,11 @@ float RayTracer::draw_frame() {
 	}
 
 	auto now = clock();
-	auto diff = ((float)now - start);
+	auto diff = ((f32)now - start);
 
 	if (write_exr) {
 		write_exr = false;
-		ImageUtils::save_exr((float*)vk::buffer_map(output_img_buffer_cpu), Window::width(), Window::height(),
+		ImageUtils::save_exr((f32*)vk::buffer_map(output_img_buffer_cpu), Window::width(), Window::height(),
 							 "out.exr");
 		vk::buffer_unmap(output_img_buffer_cpu);
 	}
@@ -468,7 +468,7 @@ float RayTracer::draw_frame() {
 	calc_rmse = time_limit;
 
 	if (calc_rmse && has_gt) {
-		float rmse = *(float*)vk::buffer_map(rmse_val_buffer);
+		f32 rmse = *(f32*)vk::buffer_map(rmse_val_buffer);
 		vk::buffer_unmap(rmse_val_buffer);
 		LUMEN_TRACE("RMSE {}", rmse * 1e6);
 		start = now;
@@ -476,13 +476,13 @@ float RayTracer::draw_frame() {
 	auto t_end = glfwGetTime() * 1000;
 	auto t_diff = t_end - t_begin;
 	cnt++;
-	return (float)t_diff;
+	return (f32)t_diff;
 }
 
-void RayTracer::parse_args(int argc, char* argv[]) {
+void RayTracer::parse_args(i32 argc, char* argv[]) {
 	scene_name = "scenes/caustics.json";
 	std::regex fn("(.*).(.json|.xml|.scene)");
-	for (int i = 0; i < argc; i++) {
+	for (i32 i = 0; i < argc; i++) {
 		if (std::regex_match(argv[i], fn)) {
 			scene_name = argv[i];
 		}

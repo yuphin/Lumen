@@ -2,8 +2,14 @@
 #include "VulkanContext.h"
 namespace vk {
 
-enum class BufferType { GPU = 1 << 0, GPU_TO_CPU = 1 << 1, CPU_TO_GPU = 1 << 2, STAGING = 1 << 3 };
-DEFINE_ENUM_FLAGS(BufferType)
+enum BufferType : uint32_t {
+    BUFFER_TYPE_GPU        = 1u << 0,
+    BUFFER_TYPE_GPU_TO_CPU = 1u << 1,
+    BUFFER_TYPE_CPU_TO_GPU = 1u << 2,
+    BUFFER_TYPE_STAGING    = 1u << 3,
+};
+
+using BufferFlags = u32;
 
 struct BufferStatus {
 	bool read = false;
@@ -41,7 +47,7 @@ struct Buffer {
 void buffer_create(Buffer* buffer, const BufferDesc& desc);
 VkDescriptorBufferInfo buffer_descriptor(const Buffer* buffer);
 void buffer_destroy(Buffer* buffer);
-void write_buffer(Buffer* buffer, void* data, size_t size);
+void write_buffer(Buffer* buffer, void* data, u64 size);
 void* buffer_map(Buffer* buffer);
 void buffer_unmap(Buffer* buffer);
 

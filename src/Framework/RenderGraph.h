@@ -8,7 +8,7 @@
 #include "EventPool.h"
 #include "RenderGraphTypes.h"
 #include "AccelerationStructure.h"
-#include "Utils.h"
+#include "Base/Utils.h"
 
 namespace lm {
 
@@ -68,17 +68,17 @@ class RenderGraph {
 	std::vector<RenderPass> passes;
 
 	// vk::Pipeline Name + Macro String + Specialization Constants -> vk::Pipeline
-	std::unordered_map<size_t, PipelineStorage> pipeline_cache;
-	std::vector<std::pair<std::function<void(RenderPass*)>, uint32_t>> pipeline_tasks;
+	std::unordered_map<u64, PipelineStorage> pipeline_cache;
+	std::vector<std::pair<std::function<void(RenderPass*)>, u32>> pipeline_tasks;
 	std::vector<std::function<void(RenderPass*)>> shader_tasks;
 	// Sync related data
 	std::vector<BufferSyncResources> buffer_sync_resources;
 	std::vector<ImageSyncResources> img_sync_resources;
-	std::unordered_map<VkBuffer, std::pair<uint32_t, VkAccessFlags>>
+	std::unordered_map<VkBuffer, std::pair<u32, VkAccessFlags>>
 		buffer_resource_map;								 // Buffer handle - { Write Pass Idx, Access Type }
-	std::unordered_map<VkImage, uint32_t> img_resource_map;	 // Tex2D handle - Pass Idx
+	std::unordered_map<VkImage, u32> img_resource_map;	 // Tex2D handle - Pass Idx
 	const bool multithreaded_pipeline_compilation = true;
-	static const uint32_t INVALID_PASS_IDX = UINT_MAX;
+	static const u32 INVALID_PASS_IDX = UINT_MAX;
 
 	template <typename Settings>
 	RenderPass& add_pass_impl(const std::string& name, const Settings& settings);
@@ -89,7 +89,7 @@ class RenderGraph {
 
 class RenderPass {
    public:
-	RenderPass(vk::PassType type, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
+	RenderPass(vk::PassType type, const std::string& name, RenderGraph* rg, u32 pass_idx,
 			   const vk::GraphicsPassSettings& gfx_settings, const std::string& macro_string,
 			   PipelineStorage* pipeline_storage, bool cached = false)
 		: type(type),
@@ -105,7 +105,7 @@ class RenderPass {
 		}
 	}
 
-	RenderPass(vk::PassType type, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
+	RenderPass(vk::PassType type, const std::string& name, RenderGraph* rg, u32 pass_idx,
 			   const vk::RTPassSettings& rt_settings, const std::string& macro_string,
 			   PipelineStorage* pipeline_storage, bool cached = false)
 		: type(type),
@@ -121,7 +121,7 @@ class RenderPass {
 		}
 	}
 
-	RenderPass(vk::PassType type, const std::string& name, RenderGraph* rg, uint32_t pass_idx,
+	RenderPass(vk::PassType type, const std::string& name, RenderGraph* rg, u32 pass_idx,
 			   const vk::ComputePassSettings& compute_settings, const std::string& macro_string,
 			   PipelineStorage* pipeline_storage, bool cached = false)
 		: type(type),
@@ -168,7 +168,7 @@ class RenderPass {
 	RenderPass& build_blas(util::Slice<vk::BVH> blases, const std::vector<vk::BlasInput>& blas_inputs,
 						   VkBuildAccelerationStructureFlagsKHR flags, const std::vector<vk::Buffer*>& source_buffers,
 						   vk::Buffer** scratch_buffer_ref);
-	RenderPass& build_tlas(vk::BVH& tlas, vk::Buffer* instances_buf, uint32_t instance_count,
+	RenderPass& build_tlas(vk::BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
 						   VkBuildAccelerationStructureFlagsKHR flags, vk::Buffer** scratch_buffer_ref,
 						   bool build_tlas_after_blas = false, bool update_blas = false);
 
@@ -177,7 +177,7 @@ class RenderPass {
 
 	vk::PassType type;
 	RenderGraph* rg;
-	uint32_t pass_idx;
+	u32 pass_idx;
 	std::unique_ptr<vk::GraphicsPassSettings> gfx_settings = nullptr;
 	std::unique_ptr<vk::RTPassSettings> rt_settings = nullptr;
 	std::unique_ptr<vk::ComputePassSettings> compute_settings = nullptr;
@@ -186,9 +186,9 @@ class RenderPass {
 
    private:
 	std::string name;
-	int next_binding_idx = 0;
-	int next_as_binding_idx = 0;
-	std::vector<uint32_t> descriptor_counts;
+	i32 next_binding_idx = 0;
+	i32 next_as_binding_idx = 0;
+	std::vector<u32> descriptor_counts;
 	void* push_constant_data = nullptr;
 	bool is_pipeline_cached = false;
 	bool disable_execution = false;
@@ -236,7 +236,7 @@ class RenderPass {
 		vk::BVH* tlas = nullptr;
 		vk::Buffer* instances_buf = nullptr;
 		vk::Buffer** scratch_buffer_ref = nullptr;
-		uint32_t instance_count = 0;
+		u32 instance_count = 0;
 		bool build_tlas_after_blas = false;
 		bool update_tlas = false;
 		VkBuildAccelerationStructureFlagsKHR flags;
@@ -294,7 +294,7 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 
 	auto populate_macros = [](const std::vector<vk::ShaderMacro>& macros, std::string& macro_string,
 							  bool& prev_nonempty) {
-		for (size_t i = 0; i < macros.size(); i++) {
+		for (u64 i = 0; i < macros.size(); i++) {
 			if (!macros[i].visible) {
 				continue;
 			}
@@ -322,9 +322,9 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	}
 	name_with_macros += macro_string;
 
-	size_t hash = 0;
+	u64 hash = 0;
 	util::hash_combine(hash, name_with_macros);
-	for (uint32_t spec_data : settings.specialization_data) {
+	for (u32 spec_data : settings.specialization_data) {
 		util::hash_combine(hash, spec_data);
 	}
 
@@ -348,7 +348,7 @@ inline RenderPass& RenderGraph::add_pass_impl(const std::string& name, const Set
 	} else {
 		type = vk::PassType::RT;
 	}
-	return passes.emplace_back(type, name_with_macros, this, uint32_t(passes.size()), settings, macro_string,
+	return passes.emplace_back(type, name_with_macros, this, u32(passes.size()), settings, macro_string,
 							   pipeline_storage, cached);
 }
 

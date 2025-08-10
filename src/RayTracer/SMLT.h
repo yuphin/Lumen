@@ -11,7 +11,7 @@ class SMLT final : public Integrator {
 	virtual void destroy(bool resize) override;
 
    private:
-	void prefix_scan(int level, int num_elems, int& counter, lm::RenderGraph* rg);
+	void prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg);
 	PCMLT pc_ray{};
 	PushConstantCompute pc_compute{};
 
@@ -40,12 +40,12 @@ class SMLT final : public Integrator {
 	vk::Buffer* light_splats_buffer;
 	vk::Buffer* light_splat_cnts_buffer;
 
-	float mutations_per_pixel;
-	int num_mlt_threads;
-	int num_bootstrap_samples;
-	int mutation_count;
-	int light_path_rand_count;
-	int cam_path_rand_count;
+	f32 mutations_per_pixel;
+	i32 num_mlt_threads;
+	i32 num_bootstrap_samples;
+	i32 mutation_count;
+	i32 light_path_rand_count;
+	i32 cam_path_rand_count;
 
 	SMLTConfig* config;
 };

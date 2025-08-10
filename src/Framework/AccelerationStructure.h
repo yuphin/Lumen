@@ -30,9 +30,9 @@ void build_blas(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
 				vk::Buffer** scratch_buffer_ref = nullptr);
 void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
 				VkBuildAccelerationStructureFlagsKHR flags, bool update = false);
-void build_tlas(BVH& tlas, vk::Buffer* instances_buf, uint32_t instance_count,
+void build_tlas(BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer_ref,
 				bool update = false);
 
-BlasInput to_vk_geometry(uint32_t vtx_count, uint32_t idx_count, uint32_t vtx_offset, uint32_t first_idx, VkDeviceAddress vertex_address, VkDeviceAddress index_address);
+BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx, VkDeviceAddress vertex_address, VkDeviceAddress index_address);
 }  // namespace vk

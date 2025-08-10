@@ -1,7 +1,9 @@
 #include "Framework/VulkanContext.h"
+#include "Framework/GPUQueryManager.h"
 #include "RenderGraph.h"
 #include "VulkanContext.h"
 #define VOLK_IMPLEMENTATION
+#include <volk/volk.h>
 #include "VulkanBase.h"
 #include "CommandBuffer.h"
 #include "PersistentResourceManager.h"
@@ -35,7 +37,7 @@ bool _enable_validation_layers;
 VkDescriptorPool _imgui_pool = 0;
 
 static std::vector<const char*> get_req_extensions() {
-	uint32_t glfwExtensionCount = 0;
+	u32 glfwExtensionCount = 0;
 	const char** glfwExtensions;
 	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
@@ -49,12 +51,12 @@ static std::vector<const char*> get_req_extensions() {
 
 static QueueFamilyIndices find_queue_families(VkPhysicalDevice device) {
 	QueueFamilyIndices indices;
-	uint32_t queue_family_count = 0;
+	u32 queue_family_count = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, nullptr);
 	_queue_families.resize(queue_family_count);
 	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, _queue_families.data());
 
-	int i = 0;
+	i32 i = 0;
 	for (const auto& queueFamily : _queue_families) {
 		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
 			indices.gfx_family = i;
@@ -87,7 +89,7 @@ static SwapChainSupportDetails query_swapchain_support(VkPhysicalDevice device) 
 
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, context().surface, &details.capabilities);
 
-	uint32_t format_cnt;
+	u32 format_cnt;
 	vkGetPhysicalDeviceSurfaceFormatsKHR(device, context().surface, &format_cnt, nullptr);
 
 	if (format_cnt != 0) {
@@ -95,7 +97,7 @@ static SwapChainSupportDetails query_swapchain_support(VkPhysicalDevice device) 
 		vkGetPhysicalDeviceSurfaceFormatsKHR(device, context().surface, &format_cnt, details.formats.data());
 	}
 
-	uint32_t present_mode_cnt;
+	u32 present_mode_cnt;
 	vkGetPhysicalDeviceSurfacePresentModesKHR(device, context().surface, &present_mode_cnt, nullptr);
 
 	if (present_mode_cnt != 0) {
@@ -218,7 +220,7 @@ static void create_surface() {
 }
 
 static void pick_physical_device() {
-	uint32_t device_cnt = 0;
+	u32 device_cnt = 0;
 	vkEnumeratePhysicalDevices(context().instance, &device_cnt, nullptr);
 	if (device_cnt == 0) {
 		LUMEN_ERROR("Failed to find GPUs with Vulkan support");
@@ -233,7 +235,7 @@ static void pick_physical_device() {
 
 		// Check device extension support
 		auto extensions_supported = [](VkPhysicalDevice device) {
-			uint32_t extension_cnt;
+			u32 extension_cnt;
 			vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_cnt, nullptr);
 
 			std::vector<VkExtensionProperties> available_extensions(extension_cnt);
@@ -280,15 +282,15 @@ static void create_logical_device() {
 	context().queue_indices = find_queue_families(context().physical_device);
 
 	std::vector<VkDeviceQueueCreateInfo> queue_CIs;
-	std::unordered_set<uint32_t> unique_queue_families = {context().queue_indices.gfx_family.value(),
+	std::unordered_set<u32> unique_queue_families = {context().queue_indices.gfx_family.value(),
 														  context().queue_indices.present_family.value(),
 														  context().queue_indices.compute_family.value()};
 
 	context().queues.resize(context().queue_indices.gfx_family.has_value() +
 							context().queue_indices.present_family.has_value() +
 							context().queue_indices.compute_family.has_value());
-	float queue_priority = 1.0f;
-	for (uint32_t queue_family_idx : unique_queue_families) {
+	f32 queue_priority = 1.0f;
+	for (u32 queue_family_idx : unique_queue_families) {
 		VkDeviceQueueCreateInfo queue_CI{};
 		queue_CI.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 		queue_CI.queueFamilyIndex = queue_family_idx;
@@ -367,16 +369,16 @@ static void create_logical_device() {
 	VkDeviceCreateInfo logical_device_CI{};
 	logical_device_CI.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
-	logical_device_CI.queueCreateInfoCount = static_cast<uint32_t>(queue_CIs.size());
+	logical_device_CI.queueCreateInfoCount = static_cast<u32>(queue_CIs.size());
 	logical_device_CI.pQueueCreateInfos = queue_CIs.data();
 
-	logical_device_CI.enabledExtensionCount = static_cast<uint32_t>(_device_extensions.size());
+	logical_device_CI.enabledExtensionCount = static_cast<u32>(_device_extensions.size());
 	logical_device_CI.ppEnabledExtensionNames = _device_extensions.data();
 
 	logical_device_CI.pNext = &device_features2;
 
 	if (_enable_validation_layers) {
-		logical_device_CI.enabledLayerCount = static_cast<uint32_t>(_validation_layers_lst.size());
+		logical_device_CI.enabledLayerCount = static_cast<u32>(_validation_layers_lst.size());
 		logical_device_CI.ppEnabledLayerNames = _validation_layers_lst.data();
 	} else {
 		logical_device_CI.enabledLayerCount = 0;
@@ -386,11 +388,11 @@ static void create_logical_device() {
 		  "Failed to create logical device");
 
 	vkGetDeviceQueue(context().device, context().queue_indices.gfx_family.value(), 0,
-					 &context().queues[(int)QueueType::GFX]);
+					 &context().queues[(i32)QueueType::GFX]);
 	vkGetDeviceQueue(context().device, context().queue_indices.compute_family.value(), 0,
-					 &context().queues[(int)QueueType::COMPUTE]);
+					 &context().queues[(i32)QueueType::COMPUTE]);
 	vkGetDeviceQueue(context().device, context().queue_indices.present_family.value(), 0,
-					 &context().queues[(int)QueueType::PRESENT]);
+					 &context().queues[(i32)QueueType::PRESENT]);
 }
 
 static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
@@ -426,10 +428,10 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 		if (capabilities.currentExtent.width != UINT32_MAX) {
 			return capabilities.currentExtent;
 		} else {
-			int width, height;
+			i32 width, height;
 			glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
 
-			VkExtent2D actual_extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
+			VkExtent2D actual_extent = {static_cast<u32>(width), static_cast<u32>(height)};
 
 			// Clamp width and height
 			actual_extent.width = std::max(capabilities.minImageExtent.width,
@@ -442,7 +444,7 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 		}
 	}(swapchain_support.capabilities);
 
-	uint32_t image_cnt = swapchain_support.capabilities.minImageCount + 1;
+	u32 image_cnt = swapchain_support.capabilities.minImageCount + 1;
 	if (swapchain_support.capabilities.maxImageCount > 0 && image_cnt > swapchain_support.capabilities.maxImageCount) {
 		image_cnt = swapchain_support.capabilities.maxImageCount;
 	}
@@ -461,7 +463,7 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 	_swapchain_format = surface_format.format;
 
 	QueueFamilyIndices indices = find_queue_families(context().physical_device);
-	uint32_t queue_family_indices_arr[] = {indices.gfx_family.value(), indices.present_family.value()};
+	u32 queue_family_indices_arr[] = {indices.gfx_family.value(), indices.present_family.value()};
 
 	if (indices.gfx_family != indices.present_family) {
 		swapchain_CI.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
@@ -486,7 +488,7 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 	_swapchain_images.reserve(image_cnt);
 	images.resize(image_cnt);
 	vkGetSwapchainImagesKHR(context().device, context().swapchain, &image_cnt, images.data());
-	for (uint32_t i = 0; i < image_cnt; i++) {
+	for (u32 i = 0; i < image_cnt; i++) {
 		_swapchain_images.emplace_back(prm::get_texture({
 			.name = "Swapchain Image #" + std::to_string(i),
 			.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
@@ -503,7 +505,7 @@ static void create_command_pools() {
 	pool_info.queueFamilyIndex = queue_family_idxs.gfx_family.value();
 	constexpr auto MAX_COMMAND_POOL_THREAD_COUNT = 64;
 	context().cmd_pools.resize(MAX_COMMAND_POOL_THREAD_COUNT);
-	for (unsigned int i = 0; i < MAX_COMMAND_POOL_THREAD_COUNT; i++) {
+	for (u32 i = 0; i < MAX_COMMAND_POOL_THREAD_COUNT; i++) {
 		check(vkCreateCommandPool(context().device, &pool_info, nullptr, &context().cmd_pools[i]),
 			  "Failed to create command pool!");
 	}
@@ -514,7 +516,7 @@ static void create_command_buffers() {
 	// TODO: Factor
 	// 0 is for the main thread
 	VkCommandBufferAllocateInfo alloc_info = command_buffer_allocate_info(
-		context().cmd_pools[0], VK_COMMAND_BUFFER_LEVEL_PRIMARY, (uint32_t)context().command_buffers.size());
+		context().cmd_pools[0], VK_COMMAND_BUFFER_LEVEL_PRIMARY, (u32)context().command_buffers.size());
 	check(vkAllocateCommandBuffers(context().device, &alloc_info, context().command_buffers.data()),
 		  "Failed to allocate command buffers!");
 }
@@ -529,7 +531,7 @@ static void create_sync_primitives() {
 
 	VkFenceCreateInfo fence_info = fence(VK_FENCE_CREATE_SIGNALED_BIT);
 
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+	for (u64 i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		check<3>({vkCreateSemaphore(context().device, &semaphore_info, nullptr, &_image_available_sem[i]),
 				  vkCreateSemaphore(context().device, &semaphore_info, nullptr, &_render_finished_sem[i]),
 				  vkCreateFence(context().device, &fence_info, nullptr, &_in_flight_fences[i])},
@@ -538,7 +540,7 @@ static void create_sync_primitives() {
 }
 
 static bool check_validation_layer_support() {
-	uint32_t layer_cnt;
+	u32 layer_cnt;
 	vkEnumerateInstanceLayerProperties(&layer_cnt, nullptr);
 
 	std::vector<VkLayerProperties> available_layers(layer_cnt);
@@ -574,11 +576,11 @@ static void create_instance() {
 	instance_CI.pApplicationInfo = &app_info;
 
 	auto extensions = get_req_extensions();
-	instance_CI.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+	instance_CI.enabledExtensionCount = static_cast<u32>(extensions.size());
 	instance_CI.ppEnabledExtensionNames = extensions.data();
 
 	if (_enable_validation_layers) {
-		instance_CI.enabledLayerCount = static_cast<uint32_t>(_validation_layers_lst.size());
+		instance_CI.enabledLayerCount = static_cast<u32>(_validation_layers_lst.size());
 		instance_CI.ppEnabledLayerNames = _validation_layers_lst.data();
 		VkDebugUtilsMessengerCreateInfoEXT debug_CI = debug_messenger(debug_callback);
 		instance_CI.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debug_CI;
@@ -598,7 +600,7 @@ static void create_instance() {
 	}
 }
 
-static VkQueryPool create_query_pool(VkQueryType query_type, uint32_t count) {
+static VkQueryPool create_query_pool(VkQueryType query_type, u32 count) {
 	VkQueryPoolCreateInfo create_info = {VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO};
 	create_info.queryType = query_type;
 	create_info.queryCount = count;
@@ -645,7 +647,7 @@ void init_imgui() {
 	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 	pool_info.maxSets = 1000;
-	pool_info.poolSizeCount = (uint32_t)std::size(pool_sizes);
+	pool_info.poolSizeCount = (u32)std::size(pool_sizes);
 	pool_info.pPoolSizes = pool_sizes;
 	check(vkCreateDescriptorPool(context().device, &pool_info, nullptr, &_imgui_pool));
 	IMGUI_CHECKVERSION();
@@ -659,7 +661,7 @@ void init_imgui() {
 	init_info.Instance = context().instance;
 	init_info.PhysicalDevice = context().physical_device;
 	init_info.Device = context().device;
-	init_info.Queue = context().queues[(int)QueueType::GFX];
+	init_info.Queue = context().queues[(i32)QueueType::GFX];
 	init_info.DescriptorPool = _imgui_pool;
 	init_info.MinImageCount = 3;
 	init_info.ImageCount = 3;
@@ -671,7 +673,7 @@ void init_imgui() {
 
 	CommandBuffer cmd(true);
 	ImGui_ImplVulkan_CreateFontsTexture(cmd.handle);
-	cmd.submit(context().queues[(int)QueueType::GFX]);
+	cmd.submit(context().queues[(i32)QueueType::GFX]);
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
@@ -686,7 +688,7 @@ void add_device_extension(const char* name) { _device_extensions.push_back(name)
 
 // Called after window resize or manually
 void recreate_swap_chain() {
-	int width = 0, height = 0;
+	i32 width = 0, height = 0;
 	glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
 	while (width == 0 || height == 0) {
 		// Window is minimized
@@ -701,11 +703,11 @@ void recreate_swap_chain() {
 
 std::vector<Texture*>& swapchain_images() { return _swapchain_images; }
 
-uint32_t prepare_frame() {
+u32 prepare_frame() {
 	check(vkWaitForFences(context().device, 1, &_in_flight_fences[context().in_flight_frame_idx], VK_TRUE, ~0ull),
 		  "Timeout");
 
-	uint32_t image_idx;
+	u32 image_idx;
 	VkResult result =
 		vkAcquireNextImageKHR(context().device, context().swapchain, UINT64_MAX,
 							  _image_available_sem[context().in_flight_frame_idx], VK_NULL_HANDLE, &image_idx);
@@ -719,11 +721,11 @@ uint32_t prepare_frame() {
 	vkResetFences(context().device, 1, &_in_flight_fences[context().in_flight_frame_idx]);
 	_images_in_flight[image_idx] = _in_flight_fences[context().in_flight_frame_idx];
 	check(vkResetCommandBuffer(context().command_buffers[image_idx], 0));
-	GPUQueryManager::collect(uint32_t(context().in_flight_frame_idx));
+	GPUQueryManager::collect(u32(context().in_flight_frame_idx));
 	return image_idx;
 }
 
-VkResult submit_frame(uint32_t image_idx) {
+VkResult submit_frame(u32 image_idx) {
 	VkSubmitInfo submit_info = vk::submit_info();
 	VkSemaphore wait_semaphores[] = {_image_available_sem[context().in_flight_frame_idx]};
 	VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
@@ -738,7 +740,7 @@ VkResult submit_frame(uint32_t image_idx) {
 	submit_info.signalSemaphoreCount = 1;
 	submit_info.pSignalSemaphores = signal_semaphores;
 
-	check(vkQueueSubmit(context().queues[(int)QueueType::GFX], 1, &submit_info,
+	check(vkQueueSubmit(context().queues[(i32)QueueType::GFX], 1, &submit_info,
 						_in_flight_fences[context().in_flight_frame_idx]),
 		  "Failed to submit draw command buffer");
 	context().in_flight_frame_idx = (context().in_flight_frame_idx + 1) % MAX_FRAMES_IN_FLIGHT;
@@ -754,7 +756,7 @@ VkResult submit_frame(uint32_t image_idx) {
 
 	present_info.pImageIndices = &image_idx;
 
-	VkResult result = vkQueuePresentKHR(context().queues[(int)QueueType::GFX], &present_info);
+	VkResult result = vkQueuePresentKHR(context().queues[(i32)QueueType::GFX], &present_info);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
 		vkDeviceWaitIdle(context().device);
 		recreate_swap_chain();
@@ -779,8 +781,8 @@ void cleanup() {
 	vkDestroySwapchainKHR(context().device, context().swapchain, nullptr);
 	vk::event_pool::cleanup();
 	vkFreeCommandBuffers(context().device, context().cmd_pools[0],
-						 static_cast<uint32_t>(context().command_buffers.size()), context().command_buffers.data());
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+						 static_cast<u32>(context().command_buffers.size()), context().command_buffers.data());
+	for (u64 i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		vkDestroySemaphore(context().device, _image_available_sem[i], nullptr);
 		vkDestroySemaphore(context().device, _render_finished_sem[i], nullptr);
 		vkDestroyFence(context().device, _in_flight_fences[i], nullptr);

@@ -16,7 +16,7 @@
 
 class RayTracer {
    public:
-	RayTracer(bool debug, int, char*[]);
+	RayTracer(bool debug, i32, char*[]);
 	void init();
 	void update();
 	void cleanup();
@@ -27,16 +27,16 @@ class RayTracer {
    private:
 	void init_resources();
 	void cleanup_resources();
-	void parse_args(int argc, char* argv[]);
-	float draw_frame();
-	void render(uint32_t idx);
+	void parse_args(i32 argc, char* argv[]);
+	f32 draw_frame();
+	void render(u32 idx);
 	void render_debug_utils();
-	void create_integrator(int integrator_idx);
+	void create_integrator(i32 integrator_idx);
 	bool gui();
 	void destroy_accel();
 	bool initialized = false;
-	float cpu_avg_time = 0;
-	int cnt = 0;
+	f32 cpu_avg_time = 0;
+	i32 cnt = 0;
 	std::unique_ptr<Integrator> integrator;
 	PostFX post_fx;
 

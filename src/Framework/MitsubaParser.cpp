@@ -12,7 +12,7 @@ void MitsubaParser::parse(const std::string& path) {
 				integrator.type = obj->pluginType();
 				for (const auto& prop : obj->properties()) {
 					if (prop.first == "max_depth") {
-						integrator.depth = (int)prop.second.getInteger();
+						integrator.depth = (i32)prop.second.getInteger();
 					}
 					if (prop.first == "enable_vm") {
 						integrator.enable_vm = prop.second.getBool();
@@ -25,10 +25,10 @@ void MitsubaParser::parse(const std::string& path) {
 					if (prop.first == "fov") {
 						camera.fov = prop.second.getNumber();
 					} else if (prop.first == "to_world") {
-						float* p_dst = (float*)glm::value_ptr(camera.cam_matrix);
+						f32* p_dst = (f32*)glm::value_ptr(camera.cam_matrix);
 						const auto& src = prop.second.getTransform();
-						for (int i = 0; i < 4; i++) {
-							for (int j = 0; j < 4; j++) {
+						for (i32 i = 0; i < 4; i++) {
+							for (i32 j = 0; j < 4; j++) {
 								p_dst[4 * j + i] = src.matrix[4 * j + i];
 							}
 						}
@@ -95,10 +95,10 @@ void MitsubaParser::parse(const std::string& path) {
 						mesh.file = prop.second.getString();
 
 					} else if (prop.first == "to_world") {
-						float* p_dst = (float*)glm::value_ptr(mesh.transform);
+						f32* p_dst = (f32*)glm::value_ptr(mesh.transform);
 						const auto& src = prop.second.getTransform();
-						for (int i = 0; i < 4; i++) {
-							for (int j = 0; j < 4; j++) {
+						for (i32 i = 0; i < 4; i++) {
+							for (i32 j = 0; j < 4; j++) {
 								p_dst[4 * i + j] = src.matrix[4 * j + i];
 							}
 						}
@@ -108,7 +108,7 @@ void MitsubaParser::parse(const std::string& path) {
 				// Assume refs to BSDFs
 				for (const auto& mesh_child : obj->anonymousChildren()) {
 					auto ref = mesh_child.get()->id();
-					for (int i = 0; i < bsdfs.size(); i++) {
+					for (i32 i = 0; i < bsdfs.size(); i++) {
 						if (bsdfs[i].name == ref) {
 							mesh.bsdf_idx = i;
 						}

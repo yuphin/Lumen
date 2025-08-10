@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Framework/VulkanContext.h"
+
 namespace vk {
 class CommandBuffer {
    public:
@@ -16,7 +18,7 @@ class CommandBuffer {
 	enum class CommandBufferState { RECORDING, STOPPED };
 	CommandBufferState state = CommandBufferState::STOPPED;
 	vk::QueueType type;
-	uint32_t curr_tid = -1;
+	u32 curr_tid = -1;
 };
 
 }  // namespace vk

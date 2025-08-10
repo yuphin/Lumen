@@ -152,12 +152,12 @@ struct Window {
 	double mouse_delta_prev_x, mouse_delta_prev_y;
 	double mouse_last_x, mouse_last_y;
 	GLFWwindow* window_handle;
-	uint32_t window_width;
-	uint32_t window_height;
-	uint32_t viewport_width;
-	uint32_t viewport_height;
+	u32 window_width;
+	u32 window_height;
+	u32 viewport_width;
+	u32 viewport_height;
 };
-void init(int width, int height, bool fullscreen);
+void init(i32 width, i32 height, bool fullscreen);
 Window* get();
 void update_window_size();
 void poll();
@@ -175,7 +175,7 @@ void add_mouse_click_callback(MouseClickCallback callback);
 void add_mouse_move_callback(MouseMoveCallback callback);
 void add_scroll_callback(MouseScrollCallback callback);
 void add_key_callback(KeyCallback callback);
-uint32_t width();
-uint32_t height();
+u32 width();
+u32 height();
 
 };	// namespace Window

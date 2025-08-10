@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include "VulkanContext.h"
 #include "VkUtils.h"
-#include "OS.h"
+#include "Base/OS.h"
 
 #if !defined(_WIN32) && !defined(_WIN64)
 #include <sys/mman.h>
@@ -22,7 +22,7 @@ static bool operator==(const VkSamplerCreateInfo& lhs, const VkSamplerCreateInfo
 		   lhs.unnormalizedCoordinates == rhs.unnormalizedCoordinates;
 }
 
-constexpr size_t RESERVE_SIZE = 1024ull * 1024 * 1024 * 1024 * 64;	// 64GB
+constexpr u64 RESERVE_SIZE = 1024ull * 1024 * 1024 * 1024 * 64;	// 64GB
 template <typename T>
 class PersistentPool {
    public:
@@ -32,11 +32,11 @@ class PersistentPool {
 		data_base = (T*)VirtualAlloc(data_base, PAGE_SIZE, MEM_COMMIT, PAGE_READWRITE);
 #else
 		data_base = (T*)mmap(NULL, RESERVE_SIZE, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-		int result = mprotect(data_base, ALLOC_SIZE, PROT_READ | PROT_WRITE)
+		i32 result = mprotect(data_base, ALLOC_SIZE, PROT_READ | PROT_WRITE)
 			LUMEN_ASSERT(result == 0, "Could not allocate memory");
 #endif
 		base_ptr = data_base;
-		next_page = (uint8_t*)data_base + PAGE_SIZE;
+		next_page = (u8*)data_base + PAGE_SIZE;
 	}
 	T* get(bool use_mutex) {
 		std::unique_lock<std::mutex> lock(mutex, std::defer_lock);
@@ -44,25 +44,25 @@ class PersistentPool {
 			lock.lock();
 		}
 		if (!free_list.empty()) {
-			size_t idx = free_list.back();
+			u64 idx = free_list.back();
 			free_list.pop_back();
 			return base_ptr + idx;
 		}
-		while ((uint8_t*)next_page - (uint8_t*)data_base < sizeof(T)) {
+		while ((u8*)next_page - (u8*)data_base < sizeof(T)) {
 #if defined(_WIN32) || defined(_WIN64)
 			data_base = (T*)VirtualAlloc(next_page, PAGE_SIZE, MEM_COMMIT, PAGE_READWRITE);
-			next_page = (uint8_t*)data_base + PAGE_SIZE;
+			next_page = (u8*)data_base + PAGE_SIZE;
 #else
-			int result = mprotect(next_page, PAGE_SIZE, PROT_READ | PROT_WRITE);
+			i32 result = mprotect(next_page, PAGE_SIZE, PROT_READ | PROT_WRITE);
 			LUMEN_ASSERT(result == 0, "Could not allocate memory");
-			next_page = (uint8_t*)next_page + PAGE_SIZE;
+			next_page = (u8*)next_page + PAGE_SIZE;
 #endif
 		}
 		return data_base++;
 	}
 
 	void remove(T* ptr) {
-		size_t idx = ptr - base_ptr;
+		u64 idx = ptr - base_ptr;
 		free_list.push_back(idx);
 	}
 
@@ -74,11 +74,11 @@ class PersistentPool {
 	}
 
    private:
-	const size_t PAGE_SIZE;
+	const u64 PAGE_SIZE;
 	T* base_ptr = nullptr;
 	T* data_base = nullptr;
 	void* next_page = nullptr;
-	std::vector<size_t> free_list;
+	std::vector<u64> free_list;
 	std::mutex mutex;
 };
 

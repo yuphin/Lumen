@@ -11,7 +11,7 @@ class PSSMLT final : public Integrator {
 	virtual void destroy(bool resize) override;
 
    private:
-	void prefix_scan(int level, int num_elems, int& counter, lm::RenderGraph* rg);
+	void prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg);
 	PCMLT pc_ray{};
 	PushConstantCompute pc_compute{};
 	// PSSMLT buffers
@@ -35,10 +35,10 @@ class PSSMLT final : public Integrator {
 
 	std::vector<vk::Buffer*> block_sums;
 
-	int mutation_count;
-	int light_path_rand_count;
-	int cam_path_rand_count;
-	int connect_path_rand_count;
+	i32 mutation_count;
+	i32 light_path_rand_count;
+	i32 cam_path_rand_count;
+	i32 connect_path_rand_count;
 
 	PSSMLTConfig* config;
 };

@@ -1,7 +1,7 @@
 #include "OS.h"
 
 namespace os {
-size_t get_page_size() {
+u64 get_page_size() {
 #if defined(_WIN32) || defined(_WIN64)
 	SYSTEM_INFO sys_info;
 	GetSystemInfo(&sys_info);
@@ -10,7 +10,7 @@ size_t get_page_size() {
 	return sysconf(_SC_PAGE_SIZE);
 #endif	// defined(_WIN32) || defined(_WIN64)
 }
-void* reserve(size_t reserve_size) {
+void* reserve(u64 reserve_size) {
 	void* data_base;
 #if defined(_WIN32) || defined(_WIN64)
 	data_base = VirtualAlloc(NULL, reserve_size, MEM_RESERVE, PAGE_NOACCESS);
@@ -22,7 +22,7 @@ void* reserve(size_t reserve_size) {
 #endif	// defined(_WIN32) || defined(_WIN64)
 	return data_base;
 }
-bool commit(void* ptr, size_t commit_size) {
+bool commit(void* ptr, u64 commit_size) {
 #if defined(_WIN32) || defined(_WIN64)
 	return (VirtualAlloc(ptr, commit_size, MEM_COMMIT, PAGE_READWRITE) != 0);
 #else

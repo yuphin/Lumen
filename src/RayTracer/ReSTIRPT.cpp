@@ -17,13 +17,13 @@ void ReSTIRPT::init() {
 	gris_gbuffer =
 		prm::get_buffer({.name = "GRIS GBuffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(GBuffer)});
 
 	gris_prev_gbuffer =
 		prm::get_buffer({.name = "GRIS Previous GBuffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(GBuffer)});
 
 	direct_lighting_texture = prm::get_texture({.name = "Direct Lighting Texture",
@@ -38,50 +38,50 @@ void ReSTIRPT::init() {
 	gris_reservoir_ping_buffer =
 		prm::get_buffer({.name = "GRIS Reservoirs Ping",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(Reservoir)});
 
 	gris_reservoir_pong_buffer =
 		prm::get_buffer({.name = "GRIS Reservoirs Pong",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(Reservoir)});
 
 	prefix_contribution_buffer =
 		prm::get_buffer({.name = "Prefix Contributions",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(glm::vec3)});
 
 	debug_vis_buffer =
 		prm::get_buffer({.name = "Debug Vis",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height() * sizeof(uint32_t)});
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = Window::width() * Window::height() * sizeof(u32)});
 	reconnection_buffer = prm::get_buffer(
 		{.name = "Reservoir Connection",
 		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		 .memory_type = vk::BufferType::GPU,
+		 .memory_type = vk::BUFFER_TYPE_GPU,
 		 .size = Window::width() * Window::height() * sizeof(ReconnectionData) * (num_spatial_samples + 1)});
 
 	transformations_buffer = prm::get_buffer({
 		.name = "Transformations Buffer",
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		.memory_type = vk::BufferType::GPU,
+		.memory_type = vk::BUFFER_TYPE_GPU,
 		.size = transformations.size() * sizeof(glm::mat4),
 		.data = transformations.data(),
 	});
 	photon_eye_buffer_ping =
 		prm::get_buffer({.name = "Photon - Eye - Ping",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(PhotonData)});
 
 	photon_eye_buffer_pong =
 		prm::get_buffer({.name = "Photon - Eye - Pong",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(PhotonData)});
 
 	caustic_photon_aabbs_buffer =
@@ -89,30 +89,30 @@ void ReSTIRPT::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 								  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height() * sizeof(float) * 6});
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = Window::width() * Window::height() * sizeof(f32) * 6});
 	caustic_photon_light_buffer =
 		prm::get_buffer({.name = "Caustic Photon - Light",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(PhotonData)});
 	photon_count_buffer =
 		prm::get_buffer({.name = "Photon Counts",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = 4});
 
 	caustics_reservoir_ping_buffer =
 		prm::get_buffer({.name = "Caustics Reservoirs Ping",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(PhotonReservoir)});
 
 	caustics_reservoir_pong_buffer =
 		prm::get_buffer({.name = "Caustics Reservoirs Pong",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(PhotonReservoir)});
 
 	SceneDesc desc;
@@ -134,7 +134,7 @@ void ReSTIRPT::init() {
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
 
@@ -160,7 +160,7 @@ void ReSTIRPT::init() {
 		prm::get_buffer({.name = "Photon BVH Instance",
 						 .usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-						 .memory_type = vk::BufferType::CPU_TO_GPU,
+						 .memory_type = vk::BUFFER_TYPE_CPU_TO_GPU,
 						 .size = sizeof(VkAccelerationStructureInstanceKHR),
 						 .create_mapped = true,
 						 .data = &tlas_instance,
@@ -193,7 +193,7 @@ void ReSTIRPT::render() {
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
 	pc_ray.enable_temporal_jitter = uint(enable_temporal_jitter);
-	pc_ray.num_lights = (int)lumen_scene->gpu_lights.size();
+	pc_ray.num_lights = (i32)lumen_scene->gpu_lights.size();
 	pc_ray.prev_random_num = pc_ray.general_seed;
 	pc_ray.sampling_seed = rand() % UINT_MAX;
 	pc_ray.seed2 = rand() % UINT_MAX;
@@ -226,7 +226,7 @@ void ReSTIRPT::render() {
 	pc_ray.pm_temporal_reuse = uint(enable_pm_temporal_reuse);
 
 	if (progressive_radius_reduction) {
-		pc_ray.photon_radius = curr_photon_radius * sqrtf(((float)frame_num + 2.0f / 3.0f) / ((float)frame_num + 1.0f));
+		pc_ray.photon_radius = curr_photon_radius * sqrtf(((f32)frame_num + 2.0f / 3.0f) / ((f32)frame_num + 1.0f));
 		curr_photon_radius = pc_ray.photon_radius;
 	}
 
@@ -239,11 +239,11 @@ void ReSTIRPT::render() {
 	const std::array<vk::Buffer*, 2> photon_gbuffers = {photon_eye_buffer_ping, photon_eye_buffer_pong};
 	const std::array<vk::Buffer*, 2> gbuffers = {gris_prev_gbuffer, gris_gbuffer};
 
-	int ping = pc_ray.total_frame_num % 2;
-	int pong = ping ^ 1;
+	i32 ping = pc_ray.total_frame_num % 2;
+	i32 pong = ping ^ 1;
 
-	constexpr int WRITE_OR_CURR_IDX = 1;
-	constexpr int READ_OR_PREV_IDX = 0;
+	constexpr i32 WRITE_OR_CURR_IDX = 1;
+	constexpr i32 READ_OR_PREV_IDX = 0;
 	if (enable_photon_mapping) {
 		vk::render_graph()
 			->add_rt("PM - Trace First Diffuse",
@@ -266,7 +266,7 @@ void ReSTIRPT::render() {
 		VkAccelerationStructureGeometryAabbsDataKHR aabbs_data{
 			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR};
 		aabbs_data.data.deviceAddress = caustic_photon_aabbs_buffer->get_device_address();
-		aabbs_data.stride = sizeof(float) * 6;
+		aabbs_data.stride = sizeof(f32) * 6;
 
 		VkAccelerationStructureGeometryKHR as_geom{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
 		as_geom.geometryType = VK_GEOMETRY_TYPE_AABBS_KHR;
@@ -318,7 +318,7 @@ void ReSTIRPT::render() {
 										 {"src/shaders/ray_shadow.rmiss"},
 										 {"src/shaders/integrators/restir/gris/ray.rchit"},
 										 {"src/shaders/ray.rahit"}},
-							 .macros = {{"STREAMING_MODE", int(streaming_method)},
+							 .macros = {{"STREAMING_MODE", i32(streaming_method)},
 										vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
 							 .dims = {Window::width(), Window::height()},
 						 })
@@ -345,7 +345,7 @@ void ReSTIRPT::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/integrators/restir/gris/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .macros = {{"STREAMING_MODE", int(streaming_method)},
+					 .macros = {{"STREAMING_MODE", i32(streaming_method)},
 								vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere),
 								vk::ShaderMacro("DISABLE_PM_MIS", !enable_pm_mis),
 								vk::ShaderMacro("ENABLE_PM", enable_photon_gather && enable_photon_mapping)},
@@ -471,7 +471,7 @@ void ReSTIRPT::render() {
 					.bind_tlas(tlas);
 			}
 			if (pixel_debug || (gris_separator < 1.0f && gris_separator > 0.0f)) {
-				uint32_t num_wgs = uint32_t((Window::width() * Window::height() + 1023) / 1024);
+				u32 num_wgs = u32((Window::width() * Window::height() + 1023) / 1024);
 				vk::render_graph()
 					->add_compute(
 						"GRIS - Debug Visualiation",
@@ -537,13 +537,13 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Enable atmosphere", &enable_atmosphere);
 	result |= ImGui::Checkbox("Enable Russian roulette", &enable_rr);
 	result |= ImGui::Checkbox("Enable GRIS", &enable_gris);
-	result |= ImGui::SliderInt("Path length", (int*)&path_length, 1, 12);
+	result |= ImGui::SliderInt("Path length", (i32*)&path_length, 1, 12);
 	result |= ImGui::Checkbox("Enable canonical-only mode", &canonical_only);
 
 	result |= ImGui::Checkbox("Enable photon mapping", &enable_photon_mapping);
 	if (enable_photon_mapping) {
 		bool num_photons_changed =
-			ImGui::SliderInt("Num photons", (int*)&num_photons, 1, Window::width() * Window::height());
+			ImGui::SliderInt("Num photons", (i32*)&num_photons, 1, Window::width() * Window::height());
 		result |= num_photons_changed;
 		result |= ImGui::SliderFloat("Initial photon radius", &initial_photon_radius, 0.0f, 0.1f);
 		result |= ImGui::Checkbox("Progressive radius reduction", &progressive_radius_reduction);
@@ -554,7 +554,7 @@ bool ReSTIRPT::gui() {
 		if (num_photons_changed) {
 			vkDeviceWaitIdle(vk::context().device);
 
-			for (size_t i = 0; i < vk::MAX_FRAMES_IN_FLIGHT; i++) {
+			for (u64 i = 0; i < vk::MAX_FRAMES_IN_FLIGHT; i++) {
 				photon_blas.destroy();
 				photon_tlas.destroy();
 			}
@@ -563,13 +563,13 @@ bool ReSTIRPT::gui() {
 	if (!enable_gris) {
 		return result;
 	}
-	int curr_streaming_method = static_cast<int>(streaming_method);
+	i32 curr_streaming_method = static_cast<i32>(streaming_method);
 	std::array<const char*, 2> streaming_methods = {
 		"Individual contributions",
 		"Split at reconnection",
 	};
 	if (ImGui::Combo("Streaming method", &curr_streaming_method, streaming_methods.data(),
-					 int(streaming_methods.size()))) {
+					 i32(streaming_methods.size()))) {
 		result = true;
 		streaming_method = static_cast<StreamingMethod>(curr_streaming_method);
 	}
@@ -588,13 +588,13 @@ bool ReSTIRPT::gui() {
 		"Talbot (Reconnection only)",
 		"Pairwise",
 	};
-	int curr_mis_method = static_cast<int>(mis_method);
-	if (ImGui::Combo("MIS method", &curr_mis_method, mis_methods.data(), int(mis_methods.size()))) {
+	i32 curr_mis_method = static_cast<i32>(mis_method);
+	if (ImGui::Combo("MIS method", &curr_mis_method, mis_methods.data(), i32(mis_methods.size()))) {
 		result = true;
 		mis_method = static_cast<MISMethod>(curr_mis_method);
 	}
 	result |= ImGui::Checkbox("Enable temporal reuse", &enable_temporal_reuse);
-	bool spatial_samples_changed = ImGui::SliderInt("Num spatial samples", (int*)&num_spatial_samples, 0, 12);
+	bool spatial_samples_changed = ImGui::SliderInt("Num spatial samples", (i32*)&num_spatial_samples, 0, 12);
 	result |= spatial_samples_changed;
 	result |= ImGui::SliderFloat("Spatial radius", &spatial_reuse_radius, 0.0f, 128.0f);
 	result |= ImGui::SliderFloat("Min reconnection distance ratio", &min_vertex_distance_ratio, 0.0f, 1.0f);
@@ -606,7 +606,7 @@ bool ReSTIRPT::gui() {
 			{.name = "Reservoir Connection",
 			 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 					  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			 .memory_type = vk::BufferType::GPU,
+			 .memory_type = vk::BUFFER_TYPE_GPU,
 			 .size = Window::width() * Window::height() * sizeof(ReconnectionData) * (num_spatial_samples + 1)});
 	}
 	if (result) {

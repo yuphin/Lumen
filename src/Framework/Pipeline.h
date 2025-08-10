@@ -5,7 +5,7 @@
 #include "RenderGraphTypes.h"
 
 namespace vk {
-inline constexpr uint32_t MAX_AS_BINDING_COUNT = 2;
+inline constexpr u32 MAX_AS_BINDING_COUNT = 2;
 struct Pipeline;
 
 struct Pipeline {
@@ -13,10 +13,10 @@ struct Pipeline {
 	enum class PipelineType { GFX = 0, RT = 1, COMPUTE = 2 };
 	Pipeline(const std::string& name);
 	void cleanup();
-	void create_gfx_pipeline(const GraphicsPassSettings& settings, const std::vector<uint32_t>& descriptor_counts,
+	void create_gfx_pipeline(const GraphicsPassSettings& settings, const std::vector<u32>& descriptor_counts,
 							 std::vector<vk::Texture*> color_outputs, vk::Texture* depth_output);
-	void create_rt_pipeline(const RTPassSettings& settings, const std::vector<uint32_t>& descriptor_counts, uint32_t num_as_bindings);
-	void create_compute_pipeline(const ComputePassSettings& settings, const std::vector<uint32_t>& descriptor_counts);
+	void create_rt_pipeline(const RTPassSettings& settings, const std::vector<u32>& descriptor_counts, u32 num_as_bindings);
+	void create_compute_pipeline(const ComputePassSettings& settings, const std::vector<u32>& descriptor_counts);
 	const std::array<VkStridedDeviceAddressRegionKHR, 4> get_rt_regions();
 
 	std::unordered_map<std::string, std::filesystem::file_time_type> paths;
@@ -40,19 +40,19 @@ struct Pipeline {
 	VkDescriptorUpdateTemplate update_template = nullptr;
 	VkShaderStageFlags pc_stages = 0;
 	std::string name;
-	uint32_t push_constant_size = 0;
+	u32 push_constant_size = 0;
 	VkDescriptorType descriptor_types[32] = {};
-	std::vector<uint32_t> descriptor_counts;
+	std::vector<u32> descriptor_counts;
 
    private:
-	void create_pipeline_layout(const std::vector<Shader>& shaders, const std::vector<uint32_t> push_const_sizes);
-	void create_update_template(const std::vector<Shader>& shaders, const std::vector<uint32_t>& descriptor_counts);
-	void create_set_layout(const std::vector<Shader>& shaders, const std::vector<uint32_t>& descriptor_counts);
-	void create_rt_set_layout(VkShaderStageFlags stage_flags, uint32_t num_as_bindings);
+	void create_pipeline_layout(const std::vector<Shader>& shaders, const std::vector<u32> push_const_sizes);
+	void create_update_template(const std::vector<Shader>& shaders, const std::vector<u32>& descriptor_counts);
+	void create_set_layout(const std::vector<Shader>& shaders, const std::vector<u32>& descriptor_counts);
+	void create_rt_set_layout(VkShaderStageFlags stage_flags, u32 num_as_bindings);
 	bool tracking_stopped = true;
 	std::mutex mut;
 	std::condition_variable cv;
-	uint32_t binding_mask;
+	u32 binding_mask;
 };
 
 }  // namespace vk

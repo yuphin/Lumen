@@ -7,36 +7,36 @@ void SPPM::init() {
 		prm::get_buffer({.name = "SPPM Data",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height()  * sizeof(SPPMData)});
 
 	atomic_data_buffer =
 		prm::get_buffer({.name = "Atomic Data",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(AtomicData)});
 
 	photon_buffer =
 		prm::get_buffer({.name = "Photon Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = 10 * Window::width() * Window::height()  * sizeof(PhotonHash)});
 
 	residual_buffer =
 		prm::get_buffer({.name = "Residual Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
-						 .size = Window::width() * Window::height()  * 4 * sizeof(float)});
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = Window::width() * Window::height()  * 4 * sizeof(f32)});
 
 	counter_buffer =
 		prm::get_buffer({.name = "Counter Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BufferType::GPU,
-						 .size = sizeof(int)});
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = sizeof(i32)});
 
 	SceneDesc desc;
 	desc.index_addr = lumen_scene->index_buffer->get_device_address();
@@ -53,7 +53,7 @@ void SPPM::init() {
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
 
@@ -74,7 +74,7 @@ void SPPM::init() {
 void SPPM::render() {
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
-	pc_ray.num_lights = int(lumen_scene->gpu_lights.size());
+	pc_ray.num_lights = i32(lumen_scene->gpu_lights.size());
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = config->path_length;
 	pc_ray.sky_col = config->sky_col;
@@ -90,12 +90,12 @@ void SPPM::render() {
 	pc_ray.max_bounds = lumen_scene->m_dimensions.max;
 	pc_ray.ppm_base_radius = config->base_radius;
 	const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
-	const float max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
-	const int base_grid_res = int(max_comp / config->base_radius);
-	pc_ray.grid_res = glm::max(ivec3(diam * float(base_grid_res) / max_comp), ivec3(1));
+	const f32 max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
+	const i32 base_grid_res = i32(max_comp / config->base_radius);
+	pc_ray.grid_res = glm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
 	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name, const std::string& reduce_name,
 						 const std::string& reduce_shader_name) {
-		uint32_t num_wgs = uint32_t((Window::width() * Window::height()  + 1023) / 1024);
+		u32 num_wgs = u32((Window::width() * Window::height()  + 1023) / 1024);
 		vk::render_graph()
 			->add_compute(op_name, {.shader = vk::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
 			.push_constants(&pc_ray)
@@ -106,7 +106,7 @@ void SPPM::render() {
 				->add_compute(reduce_name, {.shader = vk::Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
 				.push_constants(&pc_ray)
 				.bind(lumen_scene->scene_desc_buffer);
-			num_wgs = (uint32_t)(num_wgs + 1023) / 1024;
+			num_wgs = (u32)(num_wgs + 1023) / 1024;
 		}
 	};
 
@@ -163,7 +163,7 @@ void SPPM::render() {
 	vk::render_graph()
 		->add_compute("Gather",
 					  {.shader = vk::Shader("src/shaders/integrators/sppm/gather.comp"),
-					   .dims = {(uint32_t)std::ceil(Window::width() * Window::height()  / float(1024.0f)), 1, 1}})
+					   .dims = {(u32)std::ceil(Window::width() * Window::height()  / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer)
 		.bind_texture_array(lumen_scene->scene_textures);
@@ -171,7 +171,7 @@ void SPPM::render() {
 	vk::render_graph()
 		->add_compute("Composite",
 					  {.shader = vk::Shader("src/shaders/integrators/sppm/composite.comp"),
-					   .dims = {(uint32_t)std::ceil(Window::width() * Window::height()  / float(1024.0f)), 1, 1}})
+					   .dims = {(u32)std::ceil(Window::width() * Window::height()  / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }

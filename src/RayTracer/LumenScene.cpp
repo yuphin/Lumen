@@ -4,12 +4,12 @@
 #pragma warning(push, 0)
 #include <tinygltf/json.hpp>
 #pragma warning(pop)
+#define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb_image/stb_image.h>
+#include <stb/stb_image.h>
 #include "shaders/commons.h"
-#include <cctype>
 #include "Framework/PersistentResourceManager.h"
 
 static bool ends_with(const std::string& str, const std::string& end) {
@@ -18,16 +18,16 @@ static bool ends_with(const std::string& str, const std::string& end) {
 }
 
 using json = nlohmann::json;
-static float get_or_default_f(json& json, const std::string& prop, float val) {
-	return json[prop].is_null() ? val : (float)json[prop];
+static f32 get_or_default_f(json& json, const std::string& prop, f32 val) {
+	return json[prop].is_null() ? val : (f32)json[prop];
 }
 
 static glm::vec3 get_or_default_v(json& json, const std::string& prop, const glm::vec3& val) {
 	return json[prop].is_null() ? val : glm::vec3{json[prop][0], json[prop][1], json[prop][2]};
 }
 
-static uint32_t get_or_default_u(json& json, const std::string& prop, uint32_t val) {
-	return json[prop].is_null() ? val : (uint32_t)json[prop];
+static u32 get_or_default_u(json& json, const std::string& prop, u32 val) {
+	return json[prop].is_null() ? val : (u32)json[prop];
 }
 
 static void reflectance_to_conductor_eta_k(const glm::vec3& reflectance, glm::vec3& eta, glm::vec3& k) {
@@ -56,8 +56,8 @@ static LumenNode* parse_file(std::vector<char>& buffer) {
 	char* curr = line;
 
 	bool line_has_brackets = false;
-	int base_indent = 0;
-	int stack_size = 0;
+	i32 base_indent = 0;
+	i32 stack_size = 0;
 	char* ptr = nullptr;
 	while (*curr) {
 		if (*curr == '[') {
@@ -72,7 +72,7 @@ static LumenNode* parse_file(std::vector<char>& buffer) {
 				*curr = '\0';
 			}
 			ptr = line;
-			int indent = 0;
+			i32 indent = 0;
 			bool list_item = false;
 			while (*ptr && (*ptr == ' ' || *ptr == '\t' || *ptr == '-')) {
 				char c = *ptr++;
@@ -85,7 +85,7 @@ static LumenNode* parse_file(std::vector<char>& buffer) {
 				if (indent > 0 && base_indent == 0) {
 					base_indent = indent;
 				}
-				int level = base_indent == 0 ? 0 : indent / base_indent;
+				i32 level = base_indent == 0 ? 0 : indent / base_indent;
 				if (level < stack_size) {
 					stack_size = level;
 				}
@@ -159,18 +159,18 @@ static std::string_view get_or_default_str(LumenNode* node, const std::string_vi
 	}
 	return node->value;
 }
-static int get_or_default_i(LumenNode* node, int val) {
+static i32 get_or_default_i(LumenNode* node, i32 val) {
 	if (!node || node->value.empty()) {
 		return val;
 	}
 	return std::atoi(node->value.data());
 }
 
-static float get_or_default_f(LumenNode* node, float val) {
+static f32 get_or_default_f(LumenNode* node, f32 val) {
 	if (!node || node->value.empty()) {
 		return val;
 	}
-	return (float)std::atof(node->value.data());
+	return (f32)std::atof(node->value.data());
 }
 
 static std::vector<std::string_view> get_str_list(LumenNode* node) {
@@ -207,18 +207,18 @@ static glm::vec3 get_or_default_v3(LumenNode* node, const glm::vec3& val) {
 	while (*ptr && *ptr != '(') {
 		ptr++;
 	}
-	int comma_count = 0;
+	i32 comma_count = 0;
 	char* start = ++ptr;
 	while (*ptr && *ptr != ')') {
 		if (*ptr == ',') {
 			*ptr = '\0';
-			result[comma_count++] = (float)std::atof(start);
+			result[comma_count++] = (f32)std::atof(start);
 			start = ptr + 1;
 		}
 		ptr++;
 	}
 	LUMEN_ASSERT(comma_count == 2, "Expected 3 items in vec3");
-	result[comma_count++] = (float)std::atof(start);
+	result[comma_count++] = (f32)std::atof(start);
 	return result;
 }
 
@@ -228,9 +228,9 @@ static LumenNode* next_node(LumenNode* node) {
 	return nullptr;
 }
 
-static uint32_t get_child_count(LumenNode* node) {
+static u32 get_child_count(LumenNode* node) {
 	if (!node || !node->child) return 0;
-	uint32_t count = 0;
+	u32 count = 0;
 	LumenNode* child = node->child;
 	while (child) {
 		count++;
@@ -286,9 +286,9 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 
 	materials.resize(get_child_count(bsdfs_node));
 
-	std::unordered_map<std::string_view, uint32_t> material_map;
-	std::unordered_map<std::string_view, uint32_t> materials_to_objects;
-	std::unordered_map<std::string_view, uint32_t> texture_name_to_idx;
+	std::unordered_map<std::string_view, u32> material_map;
+	std::unordered_map<std::string_view, u32> materials_to_objects;
+	std::unordered_map<std::string_view, u32> texture_name_to_idx;
 
 	LumenNode* textures_node = get_node(root, "textures");
 
@@ -298,13 +298,13 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 			std::string_view file = get_str(get_node(texture_node, "file"));
 			LUMEN_ASSERT(!name.empty() && !file.empty(), "Texture name and file must be specified");
 			textures.push_back(path_root + std::string(file));
-			uint32_t idx = (uint32_t)textures.size() - 1;
+			u32 idx = (u32)textures.size() - 1;
 			texture_name_to_idx[name] = idx;
 		}
 	}
 
 	if (bsdfs_node) {
-		uint32_t bsdf_idx = 0;
+		u32 bsdf_idx = 0;
 		for (LumenNode* bsdf_node = bsdfs_node->child; bsdf_node; bsdf_node = next_node(bsdf_node), bsdf_idx++) {
 			materials[bsdf_idx].albedo = get_or_default_v3(get_node(bsdf_node, "albedo"), glm::vec3(1.0f));
 			materials[bsdf_idx].emissive_factor =
@@ -435,7 +435,7 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 			std::string_view mat_name = get_str(get_node(mat_ref_node, "name"));
 			auto it = material_map.find(mat_name);
 			if (it != material_map.end()) {
-				uint32_t mat_idx = it->second;
+				u32 mat_idx = it->second;
 				std::vector<std::string_view> refs = get_str_list(get_node(mat_ref_node, "refs"));
 				for (const std::string_view ref : refs) {
 					materials_to_objects[ref] = mat_idx;
@@ -465,14 +465,14 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 	auto& shapes = reader.GetShapes();
 
 	prim_meshes.resize(shapes.size());
-	for (uint32_t shape_idx = 0; shape_idx < shapes.size(); shape_idx++) {
+	for (u32 shape_idx = 0; shape_idx < shapes.size(); shape_idx++) {
 		MeshData mesh_data;
-		prim_meshes[shape_idx].first_idx = (uint32_t)indices.size();
-		prim_meshes[shape_idx].vtx_offset = (uint32_t)positions.size();
+		prim_meshes[shape_idx].first_idx = (u32)indices.size();
+		prim_meshes[shape_idx].vtx_offset = (u32)positions.size();
 		prim_meshes[shape_idx].name = shapes[shape_idx].name;
 		prim_meshes[shape_idx].filename = mesh_file;
-		prim_meshes[shape_idx].idx_count = (uint32_t)shapes[shape_idx].mesh.indices.size();
-		prim_meshes[shape_idx].vtx_count = (uint32_t)shapes[shape_idx].mesh.num_face_vertices.size();
+		prim_meshes[shape_idx].idx_count = (u32)shapes[shape_idx].mesh.indices.size();
+		prim_meshes[shape_idx].vtx_count = (u32)shapes[shape_idx].mesh.num_face_vertices.size();
 		prim_meshes[shape_idx].prim_idx = shape_idx;
 
 		auto found = materials_to_objects.find(shapes[shape_idx].name);
@@ -484,27 +484,27 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 
 		glm::vec3 min_vtx = glm::vec3(FLT_MAX);
 		glm::vec3 max_vtx = glm::vec3(-FLT_MAX);
-		uint32_t index_offset = 0;
-		uint32_t idx_val = 0;
-		for (uint32_t f = 0; f < shapes[shape_idx].mesh.num_face_vertices.size(); f++) {
-			for (uint32_t v = 0; v < 3; v++) {
+		u32 index_offset = 0;
+		u32 idx_val = 0;
+		for (u32 f = 0; f < shapes[shape_idx].mesh.num_face_vertices.size(); f++) {
+			for (u32 v = 0; v < 3; v++) {
 				tinyobj::index_t idx = shapes[shape_idx].mesh.indices[index_offset + v];
 				mesh_data.indices.push_back(idx_val++);
-				tinyobj::real_t vx = attrib.vertices[3 * uint32_t(idx.vertex_index) + 0];
-				tinyobj::real_t vy = attrib.vertices[3 * uint32_t(idx.vertex_index) + 1];
-				tinyobj::real_t vz = attrib.vertices[3 * uint32_t(idx.vertex_index) + 2];
+				tinyobj::real_t vx = attrib.vertices[3 * u32(idx.vertex_index) + 0];
+				tinyobj::real_t vy = attrib.vertices[3 * u32(idx.vertex_index) + 1];
+				tinyobj::real_t vz = attrib.vertices[3 * u32(idx.vertex_index) + 2];
 				mesh_data.positions.emplace_back(vx, vy, vz);
 				min_vtx = glm::min(mesh_data.positions[mesh_data.positions.size() - 1], min_vtx);
 				max_vtx = glm::max(mesh_data.positions[mesh_data.positions.size() - 1], max_vtx);
 				if (idx.normal_index >= 0) {
-					tinyobj::real_t nx = attrib.normals[3 * uint32_t(idx.normal_index) + 0];
-					tinyobj::real_t ny = attrib.normals[3 * uint32_t(idx.normal_index) + 1];
-					tinyobj::real_t nz = attrib.normals[3 * uint32_t(idx.normal_index) + 2];
+					tinyobj::real_t nx = attrib.normals[3 * u32(idx.normal_index) + 0];
+					tinyobj::real_t ny = attrib.normals[3 * u32(idx.normal_index) + 1];
+					tinyobj::real_t nz = attrib.normals[3 * u32(idx.normal_index) + 2];
 					mesh_data.normals.emplace_back(nx, ny, nz);
 				}
 				if (idx.texcoord_index >= 0) {
-					tinyobj::real_t tx = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 0];
-					tinyobj::real_t ty = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 1];
+					tinyobj::real_t tx = attrib.texcoords[2 * u32(idx.texcoord_index) + 0];
+					tinyobj::real_t ty = attrib.texcoords[2 * u32(idx.texcoord_index) + 1];
 					mesh_data.texcoords0.emplace_back(tx, ty);
 				}
 			}
@@ -548,7 +548,7 @@ void LumenScene::load_lumen_scene_new(const std::string& path) {
 		return;
 	}
 	std::fseek(file, 0, SEEK_END);
-	size_t file_size = std::ftell(file);
+	u64 file_size = std::ftell(file);
 	std::rewind(file);
 	std::vector<char> buffer(file_size + 1);
 
@@ -573,7 +573,7 @@ void LumenScene::load_scene(const std::string& path) {
 		return;
 	}
 
-	const float aspect_ratio = (float)Window::width() / Window::height();
+	const f32 aspect_ratio = (f32)Window::width() / Window::height();
 	if (config->cam_settings.pos != vec3(-1)) {
 		camera = std::unique_ptr<lm::PerspectiveCamera>(
 			new lm::PerspectiveCamera(config->cam_settings.fov, 0.01f, 1000.0f, aspect_ratio,
@@ -587,7 +587,7 @@ void LumenScene::load_scene(const std::string& path) {
 	total_light_triangle_cnt = 0;
 	total_light_area = 0;
 	std::vector<PrimInfo> prim_lookup;
-	uint32_t idx = 0;
+	u32 idx = 0;
 	for (auto& pm : prim_meshes) {
 		PrimInfo m_info;
 		m_info.index_offset = pm.first_idx;
@@ -627,21 +627,21 @@ void LumenScene::load_scene(const std::string& path) {
 		gpu_lights.emplace_back(light);
 	}
 
-	float total_light_triangle_area = 0.0f;
+	f32 total_light_triangle_area = 0.0f;
 	for (auto& l : gpu_lights) {
 		if ((l.light_flags & 0x7) == LIGHT_AREA) {
 			const auto& pm = prim_meshes[l.prim_mesh_idx];
 			l.world_matrix = pm.world_matrix;
 			auto& idx_base_offset = pm.first_idx;
 			auto& vtx_offset = pm.vtx_offset;
-			for (uint32_t i = 0; i < l.num_triangles; i++) {
+			for (u32 i = 0; i < l.num_triangles; i++) {
 				auto idx_offset = idx_base_offset + 3 * i;
 				glm::ivec3 ind = {indices[idx_offset], indices[idx_offset + 1], indices[idx_offset + 2]};
 				ind += glm::vec3{vtx_offset, vtx_offset, vtx_offset};
 				const vec3 v0 = pm.world_matrix * glm::vec4(positions[ind.x], 1.0);
 				const vec3 v1 = pm.world_matrix * glm::vec4(positions[ind.y], 1.0);
 				const vec3 v2 = pm.world_matrix * glm::vec4(positions[ind.z], 1.0);
-				float area = 0.5f * glm::length(glm::cross(v1 - v0, v2 - v0));
+				f32 area = 0.5f * glm::length(glm::cross(v1 - v0, v2 - v0));
 				total_light_triangle_area += area;
 			}
 		}
@@ -649,7 +649,7 @@ void LumenScene::load_scene(const std::string& path) {
 	if (gpu_lights.size()) {
 		mesh_lights_buffer = prm::get_buffer({.name = "Mesh Lights Buffer",
 											  .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-											  .memory_type = vk::BufferType::GPU,
+											  .memory_type = vk::BUFFER_TYPE_GPU,
 											  .size = gpu_lights.size() * sizeof(Light),
 											  .data = gpu_lights.data()});
 	}
@@ -658,7 +658,7 @@ void LumenScene::load_scene(const std::string& path) {
 									 .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 											  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 											  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-									 .memory_type = vk::BufferType::GPU,
+									 .memory_type = vk::BUFFER_TYPE_GPU,
 									 .size = positions.size() * sizeof(glm::vec3),
 									 .data = positions.data()});
 
@@ -666,21 +666,21 @@ void LumenScene::load_scene(const std::string& path) {
 									.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 											 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 											 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-									.memory_type = vk::BufferType::GPU,
-									.size = indices.size() * sizeof(uint32_t),
+									.memory_type = vk::BUFFER_TYPE_GPU,
+									.size = indices.size() * sizeof(u32),
 									.data = indices.data()});
 
 	materials_buffer =
 		prm::get_buffer({.name = "Materials Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = materials.size() * sizeof(Material),
 						 .data = materials.data()});
 
 	prim_lookup_buffer =
 		prm::get_buffer({.name = "Prim Lookup Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = prim_lookup.size() * sizeof(PrimInfo),
 						 .data = prim_lookup.data()});
 
@@ -696,7 +696,7 @@ void LumenScene::load_scene(const std::string& path) {
 	compact_vertices_buffer =
 		prm::get_buffer({.name = "Compact Vertices Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BufferType::GPU,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = vertices.size() * sizeof(vertices[0]),
 						 .data = vertices.data()});
 
@@ -712,14 +712,14 @@ void LumenScene::load_scene(const std::string& path) {
 		add_default_texture();
 	} else {
 		scene_textures.resize(textures.size());
-		int i = 0;
+		i32 i = 0;
 		for (const auto& texture_path : textures) {
-			int x, y, n;
+			i32 x, y, n;
 			unsigned char* data = stbi_load(texture_path.c_str(), &x, &y, &n, 4);
 			scene_textures[i] = prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-												  .dimensions = {(uint32_t)x, (uint32_t)y, 1},
+												  .dimensions = {(u32)x, (u32)y, 1},
 												  .format = VK_FORMAT_R8G8B8A8_SRGB,
-												  .data = {.data = data, .size = size_t(x * y * 4)},
+												  .data = {.data = data, .size = u64(x * y * 4)},
 												  .sampler = texture_sampler});
 			stbi_image_free(data);
 			i++;
@@ -864,7 +864,7 @@ void LumenScene::write_lumen_scene() {
 	for (const std::string& texture_path : textures) {
 		LumenNode* texture_prop = new LumenNode{.key = "-"};
 		const std::string_view texture_path_view = texture_path;
-		const size_t last_slash = texture_path_view.find_last_of("/\\");
+		const u64 last_slash = texture_path_view.find_last_of("/\\");
 		const std::string_view texture_file_str =
 			(last_slash != std::string::npos) ? texture_path_view.substr(last_slash + 1) : texture_path_view;
 		add_leaf_node(texture_prop, "file", texture_file_str);
@@ -873,7 +873,7 @@ void LumenScene::write_lumen_scene() {
 	}
 
 	LumenNode* bsdfs_node = new LumenNode{.key = "bsdfs"};
-	for(uint32_t i = 0; i < materials.size(); i++) {
+	for(u32 i = 0; i < materials.size(); i++) {
 		LumenNode* bsdf_prop = new LumenNode{.key = "-"};
 		const Material& mat = materials[i];
 		add_leaf_node(bsdf_prop, "name", material_idx_to_name[i]);
@@ -947,38 +947,38 @@ void LumenScene::load_lumen_scene(const std::string& path) {
 	auto& shapes = reader.GetShapes();
 
 	prim_meshes.resize(shapes.size());
-	for (uint32_t s = 0; s < shapes.size(); s++) {
+	for (u32 s = 0; s < shapes.size(); s++) {
 		MeshData mesh_data;
-		prim_meshes[s].first_idx = (uint32_t)indices.size();
-		prim_meshes[s].vtx_offset = (uint32_t)positions.size();
+		prim_meshes[s].first_idx = (u32)indices.size();
+		prim_meshes[s].vtx_offset = (u32)positions.size();
 		prim_meshes[s].name = shapes[s].name;
 		prim_meshes[s].filename = mesh_file;
-		prim_meshes[s].idx_count = (uint32_t)shapes[s].mesh.indices.size();
-		prim_meshes[s].vtx_count = (uint32_t)shapes[s].mesh.num_face_vertices.size();
+		prim_meshes[s].idx_count = (u32)shapes[s].mesh.indices.size();
+		prim_meshes[s].vtx_count = (u32)shapes[s].mesh.num_face_vertices.size();
 		prim_meshes[s].prim_idx = s;
 		glm::vec3 min_vtx = glm::vec3(FLT_MAX);
 		glm::vec3 max_vtx = glm::vec3(-FLT_MAX);
-		uint32_t index_offset = 0;
-		uint32_t idx_val = 0;
-		for (uint32_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
-			for (uint32_t v = 0; v < 3; v++) {
+		u32 index_offset = 0;
+		u32 idx_val = 0;
+		for (u32 f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+			for (u32 v = 0; v < 3; v++) {
 				tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
 				mesh_data.indices.push_back(idx_val++);
-				tinyobj::real_t vx = attrib.vertices[3 * uint32_t(idx.vertex_index) + 0];
-				tinyobj::real_t vy = attrib.vertices[3 * uint32_t(idx.vertex_index) + 1];
-				tinyobj::real_t vz = attrib.vertices[3 * uint32_t(idx.vertex_index) + 2];
+				tinyobj::real_t vx = attrib.vertices[3 * u32(idx.vertex_index) + 0];
+				tinyobj::real_t vy = attrib.vertices[3 * u32(idx.vertex_index) + 1];
+				tinyobj::real_t vz = attrib.vertices[3 * u32(idx.vertex_index) + 2];
 				mesh_data.positions.emplace_back(vx, vy, vz);
 				min_vtx = glm::min(mesh_data.positions[mesh_data.positions.size() - 1], min_vtx);
 				max_vtx = glm::max(mesh_data.positions[mesh_data.positions.size() - 1], max_vtx);
 				if (idx.normal_index >= 0) {
-					tinyobj::real_t nx = attrib.normals[3 * uint32_t(idx.normal_index) + 0];
-					tinyobj::real_t ny = attrib.normals[3 * uint32_t(idx.normal_index) + 1];
-					tinyobj::real_t nz = attrib.normals[3 * uint32_t(idx.normal_index) + 2];
+					tinyobj::real_t nx = attrib.normals[3 * u32(idx.normal_index) + 0];
+					tinyobj::real_t ny = attrib.normals[3 * u32(idx.normal_index) + 1];
+					tinyobj::real_t nz = attrib.normals[3 * u32(idx.normal_index) + 2];
 					mesh_data.normals.emplace_back(nx, ny, nz);
 				}
 				if (idx.texcoord_index >= 0) {
-					tinyobj::real_t tx = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 0];
-					tinyobj::real_t ty = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 1];
+					tinyobj::real_t tx = attrib.texcoords[2 * u32(idx.texcoord_index) + 0];
+					tinyobj::real_t ty = attrib.texcoords[2 * u32(idx.texcoord_index) + 1];
 					mesh_data.texcoords0.emplace_back(tx, ty);
 				}
 			}
@@ -1009,15 +1009,15 @@ void LumenScene::load_lumen_scene(const std::string& path) {
 	auto& lights_arr = j["lights"];
 	materials.resize(bsdfs_arr.size());
 	lights.resize(lights_arr.size());
-	int bsdf_idx = 0;
-	int light_idx = 0;
+	i32 bsdf_idx = 0;
+	i32 light_idx = 0;
 	for (auto& bsdf : bsdfs_arr) {
 		materials[bsdf_idx].texture_id = -1;
 		auto& refs = bsdf["refs"];
 
 		if (!bsdf["texture"].is_null()) {
 			textures.push_back(root + (std::string)bsdf["texture"]);
-			materials[bsdf_idx].texture_id = (int)textures.size() - 1;
+			materials[bsdf_idx].texture_id = (i32)textures.size() - 1;
 		}
 		if (!bsdf["albedo"].is_null()) {
 			const auto& f = bsdf["albedo"];
@@ -1050,8 +1050,8 @@ void LumenScene::load_lumen_scene(const std::string& path) {
 			auto roughness = bsdf["roughness"];
 			auto transmission = bsdf["transmission"];
 			auto reflection = bsdf["reflection"];
-			materials[bsdf_idx].ior = ior.is_null() ? 1.0f : float(ior);
-			materials[bsdf_idx].roughness = roughness.is_null() ? 0.0f : float(roughness);
+			materials[bsdf_idx].ior = ior.is_null() ? 1.0f : f32(ior);
+			materials[bsdf_idx].roughness = roughness.is_null() ? 0.0f : f32(roughness);
 			if (transmission.is_null() || bool(transmission)) {
 				materials[bsdf_idx].bsdf_props |= BSDF_FLAG_TRANSMISSION;
 			}
@@ -1071,7 +1071,7 @@ void LumenScene::load_lumen_scene(const std::string& path) {
 			auto roughness = bsdf["roughness"];
 			auto reflectance = bsdf["reflectance"];
 
-			mat.roughness = roughness.is_null() ? 0.0f : float(roughness);
+			mat.roughness = roughness.is_null() ? 0.0f : f32(roughness);
 
 			// In conductor context, albedo is used as eta (i.e the IOR)
 			// k is the absorption coefficient
@@ -1136,7 +1136,7 @@ void LumenScene::load_lumen_scene(const std::string& path) {
 		}
 
 		for (auto& ref : refs) {
-			for (int s = 0; s < shapes.size(); s++) {
+			for (i32 s = 0; s < shapes.size(); s++) {
 				if (ref == shapes[s].name) {
 					prim_meshes[s].material_idx = bsdf_idx;
 				}
@@ -1198,7 +1198,7 @@ void LumenScene::load_mitsuba_scene(const std::string& path) {
 	curr_config->cam_settings.cam_matrix = mitsuba_parser.camera.cam_matrix;
 	prim_meshes.resize(mitsuba_parser.meshes.size());
 	// Load objs
-	int i = 0;
+	i32 i = 0;
 	for (const auto& mesh : mitsuba_parser.meshes) {
 		if (mesh.file == "") {
 			continue;
@@ -1221,36 +1221,36 @@ void LumenScene::load_mitsuba_scene(const std::string& path) {
 		auto& attrib = reader.GetAttrib();
 		auto& shapes = reader.GetShapes();
 		assert(shapes.size() == 1);
-		prim_meshes[i].first_idx = (uint32_t)indices.size();
-		prim_meshes[i].vtx_offset = (uint32_t)positions.size();
+		prim_meshes[i].first_idx = (u32)indices.size();
+		prim_meshes[i].vtx_offset = (u32)positions.size();
 		prim_meshes[i].name = shapes[0].name;
 		prim_meshes[i].filename = mesh_file;
-		prim_meshes[i].idx_count = (uint32_t)shapes[0].mesh.indices.size();
-		prim_meshes[i].vtx_count = (uint32_t)shapes[0].mesh.num_face_vertices.size();
+		prim_meshes[i].idx_count = (u32)shapes[0].mesh.indices.size();
+		prim_meshes[i].vtx_count = (u32)shapes[0].mesh.num_face_vertices.size();
 		prim_meshes[i].prim_idx = i;
 		glm::vec3 min_vtx = glm::vec3(FLT_MAX);
 		glm::vec3 max_vtx = glm::vec3(-FLT_MAX);
-		uint32_t index_offset = 0;
-		uint32_t idx_val = 0;
-		for (uint32_t f = 0; f < shapes[0].mesh.num_face_vertices.size(); f++) {
-			for (uint32_t v = 0; v < 3; v++) {
+		u32 index_offset = 0;
+		u32 idx_val = 0;
+		for (u32 f = 0; f < shapes[0].mesh.num_face_vertices.size(); f++) {
+			for (u32 v = 0; v < 3; v++) {
 				tinyobj::index_t idx = shapes[0].mesh.indices[index_offset + v];
 				indices.push_back(idx_val++);
-				tinyobj::real_t vx = attrib.vertices[3 * uint32_t(idx.vertex_index) + 0];
-				tinyobj::real_t vy = attrib.vertices[3 * uint32_t(idx.vertex_index) + 1];
-				tinyobj::real_t vz = attrib.vertices[3 * uint32_t(idx.vertex_index) + 2];
+				tinyobj::real_t vx = attrib.vertices[3 * u32(idx.vertex_index) + 0];
+				tinyobj::real_t vy = attrib.vertices[3 * u32(idx.vertex_index) + 1];
+				tinyobj::real_t vz = attrib.vertices[3 * u32(idx.vertex_index) + 2];
 				positions.emplace_back(vx, vy, vz);
 				min_vtx = glm::min(positions[positions.size() - 1], min_vtx);
 				max_vtx = glm::max(positions[positions.size() - 1], max_vtx);
 				if (idx.normal_index >= 0) {
-					tinyobj::real_t nx = attrib.normals[3 * uint32_t(idx.normal_index) + 0];
-					tinyobj::real_t ny = attrib.normals[3 * uint32_t(idx.normal_index) + 1];
-					tinyobj::real_t nz = attrib.normals[3 * uint32_t(idx.normal_index) + 2];
+					tinyobj::real_t nx = attrib.normals[3 * u32(idx.normal_index) + 0];
+					tinyobj::real_t ny = attrib.normals[3 * u32(idx.normal_index) + 1];
+					tinyobj::real_t nz = attrib.normals[3 * u32(idx.normal_index) + 2];
 					normals.emplace_back(nx, ny, nz);
 				}
 				if (idx.texcoord_index >= 0) {
-					tinyobj::real_t tx = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 0];
-					tinyobj::real_t ty = attrib.texcoords[2 * uint32_t(idx.texcoord_index) + 1];
+					tinyobj::real_t tx = attrib.texcoords[2 * u32(idx.texcoord_index) + 0];
+					tinyobj::real_t ty = attrib.texcoords[2 * u32(idx.texcoord_index) + 1];
 					texcoords0.emplace_back(tx, ty);
 				}
 			}
@@ -1279,7 +1279,7 @@ void LumenScene::load_mitsuba_scene(const std::string& path) {
 	for (const auto& m_bsdf : mitsuba_parser.bsdfs) {
 		if (m_bsdf.texture != "") {
 			textures.push_back(root + m_bsdf.texture);
-			materials[i].texture_id = (int)textures.size() - 1;
+			materials[i].texture_id = (i32)textures.size() - 1;
 		} else {
 			materials[i].texture_id = -1;
 		}
@@ -1356,7 +1356,7 @@ void LumenScene::load_mitsuba_scene(const std::string& path) {
 }
 
 void LumenScene::add_default_texture() {
-	std::array<uint8_t, 4> nil = {0, 0, 0, 0};
+	std::array<u8, 4> nil = {0, 0, 0, 0};
 	scene_textures.resize(1);
 	scene_textures[0] = prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 										  .dimensions = {1, 1, 1},

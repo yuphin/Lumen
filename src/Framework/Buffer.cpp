@@ -13,15 +13,15 @@ void buffer_create(Buffer* buffer, const BufferDesc& desc) {
 
 	VmaAllocationCreateInfo alloc_ci = {};
 	alloc_ci.usage = VMA_MEMORY_USAGE_AUTO;
-	if (int(desc.memory_type & BufferType::GPU_TO_CPU) != 0) {
+	if (desc.memory_type & BUFFER_TYPE_GPU_TO_CPU) {
 		alloc_ci.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	} else if (int(desc.memory_type & BufferType::CPU_TO_GPU) != 0) {
+	} else if (desc.memory_type & BUFFER_TYPE_CPU_TO_GPU) {
 		alloc_ci.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
 						  VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT;
 	}
-	if (desc.memory_type == BufferType::STAGING) {
+	if (desc.memory_type == BUFFER_TYPE_STAGING) {
 		alloc_ci.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	} else if (desc.data && desc.memory_type == BufferType::GPU) {
+	} else if (desc.data && desc.memory_type == BUFFER_TYPE_GPU) {
 		// In case we need to copy data to the buffer
 		buffer->usage_flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 	}
@@ -48,7 +48,7 @@ void buffer_create(Buffer* buffer, const BufferDesc& desc) {
 	if (desc.data && (mem_prop_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) == 0) {
 		Buffer* staging_buffer = drm::get({.name = "Scratch Buffer",
 										   .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-										   .memory_type = BufferType::STAGING,
+										   .memory_type = BUFFER_TYPE_STAGING,
 										   .size = buffer->size,
 										   .data = desc.data,
 										   .dedicated_allocation = false});
@@ -76,7 +76,7 @@ VkDescriptorBufferInfo buffer_descriptor(const vk::Buffer* buffer) {
 
 void buffer_destroy(Buffer* buffer) { vmaDestroyBuffer(vk::context().allocator, buffer->handle, buffer->allocation); }
 
-void write_buffer(Buffer* buffer, void* data, size_t size) {
+void write_buffer(Buffer* buffer, void* data, u64 size) {
 	VkMemoryPropertyFlags mem_prop_flags;
 	vmaGetAllocationMemoryProperties(vk::context().allocator, buffer->allocation, &mem_prop_flags);
 	LUMEN_ASSERT((mem_prop_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0, "Buffer is not host visible");

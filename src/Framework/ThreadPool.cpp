@@ -6,11 +6,11 @@ std::mutex ThreadPool::queue_mutex;
 std::condition_variable ThreadPool::cv;
 std::vector<std::thread> ThreadPool::threads;
 void ThreadPool::init() {
-	uint32_t thread_count = std::thread::hardware_concurrency();
+	u32 thread_count = std::thread::hardware_concurrency();
 	done = false;
 	try {
 		threads.reserve(thread_count);
-		for (uint32_t i = 0; i < thread_count; i++) {
+		for (u32 i = 0; i < thread_count; i++) {
 			threads.emplace_back([i] {
 #ifdef _WIN32
 				wchar_t threadName[64];
