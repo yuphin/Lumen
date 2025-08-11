@@ -33,7 +33,6 @@ struct Array {
 
 	void push_back(const T& value) {
 		if (size == capacity) {
-			LUMEN_INFO("Resize at {}", size);
 			u64 new_capacity = capacity == 0 ? 4 : 3 * (capacity >> 1);
 			arena_ensure_allocated<T>(arena_node, new_capacity, capacity);
 			capacity = new_capacity;

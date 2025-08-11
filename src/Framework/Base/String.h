@@ -10,26 +10,45 @@ struct String {
 		assert(idx < size);
 		return data[idx];
 	}
+	char operator[](u64 idx) const {
+		assert(idx < size);
+		return data[idx];
+	}
+
+	inline char* begin() { return &data[0]; }
+	inline char* end() { return &data[size]; }
+	inline const char* begin() const { return &data[0]; }
+	inline const char* end() const { return &data[size]; }
 };
+
+template <size_t N>
+constexpr String str_literal(const char (&str)[N]) {
+	return String{(char*)str, N - 1};
+}
+
+template <size_t N>
+constexpr String cstr_literal(const char (&str)[N]) {
+	return String{(char*)str, N};
+}
+
+bool char_is_digit(char c);
+bool char_is_upper(char c);
+bool char_is_lower(char c);
+bool char_is_alpha(char c);
+bool char_is_alnum(char c);
+bool char_is_whitespace(char c);
+char char_to_upper(char c);
+char char_to_lower(char c);
 
 String str_from_f64(Arena* arena, double val, bool cstr = false);
 String str_to_cstr(Arena* arena, const String& str);
+String str_chop(const String& str, u64 start = 0, u64 end = -1);
 
-template <typename NumType>
-String str_from_number(Arena* arena, NumType val, bool cstr = false) {
-	u32 num_chars = 0;
-	for (uint64_t v = val; v != 0; ++num_chars) {
-		v /= 10;
-	}
-	String result = {0};
-	result.size = num_chars + cstr;
-	result.data = (char*)arena->allocate(result.size);
-	for (u32 i = 0; i < num_chars; i++) {
-		result.data[num_chars - 1 - i] = '0' + val % 10;
-		val /= 10;
-	}
-	if (cstr) result.data[num_chars] = 0;
-	return result;
-}
+u64 u64_from_str(const String& str);
+s64 s64_from_str(const String& str);
+f64 f64_from_str(const String& str);
+
+String str_from_u64(Arena* arena, u64 val, bool cstr = false);
+String str_from_s64(Arena* arena, s64 val, bool cstr = false);
 
 }  // namespace lm

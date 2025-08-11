@@ -1,6 +1,6 @@
 #include "CommandBuffer.h"
 
-static u32 get_first_available_tid(uint64_t val) {
+static u32 get_first_available_tid(u64 val) {
 #ifdef _MSC_VER
 	unsigned long index;
 	_BitScanForward64(&index, val);
@@ -13,7 +13,7 @@ namespace vk {
 
 std::mutex queue_mutex;
 std::mutex command_pool_mutex;
-uint64_t available_command_pools = UINT64_MAX;
+u64 available_command_pools = UINT64_MAX;
 std::counting_semaphore<64> command_pool_semaphore{64};
 
 CommandBuffer::CommandBuffer(bool begin, VkCommandBufferUsageFlags begin_flags, vk::QueueType type,
@@ -25,7 +25,7 @@ CommandBuffer::CommandBuffer(bool begin, VkCommandBufferUsageFlags begin_flags, 
 	{
 		std::scoped_lock lock(command_pool_mutex);
 		curr_tid = get_first_available_tid(available_command_pools);
-		available_command_pools &= ~(uint64_t(1) << curr_tid);
+		available_command_pools &= ~(u64(1) << curr_tid);
 	}
 	auto cmd_buf_allocate_info = vk::command_buffer_allocate_info(vk::context().cmd_pools[curr_tid], level, 1);
 	vk::check(vkAllocateCommandBuffers(vk::context().device, &cmd_buf_allocate_info, &handle));
@@ -44,7 +44,7 @@ void CommandBuffer::begin(VkCommandBufferUsageFlags begin_flags) {
 		{
 			std::scoped_lock lock(command_pool_mutex);
 			curr_tid = get_first_available_tid(available_command_pools);
-			available_command_pools &= ~(uint64_t(1) << curr_tid);
+			available_command_pools &= ~(u64(1) << curr_tid);
 		}
 	}
 	auto begin_info = vk::command_buffer_begin_info(begin_flags);
@@ -86,7 +86,7 @@ CommandBuffer::~CommandBuffer() {
 	vkFreeCommandBuffers(vk::context().device, vk::context().cmd_pools[curr_tid], 1, &handle);
 	{
 		std::scoped_lock lock(command_pool_mutex);
-		available_command_pools |= uint64_t(1) << curr_tid;
+		available_command_pools |= u64(1) << curr_tid;
 	}
 	command_pool_semaphore.release();
 }
