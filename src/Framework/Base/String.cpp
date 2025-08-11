@@ -83,6 +83,7 @@ s64 s64_from_str(const String& str) {
 		}
 		if (str[curr] == '-') {
 			negative = true;
+			curr++;
 			break;
 		}
 	}
@@ -111,7 +112,7 @@ static String str_from_number(Arena* arena, u64 abs_val, bool negative, bool cst
 	if (cstr) result.data[result.size - 1] = 0;
 	if (negative) result.data[0] = '-';
 	for (u32 i = 0; i < num_chars; i++) {
-		result.data[num_chars - 1 - i] = '0' + abs_val % 10;
+		result.data[num_chars - 1 - i + negative] = '0' + abs_val % 10;
 		abs_val /= 10;
 	}
 	return result;
@@ -120,9 +121,64 @@ static String str_from_number(Arena* arena, u64 abs_val, bool negative, bool cst
 String str_from_u64(Arena* arena, u64 val, bool cstr) { return str_from_number(arena, val, false, cstr); }
 String str_from_s64(Arena* arena, s64 val, bool cstr) {
 	bool negative = val < 0;
-	// Handle INT64_MIN safely
 	u64 abs_val = negative ? (u64)(-(val + 1)) + 1 : (u64)val;
 	return str_from_number(arena, abs_val, negative, cstr);
 }
+
+f64 f64_from_str(const String& str) {
+	f64 result = 0;
+	size_t curr = 0;
+	bool negative = false;
+
+	while (curr < str.size && char_is_whitespace(str[curr])) ++curr;
+	if (curr == str.size) {
+		return 0;
+	}
+
+	if (str[curr] == '-' || str[curr] == '+') {
+		negative = str[curr] == '-';
+		curr++;
+	}
+
+	// Integer
+	while (curr < str.size && char_is_digit(str[curr])) {
+		result = result * 10.0 + (str[curr] - '0');
+		curr++;
+	}
+
+	// Fractional
+	if (curr < str.size && str[curr] == '.') {
+		curr++;
+		f64 frac = 0.0;
+		f64 base = 0.1;
+		while (curr < str.size && char_is_digit(str[curr])) {
+			frac += (str[curr] - '0') * base;
+			base *= 0.1;
+			++curr;
+		}
+		result += frac;
+	}
+	if (curr < str.size && (str[curr] == 'e' || str[curr] == 'E')) {
+		++curr;
+		bool exp_negative = false;
+		if (curr < str.size && (str[curr] == '-' || str[curr] == '+')) {
+			exp_negative = (str[curr] == '-');
+			++curr;
+		}
+		u32 exp = 0;
+		while (curr < str.size && char_is_digit(str[curr])) {
+			exp = exp * 10 + (str[curr] - '0');
+			++curr;
+		}
+		f64 exp_mul = 1.0;
+		f64 base = exp_negative ? 0.1 : 10.0;
+		for (u32 j = 0; j < exp; ++j) {
+			exp_mul *= base;
+		}
+		result *= exp_mul;
+	}
+	return negative ? -result : result;
+}
+f32 f32_from_str(const String& str) { return (f32)f64_from_str(str); }
 
 }  // namespace lm

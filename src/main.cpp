@@ -70,16 +70,27 @@ i32 main(i32 argc, char* argv[]) {
 		LUMEN_INFO("HashMap entry: key = {}, value = {}", e.key, e.value);
 	}
 
-	lm::String result = lm::str_from_number(arena, 62832387, true);
-	lm::String result2 = lm::str_from_f64(arena, 1421.363);
+	lm::String result = lm::str_from_u64(arena, 62832387, true);
+	lm::String result2 = lm::str_from_s64(arena, -62832387, true);
+	lm::String result3 = lm::str_from_f64(arena, 1421.363);
 
 	LUMEN_INFO("CSTR Literal: {}", lm::cstr_literal("Test").data);
 	LUMEN_INFO("Result {}", result.data);
+	LUMEN_INFO("Result2 {}", result2.data);
+	LUMEN_INFO("Result3 {}", result3.data);
 
-	// LUMEN_INFO("U64 from str: {}", lm::u64_from_str(lm::str_literal("123456789")));
-	// LUMEN_INFO("U64 from str: {}", lm::u64_from_str(lm::str_literal("  asd  123456789asd")));
-	// LUMEN_INFO("U64 from str2: {}", lm::u64_from_str(lm::str_literal("   18446744073709551616")));
-	// LUMEN_INFO("S64 from str: {}", lm::s64_from_str(lm::str_literal("  -  123456789asd")));
+	LUMEN_INFO("U64 from str: {}", lm::u64_from_str(lm::str_literal("123456789")));
+	LUMEN_INFO("U64 from str: {}", lm::u64_from_str(lm::str_literal("  asd  123456789asd")));
+	LUMEN_INFO("U64 from str2: {}", lm::u64_from_str(lm::str_literal("   18446744073709551616")));
+	LUMEN_INFO("S64 from str: {}", lm::s64_from_str(lm::str_literal("  -  123456789asd")));
+
+	LUMEN_INFO("{}", f64_from_str(lm::cstr_literal("-1.32e-1")));
+	LUMEN_INFO("{}", f64_from_str(lm::cstr_literal("1.2423")));
+	LUMEN_INFO("{}", f64_from_str(lm::cstr_literal("-1.2423")));
+	LUMEN_INFO("{}", f64_from_str(lm::cstr_literal(".2423")));
+	LUMEN_INFO("{}", f64_from_str(lm::cstr_literal("1361763176537161637")));
+	LUMEN_INFO("{}", f32_from_str(lm::cstr_literal("1432.34")));
+	LUMEN_INFO("{}", f64_from_str(lm::cstr_literal("-0.9814223")));
 
 
 	// __debugbreak();

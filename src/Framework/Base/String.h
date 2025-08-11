@@ -41,14 +41,16 @@ char char_to_upper(char c);
 char char_to_lower(char c);
 
 String str_from_f64(Arena* arena, double val, bool cstr = false);
+String str_from_s64(Arena* arena, s64 val, bool cstr = false);
+
 String str_to_cstr(Arena* arena, const String& str);
 String str_chop(const String& str, u64 start = 0, u64 end = -1);
 
 u64 u64_from_str(const String& str);
 s64 s64_from_str(const String& str);
 f64 f64_from_str(const String& str);
+f32 f32_from_str(const String& str);
 
 String str_from_u64(Arena* arena, u64 val, bool cstr = false);
-String str_from_s64(Arena* arena, s64 val, bool cstr = false);
 
 }  // namespace lm
