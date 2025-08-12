@@ -2,6 +2,9 @@
 
 namespace util {
 
+template<typename A, typename B> struct is_same { static constexpr bool value = false; };
+template<typename A> struct is_same<A, A> { static constexpr bool value = true; };
+
 inline constexpr u64 align_pow2(u64 x, u64 align) { return (x + align - 1) & ~(align - 1); }
 
 template <typename T>

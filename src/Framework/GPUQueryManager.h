@@ -16,6 +16,6 @@ void collect();
 void reset_data();
 
 util::Slice<TimestampData> get();
-uint64_t get_elapsed(const TimestampData& data);
-uint64_t get_total_elapsed();
+u64 get_elapsed(const TimestampData& data);
+u64 get_total_elapsed();
 }  // namespace GPUQueryManager

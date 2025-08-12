@@ -103,7 +103,7 @@ s64 s64_from_str(const String& str) {
 
 static String str_from_number(Arena* arena, u64 abs_val, bool negative, bool cstr) {
 	u32 num_chars = 0;
-	for (uint64_t v = abs_val; v != 0; ++num_chars) {
+	for (u64 v = abs_val; v != 0; ++num_chars) {
 		v /= 10;
 	}
 	String result = {0};

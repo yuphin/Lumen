@@ -55,19 +55,33 @@ i32 main(i32 argc, char* argv[]) {
 	// }
 
 	auto hm = lm::hash_map_create<i32, i32>(arena);
+	
 
 	hm.insert(1, 100);
 	hm.insert(2, 200);
+	hm.insert(2, 400);
 	hm.insert(682, 800);
+	hm.remove(2);
 
 	auto entry = hm.find(682);
 	assert(entry != nullptr);
 	auto entry2 = hm.find(3);
 	assert(entry2 == nullptr);
+	auto entry4 = hm.find(2);
+	assert(entry4 == nullptr);
 	// LUMEN_INFO("Found entry: key = {}, value = {}", entry->key, entry->value);
 
 	for (auto& e : hm) {
 		LUMEN_INFO("HashMap entry: key = {}, value = {}", e.key, e.value);
+	}
+
+	auto hs = lm::hash_set_create<int>(arena);
+	hs.insert(24);
+	hs.insert(24);
+	hs.insert(541);
+	hs.insert(60);
+	for (auto& e : hs) {
+		LUMEN_INFO("HashSet entry: key = {}", e.key);
 	}
 
 	lm::String result = lm::str_from_u64(arena, 62832387, true);

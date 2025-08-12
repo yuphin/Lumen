@@ -166,7 +166,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 		vkDestroyShaderModule(vk::context().device, stage.module, nullptr);
 	}
 	if (!name.empty()) {
-		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)handle, name.c_str(),
+		vk::DebugMarker::set_resource_name(vk::context().device, (u64)handle, name.c_str(),
 										   VK_OBJECT_TYPE_PIPELINE);
 	}
 }
@@ -291,7 +291,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 	sbt_wrapper.setup(vk::context().queue_indices.gfx_family.value(), vk::context().rt_props);
 	sbt_wrapper.create(handle, pipeline_CI);
 	if (!name.empty()) {
-		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)handle, name.c_str(),
+		vk::DebugMarker::set_resource_name(vk::context().device, (u64)handle, name.c_str(),
 										   VK_OBJECT_TYPE_PIPELINE);
 	}
 	for (auto& stage : stages) {
@@ -339,7 +339,7 @@ void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
 	vk::check(vkCreateComputePipelines(vk::context().device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle));
 	vkDestroyShaderModule(vk::context().device, compute_shader_module, nullptr);
 	if (!name.empty()) {
-		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)handle, name.c_str(),
+		vk::DebugMarker::set_resource_name(vk::context().device, (u64)handle, name.c_str(),
 										   VK_OBJECT_TYPE_PIPELINE);
 	}
 }

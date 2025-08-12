@@ -5,7 +5,7 @@ namespace GPUQueryManager {
 
 u32 _curr_pool_idx = 0;
 
-uint64_t _queries[4096];
+u64 _queries[4096];
 u32 _curr_query_idx = 0;
 u32 _num_collected_queries = 0;
 
@@ -49,7 +49,7 @@ void collect(u32 curr_frame_idx) {
 	// Note: curr_frame_idx is the index of the command buffer that has finished its execution
 	if (_curr_query_idx > 0) {
 		vkGetQueryPoolResults(vk::context().device, vk::context().query_pool_timestamps[curr_frame_idx], 0,
-							  _curr_query_idx, sizeof(uint64_t) * _curr_query_idx, _queries, sizeof(uint64_t),
+							  _curr_query_idx, sizeof(u64) * _curr_query_idx, _queries, sizeof(u64),
 							  VK_QUERY_RESULT_64_BIT);
 		_curr_query_idx = 0;
 		_curr_timestamp_idx = 0;
@@ -63,11 +63,11 @@ void reset_data() { memset(_data, 0, sizeof(TimestampData) * 4096); }
 util::Slice<TimestampData> get() { return util::Slice<TimestampData>(_data, _num_collected_timestamps); }
 
 // Assumes that collect has been called
-uint64_t get_elapsed(const TimestampData& data) {
+u64 get_elapsed(const TimestampData& data) {
 	return _queries[data.end_timestamp_idx] - _queries[data.start_timestamp_idx];
 }
 
-uint64_t get_total_elapsed() {
+u64 get_total_elapsed() {
 	return _num_collected_queries == 0 ? 0 : _queries[_num_collected_queries - 1] - _queries[0];
 }
 }  // namespace GPUQueryManager

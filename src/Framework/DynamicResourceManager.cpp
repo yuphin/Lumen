@@ -3,7 +3,7 @@
 #include "Texture.h"
 #include "DynamicResourceManager.h"
 
-static uint16_t count_leading_ones(uint64_t val) {
+static uint16_t count_leading_ones(u64 val) {
 	if (val == 0) {
 		return 0;
 	}
@@ -29,7 +29,7 @@ class DynamicPool {
 			}
 		}
 		assert(idx < 512);
-		availability_mask[i] |= uint64_t(1) << (idx % 8);
+		availability_mask[i] |= u64(1) << (idx % 8);
 		return &data[idx];
 	}
 	void remove(T* object) {
@@ -39,7 +39,7 @@ class DynamicPool {
 
    private:
 	T data[512];
-	uint64_t availability_mask[8] = {0};
+	u64 availability_mask[8] = {0};
 };
 
 namespace drm {

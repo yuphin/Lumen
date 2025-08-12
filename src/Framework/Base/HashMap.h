@@ -29,10 +29,19 @@ static inline uint64_t get_default_hash(const Array<T>& array) {
 
 template <typename T1, typename T2>
 struct HashMapEntry {
-	uint64_t hash = 0;
+	uint64_t hash;
 	T1 key;
 	T2 value;
 };
+
+// For hash set
+struct Empty {};
+template <typename T>
+struct HashMapEntry<T, Empty> {
+	uint64_t hash;
+	T key;
+};
+// Hash map
 
 template <typename T1, typename T2, uint64_t (*hash_func)(const T1&)>
 struct HashMapLinear {
@@ -63,18 +72,29 @@ struct HashMapLinear {
 
 		u32 probe_inc = 1;
 		while (data[index].hash != HASH_MAP_HASH_EMPTY) {
-			const HashMapEntry<T1, T2>& entry = data[index];
+			HashMapEntry<T1, T2>& entry = data[index];
 			if (entry.hash == HASH_MAP_HASH_DELETED) {
-				++num_slots;
+				--num_slots;
+				break;
+			} else if (entry.key == key) {
+				if constexpr (!util::is_same<T2, Empty>::value) {
+					entry.value = value;
+				}
+				return &data[index];
 			}
 			index = (index + probe_inc) & (capacity - 1);
 			probe_inc++;
 		}
+		++num_slots;
+		++size;
 		data[index].hash = hash;
 		data[index].key = key;
-		data[index].value = value;
+		if constexpr (!util::is_same<T2, Empty>::value) {
+			data[index].value = value;
+		}
 		return &data[index];
 	}
+	HashMapEntry<T1, T2>* insert(const T1& key) { return insert(key, T2{}); }
 
 	HashMapEntry<T1, T2>* find(const T1& key) {
 		uint64_t hash = hash_func(key);
@@ -105,6 +125,7 @@ struct HashMapLinear {
 		while (data[index].hash > HASH_MAP_HASH_DELETED) {
 			if (data[index].hash == hash && data[index].key == key) {
 				data[index].hash = HASH_MAP_HASH_DELETED;
+				--size;
 				return &data[index];
 			}
 			index = (index + probe_inc) & (capacity - 1);
@@ -167,7 +188,7 @@ HashMapLinear<T1, T2, hash_func> hash_map_create(Arena* arena) {
 	using HashMapEntryType = HashMapEntry<T1, T2>;
 	HashMapLinear<T1, T2, hash_func> map;
 	map.arena_node = arena;
-	map.size = map.capacity = HASH_MAP_LINEAR_MIN_CAPACITY;
+	map.capacity = HASH_MAP_LINEAR_MIN_CAPACITY;
 
 	Arena* arena_node;
 	map.data = (HashMapEntryType*)arena->allocate(HASH_MAP_LINEAR_MIN_CAPACITY * sizeof(HashMapEntryType),
@@ -177,4 +198,11 @@ HashMapLinear<T1, T2, hash_func> hash_map_create(Arena* arena) {
 	return map;
 }
 
+template <typename T, uint64_t (*hash_func)(const T&) = get_default_hash<T>>
+using HashSet = HashMapLinear<T, Empty, hash_func>;
+
+template <typename T, uint64_t (*hash_func)(const T&) = get_default_hash<T>>
+HashSet<T, hash_func> hash_set_create(Arena* arena) {
+	return hash_map_create<T, Empty, hash_func>(arena);
+}
 }  // namespace lm

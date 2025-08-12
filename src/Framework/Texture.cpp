@@ -103,7 +103,7 @@ void texture_create(Texture* texture, const TextureDesc& desc) {
 	}
 
 	if (!texture->name.empty()) {
-		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)texture->handle, texture->name.data(),
+		vk::DebugMarker::set_resource_name(vk::context().device, (u64)texture->handle, texture->name.data(),
 										   VK_OBJECT_TYPE_IMAGE);
 	}
 

@@ -40,7 +40,7 @@ void buffer_create(Buffer* buffer, const BufferDesc& desc) {
 	vk::check(vmaCreateBuffer(vk::context().allocator, &buffer_ci, &alloc_ci, &buffer->handle, &buffer->allocation,
 							  &alloc_info));
 	if (!buffer->name.empty()) {
-		vk::DebugMarker::set_resource_name(vk::context().device, (uint64_t)buffer->handle, buffer->name.data(),
+		vk::DebugMarker::set_resource_name(vk::context().device, (u64)buffer->handle, buffer->name.data(),
 										   VK_OBJECT_TYPE_BUFFER);
 	}
 	VkMemoryPropertyFlags mem_prop_flags;
