@@ -3,6 +3,14 @@
 #include <stb/stb_sprintf.h>
 
 namespace lm {
+
+String str_reserve(Arena* arena, u64 size) {
+	String result = {0};
+	result.size = size;
+	result.data = (char*)arena->allocate(size);
+	return result;
+}
+
 String str_from_f64(Arena* arena, double val, bool cstr) {
 	char buf[32];
 	i32 num_chars = stbsp_snprintf(buf, sizeof(buf), "%.9g", val);

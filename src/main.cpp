@@ -3,6 +3,7 @@
 #include "RayTracer/RayTracer.h"
 #include "Framework/Base/String.h"
 #include "Framework/ThreadPool.h"
+#include "Framework/Base/OS.h"
 
 #if 0
 i32 main(i32 argc, char* argv[]) {
@@ -55,7 +56,6 @@ i32 main(i32 argc, char* argv[]) {
 	// }
 
 	auto hm = lm::hash_map_create<i32, i32>(arena);
-	
 
 	hm.insert(1, 100);
 	hm.insert(2, 200);
@@ -106,6 +106,20 @@ i32 main(i32 argc, char* argv[]) {
 	LUMEN_INFO("{}", f32_from_str(lm::cstr_literal("1432.34")));
 	LUMEN_INFO("{}", f64_from_str(lm::cstr_literal("-0.9814223")));
 
+	os::FileHandle file_handle = os::file_open(lm::cstr_literal("scenes/cornell_box/path.scene"), os::AccessFlag_Read);
+	if (file_handle == 0) {
+		LUMEN_ERROR("Failed to open file");
+		return -1;
+	}
+	os::FileProperties props = os::file_properties(file_handle);
+	LUMEN_INFO("File size: {}, created: {}, modified: {}", props.size, props.created, props.modified);
+
+	lm::String file_content = lm::str_reserve(arena, props.size + 1);
+
+	u64 bytes_read = os::file_read(file_handle, file_content.data);
+	file_content.data[props.size] = '\0';
+
+	LUMEN_INFO("Bytes read: {} - File content: {}", bytes_read, file_content.data);
 
 	// __debugbreak();
 }

@@ -4,8 +4,8 @@ namespace lm {
 struct Arena;
 
 struct String {
-	char* data;
-	u64 size;
+	char* data = nullptr;
+	u64 size = 0;
 	char& operator[](u64 idx) {
 		assert(idx < size);
 		return data[idx];
@@ -52,5 +52,6 @@ f64 f64_from_str(const String& str);
 f32 f32_from_str(const String& str);
 
 String str_from_u64(Arena* arena, u64 val, bool cstr = false);
+String str_reserve(Arena* arena, u64 size);
 
 }  // namespace lm

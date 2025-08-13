@@ -41,7 +41,7 @@ struct HashMapEntry<T, Empty> {
 	uint64_t hash;
 	T key;
 };
-// Hash map
+
 
 template <typename T1, typename T2, uint64_t (*hash_func)(const T1&)>
 struct HashMapLinear {
