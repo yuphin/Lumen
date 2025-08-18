@@ -5,7 +5,7 @@
 
 struct CameraSettings {
 	f32 fov;
-	glm::vec3 pos = glm::vec3(0);
+	glm::vec3 pos = glm::vec3(-1);
 	glm::vec3 rotation = glm::vec3(0);
 	glm::vec3 dir = glm ::vec3(0);
 	glm::mat4 cam_matrix = glm::mat4();
