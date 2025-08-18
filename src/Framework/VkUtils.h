@@ -120,7 +120,7 @@ inline u32 calc_mip_levels(VkExtent2D extent) {
 
 namespace DebugMarker {
 inline void set_resource_name(VkDevice device, u64 obj, const char* name, VkObjectType type) {
-#if _DEBUG
+#if USE_VALIDATION_LAYERS
 	VkDebugUtilsObjectNameInfoEXT debug_utils_name{VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT, nullptr, type,
 												   obj, name};
 	if (vkSetDebugUtilsObjectNameEXT) {

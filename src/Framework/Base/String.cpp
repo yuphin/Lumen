@@ -5,7 +5,7 @@
 namespace lm {
 
 String str_reserve(Arena* arena, u64 size) {
-	String result = {0};
+	String result;
 	result.size = size;
 	result.data = (char*)arena->allocate(size);
 	return result;
@@ -14,7 +14,7 @@ String str_reserve(Arena* arena, u64 size) {
 String str_from_f64(Arena* arena, double val, bool cstr) {
 	char buf[32];
 	i32 num_chars = stbsp_snprintf(buf, sizeof(buf), "%.9g", val);
-	String result = {0};
+	String result;
 	result.size = num_chars + cstr;
 	char* data = (char*)arena->allocate(result.size);
 	memmove(data, buf, sizeof(buf));
@@ -27,7 +27,7 @@ String str_to_cstr(Arena* arena, const String& str) {
 	char* data = (char*)arena->allocate(str.size + 1);
 	memmove(data, str.data, str.size);
 	data[str.size] = 0;
-	String result = {0};
+	String result;
 	result.data = data;
 	result.size = str.size + 1;
 	return result;
@@ -53,10 +53,10 @@ char char_to_lower(char c) {
 }
 
 String str_chop(const String& str, u64 start, u64 end) {
-	if (start >= str.size) return {nullptr, 0};
+	if (start >= str.size) return {};
 	if (end == -1 || end > str.size) end = str.size;
-	if (start >= end) return {nullptr, 0};
-	String result = {0};
+	if (start >= end) return {};
+	String result;
 	result.data = str.data + start;
 	result.size = end - start;
 	return result;
@@ -114,7 +114,7 @@ static String str_from_number(Arena* arena, u64 abs_val, bool negative, bool cst
 	for (u64 v = abs_val; v != 0; ++num_chars) {
 		v /= 10;
 	}
-	String result = {0};
+	String result;
 	result.size = num_chars + cstr + negative;
 	result.data = (char*)arena->allocate(result.size);
 	if (cstr) result.data[result.size - 1] = 0;
@@ -188,5 +188,13 @@ f64 f64_from_str(const String& str) {
 	return negative ? -result : result;
 }
 f32 f32_from_str(const String& str) { return (f32)f64_from_str(str); }
+
+String str_to_lower(Arena* arena, const String& str) {
+	String result = str_reserve(arena, str.size);
+	for (u64 i = 0; i < str.size; i++) {
+		result.data[i] = char_to_lower(str.data[i]);
+	}
+	return result;
+}
 
 }  // namespace lm

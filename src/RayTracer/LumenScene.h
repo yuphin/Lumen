@@ -44,12 +44,17 @@ struct LumenLight {
 };
 
 struct LumenNode {
-	std::string_view key = "";
-	std::string_view value = "";
+	std::string key = "";
+	std::string value = "";
 	LumenNode* parent = nullptr;
 	LumenNode* child = nullptr;
 	LumenNode* next = nullptr;
 	i32 num_list_items = 0;
+};
+
+struct TextureRef {
+	std::string name;
+	std::string path;
 };
 
 class LumenScene {
@@ -68,7 +73,7 @@ class LumenScene {
 
 	std::vector<LumenPrimMesh> prim_meshes;
 	std::vector<Material> materials;
-	std::vector<std::string> textures;
+	std::vector<TextureRef> textures;
 	std::vector<LumenLight> lights;
 
 	std::vector<Light> gpu_lights;

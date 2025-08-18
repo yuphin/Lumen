@@ -72,16 +72,61 @@ u64 file_read(FileHandle handle, void* out_data, u64 size) {
 	u64 total_bytes_read = 0;
 	u64 bytes_left = size;
 	for (u64 offset = 0; offset < size; offset += total_bytes_read) {
-		int result = pread(fd, (u8*)out_data + offset, bytes_left, offset)
-		if(result >= 0) {
+		int result = pread(fd, (u8*)out_data + offset, bytes_left, offset) if (result >= 0) {
 			total_bytes_read += result;
 			bytes_left -= result;
-		} else {
-			return 0; // Error reading file
+		}
+		else {
+			return 0;  // Error reading file
 		}
 	}
 	return total_bytes_read;
 #endif	// defined(_WIN32) || defined(_WIN64)
+}
+
+u64 file_write(FileHandle handle, void* in_data, u64 size) {
+	if (handle == 0) {
+		return 0;
+	}
+#if defined(_WIN32) || defined(_WIN64)
+	HANDLE win_handle = (HANDLE)handle;
+	u64 src_offset = 0;
+	u64 dst_offset = 0;
+	for (;;) {
+		DWORD bytes_left = DWORD(size - src_offset);
+		if (bytes_left == 0) {
+			break;
+		}
+		DWORD bytes_written = 0;
+		void* data = (u8*)in_data + src_offset;
+		OVERLAPPED overlapped = {0};
+		overlapped.Offset = (dst_offset & 0x00000000ffffffffull);
+		overlapped.OffsetHigh = (dst_offset & 0xffffffff00000000ull) >> 32;
+		BOOL success = WriteFile(win_handle, data, bytes_left, &bytes_written, &overlapped);
+		if (success == 0) {
+			break;
+		}
+		src_offset += bytes_written;
+		dst_offset += bytes_written;
+	}
+	return src_offset;
+#else
+	int fd = (int)handle;
+	u64 src_offset = 0;
+	u64 dst_offset = 0;
+	for (;;) {
+		u64 bytes_left = size - src_offset;
+		if (bytes_left == 0) break;
+		ssize_t n = pwrite(fd, (u8*)in_data + src_offset, bytes_left, (off_t)dst_offset);
+		if (n < 0) {
+			if (errno == EINTR) continue;
+			break;
+		}
+		src_offset += (u64)n;
+		dst_offset += (u64)n;
+	}
+	return src_offset;
+#endif
 }
 
 FileHandle file_open(const lm::String& path, AccessFlags access_flags) {
@@ -125,6 +170,17 @@ FileHandle file_open(const lm::String& path, AccessFlags access_flags) {
 	return (FileHandle)fd;
 
 #endif	// defined(_WIN32) || defined(_WIN64)
+}
+
+void file_close(FileHandle handle) {
+	if(handle == 0) {
+		return;
+	}
+#if defined(_WIN32) || defined(_WIN64)
+	CloseHandle((HANDLE)handle);
+#else
+	close((int)handle);
+#endif
 }
 
 FileProperties file_properties(FileHandle handle) {

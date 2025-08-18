@@ -24,7 +24,9 @@ u64 get_page_size();
 void* reserve(u64 reserve_size);
 bool commit(void* ptr, u64 commit_size);
 u64 file_read(FileHandle handle, void* out_data, u64 size = U64_MAX);
+u64 file_write(FileHandle handle, void* in_data, u64 size);
 FileHandle file_open(const lm::String& path, AccessFlags access_flags);
+void file_close(FileHandle handle);
 FileProperties file_properties(FileHandle handle);
 
 

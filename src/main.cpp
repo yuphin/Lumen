@@ -5,9 +5,11 @@
 #include "Framework/ThreadPool.h"
 #include "Framework/Base/OS.h"
 
-#if 0
+#undef USE_VALIDATION_LAYERS
+
+#if 1
 i32 main(i32 argc, char* argv[]) {
-#ifdef _DEBUG
+#ifdef USE_VALIDATION_LAYERS
 	bool enable_debug = true;
 #else
 	bool enable_debug = false;
@@ -55,7 +57,7 @@ i32 main(i32 argc, char* argv[]) {
 	// 	LUMEN_INFO("Array value: {}", arr[i]);
 	// }
 
-	auto hm = lm::hash_map_create<i32, i32>(arena);
+	auto hm = lm::hash_map_create<i32, u64>(arena);
 
 	hm.insert(1, 100);
 	hm.insert(2, 200);
@@ -72,15 +74,17 @@ i32 main(i32 argc, char* argv[]) {
 	// LUMEN_INFO("Found entry: key = {}, value = {}", entry->key, entry->value);
 
 	for (auto& e : hm) {
+		LUMEN_INFO("HM Entry size = {}", sizeof(e));
 		LUMEN_INFO("HashMap entry: key = {}, value = {}", e.key, e.value);
 	}
 
-	auto hs = lm::hash_set_create<int>(arena);
+	auto hs = lm::hash_set_create<u64>(arena);
 	hs.insert(24);
 	hs.insert(24);
 	hs.insert(541);
 	hs.insert(60);
 	for (auto& e : hs) {
+		LUMEN_INFO("HS Entry size = {}", sizeof(e));
 		LUMEN_INFO("HashSet entry: key = {}", e.key);
 	}
 
@@ -88,25 +92,25 @@ i32 main(i32 argc, char* argv[]) {
 	lm::String result2 = lm::str_from_s64(arena, -62832387, true);
 	lm::String result3 = lm::str_from_f64(arena, 1421.363);
 
-	LUMEN_INFO("CSTR Literal: {}", lm::cstr_literal("Test").data);
+	LUMEN_INFO("CSTR Literal: {}", lm::cliteral("Test").data);
 	LUMEN_INFO("Result {}", result.data);
 	LUMEN_INFO("Result2 {}", result2.data);
 	LUMEN_INFO("Result3 {}", result3.data);
 
-	LUMEN_INFO("U64 from str: {}", lm::u64_from_str(lm::str_literal("123456789")));
-	LUMEN_INFO("U64 from str: {}", lm::u64_from_str(lm::str_literal("  asd  123456789asd")));
-	LUMEN_INFO("U64 from str2: {}", lm::u64_from_str(lm::str_literal("   18446744073709551616")));
-	LUMEN_INFO("S64 from str: {}", lm::s64_from_str(lm::str_literal("  -  123456789asd")));
+	LUMEN_INFO("U64 from str: {}", lm::u64_from_str(lm::literal("123456789")));
+	LUMEN_INFO("U64 from str: {}", lm::u64_from_str(lm::literal("  asd  123456789asd")));
+	LUMEN_INFO("U64 from str2: {}", lm::u64_from_str(lm::literal("   18446744073709551616")));
+	LUMEN_INFO("S64 from str: {}", lm::s64_from_str(lm::literal("  -  123456789asd")));
 
-	LUMEN_INFO("{}", f64_from_str(lm::cstr_literal("-1.32e-1")));
-	LUMEN_INFO("{}", f64_from_str(lm::cstr_literal("1.2423")));
-	LUMEN_INFO("{}", f64_from_str(lm::cstr_literal("-1.2423")));
-	LUMEN_INFO("{}", f64_from_str(lm::cstr_literal(".2423")));
-	LUMEN_INFO("{}", f64_from_str(lm::cstr_literal("1361763176537161637")));
-	LUMEN_INFO("{}", f32_from_str(lm::cstr_literal("1432.34")));
-	LUMEN_INFO("{}", f64_from_str(lm::cstr_literal("-0.9814223")));
+	LUMEN_INFO("{}", f64_from_str(lm::cliteral("-1.32e-1")));
+	LUMEN_INFO("{}", f64_from_str(lm::cliteral("1.2423")));
+	LUMEN_INFO("{}", f64_from_str(lm::cliteral("-1.2423")));
+	LUMEN_INFO("{}", f64_from_str(lm::cliteral(".2423")));
+	LUMEN_INFO("{}", f64_from_str(lm::cliteral("1361763176537161637")));
+	LUMEN_INFO("{}", f32_from_str(lm::cliteral("1432.34")));
+	LUMEN_INFO("{}", f64_from_str(lm::cliteral("-0.9814223")));
 
-	os::FileHandle file_handle = os::file_open(lm::cstr_literal("scenes/cornell_box/path.scene"), os::AccessFlag_Read);
+	os::FileHandle file_handle = os::file_open(lm::cliteral("scenes/cornell_box/path.scene"), os::AccessFlag_Read);
 	if (file_handle == 0) {
 		LUMEN_ERROR("Failed to open file");
 		return -1;
@@ -120,6 +124,7 @@ i32 main(i32 argc, char* argv[]) {
 	file_content.data[props.size] = '\0';
 
 	LUMEN_INFO("Bytes read: {} - File content: {}", bytes_read, file_content.data);
+
 
 	// __debugbreak();
 }

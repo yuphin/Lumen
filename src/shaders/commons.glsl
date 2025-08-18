@@ -224,6 +224,9 @@ vec3 uniform_sample_cone(vec2 uv, float cos_max) {
 vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out float pdf_pos_w, out vec3 wi,
 					 out float wi_len, out float pdf_pos_a, out float cos_from_light, out LightRecord light_record,
 					 out vec3 n, out vec3 pos, out float pdf_pos_dir_w) {
+	if(num_lights == 0) {
+		return vec3(0);
+	}
 	light_record.light_idx = uint(rands_pos.x * num_lights);
 	Light light = lights[light_record.light_idx];
 	uint light_type = get_light_type(light.light_flags);
