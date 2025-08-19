@@ -54,7 +54,7 @@ struct LumenNode {
 
 struct TextureRef {
 	std::string name;
-	std::string path;
+	std::string relative_path;
 };
 
 class LumenScene {

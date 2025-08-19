@@ -86,6 +86,7 @@ class PerspectiveCamera : public Camera {
 		glm::extractEulerAngleXYZ(glm::toMat4(q), rot.x, rot.y, rot.z);
 		rot *= 180. / glm::pi<f32>();
 		rotation = rot;
+		update_view_matrix();
 	}
 
 	explicit PerspectiveCamera(f32 fov, const glm::mat4 cam_matrix, f32 cam_near, f32 cam_far, f32 aspect_ratio)
@@ -105,7 +106,8 @@ class PerspectiveCamera : public Camera {
 		rot *= 180. / glm::pi<f32>();
 		rotation = rot;
 		glm::vec3 pos = glm::vec3({cam_matrix[0][3], cam_matrix[1][3], cam_matrix[2][3]});
-		this->set_position(pos);
+		set_position(pos);
+		update_view_matrix();
 	}
 
 	f32 fov{}, aspect_ratio{};

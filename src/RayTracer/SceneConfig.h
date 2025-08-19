@@ -5,6 +5,7 @@
 
 struct CameraSettings {
 	f32 fov;
+	// FIXME: Change default 
 	glm::vec3 pos = glm::vec3(-1);
 	glm::vec3 rotation = glm::vec3(0);
 	glm::vec3 dir = glm ::vec3(0);

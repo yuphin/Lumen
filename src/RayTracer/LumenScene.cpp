@@ -109,7 +109,7 @@ static LumenNode* parse_file(std::vector<char>& buffer) {
 				if (colon) {
 					*colon = '\0';
 				}
-				node->key = std::string_view(ptr);
+				node->key = std::string(ptr);
 				if (colon) {
 					colon++;
 					while (*colon == ' ' || *colon == '\t') {
@@ -126,7 +126,10 @@ static LumenNode* parse_file(std::vector<char>& buffer) {
 						}
 						*curr++ = '\0';
 					}
-					node->value = std::string_view(colon);
+					node->value = std::string(colon);
+				}
+				if (node->value == "CeilingLight") {
+					int a = 4;
 				}
 
 				if (prev) {
@@ -146,7 +149,7 @@ static LumenNode* parse_file(std::vector<char>& buffer) {
 	return root;
 }
 
-static LumenNode* get_node(LumenNode* node, const std::string_view name) {
+static LumenNode* get_node(LumenNode* node, const std::string name) {
 	if (!node) return nullptr;
 	if (node->key == name) return node;
 	for (LumenNode* child = node->child; child; child = child->next) {
@@ -156,11 +159,11 @@ static LumenNode* get_node(LumenNode* node, const std::string_view name) {
 	return nullptr;
 }
 
-static std::string_view get_str(LumenNode* node) {
+static std::string get_str(LumenNode* node) {
 	assert(node);
 	return node->value;
 }
-static std::string_view get_or_default_str(LumenNode* node, const std::string_view& val) {
+static std::string get_or_default_str(LumenNode* node, const std::string& val) {
 	if (!node || node->value.empty()) {
 		return val;
 	}
@@ -180,12 +183,12 @@ static f32 get_or_default_f(LumenNode* node, f32 val) {
 	return (f32)std::atof(node->value.data());
 }
 
-static std::vector<std::string_view> get_str_list(LumenNode* node) {
+static std::vector<std::string> get_str_list(LumenNode* node) {
 	if (!node || node->value.empty()) {
 		return {};
 	}
 	assert(node->num_list_items);
-	std::vector<std::string_view> result;
+	std::vector<std::string> result;
 	result.reserve(node->num_list_items);
 	char* ptr = (char*)node->value.data();
 	while (*ptr) {
@@ -193,14 +196,17 @@ static std::vector<std::string_view> get_str_list(LumenNode* node) {
 			ptr++;
 		}
 		char* start = ptr;
-		while (*ptr != ',' && *ptr != '\0') {
+		while (*ptr != ',' && *ptr) {
 			ptr++;
 		}
+		char* end = ptr - 1;
+		while (std::isspace(*end)) {
+			--end;
+		}
+		result.emplace_back(start, end - start + 1);
 		if (*ptr == ',') {
-			*ptr = '\0';
 			ptr++;
 		}
-		result.emplace_back(start);
 	}
 	return result;
 }
@@ -229,8 +235,9 @@ static glm::vec3 get_or_default_v3(LumenNode* node, const glm::vec3& val) {
 	char* start = ++ptr;
 	while (*ptr && *ptr != ')') {
 		if (*ptr == ',') {
-			*ptr = '\0';
-			result[comma_count++] = (f32)std::atof(start);
+			std::string val = std::string(start, ptr - start);
+			// atof handles the trailing spaces and other degeneracies
+			result[comma_count++] = (f32)std::atof(val.data());
 			start = ptr + 1;
 		}
 		ptr++;
@@ -264,7 +271,7 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 	LumenNode* camera_node = get_node(root, "camera");
 	LumenNode* lights_node = get_node(root, "lights");
 
-	std::string_view integrator_type = get_or_default_str(get_node(integrator_node, "type"), "path");
+	std::string integrator_type = get_or_default_str(get_node(integrator_node, "type"), "path");
 
 	// TODO: Rework this function and return a pointer
 	create_scene_config(std::string(integrator_type));
@@ -305,20 +312,20 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 
 	materials.resize(get_child_count(bsdfs_node));
 
-	std::unordered_map<std::string_view, u32> material_map;
-	std::unordered_map<std::string_view, u32> materials_to_objects;
-	std::unordered_map<std::string_view, u32> texture_name_to_idx;
+	std::unordered_map<std::string, u32> material_map;
+	std::unordered_map<std::string, u32> materials_to_objects;
+	std::unordered_map<std::string, u32> texture_name_to_idx;
 
 	LumenNode* textures_node = get_node(root, "textures");
 
 	if (textures_node) {
 		for (LumenNode* texture_node = textures_node->child; texture_node; texture_node = next_node(texture_node)) {
-			std::string_view name = get_str(get_node(texture_node, "name"));
-			std::string_view file = get_str(get_node(texture_node, "file"));
+			std::string name = get_str(get_node(texture_node, "name"));
+			std::string file = get_str(get_node(texture_node, "file"));
 			LUMEN_ASSERT(!name.empty() && !file.empty(), "Texture name and file must be specified");
 			TextureRef ref;
 			ref.name = name;
-			ref.path = path_root + std::string(file);
+			ref.relative_path = std::string(file);
 			textures.push_back(ref);
 			u32 idx = (u32)textures.size() - 1;
 			texture_name_to_idx[name] = idx;
@@ -332,13 +339,13 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 			materials[bsdf_idx].emissive_factor =
 				get_or_default_v3(get_node(bsdf_node, "emissive_factor"), glm::vec3(0.0f));
 			materials[bsdf_idx].texture_id = -1;
-			std::string_view mat_name = get_str(get_node(bsdf_node, "name"));
+			std::string mat_name = get_str(get_node(bsdf_node, "name"));
 			if (!mat_name.empty()) {
 				material_map[mat_name] = bsdf_idx;
 				material_idx_to_name[bsdf_idx] = std::string(mat_name);
 			}
 
-			std::string_view texture_name = get_or_default_str(get_node(bsdf_node, "texture"), "");
+			std::string texture_name = get_or_default_str(get_node(bsdf_node, "texture"), "");
 			if (!texture_name.empty()) {
 				auto it = texture_name_to_idx.find(texture_name);
 				if (it != texture_name_to_idx.end()) {
@@ -346,7 +353,7 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 				}
 			}
 
-			std::string_view type = get_or_default_str(get_node(bsdf_node, "type"), "diffuse");
+			std::string type = get_or_default_str(get_node(bsdf_node, "type"), "diffuse");
 			if (type == "diffuse") {
 				bsdf_types |= BSDF_TYPE_DIFFUSE;
 				materials[bsdf_idx].bsdf_type = BSDF_TYPE_DIFFUSE;
@@ -424,6 +431,7 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 				bsdf_types |= BSDF_TYPE_PRINCIPLED;
 				Material& mat = materials[bsdf_idx];
 				mat.bsdf_type = BSDF_TYPE_PRINCIPLED;
+				auto a = get_node(bsdf_node, "albedo");
 				mat.albedo = get_or_default_v3(get_node(bsdf_node, "albedo"), glm::vec3(1));
 				mat.ior = get_or_default_f(get_node(bsdf_node, "ior"), 1.0f);
 				mat.roughness = get_or_default_f(get_node(bsdf_node, "roughness"), 0.5f);
@@ -459,7 +467,7 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 		u32 light_idx = 0;
 		lights.resize(get_child_count(lights_node));
 		for (LumenNode* light_node = lights_node->child; light_node; light_node = next_node(light_node), light_idx++) {
-			std::string_view type = get_str(get_node(light_node, "type"));
+			std::string type = get_str(get_node(light_node, "type"));
 			lights[light_idx].L = get_or_default_v3(get_node(light_node, "L"), glm::vec3(0));
 			lights[light_idx].pos = get_or_default_v3(get_node(light_node, "pos"), glm::vec3(0));
 			lights[light_idx].to = get_or_default_v3(get_node(light_node, "dir"), glm::vec3(0, 0, 1));
@@ -477,118 +485,140 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 		}
 	}
 
-	LumenNode* mesh_node = get_node(root, "mesh");
-	LUMEN_ASSERT(mesh_node, "Mesh node not found in Lumen scene");
-
-	LumenNode* materials_refs_node = get_node(mesh_node, "materials");
-	if (materials_refs_node) {
-		for (LumenNode* mat_ref_node = materials_refs_node->child; mat_ref_node;
-			 mat_ref_node = next_node(mat_ref_node)) {
-			std::string_view mat_name = get_str(get_node(mat_ref_node, "name"));
-			auto it = material_map.find(mat_name);
-			if (it != material_map.end()) {
-				u32 mat_idx = it->second;
-				LumenNode* refs_node = get_node(mat_ref_node, "refs");
-				std::vector<std::string_view> refs;
-				if (refs_node->num_list_items) {
-					refs = get_str_list(get_node(mat_ref_node, "refs"));
+	LumenNode* meshes_node = get_node(root, "mesh");
+	LUMEN_ASSERT(meshes_node, "Meshes node not found in Lumen scene");
+	u32 mesh_idx = 0;
+	for (LumenNode* mesh_node = meshes_node->child; mesh_node; mesh_node = next_node(mesh_node), mesh_idx++) {
+		const std::string relative_mesh_file = std::string(get_or_default_str(get_node(mesh_node, "name"), ""));
+		const std::string mesh_file = path_root + relative_mesh_file;
+		LumenNode* materials_refs_node = get_node(mesh_node, "materials");
+		LumenNode* transforms_node = get_node(mesh_node, "transforms");
+		u32 material_entire_mesh_idx = U32_MAX;
+		if (materials_refs_node) {
+			for (LumenNode* mat_ref_node = materials_refs_node->child; mat_ref_node;
+				 mat_ref_node = next_node(mat_ref_node)) {
+				std::string mat_name = get_str(get_node(mat_ref_node, "name"));
+				auto it = material_map.find(mat_name);
+				if (it != material_map.end()) {
+					u32 mat_idx = it->second;
+					LumenNode* refs_node = get_node(mat_ref_node, "refs");
+					std::vector<std::string> refs;
+					if (refs_node && refs_node->num_list_items) {
+						refs = get_str_list(get_node(mat_ref_node, "refs"));
+					} else if (refs_node) {
+						refs.push_back(get_str(refs_node));
+					} else {
+						// Material ref points to all the meshes in this file
+						material_entire_mesh_idx = mat_idx;
+						break;
+					}
+					for (const std::string ref : refs) {
+						materials_to_objects[ref] = mat_idx;
+					}
 				} else {
-					refs.push_back(get_str(refs_node));
+					LUMEN_ERROR("Material {} not found in Lumen scene", mat_name.data());
 				}
-				for (const std::string_view ref : refs) {
-					materials_to_objects[ref] = mat_idx;
-				}
+			}
+		}
+		glm::mat4 world_matrix = glm::mat4(1);
+		if (transforms_node) {
+			glm::vec3 translation = get_or_default_v3(get_node(transforms_node, "translation"), glm::vec3(0));
+			glm::vec3 rotation = glm::radians(get_or_default_v3(get_node(transforms_node, "rotation"), glm::vec3(0)));
+			glm::vec3 scale = get_or_default_v3(get_node(transforms_node, "scale"), glm::vec3(1));
+			if(scale == glm::vec3(2)) {
+				int a =4;
+			}
+			world_matrix = glm::translate(world_matrix, translation);
+			world_matrix = glm::rotate(world_matrix, rotation.x, glm::vec3(1, 0, 0));
+			world_matrix = glm::rotate(world_matrix, rotation.y, glm::vec3(0, 1, 0));
+			world_matrix = glm::rotate(world_matrix, rotation.z, glm::vec3(0, 0, 1));
+			world_matrix = glm::scale(world_matrix, scale);
+		}
+		// Load obj file
+		tinyobj::ObjReaderConfig reader_config;
+
+		tinyobj::ObjReader reader;
+		if (!reader.ParseFromFile(mesh_file, reader_config)) {
+			if (!reader.Error().empty()) {
+				LUMEN_ERROR("Failed to load Lumen scene mesh file: {}", mesh_file.c_str());
+			}
+		}
+
+		if (!reader.Warning().empty()) {
+			std::cout << "TinyObjReader: " << reader.Warning();
+		}
+
+		auto& attrib = reader.GetAttrib();
+		auto& shapes = reader.GetShapes();
+
+		for (u32 shape_idx = 0; shape_idx < shapes.size(); shape_idx++) {
+			LumenPrimMesh& prim_mesh = prim_meshes.emplace_back();
+			prim_mesh.name = shapes[shape_idx].name;
+			prim_mesh.filename = relative_mesh_file;
+			prim_mesh.vtx_offset = (u32)positions.size();
+			prim_mesh.first_idx = (u32)indices.size();
+			prim_mesh.idx_count = (u32)shapes[shape_idx].mesh.indices.size();
+			prim_mesh.vtx_count = (u32)shapes[shape_idx].mesh.num_face_vertices.size();
+			prim_mesh.prim_idx = (u32)prim_meshes.size() - 1;
+
+			auto found = materials_to_objects.find(shapes[shape_idx].name);
+			if (found != materials_to_objects.end()) {
+				prim_mesh.material_idx = found->second;
+			} else if (material_entire_mesh_idx != U32_MAX) {
+				prim_mesh.material_idx = material_entire_mesh_idx;
 			} else {
-				LUMEN_ERROR("Material {} not found in Lumen scene", mat_name.data());
+				prim_mesh.material_idx = 0;	 // Default material
 			}
-		}
-	}
 
-	// Load obj file
-	const std::string mesh_file = path_root + std::string(get_or_default_str(get_node(mesh_node, "name"), ""));
-	tinyobj::ObjReaderConfig reader_config;
-
-	tinyobj::ObjReader reader;
-	if (!reader.ParseFromFile(mesh_file, reader_config)) {
-		if (!reader.Error().empty()) {
-			LUMEN_ERROR("Failed to load Lumen scene mesh file: {}", mesh_file.c_str());
-		}
-	}
-
-	if (!reader.Warning().empty()) {
-		std::cout << "TinyObjReader: " << reader.Warning();
-	}
-
-	auto& attrib = reader.GetAttrib();
-	auto& shapes = reader.GetShapes();
-
-	prim_meshes.resize(shapes.size());
-	for (u32 shape_idx = 0; shape_idx < shapes.size(); shape_idx++) {
-		MeshData mesh_data;
-		prim_meshes[shape_idx].first_idx = (u32)indices.size();
-		prim_meshes[shape_idx].vtx_offset = (u32)positions.size();
-		prim_meshes[shape_idx].name = shapes[shape_idx].name;
-		prim_meshes[shape_idx].filename = mesh_file;
-		prim_meshes[shape_idx].idx_count = (u32)shapes[shape_idx].mesh.indices.size();
-		prim_meshes[shape_idx].vtx_count = (u32)shapes[shape_idx].mesh.num_face_vertices.size();
-		prim_meshes[shape_idx].prim_idx = shape_idx;
-
-		auto found = materials_to_objects.find(shapes[shape_idx].name);
-		if (found != materials_to_objects.end()) {
-			prim_meshes[shape_idx].material_idx = found->second;
-		} else {
-			prim_meshes[shape_idx].material_idx = 0;  // Default material
-		}
-
-		glm::vec3 min_vtx = glm::vec3(FLT_MAX);
-		glm::vec3 max_vtx = glm::vec3(-FLT_MAX);
-		u32 index_offset = 0;
-		u32 idx_val = 0;
-		for (u32 f = 0; f < shapes[shape_idx].mesh.num_face_vertices.size(); f++) {
-			for (u32 v = 0; v < 3; v++) {
-				tinyobj::index_t idx = shapes[shape_idx].mesh.indices[index_offset + v];
-				mesh_data.indices.push_back(idx_val++);
-				tinyobj::real_t vx = attrib.vertices[3 * u32(idx.vertex_index) + 0];
-				tinyobj::real_t vy = attrib.vertices[3 * u32(idx.vertex_index) + 1];
-				tinyobj::real_t vz = attrib.vertices[3 * u32(idx.vertex_index) + 2];
-				mesh_data.positions.emplace_back(vx, vy, vz);
-				min_vtx = glm::min(mesh_data.positions[mesh_data.positions.size() - 1], min_vtx);
-				max_vtx = glm::max(mesh_data.positions[mesh_data.positions.size() - 1], max_vtx);
-				if (idx.normal_index >= 0) {
-					tinyobj::real_t nx = attrib.normals[3 * u32(idx.normal_index) + 0];
-					tinyobj::real_t ny = attrib.normals[3 * u32(idx.normal_index) + 1];
-					tinyobj::real_t nz = attrib.normals[3 * u32(idx.normal_index) + 2];
-					mesh_data.normals.emplace_back(nx, ny, nz);
+			glm::vec3 min_vtx = glm::vec3(FLT_MAX);
+			glm::vec3 max_vtx = glm::vec3(-FLT_MAX);
+			u32 index_offset = 0;
+			u32 idx_val = 0;
+			MeshData per_mesh_data;
+			for (u32 f = 0; f < shapes[shape_idx].mesh.num_face_vertices.size(); f++) {
+				for (u32 v = 0; v < 3; v++) {
+					tinyobj::index_t idx = shapes[shape_idx].mesh.indices[index_offset + v];
+					per_mesh_data.indices.push_back(idx_val++);
+					tinyobj::real_t vx = attrib.vertices[3 * u32(idx.vertex_index) + 0];
+					tinyobj::real_t vy = attrib.vertices[3 * u32(idx.vertex_index) + 1];
+					tinyobj::real_t vz = attrib.vertices[3 * u32(idx.vertex_index) + 2];
+					per_mesh_data.positions.emplace_back(vx, vy, vz);
+					min_vtx = glm::min(per_mesh_data.positions[per_mesh_data.positions.size() - 1], min_vtx);
+					max_vtx = glm::max(per_mesh_data.positions[per_mesh_data.positions.size() - 1], max_vtx);
+					if (idx.normal_index >= 0) {
+						tinyobj::real_t nx = attrib.normals[3 * u32(idx.normal_index) + 0];
+						tinyobj::real_t ny = attrib.normals[3 * u32(idx.normal_index) + 1];
+						tinyobj::real_t nz = attrib.normals[3 * u32(idx.normal_index) + 2];
+						per_mesh_data.normals.emplace_back(nx, ny, nz);
+					}
+					if (idx.texcoord_index >= 0) {
+						tinyobj::real_t tx = attrib.texcoords[2 * u32(idx.texcoord_index) + 0];
+						tinyobj::real_t ty = attrib.texcoords[2 * u32(idx.texcoord_index) + 1];
+						per_mesh_data.texcoords0.emplace_back(tx, ty);
+					}
 				}
-				if (idx.texcoord_index >= 0) {
-					tinyobj::real_t tx = attrib.texcoords[2 * u32(idx.texcoord_index) + 0];
-					tinyobj::real_t ty = attrib.texcoords[2 * u32(idx.texcoord_index) + 1];
-					mesh_data.texcoords0.emplace_back(tx, ty);
-				}
+				index_offset += 3;
 			}
-			index_offset += 3;
+			positions.insert(positions.end(), std::make_move_iterator(per_mesh_data.positions.begin()),
+							 std::make_move_iterator(per_mesh_data.positions.end()));
+			indices.insert(indices.end(), std::make_move_iterator(per_mesh_data.indices.begin()),
+						   std::make_move_iterator(per_mesh_data.indices.end()));
+			normals.insert(normals.end(), std::make_move_iterator(per_mesh_data.normals.begin()),
+						   std::make_move_iterator(per_mesh_data.normals.end()));
+			tangents.insert(tangents.end(), std::make_move_iterator(per_mesh_data.tangents.begin()),
+							std::make_move_iterator(per_mesh_data.tangents.end()));
+			texcoords0.insert(texcoords0.end(), std::make_move_iterator(per_mesh_data.texcoords0.begin()),
+							  std::make_move_iterator(per_mesh_data.texcoords0.end()));
+			texcoords1.insert(texcoords1.end(), std::make_move_iterator(per_mesh_data.texcoords1.begin()),
+							  std::make_move_iterator(per_mesh_data.texcoords1.end()));
+			colors0.insert(colors0.end(), std::make_move_iterator(per_mesh_data.colors0.begin()),
+						   std::make_move_iterator(per_mesh_data.colors0.end()));
+
+			prim_mesh.min_pos = min_vtx;
+			prim_mesh.max_pos = max_vtx;
+			prim_mesh.world_matrix = world_matrix;
 		}
-		prim_meshes[shape_idx].min_pos = min_vtx;
-		prim_meshes[shape_idx].max_pos = max_vtx;
-		prim_meshes[shape_idx].world_matrix = glm::mat4(1);
-
-		positions.insert(positions.end(), std::make_move_iterator(mesh_data.positions.begin()),
-						 std::make_move_iterator(mesh_data.positions.end()));
-		indices.insert(indices.end(), std::make_move_iterator(mesh_data.indices.begin()),
-					   std::make_move_iterator(mesh_data.indices.end()));
-		normals.insert(normals.end(), std::make_move_iterator(mesh_data.normals.begin()),
-					   std::make_move_iterator(mesh_data.normals.end()));
-		tangents.insert(tangents.end(), std::make_move_iterator(mesh_data.tangents.begin()),
-						std::make_move_iterator(mesh_data.tangents.end()));
-		texcoords0.insert(texcoords0.end(), std::make_move_iterator(mesh_data.texcoords0.begin()),
-						  std::make_move_iterator(mesh_data.texcoords0.end()));
-		texcoords1.insert(texcoords1.end(), std::make_move_iterator(mesh_data.texcoords1.begin()),
-						  std::make_move_iterator(mesh_data.texcoords1.end()));
-		colors0.insert(colors0.end(), std::make_move_iterator(mesh_data.colors0.begin()),
-					   std::make_move_iterator(mesh_data.colors0.end()));
-		// TODO: Implement world transforms
 	}
-
 	curr_config->cam_settings = CameraSettings{
 		.fov = get_or_default_f(get_node(camera_node, "fov"), 90.0f),
 		.pos = get_or_default_v3(get_node(camera_node, "position"), glm::vec3(-1.0f)),
@@ -596,7 +626,6 @@ void LumenScene::parse_lumen_scene(const std::string& path, LumenNode* root) {
 		.dir = get_or_default_v3(get_node(camera_node, "dir"), glm::vec3(0.0f, 0.0f, -1.0f)),
 	};
 	compute_scene_dimensions();
-	// TODO: Lights
 }
 
 void LumenScene::load_lumen_scene_new(const std::string& path) {
@@ -614,9 +643,9 @@ void LumenScene::load_lumen_scene_new(const std::string& path) {
 		LUMEN_ERROR("Failed to read Lumen scene file: {}", path.c_str());
 		return;
 	}
-	fclose(file);
 	LumenNode* root = parse_file(buffer);
 	parse_lumen_scene(path, root);
+	fclose(file);
 }
 
 void LumenScene::load_scene(const std::string& path) {
@@ -630,6 +659,7 @@ void LumenScene::load_scene(const std::string& path) {
 		LUMEN_ERROR("Unsupported scene file format: {}", path.c_str());
 		return;
 	}
+	std::string root_path = path.substr(0, path.find_last_of("/\\") + 1);
 
 	const f32 aspect_ratio = (f32)Window::width() / Window::height();
 	if (config->cam_settings.pos != vec3(-1)) {
@@ -650,7 +680,6 @@ void LumenScene::load_scene(const std::string& path) {
 		PrimInfo m_info;
 		m_info.index_offset = pm.first_idx;
 		m_info.vertex_offset = pm.vtx_offset;
-		m_info.material_index = pm.material_idx;
 		m_info.material_index = pm.material_idx;
 		prim_lookup.emplace_back(m_info);
 		auto& mef = materials[pm.material_idx].emissive_factor;
@@ -704,13 +733,11 @@ void LumenScene::load_scene(const std::string& path) {
 			}
 		}
 	}
-	if (gpu_lights.size()) {
-		mesh_lights_buffer = prm::get_buffer({.name = "Mesh Lights Buffer",
-											  .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-											  .memory_type = vk::BUFFER_TYPE_GPU,
-											  .size = gpu_lights.size() * sizeof(Light),
-											  .data = gpu_lights.data()});
-	}
+	mesh_lights_buffer = prm::get_buffer({.name = "Mesh Lights Buffer",
+										  .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+										  .memory_type = vk::BUFFER_TYPE_GPU,
+										  .size = std::max(gpu_lights.size(), size_t(1)) * sizeof(Light),
+										  .data = gpu_lights.data()});
 	total_light_area += total_light_triangle_area;
 	vertex_buffer = prm::get_buffer({.name = "Vertex Buffer",
 									 .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -773,7 +800,7 @@ void LumenScene::load_scene(const std::string& path) {
 		i32 i = 0;
 		for (const auto& texture_path : textures) {
 			i32 x, y, n;
-			unsigned char* data = stbi_load(texture_path.path.c_str(), &x, &y, &n, 4);
+			unsigned char* data = stbi_load((root_path + texture_path.relative_path).c_str(), &x, &y, &n, 4);
 			scene_textures[i] = prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 												  .dimensions = {(u32)x, (u32)y, 1},
 												  .format = VK_FORMAT_R8G8B8A8_SRGB,
@@ -879,15 +906,10 @@ static void traverse_and_write_scene(std::string& buffer, LumenNode* curr_node, 
 	if (!curr_node) {
 		return;
 	}
-	if (curr_node->key == "-") {
-		int a = 4;
-	}
 	if (!first_list_item) {
 		for (i32 i = 0; i < depth; i++) {
 			buffer += "  ";
 		}
-	} else {
-		int a = 4;
 	}
 	if (!curr_node->key.empty()) {
 		buffer += curr_node->key;
@@ -966,14 +988,10 @@ void LumenScene::write_lumen_scene() {
 	// Scene textures
 	LumenNode* textures_node = new LumenNode{.key = "textures"};
 	for (const TextureRef& texture_ref : textures) {
-		const std::string& texture_path = texture_ref.path;
 		const std::string& texture_name = texture_ref.name;
 		LumenNode* texture_prop = new LumenNode{.key = "-"};
-		const u64 last_slash = texture_path.find_last_of("/\\");
-		const std::string texture_file_str =
-			(last_slash != std::string::npos) ? texture_path.substr(last_slash + 1) : texture_path;
 		add_leaf_node(texture_prop, "name", texture_name);
-		add_leaf_node(texture_prop, "file", texture_file_str);
+		add_leaf_node(texture_prop, "file", texture_ref.relative_path);
 		add_child_node(textures_node, texture_prop);
 	}
 	add_child_node(root, textures_node);
@@ -984,10 +1002,8 @@ void LumenScene::write_lumen_scene() {
 		const Material& mat = materials[i];
 		add_leaf_node(bsdf_prop, "name", material_idx_to_name[i]);
 		add_leaf_node(bsdf_prop, "type", get_material_type(mat));
-		if (glm::any(glm::notEqual(mat.albedo, glm::vec3(1.0f)))) {
-			std::string albedo = vec3_to_str(mat.albedo);
-			add_leaf_node(bsdf_prop, "albedo", albedo);
-		}
+		std::string albedo = vec3_to_str(mat.albedo);
+		add_leaf_node(bsdf_prop, "albedo", albedo);
 		if (glm::any(glm::greaterThan(mat.emissive_factor, glm::vec3(0.0f)))) {
 			std::string emissive_factor = vec3_to_str(mat.emissive_factor);
 			add_leaf_node(bsdf_prop, "emissive_factor", emissive_factor);
@@ -1080,24 +1096,61 @@ void LumenScene::write_lumen_scene() {
 	// Camera settings
 	LumenNode* camera_node = new LumenNode{.key = "camera"};
 	add_leaf_node(camera_node, "fov", std::to_string(config->cam_settings.fov));
-	add_leaf_node(camera_node, "position", vec3_to_str(config->cam_settings.pos));
-	add_leaf_node(camera_node, "rotation", vec3_to_str(config->cam_settings.rotation));
-	add_leaf_node(camera_node, "dir", vec3_to_str(config->cam_settings.dir));
+	add_leaf_node(camera_node, "position", vec3_to_str(camera->position));
+	add_leaf_node(camera_node, "rotation", vec3_to_str(camera->rotation));
+	add_leaf_node(camera_node, "dir", vec3_to_str(camera->direction));
 	add_child_node(root, camera_node);
 
 	// Mesh and material mappings
 	if (!prim_meshes.empty()) {
-		LumenNode* meshes_node = new LumenNode{.key = "mesh"};
-		std::string filename_without_path =
-			prim_meshes[0].filename.substr(prim_meshes[0].filename.find_last_of("/\\") + 1);
-		add_leaf_node(meshes_node, "name", filename_without_path);
-		LumenNode* materials_node = new LumenNode{.key = "materials"};
-		add_child_node(meshes_node, materials_node);
+		// File name to mesh/sub-mesh mapping
+		std::unordered_map<std::string, std::vector<LumenPrimMesh*>> mesh_mappings;
 		for (LumenPrimMesh& mesh : prim_meshes) {
-			LumenNode* mesh_to_material_node = new LumenNode{.key = "-"};
-			add_leaf_node(mesh_to_material_node, "refs", mesh.name);
-			add_leaf_node(mesh_to_material_node, "name", material_idx_to_name[mesh.material_idx]);
-			add_child_node(materials_node, mesh_to_material_node);
+			mesh_mappings[mesh.filename].push_back(&mesh);
+		}
+
+		LumenNode* meshes_node = new LumenNode{.key = "mesh"};
+		for (const auto& [name, meshes] : mesh_mappings) {
+			LumenNode* mesh_node = new LumenNode{.key = "-"};
+			add_leaf_node(mesh_node, "name", name);
+			LumenNode* materials_node = new LumenNode{.key = "materials"};
+			LumenNode* transforms_node = new LumenNode{.key = "transforms"};
+			add_child_node(mesh_node, materials_node);
+			bool has_transform = false;
+			for (LumenPrimMesh* mesh : meshes) {
+				LumenNode* mesh_to_material_node = new LumenNode{.key = "-"};
+				if (!mesh->name.empty()) {
+					add_leaf_node(mesh_to_material_node, "refs", mesh->name);
+				}
+				add_leaf_node(mesh_to_material_node, "name", material_idx_to_name[mesh->material_idx]);
+				add_child_node(materials_node, mesh_to_material_node);
+
+				glm::vec3 scale;
+				glm::quat q;
+				glm::vec3 translation;
+				glm::vec3 skew;
+				glm::vec4 perspective;
+				glm::decompose(mesh->world_matrix, scale, q, translation, skew, perspective);
+				glm::vec3 rot{};
+				glm::extractEulerAngleXYZ(glm::toMat4(q), rot.x, rot.y, rot.z);
+				if (translation != glm::vec3(0.0)) {
+					add_leaf_node(transforms_node, "translation", vec3_to_str(translation));
+					has_transform = true;
+				}
+				if (rot != glm::vec3(0.0)) {
+					add_leaf_node(transforms_node, "rotation", vec3_to_str(glm::degrees(rot)));
+					has_transform = true;
+				}
+				if (scale != glm::vec3(1.0)) {
+					add_leaf_node(transforms_node, "scale", vec3_to_str(scale));
+					has_transform = true;
+				}
+			}
+			if (has_transform) {
+				add_child_node(mesh_node, transforms_node);
+			}
+
+			add_child_node(meshes_node, mesh_node);
 		}
 		add_child_node(root, meshes_node);
 	}
@@ -1177,7 +1230,7 @@ void LumenScene::load_lumen_scene(const std::string& path) {
 		prim_meshes[s].first_idx = (u32)indices.size();
 		prim_meshes[s].vtx_offset = (u32)positions.size();
 		prim_meshes[s].name = shapes[s].name;
-		prim_meshes[s].filename = mesh_file;
+		prim_meshes[s].filename = std::string(j["mesh_file"]);
 		prim_meshes[s].idx_count = (u32)shapes[s].mesh.indices.size();
 		prim_meshes[s].vtx_count = (u32)shapes[s].mesh.num_face_vertices.size();
 		prim_meshes[s].prim_idx = s;
@@ -1243,8 +1296,8 @@ void LumenScene::load_lumen_scene(const std::string& path) {
 
 		if (!bsdf["texture"].is_null()) {
 			TextureRef ref;
-			ref.name = root + (std::string)bsdf["texture"];
-			ref.path = ref.name;
+			ref.name = (std::string)bsdf["texture"];
+			ref.relative_path = ref.name;
 			textures.push_back(ref);
 			materials[bsdf_idx].texture_id = (i32)textures.size() - 1;
 		}
@@ -1452,7 +1505,7 @@ void LumenScene::load_mitsuba_scene(const std::string& path) {
 		prim_meshes[i].first_idx = (u32)indices.size();
 		prim_meshes[i].vtx_offset = (u32)positions.size();
 		prim_meshes[i].name = shapes[0].name;
-		prim_meshes[i].filename = mesh_file;
+		prim_meshes[i].filename = mesh.file;
 		prim_meshes[i].idx_count = (u32)shapes[0].mesh.indices.size();
 		prim_meshes[i].vtx_count = (u32)shapes[0].mesh.num_face_vertices.size();
 		prim_meshes[i].prim_idx = i;
@@ -1507,14 +1560,15 @@ void LumenScene::load_mitsuba_scene(const std::string& path) {
 	for (const auto& m_bsdf : mitsuba_parser.bsdfs) {
 		if (m_bsdf.texture != "") {
 			TextureRef ref;
-			ref.name = root + m_bsdf.texture;
-			ref.path = ref.name;
+			ref.name = m_bsdf.texture;
+			ref.relative_path = m_bsdf.texture;
 			textures.push_back(ref);
 			materials[i].texture_id = (i32)textures.size() - 1;
 		} else {
 			materials[i].texture_id = -1;
 		}
 		Material& mat = materials[i];
+		material_idx_to_name[i] = m_bsdf.name;
 		make_default_principled(mat);
 		mat.albedo = m_bsdf.albedo;
 		mat.roughness = m_bsdf.roughness;
@@ -1578,7 +1632,7 @@ void LumenScene::load_mitsuba_scene(const std::string& path) {
 		if (light.type == "directional") {
 			lights[i].pos = light.from;
 			lights[i].to = light.to;
-			lights[i].light_flags = LIGHT_DIRECTIONAL;
+			lights[i].light_flags |= LIGHT_DIRECTIONAL;
 			// Is delta
 			lights[i].light_flags |= 1 << 5;
 		}
@@ -1648,11 +1702,8 @@ void LumenScene::compute_scene_dimensions() {
 }
 
 void LumenScene::destroy() {
-	std::vector<vk::Buffer*> buffer_list = {index_buffer, vertex_buffer, compact_vertices_buffer, materials_buffer,
-											prim_lookup_buffer};
-	if (gpu_lights.size()) {
-		buffer_list.push_back(mesh_lights_buffer);
-	}
+	std::vector<vk::Buffer*> buffer_list = {index_buffer,	  vertex_buffer,	  compact_vertices_buffer,
+											materials_buffer, prim_lookup_buffer, mesh_lights_buffer};
 	for (vk::Buffer* b : buffer_list) {
 		prm::remove(b);
 	}

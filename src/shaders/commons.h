@@ -33,9 +33,9 @@
 #define BSDF_FLAG_ALL BSDF_FLAG_DIFFUSE | BSDF_FLAG_SPECULAR | BSDF_FLAG_REFLECTION | BSDF_FLAG_TRANSMISSION
 
 // Light Type
-#define LIGHT_SPOT 1
-#define LIGHT_AREA 2
-#define LIGHT_DIRECTIONAL 3
+#define LIGHT_SPOT 1 << 0
+#define LIGHT_AREA 1 << 1
+#define LIGHT_DIRECTIONAL 1 << 2
 
 #ifdef __cplusplus
 // GLSL Type
