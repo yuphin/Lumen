@@ -15,6 +15,9 @@
 #include "Framework/Base/String.h"
 #include "Framework/Base/OS.h"
 
+
+// TODO: Add instancing to the scene format
+
 static bool ends_with(const std::string& str, const std::string& end) {
 	if (end.size() > str.size()) return false;
 	return std::equal(end.rbegin(), end.rend(), str.rbegin());
@@ -665,7 +668,7 @@ void LumenScene::load_scene(const std::string& path) {
 	if (config->cam_settings.pos != vec3(-1)) {
 		camera = std::unique_ptr<lm::PerspectiveCamera>(
 			new lm::PerspectiveCamera(config->cam_settings.fov, 0.01f, 1000.0f, aspect_ratio, config->cam_settings.dir,
-									  config->cam_settings.pos));
+									  config->cam_settings.pos, config->cam_settings.rotation));
 	} else {
 		// Assume the camera matrix is given
 		camera = std::unique_ptr<lm::PerspectiveCamera>(new lm::PerspectiveCamera(

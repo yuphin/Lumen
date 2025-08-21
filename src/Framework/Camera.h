@@ -69,22 +69,13 @@ class PerspectiveCamera : public Camera {
 	}
 
 	explicit PerspectiveCamera(f32 fov, f32 cam_near, f32 cam_far, f32 aspect_ratio, const glm::vec3& dir,
-							   const glm::vec3& pos)
+							   const glm::vec3& pos, const glm::vec3 rot)
 		: Camera(cam_near, cam_far), fov(fov), aspect_ratio(aspect_ratio) {
 		left = right = top = bot = -1;
 		make_projection_matrix(true);
 		set_position(pos);
 		set_direction(dir);
 		view = glm::lookAtLH(position, position + direction, glm::vec3(0, 1, 0));
-		glm::vec3 scale;
-		glm::quat q;
-		glm::vec3 translation;
-		glm::vec3 skew;
-		glm::vec4 perspective;
-		glm::decompose(view, scale, q, translation, skew, perspective);
-		glm::vec3 rot{};
-		glm::extractEulerAngleXYZ(glm::toMat4(q), rot.x, rot.y, rot.z);
-		rot *= 180. / glm::pi<f32>();
 		rotation = rot;
 		update_view_matrix();
 	}
