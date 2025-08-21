@@ -1,0 +1,77 @@
+integrator: 
+  type: restir pt
+  path_length: 3
+  sky_col: v3f(0.000000, 0.000000, 0.000000)
+
+textures: 
+
+bsdfs: 
+  - name: Glass
+    type: glass
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    ior: 1.520000
+
+  - name: Mirror
+    type: mirror
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+
+  - name: Left Wall
+    type: diffuse
+    albedo: v3f(0.630000, 0.065000, 0.050000)
+
+  - name: Right Wall
+    type: diffuse
+    albedo: v3f(0.140000, 0.450000, 0.091000)
+
+  - name: Other Walls
+    type: diffuse
+    albedo: v3f(0.725000, 0.710000, 0.680000)
+
+  - name: Floor
+    type: conductor
+    albedo: v3f(0.725000, 0.710000, 0.680000)
+    roughness: 0.260000
+    reflectivity: v3f(0.025415, 0.028761, 0.036281)
+    edge_tint: v3f(1.525625, 1.504100, 1.462400)
+
+  - name: Light
+    type: diffuse
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    emissive_factor: v3f(17.000000, 12.000000, 4.000000)
+
+
+camera: 
+  fov: 45.000000
+  position: v3f(0.700000, 0.500000, 17.500000)
+  rotation: v3f(0.000000, 0.000000, 0.000000)
+  dir: v3f(-0.000000, 0.000000, 1.000000)
+
+mesh: 
+  - name: cornell_box.obj
+    materials: 
+      - refs: back_wall
+        name: Other Walls
+
+      - refs: floor
+        name: Floor
+
+      - refs: ceiling
+        name: Other Walls
+
+      - refs: left_wall
+        name: Left Wall
+
+      - refs: right_wall
+        name: Right Wall
+
+      - refs: light
+        name: Light
+
+      - refs: mirror_sphere
+        name: Mirror
+
+      - refs: glass_sphere
+        name: Glass
+
+
+

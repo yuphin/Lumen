@@ -1,0 +1,241 @@
+integrator: 
+  type: path
+  path_length: 10
+  sky_col: v3f(0.500000, 0.500000, 0.500000)
+
+textures: 
+
+bsdfs: 
+  - name: Dielectric1
+    type: dielectric
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    ior: 1.520000
+    roughness: 0.000000
+    transmission: 1
+    reflection: 1
+
+  - name: Dielectric2
+    type: dielectric
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    ior: 1.520000
+    roughness: 0.000000
+    transmission: 1
+    reflection: 1
+
+  - name: Dielectric3
+    type: dielectric
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    ior: 1.520000
+    roughness: 0.100000
+    transmission: 1
+    reflection: 1
+
+  - name: Mirror
+    type: mirror
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+
+  - name: Conductor
+    type: conductor
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    roughness: 0.200000
+    reflectivity: v3f(0.999001, 0.999001, 0.000000)
+    edge_tint: v3f(0.999750, 0.999750, 0.000000)
+
+  - name: Principled1
+    type: principled
+    albedo: v3f(0.000000, 0.000000, 1.000000)
+    ior: 1.000000
+    roughness: 0.100000
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.000000
+    metallic: 0.500000
+    specular_tint: 0.500000
+    sheen_tint: 0.500000
+    clearcoat: 0.000000
+    clearcoat_gloss: 1.000000
+    subsurface: 0.000000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 0
+
+  - name: Principled2
+    type: principled
+    albedo: v3f(1.000000, 0.000000, 1.000000)
+    ior: 1.000000
+    roughness: 1.000000
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.000000
+    metallic: 0.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.500000
+    clearcoat: 0.000000
+    clearcoat_gloss: 1.000000
+    subsurface: 0.000000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 0
+
+  - name: Principled3
+    type: principled
+    albedo: v3f(1.000000, 0.000000, 1.000000)
+    ior: 1.000000
+    roughness: 0.200000
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.000000
+    metallic: 0.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.500000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.000000
+    subsurface: 0.000000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 0
+
+  - name: Principled4
+    type: principled
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    ior: 1.000000
+    roughness: 0.200000
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.800000
+    metallic: 1.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.500000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.000000
+    subsurface: 0.000000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 1.000000
+    thin: 0
+
+  - name: Principled5
+    type: principled
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    ior: 1.000000
+    roughness: 0.200000
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.000000
+    metallic: 1.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.500000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.000000
+    subsurface: 0.000000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 0
+
+  - name: Principled6
+    type: principled
+    albedo: v3f(1.000000, 0.000000, 1.000000)
+    ior: 1.520000
+    roughness: 0.200000
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.800000
+    metallic: 0.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.500000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.000000
+    subsurface: 0.000000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 0
+
+  - name: Conductor2
+    type: conductor
+    albedo: v3f(3.885235, 2.435432, 1.984851)
+    roughness: 0.200000
+    reflectivity: v3f(0.956520, 0.791550, 0.408000)
+    edge_tint: v3f(0.957060, 0.863700, 0.619910)
+
+  - name: Other Walls
+    type: diffuse
+    albedo: v3f(0.725000, 0.710000, 0.680000)
+
+  - name: Floor
+    type: diffuse
+    albedo: v3f(0.630000, 0.065000, 0.050000)
+
+  - name: Ceiling
+    type: diffuse
+    albedo: v3f(0.140000, 0.450000, 0.091000)
+
+  - name: Light
+    type: diffuse
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    emissive_factor: v3f(17.000000, 12.000000, 4.000000)
+
+
+camera: 
+  fov: 45.000000
+  position: v3f(0.700000, 0.500000, 17.500000)
+  rotation: v3f(-0.000000, 0.000000, -0.000000)
+  dir: v3f(-0.000000, 0.000000, 1.000000)
+
+mesh: 
+  - name: materials.obj
+    materials: 
+      - refs: back_wall
+        name: Other Walls
+
+      - refs: ceiling
+        name: Ceiling
+
+      - refs: floor
+        name: Floor
+
+      - refs: light
+        name: Light
+
+      - refs: light2
+        name: Light
+
+      - refs: light3
+        name: Light
+
+      - refs: sphere1
+        name: Dielectric1
+
+      - refs: sphere10
+        name: Principled3
+
+      - refs: sphere11
+        name: Principled4
+
+      - refs: sphere12
+        name: Conductor2
+
+      - refs: sphere2
+        name: Mirror
+
+      - refs: sphere3
+        name: Conductor
+
+      - refs: sphere4
+        name: Principled2
+
+      - refs: sphere5
+        name: Principled6
+
+      - refs: sphere6
+        name: Principled5
+
+      - refs: sphere7
+        name: Dielectric2
+
+      - refs: sphere8
+        name: Dielectric3
+
+      - refs: sphere9
+        name: Principled1
+
+
+

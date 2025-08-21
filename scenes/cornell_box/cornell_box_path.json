@@ -1,12 +1,13 @@
 {
-    "integrator" : {
-        "type" : "path",
-        "path_length" : 10,
-        "sky_col" : [
-            0,0,0
+    "integrator": {
+        "type": "path",
+        "path_length": 10,
+        "sky_col": [
+            0,
+            0,
+            0
         ]
     },
- 
     "bsdfs": [
         {
             "ior": 1.52,
@@ -65,7 +66,6 @@
             ],
             "type": "diffuse"
         },
-
         {
             "albedo": [
                 0.725,
@@ -99,12 +99,19 @@
     "camera": {
         "fov": 45,
         "position": [
-            0.7,
-            0.5,
-            17.5
+            3.40,
+            -3.39,
+            7.35
         ],
-        "dir" : [
-            0,0, 2
+        "rotation": [
+            -3.80,
+            24.55,
+            0.00
+        ],
+        "dir": [
+            -0.41,
+            -0.07,
+            0.91
         ]
     },
     "mesh_file": "cornell_box.obj"

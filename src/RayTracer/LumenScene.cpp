@@ -940,6 +940,7 @@ void LumenScene::write_lumen_scene() {
 
 	// Integrator settings
 	LumenNode* integrator_node = new LumenNode{.key = "integrator"};
+	// TODO: Convert from integrator code name to scene code name
 	std::string integrator_name = to_lower(config->integrator_name);
 	add_leaf_node(integrator_node, "type", integrator_name);
 	std::string path_length = std::to_string(config->path_length);

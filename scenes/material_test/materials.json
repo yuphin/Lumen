@@ -1,12 +1,13 @@
 {
-    "integrator" : {
-        "type" : "path",
-        "path_length" : 10,
-        "sky_col" : [
-            0.5,0.5,0.5
+    "integrator": {
+        "type": "path",
+        "path_length": 10,
+        "sky_col": [
+            0.5,
+            0.5,
+            0.5
         ]
     },
- 
     "bsdfs": [
         {
             "ior": 1.52,
@@ -21,7 +22,6 @@
             ],
             "type": "dielectric"
         },
-
         {
             "ior": 1.52,
             "name": "Dielectric2",
@@ -35,7 +35,6 @@
             ],
             "type": "dielectric"
         },
-
         {
             "ior": 1.52,
             "name": "Dielectric3",
@@ -48,9 +47,9 @@
                 1
             ],
             "type": "dielectric",
-            "roughness" : 0.1,
-            "transmission" : true,
-            "reflection" : true 
+            "roughness": 0.1,
+            "transmission": true,
+            "reflection": true
         },
         {
             "name": "Mirror",
@@ -59,116 +58,145 @@
             ],
             "type": "mirror"
         },
-
         {
             "name": "Conductor",
             "refs": [
                 "sphere3"
             ],
             "type": "conductor",
-            "roughness" : 0.2,
-            "reflectance" : [1,1,0]
+            "roughness": 0.2,
+            "reflectance": [
+                1,
+                1,
+                0
+            ]
         },
-
         {
             "name": "Principled1",
             "refs": [
                 "sphere9"
             ],
             "type": "principled",
-            "albedo": [0,0,1],
-            "roughness" : 0.1,
-            "metallic" : 0.5,
+            "albedo": [
+                0,
+                0,
+                1
+            ],
+            "roughness": 0.1,
+            "metallic": 0.5,
             "spec_trans": 0.0,
-            "specular_tint" : 0.5
+            "specular_tint": 0.5
         },
-
         {
             "name": "Principled2",
             "refs": [
                 "sphere4"
             ],
             "type": "principled",
-            "albedo": [1,0,1],
-            "roughness" : 1.0,
-            "metallic" : 0.0,
+            "albedo": [
+                1,
+                0,
+                1
+            ],
+            "roughness": 1.0,
+            "metallic": 0.0,
             "spec_trans": 0.0,
-            "specular_tint" : 0.0
+            "specular_tint": 0.0
         },
-
         {
             "name": "Principled3",
             "refs": [
                 "sphere10"
             ],
             "type": "principled",
-            "albedo": [1,0,1],
-            "roughness" : 0.2,
-            "metallic" : 0.0,
-            "spec_trans": 0.0,
-            "specular_tint" : 0.0,
-            "clearcoat" : 0.0,
-            "clearcoat_gloss" : 0.0
-        },
-
-        {
-            "name": "Principled3",
-            "refs": [
-                "sphere5"
+            "albedo": [
+                1,
+                0,
+                1
             ],
-            "type": "principled",
-            "albedo": [1,0,1],
-            "ior" : 1.52,
-            "roughness" : 0.2,
-            "metallic" : 0.0,
-            "specular_transmission": 0.8,
-            "specular_tint" : 0.0,
-            "clearcoat" : 0.0,
-            "clearcoat_gloss" : 0.0
+            "roughness": 0.2,
+            "metallic": 0.0,
+            "spec_trans": 0.0,
+            "specular_tint": 0.0,
+            "clearcoat": 0.0,
+            "clearcoat_gloss": 0.0
         },
-
         {
             "name": "Principled4",
             "refs": [
                 "sphere11"
             ],
             "type": "principled",
-            "albedo": [1,1,1],
-            "ior" : 1.00,
-            "roughness" : 0.2,
-            "metallic" : 1.0,
+            "albedo": [
+                1,
+                1,
+                1
+            ],
+            "ior": 1.00,
+            "roughness": 0.2,
+            "metallic": 1.0,
             "specular_transmission": 0.8,
-            "specular_tint" : 0.0,
-            "clearcoat" : 0.0,
-            "clearcoat_gloss" : 0.0,
-            "anisotropy" : 1.0
+            "specular_tint": 0.0,
+            "clearcoat": 0.0,
+            "clearcoat_gloss": 0.0,
+            "anisotropy": 1.0
         },
-
         {
             "name": "Principled5",
             "refs": [
                 "sphere6"
             ],
             "type": "principled",
-            "albedo": [1,1,1],
-            "ior" : 1.00,
-            "roughness" : 0.2,
-            "metallic" : 1.0,
+            "albedo": [
+                1,
+                1,
+                1
+            ],
+            "ior": 1.00,
+            "roughness": 0.2,
+            "metallic": 1.0,
             "specular_transmission": 0.0,
-            "specular_tint" : 0.0,
-            "clearcoat" : 0.0,
-            "clearcoat_gloss" : 0.0,
-            "anisotropy" : 0.0
+            "specular_tint": 0.0,
+            "clearcoat": 0.0,
+            "clearcoat_gloss": 0.0,
+            "anisotropy": 0.0
         },
         {
-            "name": "Conductor",
+            "name": "Principled6",
+            "refs": [
+                "sphere5"
+            ],
+            "type": "principled",
+            "albedo": [
+                1,
+                0,
+                1
+            ],
+            "ior": 1.52,
+            "roughness": 0.2,
+            "metallic": 0.0,
+            "specular_transmission": 0.8,
+            "specular_tint": 0.0,
+            "clearcoat": 0.0,
+            "clearcoat_gloss": 0.0
+        },
+        {
+            "name": "Conductor2",
             "refs": [
                 "sphere12"
             ],
             "type": "conductor",
-            "roughness" : 0.2,
-            "reflectivity" : [0.95652,0.79155,0.40800],
-            "edge_tint" : [0.95706,0.86370,0.61991]
+            "roughness": 0.2,
+            "reflectivity": [
+                0.95652,
+                0.79155,
+                0.40800
+            ],
+            "edge_tint": [
+                0.95706,
+                0.86370,
+                0.61991
+            ]
         },
         {
             "albedo": [
@@ -182,7 +210,6 @@
             ],
             "type": "diffuse"
         },
-
         {
             "albedo": [
                 0.63,
@@ -195,7 +222,6 @@
             ],
             "type": "diffuse"
         },
-
         {
             "albedo": [
                 0.14,
@@ -235,8 +261,10 @@
             0.5,
             17.5
         ],
-        "dir" : [
-            0,0, 2
+        "dir": [
+            0,
+            0,
+            1
         ]
     },
     "mesh_file": "materials.obj"

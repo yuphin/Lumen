@@ -1,0 +1,80 @@
+integrator: 
+  type: vcm
+  path_length: 10
+  sky_col: v3f(0.100000, 0.100000, 0.100000)
+  enable_vm: 1
+  radius_factor: 0.025000
+
+textures: 
+
+bsdfs: 
+  - name: Glass
+    type: dielectric
+    ior: 1.520000
+    roughness: 0.000000
+    transmission: 1
+    reflection: 1
+
+  - name: Ring
+    type: conductor
+    albedo: v3f(3.885235, 2.435432, 1.984851)
+    roughness: 0.100000
+    reflectivity: v3f(0.956520, 0.791550, 0.408000)
+    edge_tint: v3f(0.957060, 0.863700, 0.619910)
+
+  - name: Other Walls
+    type: diffuse
+    albedo: v3f(0.725000, 0.710000, 0.680000)
+
+  - name: Table
+    type: diffuse
+    albedo: v3f(0.640000, 0.165000, 0.165000)
+
+  - name: Floor
+    type: conductor
+    roughness: 0.500000
+    reflectivity: v3f(0.000000, 0.000000, 0.000000)
+    edge_tint: v3f(0.000000, 0.000000, 0.000000)
+
+
+lights: 
+  - type: spot
+    L: v3f(170.000000, 120.000000, 40.000000)
+    pos: v3f(2.420000, 0.000000, -2.432593)
+    dir: v3f(0.420776, -2.158489, 3.000000)
+
+
+camera: 
+  fov: 45.000000
+  position: v3f(2.700000, 0.500000, 3.100000)
+  rotation: v3f(0.000000, 0.000000, 0.000000)
+  dir: v3f(-1.420776, -2.158489, 2.000000)
+
+mesh: 
+  name: caustics.obj
+  materials: 
+    - refs: floor
+      name: Floor
+
+    - refs: ceiling
+      name: Other Walls
+
+    - refs: left_wall
+      name: Other Walls
+
+    - refs: right_wall
+      name: Other Walls
+
+    - refs: table
+      name: Table
+
+    - refs: ring
+      name: Ring
+
+    - refs: back_wall
+      name: Other Walls
+
+    - refs: glass
+      name: Glass
+
+

@@ -1,0 +1,609 @@
+integrator: 
+  type: path
+  path_length: 65
+  sky_col: v3f(0.530000, 0.800000, 0.920000)
+
+textures: 
+  - name: textures/wallpaper-1.jpg
+    file: textures/wallpaper-1.jpg
+
+  - name: textures/Teapot.png
+    file: textures/Teapot.png
+
+  - name: textures/wood4.jpg
+    file: textures/wood4.jpg
+
+  - name: textures/panel-wood-3.jpg
+    file: textures/panel-wood-3.jpg
+
+
+bsdfs: 
+  - name: Boxes
+    type: diffuse
+    albedo: v3f(0.483044, 0.384664, 0.301561)
+
+  - name: PlasticCable
+    type: diffuse
+    albedo: v3f(0.558543, 0.558543, 0.558543)
+
+  - name: LampEmitter
+    type: diffuse
+    albedo: v3f(0.640000, 0.640000, 0.640000)
+
+  - name: Blankets
+    type: diffuse
+    albedo: v3f(0.485435, 0.456263, 0.428075)
+
+  - name: Bedsheets
+    type: diffuse
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    texture: textures/wallpaper-1.jpg
+
+  - name: Window
+    type: diffuse
+    albedo: v3f(0.028173, 0.028173, 0.028173)
+
+  - name: PictureBacking
+    type: diffuse
+    albedo: v3f(0.111567, 0.037068, 0.017016)
+
+  - name: Picture
+    type: diffuse
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    texture: textures/Teapot.png
+
+  - name: Rocks1
+    type: diffuse
+    albedo: v3f(0.350827, 0.242986, 0.178830)
+
+  - name: Rocks2
+    type: diffuse
+    albedo: v3f(0.098964, 0.098964, 0.098964)
+
+  - name: Rocks3
+    type: diffuse
+    albedo: v3f(0.558544, 0.558544, 0.558544)
+
+  - name: DecoPlant
+    type: diffuse
+    albedo: v3f(0.041772, 0.011306, 0.007575)
+
+  - name: Painting
+    type: diffuse
+    albedo: v3f(0.015396, 0.015396, 0.015396)
+
+  - name: Carpet
+    type: diffuse
+    albedo: v3f(0.034499, 0.034499, 0.034499)
+
+  - name: Matress
+    type: diffuse
+    albedo: v3f(0.893289, 0.893289, 0.893289)
+
+  - name: WoodFloor
+    type: principled
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    texture: textures/wood4.jpg
+    ior: 1.500000
+    roughness: 0.387298
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.500000
+    metallic: 1.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.000000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.000000
+    subsurface: 0.100000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 1
+
+  - name: Walls2
+    type: diffuse
+    albedo: v3f(0.799999, 0.799999, 0.799999)
+
+  - name: WoodFurniture
+    type: principled
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    texture: textures/panel-wood-3.jpg
+    ior: 1.500000
+    roughness: 0.387298
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.500000
+    metallic: 1.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.000000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.000000
+    subsurface: 0.100000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 1
+
+  - name: Walls
+    type: diffuse
+    albedo: v3f(0.799999, 0.799999, 0.799999)
+
+  - name: Mirror
+    type: conductor
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    roughness: 0.000000
+    reflectivity: v3f(0.999001, 0.999001, 0.999001)
+    edge_tint: v3f(0.999750, 0.999750, 0.999750)
+
+  - name: Aluminium
+    type: conductor
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    roughness: 0.447214
+    reflectivity: v3f(0.999001, 0.999001, 0.999001)
+    edge_tint: v3f(0.999750, 0.999750, 0.999750)
+
+  - name: BookCover
+    type: diffuse
+    albedo: v3f(0.000000, 0.000000, 0.000000)
+
+  - name: BookPages
+    type: diffuse
+    albedo: v3f(0.567027, 0.567027, 0.567027)
+
+  - name: LampMetal
+    type: conductor
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    roughness: 0.316228
+    reflectivity: v3f(0.999001, 0.999001, 0.999001)
+    edge_tint: v3f(0.999750, 0.999750, 0.999750)
+
+  - name: LampGlass
+    type: principled
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    ior: 1.500000
+    roughness: 0.316228
+    diffuse_transmission: 0.000000
+    specular_transmission: 1.000000
+    metallic: 0.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.000000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.000000
+    subsurface: 0.000000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 0
+
+  - name: PictureFrame
+    type: conductor
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    roughness: 0.316228
+    reflectivity: v3f(0.999001, 0.999001, 0.999001)
+    edge_tint: v3f(0.999750, 0.999750, 0.999750)
+
+  - name: Glass
+    type: principled
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    ior: 1.500000
+    roughness: 0.000000
+    diffuse_transmission: 0.000000
+    specular_transmission: 1.000000
+    metallic: 0.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.000000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.000000
+    subsurface: 0.000000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 0
+
+  - name: Vase
+    type: principled
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    ior: 1.500000
+    roughness: 0.000000
+    diffuse_transmission: 0.000000
+    specular_transmission: 1.000000
+    metallic: 0.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.000000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.000000
+    subsurface: 0.000000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 0
+
+  - name: Curtains
+    type: diffuse
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+
+  - name: CurtainRod
+    type: conductor
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    roughness: 0.316228
+    reflectivity: v3f(0.500000, 0.500000, 0.500000)
+    edge_tint: v3f(0.878680, 0.878680, 0.878680)
+
+  - name: StainlessSmooth
+    type: conductor
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    roughness: 0.000000
+    reflectivity: v3f(0.999001, 0.999001, 0.999001)
+    edge_tint: v3f(0.999750, 0.999750, 0.999750)
+
+
+lights: 
+  - type: directional
+    L: v3f(49.000000, 41.000000, 15.000001)
+    pos: v3f(-0.865804, 0.916766, -0.276929)
+    dir: v3f(0.000000, 0.000000, 0.000000)
+
+
+camera: 
+  fov: 32.500000
+  position: v3f(3.455580, 1.212440, 3.298970)
+  rotation: v3f(-1.488904, 49.177444, 0.163753)
+  dir: v3f(-0.756482, -0.025983, 0.653498)
+
+mesh: 
+  - name: models/Mesh053.obj
+    materials: 
+      - name: PictureBacking
+
+
+  - name: models/Mesh022.obj
+    materials: 
+      - name: Aluminium
+
+
+  - name: models/Mesh017.obj
+    materials: 
+      - name: Painting
+
+    transforms: 
+      translation: v3f(-0.235899, 0.000000, 0.000000)
+
+  - name: models/Mesh044.obj
+    materials: 
+      - name: Aluminium
+
+
+  - name: models/Mesh032.obj
+    materials: 
+      - name: WoodFurniture
+
+
+  - name: models/Mesh014.obj
+    materials: 
+      - name: CurtainRod
+
+
+  - name: models/Mesh047.obj
+    materials: 
+      - name: Aluminium
+
+
+  - name: models/Mesh015.obj
+    materials: 
+      - name: CurtainRod
+
+
+  - name: models/Mesh046.obj
+    materials: 
+      - name: Aluminium
+
+
+  - name: models/Mesh064.obj
+    materials: 
+      - name: BookPages
+
+
+  - name: models/Mesh059.obj
+    materials: 
+      - name: LampEmitter
+
+
+  - name: models/Mesh028.obj
+    materials: 
+      - name: StainlessSmooth
+
+
+  - name: models/Mesh056.obj
+    materials: 
+      - name: LampMetal
+
+
+  - name: models/Mesh027.obj
+    materials: 
+      - name: Aluminium
+
+
+  - name: models/Mesh011.obj
+    materials: 
+      - name: Mirror
+
+
+  - name: models/Mesh042.obj
+    materials: 
+      - name: Aluminium
+
+
+  - name: models/Mesh036.obj
+    materials: 
+      - name: Aluminium
+
+
+  - name: models/Mesh010.obj
+    materials: 
+      - name: Window
+
+
+  - name: models/Mesh043.obj
+    materials: 
+      - name: Aluminium
+
+
+  - name: models/Mesh013.obj
+    materials: 
+      - name: Walls
+
+
+  - name: models/Mesh040.obj
+    materials: 
+      - name: Aluminium
+
+
+  - name: models/Mesh037.obj
+    materials: 
+      - name: LampGlass
+
+
+  - name: models/Mesh057.obj
+    materials: 
+      - name: Curtains
+
+
+  - name: models/Mesh026.obj
+    materials: 
+      - name: LampGlass
+
+
+  - name: models/Mesh052.obj
+    materials: 
+      - name: Glass
+
+
+  - name: models/Mesh023.obj
+    materials: 
+      - name: LampMetal
+
+
+  - name: models/Mesh049.obj
+    materials: 
+      - name: LampGlass
+
+
+  - name: models/Mesh060.obj
+    materials: 
+      - name: WoodFloor
+
+
+  - name: models/Mesh033.obj
+    materials: 
+      - name: DecoPlant
+
+
+  - name: models/Mesh054.obj
+    materials: 
+      - name: LampEmitter
+
+
+  - name: models/Mesh025.obj
+    materials: 
+      - name: Rocks1
+
+
+  - name: models/Mesh024.obj
+    materials: 
+      - name: StainlessSmooth
+
+
+  - name: models/Mesh068.obj
+    materials: 
+      - name: Bedsheets
+
+
+  - name: models/Mesh055.obj
+    materials: 
+      - name: Rocks2
+
+
+  - name: models/Mesh035.obj
+    materials: 
+      - name: Rocks3
+
+
+  - name: models/Mesh048.obj
+    materials: 
+      - name: LampGlass
+
+
+  - name: models/Mesh029.obj
+    materials: 
+      - name: StainlessSmooth
+
+
+  - name: models/Mesh065.obj
+    materials: 
+      - name: Vase
+
+
+  - name: models/Mesh058.obj
+    materials: 
+      - name: PlasticCable
+
+
+  - name: models/Mesh061.obj
+    materials: 
+      - name: LampEmitter
+
+
+  - name: models/Mesh020.obj
+    materials: 
+      - name: Carpet
+
+    transforms: 
+      translation: v3f(-0.441852, 0.000000, 0.000000)
+
+  - name: models/Mesh051.obj
+    materials: 
+      - name: LampGlass
+
+
+  - name: models/Mesh066.obj
+    materials: 
+      - name: LampMetal
+
+
+  - name: models/Mesh062.obj
+    materials: 
+      - name: PlasticCable
+
+
+  - name: models/Mesh063.obj
+    materials: 
+      - name: BookCover
+
+
+  - name: models/Mesh012.obj
+    materials: 
+      - name: WoodFurniture
+
+
+  - name: models/Mesh041.obj
+    materials: 
+      - name: Bedsheets
+
+
+  - name: models/Mesh067.obj
+    materials: 
+      - name: Vase
+
+
+  - name: models/Mesh034.obj
+    materials: 
+      - name: Bedsheets
+
+
+  - name: models/Mesh050.obj
+    materials: 
+      - name: PictureFrame
+
+
+  - name: models/Mesh021.obj
+    materials: 
+      - name: Matress
+
+
+  - name: models/Mesh019.obj
+    materials: 
+      - name: Carpet
+
+    transforms: 
+      translation: v3f(-0.441852, 0.000000, 0.000000)
+
+  - name: models/Mesh018.obj
+    materials: 
+      - name: Painting
+
+    transforms: 
+      translation: v3f(-0.110000, 0.000000, 0.000000)
+
+  - name: models/Mesh018.obj
+    materials: 
+      - name: Painting
+
+    transforms: 
+      translation: v3f(-1.102100, 0.095804, 0.000000)
+
+  - name: models/Mesh039.obj
+    materials: 
+      - name: Window
+
+
+  - name: models/Mesh031.obj
+    materials: 
+      - name: WoodFurniture
+
+
+  - name: models/Mesh045.obj
+    materials: 
+      - name: StainlessSmooth
+
+
+  - name: models/Mesh038.obj
+    materials: 
+      - name: Mirror
+
+
+  - name: models/Mesh009.obj
+    materials: 
+      - name: WoodFurniture
+
+
+  - name: models/Mesh030.obj
+    materials: 
+      - name: WoodFurniture
+
+
+  - name: models/Mesh008.obj
+    materials: 
+      - name: Walls2
+
+
+  - name: models/Mesh007.obj
+    materials: 
+      - name: WoodFurniture
+
+
+  - name: models/Mesh006.obj
+    materials: 
+      - name: WoodFurniture
+
+
+  - name: models/Mesh005.obj
+    materials: 
+      - name: StainlessSmooth
+
+
+  - name: models/Mesh004.obj
+    materials: 
+      - name: Curtains
+
+
+  - name: models/Mesh003.obj
+    materials: 
+      - name: Picture
+
+
+  - name: models/Mesh002.obj
+    materials: 
+      - name: Boxes
+
+
+  - name: models/Mesh016.obj
+    materials: 
+      - name: Blankets
+
+
+  - name: models/Mesh001.obj
+    materials: 
+      - name: Blankets
+
+
+  - name: models/Mesh000.obj
+    materials: 
+      - name: Blankets

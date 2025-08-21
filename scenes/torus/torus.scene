@@ -1,0 +1,81 @@
+integrator: 
+  type: vcm
+  path_length: 6
+  sky_col: v3f(0.053000, 0.080000, 0.092000)
+  enable_vm: 1
+  radius_factor: 0.025000
+
+textures: 
+
+bsdfs: 
+  - name: mat_donut
+    type: diffuse
+    albedo: v3f(0.800000, 0.800000, 0.400000)
+
+  - name: mat_metal
+    type: conductor
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    roughness: 0.316228
+    reflectivity: v3f(0.999001, 0.999001, 0.999001)
+    edge_tint: v3f(0.999750, 0.999750, 0.999750)
+
+  - name: mat_glass
+    type: glass
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    ior: 1.500000
+
+  - name: mat_floor
+    type: diffuse
+    albedo: v3f(0.400000, 0.400000, 0.400000)
+
+  - name: mat_lamp
+    type: diffuse
+    albedo: v3f(0.400000, 0.400000, 0.400000)
+
+
+lights: 
+  - type: directional
+    L: v3f(0.980000, 0.820000, 0.300000)
+    pos: v3f(-0.865804, 0.916766, -0.276929)
+    dir: v3f(0.000000, 0.000000, 0.000000)
+
+
+camera: 
+  fov: 30.000000
+  position: v3f(33.25,13.00,-26.80)
+  rotation: v3f(-13.05,-225.85,0.00)
+  dir: v3f(-0.70,-0.23,-0.68)
+
+  
+mesh: 
+  - name: mesh0.obj
+    materials: 
+      - refs: mesh_0000_mesh_0000.001
+        name: mat_floor
+
+
+  - name: mesh1.obj
+    materials: 
+      - refs: mesh_0001_mesh_0001.002
+        name: mat_donut
+
+
+  - name: mesh2.obj
+    materials: 
+      - refs: mesh_0002_mesh_0002.002
+        name: mat_glass
+
+
+  - name: mesh3.obj
+    materials: 
+      - refs: mesh_0003_mesh_0003.002
+        name: mat_metal
+
+
+  - name: mesh4.obj
+    materials: 
+      - refs: mesh_0004_mesh_0004.001
+        name: mat_metal
+
+
+

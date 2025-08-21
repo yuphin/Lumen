@@ -1,0 +1,696 @@
+integrator: 
+  type: path
+  path_length: 17
+  sky_col: v3f(0.530000, 0.800000, 0.920000)
+
+textures: 
+  - name: textures/wood1.jpg
+    file: textures/wood1.jpg
+
+  - name: textures/wood2.jpg
+    file: textures/wood2.jpg
+
+  - name: textures/blackboard.jpg
+    file: textures/blackboard.jpg
+
+
+bsdfs: 
+  - name: Walls
+    type: diffuse
+    albedo: v3f(0.654071, 0.674080, 0.800000)
+
+  - name: Lectern
+    type: diffuse
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    texture: textures/wood1.jpg
+
+  - name: FlagRed
+    type: diffuse
+    albedo: v3f(0.800000, 0.008214, 0.000000)
+
+  - name: FlagWhite
+    type: diffuse
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+
+  - name: FlagBase
+    type: diffuse
+    albedo: v3f(0.779661, 0.653162, 0.349188)
+
+  - name: ChalkHolder
+    type: diffuse
+    albedo: v3f(0.800000, 0.644901, 0.412119)
+
+  - name: ProjectorScreen
+    type: diffuse
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+
+  - name: StickyNote1
+    type: diffuse
+    albedo: v3f(0.612066, 0.612066, 0.612066)
+
+  - name: Whiteboard
+    type: diffuse
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+
+  - name: StickyNote7
+    type: diffuse
+    albedo: v3f(0.612066, 0.612066, 0.612066)
+
+  - name: StickyNote8
+    type: diffuse
+    albedo: v3f(0.612066, 0.612066, 0.612066)
+
+  - name: Bin2
+    type: diffuse
+    albedo: v3f(0.800000, 0.717509, 0.190456)
+
+  - name: Boxes2
+    type: diffuse
+    albedo: v3f(0.800000, 0.791642, 0.388399)
+
+  - name: Boxes1
+    type: diffuse
+    albedo: v3f(0.640000, 0.472188, 0.319233)
+
+  - name: StickyNote4
+    type: diffuse
+    albedo: v3f(0.612066, 0.612066, 0.612066)
+
+  - name: Whiteboard2
+    type: diffuse
+    albedo: v3f(0.793110, 0.793110, 0.793110)
+
+  - name: BluePencil
+    type: diffuse
+    albedo: v3f(0.000000, 0.030764, 0.800000)
+
+  - name: GreenPencil
+    type: diffuse
+    albedo: v3f(0.145676, 0.640000, 0.000000)
+
+  - name: RedPencil
+    type: diffuse
+    albedo: v3f(0.626651, 0.000000, 0.000000)
+
+  - name: Bookshelf
+    type: diffuse
+    albedo: v3f(0.491301, 0.305177, 0.800000)
+
+  - name: Hallway
+    type: diffuse
+    albedo: v3f(0.784314, 0.784314, 0.784314)
+
+  - name: CeilingLight
+    type: principled
+    albedo: v3f(0.647814, 0.647814, 0.647814)
+    ior: 1.500000
+    roughness: 0.316228
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.500000
+    metallic: 1.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.000000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.000000
+    subsurface: 0.100000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 1
+
+  - name: Black
+    type: diffuse
+    albedo: v3f(0.006310, 0.006310, 0.006310)
+
+  - name: BlackPlastic
+    type: principled
+    albedo: v3f(0.006310, 0.006310, 0.006310)
+    ior: 1.500000
+    roughness: 0.316228
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.500000
+    metallic: 1.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.000000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.000000
+    subsurface: 0.100000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 1
+
+  - name: Projector
+    type: diffuse
+    albedo: v3f(0.006310, 0.006310, 0.006310)
+
+  - name: ScreenEnds
+    type: diffuse
+    albedo: v3f(0.028991, 0.028991, 0.028991)
+
+  - name: FoamEraser
+    type: diffuse
+    albedo: v3f(0.684615, 0.684615, 0.684615)
+
+  - name: Whiteboard3
+    type: principled
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    ior: 1.500000
+    roughness: 0.223607
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.500000
+    metallic: 1.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.000000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.000000
+    subsurface: 0.100000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 1
+
+  - name: ChairWood
+    type: principled
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    texture: textures/wood2.jpg
+    ior: 1.500000
+    roughness: 0.223607
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.500000
+    metallic: 1.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.000000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.000000
+    subsurface: 0.100000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 1
+
+  - name: ChairFrame
+    type: conductor
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    roughness: 0.316228
+    reflectivity: v3f(0.751534, 0.751534, 0.751534)
+    edge_tint: v3f(0.938199, 0.938199, 0.938199)
+
+  - name: ChairStainless
+    type: conductor
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    roughness: 0.000000
+    reflectivity: v3f(0.999001, 0.999001, 0.999001)
+    edge_tint: v3f(0.999750, 0.999750, 0.999750)
+
+  - name: Floor
+    type: diffuse
+    albedo: v3f(0.659224, 0.592438, 0.517401)
+
+  - name: WoodFrame
+    type: diffuse
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    texture: textures/blackboard.jpg
+
+  - name: WhiteboardFrame
+    type: diffuse
+    albedo: v3f(0.056173, 0.056173, 0.056173)
+
+  - name: StickyNote3
+    type: diffuse
+    albedo: v3f(0.612066, 0.612066, 0.612066)
+
+  - name: StickyNote5
+    type: diffuse
+    albedo: v3f(0.612066, 0.612066, 0.612066)
+
+  - name: StickyNote6
+    type: diffuse
+    albedo: v3f(0.612066, 0.612066, 0.612066)
+
+  - name: Speakers
+    type: diffuse
+    albedo: v3f(0.035980, 0.035980, 0.035980)
+
+  - name: Wall
+    type: diffuse
+    albedo: v3f(0.450837, 0.453663, 0.499605)
+
+  - name: WindowFrame
+    type: conductor
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    roughness: 0.316228
+    reflectivity: v3f(0.471008, 0.471008, 0.471008)
+    edge_tint: v3f(0.872329, 0.872329, 0.872329)
+
+  - name: Bin1
+    type: diffuse
+    albedo: v3f(0.327125, 0.578596, 0.280561)
+
+  - name: Rubber
+    type: diffuse
+    albedo: v3f(0.687031, 0.715465, 0.560499)
+
+  - name: FluorescentTube
+    type: principled
+    albedo: v3f(0.612066, 0.612066, 0.612066)
+    ior: 1.500000
+    roughness: 0.000000
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.500000
+    metallic: 1.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.000000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.000000
+    subsurface: 0.100000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 1
+
+  - name: StickyNote2
+    type: diffuse
+    albedo: v3f(0.612066, 0.612066, 0.612066)
+
+
+lights: 
+  - type: directional
+    L: v3f(9.800000, 8.200000, 3.000000)
+    pos: v3f(-0.865804, 0.916766, -0.276929)
+    dir: v3f(0.000000, 0.000000, 0.000000)
+
+
+camera: 
+  fov: 30.000000
+  position: v3f(-1.690490, 1.271580, 5.886530)
+  rotation: v3f(-1.640990, -8.701925, -0.248339)
+  dir: v3f(0.151232, -0.028637, 0.988083)
+
+mesh: 
+  - name: models/Mesh061.obj
+    materials: 
+      - name: Black
+
+
+  - name: models/Mesh025.obj
+    materials: 
+      - name: WoodFrame
+
+
+  - name: models/Mesh069.obj
+    materials: 
+      - name: ChairWood
+
+
+  - name: models/Mesh054.obj
+    materials: 
+      - name: Black
+
+
+  - name: models/Mesh036.obj
+    materials: 
+      - name: Walls
+
+
+  - name: models/Mesh062.obj
+    materials: 
+      - name: CeilingLight
+
+
+  - name: models/Mesh048.obj
+    materials: 
+      - name: FluorescentTube
+
+
+  - name: models/Mesh023.obj
+    materials: 
+      - name: Walls
+
+
+  - name: models/Mesh052.obj
+    materials: 
+      - name: BlackPlastic
+
+
+  - name: models/Mesh074.obj
+    materials: 
+      - name: RedPencil
+
+
+  - name: models/Mesh038.obj
+    materials: 
+      - name: FluorescentTube
+
+
+  - name: models/Mesh077.obj
+    materials: 
+      - name: Black
+
+
+  - name: models/Mesh031.obj
+    materials: 
+      - name: Projector
+
+
+  - name: models/Mesh030.obj
+    materials: 
+      - name: Projector
+
+
+  - name: models/Mesh026.obj
+    materials: 
+      - name: Rubber
+
+
+  - name: models/Mesh057.obj
+    materials: 
+      - name: Black
+
+
+  - name: models/Mesh056.obj
+    materials: 
+      - name: Lectern
+
+
+  - name: models/Mesh027.obj
+    materials: 
+      - name: Walls
+
+
+  - name: models/Mesh014.obj
+    materials: 
+      - name: Hallway
+
+
+  - name: models/Mesh047.obj
+    materials: 
+      - name: Bin2
+
+
+  - name: models/Mesh049.obj
+    materials: 
+      - name: Boxes1
+
+    transforms: 
+      translation: v3f(0.000000, -0.073422, 0.000000)
+
+  - name: models/Mesh053.obj
+    materials: 
+      - name: FoamEraser
+
+
+  - name: models/Mesh022.obj
+    materials: 
+      - name: Black
+
+
+  - name: models/Mesh065.obj
+    materials: 
+      - name: Bookshelf
+
+
+  - name: models/Mesh058.obj
+    materials: 
+      - name: ChalkHolder
+
+
+  - name: models/Mesh029.obj
+    materials: 
+      - name: Black
+
+
+  - name: models/Mesh033.obj
+    materials: 
+      - name: Whiteboard
+
+
+  - name: models/Mesh040.obj
+    materials: 
+      - name: Walls
+
+
+  - name: models/Mesh059.obj
+    materials: 
+      - name: RedPencil
+
+
+  - name: models/Mesh064.obj
+    materials: 
+      - name: ChairFrame
+
+
+  - name: models/Mesh028.obj
+    materials: 
+      - name: Black
+
+
+  - name: models/Mesh076.obj
+    materials: 
+      - name: ProjectorScreen
+
+
+  - name: models/Mesh021.obj
+    materials: 
+      - name: Whiteboard3
+
+
+  - name: models/Mesh050.obj
+    materials: 
+      - name: ScreenEnds
+
+
+  - name: models/Mesh024.obj
+    materials: 
+      - name: ChairWood
+
+
+  - name: models/Mesh055.obj
+    materials: 
+      - name: FlagBase
+
+
+  - name: models/Mesh060.obj
+    materials: 
+      - name: ChairWood
+
+
+  - name: models/Mesh063.obj
+    materials: 
+      - name: ChairStainless
+
+
+  - name: models/Mesh037.obj
+    materials: 
+      - name: ChairWood
+
+
+  - name: models/Mesh067.obj
+    materials: 
+      - name: ChairWood
+
+
+  - name: models/Mesh073.obj
+    materials: 
+      - name: ChairWood
+
+
+  - name: models/Mesh012.obj
+    materials: 
+      - name: BluePencil
+
+
+  - name: models/Mesh041.obj
+    materials: 
+      - name: ChairWood
+
+
+  - name: models/Mesh035.obj
+    materials: 
+      - name: Floor
+
+    transforms: 
+      scale: v3f(11.651700, 11.651700, 11.651700)
+
+  - name: models/Mesh010.obj
+    materials: 
+      - name: GreenPencil
+
+
+  - name: models/Mesh043.obj
+    materials: 
+      - name: WoodFrame
+
+
+  - name: models/Mesh072.obj
+    materials: 
+      - name: Whiteboard2
+
+
+  - name: models/Mesh016.obj
+    materials: 
+      - name: Lectern
+
+
+  - name: models/Mesh045.obj
+    materials: 
+      - name: StickyNote1
+
+
+  - name: models/Mesh017.obj
+    materials: 
+      - name: Lectern
+
+
+  - name: models/Mesh044.obj
+    materials: 
+      - name: StickyNote2
+
+
+  - name: models/Mesh070.obj
+    materials: 
+      - name: BluePencil
+
+
+  - name: models/Mesh078.obj
+    materials: 
+      - name: GreenPencil
+
+
+  - name: models/Mesh018.obj
+    materials: 
+      - name: WhiteboardFrame
+
+
+  - name: models/Mesh066.obj
+    materials: 
+      - name: Lectern
+
+
+  - name: models/Mesh046.obj
+    materials: 
+      - name: Whiteboard2
+
+
+  - name: models/Mesh015.obj
+    materials: 
+      - name: Lectern
+
+
+  - name: models/Mesh011.obj
+    materials: 
+      - name: GreenPencil
+
+
+  - name: models/Mesh009.obj
+    materials: 
+      - name: GreenPencil
+
+
+  - name: models/Mesh008.obj
+    materials: 
+      - name: BluePencil
+
+
+  - name: models/Mesh032.obj
+    materials: 
+      - name: StickyNote3
+
+
+  - name: models/Mesh007.obj
+    materials: 
+      - name: StickyNote4
+
+
+  - name: models/Mesh075.obj
+    materials: 
+      - name: StickyNote5
+
+
+  - name: models/Mesh071.obj
+    materials: 
+      - name: StickyNote6
+
+
+  - name: models/Mesh039.obj
+    materials: 
+      - name: StickyNote7
+
+
+  - name: models/Mesh006.obj
+    materials: 
+      - name: StickyNote8
+
+
+  - name: models/Mesh051.obj
+    materials: 
+      - name: Black
+
+
+  - name: models/Mesh013.obj
+    materials: 
+      - name: FlagRed
+
+
+  - name: models/Mesh005.obj
+    materials: 
+      - name: FlagWhite
+
+
+  - name: models/Mesh042.obj
+    materials: 
+      - name: Walls
+
+
+  - name: models/Mesh003.obj
+    materials: 
+      - name: Speakers
+
+
+  - name: models/Mesh020.obj
+    materials: 
+      - name: FluorescentTube
+
+
+  - name: models/Mesh002.obj
+    materials: 
+      - name: CeilingLight
+
+
+  - name: models/Mesh019.obj
+    materials: 
+      - name: Wall
+
+
+  - name: models/Mesh068.obj
+    materials: 
+      - name: WindowFrame
+
+
+  - name: models/Mesh001.obj
+    materials: 
+      - name: Bin1
+
+
+  - name: models/Mesh004.obj
+    materials: 
+      - name: Boxes1
+
+    transforms: 
+      translation: v3f(0.000000, -0.073422, 0.000000)
+
+  - name: models/Mesh034.obj
+    materials: 
+      - name: Boxes2
+
+    transforms: 
+      translation: v3f(0.000000, -0.073422, 0.000000)
+
+  - name: models/Mesh000.obj
+    materials: 
+      - name: Boxes1
+
+    transforms: 
+      translation: v3f(0.000000, -0.073422, 0.000000)
+
+

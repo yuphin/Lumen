@@ -1,15 +1,16 @@
 {
     "integrator" : {
-        "type" : "path",
-        "path_length" : 6,
+        "type" : "restirpt",
+        "path_length" : 3,
         "sky_col" : [
-            1,1,1
+            0,0,0
         ]
     },
+ 
     "bsdfs": [
         {
-            "ior": 1.52,
             "name": "Glass",
+            "ior": 1.52,
             "refs": [
                 "glass_sphere"
             ],
@@ -22,15 +23,15 @@
         },
         {
             "albedo": [
-                0.815, 0.418501512, 0.00180012
+                1,
+                1,
+                1
             ],
-            "metallic" : 1,
-            "roughness": 0.53,
             "name": "Mirror",
             "refs": [
                 "mirror_sphere"
             ],
-            "type": "disney"
+            "type": "mirror"
         },
         {
             "albedo": [
@@ -80,7 +81,10 @@
             "refs": [
                 "floor"
             ],
-            "type": "diffuse"
+            "type": "conductor",
+            "roughness" : 0.26,
+            "metallic" : 1.0
+
         },
         {
             "emissive_factor": [
@@ -105,7 +109,7 @@
         "position": [
             0.7,
             0.5,
-            15.5
+            17.5
         ],
         "dir" : [
             0,0, 2
