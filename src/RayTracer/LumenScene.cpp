@@ -1,11 +1,8 @@
-#include "Framework/Base/Memory.h"
-#include "Framework/VkUtils.h"
 #include "Framework/BBox.h"
 #include "LumenScene.h"
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 #define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb/stb_image.h>
 #include "shaders/commons.h"
 #include "Framework/PersistentResourceManager.h"
