@@ -11,10 +11,6 @@ file(GLOB imgui_src
     "imgui/*.cpp"
 )
 
-file(GLOB mitsuba_src
-    "mitsuba_parser/*.cpp"
-)
-
 file(GLOB tinyxml_src
     "tinyxml2/tinyxml2.cpp"
 )

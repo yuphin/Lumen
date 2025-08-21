@@ -4,7 +4,6 @@
 #include "Framework/Window.h"
 
 #include "shaders/commons.h"
-#include "Framework/MitsubaParser.h"
 #include "SceneConfig.h"
 #include "Framework/Buffer.h"
 #include "Framework/Texture.h"
