@@ -641,15 +641,9 @@ void LumenScene::load_scene(const std::string& path) {
 	std::string root_path = path.substr(0, path.find_last_of("/\\") + 1);
 
 	const f32 aspect_ratio = (f32)Window::width() / Window::height();
-	if (config->cam_settings.pos != vec3(-1)) {
-		camera = std::unique_ptr<lm::PerspectiveCamera>(
-			new lm::PerspectiveCamera(config->cam_settings.fov, 0.01f, 1000.0f, aspect_ratio, config->cam_settings.dir,
-									  config->cam_settings.pos, config->cam_settings.rotation));
-	} else {
-		// Assume the camera matrix is given
-		camera = std::unique_ptr<lm::PerspectiveCamera>(new lm::PerspectiveCamera(
-			config->cam_settings.fov, config->cam_settings.cam_matrix, 0.01f, 1000.0f, aspect_ratio));
-	}
+	camera = std::unique_ptr<lm::PerspectiveCamera>(
+		new lm::PerspectiveCamera(config->cam_settings.fov, 0.01f, 1000.0f, aspect_ratio, config->cam_settings.dir,
+								  config->cam_settings.pos, config->cam_settings.rotation));
 
 	total_light_triangle_cnt = 0;
 	total_light_area = 0;
