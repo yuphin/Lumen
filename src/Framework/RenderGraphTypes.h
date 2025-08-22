@@ -30,9 +30,9 @@ struct ResourceBinding {
 	ResourceBinding(vk::Texture* tex, VkSampler sampler) : tex(tex), sampler(sampler) {}
 	inline void replace(const ResourceBinding& binding) {
 		if (binding.buf) {
-			this->buf = binding.buf;
+			buf = binding.buf;
 		} else {
-			this->tex = binding.tex;
+			tex = binding.tex;
 		}
 	}
 

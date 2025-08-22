@@ -40,7 +40,7 @@ void buffer_create(Buffer* buffer, const BufferDesc& desc) {
 	vk::check(vmaCreateBuffer(vk::context().allocator, &buffer_ci, &alloc_ci, &buffer->handle, &buffer->allocation,
 							  &alloc_info));
 	if (!buffer->name.empty()) {
-		vk::DebugMarker::set_resource_name(vk::context().device, (u64)buffer->handle, buffer->name.data(),
+		vk::set_resource_name(vk::context().device, (u64)buffer->handle, buffer->name.data(),
 										   VK_OBJECT_TYPE_BUFFER);
 	}
 	VkMemoryPropertyFlags mem_prop_flags;
@@ -76,7 +76,7 @@ VkDescriptorBufferInfo buffer_descriptor(const vk::Buffer* buffer) {
 
 void buffer_destroy(Buffer* buffer) { vmaDestroyBuffer(vk::context().allocator, buffer->handle, buffer->allocation); }
 
-void write_buffer(Buffer* buffer, void* data, u64 size) {
+void buffer_write(Buffer* buffer, void* data, u64 size) {
 	VkMemoryPropertyFlags mem_prop_flags;
 	vmaGetAllocationMemoryProperties(vk::context().allocator, buffer->allocation, &mem_prop_flags);
 	LUMEN_ASSERT((mem_prop_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0, "Buffer is not host visible");

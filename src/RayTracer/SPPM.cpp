@@ -39,17 +39,17 @@ void SPPM::init() {
 						 .size = sizeof(i32)});
 
 	SceneDesc desc;
-	desc.index_addr = lumen_scene->index_buffer->get_device_address();
+	desc.index_addr = lumen_scene->index_buffer->device_address();
 
-	desc.material_addr = lumen_scene->materials_buffer->get_device_address();
-	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->get_device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer->device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
 	// SPPM
-	desc.sppm_data_addr = sppm_data_buffer->get_device_address();
-	desc.atomic_data_addr = atomic_data_buffer->get_device_address();
-	desc.photon_addr = photon_buffer->get_device_address();
-	desc.residual_addr = residual_buffer->get_device_address();
-	desc.counter_addr = counter_buffer->get_device_address();
+	desc.sppm_data_addr = sppm_data_buffer->device_address();
+	desc.atomic_data_addr = atomic_data_buffer->device_address();
+	desc.photon_addr = photon_buffer->device_address();
+	desc.residual_addr = residual_buffer->device_address();
+	desc.counter_addr = counter_buffer->device_address();
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,

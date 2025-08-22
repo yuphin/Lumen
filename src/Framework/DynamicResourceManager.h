@@ -6,7 +6,6 @@ namespace vk {
     struct Buffer;
     struct BufferDesc;
     struct TextureDesc;
-
 }
 namespace drm {
 

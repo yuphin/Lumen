@@ -7,7 +7,7 @@ namespace vk {
 struct BVH {
 	VkAccelerationStructureKHR accel = VK_NULL_HANDLE;
 	vk::Buffer* buffer = nullptr;
-	inline VkDeviceAddress get_device_address() const {
+	inline VkDeviceAddress device_address() const {
 		VkAccelerationStructureDeviceAddressInfoKHR addr_info{
 			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR, .accelerationStructure = accel};
 		return vkGetAccelerationStructureDeviceAddressKHR(vk::context().device, &addr_info);
@@ -22,17 +22,17 @@ struct BlasInput {
 	std::vector<VkAccelerationStructureBuildRangeInfoKHR> as_build_offset_info;
 	VkBuildAccelerationStructureFlagsKHR flags{0};
 };
-void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
+void blas_build(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd = VK_NULL_HANDLE,
 				vk::Buffer** scratch_buffer_ref = nullptr);
-void build_blas(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
+void blas_build(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd = VK_NULL_HANDLE,
 				vk::Buffer** scratch_buffer_ref = nullptr);
-void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
+void tlas_build(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
 				VkBuildAccelerationStructureFlagsKHR flags, bool update = false);
-void build_tlas(BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
-				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer_ref,
-				bool update = false);
+void tlas_build(BVH& tlas, vk::Buffer* instances_buf, u32 instance_count, VkBuildAccelerationStructureFlagsKHR flags,
+				VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer_ref, bool update = false);
 
-BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx, VkDeviceAddress vertex_address, VkDeviceAddress index_address);
+BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx, VkDeviceAddress vertex_address,
+						 VkDeviceAddress index_address);
 }  // namespace vk

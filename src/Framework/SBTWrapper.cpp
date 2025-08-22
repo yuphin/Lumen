@@ -136,7 +136,7 @@ VkDeviceAddress SBTWrapper::get_address(GroupType t) {
 	if (!group_data[t].buffer || !group_data[t].buffer->size) {
 		return 0;
 	}
-	return group_data[t].buffer->get_device_address();
+	return group_data[t].buffer->device_address();
 }
 
 const VkStridedDeviceAddressRegionKHR SBTWrapper::get_region(GroupType t) {

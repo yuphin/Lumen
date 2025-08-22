@@ -640,10 +640,8 @@ void LumenScene::load_scene(const std::string& path) {
 	}
 	std::string root_path = path.substr(0, path.find_last_of("/\\") + 1);
 
-	const f32 aspect_ratio = (f32)Window::width() / Window::height();
-	camera = std::unique_ptr<lm::PerspectiveCamera>(
-		new lm::PerspectiveCamera(config->cam_settings.fov, 0.01f, 1000.0f, aspect_ratio, config->cam_settings.dir,
-								  config->cam_settings.pos, config->cam_settings.rotation));
+	lm::camera_init(&camera, config->cam_settings.fov, 0.01f, 1000.0f, Window::aspect_ratio(), config->cam_settings.dir,
+					config->cam_settings.pos, config->cam_settings.rotation);
 
 	total_light_triangle_cnt = 0;
 	total_light_area = 0;
@@ -1070,9 +1068,9 @@ void LumenScene::write_lumen_scene() {
 	// Camera settings
 	LumenNode* camera_node = new LumenNode{.key = "camera"};
 	add_leaf_node(camera_node, "fov", std::to_string(config->cam_settings.fov));
-	add_leaf_node(camera_node, "position", vec3_to_str(camera->position));
-	add_leaf_node(camera_node, "rotation", vec3_to_str(camera->rotation));
-	add_leaf_node(camera_node, "dir", vec3_to_str(camera->direction));
+	add_leaf_node(camera_node, "position", vec3_to_str(camera.position));
+	add_leaf_node(camera_node, "rotation", vec3_to_str(camera.rotation));
+	add_leaf_node(camera_node, "dir", vec3_to_str(camera.direction));
 	add_child_node(root, camera_node);
 
 	// Mesh and material mappings

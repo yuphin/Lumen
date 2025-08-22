@@ -72,23 +72,23 @@ void VCM::init() {
 								  .size = sizeof(AvgStruct)});
 
 	SceneDesc desc;
-	desc.index_addr = lumen_scene->index_buffer->get_device_address();
+	desc.index_addr = lumen_scene->index_buffer->device_address();
 
-	desc.material_addr = lumen_scene->materials_buffer->get_device_address();
-	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->get_device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer->device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
 	// VCM
-	desc.photon_addr = photon_buffer->get_device_address();
-	desc.vcm_vertices_addr = vcm_light_vertices_buffer->get_device_address();
-	desc.path_cnt_addr = light_path_cnt_buffer->get_device_address();
-	desc.color_storage_addr = color_storage_buffer->get_device_address();
+	desc.photon_addr = photon_buffer->device_address();
+	desc.vcm_vertices_addr = vcm_light_vertices_buffer->device_address();
+	desc.path_cnt_addr = light_path_cnt_buffer->device_address();
+	desc.color_storage_addr = color_storage_buffer->device_address();
 
-	desc.vcm_reservoir_addr = vcm_reservoir_buffer->get_device_address();
-	desc.light_samples_addr = light_samples_buffer->get_device_address();
-	desc.should_resample_addr = should_resample_buffer->get_device_address();
-	desc.light_state_addr = light_state_buffer->get_device_address();
-	desc.angle_struct_addr = angle_struct_buffer->get_device_address();
-	desc.avg_addr = avg_buffer->get_device_address();
+	desc.vcm_reservoir_addr = vcm_reservoir_buffer->device_address();
+	desc.light_samples_addr = light_samples_buffer->device_address();
+	desc.should_resample_addr = should_resample_buffer->device_address();
+	desc.light_state_addr = light_state_buffer->device_address();
+	desc.angle_struct_addr = angle_struct_buffer->device_address();
+	desc.avg_addr = avg_buffer->device_address();
 
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",

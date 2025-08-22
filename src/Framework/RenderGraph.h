@@ -165,10 +165,10 @@ class RenderPass {
 	RenderPass& copy(const Resource& src, const Resource& dst);
 
 	// BLAS building happens after the pass runs
-	RenderPass& build_blas(util::Slice<vk::BVH> blases, const std::vector<vk::BlasInput>& blas_inputs,
+	RenderPass& blas_build(util::Slice<vk::BVH> blases, const std::vector<vk::BlasInput>& blas_inputs,
 						   VkBuildAccelerationStructureFlagsKHR flags, const std::vector<vk::Buffer*>& source_buffers,
 						   vk::Buffer** scratch_buffer_ref);
-	RenderPass& build_tlas(vk::BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
+	RenderPass& tlas_build(vk::BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
 						   VkBuildAccelerationStructureFlagsKHR flags, vk::Buffer** scratch_buffer_ref,
 						   bool build_tlas_after_blas = false, bool update_blas = false);
 
@@ -222,7 +222,7 @@ class RenderPass {
 
 	// For now, there is only one set of BLASes to build per pass
 	struct BlasBuildData {
-		// The owner is the caller of the build_blas function
+		// The owner is the caller of the blas_build function
 		vk::Buffer** scratch_buffer_ref = nullptr;
 		// For barrier placement
 		std::vector<vk::Buffer*> source_buffers;

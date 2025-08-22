@@ -104,8 +104,8 @@ void DDGI::init() {
 		});
 
 		SphereDesc sphere_desc;
-		sphere_desc.index_addr = sphere_indices_buffer->get_device_address();
-		sphere_desc.vertex_addr = sphere_vertices_buffer->get_device_address();
+		sphere_desc.index_addr = sphere_indices_buffer->device_address();
+		sphere_desc.vertex_addr = sphere_vertices_buffer->device_address();
 
 		sphere_desc_buffer =
 			prm::get_buffer({.name = "Sphere Desc",
@@ -176,15 +176,15 @@ void DDGI::init() {
 	});
 
 	SceneDesc desc;
-	desc.index_addr = lumen_scene->index_buffer->get_device_address();
+	desc.index_addr = lumen_scene->index_buffer->device_address();
 
-	desc.material_addr = lumen_scene->materials_buffer->get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer->device_address();
 	// DDGI
-	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->get_device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->get_device_address();
-	desc.direct_lighting_addr = direct_lighting_buffer->get_device_address();
-	desc.probe_offsets_addr = probe_offsets_buffer->get_device_address();
-	desc.g_buffer_addr = g_buffer->get_device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
+	desc.direct_lighting_addr = direct_lighting_buffer->device_address();
+	desc.probe_offsets_addr = probe_offsets_buffer->device_address();
+	desc.g_buffer_addr = g_buffer->device_address();
 
 	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
@@ -396,7 +396,7 @@ void DDGI::update_ddgi_uniforms() {
 	ddgi_ubo.min_frontface_dist = min_frontface_dist;
 	ddgi_ubo.tmax = tmax;
 	ddgi_ubo.tmin = tmin;
-	vk::write_buffer(ddgi_ubo_buffer, &ddgi_ubo, sizeof(ddgi_ubo));
+	vk::buffer_write(ddgi_ubo_buffer, &ddgi_ubo, sizeof(ddgi_ubo));
 }
 
 void DDGI::create_radiance_textures() {
@@ -422,8 +422,8 @@ void DDGI::create_radiance_textures() {
 void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 	std::vector<vk::BlasInput> blas_inputs;
 
-	VkDeviceAddress vertex_address = lumen_scene->vertex_buffer->get_device_address();
-	VkDeviceAddress idx_address = lumen_scene->index_buffer->get_device_address();
+	VkDeviceAddress vertex_address = lumen_scene->vertex_buffer->device_address();
+	VkDeviceAddress idx_address = lumen_scene->index_buffer->device_address();
 	for (auto& prim_mesh : lumen_scene->prim_meshes) {
 		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh.vtx_count, prim_mesh.idx_count, prim_mesh.vtx_offset,
 											   prim_mesh.first_idx, vertex_address, idx_address);
@@ -431,8 +431,8 @@ void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 	}
 
 	{
-		VkDeviceAddress sphere_vertex_addr = sphere_vertices_buffer->get_device_address();
-		VkDeviceAddress sphere_idx_addr = sphere_indices_buffer->get_device_address();
+		VkDeviceAddress sphere_vertex_addr = sphere_vertices_buffer->device_address();
+		VkDeviceAddress sphere_idx_addr = sphere_indices_buffer->device_address();
 
 		VkAccelerationStructureGeometryTrianglesDataKHR sphere_triangles{
 			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR};
@@ -460,7 +460,7 @@ void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 		sphere_blas_input.as_build_offset_info.push_back(offset);
 	}
 
-	vk::build_blas(blases, blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+	vk::blas_build(blases, blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 
 	std::vector<VkAccelerationStructureInstanceKHR> tlas_instances;
 	for (const auto& pm : lumen_scene->prim_meshes) {
@@ -468,7 +468,7 @@ void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 		ray_inst.transform = vk::to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
 		assert(pm.prim_idx < blases.size());
-		ray_inst.accelerationStructureReference = blases[pm.prim_idx].get_device_address();
+		ray_inst.accelerationStructureReference = blases[pm.prim_idx].device_address();
 		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		ray_inst.mask = 0x1;
 		ray_inst.instanceShaderBindingTableRecordOffset = 0;
@@ -486,14 +486,14 @@ void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 
 			sphere_inst.transform = vk::to_vk_matrix(transform);
 			sphere_inst.instanceCustomIndex = i;
-			sphere_inst.accelerationStructureReference = blases[sphere_blas_idx].get_device_address();
+			sphere_inst.accelerationStructureReference = blases[sphere_blas_idx].device_address();
 			sphere_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 			sphere_inst.mask = 0x2;
 			sphere_inst.instanceShaderBindingTableRecordOffset = 0;
 			tlas_instances.emplace_back(sphere_inst);
 		}
 	}
-	vk::build_tlas(tlas, tlas_instances, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+	vk::tlas_build(tlas, tlas_instances, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 glm::vec3 DDGI::probe_location(u32 index) {

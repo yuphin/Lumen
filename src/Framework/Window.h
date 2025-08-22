@@ -177,5 +177,6 @@ void add_scroll_callback(MouseScrollCallback callback);
 void add_key_callback(KeyCallback callback);
 u32 width();
 u32 height();
+f32 aspect_ratio();
 
 };	// namespace Window

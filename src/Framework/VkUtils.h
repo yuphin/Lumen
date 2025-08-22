@@ -118,7 +118,6 @@ inline u32 calc_mip_levels(VkExtent2D extent) {
 	return static_cast<u32>(std::floor(std::log2(std::max(extent.width, extent.height)))) + 1;
 }
 
-namespace DebugMarker {
 inline void set_resource_name(VkDevice device, u64 obj, const char* name, VkObjectType type) {
 #if USE_VALIDATION_LAYERS
 	VkDebugUtilsObjectNameInfoEXT debug_utils_name{VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT, nullptr, type,
@@ -158,6 +157,5 @@ inline void insert(VkDevice device, VkCommandBuffer cmd, const char* name, glm::
 		pfnCmdDebugMarkerInsert(cmd, &info);
 	}
 }
-}  // namespace DebugMarker
 
 }  // namespace vk

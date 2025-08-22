@@ -1,5 +1,4 @@
 #pragma once
-#include "Framework/Camera.h"
 #include "Framework/VulkanBase.h"
 #include "Framework/Window.h"
 
@@ -84,7 +83,8 @@ class LumenScene {
 	vk::Buffer* scene_desc_buffer;
 	vk::Buffer* mesh_lights_buffer;
 	std::vector<vk::Texture*> scene_textures;
-	std::unique_ptr<lm::Camera> camera;
+	// std::unique_ptr<lm::Camera> camera;
+	lm::Camera camera{};
 	std::unordered_map<u32, std::string> material_idx_to_name;
 
 	u32 total_light_triangle_cnt = 0;
@@ -107,8 +107,6 @@ class LumenScene {
 	u32 bsdf_types = 0;
 	void compute_scene_dimensions();
 	void load_lumen_scene(const std::string& path);
-	void load_mitsuba_scene(const std::string& path);
-	void load_lumen_scene_new(const std::string& path);
 	void parse_lumen_scene(const std::string& path, LumenNode* root);
 	void add_default_texture();
 	VkSampler texture_sampler;

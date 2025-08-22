@@ -129,14 +129,14 @@ void RayTracer::init_resources() {
 							 .memory_type = vk::BUFFER_TYPE_GPU,
 							 .size = Window::width() * Window::height() * 4 * sizeof(f32),
 							 .data = data});
-		rt_utils_desc.gt_img_addr = gt_img_buffer->get_device_address();
+		rt_utils_desc.gt_img_addr = gt_img_buffer->device_address();
 		free(data);
 	}
 
-	rt_utils_desc.out_img_addr = output_img_buffer->get_device_address();
-	rt_utils_desc.residual_addr = residual_buffer->get_device_address();
-	rt_utils_desc.counter_addr = counter_buffer->get_device_address();
-	rt_utils_desc.rmse_val_addr = rmse_val_buffer->get_device_address();
+	rt_utils_desc.out_img_addr = output_img_buffer->device_address();
+	rt_utils_desc.residual_addr = residual_buffer->device_address();
+	rt_utils_desc.counter_addr = counter_buffer->device_address();
+	rt_utils_desc.rmse_val_addr = rmse_val_buffer->device_address();
 
 	rt_utils_desc_buffer =
 		prm::get_buffer({.name = "RT Utils Desc",
@@ -316,19 +316,19 @@ bool RayTracer::gui() {
 	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
 	if (show_cam_stats) {
 		ImGui::Text("X - Right, Y - Up, -Z - Forward");
-		ImGui::Text("Camera position: %.2f %.2f %.2f", scene.camera->position.x, scene.camera->position.y,
-					scene.camera->position.z);
-		ImGui::Text("Camera rotation (degrees): X:%.2f Y:%.2f Z:%.2f", scene.camera->rotation.x,
-					scene.camera->rotation.y, scene.camera->rotation.z);
-		ImGui::Text("Camera direction:  %.2f %.2f %.2f", scene.camera->direction.x, scene.camera->direction.y,
-					scene.camera->direction.z);
+		ImGui::Text("Camera position: %.2f %.2f %.2f", scene.camera.position.x, scene.camera.position.y,
+					scene.camera.position.z);
+		ImGui::Text("Camera rotation (degrees): X:%.2f Y:%.2f Z:%.2f", scene.camera.rotation.x,
+					scene.camera.rotation.y, scene.camera.rotation.z);
+		ImGui::Text("Camera direction:  %.2f %.2f %.2f", scene.camera.direction.x, scene.camera.direction.y,
+					scene.camera.direction.z);
 		if (ImGui::Button("Copy camera data to clipboard")) {
 			std::string cam_pos_str = std::format(
 				"    \"position\": "
 				"[{:.2f},{:.2f},{:.2f}],\n    \"rotation\":[{:.2f},{:.2f},{:.2f}],\n    \"dir\":[{:.2f},{:.2f},{:.2f}]",
-				scene.camera->position.x, scene.camera->position.y, scene.camera->position.z, scene.camera->rotation.x,
-				scene.camera->rotation.y, scene.camera->rotation.z, scene.camera->direction.x,
-				scene.camera->direction.y, scene.camera->direction.z);
+				scene.camera.position.x, scene.camera.position.y, scene.camera.position.z, scene.camera.rotation.x,
+				scene.camera.rotation.y, scene.camera.rotation.z, scene.camera.direction.x,
+				scene.camera.direction.y, scene.camera.direction.z);
 			glfwSetClipboardString(Window::get()->window_handle, cam_pos_str.c_str());
 		}
 	}
@@ -439,7 +439,6 @@ f32 RayTracer::draw_frame() {
 	vk::render_graph()->reset();
 	if (result != VK_SUCCESS) {
 		Window::update_window_size();
-		const f32 aspect_ratio = (f32)Window::width() / Window::height();
 		cleanup_resources();
 		integrator->destroy(/*resize=*/true);
 		post_fx.destroy();

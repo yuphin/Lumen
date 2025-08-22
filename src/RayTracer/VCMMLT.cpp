@@ -152,32 +152,32 @@ void VCMMLT::init() {
 	} while (arr_size > 1);
 
 	SceneDesc desc;
-	desc.index_addr = lumen_scene->index_buffer->get_device_address();
+	desc.index_addr = lumen_scene->index_buffer->device_address();
 
-	desc.material_addr = lumen_scene->materials_buffer->get_device_address();
-	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->get_device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer->device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
 	// VCMMLT
-	desc.bootstrap_addr = bootstrap_buffer->get_device_address();
-	desc.cdf_addr = cdf_buffer->get_device_address();
-	desc.cdf_sum_addr = cdf_sum_buffer->get_device_address();
-	desc.seeds_addr = seeds_buffer->get_device_address();
-	desc.light_primary_samples_addr = light_primary_samples_buffer->get_device_address();
-	desc.mlt_samplers_addr = mlt_samplers_buffer->get_device_address();
-	desc.mlt_col_addr = mlt_col_buffer->get_device_address();
-	desc.chain_stats_addr = chain_stats_buffer->get_device_address();
-	desc.splat_addr = splat_buffer->get_device_address();
-	desc.past_splat_addr = past_splat_buffer->get_device_address();
+	desc.bootstrap_addr = bootstrap_buffer->device_address();
+	desc.cdf_addr = cdf_buffer->device_address();
+	desc.cdf_sum_addr = cdf_sum_buffer->device_address();
+	desc.seeds_addr = seeds_buffer->device_address();
+	desc.light_primary_samples_addr = light_primary_samples_buffer->device_address();
+	desc.mlt_samplers_addr = mlt_samplers_buffer->device_address();
+	desc.mlt_col_addr = mlt_col_buffer->device_address();
+	desc.chain_stats_addr = chain_stats_buffer->device_address();
+	desc.splat_addr = splat_buffer->device_address();
+	desc.past_splat_addr = past_splat_buffer->device_address();
 
-	desc.vcm_vertices_addr = light_path_buffer->get_device_address();
-	desc.path_cnt_addr = light_path_cnt_buffer->get_device_address();
+	desc.vcm_vertices_addr = light_path_buffer->device_address();
+	desc.path_cnt_addr = light_path_cnt_buffer->device_address();
 
-	desc.color_storage_addr = tmp_col_buffer->get_device_address();
-	desc.photon_addr = photon_buffer->get_device_address();
+	desc.color_storage_addr = tmp_col_buffer->device_address();
+	desc.photon_addr = photon_buffer->device_address();
 
-	desc.mlt_atomicsum_addr = mlt_atomicsum_buffer->get_device_address();
-	desc.residual_addr = mlt_residual_buffer->get_device_address();
-	desc.counter_addr = counter_buffer->get_device_address();
+	desc.mlt_atomicsum_addr = mlt_atomicsum_buffer->device_address();
+	desc.residual_addr = mlt_residual_buffer->device_address();
+	desc.counter_addr = counter_buffer->device_address();
 
 	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
@@ -479,7 +479,7 @@ void VCMMLT::prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph
 		pc_compute.n = 2 * 1024;
 		pc_compute.store_sum = 1;
 		pc_compute.scan_sums = i32(scan_sums);
-		pc_compute.block_sum_addr = block_sums[level]->get_device_address();
+		pc_compute.block_sum_addr = block_sums[level]->device_address();
 		scan(num_grids, level);
 		i32 rem = num_elems % (2 * 1024);
 		if (rem) {
@@ -494,9 +494,9 @@ void VCMMLT::prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph
 		pc_compute.n = num_elems - rem;
 		pc_compute.store_sum = 1;
 		pc_compute.scan_sums = i32(scan_sums);
-		pc_compute.block_sum_addr = block_sums[level]->get_device_address();
+		pc_compute.block_sum_addr = block_sums[level]->device_address();
 		if (scan_sums) {
-			pc_compute.out_addr = block_sums[level - 1]->get_device_address();
+			pc_compute.out_addr = block_sums[level - 1]->device_address();
 		}
 		uniform_add(num_grids, level - 1);
 		if (rem) {
@@ -513,7 +513,7 @@ void VCMMLT::prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph
 		pc_compute.store_sum = 0;
 		pc_compute.scan_sums = bool(scan_sums);
 		if (scan_sums) {
-			pc_compute.block_sum_addr = block_sums[level - 1]->get_device_address();
+			pc_compute.block_sum_addr = block_sums[level - 1]->device_address();
 		}
 		scan(num_wgs, level - 1);
 	}

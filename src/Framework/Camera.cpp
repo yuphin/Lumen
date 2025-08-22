@@ -1,11 +1,12 @@
 
-#include "Camera2.h"
+#include "Camera.h"
 namespace lm {
 
 static constexpr glm::vec3 UP = glm::vec3(0, 1, 0);
 static constexpr glm::vec3 RIGHT = glm::vec3(1, 0, 0);
 static constexpr glm::vec3 FORWARD = glm::vec3(0, 0, 1);
 static void camera_init_projection(Camera* camera, f32 aspect_ratio) {
+	camera->projection = glm::mat4(1.0f);
 	camera->projection[0][0] = 1 / (aspect_ratio * tanf(glm::radians(camera->fov / 2)));
 	camera->projection[1][1] = -1 / (tanf(glm::radians(camera->fov / 2)));
 	camera->projection[2][2] = camera->far_plane / (camera->near_plane - camera->far_plane);
@@ -27,7 +28,7 @@ void camera_init(Camera* camera, f32 fov, f32 cam_near, f32 cam_far, f32 aspect_
 }
 
 void camera_update_view(Camera* camera) {
-	glm::mat4 camera_matrix = glm::mat4(1);
+	glm::mat4 camera_matrix = glm::mat4(1.0f);
 	camera_matrix = glm::translate(camera_matrix, camera->position);
 	camera_matrix = glm::rotate(camera_matrix, glm::radians(camera->rotation.y), UP);
 	camera_matrix = glm::rotate(camera_matrix, glm::radians(camera->rotation.x), RIGHT);

@@ -105,7 +105,7 @@ VkSampler get_sampler(const VkSamplerCreateInfo& sampler_create_info, bool use_m
 	lock.unlock();
 	vk::check(vkCreateSampler(vk::context().device, &sampler_create_info, nullptr, &result.first->second),
 			  "Could not create a sampler");
-	vk::DebugMarker::set_resource_name(vk::context().device, (u64)result.first->second, "Sampler",
+	vk::set_resource_name(vk::context().device, (u64)result.first->second, "Sampler",
 									   VK_OBJECT_TYPE_SAMPLER);
 	return result.first->second;
 }

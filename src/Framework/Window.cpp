@@ -173,4 +173,5 @@ void update_window_size() {
 
 u32 width() { return _window.viewport_width; }
 u32 height() { return _window.viewport_height; }
+f32 aspect_ratio() { return (f32)_window.viewport_width / _window.viewport_height; }
 }  // namespace Window

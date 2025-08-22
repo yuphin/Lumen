@@ -116,20 +116,20 @@ void ReSTIRPT::init() {
 						 .size = Window::width() * Window::height() * sizeof(PhotonReservoir)});
 
 	SceneDesc desc;
-	desc.index_addr = lumen_scene->index_buffer->get_device_address();
+	desc.index_addr = lumen_scene->index_buffer->device_address();
 
-	desc.material_addr = lumen_scene->materials_buffer->get_device_address();
-	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->get_device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->get_device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer->device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
 	// ReSTIR PT (GRIS)
-	desc.transformations_addr = transformations_buffer->get_device_address();
-	desc.prefix_contributions_addr = prefix_contribution_buffer->get_device_address();
-	desc.debug_vis_addr = debug_vis_buffer->get_device_address();
-	desc.photon_eye_addr = photon_eye_buffer_ping->get_device_address();
-	desc.caustic_photon_aabbs_addr = caustic_photon_aabbs_buffer->get_device_address();
-	desc.caustic_photon_light_addr = caustic_photon_light_buffer->get_device_address();
-	desc.photon_count_addr = photon_count_buffer->get_device_address();
+	desc.transformations_addr = transformations_buffer->device_address();
+	desc.prefix_contributions_addr = prefix_contribution_buffer->device_address();
+	desc.debug_vis_addr = debug_vis_buffer->device_address();
+	desc.photon_eye_addr = photon_eye_buffer_ping->device_address();
+	desc.caustic_photon_aabbs_addr = caustic_photon_aabbs_buffer->device_address();
+	desc.caustic_photon_light_addr = caustic_photon_light_buffer->device_address();
+	desc.photon_count_addr = photon_count_buffer->device_address();
 
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",
@@ -265,7 +265,7 @@ void ReSTIRPT::render() {
 		// For BLAS
 		VkAccelerationStructureGeometryAabbsDataKHR aabbs_data{
 			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR};
-		aabbs_data.data.deviceAddress = caustic_photon_aabbs_buffer->get_device_address();
+		aabbs_data.data.deviceAddress = caustic_photon_aabbs_buffer->device_address();
 		aabbs_data.stride = sizeof(f32) * 6;
 
 		VkAccelerationStructureGeometryKHR as_geom{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
@@ -301,10 +301,10 @@ void ReSTIRPT::render() {
 			.bind_texture_array(lumen_scene->scene_textures)
 			.zero(photon_count_buffer)
 			.zero(caustic_photon_aabbs_buffer)
-			.build_blas(util::Slice(&photon_blas, 1), photon_blas_inputs,
+			.blas_build(util::Slice(&photon_blas, 1), photon_blas_inputs,
 						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, {caustic_photon_aabbs_buffer},
 						&photon_bvh_scratch_buf)
-			.build_tlas(photon_tlas, photon_bvh_instances_buf, 1,
+			.tlas_build(photon_tlas, photon_bvh_instances_buf, 1,
 						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, &photon_bvh_scratch_buf,
 						/*build_tlas_after_blas=*/true)
 			.bind_tlas(tlas);

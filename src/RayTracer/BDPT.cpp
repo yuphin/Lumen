@@ -21,15 +21,15 @@ void BDPT::init() {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * 3 * 4});
 	SceneDesc desc;
-	desc.index_addr = lumen_scene->index_buffer->get_device_address();
+	desc.index_addr = lumen_scene->index_buffer->device_address();
 
-	desc.material_addr = lumen_scene->materials_buffer->get_device_address();
-	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->get_device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->get_device_address();
+	desc.material_addr = lumen_scene->materials_buffer->device_address();
+	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
 	// BDPT
-	desc.light_path_addr = light_path_buffer->get_device_address();
-	desc.camera_path_addr = camera_path_buffer->get_device_address();
-	desc.color_storage_addr = color_storage_buffer->get_device_address();
+	desc.light_path_addr = light_path_buffer->device_address();
+	desc.camera_path_addr = camera_path_buffer->device_address();
+	desc.color_storage_addr = color_storage_buffer->device_address();
 
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",

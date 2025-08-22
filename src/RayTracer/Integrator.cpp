@@ -4,7 +4,7 @@
 #include "Framework/VkUtils.h"
 
 void Integrator::init() {
-	lm::Camera* cam_ptr = lumen_scene->camera.get();
+	lm::Camera* cam_ptr = &lumen_scene->camera;
 	Window::add_mouse_click_callback([this](MouseAction button, KeyAction action, double x, double y) {
 		if (ImGui::GetIO().WantCaptureMouse) {
 			return;
@@ -21,7 +21,7 @@ void Integrator::init() {
 			return;
 		}
 		if (Window::is_mouse_held(MouseAction::LEFT) && !Window::is_key_held(KeyInput::KEY_TAB)) {
-			cam_ptr->rotate(0.05f * (f32)delta_y, -0.05f * (f32)delta_x, 0.0f);
+			lm::camera_rotate(cam_ptr, 0.05f * (f32)delta_y, -0.05f * (f32)delta_x, 0.0f);
 			updated = true;
 		}
 	});
@@ -54,17 +54,18 @@ bool Integrator::gui() {
 }
 
 void Integrator::update_uniform_buffers() {
-	lumen_scene->camera->update_view_matrix();
+	lm::Camera& camera = lumen_scene->camera;
+	lm::camera_update_view(&camera);
 	scene_ubo.prev_view = scene_ubo.view;
-	scene_ubo.view = lumen_scene->camera->view;
-	scene_ubo.prev_projection = lumen_scene->camera->projection;
-	scene_ubo.projection = lumen_scene->camera->projection;
-	scene_ubo.view_pos = glm::vec4(lumen_scene->camera->position, 1);
-	scene_ubo.inv_view = glm::inverse(lumen_scene->camera->view);
-	scene_ubo.inv_projection = glm::inverse(lumen_scene->camera->projection);
+	scene_ubo.view = camera.view;
+	scene_ubo.prev_projection = camera.projection;
+	scene_ubo.projection = camera.projection;
+	scene_ubo.view_pos = glm::vec4(camera.position, 1);
+	scene_ubo.inv_view = glm::inverse(camera.view);
+	scene_ubo.inv_projection = glm::inverse(camera.projection);
 	scene_ubo.model = glm::mat4(1.0);
 	scene_ubo.light_pos = glm::vec4(3.0f, 2.5f, 1.0f, 1.0f);
-	vk::write_buffer(scene_ubo_buffer, &scene_ubo, sizeof(scene_ubo));
+	vk::buffer_write(scene_ubo_buffer, &scene_ubo, sizeof(scene_ubo));
 }
 
 bool Integrator::update() {
@@ -73,38 +74,38 @@ bool Integrator::update() {
 	if (Window::is_key_held(KeyInput::KEY_LEFT_SHIFT)) {
 		trans_speed *= 4;
 	}
-
-	front.x = cos(glm::radians(lumen_scene->camera->rotation.x)) * sin(glm::radians(lumen_scene->camera->rotation.y));
-	front.y = sin(glm::radians(lumen_scene->camera->rotation.x));
-	front.z = cos(glm::radians(lumen_scene->camera->rotation.x)) * cos(glm::radians(lumen_scene->camera->rotation.y));
+	lm::Camera& camera = lumen_scene->camera;
+	front.x = cos(glm::radians(camera.rotation.x)) * sin(glm::radians(camera.rotation.y));
+	front.y = sin(glm::radians(camera.rotation.x));
+	front.z = cos(glm::radians(camera.rotation.x)) * cos(glm::radians(camera.rotation.y));
 	front = glm::normalize(-front);
 	if (Window::is_key_held(KeyInput::KEY_W)) {
-		lumen_scene->camera->position += front * trans_speed;
+		camera.position += front * trans_speed;
 		updated = true;
 	}
 	if (Window::is_key_held(KeyInput::KEY_A)) {
-		lumen_scene->camera->position -= glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * trans_speed;
+		camera.position -= glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * trans_speed;
 		updated = true;
 	}
 	if (Window::is_key_held(KeyInput::KEY_S)) {
-		lumen_scene->camera->position -= front * trans_speed;
+		camera.position -= front * trans_speed;
 		updated = true;
 	}
 	if (Window::is_key_held(KeyInput::KEY_D)) {
-		lumen_scene->camera->position += glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * trans_speed;
+		camera.position += glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * trans_speed;
 		updated = true;
 	}
 	if (Window::is_key_held(KeyInput::SPACE) || Window::is_key_held(KeyInput::KEY_E)) {
 		// Right
 		auto right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
 		auto up = glm::cross(right, front);
-		lumen_scene->camera->position += up * trans_speed;
+		camera.position += up * trans_speed;
 		updated = true;
 	}
 	if (Window::is_key_held(KeyInput::KEY_LEFT_CONTROL) || Window::is_key_held(KeyInput::KEY_Q)) {
 		auto right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
 		auto up = glm::cross(right, front);
-		lumen_scene->camera->position -= up * trans_speed;
+		camera.position -= up * trans_speed;
 		updated = true;
 	}
 
@@ -129,14 +130,14 @@ void Integrator::destroy(bool resize) {
 void Integrator::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 	std::vector<vk::BlasInput> blas_inputs;
 
-	VkDeviceAddress vertex_address = lumen_scene->vertex_buffer->get_device_address();
-	VkDeviceAddress idx_address = lumen_scene->index_buffer->get_device_address();
+	VkDeviceAddress vertex_address = lumen_scene->vertex_buffer->device_address();
+	VkDeviceAddress idx_address = lumen_scene->index_buffer->device_address();
 	for (auto& prim_mesh : lumen_scene->prim_meshes) {
 		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh.vtx_count, prim_mesh.idx_count, prim_mesh.vtx_offset,
 											   prim_mesh.first_idx, vertex_address, idx_address);
 		blas_inputs.push_back({geo});
 	}
-	vk::build_blas(blases, blas_inputs,
+	vk::blas_build(blases, blas_inputs,
 				   VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
 					   VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 	std::vector<VkAccelerationStructureInstanceKHR> tlas_instances;
@@ -145,11 +146,11 @@ void Integrator::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 		ray_inst.transform = vk::to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
 		assert(pm.prim_idx < blases.size());
-		ray_inst.accelerationStructureReference = blases[pm.prim_idx].get_device_address();
+		ray_inst.accelerationStructureReference = blases[pm.prim_idx].device_address();
 		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		ray_inst.mask = 0xFF;
 		ray_inst.instanceShaderBindingTableRecordOffset = 0;  // We will use the same hit group for all objects
 		tlas_instances.emplace_back(ray_inst);
 	}
-	vk::build_tlas(tlas, tlas_instances, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+	vk::tlas_build(tlas, tlas_instances, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }

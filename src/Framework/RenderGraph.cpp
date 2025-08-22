@@ -537,7 +537,7 @@ RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 	return *this;
 }
 
-RenderPass& RenderPass::build_blas(util::Slice<vk::BVH> blases, const std::vector<vk::BlasInput>& blas_inputs,
+RenderPass& RenderPass::blas_build(util::Slice<vk::BVH> blases, const std::vector<vk::BlasInput>& blas_inputs,
 								   VkBuildAccelerationStructureFlagsKHR flags,
 								   const std::vector<vk::Buffer*>& source_buffers, vk::Buffer** scratch_buffer_ref) {
 	LUMEN_ASSERT(!blas_build_data.is_valid(), "Only one BLAS build per pass is supported");
@@ -551,7 +551,7 @@ RenderPass& RenderPass::build_blas(util::Slice<vk::BVH> blases, const std::vecto
 	return *this;
 }
 
-RenderPass& RenderPass::build_tlas(vk::BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
+RenderPass& RenderPass::tlas_build(vk::BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
 								   VkBuildAccelerationStructureFlagsKHR flags, vk::Buffer** scratch_buffer_ref,
 								   bool build_tlas_after_blas, bool update_tlas) {
 	LUMEN_ASSERT(!tlas_build_data.is_valid(), "Only one TLAS build per pass is supported");
@@ -644,7 +644,7 @@ void RenderPass::write_impl(const vk::Buffer* buffer, VkAccessFlags access_flags
 }
 
 void RenderPass::write_impl(vk::Texture* tex, VkAccessFlags access_flags) {
-	VkImageLayout target_layout = vk::image_layout_from_tex(tex, access_flags);
+	VkImageLayout target_layout = vk::texture_to_image_layout(tex, access_flags);
 	register_dependencies(tex, target_layout);
 	rg->img_resource_map[tex->handle] = pass_idx;
 }
@@ -655,7 +655,7 @@ void RenderPass::read_impl(const vk::Buffer* buffer, VkAccessFlags access_flags,
 }
 
 void RenderPass::read_impl(vk::Texture* tex) {
-	VkImageLayout target_layout = vk::image_layout_from_tex(tex, VK_ACCESS_SHADER_READ_BIT);
+	VkImageLayout target_layout = vk::texture_to_image_layout(tex, VK_ACCESS_SHADER_READ_BIT);
 	register_dependencies(tex, target_layout);
 	rg->img_resource_map[tex->handle] = pass_idx;
 }
@@ -671,7 +671,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	if (use_events) {
 		wait_events.reserve(wait_signals_buffer.size());
 	}
-	vk::DebugMarker::begin_region(vk::context().device, cmd, name.c_str(), glm::vec4(1.0f, 0.78f, 0.05f, 1.0f));
+	vk::begin_region(vk::context().device, cmd, name.c_str(), glm::vec4(1.0f, 0.78f, 0.05f, 1.0f));
 	GPUQueryManager::begin(cmd, name.c_str());
 
 	// Wait: Buffer
@@ -952,7 +952,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 	if (blas_build_data.is_valid()) {
 		GPUQueryManager::begin(cmd, "BLAS Build");
-		vk::build_blas(blas_build_data.blases, blas_build_data.blas_inputs, blas_build_data.flags, cmd,
+		vk::blas_build(blas_build_data.blases, blas_build_data.blas_inputs, blas_build_data.flags, cmd,
 					   blas_build_data.scratch_buffer_ref);
 		GPUQueryManager::end(cmd);
 
@@ -961,7 +961,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			void* instance_data = vk::buffer_map(tlas_build_data.instances_buf);
 			for (u64 i = 0; i < blas_build_data.blases.size; i++) {
 				VkAccelerationStructureInstanceKHR* instance = (VkAccelerationStructureInstanceKHR*)instance_data + i;
-				instance->accelerationStructureReference = blas_build_data.blases[i].get_device_address();
+				instance->accelerationStructureReference = blas_build_data.blases[i].device_address();
 			}
 			vk::buffer_unmap(tlas_build_data.instances_buf);
 #if 0
@@ -981,7 +981,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 	if (tlas_build_data.is_valid()) {
 		GPUQueryManager::begin(cmd, "TLAS Build");
-		vk::build_tlas(*tlas_build_data.tlas, tlas_build_data.instances_buf, tlas_build_data.instance_count,
+		vk::tlas_build(*tlas_build_data.tlas, tlas_build_data.instances_buf, tlas_build_data.instance_count,
 					   tlas_build_data.flags, cmd, tlas_build_data.scratch_buffer_ref);
 		write_impl(tlas_build_data.tlas->buffer, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
 		GPUQueryManager::end(cmd);
@@ -1018,7 +1018,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			vkCmdSetEvent2(cmd, set_signals_img[k].event, &dependency_info);
 		}
 	}
-	vk::DebugMarker::end_region(vk::context().device, cmd);
+	vk::end_region(vk::context().device, cmd);
 	GPUQueryManager::end(cmd);
 }
 

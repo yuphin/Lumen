@@ -174,7 +174,7 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, u32 primitive_co
 	// Update build information
 	build_info.srcAccelerationStructure = update ? tlas.accel : VK_NULL_HANDLE;
 	build_info.dstAccelerationStructure = tlas.accel;
-	build_info.scratchData.deviceAddress = (*scratch_buffer_ref)->get_device_address();
+	build_info.scratchData.deviceAddress = (*scratch_buffer_ref)->device_address();
 
 	// Build Offsets info: n instances
 	VkAccelerationStructureBuildRangeInfoKHR build_offset_info{primitive_count, 0, 0, 0};
@@ -286,11 +286,11 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<Build
 		// Over the limit or last BLAS element
 		if (batch_size >= batch_limit || idx == num_blases - 1) {
 			if (external_cmd_buf) {
-				cmd_create_blas(external_cmd_buf, indices, build_as, scratch_buffer->get_device_address(),
+				cmd_create_blas(external_cmd_buf, indices, build_as, scratch_buffer->device_address(),
 								compaction_query_pool);
 			} else {
 				vk::CommandBuffer cmd(true);
-				cmd_create_blas(cmd.handle, indices, build_as, scratch_buffer->get_device_address(),
+				cmd_create_blas(cmd.handle, indices, build_as, scratch_buffer->device_address(),
 								compaction_query_pool);
 				cmd.submit();
 				if (compaction_query_pool) {
@@ -328,7 +328,7 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<Build
 	return build_as;
 }
 
-void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
+void blas_build(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer) {
 	std::vector<BuildAccelerationStructure> build_as(input.size());
 	blases.resize(input.size());
@@ -338,7 +338,7 @@ void build_blas(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
 	build_blas_impl(build_as, input, flags, cmd_buf, scratch_buffer);
 }
 
-void build_blas(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
+void blas_build(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer) {
 	LUMEN_ASSERT(blases.size == input.size(), "Mismatch between input and output sizes");
 	std::vector<BuildAccelerationStructure> build_as(input.size());
@@ -353,7 +353,7 @@ void build_blas(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
 // - The resulting TLAS will be stored in m_tlas
 // - update is to rebuild the Tlas with updated matrices, flag must have the
 // 'allow_update'
-void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
+void tlas_build(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
 				VkBuildAccelerationStructureFlagsKHR flags, bool update) {
 	u32 instance_count = static_cast<u32>(instances.size());
 
@@ -377,13 +377,13 @@ void build_tlas(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 						 nullptr);
 	// Creating the TLAS
 	cmd_create_tlas(tlas, cmd.handle, instance_count, &scratch_buffer, /*export_scratch_buffer=*/false,
-					instances_buf->get_device_address(), flags, update);
+					instances_buf->device_address(), flags, update);
 	cmd.submit();
 	drm::destroy(scratch_buffer);
 	drm::destroy(instances_buf);
 }
 
-void build_tlas(BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
+void tlas_build(BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer_ref,
 				bool update) {
 	VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
@@ -395,7 +395,7 @@ void build_tlas(BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
 						 nullptr);
 	// Creating the TLAS
 	cmd_create_tlas(tlas, cmd_buf, instance_count, scratch_buffer_ref, /*export_scratch_buffer=*/true,
-					instances_buf->get_device_address(), flags, update);
+					instances_buf->device_address(), flags, update);
 }
 
 BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx,

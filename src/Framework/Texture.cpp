@@ -103,7 +103,7 @@ void texture_create(Texture* texture, const TextureDesc& desc) {
 	}
 
 	if (!texture->name.empty()) {
-		vk::DebugMarker::set_resource_name(vk::context().device, (u64)texture->handle, texture->name.data(),
+		vk::set_resource_name(vk::context().device, (u64)texture->handle, texture->name.data(),
 										   VK_OBJECT_TYPE_IMAGE);
 	}
 
@@ -248,7 +248,7 @@ void texture_transition(Texture* tex, VkCommandBuffer cmd, VkImageLayout new_lay
 	tex->layout = new_layout;
 }
 
-VkImageLayout image_layout_from_tex(const vk::Texture* tex, VkAccessFlags access_flags) {
+VkImageLayout texture_to_image_layout(const vk::Texture* tex, VkAccessFlags access_flags) {
 	if ((tex->usage_flags & VK_IMAGE_USAGE_SAMPLED_BIT) && access_flags == VK_ACCESS_SHADER_READ_BIT) {
 		return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	}
