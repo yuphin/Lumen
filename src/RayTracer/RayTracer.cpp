@@ -8,12 +8,16 @@ RayTracer* RayTracer::instance = nullptr;
 bool load_reference = false;
 bool calc_rmse = false;
 
-RayTracer::RayTracer(bool debug, i32 argc, char* argv[]) : debug(debug) {
+void RayTracer::init(bool use_debug, i32 argc, char* argv[]) {
 	instance = this;
-	parse_args(argc, argv);
-}
-
-void RayTracer::init() {
+	debug = use_debug;
+	scene_name = "scenes/caustics.scene";
+	for (i32 i = 0; i < argc; i++) {
+		lm::String arg_str = lm::String(argv[i], strlen(argv[i]));
+		if (lm::str_ends_with(arg_str, lm::cliteral(".scene"))) {
+			scene_name = arg_str;
+		}
+	}
 	srand((u32)time(NULL));
 	Window::add_key_callback([this](KeyInput key, KeyAction action) {
 		if (Window::is_key_down(KeyInput::KEY_F1)) {
@@ -318,8 +322,8 @@ bool RayTracer::gui() {
 		ImGui::Text("X - Right, Y - Up, -Z - Forward");
 		ImGui::Text("Camera position: %.2f %.2f %.2f", scene.camera.position.x, scene.camera.position.y,
 					scene.camera.position.z);
-		ImGui::Text("Camera rotation (degrees): X:%.2f Y:%.2f Z:%.2f", scene.camera.rotation.x,
-					scene.camera.rotation.y, scene.camera.rotation.z);
+		ImGui::Text("Camera rotation (degrees): X:%.2f Y:%.2f Z:%.2f", scene.camera.rotation.x, scene.camera.rotation.y,
+					scene.camera.rotation.z);
 		ImGui::Text("Camera direction:  %.2f %.2f %.2f", scene.camera.direction.x, scene.camera.direction.y,
 					scene.camera.direction.z);
 		if (ImGui::Button("Copy camera data to clipboard")) {
@@ -327,8 +331,8 @@ bool RayTracer::gui() {
 				"    \"position\": "
 				"[{:.2f},{:.2f},{:.2f}],\n    \"rotation\":[{:.2f},{:.2f},{:.2f}],\n    \"dir\":[{:.2f},{:.2f},{:.2f}]",
 				scene.camera.position.x, scene.camera.position.y, scene.camera.position.z, scene.camera.rotation.x,
-				scene.camera.rotation.y, scene.camera.rotation.z, scene.camera.direction.x,
-				scene.camera.direction.y, scene.camera.direction.z);
+				scene.camera.rotation.y, scene.camera.rotation.z, scene.camera.direction.x, scene.camera.direction.y,
+				scene.camera.direction.z);
 			glfwSetClipboardString(Window::get()->window_handle, cam_pos_str.c_str());
 		}
 	}
@@ -379,11 +383,12 @@ bool RayTracer::gui() {
 		bool was_custom_accel = typeid(*integrator) == typeid(DDGI);
 		integrator->destroy(/*resize=*/false);
 		SceneConfig prev_scene_config = *scene.config;
-		auto integrator_str = std::string(settings[curr_integrator_idx]);
+		// TODO: Remove
+		std::string integrator_str = std::string(settings[curr_integrator_idx]);
 		integrator_str.erase(std::remove_if(integrator_str.begin(), integrator_str.end(), ::isspace),
 							 integrator_str.end());
 		std::transform(integrator_str.begin(), integrator_str.end(), integrator_str.begin(), ::tolower);
-		scene.create_scene_config(integrator_str);
+		scene.create_scene_config(lm::String(integrator_str.data(), integrator_str.size() - 1));
 		scene.config->cam_settings = prev_scene_config.cam_settings;
 		scene.config->sky_col = prev_scene_config.sky_col;
 		scene.config->path_length = prev_scene_config.path_length;
@@ -459,8 +464,7 @@ f32 RayTracer::draw_frame() {
 
 	if (write_exr) {
 		write_exr = false;
-		ImageUtils::save_exr((f32*)vk::buffer_map(output_img_buffer_cpu), Window::width(), Window::height(),
-							 "out.exr");
+		ImageUtils::save_exr((f32*)vk::buffer_map(output_img_buffer_cpu), Window::width(), Window::height(), "out.exr");
 		vk::buffer_unmap(output_img_buffer_cpu);
 	}
 	bool time_limit = (abs(diff / CLOCKS_PER_SEC - 5)) < 0.1;
@@ -478,15 +482,6 @@ f32 RayTracer::draw_frame() {
 	return (f32)t_diff;
 }
 
-void RayTracer::parse_args(i32 argc, char* argv[]) {
-	scene_name = "scenes/caustics.json";
-	std::regex fn("(.*).(.json|.xml|.scene)");
-	for (i32 i = 0; i < argc; i++) {
-		if (std::regex_match(argv[i], fn)) {
-			scene_name = argv[i];
-		}
-	}
-}
 void RayTracer::destroy_accel() {
 	tlas.destroy();
 	for (vk::BVH& blas : blases) {

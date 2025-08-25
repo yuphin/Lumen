@@ -1,5 +1,6 @@
 file(GLOB main_src
     "main.cpp"
+    "main_tests.cpp"
 )
 
 file(GLOB framework_src

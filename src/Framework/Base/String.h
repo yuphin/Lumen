@@ -1,7 +1,7 @@
-#include "Memory.h"
 #pragma once
 namespace lm {
 struct Arena;
+struct String;
 
 struct String {
 	char* data = nullptr;
@@ -9,29 +9,29 @@ struct String {
 
 	String() = default;
 	String(char* str, u64 size) : data(str), size(size) {}
+	// Our strings do not end with null, unless explicitly specified
 	template <size_t N>
-    constexpr String(const char (&str)[N]) : data((char*)str), size(N) {}
+	constexpr String(const char (&str)[N], bool cstr = false) : data((char*)str), size(cstr ? N : N - 1) {}
 
-	
-	char& operator[](u64 idx) {
+	bool operator==(const String& other);
+
+	inline char& operator[](u64 idx) {
 		assert(idx < size);
 		return data[idx];
 	}
-	char operator[](u64 idx) const {
+	inline char operator[](u64 idx) const {
 		assert(idx < size);
 		return data[idx];
 	}
 
+	inline bool operator!=(const String& other) { return !(*this == other); }
 	inline char* begin() { return &data[0]; }
 	inline char* end() { return &data[size]; }
 	inline const char* begin() const { return &data[0]; }
 	inline const char* end() const { return &data[size]; }
+	inline bool empty() { return size > 0; }
+	inline bool is_cstr() const { return data[size - 1] == '\0'; }
 };
-
-template <size_t N>
-constexpr String literal(const char (&str)[N]) {
-	return String{(char*)str, N - 1};
-}
 
 template <size_t N>
 constexpr String cliteral(const char (&str)[N]) {
@@ -48,18 +48,23 @@ char char_to_upper(char c);
 char char_to_lower(char c);
 
 String str_from_f64(Arena* arena, double val, bool cstr = false);
+String str_from_f32(Arena* arena, float val, bool cstr = false);
 String str_from_u64(Arena* arena, u64 val, bool cstr = false);
+String str_from_u32(Arena* arena, u32 val, bool cstr = false);
 String str_from_s64(Arena* arena, s64 val, bool cstr = false);
 String str_to_lower(Arena* arena, const String& str);
-
+String str_substr(const String& str, u64 begin = U64_MAX, u64 length = U64_MAX);
+String str_reserve(Arena* arena, u64 size);
 String str_to_cstr(Arena* arena, const String& str);
-String str_chop(const String& str, u64 start = 0, u64 end = -1);
-
+String str_concat(Arena* arena, const String& str1, const String& str2, bool cstr = false);
+bool str_compare(const String& str1, const String& str2);
+u64 str_rfind(const String& str1, const String& str2);
+bool str_ends_with(const lm::String& str1, const lm::String& str2);
 u64 u64_from_str(const String& str);
 s64 s64_from_str(const String& str);
 f64 f64_from_str(const String& str);
 f32 f32_from_str(const String& str);
 
-String str_reserve(Arena* arena, u64 size);
+u64 cstr_len(const char* cstr);
 
 }  // namespace lm

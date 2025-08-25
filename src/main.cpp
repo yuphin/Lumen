@@ -7,7 +7,7 @@
 
 #undef USE_VALIDATION_LAYERS
 
-#if 1
+#if 0
 i32 main(i32 argc, char* argv[]) {
 #ifdef USE_VALIDATION_LAYERS
 	bool enable_debug = true;
@@ -30,9 +30,10 @@ i32 main(i32 argc, char* argv[]) {
 	Logger::init();
 	ThreadPool::init();
 	Window::init(width, height, fullscreen);
+	lm::arena_init(MB(16), MB(1));
 	{
-		RayTracer app(enable_debug, argc, argv);
-		app.init();
+		RayTracer app;
+		app.init(enable_debug, argc, argv);
 		while (!Window::should_close()) {
 			Window::poll();
 			app.update();
@@ -97,10 +98,10 @@ i32 main(i32 argc, char* argv[]) {
 	LUMEN_INFO("Result2 {}", result2.data);
 	LUMEN_INFO("Result3 {}", result3.data);
 
-	LUMEN_INFO("U64 from str: {}", lm::u64_from_str(lm::literal("123456789")));
-	LUMEN_INFO("U64 from str: {}", lm::u64_from_str(lm::literal("  asd  123456789asd")));
-	LUMEN_INFO("U64 from str2: {}", lm::u64_from_str(lm::literal("   18446744073709551616")));
-	LUMEN_INFO("S64 from str: {}", lm::s64_from_str(lm::literal("  -  123456789asd")));
+	LUMEN_INFO("U64 from str: {}", lm::u64_from_str(lm::cliteral("123456789")));
+	LUMEN_INFO("U64 from str: {}", lm::u64_from_str(lm::cliteral("  asd  123456789asd")));
+	LUMEN_INFO("U64 from str2: {}", lm::u64_from_str(lm::cliteral("   18446744073709551616")));
+	LUMEN_INFO("S64 from str: {}", lm::s64_from_str(lm::cliteral("  -  123456789asd")));
 
 	LUMEN_INFO("{}", f64_from_str(lm::cliteral("-1.32e-1")));
 	LUMEN_INFO("{}", f64_from_str(lm::cliteral("1.2423")));

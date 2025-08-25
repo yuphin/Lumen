@@ -1,4 +1,5 @@
 #include "String.h"
+#include "Memory.h"
 #define STB_SPRINTF_IMPLEMENTATION
 #include <stb/stb_sprintf.h>
 
@@ -23,6 +24,8 @@ String str_from_f64(Arena* arena, double val, bool cstr) {
 	return result;
 }
 
+String str_from_f32(Arena* arena, float val, bool cstr) { return str_from_f64(arena, val, cstr); }
+
 String str_to_cstr(Arena* arena, const String& str) {
 	char* data = (char*)arena->allocate(str.size + 1);
 	memmove(data, str.data, str.size);
@@ -30,6 +33,18 @@ String str_to_cstr(Arena* arena, const String& str) {
 	String result;
 	result.data = data;
 	result.size = str.size + 1;
+	return result;
+}
+
+String str_concat(Arena* arena, const String& str1, const String& str2, bool cstr) {
+	String result = {};
+	result.size = str1.size + str2.size + (u64)cstr;
+	result.data = (char*)arena->allocate(result.size);
+	memcpy(result.data, str1.data, str1.size);
+	memcpy(result.data + str1.size, str2.data, str2.size);
+	if (cstr) {
+		result.data[result.size - 1] = '\0';
+	}
 	return result;
 }
 
@@ -51,15 +66,9 @@ char char_to_lower(char c) {
 	}
 	return c;
 }
-
-String str_chop(const String& str, u64 start, u64 end) {
-	if (start >= str.size) return {};
-	if (end == -1 || end > str.size) end = str.size;
-	if (start >= end) return {};
-	String result;
-	result.data = str.data + start;
-	result.size = end - start;
-	return result;
+String str_substr(const String& str, u64 begin, u64 length) {
+	assert(begin < str.size && (begin + length) <= str.size);
+	return String((char*)str.data + begin, length);
 }
 
 // Radix 10
@@ -127,6 +136,7 @@ static String str_from_number(Arena* arena, u64 abs_val, bool negative, bool cst
 }
 
 String str_from_u64(Arena* arena, u64 val, bool cstr) { return str_from_number(arena, val, false, cstr); }
+String str_from_u32(Arena* arena, u32 val, bool cstr) { return str_from_number(arena, val, false, cstr); }
 String str_from_s64(Arena* arena, s64 val, bool cstr) {
 	bool negative = val < 0;
 	u64 abs_val = negative ? (u64)(-(val + 1)) + 1 : (u64)val;
@@ -197,4 +207,43 @@ String str_to_lower(Arena* arena, const String& str) {
 	return result;
 }
 
+bool str_compare(const String& str1, const String& str2) {
+	if (str1.size != str2.size) {
+		return false;
+	}
+	for (u64 idx = 0; idx < str1.size; ++idx) {
+		if (str1[idx] != str2[idx]) {
+			return false;
+		}
+	}
+	return true;
+}
+
+
+u64 str_rfind(const String& str1, const String& str2) {
+	assert(str1.size >= str2.size);
+	u64 str2_idx = str2.size - 1;
+	u64 str1_idx = str1.size - 1;
+	for (; str2_idx >= 0; --str1_idx, --str2_idx) {
+		if (str1[str1_idx] != str2[str2_idx]) {
+			return U64_MAX;
+		}
+	}
+	return str1_idx;
+}
+
+bool str_ends_with(const lm::String& str1, const lm::String& str2) {
+	return str_rfind(str1, str2) != U64_MAX;
+}
+
+bool String::operator==(const String& other) { return str_compare(*this, other); }
+
+u64 cstr_len(const char* cstr) {
+	for (u64 len = 0;; len++) {
+		if (cstr[len] == '\0') {
+			return len + 1;
+		}
+	}
+	return U64_MAX;
+}
 }  // namespace lm

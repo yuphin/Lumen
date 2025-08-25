@@ -29,5 +29,4 @@ FileHandle file_open(const lm::String& path, AccessFlags access_flags);
 void file_close(FileHandle handle);
 FileProperties file_properties(FileHandle handle);
 
-
 }  // namespace os

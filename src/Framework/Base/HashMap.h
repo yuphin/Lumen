@@ -1,6 +1,7 @@
 #pragma once
 #include "Memory.h"
 #include "Hash.h"
+#include "String.h"
 namespace lm {
 
 inline constexpr u64 HASH_MAP_LINEAR_MIN_CAPACITY = 32;
@@ -16,6 +17,8 @@ static inline uint64_t get_default_hash(const T& x) {
 		} else {
 			return knuth_hash(static_cast<uint64_t>(x) ^ HASH_INIT);
 		}
+	} else if constexpr (std::is_same_v<T, lm::String>) {
+		return fnv1a_hash((void*)x.data, x.size, HASH_INIT);
 	} else {
 		static_assert(false, "get_default_hash: Unsupported type for hashing");
 		return 0;
@@ -42,7 +45,6 @@ struct HashMapEntry<T, Empty> {
 	T key;
 };
 
-
 template <typename T1, typename T2, uint64_t (*hash_func)(const T1&)>
 struct HashMapLinear {
 	HashMapEntry<T1, T2>* data = nullptr;
@@ -54,7 +56,8 @@ struct HashMapLinear {
 
 	void resize(u64 new_capacity) {
 		new_capacity = util::next_pow2(new_capacity);
-		arena_ensure_allocated<HashMapEntry<T1, T2>>(arena_node, new_capacity, capacity, /*zero_initialize=*/true);
+		arena_ensure_allocated_in_the_same_block<HashMapEntry<T1, T2>>(arena_node, new_capacity, capacity,
+																	   /*zero_initialize=*/true);
 		capacity = new_capacity;
 	}
 
@@ -112,6 +115,39 @@ struct HashMapLinear {
 			probe_inc++;
 		}
 		return nullptr;
+	}
+
+	// If the entry doesn't exist, creates it, but doesn't initialize the value
+	HashMapEntry<T1, T2>* get_or_create(const T1& key) {
+		// Assumes the capacity is always a power of two
+		if (num_slots * 100 > capacity * HASH_MAP_LOAD_PERCENTAGE_THRESHOLD) {
+			resize(capacity << 1);
+		}
+		uint64_t hash = hash_func(key);
+		if (hash <= HASH_MAP_HASH_DELETED) {
+			hash += HASH_MAP_HASH_DELETED + 1;
+		}
+
+		u64 index = hash & (capacity - 1);
+
+		u32 probe_inc = 1;
+		while (data[index].hash != HASH_MAP_HASH_EMPTY) {
+			HashMapEntry<T1, T2>& entry = data[index];
+			if (entry.hash == HASH_MAP_HASH_DELETED) {
+				--num_slots;
+				break;
+			} else if (entry.key == key) {
+				return &data[index];
+			}
+			index = (index + probe_inc) & (capacity - 1);
+			probe_inc++;
+		}
+		++num_slots;
+		++size;
+		data[index].hash = hash;
+		data[index].key = key;
+		data[index].value = {};
+		return &data[index];
 	}
 
 	HashMapEntry<T1, T2>* remove(const T1& key) {
@@ -183,6 +219,7 @@ struct HashMapLinear {
 	}
 };
 
+// Like arrays, hash maps are also always allocated in a new block
 template <typename T1, typename T2, uint64_t (*hash_func)(const T1&) = get_default_hash<T1>>
 HashMapLinear<T1, T2, hash_func> hash_map_create(Arena* arena) {
 	using HashMapEntryType = HashMapEntry<T1, T2>;
@@ -192,11 +229,15 @@ HashMapLinear<T1, T2, hash_func> hash_map_create(Arena* arena) {
 
 	Arena* arena_node;
 	map.data = (HashMapEntryType*)arena->allocate(HASH_MAP_LINEAR_MIN_CAPACITY * sizeof(HashMapEntryType),
-												  alignof(HashMapEntryType), &arena_node);
+												  alignof(HashMapEntryType), &arena_node, /*zero_initialize=*/true,
+												  /*new_block=*/true);
 	memset(map.data, 0, HASH_MAP_LINEAR_MIN_CAPACITY * sizeof(HashMapEntryType));
 	map.arena_node = arena_node;
 	return map;
 }
+
+template <typename T1, typename T2, uint64_t (*hash_func)(const T1&) = get_default_hash<T1>>
+using HashMap = HashMapLinear<T1, T2, hash_func>;
 
 template <typename T, uint64_t (*hash_func)(const T&) = get_default_hash<T>>
 using HashSet = HashMapLinear<T, Empty, hash_func>;

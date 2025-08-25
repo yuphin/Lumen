@@ -130,6 +130,7 @@ u64 file_write(FileHandle handle, void* in_data, u64 size) {
 }
 
 FileHandle file_open(const lm::String& path, AccessFlags access_flags) {
+	assert(path.is_cstr());
 #if defined(_WIN32) || defined(_WIN64)
 	DWORD access = 0;
 	DWORD creation_disposition = OPEN_EXISTING;

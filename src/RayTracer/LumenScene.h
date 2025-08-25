@@ -7,6 +7,10 @@
 #include "Framework/Buffer.h"
 #include "Framework/Texture.h"
 #include "Framework/Camera.h"
+#include "Framework/Base/String.h"
+#include "Framework/Base/OS.h"
+#include "Framework/Base/Memory.h"
+#include "Framework/Base/HashMap.h"
 
 struct MeshData {
 	std::vector<glm::vec3> positions;
@@ -19,8 +23,8 @@ struct MeshData {
 };
 
 struct LumenPrimMesh {
-	std::string name;
-	std::string filename;
+	lm::String name;
+	lm::String filename;
 	u32 material_idx;
 	u32 vtx_offset;
 	u32 first_idx;
@@ -42,8 +46,8 @@ struct LumenLight {
 };
 
 struct LumenNode {
-	std::string key = "";
-	std::string value = "";
+	lm::String key = "";
+	lm::String value = "";
 	LumenNode* parent = nullptr;
 	LumenNode* child = nullptr;
 	LumenNode* next = nullptr;
@@ -51,14 +55,14 @@ struct LumenNode {
 };
 
 struct TextureRef {
-	std::string name;
-	std::string relative_path;
+	lm::String name;
+	lm::String relative_path;
 };
 
 class LumenScene {
    public:
 	LumenScene() = default;
-	void load_scene(const std::string& path);
+	void load_scene(const lm::String& path);
 	void write_lumen_scene();
 	void destroy();
 	std::vector<glm::vec3> positions;
@@ -83,9 +87,8 @@ class LumenScene {
 	vk::Buffer* scene_desc_buffer;
 	vk::Buffer* mesh_lights_buffer;
 	std::vector<vk::Texture*> scene_textures;
-	// std::unique_ptr<lm::Camera> camera;
 	lm::Camera camera{};
-	std::unordered_map<u32, std::string> material_idx_to_name;
+	lm::HashMap<u32, lm::String> material_idx_to_name{};
 
 	u32 total_light_triangle_cnt = 0;
 	f32 total_light_area = 0;
@@ -100,14 +103,13 @@ class LumenScene {
 	std::unique_ptr<SceneConfig> config;
 
 	u32 dir_light_idx = -1;
-	void create_scene_config(const std::string& integrator_name);
+	void create_scene_config(const lm::String& integrator_name);
 	inline bool has_bsdf_type(u32 flag) { return (bsdf_types & flag) != 0; }
 
    private:
 	u32 bsdf_types = 0;
 	void compute_scene_dimensions();
-	void load_lumen_scene(const std::string& path);
-	void parse_lumen_scene(const std::string& path, LumenNode* root);
+	void parse_lumen_scene(const lm::String& path, const lm::String& path_root, LumenNode* root);
 	void add_default_texture();
 	VkSampler texture_sampler;
 };

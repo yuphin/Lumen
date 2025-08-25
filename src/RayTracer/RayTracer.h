@@ -13,11 +13,11 @@
 #include "DDGI.h"
 #include "PostFX.h"
 #include "Framework/Window.h"
+#include "Framework/Base/String.h"
 
 class RayTracer {
    public:
-	RayTracer(bool debug, i32, char*[]);
-	void init();
+	void init(bool use_debug, i32 argc, char* argv[]);
 	void update();
 	void cleanup();
 	static RayTracer* instance;
@@ -27,7 +27,6 @@ class RayTracer {
    private:
 	void init_resources();
 	void cleanup_resources();
-	void parse_args(i32 argc, char* argv[]);
 	f32 draw_frame();
 	void render(u32 idx);
 	void render_debug_utils();
@@ -53,7 +52,7 @@ class RayTracer {
 	vk::Texture* reference_tex;
 	vk::Texture* target_tex;
 
-	std::string scene_name;
+	lm::String scene_name;
 	LumenScene scene;
 
 	clock_t start;

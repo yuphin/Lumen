@@ -5,6 +5,8 @@ namespace lm {
 constexpr u64 HEADER_SIZE = sizeof(Arena);
 static constexpr u64 ALIGNED_HEADER_SIZE = util::next_pow2(HEADER_SIZE);
 
+thread_local Arena* _arena = nullptr;
+
 static void arena_pop(Arena* arena, u64 target_base) {
 	Arena* last_arena = arena;
 	for (Arena* next_arena = arena->next; next_arena; last_arena = next_arena, next_arena = next_arena->next) {
@@ -36,7 +38,7 @@ ScratchArena::ScratchArena(Arena* arena_) {
 }
 ScratchArena::~ScratchArena() { arena_pop(arena, saved_base); }
 
-void* Arena::allocate(u64 size, u64 alignment, Arena** arena_node) {
+void* Arena::allocate(u64 size, u64 alignment, Arena** arena_node, bool zero_initialize, bool new_block) {
 	Arena* curr_arena = this;
 
 	u64 local_offset_alligned = util::align_pow2(curr_arena->local_offset, alignment);
@@ -44,6 +46,9 @@ void* Arena::allocate(u64 size, u64 alignment, Arena** arena_node) {
 
 	Arena* last_block = nullptr;
 	for (Arena* arena = curr_arena; arena; last_block = arena, arena = arena->next) {
+		if (new_block && local_offset_alligned > 0) {
+			continue;
+		}
 		local_offset_alligned = util::align_pow2(arena->local_offset, alignment);
 		new_pos = local_offset_alligned + size;
 
@@ -68,6 +73,9 @@ void* Arena::allocate(u64 size, u64 alignment, Arena** arena_node) {
 	if (arena_node) {
 		*arena_node = curr_arena;
 	}
+	if (zero_initialize) {
+		memset(result, 0, size);
+	}
 	return result;
 }
 
@@ -84,7 +92,7 @@ Arena* arena_create(u64 reserve_size, u64 commit_size, u64 header_alignment) {
 							   : ALIGNED_HEADER_SIZE;
 	}
 	reserve_size = util::align_pow2(reserve_size + HEADER_SIZE, page_size);
-commit_size = util::align_pow2(commit_size + HEADER_SIZE, page_size);
+	commit_size = util::align_pow2(commit_size + HEADER_SIZE, page_size);
 	void* base = os::reserve(reserve_size);
 	bool commited = os::commit(base, commit_size);
 	assert(commited);
@@ -96,8 +104,17 @@ commit_size = util::align_pow2(commit_size + HEADER_SIZE, page_size);
 	arena->next = nullptr;
 	arena->data = (u8*)base + header_alignment;
 	arena->local_offset = 0;
+	// @Performance: Perhaps keeping the ends to the requested reserve_size/commit_size
+	// would be more beneficial. That way we can have multiple blocks for a single page
+	// This might be useful in the context of Arrays and other data structures
 	arena->end_reserved = reserve_size;
 	arena->end_committed = commit_size;
+
 	return arena;
+}
+
+Arena* arena() { return _arena; }
+void arena_init(u64 reserve_size, u64 commit_size, u64 header_alignment) {
+	_arena = arena_create(reserve_size, commit_size, header_alignment);
 }
 }  // namespace lm

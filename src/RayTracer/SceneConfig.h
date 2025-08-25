@@ -1,5 +1,6 @@
 #pragma once
 #include "shaders/commons.h"
+#include "Framework/Base/String.h"
 
 #define CAST_CONFIG(ptr, cast) ((cast*)ptr)
 
@@ -15,14 +16,14 @@ struct CameraSettings {
 enum class IntegratorType { Path, BDPT, SPPM, VCM, PSSMLT, SMLT, VCMMLT, ReSTIR, ReSTIRGI, ReSTIRPT, DDGI };
 
 struct SceneConfig {
-	i32 path_length = 6;
+	u32 path_length = 6;
 	glm::vec3 sky_col = glm::vec3(0);
-	const std::string integrator_name = "Path";
+	lm::String integrator_name = "Path";
 	IntegratorType integrator_type = IntegratorType::Path;
 	CameraSettings cam_settings;
 
 	SceneConfig() = default;
-	SceneConfig(const std::string& integrator_name, IntegratorType type)
+	SceneConfig(const lm::String& integrator_name, IntegratorType type)
 		: integrator_name(integrator_name), integrator_type(type) {}
 };
 
@@ -45,22 +46,22 @@ struct VCMConfig : SceneConfig {
 
 struct PSSMLTConfig : SceneConfig {
 	f32 mutations_per_pixel = 100.0f;
-	i32 num_mlt_threads = 360000;
-	i32 num_bootstrap_samples = 360000;
+	u32 num_mlt_threads = 360000;
+	u32 num_bootstrap_samples = 360000;
 	PSSMLTConfig() : SceneConfig("PSSMLT", IntegratorType::PSSMLT) {}
 };
 
 struct SMLTConfig : SceneConfig {
 	f32 mutations_per_pixel = 100.0f;
-	i32 num_mlt_threads = 360000;
-	i32 num_bootstrap_samples = 360000;
+	u32 num_mlt_threads = 360000;
+	u32 num_bootstrap_samples = 360000;
 	SMLTConfig() : SceneConfig("SMLT", IntegratorType::SMLT) {}
 };
 
 struct VCMMLTConfig : SceneConfig {
 	f32 mutations_per_pixel = 100.0f;
-	i32 num_mlt_threads = 360000;
-	i32 num_bootstrap_samples = 360000;
+	u32 num_mlt_threads = 360000;
+	u32 num_bootstrap_samples = 360000;
 	f32 radius_factor = 0.025f;
 	bool enable_vm = false;
 	bool alternate = true;
