@@ -1,4 +1,5 @@
 #include "Buffer.h"
+#include <array>
 #pragma once
 
 namespace vk {

@@ -27,7 +27,6 @@ i32 main(i32 argc, char* argv[]) {
 	bool fullscreen = false;
 	i32 width = 1920;
 	i32 height = 1080;
-	Logger::init();
 	ThreadPool::init();
 	Window::init(width, height, fullscreen);
 	lm::arena_init(MB(16), MB(1));
@@ -46,7 +45,6 @@ i32 main(i32 argc, char* argv[]) {
 }
 #else
 i32 main(i32 argc, char* argv[]) {
-	Logger::init();
 	lm::Arena* arena = lm::arena_create(GB(1), MB(1));
 
 	lm::Array<i32> arr = lm::array_create<i32>(arena);
@@ -54,9 +52,6 @@ i32 main(i32 argc, char* argv[]) {
 	for (i32 i = 0; i < 100'000'000; i++) {
 		arr.push_back(i);
 	}
-	// for (i32 i = 0; i < 100; i++) {
-	// 	LUMEN_INFO("Array value: {}", arr[i]);
-	// }
 
 	auto hm = lm::hash_map_create<i32, u64>(arena);
 
@@ -72,11 +67,10 @@ i32 main(i32 argc, char* argv[]) {
 	assert(entry2 == nullptr);
 	auto entry4 = hm.find(2);
 	assert(entry4 == nullptr);
-	// LUMEN_INFO("Found entry: key = {}, value = {}", entry->key, entry->value);
 
 	for (auto& e : hm) {
-		LUMEN_INFO("HM Entry size = {}", sizeof(e));
-		LUMEN_INFO("HashMap entry: key = {}, value = {}", e.key, e.value);
+		LUMEN_INFO("HM Entry size = %d", sizeof(e));
+		LUMEN_INFO("HashMap entry: key = %d, value = %llu", e.key, e.value);
 	}
 
 	auto hs = lm::hash_set_create<u64>(arena);
@@ -85,31 +79,31 @@ i32 main(i32 argc, char* argv[]) {
 	hs.insert(541);
 	hs.insert(60);
 	for (auto& e : hs) {
-		LUMEN_INFO("HS Entry size = {}", sizeof(e));
-		LUMEN_INFO("HashSet entry: key = {}", e.key);
+		LUMEN_INFO("HS Entry size = %d", sizeof(e));
+		LUMEN_INFO("HashSet entry: key = %llu", e.key);
 	}
 
-	lm::String result = lm::str_from_u64(arena, 62832387, true);
-	lm::String result2 = lm::str_from_s64(arena, -62832387, true);
+	lm::String result = lm::str_from_u64(arena, 62832387);
+	lm::String result2 = lm::str_from_s64(arena, -62832387);
 	lm::String result3 = lm::str_from_f64(arena, 1421.363);
 
-	LUMEN_INFO("CSTR Literal: {}", lm::cliteral("Test").data);
-	LUMEN_INFO("Result {}", result.data);
-	LUMEN_INFO("Result2 {}", result2.data);
-	LUMEN_INFO("Result3 {}", result3.data);
+	LUMEN_INFO("CSTR Literal: %s", lm::cliteral("Test").data);
+	LUMEN_INFO("Result %s", result.data);
+	LUMEN_INFO("Result2 %s", result2.data);
+	LUMEN_INFO("Result3 %s", result3.data);
 
-	LUMEN_INFO("U64 from str: {}", lm::u64_from_str(lm::cliteral("123456789")));
-	LUMEN_INFO("U64 from str: {}", lm::u64_from_str(lm::cliteral("  asd  123456789asd")));
-	LUMEN_INFO("U64 from str2: {}", lm::u64_from_str(lm::cliteral("   18446744073709551616")));
-	LUMEN_INFO("S64 from str: {}", lm::s64_from_str(lm::cliteral("  -  123456789asd")));
+	LUMEN_INFO("U64 from str: %llu", lm::u64_from_str(lm::cliteral("123456789")));
+	LUMEN_INFO("U64 from str: %llu", lm::u64_from_str(lm::cliteral("  asd  123456789asd")));
+	LUMEN_INFO("U64 from str2: %llu", lm::u64_from_str(lm::cliteral("   18446744073709551616")));
+	LUMEN_INFO("S64 from str: %lld", lm::s64_from_str(lm::cliteral("  -  123456789asd")));
 
-	LUMEN_INFO("{}", f64_from_str(lm::cliteral("-1.32e-1")));
-	LUMEN_INFO("{}", f64_from_str(lm::cliteral("1.2423")));
-	LUMEN_INFO("{}", f64_from_str(lm::cliteral("-1.2423")));
-	LUMEN_INFO("{}", f64_from_str(lm::cliteral(".2423")));
-	LUMEN_INFO("{}", f64_from_str(lm::cliteral("1361763176537161637")));
-	LUMEN_INFO("{}", f32_from_str(lm::cliteral("1432.34")));
-	LUMEN_INFO("{}", f64_from_str(lm::cliteral("-0.9814223")));
+	LUMEN_INFO("%f", f64_from_str(lm::cliteral("-1.32e-1")));
+	LUMEN_INFO("%f", f64_from_str(lm::cliteral("1.2423")));
+	LUMEN_INFO("%f", f64_from_str(lm::cliteral("-1.2423")));
+	LUMEN_INFO("%f", f64_from_str(lm::cliteral(".2423")));
+	LUMEN_INFO("%f", f64_from_str(lm::cliteral("1361763176537161637")));
+	LUMEN_INFO("%f", f32_from_str(lm::cliteral("1432.34")));
+	LUMEN_INFO("%f", f64_from_str(lm::cliteral("-0.9814223")));
 
 	os::FileHandle file_handle = os::file_open(lm::cliteral("scenes/cornell_box/path.scene"), os::AccessFlag_Read);
 	if (file_handle == 0) {
@@ -117,15 +111,14 @@ i32 main(i32 argc, char* argv[]) {
 		return -1;
 	}
 	os::FileProperties props = os::file_properties(file_handle);
-	LUMEN_INFO("File size: {}, created: {}, modified: {}", props.size, props.created, props.modified);
+	LUMEN_INFO("File size: %llu, created: %llu, modified: %llu", props.size, props.created, props.modified);
 
 	lm::String file_content = lm::str_reserve(arena, props.size + 1);
 
 	u64 bytes_read = os::file_read(file_handle, file_content.data);
 	file_content.data[props.size] = '\0';
 
-	LUMEN_INFO("Bytes read: {} - File content: {}", bytes_read, file_content.data);
-
+	LUMEN_INFO("Bytes read: %llu - File content: %s", bytes_read, file_content.data);
 
 	// __debugbreak();
 }

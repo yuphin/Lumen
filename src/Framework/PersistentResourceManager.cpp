@@ -9,6 +9,8 @@
 #if !defined(_WIN32) && !defined(_WIN64)
 #include <sys/mman.h>
 #include <unistd.h>
+#else
+#include <windows.h>
 #endif
 static bool operator==(const VkSamplerCreateInfo& lhs, const VkSamplerCreateInfo& rhs) {
 	// Compare the individual members of VkSamplerCreateInfo

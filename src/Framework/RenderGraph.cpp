@@ -505,7 +505,7 @@ RenderPass& RenderPass::skip_execution(bool condition) {
 
 RenderPass& RenderPass::zero(const Resource& resource) {
 	if (resource.tex) {
-		LUMEN_ERROR("Unimplemented: Immage zeroing")
+		LUMEN_ERROR("Unimplemented: Immage zeroing");
 	}
 	resource_zeros.push_back(resource);
 	return *this;
@@ -574,7 +574,7 @@ void RenderPass::finalize() {
 		u32 num_accels = 0;
 		for (u32 i = 0; i < pipeline_storage->as_bindings.size(); i++) {
 			if (!pipeline_storage->as_bindings[i].accel) {
-				LUMEN_INFO("Using null descriptor inside {}", name);
+				LUMEN_INFO("Using null descriptor inside %s", name);
 			}
 			accels[i] = pipeline_storage->as_bindings[i].accel;
 			++num_accels;

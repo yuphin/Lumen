@@ -513,7 +513,7 @@ void LumenScene::parse_lumen_scene(const lm::String& path, const lm::String& pat
 						materials_to_objects.insert(ref, mat_idx);
 					}
 				} else {
-					LUMEN_ERROR("Material {} not found in Lumen scene", mat_name.data);
+					LUMEN_ERROR("Material %s not found in Lumen scene", mat_name.data);
 				}
 			}
 		}
@@ -532,10 +532,9 @@ void LumenScene::parse_lumen_scene(const lm::String& path, const lm::String& pat
 		tinyobj::ObjReaderConfig reader_config;
 
 		tinyobj::ObjReader reader;
-		lm::String mesh_file_cstr = lm::str_to_cstr(lm::arena(), mesh_file);
-		if (!reader.ParseFromFile(mesh_file_cstr.data, reader_config)) {
+		if (!reader.ParseFromFile(mesh_file.data, reader_config)) {
 			if (!reader.Error().empty()) {
-				LUMEN_ERROR("Failed to load Lumen scene mesh file: {}", mesh_file_cstr.data);
+				LUMEN_ERROR("Failed to load Lumen scene mesh file: %s", mesh_file.data);
 			}
 		}
 
@@ -627,7 +626,7 @@ void LumenScene::load_scene(const lm::String& path) {
 	assert(path.is_cstr());
 	os::FileHandle file_handle = os::file_open(path, os::AccessFlag_Read);
 	if (file_handle == 0) {
-		LUMEN_ERROR("Failed to open Lumen scene file: {}", path.data);
+		LUMEN_ERROR("Failed to open Lumen scene file: %s", path.data);
 	}
 	os::FileProperties props = os::file_properties(file_handle);
 	lm::String file_content = lm::str_reserve(lm::arena(), props.size + 1);
@@ -635,7 +634,7 @@ void LumenScene::load_scene(const lm::String& path) {
 	file_content.data[props.size] = '\0';
 	LumenNode* root = parse_scene(lm::arena(), file_content);
 	if (!root) {
-		LUMEN_ERROR("Failed to parse the file {}", path.data);
+		LUMEN_ERROR("Failed to parse the file %s", path.data);
 	}
 	// TODO: Error check?
 	lm::String path_root = lm::str_substr(path, 0, lm::str_rfind(path, "/\\") + 1);
@@ -773,7 +772,7 @@ void LumenScene::load_scene(const lm::String& path) {
 		for (const auto& texture_path : textures) {
 			i32 x, y, n;
 			lm::ScratchArena scratch = lm::arena();
-			lm::String path  = lm::str_concat(scratch.arena, path_root, texture_path.relative_path, /*cstr=*/true);
+			lm::String path  = lm::str_concat(scratch.arena, path_root, texture_path.relative_path);
 			unsigned char* data = stbi_load(path.data, &x, &y, &n, 4);
 			scene_textures[i] = prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 												  .dimensions = {(u32)x, (u32)y, 1},
@@ -878,7 +877,7 @@ static lm::String get_material_type(const Material& mat) {
 		case BSDF_TYPE_PRINCIPLED:
 			return "principled";
 		default:
-			LUMEN_ERROR("Unknown material type: {}", mat.bsdf_type);
+			LUMEN_ERROR("Unknown material type: %d", mat.bsdf_type);
 			return "unknown";
 	}
 }

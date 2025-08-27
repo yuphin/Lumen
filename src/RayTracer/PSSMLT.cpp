@@ -355,7 +355,7 @@ void PSSMLT::render() {
 			}
 			iter += 100;
 			rg->run(cmd.handle);
-			LUMEN_TRACE("{} / {}", iter, mutation_count);
+			LUMEN_TRACE("%d / %d", iter, mutation_count);
 			rg->submit(cmd);
 		}
 		const u32 rem = mutation_count % iter_cnt;

@@ -1,3 +1,16 @@
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#else
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 700
+#endif
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/types.h>
+#endif // defined(_WIN32) || defined(_WIN64)
 #include "OS.h"
 #include "Framework/Base/String.h"
 namespace os {
@@ -174,7 +187,7 @@ FileHandle file_open(const lm::String& path, AccessFlags access_flags) {
 }
 
 void file_close(FileHandle handle) {
-	if(handle == 0) {
+	if (handle == 0) {
 		return;
 	}
 #if defined(_WIN32) || defined(_WIN64)

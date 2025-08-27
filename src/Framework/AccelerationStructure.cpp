@@ -6,7 +6,7 @@
 #include "Framework/CommandBuffer.h"
 
 namespace vk {
-static constexpr u64 BATCH_LIMIT = 256'000'000;	// 256 MB
+static constexpr u64 BATCH_LIMIT = 256'000'000;	 // 256 MB
 struct BuildAccelerationStructure {
 	VkAccelerationStructureBuildGeometryInfoKHR build_info{
 		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR};
@@ -117,9 +117,9 @@ static void cmd_compact_blas(VkCommandBuffer cmd_buf, std::vector<u32> indices,
 	}
 }
 
-static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, u32 primitive_count,
-							vk::Buffer** scratch_buffer_ref, bool export_scratch_buffer,
-							VkDeviceAddress inst_buffer_addr, VkBuildAccelerationStructureFlagsKHR flags, bool update) {
+static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, u32 primitive_count, vk::Buffer** scratch_buffer_ref,
+							bool export_scratch_buffer, VkDeviceAddress inst_buffer_addr,
+							VkBuildAccelerationStructureFlagsKHR flags, bool update) {
 	// Wraps a device pointer to the above uploaded instances.
 	VkAccelerationStructureGeometryInstancesDataKHR instances_vk{
 		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR};
@@ -202,7 +202,7 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<Build
 															   vk::Buffer** scratch_buffer_ref) {
 	u32 num_blases = static_cast<u32>(input.size());
 	VkDeviceSize as_total_size{0};	   // Memory size of all allocated BLAS
-	u32 num_compactions{0};	   // Nb of BLAS requesting compaction
+	u32 num_compactions{0};			   // Nb of BLAS requesting compaction
 	VkDeviceSize max_scratch_size{0};  // Largest scratch size
 
 	// Preparing the information for the acceleration build commands.
@@ -277,7 +277,7 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<Build
 	}
 	// Batching creation/compaction of BLAS to allow staying in restricted
 	// amount of memory
-	std::vector<u32> indices;	// Indices of the BLAS to create
+	std::vector<u32> indices;  // Indices of the BLAS to create
 	VkDeviceSize batch_size{0};
 	VkDeviceSize batch_limit{BATCH_LIMIT};
 	for (u32 idx = 0; idx < num_blases; idx++) {
@@ -290,8 +290,7 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<Build
 								compaction_query_pool);
 			} else {
 				vk::CommandBuffer cmd(true);
-				cmd_create_blas(cmd.handle, indices, build_as, scratch_buffer->device_address(),
-								compaction_query_pool);
+				cmd_create_blas(cmd.handle, indices, build_as, scratch_buffer->device_address(), compaction_query_pool);
 				cmd.submit();
 				if (compaction_query_pool) {
 					cmd.begin();
@@ -315,10 +314,8 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<Build
 		VkDeviceSize compact_size =
 			std::accumulate(build_as.begin(), build_as.end(), 0ULL,
 							[](const auto& a, const auto& b) { return a + b.size_info.accelerationStructureSize; });
-		LUMEN_TRACE("RT BLAS: reducing from: {} MB to: {} MB = ({}% smaller) \n", as_total_size * 1e-6,
+		LUMEN_TRACE("RT BLAS: reducing from: %llu MB to: %llu MB = (%f% smaller) \n", as_total_size * 1e-6,
 					compact_size * 1e-6, (as_total_size - compact_size) / f32(as_total_size) * 100.f);
-	} else {
-		// LUMEN_TRACE("RT BLAS: total size: {} MB\n", as_total_size * 1e-6);
 	}
 	// Clean up
 	vkDestroyQueryPool(context().device, compaction_query_pool, nullptr);
@@ -383,9 +380,8 @@ void tlas_build(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 	drm::destroy(instances_buf);
 }
 
-void tlas_build(BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
-				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer_ref,
-				bool update) {
+void tlas_build(BVH& tlas, vk::Buffer* instances_buf, u32 instance_count, VkBuildAccelerationStructureFlagsKHR flags,
+				VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer_ref, bool update) {
 	VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
 	barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 	barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
@@ -398,8 +394,8 @@ void tlas_build(BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
 					instances_buf->device_address(), flags, update);
 }
 
-BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx,
-						 VkDeviceAddress vertex_address, VkDeviceAddress index_address) {
+BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx, VkDeviceAddress vertex_address,
+						 VkDeviceAddress index_address) {
 	u32 maxPrimitiveCount = idx_count / 3;
 
 	// Describe buffer as array of VertexObj.

@@ -506,7 +506,7 @@ static std::vector<u32> compile_file(const std::string& source_name, shaderc_sha
 
 Shader::Shader(const std::string& filename) : filename(filename) {}
 i32 Shader::compile(lm::RenderPass* pass) {
-	LUMEN_TRACE("Compiling shader: {0}", name_with_macros);
+	LUMEN_TRACE("Compiling shader: %s", name_with_macros.c_str());
 #if USE_SHADERC
 	std::ifstream fin(filename);
 	std::stringstream buffer;

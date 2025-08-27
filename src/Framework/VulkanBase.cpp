@@ -139,10 +139,10 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverity
 	// }
 
 	if ((messageSeverity & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) == 0) {
-		// LUMEN_TRACE("Validation Warning: {0} ", pCallbackData->pMessage);
+		// LUMEN_TRACE("Validation Warning: %s ", pCallbackData->pMessage);
 		return VK_TRUE;
 	}
-	LUMEN_ERROR("Validation Error: {0} ", pCallbackData->pMessage);
+	LUMEN_ERROR("Validation Error: %s ", pCallbackData->pMessage);
 	return VK_FALSE;
 }
 

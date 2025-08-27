@@ -224,7 +224,7 @@ void VCMMLT::init() {
 }
 
 void VCMMLT::render() {
-	LUMEN_TRACE("Rendering sample {}...", sample_cnt++);
+	LUMEN_TRACE("Rendering sample %d...", sample_cnt++);
 	vk::CommandBuffer cmd(/*start*/ true);
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
@@ -407,7 +407,7 @@ void VCMMLT::render() {
 		const u32 freq = mutation_count / iter_cnt;
 		u32 cnt = 0;
 		for (u32 f = 0; f < freq; f++) {
-			LUMEN_TRACE("Mutation: {} / {}", cnt, mutation_count);
+			LUMEN_TRACE("Mutation: %d / %d", cnt, mutation_count);
 			cmd.begin();
 			for (i32 i = 0; i < iter_cnt; i++) {
 				mutate(cnt++);

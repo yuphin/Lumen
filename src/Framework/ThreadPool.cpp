@@ -1,4 +1,7 @@
 #include "ThreadPool.h"
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#endif //  defined(_WIN32) || defined(_WIN64)
 
 std::atomic_bool ThreadPool::done;
 std::queue<std::function<void()>> ThreadPool::work_queue;

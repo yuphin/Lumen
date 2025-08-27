@@ -9,9 +9,8 @@ struct String {
 
 	String() = default;
 	String(char* str, u64 size) : data(str), size(size) {}
-	// Our strings do not end with null, unless explicitly specified
 	template <size_t N>
-	constexpr String(const char (&str)[N], bool cstr = false) : data((char*)str), size(cstr ? N : N - 1) {}
+	constexpr String(const char (&str)[N]) : data((char*)str), size(N) {}
 
 	bool operator==(const String& other);
 
@@ -47,16 +46,15 @@ bool char_is_whitespace(char c);
 char char_to_upper(char c);
 char char_to_lower(char c);
 
-String str_from_f64(Arena* arena, double val, bool cstr = false);
-String str_from_f32(Arena* arena, float val, bool cstr = false);
-String str_from_u64(Arena* arena, u64 val, bool cstr = false);
-String str_from_u32(Arena* arena, u32 val, bool cstr = false);
-String str_from_s64(Arena* arena, s64 val, bool cstr = false);
+String str_from_f64(Arena* arena, double val);
+String str_from_f32(Arena* arena, float val);
+String str_from_u64(Arena* arena, u64 val);
+String str_from_u32(Arena* arena, u32 val);
+String str_from_s64(Arena* arena, s64 val);
 String str_to_lower(Arena* arena, const String& str);
 String str_substr(const String& str, u64 begin = U64_MAX, u64 length = U64_MAX);
 String str_reserve(Arena* arena, u64 size);
-String str_to_cstr(Arena* arena, const String& str);
-String str_concat(Arena* arena, const String& str1, const String& str2, bool cstr = false);
+String str_concat(Arena* arena, const String& str1, const String& str2);
 bool str_compare(const String& str1, const String& str2);
 u64 str_rfind(const String& str1, const String& str2);
 bool str_ends_with(const lm::String& str1, const lm::String& str2);
@@ -64,7 +62,5 @@ u64 u64_from_str(const String& str);
 s64 s64_from_str(const String& str);
 f64 f64_from_str(const String& str);
 f32 f32_from_str(const String& str);
-
-u64 cstr_len(const char* cstr);
 
 }  // namespace lm

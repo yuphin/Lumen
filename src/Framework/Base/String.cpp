@@ -12,39 +12,27 @@ String str_reserve(Arena* arena, u64 size) {
 	return result;
 }
 
-String str_from_f64(Arena* arena, double val, bool cstr) {
+String str_from_f64(Arena* arena, double val) {
 	char buf[32];
 	i32 num_chars = stbsp_snprintf(buf, sizeof(buf), "%.9g", val);
 	String result;
-	result.size = num_chars + cstr;
+	result.size = num_chars + 1;
 	char* data = (char*)arena->allocate(result.size);
 	memmove(data, buf, sizeof(buf));
 	result.data = data;
-	if (cstr) result.data[num_chars] = 0;
+	result.data[num_chars] = '\0';
 	return result;
 }
 
-String str_from_f32(Arena* arena, float val, bool cstr) { return str_from_f64(arena, val, cstr); }
+String str_from_f32(Arena* arena, float val) { return str_from_f64(arena, val); }
 
-String str_to_cstr(Arena* arena, const String& str) {
-	char* data = (char*)arena->allocate(str.size + 1);
-	memmove(data, str.data, str.size);
-	data[str.size] = 0;
-	String result;
-	result.data = data;
-	result.size = str.size + 1;
-	return result;
-}
-
-String str_concat(Arena* arena, const String& str1, const String& str2, bool cstr) {
+String str_concat(Arena* arena, const String& str1, const String& str2) {
 	String result = {};
-	result.size = str1.size + str2.size + (u64)cstr;
+	result.size = str1.size + str2.size + 1;
 	result.data = (char*)arena->allocate(result.size);
 	memcpy(result.data, str1.data, str1.size);
 	memcpy(result.data + str1.size, str2.data, str2.size);
-	if (cstr) {
-		result.data[result.size - 1] = '\0';
-	}
+	result.data[result.size - 1] = '\0';
 	return result;
 }
 
@@ -118,15 +106,15 @@ s64 s64_from_str(const String& str) {
 	return negative ? -result : result;
 }
 
-static String str_from_number(Arena* arena, u64 abs_val, bool negative, bool cstr) {
+static String str_from_number(Arena* arena, u64 abs_val, bool negative) {
 	u32 num_chars = 0;
 	for (u64 v = abs_val; v != 0; ++num_chars) {
 		v /= 10;
 	}
 	String result;
-	result.size = num_chars + cstr + negative;
+	result.size = num_chars + negative + 1;
 	result.data = (char*)arena->allocate(result.size);
-	if (cstr) result.data[result.size - 1] = 0;
+	result.data[result.size - 1] = '\0';
 	if (negative) result.data[0] = '-';
 	for (u32 i = 0; i < num_chars; i++) {
 		result.data[num_chars - 1 - i + negative] = '0' + abs_val % 10;
@@ -135,12 +123,12 @@ static String str_from_number(Arena* arena, u64 abs_val, bool negative, bool cst
 	return result;
 }
 
-String str_from_u64(Arena* arena, u64 val, bool cstr) { return str_from_number(arena, val, false, cstr); }
-String str_from_u32(Arena* arena, u32 val, bool cstr) { return str_from_number(arena, val, false, cstr); }
-String str_from_s64(Arena* arena, s64 val, bool cstr) {
+String str_from_u64(Arena* arena, u64 val) { return str_from_number(arena, val, false); }
+String str_from_u32(Arena* arena, u32 val) { return str_from_number(arena, val, false); }
+String str_from_s64(Arena* arena, s64 val) {
 	bool negative = val < 0;
 	u64 abs_val = negative ? (u64)(-(val + 1)) + 1 : (u64)val;
-	return str_from_number(arena, abs_val, negative, cstr);
+	return str_from_number(arena, abs_val, negative);
 }
 
 f64 f64_from_str(const String& str) {
@@ -238,12 +226,4 @@ bool str_ends_with(const lm::String& str1, const lm::String& str2) {
 
 bool String::operator==(const String& other) { return str_compare(*this, other); }
 
-u64 cstr_len(const char* cstr) {
-	for (u64 len = 0;; len++) {
-		if (cstr[len] == '\0') {
-			return len + 1;
-		}
-	}
-	return U64_MAX;
-}
 }  // namespace lm

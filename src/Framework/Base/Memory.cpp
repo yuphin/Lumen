@@ -22,7 +22,7 @@ void arena_ensure_committed(Arena* arena, u64 target_offset) {
 	arena->local_offset = target_offset;
 	if (target_offset <= arena->end_committed) return;
 	u64 commit_size = util::align_pow2(target_offset - arena->end_committed, os::get_page_size());
-	LUMEN_INFO("Commiting {} bytes ( {} MB) for Arena", commit_size, commit_size / (1024 * 1024));
+	LUMEN_INFO("Commiting %llu bytes ( %llu MB) for Arena", commit_size, commit_size / (1024 * 1024));
 	bool commited = os::commit(arena->data + arena->end_committed, commit_size);
 	memset(arena->data + arena->end_committed, 0, commit_size);
 	LUMEN_ASSERT(commited, "Could not commit memory for Arena");

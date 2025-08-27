@@ -10,7 +10,7 @@ static u32 get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDes
 			if (shader.binding_mask & (1 << i)) {
 				if (binding_mask & (1 << i)) {
 					LUMEN_ASSERT(descriptor_types[i] == shader.descriptor_types[i],
-								 "Binding mask mismatch on shader {}", shader.filename.c_str());
+								 "Binding mask mismatch on shader %s", shader.filename.c_str());
 				} else {
 					descriptor_types[i] = shader.descriptor_types[i];
 					binding_mask |= 1 << i;
@@ -189,7 +189,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 		binding_stage_flags |= shader.stage;
 	}
 	if (num_as_bindings_in_shader == 0) {
-		LUMEN_WARN("No AS bindings found in RT shaders for pipeline {}", name.c_str());
+		LUMEN_WARN("No AS bindings found in RT shaders for pipeline %s", name.c_str());
 	}
 	LUMEN_ASSERT(num_as_bindings_in_shader <= MAX_AS_BINDING_COUNT, "Max 2 AS bindings are supported");
 	create_set_layout(settings.shaders, descriptor_counts);
