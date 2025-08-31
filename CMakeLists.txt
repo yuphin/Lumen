@@ -13,7 +13,6 @@ add_subdirectory(libs)
 
 set(structures_INCLUDE_DIR
     "libs"
-    "libs/spdlog/include"
     "libs/glfw/include"
     "libs/vma/include"
     "libs/gli"

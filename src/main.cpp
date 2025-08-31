@@ -63,7 +63,38 @@ std::string random_std_string(u64 length) {
 	return result;
 }
 
-void hash_set_test() {
+void hash_set_u64_test() {
+	LUMEN_TRACE("----Hash Set Test Begin----");
+	lm::Arena* arena = lm::arena_create(GB(1));
+	auto hs = lm::hash_set_create<u64>(arena, 32);
+	auto stdhs = std::unordered_set<u64>();
+	auto time_begin = std::chrono::high_resolution_clock::now();
+	constexpr u64 NUM_INSERTS = 1024 * 32;
+	for (u64 i = 0; i < NUM_INSERTS; i++) {
+		if (i % 1000000 == 0) {
+			printf("Inserted %llu items into hash set\n", i);
+		}
+		hs.insert(rand());
+	}
+	auto time_end = std::chrono::high_resolution_clock::now();
+	LUMEN_INFO("Time taken for lm::hash_set: %f seconds\n",
+			   std::chrono::duration<double>(time_end - time_begin).count());
+
+	time_begin = std::chrono::high_resolution_clock::now();
+	for (u64 i = 0; i < NUM_INSERTS; i++) {
+		if (i % 1000000 == 0) {
+			printf("Inserted %llu items into hash set\n", i);
+		}
+		hs.insert(rand());
+	}
+	time_end = std::chrono::high_resolution_clock::now();
+
+	LUMEN_INFO("Time taken for std::unordered_set: %f seconds\n",
+			   std::chrono::duration<double>(time_end - time_begin).count());
+	LUMEN_TRACE("----Hash Set Test END----");
+}
+
+void hash_set_str_test() {
 	LUMEN_TRACE("----Hash Set Test Begin----");
 	lm::Arena* arena = lm::arena_create(GB(1));
 	auto hs = lm::hash_set_create<lm::String>(arena, 1024 * 1024 * 4);
@@ -106,7 +137,8 @@ void scratch_arena_test() {
 }
 
 i32 main(i32 argc, char* argv[]) {
-	hash_set_test();
+	hash_set_u64_test();
+	hash_set_str_test();
 	scratch_arena_test();
 	lm::Arena* arena = lm::arena_create(GB(1), MB(1));
 

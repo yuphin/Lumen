@@ -56,9 +56,33 @@ struct HashMapLinear {
 
 	void resize(u64 new_capacity) {
 		new_capacity = util::next_pow2(new_capacity);
-		arena_ensure_allocated_in_the_same_block<HashMapEntry<T1, T2>>(arena_node, new_capacity, capacity,
-																	   /*zero_initialize=*/true);
+		using HashMapEntryType = HashMapEntry<T1, T2>;
+		Arena* new_arena_node;
+		// When we re-size, we need to allocate into a new block
+		HashMapEntryType* new_data = (HashMapEntryType*)arena_node->allocate(
+			new_capacity * sizeof(HashMapEntryType), alignof(HashMapEntryType), &new_arena_node,
+			/*zero_initialize=*/true,
+			/*exclusive_block_reserve_size=*/new_capacity * sizeof(HashMapEntryType));
+		HashMapEntryType* old_data = data;
+
+		data = new_data;
+		size = 0;
+		num_slots = 0;
+		arena_node->local_offset -= capacity * sizeof(HashMapEntryType);
+		arena_node = new_arena_node;
+		u64 old_capacity = capacity;
 		capacity = new_capacity;
+
+		for (u64 i = 0; i < old_capacity; i++) {
+			auto old_entry = old_data[i];
+			if (old_entry.hash > HASH_MAP_HASH_DELETED) {
+				if constexpr (!util::is_same<T2, Empty>::value) {
+					insert(old_entry.key, old_entry.value);
+				} else {
+					insert(old_entry.key);
+				}
+			}
+		}
 	}
 
 	HashMapEntry<T1, T2>* insert(const T1& key, const T2& value) {
@@ -221,17 +245,14 @@ struct HashMapLinear {
 
 // Like arrays, hash maps are also always allocated in a new block
 template <typename T1, typename T2, uint64_t (*hash_func)(const T1&) = get_default_hash<T1>>
-HashMapLinear<T1, T2, hash_func> hash_map_create(Arena* arena, u64 reserved_capacity = 1024) {
+HashMapLinear<T1, T2, hash_func> hash_map_create(Arena* arena, u64 initial_capacity = HASH_MAP_LINEAR_MIN_CAPACITY) {
 	using HashMapEntryType = HashMapEntry<T1, T2>;
 	HashMapLinear<T1, T2, hash_func> map;
-	map.capacity = HASH_MAP_LINEAR_MIN_CAPACITY;
-
+	map.capacity = initial_capacity;
 	Arena* arena_node;
-	map.data = (HashMapEntryType*)arena->allocate(
-		HASH_MAP_LINEAR_MIN_CAPACITY * sizeof(HashMapEntryType), alignof(HashMapEntryType), &arena_node,
-		/*zero_initialize=*/true,
-		/*exclusive_block_reserve_size=*/util::next_pow2(reserved_capacity) * sizeof(HashMapEntryType));
-	memset(map.data, 0, HASH_MAP_LINEAR_MIN_CAPACITY * sizeof(HashMapEntryType));
+	map.data = (HashMapEntryType*)arena->allocate(initial_capacity * sizeof(HashMapEntryType),
+												  alignof(HashMapEntryType), &arena_node,
+												  /*zero_initialize=*/true);
 	map.arena_node = arena_node;
 	return map;
 }
@@ -243,7 +264,7 @@ template <typename T, uint64_t (*hash_func)(const T&) = get_default_hash<T>>
 using HashSet = HashMapLinear<T, Empty, hash_func>;
 
 template <typename T, uint64_t (*hash_func)(const T&) = get_default_hash<T>>
-HashSet<T, hash_func> hash_set_create(Arena* arena, u64 reserved_capacity = 1024) {
-	return hash_map_create<T, Empty, hash_func>(arena, reserved_capacity);
+HashSet<T, hash_func> hash_set_create(Arena* arena, u64 initial_capacity = HASH_MAP_LINEAR_MIN_CAPACITY) {
+	return hash_map_create<T, Empty, hash_func>(arena, initial_capacity);
 }
 }  // namespace lm
