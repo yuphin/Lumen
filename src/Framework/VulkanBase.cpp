@@ -434,11 +434,11 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 			VkExtent2D actual_extent = {static_cast<u32>(width), static_cast<u32>(height)};
 
 			// Clamp width and height
-			actual_extent.width = std::max(capabilities.minImageExtent.width,
-										   std::min(capabilities.maxImageExtent.width, actual_extent.width));
+			actual_extent.width = glm::max(capabilities.minImageExtent.width,
+										   glm::min(capabilities.maxImageExtent.width, actual_extent.width));
 
-			actual_extent.height = std::max(capabilities.minImageExtent.height,
-											std::min(capabilities.maxImageExtent.height, actual_extent.height));
+			actual_extent.height = glm::max(capabilities.minImageExtent.height,
+											glm::min(capabilities.maxImageExtent.height, actual_extent.height));
 
 			return actual_extent;
 		}

@@ -70,7 +70,7 @@ static LumenNode* file_parse(lm::String buffer) {
 #endif
 		if (buffer[buffer_cursor] == '\n') {
 			if (!can_span_multiple_lines) {
-				line_end_idx = std::min(line_end_idx, buffer_cursor);
+				line_end_idx = glm::min(line_end_idx, buffer_cursor);
 			}
 			u64 line_cursor = curr_line_idx;
 			i32 indentation = 0;

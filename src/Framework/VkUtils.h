@@ -115,7 +115,7 @@ inline VkDeviceSize get_memory_usage(VkPhysicalDevice physical_device) {
 }
 
 inline u32 calc_mip_levels(VkExtent2D extent) {
-	return static_cast<u32>(std::floor(std::log2(std::max(extent.width, extent.height)))) + 1;
+	return static_cast<u32>(std::floor(std::log2(glm::max(extent.width, extent.height)))) + 1;
 }
 
 inline void set_resource_name(VkDevice device, u64 obj, const char* name, VkObjectType type) {

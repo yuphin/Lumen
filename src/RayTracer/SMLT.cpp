@@ -99,7 +99,7 @@ void SMLT::init() {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = num_mlt_threads * (path_length * (path_length + 1)) * sizeof(Splat)});
 
-	auto path_size = std::max(num_mlt_threads, num_bootstrap_samples);
+	auto path_size = glm::max(num_mlt_threads, num_bootstrap_samples);
 	light_path_buffer =
 		prm::get_buffer({.name = "Light Path Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -154,7 +154,7 @@ void SMLT::init() {
 	i32 size = 0;
 	i32 arr_size = num_bootstrap_samples;
 	do {
-		i32 num_blocks = std::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
+		i32 num_blocks = glm::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
 			size++;
 		}
@@ -164,7 +164,7 @@ void SMLT::init() {
 	i32 i = 0;
 	arr_size = num_bootstrap_samples;
 	do {
-		i32 num_blocks = std::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
+		i32 num_blocks = glm::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
 			block_sums[i++] = prm::get_buffer(
 				{.name = "Block Sum Buffer #" + std::to_string(i),
@@ -462,7 +462,7 @@ bool SMLT::update() {
 
 void SMLT::prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg) {
 	const bool scan_sums = level > 0;
-	i32 num_wgs = std::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
+	i32 num_wgs = glm::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
 	i32 num_grids = num_wgs - i32((num_elems % 2048) != 0);
 	pc_compute.num_elems = num_elems;
 	auto scan = [&](i32 num_wgs, i32 idx) {

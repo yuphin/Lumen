@@ -185,7 +185,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 		if (shader.push_constant_size) {
 			push_constant_size = shader.push_constant_size;
 		}
-		num_as_bindings_in_shader = std::max(num_as_bindings_in_shader, shader.num_as_bindings);
+		num_as_bindings_in_shader = glm::max(num_as_bindings_in_shader, shader.num_as_bindings);
 		binding_stage_flags |= shader.stage;
 	}
 	if (num_as_bindings_in_shader == 0) {

@@ -9,7 +9,7 @@ void VCMMLT::init() {
 	const VCMMLTConfig& config = lumen_scene->config.settings.vcmmlt;
 	u32 path_length = lumen_scene->config.common.path_length;
 	mutation_count = i32(Window::width() * Window::height() * config.mutations_per_pixel / f32(config.num_mlt_threads));
-	light_path_rand_count = std::max(7 + 3 * path_length, 3 + 7 * path_length);
+	light_path_rand_count = glm::max(7 + 3 * path_length, 3 + 7 * path_length);
 
 	// MLTVCM buffers
 	bootstrap_buffer =
@@ -132,7 +132,7 @@ void VCMMLT::init() {
 	i32 size = 0;
 	i32 arr_size = config.num_bootstrap_samples;
 	do {
-		i32 num_blocks = std::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
+		i32 num_blocks = glm::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
 			size++;
 		}
@@ -142,7 +142,7 @@ void VCMMLT::init() {
 	i32 i = 0;
 	arr_size = config.num_bootstrap_samples;
 	do {
-		i32 num_blocks = std::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
+		i32 num_blocks = glm::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
 			block_sums[i++] = prm::get_buffer(
 				{.name = "Block Sum Buffer #" + std::to_string(i),
@@ -419,7 +419,7 @@ void VCMMLT::render() {
 	}
 	// Compositions
 	rg->add_compute("Composition", {.shader = vk::Shader("src/shaders/integrators/vcmmlt/composite.comp"),
-									.dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+									.dims = {(u32)glm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }
@@ -445,7 +445,7 @@ bool VCMMLT::update() {
 
 void VCMMLT::prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg) {
 	const bool scan_sums = level > 0;
-	i32 num_wgs = std::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
+	i32 num_wgs = glm::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
 	i32 num_grids = num_wgs - i32((num_elems % 2048) != 0);
 	pc_compute.num_elems = num_elems;
 	auto scan = [&](i32 num_wgs, i32 idx) {

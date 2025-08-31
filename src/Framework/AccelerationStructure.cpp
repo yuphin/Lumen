@@ -229,7 +229,7 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<Build
 
 		// Extra info
 		as_total_size += build_as[idx].size_info.accelerationStructureSize;
-		max_scratch_size = std::max(max_scratch_size, build_as[idx].size_info.buildScratchSize);
+		max_scratch_size = glm::max(max_scratch_size, build_as[idx].size_info.buildScratchSize);
 		num_compactions +=
 			has_flag(build_as[idx].build_info.flags, VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 	}

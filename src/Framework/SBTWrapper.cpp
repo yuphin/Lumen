@@ -62,7 +62,7 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 		total_group_cnt += pipeline_info.groupCount;
 	} else {
 		for (auto& i : idx_array) {
-			if (!i.empty()) total_group_cnt = std::max(total_group_cnt, *std::max_element(std::begin(i), std::end(i)));
+			if (!i.empty()) total_group_cnt = glm::max(total_group_cnt, *std::max_element(std::begin(i), std::end(i)));
 		}
 		total_group_cnt++;
 		group_cnt_per_input.push_back(total_group_cnt);
@@ -77,7 +77,7 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 		for (auto& e : entry) {
 			u32 data_handle_size =
 				align_up(static_cast<u32>(handle_size + e.second.size() * sizeof(u8)), handle_alignment);
-			stride = std::max(stride, data_handle_size);
+			stride = glm::max(stride, data_handle_size);
 		}
 	};
 	find_stride(group_data[GROUP_RAYGEN].handle_alignment, group_data[GROUP_RAYGEN].stride);
