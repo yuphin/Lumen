@@ -8,7 +8,7 @@ void SPPM::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height()  * sizeof(SPPMData)});
+						 .size = Window::width() * Window::height() * sizeof(SPPMData)});
 
 	atomic_data_buffer =
 		prm::get_buffer({.name = "Atomic Data",
@@ -22,14 +22,14 @@ void SPPM::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = 10 * Window::width() * Window::height()  * sizeof(PhotonHash)});
+						 .size = 10 * Window::width() * Window::height() * sizeof(PhotonHash)});
 
 	residual_buffer =
 		prm::get_buffer({.name = "Residual Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height()  * 4 * sizeof(f32)});
+						 .size = Window::width() * Window::height() * 4 * sizeof(f32)});
 
 	counter_buffer =
 		prm::get_buffer({.name = "Counter Buffer",
@@ -59,13 +59,10 @@ void SPPM::init() {
 
 	frame_num = 0;
 
-
 	assert(vk::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
-								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, sppm_data_addr, sppm_data_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, atomic_data_addr, atomic_data_buffer,
-								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, atomic_data_addr, atomic_data_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, photon_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, residual_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, counter_buffer, vk::render_graph());
@@ -74,28 +71,29 @@ void SPPM::init() {
 void SPPM::render() {
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
-	pc_ray.num_lights = i32(lumen_scene->gpu_lights.size());
+	pc_ray.num_lights = i32(lumen_scene->gpu_lights.size);
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = config->path_length;
-	pc_ray.sky_col = config->sky_col;
+	pc_ray.max_depth = lumen_scene->config.common.path_length;
+	pc_ray.sky_col = lumen_scene->config.common.sky_col;
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.total_light_area = lumen_scene->total_light_area;
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.frame_num = frame_num;
+	SPPMConfig& config = lumen_scene->config.settings.sppm;
 	// PPM related constants
-	if (config->base_radius < 1e-7f) {
-		config->base_radius = 1e-7f;
+	if (config.base_radius < 1e-7f) {
+		config.base_radius = 1e-7f;
 	}
-	pc_ray.min_bounds = lumen_scene->m_dimensions.min;
-	pc_ray.max_bounds = lumen_scene->m_dimensions.max;
-	pc_ray.ppm_base_radius = config->base_radius;
+	pc_ray.min_bounds = lumen_scene->dimensions.min;
+	pc_ray.max_bounds = lumen_scene->dimensions.max;
+	pc_ray.ppm_base_radius = config.base_radius;
 	const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
 	const f32 max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
-	const i32 base_grid_res = i32(max_comp / config->base_radius);
+	const i32 base_grid_res = i32(max_comp / config.base_radius);
 	pc_ray.grid_res = glm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
 	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name, const std::string& reduce_name,
 						 const std::string& reduce_shader_name) {
-		u32 num_wgs = u32((Window::width() * Window::height()  + 1023) / 1024);
+		u32 num_wgs = u32((Window::width() * Window::height() + 1023) / 1024);
 		vk::render_graph()
 			->add_compute(op_name, {.shader = vk::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
 			.push_constants(&pc_ray)
@@ -125,7 +123,7 @@ void SPPM::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .dims = {Window::width(), Window::height() },
+					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc_ray)
 		.zero(photon_buffer)
@@ -152,7 +150,7 @@ void SPPM::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .dims = {Window::width(), Window::height() },
+					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
@@ -161,17 +159,15 @@ void SPPM::render() {
 		.bind_tlas(tlas);
 	// Gather
 	vk::render_graph()
-		->add_compute("Gather",
-					  {.shader = vk::Shader("src/shaders/integrators/sppm/gather.comp"),
-					   .dims = {(u32)std::ceil(Window::width() * Window::height()  / f32(1024.0f)), 1, 1}})
+		->add_compute("Gather", {.shader = vk::Shader("src/shaders/integrators/sppm/gather.comp"),
+								 .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer)
 		.bind_texture_array(lumen_scene->scene_textures);
 	// Composite
 	vk::render_graph()
-		->add_compute("Composite",
-					  {.shader = vk::Shader("src/shaders/integrators/sppm/composite.comp"),
-					   .dims = {(u32)std::ceil(Window::width() * Window::height()  / f32(1024.0f)), 1, 1}})
+		->add_compute("Composite", {.shader = vk::Shader("src/shaders/integrators/sppm/composite.comp"),
+									.dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }
@@ -187,8 +183,7 @@ bool SPPM::update() {
 
 void SPPM::destroy(bool resize) {
 	Integrator::destroy(resize);
-	auto buffer_list = {sppm_data_buffer, atomic_data_buffer, photon_buffer, residual_buffer,
-						counter_buffer};
+	auto buffer_list = {sppm_data_buffer, atomic_data_buffer, photon_buffer, residual_buffer, counter_buffer};
 	for (vk::Buffer* b : buffer_list) {
 		prm::remove(b);
 	}

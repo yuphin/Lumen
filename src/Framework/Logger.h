@@ -11,6 +11,7 @@ void log(i32 level, const char* str, ...);
 
 #define LUMEN_TRACE(...) lm::log(lm::LOG_TRACE, __VA_ARGS__)
 #define LUMEN_WARN(...) lm::log(lm::LOG_WARN, __VA_ARGS__)
+#define LUMEN_INFO(...) lm::log(lm::LOG_INFO, __VA_ARGS__)
 
 #define LUMEN_ERROR(...)                     \
 	do {                                     \
@@ -19,7 +20,6 @@ void log(i32 level, const char* str, ...);
 	} while (0)
 
 #ifdef _DEBUG
-#define LUMEN_INFO(...) lm::log(lm::LOG_INFO, __VA_ARGS__)
 #define LUMEN_ASSERT(x, ...)                     \
 	do {                                         \
 		if (!(x)) {                              \
@@ -28,6 +28,5 @@ void log(i32 level, const char* str, ...);
 		}                                        \
 	} while (0)
 #else
-#define LUMEN_INFO(...) ((void)0)
 #define LUMEN_ASSERT(x, ...) ((void)0)
 #endif

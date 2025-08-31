@@ -1,10 +1,9 @@
 #pragma once
 #include "Integrator.h"
 #include "shaders/integrators/restir/di/restirdi_commons.h"
-class ReSTIR final: public Integrator {
+class ReSTIR final : public Integrator {
    public:
-	ReSTIR(LumenScene* lumen_scene, const vk::BVH& tlas)
-		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), ReSTIRConfig)) {}
+	ReSTIR(const vk::BVH& tlas) : Integrator(tlas) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -20,5 +19,4 @@ class ReSTIR final: public Integrator {
 	PCReSTIR pc_ray{};
 	bool do_spatiotemporal = false;
 	bool enable_accumulation = false;
-	ReSTIRConfig* config;
 };

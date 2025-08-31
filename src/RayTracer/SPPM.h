@@ -3,8 +3,7 @@
 #include "shaders/integrators/sppm/sppm_commons.h"
 class SPPM final : public Integrator {
    public:
-	SPPM(LumenScene* lumen_scene, const vk::BVH& tlas)
-		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), SPPMConfig)) {}
+	SPPM(const vk::BVH& tlas) : Integrator(tlas) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -20,5 +19,4 @@ class SPPM final : public Integrator {
 	vk::Buffer* photon_buffer;
 	vk::Buffer* residual_buffer;
 	vk::Buffer* counter_buffer;
-	SPPMConfig* config;
 };

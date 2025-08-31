@@ -3,8 +3,7 @@
 #include "shaders/integrators/path/path_commons.h"
 class Path final : public Integrator {
    public:
-	Path(LumenScene* lumen_scene, const vk::BVH& tlas)
-		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), PathConfig)) {}
+	Path(const vk::BVH& tlas) : Integrator(tlas) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -13,7 +12,6 @@ class Path final : public Integrator {
 
    private:
 	PCPath pc_ray{};
-	PathConfig* config;
 	u32 path_length = 0;
 	bool direct_lighting = true;
 };

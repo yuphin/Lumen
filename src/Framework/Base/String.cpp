@@ -54,6 +54,17 @@ char char_to_lower(char c) {
 	}
 	return c;
 }
+
+
+String str_from_cstr(Arena* arena, const char* cstr, u64 size) {
+
+	String result = {};
+	result.size = size;
+	result.data = (char*)arena->allocate(result.size);
+	memcpy(result.data, cstr, size);
+	return result;
+}
+
 String str_substr(const String& str, u64 begin, u64 length) {
 	assert(begin < str.size && (begin + length) <= str.size);
 	return String((char*)str.data + begin, length);

@@ -6,7 +6,7 @@
 #include "Framework/PersistentResourceManager.h"
 class Integrator {
    public:
-	Integrator(LumenScene* lumen_scene, const vk::BVH& tlas) : lumen_scene(lumen_scene), tlas(tlas) {}
+	Integrator(const vk::BVH& tlas) : tlas(tlas) {}
 	virtual void init();
 	virtual void render() = 0;
 	virtual bool gui();
@@ -20,7 +20,7 @@ class Integrator {
    protected:
 	void update_uniform_buffers();
 	SceneUBO scene_ubo{};
-	LumenScene* lumen_scene = nullptr;
 	vk::Buffer* scene_ubo_buffer = nullptr;
 	const vk::BVH& tlas;
+	scene::Scene* lumen_scene = nullptr;
 };

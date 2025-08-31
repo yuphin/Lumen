@@ -4,6 +4,9 @@
 #include "Framework/VkUtils.h"
 
 void Integrator::init() {
+	if(!lumen_scene) {
+		lumen_scene = scene::get();
+	}
 	lm::Camera* cam_ptr = &lumen_scene->camera;
 	Window::add_mouse_click_callback([this](MouseAction button, KeyAction action, double x, double y) {
 		if (ImGui::GetIO().WantCaptureMouse) {

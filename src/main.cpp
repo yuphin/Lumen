@@ -29,7 +29,6 @@ i32 main(i32 argc, char* argv[]) {
 	i32 height = 1080;
 	ThreadPool::init();
 	Window::init(width, height, fullscreen);
-	lm::arena_init(MB(16), MB(1));
 	{
 		RayTracer app;
 		app.init(enable_debug, argc, argv);
@@ -44,7 +43,71 @@ i32 main(i32 argc, char* argv[]) {
 	return 0;
 }
 #else
+
+lm::String random_string(lm::Arena* arena, u64 length) {
+	lm::ScratchArena scratch = arena;
+	lm::String result = lm::str_reserve(scratch.arena, length + 1);
+	for (u64 i = 0; i < length; i++) {
+		result.data[i] = 'a' + (rand() % 26);
+	}
+	result.data[length] = '\0';
+	return result;
+}
+
+std::string random_std_string(u64 length) {
+	std::string result;
+	result.resize(length);
+	for (u64 i = 0; i < length; i++) {
+		result[i] = 'a' + (rand() % 26);
+	}
+	return result;
+}
+
+void hash_set_test() {
+	LUMEN_TRACE("----Hash Set Test Begin----");
+	lm::Arena* arena = lm::arena_create(GB(1));
+	auto hs = lm::hash_set_create<lm::String>(arena, 1024 * 1024 * 4);
+	auto stdhs = std::unordered_set<std::string>();
+	auto time_begin = std::chrono::high_resolution_clock::now();
+	constexpr u64 NUM_INSERTS = 1024 * 32;
+	for (u64 i = 0; i < NUM_INSERTS; i++) {
+		if (i % 1000000 == 0) {
+			printf("Inserted %llu items into hash set\n", i);
+		}
+		hs.insert(random_string(arena, 1024));
+	}
+	auto time_end = std::chrono::high_resolution_clock::now();
+	LUMEN_INFO("Time taken for lm::hash_set: %f seconds\n",
+			   std::chrono::duration<double>(time_end - time_begin).count());
+
+	time_begin = std::chrono::high_resolution_clock::now();
+	for (u64 i = 0; i < NUM_INSERTS; i++) {
+		if (i % 1000000 == 0) {
+			printf("Inserted %llu items into hash set\n", i);
+		}
+		stdhs.insert(random_std_string(1024));
+	}
+	time_end = std::chrono::high_resolution_clock::now();
+
+	LUMEN_INFO("Time taken for std::unordered_set: %f seconds\n",
+			   std::chrono::duration<double>(time_end - time_begin).count());
+	LUMEN_TRACE("----Hash Set Test END----");
+}
+
+void scratch_arena_test() {
+	LUMEN_TRACE("----Scratch Arena Test----");
+	lm::Arena* arena = lm::arena_create(MB(1));
+	lm::FixedArray<i32> arr = lm::fixed_array_create<i32>(arena, 512);
+	{
+		lm::ScratchArena scratch = arena;
+		lm::FixedArray<i32> arr2 = lm::fixed_array_create<i32>(scratch.arena, 256);
+	}
+	LUMEN_TRACE("----Scratch Arena Test End----");
+}
+
 i32 main(i32 argc, char* argv[]) {
+	hash_set_test();
+	scratch_arena_test();
 	lm::Arena* arena = lm::arena_create(GB(1), MB(1));
 
 	lm::Array<i32> arr = lm::array_create<i32>(arena);

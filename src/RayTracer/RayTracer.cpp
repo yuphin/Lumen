@@ -11,7 +11,7 @@ bool calc_rmse = false;
 void RayTracer::init(bool use_debug, i32 argc, char* argv[]) {
 	instance = this;
 	debug = use_debug;
-	scene_name = "scenes/caustics.scene";
+	lm::String scene_name = "scenes/caustics.scene";
 	for (i32 i = 0; i < argc; i++) {
 		lm::String arg_str = lm::String(argv[i], strlen(argv[i]));
 		if (lm::str_ends_with(arg_str, lm::cliteral(".scene"))) {
@@ -62,9 +62,8 @@ void RayTracer::init(bool use_debug, i32 argc, char* argv[]) {
 	// Event based synchronization instead of barriers
 	vk::render_graph()->settings.use_events = use_events;
 
-	scene.load_scene(scene_name);
-	scene.write_lumen_scene();
-	create_integrator(i32(scene.config->integrator_type));
+	scene::load(scene_name);
+	create_integrator(scene::get()->config.type);
 	integrator->init();
 	if (!tlas.accel) {
 		integrator->create_accel(tlas, blases);
@@ -247,40 +246,40 @@ void RayTracer::render_debug_utils() {
 	}
 }
 
-void RayTracer::create_integrator(i32 integrator_idx) {
-	switch (integrator_idx) {
-		case i32(IntegratorType::Path):
-			integrator = std::make_unique<Path>(&scene, tlas);
+void RayTracer::create_integrator(IntegratorType type) {
+	switch (type) {
+		case INTEGRATOR_PATH:
+			integrator = std::make_unique<Path>(tlas);
 			break;
-		case i32(IntegratorType::BDPT):
-			integrator = std::make_unique<BDPT>(&scene, tlas);
+		case INTEGRATOR_BDPT:
+			integrator = std::make_unique<BDPT>(tlas);
 			break;
-		case i32(IntegratorType::SPPM):
-			integrator = std::make_unique<SPPM>(&scene, tlas);
+		case INTEGRATOR_SPPM:
+			integrator = std::make_unique<SPPM>(tlas);
 			break;
-		case i32(IntegratorType::VCM):
-			integrator = std::make_unique<VCM>(&scene, tlas);
+		case INTEGRATOR_VCM:
+			integrator = std::make_unique<VCM>(tlas);
 			break;
-		case i32(IntegratorType::ReSTIR):
-			integrator = std::make_unique<ReSTIR>(&scene, tlas);
+		case INTEGRATOR_PSSMLT:
+			integrator = std::make_unique<PSSMLT>(tlas);
 			break;
-		case i32(IntegratorType::ReSTIRGI):
-			integrator = std::make_unique<ReSTIRGI>(&scene, tlas);
+		case INTEGRATOR_SMLT:
+			integrator = std::make_unique<SMLT>(tlas);
 			break;
-		case i32(IntegratorType::ReSTIRPT):
-			integrator = std::make_unique<ReSTIRPT>(&scene, tlas);
+		case INTEGRATOR_VCMMLT:
+			integrator = std::make_unique<VCMMLT>(tlas);
 			break;
-		case i32(IntegratorType::PSSMLT):
-			integrator = std::make_unique<PSSMLT>(&scene, tlas);
+		case INTEGRATOR_RESTIR:
+			integrator = std::make_unique<ReSTIR>(tlas);
 			break;
-		case i32(IntegratorType::SMLT):
-			integrator = std::make_unique<SMLT>(&scene, tlas);
+		case INTEGRATOR_RESTIRGI:
+			integrator = std::make_unique<ReSTIRGI>(tlas);
 			break;
-		case i32(IntegratorType::VCMMLT):
-			integrator = std::make_unique<VCMMLT>(&scene, tlas);
+		case INTEGRATOR_DDGI:
+			integrator = std::make_unique<DDGI>(tlas);
 			break;
-		case i32(IntegratorType::DDGI):
-			integrator = std::make_unique<DDGI>(&scene, tlas);
+		case INTEGRATOR_RESTIRPT:
+			integrator = std::make_unique<ReSTIRPT>(tlas);
 			break;
 		default:
 			break;
@@ -319,20 +318,18 @@ bool RayTracer::gui() {
 	bool updated = false;
 	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
 	if (show_cam_stats) {
+		const lm::Camera& camera = scene::get()->camera;
 		ImGui::Text("X - Right, Y - Up, -Z - Forward");
-		ImGui::Text("Camera position: %.2f %.2f %.2f", scene.camera.position.x, scene.camera.position.y,
-					scene.camera.position.z);
-		ImGui::Text("Camera rotation (degrees): X:%.2f Y:%.2f Z:%.2f", scene.camera.rotation.x, scene.camera.rotation.y,
-					scene.camera.rotation.z);
-		ImGui::Text("Camera direction:  %.2f %.2f %.2f", scene.camera.direction.x, scene.camera.direction.y,
-					scene.camera.direction.z);
+		ImGui::Text("Camera position: %.2f %.2f %.2f", camera.position.x, camera.position.y, camera.position.z);
+		ImGui::Text("Camera rotation (degrees): X:%.2f Y:%.2f Z:%.2f", camera.rotation.x, camera.rotation.y,
+					camera.rotation.z);
+		ImGui::Text("Camera direction:  %.2f %.2f %.2f", camera.direction.x, camera.direction.y, camera.direction.z);
 		if (ImGui::Button("Copy camera data to clipboard")) {
 			std::string cam_pos_str = std::format(
 				"    \"position\": "
 				"[{:.2f},{:.2f},{:.2f}],\n    \"rotation\":[{:.2f},{:.2f},{:.2f}],\n    \"dir\":[{:.2f},{:.2f},{:.2f}]",
-				scene.camera.position.x, scene.camera.position.y, scene.camera.position.z, scene.camera.rotation.x,
-				scene.camera.rotation.y, scene.camera.rotation.z, scene.camera.direction.x, scene.camera.direction.y,
-				scene.camera.direction.z);
+				camera.position.x, camera.position.y, camera.position.z, camera.rotation.x, camera.rotation.y,
+				camera.rotation.z, camera.direction.x, camera.direction.y, camera.direction.z);
 			glfwSetClipboardString(Window::get()->window_handle, cam_pos_str.c_str());
 		}
 	}
@@ -358,10 +355,11 @@ bool RayTracer::gui() {
 		capture_target_img = true;
 	}
 
+	SceneConfig& config = scene::get()->config;
 	const char* settings[] = {"Path",	"BDPT",	  "SPPM",	   "VCM",		"PSSMLT", "SMLT",
 							  "VCMMLT", "ReSTIR", "ReSTIR GI", "ReSTIR PT", "DDGI"};
 
-	static i32 curr_integrator_idx = i32(scene.config->integrator_type);
+	static i32 curr_integrator_idx = i32(config.type);
 	if (ImGui::BeginCombo("Select Integrator", settings[curr_integrator_idx])) {
 		for (i32 n = 0; n < IM_ARRAYSIZE(settings); n++) {
 			const bool selected = curr_integrator_idx == n;
@@ -377,23 +375,24 @@ bool RayTracer::gui() {
 		ImGui::EndCombo();
 	}
 
-	if (curr_integrator_idx != i32(scene.config->integrator_type)) {
+	if (curr_integrator_idx != i32(config.type)) {
 		updated = true;
 		vkDeviceWaitIdle(vk::context().device);
 		bool was_custom_accel = typeid(*integrator) == typeid(DDGI);
 		integrator->destroy(/*resize=*/false);
-		SceneConfig prev_scene_config = *scene.config;
+		SceneConfig prev_scene_config = config;
 		// TODO: Remove
 		std::string integrator_str = std::string(settings[curr_integrator_idx]);
 		integrator_str.erase(std::remove_if(integrator_str.begin(), integrator_str.end(), ::isspace),
 							 integrator_str.end());
 		std::transform(integrator_str.begin(), integrator_str.end(), integrator_str.begin(), ::tolower);
-		scene.create_scene_config(lm::String(integrator_str.data(), integrator_str.size() - 1));
-		scene.config->cam_settings = prev_scene_config.cam_settings;
-		scene.config->sky_col = prev_scene_config.sky_col;
-		scene.config->path_length = prev_scene_config.path_length;
+		scene::config_init(lm::String(integrator_str.data(), integrator_str.size()));
+		config.common.cam_settings = prev_scene_config.common.cam_settings;
+		config.common.sky_col = prev_scene_config.common.sky_col;
+		config.common.path_length = prev_scene_config.common.path_length;
+
 		GPUQueryManager::reset_data();
-		create_integrator(curr_integrator_idx);
+		create_integrator((IntegratorType)curr_integrator_idx);
 		bool is_custom_accel = typeid(*integrator) == typeid(DDGI);
 		integrator->init();
 		if (was_custom_accel || is_custom_accel) {
@@ -496,7 +495,7 @@ void RayTracer::cleanup() {
 		cleanup_resources();
 		integrator->destroy(/*resize=*/false);
 		post_fx.destroy();
-		scene.destroy();
+		scene::destroy();
 		destroy_accel();
 		vk::destroy_imgui();
 		vk::cleanup();

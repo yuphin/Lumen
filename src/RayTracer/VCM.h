@@ -3,8 +3,7 @@
 #include "shaders/integrators/vcm/vcm_commons.h"
 class VCM final : public Integrator {
    public:
-	VCM(LumenScene* lumen_scene, const vk::BVH& tlas)
-		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), VCMConfig)) {}
+	VCM(const vk::BVH& tlas) : Integrator(tlas) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -26,6 +25,4 @@ class VCM final : public Integrator {
 	vk::Buffer* angle_struct_buffer;
 	vk::Buffer* avg_buffer;
 	bool do_spatiotemporal = false;
-
-	VCMConfig* config;
 };

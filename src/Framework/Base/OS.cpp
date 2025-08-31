@@ -24,6 +24,16 @@ u64 get_page_size() {
 	return sysconf(_SC_PAGE_SIZE);
 #endif	// defined(_WIN32) || defined(_WIN64)
 }
+
+void reserve(void* ptr, u64 size) {
+#if defined(_WIN32) || defined(_WIN64)
+	void* res = VirtualAlloc(ptr, size, MEM_RESERVE, PAGE_NOACCESS);
+	assert(res == ptr);
+#else
+	mmap(ptr, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+#endif
+}
+
 void* reserve(u64 reserve_size) {
 	void* data_base;
 #if defined(_WIN32) || defined(_WIN64)

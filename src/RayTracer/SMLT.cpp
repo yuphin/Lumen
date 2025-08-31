@@ -3,12 +3,14 @@
 
 void SMLT::init() {
 	Integrator::init();
-	mutations_per_pixel = config->mutations_per_pixel;
-	num_mlt_threads = config->num_mlt_threads;
-	num_bootstrap_samples = config->num_bootstrap_samples;
+	const SMLTConfig& config = lumen_scene->config.settings.smlt;
+	mutations_per_pixel = config.mutations_per_pixel;
+	num_mlt_threads = config.num_mlt_threads;
+	num_bootstrap_samples = config.num_bootstrap_samples;
 	mutation_count = i32(Window::width() * Window::height() * mutations_per_pixel / f32(num_mlt_threads));
-	light_path_rand_count = 6 + 3 * config->path_length;
-	cam_path_rand_count = 3 + 7 * config->path_length;
+	u32 path_length = lumen_scene->config.common.path_length;
+	light_path_rand_count = 6 + 3 * path_length;
+	cam_path_rand_count = 3 + 7 * path_length;
 
 	bootstrap_buffer =
 		prm::get_buffer({.name = "Bootstrap Buffer",
@@ -88,21 +90,21 @@ void SMLT::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat)});
+						 .size = num_mlt_threads * (path_length * (path_length + 1)) * sizeof(Splat)});
 
 	past_splat_buffer =
 		prm::get_buffer({.name = "Past Splat Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat)});
+						 .size = num_mlt_threads * (path_length * (path_length + 1)) * sizeof(Splat)});
 
 	auto path_size = std::max(num_mlt_threads, num_bootstrap_samples);
 	light_path_buffer =
 		prm::get_buffer({.name = "Light Path Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = path_size * (config->path_length + 1) * sizeof(VCMVertex)});
+						 .size = path_size * (path_length + 1) * sizeof(VCMVertex)});
 
 	connected_lights_buffer =
 		prm::get_buffer({.name = "Connected Lights Buffer",
@@ -128,7 +130,7 @@ void SMLT::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = path_size * (config->path_length * (config->path_length + 1)) * sizeof(Splat)});
+						 .size = path_size * (path_length * (path_length + 1)) * sizeof(Splat)});
 
 	light_splat_cnts_buffer =
 		prm::get_buffer({.name = "Light Splat Counts Buffer",
@@ -242,10 +244,10 @@ void SMLT::render() {
 	vk::CommandBuffer cmd(/*start*/ true);
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
-	pc_ray.num_lights = i32(lumen_scene->gpu_lights.size());
+	pc_ray.num_lights = i32(lumen_scene->gpu_lights.size);
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = config->path_length;
-	pc_ray.sky_col = config->sky_col;
+	pc_ray.max_depth = lumen_scene->config.common.path_length;
+	pc_ray.sky_col = lumen_scene->config.common.sky_col;
 	// SMLT related constants
 	pc_ray.light_rand_count = light_path_rand_count;
 	pc_ray.cam_rand_count = cam_path_rand_count;
@@ -299,7 +301,7 @@ void SMLT::render() {
 			.bind_tlas(tlas);
 	}
 	i32 counter = 0;
-	prefix_scan(0, config->num_bootstrap_samples, counter, rg);
+	prefix_scan(0, lumen_scene->config.settings.smlt.num_bootstrap_samples, counter, rg);
 	// Calculate CDF
 	rg->add_compute("Calculate CDF", {.shader = vk::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
 									  .specialization_data = {(u32)num_bootstrap_samples},
@@ -443,9 +445,8 @@ void SMLT::render() {
 		}
 	}
 	// Compositions
-	rg->add_compute("Composition",
-					{.shader = vk::Shader("src/shaders/integrators/pssmlt/composite.comp"),
-					 .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+	rg->add_compute("Composition", {.shader = vk::Shader("src/shaders/integrators/pssmlt/composite.comp"),
+									.dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }
@@ -473,9 +474,9 @@ void SMLT::prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph* 
 	};
 	auto uniform_add = [&](i32 num_wgs, i32 output_idx) {
 		++counter;
-		rg->add_compute("PrefixScan - Uniform Add",
-						{.shader = vk::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"),
-						 .dims = {(u32)num_wgs, 1, 1}})
+		rg->add_compute(
+			  "PrefixScan - Uniform Add",
+			  {.shader = vk::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"), .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
 	};

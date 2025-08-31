@@ -12,16 +12,6 @@
 #include "Framework/Base/Memory.h"
 #include "Framework/Base/HashMap.h"
 
-struct MeshData {
-	std::vector<glm::vec3> positions;
-	std::vector<u32> indices;
-	std::vector<glm::vec3> normals;
-	std::vector<glm::vec3> tangents;
-	std::vector<glm::vec2> texcoords0;
-	std::vector<glm::vec2> texcoords1;
-	std::vector<glm::vec4> colors0;
-};
-
 struct LumenPrimMesh {
 	lm::String name;
 	lm::String filename;
@@ -59,26 +49,23 @@ struct TextureRef {
 	lm::String relative_path;
 };
 
-class LumenScene {
-   public:
-	LumenScene() = default;
-	void load_scene(const lm::String& path);
-	void write_lumen_scene();
-	void destroy();
-	std::vector<glm::vec3> positions;
-	std::vector<u32> indices;
-	std::vector<glm::vec3> normals;
-	std::vector<glm::vec3> tangents;
-	std::vector<glm::vec2> texcoords0;
-	std::vector<glm::vec2> texcoords1;
-	std::vector<glm::vec4> colors0;
+namespace scene {
 
-	std::vector<LumenPrimMesh> prim_meshes;
-	std::vector<Material> materials;
-	std::vector<TextureRef> textures;
-	std::vector<LumenLight> lights;
+struct Scene {
+	lm::FixedArray<glm::vec3> positions;
+	lm::FixedArray<u32> indices;
+	lm::FixedArray<glm::vec3> normals;
+	lm::FixedArray<glm::vec3> tangents;
+	lm::FixedArray<glm::vec2> texcoords0;
+	lm::FixedArray<glm::vec2> texcoords1;
+	lm::FixedArray<glm::vec4> colors0;
+	lm::FixedArray<LumenPrimMesh> prim_meshes;
+	lm::FixedArray<Material> materials;
+	lm::FixedArray<TextureRef> textures;
+	lm::FixedArray<LumenLight> lights;
+	lm::FixedArray<Light> gpu_lights;
+	lm::FixedArray<vk::Texture*> scene_textures;
 
-	std::vector<Light> gpu_lights;
 	vk::Buffer* index_buffer;
 	vk::Buffer* vertex_buffer;
 	vk::Buffer* compact_vertices_buffer;
@@ -86,7 +73,6 @@ class LumenScene {
 	vk::Buffer* prim_lookup_buffer;
 	vk::Buffer* scene_desc_buffer;
 	vk::Buffer* mesh_lights_buffer;
-	std::vector<vk::Texture*> scene_textures;
 	lm::Camera camera{};
 	lm::HashMap<u32, lm::String> material_idx_to_name{};
 
@@ -94,22 +80,22 @@ class LumenScene {
 	f32 total_light_area = 0;
 
 	struct Dimensions {
-		glm::vec3 min = glm::vec3(std::numeric_limits<f32>::max());
-		glm::vec3 max = glm::vec3(std::numeric_limits<f32>::min());
-		glm::vec3 size{0.f};
-		glm::vec3 center{0.f};
-		f32 radius{0};
-	} m_dimensions;
-	std::unique_ptr<SceneConfig> config;
+		glm::vec3 min = glm::vec3(F32_MAX);
+		glm::vec3 max = glm::vec3(F32_MIN);
+		glm::vec3 size = glm::vec3(0.f);
+		glm::vec3 center = glm::vec3(0.f);
+		f32 radius = 0.0f;
+	} dimensions;
+	SceneConfig config;
 
-	u32 dir_light_idx = -1;
-	void create_scene_config(const lm::String& integrator_name);
-	inline bool has_bsdf_type(u32 flag) { return (bsdf_types & flag) != 0; }
-
-   private:
+	u32 dir_light_idx = U32_MAX;
 	u32 bsdf_types = 0;
-	void compute_scene_dimensions();
-	void parse_lumen_scene(const lm::String& path, const lm::String& path_root, LumenNode* root);
-	void add_default_texture();
-	VkSampler texture_sampler;
+	VkSampler scene_texture_sampler;
 };
+
+void load(const lm::String& path);
+void write();
+void destroy();
+void config_init(const lm::String& integrator_name);
+Scene* get();
+}  // namespace scene

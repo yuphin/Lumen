@@ -30,7 +30,7 @@ class RayTracer {
 	f32 draw_frame();
 	void render(u32 idx);
 	void render_debug_utils();
-	void create_integrator(i32 integrator_idx);
+	void create_integrator(IntegratorType type);
 	bool gui();
 	void destroy_accel();
 	bool initialized = false;
@@ -51,9 +51,6 @@ class RayTracer {
 
 	vk::Texture* reference_tex;
 	vk::Texture* target_tex;
-
-	lm::String scene_name;
-	LumenScene scene;
 
 	clock_t start;
 	bool debug = false;

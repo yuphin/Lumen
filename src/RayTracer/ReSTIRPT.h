@@ -5,8 +5,7 @@
 using namespace RestirPT;
 class ReSTIRPT final : public Integrator {
    public:
-	ReSTIRPT(LumenScene* lumen_scene, const vk::BVH& tlas)
-		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), ReSTIRPTConfig)) {}
+	ReSTIRPT(const vk::BVH& tlas) : Integrator(tlas) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -25,7 +24,6 @@ class ReSTIRPT final : public Integrator {
 	vk::Buffer* reconnection_buffer;
 	vk::Buffer* transformations_buffer;
 	vk::Buffer* debug_vis_buffer;
-
 
 	vk::Buffer* photon_eye_buffer_ping;
 	vk::Buffer* photon_eye_buffer_pong;
@@ -73,9 +71,7 @@ class ReSTIRPT final : public Integrator {
 	u32 num_photons = 1920 * 1080;
 	StreamingMethod streaming_method = StreamingMethod::INDIVIDUAL_CONTRIBUTIONS;
 	MISMethod mis_method = MISMethod::PAIRWISE;
-	ReSTIRPTConfig* config;
 
 	vk::BVH photon_blas;
 	vk::BVH photon_tlas;
-
 };

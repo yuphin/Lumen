@@ -3,9 +3,12 @@
 
 void PSSMLT::init() {
 	Integrator::init();
-	light_path_rand_count = 6 + 3 * config->path_length;
-	cam_path_rand_count = 2 + 3 * config->path_length;
-	connect_path_rand_count = 4 * config->path_length;
+
+	u32 path_length = lumen_scene->config.common.path_length;
+	light_path_rand_count = 6 + 3 * path_length;
+	cam_path_rand_count = 2 + 3 * path_length;
+	connect_path_rand_count = 4 * path_length;
+	const PSSMLTConfig& config = lumen_scene->config.settings.pssmlt;
 
 	// MLTVCM buffers
 	bootstrap_buffer =
@@ -13,24 +16,24 @@ void PSSMLT::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = config->num_bootstrap_samples * sizeof(BootstrapSample)});
+						 .size = config.num_bootstrap_samples * sizeof(BootstrapSample)});
 
 	cdf_buffer =
 		prm::get_buffer({.name = "CDF",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = config->num_bootstrap_samples * sizeof(f32)});
+						 .size = config.num_bootstrap_samples * sizeof(f32)});
 
 	bootstrap_cpu = prm::get_buffer({.name = "Boostrap - CPU",
 									 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 									 .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
-									 .size = config->num_bootstrap_samples * sizeof(BootstrapSample)});
+									 .size = config.num_bootstrap_samples * sizeof(BootstrapSample)});
 
 	cdf_cpu = prm::get_buffer({.name = "CDF - CPU",
 							   .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 							   .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
-							   .size = config->num_bootstrap_samples * sizeof(f32)});
+							   .size = config.num_bootstrap_samples * sizeof(f32)});
 
 	cdf_sum_buffer =
 		prm::get_buffer({.name = "CDF Sums",
@@ -44,84 +47,82 @@ void PSSMLT::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = config->num_mlt_threads * sizeof(SeedData)});
+						 .size = config.num_mlt_threads * sizeof(SeedData)});
 
 	light_primary_samples_buffer =
 		prm::get_buffer({.name = "Primary Samples - Light",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = config->num_mlt_threads * light_path_rand_count * sizeof(PrimarySample)});
+						 .size = config.num_mlt_threads * light_path_rand_count * sizeof(PrimarySample)});
 
 	cam_primary_samples_buffer =
 		prm::get_buffer({.name = "Primary Samples - Camera",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = config->num_mlt_threads * cam_path_rand_count * sizeof(PrimarySample)});
+						 .size = config.num_mlt_threads * cam_path_rand_count * sizeof(PrimarySample)});
 
 	connection_primary_samples_buffer =
 		prm::get_buffer({.name = "Primary Samples - Connection",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = config->num_mlt_threads * connect_path_rand_count * sizeof(PrimarySample)});
+						 .size = config.num_mlt_threads * connect_path_rand_count * sizeof(PrimarySample)});
 
 	mlt_samplers_buffer =
 		prm::get_buffer({.name = "MLT Samplers",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = config->num_mlt_threads * sizeof(MLTSampler)});
+						 .size = config.num_mlt_threads * sizeof(MLTSampler)});
 
 	mlt_col_buffer =
 		prm::get_buffer({.name = "MLT Color Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height()  * 3 * sizeof(f32)});
+						 .size = Window::width() * Window::height() * 3 * sizeof(f32)});
 
 	chain_stats_buffer =
 		prm::get_buffer({.name = "Chain Stats",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = config->num_mlt_threads * sizeof(ChainData)});
+						 .size = config.num_mlt_threads * sizeof(ChainData)});
 
-	splat_buffer = prm::get_buffer(
-		{.name = "Splat Buffer",
-		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-				  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		 .memory_type = vk::BUFFER_TYPE_GPU,
-		 .size = config->num_mlt_threads *
-				 (config->path_length * (static_cast<unsigned long long>(config->path_length) + 1)) * sizeof(Splat)});
+	splat_buffer =
+		prm::get_buffer({.name = "Splat Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = config.num_mlt_threads * (path_length * (path_length + 1)) * sizeof(Splat)});
 
-	past_splat_buffer = prm::get_buffer(
-		{.name = "Past Splats Buffer",
-		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-				  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		 .memory_type = vk::BUFFER_TYPE_GPU,
-		 .size = config->num_mlt_threads *
-				 (config->path_length * (static_cast<unsigned long long>(config->path_length) + 1)) * sizeof(Splat)});
+	past_splat_buffer =
+		prm::get_buffer({.name = "Past Splats Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = config.num_mlt_threads * (path_length * (path_length + 1)) * sizeof(Splat)});
 
-	auto path_size = std::max(config->num_mlt_threads, config->num_bootstrap_samples);
+	auto path_size = std::max(config.num_mlt_threads, config.num_bootstrap_samples);
 
 	light_path_buffer =
 		prm::get_buffer({.name = "Light Paths",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = path_size * (config->path_length + 1) * sizeof(MLTPathVertex)});
+						 .size = path_size * (path_length + 1) * sizeof(MLTPathVertex)});
 
 	camera_path_buffer =
 		prm::get_buffer({.name = "Camera Paths",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = path_size * (config->path_length + 1) * sizeof(MLTPathVertex)});
+						 .size = path_size * (path_length + 1) * sizeof(MLTPathVertex)});
 
 	i32 size = 0;
-	i32 arr_size = config->num_bootstrap_samples;
+	i32 arr_size = config.num_bootstrap_samples;
 	do {
 		i32 num_blocks = std::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
@@ -131,7 +132,7 @@ void PSSMLT::init() {
 	} while (arr_size > 1);
 	block_sums.resize(size);
 	i32 i = 0;
-	arr_size = config->num_bootstrap_samples;
+	arr_size = config.num_bootstrap_samples;
 	do {
 		i32 num_blocks = std::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
@@ -167,8 +168,7 @@ void PSSMLT::init() {
 	desc.camera_path_addr = camera_path_buffer->device_address();
 
 	assert(vk::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
-								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, bootstrap_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, cdf_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, cdf_sum_buffer, vk::render_graph());
@@ -179,18 +179,13 @@ void PSSMLT::init() {
 								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, connection_primary_samples_addr, connection_primary_samples_buffer,
 								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_samplers_addr, mlt_samplers_buffer,
-								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_samplers_addr, mlt_samplers_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_col_addr, mlt_col_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, chain_stats_addr, chain_stats_buffer,
-								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, chain_stats_addr, chain_stats_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, splat_addr, splat_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, past_splat_addr, past_splat_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_path_addr, light_path_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, camera_path_addr, camera_path_buffer,
-								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, past_splat_addr, past_splat_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_path_addr, light_path_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, camera_path_addr, camera_path_buffer, vk::render_graph());
 
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",
@@ -202,25 +197,25 @@ void PSSMLT::init() {
 
 	frame_num = 0;
 
-
 	mutation_count =
-		i32(Window::width() * Window::height()  * config->mutations_per_pixel / f32(config->num_mlt_threads));
-	pc_ray.mutations_per_pixel = config->mutations_per_pixel;
+		i32(Window::width() * Window::height() * config.mutations_per_pixel / f32(config.num_mlt_threads));
+	pc_ray.mutations_per_pixel = config.mutations_per_pixel;
 }
 
 void PSSMLT::render() {
+	const PSSMLTConfig& config = lumen_scene->config.settings.pssmlt;
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
-	pc_ray.num_lights = i32(lumen_scene->gpu_lights.size());
+	pc_ray.num_lights = i32(lumen_scene->gpu_lights.size);
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = config->path_length;
-	pc_ray.sky_col = config->sky_col;
+	pc_ray.max_depth = lumen_scene->config.common.path_length;
+	pc_ray.sky_col = lumen_scene->config.common.sky_col;
 	// PSSMLT related constants
 	pc_ray.light_rand_count = light_path_rand_count;
 	pc_ray.cam_rand_count = cam_path_rand_count;
 	pc_ray.connection_rand_count = connect_path_rand_count;
 	pc_ray.random_num = rand() % UINT_MAX;
-	pc_ray.num_bootstrap_samples = config->num_bootstrap_samples;
+	pc_ray.num_bootstrap_samples = config.num_bootstrap_samples;
 	pc_ray.total_light_area = lumen_scene->total_light_area;
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.frame_num = frame_num;
@@ -241,7 +236,7 @@ void PSSMLT::render() {
 								 {"src/shaders/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
 					 .specialization_data = {1},
-					 .dims = {(u32)config->num_bootstrap_samples},
+					 .dims = {(u32)config.num_bootstrap_samples},
 				 })
 		.push_constants(&pc_ray)
 		.zero({light_path_buffer, camera_path_buffer})
@@ -251,13 +246,12 @@ void PSSMLT::render() {
 		.bind_tlas(tlas);
 
 	i32 counter = 0;
-	prefix_scan(0, config->num_bootstrap_samples, counter, vk::render_graph());
+	prefix_scan(0, config.num_bootstrap_samples, counter, vk::render_graph());
 	// Calculate CDF
 	vk::render_graph()
-		->add_compute("Calculate CDF",
-					  {.shader = vk::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
-					   .specialization_data = {(u32)config->num_bootstrap_samples},
-					   .dims = {(u32)std::ceil(config->num_bootstrap_samples / f32(1024.0f)), 1, 1}})
+		->add_compute("Calculate CDF", {.shader = vk::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
+										.specialization_data = {(u32)config.num_bootstrap_samples},
+										.dims = {(u32)std::ceil(config.num_bootstrap_samples / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer);
 
@@ -268,22 +262,22 @@ void PSSMLT::render() {
 	cmd.submit();
 	std::vector<BootstrapSample> samples;
 	samples.assign((BootstrapSample*)bootstrap_cpu.data,
-				   (BootstrapSample*)bootstrap_cpu.data + config->num_bootstrap_samples);
-	std::vector<f32> cdf1(config->num_bootstrap_samples, 0);
-	std::vector<f32> cdf2(config->num_bootstrap_samples, 0);
+				   (BootstrapSample*)bootstrap_cpu.data + config.num_bootstrap_samples);
+	std::vector<f32> cdf1(config.num_bootstrap_samples, 0);
+	std::vector<f32> cdf2(config.num_bootstrap_samples, 0);
 
 	cdf1[0] = 0;
-	for (i32 i = 1; i < config->num_bootstrap_samples; i++) {
-		cdf1[i] = cdf1[i - 1] + samples[i - 1].lum / config->num_bootstrap_samples;
+	for (i32 i = 1; i < config.num_bootstrap_samples; i++) {
+		cdf1[i] = cdf1[i - 1] + samples[i - 1].lum / config.num_bootstrap_samples;
 	}
-	f32 sum = cdf1[config->num_bootstrap_samples - 1];
-	for (i32 i = 1; i < config->num_bootstrap_samples; i++) {
+	f32 sum = cdf1[config.num_bootstrap_samples - 1];
+	for (i32 i = 1; i < config.num_bootstrap_samples; i++) {
 		cdf1[i] *= 1. / sum;
 	}
 	cdf2.assign((f32*)cdf_cpu.data,
-				(f32*)cdf_cpu.data + config->num_bootstrap_samples);
+				(f32*)cdf_cpu.data + config.num_bootstrap_samples);
 	f32 EPS = 1e-3;
-	for (i32 i = 0; i < config->num_bootstrap_samples; i++) {
+	for (i32 i = 0; i < config.num_bootstrap_samples; i++) {
 		f32 val1 = cdf1[i];
 		f32 val2 = cdf2[i];
 		f32 diff = abs(val1 - val2);
@@ -292,8 +286,8 @@ void PSSMLT::render() {
 		}
 
 	}
-	sum = cdf1[config->num_bootstrap_samples - 1];
-	f32 sum2 = cdf2[config->num_bootstrap_samples - 1];
+	sum = cdf1[config.num_bootstrap_samples - 1];
+	f32 sum2 = cdf2[config.num_bootstrap_samples - 1];
 	return;
 #endif
 
@@ -301,8 +295,8 @@ void PSSMLT::render() {
 
 	// Select seeds
 	rg->add_compute("Select Seeds", {.shader = vk::Shader("src/shaders/integrators/pssmlt/select_seeds.comp"),
-									 .specialization_data = {(u32)config->num_mlt_threads},
-									 .dims = {(u32)std::ceil(config->num_mlt_threads / f32(1024.0f)), 1, 1}})
+									 .specialization_data = {(u32)config.num_mlt_threads},
+									 .dims = {(u32)std::ceil(config.num_mlt_threads / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer);
 
@@ -314,7 +308,7 @@ void PSSMLT::render() {
 							   {"src/shaders/ray_shadow.rmiss"},
 							   {"src/shaders/ray.rchit"},
 							   {"src/shaders/ray.rahit"}},
-				   .dims = {(u32)config->num_mlt_threads},
+				   .dims = {(u32)config.num_mlt_threads},
 			   })
 		.push_constants(&pc_ray)
 		.zero({light_path_buffer, camera_path_buffer})
@@ -336,7 +330,7 @@ void PSSMLT::render() {
 									   {"src/shaders/ray_shadow.rmiss"},
 									   {"src/shaders/ray.rchit"},
 									   {"src/shaders/ray.rahit"}},
-						   .dims = {(u32)config->num_mlt_threads},
+						   .dims = {(u32)config.num_mlt_threads},
 					   })
 				.push_constants(&pc_ray)
 				.zero({light_path_buffer, camera_path_buffer})
@@ -369,9 +363,8 @@ void PSSMLT::render() {
 		}
 	}
 	// Compositions
-	rg->add_compute("Composition",
-					{.shader = vk::Shader("src/shaders/integrators/pssmlt/composite.comp"),
-					 .dims = {(u32)std::ceil(Window::width() * Window::height()  / f32(1024.0f)), 1, 1}})
+	rg->add_compute("Composition", {.shader = vk::Shader("src/shaders/integrators/pssmlt/composite.comp"),
+									.dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }
@@ -392,17 +385,16 @@ void PSSMLT::prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph
 	pc_compute.num_elems = num_elems;
 	auto scan = [&](i32 num_wgs, i32 idx) {
 		++counter;
-		rg->add_compute("PrefixScan - Scan",
-						{.shader = vk::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
-						 .dims = {(u32)num_wgs, 1, 1}})
+		rg->add_compute("PrefixScan - Scan", {.shader = vk::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
+											  .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
 	};
 	auto uniform_add = [&](i32 num_wgs, i32 output_idx) {
 		++counter;
-		rg->add_compute("PrefixScan - Uniform Add",
-						{.shader = vk::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"),
-						 .dims = {(u32)num_wgs, 1, 1}})
+		rg->add_compute(
+			  "PrefixScan - Uniform Add",
+			  {.shader = vk::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"), .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
 	};

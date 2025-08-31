@@ -44,8 +44,8 @@ void DDGI::init() {
 	u32 num_probes;
 	// DDGI Resources
 	{
-		glm::vec3 min_pos = lumen_scene->m_dimensions.min - vec3(0.1f);
-		glm::vec3 max_pos = lumen_scene->m_dimensions.max + vec3(0.1f);
+		glm::vec3 min_pos = lumen_scene->dimensions.min - vec3(0.1f);
+		glm::vec3 max_pos = lumen_scene->dimensions.max + vec3(0.1f);
 		glm::vec3 diag = (max_pos - min_pos) * 1.1f;
 		probe_counts = glm::ivec3(diag / probe_distance);
 		probe_start_position = min_pos;
@@ -208,10 +208,10 @@ void DDGI::init() {
 void DDGI::render() {
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
-	pc_ray.num_lights = (i32)lumen_scene->gpu_lights.size();
+	pc_ray.num_lights = (i32)lumen_scene->gpu_lights.size;
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = config->path_length;
-	pc_ray.sky_col = config->sky_col;
+	pc_ray.max_depth = lumen_scene->config.common.path_length;
+	pc_ray.sky_col = lumen_scene->config.common.sky_col;
 	pc_ray.first_frame = first_frame;
 	pc_ray.infinite_bounces = infinite_bounces;
 	pc_ray.total_light_area = lumen_scene->total_light_area;

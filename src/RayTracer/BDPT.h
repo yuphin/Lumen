@@ -4,8 +4,7 @@
 
 class BDPT final : public Integrator {
    public:
-	BDPT(LumenScene* lumen_scene, const vk::BVH& tlas)
-		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), BDPTConfig)) {}
+	BDPT(const vk::BVH& tlas) : Integrator(tlas) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -16,5 +15,4 @@ class BDPT final : public Integrator {
 	vk::Buffer* light_path_buffer;
 	vk::Buffer* camera_path_buffer;
 	vk::Buffer* color_storage_buffer;
-	BDPTConfig* config;
 };

@@ -21,6 +21,7 @@ struct FileProperties {
 	u64 modified;
 };
 u64 get_page_size();
+void reserve(void* ptr, u64 size);
 void* reserve(u64 reserve_size);
 bool commit(void* ptr, u64 commit_size);
 u64 file_read(FileHandle handle, void* out_data, u64 size = U64_MAX);

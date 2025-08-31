@@ -3,8 +3,7 @@
 #include "shaders/integrators/vcmmlt/vcmmlt_commons.h"
 class VCMMLT final : public Integrator {
    public:
-	VCMMLT(LumenScene* lumen_scene, const vk::BVH& tlas)
-		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), VCMMLTConfig)) {}
+	VCMMLT(const vk::BVH& tlas) : Integrator(tlas) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool gui() override;
@@ -38,6 +37,4 @@ class VCMMLT final : public Integrator {
 	i32 mutation_count;
 	i32 light_path_rand_count;
 	i32 sample_cnt = 0;
-
-	VCMMLTConfig* config;
 };

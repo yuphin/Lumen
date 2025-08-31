@@ -20,16 +20,16 @@ void Path::init() {
 	assert(vk::render_graph()->settings.shader_inference == true);
 	// For shader resource dependency inference, use this macro to register a buffer address to the rendergraph
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
-	path_length = config->path_length;
+	path_length = lumen_scene->config.common.path_length;
 }
 
 void Path::render() {
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
-	pc_ray.num_lights = (i32)lumen_scene->gpu_lights.size();
+	pc_ray.num_lights = (i32)lumen_scene->gpu_lights.size;
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = path_length;
-	pc_ray.sky_col = config->sky_col;
+	pc_ray.sky_col = lumen_scene->config.common.sky_col;
 	pc_ray.total_light_area = lumen_scene->total_light_area;
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.dir_light_idx = lumen_scene->dir_light_idx;

@@ -3,8 +3,7 @@
 #include "shaders/integrators/restir/gi/restirgi_commons.h"
 class ReSTIRGI final : public Integrator {
    public:
-	ReSTIRGI(LumenScene* lumen_scene, const vk::BVH& tlas)
-		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), ReSTIRGIConfig)) {}
+	ReSTIRGI(const vk::BVH& tlas) : Integrator(tlas) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -20,6 +19,4 @@ class ReSTIRGI final : public Integrator {
 	PCReSTIRGI pc_ray{};
 	bool do_spatiotemporal = false;
 	bool enable_accumulation = false;
-
-	ReSTIRGIConfig* config;
 };

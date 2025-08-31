@@ -7,7 +7,7 @@ namespace lm {
 inline constexpr u64 HASH_MAP_LINEAR_MIN_CAPACITY = 32;
 inline constexpr u64 HASH_MAP_HASH_EMPTY = 0;
 inline constexpr u64 HASH_MAP_HASH_DELETED = 1;
-inline constexpr u64 HASH_MAP_LOAD_PERCENTAGE_THRESHOLD = 70;
+inline constexpr u64 HASH_MAP_LOAD_PERCENTAGE_THRESHOLD = 50;
 
 template <typename T>
 static inline uint64_t get_default_hash(const T& x) {
@@ -73,7 +73,7 @@ struct HashMapLinear {
 
 		u64 index = hash & (capacity - 1);
 
-		u32 probe_inc = 1;
+		u64 probe_inc = 1;
 		while (data[index].hash != HASH_MAP_HASH_EMPTY) {
 			HashMapEntry<T1, T2>& entry = data[index];
 			if (entry.hash == HASH_MAP_HASH_DELETED) {
@@ -105,7 +105,7 @@ struct HashMapLinear {
 			hash += HASH_MAP_HASH_DELETED + 1;
 		}
 		u64 index = hash & (capacity - 1);
-		u32 probe_inc = 1;
+		u64 probe_inc = 1;
 
 		while (data[index].hash > HASH_MAP_HASH_DELETED) {
 			if (data[index].hash == hash && data[index].key == key) {
@@ -130,7 +130,7 @@ struct HashMapLinear {
 
 		u64 index = hash & (capacity - 1);
 
-		u32 probe_inc = 1;
+		u64 probe_inc = 1;
 		while (data[index].hash != HASH_MAP_HASH_EMPTY) {
 			HashMapEntry<T1, T2>& entry = data[index];
 			if (entry.hash == HASH_MAP_HASH_DELETED) {
@@ -156,7 +156,7 @@ struct HashMapLinear {
 			hash += HASH_MAP_HASH_DELETED + 1;
 		}
 		u64 index = hash & (capacity - 1);
-		u32 probe_inc = 1;
+		u64 probe_inc = 1;
 
 		while (data[index].hash > HASH_MAP_HASH_DELETED) {
 			if (data[index].hash == hash && data[index].key == key) {
@@ -221,16 +221,16 @@ struct HashMapLinear {
 
 // Like arrays, hash maps are also always allocated in a new block
 template <typename T1, typename T2, uint64_t (*hash_func)(const T1&) = get_default_hash<T1>>
-HashMapLinear<T1, T2, hash_func> hash_map_create(Arena* arena) {
+HashMapLinear<T1, T2, hash_func> hash_map_create(Arena* arena, u64 reserved_capacity = 1024) {
 	using HashMapEntryType = HashMapEntry<T1, T2>;
 	HashMapLinear<T1, T2, hash_func> map;
-	map.arena_node = arena;
 	map.capacity = HASH_MAP_LINEAR_MIN_CAPACITY;
 
 	Arena* arena_node;
-	map.data = (HashMapEntryType*)arena->allocate(HASH_MAP_LINEAR_MIN_CAPACITY * sizeof(HashMapEntryType),
-												  alignof(HashMapEntryType), &arena_node, /*zero_initialize=*/true,
-												  /*new_block=*/true);
+	map.data = (HashMapEntryType*)arena->allocate(
+		HASH_MAP_LINEAR_MIN_CAPACITY * sizeof(HashMapEntryType), alignof(HashMapEntryType), &arena_node,
+		/*zero_initialize=*/true,
+		/*exclusive_block_reserve_size=*/util::next_pow2(reserved_capacity) * sizeof(HashMapEntryType));
 	memset(map.data, 0, HASH_MAP_LINEAR_MIN_CAPACITY * sizeof(HashMapEntryType));
 	map.arena_node = arena_node;
 	return map;
@@ -243,7 +243,7 @@ template <typename T, uint64_t (*hash_func)(const T&) = get_default_hash<T>>
 using HashSet = HashMapLinear<T, Empty, hash_func>;
 
 template <typename T, uint64_t (*hash_func)(const T&) = get_default_hash<T>>
-HashSet<T, hash_func> hash_set_create(Arena* arena) {
-	return hash_map_create<T, Empty, hash_func>(arena);
+HashSet<T, hash_func> hash_set_create(Arena* arena, u64 reserved_capacity = 1024) {
+	return hash_map_create<T, Empty, hash_func>(arena, reserved_capacity);
 }
 }  // namespace lm

@@ -5,9 +5,11 @@ static f32 vcm_radius_factor = 0.025f;
 static bool light_first = false;
 void VCMMLT::init() {
 	Integrator::init();
-	mutation_count =
-		i32(Window::width() * Window::height()  * config->mutations_per_pixel / f32(config->num_mlt_threads));
-	light_path_rand_count = std::max(7 + 3 * config->path_length, 3 + 7 * config->path_length);
+
+	const VCMMLTConfig& config = lumen_scene->config.settings.vcmmlt;
+	u32 path_length = lumen_scene->config.common.path_length;
+	mutation_count = i32(Window::width() * Window::height() * config.mutations_per_pixel / f32(config.num_mlt_threads));
+	light_path_rand_count = std::max(7 + 3 * path_length, 3 + 7 * path_length);
 
 	// MLTVCM buffers
 	bootstrap_buffer =
@@ -15,14 +17,14 @@ void VCMMLT::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = config->num_bootstrap_samples * sizeof(BootstrapSample)});
+						 .size = config.num_bootstrap_samples * sizeof(BootstrapSample)});
 
 	cdf_buffer =
 		prm::get_buffer({.name = "CDF Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = VkDeviceSize(config->num_bootstrap_samples * 4)});
+						 .size = VkDeviceSize(config.num_bootstrap_samples * 4)});
 
 	cdf_sum_buffer =
 		prm::get_buffer({.name = "CDF Sum Buffer",
@@ -36,28 +38,28 @@ void VCMMLT::init() {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = config->num_mlt_threads * sizeof(VCMMLTSeedData)});
+						 .size = config.num_mlt_threads * sizeof(VCMMLTSeedData)});
 
 	light_primary_samples_buffer =
 		prm::get_buffer({.name = "Light Primary Samples Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = config->num_mlt_threads * light_path_rand_count * sizeof(PrimarySample) * 2});
+						 .size = config.num_mlt_threads * light_path_rand_count * sizeof(PrimarySample) * 2});
 
 	mlt_samplers_buffer =
 		prm::get_buffer({.name = "MLT Samplers Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = config->num_mlt_threads * sizeof(VCMMLTSampler) * 2});
+						 .size = config.num_mlt_threads * sizeof(VCMMLTSampler) * 2});
 
 	mlt_col_buffer =
 		prm::get_buffer({.name = "MLT Col Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height()  * 3 * sizeof(f32)});
+						 .size = Window::width() * Window::height() * 3 * sizeof(f32)});
 
 	chain_stats_buffer =
 		prm::get_buffer({.name = "Chain Stats Buffer",
@@ -66,59 +68,59 @@ void VCMMLT::init() {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = 2 * sizeof(ChainData)});
 
-	splat_buffer = prm::get_buffer(
-		{.name = "Splat Buffer",
-		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-				  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		 .memory_type = vk::BUFFER_TYPE_GPU,
-		 .size = config->num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat) * 2});
+	splat_buffer =
+		prm::get_buffer({.name = "Splat Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = config.num_mlt_threads * (path_length * (path_length + 1)) * sizeof(Splat) * 2});
 
-	past_splat_buffer = prm::get_buffer(
-		{.name = "Past Splat Buffer",
-		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-				  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		 .memory_type = vk::BUFFER_TYPE_GPU,
-		 .size = config->num_mlt_threads * (config->path_length * (config->path_length + 1)) * sizeof(Splat) * 2});
+	past_splat_buffer =
+		prm::get_buffer({.name = "Past Splat Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = config.num_mlt_threads * (path_length * (path_length + 1)) * sizeof(Splat) * 2});
 
 	light_path_buffer =
 		prm::get_buffer({.name = "Light Path Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height()  * (config->path_length + 1) * sizeof(VCMVertex)});
+						 .size = Window::width() * Window::height() * (path_length + 1) * sizeof(VCMVertex)});
 
 	light_path_cnt_buffer =
 		prm::get_buffer({.name = "Light Path Cnt Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height()  * sizeof(f32)});
+						 .size = Window::width() * Window::height() * sizeof(f32)});
 
 	tmp_col_buffer =
 		prm::get_buffer({.name = "Tmp Col Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height()  * sizeof(f32) * 3});
+						 .size = Window::width() * Window::height() * sizeof(f32) * 3});
 
 	photon_buffer =
 		prm::get_buffer({.name = "Photon Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = 10 * Window::width() * Window::height()  * sizeof(VCMPhotonHash)});
+						 .size = 10 * Window::width() * Window::height() * sizeof(VCMPhotonHash)});
 
 	mlt_atomicsum_buffer =
 		prm::get_buffer({.name = "MLT Atomic Sum Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = config->num_mlt_threads * sizeof(SumData) * 2});
+						 .size = config.num_mlt_threads * sizeof(SumData) * 2});
 
 	mlt_residual_buffer =
 		prm::get_buffer({.name = "MLT Residual Buffer",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = config->num_mlt_threads * sizeof(SumData)});
+						 .size = config.num_mlt_threads * sizeof(SumData)});
 
 	counter_buffer =
 		prm::get_buffer({.name = "Counter Buffer",
@@ -128,7 +130,7 @@ void VCMMLT::init() {
 						 .size = sizeof(i32)});
 
 	i32 size = 0;
-	i32 arr_size = config->num_bootstrap_samples;
+	i32 arr_size = config.num_bootstrap_samples;
 	do {
 		i32 num_blocks = std::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
@@ -138,7 +140,7 @@ void VCMMLT::init() {
 	} while (arr_size > 1);
 	block_sums.resize(size);
 	i32 i = 0;
-	arr_size = config->num_bootstrap_samples;
+	arr_size = config.num_bootstrap_samples;
 	do {
 		i32 num_blocks = std::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
@@ -180,33 +182,24 @@ void VCMMLT::init() {
 	desc.counter_addr = counter_buffer->device_address();
 
 	assert(vk::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer,
-								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, bootstrap_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, cdf_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, cdf_sum_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, seeds_addr, seeds_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_primary_samples_addr, light_primary_samples_buffer,
 								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_samplers_addr, mlt_samplers_buffer,
-								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_samplers_addr, mlt_samplers_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_col_addr, mlt_col_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, chain_stats_addr, chain_stats_buffer,
-								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, chain_stats_addr, chain_stats_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, splat_addr, splat_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, past_splat_addr, past_splat_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_vertices_addr, light_path_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, path_cnt_addr, light_path_cnt_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, tmp_col_buffer,
-								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, past_splat_addr, past_splat_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_vertices_addr, light_path_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, path_cnt_addr, light_path_cnt_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, tmp_col_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, photon_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_atomicsum_addr, mlt_atomicsum_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, mlt_residual_buffer,
-								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_atomicsum_addr, mlt_atomicsum_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, mlt_residual_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, counter_buffer, vk::render_graph());
 
 	lumen_scene->scene_desc_buffer =
@@ -219,29 +212,30 @@ void VCMMLT::init() {
 
 	frame_num = 0;
 
-	pc_ray.mutations_per_pixel = config->mutations_per_pixel;
-	pc_ray.num_mlt_threads = config->num_mlt_threads;
+	pc_ray.mutations_per_pixel = config.mutations_per_pixel;
+	pc_ray.num_mlt_threads = config.num_mlt_threads;
 }
 
 void VCMMLT::render() {
 	LUMEN_TRACE("Rendering sample %d...", sample_cnt++);
 	vk::CommandBuffer cmd(/*start*/ true);
+	const VCMMLTConfig& config = lumen_scene->config.settings.vcmmlt;
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
-	pc_ray.num_lights = i32(lumen_scene->gpu_lights.size());
+	pc_ray.num_lights = i32(lumen_scene->gpu_lights.size);
 	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = config->path_length;
-	pc_ray.sky_col = config->sky_col;
+	pc_ray.max_depth = lumen_scene->config.common.path_length;
+	pc_ray.sky_col = lumen_scene->config.common.sky_col;
 	pc_ray.frame_num = frame_num;
 	// VCMMLT related constants
 	pc_ray.use_vm = use_vm;
 	pc_ray.light_rand_count = light_path_rand_count;
 	pc_ray.random_num = rand() % UINT_MAX;
-	pc_ray.num_bootstrap_samples = config->num_bootstrap_samples;
-	pc_ray.radius = lumen_scene->m_dimensions.radius * vcm_radius_factor / 100.f;
+	pc_ray.num_bootstrap_samples = config.num_bootstrap_samples;
+	pc_ray.radius = lumen_scene->dimensions.radius * vcm_radius_factor / 100.f;
 	pc_ray.radius /= (f32)pow((double)pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
-	pc_ray.min_bounds = lumen_scene->m_dimensions.min;
-	pc_ray.max_bounds = lumen_scene->m_dimensions.max;
+	pc_ray.min_bounds = lumen_scene->dimensions.min;
+	pc_ray.max_bounds = lumen_scene->dimensions.max;
 	const glm::vec3 diam = pc_ray.max_bounds - pc_ray.min_bounds;
 	const f32 max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
 	const i32 base_grid_res = i32(max_comp / pc_ray.radius);
@@ -262,7 +256,7 @@ void VCMMLT::render() {
 	};
 	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name, const std::string& reduce_name,
 						 const std::string& reduce_shader_name, const std::vector<u32> spec_data) {
-		u32 num_wgs = u32((config->num_mlt_threads + 1023) / 1024);
+		u32 num_wgs = u32((config.num_mlt_threads + 1023) / 1024);
 		rg->add_compute(
 			  op_name,
 			  {.shader = vk::Shader(op_shader_name), .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
@@ -270,9 +264,9 @@ void VCMMLT::render() {
 			.bind(lumen_scene->scene_desc_buffer)
 			.zero({mlt_residual_buffer, counter_buffer});
 		while (num_wgs != 1) {
-			rg->add_compute(reduce_name, {.shader = vk::Shader(reduce_shader_name),
-										  .specialization_data = spec_data,
-										  .dims = {num_wgs, 1, 1}})
+			rg->add_compute(
+				  reduce_name,
+				  {.shader = vk::Shader(reduce_shader_name), .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
 				.push_constants(&pc_ray)
 				.bind(lumen_scene->scene_desc_buffer);
 			num_wgs = (u32)(num_wgs + 1023) / 1024;
@@ -306,7 +300,7 @@ void VCMMLT::render() {
 							   {"src/shaders/ray.rchit"},
 							   {"src/shaders/ray.rahit"}},
 				   .specialization_data = spec_consts,
-				   .dims = {Window::width() * Window::height() },
+				   .dims = {Window::width() * Window::height()},
 			   })
 		.push_constants(&pc_ray)
 		.zero({chain_stats_buffer, mlt_atomicsum_buffer})
@@ -325,7 +319,7 @@ void VCMMLT::render() {
 							   {"src/shaders/ray.rchit"},
 							   {"src/shaders/ray.rahit"}},
 				   .specialization_data = spec_consts,
-				   .dims = {(u32)config->num_bootstrap_samples},
+				   .dims = {(u32)config.num_bootstrap_samples},
 			   })
 		.push_constants(&pc_ray)
 		.bind(rt_bindings)
@@ -333,16 +327,15 @@ void VCMMLT::render() {
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
 	i32 counter = 0;
-	prefix_scan(0, config->num_bootstrap_samples, counter, rg);
+	prefix_scan(0, config.num_bootstrap_samples, counter, rg);
 	// Calculate CDF
-	rg->add_compute("Calculate CDF",
-					{.shader = vk::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
-					 .dims = {(u32)std::ceil(config->num_bootstrap_samples / f32(1024.0f)), 1, 1}})
+	rg->add_compute("Calculate CDF", {.shader = vk::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
+									  .dims = {(u32)std::ceil(config.num_bootstrap_samples / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer);
 	// Select seeds
 	rg->add_compute("Select Seeds", {.shader = vk::Shader("src/shaders/integrators/vcmmlt/select_seeds.comp"),
-									 .dims = {(u32)std::ceil(config->num_mlt_threads / f32(1024.0f)), 1, 1}})
+									 .dims = {(u32)std::ceil(config.num_mlt_threads / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer);
 	// Fill in the samplers for mutations
@@ -357,7 +350,7 @@ void VCMMLT::render() {
 								   {"src/shaders/ray.rchit"},
 								   {"src/shaders/ray.rahit"}},
 					   .specialization_data = spec_consts,
-					   .dims = {(u32)config->num_mlt_threads},
+					   .dims = {(u32)config.num_mlt_threads},
 				   })
 			.push_constants(&pc_ray)
 			.bind(rt_bindings)
@@ -387,7 +380,7 @@ void VCMMLT::render() {
 									   {"src/shaders/ray_shadow.rmiss"},
 									   {"src/shaders/ray.rchit"},
 									   {"src/shaders/ray.rahit"}},
-						   .dims = {(u32)config->num_mlt_threads},
+						   .dims = {(u32)config.num_mlt_threads},
 					   })
 				.push_constants(&pc_ray)
 				.zero(mlt_atomicsum_buffer)
@@ -397,9 +390,8 @@ void VCMMLT::render() {
 				.bind_tlas(tlas);
 			sum_up_chain_data();
 			// Normalization
-			rg->add_compute(
-				  "Calculate Normalization",
-				  {.shader = vk::Shader("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
+			rg->add_compute("Calculate Normalization",
+							{.shader = vk::Shader("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
 				.push_constants(&pc_ray)
 				.bind(lumen_scene->scene_desc_buffer);
 		};
@@ -426,9 +418,8 @@ void VCMMLT::render() {
 		}
 	}
 	// Compositions
-	rg->add_compute("Composition",
-					{.shader = vk::Shader("src/shaders/integrators/vcmmlt/composite.comp"),
-					 .dims = {(u32)std::ceil(Window::width() * Window::height()  / f32(1024.0f)), 1, 1}})
+	rg->add_compute("Composition", {.shader = vk::Shader("src/shaders/integrators/vcmmlt/composite.comp"),
+									.dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }
@@ -459,17 +450,16 @@ void VCMMLT::prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph
 	pc_compute.num_elems = num_elems;
 	auto scan = [&](i32 num_wgs, i32 idx) {
 		++counter;
-		rg->add_compute("PrefixScan - Scan",
-						{.shader = vk::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
-						 .dims = {(u32)num_wgs, 1, 1}})
+		rg->add_compute("PrefixScan - Scan", {.shader = vk::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
+											  .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
 	};
 	auto uniform_add = [&](i32 num_wgs, i32 output_idx) {
 		++counter;
-		rg->add_compute("PrefixScan - Uniform Add",
-						{.shader = vk::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"),
-						 .dims = {(u32)num_wgs, 1, 1}})
+		rg->add_compute(
+			  "PrefixScan - Uniform Add",
+			  {.shader = vk::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"), .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
 	};

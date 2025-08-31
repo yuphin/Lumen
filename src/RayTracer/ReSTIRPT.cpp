@@ -9,7 +9,7 @@ void ReSTIRPT::init() {
 	Integrator::init();
 
 	std::vector<glm::mat4> transformations;
-	transformations.resize(lumen_scene->prim_meshes.size());
+	transformations.resize(lumen_scene->prim_meshes.size);
 	for (auto& pm : lumen_scene->prim_meshes) {
 		transformations[pm.prim_idx] = pm.world_matrix;
 	}
@@ -186,26 +186,26 @@ void ReSTIRPT::init() {
 								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_count_addr, photon_count_buffer, vk::render_graph());
 
-	path_length = config->path_length;
+	path_length = lumen_scene->config.common.path_length;
 }
 
 void ReSTIRPT::render() {
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
 	pc_ray.enable_temporal_jitter = uint(enable_temporal_jitter);
-	pc_ray.num_lights = (i32)lumen_scene->gpu_lights.size();
+	pc_ray.num_lights = (i32)lumen_scene->gpu_lights.size;
 	pc_ray.prev_random_num = pc_ray.general_seed;
 	pc_ray.sampling_seed = rand() % UINT_MAX;
 	pc_ray.seed2 = rand() % UINT_MAX;
 	pc_ray.seed3 = rand() % UINT_MAX;
 	pc_ray.max_depth = path_length;
-	pc_ray.sky_col = config->sky_col;
+	pc_ray.sky_col = lumen_scene->config.common.sky_col;
 	pc_ray.total_light_area = lumen_scene->total_light_area;
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.dir_light_idx = lumen_scene->dir_light_idx;
 	pc_ray.enable_accumulation = enable_accumulation;
 	pc_ray.num_spatial_samples = num_spatial_samples;
-	pc_ray.scene_extent = glm::length(lumen_scene->m_dimensions.max - lumen_scene->m_dimensions.min);
+	pc_ray.scene_extent = glm::length(lumen_scene->dimensions.max - lumen_scene->dimensions.min);
 	pc_ray.direct_lighting = direct_lighting;
 	pc_ray.enable_rr = enable_rr;
 

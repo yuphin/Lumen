@@ -3,8 +3,7 @@
 #include "shaders/integrators/pssmlt/pssmlt_commons.h"
 class PSSMLT final : public Integrator {
    public:
-	PSSMLT(LumenScene* lumen_scene, const vk::BVH& tlas)
-		: Integrator(lumen_scene, tlas), config(CAST_CONFIG(lumen_scene->config.get(), PSSMLTConfig)) {}
+	PSSMLT(const vk::BVH& tlas) : Integrator(tlas) {}
 	virtual void init() override;
 	virtual void render() override;
 	virtual bool update() override;
@@ -39,6 +38,4 @@ class PSSMLT final : public Integrator {
 	i32 light_path_rand_count;
 	i32 cam_path_rand_count;
 	i32 connect_path_rand_count;
-
-	PSSMLTConfig* config;
 };

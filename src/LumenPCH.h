@@ -68,6 +68,8 @@ typedef double f64;
 #define U16_MAX       0xffffui16
 #define U32_MAX       0xffffffffui32
 #define U64_MAX       0xffffffffffffffffui64
+#define F32_MAX       3.40282347E+38F
+#define F32_MIN       -F32_MAX
 
 #define KB(n) (((u64)(n)) << 10)
 #define MB(n) (((u64)(n)) << 20)
