@@ -19,8 +19,6 @@ namespace lm {
 		auto key = std::string(#struct_type) + '_' + std::string(#field_name);             \
 		rg->registered_buffer_pointers[key] = buffer_ptr;                                  \
 	} while (0)
-#define REGISTER_BUFFER(X, Y) ((X) < (Y) ? (X) : (Y))
-#define REGISTER_IMAGE(X, Y) ((X) < (Y) ? (X) : (Y))
 
 class RenderGraph;
 class RenderPass;

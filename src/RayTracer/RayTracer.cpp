@@ -380,16 +380,13 @@ bool RayTracer::gui() {
 		vkDeviceWaitIdle(vk::context().device);
 		bool was_custom_accel = typeid(*integrator) == typeid(DDGI);
 		integrator->destroy(/*resize=*/false);
-		SceneConfig prev_scene_config = config;
+		SceneCommon prev_scene_config = config.common;
 		// TODO: Remove
 		std::string integrator_str = std::string(settings[curr_integrator_idx]);
 		integrator_str.erase(std::remove_if(integrator_str.begin(), integrator_str.end(), ::isspace),
 							 integrator_str.end());
 		std::transform(integrator_str.begin(), integrator_str.end(), integrator_str.begin(), ::tolower);
-		scene::config_init(lm::String(integrator_str.data(), integrator_str.size()));
-		config.common.cam_settings = prev_scene_config.common.cam_settings;
-		config.common.sky_col = prev_scene_config.common.sky_col;
-		config.common.path_length = prev_scene_config.common.path_length;
+		scene::config_init(lm::String(integrator_str.data(), integrator_str.size()), prev_scene_config);
 
 		GPUQueryManager::reset_data();
 		create_integrator((IntegratorType)curr_integrator_idx);

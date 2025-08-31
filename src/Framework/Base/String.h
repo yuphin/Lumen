@@ -61,6 +61,8 @@ u64 str_rfind(const String& str1, const String& str2);
 bool str_ends_with(const lm::String& str1, const lm::String& str2);
 u64 u64_from_str(const String& str);
 s64 s64_from_str(const String& str);
+u64 u32_from_str(const String& str);
+s64 i32_from_str(const String& str);
 f64 f64_from_str(const String& str);
 f32 f32_from_str(const String& str);
 

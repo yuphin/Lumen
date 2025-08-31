@@ -96,6 +96,7 @@ struct Scene {
 void load(const lm::String& path);
 void write();
 void destroy();
-void config_init(const lm::String& integrator_name);
+void config_init(const lm::String& integrator_name, const SceneCommon& common_config,
+				 LumenNode* integrator_node = nullptr);
 Scene* get();
 }  // namespace scene

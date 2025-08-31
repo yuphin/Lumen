@@ -55,9 +55,7 @@ char char_to_lower(char c) {
 	return c;
 }
 
-
 String str_from_cstr(Arena* arena, const char* cstr, u64 size) {
-
 	String result = {};
 	result.size = size;
 	result.data = (char*)arena->allocate(result.size);
@@ -116,6 +114,9 @@ s64 s64_from_str(const String& str) {
 	}
 	return negative ? -result : result;
 }
+
+u64 u32_from_str(const String& str) { return (u32)u64_from_str(str); }
+s64 i32_from_str(const String& str) { return (i32)s64_from_str(str); }
 
 static String str_from_number(Arena* arena, u64 abs_val, bool negative) {
 	u32 num_chars = 0;
@@ -218,7 +219,6 @@ bool str_compare(const String& str1, const String& str2) {
 	return true;
 }
 
-
 u64 str_rfind(const String& str1, const String& str2) {
 	assert(str1.size >= str2.size);
 	u64 str2_idx = str2.size - 1;
@@ -231,9 +231,7 @@ u64 str_rfind(const String& str1, const String& str2) {
 	return str1_idx;
 }
 
-bool str_ends_with(const lm::String& str1, const lm::String& str2) {
-	return str_rfind(str1, str2) != U64_MAX;
-}
+bool str_ends_with(const lm::String& str1, const lm::String& str2) { return str_rfind(str1, str2) != U64_MAX; }
 
 bool String::operator==(const String& other) { return str_compare(*this, other); }
 
