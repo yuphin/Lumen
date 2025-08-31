@@ -9,30 +9,9 @@ inline constexpr u64 HASH_MAP_HASH_EMPTY = 0;
 inline constexpr u64 HASH_MAP_HASH_DELETED = 1;
 inline constexpr u64 HASH_MAP_LOAD_PERCENTAGE_THRESHOLD = 50;
 
-template <typename T>
-static inline uint64_t get_default_hash(const T& x) {
-	if constexpr (std::is_integral_v<T> || std::is_enum_v<T> || std::is_pointer_v<T> || std::is_floating_point_v<T>) {
-		if constexpr (std::is_floating_point_v<T>) {
-			return sdbm_hash((void*)&x, sizeof(T), HASH_INIT);
-		} else {
-			return knuth_hash(static_cast<uint64_t>(x) ^ HASH_INIT);
-		}
-	} else if constexpr (std::is_same_v<T, lm::String>) {
-		return fnv1a_hash((void*)x.data, x.size, HASH_INIT);
-	} else {
-		static_assert(false, "get_default_hash: Unsupported type for hashing");
-		return 0;
-	}
-}
-
-template <typename T>
-static inline uint64_t get_default_hash(const Array<T>& array) {
-	return sdbm_hash((void*)array.data, array.size * sizeof(T), HASH_INIT);
-}
-
 template <typename T1, typename T2>
 struct HashMapEntry {
-	uint64_t hash;
+	u64 hash;
 	T1 key;
 	T2 value;
 };
@@ -41,11 +20,11 @@ struct HashMapEntry {
 struct Empty {};
 template <typename T>
 struct HashMapEntry<T, Empty> {
-	uint64_t hash;
+	u64 hash;
 	T key;
 };
 
-template <typename T1, typename T2, uint64_t (*hash_func)(const T1&)>
+template <typename T1, typename T2, u64 (*hash_func)(const T1&)>
 struct HashMapLinear {
 	HashMapEntry<T1, T2>* data = nullptr;
 	u64 size = 0;
@@ -90,7 +69,7 @@ struct HashMapLinear {
 		if (num_slots * 100 > capacity * HASH_MAP_LOAD_PERCENTAGE_THRESHOLD) {
 			resize(capacity << 1);
 		}
-		uint64_t hash = hash_func(key);
+		u64 hash = hash_func(key);
 		if (hash <= HASH_MAP_HASH_DELETED) {
 			hash += HASH_MAP_HASH_DELETED + 1;
 		}
@@ -124,7 +103,7 @@ struct HashMapLinear {
 	HashMapEntry<T1, T2>* insert(const T1& key) { return insert(key, T2{}); }
 
 	HashMapEntry<T1, T2>* find(const T1& key) {
-		uint64_t hash = hash_func(key);
+		u64 hash = hash_func(key);
 		if (hash <= HASH_MAP_HASH_DELETED) {
 			hash += HASH_MAP_HASH_DELETED + 1;
 		}
@@ -147,7 +126,7 @@ struct HashMapLinear {
 		if (num_slots * 100 > capacity * HASH_MAP_LOAD_PERCENTAGE_THRESHOLD) {
 			resize(capacity << 1);
 		}
-		uint64_t hash = hash_func(key);
+		u64 hash = hash_func(key);
 		if (hash <= HASH_MAP_HASH_DELETED) {
 			hash += HASH_MAP_HASH_DELETED + 1;
 		}
@@ -175,7 +154,7 @@ struct HashMapLinear {
 	}
 
 	HashMapEntry<T1, T2>* remove(const T1& key) {
-		uint64_t hash = hash_func(key);
+		u64 hash = hash_func(key);
 		if (hash <= HASH_MAP_HASH_DELETED) {
 			hash += HASH_MAP_HASH_DELETED + 1;
 		}
@@ -244,7 +223,7 @@ struct HashMapLinear {
 };
 
 // Like arrays, hash maps are also always allocated in a new block
-template <typename T1, typename T2, uint64_t (*hash_func)(const T1&) = get_default_hash<T1>>
+template <typename T1, typename T2, u64 (*hash_func)(const T1&) = default_hash<T1>>
 HashMapLinear<T1, T2, hash_func> hash_map_create(Arena* arena, u64 initial_capacity = HASH_MAP_LINEAR_MIN_CAPACITY) {
 	using HashMapEntryType = HashMapEntry<T1, T2>;
 	HashMapLinear<T1, T2, hash_func> map;
@@ -257,13 +236,13 @@ HashMapLinear<T1, T2, hash_func> hash_map_create(Arena* arena, u64 initial_capac
 	return map;
 }
 
-template <typename T1, typename T2, uint64_t (*hash_func)(const T1&) = get_default_hash<T1>>
+template <typename T1, typename T2, u64 (*hash_func)(const T1&) = default_hash<T1>>
 using HashMap = HashMapLinear<T1, T2, hash_func>;
 
-template <typename T, uint64_t (*hash_func)(const T&) = get_default_hash<T>>
+template <typename T, u64 (*hash_func)(const T&) = default_hash<T>>
 using HashSet = HashMapLinear<T, Empty, hash_func>;
 
-template <typename T, uint64_t (*hash_func)(const T&) = get_default_hash<T>>
+template <typename T, u64 (*hash_func)(const T&) = default_hash<T>>
 HashSet<T, hash_func> hash_set_create(Arena* arena, u64 initial_capacity = HASH_MAP_LINEAR_MIN_CAPACITY) {
 	return hash_map_create<T, Empty, hash_func>(arena, initial_capacity);
 }

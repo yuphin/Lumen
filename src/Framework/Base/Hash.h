@@ -1,6 +1,5 @@
 #pragma once
 namespace lm {
-
 inline constexpr u64 HASH_INIT = 5381;
 
 static inline u64 sdbm_hash(void* data, u64 size, u64 hash = HASH_INIT) {
@@ -30,5 +29,27 @@ static inline u64 fnv1a_hash(void* data, u64 size, u64 hash = FNV_64_OFFSET_BIAS
 static inline u64 knuth_hash(u64 x) {
 	constexpr u64 MULTIPLIER = 11400714819323198485ULL;
 	return MULTIPLIER * x;
+}
+
+
+template <typename T>
+static inline u64 default_hash(const T& x) {
+	if constexpr (std::is_integral_v<T> || std::is_enum_v<T> || std::is_pointer_v<T> || std::is_floating_point_v<T>) {
+		if constexpr (std::is_floating_point_v<T>) {
+			return sdbm_hash((void*)&x, sizeof(T), HASH_INIT);
+		} else {
+			return knuth_hash(static_cast<u64>(x) ^ HASH_INIT);
+		}
+	} else if constexpr (std::is_same_v<T, lm::String>) {
+		return fnv1a_hash((void*)x.data, x.size, HASH_INIT);
+	} else {
+		static_assert(false, "default_hash: Unsupported type for hashing");
+		return 0;
+	}
+}
+
+template <typename T>
+static inline u64 default_hash(const Array<T>& array) {
+	return sdbm_hash((void*)array.data, array.size * sizeof(T), HASH_INIT);
 }
 }  // namespace lm
