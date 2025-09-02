@@ -7,6 +7,8 @@ enable_testing()
 find_package(Vulkan REQUIRED)
 find_package(Threads REQUIRED)
 
+set(VOLK_HEADERS_ONLY ON CACHE BOOL "Use volk as headers-only")
+
 set(src_files)
 add_subdirectory(src)
 add_subdirectory(libs)
@@ -15,7 +17,6 @@ set(structures_INCLUDE_DIR
     "libs"
     "libs/glfw/include"
     "libs/vma/include"
-    "libs/gli"
     "src"
 )
 
@@ -70,6 +71,9 @@ else()
 endif()
 
 if(MSVC)
+    if(TARGET glfw)
+        target_compile_options(glfw PRIVATE "/MP")
+    endif()
 	target_compile_options(Lumen PRIVATE "/MP")
 	set_target_properties(Lumen PROPERTIES
     				      VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
