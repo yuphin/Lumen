@@ -1,6 +1,5 @@
 #include "String.h"
 #include "Memory.h"
-#define STB_SPRINTF_IMPLEMENTATION
 #include <stb/stb_sprintf.h>
 
 namespace lm {
@@ -16,11 +15,10 @@ String str_from_f64(Arena* arena, double val) {
 	char buf[32];
 	i32 num_chars = stbsp_snprintf(buf, sizeof(buf), "%.9g", val);
 	String result;
-	result.size = num_chars + 1;
+	result.size = num_chars;
 	char* data = (char*)arena->allocate(result.size);
 	memmove(data, buf, sizeof(buf));
 	result.data = data;
-	result.data[num_chars] = '\0';
 	return result;
 }
 
@@ -28,11 +26,10 @@ String str_from_f32(Arena* arena, float val) { return str_from_f64(arena, val); 
 
 String str_concat(Arena* arena, const String& str1, const String& str2) {
 	String result = {};
-	result.size = str1.size + str2.size + 1;
+	result.size = str1.size + str2.size;
 	result.data = (char*)arena->allocate(result.size);
 	memcpy(result.data, str1.data, str1.size);
 	memcpy(result.data + str1.size, str2.data, str2.size);
-	result.data[result.size - 1] = '\0';
 	return result;
 }
 
@@ -41,7 +38,7 @@ bool char_is_upper(char c) { return c >= 'A' && c <= 'Z'; }
 bool char_is_lower(char c) { return c >= 'a' && c <= 'z'; }
 bool char_is_alpha(char c) { return char_is_upper(c) || char_is_lower(c); }
 bool char_is_alnum(char c) { return char_is_digit(c) || char_is_alpha(c); }
-bool char_is_whitespace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f'; }
+bool char_is_whitespace(char c) { return c == ' ' || c == '\t' || c == '\v' || c == '\f'; }
 char char_to_upper(char c) {
 	if (char_is_lower(c)) {
 		return c - ('a' - 'A');
@@ -60,6 +57,15 @@ String str_from_cstr(Arena* arena, const char* cstr, u64 size) {
 	result.size = size;
 	result.data = (char*)arena->allocate(result.size);
 	memcpy(result.data, cstr, size);
+	return result;
+}
+
+String str_to_cstr(Arena* arena, const String& str) {
+	String result = {};
+	result.size = str.size + 1;
+	result.data = (char*)arena->allocate(result.size);
+	memcpy(result.data, str.data, str.size);
+	result.data[str.size] = '\0';
 	return result;
 }
 
@@ -124,9 +130,8 @@ static String str_from_number(Arena* arena, u64 abs_val, bool negative) {
 		v /= 10;
 	}
 	String result;
-	result.size = num_chars + negative + 1;
+	result.size = num_chars + negative;
 	result.data = (char*)arena->allocate(result.size);
-	result.data[result.size - 1] = '\0';
 	if (negative) result.data[0] = '-';
 	for (u32 i = 0; i < num_chars; i++) {
 		result.data[num_chars - 1 - i + negative] = '0' + abs_val % 10;
@@ -223,12 +228,23 @@ u64 str_rfind(const String& str1, const String& str2) {
 	assert(str1.size >= str2.size);
 	u64 str2_idx = str2.size - 1;
 	u64 str1_idx = str1.size - 1;
-	for (; str2_idx >= 0; --str1_idx, --str2_idx) {
+	for (; str2_idx != U64_MAX; --str1_idx, --str2_idx) {
 		if (str1[str1_idx] != str2[str2_idx]) {
 			return U64_MAX;
 		}
 	}
 	return str1_idx;
+}
+u64 str_rfind_any(const String& str1, const String& chars) {
+	u64 str1_idx = str1.size -1;
+	for (; str1_idx != U64_MAX; --str1_idx) {
+		for (u64 j = 0; j < chars.size; ++j) {
+			if (str1[str1_idx] == chars[j]) {
+				return str1_idx;
+			}
+		}
+	}
+	return U64_MAX;
 }
 
 bool str_ends_with(const lm::String& str1, const lm::String& str2) { return str_rfind(str1, str2) != U64_MAX; }

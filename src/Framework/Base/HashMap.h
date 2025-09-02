@@ -7,7 +7,7 @@ namespace lm {
 inline constexpr u64 HASH_MAP_LINEAR_MIN_CAPACITY = 32;
 inline constexpr u64 HASH_MAP_HASH_EMPTY = 0;
 inline constexpr u64 HASH_MAP_HASH_DELETED = 1;
-inline constexpr u64 HASH_MAP_LOAD_PERCENTAGE_THRESHOLD = 50;
+inline constexpr u64 HASH_MAP_LOAD_PERCENTAGE_THRESHOLD = 70;
 
 template <typename T1, typename T2>
 struct HashMapEntry {
@@ -25,7 +25,7 @@ struct HashMapEntry<T, Empty> {
 };
 
 template <typename T1, typename T2, u64 (*hash_func)(const T1&)>
-struct HashMapLinear {
+struct HashMapProbed {
 	HashMapEntry<T1, T2>* data = nullptr;
 	u64 size = 0;
 	// Also includes the deleted entries
@@ -174,7 +174,7 @@ struct HashMapLinear {
 	}
 
 	struct Iterator {
-		HashMapLinear<T1, T2, hash_func>* map;
+		HashMapProbed<T1, T2, hash_func>* map;
 		HashMapEntry<T1, T2>* entry;
 		u64 index;
 
@@ -224,9 +224,10 @@ struct HashMapLinear {
 
 // Like arrays, hash maps are also always allocated in a new block
 template <typename T1, typename T2, u64 (*hash_func)(const T1&) = default_hash<T1>>
-HashMapLinear<T1, T2, hash_func> hash_map_create(Arena* arena, u64 initial_capacity = HASH_MAP_LINEAR_MIN_CAPACITY) {
+HashMapProbed<T1, T2, hash_func> hash_map_create(Arena* arena, u64 initial_capacity = HASH_MAP_LINEAR_MIN_CAPACITY ) {
 	using HashMapEntryType = HashMapEntry<T1, T2>;
-	HashMapLinear<T1, T2, hash_func> map;
+	HashMapProbed<T1, T2, hash_func> map;
+	initial_capacity = util::next_pow2(initial_capacity);
 	map.capacity = initial_capacity;
 	Arena* arena_node;
 	map.data = (HashMapEntryType*)arena->allocate(initial_capacity * sizeof(HashMapEntryType),
@@ -237,10 +238,10 @@ HashMapLinear<T1, T2, hash_func> hash_map_create(Arena* arena, u64 initial_capac
 }
 
 template <typename T1, typename T2, u64 (*hash_func)(const T1&) = default_hash<T1>>
-using HashMap = HashMapLinear<T1, T2, hash_func>;
+using HashMap = HashMapProbed<T1, T2, hash_func>;
 
 template <typename T, u64 (*hash_func)(const T&) = default_hash<T>>
-using HashSet = HashMapLinear<T, Empty, hash_func>;
+using HashSet = HashMapProbed<T, Empty, hash_func>;
 
 template <typename T, u64 (*hash_func)(const T&) = default_hash<T>>
 HashSet<T, hash_func> hash_set_create(Arena* arena, u64 initial_capacity = HASH_MAP_LINEAR_MIN_CAPACITY) {

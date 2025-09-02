@@ -1,3 +1,6 @@
+file(GLOB src_files 
+    "external.cpp")
+
 file(GLOB main_src
     "main.cpp"
     "main_tests.cpp"

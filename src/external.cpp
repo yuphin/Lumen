@@ -1,0 +1,12 @@
+#define TINYEXR_IMPLEMENTATION
+#include <tinyexr.h>
+#define VOLK_IMPLEMENTATION
+#include <volk/volk.h>
+#define VMA_IMPLEMENTATION
+#include <vma/vk_mem_alloc.h>
+#define STB_SPRINTF_IMPLEMENTATION
+#include <stb/stb_sprintf.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
+#define FAST_OBJ_IMPLEMENTATION
+#include <fast_obj.h>

@@ -4,10 +4,11 @@
 #include "Framework/Base/String.h"
 #include "Framework/ThreadPool.h"
 #include "Framework/Base/OS.h"
+#include <stb/stb_sprintf.h>
 
 #undef USE_VALIDATION_LAYERS
 
-#if 0
+#if 1
 i32 main(i32 argc, char* argv[]) {
 #ifdef USE_VALIDATION_LAYERS
 	bool enable_debug = true;
@@ -182,25 +183,25 @@ i32 main(i32 argc, char* argv[]) {
 	lm::String result2 = lm::str_from_s64(arena, -62832387);
 	lm::String result3 = lm::str_from_f64(arena, 1421.363);
 
-	LUMEN_INFO("CSTR Literal: %s", lm::cliteral("Test").data);
-	LUMEN_INFO("Result %s", result.data);
-	LUMEN_INFO("Result2 %s", result2.data);
-	LUMEN_INFO("Result3 %s", result3.data);
+	LUMEN_INFO("CSTR Literal: %s", lm::cstr("Test").data);
+	LUMEN_INFO("Result %s", lm::str_to_cstr(arena, result).data);
+	LUMEN_INFO("Result2 %s", lm::str_to_cstr(arena, result2).data);
+	LUMEN_INFO("Result3 %s", lm::str_to_cstr(arena, result3).data);
 
-	LUMEN_INFO("U64 from str: %llu", lm::u64_from_str(lm::cliteral("123456789")));
-	LUMEN_INFO("U64 from str: %llu", lm::u64_from_str(lm::cliteral("  asd  123456789asd")));
-	LUMEN_INFO("U64 from str2: %llu", lm::u64_from_str(lm::cliteral("   18446744073709551616")));
-	LUMEN_INFO("S64 from str: %lld", lm::s64_from_str(lm::cliteral("  -  123456789asd")));
+	LUMEN_INFO("U64 from str: %llu", lm::u64_from_str(lm::cstr("123456789")));
+	LUMEN_INFO("U64 from str: %llu", lm::u64_from_str(lm::cstr("  asd  123456789asd")));
+	LUMEN_INFO("U64 from str2: %llu", lm::u64_from_str(lm::cstr("   18446744073709551616")));
+	LUMEN_INFO("S64 from str: %lld", lm::s64_from_str(lm::cstr("  -  123456789asd")));
 
-	LUMEN_INFO("%f", f64_from_str(lm::cliteral("-1.32e-1")));
-	LUMEN_INFO("%f", f64_from_str(lm::cliteral("1.2423")));
-	LUMEN_INFO("%f", f64_from_str(lm::cliteral("-1.2423")));
-	LUMEN_INFO("%f", f64_from_str(lm::cliteral(".2423")));
-	LUMEN_INFO("%f", f64_from_str(lm::cliteral("1361763176537161637")));
-	LUMEN_INFO("%f", f32_from_str(lm::cliteral("1432.34")));
-	LUMEN_INFO("%f", f64_from_str(lm::cliteral("-0.9814223")));
+	LUMEN_INFO("%f", f64_from_str(lm::cstr("-1.32e-1")));
+	LUMEN_INFO("%f", f64_from_str(lm::cstr("1.2423")));
+	LUMEN_INFO("%f", f64_from_str(lm::cstr("-1.2423")));
+	LUMEN_INFO("%f", f64_from_str(lm::cstr(".2423")));
+	LUMEN_INFO("%f", f64_from_str(lm::cstr("1361763176537161637")));
+	LUMEN_INFO("%f", f32_from_str(lm::cstr("1432.34")));
+	LUMEN_INFO("%f", f64_from_str(lm::cstr("-0.9814223")));
 
-	os::FileHandle file_handle = os::file_open(lm::cliteral("scenes/cornell_box/path.scene"), os::AccessFlag_Read);
+	os::FileHandle file_handle = os::file_open(lm::cstr("scenes/cornell_box/path.scene"), os::AccessFlag_Read);
 	if (file_handle == 0) {
 		LUMEN_ERROR("Failed to open file");
 		return -1;

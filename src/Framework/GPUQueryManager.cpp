@@ -3,17 +3,17 @@
 
 namespace GPUQueryManager {
 
-u32 _curr_pool_idx = 0;
+static u32 _curr_pool_idx = 0;
 
-u64 _queries[4096];
-u32 _curr_query_idx = 0;
-u32 _num_collected_queries = 0;
+static u64 _queries[4096];
+static u32 _curr_query_idx = 0;
+static u32 _num_collected_queries = 0;
 
-TimestampData _data[4096];
-u32 _curr_timestamp_idx = 0;
-u32 _num_collected_timestamps = 0;
+static TimestampData _data[4096];
+static u32 _curr_timestamp_idx = 0;
+static u32 _num_collected_timestamps = 0;
 
-std::vector<u32> _timestamp_stack;
+static std::vector<u32> _timestamp_stack;
 
 void begin(VkCommandBuffer cmd, const char* name) {
 	LUMEN_ASSERT(_curr_query_idx < 4096, "Query pool exhausted");

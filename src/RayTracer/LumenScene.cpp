@@ -1,32 +1,18 @@
 #include "Framework/Base/BBox.h"
 #include "LumenScene.h"
-#define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 #include "shaders/commons.h"
 #include "Framework/PersistentResourceManager.h"
 #include "Framework/Base/HashMap.h"
-
-#define FAST_OBJ_IMPLEMENTATION
 #include <fast_obj.h>
+#include <stb/stb_sprintf.h>
 
 // TODO: Add instancing to the scene format
-
 namespace scene {
 
 static lm::Arena* _arena_scene = nullptr;
 static lm::Arena* _arena_strings = nullptr;
 Scene _scene = {};
-
-static lm::String str_from_std_string(lm::Arena* arena, const std::string& str) {
-	lm::String result = {};
-	if (str.empty()) {
-		return result;
-	}
-	result.size = str.size() - 1;
-	result.data = (char*)arena->allocate(result.size);
-	memcpy(result.data, str.data(), str.size() - 1);
-	return result;
-}
 
 static void reflectance_to_conductor_eta_k(const glm::vec3& reflectance, glm::vec3& eta, glm::vec3& k) {
 	eta = glm::vec3(1.0f);
@@ -44,19 +30,25 @@ static void insert_child(LumenNode* parent, LumenNode* child) {
 		sibling->next = child;
 	}
 }
+
+static LumenNode* node_create(lm::Arena* arena, lm::String key, lm::String val = {}) {
+	LumenNode* node =
+		(LumenNode*)arena->allocate(sizeof(LumenNode), alignof(LumenNode), nullptr, /*zero_initialize=*/true);
+	node->key = key;
+	node->value = val;
+	return node;
+}
+
 static LumenNode* file_parse(lm::String buffer) {
 	buffer[buffer.size - 1] = '\n';
-	LumenNode* root = new LumenNode();
-	root->key = "root";
+	LumenNode* root = node_create(_arena_strings, "root");
 	LumenNode* stack[64];
+	i32 stack_size = 0;
 
 	u64 curr_line_idx = 0;
-
 	bool can_span_multiple_lines = false;
 	i32 base_indentation = 0;
-	i32 stack_size = 0;
-	u64 buffer_cursor = 0;
-	while (buffer_cursor < buffer.size) {
+	for (u64 buffer_cursor = 0; buffer_cursor < buffer.size; buffer_cursor++) {
 		// Note: Currently only braces are allowed for this
 		if (buffer[buffer_cursor] == '[') {
 			can_span_multiple_lines = true;
@@ -72,18 +64,21 @@ static LumenNode* file_parse(lm::String buffer) {
 			if (!can_span_multiple_lines) {
 				line_end_idx = glm::min(line_end_idx, buffer_cursor);
 			}
+			assert(line_end_idx != U64_MAX);
 			u64 line_cursor = curr_line_idx;
 			i32 indentation = 0;
 			bool list_item = false;
-			while (lm::char_is_whitespace(buffer[line_cursor])) {
+			while (lm::char_is_whitespace(buffer[line_cursor]) || buffer[line_cursor] == '-') {
 				if (buffer[line_cursor] == '-') {
 					list_item = true;
 				}
 				line_cursor++;
 				indentation++;
 			}
-			if (line_cursor >= line_end_idx) {
-				return nullptr;
+			// Empty new line
+			if (line_cursor == line_end_idx) {
+				curr_line_idx = buffer_cursor + 1;
+				continue;
 			}
 			if (base_indentation == 0) {
 				base_indentation = indentation;
@@ -95,42 +90,41 @@ static LumenNode* file_parse(lm::String buffer) {
 			}
 			if (list_item) {
 				stack_size = level - 1;
-				LumenNode* temp = (LumenNode*)_arena_scene->allocate(sizeof(LumenNode));
+				LumenNode* temp = node_create(_arena_strings, "-");
 				stack[stack_size++] = temp;
 				LUMEN_ASSERT(stack_size >= 2, "LumenNode list item level must be at least 2");
-				temp->key = "-";
 				temp->parent = stack[stack_size - 2];
 				insert_child(stack[stack_size - 2], temp);
 			}
-			LumenNode* node = (LumenNode*)_arena_scene->allocate(sizeof(LumenNode));
-			LumenNode* prev = level > 0 ? stack[stack_size - 1] : root;
-			node->parent = prev;
 
 			u64 colon_idx = line_cursor;
 			while (buffer[colon_idx] != ':') colon_idx++;
 			if (colon_idx >= line_end_idx) {
-				return nullptr;
+				LUMEN_ERROR("Malformed scene file, missing ':'");
 			}
-			node->key = lm::str_substr(buffer, line_cursor, colon_idx - line_cursor);
+			LumenNode* node = node_create(_arena_strings, lm::str_substr(buffer, line_cursor, colon_idx - line_cursor));
+			LumenNode* prev = level > 0 ? stack[stack_size - 1] : root;
+			node->parent = prev;
 			line_cursor = colon_idx + 1;
 			while (lm::char_is_whitespace(buffer[line_cursor])) line_cursor++;
-			assert(line_cursor < line_end_idx);
-			if (buffer[line_cursor] == '[') {
-				++line_cursor;
-				u64 list_cursor = line_cursor;
-				while (lm::char_is_whitespace(buffer[line_cursor])) line_cursor++;
-				node->num_list_items = 1;
-				for (; buffer[line_cursor] != ']'; line_cursor++) {
-					if (line_cursor >= line_end_idx) {
-						return nullptr;
+			if (line_cursor < line_end_idx) {
+				if (buffer[line_cursor] == '[') {
+					++line_cursor;
+					u64 list_cursor = line_cursor;
+					while (lm::char_is_whitespace(buffer[line_cursor])) line_cursor++;
+					node->num_list_items = 1;
+					for (; buffer[line_cursor] != ']'; line_cursor++) {
+						if (line_cursor >= line_end_idx) {
+							return nullptr;
+						}
+						if (buffer[line_cursor] == ',') {
+							++node->num_list_items;
+						}
 					}
-					if (buffer[line_cursor] == ',') {
-						++node->num_list_items;
-					}
+					node->value = lm::str_substr(buffer, list_cursor, line_cursor - list_cursor);
+				} else {
+					node->value = lm::str_substr(buffer, line_cursor, line_end_idx - line_cursor);
 				}
-				node->value = lm::str_substr(buffer, list_cursor, line_cursor - list_cursor);
-			} else {
-				node->value = lm::str_substr(buffer, line_cursor, line_end_idx - line_cursor);
 			}
 
 			if (prev) {
@@ -139,8 +133,8 @@ static LumenNode* file_parse(lm::String buffer) {
 			LUMEN_ASSERT(stack_size < 64, "LumenNode stack overflow");
 			stack[stack_size++] = node;
 			can_span_multiple_lines = false;
+			curr_line_idx = buffer_cursor + 1;
 		}
-		++buffer_cursor;
 	}
 
 	return root;
@@ -189,13 +183,11 @@ static f32 get_or_default_f(LumenNode* node, f32 val) {
 	return result;
 }
 
-static lm::Array<lm::String> get_str_list(lm::Arena* arena, LumenNode* node) {
+static lm::FixedArray<lm::String> get_str_list(lm::Arena* arena, LumenNode* node) {
 	if (!node || node->value.empty()) {
 		return {};
 	}
-	assert(node->num_list_items);
-	lm::Array<lm::String> result = lm::array_create<lm::String>(arena);
-	result.reserve(node->num_list_items);
+	auto result = lm::fixed_array_create<lm::String>(arena, node->num_list_items);
 	char* ptr = node->value.data;
 	while (*ptr) {
 		while (lm::char_is_whitespace(*ptr)) {
@@ -217,13 +209,12 @@ static lm::Array<lm::String> get_str_list(lm::Arena* arena, LumenNode* node) {
 	return result;
 }
 
-static lm::String get_light_type_str(const LumenLight& light) {
+static lm::String get_light_type_str(const AnalyticalLight& light) {
 	if (light.light_flags & LIGHT_SPOT) {
 		return "spot";
 	} else if (light.light_flags & LIGHT_DIRECTIONAL) {
 		return "directional";
 	}
-	LUMEN_ASSERT(false, "Unknown light type");
 	return "";
 }
 
@@ -239,15 +230,14 @@ static void get_or_default_v3(LumenNode* node, const glm::vec3& val, glm::vec3& 
 	char* start = ++ptr;
 	while (*ptr && *ptr != ')') {
 		if (*ptr == ',') {
-			std::string val = std::string(start, ptr - start);
-			// atof handles the trailing spaces and other degeneracies
-			result[comma_count++] = (f32)std::atof(val.data());
+			lm::String val = lm::String(start, ptr - start);
+			result[comma_count++] = lm::f32_from_str(val);
 			start = ptr + 1;
 		}
 		ptr++;
 	}
 	LUMEN_ASSERT(comma_count == 2, "Expected 3 items in vec3");
-	result[comma_count++] = (f32)std::atof(start);
+	result[comma_count++] = lm::f32_from_str(lm::String(start, ptr - start));
 }
 
 static glm::vec3 get_or_default_v3(LumenNode* node, const glm::vec3& val) {
@@ -319,22 +309,13 @@ static void add_list_node(lm::Arena* arena, LumenNode* parent, LumenNode* list_n
 	}
 }
 
-static std::string to_lower(const std::string& str) {
-	std::string lower_str = str;
-	for (char& c : lower_str) {
-		c = std::tolower(c);
-	}
-	return lower_str;
-}
-
 static lm::String str_from_vec3(lm::Arena* arena, const glm::vec3& vec) {
-	lm::String result = "v3f(";
-	result = lm::str_concat(arena, result, lm::str_from_f32(arena, vec.x));
-	result = lm::str_concat(arena, result, ",");
-	result = lm::str_concat(arena, result, lm::str_from_f32(arena, vec.y));
-	result = lm::str_concat(arena, result, ",");
-	result = lm::str_concat(arena, result, lm::str_from_f32(arena, vec.z));
-	result = lm::str_concat(arena, result, ")");
+	char buf[64];
+	i32 num_chars = stbsp_snprintf(buf, sizeof(buf), "v3f(%.6g,%.6g,%.6g)", vec.x, vec.y, vec.z);
+	lm::String result;
+	result.size = num_chars;
+	result.data = (char*)arena->allocate(result.size);
+	memmove(result.data, buf, sizeof(buf));
 	return result;
 }
 
@@ -386,34 +367,6 @@ static void traverse_and_write_scene(lm::Arena* arena, lm::String& buffer, Lumen
 	traverse_and_write_scene(arena, buffer, curr_node->next, depth);
 }
 
-static void compute_scene_dimensions() {
-	lm::BBox scene_bbox;
-	for (const LumenPrimMesh& prim_mesh : _scene.prim_meshes) {
-		lm::BBox mesh_bbox(prim_mesh.min_pos, prim_mesh.max_pos);
-		lm::bbox_transform(mesh_bbox, prim_mesh.world_matrix);
-		lm::bbox_insert(scene_bbox, mesh_bbox);
-	}
-
-	if (scene_bbox.is_empty()) {
-		lm::bbox_insert(scene_bbox, glm::vec3(-1.0f));
-		lm::bbox_insert(scene_bbox, glm::vec3(1.0f));
-	}
-	_scene.dimensions.min = scene_bbox.min();
-	_scene.dimensions.max = scene_bbox.max();
-	_scene.dimensions.size = scene_bbox.extents();
-	_scene.dimensions.center = scene_bbox.center();
-	_scene.dimensions.radius = scene_bbox.radius();
-}
-
-static void scene_allocate(lm::Arena* arena, LumenNode* meshes_node, const lm::String& path,
-						   const lm::String& path_root) {
-	for (LumenNode* mesh_node = meshes_node->child; mesh_node; mesh_node = next_node(mesh_node)) {
-		lm::ScratchArena scratch = arena;
-		const lm::String relative_mesh_file = get_or_default_str(get_node(mesh_node, "name"), "");
-		lm::String mesh_file = lm::str_concat(scratch.arena, path_root, relative_mesh_file);
-	}
-}
-
 static void scene_init(const lm::String& path, const lm::String& path_root, LumenNode* root) {
 	LumenNode* integrator_node = get_node(root, "integrator");
 	LumenNode* bsdfs_node = get_node(root, "bsdfs");
@@ -421,6 +374,41 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 	LumenNode* lights_node = get_node(root, "lights");
 	LumenNode* textures_node = get_node(root, "textures");
 	LumenNode* meshes_node = get_node(root, "mesh");
+
+	////////////////////////////
+	// --- Scene memory allocation ---
+
+	auto mesh_to_obj_map = lm::hash_map_create<u32, fastObjMesh*>(_arena_scene);
+	u64 total_obj_count = 0;
+	u64 total_vtx_count = 0;
+	u32 mesh_idx = 0;
+	for (LumenNode* mesh_node = meshes_node->child; mesh_node; mesh_node = next_node(mesh_node), mesh_idx++) {
+		lm::ScratchArena scratch = _arena_strings;
+		lm::String relative_mesh_file =
+			lm::str_to_cstr(scratch.arena, get_or_default_str(get_node(mesh_node, "name"), lm::cstr("")));
+		lm::String mesh_file = lm::str_concat(scratch.arena, path_root, relative_mesh_file);
+		fastObjMesh* obj = fast_obj_read(mesh_file.data);
+		mesh_to_obj_map.insert(mesh_idx, obj);
+		total_obj_count += obj->object_count;
+		for (u32 i = 0; i < obj->face_count; i++) {
+			total_vtx_count += 3 * obj->face_vertices[i] - 6;
+		}
+	}
+
+	_scene.positions = lm::fixed_array_create<glm::vec3>(_arena_scene, total_vtx_count);
+	_scene.indices = lm::fixed_array_create<u32>(_arena_scene, total_vtx_count);
+	_scene.normals = lm::fixed_array_create<glm::vec3>(_arena_scene, total_vtx_count);
+	_scene.texcoords0 = lm::fixed_array_create<glm::vec2>(_arena_scene, total_vtx_count);
+	_scene.prim_meshes = lm::fixed_array_create<LumenPrimMesh>(_arena_scene, total_obj_count);
+	_scene.materials = lm::fixed_array_create<Material>(_arena_scene, get_child_count(bsdfs_node));
+	_scene.textures = lm::fixed_array_create<TextureRef>(_arena_scene, get_child_count(textures_node));
+	_scene.scene_textures = lm::fixed_array_create<vk::Texture*>(_arena_scene, glm::max(_scene.textures.capacity, 1ull));
+	_scene.analytical_lights = lm::fixed_array_create<AnalyticalLight>(_arena_scene, get_child_count(lights_node));
+	_scene.gpu_lights = lm::fixed_array_create<Light>(_arena_scene, _scene.analytical_lights.capacity);
+	_scene.material_idx_to_name = lm::hash_map_create<u32, lm::String>(_arena_scene, get_child_count(bsdfs_node));
+
+	////////////////////////////
+	// --- Scene initialization ---
 
 	lm::String integrator_type = get_or_default_str(get_node(integrator_node, "type"), "path");
 	SceneCommon common_config = {};
@@ -432,16 +420,12 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 	get_or_default_v3(get_node(camera_node, "dir"), common_config.cam_settings.dir);
 	config_init(integrator_type, common_config, integrator_node);
 
-	// TODO
-	// _scene.materials.resize(get_child_count(bsdfs_node));
-
-	// TODO: Revise hashmap logic altogether and initialize material_idx_to_name
-	// TODO: Revise whether we need scratch arena or permanent
-	lm::ScratchArena scratch(_arena_scene);
+	lm::ScratchArena scratch = _arena_scene;
 	lm::HashMap<lm::String, u32> material_map = lm::hash_map_create<lm::String, u32>(scratch.arena);
 	lm::HashMap<lm::String, u32> materials_to_objects = lm::hash_map_create<lm::String, u32>(scratch.arena);
 	lm::HashMap<lm::String, u32> texture_name_to_idx = lm::hash_map_create<lm::String, u32>(scratch.arena);
 
+	// Textures
 	if (textures_node) {
 		for (LumenNode* texture_node = textures_node->child; texture_node; texture_node = next_node(texture_node)) {
 			lm::String name = get_str(get_node(texture_node, "name"));
@@ -455,13 +439,14 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 		}
 	}
 
+	// Materials
 	if (bsdfs_node) {
 		u32 bsdf_idx = 0;
 		for (LumenNode* bsdf_node = bsdfs_node->child; bsdf_node; bsdf_node = next_node(bsdf_node), bsdf_idx++) {
-			_scene.materials[bsdf_idx].albedo = get_or_default_v3(get_node(bsdf_node, "albedo"), glm::vec3(1.0f));
-			_scene.materials[bsdf_idx].emissive_factor =
-				get_or_default_v3(get_node(bsdf_node, "emissive_factor"), glm::vec3(0.0f));
-			_scene.materials[bsdf_idx].texture_id = -1;
+			Material& material = _scene.materials.emplace_back();
+			material.albedo = get_or_default_v3(get_node(bsdf_node, "albedo"), glm::vec3(1.0f));
+			material.emissive_factor = get_or_default_v3(get_node(bsdf_node, "emissive_factor"), glm::vec3(0.0f));
+			material.texture_id = -1;
 			lm::String mat_name = get_str(get_node(bsdf_node, "name"));
 			if (!mat_name.empty()) {
 				material_map.insert(mat_name, bsdf_idx);
@@ -472,52 +457,51 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 			if (!texture_name.empty()) {
 				auto entry = texture_name_to_idx.find(texture_name);
 				if (entry) {
-					_scene.materials[bsdf_idx].texture_id = entry->value;
+					material.texture_id = entry->value;
 				}
 			}
 
 			lm::String type = get_or_default_str(get_node(bsdf_node, "type"), "diffuse");
 			if (type == "diffuse") {
 				_scene.bsdf_types |= BSDF_TYPE_DIFFUSE;
-				_scene.materials[bsdf_idx].bsdf_type = BSDF_TYPE_DIFFUSE;
-				_scene.materials[bsdf_idx].bsdf_props = BSDF_FLAG_DIFFUSE_REFLECTION;
+				material.bsdf_type = BSDF_TYPE_DIFFUSE;
+				material.bsdf_props = BSDF_FLAG_DIFFUSE_REFLECTION;
 			} else if (type == "mirror") {
 				_scene.bsdf_types |= BSDF_TYPE_MIRROR;
-				_scene.materials[bsdf_idx].bsdf_type = BSDF_TYPE_MIRROR;
-				_scene.materials[bsdf_idx].bsdf_props = BSDF_FLAG_SPECULAR_REFLECTION;
+				material.bsdf_type = BSDF_TYPE_MIRROR;
+				material.bsdf_props = BSDF_FLAG_SPECULAR_REFLECTION;
 			} else if (type == "glass") {
 				_scene.bsdf_types |= BSDF_TYPE_GLASS;
-				_scene.materials[bsdf_idx].bsdf_type = BSDF_TYPE_GLASS;
-				_scene.materials[bsdf_idx].bsdf_props = BSDF_FLAG_SPECULAR_TRANSMISSION;
-				_scene.materials[bsdf_idx].ior = get_or_default_f(get_node(bsdf_node, "ior"), 1.0f);
+				material.bsdf_type = BSDF_TYPE_GLASS;
+				material.bsdf_props = BSDF_FLAG_SPECULAR_TRANSMISSION;
+				material.ior = get_or_default_f(get_node(bsdf_node, "ior"), 1.0f);
 			} else if (type == "dielectric") {
 				_scene.bsdf_types |= BSDF_TYPE_DIELECTRIC;
-				_scene.materials[bsdf_idx].bsdf_type = BSDF_TYPE_DIELECTRIC;
+				material.bsdf_type = BSDF_TYPE_DIELECTRIC;
 
-				_scene.materials[bsdf_idx].ior = get_or_default_f(get_node(bsdf_node, "ior"), 1.0f);
-				_scene.materials[bsdf_idx].roughness = get_or_default_f(get_node(bsdf_node, "roughness"), 0.0f);
+				material.ior = get_or_default_f(get_node(bsdf_node, "ior"), 1.0f);
+				material.roughness = get_or_default_f(get_node(bsdf_node, "roughness"), 0.0f);
 
 				LumenNode* transmission_node = get_node(bsdf_node, "transmission");
 				LumenNode* reflection_node = get_node(bsdf_node, "reflection");
 				bool transmission = !transmission_node || get_or_default_i(transmission_node, 1);
 				bool reflection = !reflection_node || get_or_default_i(reflection_node, 1);
 				if (transmission) {
-					_scene.materials[bsdf_idx].bsdf_props |= BSDF_FLAG_TRANSMISSION;
+					material.bsdf_props |= BSDF_FLAG_TRANSMISSION;
 				}
 				if (reflection) {
-					_scene.materials[bsdf_idx].bsdf_props |= BSDF_FLAG_REFLECTION;
+					material.bsdf_props |= BSDF_FLAG_REFLECTION;
 				}
-				if (_scene.materials[bsdf_idx].ior != 1.0f && _scene.materials[bsdf_idx].roughness > 0.08f) {
-					_scene.materials[bsdf_idx].bsdf_props |= BSDF_FLAG_GLOSSY;
+				if (material.ior != 1.0f && material.roughness > 0.08f) {
+					material.bsdf_props |= BSDF_FLAG_GLOSSY;
 				} else {
-					_scene.materials[bsdf_idx].bsdf_props |= BSDF_FLAG_SPECULAR;
+					material.bsdf_props |= BSDF_FLAG_SPECULAR;
 				}
-				_scene.materials[bsdf_idx].thin = get_or_default_i(get_node(bsdf_node, "thin"), 0);
+				material.thin = get_or_default_i(get_node(bsdf_node, "thin"), 0);
 			} else if (type == "conductor") {
 				_scene.bsdf_types |= BSDF_TYPE_CONDUCTOR;
-				Material& mat = _scene.materials[bsdf_idx];
-				mat.bsdf_type = BSDF_TYPE_CONDUCTOR;
-				mat.roughness = get_or_default_f(get_node(bsdf_node, "roughness"), 0.0f);
+				material.bsdf_type = BSDF_TYPE_CONDUCTOR;
+				material.roughness = get_or_default_f(get_node(bsdf_node, "roughness"), 0.0f);
 
 				// In conductor context, albedo is used as eta (i.e the IOR)
 				// k is the absorption coefficient
@@ -525,7 +509,7 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 				if (reflectance) {
 					glm::vec3 reflectance_val =
 						glm::clamp(get_or_default_v3(reflectance, glm::vec3(1.0f)), 0.0f, 0.9999f);
-					reflectance_to_conductor_eta_k(reflectance_val, mat.albedo, mat.k);
+					reflectance_to_conductor_eta_k(reflectance_val, material.albedo, material.k);
 				}
 
 				// Apply the mappings from https://jcgt.org/published/0003/04/03/paper.pdf
@@ -534,85 +518,84 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 				if (edge_tint && reflectivity) {
 					glm::vec3 edge_tint_vec = get_or_default_v3(edge_tint, glm::vec3(1));
 					glm::vec3 reflectivity_vec = get_or_default_v3(reflectivity, glm::vec3(1));
-					mat.albedo = edge_tint_vec * (1.0f - reflectivity_vec) / (1.0f + reflectivity_vec) +
-								 (1.0f - edge_tint_vec) * (1.0f + glm::sqrt(reflectivity_vec)) /
-									 (1.0f - glm::sqrt(reflectivity_vec));
-					auto intermediate_term = mat.albedo + 1.0f;
-					auto intermediate_term2 = mat.albedo - 1.0f;
-					mat.k = glm::sqrt(1.0f / (1.0f - reflectivity_vec) *
-									  (reflectivity_vec * intermediate_term * intermediate_term -
-									   intermediate_term2 * intermediate_term2));
+					material.albedo = edge_tint_vec * (1.0f - reflectivity_vec) / (1.0f + reflectivity_vec) +
+									  (1.0f - edge_tint_vec) * (1.0f + glm::sqrt(reflectivity_vec)) /
+										  (1.0f - glm::sqrt(reflectivity_vec));
+					auto intermediate_term = material.albedo + 1.0f;
+					auto intermediate_term2 = material.albedo - 1.0f;
+					material.k = glm::sqrt(1.0f / (1.0f - reflectivity_vec) *
+										   (reflectivity_vec * intermediate_term * intermediate_term -
+											intermediate_term2 * intermediate_term2));
 				}
 
-				mat.bsdf_props = BSDF_FLAG_REFLECTION;
-				if (mat.roughness > 0.08f) {
-					mat.bsdf_props |= BSDF_FLAG_GLOSSY;
+				material.bsdf_props = BSDF_FLAG_REFLECTION;
+				if (material.roughness > 0.08f) {
+					material.bsdf_props |= BSDF_FLAG_GLOSSY;
 				} else {
-					mat.bsdf_props |= BSDF_FLAG_SPECULAR;
+					material.bsdf_props |= BSDF_FLAG_SPECULAR;
 				}
 			} else if (type == "principled") {
 				_scene.bsdf_types |= BSDF_TYPE_PRINCIPLED;
-				Material& mat = _scene.materials[bsdf_idx];
-				mat.bsdf_type = BSDF_TYPE_PRINCIPLED;
-				mat.albedo = get_or_default_v3(get_node(bsdf_node, "albedo"), glm::vec3(1));
-				mat.ior = get_or_default_f(get_node(bsdf_node, "ior"), 1.0f);
-				mat.roughness = get_or_default_f(get_node(bsdf_node, "roughness"), 0.5f);
-				mat.diffuse_trans = get_or_default_f(get_node(bsdf_node, "diffuse_transmission"), 0.0f);
-				mat.spec_trans = get_or_default_f(get_node(bsdf_node, "specular_transmission"), 0.0f);
-				mat.metallic = get_or_default_f(get_node(bsdf_node, "metallic"), 0.0f);
-				mat.specular_tint = get_or_default_f(get_node(bsdf_node, "specular_tint"), 0.0f);
-				mat.sheen_tint = get_or_default_f(get_node(bsdf_node, "sheen_tint"), 0.5f);
-				mat.clearcoat = get_or_default_f(get_node(bsdf_node, "clearcoat"), 0.0f);
-				mat.clearcoat_gloss = get_or_default_f(get_node(bsdf_node, "clearcoat_gloss"), 1.0f);
-				mat.subsurface = get_or_default_f(get_node(bsdf_node, "subsurface"), 0.0f);
-				mat.flatness = get_or_default_f(get_node(bsdf_node, "flatness"), 0.0f);
-				mat.sheen = get_or_default_f(get_node(bsdf_node, "sheen"), 0.0f);
-				mat.anisotropy = get_or_default_f(get_node(bsdf_node, "anisotropy"), 0.0f);
-				mat.thin = get_or_default_i(get_node(bsdf_node, "thin"), 0);
+				material.bsdf_type = BSDF_TYPE_PRINCIPLED;
+				material.albedo = get_or_default_v3(get_node(bsdf_node, "albedo"), glm::vec3(1));
+				material.ior = get_or_default_f(get_node(bsdf_node, "ior"), 1.0f);
+				material.roughness = get_or_default_f(get_node(bsdf_node, "roughness"), 0.5f);
+				material.diffuse_trans = get_or_default_f(get_node(bsdf_node, "diffuse_transmission"), 0.0f);
+				material.spec_trans = get_or_default_f(get_node(bsdf_node, "specular_transmission"), 0.0f);
+				material.metallic = get_or_default_f(get_node(bsdf_node, "metallic"), 0.0f);
+				material.specular_tint = get_or_default_f(get_node(bsdf_node, "specular_tint"), 0.0f);
+				material.sheen_tint = get_or_default_f(get_node(bsdf_node, "sheen_tint"), 0.5f);
+				material.clearcoat = get_or_default_f(get_node(bsdf_node, "clearcoat"), 0.0f);
+				material.clearcoat_gloss = get_or_default_f(get_node(bsdf_node, "clearcoat_gloss"), 1.0f);
+				material.subsurface = get_or_default_f(get_node(bsdf_node, "subsurface"), 0.0f);
+				material.flatness = get_or_default_f(get_node(bsdf_node, "flatness"), 0.0f);
+				material.sheen = get_or_default_f(get_node(bsdf_node, "sheen"), 0.0f);
+				material.anisotropy = get_or_default_f(get_node(bsdf_node, "anisotropy"), 0.0f);
+				material.thin = get_or_default_i(get_node(bsdf_node, "thin"), 0);
 
-				if (mat.roughness < 1.0f) {
-					mat.bsdf_props |= BSDF_FLAG_REFLECTION;
+				if (material.roughness < 1.0f) {
+					material.bsdf_props |= BSDF_FLAG_REFLECTION;
 				}
-				if (mat.spec_trans > 0.0f) {
-					mat.bsdf_props |= BSDF_FLAG_TRANSMISSION;
+				if (material.spec_trans > 0.0f) {
+					material.bsdf_props |= BSDF_FLAG_TRANSMISSION;
 				}
-				if (mat.roughness > 0.08f) {
-					mat.bsdf_props |= BSDF_FLAG_GLOSSY;
+				if (material.roughness > 0.08f) {
+					material.bsdf_props |= BSDF_FLAG_GLOSSY;
 				} else {
-					mat.bsdf_props |= BSDF_FLAG_SPECULAR;
+					material.bsdf_props |= BSDF_FLAG_SPECULAR;
 				}
 			}
 		}
 	}
 
+	// Analytical Lights
 	if (lights_node) {
-		u32 light_idx = 0;
-		// TODO:
-		// _scene.lights.resize(get_child_count(lights_node));
-		for (LumenNode* light_node = lights_node->child; light_node; light_node = next_node(light_node), light_idx++) {
+		for (LumenNode* light_node = lights_node->child; light_node; light_node = next_node(light_node)) {
 			lm::String type = get_str(get_node(light_node, "type"));
-			_scene.lights[light_idx].L = get_or_default_v3(get_node(light_node, "L"), glm::vec3(0));
-			_scene.lights[light_idx].pos = get_or_default_v3(get_node(light_node, "pos"), glm::vec3(0));
-			_scene.lights[light_idx].to = get_or_default_v3(get_node(light_node, "dir"), glm::vec3(0, 0, 1));
+			AnalyticalLight& light = _scene.analytical_lights.emplace_back();
+			light.L = get_or_default_v3(get_node(light_node, "L"), glm::vec3(0));
+			light.pos = get_or_default_v3(get_node(light_node, "pos"), glm::vec3(0));
+			light.to = get_or_default_v3(get_node(light_node, "dir"), glm::vec3(0, 0, 1));
 			if (type == "spot") {
-				_scene.lights[light_idx].light_flags |= LIGHT_SPOT;
+				light.light_flags |= LIGHT_SPOT;
 				// Is finite
-				_scene.lights[light_idx].light_flags |= 1 << 4;
+				light.light_flags |= 1 << 4;
 				// Is delta
-				_scene.lights[light_idx].light_flags |= 1 << 5;
+				light.light_flags |= 1 << 5;
 			} else if (type == "directional") {
-				_scene.lights[light_idx].light_flags |= LIGHT_DIRECTIONAL;
+				light.light_flags |= LIGHT_DIRECTIONAL;
 				// Is delta
-				_scene.lights[light_idx].light_flags |= 1 << 5;
+				light.light_flags |= 1 << 5;
 			}
 		}
 	}
 
 	LUMEN_ASSERT(meshes_node, "Meshes node not found in Lumen scene");
-	u32 mesh_idx = 0;
+
+	// Meshes
+	mesh_idx = 0;
 	for (LumenNode* mesh_node = meshes_node->child; mesh_node; mesh_node = next_node(mesh_node), mesh_idx++) {
 		const lm::String relative_mesh_file = get_or_default_str(get_node(mesh_node, "name"), "");
-		const lm::String mesh_file = lm::str_concat(scratch.arena, path_root, relative_mesh_file);
 		LumenNode* materials_refs_node = get_node(mesh_node, "materials");
 		LumenNode* transforms_node = get_node(mesh_node, "transforms");
 		u32 material_entire_mesh_idx = U32_MAX;
@@ -624,19 +607,17 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 				if (material_entry) {
 					u32 mat_idx = material_entry->value;
 					LumenNode* refs_node = get_node(mat_ref_node, "refs");
-					lm::Array<lm::String> refs;
 					if (refs_node && refs_node->num_list_items) {
-						refs = get_str_list(scratch.arena, get_node(mat_ref_node, "refs"));
+						auto refs = get_str_list(scratch.arena, get_node(mat_ref_node, "refs"));
+						for (const lm::String& ref : refs) {
+							materials_to_objects.insert(ref, mat_idx);
+						}
 					} else if (refs_node) {
-						refs = lm::array_create<lm::String>(scratch.arena);
-						refs.push_back(get_str(refs_node));
+						materials_to_objects.insert(get_str(refs_node), mat_idx);
 					} else {
 						// Material ref points to all the meshes in this file
 						material_entire_mesh_idx = mat_idx;
 						break;
-					}
-					for (const lm::String& ref : refs) {
-						materials_to_objects.insert(ref, mat_idx);
 					}
 				} else {
 					LUMEN_ERROR("Material %s not found in Lumen scene", mat_name.data);
@@ -655,12 +636,11 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 			world_matrix = glm::scale(world_matrix, scale);
 		}
 		// Load obj file
-
-		fastObjMesh* obj = fast_obj_read(mesh_file.data);
+		fastObjMesh* obj = mesh_to_obj_map.find(mesh_idx)->value;
 		for (u32 shape_idx = 0; shape_idx < obj->object_count; shape_idx++) {
 			LumenPrimMesh& prim_mesh = _scene.prim_meshes.emplace_back();
 			prim_mesh.name =
-				lm::str_from_cstr(_arena_scene, obj->objects[shape_idx].name, strlen(obj->objects[shape_idx].name));
+				lm::str_from_cstr(_arena_strings, obj->objects[shape_idx].name, strlen(obj->objects[shape_idx].name));
 			prim_mesh.filename = relative_mesh_file;
 			prim_mesh.vtx_offset = (u32)_scene.positions.size;
 			prim_mesh.first_idx = (u32)_scene.indices.size;
@@ -678,11 +658,11 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 			}
 
 			glm::vec3 min_vtx = glm::vec3(F32_MAX);
-			glm::vec3 max_vtx = glm::vec3(-F32_MIN);
+			glm::vec3 max_vtx = glm::vec3(F32_MIN);
 
 			u32 index_offset = 0;
 			u32 idx_cnt = 0;
-			u32 vtx_offset = 0;
+			u32 vtx_cnt = 0;
 
 			for (u32 i = 0; i < obj->face_count; i++) {
 				for (u32 j = 0; j < obj->face_vertices[i]; j++) {
@@ -690,26 +670,23 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 
 					if (j >= 3) {
 						// Triangulate
-						_scene.positions[vtx_offset] = _scene.positions[vtx_offset - 3];
-						_scene.positions[vtx_offset + 1] = _scene.positions[vtx_offset - 1];
+						_scene.positions.push_back(_scene.positions[vtx_cnt - 3]);
+						_scene.positions.push_back(_scene.positions[vtx_cnt - 1]);
 
-						_scene.normals[vtx_offset] = _scene.normals[vtx_offset - 3];
-						_scene.normals[vtx_offset + 1] = _scene.normals[vtx_offset - 1];
+						_scene.normals.push_back(_scene.normals[vtx_cnt - 3]);
+						_scene.normals.push_back(_scene.normals[vtx_cnt - 1]);
 
-						_scene.texcoords0[vtx_offset] = _scene.texcoords0[vtx_offset - 3];
-						_scene.texcoords0[vtx_offset + 1] = _scene.texcoords0[vtx_offset - 1];
+						_scene.texcoords0.push_back(_scene.texcoords0[vtx_cnt - 3]);
+						_scene.texcoords0.push_back(_scene.texcoords0[vtx_cnt - 1]);
 
 						_scene.indices.push_back(idx_cnt++);
 						_scene.indices.push_back(idx_cnt++);
-						vtx_offset += 2;
+						vtx_cnt += 2;
 					}
-					// TODO: Might be unnecessary
+					// TODO: Indices might be unnecessary
 					_scene.indices.push_back(idx_cnt++);
-					++vtx_offset;
-
 					_scene.positions.emplace_back(obj->positions[3 * idx.p + 0], obj->positions[3 * idx.p + 1],
 												  obj->positions[3 * idx.p + 2]);
-
 					_scene.normals.emplace_back(obj->normals[3 * idx.n + 0], obj->normals[3 * idx.n + 1],
 												obj->normals[3 * idx.n + 2]);
 
@@ -717,25 +694,70 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 
 					min_vtx = glm::min(_scene.positions.back(), min_vtx);
 					max_vtx = glm::max(_scene.positions.back(), max_vtx);
+					++vtx_cnt;
 				}
 				index_offset += obj->face_vertices[i];
 			}
-
+			assert(idx_cnt == vtx_cnt);
 			prim_mesh.min_pos = min_vtx;
 			prim_mesh.max_pos = max_vtx;
 			prim_mesh.world_matrix = world_matrix;
 		}
 	}
+	// Free obj data
+	for (const auto& kv : mesh_to_obj_map) {
+		fast_obj_destroy(kv.value);
+	}
+	// Camera
+	CameraSettings& cam_settings = _scene.config.common.cam_settings;
+	lm::camera_init(&_scene.camera, cam_settings.fov, 0.01f, 1000.0f, Window::aspect_ratio(), cam_settings.dir,
+					cam_settings.pos, cam_settings.rotation);
+	// Compute scene dimensions
+	lm::BBox scene_bbox;
+	for (const LumenPrimMesh& prim_mesh : _scene.prim_meshes) {
+		lm::BBox mesh_bbox(prim_mesh.min_pos, prim_mesh.max_pos);
+		lm::bbox_transform(mesh_bbox, prim_mesh.world_matrix);
+		lm::bbox_insert(scene_bbox, mesh_bbox);
+	}
 
-	compute_scene_dimensions();
+	if (scene_bbox.is_empty()) {
+		lm::bbox_insert(scene_bbox, glm::vec3(-1.0f));
+		lm::bbox_insert(scene_bbox, glm::vec3(1.0f));
+	}
+	_scene.dimensions.min = scene_bbox.min();
+	_scene.dimensions.max = scene_bbox.max();
+	_scene.dimensions.size = scene_bbox.extents();
+	_scene.dimensions.center = scene_bbox.center();
+	_scene.dimensions.radius = scene_bbox.radius();
+
+	// Scene lights
+	_scene.total_light_triangle_cnt = 0;
+	_scene.total_light_area = 0;
+	for (auto i = 0; i < _scene.analytical_lights.size; i++) {
+		AnalyticalLight& l = _scene.analytical_lights[i];
+		Light light;
+		light.L = l.L;
+		light.light_flags = l.light_flags;
+		light.pos = l.pos;
+		light.to = l.to;
+		_scene.total_light_triangle_cnt++;
+		light.world_radius = _scene.dimensions.radius;
+		light.world_center = _scene.dimensions.center;
+		if ((l.light_flags & LIGHT_DIRECTIONAL) == LIGHT_DIRECTIONAL) {
+			LUMEN_ASSERT(_scene.dir_light_idx == -1, "Only one directional light supported");
+			_scene.dir_light_idx = i;
+		}
+		_scene.gpu_lights.emplace_back(light);
+	}
 }
 static void add_default_texture() {
-	std::array<u8, 4> nil = {0, 0, 0, 0};
-	_scene.scene_textures[0] = prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-												 .dimensions = {1, 1, 1},
-												 .format = VK_FORMAT_R8G8B8A8_SRGB,
-												 .data = {.data = nil.data(), .size = 4},
-												 .sampler = _scene.scene_texture_sampler});
+	u8 nil[4] = {0, 0, 0, 0};
+	_scene.scene_textures.push_back(
+		prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+						  .dimensions = {1, 1, 1},
+						  .format = VK_FORMAT_R8G8B8A8_SRGB,
+						  .data = {.data = nil, .size = sizeof(nil)},
+						  .sampler = _scene.scene_texture_sampler}));
 }
 
 static bool scene_has_bsdf_type(u32 bsdf_type) { return (_scene.bsdf_types & bsdf_type) == bsdf_type; }
@@ -809,41 +831,16 @@ void load(const lm::String& path) {
 		_arena_scene = lm::arena_create(GB(16));
 		_arena_strings = lm::arena_create(KB(1));
 	}
-	// TODO: Reserve and init arrays
 	os::FileProperties props = os::file_properties(file_handle);
-	lm::String file_content = lm::str_reserve(_arena_strings, props.size);
+	lm::String file_content = lm::str_reserve(_arena_strings, props.size + 1);
 	os::file_read(file_handle, file_content.data);
 	LumenNode* root = file_parse(file_content);
 	if (!root) {
 		LUMEN_ERROR("Failed to parse the file %s", path.data);
 	}
 	// TODO: Error check?
-	lm::String path_root = lm::str_substr(path, 0, lm::str_rfind(path, "/\\") + 1);
+	lm::String path_root = lm::str_substr(path, 0, lm::str_rfind_any(path, "/\\") + 1);
 	scene_init(path, path_root, root);
-
-	CameraSettings& cam_settings = _scene.config.common.cam_settings;
-	lm::camera_init(&_scene.camera, cam_settings.fov, 0.01f, 1000.0f, Window::aspect_ratio(), cam_settings.dir,
-					cam_settings.pos, cam_settings.rotation);
-
-	_scene.total_light_triangle_cnt = 0;
-	_scene.total_light_area = 0;
-
-	for (auto i = 0; i < _scene.lights.size; i++) {
-		auto& l = _scene.lights[i];
-		Light light;
-		light.L = l.L;
-		light.light_flags = l.light_flags;
-		light.pos = l.pos;
-		light.to = l.to;
-		_scene.total_light_triangle_cnt++;
-		light.world_radius = _scene.dimensions.radius;
-		light.world_center = _scene.dimensions.center;
-		if ((l.light_flags & LIGHT_DIRECTIONAL) == LIGHT_DIRECTIONAL) {
-			LUMEN_ASSERT(_scene.dir_light_idx == -1, "Only one directional light supported");
-			_scene.dir_light_idx = i;
-		}
-		_scene.gpu_lights.emplace_back(light);
-	}
 
 	f32 total_light_triangle_area = 0.0f;
 	for (Light& l : _scene.gpu_lights) {
@@ -856,7 +853,7 @@ void load(const lm::String& path) {
 				auto idx_offset = idx_base_offset + 3 * i;
 				glm::ivec3 ind = {_scene.indices[idx_offset], _scene.indices[idx_offset + 1],
 								  _scene.indices[idx_offset + 2]};
-				ind += glm::vec3{vtx_offset, vtx_offset, vtx_offset};
+				ind += glm::ivec3(vtx_offset);
 				const vec3 v0 = pm.world_matrix * glm::vec4(_scene.positions[ind.x], 1.0);
 				const vec3 v1 = pm.world_matrix * glm::vec4(_scene.positions[ind.y], 1.0);
 				const vec3 v2 = pm.world_matrix * glm::vec4(_scene.positions[ind.z], 1.0);
@@ -865,6 +862,9 @@ void load(const lm::String& path) {
 			}
 		}
 	}
+	////////////////////////////
+	// --- GPU memory allocation ---
+
 	_scene.mesh_lights_buffer = prm::get_buffer({.name = "Mesh Lights Buffer",
 												 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 												 .memory_type = vk::BUFFER_TYPE_GPU,
@@ -930,11 +930,10 @@ void load(const lm::String& path) {
 							 .data = prim_lookup.data});
 
 		for (auto i = 0; i < _scene.positions.size; i++) {
-			Vertex v;
+			Vertex& v = vertices.emplace_back();
 			v.pos = _scene.positions[i];
 			v.normal = _scene.normals[i];
 			v.uv0 = _scene.texcoords0[i];
-			vertices[i] = v;
 		}
 		_scene.compact_vertices_buffer =
 			prm::get_buffer({.name = "Compact Vertices Buffer",
@@ -943,7 +942,6 @@ void load(const lm::String& path) {
 							 .size = vertices.size * sizeof(vertices[0]),
 							 .data = vertices.data});
 	}
-
 	// Create a sampler for textures
 	VkSamplerCreateInfo sampler_ci = vk::sampler();
 	sampler_ci.minFilter = VK_FILTER_LINEAR;
@@ -955,20 +953,19 @@ void load(const lm::String& path) {
 	if (!_scene.textures.size) {
 		add_default_texture();
 	} else {
-		i32 i = 0;
 		for (const auto& texture_path : _scene.textures) {
 			lm::ScratchArena scratch = _arena_strings;
 			i32 x, y, n;
 			lm::String path = lm::str_concat(scratch.arena, path_root, texture_path.relative_path);
 			unsigned char* data = stbi_load(path.data, &x, &y, &n, 4);
-			_scene.scene_textures[i] =
+
+			_scene.scene_textures.push_back(
 				prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 								  .dimensions = {(u32)x, (u32)y, 1},
 								  .format = VK_FORMAT_R8G8B8A8_SRGB,
 								  .data = {.data = data, .size = u64(x * y * 4)},
-								  .sampler = _scene.scene_texture_sampler});
+								  .sampler = _scene.scene_texture_sampler}));
 			stbi_image_free(data);
-			i++;
 		}
 	}
 	vk::render_graph()->global_macro_defines.push_back(
@@ -986,14 +983,11 @@ void load(const lm::String& path) {
 }
 
 void write() {
-	std::ofstream out_file("scene.scene");
-	lm::ScratchArena scratch = _arena_scene;
-
-	LumenNode* root = new LumenNode();
-	root->key = "scene";
+	lm::ScratchArena scratch = _arena_strings;
+	LumenNode* root = node_create(scratch.arena, "scene");
 
 	// Integrator settings
-	LumenNode* integrator_node = new LumenNode{.key = "integrator"};
+	LumenNode* integrator_node = node_create(scratch.arena, "integrator");
 	const SceneCommon& common_config = _scene.config.common;
 	lm::String integrator_name = lm::str_to_lower(scratch.arena, common_config.integrator_name);
 	add_leaf_node(scratch.arena, integrator_node, "type", integrator_name);
@@ -1046,18 +1040,18 @@ void write() {
 	}
 	add_child_node(root, integrator_node);
 	// Scene textures
-	LumenNode* textures_node = new LumenNode{.key = "textures"};
+	LumenNode* textures_node = node_create(scratch.arena, "textures");
 	for (const TextureRef& texture_ref : _scene.textures) {
-		LumenNode* texture_prop = new LumenNode{.key = "-"};
+		LumenNode* texture_prop = node_create(scratch.arena, "-");
 		add_leaf_node(scratch.arena, texture_prop, "name", texture_ref.name);
 		add_leaf_node(scratch.arena, texture_prop, "file", texture_ref.relative_path);
 		add_child_node(textures_node, texture_prop);
 	}
 	add_child_node(root, textures_node);
 	// Scene materials
-	LumenNode* bsdfs_node = new LumenNode{.key = "bsdfs"};
+	LumenNode* bsdfs_node = node_create(scratch.arena, "bsdfs");
 	for (u32 i = 0; i < _scene.materials.size; i++) {
-		LumenNode* bsdf_prop = new LumenNode{.key = "-"};
+		LumenNode* bsdf_prop = node_create(scratch.arena, "-");
 		const Material& mat = _scene.materials[i];
 		auto material_entry = _scene.material_idx_to_name.find(i);
 		assert(material_entry);
@@ -1144,10 +1138,10 @@ void write() {
 	add_child_node(root, bsdfs_node);
 
 	// Analytical lights
-	if (!_scene.lights.empty()) {
-		LumenNode* lights_node = new LumenNode{.key = "lights"};
-		for (const LumenLight& light : _scene.lights) {
-			LumenNode* light_node = new LumenNode{.key = "-"};
+	if (!_scene.analytical_lights.empty()) {
+		LumenNode* lights_node = node_create(scratch.arena, "lights");
+		for (const AnalyticalLight& light : _scene.analytical_lights) {
+			LumenNode* light_node = node_create(scratch.arena, "-");
 
 			add_leaf_node(scratch.arena, light_node, "type", get_light_type_str(light));
 			add_leaf_node(scratch.arena, light_node, "L", str_from_vec3(scratch.arena, light.L));
@@ -1159,7 +1153,7 @@ void write() {
 	}
 
 	// Camera settings
-	LumenNode* camera_node = new LumenNode{.key = "camera"};
+	LumenNode* camera_node = node_create(scratch.arena, "camera");
 	add_leaf_node(scratch.arena, camera_node, "fov", lm::str_from_f32(scratch.arena, _scene.camera.fov));
 	add_leaf_node(scratch.arena, camera_node, "position", str_from_vec3(scratch.arena, _scene.camera.position));
 	add_leaf_node(scratch.arena, camera_node, "rotation", str_from_vec3(scratch.arena, _scene.camera.rotation));
@@ -1179,16 +1173,16 @@ void write() {
 			entry->value.push_back(&mesh);
 		}
 
-		LumenNode* meshes_node = new LumenNode{.key = "mesh"};
+		LumenNode* meshes_node = node_create(scratch.arena, "mesh");
 		for (const auto& mesh_mapping : mesh_mappings) {
-			LumenNode* mesh_node = new LumenNode{.key = "-"};
+			LumenNode* mesh_node = node_create(scratch.arena, "-");
 			add_leaf_node(scratch.arena, mesh_node, "name", mesh_mapping.key);
-			LumenNode* materials_node = new LumenNode{.key = "materials"};
-			LumenNode* transforms_node = new LumenNode{.key = "transforms"};
+			LumenNode* materials_node = node_create(scratch.arena, "materials");
+			LumenNode* transforms_node = node_create(scratch.arena, "transforms");
 			add_child_node(mesh_node, materials_node);
 			bool has_transform = false;
 			for (LumenPrimMesh* mesh : mesh_mapping.value) {
-				LumenNode* mesh_to_material_node = new LumenNode{.key = "-"};
+				LumenNode* mesh_to_material_node = node_create(scratch.arena, "-");
 				if (!mesh->name.empty()) {
 					add_leaf_node(scratch.arena, mesh_to_material_node, "refs", mesh->name);
 				}
@@ -1237,14 +1231,11 @@ void write() {
 	traverse_and_write_scene(scratch.arena, buffer, root->child, 0);
 	os::file_write(handle, (void*)buffer.data, buffer.size);
 	os::file_close(handle);
-
-	// __debugbreak();
 }
 
 void destroy() {
-	std::vector<vk::Buffer*> buffer_list = {
-		_scene.index_buffer,	 _scene.vertex_buffer,		_scene.compact_vertices_buffer,
-		_scene.materials_buffer, _scene.prim_lookup_buffer, _scene.mesh_lights_buffer};
+	auto buffer_list = {_scene.index_buffer,	 _scene.vertex_buffer,		_scene.compact_vertices_buffer,
+						_scene.materials_buffer, _scene.prim_lookup_buffer, _scene.mesh_lights_buffer};
 	for (vk::Buffer* b : buffer_list) {
 		prm::remove(b);
 	}

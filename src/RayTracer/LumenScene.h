@@ -26,7 +26,7 @@ struct LumenPrimMesh {
 	glm::vec3 max_pos;
 };
 
-struct LumenLight {
+struct AnalyticalLight {
 	glm::vec3 pos;
 	glm::vec3 to;
 	glm::vec3 L;
@@ -55,16 +55,14 @@ struct Scene {
 	lm::FixedArray<glm::vec3> positions;
 	lm::FixedArray<u32> indices;
 	lm::FixedArray<glm::vec3> normals;
-	lm::FixedArray<glm::vec3> tangents;
 	lm::FixedArray<glm::vec2> texcoords0;
-	lm::FixedArray<glm::vec2> texcoords1;
-	lm::FixedArray<glm::vec4> colors0;
 	lm::FixedArray<LumenPrimMesh> prim_meshes;
 	lm::FixedArray<Material> materials;
 	lm::FixedArray<TextureRef> textures;
-	lm::FixedArray<LumenLight> lights;
-	lm::FixedArray<Light> gpu_lights;
 	lm::FixedArray<vk::Texture*> scene_textures;
+	lm::FixedArray<AnalyticalLight> analytical_lights;
+	lm::FixedArray<Light> gpu_lights;
+	lm::HashMap<u32, lm::String> material_idx_to_name{};
 
 	vk::Buffer* index_buffer;
 	vk::Buffer* vertex_buffer;
@@ -74,7 +72,6 @@ struct Scene {
 	vk::Buffer* scene_desc_buffer;
 	vk::Buffer* mesh_lights_buffer;
 	lm::Camera camera{};
-	lm::HashMap<u32, lm::String> material_idx_to_name{};
 
 	u32 total_light_triangle_cnt = 0;
 	f32 total_light_area = 0;

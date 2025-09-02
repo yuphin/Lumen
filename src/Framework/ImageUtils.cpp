@@ -1,5 +1,4 @@
 #include "ImageUtils.h"
-#define TINYEXR_IMPLEMENTATION
 #include <tinyexr.h>
 
 namespace ImageUtils {

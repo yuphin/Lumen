@@ -2,7 +2,6 @@
 #include "Framework/GPUQueryManager.h"
 #include "RenderGraph.h"
 #include "VulkanContext.h"
-#define VOLK_IMPLEMENTATION
 #include <volk/volk.h>
 #include "VulkanBase.h"
 #include "CommandBuffer.h"

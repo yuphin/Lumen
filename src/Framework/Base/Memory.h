@@ -42,7 +42,7 @@ struct Array {
 				arena_ensure_allocated_in_the_same_block<T>(arena_node, new_capacity, capacity);
 				capacity = new_capacity;
 			} else {
-				LUMEN_ERROR("Array capacity exceeded for fixed array");
+				LUMEN_ASSERT(false, "Array capacity exceeded for fixed array");
 			}
 		}
 		data[size++] = value;
@@ -55,7 +55,7 @@ struct Array {
 				arena_ensure_allocated_in_the_same_block<T>(arena_node, new_capacity, capacity);
 				capacity = new_capacity;
 			} else {
-				LUMEN_ERROR("Array capacity exceeded for fixed array");
+				LUMEN_ASSERT(false, "Array capacity exceeded for fixed array");
 			}
 		}
 		T* slot = &data[size++];

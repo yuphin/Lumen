@@ -1,7 +1,6 @@
 #include "Framework/RenderGraph.h"
 #include "Framework/GPUQueryManager.h"
 #include <tinyexr.h>
-#define TINYGLTF_IMPLEMENTATION
 #include "RayTracer.h"
 
 RayTracer* RayTracer::instance = nullptr;
@@ -11,10 +10,11 @@ bool calc_rmse = false;
 void RayTracer::init(bool use_debug, i32 argc, char* argv[]) {
 	instance = this;
 	debug = use_debug;
-	lm::String scene_name = "scenes/caustics.scene";
+	lm::String scene_name = lm::cstr("scenes/caustics.scene");
 	for (i32 i = 0; i < argc; i++) {
-		lm::String arg_str = lm::String(argv[i], strlen(argv[i]));
-		if (lm::str_ends_with(arg_str, lm::cliteral(".scene"))) {
+		// +1 for null terminator
+		lm::String arg_str = lm::String(argv[i], strlen(argv[i]) + 1);
+		if (lm::str_ends_with(arg_str, lm::cstr(".scene"))) {
 			scene_name = arg_str;
 		}
 	}
