@@ -14,6 +14,13 @@ static lm::Arena* _arena_scene = nullptr;
 static lm::Arena* _arena_strings = nullptr;
 Scene _scene = {};
 
+static void arena_get_stats(lm::Arena* arena, u64& used, u64& allocated) {
+	for (lm::Arena* curr = arena; curr; curr = curr->next) {
+		used += curr->local_offset;
+		allocated += curr->end_committed;
+	}
+}
+
 static void reflectance_to_conductor_eta_k(const glm::vec3& reflectance, glm::vec3& eta, glm::vec3& k) {
 	eta = glm::vec3(1.0f);
 	k = 2.0f * glm::sqrt(reflectance) / glm::sqrt(glm::max(glm::vec3(1.0f) - reflectance, 0.001f));
@@ -652,8 +659,7 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 			glm::vec3 max_vtx = glm::vec3(F32_MIN);
 
 			LumenPrimMesh& prim_mesh = _scene.prim_meshes.emplace_back();
-			prim_mesh.name =
-				lm::str_from_cstr(_arena_strings, obj->objects[shape_idx].name);
+			prim_mesh.name = lm::str_from_cstr(_arena_strings, obj->objects[shape_idx].name);
 			prim_mesh.filename = relative_mesh_file;
 			prim_mesh.vtx_offset = (u32)_scene.positions.size;
 			prim_mesh.first_idx = (u32)_scene.indices.size;
@@ -850,7 +856,7 @@ void load(const lm::String& path) {
 	}
 	if (!_arena_scene) {
 		_arena_scene = lm::arena_create(GB(16));
-		_arena_strings = lm::arena_create(KB(1));
+		_arena_strings = lm::arena_create(MB(16));
 	}
 	os::FileProperties props = os::file_properties(file_handle);
 	lm::String file_content = lm::str_reserve(_arena_strings, props.size + 1);
@@ -975,6 +981,15 @@ void load(const lm::String& path) {
 			stbi_image_free(data);
 		}
 	}
+
+	u64 total_used = 0;
+	u64 total_allocated = 0;
+	arena_get_stats(_arena_scene, total_used, total_allocated);
+	arena_get_stats(_arena_strings, total_used, total_allocated);
+	f64 MB = 1024.0 * 1024.0;
+	LUMEN_INFO("Scene: Total memory used: %.2f MB / allocated: %.2f MB (%.2f%%)", total_used / MB, total_allocated / MB,
+			   (f64)100.0 * total_used / total_allocated);
+
 	vk::render_graph()->global_macro_defines.push_back(
 		vk::ShaderMacro("ENABLE_DIFFUSE", scene_has_bsdf_type(BSDF_TYPE_DIFFUSE), /* visible = */ false));
 	vk::render_graph()->global_macro_defines.push_back(

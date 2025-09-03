@@ -34,9 +34,7 @@ ScratchArena::ScratchArena(Arena* arena_) {
 		// Example:
 		// Arena a (offset 24 / 1024) -> Arena b (offset 55 / 1024) -> Arena c (offset 0)
 		// will return b
-		while (curr->next && curr->next->local_offset != 0) {
-			curr = curr->next;
-		}
+		for(; curr->next && curr->next->local_offset != 0; curr = curr->next);
 		arena = curr;
 	}
 	arena->flags |= ARENA_FLAG_SCRATCH;
