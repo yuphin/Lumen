@@ -52,12 +52,23 @@ char char_to_lower(char c) {
 	return c;
 }
 
-String str_from_cstr(Arena* arena, const char* cstr, u64 size) {
+String str_from_cstr(Arena* arena, const char* cstr) {
+	if(!cstr) {
+		return String();
+	}
+	u64 size = strlen(cstr);
 	String result = {};
 	result.size = size;
 	result.data = (char*)arena->allocate(result.size);
 	memcpy(result.data, cstr, size);
 	return result;
+}
+String str_from_cstr(const char* cstr) { 
+	if(!cstr) {
+		return String();
+	}
+	u64 size = strlen(cstr);
+	return String((char*)cstr, size);
 }
 
 String str_to_cstr(Arena* arena, const String& str) {

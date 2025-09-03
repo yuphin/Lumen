@@ -23,13 +23,10 @@ static void log_bytes(const char* str, u64 n, bool err_stream) {
 
 static void log_bytes_colored(const char* str, u64 n, int level, bool err_stream) {
 #if defined(_WIN32) || defined(_WIN64)
+	static SRWLOCK log_lock = SRWLOCK_INIT;
 	HANDLE h = GetStdHandle(err_stream ? STD_ERROR_HANDLE : STD_OUTPUT_HANDLE);
 
-	CONSOLE_SCREEN_BUFFER_INFO csbi;
-	WORD orig = 0;
-	GetConsoleScreenBufferInfo(h, &csbi);
-	orig = csbi.wAttributes;
-
+	WORD orig = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
 	WORD col = orig;
 	switch (level) {
 		case LOG_ERROR:
@@ -42,15 +39,18 @@ static void log_bytes_colored(const char* str, u64 n, int level, bool err_stream
 			col = FOREGROUND_BLUE;
 			break;
 		case LOG_TRACE:
-			col = orig;
+			col = FOREGROUND_BLUE;
 			break;
 	}
 
-	SetConsoleTextAttribute(h, col);
-	DWORD written;
-	WriteFile(h, str, (DWORD)n, &written, nullptr);
-	SetConsoleTextAttribute(h, orig);
-
+	AcquireSRWLockExclusive(&log_lock);
+	{
+		SetConsoleTextAttribute(h, col);
+		DWORD written;
+		WriteFile(h, str, (DWORD)n, &written, nullptr);
+		SetConsoleTextAttribute(h, orig);
+	}
+	ReleaseSRWLockExclusive(&log_lock);
 #else
 	int fd = err_stream ? STDERR_FILENO : STDOUT_FILENO;
 	const bool tty = isatty(fd);
@@ -69,7 +69,7 @@ static void log_bytes_colored(const char* str, u64 n, int level, bool err_stream
 				prefix = "\x1b[34m";
 				break;	// blue
 			case LOG_TRACE:
-				prefix = "";
+				prefix = "\x1b[34m";
 				break;	// original
 		}
 		suffix = (prefix[0] ? "\x1b[0m" : "");
@@ -78,6 +78,7 @@ static void log_bytes_colored(const char* str, u64 n, int level, bool err_stream
 	if (prefix[0]) ::write(fd, prefix, 5);	// ESC[xxm is 5 bytes
 	::write(fd, str, n);
 	if (suffix[0]) ::write(fd, suffix, 4);	// ESC[0m is 4 bytes
+	// TODO: Mutex on linux
 #endif
 }
 

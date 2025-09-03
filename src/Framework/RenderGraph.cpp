@@ -387,14 +387,14 @@ RenderPass& RenderPass::bind_texture_with_sampler(vk::Texture* tex, VkSampler sa
 	return *this;
 }
 
-RenderPass& RenderPass::bind_texture_array(std::span<vk::Texture*> textures, bool force_update) {
+RenderPass& RenderPass::bind_texture_array(lm::FixedArray<vk::Texture*> textures, bool force_update) {
 	if (next_binding_idx >= pipeline_storage->bound_resources.size()) {
 		for (auto& texture : textures) {
 			pipeline_storage->bound_resources.emplace_back(texture);
 		}
-		descriptor_counts.push_back((u32)textures.size());
+		descriptor_counts.push_back((u32)textures.size);
 	} else {
-		for (auto i = 0; i < textures.size(); i++) {
+		for (auto i = 0; i < textures.size; i++) {
 			pipeline_storage->bound_resources[next_binding_idx + i].replace(textures[i]);
 		}
 	}

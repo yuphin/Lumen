@@ -314,7 +314,7 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<Build
 		VkDeviceSize compact_size =
 			std::accumulate(build_as.begin(), build_as.end(), 0ULL,
 							[](const auto& a, const auto& b) { return a + b.size_info.accelerationStructureSize; });
-		LUMEN_TRACE("RT BLAS: reducing from: %llu MB to: %llu MB = (%f% smaller) \n", as_total_size * 1e-6,
+		LUMEN_TRACE("RT BLAS: reducing from: %f MB to: %f MB = (%f% smaller) \n", as_total_size * 1e-6,
 					compact_size * 1e-6, (as_total_size - compact_size) / f32(as_total_size) * 100.f);
 	}
 	// Clean up

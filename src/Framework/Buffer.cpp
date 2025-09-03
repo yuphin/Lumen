@@ -7,6 +7,7 @@
 #include "VulkanStructs.h"
 namespace vk {
 void buffer_create(Buffer* buffer, const BufferDesc& desc) {
+	LUMEN_ASSERT(desc.size > 0, "Buffer size can't be 0");
 	buffer->name = desc.name;
 	buffer->size = desc.size;
 	buffer->usage_flags = desc.usage;

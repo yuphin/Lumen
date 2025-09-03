@@ -9,6 +9,7 @@
 #include "RenderGraphTypes.h"
 #include "AccelerationStructure.h"
 #include "Base/Utils.h"
+#include "Base/Memory.h"
 
 namespace lm {
 
@@ -136,7 +137,7 @@ class RenderPass {
 	RenderPass& bind(const ResourceBinding& binding);
 	RenderPass& bind_texture_with_sampler(vk::Texture* tex, VkSampler sampler);
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
-	RenderPass& bind_texture_array(std::span<vk::Texture*> texes, bool force_update = false);
+	RenderPass& bind_texture_array(lm::FixedArray<vk::Texture*> texes, bool force_update = false);
 	RenderPass& bind_buffer_array(std::span<vk::Buffer*> buffers, bool force_update = false);
 	RenderPass& bind_tlas(const vk::BVH& tlas);
 

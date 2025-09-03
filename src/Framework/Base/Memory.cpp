@@ -18,7 +18,7 @@ void arena_ensure_committed(Arena* arena, u64 target_offset) {
 	arena->local_offset = target_offset;
 	if (target_offset <= arena->end_committed) return;
 	u64 commit_size = util::align_pow2(target_offset - arena->end_committed, os::get_page_size());
-	LUMEN_INFO("Commiting %llu bytes ( %llu MB) for Arena", commit_size, commit_size / (1024 * 1024));
+	LUMEN_INFO("Commiting %llu bytes ( %f MB) for Arena", commit_size, commit_size / (1024.0 * 1024));
 	bool commited = os::commit(arena->data + arena->end_committed, commit_size);
 	memset(arena->data + arena->end_committed, 0, commit_size);
 	LUMEN_ASSERT(commited, "Could not commit memory for Arena");
@@ -26,10 +26,19 @@ void arena_ensure_committed(Arena* arena, u64 target_offset) {
 }
 
 ScratchArena::ScratchArena(Arena* arena_) {
-	Arena* last_arena = nullptr;
-	for (Arena* arena = arena_; arena; last_arena = arena, arena = arena->next);
-	assert(last_arena);
-	arena = last_arena;
+	Arena* curr = arena_;
+	if (curr->local_offset == 0) {
+		arena = curr;
+	} else {
+		// Find the first arena block whose next is empty
+		// Example:
+		// Arena a (offset 24 / 1024) -> Arena b (offset 55 / 1024) -> Arena c (offset 0)
+		// will return b
+		while (curr->next && curr->next->local_offset != 0) {
+			curr = curr->next;
+		}
+		arena = curr;
+	}
 	arena->flags |= ARENA_FLAG_SCRATCH;
 	saved_base = arena->local_offset;
 }

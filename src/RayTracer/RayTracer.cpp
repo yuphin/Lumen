@@ -70,7 +70,7 @@ void RayTracer::init(bool use_debug, i32 argc, char* argv[]) {
 	}
 	post_fx.init();
 	init_resources();
-	LUMEN_TRACE("Memory usage %llu MB", vk::get_memory_usage(vk::context().physical_device) * 1e-6);
+	LUMEN_TRACE("Memory usage: %f MB", vk::get_memory_usage(vk::context().physical_device) * 1e-6);
 }
 
 void RayTracer::init_resources() {

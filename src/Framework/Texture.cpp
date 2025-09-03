@@ -138,6 +138,7 @@ void texture_create(Texture* texture, const TextureDesc& desc) {
 	subresource_range.baseMipLevel = 0;
 	subresource_range.levelCount = texture->mip_levels;
 	if (desc.data.data) {
+		assert(desc.data.size);
 		Buffer* staging_buffer = drm::get({.name = "Scratch Buffer",
 										   .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 										   .memory_type = BUFFER_TYPE_STAGING,
