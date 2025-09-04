@@ -8,7 +8,7 @@
 
 #undef USE_VALIDATION_LAYERS
 
-#if 0
+#if 1
 i32 main(i32 argc, char* argv[]) {
 #ifdef USE_VALIDATION_LAYERS
 	bool enable_debug = true;

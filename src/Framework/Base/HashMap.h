@@ -67,25 +67,19 @@ struct HashMapProbed {
 		}
 #else
 		// Try to resize in-place
-		u64 old_offset = arena_node->local_offset;
-		arena_node->local_offset -= capacity * sizeof(HashMapEntryType);
+		bool is_sequential = arena_node->data == (u8*)data ;
+		if (is_sequential) {
+			arena_node->local_offset -= capacity * sizeof(HashMapEntryType);
+		} else {
+			LUMEN_WARN("Hash Map: Not resizing in-place. You may want to re-think your hashmap allocation strategy");
+		}
 
 		// TODO: Do we need to make sure it's exclusive if initial size isn't given?
 		Arena* new_arena_node;
 		u64 alloc_size = new_capacity * sizeof(HashMapEntryType);
-		u64 new_offset = util::align_pow2(arena_node->local_offset, alignof(HashMapEntryType)) + alloc_size;
 		HashMapEntryType* new_data =
 			(HashMapEntryType*)arena_node->allocate(alloc_size, alignof(HashMapEntryType), &new_arena_node,
 													/*zero_initialize=*/false);
-
-		bool same_arena_block = new_arena_node == arena_node;
-		bool is_sequential = same_arena_block && new_offset == arena_node->local_offset;
-
-		if (!is_sequential) {
-			// Rollback
-			arena_node->local_offset = old_offset;
-			LUMEN_WARN("Hash Map: Not resizing in-place. You may want to re-think your hashmap allocation strategy");
-		}
 
 		HashMapEntryType* old_data = data;
 		data = new_data;
