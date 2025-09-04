@@ -1,7 +1,7 @@
 integrator: 
   type: vcm
   path_length: 10
-  sky_col: v3f(0.100000, 0.100000, 0.100000)
+  sky_col: v3f(0.100000, 0.100000, 0.1)
   enable_vm: 1
   radius_factor: 0.025000
 
@@ -33,7 +33,7 @@ bsdfs:
   - name: Floor
     type: conductor
     roughness: 0.500000
-    reflectivity: v3f(0.000000, 0.000000, 0.000000)
+    reflectivity: v3f(1.000000, 1.000000, 1.000000)
     edge_tint: v3f(0.000000, 0.000000, 0.000000)
 
 
@@ -46,35 +46,35 @@ lights:
 
 camera: 
   fov: 45.000000
-  position: v3f(2.700000, 0.500000, 3.100000)
-  rotation: v3f(0.000000, 0.000000, 0.000000)
-  dir: v3f(-1.420776, -2.158489, 2.000000)
+  position: v3f(3.42,0.06,2.94)
+  rotation: v3f(-33.15,34.50,0.00)
+  dir: v3f(-0.47,-0.55,0.69)
 
 mesh: 
-  name: caustics.obj
-  materials: 
-    - refs: floor
-      name: Floor
-
-    - refs: ceiling
-      name: Other Walls
-
-    - refs: left_wall
-      name: Other Walls
-
-    - refs: right_wall
-      name: Other Walls
-
-    - refs: table
-      name: Table
-
-    - refs: ring
-      name: Ring
-
-    - refs: back_wall
-      name: Other Walls
-
-    - refs: glass
-      name: Glass
+  - name: caustics.obj
+    materials: 
+      - refs: floor
+        name: Floor
+  
+      - refs: ceiling
+        name: Other Walls
+  
+      - refs: left_wall
+        name: Other Walls
+  
+      - refs: right_wall
+        name: Other Walls
+  
+      - refs: table
+        name: Table
+  
+      - refs: ring
+        name: Ring
+  
+      - refs: back_wall
+        name: Other Walls
+  
+      - refs: glass
+        name: Glass
 
 
