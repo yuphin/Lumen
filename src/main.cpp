@@ -8,7 +8,7 @@
 
 #undef USE_VALIDATION_LAYERS
 
-#if 1
+#if 0
 i32 main(i32 argc, char* argv[]) {
 #ifdef USE_VALIDATION_LAYERS
 	bool enable_debug = true;
@@ -147,9 +147,9 @@ void hm_test() {
 		hm.insert(i, rand() & U32_MAX);
 	}
 
-	for(const auto& kv: hm) {
-		LUMEN_INFO("%d - %d\n", kv.key, kv.value);
-	}
+	// for(const auto& kv: hm) {
+	// 	LUMEN_INFO("%d - %d\n", kv.key, kv.value);
+	// }
 	LUMEN_TRACE("----Hash Map Test End----");
 }
 
