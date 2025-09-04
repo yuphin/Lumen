@@ -6,7 +6,8 @@ namespace lm {
 
 inline constexpr u64 HASH_MAP_LINEAR_MIN_CAPACITY = 32;
 inline constexpr u64 HASH_MAP_HASH_EMPTY = 0;
-inline constexpr u64 HASH_MAP_HASH_DELETED = 1;
+inline constexpr u64 HASH_MAP_HASH_EMPTY_BUT_RESIZING = 1;
+inline constexpr u64 HASH_MAP_HASH_DELETED = 2;
 inline constexpr u64 HASH_MAP_LOAD_PERCENTAGE_THRESHOLD = 70;
 
 template <typename T1, typename T2>
@@ -36,14 +37,16 @@ struct HashMapProbed {
 	void resize(u64 new_capacity) {
 		new_capacity = util::next_pow2(new_capacity);
 		using HashMapEntryType = HashMapEntry<T1, T2>;
+#if 0
 		Arena* new_arena_node;
 		// When we re-size, we need to allocate into a new block
 		HashMapEntryType* new_data = (HashMapEntryType*)arena_node->allocate(
 			new_capacity * sizeof(HashMapEntryType), alignof(HashMapEntryType), &new_arena_node,
 			/*zero_initialize=*/true,
 			/*exclusive_block_reserve_size=*/new_capacity * sizeof(HashMapEntryType));
-		HashMapEntryType* old_data = data;
 
+
+		HashMapEntryType* old_data = data;
 		data = new_data;
 		size = 0;
 		num_slots = 0;
@@ -53,7 +56,7 @@ struct HashMapProbed {
 		capacity = new_capacity;
 
 		for (u64 i = 0; i < old_capacity; i++) {
-			auto old_entry = old_data[i];
+			const auto& old_entry = old_data[i];
 			if (old_entry.hash > HASH_MAP_HASH_DELETED) {
 				if constexpr (!util::is_same<T2, Empty>::value) {
 					insert(old_entry.key, old_entry.value);
@@ -62,6 +65,94 @@ struct HashMapProbed {
 				}
 			}
 		}
+#else
+		// In place resize
+		arena_node->local_offset -= capacity * sizeof(HashMapEntryType);
+
+		// TODO: Do we need to make sure it's exclusive if initial size isn't given?
+		Arena* new_arena_node;
+		HashMapEntryType* new_data = (HashMapEntryType*)arena_node->allocate(new_capacity * sizeof(HashMapEntryType),
+																			 alignof(HashMapEntryType), &new_arena_node,
+																			 /*zero_initialize=*/false);
+
+		bool same_arena_block = new_arena_node == arena_node;
+		HashMapEntryType* old_data = data;
+		data = new_data;
+		u64 old_size = size;
+		size = 0;
+		num_slots = 0;
+		arena_node = new_arena_node;
+		u64 old_capacity = capacity;
+		capacity = new_capacity;
+		for (u64 i = 0; i < old_capacity; i++) {
+			if (old_data[i].hash > HASH_MAP_HASH_DELETED) {
+				old_data[i].hash = HASH_MAP_HASH_EMPTY_BUT_RESIZING;
+			}
+		}
+		u64 processed = 0;
+		u64 scan_idx = 0;
+		HashMapEntry<T1, T2> old_entry;
+		bool old_entry_found = false;
+		while (processed < old_size) {
+			if (!old_entry_found) {
+				for (; scan_idx < old_capacity; ++scan_idx) {
+					if (old_data[scan_idx].hash == HASH_MAP_HASH_EMPTY_BUT_RESIZING) {
+						break;
+					}
+				}
+				old_entry = old_data[scan_idx++];
+			}
+			old_entry_found = insert_during_resize(&old_entry);
+			++processed;
+		}
+		if (same_arena_block) {
+			for (u64 i = 0; i < old_capacity; i++) {
+				if (old_data[i].hash == HASH_MAP_HASH_EMPTY_BUT_RESIZING) {
+					old_data[i].hash = HASH_MAP_HASH_EMPTY;
+				}
+			}
+		}
+
+#endif
+	}
+
+	bool insert_during_resize(HashMapEntry<T1, T2>* old_entry) {
+		u64 hash = hash_func(old_entry->key);
+		if (hash <= HASH_MAP_HASH_DELETED) {
+			hash += HASH_MAP_HASH_DELETED + 1;
+		}
+		bool old_entry_found = false;
+		u64 index = hash & (capacity - 1);
+
+		u64 probe_inc = 1;
+		while (data[index].hash > HASH_MAP_HASH_EMPTY_BUT_RESIZING) {
+			HashMapEntry<T1, T2>& entry = data[index];
+			if (entry.hash == HASH_MAP_HASH_DELETED) {
+				--num_slots;
+				break;
+			} else if (entry.key == old_entry->key) {
+				if constexpr (!util::is_same<T2, Empty>::value) {
+					entry.value = old_entry->value;
+				}
+				return old_entry_found;
+			}
+			index = (index + probe_inc) & (capacity - 1);
+			probe_inc++;
+		}
+		++num_slots;
+		++size;
+
+		HashMapEntry<T1, T2> old_entry_copy = *old_entry;
+		if (data[index].key != old_entry_copy.key && data[index].hash == HASH_MAP_HASH_EMPTY_BUT_RESIZING) {
+			*old_entry = data[index];
+			old_entry_found = true;
+		}
+		data[index].hash = hash;
+		data[index].key = old_entry_copy.key;
+		if constexpr (!util::is_same<T2, Empty>::value) {
+			data[index].value = old_entry_copy.value;
+		}
+		return old_entry_found;
 	}
 
 	HashMapEntry<T1, T2>* insert(const T1& key, const T2& value) {
@@ -224,10 +315,11 @@ struct HashMapProbed {
 
 // Like arrays, hash maps are also always allocated in a new block
 template <typename T1, typename T2, u64 (*hash_func)(const T1&) = default_hash<T1>>
-HashMapProbed<T1, T2, hash_func> hash_map_create(Arena* arena, u64 initial_capacity = HASH_MAP_LINEAR_MIN_CAPACITY ) {
+HashMapProbed<T1, T2, hash_func> hash_map_create(Arena* arena, u64 initial_capacity = HASH_MAP_LINEAR_MIN_CAPACITY) {
 	using HashMapEntryType = HashMapEntry<T1, T2>;
 	HashMapProbed<T1, T2, hash_func> map;
-	initial_capacity = util::next_pow2(initial_capacity);
+	// We also multiply the capacity by 1.5 in case we want to accomodate w.r.t hash map load percentage threshold
+	initial_capacity = util::next_pow2(3 * (initial_capacity + 1) >> 1);
 	map.capacity = initial_capacity;
 	Arena* arena_node;
 	map.data = (HashMapEntryType*)arena->allocate(initial_capacity * sizeof(HashMapEntryType),

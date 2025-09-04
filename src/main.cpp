@@ -137,7 +137,25 @@ void scratch_arena_test() {
 	LUMEN_TRACE("----Scratch Arena Test End----");
 }
 
+void hm_test() {
+	LUMEN_TRACE("----Hash Map Test----");
+	lm::Arena* arena = lm::arena_create(KB(1));
+
+	auto hm = lm::hash_map_create<u32, u32>(arena);
+	constexpr u32 HM_SIZE = 4096;
+	for(u32 i = 0; i < HM_SIZE; i++) {
+		hm.insert(i, rand() & U32_MAX);
+	}
+
+	for(const auto& kv: hm) {
+		LUMEN_INFO("%d - %d\n", kv.key, kv.value);
+	}
+	LUMEN_TRACE("----Hash Map Test End----");
+}
+
 i32 main(i32 argc, char* argv[]) {
+	hm_test();
+	return 0;
 	hash_set_u64_test();
 	hash_set_str_test();
 	scratch_arena_test();

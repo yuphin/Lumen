@@ -451,16 +451,12 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 	}
 
 	// Materials
-	u64 num_emissives = 0;
 	if (bsdfs_node) {
 		u32 bsdf_idx = 0;
 		for (LumenNode* bsdf_node = bsdfs_node->child; bsdf_node; bsdf_node = next_node(bsdf_node), bsdf_idx++) {
 			Material& material = _scene.materials.emplace_back();
 			material.albedo = get_or_default_v3(get_node(bsdf_node, "albedo"), glm::vec3(1.0f));
 			material.emissive_factor = get_or_default_v3(get_node(bsdf_node, "emissive_factor"), glm::vec3(0.0f));
-			if (material.emissive_factor.x > 0 || material.emissive_factor.y > 0 || material.emissive_factor.z > 0) {
-				++num_emissives;
-			}
 			material.texture_id = -1;
 			lm::String mat_name = get_str(get_node(bsdf_node, "name"));
 			if (!mat_name.empty()) {
@@ -582,8 +578,6 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 			}
 		}
 	}
-	// Allocate lights array
-	_scene.gpu_lights = lm::fixed_array_create<Light>(_arena_scene, _scene.analytical_lights.capacity + num_emissives);
 
 	// Analytical Lights
 	if (lights_node) {
@@ -611,6 +605,7 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 
 	// Meshes
 	mesh_idx = 0;
+	u64 num_emissives = 0;
 	for (LumenNode* mesh_node = meshes_node->child; mesh_node; mesh_node = next_node(mesh_node), mesh_idx++) {
 		const lm::String relative_mesh_file = get_or_default_str(get_node(mesh_node, "name"), "");
 		LumenNode* materials_refs_node = get_node(mesh_node, "materials");
@@ -716,15 +711,7 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 
 			glm::vec3 emissive_factor = _scene.materials[prim_mesh.material_idx].emissive_factor;
 			if (emissive_factor.x > 0 || emissive_factor.y > 0 || emissive_factor.z > 0) {
-				Light& light = _scene.gpu_lights.emplace_back();
-				light.world_matrix = prim_mesh.world_matrix;
-				light.num_triangles = prim_mesh.idx_count / 3;
-				light.prim_mesh_idx = prim_mesh.prim_idx;
-				light.light_flags = LIGHT_AREA;
-				// Is finite
-				light.light_flags |= 1 << 4;
-				light.L = emissive_factor;
-				_scene.total_light_triangle_cnt += light.num_triangles;
+				num_emissives++;
 			}
 
 			prim_mesh.min_pos = min_vtx;
@@ -740,12 +727,28 @@ static void scene_init(const lm::String& path, const lm::String& path_root, Lume
 	CameraSettings& cam_settings = _scene.config.common.cam_settings;
 	lm::camera_init(&_scene.camera, cam_settings.fov, 0.01f, 1000.0f, Window::aspect_ratio(), cam_settings.dir,
 					cam_settings.pos, cam_settings.rotation);
-	// Compute scene dimensions
+
+	// Allocate lights array
+	_scene.gpu_lights = lm::fixed_array_create<Light>(_arena_scene, _scene.analytical_lights.capacity + num_emissives);
+	// Compute scene dimensions and fill in lights array
 	lm::BBox scene_bbox;
 	for (const LumenPrimMesh& prim_mesh : _scene.prim_meshes) {
 		lm::BBox mesh_bbox(prim_mesh.min_pos, prim_mesh.max_pos);
 		lm::bbox_transform(mesh_bbox, prim_mesh.world_matrix);
 		lm::bbox_insert(scene_bbox, mesh_bbox);
+		glm::vec3 emissive_factor = _scene.materials[prim_mesh.material_idx].emissive_factor;
+
+		if (emissive_factor.x > 0 || emissive_factor.y > 0 || emissive_factor.z > 0) {
+			Light& light = _scene.gpu_lights.emplace_back();
+			light.world_matrix = prim_mesh.world_matrix;
+			light.num_triangles = prim_mesh.idx_count / 3;
+			light.prim_mesh_idx = prim_mesh.prim_idx;
+			light.light_flags = LIGHT_AREA;
+			// Is finite
+			light.light_flags |= 1 << 4;
+			light.L = emissive_factor;
+			_scene.total_light_triangle_cnt += light.num_triangles;
+		}
 	}
 
 	if (scene_bbox.is_empty()) {
@@ -987,6 +990,7 @@ void load(const lm::String& path) {
 	arena_get_stats(_arena_scene, total_used, total_allocated);
 	arena_get_stats(_arena_strings, total_used, total_allocated);
 	f64 MB = 1024.0 * 1024.0;
+	LUMEN_ASSERT(!_arena_scene->next, "Scene arena should be a single block");
 	LUMEN_INFO("Scene: Total memory used: %.2f MB / allocated: %.2f MB (%.2f%%)", total_used / MB, total_allocated / MB,
 			   (f64)100.0 * total_used / total_allocated);
 

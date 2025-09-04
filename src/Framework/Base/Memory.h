@@ -51,7 +51,7 @@ struct Array {
 	T& emplace_back(Args&&... args) {
 		if (size == capacity) {
 			if constexpr (GROWABLE) {
-				u64 new_capacity = 0 ? 1 : 3 * (capacity >> 1);
+				u64 new_capacity = 0 ? 1 : 3 * ((capacity + 1) >> 1);
 				arena_ensure_allocated_in_the_same_block<T>(arena_node, new_capacity, capacity);
 				capacity = new_capacity;
 			} else {
@@ -92,9 +92,6 @@ template <typename T, bool GROWABLE = true>
 Array<T, GROWABLE> array_create(Arena* arena, u64 initial_capacity = 0, u64 reserved_capacity = 1024) {
 	Array<T, GROWABLE> arr;
 	Arena* arena_node;
-	LUMEN_ASSERT(initial_capacity * sizeof(T) <= arena->end_reserved - arena->local_offset,
-				 "Not enough space in Arena, consider increasing arena block size by %llu bytes",
-				 initial_capacity * sizeof(T) - (arena->end_reserved - arena->local_offset));
 	arr.data = (T*)arena->allocate(initial_capacity * sizeof(T), alignof(T), &arena_node, /*zero_initialize=*/true,
 								   /*exclusive_block_reserve_size=*/reserved_capacity * sizeof(T));
 	arr.size = 0;

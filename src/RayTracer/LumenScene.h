@@ -61,8 +61,8 @@ struct Scene {
 	lm::FixedArray<TextureRef> textures;
 	lm::FixedArray<vk::Texture*> scene_textures;
 	lm::FixedArray<AnalyticalLight> analytical_lights;
-	lm::FixedArray<Light> gpu_lights;
 	lm::HashMap<u32, lm::String> material_idx_to_name{};
+	lm::FixedArray<Light> gpu_lights;
 
 	vk::Buffer* index_buffer;
 	vk::Buffer* vertex_buffer;
