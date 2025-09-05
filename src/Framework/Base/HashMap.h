@@ -67,7 +67,9 @@ struct HashMapProbed {
 		}
 #else
 		// Try to resize in-place
-		bool is_sequential = arena_node->data == (u8*)data ;
+		u64 hm_size = capacity * sizeof(HashMapEntryType);
+		u64 local_offset_alligned_prev = util::align_pow2(arena_node->local_offset - hm_size, alignof(HashMapEntryType));
+		bool is_sequential = (arena_node->data + local_offset_alligned_prev) == (u8*)data ;
 		if (is_sequential) {
 			arena_node->local_offset -= capacity * sizeof(HashMapEntryType);
 		} else {
@@ -80,6 +82,7 @@ struct HashMapProbed {
 		HashMapEntryType* new_data =
 			(HashMapEntryType*)arena_node->allocate(alloc_size, alignof(HashMapEntryType), &new_arena_node,
 													/*zero_initialize=*/false);
+		bool is_different_block = new_arena_node != arena_node;
 
 		HashMapEntryType* old_data = data;
 		data = new_data;
@@ -110,7 +113,7 @@ struct HashMapProbed {
 			old_entry_found = insert_during_resize(&old_entry);
 			++processed;
 		}
-		if (is_sequential) {
+		if (!is_different_block && is_sequential) {
 			for (u64 i = 0; i < old_capacity; i++) {
 				if (old_data[i].hash == HASH_MAP_HASH_EMPTY_BUT_RESIZING) {
 					old_data[i].hash = HASH_MAP_HASH_EMPTY;

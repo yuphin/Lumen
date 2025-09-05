@@ -108,7 +108,7 @@ s64 s64_from_str(const String& str) {
 	s64 result = 0;
 
 	size_t curr = 0;
-	for (size_t curr = 0; curr < str.size; curr++) {
+	for (; curr < str.size; curr++) {
 		if (char_is_digit(str[curr])) {
 			break;
 		}

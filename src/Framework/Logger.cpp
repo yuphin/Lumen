@@ -9,18 +9,6 @@
 #endif
 namespace lm {
 
-static void log_bytes(const char* str, u64 n, bool err_stream) {
-#if defined(_WIN32) || defined(_WIN64)
-	HANDLE h = GetStdHandle(err_stream ? STD_ERROR_HANDLE : STD_OUTPUT_HANDLE);
-	DWORD written;
-	WriteFile(h, str, (DWORD)n, &written, nullptr);
-#else
-	int fd = err_stream ? STDERR_FILENO : STDOUT_FILENO;
-	ssize_t written = ::write(fd, str, n);
-	(void)written;
-#endif
-}
-
 static void log_bytes_colored(const char* str, u64 n, int level, bool err_stream) {
 #if defined(_WIN32) || defined(_WIN64)
 	static SRWLOCK log_lock = SRWLOCK_INIT;

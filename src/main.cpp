@@ -142,14 +142,25 @@ void hm_test() {
 	lm::Arena* arena = lm::arena_create(KB(1));
 
 	auto hm = lm::hash_map_create<u32, u32>(arena);
-	constexpr u32 HM_SIZE = 4096;
+	for(u32 i = 0; i < 4; i++) { 
+		hm.insert(i, rand() & U32_MAX);
+	}
+	
+	constexpr u32 HM_SIZE = 1024 * 1024;
 	for(u32 i = 0; i < HM_SIZE; i++) {
 		hm.insert(i, rand() & U32_MAX);
+	}
+	auto hs = lm::hash_set_create<u32>(arena);
+	for(u32 i = 0; i < 4; i++) { 
+		hs.insert(i);
 	}
 
 	// for(const auto& kv: hm) {
 	// 	LUMEN_INFO("%d - %d\n", kv.key, kv.value);
 	// }
+	for(const auto& k: hs) {
+		LUMEN_INFO("%d", k.key);
+	}
 	LUMEN_TRACE("----Hash Map Test End----");
 }
 

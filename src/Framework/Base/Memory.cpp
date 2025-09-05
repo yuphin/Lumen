@@ -17,7 +17,7 @@ static void arena_pop(Arena* arena, u64 target_base) {
 void arena_ensure_committed(Arena* arena, u64 target_offset) {
 	arena->local_offset = target_offset;
 	if (target_offset <= arena->end_committed) return;
-	u64 commit_size = util::align_pow2(target_offset - arena->end_committed, os::get_page_size());
+	u64 commit_size = glm::max(MIN_ARENA_COMMIT_SIZE, util::align_pow2(target_offset - arena->end_committed, os::get_page_size()));
 	LUMEN_INFO("Commiting %llu bytes ( %f MB) for Arena", commit_size, commit_size / (1024.0 * 1024));
 	bool commited = os::commit(arena->data + arena->end_committed, commit_size);
 	memset(arena->data + arena->end_committed, 0, commit_size);
@@ -34,7 +34,7 @@ ScratchArena::ScratchArena(Arena* arena_) {
 		// Example:
 		// Arena a (offset 24 / 1024) -> Arena b (offset 55 / 1024) -> Arena c (offset 0)
 		// will return b
-		for(; curr->next && curr->next->local_offset != 0; curr = curr->next);
+		for (; curr->next && curr->next->local_offset != 0; curr = curr->next);
 		arena = curr;
 	}
 	arena->flags |= ARENA_FLAG_SCRATCH;
@@ -71,7 +71,9 @@ void* Arena::allocate(u64 size, u64 alignment, Arena** arena_node, bool zero_ini
 		}
 	}
 	if (last_block != nullptr) {
-		Arena* new_arena = arena_create(glm::max(exclusive_block_reserve_size, size), size, alignment);
+		u64 reserve_size = glm::max(MIN_ARENA_RESERVE_SIZE, glm::max(exclusive_block_reserve_size, size));
+		u64 commit_size = glm::max(MIN_ARENA_COMMIT_SIZE, size);
+		Arena* new_arena = arena_create(reserve_size, commit_size, alignment);
 		last_block->next = new_arena;
 		curr_arena = new_arena;
 

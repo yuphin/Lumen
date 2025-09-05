@@ -574,7 +574,7 @@ void RenderPass::finalize() {
 		u32 num_accels = 0;
 		for (u32 i = 0; i < pipeline_storage->as_bindings.size(); i++) {
 			if (!pipeline_storage->as_bindings[i].accel) {
-				LUMEN_INFO("Using null descriptor inside %s", name);
+				LUMEN_INFO("Using null descriptor inside %s", name.c_str());
 			}
 			accels[i] = pipeline_storage->as_bindings[i].accel;
 			++num_accels;

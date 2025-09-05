@@ -63,18 +63,25 @@ if(WIN32)
     get_filename_component(vulkan_lib_folder ${Vulkan_LIBRARIES} DIRECTORY)
     target_link_directories(Lumen PRIVATE ${vulkan_lib_folder})
     target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared glm GPUOpen::VulkanMemoryAllocator
-    $<$<CONFIG:Debug>:spirv-cross-cored> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-core>
-    $<$<CONFIG:Debug>:spirv-cross-glsld> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-glsl>)
+        $<$<CONFIG:Debug>:spirv-cross-cored> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-core>
+        $<$<CONFIG:Debug>:spirv-cross-glsld> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-glsl>)
     target_compile_definitions(Lumen PRIVATE _CRT_SECURE_NO_WARNINGS)
 else()
     target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared spirv-cross-core spirv-cross-glsl glm GPUOpen::VulkanMemoryAllocator)
 endif()
+# target_compile_options(Lumen PRIVATE
+#     $<$<CXX_COMPILER_ID:MSVC>:/W4>
+#     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>)
 
 if(MSVC)
     if(TARGET glfw)
         target_compile_options(glfw PRIVATE "/MP")
     endif()
 	target_compile_options(Lumen PRIVATE "/MP")
+    # For MSVC compilation diagnostics
+    # target_compile_options(Lumen PRIVATE /d1reportTime)
+    # For struct layouts
+    # target_compile_options(Lumen PRIVATE /d1reportAllClassLayout)
 	set_target_properties(Lumen PROPERTIES
     				      VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Lumen)

@@ -5,7 +5,7 @@ namespace vk {
 namespace event_pool {
 struct Events {
 	std::vector<VkEvent> events;
-	u64 available_event_idx = -1;
+	u64 available_event_idx = U64_MAX;
 };
 std::unordered_map<VkCommandBuffer, Events> _events_map;
 

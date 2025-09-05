@@ -301,7 +301,6 @@ bool RayTracer::gui() {
 		for (u64 i = 0; i < query_results.size; i++) {
 			const GPUQueryManager::TimestampData& data = query_results[i];
 			GPUQueryManager::TimestampData* parent = data.parent;
-			bool is_root = parent == nullptr;
 			u32 scope = 0;
 			while (parent != nullptr) {
 				scope++;

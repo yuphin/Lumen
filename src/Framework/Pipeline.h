@@ -29,7 +29,6 @@ struct Pipeline {
 	std::string name;
 	u32 push_constant_size = 0;
 	VkDescriptorType descriptor_types[32] = {};
-	std::vector<u32> descriptor_counts;
 
 	/*
 		Potentially 1 descriptor pool for a pass where we have to keep the

@@ -280,7 +280,7 @@ void DDGI::render() {
 	// Update probes & borders
 	{
 		// Probes
-		u32 wg_x = probe_counts.x * probe_counts.y;
+		wg_x = probe_counts.x * probe_counts.y;
 		u32 wg_y = probe_counts.z;
 		auto update_probe = [&](bool is_irr) {
 			vk::render_graph()

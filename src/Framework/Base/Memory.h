@@ -25,7 +25,11 @@ struct Arena {
 	void clear();
 };
 
-Arena* arena_create(u64 reserve_size = MB(64), u64 commit_size = KB(64), u64 header_alignment = -1);
+constexpr u64 MIN_ARENA_RESERVE_SIZE = MB(1);
+constexpr u64 MIN_ARENA_COMMIT_SIZE = KB(64);
+
+Arena* arena_create(u64 reserve_size = MIN_ARENA_RESERVE_SIZE, u64 commit_size = MIN_ARENA_COMMIT_SIZE,
+					u64 header_alignment = -1);
 void arena_ensure_committed(Arena* arena, u64 target_offset);
 
 // A dynamic array that doesn't move its elements when resizing

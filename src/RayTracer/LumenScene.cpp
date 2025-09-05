@@ -304,21 +304,6 @@ static void add_child_node(LumenNode* parent, LumenNode* child) {
 	child->parent = parent;
 }
 
-static void add_list_node(lm::Arena* arena, LumenNode* parent, LumenNode* list_node) {
-	LUMEN_ASSERT(parent && list_node, "Parent and list node cannot be null when adding list node");
-	if (!parent->child) {
-		parent->child = list_node;
-	} else {
-		LumenNode* last_child = parent->child;
-		while (last_child->next) {
-			last_child = last_child->next;
-		}
-		last_child->next = (LumenNode*)arena->allocate(sizeof(LumenNode));
-		last_child->next->key = "-";
-		last_child->next->child = list_node;
-	}
-}
-
 static lm::String str_from_vec3(lm::Arena* arena, const glm::vec3& vec) {
 	char buf[64];
 	i32 num_chars = stbsp_snprintf(buf, sizeof(buf), "v3f(%.6g,%.6g,%.6g)", vec.x, vec.y, vec.z);
@@ -377,7 +362,7 @@ static void traverse_and_write_scene(lm::Arena* arena, lm::String& buffer, Lumen
 	traverse_and_write_scene(arena, buffer, curr_node->next, depth);
 }
 
-static void scene_init(const lm::String& path, const lm::String& path_root, LumenNode* root) {
+static void scene_init(const lm::String& path_root, LumenNode* root) {
 	LumenNode* integrator_node = get_node(root, "integrator");
 	LumenNode* bsdfs_node = get_node(root, "bsdfs");
 	LumenNode* camera_node = get_node(root, "camera");
@@ -870,7 +855,7 @@ void load(const lm::String& path) {
 	}
 	// TODO: Error check?
 	lm::String path_root = lm::str_substr(path, 0, lm::str_rfind_any(path, "/\\") + 1);
-	scene_init(path, path_root, root);
+	scene_init(path_root, root);
 
 	f32 total_light_triangle_area = 0.0f;
 	for (Light& l : _scene.gpu_lights) {
@@ -972,8 +957,8 @@ void load(const lm::String& path) {
 		for (const auto& texture_path : _scene.textures) {
 			lm::ScratchArena scratch = _arena_strings;
 			i32 x, y, n;
-			lm::String path = lm::str_concat(scratch.arena, path_root, texture_path.relative_path);
-			unsigned char* data = stbi_load(path.data, &x, &y, &n, 4);
+			lm::String img_path = lm::str_concat(scratch.arena, path_root, texture_path.relative_path);
+			unsigned char* data = stbi_load(img_path.data, &x, &y, &n, 4);
 
 			_scene.scene_textures.push_back(
 				prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,

@@ -294,8 +294,8 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 		vk::set_resource_name(vk::context().device, (u64)handle, name.c_str(),
 										   VK_OBJECT_TYPE_PIPELINE);
 	}
-	for (auto& stage : stages) {
-		vkDestroyShaderModule(vk::context().device, stage.module, nullptr);
+	for (auto& shader_stage : stages) {
+		vkDestroyShaderModule(vk::context().device, shader_stage.module, nullptr);
 	}
 }
 

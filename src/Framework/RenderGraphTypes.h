@@ -36,9 +36,9 @@ struct ResourceBinding {
 		}
 	}
 
-	inline void replace(vk::Texture* tex, VkSampler sampler) {
-		this->tex = tex;
-		this->sampler = sampler;
+	inline void replace(vk::Texture* tex_, VkSampler sampler_) {
+		tex = tex_;
+		sampler = sampler_;
 	}
 
 	inline vk::DescriptorInfo get_descriptor_info() {
