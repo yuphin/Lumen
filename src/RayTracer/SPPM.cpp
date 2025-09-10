@@ -91,8 +91,8 @@ void SPPM::render() {
 	const f32 max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
 	const i32 base_grid_res = i32(max_comp / config.base_radius);
 	pc_ray.grid_res = glm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
-	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name, const std::string& reduce_name,
-						 const std::string& reduce_shader_name) {
+	auto op_reduce = [&](const lm::String& op_name, const lm::String& op_shader_name, const lm::String& reduce_name,
+						 const lm::String& reduce_shader_name) {
 		u32 num_wgs = u32((Window::width() * Window::height() + 1023) / 1024);
 		vk::render_graph()
 			->add_compute(op_name, {.shader = vk::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})

@@ -32,6 +32,9 @@ String str_concat(Arena* arena, const String& str1, const String& str2) {
 	memcpy(result.data + str1.size, str2.data, str2.size);
 	return result;
 }
+String str_from_cpp_str(const std::string& str) {
+	return String((char*)str.data(), str.size());
+}
 
 bool char_is_digit(char c) { return c >= '0' && c <= '9'; }
 bool char_is_upper(char c) { return c >= 'A' && c <= 'Z'; }
@@ -53,7 +56,7 @@ char char_to_lower(char c) {
 }
 
 String str_from_cstr(Arena* arena, const char* cstr) {
-	if(!cstr) {
+	if (!cstr) {
 		return String();
 	}
 	u64 size = strlen(cstr);
@@ -63,8 +66,8 @@ String str_from_cstr(Arena* arena, const char* cstr) {
 	memcpy(result.data, cstr, size);
 	return result;
 }
-String str_from_cstr(const char* cstr) { 
-	if(!cstr) {
+String str_from_cstr(const char* cstr) {
+	if (!cstr) {
 		return String();
 	}
 	u64 size = strlen(cstr);
@@ -247,7 +250,7 @@ u64 str_rfind(const String& str1, const String& str2) {
 	return str1_idx;
 }
 u64 str_rfind_any(const String& str1, const String& chars) {
-	u64 str1_idx = str1.size -1;
+	u64 str1_idx = str1.size - 1;
 	for (; str1_idx != U64_MAX; --str1_idx) {
 		for (u64 j = 0; j < chars.size; ++j) {
 			if (str1[str1_idx] == chars[j]) {
@@ -259,6 +262,22 @@ u64 str_rfind_any(const String& str1, const String& chars) {
 }
 
 bool str_ends_with(const lm::String& str1, const lm::String& str2) { return str_rfind(str1, str2) != U64_MAX; }
+
+i32 str_cmp(const String& str1, const String& str2) {
+	for (u64 i = 0; i < str1.size && i < str2.size; ++i) {
+		if (str1[i] < str2[i]) {
+			return -1;
+		} else if (str1[i] > str2[i]) {
+			return 1;
+		}
+	}
+	if (str1.size < str2.size) {
+		return -1;
+	} else if (str1.size > str2.size) {
+		return 1;
+	}
+	return 0;
+}
 
 bool String::operator==(const String& other) { return str_compare(*this, other); }
 

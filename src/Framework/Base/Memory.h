@@ -82,6 +82,10 @@ struct Array {
 		assert(index < size);
 		return data[index];
 	}
+	T& operator[](u64 index) const {
+		assert(index < size);
+		return data[index];
+	}
 	T* begin() const { return data; }
 	T* end() const { return data + size; }
 	inline bool initialized() const { return arena_node != nullptr; }
@@ -127,6 +131,15 @@ template <typename T>
 FixedArray<T> fixed_array_create(Arena* arena, u64 capacity) {
 	// exclusive_block_reserve_size = 0 means no exclusive block
 	return array_create<T, false>(arena, capacity, 0);
+}
+
+template<typename T>
+FixedArray<T> fixed_array_init(Arena* arena, std::initializer_list<T> list) {
+	FixedArray<T> arr = fixed_array_create<T>(arena, list.size());
+	for (const T& item : list) {
+		arr.push_back(item);
+	}
+	return arr;
 }
 
 }  // namespace lm

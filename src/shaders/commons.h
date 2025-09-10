@@ -8,6 +8,7 @@
 #define BSDF_TYPE_DIELECTRIC 1 << 3
 #define BSDF_TYPE_CONDUCTOR 1 << 4
 #define BSDF_TYPE_PRINCIPLED 1 << 5
+#define BSDF_COUNT 6
 #define BSDF_NONE -1
 
 // BSDF Props

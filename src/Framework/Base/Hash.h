@@ -31,12 +31,13 @@ static inline u64 knuth_hash(u64 x) {
 	return MULTIPLIER * x;
 }
 
-
 template <typename T>
 static inline u64 default_hash(const T& x) {
 	if constexpr (std::is_integral_v<T> || std::is_enum_v<T> || std::is_pointer_v<T> || std::is_floating_point_v<T>) {
 		if constexpr (std::is_floating_point_v<T>) {
 			return sdbm_hash((void*)&x, sizeof(T), HASH_INIT);
+		} else if constexpr (std::is_pointer_v<T>) {
+			return knuth_hash(static_cast<u64>(reinterpret_cast<std::uintptr_t>(x)) ^ HASH_INIT);
 		} else {
 			return knuth_hash(static_cast<u64>(x) ^ HASH_INIT);
 		}

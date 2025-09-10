@@ -218,8 +218,8 @@ void RayTracer::render_debug_utils() {
 	}
 
 	if (calc_rmse && has_gt) {
-		auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name,
-							 const std::string& reduce_name, const std::string& reduce_shader_name) {
+		auto op_reduce = [&](const lm::String& op_name, const lm::String& op_shader_name, const lm::String& reduce_name,
+							 const lm::String& reduce_shader_name) {
 			u32 num_wgs = u32((Window::width() * Window::height() + 1023) / 1024);
 			vk::render_graph()
 				->add_compute(op_name, {.shader = vk::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})

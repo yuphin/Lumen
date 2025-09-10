@@ -5,6 +5,11 @@
 #include "Framework/Window.h"
 #include "Framework/VulkanBase.h"
 
+#include "Framework/Base/String.h"
+#include "Framework/Base/OS.h"
+#include "Framework/Base/Memory.h"
+#include "Framework/Base/HashMap.h"
+
 void PostFX::init() {
 	VkSamplerCreateInfo sampler_ci = vk::sampler();
 	sampler_ci.minFilter = VK_FILTER_NEAREST;
@@ -67,12 +72,14 @@ void PostFX::init() {
 
 	const i32 RADIX_X = (31 - std::countl_zero(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
 	const i32 RADIX_Y = (31 - std::countl_zero(fft_ping_padded->extent.height)) % 2 ? 2 : 4;
-	const std::vector<vk::ShaderMacro> macros_x =
-		RADIX_X == 2 ? std::vector<vk::ShaderMacro>{{"KERNEL_GENERATION"}}
-					 : std::vector<vk::ShaderMacro>{{"KERNEL_GENERATION"}, {"RADIX", RADIX_X}};
-	const std::vector<vk::ShaderMacro> macros_y =
-		RADIX_Y == 2 ? std::vector<vk::ShaderMacro>{{"KERNEL_GENERATION"}}
-					 : std::vector<vk::ShaderMacro>{{"KERNEL_GENERATION"}, {"RADIX", RADIX_Y}};
+	lm::FixedArray<vk::ShaderMacro> macros_x = lm::fixed_array_create<vk::ShaderMacro>(arena, 2);
+	lm::FixedArray<vk::ShaderMacro> macros_y = lm::fixed_array_create<vk::ShaderMacro>(arena, 2);
+	macros_x.push_back({"KERNEL_GENERATION"});
+	macros_y.push_back({"KERNEL_GENERATION"});
+	if(RADIX_X != 2) {
+		macros_x.push_back({"RADIX", RADIX_X});
+		macros_y.push_back({"RADIX", RADIX_Y});
+	}
 	rg->add_compute("FFT - Horizontal", {.shader = vk::Shader("src/shaders/bloom/fft.comp"),
 										 .macros = macros_x,
 										 .specialization_data = {wg_size_x / RADIX_X, u32(vertical), 0},
@@ -104,17 +111,20 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 			.bind(fft_ping_padded);
 		u32 wg_size_x = fft_ping_padded->extent.width;
 		u32 wg_size_y = fft_ping_padded->extent.height;
-		auto dim_y =
-			(u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_x - 1) / wg_size_x;
-		auto dim_x =
-			(u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_y - 1) / wg_size_y;
+		auto dim_y = (u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_x - 1) / wg_size_x;
+		auto dim_x = (u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_y - 1) / wg_size_y;
 		bool vertical = false;
 		const i32 RADIX_X = (31 - std::countl_zero(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
 		const i32 RADIX_Y = (31 - std::countl_zero(fft_ping_padded->extent.height)) % 2 ? 2 : 4;
-		const std::vector<vk::ShaderMacro> macros_x =
-			RADIX_X == 2 ? std::vector<vk::ShaderMacro>{} : std::vector<vk::ShaderMacro>{{"RADIX", RADIX_X}};
-		const std::vector<vk::ShaderMacro> macros_y =
-			RADIX_Y == 2 ? std::vector<vk::ShaderMacro>{} : std::vector<vk::ShaderMacro>{{"RADIX", RADIX_Y}};
+		lm::FixedArray<vk::ShaderMacro> macros_x = lm::fixed_array_create<vk::ShaderMacro>(arena, 1);
+		lm::FixedArray<vk::ShaderMacro> macros_y = lm::fixed_array_create<vk::ShaderMacro>(arena, 1);
+		if(RADIX_X != 2) {
+			macros_x.push_back({"RADIX", RADIX_X});
+		}
+		if(RADIX_Y != 2) {
+			macros_y.push_back({"RADIX", RADIX_Y});
+		}
+
 		rg->add_compute("FFT - Horizontal", {.shader = vk::Shader("src/shaders/bloom/fft.comp"),
 											 .macros = macros_x,
 											 .specialization_data = {wg_size_x / RADIX_X, u32(vertical), 0},
@@ -130,20 +140,18 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 			.bind_texture_with_sampler(fft_ping_padded, img_sampler)
 			.bind(fft_pong_padded)
 			.bind_texture_with_sampler(kernel_pong, img_sampler);
-		rg->add_compute("FFT - Vertical - Inverse",
-						{.shader = vk::Shader("src/shaders/bloom/fft.comp"),
-						 .macros = macros_y,
-						 .specialization_data = {wg_size_y / RADIX_Y, u32(vertical), 1},
-						 .dims = {dim_x, 1, 1}})
+		rg->add_compute("FFT - Vertical - Inverse", {.shader = vk::Shader("src/shaders/bloom/fft.comp"),
+													 .macros = macros_y,
+													 .specialization_data = {wg_size_y / RADIX_Y, u32(vertical), 1},
+													 .dims = {dim_x, 1, 1}})
 			.bind_texture_with_sampler(fft_ping_padded, img_sampler)
 			.bind(fft_pong_padded)
 			.bind_texture_with_sampler(kernel_pong, img_sampler);
 		vertical = false;
-		rg->add_compute("FFT - Horizontal - Inverse",
-						{.shader = vk::Shader("src/shaders/bloom/fft.comp"),
-						 .macros = macros_x,
-						 .specialization_data = {wg_size_x / RADIX_X, u32(vertical), 1},
-						 .dims = {dim_y, 1, 1}})
+		rg->add_compute("FFT - Horizontal - Inverse", {.shader = vk::Shader("src/shaders/bloom/fft.comp"),
+													   .macros = macros_x,
+													   .specialization_data = {wg_size_x / RADIX_X, u32(vertical), 1},
+													   .dims = {dim_y, 1, 1}})
 			.bind_texture_with_sampler(fft_ping_padded, img_sampler)
 			.bind(fft_pong_padded)
 			.bind_texture_with_sampler(kernel_pong, img_sampler);

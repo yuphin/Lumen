@@ -254,8 +254,8 @@ void VCMMLT::render() {
 		}
 		return res;
 	};
-	auto op_reduce = [&](const std::string& op_name, const std::string& op_shader_name, const std::string& reduce_name,
-						 const std::string& reduce_shader_name, const std::vector<u32> spec_data) {
+	auto op_reduce = [&](const lm::String& op_name, const lm::String& op_shader_name, const lm::String& reduce_name,
+						 const lm::String& reduce_shader_name, const std::vector<u32> spec_data) {
 		u32 num_wgs = u32((config.num_mlt_threads + 1023) / 1024);
 		rg->add_compute(
 			  op_name,
@@ -292,7 +292,7 @@ void VCMMLT::render() {
 	std::string pipeline_postfix = get_pipeline_postfix(spec_consts);
 	// Shoot rays
 	std::string pipeline_name = "VCMMLT - Trace " + pipeline_postfix;
-	rg->add_rt(pipeline_name,
+	rg->add_rt(lm::str_from_cpp_str(pipeline_name),
 			   {
 				   .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_eye.rgen"},
 							   {"src/shaders/ray.rmiss"},
@@ -311,7 +311,7 @@ void VCMMLT::render() {
 		.bind_tlas(tlas);
 	// Start bootstrap sampling
 	pipeline_name = "VCMMLT - Bootstrap " + pipeline_postfix;
-	rg->add_rt(pipeline_name,
+	rg->add_rt(lm::str_from_cpp_str(pipeline_name),
 			   {
 				   .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_seed.rgen"},
 							   {"src/shaders/ray.rmiss"},
@@ -342,7 +342,7 @@ void VCMMLT::render() {
 	{
 		// Fill
 		std::string pipeline_name = "VCMMLT - Preprocess " + pipeline_postfix;
-		rg->add_rt(pipeline_name,
+		rg->add_rt(lm::str_from_cpp_str(pipeline_name),
 				   {
 					   .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_preprocess.rgen"},
 								   {"src/shaders/ray.rmiss"},
@@ -373,7 +373,7 @@ void VCMMLT::render() {
 			pc_ray.random_num = rand() % UINT_MAX;
 			pc_ray.mutation_counter = i;
 			// Mutate
-			rg->add_rt(pipeline_name,
+			rg->add_rt(lm::str_from_cpp_str(pipeline_name),
 					   {
 						   .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_mutate.rgen"},
 									   {"src/shaders/ray.rmiss"},

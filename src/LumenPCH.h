@@ -75,6 +75,8 @@ typedef double f64;
 #define MB(n) (((u64)(n)) << 20)
 #define GB(n) (((u64)(n)) << 30)
 
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+
 #include <assert.h>
 #include <unordered_map>
 #include <unordered_set>

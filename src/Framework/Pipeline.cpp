@@ -2,6 +2,7 @@
 #include "VkUtils.h"
 
 namespace vk {
+	// TODO: make shader filename cstr
 
 static u32 get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types) {
 	u32 binding_mask = 0;
@@ -10,7 +11,7 @@ static u32 get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDes
 			if (shader.binding_mask & (1 << i)) {
 				if (binding_mask & (1 << i)) {
 					LUMEN_ASSERT(descriptor_types[i] == shader.descriptor_types[i],
-								 "Binding mask mismatch on shader %s", shader.filename.c_str());
+								 "Binding mask mismatch on shader %s", shader.filename.data);
 				} else {
 					descriptor_types[i] = shader.descriptor_types[i];
 					binding_mask |= 1 << i;
@@ -23,7 +24,7 @@ static u32 get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDes
 
 Pipeline::Pipeline(const std::string& name) : name(name) {}
 
-void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const std::vector<u32>& descriptor_counts,
+void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const lm::FixedArray<u32>& descriptor_counts,
 								   std::vector<vk::Texture*> color_outputs, vk::Texture* depth_output) {
 	LUMEN_ASSERT(color_outputs.size(), "No color outputs for GFX pipeline");
 	type = PipelineType::GFX;
@@ -166,12 +167,11 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const s
 		vkDestroyShaderModule(vk::context().device, stage.module, nullptr);
 	}
 	if (!name.empty()) {
-		vk::set_resource_name(vk::context().device, (u64)handle, name.c_str(),
-										   VK_OBJECT_TYPE_PIPELINE);
+		vk::set_resource_name(vk::context().device, (u64)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
 	}
 }
 
-void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vector<u32>& descriptor_counts,
+void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const lm::FixedArray<u32>& descriptor_counts,
 								  u32 num_as_bindings) {
 	type = PipelineType::RT;
 	binding_mask = get_bindings_for_shader_set(settings.shaders, descriptor_types);
@@ -291,16 +291,14 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const std::vec
 	sbt_wrapper.setup(vk::context().queue_indices.gfx_family.value(), vk::context().rt_props);
 	sbt_wrapper.create(handle, pipeline_CI);
 	if (!name.empty()) {
-		vk::set_resource_name(vk::context().device, (u64)handle, name.c_str(),
-										   VK_OBJECT_TYPE_PIPELINE);
+		vk::set_resource_name(vk::context().device, (u64)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
 	}
 	for (auto& shader_stage : stages) {
 		vkDestroyShaderModule(vk::context().device, shader_stage.module, nullptr);
 	}
 }
 
-void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
-									   const std::vector<u32>& descriptor_counts) {
+void Pipeline::create_compute_pipeline(const ComputePassSettings& settings, const lm::FixedArray<u32>& descriptor_counts) {
 	type = PipelineType::COMPUTE;
 	binding_mask = get_bindings_for_shader_set({settings.shader}, descriptor_types);
 	create_set_layout({settings.shader}, descriptor_counts);
@@ -339,8 +337,7 @@ void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
 	vk::check(vkCreateComputePipelines(vk::context().device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle));
 	vkDestroyShaderModule(vk::context().device, compute_shader_module, nullptr);
 	if (!name.empty()) {
-		vk::set_resource_name(vk::context().device, (u64)handle, name.c_str(),
-										   VK_OBJECT_TYPE_PIPELINE);
+		vk::set_resource_name(vk::context().device, (u64)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
 	}
 }
 
@@ -412,10 +409,10 @@ void Pipeline::create_rt_set_layout(VkShaderStageFlags binding_stage_flags, u32 
 	vk::check(vkCreateDescriptorSetLayout(vk::context().device, &set_create_info, nullptr, &tlas_layout));
 }
 
-void Pipeline::create_set_layout(const std::vector<Shader>& shaders, const std::vector<u32>& descriptor_counts) {
+void Pipeline::create_set_layout(const std::vector<Shader>& shaders, const lm::FixedArray<u32>& descriptor_counts) {
 	std::vector<VkDescriptorSetLayoutBinding> set_bindings;
 
-	if (descriptor_counts.size()) {
+	if (descriptor_counts.size) {
 		i32 idx = 0;
 		for (u32 i = 0; i < 32; ++i) {
 			if (binding_mask & (1 << i)) {
@@ -444,8 +441,7 @@ void Pipeline::create_set_layout(const std::vector<Shader>& shaders, const std::
 	vk::check(vkCreateDescriptorSetLayout(vk::context().device, &set_create_info, nullptr, &set_layout));
 }
 
-void Pipeline::create_pipeline_layout(const std::vector<Shader>& shaders,
-									  const std::vector<u32> push_const_sizes) {
+void Pipeline::create_pipeline_layout(const std::vector<Shader>& shaders, const std::vector<u32> push_const_sizes) {
 	VkPipelineLayoutCreateInfo create_info = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
 	VkDescriptorSetLayout set_layouts[] = {set_layout, tlas_layout};
 	create_info.setLayoutCount = type == PipelineType::RT ? 2 : 1;
@@ -468,8 +464,7 @@ void Pipeline::create_pipeline_layout(const std::vector<Shader>& shaders,
 	vk::check(vkCreatePipelineLayout(vk::context().device, &create_info, nullptr, &pipeline_layout));
 }
 
-void Pipeline::create_update_template(const std::vector<Shader>& shaders,
-									  const std::vector<u32>& descriptor_counts) {
+void Pipeline::create_update_template(const std::vector<Shader>& shaders, const lm::FixedArray<u32>& descriptor_counts) {
 	if (descriptor_counts.empty()) {
 		return;
 	}
@@ -529,7 +524,7 @@ void Pipeline::create_update_template(const std::vector<Shader>& shaders,
 	};
 
 	std::vector<VkDescriptorUpdateTemplateEntry> entries;
-	LUMEN_ASSERT(count_ones(binding_mask) == descriptor_counts.size(),
+	LUMEN_ASSERT(count_ones(binding_mask) == descriptor_counts.size,
 				 "Descriptor size mismatch! Check shaders or the supplied descriptors.");
 	u64 offset = 0;
 	i32 idx = 0;

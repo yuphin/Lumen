@@ -4,6 +4,11 @@
 #include "LumenScene.h"
 #include "Framework/DynamicResourceManager.h"
 #include "Framework/PersistentResourceManager.h"
+#include "Framework/Base/String.h"
+#include "Framework/Base/OS.h"
+#include "Framework/Base/Memory.h"
+#include "Framework/Base/HashMap.h"
+
 class Integrator {
    public:
 	Integrator(const vk::BVH& tlas) : tlas(tlas) {}
@@ -23,4 +28,5 @@ class Integrator {
 	vk::Buffer* scene_ubo_buffer = nullptr;
 	const vk::BVH& tlas;
 	scene::Scene* lumen_scene = nullptr;
+	lm::Arena* arena = nullptr;
 };

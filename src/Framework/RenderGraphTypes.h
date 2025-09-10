@@ -2,6 +2,10 @@
 #include "Shader.h"
 #include "Buffer.h"
 #include "Texture.h"
+#include "Framework/Base/String.h"
+#include "Framework/Base/OS.h"
+#include "Framework/Base/Memory.h"
+#include "Framework/Base/HashMap.h"
 
 namespace lm {
 class RenderPass;
@@ -79,23 +83,23 @@ struct ImageSyncDescriptor {
 namespace vk {
 enum class PassType { Compute, RT, Graphics };
 struct ShaderMacro {
-	ShaderMacro(const std::string& name, i32 val, bool visible)
+	ShaderMacro(const lm::String& name, i32 val, bool visible)
 		: name(name), val(val), has_val(true), visible(visible) {}
-	ShaderMacro(const std::string& name, i32 val) : name(name), val(val), has_val(true) {}
-	ShaderMacro(const std::string& name, bool enable) {
+	ShaderMacro(const lm::String& name, i32 val) : name(name), val(val), has_val(true) {}
+	ShaderMacro(const lm::String& name, bool enable) {
 		if (enable) {
 			this->name = name;
 		}
 	}
-	ShaderMacro(const std::string& name) : name(name) {}
-	std::string name = "";
+	ShaderMacro(const lm::String& name) : name(name) {}
+	lm::String name;
 	i32 val = 0;
 	bool has_val = false;
 	bool visible = true;
 };
 struct GraphicsPassSettings {
 	std::vector<vk::Shader> shaders;
-	const std::vector<ShaderMacro> macros = {};
+	lm::FixedArray<ShaderMacro> macros;
 	u32 width;
 	u32 height;
 	VkClearValue clear_color;
@@ -119,7 +123,7 @@ struct GraphicsPassSettings {
 
 struct RTPassSettings {
 	std::vector<vk::Shader> shaders;
-	std::vector<ShaderMacro> macros = {};
+	lm::FixedArray<ShaderMacro> macros;
 	u32 recursion_depth = 1;
 	std::vector<u32> specialization_data = {};
 	lm::dim3 dims;
@@ -129,7 +133,7 @@ struct RTPassSettings {
 
 struct ComputePassSettings {
 	vk::Shader shader;
-	std::vector<ShaderMacro> macros = {};
+	lm::FixedArray<ShaderMacro> macros;
 	std::vector<u32> specialization_data = {};
 	lm::dim3 dims;
 	std::function<void(VkCommandBuffer cmd, const lm::RenderPass& pass)> pass_func;

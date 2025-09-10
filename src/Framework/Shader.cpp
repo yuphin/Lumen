@@ -28,8 +28,7 @@ struct input_map_hash {
 	}
 };
 
-static std::unordered_map<std::pair<spirv_cross::SPIRType::BaseType, u32>, std::pair<VkFormat, u32>,
-						  input_map_hash>
+static std::unordered_map<std::pair<spirv_cross::SPIRType::BaseType, u32>, std::pair<VkFormat, u32>, input_map_hash>
 	vertex_input_map = {
 		{{spirv_cross::SPIRType::BaseType::Int, 1u}, {VK_FORMAT_R32_SINT, (u32)sizeof(i32)}},
 		{{spirv_cross::SPIRType::BaseType::Int, 2u}, {VK_FORMAT_R32G32_SINT, 2 * (u32)sizeof(i32)}},
@@ -147,21 +146,22 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 	auto active_vars = glsl.get_active_interface_variables();
 	auto active_resources = glsl.get_shader_resources(active_vars);
 	for (auto& sampled_img : active_resources.sampled_images) {
-		auto binding = glsl.get_decoration(sampled_img.id, spv::DecorationBinding);
-		shader.resource_binding_map[binding].read = true;
-		shader.resource_binding_map[binding].active = true;
+		u32 binding = glsl.get_decoration(sampled_img.id, spv::DecorationBinding);
+		shader.resource_binding_map.insert(binding, BindingStatus{.read = true, .active = true});
 	}
 	for (auto& storage_img : active_resources.storage_images) {
 		auto binding = glsl.get_decoration(storage_img.id, spv::DecorationBinding);
-		shader.resource_binding_map[binding].write = true;
-		shader.resource_binding_map[binding].active = true;
+		BindingStatus& binding_status = shader.resource_binding_map.get_or_create(binding, BindingStatus{})->value;
+		binding_status.write = true;
+		binding_status.active = true;
 	}
 	for (auto& storage_buffer : active_resources.storage_buffers) {
 		auto binding = glsl.get_decoration(storage_buffer.id, spv::DecorationBinding);
-		shader.resource_binding_map[binding].active = true;
+		BindingStatus& binding_status = shader.resource_binding_map.get_or_create(binding, BindingStatus{})->value;
+		binding_status.active = true;
 	}
 
-	for(auto& as : active_resources.acceleration_structures) {
+	for (auto& as : active_resources.acceleration_structures) {
 		auto set = glsl.get_decoration(as.id, spv::DecorationDescriptorSet);
 		LUMEN_ASSERT(set == 1, "Acceleration structure must be in descriptor set 1");
 		shader.num_as_bindings++;
@@ -184,8 +184,8 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 
 	std::unordered_map<u32, AccessChain> access_chain_map;
 	std::unordered_map<u32, Variable> variable_map;
-	std::unordered_map<u32, u32> load_map;		  // Dst Id - Ptr Id
-	std::unordered_map<u32, u32> store_access_map;  //  Ptr Data from load_map
+	std::unordered_map<u32, u32> load_map;			// Dst Id - Ptr Id
+	std::unordered_map<u32, u32> store_access_map;	//  Ptr Data from load_map
 	std::unordered_map<u32, u32> constant_map;
 	std::unordered_map<u32, std::string> buffer_ptr_hash_map;
 
@@ -199,7 +199,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 				if (is_bound_buffer(variable_storage_class)) {
 					// Bound resource
 					auto binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
-					shader.resource_binding_map[binding].write = true;
+					shader.resource_binding_map.get_or_create(binding, BindingStatus{})->value.write = true;
 				} else if (is_buffer(variable_storage_class)) {
 					// Via pointer
 					auto ptr_var_id = load_map[access_chain.base_ptr_id];
@@ -207,16 +207,18 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 					auto var_type = glsl.get_type_from_variable(ptr_var_id);
 					assert(buffer_ptr_hash_map.find(ptr_var_id) != buffer_ptr_hash_map.end());
 					const auto& res = buffer_ptr_hash_map[ptr_var_id];
-					if (pass->rg->registered_buffer_pointers.find(res) != pass->rg->registered_buffer_pointers.end()) {
-						shader.buffer_status_map[res].write = true;
+					auto entry = pass->rg->registered_buffer_pointers.find(lm::str_from_cstr(res.c_str()));
+					if (entry) {
+						shader.buffer_status_map.get_or_create(entry->key, BufferStatus{})->value.write = true;
 					}
 				}
 			} else if (load_map.find(access_chain.base_ptr_id) != load_map.end()) {
 				// Access chain has loads
 				// If it has loads, it should be a buffer pointer
 				const auto& res = buffer_ptr_hash_map[load_map[access_chain.base_ptr_id]];
-				if (pass->rg->registered_buffer_pointers.find(res) != pass->rg->registered_buffer_pointers.end()) {
-					shader.buffer_status_map[res].write = true;
+				auto entry = pass->rg->registered_buffer_pointers.find(lm::str_from_cstr(res.c_str()));
+				if( entry ) {
+					shader.buffer_status_map.get_or_create(entry->key, BufferStatus{})->value.write = true;
 				}
 			}
 		}
@@ -227,7 +229,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 		if (variable_map.find(store_id) != variable_map.end()) {
 			if (is_bound_buffer(variable_map[store_id].storage_class)) {
 				auto binding = glsl.get_decoration(store_id, spv::DecorationBinding);
-				shader.resource_binding_map[binding].write = true;
+				shader.resource_binding_map.get_or_create(binding, BindingStatus{})->value.write = true;
 			}
 		}
 	};
@@ -282,7 +284,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 						auto storage_class = glsl.get_storage_class(access_chain.base_ptr_id);
 						if (is_bound_buffer(storage_class)) {
 							auto binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
-							shader.resource_binding_map[binding].read = true;
+							shader.resource_binding_map.get_or_create(binding, BindingStatus{})->value.read = true;
 						}
 						auto nh = access_chain_map.extract(id);
 						nh.key() = insn[2];
@@ -303,7 +305,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 							const auto variable_storage_class = variable_map[access_chain.base_ptr_id].storage_class;
 							if (is_bound_buffer(variable_storage_class)) {
 								auto binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
-								shader.resource_binding_map[binding].read = true;
+								shader.resource_binding_map.get_or_create(binding, BindingStatus{})->value.read = true;
 							} else {
 								// Variable + buffer pointer?
 							}
@@ -314,9 +316,9 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 								// TODO: Distinguish buffer and image pointers
 								// when we add bindless images in the future
 								const auto& res = buffer_ptr_hash_map[load_map[access_chain.base_ptr_id]];
-								if (pass->rg->registered_buffer_pointers.find(res) !=
-									pass->rg->registered_buffer_pointers.end()) {
-									shader.buffer_status_map[res].read = true;
+								auto entry = pass->rg->registered_buffer_pointers.find(lm::str_from_cstr(res.c_str()));
+								if( entry ) {
+									shader.buffer_status_map.get_or_create(entry->key, BufferStatus{})->value.read = true;
 								}
 							}
 						}
@@ -326,15 +328,16 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 					// TODO: Distinguish buffer and image pointers when we add
 					// bindless images in the future
 					const auto& res = buffer_ptr_hash_map[ptr_var_id];
-					if (pass->rg->registered_buffer_pointers.find(res) != pass->rg->registered_buffer_pointers.end()) {
-						shader.buffer_status_map[res].read = true;
+					auto entry = pass->rg->registered_buffer_pointers.find(lm::str_from_cstr(res.c_str()));
+					if( entry ) {
+						shader.buffer_status_map.get_or_create(entry->key, BufferStatus{})->value.read = true;
 					}
 				}
 
 				if (variable_map.find(ptr_var_id) != variable_map.end()) {
 					if (is_bound_buffer(variable_map[ptr_var_id].storage_class)) {
 						auto binding = glsl.get_decoration(ptr_var_id, spv::DecorationBinding);
-						shader.resource_binding_map[binding].read = true;
+						shader.resource_binding_map.get_or_create(binding, BindingStatus{})->value.read = true;
 					}
 				}
 
@@ -464,23 +467,25 @@ static std::unordered_map<std::string, shaderc_shader_kind> mstages = {
 	{"rmiss", shaderc_miss_shader},
 };
 
+static void add_macros(const lm::FixedArray<ShaderMacro>& macros, shaderc::CompileOptions& options) {
+	// TODO: FIX!!!
+	// for (const auto& macro : macros) {
+	// 	if (macro.has_val) {
+	// 		options.AddMacroDefinition(macro.name, std::to_string(macro.val));
+
+	// 	} else if (!macro.name.empty()) {
+	// 		options.AddMacroDefinition(macro.name);
+	// 	}
+	// }
+}
+
 static std::vector<u32> compile_file(const std::string& source_name, shaderc_shader_kind kind,
-										  const std::string& source, lm::RenderPass* pass, bool optimize = false) {
+									 const std::string& source, lm::RenderPass* pass, bool optimize = false) {
 	shaderc::Compiler compiler;
 	shaderc::CompileOptions options;
 
-	auto add_macros = [&options](const std::vector<ShaderMacro>& macros) {
-		for (const auto& macro : macros) {
-			if (macro.has_val) {
-				options.AddMacroDefinition(macro.name, std::to_string(macro.val));
-
-			} else if (!macro.name.empty()) {
-				options.AddMacroDefinition(macro.name);
-			}
-		}
-	};
-	add_macros(pass->macro_defines);
-	add_macros(pass->rg->global_macro_defines);
+	add_macros(pass->macro_defines, options);
+	add_macros(pass->rg->global_macro_defines, options);
 	if (optimize) {
 		options.SetOptimizationLevel(shaderc_optimization_level_size);
 	}
@@ -504,24 +509,25 @@ static std::vector<u32> compile_file(const std::string& source_name, shaderc_sha
 }
 #endif
 
-Shader::Shader(const std::string& filename) : filename(filename) {}
+Shader::Shader(const lm::String& filename) : filename(filename) {}
 i32 Shader::compile(lm::RenderPass* pass) {
-	LUMEN_TRACE("Compiling shader: %s", name_with_macros.c_str());
+	// LUMEN_TRACE("Compiling shader: %s", name_with_macros.c_str());
 #if USE_SHADERC
-	std::ifstream fin(filename);
-	std::stringstream buffer;
-	buffer << fin.rdbuf();
-	auto get_ext = [](const std::string& str) -> std::string {
-		auto fnd = str.rfind('.');
-		assert(fnd != std::string::npos);
-		return str.substr(fnd + 1);
-	};
-	buffer << "\n";
-	const auto& str = buffer.str();
-	// Compiling
-	binary = compile_file(filename, mstages[get_ext(filename)], str, pass);
-	parse_shader(*this, binary.data(), binary.size(), pass);
-	return 0;
+	LUMEN_ERROR("Implement me");
+	// std::ifstream fin(filename);
+	// std::stringstream buffer;
+	// buffer << fin.rdbuf();
+	// auto get_ext = [](const std::string& str) -> std::string {
+	// 	auto fnd = str.rfind('.');
+	// 	assert(fnd != std::string::npos);
+	// 	return str.substr(fnd + 1);
+	// };
+	// buffer << "\n";
+	// const auto& str = buffer.str();
+	// // Compiling
+	// binary = compile_file(filename, mstages[get_ext(filename)], str, pass);
+	// parse_shader(*this, binary.data, binary.size, pass);
+	// return 0;
 #else
 	std::string file_path = filename + ".spv";
 #ifdef _DEBUG
@@ -556,8 +562,8 @@ i32 Shader::compile(lm::RenderPass* pass) {
 VkShaderModule Shader::create_vk_shader_module(const VkDevice& device) const {
 	VkShaderModuleCreateInfo shader_module_CI{};
 	shader_module_CI.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	shader_module_CI.codeSize = binary.size() * 4;
-	shader_module_CI.pCode = (u32*)binary.data();
+	shader_module_CI.codeSize = binary.size * 4;
+	shader_module_CI.pCode = (u32*)binary.data;
 	shader_module_CI.pNext = nullptr;
 
 	VkShaderModule shader_module;
@@ -566,4 +572,4 @@ VkShaderModule Shader::create_vk_shader_module(const VkDevice& device) const {
 	}
 	return shader_module;
 }
-}  // namespace lm
+}  // namespace vk

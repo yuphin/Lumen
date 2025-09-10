@@ -220,7 +220,7 @@ struct HashMapProbed {
 	}
 
 	// If the entry doesn't exist, creates it, but doesn't initialize the value
-	HashMapEntry<T1, T2>* get_or_create(const T1& key) {
+	HashMapEntry<T1, T2>* get_or_create(const T1& key, const T2& value = T2{}) {
 		// Assumes the capacity is always a power of two
 		if (num_slots * 100 > capacity * HASH_MAP_LOAD_PERCENTAGE_THRESHOLD) {
 			resize(capacity << 1);
@@ -270,6 +270,14 @@ struct HashMapProbed {
 			probe_inc++;
 		}
 		return nullptr;
+	}
+
+	void clear() {
+		for (u64 i = 0; i < capacity; i++) {
+			data[i].hash = HASH_MAP_HASH_EMPTY;
+		}
+		size = 0;
+		num_slots = 0;
 	}
 
 	struct Iterator {

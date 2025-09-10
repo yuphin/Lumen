@@ -283,12 +283,13 @@ void DDGI::render() {
 		wg_x = probe_counts.x * probe_counts.y;
 		u32 wg_y = probe_counts.z;
 		auto update_probe = [&](bool is_irr) {
+			const char* pipeline_name = is_irr ? "Update Irradiance" : "Update Depth";
 			vk::render_graph()
-				->add_compute(
-					is_irr ? "Update Irradiance" : "Update Depth",
-					{.shader = vk::Shader("src/shaders/integrators/ddgi/update.comp"),
-					 .macros = {is_irr ? vk::ShaderMacro("IRRADIANCE_UPDATE") : vk::ShaderMacro("DEPTH_UPDATE")},
-					 .dims = {wg_x, wg_y}})
+				->add_compute(lm::str_from_cstr(pipeline_name),
+							  {.shader = vk::Shader("src/shaders/integrators/ddgi/update.comp"),
+							   .macros = {is_irr ? lm::fixed_array_init(arena, {vk::ShaderMacro("IRRADIANCE_UPDATE")})
+												 : lm::fixed_array_init(arena, {vk::ShaderMacro("DEPTH_UPDATE")})},
+							   .dims = {wg_x, wg_y}})
 				.push_constants(&pc_ray)
 				.bind({lumen_scene->scene_desc_buffer, irr_texes[!ping_pong], depth_texes[!ping_pong],
 					   irr_texes[ping_pong], depth_texes[ping_pong], ddgi_ubo_buffer, rt.radiance_tex,

@@ -23,4 +23,5 @@ class PostFX {
 	bool enable_bloom = false;
 	f32 bloom_exposure = 1e-5f;
 	f32 bloom_amount = 0.26f;
+	lm::Arena* arena = nullptr;
 };

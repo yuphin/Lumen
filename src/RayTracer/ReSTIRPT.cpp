@@ -246,16 +246,17 @@ void ReSTIRPT::render() {
 	constexpr i32 READ_OR_PREV_IDX = 0;
 	if (enable_photon_mapping) {
 		vk::render_graph()
-			->add_rt("PM - Trace First Diffuse",
-					 {
-						 .shaders = {{"src/shaders/integrators/restir/gris/pm_trace_eye.rgen"},
-									 {"src/shaders/integrators/restir/gris/ray.rmiss"},
-									 {"src/shaders/ray_shadow.rmiss"},
-									 {"src/shaders/integrators/restir/gris/ray.rchit"},
-									 {"src/shaders/ray.rahit"}},
-						 .macros = {vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
-						 .dims = {Window::width(), Window::height()},
-					 })
+			->add_rt(
+				"PM - Trace First Diffuse",
+				{
+					.shaders = {{"src/shaders/integrators/restir/gris/pm_trace_eye.rgen"},
+								{"src/shaders/integrators/restir/gris/ray.rmiss"},
+								{"src/shaders/ray_shadow.rmiss"},
+								{"src/shaders/integrators/restir/gris/ray.rchit"},
+								{"src/shaders/ray.rahit"}},
+					.macros = lm::fixed_array_init(arena, {vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)}),
+					.dims = {Window::width(), Window::height()},
+				})
 			.push_constants(&pc_ray)
 			.bind(common_bindings)
 			.bind(photon_gbuffers[pong])
@@ -292,8 +293,8 @@ void ReSTIRPT::render() {
 									 {"src/shaders/ray_shadow.rmiss"},
 									 {"src/shaders/integrators/restir/gris/ray.rchit"},
 									 {"src/shaders/ray.rahit"}},
-						 .macros = {vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere),
-									vk::ShaderMacro("DISABLE_PM_MIS", !enable_pm_mis)},
+						 .macros = lm::fixed_array_init(arena, {vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere),
+																vk::ShaderMacro("DISABLE_PM_MIS", !enable_pm_mis)}),
 						 .dims = {num_photons, 1},
 					 })
 			.push_constants(&pc_ray)
@@ -318,8 +319,9 @@ void ReSTIRPT::render() {
 										 {"src/shaders/ray_shadow.rmiss"},
 										 {"src/shaders/integrators/restir/gris/ray.rchit"},
 										 {"src/shaders/ray.rahit"}},
-							 .macros = {{"STREAMING_MODE", i32(streaming_method)},
-										vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
+							 .macros =
+								 lm::fixed_array_init(arena, {{"STREAMING_MODE", i32(streaming_method)},
+															  vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)}),
 							 .dims = {Window::width(), Window::height()},
 						 })
 				.push_constants(&pc_ray)
@@ -345,10 +347,11 @@ void ReSTIRPT::render() {
 								 {"src/shaders/ray_shadow.rmiss"},
 								 {"src/shaders/integrators/restir/gris/ray.rchit"},
 								 {"src/shaders/ray.rahit"}},
-					 .macros = {{"STREAMING_MODE", i32(streaming_method)},
-								vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere),
-								vk::ShaderMacro("DISABLE_PM_MIS", !enable_pm_mis),
-								vk::ShaderMacro("ENABLE_PM", enable_photon_gather && enable_photon_mapping)},
+					 .macros = lm::fixed_array_init(
+						 arena, {{"STREAMING_MODE", i32(streaming_method)},
+								 vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere),
+								 vk::ShaderMacro("DISABLE_PM_MIS", !enable_pm_mis),
+								 vk::ShaderMacro("ENABLE_PM", enable_photon_gather && enable_photon_mapping)}),
 					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc_ray)
@@ -456,7 +459,8 @@ void ReSTIRPT::render() {
 										{"src/shaders/ray_shadow.rmiss"},
 										{"src/shaders/integrators/restir/gris/ray.rchit"},
 										{"src/shaders/ray.rahit"}},
-							.macros = {vk::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS", enable_defensive_formulation)},
+							.macros = lm::fixed_array_init(
+								arena, {vk::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS", enable_defensive_formulation)}),
 							.dims = {Window::width(), Window::height()},
 						})
 					.push_constants(&pc_ray)
