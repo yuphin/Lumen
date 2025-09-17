@@ -18,7 +18,7 @@ struct BindingStatus {
 struct Shader {
 	Shader() = default;
 	Shader(const lm::String& filename);
-	lm::Array<u32> binary;
+	std::vector<u32> binary;
 	lm::String filename;
 	lm::String name_with_macros;
 

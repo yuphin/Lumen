@@ -99,7 +99,7 @@ struct HashMapProbed {
 		}
 		u64 processed = 0;
 		u64 scan_idx = 0;
-		HashMapEntry<T1, T2> old_entry;
+		HashMapEntry<T1, T2>* old_entry = nullptr;
 		bool old_entry_found = false;
 		while (processed < old_size) {
 			if (!old_entry_found) {
@@ -108,9 +108,11 @@ struct HashMapProbed {
 						break;
 					}
 				}
-				old_entry = old_data[scan_idx++];
+				old_entry = &old_data[scan_idx++];
 			}
-			old_entry_found = insert_during_resize(&old_entry);
+			if(old_entry) {
+				old_entry_found = insert_during_resize(old_entry);
+			}
 			++processed;
 		}
 		if (!is_different_block && is_sequential) {

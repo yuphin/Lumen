@@ -849,6 +849,8 @@ void load(const lm::String& path) {
 	os::FileProperties props = os::file_properties(file_handle);
 	lm::String file_content = lm::str_reserve(_arena_strings, props.size + 1);
 	os::file_read(file_handle, file_content.data);
+	file_content.data[props.size] = '\0';
+	os::file_close(file_handle);
 	LumenNode* root = file_parse(file_content);
 	if (!root) {
 		LUMEN_ERROR("Failed to parse the file %s", path.data);

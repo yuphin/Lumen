@@ -8,6 +8,8 @@
 #include <glslc/file_includer.h>
 #endif	//  USE_SHADERC
 
+static lm::Arena* _arena_shaders = nullptr;
+
 namespace vk {
 enum class ResourceType { UniformBuffer, StorageBuffer, StorageImage, SampledImage, AccelarationStructure };
 
@@ -461,26 +463,22 @@ static void parse_shader(Shader& shader, const u32* code, u64 code_size, lm::Ren
 
 #if USE_SHADERC
 
-static std::unordered_map<std::string, shaderc_shader_kind> mstages = {
-	{"vert", shaderc_vertex_shader}, {"frag", shaderc_fragment_shader}, {"comp", shaderc_compute_shader},
-	{"rgen", shaderc_raygen_shader}, {"rahit", shaderc_anyhit_shader},	{"rchit", shaderc_closesthit_shader},
-	{"rmiss", shaderc_miss_shader},
-};
+static lm::HashMap<lm::String, shaderc_shader_kind> mstages;
 
 static void add_macros(const lm::FixedArray<ShaderMacro>& macros, shaderc::CompileOptions& options) {
-	// TODO: FIX!!!
-	// for (const auto& macro : macros) {
-	// 	if (macro.has_val) {
-	// 		options.AddMacroDefinition(macro.name, std::to_string(macro.val));
+	// TODO: Remove std::string dependency
+	for (const auto& macro : macros) {
+		if (macro.has_val) {
+			options.AddMacroDefinition(std::string(macro.name.data, macro.name.size), std::to_string(macro.val));
 
-	// 	} else if (!macro.name.empty()) {
-	// 		options.AddMacroDefinition(macro.name);
-	// 	}
-	// }
+		} else if (!macro.name.empty()) {
+			options.AddMacroDefinition(std::string(macro.name.data, macro.name.size));
+		}
+	}
 }
 
-static std::vector<u32> compile_file(const std::string& source_name, shaderc_shader_kind kind,
-									 const std::string& source, lm::RenderPass* pass, bool optimize = false) {
+static std::vector<u32> compile_file(const lm::String& source_name, shaderc_shader_kind kind,
+									 const lm::String& source, lm::RenderPass* pass, bool optimize = false) {
 	shaderc::Compiler compiler;
 	shaderc::CompileOptions options;
 
@@ -497,8 +495,8 @@ static std::vector<u32> compile_file(const std::string& source_name, shaderc_sha
 #if 1
 	options.SetGenerateDebugInfo();
 #endif
-
-	shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(source, kind, source_name.c_str(), options);
+	std::string source_cpp = lm::str_to_cpp_str(source);
+	shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(source_cpp, kind, source_name.data, options);
 
 	if (module.GetCompilationStatus() != shaderc_compilation_status_success) {
 		std::cerr << module.GetErrorMessage();
@@ -511,9 +509,47 @@ static std::vector<u32> compile_file(const std::string& source_name, shaderc_sha
 
 Shader::Shader(const lm::String& filename) : filename(filename) {}
 i32 Shader::compile(lm::RenderPass* pass) {
-	// LUMEN_TRACE("Compiling shader: %s", name_with_macros.c_str());
+	LUMEN_TRACE("Compiling shader: %s", name_with_macros.data);
 #if USE_SHADERC
-	LUMEN_ERROR("Implement me");
+	
+	os::FileHandle file_handle = os::file_open(filename, os::AccessFlag_Read);
+	if(file_handle == 0) {
+		LUMEN_ERROR("Failed to open shader file: %s", filename.data);
+		return -1;
+	}
+	if(!_arena_shaders) {
+		_arena_shaders = lm::arena_create(MB(16));
+	}
+	if(!mstages.arena_node) {
+		mstages = lm::hash_map_create<lm::String, shaderc_shader_kind>(_arena_shaders, 8);
+
+		mstages.insert("vert", shaderc_vertex_shader);
+		mstages.insert("frag", shaderc_fragment_shader);
+		mstages.insert("comp", shaderc_compute_shader);
+		mstages.insert("rgen", shaderc_raygen_shader);
+		mstages.insert("rahit", shaderc_anyhit_shader);
+		mstages.insert("rchit", shaderc_closesthit_shader);
+		mstages.insert("rmiss", shaderc_miss_shader);
+	}
+
+	os::FileProperties file_props = os::file_properties(file_handle);
+
+	lm::ScratchArena scratch(_arena_shaders);
+	lm::String buffer = lm::str_reserve(scratch.arena, file_props.size + 1);
+	os::file_read(file_handle, buffer.data);
+	buffer.data[file_props.size] = '\0';
+	os::file_close(file_handle);
+
+	u64 dot = lm::str_rfind(filename, ".");
+	assert(dot != U64_MAX);
+	u64 ext_len = filename.size - (dot + 1);
+	lm::String file_ext = lm::str_substr(filename, dot + 1, ext_len);
+
+	shaderc_shader_kind stage = mstages.find(file_ext)->value;
+	binary = compile_file(filename, stage, buffer, pass);
+	parse_shader(*this, binary.data(), binary.size(), pass);
+	return 0;
+
 	// std::ifstream fin(filename);
 	// std::stringstream buffer;
 	// buffer << fin.rdbuf();
@@ -562,8 +598,8 @@ i32 Shader::compile(lm::RenderPass* pass) {
 VkShaderModule Shader::create_vk_shader_module(const VkDevice& device) const {
 	VkShaderModuleCreateInfo shader_module_CI{};
 	shader_module_CI.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	shader_module_CI.codeSize = binary.size * 4;
-	shader_module_CI.pCode = (u32*)binary.data;
+	shader_module_CI.codeSize = binary.size() * 4;
+	shader_module_CI.pCode = (u32*)binary.data();
 	shader_module_CI.pNext = nullptr;
 
 	VkShaderModule shader_module;

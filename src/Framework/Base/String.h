@@ -29,7 +29,7 @@ struct String {
 	inline char* end() { return &data[size]; }
 	inline const char* begin() const { return &data[0]; }
 	inline const char* end() const { return &data[size]; }
-	inline bool empty() { return size == 0; }
+	inline bool empty() const { return size == 0; }
 	inline bool is_cstr() const { return data[size - 1] == '\0'; }
 };
 template <size_t N>
@@ -58,7 +58,10 @@ String str_to_lower(Arena* arena, const String& str);
 String str_substr(const String& str, u64 begin, u64 length);
 String str_reserve(Arena* arena, u64 size);
 String str_concat(Arena* arena, const String& str1, const String& str2);
+String str_dup(Arena* arena, const String& str);
+// TODO: remove these
 String str_from_cpp_str(const std::string& str);
+std::string str_to_cpp_str(const lm::String& str); 
 bool str_compare(const String& str1, const String& str2);
 u64 str_rfind(const String& str1, const String& str2);
 u64 str_rfind_any(const String& str1, const String& chars);
@@ -66,8 +69,8 @@ bool str_ends_with(const lm::String& str1, const lm::String& str2);
 i32 str_cmp(const String& str1, const String& str2);
 u64 u64_from_str(const String& str);
 s64 s64_from_str(const String& str);
-u64 u32_from_str(const String& str);
-s64 i32_from_str(const String& str);
+u32 u32_from_str(const String& str);
+i32 i32_from_str(const String& str);
 f64 f64_from_str(const String& str);
 f32 f32_from_str(const String& str);
 

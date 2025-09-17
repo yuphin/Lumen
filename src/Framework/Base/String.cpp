@@ -32,8 +32,20 @@ String str_concat(Arena* arena, const String& str1, const String& str2) {
 	memcpy(result.data + str1.size, str2.data, str2.size);
 	return result;
 }
+
+String str_dup(Arena* arena, const String& str) {
+	String result = {};
+	result.size = str.size;
+	result.data = (char*)arena->allocate(result.size);
+	memcpy(result.data, str.data, str.size);
+	return result;
+}
+
 String str_from_cpp_str(const std::string& str) {
 	return String((char*)str.data(), str.size());
+}
+std::string str_to_cpp_str(const lm::String& str) {
+	return std::string(str.data, str.size);
 }
 
 bool char_is_digit(char c) { return c >= '0' && c <= '9'; }
@@ -135,8 +147,8 @@ s64 s64_from_str(const String& str) {
 	return negative ? -result : result;
 }
 
-u64 u32_from_str(const String& str) { return (u32)u64_from_str(str); }
-s64 i32_from_str(const String& str) { return (i32)s64_from_str(str); }
+u32 u32_from_str(const String& str) { return (u32)u64_from_str(str); }
+i32 i32_from_str(const String& str) { return (i32)s64_from_str(str); }
 
 static String str_from_number(Arena* arena, u64 abs_val, bool negative) {
 	u32 num_chars = 0;

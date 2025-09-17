@@ -23,7 +23,7 @@ namespace lm {
 #define REGISTER_BUFFER_WITH_ADDRESS(struct_type, struct_name, field_name, buffer_ptr, rg) \
 	do {                                                                                   \
 		auto key = std::string(#struct_type) + '_' + std::string(#field_name);             \
-		rg->registered_buffer_pointers.insert(lm::str_from_cpp_str(key), buffer_ptr);  \
+		rg->registered_buffer_pointers.insert(lm::str_from_cpp_str(key), buffer_ptr);      \
 	} while (0)
 
 class RenderGraph;
@@ -39,6 +39,44 @@ struct PipelineStorage {
 	bool update_as_descriptor;
 };
 
+struct BufferSyncResources {
+	lm::FixedArray<VkBufferMemoryBarrier2> buffer_bariers;
+	lm::FixedArray<VkDependencyInfo> dependency_infos;
+};
+struct ImageSyncResources {
+	lm::FixedArray<VkImageMemoryBarrier2> img_barriers;
+	lm::FixedArray<VkDependencyInfo> dependency_infos;
+};
+
+struct BufferBarrier {
+	VkBuffer buffer;
+	VkAccessFlags src_access_flags = VK_ACCESS_SHADER_WRITE_BIT;
+	VkAccessFlags dst_access_flags = VK_ACCESS_SHADER_READ_BIT;
+};
+
+// For now, there is only one set of BLASes to build per pass
+struct BlasBuildData {
+	// The owner is the caller of the blas_build function
+	vk::Buffer** scratch_buffer_ref = nullptr;
+	// For barrier placement
+	std::vector<vk::Buffer*> source_buffers;
+	util::Slice<vk::BVH> blases;
+	std::vector<vk::BlasInput> blas_inputs;
+	VkBuildAccelerationStructureFlagsKHR flags;
+	inline bool is_valid() { return !blases.empty(); }
+};
+
+struct TlasBuildData {
+	vk::BVH* tlas = nullptr;
+	vk::Buffer* instances_buf = nullptr;
+	vk::Buffer** scratch_buffer_ref = nullptr;
+	u32 instance_count = 0;
+	bool build_tlas_after_blas = false;
+	bool update_tlas = false;
+	VkBuildAccelerationStructureFlagsKHR flags;
+	inline bool is_valid() { return instance_count != 0; }
+};
+
 class RenderGraph {
    public:
 	RenderGraph();
@@ -46,6 +84,9 @@ class RenderGraph {
 	RenderPass& add_rt(const lm::String& name, const vk::RTPassSettings& settings);
 	RenderPass& add_gfx(const lm::String& name, const vk::GraphicsPassSettings& settings);
 	RenderPass& add_compute(const lm::String& name, const vk::ComputePassSettings& settings);
+	PipelineStorage* add_pass_impl_common(const lm::String& name, const lm::FixedArray<vk::ShaderMacro>& macros,
+										  const std::vector<u32>& specialization_data, bool& cached,
+										  lm::String& name_with_macros, lm::String& macro_string);
 	void init();
 	void run(VkCommandBuffer cmd);
 	void reset();
@@ -53,56 +94,39 @@ class RenderGraph {
 	void run_and_submit(vk::CommandBuffer& cmd);
 	void destroy();
 	friend RenderPass;
-	bool reload_shaders = false;
-	lm::HashMap<lm::String, vk::Buffer*> registered_buffer_pointers;
-	// vk::Shader Name + Macro String -> vk::Shader
-	lm::HashMap<lm::String, vk::Shader> shader_cache;
-	RenderGraphSettings settings;
-	std::mutex shader_map_mutex;
+
 	lm::FixedArray<vk::ShaderMacro> global_macro_defines;
-
-   private:
-	struct BufferSyncResources {
-		lm::FixedArray<VkBufferMemoryBarrier2> buffer_bariers;
-		lm::FixedArray<VkDependencyInfo> dependency_infos;
-	};
-	struct ImageSyncResources {
-		lm::FixedArray<VkImageMemoryBarrier2> img_barriers;
-		lm::FixedArray<VkDependencyInfo> dependency_infos;
-	};
-
+	lm::FixedArray<std::pair<std::function<void(RenderPass*)>, u32>> pipeline_tasks;
+	lm::FixedArray<std::function<void(RenderPass*)>> shader_tasks;
 	lm::FixedArray<RenderPass> passes;
 
 	// vk::Pipeline Name + Macro String + Specialization Constants -> vk::Pipeline
 	lm::HashMap<u64, PipelineStorage> pipeline_cache;
-	lm::FixedArray<std::pair<std::function<void(RenderPass*)>, u32>> pipeline_tasks;
-	lm::FixedArray<std::function<void(RenderPass*)>> shader_tasks;
-	// Sync related data
-	lm::FixedArray<BufferSyncResources> buffer_sync_resources;
-	lm::FixedArray<ImageSyncResources> img_sync_resources;
 	lm::HashMap<VkBuffer, std::pair<u32, VkAccessFlags>>
 		buffer_resource_map;					 // Buffer handle - { Write Pass Idx, Access Type }
 	lm::HashMap<VkImage, u32> img_resource_map;	 // Tex2D handle - Pass Idx
+	lm::HashMap<lm::String, vk::Buffer*> registered_buffer_pointers;
+	// vk::Shader Name + Macro String -> vk::Shader
+	lm::HashMap<lm::String, vk::Shader> shader_cache;
+
+	RenderGraphSettings settings;
+	std::mutex shader_map_mutex;
 	const bool multithreaded_pipeline_compilation = true;
 	static const u32 INVALID_PASS_IDX = UINT_MAX;
-
-	template <typename Settings>
-	RenderPass& add_pass_impl(const lm::String& name, const Settings& settings);
-
-   private:
 	bool dirty_pass_encountered = false;
+	bool reload_shaders = false;
 };
 
 class RenderPass {
    public:
-    RenderPass() = default;
+	RenderPass() = default;
 	RenderPass(vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
 			   const vk::GraphicsPassSettings& gfx_settings, const lm::String& macro_string,
 			   PipelineStorage* pipeline_storage, bool cached = false);
 
 	RenderPass(vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
-			   const vk::RTPassSettings& rt_settings, const lm::String& macro_string,
-			   PipelineStorage* pipeline_storage, bool cached = false);
+			   const vk::RTPassSettings& rt_settings, const lm::String& macro_string, PipelineStorage* pipeline_storage,
+			   bool cached = false);
 
 	RenderPass(vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
 			   const vk::ComputePassSettings& compute_settings, const lm::String& macro_string,
@@ -183,38 +207,14 @@ class RenderPass {
 
 	lm::FixedArray<Resource> resource_zeros;
 	lm::FixedArray<std::pair<Resource, Resource>> resource_copies;
+	// Sync related data
+	lm::FixedArray<BufferSyncResources> buffer_sync_resources;
+	lm::FixedArray<ImageSyncResources> img_sync_resources;
 
-	struct BufferBarrier {
-		VkBuffer buffer;
-		VkAccessFlags src_access_flags = VK_ACCESS_SHADER_WRITE_BIT;
-		VkAccessFlags dst_access_flags = VK_ACCESS_SHADER_READ_BIT;
-	};
 	lm::FixedArray<BufferBarrier> prefill_buffer_barriers;
 	lm::FixedArray<BufferBarrier> buffer_barriers;
 	lm::FixedArray<BufferBarrier> post_execution_buffer_barriers;
 
-	// For now, there is only one set of BLASes to build per pass
-	struct BlasBuildData {
-		// The owner is the caller of the blas_build function
-		vk::Buffer** scratch_buffer_ref = nullptr;
-		// For barrier placement
-		std::vector<vk::Buffer*> source_buffers;
-		util::Slice<vk::BVH> blases;
-		std::vector<vk::BlasInput> blas_inputs;
-		VkBuildAccelerationStructureFlagsKHR flags;
-		inline bool is_valid() { return !blases.empty(); }
-	};
-
-	struct TlasBuildData {
-		vk::BVH* tlas = nullptr;
-		vk::Buffer* instances_buf = nullptr;
-		vk::Buffer** scratch_buffer_ref = nullptr;
-		u32 instance_count = 0;
-		bool build_tlas_after_blas = false;
-		bool update_tlas = false;
-		VkBuildAccelerationStructureFlagsKHR flags;
-		inline bool is_valid() { return instance_count != 0; }
-	};
 	BlasBuildData blas_build_data;
 	TlasBuildData tlas_build_data;
 
@@ -251,80 +251,6 @@ class RenderPass {
 
 	void run(VkCommandBuffer cmd);
 };
-
-template <typename Settings>
-inline RenderPass& RenderGraph::add_pass_impl(const lm::String& name, const Settings& settings) {
-	// PipelineStorage* pipeline_storage;
-	// bool cached = false;
-
-	// std::string name_with_macros = name;
-	// std::string macro_string;
-
-	// std::vector<vk::ShaderMacro> combined_macros;
-	// if (!settings.macros.empty() || !global_macro_defines.empty()) {
-	// 	macro_string += '(';
-	// }
-
-	// auto populate_macros = [](const std::vector<vk::ShaderMacro>& macros, std::string& macro_string,
-	// 						  bool& prev_nonempty) {
-	// 	for (u64 i = 0; i < macros.size(); i++) {
-	// 		if (!macros[i].visible) {
-	// 			continue;
-	// 		}
-	// 		if (!macros[i].name.empty()) {
-	// 			if (prev_nonempty) {
-	// 				macro_string += ",";
-	// 			}
-	// 			macro_string += macros[i].name;
-	// 			prev_nonempty = true;
-	// 		}
-	// 		if (macros[i].has_val) {
-	// 			macro_string += "=" + std::to_string(macros[i].val);
-	// 		}
-	// 	}
-	// };
-	// bool prev_nonempty = false;
-	// populate_macros(settings.macros, macro_string, prev_nonempty);
-	// populate_macros(global_macro_defines, macro_string, prev_nonempty);
-
-	// if (!settings.macros.empty() || !global_macro_defines.empty()) {
-	// 	macro_string += ')';
-	// }
-	// if (macro_string == "()") {
-	// 	macro_string.clear();
-	// }
-	// name_with_macros += macro_string;
-
-	// u64 hash = 0;
-	// util::hash_combine(hash, name_with_macros);
-	// for (u32 spec_data : settings.specialization_data) {
-	// 	util::hash_combine(hash, spec_data);
-	// }
-
-	// if (auto cache_it = pipeline_cache.find(hash); cache_it != pipeline_cache.end() && !reload_shaders) {
-	// 	pipeline_storage = &cache_it->second;
-	// 	cached = true;
-	// } else {
-	// 	dirty_pass_encountered = true;
-	// 	if (cache_it != pipeline_cache.end()) {
-	// 		vkDeviceWaitIdle(vk::context().device);
-	// 		cache_it->second.pipeline->cleanup();
-	// 	}
-	// 	pipeline_cache[hash] = PipelineStorage(std::make_unique<vk::Pipeline>(name_with_macros));
-	// 	pipeline_storage = &pipeline_cache[hash];
-	// }
-	// vk::PassType type;
-	// if constexpr (std::is_same_v<vk::ComputePassSettings, Settings>) {
-	// 	type = vk::PassType::Compute;
-	// } else if constexpr (std::is_same_v<vk::GraphicsPassSettings, Settings>) {
-	// 	type = vk::PassType::Graphics;
-	// } else {
-	// 	type = vk::PassType::RT;
-	// }
-	// return passes.emplace_back(type, name_with_macros, this, u32(passes.size()), settings, macro_string,
-	// 						   pipeline_storage, cached);
-	return passes.emplace_back();
-}
 
 template <typename T>
 inline RenderPass& RenderPass::push_constants(T* data) {
