@@ -168,7 +168,6 @@ class RenderPass {
 	RenderPass& tlas_build(vk::BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
 						   VkBuildAccelerationStructureFlagsKHR flags, vk::Buffer** scratch_buffer_ref,
 						   bool build_tlas_after_blas = false, bool update_blas = false);
-
 	void finalize();
 	friend RenderGraph;
 
@@ -182,54 +181,47 @@ class RenderPass {
 	PipelineStorage* pipeline_storage = nullptr;
 
    private:
-	lm::String name;
-	i32 next_binding_idx = 0;
-	i32 next_as_binding_idx = 0;
+	lm::FixedArray<Resource> resource_zeros;
+	lm::FixedArray<BufferBarrier> prefill_buffer_barriers;
+	lm::FixedArray<std::pair<Resource, Resource>> resource_copies;
+	BufferSyncResources buffer_sync_resources;
+	ImageSyncResources image_sync_resources;
+	// TODO: Might be redundant?
+	lm::FixedArray<BufferBarrier> carryover_buffer_barriers;
+	// 
+	lm::FixedArray<BufferBarrier> post_execution_buffer_barriers;
+	lm::FixedArray<vk::Buffer*> explicit_buffer_writes;
+	lm::FixedArray<vk::Buffer*> explicit_buffer_reads;
+	lm::FixedArray<vk::Texture*> explicit_tex_writes;
+	lm::FixedArray<vk::Texture*> explicit_tex_reads;
 	lm::FixedArray<u32> descriptor_counts;
-	void* push_constant_data = nullptr;
-	bool is_pipeline_cached = false;
-	bool disable_execution = false;
+	lm::FixedArray<std::tuple<vk::Texture*, VkImageLayout, VkImageLayout>> layout_transitions;
 	/*
-		Note:
-		The assumption is that a SyncDescriptor is unique to a pass (either via
-		Buffer or Image). Which is reasonable because each pass is comprised of a
-		single shader dispatch
+	Note:
+	The assumption is that a SyncDescriptor is unique to a pass (either via
+	Buffer or Image). Which is reasonable because each pass is comprised of a
+	single shader dispatch
 	*/
 	lm::HashMap<VkBuffer, BufferSyncDescriptor> set_signals_buffer;
 	lm::HashMap<VkBuffer, BufferSyncDescriptor> wait_signals_buffer;
-
 	lm::HashMap<VkImage, ImageSyncDescriptor> set_signals_img;
 	lm::HashMap<VkImage, ImageSyncDescriptor> wait_signals_img;
 
+	lm::String name;
+	i32 next_binding_idx = 0;
+	i32 next_as_binding_idx = 0;
+	void* push_constant_data = nullptr;
+	bool is_pipeline_cached = false;
+	bool disable_execution = false;
+	bool resources_initialized = false;
 	vk::DescriptorInfo descriptor_infos[32] = {};
-
-	lm::FixedArray<std::tuple<vk::Texture*, VkImageLayout, VkImageLayout>> layout_transitions;
-
-	lm::FixedArray<Resource> resource_zeros;
-	lm::FixedArray<std::pair<Resource, Resource>> resource_copies;
-	// Sync related data
-	lm::FixedArray<BufferSyncResources> buffer_sync_resources;
-	lm::FixedArray<ImageSyncResources> img_sync_resources;
-
-	lm::FixedArray<BufferBarrier> prefill_buffer_barriers;
-	lm::FixedArray<BufferBarrier> buffer_barriers;
-	lm::FixedArray<BufferBarrier> post_execution_buffer_barriers;
-
 	BlasBuildData blas_build_data;
 	TlasBuildData tlas_build_data;
-
 	RenderPass& read(vk::Texture* tex);
 	RenderPass& read(vk::Buffer* buffer);
 
 	RenderPass& write(vk::Texture* tex);
 	RenderPass& write(vk::Buffer* buffer);
-
-	// When the automatic inference isn't used
-	lm::FixedArray<vk::Buffer*> explicit_buffer_writes;
-	lm::FixedArray<vk::Buffer*> explicit_buffer_reads;
-	lm::FixedArray<vk::Texture*> explicit_tex_writes;
-	lm::FixedArray<vk::Texture*> explicit_tex_reads;
-	//
 
 	void transition_resources();
 	void post_execution_barrier(vk::Buffer* buffer, VkAccessFlags access_flags);

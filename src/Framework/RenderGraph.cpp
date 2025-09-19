@@ -12,6 +12,15 @@ static constexpr u64 MAX_GLOBAL_MACRO_DEFINES = 64;
 static constexpr u64 MAX_PASSES_PER_FRAME = 4096;
 // Max concurrent tasks
 static constexpr u64 MAX_PIPELINE_TASKS = 128;
+////////////////////////////
+// --- Limits for resources in a Render Pass  ---
+static constexpr u64 MAX_RESOURCES_ZEROS = 128;
+static constexpr u64 MAX_RESOURCES_COPIES = 128;
+static constexpr u64 MAX_BUFFER_BARRIERS = 128;
+static constexpr u64 MAX_IMG_BARRIERS = 128;
+static constexpr u64 MAX_EXPLICIT_BUFFER_READ_WRITES = 128;
+static constexpr u64 MAX_EXPLICIT_IMG_READ_WRITES = 128;
+static constexpr u64 MAX_DESCRIPTORS = 32;
 
 namespace lm {
 
@@ -136,7 +145,8 @@ void RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags d
 				LUMEN_ASSERT(dst_access_flags == VK_ACCESS_TRANSFER_WRITE_BIT, "Invalid buffer zero flags");
 				prefill_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
 			} else {
-				buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
+				LUMEN_ASSERT(false, "Unreachable?");
+				carryover_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
 			}
 		}
 	}
@@ -749,8 +759,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	GPUQueryManager::begin(cmd, name.data);
 
 	// Wait: Buffer
-	auto& buffer_sync = buffer_sync_resources[pass_idx];
-	auto& img_sync = img_sync_resources[pass_idx];
+	auto& buffer_sync = buffer_sync_resources;
+	auto& img_sync = image_sync_resources;
 	i32 i = 0;
 	for (const auto& entry : wait_signals_buffer) {
 		VkBuffer buffer = entry.key;
@@ -807,9 +817,9 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	// Buffer barriers
 	{
 		std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
-		if (!buffer_barriers.empty()) {
-			buffer_memory_barriers.reserve(buffer_barriers.size);
-			for (auto& barrier : buffer_barriers) {
+		if (!carryover_buffer_barriers.empty()) {
+			buffer_memory_barriers.reserve(carryover_buffer_barriers.size);
+			for (auto& barrier : carryover_buffer_barriers) {
 				auto curr_stage = pipeline_stage_from_pass_type(type, barrier.src_access_flags);
 				auto dst_stage = pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
 				buffer_memory_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
@@ -1128,6 +1138,46 @@ void RenderGraph::init() {
 	shader_cache = lm::hash_map_create<lm::String, vk::Shader>(_arena_rendergraph, 4 * MAX_PASSES_PER_FRAME);
 }
 void RenderGraph::run(VkCommandBuffer cmd) {
+	////////////////////////////
+	// --- Init pass resources ---
+	for (RenderPass& pass : passes) {
+		if (pass.resources_initialized) {
+			continue;
+		}
+		pass.resource_zeros = lm::fixed_array_create<Resource>(_arena_rendergraph, MAX_RESOURCES_ZEROS);
+		pass.prefill_buffer_barriers = lm::fixed_array_create<BufferBarrier>(_arena_rendergraph, MAX_RESOURCES_ZEROS);
+		pass.resource_copies =
+			lm::fixed_array_create<std::pair<Resource, Resource>>(_arena_rendergraph, MAX_RESOURCES_COPIES);
+		pass.buffer_sync_resources.buffer_bariers =
+			lm::fixed_array_create<VkBufferMemoryBarrier2>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
+		pass.buffer_sync_resources.dependency_infos =
+			lm::fixed_array_create<VkDependencyInfo>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
+		pass.image_sync_resources.img_barriers =
+			lm::fixed_array_create<VkImageMemoryBarrier2>(_arena_rendergraph, MAX_IMG_BARRIERS);
+		pass.image_sync_resources.dependency_infos =
+			lm::fixed_array_create<VkDependencyInfo>(_arena_rendergraph, MAX_IMG_BARRIERS);
+		pass.post_execution_buffer_barriers =
+			lm::fixed_array_create<BufferBarrier>(_arena_rendergraph, MAX_RESOURCES_COPIES);
+		pass.explicit_buffer_writes =
+			lm::fixed_array_create<vk::Buffer*>(_arena_rendergraph, MAX_EXPLICIT_BUFFER_READ_WRITES);
+		pass.explicit_buffer_reads =
+			lm::fixed_array_create<vk::Buffer*>(_arena_rendergraph, MAX_EXPLICIT_BUFFER_READ_WRITES);
+		pass.explicit_tex_writes =
+			lm::fixed_array_create<vk::Texture*>(_arena_rendergraph, MAX_EXPLICIT_IMG_READ_WRITES);
+		pass.explicit_tex_reads =
+			lm::fixed_array_create<vk::Texture*>(_arena_rendergraph, MAX_EXPLICIT_IMG_READ_WRITES);
+		pass.descriptor_counts = lm::fixed_array_create<u32>(_arena_rendergraph, MAX_DESCRIPTORS);
+		pass.layout_transitions = lm::fixed_array_create<std::tuple<vk::Texture*, VkImageLayout, VkImageLayout>>(
+			_arena_rendergraph, MAX_IMG_BARRIERS);
+		
+		pass.set_signals_buffer = lm::hash_map_create<VkBuffer, BufferSyncDescriptor>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
+		pass.wait_signals_buffer = lm::hash_map_create<VkBuffer, BufferSyncDescriptor>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
+		pass.set_signals_img = lm::hash_map_create<VkImage, ImageSyncDescriptor>(_arena_rendergraph, MAX_IMG_BARRIERS);
+		pass.wait_signals_img = lm::hash_map_create<VkImage, ImageSyncDescriptor>(_arena_rendergraph, MAX_IMG_BARRIERS);
+
+		pass.resources_initialized = true;
+	}
+
 	// TODO:
 	// buffer_sync_resources.resize(passes.size);
 	// img_sync_resources.resize(passes.size);
