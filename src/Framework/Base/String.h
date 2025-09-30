@@ -3,6 +3,8 @@ namespace lm {
 struct Arena;
 struct String;
 
+#define CSTR lm::cstr
+
 struct String {
 	char* data = nullptr;
 	u64 size = 0;

@@ -5,17 +5,6 @@
 
 namespace vk {
 
-template <class T>
-static constexpr T align_up(T x, u64 a) noexcept {
-	return T((x + (T(a) - 1)) & ~T(a - 1));
-}
-
-void SBTWrapper::setup(u32 family_idx, const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& rt_props) {
-	queue_idx = family_idx;
-	handle_size = rt_props.shaderGroupHandleSize;
-	handle_alignment = rt_props.shaderGroupHandleAlignment;
-}
-
 void SBTWrapper::destroy() {
 	for (auto& group : group_data) {
 		prm::remove(group.buffer);
@@ -28,62 +17,44 @@ void SBTWrapper::add_indices(VkRayTracingPipelineCreateInfoKHR info) {
 		i = {};
 	};
 	u32 stage_idx = 0;
-	u32 group_offset = stage_idx;
-	for (u32 g = 0; g < info.groupCount; g++) {
-		if (info.pGroups[g].type == VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR) {
+	for (u32 group_idx = 0; group_idx < info.groupCount; group_idx++) {
+		LUMEN_ASSERT(group_idx == stage_idx, "Currently 1 stage = 1 group");
+		if (info.pGroups[group_idx].type == VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR) {
 			if (info.pStages[stage_idx].stage == VK_SHADER_STAGE_RAYGEN_BIT_KHR) {
-				idx_array[GROUP_RAYGEN].push_back(g + group_offset);
+				idx_array[GROUP_RAYGEN].push_back(group_idx);
 				stage_idx++;
 			} else if (info.pStages[stage_idx].stage == VK_SHADER_STAGE_MISS_BIT_KHR) {
-				idx_array[GROUP_MISS].push_back(g + group_offset);
+				idx_array[GROUP_MISS].push_back(group_idx);
 				stage_idx++;
 			} else if (info.pStages[stage_idx].stage == VK_SHADER_STAGE_CALLABLE_BIT_KHR) {
-				idx_array[GROUP_CALLABLE].push_back(g + group_offset);
+				idx_array[GROUP_CALLABLE].push_back(group_idx);
 				stage_idx++;
 			}
 		} else {
-			idx_array[GROUP_HIT].push_back(g + group_offset);
-			if (info.pGroups[g].closestHitShader != VK_SHADER_UNUSED_KHR) stage_idx++;
-			if (info.pGroups[g].anyHitShader != VK_SHADER_UNUSED_KHR) stage_idx++;
-			if (info.pGroups[g].intersectionShader != VK_SHADER_UNUSED_KHR) stage_idx++;
+			// mainly for any hit and closest hit shaders
+			idx_array[GROUP_HIT].push_back(group_idx);
+			if (info.pGroups[group_idx].closestHitShader != VK_SHADER_UNUSED_KHR) stage_idx++;
+			if (info.pGroups[group_idx].anyHitShader != VK_SHADER_UNUSED_KHR) stage_idx++;
+			// if (info.pGroups[group_idx].intersectionShader != VK_SHADER_UNUSED_KHR) stage_idx++;
 		}
 	}
 }
 void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKHR pipeline_info /*= {}*/) {
+	assert(pipeline_info.sType == VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR);
+	u32 group_handle_size = vk::context().rt_props.shaderGroupHandleSize;
+	u32 group_handle_alignment = vk::context().rt_props.shaderGroupHandleAlignment;
+	u32 group_stride = util::align_up_pow2(group_handle_size, group_handle_alignment);
 	for (GroupData& group : group_data) {
 		prm::remove(group.buffer);
+		group.stride = group_stride;
 	}
 
-	u32 total_group_cnt{0};
-	std::vector<u32> group_cnt_per_input;
-	if (pipeline_info.sType == VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR) {
-		add_indices(pipeline_info);
-		group_cnt_per_input.push_back(pipeline_info.groupCount);
-		total_group_cnt += pipeline_info.groupCount;
-	} else {
-		for (auto& i : idx_array) {
-			if (!i.empty()) total_group_cnt = glm::max(total_group_cnt, *std::max_element(std::begin(i), std::end(i)));
-		}
-		total_group_cnt++;
-		group_cnt_per_input.push_back(total_group_cnt);
-	}
-	u32 sbt_size = total_group_cnt * handle_size;
+	add_indices(pipeline_info);
+	u32 sbt_size = pipeline_info.groupCount * group_handle_size;
 	std::vector<u8> shader_handle_storage(sbt_size);
 
-	vk::check(vkGetRayTracingShaderGroupHandlesKHR(vk::context().device, rt_pipeline, 0, total_group_cnt, sbt_size,
-												   shader_handle_storage.data()));
-	auto find_stride = [&](const Entry& entry, u32& stride) {
-		stride = align_up(handle_size, handle_alignment);  // minimum stride
-		for (auto& e : entry) {
-			u32 data_handle_size =
-				align_up(static_cast<u32>(handle_size + e.second.size() * sizeof(u8)), handle_alignment);
-			stride = glm::max(stride, data_handle_size);
-		}
-	};
-	find_stride(group_data[GROUP_RAYGEN].handle_alignment, group_data[GROUP_RAYGEN].stride);
-	find_stride(group_data[GROUP_MISS].handle_alignment, group_data[GROUP_MISS].stride);
-	find_stride(group_data[GROUP_HIT].handle_alignment, group_data[GROUP_HIT].stride);
-	find_stride(group_data[GROUP_CALLABLE].handle_alignment, group_data[GROUP_CALLABLE].stride);
+	vk::check(vkGetRayTracingShaderGroupHandlesKHR(vk::context().device, rt_pipeline, 0, pipeline_info.groupCount,
+												   sbt_size, shader_handle_storage.data()));
 
 	std::array<std::vector<u8>, 4> stage;
 	stage[GROUP_RAYGEN] = std::vector<u8>(group_data[GROUP_RAYGEN].stride * index_count(GROUP_RAYGEN));
@@ -91,31 +62,19 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 	stage[GROUP_HIT] = std::vector<u8>(group_data[GROUP_HIT].stride * index_count(GROUP_HIT));
 	stage[GROUP_CALLABLE] = std::vector<u8>(group_data[GROUP_CALLABLE].stride * index_count(GROUP_CALLABLE));
 
-	auto copy_handles = [&](std::vector<u8>& stage_buffer, std::vector<u32>& indices, u32 stride,
-							auto& data) {
+	auto copy_handles = [&](std::vector<u8>& stage_buffer, std::vector<u32>& indices, u32 stride) {
 		auto* pbuffer = stage_buffer.data();
 		for (u32 index = 0; index < static_cast<u32>(indices.size()); index++) {
 			auto* pstart = pbuffer;
-			// Copy the handle
-			memcpy(pbuffer, shader_handle_storage.data() + (indices[index] * handle_size), handle_size);
-			// If there is data for this group index, copy it too
-			auto it = data.find(index);
-			if (it != std::end(data)) {
-				pbuffer += handle_size;
-				memcpy(pbuffer, it->second.data(), it->second.size() * sizeof(u8));
-			}
-			pbuffer = pstart + stride;	// Jumping to next group
+			memcpy(pbuffer, shader_handle_storage.data() + (indices[index] * group_handle_size), group_handle_size);
+			pbuffer = pstart + stride;
 		}
 	};
 
-	copy_handles(stage[GROUP_RAYGEN], idx_array[GROUP_RAYGEN], group_data[GROUP_RAYGEN].stride,
-				 group_data[GROUP_RAYGEN].handle_alignment);
-	copy_handles(stage[GROUP_MISS], idx_array[GROUP_MISS], group_data[GROUP_MISS].stride,
-				 group_data[GROUP_MISS].handle_alignment);
-	copy_handles(stage[GROUP_HIT], idx_array[GROUP_HIT], group_data[GROUP_HIT].stride,
-				 group_data[GROUP_HIT].handle_alignment);
-	copy_handles(stage[GROUP_CALLABLE], idx_array[GROUP_CALLABLE], group_data[GROUP_CALLABLE].stride,
-				 group_data[GROUP_CALLABLE].handle_alignment);
+	copy_handles(stage[GROUP_RAYGEN], idx_array[GROUP_RAYGEN], group_data[GROUP_RAYGEN].stride);
+	copy_handles(stage[GROUP_MISS], idx_array[GROUP_MISS], group_data[GROUP_MISS].stride);
+	copy_handles(stage[GROUP_HIT], idx_array[GROUP_HIT], group_data[GROUP_HIT].stride);
+	copy_handles(stage[GROUP_CALLABLE], idx_array[GROUP_CALLABLE], group_data[GROUP_CALLABLE].stride);
 
 	VkBufferUsageFlags usage_flags =
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;

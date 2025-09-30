@@ -36,13 +36,13 @@ void Path::render() {
 	pc_ray.frame_num = frame_num;
 	pc_ray.direct_lighting = direct_lighting;
 	vk::render_graph()
-		->add_rt("Path",
+		->add_rt(CSTR("Path"),
 				 {
-					 .shaders = {{"src/shaders/integrators/path/path.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
+					 .shaders = {{CSTR("src/shaders/integrators/path/path.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc_ray)

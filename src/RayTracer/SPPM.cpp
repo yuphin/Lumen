@@ -116,13 +116,13 @@ void SPPM::render() {
 
 	// Trace rays from eye
 	vk::render_graph()
-		->add_rt("SPPM - Eye",
+		->add_rt(CSTR("SPPM - Eye"),
 				 {
-					 .shaders = {{"src/shaders/integrators/sppm/sppm_eye.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
+					 .shaders = {{CSTR("src/shaders/integrators/sppm/sppm_eye.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc_ray)
@@ -133,23 +133,23 @@ void SPPM::render() {
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
 	// Calculate scene bbox given the calculated radius
-	op_reduce("OpReduce: Max", "src/shaders/integrators/sppm/max.comp", "OpReduce: Reduce Max",
-			  "src/shaders/integrators/sppm/reduce_max.comp");
-	op_reduce("OpReduce: Min", "src/shaders/integrators/sppm/min.comp", "OpReduce: Reduce Min",
-			  "src/shaders/integrators/sppm/reduce_min.comp");
+	op_reduce(CSTR("OpReduce: Max"), CSTR("src/shaders/integrators/sppm/max.comp"), "OpReduce: Reduce Max",
+			  CSTR("src/shaders/integrators/sppm/reduce_max.comp"));
+	op_reduce(CSTR("OpReduce: Min"), CSTR("src/shaders/integrators/sppm/min.comp"), "OpReduce: Reduce Min",
+			  CSTR("src/shaders/integrators/sppm/reduce_min.comp"));
 	vk::render_graph()
-		->add_compute("Bounds Calculation",
-					  {.shader = vk::Shader("src/shaders/integrators/sppm/calc_bounds.comp"), .dims = {1, 1, 1}})
+		->add_compute(CSTR("Bounds Calculation"),
+					  {.shader = vk::Shader(CSTR("src/shaders/integrators/sppm/calc_bounds.comp")), .dims = {1, 1, 1}})
 		.bind(lumen_scene->scene_desc_buffer);
 	// Trace from light
 	vk::render_graph()
-		->add_rt("SPPM - Light",
+		->add_rt(CSTR("SPPM - Light"),
 				 {
-					 .shaders = {{"src/shaders/integrators/sppm/sppm_light.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
+					 .shaders = {{CSTR("src/shaders/integrators/sppm/sppm_light.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc_ray)
@@ -159,14 +159,14 @@ void SPPM::render() {
 		.bind_tlas(tlas);
 	// Gather
 	vk::render_graph()
-		->add_compute("Gather", {.shader = vk::Shader("src/shaders/integrators/sppm/gather.comp"),
+		->add_compute(CSTR("Gather"), {.shader = vk::Shader(CSTR("src/shaders/integrators/sppm/gather.comp")),
 								 .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer)
 		.bind_texture_array(lumen_scene->scene_textures);
 	// Composite
 	vk::render_graph()
-		->add_compute("Composite", {.shader = vk::Shader("src/shaders/integrators/sppm/composite.comp"),
+		->add_compute(CSTR("Composite"), {.shader = vk::Shader(CSTR("src/shaders/integrators/sppm/composite.comp")),
 									.dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});

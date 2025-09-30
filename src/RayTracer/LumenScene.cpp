@@ -380,7 +380,7 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 	for (LumenNode* mesh_node = meshes_node->child; mesh_node; mesh_node = next_node(mesh_node), mesh_idx++) {
 		lm::ScratchArena scratch = _arena_strings;
 		lm::String relative_mesh_file =
-			lm::str_to_cstr(scratch.arena, get_or_default_str(get_node(mesh_node, "name"), lm::cstr("")));
+			lm::str_to_cstr(scratch.arena, get_or_default_str(get_node(mesh_node, "name"), CSTR("")));
 		lm::String mesh_file = lm::str_concat(scratch.arena, path_root, relative_mesh_file);
 		fastObjMesh* obj = fast_obj_read(mesh_file.data);
 		mesh_to_obj_map.insert(mesh_idx, obj);

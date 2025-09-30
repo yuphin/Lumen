@@ -32,8 +32,6 @@ class RenderPass;
 struct PipelineStorage {
 	vk::Pipeline pipeline;
 	lm::FixedArray<ResourceBinding> bound_resources;
-	// vk::BVH as_bindings[vk::MAX_AS_BINDING_COUNT];
-	// std::array<vk::BVH, vk::MAX_AS_BINDING_COUNT> as_bindings;
 	lm::FixedArray<vk::BVH> as_bindings;
 	lm::HashMap<lm::String, vk::BufferStatus> affected_buffer_pointers;
 	bool update_as_descriptor;
@@ -111,7 +109,7 @@ class RenderGraph {
 
 	RenderGraphSettings settings;
 	std::mutex shader_map_mutex;
-	const bool multithreaded_pipeline_compilation = true;
+	const bool multithreaded_pipeline_compilation = false;
 	static const u32 INVALID_PASS_IDX = UINT_MAX;
 	bool dirty_pass_encountered = false;
 	bool reload_shaders = false;
@@ -120,18 +118,7 @@ class RenderGraph {
 class RenderPass {
    public:
 	RenderPass() = default;
-	RenderPass(vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
-			   const vk::GraphicsPassSettings& gfx_settings, const lm::String& macro_string,
-			   PipelineStorage* pipeline_storage, bool cached = false);
-
-	RenderPass(vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
-			   const vk::RTPassSettings& rt_settings, const lm::String& macro_string, PipelineStorage* pipeline_storage,
-			   bool cached = false);
-
-	RenderPass(vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
-			   const vk::ComputePassSettings& compute_settings, const lm::String& macro_string,
-			   PipelineStorage* pipeline_storage, bool cached = false);
-
+	
 	RenderPass& bind(const ResourceBinding& binding);
 	RenderPass& bind_texture_with_sampler(vk::Texture* tex, VkSampler sampler);
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
@@ -168,6 +155,7 @@ class RenderPass {
 	RenderPass& tlas_build(vk::BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
 						   VkBuildAccelerationStructureFlagsKHR flags, vk::Buffer** scratch_buffer_ref,
 						   bool build_tlas_after_blas = false, bool update_blas = false);
+	void init();
 	void finalize();
 	friend RenderGraph;
 
@@ -179,6 +167,8 @@ class RenderPass {
 	std::unique_ptr<vk::ComputePassSettings> compute_settings = nullptr;
 	lm::FixedArray<vk::ShaderMacro> macro_defines;
 	PipelineStorage* pipeline_storage = nullptr;
+	lm::String name;
+	bool is_pipeline_cached = false;
 
    private:
 	lm::FixedArray<Resource> resource_zeros;
@@ -188,7 +178,7 @@ class RenderPass {
 	ImageSyncResources image_sync_resources;
 	// TODO: Might be redundant?
 	lm::FixedArray<BufferBarrier> carryover_buffer_barriers;
-	// 
+	//
 	lm::FixedArray<BufferBarrier> post_execution_buffer_barriers;
 	lm::FixedArray<vk::Buffer*> explicit_buffer_writes;
 	lm::FixedArray<vk::Buffer*> explicit_buffer_reads;
@@ -206,17 +196,16 @@ class RenderPass {
 	lm::HashMap<VkBuffer, BufferSyncDescriptor> wait_signals_buffer;
 	lm::HashMap<VkImage, ImageSyncDescriptor> set_signals_img;
 	lm::HashMap<VkImage, ImageSyncDescriptor> wait_signals_img;
+	BlasBuildData blas_build_data;
+	TlasBuildData tlas_build_data;
 
-	lm::String name;
 	i32 next_binding_idx = 0;
 	i32 next_as_binding_idx = 0;
 	void* push_constant_data = nullptr;
-	bool is_pipeline_cached = false;
 	bool disable_execution = false;
 	bool resources_initialized = false;
 	vk::DescriptorInfo descriptor_infos[32] = {};
-	BlasBuildData blas_build_data;
-	TlasBuildData tlas_build_data;
+
 	RenderPass& read(vk::Texture* tex);
 	RenderPass& read(vk::Buffer* buffer);
 
@@ -244,11 +233,24 @@ class RenderPass {
 	void run(VkCommandBuffer cmd);
 };
 
+void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
+						 const vk::GraphicsPassSettings& gfx_settings, const lm::String& macro_string,
+						 PipelineStorage* pipeline_storage, bool cached = false);
+
+void render_pass_init_rt(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
+						 const vk::RTPassSettings& rt_settings, const lm::String& macro_string,
+						 PipelineStorage* pipeline_storage, bool cached = false);
+
+void render_pass_init_compute(RenderPass&, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
+							  const vk::ComputePassSettings& compute_settings, const lm::String& macro_string,
+							  PipelineStorage* pipeline_storage, bool cached = false);
 template <typename T>
 inline RenderPass& RenderPass::push_constants(T* data) {
-	if (!push_constant_data) {
-		push_constant_data = malloc(sizeof(T));
-	}
+	push_constant_data = malloc(sizeof(T));
+	// TODO
+	// if (!push_constant_data) {
+	// 	push_constant_data = malloc(sizeof(T));
+	// }
 	memcpy(push_constant_data, data, sizeof(T));
 	return *this;
 }

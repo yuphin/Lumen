@@ -17,16 +17,17 @@ static constexpr u64 MAX_PIPELINE_TASKS = 128;
 static constexpr u64 MAX_RESOURCES_ZEROS = 128;
 static constexpr u64 MAX_RESOURCES_COPIES = 128;
 static constexpr u64 MAX_BUFFER_BARRIERS = 128;
+static constexpr u64 MAX_DESCRIPTORS = 32;
 static constexpr u64 MAX_IMG_BARRIERS = 128;
 static constexpr u64 MAX_EXPLICIT_BUFFER_READ_WRITES = 128;
 static constexpr u64 MAX_EXPLICIT_IMG_READ_WRITES = 128;
-static constexpr u64 MAX_DESCRIPTORS = 32;
 
 namespace lm {
 
 static lm::Arena* _arena_rendergraph = nullptr;
+static lm::Arena* _arena_strings = nullptr;
 
-// TODO: make sure render pass name is cstr
+// TODO: Investigate get_or_create behavior
 // TODO: Ensure shader name_with_macros is cstr
 
 static VkPipelineStageFlags pipeline_stage_from_pass_type(vk::PassType pass_type, VkAccessFlags access_flags) {
@@ -61,53 +62,6 @@ static bool is_read_flag(VkAccessFlags flags) {
 		   (VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR);
 }
 
-RenderPass::RenderPass(vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
-					   const vk::GraphicsPassSettings& gfx_settings, const lm::String& macro_string,
-					   PipelineStorage* pipeline_storage, bool cached)
-	: type(type),
-	  rg(rg),
-	  pass_idx(pass_idx),
-	  gfx_settings(std::make_unique<vk::GraphicsPassSettings>(gfx_settings)),
-	  macro_defines(gfx_settings.macros),
-	  pipeline_storage(pipeline_storage),
-	  name(name),
-	  is_pipeline_cached(cached) {
-	for (auto& shader : this->gfx_settings->shaders) {
-		shader.name_with_macros = lm::str_concat(_arena_rendergraph, shader.filename, macro_string);
-	}
-}
-
-RenderPass::RenderPass(vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
-					   const vk::RTPassSettings& rt_settings, const lm::String& macro_string,
-					   PipelineStorage* pipeline_storage, bool cached)
-	: type(type),
-	  rg(rg),
-	  pass_idx(pass_idx),
-	  rt_settings(std::make_unique<vk::RTPassSettings>(rt_settings)),
-	  macro_defines(rt_settings.macros),
-	  pipeline_storage(pipeline_storage),
-	  name(name),
-	  is_pipeline_cached(cached) {
-	for (auto& shader : this->rt_settings->shaders) {
-		shader.name_with_macros = lm::str_concat(_arena_rendergraph, shader.filename, macro_string);
-	}
-}
-
-RenderPass::RenderPass(vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
-					   const vk::ComputePassSettings& compute_settings, const lm::String& macro_string,
-					   PipelineStorage* pipeline_storage, bool cached)
-	: type(type),
-	  rg(rg),
-	  pass_idx(pass_idx),
-	  compute_settings(std::make_unique<vk::ComputePassSettings>(compute_settings)),
-	  macro_defines(compute_settings.macros),
-	  pipeline_storage(pipeline_storage),
-	  name(name),
-	  is_pipeline_cached(cached) {
-	this->compute_settings->shader.name_with_macros =
-		lm::str_concat(_arena_rendergraph, compute_settings.shader.filename, macro_string);
-}
-
 void RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags dst_access_flags,
 									   BufferSyncFlags flags) {
 	// Invariant : Pass with lower index should be the setter before the cmd buffer submission
@@ -123,16 +77,16 @@ void RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags d
 	// However when multiple cmd buffers are in flight, we must still ensure the synchronization
 	if (opposing_pass_idx < rg->passes.size && opposing_pass_idx < pass_idx) {
 		RenderPass& opposing_pass = rg->passes[opposing_pass_idx];
-		wait_signals_buffer.get_or_create(buffer->handle, BufferSyncDescriptor{
-															  .src_access_flags = src_access_flags,
-															  .dst_access_flags = dst_access_flags,
-															  .opposing_pass_idx = opposing_pass.pass_idx,
-														  });
-		opposing_pass.set_signals_buffer.get_or_create(buffer->handle, BufferSyncDescriptor{
-																		   .src_access_flags = src_access_flags,
-																		   .dst_access_flags = dst_access_flags,
-																		   .opposing_pass_idx = pass_idx,
-																	   });
+		wait_signals_buffer.insert(buffer->handle, BufferSyncDescriptor{
+													   .src_access_flags = src_access_flags,
+													   .dst_access_flags = dst_access_flags,
+													   .opposing_pass_idx = opposing_pass.pass_idx,
+												   });
+		opposing_pass.set_signals_buffer.insert(buffer->handle, BufferSyncDescriptor{
+																	.src_access_flags = src_access_flags,
+																	.dst_access_flags = dst_access_flags,
+																	.opposing_pass_idx = pass_idx,
+																});
 	} else {
 		if (flags == BufferSyncFlags::BUFFER_COPY || flags == BufferSyncFlags::BUFFER_AS_BUILD) {
 			// Resource copies happens after the pass execution
@@ -177,19 +131,19 @@ void RenderPass::register_dependencies(vk::Texture* tex, VkImageLayout dst_layou
 	} else if (img_resource_entry->value < rg->passes.size) {
 		RenderPass& opposing_pass = rg->passes[img_resource_entry->value];
 		if (opposing_pass.pass_idx < pass_idx) {
-			wait_signals_img.get_or_create(tex->handle, ImageSyncDescriptor{
-															.old_layout = tex->layout,
-															.new_layout = dst_layout,
-															.opposing_pass_idx = opposing_pass.pass_idx,
-															.image_aspect = tex->aspect_flags,
-														});
+			wait_signals_img.insert(tex->handle, ImageSyncDescriptor{
+													 .old_layout = tex->layout,
+													 .new_layout = dst_layout,
+													 .opposing_pass_idx = opposing_pass.pass_idx,
+													 .image_aspect = tex->aspect_flags,
+												 });
 
-			opposing_pass.set_signals_img.get_or_create(tex->handle, ImageSyncDescriptor{
-																		 .old_layout = tex->layout,
-																		 .new_layout = dst_layout,
-																		 .opposing_pass_idx = pass_idx,
-																		 .image_aspect = tex->aspect_flags,
-																	 });
+			opposing_pass.set_signals_img.insert(tex->handle, ImageSyncDescriptor{
+																  .old_layout = tex->layout,
+																  .new_layout = dst_layout,
+																  .opposing_pass_idx = pass_idx,
+																  .image_aspect = tex->aspect_flags,
+															  });
 			tex->layout = dst_layout;
 		} else if (tex->layout != dst_layout) {
 			// Means the opposing pass has already executed
@@ -304,8 +258,7 @@ static void process_bindless_resources(RenderPass* pass, vk::Shader& shader) {
 		return;
 	}
 	for (const auto& entry : shader.buffer_status_map) {
-		vk::BufferStatus status = entry.value;
-		pass->pipeline_storage->affected_buffer_pointers.get_or_create(entry.key, status);
+		pass->pipeline_storage->affected_buffer_pointers.insert(entry.key, entry.value);
 	}
 }
 
@@ -417,9 +370,17 @@ RenderPass& RenderGraph::add_rt(const lm::String& name, const vk::RTPassSettings
 	lm::String macro_string;
 	PipelineStorage* pipeline_storage = add_pass_impl_common(name, settings.macros, settings.specialization_data,
 															 cached, name_with_macros, macro_string);
+	if (!pipeline_storage->as_bindings.initialized()) {
+		pipeline_storage->as_bindings = lm::fixed_array_create<vk::BVH>(_arena_rendergraph, vk::MAX_AS_BINDING_COUNT);
+	}
 	vk::PassType type = vk::PassType::RT;
-	return passes.emplace_back(type, name_with_macros, this, (u32)passes.size, settings, macro_string, pipeline_storage,
-							   cached);
+	RenderPass& pass = passes.push();
+	if(!pass.name.empty() && !lm::str_compare(name, pass.name)) {
+		int a = 4;
+	}
+	render_pass_init_rt(pass, type, name_with_macros, this, (u32)passes.size - 1, settings, macro_string,
+						pipeline_storage, cached);
+	return pass;
 }
 
 RenderPass& RenderGraph::add_gfx(const lm::String& name, const vk::GraphicsPassSettings& settings) {
@@ -429,8 +390,10 @@ RenderPass& RenderGraph::add_gfx(const lm::String& name, const vk::GraphicsPassS
 	PipelineStorage* pipeline_storage = add_pass_impl_common(name, settings.macros, settings.specialization_data,
 															 cached, name_with_macros, macro_string);
 	vk::PassType type = vk::PassType::Graphics;
-	return passes.emplace_back(type, name_with_macros, this, (u32)passes.size, settings, macro_string, pipeline_storage,
-							   cached);
+	RenderPass& pass = passes.push();
+	render_pass_init_gfx(pass, type, name_with_macros, this, (u32)passes.size - 1, settings, macro_string,
+						 pipeline_storage, cached);
+	return pass;
 }
 
 RenderPass& RenderGraph::add_compute(const lm::String& name, const vk::ComputePassSettings& settings) {
@@ -439,9 +402,44 @@ RenderPass& RenderGraph::add_compute(const lm::String& name, const vk::ComputePa
 	lm::String macro_string;
 	PipelineStorage* pipeline_storage = add_pass_impl_common(name, settings.macros, settings.specialization_data,
 															 cached, name_with_macros, macro_string);
+
 	vk::PassType type = vk::PassType::Compute;
-	return passes.emplace_back(type, name_with_macros, this, (u32)passes.size, settings, macro_string, pipeline_storage,
-							   cached);
+	RenderPass& pass = passes.push();
+	render_pass_init_compute(pass, type, name_with_macros, this, (u32)passes.size - 1, settings, macro_string,
+							 pipeline_storage, cached);
+	return pass;
+}
+
+void RenderPass::init() {
+	if (resources_initialized) {
+		return;
+	}
+
+	resource_zeros = lm::fixed_array_create<Resource>(_arena_rendergraph, MAX_RESOURCES_ZEROS);
+	prefill_buffer_barriers = lm::fixed_array_create<BufferBarrier>(_arena_rendergraph, MAX_RESOURCES_ZEROS);
+	resource_copies = lm::fixed_array_create<std::pair<Resource, Resource>>(_arena_rendergraph, MAX_RESOURCES_COPIES);
+	buffer_sync_resources.buffer_bariers =
+		lm::fixed_array_create<VkBufferMemoryBarrier2>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
+	buffer_sync_resources.dependency_infos =
+		lm::fixed_array_create<VkDependencyInfo>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
+	image_sync_resources.img_barriers =
+		lm::fixed_array_create<VkImageMemoryBarrier2>(_arena_rendergraph, MAX_IMG_BARRIERS);
+	image_sync_resources.dependency_infos =
+		lm::fixed_array_create<VkDependencyInfo>(_arena_rendergraph, MAX_IMG_BARRIERS);
+	post_execution_buffer_barriers = lm::fixed_array_create<BufferBarrier>(_arena_rendergraph, MAX_RESOURCES_COPIES);
+	explicit_buffer_writes = lm::fixed_array_create<vk::Buffer*>(_arena_rendergraph, MAX_EXPLICIT_BUFFER_READ_WRITES);
+	explicit_buffer_reads = lm::fixed_array_create<vk::Buffer*>(_arena_rendergraph, MAX_EXPLICIT_BUFFER_READ_WRITES);
+	explicit_tex_writes = lm::fixed_array_create<vk::Texture*>(_arena_rendergraph, MAX_EXPLICIT_IMG_READ_WRITES);
+	explicit_tex_reads = lm::fixed_array_create<vk::Texture*>(_arena_rendergraph, MAX_EXPLICIT_IMG_READ_WRITES);
+	descriptor_counts = lm::fixed_array_create<u32>(_arena_rendergraph, MAX_DESCRIPTORS);
+	layout_transitions = lm::fixed_array_create<std::tuple<vk::Texture*, VkImageLayout, VkImageLayout>>(
+		_arena_rendergraph, MAX_IMG_BARRIERS);
+	set_signals_buffer = lm::hash_map_create<VkBuffer, BufferSyncDescriptor>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
+	wait_signals_buffer = lm::hash_map_create<VkBuffer, BufferSyncDescriptor>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
+	set_signals_img = lm::hash_map_create<VkImage, ImageSyncDescriptor>(_arena_rendergraph, MAX_IMG_BARRIERS);
+	wait_signals_img = lm::hash_map_create<VkImage, ImageSyncDescriptor>(_arena_rendergraph, MAX_IMG_BARRIERS);
+
+	resources_initialized = true;
 }
 
 RenderPass& RenderPass::bind(const ResourceBinding& binding) {
@@ -833,7 +831,6 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 	// Wait: Images
 	wait_events.clear();
-	i = 0;
 	for (const auto& entry : wait_signals_img) {
 		VkImage image = entry.key;
 		const ImageSyncDescriptor& v = entry.value;
@@ -845,14 +842,13 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		auto dst_access_flags = vk::access_flags_for_img_layout(v.new_layout);
 		auto src_stage = pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, src_access_flags);
 		auto dst_stage = pipeline_stage_from_pass_type(type, dst_access_flags);
-		img_sync.img_barriers[i] =
+		VkImageMemoryBarrier2& img_barrier = img_sync.img_barriers.emplace_back(
 			vk::image_barrier2(entry.key, src_access_flags, dst_access_flags, v.old_layout, v.new_layout,
-							   v.image_aspect, src_stage, dst_stage, vk::context().queue_indices.gfx_family.value());
-		img_sync.dependency_infos[i] = vk::dependency_info(1, &img_sync.img_barriers[i]);
+							   v.image_aspect, src_stage, dst_stage, vk::context().queue_indices.gfx_family.value()));
+		img_sync.dependency_infos.emplace_back(vk::dependency_info(1, &img_barrier));
 		if (use_events) {
 			wait_events.push_back(rg->passes[v.opposing_pass_idx].set_signals_img.find(image)->value.event);
 		}
-		i++;
 	}
 
 	if (wait_events.size()) {
@@ -1120,6 +1116,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 void RenderGraph::init() {
 	if (!_arena_rendergraph) {
 		_arena_rendergraph = lm::arena_create(GB(1), KB(64));
+		_arena_strings = lm::arena_create(MB(16), KB(64));
 	}
 	// Arrays
 	passes = lm::fixed_array_create<RenderPass>(_arena_rendergraph, MAX_PASSES_PER_FRAME);
@@ -1128,7 +1125,7 @@ void RenderGraph::init() {
 																							  MAX_PIPELINE_TASKS);
 	shader_tasks = lm::fixed_array_create<std::function<void(RenderPass*)>>(_arena_rendergraph, 4 * MAX_PIPELINE_TASKS);
 	// Hashmaps
-	// Sizes are reasonable upper bounds but not -hard- bounds unlike arrays
+	// Sizes are reasonable upper bounds but not hard bounds unlike arrays
 	pipeline_cache = lm::hash_map_create<u64, PipelineStorage>(_arena_rendergraph, MAX_PASSES_PER_FRAME);
 	buffer_resource_map =
 		lm::hash_map_create<VkBuffer, std::pair<u32, VkAccessFlags>>(_arena_rendergraph, 32 * MAX_PASSES_PER_FRAME);
@@ -1138,50 +1135,6 @@ void RenderGraph::init() {
 	shader_cache = lm::hash_map_create<lm::String, vk::Shader>(_arena_rendergraph, 4 * MAX_PASSES_PER_FRAME);
 }
 void RenderGraph::run(VkCommandBuffer cmd) {
-	////////////////////////////
-	// --- Init pass resources ---
-	for (RenderPass& pass : passes) {
-		if (pass.resources_initialized) {
-			continue;
-		}
-		pass.resource_zeros = lm::fixed_array_create<Resource>(_arena_rendergraph, MAX_RESOURCES_ZEROS);
-		pass.prefill_buffer_barriers = lm::fixed_array_create<BufferBarrier>(_arena_rendergraph, MAX_RESOURCES_ZEROS);
-		pass.resource_copies =
-			lm::fixed_array_create<std::pair<Resource, Resource>>(_arena_rendergraph, MAX_RESOURCES_COPIES);
-		pass.buffer_sync_resources.buffer_bariers =
-			lm::fixed_array_create<VkBufferMemoryBarrier2>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
-		pass.buffer_sync_resources.dependency_infos =
-			lm::fixed_array_create<VkDependencyInfo>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
-		pass.image_sync_resources.img_barriers =
-			lm::fixed_array_create<VkImageMemoryBarrier2>(_arena_rendergraph, MAX_IMG_BARRIERS);
-		pass.image_sync_resources.dependency_infos =
-			lm::fixed_array_create<VkDependencyInfo>(_arena_rendergraph, MAX_IMG_BARRIERS);
-		pass.post_execution_buffer_barriers =
-			lm::fixed_array_create<BufferBarrier>(_arena_rendergraph, MAX_RESOURCES_COPIES);
-		pass.explicit_buffer_writes =
-			lm::fixed_array_create<vk::Buffer*>(_arena_rendergraph, MAX_EXPLICIT_BUFFER_READ_WRITES);
-		pass.explicit_buffer_reads =
-			lm::fixed_array_create<vk::Buffer*>(_arena_rendergraph, MAX_EXPLICIT_BUFFER_READ_WRITES);
-		pass.explicit_tex_writes =
-			lm::fixed_array_create<vk::Texture*>(_arena_rendergraph, MAX_EXPLICIT_IMG_READ_WRITES);
-		pass.explicit_tex_reads =
-			lm::fixed_array_create<vk::Texture*>(_arena_rendergraph, MAX_EXPLICIT_IMG_READ_WRITES);
-		pass.descriptor_counts = lm::fixed_array_create<u32>(_arena_rendergraph, MAX_DESCRIPTORS);
-		pass.layout_transitions = lm::fixed_array_create<std::tuple<vk::Texture*, VkImageLayout, VkImageLayout>>(
-			_arena_rendergraph, MAX_IMG_BARRIERS);
-		
-		pass.set_signals_buffer = lm::hash_map_create<VkBuffer, BufferSyncDescriptor>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
-		pass.wait_signals_buffer = lm::hash_map_create<VkBuffer, BufferSyncDescriptor>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
-		pass.set_signals_img = lm::hash_map_create<VkImage, ImageSyncDescriptor>(_arena_rendergraph, MAX_IMG_BARRIERS);
-		pass.wait_signals_img = lm::hash_map_create<VkImage, ImageSyncDescriptor>(_arena_rendergraph, MAX_IMG_BARRIERS);
-
-		pass.resources_initialized = true;
-	}
-
-	// TODO:
-	// buffer_sync_resources.resize(passes.size);
-	// img_sync_resources.resize(passes.size);
-
 	// Compile shaders and process resources
 	const bool recording_or_reload = dirty_pass_encountered || reload_shaders;
 	if (recording_or_reload) {
@@ -1196,19 +1149,20 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 			if (passes[i].is_pipeline_cached) {
 				continue;
 			}
-			if (passes[i].gfx_settings) {
+			if (passes[i].type == vk::PassType::Graphics) {
 				for (auto& shader : passes[i].gfx_settings->shaders) {
 					if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
 						existing_shaders[&passes[i]].push_back(&shader);
 					}
 				}
-			} else if (passes[i].rt_settings) {
+			} else if (passes[i].type == vk::PassType::RT) {
 				for (auto& shader : passes[i].rt_settings->shaders) {
 					if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
 						existing_shaders[&passes[i]].push_back(&shader);
 					}
 				}
-			} else {
+			} else{
+				// Compute
 				if (!unique_shaders_set.insert({&passes[i].compute_settings->shader, &passes[i]}).second) {
 					existing_shaders[&passes[i]].push_back(&passes[i].compute_settings->shader);
 				}
@@ -1262,11 +1216,6 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	}
 
 	for (auto i = 0; i < passes.size; i++) {
-		// TODO: Init
-		// buffer_sync_resources[i].buffer_bariers.resize(passes[i].wait_signals_buffer.size);
-		// buffer_sync_resources[i].dependency_infos.resize(passes[i].wait_signals_buffer.size);
-		// img_sync_resources[i].img_barriers.resize(passes[i].wait_signals_img.size);
-		// img_sync_resources[i].dependency_infos.resize(passes[i].wait_signals_img.size);
 		passes[i].run(cmd);
 	}
 }
@@ -1275,17 +1224,36 @@ void RenderGraph::reset() {
 	// TODO: Adjust to new implementation
 	vk::event_pool::reset_events();
 	for (auto& pass : passes) {
-		if (pass.push_constant_data) {
-			free(pass.push_constant_data);
-		}
+		////////////////////////////
+		// --- Reset pass resources ---
+		pass.resource_zeros.clear();
+		pass.prefill_buffer_barriers.clear();
+		pass.resource_copies.clear();
+		pass.buffer_sync_resources.buffer_bariers.clear();
+		pass.buffer_sync_resources.dependency_infos.clear();
+		pass.image_sync_resources.img_barriers.clear();
+		pass.image_sync_resources.dependency_infos.clear();
+		pass.post_execution_buffer_barriers.clear();
+		pass.explicit_buffer_writes.clear();
+		pass.explicit_buffer_reads.clear();
+		pass.explicit_tex_writes.clear();
+		pass.explicit_tex_reads.clear();
+		pass.descriptor_counts.clear();
+		pass.layout_transitions.clear();
+		pass.set_signals_buffer.clear();
+		pass.wait_signals_buffer.clear();
+		pass.set_signals_img.clear();
+		pass.wait_signals_img.clear();
+
+		// TODO: blas/tlas_build_data resets after we adjust them
+		pass.next_binding_idx = 0;
+		pass.next_as_binding_idx = 0;
+		pass.disable_execution = false;
+		
 	}
 	passes.clear();
-	if (pipeline_tasks.size) {
-		pipeline_tasks.clear();
-	}
-	// buffer_sync_resources.clear();
-	// img_sync_resources.clear();
-	reload_shaders = false;
+	pipeline_tasks.clear();
+	_arena_strings->clear();
 }
 
 void RenderGraph::submit(vk::CommandBuffer& cmd) {
@@ -1295,12 +1263,8 @@ void RenderGraph::submit(vk::CommandBuffer& cmd) {
 	// This entails adding a mapping between a pass and a timestamp
 	// Which enables us to get aggregate results for each pass per frame
 	GPUQueryManager::collect();
-	for (auto& pass : passes) {
-		if (pass.push_constant_data) {
-			free(pass.push_constant_data);
-		}
-	}
-	passes.clear();
+	// The reset is needed here because the next subsequent pass may reuse the old pass' memory
+	reset();
 	dirty_pass_encountered = false;
 }
 
@@ -1310,21 +1274,21 @@ void RenderGraph::run_and_submit(vk::CommandBuffer& cmd) {
 }
 
 static void populate_macros(lm::Arena* arena, const lm::FixedArray<vk::ShaderMacro>& macros,
-							const lm::String& macro_string, bool& prev_nonempty) {
+							lm::String& macro_string, bool& prev_nonempty) {
 	for (u64 i = 0; i < macros.size; i++) {
 		if (!macros[i].visible) {
 			continue;
 		}
 		if (!macros[i].name.empty()) {
 			if (prev_nonempty) {
-				lm::str_concat(arena, macro_string, ",");
+				macro_string = lm::str_concat(arena, macro_string, ",");
 			}
-			lm::str_concat(arena, macro_string, macros[i].name);
+			macro_string = lm::str_concat(arena, macro_string, macros[i].name);
 			prev_nonempty = true;
 		}
 		if (macros[i].has_val) {
-			lm::str_concat(arena, macro_string, "=");
-			lm::str_concat(arena, macro_string, lm::str_from_s64(_arena_rendergraph, macros[i].val));
+			macro_string = lm::str_concat(arena, macro_string, "=");
+			macro_string = lm::str_concat(arena, macro_string, lm::str_from_s64(_arena_rendergraph, macros[i].val));
 		}
 	}
 }
@@ -1333,25 +1297,26 @@ PipelineStorage* RenderGraph::add_pass_impl_common(const lm::String& name,
 												   const lm::FixedArray<vk::ShaderMacro>& macros,
 												   const std::vector<u32>& specialization_data, bool& cached,
 												   lm::String& name_with_macros, lm::String& macro_string) {
+	assert(name.is_cstr());
 	PipelineStorage* pipeline_storage;
 
-	name_with_macros = lm::str_dup(_arena_rendergraph, name);
+	name_with_macros = lm::str_dup(_arena_strings, name);
 
 	if (!macros.empty() || !global_macro_defines.empty()) {
-		lm::str_concat(_arena_rendergraph, macro_string, "(");
+		macro_string = lm::str_concat(_arena_strings, macro_string, "(");
 	}
 
 	bool prev_nonempty = false;
-	populate_macros(_arena_rendergraph, macros, macro_string, prev_nonempty);
-	populate_macros(_arena_rendergraph, global_macro_defines, macro_string, prev_nonempty);
+	populate_macros(_arena_strings, macros, macro_string, prev_nonempty);
+	populate_macros(_arena_strings, global_macro_defines, macro_string, prev_nonempty);
 
 	if (!macros.empty() || !global_macro_defines.empty()) {
-		lm::str_concat(_arena_rendergraph, macro_string, ")");
+		macro_string = lm::str_concat(_arena_strings, macro_string, ")");
 	}
 	if (macro_string == "()") {
 		macro_string = "";
 	}
-	lm::str_concat(_arena_rendergraph, name_with_macros, macro_string);
+	name_with_macros = lm::str_concat(_arena_strings, name_with_macros, macro_string);
 
 	u64 hash = 0;
 	hash = lm::fnv1a_hash((void*)name_with_macros.data, name_with_macros.size, lm::HASH_INIT);
@@ -1374,6 +1339,17 @@ PipelineStorage* RenderGraph::add_pass_impl_common(const lm::String& name,
 			hash, PipelineStorage{.pipeline = vk::Pipeline(lm::str_to_cpp_str(name_with_macros))});
 		pipeline_storage = &new_entry->value;
 	}
+	if (!pipeline_storage->bound_resources.initialized()) {
+		pipeline_storage->bound_resources =
+			lm::fixed_array_create<ResourceBinding>(_arena_rendergraph, MAX_DESCRIPTORS);
+	}
+	if (!pipeline_storage->as_bindings.initialized()) {
+		pipeline_storage->as_bindings = lm::fixed_array_create<vk::BVH>(_arena_rendergraph, vk::MAX_AS_BINDING_COUNT);
+	}
+	if (!pipeline_storage->affected_buffer_pointers.initialized()) {
+		pipeline_storage->affected_buffer_pointers =
+			lm::hash_map_create<lm::String, vk::BufferStatus>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
+	}
 	return pipeline_storage;
 }
 void RenderGraph::destroy() {
@@ -1393,6 +1369,59 @@ void RenderGraph::destroy() {
 	// registered_buffer_pointers.clear();
 	// shader_cache.clear();
 	// pipeline_cache.clear();
+}
+
+void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
+						  const vk::GraphicsPassSettings& gfx_settings, const lm::String& macro_string,
+						  PipelineStorage* pipeline_storage, bool cached) {
+	pass.type = type;
+	pass.rg = rg;
+	pass.pass_idx = pass_idx;
+	pass.gfx_settings = std::make_unique<vk::GraphicsPassSettings>(gfx_settings);
+	pass.macro_defines = gfx_settings.macros;
+	pass.pipeline_storage = pipeline_storage;
+	pass.name = name;
+	pass.is_pipeline_cached = cached;
+	for (auto& shader : pass.gfx_settings->shaders) {
+		shader.name_with_macros = lm::str_concat(_arena_strings, shader.filename, macro_string);
+	}
+	pass.init();
+}
+
+void render_pass_init_rt(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
+						 const vk::RTPassSettings& rt_settings, const lm::String& macro_string,
+						 PipelineStorage* pipeline_storage, bool cached) {
+	pass.type = type;
+	pass.rg = rg;
+	pass.pass_idx = pass_idx;
+	pass.rt_settings = std::make_unique<vk::RTPassSettings>(rt_settings);
+	pass.macro_defines = rt_settings.macros;
+	pass.pipeline_storage = pipeline_storage;
+	pass.name = name;
+	pass.is_pipeline_cached = cached;
+	if(!pass.is_pipeline_cached) {
+		// Shader names need to be persistent for the cache
+		for (auto& shader : pass.rt_settings->shaders) {
+			shader.name_with_macros = lm::str_concat(_arena_rendergraph, shader.filename, macro_string);
+		}
+	}
+	pass.init();
+}
+
+void render_pass_init_compute(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg,
+							  u32 pass_idx, const vk::ComputePassSettings& compute_settings,
+							  const lm::String& macro_string, PipelineStorage* pipeline_storage, bool cached) {
+	pass.type = type;
+	pass.rg = rg;
+	pass.pass_idx = pass_idx;
+	pass.compute_settings = std::make_unique<vk::ComputePassSettings>(compute_settings);
+	pass.macro_defines = compute_settings.macros;
+	pass.pipeline_storage = pipeline_storage;
+	pass.name = name;
+	pass.is_pipeline_cached = cached;
+	pass.compute_settings->shader.name_with_macros =
+		lm::str_concat(_arena_strings, compute_settings.shader.filename, macro_string);
+	pass.init();
 }
 
 }  // namespace lm

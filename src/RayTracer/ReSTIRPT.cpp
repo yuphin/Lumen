@@ -247,13 +247,13 @@ void ReSTIRPT::render() {
 	if (enable_photon_mapping) {
 		vk::render_graph()
 			->add_rt(
-				"PM - Trace First Diffuse",
+				CSTR("PM - Trace First Diffuse"),
 				{
-					.shaders = {{"src/shaders/integrators/restir/gris/pm_trace_eye.rgen"},
-								{"src/shaders/integrators/restir/gris/ray.rmiss"},
-								{"src/shaders/ray_shadow.rmiss"},
-								{"src/shaders/integrators/restir/gris/ray.rchit"},
-								{"src/shaders/ray.rahit"}},
+					.shaders = {{CSTR("src/shaders/integrators/restir/gris/pm_trace_eye.rgen")},
+								{CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+								{CSTR("src/shaders/ray_shadow.rmiss")},
+								{CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+								{CSTR("src/shaders/ray.rahit")}},
 					.macros = lm::fixed_array_init(arena, {vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)}),
 					.dims = {Window::width(), Window::height()},
 				})
@@ -286,13 +286,13 @@ void ReSTIRPT::render() {
 		photon_blas_input.as_build_offset_info.push_back(offset);
 
 		vk::render_graph()
-			->add_rt("PM - Trace Photons",
+			->add_rt(CSTR("PM - Trace Photons"),
 					 {
-						 .shaders = {{"src/shaders/integrators/restir/gris/pm_trace_photons.rgen"},
-									 {"src/shaders/integrators/restir/gris/ray.rmiss"},
-									 {"src/shaders/ray_shadow.rmiss"},
-									 {"src/shaders/integrators/restir/gris/ray.rchit"},
-									 {"src/shaders/ray.rahit"}},
+						 .shaders = {{CSTR("src/shaders/integrators/restir/gris/pm_trace_photons.rgen")},
+									 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+									 {CSTR("src/shaders/ray_shadow.rmiss")},
+									 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+									 {CSTR("src/shaders/ray.rahit")}},
 						 .macros = lm::fixed_array_init(arena, {vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere),
 																vk::ShaderMacro("DISABLE_PM_MIS", !enable_pm_mis)}),
 						 .dims = {num_photons, 1},
@@ -312,13 +312,13 @@ void ReSTIRPT::render() {
 
 		if (photon_tlas.accel && enable_photon_gather) {
 			vk::render_graph()
-				->add_rt("Collect Photons",
+				->add_rt(CSTR("Collect Photons"),
 						 {
-							 .shaders = {{"src/shaders/integrators/restir/gris/pm_collect_photons.rgen"},
-										 {"src/shaders/integrators/restir/gris/ray.rmiss"},
-										 {"src/shaders/ray_shadow.rmiss"},
-										 {"src/shaders/integrators/restir/gris/ray.rchit"},
-										 {"src/shaders/ray.rahit"}},
+							 .shaders = {{CSTR("src/shaders/integrators/restir/gris/pm_collect_photons.rgen")},
+										 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+										 {CSTR("src/shaders/ray_shadow.rmiss")},
+										 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+										 {CSTR("src/shaders/ray.rahit")}},
 							 .macros =
 								 lm::fixed_array_init(arena, {{"STREAMING_MODE", i32(streaming_method)},
 															  vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)}),
@@ -340,13 +340,13 @@ void ReSTIRPT::render() {
 
 	// Trace rays
 	vk::render_graph()
-		->add_rt("GRIS - Generate Samples",
+		->add_rt(CSTR("GRIS - Generate Samples"),
 				 {
-					 .shaders = {{"src/shaders/integrators/restir/gris/gris.rgen"},
-								 {"src/shaders/integrators/restir/gris/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/integrators/restir/gris/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
+					 .shaders = {{CSTR("src/shaders/integrators/restir/gris/gris.rgen")},
+								 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
 					 .macros = lm::fixed_array_init(
 						 arena, {{"STREAMING_MODE", i32(streaming_method)},
 								 vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere),
@@ -370,13 +370,13 @@ void ReSTIRPT::render() {
 		bool should_do_temporal = enable_temporal_reuse && pc_ray.total_frame_num > 0;
 		// Temporal Reuse
 		vk::render_graph()
-			->add_rt("GRIS - Temporal Reuse",
+			->add_rt(CSTR("GRIS - Temporal Reuse"),
 					 {
-						 .shaders = {{"src/shaders/integrators/restir/gris/temporal_reuse.rgen"},
-									 {"src/shaders/integrators/restir/gris/ray.rmiss"},
-									 {"src/shaders/ray_shadow.rmiss"},
-									 {"src/shaders/integrators/restir/gris/ray.rchit"},
-									 {"src/shaders/ray.rahit"}},
+						 .shaders = {{CSTR("src/shaders/integrators/restir/gris/temporal_reuse.rgen")},
+									 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+									 {CSTR("src/shaders/ray_shadow.rmiss")},
+									 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+									 {CSTR("src/shaders/ray.rahit")}},
 						 .dims = {Window::width(), Window::height()},
 					 })
 			.push_constants(&pc_ray)
@@ -393,13 +393,13 @@ void ReSTIRPT::render() {
 		if (!canonical_only) {
 			if (mis_method == MISMethod::TALBOT) {
 				vk::render_graph()
-					->add_rt("GRIS - Spatial Reuse - Talbot",
+					->add_rt(CSTR("GRIS - Spatial Reuse - Talbot"),
 							 {
-								 .shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen"},
-											 {"src/shaders/integrators/restir/gris/ray.rmiss"},
-											 {"src/shaders/ray_shadow.rmiss"},
-											 {"src/shaders/integrators/restir/gris/ray.rchit"},
-											 {"src/shaders/ray.rahit"}},
+								 .shaders = {{CSTR("src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen")},
+											 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+											 {CSTR("src/shaders/ray_shadow.rmiss")},
+											 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+											 {CSTR("src/shaders/ray.rahit")}},
 								 .dims = {Window::width(), Window::height()},
 							 })
 					.push_constants(&pc_ray)
@@ -414,13 +414,13 @@ void ReSTIRPT::render() {
 			} else {
 				// Retrace
 				vk::render_graph()
-					->add_rt("GRIS - Retrace Reservoirs",
+					->add_rt(CSTR("GRIS - Retrace Reservoirs"),
 							 {
-								 .shaders = {{"src/shaders/integrators/restir/gris/retrace_paths.rgen"},
-											 {"src/shaders/integrators/restir/gris/ray.rmiss"},
-											 {"src/shaders/ray_shadow.rmiss"},
-											 {"src/shaders/integrators/restir/gris/ray.rchit"},
-											 {"src/shaders/ray.rahit"}},
+								 .shaders = {{CSTR("src/shaders/integrators/restir/gris/retrace_paths.rgen")},
+											 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+											 {CSTR("src/shaders/ray_shadow.rmiss")},
+											 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+											 {CSTR("src/shaders/ray.rahit")}},
 								 .dims = {Window::width(), Window::height()},
 							 })
 					.push_constants(&pc_ray)
@@ -432,13 +432,13 @@ void ReSTIRPT::render() {
 					.bind_tlas(tlas);
 				// Validate
 				vk::render_graph()
-					->add_rt("GRIS - Validate Samples",
+					->add_rt(CSTR("GRIS - Validate Samples"),
 							 {
-								 .shaders = {{"src/shaders/integrators/restir/gris/validate_samples.rgen"},
-											 {"src/shaders/integrators/restir/gris/ray.rmiss"},
-											 {"src/shaders/ray_shadow.rmiss"},
-											 {"src/shaders/integrators/restir/gris/ray.rchit"},
-											 {"src/shaders/ray.rahit"}},
+								 .shaders = {{CSTR("src/shaders/integrators/restir/gris/validate_samples.rgen")},
+											 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+											 {CSTR("src/shaders/ray_shadow.rmiss")},
+											 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+											 {CSTR("src/shaders/ray.rahit")}},
 								 .dims = {Window::width(), Window::height()},
 							 })
 					.push_constants(&pc_ray)
@@ -451,18 +451,17 @@ void ReSTIRPT::render() {
 
 				// Spatial Reuse
 				vk::render_graph()
-					->add_rt(
-						"GRIS - Spatial Reuse",
-						{
-							.shaders = {{"src/shaders/integrators/restir/gris/spatial_reuse.rgen"},
-										{"src/shaders/integrators/restir/gris/ray.rmiss"},
-										{"src/shaders/ray_shadow.rmiss"},
-										{"src/shaders/integrators/restir/gris/ray.rchit"},
-										{"src/shaders/ray.rahit"}},
-							.macros = lm::fixed_array_init(
-								arena, {vk::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS", enable_defensive_formulation)}),
-							.dims = {Window::width(), Window::height()},
-						})
+					->add_rt(CSTR("GRIS - Spatial Reuse"),
+							 {
+								 .shaders = {{CSTR("src/shaders/integrators/restir/gris/spatial_reuse.rgen")},
+											 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+											 {CSTR("src/shaders/ray_shadow.rmiss")},
+											 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+											 {CSTR("src/shaders/ray.rahit")}},
+								 .macros = lm::fixed_array_init(arena, {vk::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS",
+																						enable_defensive_formulation)}),
+								 .dims = {Window::width(), Window::height()},
+							 })
 					.push_constants(&pc_ray)
 					.bind(common_bindings)
 					.bind(reconnection_buffer)
@@ -477,9 +476,9 @@ void ReSTIRPT::render() {
 			if (pixel_debug || (gris_separator < 1.0f && gris_separator > 0.0f)) {
 				u32 num_wgs = u32((Window::width() * Window::height() + 1023) / 1024);
 				vk::render_graph()
-					->add_compute(
-						"GRIS - Debug Visualiation",
-						{.shader = vk::Shader("src/shaders/integrators/restir/gris/debug_vis.comp"), .dims = {num_wgs}})
+					->add_compute(CSTR("GRIS - Debug Visualiation"),
+								  {.shader = vk::Shader(CSTR("src/shaders/integrators/restir/gris/debug_vis.comp")),
+								   .dims = {num_wgs}})
 					.push_constants(&pc_ray)
 					.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer});
 			}

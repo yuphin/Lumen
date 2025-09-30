@@ -268,13 +268,13 @@ void SMLT::render() {
 	// Start bootstrap sampling
 	{
 		// Light
-		rg->add_rt("SMLT - Bootstrap Sampling - Light",
+		rg->add_rt(CSTR("SMLT - Bootstrap Sampling - Light"),
 				   {
-					   .shaders = {{"src/shaders/integrators/smlt/smlt_seed_light.rgen"},
-								   {"src/shaders/ray.rmiss"},
-								   {"src/shaders/ray_shadow.rmiss"},
-								   {"src/shaders/ray.rchit"},
-								   {"src/shaders/ray.rahit"}},
+					   .shaders = {{CSTR("src/shaders/integrators/smlt/smlt_seed_light.rgen")},
+								   {CSTR("src/shaders/ray.rmiss")},
+								   {CSTR("src/shaders/ray_shadow.rmiss")},
+								   {CSTR("src/shaders/ray.rchit")},
+								   {CSTR("src/shaders/ray.rahit")}},
 					   .specialization_data = {1},
 					   .dims = {(u32)num_bootstrap_samples},
 				   })
@@ -284,13 +284,13 @@ void SMLT::render() {
 			.bind_texture_array(lumen_scene->scene_textures)
 			.bind_tlas(tlas);
 		// Eye
-		rg->add_rt("SMLT - Bootstrap Sampling - Eye",
+		rg->add_rt(CSTR("SMLT - Bootstrap Sampling - Eye"),
 				   {
-					   .shaders = {{"src/shaders/integrators/smlt/smlt_seed_eye.rgen"},
-								   {"src/shaders/ray.rmiss"},
-								   {"src/shaders/ray_shadow.rmiss"},
-								   {"src/shaders/ray.rchit"},
-								   {"src/shaders/ray.rahit"}},
+					   .shaders = {{CSTR("src/shaders/integrators/smlt/smlt_seed_eye.rgen")},
+								   {CSTR("src/shaders/ray.rmiss")},
+								   {CSTR("src/shaders/ray_shadow.rmiss")},
+								   {CSTR("src/shaders/ray.rchit")},
+								   {CSTR("src/shaders/ray.rahit")}},
 					   .specialization_data = {1},
 					   .dims = {(u32)num_bootstrap_samples},
 				   })
@@ -303,7 +303,7 @@ void SMLT::render() {
 	i32 counter = 0;
 	prefix_scan(0, lumen_scene->config.settings.smlt.num_bootstrap_samples, counter, rg);
 	// Calculate CDF
-	rg->add_compute("Calculate CDF", {.shader = vk::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
+	rg->add_compute(CSTR("Calculate CDF"), {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/calc_cdf.comp")),
 									  .specialization_data = {(u32)num_bootstrap_samples},
 									  .dims = {(u32)std::ceil(num_bootstrap_samples / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
@@ -344,7 +344,7 @@ void SMLT::render() {
 	return;
 #endif
 	// Select seeds
-	rg->add_compute("Select Seeds", {.shader = vk::Shader("src/shaders/integrators/pssmlt/select_seeds.comp"),
+	rg->add_compute(CSTR("Select Seeds"), {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/select_seeds.comp")),
 									 .specialization_data = {(u32)num_mlt_threads},
 									 .dims = {(u32)std::ceil(num_mlt_threads / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
@@ -352,13 +352,13 @@ void SMLT::render() {
 	// Fill in the samplers for mutations
 	{
 		// Light
-		rg->add_rt("SMLT - Preprocess - Light",
+		rg->add_rt(CSTR("SMLT - Preprocess - Light"),
 				   {
-					   .shaders = {{"src/shaders/integrators/smlt/smlt_preprocess_light.rgen"},
-								   {"src/shaders/ray.rmiss"},
-								   {"src/shaders/ray_shadow.rmiss"},
-								   {"src/shaders/ray.rchit"},
-								   {"src/shaders/ray.rahit"}},
+					   .shaders = {{CSTR("src/shaders/integrators/smlt/smlt_preprocess_light.rgen")},
+								   {CSTR("src/shaders/ray.rmiss")},
+								   {CSTR("src/shaders/ray_shadow.rmiss")},
+								   {CSTR("src/shaders/ray.rchit")},
+								   {CSTR("src/shaders/ray.rahit")}},
 					   .dims = {(u32)num_mlt_threads},
 				   })
 			.push_constants(&pc_ray)
@@ -368,13 +368,13 @@ void SMLT::render() {
 			.bind_texture_array(lumen_scene->scene_textures)
 			.bind_tlas(tlas);
 		// Eye
-		rg->add_rt("SMLT - Preprocess - Eye",
+		rg->add_rt(CSTR("SMLT - Preprocess - Eye"),
 				   {
-					   .shaders = {{"src/shaders/integrators/smlt/smlt_preprocess_eye.rgen"},
-								   {"src/shaders/ray.rmiss"},
-								   {"src/shaders/ray_shadow.rmiss"},
-								   {"src/shaders/ray.rchit"},
-								   {"src/shaders/ray.rahit"}},
+					   .shaders = {{CSTR("src/shaders/integrators/smlt/smlt_preprocess_eye.rgen")},
+								   {CSTR("src/shaders/ray.rmiss")},
+								   {CSTR("src/shaders/ray_shadow.rmiss")},
+								   {CSTR("src/shaders/ray.rchit")},
+								   {CSTR("src/shaders/ray.rahit")}},
 					   .dims = {(u32)num_mlt_threads},
 				   })
 			.push_constants(&pc_ray)
@@ -391,13 +391,13 @@ void SMLT::render() {
 			pc_ray.random_num = rand() % UINT_MAX;
 			pc_ray.mutation_counter = i;
 			// Light
-			rg->add_rt("PSSMLT - Mutate - Light",
+			rg->add_rt(CSTR("PSSMLT - Mutate - Light"),
 					   {
-						   .shaders = {{"src/shaders/integrators/smlt/smlt_mutate_light.rgen"},
-									   {"src/shaders/ray.rmiss"},
-									   {"src/shaders/ray_shadow.rmiss"},
-									   {"src/shaders/ray.rchit"},
-									   {"src/shaders/ray.rahit"}},
+						   .shaders = {{CSTR("src/shaders/integrators/smlt/smlt_mutate_light.rgen")},
+									   {CSTR("src/shaders/ray.rmiss")},
+									   {CSTR("src/shaders/ray_shadow.rmiss")},
+									   {CSTR("src/shaders/ray.rchit")},
+									   {CSTR("src/shaders/ray.rahit")}},
 						   .dims = {(u32)num_mlt_threads},
 					   })
 				.push_constants(&pc_ray)
@@ -406,13 +406,13 @@ void SMLT::render() {
 				.bind_texture_array(lumen_scene->scene_textures)
 				.bind_tlas(tlas);
 			// Eye
-			rg->add_rt("PSSMLT - Mutate - Eye",
+			rg->add_rt(CSTR("PSSMLT - Mutate - Eye"),
 					   {
-						   .shaders = {{"src/shaders/integrators/smlt/smlt_mutate_eye.rgen"},
-									   {"src/shaders/ray.rmiss"},
-									   {"src/shaders/ray_shadow.rmiss"},
-									   {"src/shaders/ray.rchit"},
-									   {"src/shaders/ray.rahit"}},
+						   .shaders = {{CSTR("src/shaders/integrators/smlt/smlt_mutate_eye.rgen")},
+									   {CSTR("src/shaders/ray.rmiss")},
+									   {CSTR("src/shaders/ray_shadow.rmiss")},
+									   {CSTR("src/shaders/ray.rchit")},
+									   {CSTR("src/shaders/ray.rahit")}},
 						   .dims = {(u32)num_mlt_threads},
 					   })
 				.push_constants(&pc_ray)
@@ -445,7 +445,7 @@ void SMLT::render() {
 		}
 	}
 	// Compositions
-	rg->add_compute("Composition", {.shader = vk::Shader("src/shaders/integrators/pssmlt/composite.comp"),
+	rg->add_compute(CSTR("Composition"), {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/composite.comp")),
 									.dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
@@ -467,7 +467,7 @@ void SMLT::prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph* 
 	pc_compute.num_elems = num_elems;
 	auto scan = [&](i32 num_wgs, i32 idx) {
 		++counter;
-		rg->add_compute("PrefixScan - Scan", {.shader = vk::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
+		rg->add_compute(CSTR("PrefixScan - Scan"), {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/prefix_scan.comp")),
 											  .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
@@ -476,7 +476,7 @@ void SMLT::prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph* 
 		++counter;
 		rg->add_compute(
 			  "PrefixScan - Uniform Add",
-			  {.shader = vk::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"), .dims = {(u32)num_wgs, 1, 1}})
+			  {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/uniform_add.comp")), .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
 	};

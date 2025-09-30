@@ -228,13 +228,13 @@ void PSSMLT::render() {
 	vk::CommandBuffer cmd(/*start*/ true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	// Start bootstrap sampling
 	vk::render_graph()
-		->add_rt("PSSMLT - Bootstrap Sampling",
+		->add_rt(CSTR("PSSMLT - Bootstrap Sampling"),
 				 {
-					 .shaders = {{"src/shaders/integrators/pssmlt/pssmlt_seed.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
+					 .shaders = {{CSTR("src/shaders/integrators/pssmlt/pssmlt_seed.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
 					 .specialization_data = {1},
 					 .dims = {(u32)config.num_bootstrap_samples},
 				 })
@@ -249,7 +249,7 @@ void PSSMLT::render() {
 	prefix_scan(0, config.num_bootstrap_samples, counter, vk::render_graph());
 	// Calculate CDF
 	vk::render_graph()
-		->add_compute("Calculate CDF", {.shader = vk::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
+		->add_compute(CSTR("Calculate CDF"), {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/calc_cdf.comp")),
 										.specialization_data = {(u32)config.num_bootstrap_samples},
 										.dims = {(u32)std::ceil(config.num_bootstrap_samples / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
@@ -294,20 +294,20 @@ void PSSMLT::render() {
 	lm::RenderGraph* rg = vk::render_graph();
 
 	// Select seeds
-	rg->add_compute("Select Seeds", {.shader = vk::Shader("src/shaders/integrators/pssmlt/select_seeds.comp"),
+	rg->add_compute(CSTR("Select Seeds"), {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/select_seeds.comp")),
 									 .specialization_data = {(u32)config.num_mlt_threads},
 									 .dims = {(u32)std::ceil(config.num_mlt_threads / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer);
 
 	// Fill in the samplers for mutations
-	rg->add_rt("PSSMLT - Preprocess",
+	rg->add_rt(CSTR("PSSMLT - Preprocess"),
 			   {
-				   .shaders = {{"src/shaders/integrators/pssmlt/pssmlt_preprocess.rgen"},
-							   {"src/shaders/ray.rmiss"},
-							   {"src/shaders/ray_shadow.rmiss"},
-							   {"src/shaders/ray.rchit"},
-							   {"src/shaders/ray.rahit"}},
+				   .shaders = {{CSTR("src/shaders/integrators/pssmlt/pssmlt_preprocess.rgen")},
+							   {CSTR("src/shaders/ray.rmiss")},
+							   {CSTR("src/shaders/ray_shadow.rmiss")},
+							   {CSTR("src/shaders/ray.rchit")},
+							   {CSTR("src/shaders/ray.rahit")}},
 				   .dims = {(u32)config.num_mlt_threads},
 			   })
 		.push_constants(&pc_ray)
@@ -323,13 +323,13 @@ void PSSMLT::render() {
 		auto mutate = [&](u32 i) {
 			pc_ray.random_num = rand() % UINT_MAX;
 			pc_ray.mutation_counter = i;
-			rg->add_rt("PSSMLT - Mutate",
+			rg->add_rt(CSTR("PSSMLT - Mutate"),
 					   {
-						   .shaders = {{"src/shaders/integrators/pssmlt/pssmlt_mutate.rgen"},
-									   {"src/shaders/ray.rmiss"},
-									   {"src/shaders/ray_shadow.rmiss"},
-									   {"src/shaders/ray.rchit"},
-									   {"src/shaders/ray.rahit"}},
+						   .shaders = {{CSTR("src/shaders/integrators/pssmlt/pssmlt_mutate.rgen")},
+									   {CSTR("src/shaders/ray.rmiss")},
+									   {CSTR("src/shaders/ray_shadow.rmiss")},
+									   {CSTR("src/shaders/ray.rchit")},
+									   {CSTR("src/shaders/ray.rahit")}},
 						   .dims = {(u32)config.num_mlt_threads},
 					   })
 				.push_constants(&pc_ray)
@@ -363,7 +363,7 @@ void PSSMLT::render() {
 		}
 	}
 	// Compositions
-	rg->add_compute("Composition", {.shader = vk::Shader("src/shaders/integrators/pssmlt/composite.comp"),
+	rg->add_compute(CSTR("Composition"), {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/composite.comp")),
 									.dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
@@ -385,7 +385,7 @@ void PSSMLT::prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph
 	pc_compute.num_elems = num_elems;
 	auto scan = [&](i32 num_wgs, i32 idx) {
 		++counter;
-		rg->add_compute("PrefixScan - Scan", {.shader = vk::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
+		rg->add_compute(CSTR("PrefixScan - Scan"), {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/prefix_scan.comp")),
 											  .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
@@ -394,7 +394,7 @@ void PSSMLT::prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph
 		++counter;
 		rg->add_compute(
 			  "PrefixScan - Uniform Add",
-			  {.shader = vk::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"), .dims = {(u32)num_wgs, 1, 1}})
+			  {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/uniform_add.comp")), .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
 	};

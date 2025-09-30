@@ -26,8 +26,8 @@ i32 main(i32 argc, char* argv[]) {
 		}
 	}
 	bool fullscreen = false;
-	i32 width = 1920;
-	i32 height = 1080;
+	i32 width = 1280;
+	i32 height = 720;
 	ThreadPool::init();
 	Window::init(width, height, fullscreen);
 	{
@@ -212,25 +212,25 @@ i32 main(i32 argc, char* argv[]) {
 	lm::String result2 = lm::str_from_s64(arena, -62832387);
 	lm::String result3 = lm::str_from_f64(arena, 1421.363);
 
-	LUMEN_INFO("CSTR Literal: %s", lm::cstr("Test").data);
+	LUMEN_INFO("CSTR Literal: %s", CSTR("Test").data);
 	LUMEN_INFO("Result %s", lm::str_to_cstr(arena, result).data);
 	LUMEN_INFO("Result2 %s", lm::str_to_cstr(arena, result2).data);
 	LUMEN_INFO("Result3 %s", lm::str_to_cstr(arena, result3).data);
 
-	LUMEN_INFO("U64 from str: %llu", lm::u64_from_str(lm::cstr("123456789")));
-	LUMEN_INFO("U64 from str: %llu", lm::u64_from_str(lm::cstr("  asd  123456789asd")));
-	LUMEN_INFO("U64 from str2: %llu", lm::u64_from_str(lm::cstr("   18446744073709551616")));
-	LUMEN_INFO("S64 from str: %lld", lm::s64_from_str(lm::cstr("  -  123456789asd")));
+	LUMEN_INFO("U64 from str: %llu", lm::u64_from_str(CSTR("123456789")));
+	LUMEN_INFO("U64 from str: %llu", lm::u64_from_str(CSTR("  asd  123456789asd")));
+	LUMEN_INFO("U64 from str2: %llu", lm::u64_from_str(CSTR("   18446744073709551616")));
+	LUMEN_INFO("S64 from str: %lld", lm::s64_from_str(CSTR("  -  123456789asd")));
 
-	LUMEN_INFO("%f", f64_from_str(lm::cstr("-1.32e-1")));
-	LUMEN_INFO("%f", f64_from_str(lm::cstr("1.2423")));
-	LUMEN_INFO("%f", f64_from_str(lm::cstr("-1.2423")));
-	LUMEN_INFO("%f", f64_from_str(lm::cstr(".2423")));
-	LUMEN_INFO("%f", f64_from_str(lm::cstr("1361763176537161637")));
-	LUMEN_INFO("%f", f32_from_str(lm::cstr("1432.34")));
-	LUMEN_INFO("%f", f64_from_str(lm::cstr("-0.9814223")));
+	LUMEN_INFO("%f", f64_from_str(CSTR("-1.32e-1")));
+	LUMEN_INFO("%f", f64_from_str(CSTR("1.2423")));
+	LUMEN_INFO("%f", f64_from_str(CSTR("-1.2423")));
+	LUMEN_INFO("%f", f64_from_str(CSTR(".2423")));
+	LUMEN_INFO("%f", f64_from_str(CSTR("1361763176537161637")));
+	LUMEN_INFO("%f", f32_from_str(CSTR("1432.34")));
+	LUMEN_INFO("%f", f64_from_str(CSTR("-0.9814223")));
 
-	os::FileHandle file_handle = os::file_open(lm::cstr("scenes/cornell_box/path.scene"), os::AccessFlag_Read);
+	os::FileHandle file_handle = os::file_open(CSTR("scenes/cornell_box/path.scene"), os::AccessFlag_Read);
 	if (file_handle == 0) {
 		LUMEN_ERROR("Failed to open file");
 		return -1;

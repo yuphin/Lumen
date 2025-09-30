@@ -235,13 +235,13 @@ void DDGI::render() {
 	};
 	// Trace Primary rays and fill G buffer
 	vk::render_graph()
-		->add_rt("DDGI - GBuffer Pass",
+		->add_rt(CSTR("DDGI - GBuffer Pass"),
 				 {
-					 .shaders = {{"src/shaders/integrators/ddgi/primary_rays.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
+					 .shaders = {{CSTR("src/shaders/integrators/ddgi/primary_rays.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
 					 .specialization_data = {1},
 					 .dims = {Window::width(), Window::height()},
 				 })
@@ -254,13 +254,13 @@ void DDGI::render() {
 	// Trace rays from probes
 	u32 grid_size = probe_counts.x * probe_counts.y * probe_counts.z;
 	vk::render_graph()
-		->add_rt("DDGI - Probe Trace",
+		->add_rt(CSTR("DDGI - Probe Trace"),
 				 {
-					 .shaders = {{"src/shaders/integrators/ddgi/trace.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
+					 .shaders = {{CSTR("src/shaders/integrators/ddgi/trace.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
 					 .specialization_data = {1},
 					 .dims = {(u32)rays_per_probe, grid_size},
 				 })
@@ -273,8 +273,8 @@ void DDGI::render() {
 	// Classify
 	u32 wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 31) / 32;
 	vk::render_graph()
-		->add_compute("Classify Probes",
-					  {.shader = vk::Shader("src/shaders/integrators/ddgi/classify.comp"), .dims = {wg_x}})
+		->add_compute(CSTR("Classify Probes"),
+					  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/classify.comp")), .dims = {wg_x}})
 		.push_constants(&pc_ray)
 		.bind({scene_ubo_buffer, lumen_scene->scene_desc_buffer, ddgi_ubo_buffer, rt.radiance_tex, rt.dir_depth_tex});
 	// Update probes & borders
@@ -286,7 +286,7 @@ void DDGI::render() {
 			const char* pipeline_name = is_irr ? "Update Irradiance" : "Update Depth";
 			vk::render_graph()
 				->add_compute(lm::str_from_cstr(pipeline_name),
-							  {.shader = vk::Shader("src/shaders/integrators/ddgi/update.comp"),
+							  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/update.comp")),
 							   .macros = {is_irr ? lm::fixed_array_init(arena, {vk::ShaderMacro("IRRADIANCE_UPDATE")})
 												 : lm::fixed_array_init(arena, {vk::ShaderMacro("DEPTH_UPDATE")})},
 							   .dims = {wg_x, wg_y}})
@@ -301,8 +301,8 @@ void DDGI::render() {
 		// 13 WGs process 4 probes (wg = 32 threads)
 		wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 3) * 13 / 4;
 		vk::render_graph()
-			->add_compute("Update Borders",
-						  {.shader = vk::Shader("src/shaders/integrators/ddgi/update_borders.comp"), .dims = {wg_x}})
+			->add_compute(CSTR("Update Borders"),
+						  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/update_borders.comp")), .dims = {wg_x}})
 			.push_constants(&pc_ray)
 			.bind({irr_texes[!ping_pong], depth_texes[!ping_pong], ddgi_ubo_buffer});
 	}
@@ -310,20 +310,20 @@ void DDGI::render() {
 	wg_x = (Window::width() + 31) / 32;
 	u32 wg_y = (Window::height() + 31) / 32;
 	vk::render_graph()
-		->add_compute("Sample Probes",
-					  {.shader = vk::Shader("src/shaders/integrators/ddgi/sample.comp"), .dims = {wg_x, wg_y}})
+		->add_compute(CSTR("Sample Probes"),
+					  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/sample.comp")), .dims = {wg_x, wg_y}})
 		.push_constants(&pc_ray)
 		.bind({scene_ubo_buffer, lumen_scene->scene_desc_buffer, output.tex, irr_texes[!ping_pong],
 			   depth_texes[!ping_pong], ddgi_ubo_buffer, output_tex});
 
 	if (visualize_probes) {
 		vk::render_graph()
-			->add_rt("Visualize probes",
+			->add_rt(CSTR("Visualize probes"),
 					 {
-						 .shaders = {{"src/shaders/integrators/ddgi/probe_vis.rgen"},
-									 {"src/shaders/integrators/ddgi/probe_vis.rmiss"},
-									 {"src/shaders/integrators/ddgi/probe_vis.rchit"},
-									 {"src/shaders/ray.rahit"}},
+						 .shaders = {{CSTR("src/shaders/integrators/ddgi/probe_vis.rgen")},
+									 {CSTR("src/shaders/integrators/ddgi/probe_vis.rmiss")},
+									 {CSTR("src/shaders/integrators/ddgi/probe_vis.rchit")},
+									 {CSTR("src/shaders/ray.rahit")}},
 						 .dims = {Window::width(), Window::height()},
 					 })
 			.push_constants(&pc_ray)
@@ -336,8 +336,8 @@ void DDGI::render() {
 		// 13 WGs process 4 probes (wg = 32 threads)
 		wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 31) / 32;
 		vk::render_graph()
-			->add_compute("Relocate",
-						  {.shader = vk::Shader("src/shaders/integrators/ddgi/relocate.comp"), .dims = {wg_x}})
+			->add_compute(CSTR("Relocate"),
+						  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/relocate.comp")), .dims = {wg_x}})
 			.push_constants(&pc_ray)
 			.bind({scene_ubo_buffer, lumen_scene->scene_desc_buffer, ddgi_ubo_buffer, rt.dir_depth_tex});
 	}

@@ -10,11 +10,11 @@ bool calc_rmse = false;
 void RayTracer::init(bool use_debug, i32 argc, char* argv[]) {
 	instance = this;
 	debug = use_debug;
-	lm::String scene_name = lm::cstr("scenes/caustics.scene");
+	lm::String scene_name = CSTR("scenes/caustics.scene");
 	for (i32 i = 0; i < argc; i++) {
 		// +1 for null terminator
 		lm::String arg_str = lm::String(argv[i], strlen(argv[i]) + 1);
-		if (lm::str_ends_with(arg_str, lm::cstr(".scene"))) {
+		if (lm::str_ends_with(arg_str, CSTR(".scene"))) {
 			scene_name = arg_str;
 		}
 	}
@@ -236,11 +236,11 @@ void RayTracer::render_debug_utils() {
 		};
 		vk::render_graph()->current_pass().copy(integrator->output_tex, output_img_buffer);
 		// Calculate RMSE
-		op_reduce("OpReduce: RMSE", "src/shaders/rmse/calc_rmse.comp", "OpReduce: Reduce RMSE",
-				  "src/shaders/rmse/reduce_rmse.comp");
+		op_reduce(CSTR("OpReduce: RMSE"), CSTR("src/shaders/rmse/calc_rmse.comp"), "OpReduce: Reduce RMSE",
+				  CSTR("src/shaders/rmse/reduce_rmse.comp"));
 		vk::render_graph()
-			->add_compute("Calculate RMSE",
-						  {.shader = vk::Shader("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1}})
+			->add_compute(CSTR("Calculate RMSE"),
+						  {.shader = vk::Shader(CSTR("src/shaders/rmse/output_rmse.comp")), .dims = {1, 1, 1}})
 			.push_constants(&rt_utils_pc)
 			.bind(rt_utils_desc_buffer);
 	}
@@ -437,6 +437,7 @@ f32 RayTracer::draw_frame() {
 	render(image_idx);
 	VkResult result = vk::submit_frame(image_idx);
 	vk::render_graph()->reset();
+	vk::render_graph()->reload_shaders = false;
 	if (result != VK_SUCCESS) {
 		Window::update_window_size();
 		cleanup_resources();

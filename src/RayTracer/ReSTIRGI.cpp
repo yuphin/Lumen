@@ -98,13 +98,13 @@ void ReSTIRGI::render() {
 
 	// Trace rays
 	vk::render_graph()
-		->add_rt("ReSTIRGI - Generate Samples",
+		->add_rt(CSTR("ReSTIRGI - Generate Samples"),
 				 {
-					 .shaders = {{"src/shaders/integrators/restir/gi/restir.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
+					 .shaders = {{CSTR("src/shaders/integrators/restir/gi/restir.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height() },
 				 })
 		.push_constants(&pc_ray)
@@ -119,13 +119,13 @@ void ReSTIRGI::render() {
 
 	// Temporal reuse
 	vk::render_graph()
-		->add_rt("ReSTIRGI - Temporal Reuse",
+		->add_rt(CSTR("ReSTIRGI - Temporal Reuse"),
 				 {
-					 .shaders = {{"src/shaders/integrators/restir/gi/temporal_reuse.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
+					 .shaders = {{CSTR("src/shaders/integrators/restir/gi/temporal_reuse.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height() },
 				 })
 		.push_constants(&pc_ray)
@@ -136,13 +136,13 @@ void ReSTIRGI::render() {
 
 	// Spatial reuse
 	vk::render_graph()
-		->add_rt("ReSTIRGI - Spatial Reuse",
+		->add_rt(CSTR("ReSTIRGI - Spatial Reuse"),
 				 {
-					 .shaders = {{"src/shaders/integrators/restir/gi/spatial_reuse.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
+					 .shaders = {{CSTR("src/shaders/integrators/restir/gi/spatial_reuse.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height() },
 				 })
 		.push_constants(&pc_ray)
@@ -152,8 +152,8 @@ void ReSTIRGI::render() {
 		.bind_tlas(tlas);
 	// Output
 	vk::render_graph()
-		->add_compute("Output",
-					  {.shader = vk::Shader("src/shaders/integrators/restir/gi/output.comp"),
+		->add_compute(CSTR("Output"),
+					  {.shader = vk::Shader(CSTR("src/shaders/integrators/restir/gi/output.comp")),
 					   .dims = {(u32)std::ceil(Window::width() * Window::height()  / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});

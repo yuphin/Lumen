@@ -59,14 +59,14 @@ void BDPT::render() {
 	pc_ray.size_x = Window::width();
 	pc_ray.size_y = Window::height();
 	vk::render_graph()
-		->add_rt("BDPT",
+		->add_rt(CSTR("BDPT"),
 				 {
 
-					 .shaders = {{"src/shaders/integrators/bdpt/bdpt.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
+					 .shaders = {{CSTR("src/shaders/integrators/bdpt/bdpt.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
 		.zero(light_path_buffer)

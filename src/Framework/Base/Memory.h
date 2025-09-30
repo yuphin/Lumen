@@ -39,6 +39,20 @@ struct Array {
 	u64 size = 0;
 	u64 capacity = 0;
 	Arena* arena_node = nullptr;
+
+	T& push() {
+		if (size == capacity) {
+			if constexpr (GROWABLE) {
+				u64 new_capacity = capacity == 0 ? 4 : 3 * (capacity >> 1);
+				arena_ensure_allocated_in_the_same_block<T>(arena_node, new_capacity, capacity);
+				capacity = new_capacity;
+			} else {
+				LUMEN_ASSERT(false, "Array capacity exceeded for fixed array");
+			}
+		}
+		return data[size++];
+	}
+
 	void push_back(const T& value) {
 		if (size == capacity) {
 			if constexpr (GROWABLE) {

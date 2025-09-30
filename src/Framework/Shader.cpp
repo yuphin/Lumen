@@ -8,7 +8,11 @@
 #include <glslc/file_includer.h>
 #endif	//  USE_SHADERC
 
-static lm::Arena* _arena_shaders = nullptr;
+////////////////////////////
+// --- Limits ---
+static constexpr u64 MAX_VERTEX_INPUTS = 32;
+
+thread_local lm::Arena* _arena_shaders = nullptr;
 
 namespace vk {
 enum class ResourceType { UniformBuffer, StorageBuffer, StorageImage, SampledImage, AccelarationStructure };
@@ -153,13 +157,13 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 	}
 	for (auto& storage_img : active_resources.storage_images) {
 		auto binding = glsl.get_decoration(storage_img.id, spv::DecorationBinding);
-		BindingStatus& binding_status = shader.resource_binding_map.get_or_create(binding, BindingStatus{})->value;
+		BindingStatus& binding_status = shader.resource_binding_map.get_or_create(binding)->value;
 		binding_status.write = true;
 		binding_status.active = true;
 	}
 	for (auto& storage_buffer : active_resources.storage_buffers) {
 		auto binding = glsl.get_decoration(storage_buffer.id, spv::DecorationBinding);
-		BindingStatus& binding_status = shader.resource_binding_map.get_or_create(binding, BindingStatus{})->value;
+		BindingStatus& binding_status = shader.resource_binding_map.get_or_create(binding)->value;
 		binding_status.active = true;
 	}
 
@@ -201,7 +205,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 				if (is_bound_buffer(variable_storage_class)) {
 					// Bound resource
 					auto binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
-					shader.resource_binding_map.get_or_create(binding, BindingStatus{})->value.write = true;
+					shader.resource_binding_map.get_or_create(binding)->value.write = true;
 				} else if (is_buffer(variable_storage_class)) {
 					// Via pointer
 					auto ptr_var_id = load_map[access_chain.base_ptr_id];
@@ -211,7 +215,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 					const auto& res = buffer_ptr_hash_map[ptr_var_id];
 					auto entry = pass->rg->registered_buffer_pointers.find(lm::str_from_cstr(res.c_str()));
 					if (entry) {
-						shader.buffer_status_map.get_or_create(entry->key, BufferStatus{})->value.write = true;
+						shader.buffer_status_map.get_or_create(entry->key)->value.write = true;
 					}
 				}
 			} else if (load_map.find(access_chain.base_ptr_id) != load_map.end()) {
@@ -219,8 +223,8 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 				// If it has loads, it should be a buffer pointer
 				const auto& res = buffer_ptr_hash_map[load_map[access_chain.base_ptr_id]];
 				auto entry = pass->rg->registered_buffer_pointers.find(lm::str_from_cstr(res.c_str()));
-				if( entry ) {
-					shader.buffer_status_map.get_or_create(entry->key, BufferStatus{})->value.write = true;
+				if (entry) {
+					shader.buffer_status_map.get_or_create(entry->key)->value.write = true;
 				}
 			}
 		}
@@ -231,7 +235,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 		if (variable_map.find(store_id) != variable_map.end()) {
 			if (is_bound_buffer(variable_map[store_id].storage_class)) {
 				auto binding = glsl.get_decoration(store_id, spv::DecorationBinding);
-				shader.resource_binding_map.get_or_create(binding, BindingStatus{})->value.write = true;
+				shader.resource_binding_map.get_or_create(binding)->value.write = true;
 			}
 		}
 	};
@@ -286,7 +290,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 						auto storage_class = glsl.get_storage_class(access_chain.base_ptr_id);
 						if (is_bound_buffer(storage_class)) {
 							auto binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
-							shader.resource_binding_map.get_or_create(binding, BindingStatus{})->value.read = true;
+							shader.resource_binding_map.get_or_create(binding)->value.read = true;
 						}
 						auto nh = access_chain_map.extract(id);
 						nh.key() = insn[2];
@@ -319,8 +323,9 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 								// when we add bindless images in the future
 								const auto& res = buffer_ptr_hash_map[load_map[access_chain.base_ptr_id]];
 								auto entry = pass->rg->registered_buffer_pointers.find(lm::str_from_cstr(res.c_str()));
-								if( entry ) {
-									shader.buffer_status_map.get_or_create(entry->key, BufferStatus{})->value.read = true;
+								if (entry) {
+									shader.buffer_status_map.get_or_create(entry->key)->value.read =
+										true;
 								}
 							}
 						}
@@ -331,15 +336,15 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 					// bindless images in the future
 					const auto& res = buffer_ptr_hash_map[ptr_var_id];
 					auto entry = pass->rg->registered_buffer_pointers.find(lm::str_from_cstr(res.c_str()));
-					if( entry ) {
-						shader.buffer_status_map.get_or_create(entry->key, BufferStatus{})->value.read = true;
+					if (entry) {
+						shader.buffer_status_map.get_or_create(entry->key)->value.read = true;
 					}
 				}
 
 				if (variable_map.find(ptr_var_id) != variable_map.end()) {
 					if (is_bound_buffer(variable_map[ptr_var_id].storage_class)) {
 						auto binding = glsl.get_decoration(ptr_var_id, spv::DecorationBinding);
-						shader.resource_binding_map.get_or_create(binding, BindingStatus{})->value.read = true;
+						shader.resource_binding_map.get_or_create(binding)->value.read = true;
 					}
 				}
 
@@ -477,8 +482,8 @@ static void add_macros(const lm::FixedArray<ShaderMacro>& macros, shaderc::Compi
 	}
 }
 
-static std::vector<u32> compile_file(const lm::String& source_name, shaderc_shader_kind kind,
-									 const lm::String& source, lm::RenderPass* pass, bool optimize = false) {
+static std::vector<u32> compile_file(const lm::String& source_name, shaderc_shader_kind kind, const lm::String& source,
+									 lm::RenderPass* pass, bool optimize = false) {
 	shaderc::Compiler compiler;
 	shaderc::CompileOptions options;
 
@@ -510,17 +515,12 @@ static std::vector<u32> compile_file(const lm::String& source_name, shaderc_shad
 Shader::Shader(const lm::String& filename) : filename(filename) {}
 i32 Shader::compile(lm::RenderPass* pass) {
 	LUMEN_TRACE("Compiling shader: %s", name_with_macros.data);
-#if USE_SHADERC
-	
-	os::FileHandle file_handle = os::file_open(filename, os::AccessFlag_Read);
-	if(file_handle == 0) {
-		LUMEN_ERROR("Failed to open shader file: %s", filename.data);
-		return -1;
-	}
-	if(!_arena_shaders) {
+
+	// If we're compiling, we need to initialize shader specific arrays and hashmaps
+	if (!_arena_shaders) {
 		_arena_shaders = lm::arena_create(MB(16));
 	}
-	if(!mstages.arena_node) {
+	if (!mstages.arena_node) {
 		mstages = lm::hash_map_create<lm::String, shaderc_shader_kind>(_arena_shaders, 8);
 
 		mstages.insert("vert", shaderc_vertex_shader);
@@ -531,18 +531,36 @@ i32 Shader::compile(lm::RenderPass* pass) {
 		mstages.insert("rchit", shaderc_closesthit_shader);
 		mstages.insert("rmiss", shaderc_miss_shader);
 	}
+	if (!vertex_inputs.initialized()) {
+		vertex_inputs = lm::fixed_array_create<std::pair<VkFormat, u32>>(_arena_shaders, MAX_VERTEX_INPUTS);
+		buffer_status_map = lm::hash_map_create<lm::String, BufferStatus>(_arena_shaders, 128);
+		resource_binding_map = lm::hash_map_create<u32, BindingStatus>(_arena_shaders, 128);
+	} else {
+		vertex_inputs.clear();
+		buffer_status_map.clear();
+		resource_binding_map.clear();
+	}
 
+#if USE_SHADERC
+
+	os::FileHandle file_handle = os::file_open(filename, os::AccessFlag_Read);
+	if (file_handle == 0) {
+		LUMEN_ERROR("Failed to open shader file: %s", filename.data);
+		return -1;
+	}
 	os::FileProperties file_props = os::file_properties(file_handle);
 
 	lm::ScratchArena scratch(_arena_shaders);
-	lm::String buffer = lm::str_reserve(scratch.arena, file_props.size + 1);
+	// TODO: Make sure to include the null terminator
+	lm::String buffer = lm::str_reserve(scratch.arena, file_props.size);
 	os::file_read(file_handle, buffer.data);
-	buffer.data[file_props.size] = '\0';
+	// buffer.data[file_props.size] = '\0';
 	os::file_close(file_handle);
 
 	u64 dot = lm::str_rfind(filename, ".");
 	assert(dot != U64_MAX);
-	u64 ext_len = filename.size - (dot + 1);
+	// -1 comes from filename being cstr
+	u64 ext_len = filename.size - (dot + 1) - 1;
 	lm::String file_ext = lm::str_substr(filename, dot + 1, ext_len);
 
 	shaderc_shader_kind stage = mstages.find(file_ext)->value;

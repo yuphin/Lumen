@@ -273,10 +273,10 @@ void VCMMLT::render() {
 		}
 	};
 	auto sum_up_chain_data = [&] {
-		op_reduce("OpReduce: Sum0", "src/shaders/integrators/vcmmlt/sum.comp", "OpReduce: Reduce Sum0",
-				  "src/shaders/integrators/vcmmlt/reduce_sum.comp", {0});
-		op_reduce("OpReduce: Sum1", "src/shaders/integrators/vcmmlt/sum.comp", "OpReduce: Reduce Sum1",
-				  "src/shaders/integrators/vcmmlt/reduce_sum.comp", {1});
+		op_reduce(CSTR("OpReduce: Sum0"), CSTR("src/shaders/integrators/vcmmlt/sum.comp"), "OpReduce: Reduce Sum0",
+				  CSTR("src/shaders/integrators/vcmmlt/reduce_sum.comp"), {0});
+		op_reduce(CSTR("OpReduce: Sum1"), CSTR("src/shaders/integrators/vcmmlt/sum.comp"), "OpReduce: Reduce Sum1",
+				  CSTR("src/shaders/integrators/vcmmlt/reduce_sum.comp"), {1});
 	};
 	std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		output_tex,
@@ -294,11 +294,11 @@ void VCMMLT::render() {
 	std::string pipeline_name = "VCMMLT - Trace " + pipeline_postfix;
 	rg->add_rt(lm::str_from_cpp_str(pipeline_name),
 			   {
-				   .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_eye.rgen"},
-							   {"src/shaders/ray.rmiss"},
-							   {"src/shaders/ray_shadow.rmiss"},
-							   {"src/shaders/ray.rchit"},
-							   {"src/shaders/ray.rahit"}},
+				   .shaders = {{CSTR("src/shaders/integrators/vcmmlt/vcmmlt_eye.rgen")},
+							   {CSTR("src/shaders/ray.rmiss")},
+							   {CSTR("src/shaders/ray_shadow.rmiss")},
+							   {CSTR("src/shaders/ray.rchit")},
+							   {CSTR("src/shaders/ray.rahit")}},
 				   .specialization_data = spec_consts,
 				   .dims = {Window::width() * Window::height()},
 			   })
@@ -313,11 +313,11 @@ void VCMMLT::render() {
 	pipeline_name = "VCMMLT - Bootstrap " + pipeline_postfix;
 	rg->add_rt(lm::str_from_cpp_str(pipeline_name),
 			   {
-				   .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_seed.rgen"},
-							   {"src/shaders/ray.rmiss"},
-							   {"src/shaders/ray_shadow.rmiss"},
-							   {"src/shaders/ray.rchit"},
-							   {"src/shaders/ray.rahit"}},
+				   .shaders = {{CSTR("src/shaders/integrators/vcmmlt/vcmmlt_seed.rgen")},
+							   {CSTR("src/shaders/ray.rmiss")},
+							   {CSTR("src/shaders/ray_shadow.rmiss")},
+							   {CSTR("src/shaders/ray.rchit")},
+							   {CSTR("src/shaders/ray.rahit")}},
 				   .specialization_data = spec_consts,
 				   .dims = {(u32)config.num_bootstrap_samples},
 			   })
@@ -329,13 +329,15 @@ void VCMMLT::render() {
 	i32 counter = 0;
 	prefix_scan(0, config.num_bootstrap_samples, counter, rg);
 	// Calculate CDF
-	rg->add_compute("Calculate CDF", {.shader = vk::Shader("src/shaders/integrators/pssmlt/calc_cdf.comp"),
-									  .dims = {(u32)std::ceil(config.num_bootstrap_samples / f32(1024.0f)), 1, 1}})
+	rg->add_compute(CSTR("Calculate CDF"),
+					{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/calc_cdf.comp")),
+					 .dims = {(u32)std::ceil(config.num_bootstrap_samples / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer);
 	// Select seeds
-	rg->add_compute("Select Seeds", {.shader = vk::Shader("src/shaders/integrators/vcmmlt/select_seeds.comp"),
-									 .dims = {(u32)std::ceil(config.num_mlt_threads / f32(1024.0f)), 1, 1}})
+	rg->add_compute(CSTR("Select Seeds"),
+					{.shader = vk::Shader(CSTR("src/shaders/integrators/vcmmlt/select_seeds.comp")),
+					 .dims = {(u32)std::ceil(config.num_mlt_threads / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer);
 	// Fill in the samplers for mutations
@@ -344,11 +346,11 @@ void VCMMLT::render() {
 		std::string pipeline_name = "VCMMLT - Preprocess " + pipeline_postfix;
 		rg->add_rt(lm::str_from_cpp_str(pipeline_name),
 				   {
-					   .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_preprocess.rgen"},
-								   {"src/shaders/ray.rmiss"},
-								   {"src/shaders/ray_shadow.rmiss"},
-								   {"src/shaders/ray.rchit"},
-								   {"src/shaders/ray.rahit"}},
+					   .shaders = {{CSTR("src/shaders/integrators/vcmmlt/vcmmlt_preprocess.rgen")},
+								   {CSTR("src/shaders/ray.rmiss")},
+								   {CSTR("src/shaders/ray_shadow.rmiss")},
+								   {CSTR("src/shaders/ray.rchit")},
+								   {CSTR("src/shaders/ray.rahit")}},
 					   .specialization_data = spec_consts,
 					   .dims = {(u32)config.num_mlt_threads},
 				   })
@@ -361,8 +363,8 @@ void VCMMLT::render() {
 		sum_up_chain_data();
 	}
 	// Calculate normalization factor
-	rg->add_compute("Calculate Normalization",
-					{.shader = vk::Shader("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
+	rg->add_compute(CSTR("Calculate Normalization"),
+					{.shader = vk::Shader(CSTR("src/shaders/integrators/vcmmlt/normalize.comp")), .dims = {1, 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer);
 	rg->run_and_submit(cmd);
@@ -375,11 +377,11 @@ void VCMMLT::render() {
 			// Mutate
 			rg->add_rt(lm::str_from_cpp_str(pipeline_name),
 					   {
-						   .shaders = {{"src/shaders/integrators/vcmmlt/vcmmlt_mutate.rgen"},
-									   {"src/shaders/ray.rmiss"},
-									   {"src/shaders/ray_shadow.rmiss"},
-									   {"src/shaders/ray.rchit"},
-									   {"src/shaders/ray.rahit"}},
+						   .shaders = {{CSTR("src/shaders/integrators/vcmmlt/vcmmlt_mutate.rgen")},
+									   {CSTR("src/shaders/ray.rmiss")},
+									   {CSTR("src/shaders/ray_shadow.rmiss")},
+									   {CSTR("src/shaders/ray.rchit")},
+									   {CSTR("src/shaders/ray.rahit")}},
 						   .dims = {(u32)config.num_mlt_threads},
 					   })
 				.push_constants(&pc_ray)
@@ -390,8 +392,9 @@ void VCMMLT::render() {
 				.bind_tlas(tlas);
 			sum_up_chain_data();
 			// Normalization
-			rg->add_compute("Calculate Normalization",
-							{.shader = vk::Shader("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
+			rg->add_compute(
+				  CSTR("Calculate Normalization"),
+				  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcmmlt/normalize.comp")), .dims = {1, 1, 1}})
 				.push_constants(&pc_ray)
 				.bind(lumen_scene->scene_desc_buffer);
 		};
@@ -418,8 +421,9 @@ void VCMMLT::render() {
 		}
 	}
 	// Compositions
-	rg->add_compute("Composition", {.shader = vk::Shader("src/shaders/integrators/vcmmlt/composite.comp"),
-									.dims = {(u32)glm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+	rg->add_compute(CSTR("Composition"),
+					{.shader = vk::Shader(CSTR("src/shaders/integrators/vcmmlt/composite.comp")),
+					 .dims = {(u32)glm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind({output_tex, lumen_scene->scene_desc_buffer});
 }
@@ -450,16 +454,17 @@ void VCMMLT::prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph
 	pc_compute.num_elems = num_elems;
 	auto scan = [&](i32 num_wgs, i32 idx) {
 		++counter;
-		rg->add_compute("PrefixScan - Scan", {.shader = vk::Shader("src/shaders/integrators/pssmlt/prefix_scan.comp"),
-											  .dims = {(u32)num_wgs, 1, 1}})
+		rg->add_compute(CSTR("PrefixScan - Scan"),
+						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/prefix_scan.comp")),
+						 .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
 	};
 	auto uniform_add = [&](i32 num_wgs, i32 output_idx) {
 		++counter;
-		rg->add_compute(
-			  "PrefixScan - Uniform Add",
-			  {.shader = vk::Shader("src/shaders/integrators/pssmlt/uniform_add.comp"), .dims = {(u32)num_wgs, 1, 1}})
+		rg->add_compute(CSTR("PrefixScan - Uniform Add"),
+						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/uniform_add.comp")),
+						 .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);
 	};

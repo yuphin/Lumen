@@ -93,13 +93,13 @@ void ReSTIR::render() {
 	lm::RenderGraph* rg = vk::render_graph();
 
 	// Temporal pass + path tracing
-	rg->add_rt("ReSTIR - Temporal Pass",
+	rg->add_rt(CSTR("ReSTIR - Temporal Pass"),
 			   {
-				   .shaders = {{"src/shaders/integrators/restir/di/temporal_pass.rgen"},
-							   {"src/shaders/ray.rmiss"},
-							   {"src/shaders/ray_shadow.rmiss"},
-							   {"src/shaders/ray.rchit"},
-							   {"src/shaders/ray.rahit"}},
+				   .shaders = {{CSTR("src/shaders/integrators/restir/di/temporal_pass.rgen")},
+							   {CSTR("src/shaders/ray.rmiss")},
+							   {CSTR("src/shaders/ray_shadow.rmiss")},
+							   {CSTR("src/shaders/ray.rchit")},
+							   {CSTR("src/shaders/ray.rahit")}},
 				   .dims = {Window::width(), Window::height() },
 			   })
 		.push_constants(&pc_ray)
@@ -111,13 +111,13 @@ void ReSTIR::render() {
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
 	// Spatial pass
-	rg->add_rt("ReSTIR - Spatial Pass",
+	rg->add_rt(CSTR("ReSTIR - Spatial Pass"),
 			   {
-				   .shaders = {{"src/shaders/integrators/restir/di/spatial_pass.rgen"},
-							   {"src/shaders/ray.rmiss"},
-							   {"src/shaders/ray_shadow.rmiss"},
-							   {"src/shaders/ray.rchit"},
-							   {"src/shaders/ray.rahit"}},
+				   .shaders = {{CSTR("src/shaders/integrators/restir/di/spatial_pass.rgen")},
+							   {CSTR("src/shaders/ray.rmiss")},
+							   {CSTR("src/shaders/ray_shadow.rmiss")},
+							   {CSTR("src/shaders/ray.rchit")},
+							   {CSTR("src/shaders/ray.rahit")}},
 				   .dims = {Window::width(), Window::height() },
 			   })
 		.push_constants(&pc_ray)
@@ -127,13 +127,13 @@ void ReSTIR::render() {
 		.bind_tlas(tlas);
 
 	// Output
-	rg->add_rt("ReSTIR - Output",
+	rg->add_rt(CSTR("ReSTIR - Output"),
 			   {
-				   .shaders = {{"src/shaders/integrators/restir/di/output.rgen"},
-							   {"src/shaders/ray.rmiss"},
-							   {"src/shaders/ray_shadow.rmiss"},
-							   {"src/shaders/ray.rchit"},
-							   {"src/shaders/ray.rahit"}},
+				   .shaders = {{CSTR("src/shaders/integrators/restir/di/output.rgen")},
+							   {CSTR("src/shaders/ray.rmiss")},
+							   {CSTR("src/shaders/ray_shadow.rmiss")},
+							   {CSTR("src/shaders/ray.rchit")},
+							   {CSTR("src/shaders/ray.rahit")}},
 				   .dims = {Window::width(), Window::height() },
 			   })
 		.push_constants(&pc_ray)

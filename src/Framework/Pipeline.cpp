@@ -268,6 +268,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const lm::Fixe
 		stages.push_back(stage);
 		stage_idx++;
 	}
+	LUMEN_ASSERT(groups.size() == stages.size(), "Currently 1 stage = 1 group");
 
 	VkSpecializationInfo specialization_info = {};
 	if (!settings.specialization_data.empty()) {
@@ -288,7 +289,6 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const lm::Fixe
 	pipeline_CI.layout = pipeline_layout;
 	pipeline_CI.flags = 0;
 	vk::check(vkCreateRayTracingPipelinesKHR(vk::context().device, {}, {}, 1, &pipeline_CI, nullptr, &handle));
-	sbt_wrapper.setup(vk::context().queue_indices.gfx_family.value(), vk::context().rt_props);
 	sbt_wrapper.create(handle, pipeline_CI);
 	if (!name.empty()) {
 		vk::set_resource_name(vk::context().device, (u64)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);

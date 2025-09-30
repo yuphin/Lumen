@@ -41,12 +41,8 @@ String str_dup(Arena* arena, const String& str) {
 	return result;
 }
 
-String str_from_cpp_str(const std::string& str) {
-	return String((char*)str.data(), str.size());
-}
-std::string str_to_cpp_str(const lm::String& str) {
-	return std::string(str.data, str.size);
-}
+String str_from_cpp_str(const std::string& str) { return String((char*)str.data(), str.size()); }
+std::string str_to_cpp_str(const lm::String& str) { return std::string(str.data, str.size); }
 
 bool char_is_digit(char c) { return c >= '0' && c <= '9'; }
 bool char_is_upper(char c) { return c >= 'A' && c <= 'Z'; }
@@ -251,15 +247,15 @@ bool str_compare(const String& str1, const String& str2) {
 }
 
 u64 str_rfind(const String& str1, const String& str2) {
-	assert(str1.size >= str2.size);
-	u64 str2_idx = str2.size - 1;
-	u64 str1_idx = str1.size - 1;
-	for (; str2_idx != U64_MAX; --str1_idx, --str2_idx) {
-		if (str1[str1_idx] != str2[str2_idx]) {
-			return U64_MAX;
+	if (str2.size > str1.size || str2.empty() || str1.empty()) {
+		return U64_MAX;
+	}
+	for (u64 i = str1.size - str2.size + 1; i-- > 0;) {
+		if (str_compare(str_substr(str1, i, str2.size), str2)) {
+			return i;
 		}
 	}
-	return str1_idx;
+	return U64_MAX;
 }
 u64 str_rfind_any(const String& str1, const String& chars) {
 	u64 str1_idx = str1.size - 1;

@@ -147,8 +147,8 @@ void VCM::render() {
 	// Prepare
 	auto& prepare_pass =
 		vk::render_graph()
-			->add_compute("Init Reservoirs",
-						  {.shader = vk::Shader("src/shaders/integrators/vcm/init_reservoirs.comp"),
+			->add_compute(CSTR("Init Reservoirs"),
+						  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/init_reservoirs.comp")),
 						   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 			.push_constants(&pc_ray)
 			.bind(lumen_scene->scene_desc_buffer)
@@ -162,13 +162,13 @@ void VCM::render() {
 
 	// Do resampling
 	vk::render_graph()
-		->add_rt("Resample",
+		->add_rt(CSTR("Resample"),
 				 {
-					 .shaders = {{"src/shaders/integrators/vcm/vcm_sample.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
+					 .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_sample.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc_ray)
@@ -179,8 +179,8 @@ void VCM::render() {
 
 	// Check resampling
 	vk::render_graph()
-		->add_compute("Check Reservoirs",
-					  {.shader = vk::Shader("src/shaders/integrators/vcm/check_reservoirs.comp"),
+		->add_compute(CSTR("Check Reservoirs"),
+					  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/check_reservoirs.comp")),
 					   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&pc_ray)
 		.bind(lumen_scene->scene_desc_buffer)
@@ -188,13 +188,13 @@ void VCM::render() {
 	pc_ray.random_num = rand() % UINT_MAX;
 	// Spawn light rays
 	vk::render_graph()
-		->add_rt("VCM - Spawn Light",
+		->add_rt(CSTR("VCM - Spawn Light"),
 				 {
-					 .shaders = {{"src/shaders/integrators/vcm/vcm_spawn_light.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
+					 .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_spawn_light.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc_ray)
@@ -206,13 +206,13 @@ void VCM::render() {
 	pc_ray.random_num = rand() % UINT_MAX;
 	// Trace spawned rays
 	vk::render_graph()
-		->add_rt("VCM - Trace Light",
+		->add_rt(CSTR("VCM - Trace Light"),
 				 {
-					 .shaders = {{"src/shaders/integrators/vcm/vcm_light.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
+					 .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_light.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc_ray)
@@ -222,28 +222,28 @@ void VCM::render() {
 		.bind_tlas(tlas);
 	// Select a reservoir sample
 	vk::render_graph()
-		->add_compute("Select Reservoir",
-					  {.shader = vk::Shader("src/shaders/integrators/vcm/select_reservoirs.comp"),
+		->add_compute(CSTR("Select Reservoir"),
+					  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/select_reservoirs.comp")),
 					   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.bind(lumen_scene->scene_desc_buffer)
 		.push_constants(&pc_ray);
 
 	// Update temporal reservoirs with the selected sample
 	vk::render_graph()
-		->add_compute("Update Reservoirs",
-					  {.shader = vk::Shader("src/shaders/integrators/vcm/update_reservoirs.comp"),
+		->add_compute(CSTR("Update Reservoirs"),
+					  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/update_reservoirs.comp")),
 					   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.bind(lumen_scene->scene_desc_buffer)
 		.push_constants(&pc_ray);
 	// Trace rays from eye
 	vk::render_graph()
-		->add_rt("VCM - Trace Eye",
+		->add_rt(CSTR("VCM - Trace Eye"),
 				 {
-					 .shaders = {{"src/shaders/integrators/vcm/vcm_eye.rgen"},
-								 {"src/shaders/ray.rmiss"},
-								 {"src/shaders/ray_shadow.rmiss"},
-								 {"src/shaders/ray.rchit"},
-								 {"src/shaders/ray.rahit"}},
+					 .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_eye.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc_ray)

@@ -19,6 +19,11 @@ inline constexpr T next_pow2(T x) {
 	return x + 1;
 }
 
+template <class T>
+inline constexpr T align_up_pow2(T x, u64 a) noexcept {
+	return T((x + (T(a) - 1)) & ~T(a - 1));
+}
+
 template <typename T, typename... Rest>
 inline void hash_combine(u64& seed, const T& v) {
 	std::hash<T> hasher;

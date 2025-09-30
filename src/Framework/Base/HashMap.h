@@ -33,6 +33,8 @@ struct HashMapProbed {
 	u64 num_slots = 0;
 	u64 capacity = 0;
 	Arena* arena_node = nullptr;
+	
+	inline bool initialized() const { return arena_node != nullptr; }
 
 	void resize(u64 new_capacity) {
 		new_capacity = util::next_pow2(new_capacity);
