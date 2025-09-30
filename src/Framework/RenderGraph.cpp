@@ -28,7 +28,6 @@ static lm::Arena* _arena_rendergraph = nullptr;
 static lm::Arena* _arena_strings = nullptr;
 
 // TODO: Investigate get_or_create behavior
-// TODO: Ensure shader name_with_macros is cstr
 
 static VkPipelineStageFlags pipeline_stage_from_pass_type(vk::PassType pass_type, VkAccessFlags access_flags) {
 	VkPipelineStageFlags res = 0;
@@ -375,9 +374,6 @@ RenderPass& RenderGraph::add_rt(const lm::String& name, const vk::RTPassSettings
 	}
 	vk::PassType type = vk::PassType::RT;
 	RenderPass& pass = passes.push();
-	if(!pass.name.empty() && !lm::str_compare(name, pass.name)) {
-		int a = 4;
-	}
 	render_pass_init_rt(pass, type, name_with_macros, this, (u32)passes.size - 1, settings, macro_string,
 						pipeline_storage, cached);
 	return pass;
@@ -1161,7 +1157,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 						existing_shaders[&passes[i]].push_back(&shader);
 					}
 				}
-			} else{
+			} else {
 				// Compute
 				if (!unique_shaders_set.insert({&passes[i].compute_settings->shader, &passes[i]}).second) {
 					existing_shaders[&passes[i]].push_back(&passes[i].compute_settings->shader);
@@ -1249,7 +1245,6 @@ void RenderGraph::reset() {
 		pass.next_binding_idx = 0;
 		pass.next_as_binding_idx = 0;
 		pass.disable_execution = false;
-		
 	}
 	passes.clear();
 	pipeline_tasks.clear();
@@ -1273,8 +1268,8 @@ void RenderGraph::run_and_submit(vk::CommandBuffer& cmd) {
 	submit(cmd);
 }
 
-static void populate_macros(lm::Arena* arena, const lm::FixedArray<vk::ShaderMacro>& macros,
-							lm::String& macro_string, bool& prev_nonempty) {
+static void populate_macros(lm::Arena* arena, const lm::FixedArray<vk::ShaderMacro>& macros, lm::String& macro_string,
+							bool& prev_nonempty) {
 	for (u64 i = 0; i < macros.size; i++) {
 		if (!macros[i].visible) {
 			continue;
@@ -1316,7 +1311,7 @@ PipelineStorage* RenderGraph::add_pass_impl_common(const lm::String& name,
 	if (macro_string == "()") {
 		macro_string = "";
 	}
-	name_with_macros = lm::str_concat(_arena_strings, name_with_macros, macro_string);
+	name_with_macros = lm::str_concat(_arena_strings, name_with_macros, macro_string, /*cstr=*/true);
 
 	u64 hash = 0;
 	hash = lm::fnv1a_hash((void*)name_with_macros.data, name_with_macros.size, lm::HASH_INIT);
@@ -1374,6 +1369,7 @@ void RenderGraph::destroy() {
 void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
 						  const vk::GraphicsPassSettings& gfx_settings, const lm::String& macro_string,
 						  PipelineStorage* pipeline_storage, bool cached) {
+	assert(name.is_cstr());
 	pass.type = type;
 	pass.rg = rg;
 	pass.pass_idx = pass_idx;
@@ -1383,7 +1379,7 @@ void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String&
 	pass.name = name;
 	pass.is_pipeline_cached = cached;
 	for (auto& shader : pass.gfx_settings->shaders) {
-		shader.name_with_macros = lm::str_concat(_arena_strings, shader.filename, macro_string);
+		shader.name_with_macros = lm::str_concat(_arena_strings, shader.filename, macro_string, /*cstr=*/true);
 	}
 	pass.init();
 }
@@ -1391,6 +1387,7 @@ void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String&
 void render_pass_init_rt(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
 						 const vk::RTPassSettings& rt_settings, const lm::String& macro_string,
 						 PipelineStorage* pipeline_storage, bool cached) {
+	assert(name.is_cstr());
 	pass.type = type;
 	pass.rg = rg;
 	pass.pass_idx = pass_idx;
@@ -1399,10 +1396,10 @@ void render_pass_init_rt(RenderPass& pass, vk::PassType type, const lm::String& 
 	pass.pipeline_storage = pipeline_storage;
 	pass.name = name;
 	pass.is_pipeline_cached = cached;
-	if(!pass.is_pipeline_cached) {
+	if (!pass.is_pipeline_cached) {
 		// Shader names need to be persistent for the cache
 		for (auto& shader : pass.rt_settings->shaders) {
-			shader.name_with_macros = lm::str_concat(_arena_rendergraph, shader.filename, macro_string);
+			shader.name_with_macros = lm::str_concat(_arena_rendergraph, shader.filename, macro_string, /*cstr=*/true);
 		}
 	}
 	pass.init();
@@ -1411,6 +1408,7 @@ void render_pass_init_rt(RenderPass& pass, vk::PassType type, const lm::String& 
 void render_pass_init_compute(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg,
 							  u32 pass_idx, const vk::ComputePassSettings& compute_settings,
 							  const lm::String& macro_string, PipelineStorage* pipeline_storage, bool cached) {
+	assert(name.is_cstr());
 	pass.type = type;
 	pass.rg = rg;
 	pass.pass_idx = pass_idx;
@@ -1420,7 +1418,7 @@ void render_pass_init_compute(RenderPass& pass, vk::PassType type, const lm::Str
 	pass.name = name;
 	pass.is_pipeline_cached = cached;
 	pass.compute_settings->shader.name_with_macros =
-		lm::str_concat(_arena_strings, compute_settings.shader.filename, macro_string);
+		lm::str_concat(_arena_strings, compute_settings.shader.filename, macro_string, /*cstr=*/true);
 	pass.init();
 }
 

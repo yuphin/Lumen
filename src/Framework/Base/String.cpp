@@ -24,12 +24,19 @@ String str_from_f64(Arena* arena, double val) {
 
 String str_from_f32(Arena* arena, float val) { return str_from_f64(arena, val); }
 
-String str_concat(Arena* arena, const String& str1, const String& str2) {
+String str_concat(Arena* arena, const String& str1, const String& str2, bool cstr) {
 	String result = {};
-	result.size = str1.size + str2.size;
+	u64 str1_size = str1.size;
+	if(str1.size && str1.is_cstr()) {
+		--str1_size;
+	}
+	result.size = str1_size + str2.size + (u64)cstr;
 	result.data = (char*)arena->allocate(result.size);
-	memcpy(result.data, str1.data, str1.size);
-	memcpy(result.data + str1.size, str2.data, str2.size);
+	memcpy(result.data, str1.data, str1_size);
+	memcpy(result.data + str1_size, str2.data, str2.size);
+	if(cstr) {
+		result.data[result.size - 1] = '\0';
+	}
 	return result;
 }
 

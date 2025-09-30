@@ -59,7 +59,7 @@ String str_from_s64(Arena* arena, s64 val);
 String str_to_lower(Arena* arena, const String& str);
 String str_substr(const String& str, u64 begin, u64 length);
 String str_reserve(Arena* arena, u64 size);
-String str_concat(Arena* arena, const String& str1, const String& str2);
+String str_concat(Arena* arena, const String& str1, const String& str2, bool cstr = false);
 String str_dup(Arena* arena, const String& str);
 // TODO: remove these
 String str_from_cpp_str(const std::string& str);
