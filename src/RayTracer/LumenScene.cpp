@@ -843,8 +843,8 @@ void load(const lm::String& path) {
 		LUMEN_ERROR("Failed to open Lumen scene file: %s", path.data);
 	}
 	if (!_arena_scene) {
-		_arena_scene = lm::arena_create(GB(16));
-		_arena_strings = lm::arena_create(MB(16));
+		_arena_scene = lm::arena_create(GB(16), MB(16));
+		_arena_strings = lm::arena_create(MB(16), MB(1));
 	}
 	os::FileProperties props = os::file_properties(file_handle);
 	lm::String file_content = lm::str_reserve(_arena_strings, props.size + 1);

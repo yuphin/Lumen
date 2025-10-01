@@ -118,7 +118,7 @@ class RenderGraph {
 class RenderPass {
    public:
 	RenderPass() = default;
-	
+
 	RenderPass& bind(const ResourceBinding& binding);
 	RenderPass& bind_texture_with_sampler(vk::Texture* tex, VkSampler sampler);
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
@@ -135,9 +135,11 @@ class RenderPass {
 	RenderPass& write(ResourceBinding& resource);
 
 	RenderPass& skip_execution(bool condition = true);
-
+	RenderPass& push_constants(void* data, u64 size, u64 alignment);
 	template <typename T>
-	RenderPass& push_constants(T* data);
+	inline RenderPass& push_constants(T* data) {
+		return push_constants((void*)data, sizeof(T), alignof(T));
+	}
 
 	// Zero-ing happens before the pass runs
 	RenderPass& zero(const Resource& resource);
@@ -234,8 +236,8 @@ class RenderPass {
 };
 
 void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
-						 const vk::GraphicsPassSettings& gfx_settings, const lm::String& macro_string,
-						 PipelineStorage* pipeline_storage, bool cached = false);
+						  const vk::GraphicsPassSettings& gfx_settings, const lm::String& macro_string,
+						  PipelineStorage* pipeline_storage, bool cached = false);
 
 void render_pass_init_rt(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
 						 const vk::RTPassSettings& rt_settings, const lm::String& macro_string,
@@ -244,15 +246,5 @@ void render_pass_init_rt(RenderPass& pass, vk::PassType type, const lm::String& 
 void render_pass_init_compute(RenderPass&, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
 							  const vk::ComputePassSettings& compute_settings, const lm::String& macro_string,
 							  PipelineStorage* pipeline_storage, bool cached = false);
-template <typename T>
-inline RenderPass& RenderPass::push_constants(T* data) {
-	push_constant_data = malloc(sizeof(T));
-	// TODO
-	// if (!push_constant_data) {
-	// 	push_constant_data = malloc(sizeof(T));
-	// }
-	memcpy(push_constant_data, data, sizeof(T));
-	return *this;
-}
 
 }  // namespace lm

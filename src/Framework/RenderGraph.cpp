@@ -25,7 +25,7 @@ static constexpr u64 MAX_EXPLICIT_IMG_READ_WRITES = 128;
 namespace lm {
 
 static lm::Arena* _arena_rendergraph = nullptr;
-static lm::Arena* _arena_strings = nullptr;
+static lm::Arena* _arena_per_frame = nullptr;
 
 // TODO: Investigate get_or_create behavior
 
@@ -582,6 +582,12 @@ RenderPass& RenderPass::skip_execution(bool condition) {
 	return *this;
 }
 
+RenderPass& RenderPass::push_constants(void* data, u64 size, u64 alignment) {
+	push_constant_data = _arena_per_frame->allocate(size, alignment, nullptr, /*zero_initialize=*/false);
+	memcpy(push_constant_data, data, size);
+	return *this;
+}
+
 RenderPass& RenderPass::zero(const Resource& resource) {
 	if (resource.tex) {
 		LUMEN_ERROR("Unimplemented: Immage zeroing");
@@ -1111,8 +1117,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 void RenderGraph::init() {
 	if (!_arena_rendergraph) {
-		_arena_rendergraph = lm::arena_create(GB(1), KB(64));
-		_arena_strings = lm::arena_create(MB(16), KB(64));
+		_arena_rendergraph = lm::arena_create(GB(1), MB(64));
+		_arena_per_frame = lm::arena_create(MB(16), MB(1));
 	}
 	// Arrays
 	passes = lm::fixed_array_create<RenderPass>(_arena_rendergraph, MAX_PASSES_PER_FRAME);
@@ -1248,7 +1254,7 @@ void RenderGraph::reset() {
 	}
 	passes.clear();
 	pipeline_tasks.clear();
-	_arena_strings->clear();
+	_arena_per_frame->clear();
 }
 
 void RenderGraph::submit(vk::CommandBuffer& cmd) {
@@ -1295,23 +1301,23 @@ PipelineStorage* RenderGraph::add_pass_impl_common(const lm::String& name,
 	assert(name.is_cstr());
 	PipelineStorage* pipeline_storage;
 
-	name_with_macros = lm::str_dup(_arena_strings, name);
+	name_with_macros = lm::str_dup(_arena_per_frame, name);
 
 	if (!macros.empty() || !global_macro_defines.empty()) {
-		macro_string = lm::str_concat(_arena_strings, macro_string, "(");
+		macro_string = lm::str_concat(_arena_per_frame, macro_string, "(");
 	}
 
 	bool prev_nonempty = false;
-	populate_macros(_arena_strings, macros, macro_string, prev_nonempty);
-	populate_macros(_arena_strings, global_macro_defines, macro_string, prev_nonempty);
+	populate_macros(_arena_per_frame, macros, macro_string, prev_nonempty);
+	populate_macros(_arena_per_frame, global_macro_defines, macro_string, prev_nonempty);
 
 	if (!macros.empty() || !global_macro_defines.empty()) {
-		macro_string = lm::str_concat(_arena_strings, macro_string, ")");
+		macro_string = lm::str_concat(_arena_per_frame, macro_string, ")");
 	}
 	if (macro_string == "()") {
 		macro_string = "";
 	}
-	name_with_macros = lm::str_concat(_arena_strings, name_with_macros, macro_string, /*cstr=*/true);
+	name_with_macros = lm::str_concat(_arena_per_frame, name_with_macros, macro_string, /*cstr=*/true);
 
 	u64 hash = 0;
 	hash = lm::fnv1a_hash((void*)name_with_macros.data, name_with_macros.size, lm::HASH_INIT);
@@ -1378,8 +1384,11 @@ void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String&
 	pass.pipeline_storage = pipeline_storage;
 	pass.name = name;
 	pass.is_pipeline_cached = cached;
-	for (auto& shader : pass.gfx_settings->shaders) {
-		shader.name_with_macros = lm::str_concat(_arena_strings, shader.filename, macro_string, /*cstr=*/true);
+	if (!pass.is_pipeline_cached) {
+		// Shader names need to be persistent for the cache
+		for (auto& shader : pass.gfx_settings->shaders) {
+			shader.name_with_macros = lm::str_concat(_arena_rendergraph, shader.filename, macro_string, /*cstr=*/true);
+		}
 	}
 	pass.init();
 }
@@ -1397,7 +1406,6 @@ void render_pass_init_rt(RenderPass& pass, vk::PassType type, const lm::String& 
 	pass.name = name;
 	pass.is_pipeline_cached = cached;
 	if (!pass.is_pipeline_cached) {
-		// Shader names need to be persistent for the cache
 		for (auto& shader : pass.rt_settings->shaders) {
 			shader.name_with_macros = lm::str_concat(_arena_rendergraph, shader.filename, macro_string, /*cstr=*/true);
 		}
@@ -1417,8 +1425,10 @@ void render_pass_init_compute(RenderPass& pass, vk::PassType type, const lm::Str
 	pass.pipeline_storage = pipeline_storage;
 	pass.name = name;
 	pass.is_pipeline_cached = cached;
-	pass.compute_settings->shader.name_with_macros =
-		lm::str_concat(_arena_strings, compute_settings.shader.filename, macro_string, /*cstr=*/true);
+	if (!pass.is_pipeline_cached) {
+		pass.compute_settings->shader.name_with_macros =
+			lm::str_concat(_arena_rendergraph, compute_settings.shader.filename, macro_string, /*cstr=*/true);
+	}
 	pass.init();
 }
 
