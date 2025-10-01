@@ -355,8 +355,8 @@ bool RayTracer::gui() {
 	}
 
 	SceneConfig& config = scene::get()->config;
-	const char* settings[] = {"Path",	"BDPT",	  "SPPM",	   "VCM",		"PSSMLT", "SMLT",
-							  "VCMMLT", "ReSTIR", "ReSTIR GI", "ReSTIR PT", "DDGI"};
+	const char* settings[] = {"Path",	"BDPT",	  "SPPM",	   "VCM",  "PSSMLT",   "SMLT",
+							  "VCMMLT", "ReSTIR", "ReSTIR GI", "DDGI", "ReSTIR PT"};
 
 	static i32 curr_integrator_idx = i32(config.type);
 	if (ImGui::BeginCombo("Select Integrator", settings[curr_integrator_idx])) {

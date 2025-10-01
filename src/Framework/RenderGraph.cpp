@@ -761,21 +761,20 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	// Wait: Buffer
 	auto& buffer_sync = buffer_sync_resources;
 	auto& img_sync = image_sync_resources;
-	i32 i = 0;
 	for (const auto& entry : wait_signals_buffer) {
 		VkBuffer buffer = entry.key;
 		const BufferSyncDescriptor& v = entry.value;
-		buffer_sync.buffer_bariers[i] =
+		VkBufferMemoryBarrier2& buffer_barrier = buffer_sync.buffer_bariers.push();
+		buffer_barrier =
 			vk::buffer_barrier2(entry.key, v.src_access_flags, v.dst_access_flags,
 								pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, v.src_access_flags),
 								pipeline_stage_from_pass_type(type, v.dst_access_flags));
-		buffer_sync.dependency_infos[i] = vk::dependency_info(1, &buffer_sync.buffer_bariers[i]);
+		buffer_sync.dependency_infos.push_back(vk::dependency_info(1, &buffer_barrier));
 		if (use_events) {
 			VkEvent event = rg->passes[v.opposing_pass_idx].set_signals_buffer.find(buffer)->value.event;
 			LUMEN_ASSERT(event, "Event can't be null");
 			wait_events.push_back(event);
 		}
-		i++;
 	}
 	if (wait_events.size()) {
 		vkCmdWaitEvents2(cmd, (u32)wait_events.size(), wait_events.data(), buffer_sync.dependency_infos.data);
@@ -929,9 +928,9 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 				if (gfx_settings->vertex_buffers.size()) {
 					std::vector<VkDeviceSize> offsets(gfx_settings->vertex_buffers.size(), 0);
-					std::vector<VkBuffer> vert_buffers(gfx_settings->vertex_buffers.size(), 0);
+					std::vector<VkBuffer> vert_buffers;
 					for (auto& buf : gfx_settings->vertex_buffers) {
-						vert_buffers[i] = buf->handle;
+						vert_buffers.push_back(buf->handle);
 					}
 					vkCmdBindVertexBuffers(cmd, 0, (u32)vert_buffers.size(), vert_buffers.data(), offsets.data());
 				}

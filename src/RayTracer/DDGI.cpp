@@ -283,9 +283,9 @@ void DDGI::render() {
 		wg_x = probe_counts.x * probe_counts.y;
 		u32 wg_y = probe_counts.z;
 		auto update_probe = [&](bool is_irr) {
-			const char* pipeline_name = is_irr ? "Update Irradiance" : "Update Depth";
+			lm::String pipeline_name = is_irr ? CSTR("Update Irradiance") : CSTR("Update Depth");
 			vk::render_graph()
-				->add_compute(lm::str_from_cstr(pipeline_name),
+				->add_compute(pipeline_name,
 							  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/update.comp")),
 							   .macros = {is_irr ? lm::fixed_array_init(arena, {vk::ShaderMacro("IRRADIANCE_UPDATE")})
 												 : lm::fixed_array_init(arena, {vk::ShaderMacro("DEPTH_UPDATE")})},
@@ -301,8 +301,9 @@ void DDGI::render() {
 		// 13 WGs process 4 probes (wg = 32 threads)
 		wg_x = (probe_counts.x * probe_counts.y * probe_counts.z + 3) * 13 / 4;
 		vk::render_graph()
-			->add_compute(CSTR("Update Borders"),
-						  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/update_borders.comp")), .dims = {wg_x}})
+			->add_compute(
+				CSTR("Update Borders"),
+				{.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/update_borders.comp")), .dims = {wg_x}})
 			.push_constants(&pc_ray)
 			.bind({irr_texes[!ping_pong], depth_texes[!ping_pong], ddgi_ubo_buffer});
 	}
