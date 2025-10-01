@@ -1354,22 +1354,9 @@ PipelineStorage* RenderGraph::add_pass_impl_common(const lm::String& name,
 	return pipeline_storage;
 }
 void RenderGraph::destroy() {
-	// TODO: This is bad. We need a custom allocator inside the Render Graoh
-	// TODO: Fix
-	// for (auto& pass : passes) {
-	// 	if (pass.push_constant_data) {
-	// 		free(pass.push_constant_data);
-	// 	}
-	// }
-	// passes.clear();
-	// for (auto& entry : pipeline_cache) {
-	// 	entry.value.pipeline.cleanup();
-	// }
-	// buffer_resource_map.clear();
-	// img_resource_map.clear();
-	// registered_buffer_pointers.clear();
-	// shader_cache.clear();
-	// pipeline_cache.clear();
+	for (auto& entry : pipeline_cache) {
+		entry.value.pipeline.cleanup();
+	}
 }
 
 void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
