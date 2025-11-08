@@ -27,6 +27,7 @@ class SBTWrapper {
 		vk::Buffer* buffer = nullptr;
 	};
 
+	// TODO: Add SmallArray here
 	std::array<GroupData, 4> group_data = {};
 	std::array<std::vector<u32>, 4> idx_array = {};
 };

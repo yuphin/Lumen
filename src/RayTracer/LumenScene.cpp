@@ -978,7 +978,7 @@ void load(const lm::String& path) {
 	arena_get_stats(_arena_strings, total_used, total_allocated);
 	f64 MB = 1024.0 * 1024.0;
 	LUMEN_ASSERT(!_arena_scene->next, "Scene arena should be a single block");
-	LUMEN_INFO("Scene: Total memory used: %.2f MB / allocated: %.2f MB (%.2f%%)", total_used / MB, total_allocated / MB,
+	LUMEN_INFO("Scene Arena: Total memory used: %.2f MB / allocated: %.2f MB (%.2f%%)", total_used / MB, total_allocated / MB,
 			   (f64)100.0 * total_used / total_allocated);
 
 	vk::render_graph()->global_macro_defines.push_back(

@@ -109,7 +109,7 @@ class RenderGraph {
 
 	RenderGraphSettings settings;
 	std::mutex shader_map_mutex;
-	const bool multithreaded_pipeline_compilation = false;
+	const bool multithreaded_pipeline_compilation = true;
 	static const u32 INVALID_PASS_IDX = UINT_MAX;
 	bool dirty_pass_encountered = false;
 	bool reload_shaders = false;

@@ -438,6 +438,7 @@ f32 RayTracer::draw_frame() {
 	VkResult result = vk::submit_frame(image_idx);
 	vk::render_graph()->reset();
 	vk::render_graph()->reload_shaders = false;
+	vk::render_graph()->dirty_pass_encountered = false;
 	if (result != VK_SUCCESS) {
 		Window::update_window_size();
 		cleanup_resources();

@@ -1135,14 +1135,26 @@ void RenderGraph::init() {
 		lm::hash_map_create<lm::String, vk::Buffer*>(_arena_rendergraph, 32 * MAX_PASSES_PER_FRAME);
 	shader_cache = lm::hash_map_create<lm::String, vk::Shader>(_arena_rendergraph, 4 * MAX_PASSES_PER_FRAME);
 }
+
+static u64 shader_render_pass_hash(const std::pair<vk::Shader*, RenderPass*>& entry) { 
+	return default_hash(entry.first->name_with_macros);
+}
+
 void RenderGraph::run(VkCommandBuffer cmd) {
 	// Compile shaders and process resources
 	const bool recording_or_reload = dirty_pass_encountered || reload_shaders;
 	if (recording_or_reload) {
+		lm::ScratchArena scratch = _arena_per_frame;
+		static constexpr u64 MAX_SHADER_COMPILATIONS_PER_FRAME = 1024;
+
+		auto unique_shaders_set_2 = lm::hash_set_create<std::pair<vk::Shader*, RenderPass*>, shader_render_pass_hash>(
+			scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
+		
 		auto cmp = [](const std::pair<vk::Shader*, RenderPass*>& a, const std::pair<vk::Shader*, RenderPass*>& b) {
 			return lm::str_cmp(a.first->name_with_macros, b.first->name_with_macros) < 0;
 		};
 		std::set<std::pair<vk::Shader*, RenderPass*>, decltype(cmp)> unique_shaders_set;
+
 		std::unordered_map<RenderPass*, std::vector<vk::Shader*>> unique_shaders;
 		std::unordered_map<RenderPass*, std::vector<vk::Shader*>> existing_shaders;
 
