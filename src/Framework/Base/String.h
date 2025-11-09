@@ -15,7 +15,8 @@ struct String {
 	// Our strings don't end with null terminator by default
 	constexpr String(const char (&str)[N]) : data((char*)str), size(N - 1) {}
 
-	bool operator==(const String& other);
+	bool operator==(const String& other) const;
+	inline bool operator!=(const String& other) const { return !(*this == other); }
 
 	inline char& operator[](u64 idx) {
 		assert(idx < size);
@@ -26,7 +27,6 @@ struct String {
 		return data[idx];
 	}
 
-	inline bool operator!=(const String& other) { return !(*this == other); }
 	inline char* begin() { return &data[0]; }
 	inline char* end() { return &data[size]; }
 	inline const char* begin() const { return &data[0]; }

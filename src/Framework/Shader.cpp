@@ -289,7 +289,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 						const AccessChain& access_chain = access_chain_map[id];
 						auto storage_class = glsl.get_storage_class(access_chain.base_ptr_id);
 						if (is_bound_buffer(storage_class)) {
-							auto binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
+							u32 binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
 							shader.resource_binding_map.get_or_create(binding)->value.read = true;
 						}
 						auto nh = access_chain_map.extract(id);

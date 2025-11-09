@@ -370,10 +370,6 @@ void Pipeline::cleanup() {
 	if (update_template) {
 		vkDestroyDescriptorUpdateTemplate(vk::context().device, update_template, nullptr);
 	}
-
-	// TODO: remove
-	// std::unique_lock<std::mutex> tracker_lk(mut);
-	// cv.wait(tracker_lk, [this] { return tracking_stopped; });
 }
 
 void Pipeline::create_rt_set_layout(VkShaderStageFlags binding_stage_flags, u32 num_as_bindings) {

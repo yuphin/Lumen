@@ -10,8 +10,11 @@
 // --- Limits for fixed size arrays inside Render Graph ---
 static constexpr u64 MAX_GLOBAL_MACRO_DEFINES = 64;
 static constexpr u64 MAX_PASSES_PER_FRAME = 4096;
-// Max concurrent tasks
+////////////////////////////
+// --- Limits for shader and pipeline compilation inside render graph ---
 static constexpr u64 MAX_PIPELINE_TASKS = 128;
+static constexpr u64 MAX_SHADER_COMPILATIONS_PER_FRAME = 1024;
+static constexpr u64 MAX_DUPLICATE_SHADERS_PER_PASS = 1024;
 ////////////////////////////
 // --- Limits for resources in a Render Pass  ---
 static constexpr u64 MAX_RESOURCES_ZEROS = 128;
@@ -270,7 +273,7 @@ static void process_bindings(RenderPass* pass, vk::Shader& shader) {
 	}
 }
 
-static void build_shaders(RenderPass* pass, const std::vector<vk::Shader*>& active_shaders) {
+static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& active_shaders) {
 	// TODO: make resource processing in order
 	switch (pass->type) {
 		case vk::PassType::Graphics: {
@@ -1136,8 +1139,13 @@ void RenderGraph::init() {
 	shader_cache = lm::hash_map_create<lm::String, vk::Shader>(_arena_rendergraph, 4 * MAX_PASSES_PER_FRAME);
 }
 
-static u64 shader_render_pass_hash(const std::pair<vk::Shader*, RenderPass*>& entry) { 
+static u64 shader_render_pass_hash(const std::pair<vk::Shader*, RenderPass*>& entry) {
 	return default_hash(entry.first->name_with_macros);
+}
+
+static bool shader_render_pass_eq(const std::pair<vk::Shader*, RenderPass*>& a,
+								  const std::pair<vk::Shader*, RenderPass*>& b) {
+	return a.first->name_with_macros == b.first->name_with_macros;
 }
 
 void RenderGraph::run(VkCommandBuffer cmd) {
@@ -1145,17 +1153,13 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	const bool recording_or_reload = dirty_pass_encountered || reload_shaders;
 	if (recording_or_reload) {
 		lm::ScratchArena scratch = _arena_per_frame;
-		static constexpr u64 MAX_SHADER_COMPILATIONS_PER_FRAME = 1024;
-
-		auto unique_shaders_set_2 = lm::hash_set_create<std::pair<vk::Shader*, RenderPass*>, shader_render_pass_hash>(
+		auto unique_shaders_set =
+			lm::hash_set_create<std::pair<vk::Shader*, RenderPass*>, shader_render_pass_hash, shader_render_pass_eq>(
+				scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
+		auto existing_shaders_map = lm::hash_map_create<RenderPass*, lm::FixedArray<vk::Shader*>>(
 			scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
-		
-		auto cmp = [](const std::pair<vk::Shader*, RenderPass*>& a, const std::pair<vk::Shader*, RenderPass*>& b) {
-			return lm::str_cmp(a.first->name_with_macros, b.first->name_with_macros) < 0;
-		};
-		std::set<std::pair<vk::Shader*, RenderPass*>, decltype(cmp)> unique_shaders_set;
-
-		std::unordered_map<RenderPass*, std::vector<vk::Shader*>> unique_shaders;
+		auto unique_shaders_map = lm::hash_map_create<RenderPass*, lm::FixedArray<vk::Shader*>>(
+			scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
 		std::unordered_map<RenderPass*, std::vector<vk::Shader*>> existing_shaders;
 
 		for (auto i = 0; i < passes.size; i++) {
@@ -1164,30 +1168,61 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 			}
 			if (passes[i].type == vk::PassType::Graphics) {
 				for (auto& shader : passes[i].gfx_settings->shaders) {
-					if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
+					bool entry_created = false;
+					unique_shaders_set.get_or_create({&shader, &passes[i]}, &entry_created);
+					if (!entry_created) {
 						existing_shaders[&passes[i]].push_back(&shader);
+						auto entry = existing_shaders_map.get_or_create(&passes[i]);
+						if (!entry->value.initialized()) {
+							entry->value =
+								lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_DUPLICATE_SHADERS_PER_PASS);
+						}
+						entry->value.push_back(&shader);
 					}
 				}
 			} else if (passes[i].type == vk::PassType::RT) {
 				for (auto& shader : passes[i].rt_settings->shaders) {
-					if (!unique_shaders_set.insert({&shader, &passes[i]}).second) {
+					bool entry_created = false;
+					unique_shaders_set.get_or_create({&shader, &passes[i]}, &entry_created);
+					if (!entry_created) {
 						existing_shaders[&passes[i]].push_back(&shader);
+						auto entry = existing_shaders_map.get_or_create(&passes[i]);
+						if (!entry->value.initialized()) {
+							entry->value =
+								lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_DUPLICATE_SHADERS_PER_PASS);
+						}
+						entry->value.push_back(&shader);
 					}
 				}
 			} else {
 				// Compute
-				if (!unique_shaders_set.insert({&passes[i].compute_settings->shader, &passes[i]}).second) {
+				bool entry_created = false;
+				unique_shaders_set.get_or_create({&passes[i].compute_settings->shader, &passes[i]}, &entry_created);
+				if (!entry_created) {
 					existing_shaders[&passes[i]].push_back(&passes[i].compute_settings->shader);
+					auto entry = existing_shaders_map.get_or_create(&passes[i]);
+					if (!entry->value.initialized()) {
+						entry->value =
+							lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_DUPLICATE_SHADERS_PER_PASS);
+					}
+					entry->value.push_back(&passes[i].compute_settings->shader);
 				}
 			}
 		}
 
 		std::vector<std::future<void>> futures;
-		for (auto& [shader, rp] : unique_shaders_set) {
-			unique_shaders[rp].push_back(shader);
+		for (const auto& entry : unique_shaders_set) {
+			vk::Shader* shader = entry.key.first;
+			RenderPass* rp = entry.key.second;
+			auto unique_shader_entry = unique_shaders_map.get_or_create(rp);
+			if (!unique_shader_entry->value.initialized()) {
+				unique_shader_entry->value =
+					lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
+			}
+			unique_shader_entry->value.push_back(shader);
 		}
 		// Compile and process resources for unique shaders
-		for (auto& [pass, shaders] : unique_shaders) {
+		for (const auto& [hash, pass, shaders] : unique_shaders_map) {
 			futures.push_back(ThreadPool::submit(std::bind(&build_shaders, pass, shaders)));
 		}
 		for (auto& future : futures) {
@@ -1195,7 +1230,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		}
 		futures.clear();
 		// Process resources for duplicate shaders
-		for (auto& [pass, shaders] : existing_shaders) {
+		for (const auto& [hash, pass, shaders] : existing_shaders_map) {
 			futures.push_back(ThreadPool::submit(std::bind(&build_shaders, pass, shaders)));
 		}
 		for (auto& future : futures) {

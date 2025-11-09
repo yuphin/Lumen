@@ -10,6 +10,11 @@ inline constexpr u64 HASH_MAP_HASH_EMPTY_BUT_RESIZING = 1;
 inline constexpr u64 HASH_MAP_HASH_DELETED = 2;
 inline constexpr u64 HASH_MAP_LOAD_PERCENTAGE_THRESHOLD = 70;
 
+template <typename T>
+inline bool default_eq(const T& a, const T& b) {
+	return a == b;
+}
+
 template <typename T1, typename T2>
 struct HashMapEntry {
 	u64 hash;
@@ -25,7 +30,7 @@ struct HashMapEntry<T, Empty> {
 	T key;
 };
 
-template <typename T1, typename T2, u64 (*hash_func)(const T1&)>
+template <typename T1, typename T2, u64 (*hash_func)(const T1&), bool (*eq_func)(const T1&, const T1&)>
 struct HashMapProbed {
 	HashMapEntry<T1, T2>* data = nullptr;
 	u64 size = 0;
@@ -33,7 +38,7 @@ struct HashMapProbed {
 	u64 num_slots = 0;
 	u64 capacity = 0;
 	Arena* arena_node = nullptr;
-	
+
 	inline bool initialized() const { return arena_node != nullptr; }
 
 	void resize(u64 new_capacity) {
@@ -70,8 +75,9 @@ struct HashMapProbed {
 #else
 		// Try to resize in-place
 		u64 hm_size = capacity * sizeof(HashMapEntryType);
-		u64 local_offset_alligned_prev = util::align_pow2(arena_node->local_offset - hm_size, alignof(HashMapEntryType));
-		bool is_sequential = (arena_node->data + local_offset_alligned_prev) == (u8*)data ;
+		u64 local_offset_alligned_prev =
+			util::align_pow2(arena_node->local_offset - hm_size, alignof(HashMapEntryType));
+		bool is_sequential = (arena_node->data + local_offset_alligned_prev) == (u8*)data;
 		if (is_sequential) {
 			arena_node->local_offset -= capacity * sizeof(HashMapEntryType);
 		} else {
@@ -112,7 +118,7 @@ struct HashMapProbed {
 				}
 				old_entry = &old_data[scan_idx++];
 			}
-			if(old_entry) {
+			if (old_entry) {
 				old_entry_found = insert_during_resize(old_entry);
 			}
 			++processed;
@@ -142,7 +148,7 @@ struct HashMapProbed {
 			if (entry.hash == HASH_MAP_HASH_DELETED) {
 				--num_slots;
 				break;
-			} else if (entry.key == old_entry->key) {
+			} else if (eq_func(entry.key, old_entry->key)) {
 				if constexpr (!util::is_same<T2, Empty>::value) {
 					entry.value = old_entry->value;
 				}
@@ -185,7 +191,7 @@ struct HashMapProbed {
 			if (entry.hash == HASH_MAP_HASH_DELETED) {
 				--num_slots;
 				break;
-			} else if (entry.key == key) {
+			} else if (eq_func(entry.key, key)) {
 				if constexpr (!util::is_same<T2, Empty>::value) {
 					entry.value = value;
 				}
@@ -214,7 +220,7 @@ struct HashMapProbed {
 		u64 probe_inc = 1;
 
 		while (data[index].hash > HASH_MAP_HASH_DELETED) {
-			if (data[index].hash == hash && data[index].key == key) {
+			if (data[index].hash == hash && eq_func(data[index].key, key)) {
 				return &data[index];
 			}
 			index = (index + probe_inc) & (capacity - 1);
@@ -223,8 +229,8 @@ struct HashMapProbed {
 		return nullptr;
 	}
 
-	// If the entry doesn't exist, creates it, but doesn't initialize the value
-	HashMapEntry<T1, T2>* get_or_create(const T1& key, const T2& value = T2{}) {
+	// If the entry doesn't exist, creates it
+	HashMapEntry<T1, T2>* get_or_create(const T1& key, const T2& value = T2{}, bool* created = nullptr) {
 		// Assumes the capacity is always a power of two
 		if (num_slots * 100 > capacity * HASH_MAP_LOAD_PERCENTAGE_THRESHOLD) {
 			resize(capacity << 1);
@@ -242,7 +248,10 @@ struct HashMapProbed {
 			if (entry.hash == HASH_MAP_HASH_DELETED) {
 				--num_slots;
 				break;
-			} else if (entry.key == key) {
+			} else if (eq_func(entry.key, key)) {
+				if (created) {
+					*created = false;
+				}
 				return &data[index];
 			}
 			index = (index + probe_inc) & (capacity - 1);
@@ -252,8 +261,18 @@ struct HashMapProbed {
 		++size;
 		data[index].hash = hash;
 		data[index].key = key;
-		data[index].value = {};
+		if constexpr (!util::is_same<T2, Empty>::value) {
+			data[index].value = value;
+		}
+		if (created) {
+			*created = true;
+		}
 		return &data[index];
+	}
+
+	HashMapEntry<T1, T2>* get_or_create(const T1& key, bool* created) {
+		static_assert(util::is_same<T2, Empty>::value);
+		return get_or_create(key, {}, created);
 	}
 
 	HashMapEntry<T1, T2>* remove(const T1& key) {
@@ -265,7 +284,7 @@ struct HashMapProbed {
 		u64 probe_inc = 1;
 
 		while (data[index].hash > HASH_MAP_HASH_DELETED) {
-			if (data[index].hash == hash && data[index].key == key) {
+			if (data[index].hash == hash && eq_func(data[index].key, key)) {
 				data[index].hash = HASH_MAP_HASH_DELETED;
 				--size;
 				return &data[index];
@@ -285,7 +304,7 @@ struct HashMapProbed {
 	}
 
 	struct Iterator {
-		HashMapProbed<T1, T2, hash_func>* map;
+		HashMapProbed<T1, T2, hash_func, eq_func>* map;
 		HashMapEntry<T1, T2>* entry;
 		u64 index;
 
@@ -334,10 +353,12 @@ struct HashMapProbed {
 };
 
 // Like arrays, hash maps are also always allocated in a new block
-template <typename T1, typename T2, u64 (*hash_func)(const T1&) = default_hash<T1>>
-HashMapProbed<T1, T2, hash_func> hash_map_create(Arena* arena, u64 initial_capacity = HASH_MAP_LINEAR_MIN_CAPACITY) {
+template <typename T1, typename T2, u64 (*hash_func)(const T1&) = default_hash<T1>,
+		  bool (*eq_func)(const T1&, const T1&) = default_eq<T1>>
+HashMapProbed<T1, T2, hash_func, eq_func> hash_map_create(Arena* arena,
+														  u64 initial_capacity = HASH_MAP_LINEAR_MIN_CAPACITY) {
 	using HashMapEntryType = HashMapEntry<T1, T2>;
-	HashMapProbed<T1, T2, hash_func> map;
+	HashMapProbed<T1, T2, hash_func, eq_func> map;
 	// We also multiply the capacity by 1.5 in case we want to accomodate w.r.t hash map load percentage threshold
 	initial_capacity = util::next_pow2(3 * (initial_capacity + 1) >> 1);
 	map.capacity = initial_capacity;
@@ -349,14 +370,15 @@ HashMapProbed<T1, T2, hash_func> hash_map_create(Arena* arena, u64 initial_capac
 	return map;
 }
 
-template <typename T1, typename T2, u64 (*hash_func)(const T1&) = default_hash<T1>>
-using HashMap = HashMapProbed<T1, T2, hash_func>;
+template <typename T1, typename T2, u64 (*hash_func)(const T1&) = default_hash<T1>,
+		  bool (*eq_func)(const T1&, const T1&) = default_eq<T1>>
+using HashMap = HashMapProbed<T1, T2, hash_func, eq_func>;
 
-template <typename T, u64 (*hash_func)(const T&) = default_hash<T>>
-using HashSet = HashMapProbed<T, Empty, hash_func>;
+template <typename T, u64 (*hash_func)(const T&) = default_hash<T>, bool (*eq_func)(const T&, const T&) = default_eq<T>>
+using HashSet = HashMapProbed<T, Empty, hash_func, eq_func>;
 
-template <typename T, u64 (*hash_func)(const T&) = default_hash<T>>
-HashSet<T, hash_func> hash_set_create(Arena* arena, u64 initial_capacity = HASH_MAP_LINEAR_MIN_CAPACITY) {
-	return hash_map_create<T, Empty, hash_func>(arena, initial_capacity);
+template <typename T, u64 (*hash_func)(const T&) = default_hash<T>, bool (*eq_func)(const T&, const T&) = default_eq<T>>
+HashSet<T, hash_func, eq_func> hash_set_create(Arena* arena, u64 initial_capacity = HASH_MAP_LINEAR_MIN_CAPACITY) {
+	return hash_map_create<T, Empty, hash_func, eq_func>(arena, initial_capacity);
 }
 }  // namespace lm

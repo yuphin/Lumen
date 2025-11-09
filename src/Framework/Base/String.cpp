@@ -294,6 +294,6 @@ i32 str_cmp(const String& str1, const String& str2) {
 	return 0;
 }
 
-bool String::operator==(const String& other) { return str_compare(*this, other); }
+bool String::operator==(const String& other) const { return str_compare(*this, other); }
 
 }  // namespace lm

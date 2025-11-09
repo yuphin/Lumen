@@ -47,9 +47,6 @@ struct Pipeline {
 	void create_update_template(const std::vector<Shader>& shaders, const lm::FixedArray<u32>& descriptor_counts);
 	void create_set_layout(const std::vector<Shader>& shaders, const lm::FixedArray<u32>& descriptor_counts);
 	void create_rt_set_layout(VkShaderStageFlags stage_flags, u32 num_as_bindings);
-	bool tracking_stopped = true;
-	// std::mutex mut;
-	// std::condition_variable cv;
 	u32 binding_mask;
 };
 
