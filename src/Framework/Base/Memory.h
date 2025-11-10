@@ -103,7 +103,7 @@ struct Array {
 	T* begin() const { return data; }
 	T* end() const { return data + size; }
 	inline bool initialized() const { return arena_node != nullptr; }
-	inline T& back() {
+	T& back() {
 		assert(size > 0);
 		return data[size - 1];
 	}
@@ -147,7 +147,7 @@ FixedArray<T> fixed_array_create(Arena* arena, u64 capacity) {
 	return array_create<T, false>(arena, capacity, 0);
 }
 
-template<typename T>
+template <typename T>
 FixedArray<T> fixed_array_init(Arena* arena, std::initializer_list<T> list) {
 	FixedArray<T> arr = fixed_array_create<T>(arena, list.size());
 	for (const T& item : list) {

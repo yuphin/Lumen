@@ -5,6 +5,7 @@
 #include "PersistentResourceManager.h"
 #include "DynamicResourceManager.h"
 #include "Framework/ThreadPool.h"
+#include "Framework/Base/SmallArray.h"
 
 ////////////////////////////
 // --- Limits for fixed size arrays inside Render Graph ---
@@ -14,7 +15,7 @@ static constexpr u64 MAX_PASSES_PER_FRAME = 4096;
 // --- Limits for shader and pipeline compilation inside render graph ---
 static constexpr u64 MAX_PIPELINE_TASKS = 128;
 static constexpr u64 MAX_SHADER_COMPILATIONS_PER_FRAME = 1024;
-static constexpr u64 MAX_DUPLICATE_SHADERS_PER_PASS = 1024;
+static constexpr u64 MAX_SHADERS_PER_PASS = 8;
 ////////////////////////////
 // --- Limits for resources in a Render Pass  ---
 static constexpr u64 MAX_RESOURCES_ZEROS = 128;
@@ -276,9 +277,9 @@ static void process_bindings(RenderPass* pass, vk::Shader& shader) {
 static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& active_shaders) {
 	// TODO: make resource processing in order
 	switch (pass->type) {
+		case vk::PassType::RT:
 		case vk::PassType::Graphics: {
-			std::vector<std::future<vk::Shader*>> shader_tasks;
-			shader_tasks.reserve(pass->gfx_settings->shaders.size());
+			lm::SmallArray<std::future<vk::Shader*>, MAX_SHADERS_PER_PASS> shader_tasks;
 			for (auto& shader : active_shaders) {
 				pass->rg->shader_map_mutex.lock();
 				auto shader_entry = pass->rg->shader_cache.find(shader->name_with_macros);
@@ -286,13 +287,14 @@ static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& a
 				if (shader_entry) {
 					*shader = shader_entry->value;
 				} else {
-					shader_tasks.push_back(ThreadPool::submit(
+					shader_tasks.push_back_move(ThreadPool::submit(
 						[pass](vk::Shader* shader) {
 							shader->compile(pass);
 							return shader;
 						},
 						shader));
 				}
+				// shader->compile(pass);
 			}
 			for (auto& task : shader_tasks) {
 				auto shader = task.get();
@@ -305,38 +307,6 @@ static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& a
 				process_bindless_resources(pass, *shader);
 				process_bindings(pass, *shader);
 			}
-		} break;
-		case vk::PassType::RT: {
-			std::vector<std::future<vk::Shader*>> shader_tasks;
-			shader_tasks.reserve(pass->rt_settings->shaders.size());
-			for (auto& shader : active_shaders) {
-				pass->rg->shader_map_mutex.lock();
-				auto shader_entry = pass->rg->shader_cache.find(shader->name_with_macros);
-				pass->rg->shader_map_mutex.unlock();
-				if (shader_entry) {
-					*shader = shader_entry->value;
-				} else {
-					shader_tasks.push_back(ThreadPool::submit(
-						[pass](vk::Shader* shader) {
-							shader->compile(pass);
-							return shader;
-						},
-						shader));
-					// shader->compile(pass);
-				}
-			}
-			for (auto& task : shader_tasks) {
-				auto shader = task.get();
-				{
-					std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
-					pass->rg->shader_cache.insert(shader->name_with_macros, *shader);
-				}
-			}
-			for (auto& shader : active_shaders) {
-				process_bindless_resources(pass, *shader);
-				process_bindings(pass, *shader);
-			}
-
 		} break;
 		case vk::PassType::Compute: {
 			for (auto& shader : active_shaders) {
@@ -1156,6 +1126,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		auto unique_shaders_set =
 			lm::hash_set_create<std::pair<vk::Shader*, RenderPass*>, shader_render_pass_hash, shader_render_pass_eq>(
 				scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
+		// TODO: Make these FixedArrays SmallArrays
 		auto existing_shaders_map = lm::hash_map_create<RenderPass*, lm::FixedArray<vk::Shader*>>(
 			scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
 		auto unique_shaders_map = lm::hash_map_create<RenderPass*, lm::FixedArray<vk::Shader*>>(
@@ -1175,7 +1146,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 						auto entry = existing_shaders_map.get_or_create(&passes[i]);
 						if (!entry->value.initialized()) {
 							entry->value =
-								lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_DUPLICATE_SHADERS_PER_PASS);
+								lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_SHADERS_PER_PASS);
 						}
 						entry->value.push_back(&shader);
 					}
@@ -1189,7 +1160,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 						auto entry = existing_shaders_map.get_or_create(&passes[i]);
 						if (!entry->value.initialized()) {
 							entry->value =
-								lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_DUPLICATE_SHADERS_PER_PASS);
+								lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_SHADERS_PER_PASS);
 						}
 						entry->value.push_back(&shader);
 					}
@@ -1203,7 +1174,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 					auto entry = existing_shaders_map.get_or_create(&passes[i]);
 					if (!entry->value.initialized()) {
 						entry->value =
-							lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_DUPLICATE_SHADERS_PER_PASS);
+							lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_SHADERS_PER_PASS);
 					}
 					entry->value.push_back(&passes[i].compute_settings->shader);
 				}
