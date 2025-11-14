@@ -2,8 +2,14 @@
 
 namespace util {
 
-template<typename A, typename B> struct is_same { static constexpr bool value = false; };
-template<typename A> struct is_same<A, A> { static constexpr bool value = true; };
+template <typename A, typename B>
+struct is_same {
+	static constexpr bool value = false;
+};
+template <typename A>
+struct is_same<A, A> {
+	static constexpr bool value = true;
+};
 
 inline constexpr u64 align_pow2(u64 x, u64 align) { return (x + align - 1) & ~(align - 1); }
 
@@ -44,8 +50,12 @@ struct Slice {
 	Slice() = default;
 	Slice(T* data, u64 size) : data(data), size(size) {}
 	T& operator[](u64 idx) { return data[idx]; }
-	T& begin() { return data[0]; }
-	T& end() { return data[size - 1]; }
+	T& operator[](u64 idx) const { return data[idx]; }
+	T* begin() { return data; }
+	T* end() { return data + size; }
+
+	const T* begin() const { return data; }
+	const T* end() const { return data + size; }
 	inline bool empty() const { return size == 0; }
 };
 

@@ -244,7 +244,7 @@ void VCMMLT::render() {
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 
 	lm::RenderGraph* rg = vk::render_graph();
-	auto get_pipeline_postfix = [&](const std::vector<u32>& spec_consts) {
+	auto get_pipeline_postfix = [&](const lm::SpecializationConstantArray& spec_consts) {
 		std::string res = "-";
 		if (spec_consts[0] == 1) {
 			res += "SEED";
@@ -255,7 +255,7 @@ void VCMMLT::render() {
 		return res;
 	};
 	auto op_reduce = [&](const lm::String& op_name, const lm::String& op_shader_name, const lm::String& reduce_name,
-						 const lm::String& reduce_shader_name, const std::vector<u32> spec_data) {
+						 const lm::String& reduce_shader_name, const lm::SpecializationConstantArray& spec_data) {
 		u32 num_wgs = u32((config.num_mlt_threads + 1023) / 1024);
 		rg->add_compute(
 			  op_name,
@@ -283,7 +283,7 @@ void VCMMLT::render() {
 		scene_ubo_buffer,
 		lumen_scene->scene_desc_buffer,
 	};
-	std::vector<u32> spec_consts;
+	lm::SpecializationConstantArray spec_consts;
 	if (!light_first) {
 		spec_consts = {1, 0};
 	} else {

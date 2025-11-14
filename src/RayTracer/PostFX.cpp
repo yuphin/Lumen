@@ -84,16 +84,16 @@ void PostFX::init() {
 		macros_y.push_back({"RADIX", RADIX_Y});
 	}
 	rg->add_compute(CSTR("FFT - Horizontal"), {.shader = vk::Shader(CSTR("src/shaders/bloom/fft.comp")),
-												   .macros = macros_x,
-												   .specialization_data = {wg_size_x / RADIX_X, u32(vertical), 0},
-												   .dims = {dim_y, 1, 1}})
+											   .macros = macros_x,
+											   .specialization_data = {wg_size_x / RADIX_X, u32(vertical), 0},
+											   .dims = {dim_y, 1, 1}})
 		.bind_texture_with_sampler(kernel_ping, img_sampler)
 		.bind(kernel_pong);
 	vertical = true;
 	rg->add_compute(CSTR("FFT - Vertical"), {.shader = vk::Shader(CSTR("src/shaders/bloom/fft.comp")),
-												 .macros = macros_y,
-												 .specialization_data = {wg_size_y / RADIX_Y, u32(vertical), 0},
-												 .dims = {dim_x, 1, 1}})
+											 .macros = macros_y,
+											 .specialization_data = {wg_size_y / RADIX_Y, u32(vertical), 0},
+											 .dims = {dim_x, 1, 1}})
 		.bind_texture_with_sampler(kernel_ping, img_sampler)
 		.bind(kernel_pong);
 	rg->run_and_submit(cmd);
@@ -108,8 +108,8 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 		u32 pad_width = (fft_ping_padded->extent.width + 31) / 32;
 		u32 pad_height = (fft_ping_padded->extent.height + 31) / 32;
 
-		rg->add_compute(CSTR("Pad Image"), {.shader = vk::Shader(CSTR("src/shaders/bloom/pad.comp")),
-												.dims = {pad_width, pad_height, 1}})
+		rg->add_compute(CSTR("Pad Image"),
+						{.shader = vk::Shader(CSTR("src/shaders/bloom/pad.comp")), .dims = {pad_width, pad_height, 1}})
 			.bind_texture_with_sampler(input, img_sampler)
 			.bind(fft_ping_padded);
 		u32 wg_size_x = fft_ping_padded->extent.width;
@@ -129,17 +129,17 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 		}
 
 		rg->add_compute(CSTR("FFT - Horizontal"), {.shader = vk::Shader(CSTR("src/shaders/bloom/fft.comp")),
-													   .macros = macros_x,
-													   .specialization_data = {wg_size_x / RADIX_X, u32(vertical), 0},
-													   .dims = {dim_y, 1, 1}})
+												   .macros = macros_x,
+												   .specialization_data = {wg_size_x / RADIX_X, u32(vertical), 0},
+												   .dims = {dim_y, 1, 1}})
 			.bind_texture_with_sampler(fft_ping_padded, img_sampler)
 			.bind(fft_pong_padded)
 			.bind_texture_with_sampler(kernel_pong, img_sampler);
 		vertical = true;
 		rg->add_compute(CSTR("FFT - Vertical"), {.shader = vk::Shader(CSTR("src/shaders/bloom/fft.comp")),
-													 .macros = macros_y,
-													 .specialization_data = {wg_size_y / RADIX_Y, u32(vertical), 0},
-													 .dims = {dim_x, 1, 1}})
+												 .macros = macros_y,
+												 .specialization_data = {wg_size_y / RADIX_Y, u32(vertical), 0},
+												 .dims = {dim_x, 1, 1}})
 			.bind_texture_with_sampler(fft_ping_padded, img_sampler)
 			.bind(fft_pong_padded)
 			.bind_texture_with_sampler(kernel_pong, img_sampler);
@@ -169,21 +169,20 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 	pc_post_settings.width = output->extent.width;
 	pc_post_settings.height = output->extent.height;
 
-	rg->add_gfx(CSTR("Post FX"),
-				{.shaders = {{CSTR("src/shaders/post.vert")}, {CSTR("src/shaders/post.frag")}},
-				 .width = output->extent.width,
-				 .height = output->extent.height,
-				 .clear_color = {VkClearColorValue{{0.25f, 0.25f, 0.25f, 1.0f}}},
-				 .clear_depth_stencil = {{{1.0f, 0}}},
-				 .cull_mode = VK_CULL_MODE_NONE,
-				 .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-				 .color_outputs = {output},
-				 .pass_func =
-					 [](VkCommandBuffer cmd, const lm::RenderPass& render_pass) {
-						 vkCmdDraw(cmd, 4, 1, 0, 0);
-						 ImGui::Render();
-						 ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
-					 }})
+	rg->add_gfx(CSTR("Post FX"), {.shaders = {{CSTR("src/shaders/post.vert")}, {CSTR("src/shaders/post.frag")}},
+								  .width = output->extent.width,
+								  .height = output->extent.height,
+								  .clear_color = {VkClearColorValue{{0.25f, 0.25f, 0.25f, 1.0f}}},
+								  .clear_depth_stencil = {{{1.0f, 0}}},
+								  .cull_mode = VK_CULL_MODE_NONE,
+								  .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
+								  .color_outputs = {output},
+								  .pass_func =
+									  [](VkCommandBuffer cmd, const lm::RenderPass& render_pass) {
+										  vkCmdDraw(cmd, 4, 1, 0, 0);
+										  ImGui::Render();
+										  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+									  }})
 		.push_constants(&pc_post_settings)
 		.bind_texture_with_sampler(fft_pong_padded, img_sampler)
 		.bind_texture_with_sampler(input, img_sampler);

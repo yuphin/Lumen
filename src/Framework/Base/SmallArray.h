@@ -1,51 +1,72 @@
 #pragma once
 
+#include "Framework/Base/Utils.h"
 namespace lm {
 template <typename T, u64 N>
 struct SmallArray {
-	u64 count = 0;
+	u64 size = 0;
 	T data[N];
 
+	SmallArray() = default;
+
+	constexpr SmallArray(std::initializer_list<T> init) {
+		assert(init.size() <= N);
+		for (const T& v : init) {
+			data[size++] = v;
+		}
+	}
+
 	void push_back(const T& val) {
-		assert(count < N);
-		data[count++] = val;
+		assert(size < N);
+		data[size++] = val;
 	}
 
 	void push_back_move(T&& v) {
-		assert(count < N);
-		data[count++] = std::move(v);
+		assert(size < N);
+		data[size++] = std::move(v);
 	}
 
 	T& push() {
-		assert(count < N);
-		return data[count++];
+		assert(size < N);
+		return data[size++];
 	}
 
 	void pop_back() {
-		assert(count > 0);
-		--count;
+		assert(size > 0);
+		--size;
 	}
 
-	inline bool empty() const { return count == 0; }
+	void resize(u64 new_capacity) {
+		assert(new_capacity <= N);
+		size = new_capacity;
+	}
+
+	inline bool empty() const { return size == 0; }
 	inline constexpr u64 capacity() { return N; }
-	T* begin() const { return data; }
-	T* end() const { return data + count; }
+	const T* begin() const { return data; }
+	const T* end() const { return data + size; }
 	T* begin() { return data; }
-	T* end() { return data + count; }
-	void clear() { count = 0; }
+	T* end() { return data + size; }
+	void clear() { size = 0; }
 
 	T& operator[](u64 index) {
-		assert(index < count);
+		assert(index < size);
 		return data[index];
 	}
-	T& operator[](u64 index) const {
-		assert(index < count);
+	const T& operator[](u64 index) const {
+		assert(index < size);
 		return data[index];
 	}
 
 	T& back() {
-		assert(count > 0);
-		return data[count - 1];
+		assert(size > 0);
+		return data[size - 1];
+	}
+	util::Slice<T> to_slice() const {
+		static_assert(size > 0);
+		return util::Slice(&data[0], size);
 	}
 };
+template <typename T, typename... U>
+SmallArray(T, U...) -> SmallArray<T, 1 + sizeof...(U)>;
 }  // namespace lm

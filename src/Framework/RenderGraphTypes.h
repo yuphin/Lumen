@@ -6,9 +6,13 @@
 #include "Framework/Base/OS.h"
 #include "Framework/Base/Memory.h"
 #include "Framework/Base/HashMap.h"
+#include "Framework/Base/SmallArray.h"
 
 namespace lm {
 class RenderPass;
+
+static constexpr u64 MAX_SPEC_CONSTANTS = 8;
+using SpecializationConstantArray = SmallArray<u32, MAX_SPEC_CONSTANTS>;
 
 struct dim3 {
 	u32 x = 1;
@@ -107,7 +111,7 @@ struct GraphicsPassSettings {
 	VkCullModeFlags cull_mode = VK_CULL_MODE_FRONT_BIT;
 	std::vector<vk::Buffer*> vertex_buffers = {};
 	vk::Buffer* index_buffer = nullptr;
-	std::vector<u32> specialization_data = {};
+	lm::SpecializationConstantArray specialization_data;
 	std::vector<bool> blend_enables = {};
 	VkFrontFace front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -125,7 +129,7 @@ struct RTPassSettings {
 	std::vector<vk::Shader> shaders;
 	lm::FixedArray<ShaderMacro> macros;
 	u32 recursion_depth = 1;
-	std::vector<u32> specialization_data = {};
+	lm::SpecializationConstantArray specialization_data;
 	lm::dim3 dims;
 	std::function<void(VkCommandBuffer cmd, const lm::RenderPass& pass)> pass_func;
 	PassType type = PassType::RT;
@@ -134,11 +138,10 @@ struct RTPassSettings {
 struct ComputePassSettings {
 	vk::Shader shader;
 	lm::FixedArray<ShaderMacro> macros;
-	std::vector<u32> specialization_data = {};
+	lm::SpecializationConstantArray specialization_data;
 	lm::dim3 dims;
 	std::function<void(VkCommandBuffer cmd, const lm::RenderPass& pass)> pass_func;
 	PassType type = PassType::Compute;
 };
 
 }  // namespace vk
-

@@ -196,11 +196,11 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, u32 primitive_co
 
 // Existence of cmd_buf implies that cmd_buf handles submission outside of this function
 static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<BuildAccelerationStructure>& build_as,
-															   const std::vector<BlasInput>& input,
+															   util::Slice<BlasInput> input,
 															   VkBuildAccelerationStructureFlagsKHR flags,
 															   VkCommandBuffer external_cmd_buf,
 															   vk::Buffer** scratch_buffer_ref) {
-	u32 num_blases = static_cast<u32>(input.size());
+	u32 num_blases = static_cast<u32>(input.size);
 	VkDeviceSize as_total_size{0};	   // Memory size of all allocated BLAS
 	u32 num_compactions{0};			   // Nb of BLAS requesting compaction
 	VkDeviceSize max_scratch_size{0};  // Largest scratch size
@@ -325,21 +325,21 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<Build
 	return build_as;
 }
 
-void blas_build(std::vector<BVH>& blases, const std::vector<BlasInput>& input,
+void blas_build(std::vector<BVH>& blases, std::vector<BlasInput>& input,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer) {
 	std::vector<BuildAccelerationStructure> build_as(input.size());
 	blases.resize(input.size());
 	for (u64 i = 0; i < input.size(); i++) {
 		build_as[i].as = &blases[i];
 	}
-	build_blas_impl(build_as, input, flags, cmd_buf, scratch_buffer);
+	build_blas_impl(build_as, util::Slice(input.data(), input.size()), flags, cmd_buf, scratch_buffer);
 }
 
-void blas_build(util::Slice<BVH> blases, const std::vector<BlasInput>& input,
-				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer) {
-	LUMEN_ASSERT(blases.size == input.size(), "Mismatch between input and output sizes");
-	std::vector<BuildAccelerationStructure> build_as(input.size());
-	for (u64 i = 0; i < input.size(); i++) {
+void blas_build(util::Slice<BVH> blases, util::Slice<BlasInput> input, VkBuildAccelerationStructureFlagsKHR flags,
+				VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer) {
+	LUMEN_ASSERT(blases.size == input.size, "Mismatch between input and output sizes");
+	std::vector<BuildAccelerationStructure> build_as(input.size);
+	for (u64 i = 0; i < input.size; i++) {
 		build_as[i].as = &blases[i];
 	}
 	build_blas_impl(build_as, input, flags, cmd_buf, scratch_buffer);

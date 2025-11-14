@@ -280,8 +280,7 @@ void ReSTIRPT::render() {
 		offset.primitiveOffset = 0;
 		offset.transformOffset = 0;
 
-		std::vector<vk::BlasInput> photon_blas_inputs;
-		vk::BlasInput& photon_blas_input = photon_blas_inputs.emplace_back();
+		vk::BlasInput photon_blas_input = {};
 		photon_blas_input.as_geom.push_back(as_geom);
 		photon_blas_input.as_build_offset_info.push_back(offset);
 
@@ -302,9 +301,9 @@ void ReSTIRPT::render() {
 			.bind_texture_array(lumen_scene->scene_textures)
 			.zero(photon_count_buffer)
 			.zero(caustic_photon_aabbs_buffer)
-			.blas_build(util::Slice(&photon_blas, 1), photon_blas_inputs,
-						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, {caustic_photon_aabbs_buffer},
-						&photon_bvh_scratch_buf)
+			.blas_build(util::Slice(&photon_blas, 1), util::Slice(&photon_blas_input, 1),
+						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR,
+						util::Slice(&caustic_photon_aabbs_buffer, 1), &photon_bvh_scratch_buf)
 			.tlas_build(photon_tlas, photon_bvh_instances_buf, 1,
 						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, &photon_bvh_scratch_buf,
 						/*build_tlas_after_blas=*/true)

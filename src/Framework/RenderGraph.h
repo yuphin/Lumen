@@ -6,15 +6,11 @@
 #include "Shader.h"
 #include "Texture.h"
 #include "EventPool.h"
-#include "RenderGraphTypes.h"
 #include "AccelerationStructure.h"
 #include "Framework/Buffer.h"
 #include "Framework/Texture.h"
 #include "Framework/Camera.h"
-#include "Framework/Base/String.h"
-#include "Framework/Base/OS.h"
-#include "Framework/Base/Memory.h"
-#include "Framework/Base/HashMap.h"
+#include "Framework/Base/SmallArray.h"
 
 namespace lm {
 
@@ -54,13 +50,14 @@ struct BufferBarrier {
 
 // For now, there is only one set of BLASes to build per pass
 struct BlasBuildData {
-	// The owner is the caller of the blas_build function
-	vk::Buffer** scratch_buffer_ref = nullptr;
-	// For barrier placement
-	std::vector<vk::Buffer*> source_buffers;
 	util::Slice<vk::BVH> blases;
-	std::vector<vk::BlasInput> blas_inputs;
+	util::Slice<vk::BlasInput> blas_inputs;
+	// For barrier placement
+	util::Slice<vk::Buffer*> source_buffers;
+	//
 	VkBuildAccelerationStructureFlagsKHR flags;
+	// The owner is the caller of the blas_build(...) function
+	vk::Buffer** scratch_buffer_ref = nullptr;
 	inline bool is_valid() { return !blases.empty(); }
 };
 
@@ -83,7 +80,7 @@ class RenderGraph {
 	RenderPass& add_gfx(const lm::String& name, const vk::GraphicsPassSettings& settings);
 	RenderPass& add_compute(const lm::String& name, const vk::ComputePassSettings& settings);
 	PipelineStorage* add_pass_impl_common(const lm::String& name, const lm::FixedArray<vk::ShaderMacro>& macros,
-										  const std::vector<u32>& specialization_data, bool& cached,
+										  const lm::SpecializationConstantArray& specialization_data, bool& cached,
 										  lm::String& name_with_macros, lm::String& macro_string);
 	void init();
 	void run(VkCommandBuffer cmd);
@@ -151,8 +148,8 @@ class RenderPass {
 	RenderPass& copy(const Resource& src, const Resource& dst);
 
 	// BLAS building happens after the pass runs
-	RenderPass& blas_build(util::Slice<vk::BVH> blases, const std::vector<vk::BlasInput>& blas_inputs,
-						   VkBuildAccelerationStructureFlagsKHR flags, const std::vector<vk::Buffer*>& source_buffers,
+	RenderPass& blas_build(util::Slice<vk::BVH> blases, util::Slice<vk::BlasInput> blas_inputs,
+						   VkBuildAccelerationStructureFlagsKHR flags, util::Slice<vk::Buffer*> source_buffers,
 						   vk::Buffer** scratch_buffer_ref);
 	RenderPass& tlas_build(vk::BVH& tlas, vk::Buffer* instances_buf, u32 instance_count,
 						   VkBuildAccelerationStructureFlagsKHR flags, vk::Buffer** scratch_buffer_ref,

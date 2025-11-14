@@ -5,7 +5,6 @@
 #include "PersistentResourceManager.h"
 #include "DynamicResourceManager.h"
 #include "Framework/ThreadPool.h"
-#include "Framework/Base/SmallArray.h"
 
 ////////////////////////////
 // --- Limits for fixed size arrays inside Render Graph ---
@@ -595,11 +594,11 @@ RenderPass& RenderPass::copy(const Resource& src, const Resource& dst) {
 	return *this;
 }
 
-RenderPass& RenderPass::blas_build(util::Slice<vk::BVH> blases, const std::vector<vk::BlasInput>& blas_inputs,
-								   VkBuildAccelerationStructureFlagsKHR flags,
-								   const std::vector<vk::Buffer*>& source_buffers, vk::Buffer** scratch_buffer_ref) {
+RenderPass& RenderPass::blas_build(util::Slice<vk::BVH> blases, util::Slice<vk::BlasInput> blas_inputs,
+								   VkBuildAccelerationStructureFlagsKHR flags, util::Slice<vk::Buffer*> source_buffers,
+								   vk::Buffer** scratch_buffer_ref) {
 	LUMEN_ASSERT(!blas_build_data.is_valid(), "Only one BLAS build per pass is supported");
-	LUMEN_ASSERT(blases.size == blas_inputs.size(), "BLASes and inputs must have the same size");
+	LUMEN_ASSERT(blases.size == blas_inputs.size, "BLASes and inputs must have the same size");
 	// TODO: Need to assert that scratch_buffer_ref == nullptr in certain cases
 	blas_build_data.blases = blases;
 	blas_build_data.blas_inputs = blas_inputs;
@@ -651,9 +650,9 @@ void RenderPass::finalize() {
 		switch (type) {
 			case vk::PassType::Graphics: {
 				auto func = [](RenderPass* pass) {
-					pass->pipeline_storage->pipeline.create_gfx_pipeline(*pass->gfx_settings, pass->descriptor_counts,
-																		 pass->gfx_settings->color_outputs,
-																		 pass->gfx_settings->depth_output);
+					pass->pipeline_storage->pipeline.create_gfx_pipeline(
+						_arena_rendergraph, *pass->gfx_settings, pass->descriptor_counts,
+						pass->gfx_settings->color_outputs, pass->gfx_settings->depth_output);
 				};
 				if (rg->multithreaded_pipeline_compilation) {
 					rg->pipeline_tasks.push_back({func, pass_idx});
@@ -664,7 +663,8 @@ void RenderPass::finalize() {
 			}
 			case vk::PassType::RT: {
 				auto func = [update_rt_descriptors](RenderPass* pass) {
-					pass->pipeline_storage->pipeline.create_rt_pipeline(*pass->rt_settings, pass->descriptor_counts,
+					pass->pipeline_storage->pipeline.create_rt_pipeline(_arena_rendergraph, *pass->rt_settings,
+																		pass->descriptor_counts,
 																		u32(pass->pipeline_storage->as_bindings.size));
 					update_rt_descriptors();
 				};
@@ -677,8 +677,8 @@ void RenderPass::finalize() {
 			}
 			case vk::PassType::Compute: {
 				auto func = [](RenderPass* pass) {
-					pass->pipeline_storage->pipeline.create_compute_pipeline(*pass->compute_settings,
-																			 pass->descriptor_counts);
+					pass->pipeline_storage->pipeline.create_compute_pipeline(
+						_arena_rendergraph, *pass->compute_settings, pass->descriptor_counts);
 				};
 				if (rg->multithreaded_pipeline_compilation) {
 					rg->pipeline_tasks.push_back({func, pass_idx});
@@ -1145,8 +1145,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 						existing_shaders[&passes[i]].push_back(&shader);
 						auto entry = existing_shaders_map.get_or_create(&passes[i]);
 						if (!entry->value.initialized()) {
-							entry->value =
-								lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_SHADERS_PER_PASS);
+							entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_SHADERS_PER_PASS);
 						}
 						entry->value.push_back(&shader);
 					}
@@ -1159,8 +1158,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 						existing_shaders[&passes[i]].push_back(&shader);
 						auto entry = existing_shaders_map.get_or_create(&passes[i]);
 						if (!entry->value.initialized()) {
-							entry->value =
-								lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_SHADERS_PER_PASS);
+							entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_SHADERS_PER_PASS);
 						}
 						entry->value.push_back(&shader);
 					}
@@ -1173,8 +1171,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 					existing_shaders[&passes[i]].push_back(&passes[i].compute_settings->shader);
 					auto entry = existing_shaders_map.get_or_create(&passes[i]);
 					if (!entry->value.initialized()) {
-						entry->value =
-							lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_SHADERS_PER_PASS);
+						entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_SHADERS_PER_PASS);
 					}
 					entry->value.push_back(&passes[i].compute_settings->shader);
 				}
@@ -1313,8 +1310,9 @@ static void populate_macros(lm::Arena* arena, const lm::FixedArray<vk::ShaderMac
 
 PipelineStorage* RenderGraph::add_pass_impl_common(const lm::String& name,
 												   const lm::FixedArray<vk::ShaderMacro>& macros,
-												   const std::vector<u32>& specialization_data, bool& cached,
-												   lm::String& name_with_macros, lm::String& macro_string) {
+												   const lm::SpecializationConstantArray& specialization_data,
+												   bool& cached, lm::String& name_with_macros,
+												   lm::String& macro_string) {
 	assert(name.is_cstr());
 	PipelineStorage* pipeline_storage;
 
