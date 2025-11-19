@@ -11,7 +11,9 @@
 namespace lm {
 class RenderPass;
 
+
 static constexpr u64 MAX_SPEC_CONSTANTS = 8;
+static constexpr u64 MAX_SHADERS_PER_PASS = 8;
 using SpecializationConstantArray = SmallArray<u32, MAX_SPEC_CONSTANTS>;
 
 struct dim3 {

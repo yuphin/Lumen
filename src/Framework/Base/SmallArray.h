@@ -63,7 +63,9 @@ struct SmallArray {
 		return data[size - 1];
 	}
 	util::Slice<T> to_slice() const {
-		static_assert(size > 0);
+		return util::Slice(&data[0], size);
+	}
+	util::Slice<T> to_slice() {
 		return util::Slice(&data[0], size);
 	}
 };

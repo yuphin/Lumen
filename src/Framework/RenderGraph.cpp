@@ -29,7 +29,6 @@ namespace lm {
 
 static lm::Arena* _arena_rendergraph = nullptr;
 static lm::Arena* _arena_per_frame = nullptr;
-
 // TODO: Investigate get_or_create behavior
 
 static VkPipelineStageFlags pipeline_stage_from_pass_type(vk::PassType pass_type, VkAccessFlags access_flags) {
@@ -650,9 +649,9 @@ void RenderPass::finalize() {
 		switch (type) {
 			case vk::PassType::Graphics: {
 				auto func = [](RenderPass* pass) {
-					pass->pipeline_storage->pipeline.create_gfx_pipeline(
-						_arena_rendergraph, *pass->gfx_settings, pass->descriptor_counts,
-						pass->gfx_settings->color_outputs, pass->gfx_settings->depth_output);
+					pass->pipeline_storage->pipeline.create_gfx_pipeline(*pass->gfx_settings, pass->descriptor_counts,
+																		 pass->gfx_settings->color_outputs,
+																		 pass->gfx_settings->depth_output);
 				};
 				if (rg->multithreaded_pipeline_compilation) {
 					rg->pipeline_tasks.push_back({func, pass_idx});
@@ -663,8 +662,7 @@ void RenderPass::finalize() {
 			}
 			case vk::PassType::RT: {
 				auto func = [update_rt_descriptors](RenderPass* pass) {
-					pass->pipeline_storage->pipeline.create_rt_pipeline(_arena_rendergraph, *pass->rt_settings,
-																		pass->descriptor_counts,
+					pass->pipeline_storage->pipeline.create_rt_pipeline(*pass->rt_settings, pass->descriptor_counts,
 																		u32(pass->pipeline_storage->as_bindings.size));
 					update_rt_descriptors();
 				};
@@ -677,8 +675,8 @@ void RenderPass::finalize() {
 			}
 			case vk::PassType::Compute: {
 				auto func = [](RenderPass* pass) {
-					pass->pipeline_storage->pipeline.create_compute_pipeline(
-						_arena_rendergraph, *pass->compute_settings, pass->descriptor_counts);
+					pass->pipeline_storage->pipeline.create_compute_pipeline(*pass->compute_settings,
+																			 pass->descriptor_counts);
 				};
 				if (rg->multithreaded_pipeline_compilation) {
 					rg->pipeline_tasks.push_back({func, pass_idx});

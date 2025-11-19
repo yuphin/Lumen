@@ -24,11 +24,9 @@ static u32 get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDes
 
 Pipeline::Pipeline(const std::string& name) : name(name) {}
 
-void Pipeline::create_gfx_pipeline(lm::Arena* arena, const GraphicsPassSettings& settings,
-								   const lm::FixedArray<u32>& descriptor_counts,
+void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const lm::FixedArray<u32>& descriptor_counts,
 								   std::vector<vk::Texture*> color_outputs, vk::Texture* depth_output) {
 	LUMEN_ASSERT(color_outputs.size(), "No color outputs for GFX pipeline");
-	lm::ScratchArena scratch = arena;
 	type = PipelineType::GFX;
 	binding_mask = get_bindings_for_shader_set(settings.shaders, descriptor_types);
 	create_set_layout(settings.shaders, descriptor_counts);
@@ -45,11 +43,8 @@ void Pipeline::create_gfx_pipeline(lm::Arena* arena, const GraphicsPassSettings&
 	create_update_template(settings.shaders, descriptor_counts);
 
 	VkSpecializationInfo specialization_info = {};
-	// std::vector<VkSpecializationMapEntry> entries(settings.specialization_data.size());
-
-	auto spec_map_entries =
-		lm::fixed_array_create<VkSpecializationMapEntry>(scratch.arena, settings.specialization_data.size);
-	for (i32 i = 0; i < spec_map_entries.size; i++) {
+	lm::SmallArray<VkSpecializationMapEntry, lm::MAX_SPEC_CONSTANTS> spec_map_entries;
+	for (i32 i = 0; i < settings.specialization_data.size; i++) {
 		VkSpecializationMapEntry& entry = spec_map_entries.push();
 		entry.constantID = i;
 		entry.size = sizeof(u32);
@@ -177,9 +172,8 @@ void Pipeline::create_gfx_pipeline(lm::Arena* arena, const GraphicsPassSettings&
 	}
 }
 
-void Pipeline::create_rt_pipeline(lm::Arena* arena, const RTPassSettings& settings,
-								  const lm::FixedArray<u32>& descriptor_counts, u32 num_as_bindings) {
-	lm::ScratchArena scratch = arena;
+void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const lm::FixedArray<u32>& descriptor_counts,
+								  u32 num_as_bindings) {
 	type = PipelineType::RT;
 	binding_mask = get_bindings_for_shader_set(settings.shaders, descriptor_types);
 	u32 num_as_bindings_in_shader = 0;
@@ -215,17 +209,16 @@ void Pipeline::create_rt_pipeline(lm::Arena* arena, const RTPassSettings& settin
 	set_allocate_info.pSetLayouts = &tlas_layout;
 	vk::check(vkAllocateDescriptorSets(vk::context().device, &set_allocate_info, &tlas_descriptor_set));
 
-	auto spec_map_entries =
-		lm::fixed_array_create<VkSpecializationMapEntry>(scratch.arena, settings.specialization_data.size);
-	for (i32 i = 0; i < spec_map_entries.size; i++) {
+	lm::SmallArray<VkSpecializationMapEntry, lm::MAX_SPEC_CONSTANTS> spec_map_entries;
+	for (i32 i = 0; i < settings.specialization_data.size; i++) {
 		VkSpecializationMapEntry& entry = spec_map_entries.push();
 		entry.constantID = i;
 		entry.size = sizeof(u32);
 		entry.offset = i * sizeof(u32);
 	}
 
-	auto stages = lm::fixed_array_create<VkPipelineShaderStageCreateInfo>(scratch.arena, settings.shaders.size());
-	auto groups = lm::fixed_array_create<VkRayTracingShaderGroupCreateInfoKHR>(scratch.arena, settings.shaders.size());
+	lm::SmallArray<VkPipelineShaderStageCreateInfo, lm::MAX_SHADERS_PER_PASS> stages;
+	lm::SmallArray<VkRayTracingShaderGroupCreateInfoKHR, lm::MAX_SHADERS_PER_PASS> groups;
 
 	VkPipelineShaderStageCreateInfo stage{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
 	stage.pName = "main";
@@ -307,9 +300,8 @@ void Pipeline::create_rt_pipeline(lm::Arena* arena, const RTPassSettings& settin
 	}
 }
 
-void Pipeline::create_compute_pipeline(lm::Arena* arena, const ComputePassSettings& settings,
+void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
 									   const lm::FixedArray<u32>& descriptor_counts) {
-	lm::ScratchArena scratch = arena;
 	type = PipelineType::COMPUTE;
 	binding_mask = get_bindings_for_shader_set({settings.shader}, descriptor_types);
 	create_set_layout({settings.shader}, descriptor_counts);
@@ -327,10 +319,9 @@ void Pipeline::create_compute_pipeline(lm::Arena* arena, const ComputePassSettin
 	shader_stage_ci.stage = VK_SHADER_STAGE_COMPUTE_BIT;
 	shader_stage_ci.module = compute_shader_module;
 	VkSpecializationInfo specialization_info = {};
-	auto spec_map_entries =
-		lm::fixed_array_create<VkSpecializationMapEntry>(scratch.arena, settings.specialization_data.size);
+	lm::SmallArray<VkSpecializationMapEntry, lm::MAX_SPEC_CONSTANTS> spec_map_entries;
 	if (settings.specialization_data.size) {
-		for (i32 i = 0; i < spec_map_entries.size; i++) {
+		for (i32 i = 0; i < settings.specialization_data.size; i++) {
 			VkSpecializationMapEntry& entry = spec_map_entries.push();
 			entry.constantID = i;
 			entry.size = sizeof(u32);

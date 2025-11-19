@@ -2,6 +2,7 @@
 #include "VkUtils.h"
 #include "CommandBuffer.h"
 #include "PersistentResourceManager.h"
+#include "Framework/Base/Utils.h"
 
 namespace vk {
 
@@ -9,12 +10,14 @@ void SBTWrapper::destroy() {
 	for (auto& group : group_data) {
 		prm::remove(group.buffer);
 	}
-	for (auto& i : idx_array) i = {};
+	for (auto& shaders : idx_array) {
+		shaders.clear();
+	}
 }
 
 void SBTWrapper::add_indices(VkRayTracingPipelineCreateInfoKHR info) {
-	for (auto& i : idx_array) {
-		i = {};
+	for (auto& shaders : idx_array) {
+		shaders.clear();
 	};
 	u32 stage_idx = 0;
 	for (u32 group_idx = 0; group_idx < info.groupCount; group_idx++) {
@@ -62,19 +65,19 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 	stage[GROUP_HIT] = std::vector<u8>(group_data[GROUP_HIT].stride * index_count(GROUP_HIT));
 	stage[GROUP_CALLABLE] = std::vector<u8>(group_data[GROUP_CALLABLE].stride * index_count(GROUP_CALLABLE));
 
-	auto copy_handles = [&](std::vector<u8>& stage_buffer, std::vector<u32>& indices, u32 stride) {
+	auto copy_handles = [&](std::vector<u8>& stage_buffer, util::Slice<u32> indices, u32 stride) {
 		auto* pbuffer = stage_buffer.data();
-		for (u32 index = 0; index < static_cast<u32>(indices.size()); index++) {
+		for (u64 index = 0; index < indices.size; index++) {
 			auto* pstart = pbuffer;
 			memcpy(pbuffer, shader_handle_storage.data() + (indices[index] * group_handle_size), group_handle_size);
 			pbuffer = pstart + stride;
 		}
 	};
 
-	copy_handles(stage[GROUP_RAYGEN], idx_array[GROUP_RAYGEN], group_data[GROUP_RAYGEN].stride);
-	copy_handles(stage[GROUP_MISS], idx_array[GROUP_MISS], group_data[GROUP_MISS].stride);
-	copy_handles(stage[GROUP_HIT], idx_array[GROUP_HIT], group_data[GROUP_HIT].stride);
-	copy_handles(stage[GROUP_CALLABLE], idx_array[GROUP_CALLABLE], group_data[GROUP_CALLABLE].stride);
+	copy_handles(stage[GROUP_RAYGEN], idx_array[GROUP_RAYGEN].to_slice(), group_data[GROUP_RAYGEN].stride);
+	copy_handles(stage[GROUP_MISS], idx_array[GROUP_MISS].to_slice(), group_data[GROUP_MISS].stride);
+	copy_handles(stage[GROUP_HIT], idx_array[GROUP_HIT].to_slice(), group_data[GROUP_HIT].stride);
+	copy_handles(stage[GROUP_CALLABLE], idx_array[GROUP_CALLABLE].to_slice(), group_data[GROUP_CALLABLE].stride);
 
 	VkBufferUsageFlags usage_flags =
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
