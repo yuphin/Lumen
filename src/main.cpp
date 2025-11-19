@@ -26,8 +26,8 @@ i32 main(i32 argc, char* argv[]) {
 		}
 	}
 	bool fullscreen = false;
-	i32 width = 1280;
-	i32 height = 720;
+	i32 width = 1920;
+	i32 height = 1080;
 	ThreadPool::init();
 	Window::init(width, height, fullscreen);
 	{

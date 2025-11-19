@@ -280,7 +280,8 @@ void ReSTIRPT::render() {
 		offset.primitiveOffset = 0;
 		offset.transformOffset = 0;
 
-		vk::BlasInput photon_blas_input = {};
+		local_persist vk::BlasInput photon_blas_input;
+		photon_blas_input = {};
 		photon_blas_input.as_geom.push_back(as_geom);
 		photon_blas_input.as_build_offset_info.push_back(offset);
 

@@ -56,7 +56,7 @@ class ReSTIRPT final : public Integrator {
 	bool enable_occlusion = true;
 	bool enable_temporal_jitter = true;
 
-	bool enable_photon_mapping = false;
+	bool enable_photon_mapping = true;
 	bool enable_photon_gather = true;
 	bool progressive_radius_reduction = false;
 	bool enable_pm_mis = false;

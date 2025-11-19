@@ -44,6 +44,8 @@
 #define NOMCX
 #endif
 
+#define local_persist static
+
 typedef signed char i8;
 typedef short i16;
 typedef int i32;

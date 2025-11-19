@@ -100,7 +100,8 @@ void RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags d
 				LUMEN_ASSERT(dst_access_flags == VK_ACCESS_TRANSFER_WRITE_BIT, "Invalid buffer zero flags");
 				prefill_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
 			} else {
-				LUMEN_ASSERT(false, "Unreachable?");
+				// TODO: Check
+				// LUMEN_ASSERT(false, "Unreachable?");
 				carryover_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
 			}
 		}
@@ -384,6 +385,7 @@ void RenderPass::init() {
 
 	resource_zeros = lm::fixed_array_create<Resource>(_arena_rendergraph, MAX_RESOURCES_ZEROS);
 	prefill_buffer_barriers = lm::fixed_array_create<BufferBarrier>(_arena_rendergraph, MAX_RESOURCES_ZEROS);
+	carryover_buffer_barriers = lm::fixed_array_create<BufferBarrier>(_arena_rendergraph, MAX_RESOURCES_ZEROS);
 	resource_copies = lm::fixed_array_create<std::pair<Resource, Resource>>(_arena_rendergraph, MAX_RESOURCES_COPIES);
 	buffer_sync_resources.buffer_bariers =
 		lm::fixed_array_create<VkBufferMemoryBarrier2>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
@@ -959,8 +961,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		if (!post_execution_buffer_barriers.empty()) {
 			post_execution_buffer_memory_barriers.reserve(post_execution_buffer_barriers.size);
 			for (auto& barrier : post_execution_buffer_barriers) {
-				auto curr_stage = pipeline_stage_from_pass_type(type, barrier.src_access_flags);
-				auto dst_stage = pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
+				VkPipelineStageFlags curr_stage = pipeline_stage_from_pass_type(type, barrier.src_access_flags);
+				VkPipelineStageFlags dst_stage = pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
 				post_execution_buffer_memory_barriers.push_back(vk::buffer_barrier2(
 					barrier.buffer, barrier.src_access_flags, barrier.dst_access_flags, curr_stage, dst_stage));
 			}
@@ -1242,6 +1244,7 @@ void RenderGraph::reset() {
 		// --- Reset pass resources ---
 		pass.resource_zeros.clear();
 		pass.prefill_buffer_barriers.clear();
+		pass.carryover_buffer_barriers.clear();
 		pass.resource_copies.clear();
 		pass.buffer_sync_resources.buffer_bariers.clear();
 		pass.buffer_sync_resources.dependency_infos.clear();
@@ -1263,6 +1266,9 @@ void RenderGraph::reset() {
 		pass.next_binding_idx = 0;
 		pass.next_as_binding_idx = 0;
 		pass.disable_execution = false;
+
+		pass.blas_build_data = {};
+		pass.tlas_build_data = {};
 	}
 	passes.clear();
 	pipeline_tasks.clear();
