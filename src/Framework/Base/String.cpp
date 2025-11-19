@@ -154,7 +154,7 @@ u32 u32_from_str(const String& str) { return (u32)u64_from_str(str); }
 i32 i32_from_str(const String& str) { return (i32)s64_from_str(str); }
 
 static String str_from_number(Arena* arena, u64 abs_val, bool negative) {
-	u32 num_chars = 0;
+	u32 num_chars = 1;
 	for (u64 v = abs_val; v != 0; ++num_chars) {
 		v /= 10;
 	}
