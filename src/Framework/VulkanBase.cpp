@@ -282,8 +282,8 @@ static void create_logical_device() {
 
 	std::vector<VkDeviceQueueCreateInfo> queue_CIs;
 	std::unordered_set<u32> unique_queue_families = {context().queue_indices.gfx_family.value(),
-														  context().queue_indices.present_family.value(),
-														  context().queue_indices.compute_family.value()};
+													 context().queue_indices.present_family.value(),
+													 context().queue_indices.compute_family.value()};
 
 	context().queues.resize(context().queue_indices.gfx_family.has_value() +
 							context().queue_indices.present_family.has_value() +
@@ -522,7 +522,7 @@ static void create_command_buffers() {
 
 static void create_sync_primitives() {
 	_image_available_sem.resize(MAX_FRAMES_IN_FLIGHT);
-	_render_finished_sem.resize(MAX_FRAMES_IN_FLIGHT);
+	_render_finished_sem.resize(_swapchain_images.size());
 	_in_flight_fences.resize(MAX_FRAMES_IN_FLIGHT);
 	_images_in_flight.resize(_swapchain_images.size(), VK_NULL_HANDLE);
 
@@ -531,10 +531,12 @@ static void create_sync_primitives() {
 	VkFenceCreateInfo fence_info = fence(VK_FENCE_CREATE_SIGNALED_BIT);
 
 	for (u64 i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		check<3>({vkCreateSemaphore(context().device, &semaphore_info, nullptr, &_image_available_sem[i]),
-				  vkCreateSemaphore(context().device, &semaphore_info, nullptr, &_render_finished_sem[i]),
+		check<2>({vkCreateSemaphore(context().device, &semaphore_info, nullptr, &_image_available_sem[i]),
 				  vkCreateFence(context().device, &fence_info, nullptr, &_in_flight_fences[i])},
 				 "Failed to create synchronization primitives for a frame");
+	}
+	for (u64 i = 0; i < _swapchain_images.size(); i++) {
+		check(vkCreateSemaphore(context().device, &semaphore_info, nullptr, &_render_finished_sem[i]));
 	}
 }
 
@@ -735,7 +737,7 @@ VkResult submit_frame(u32 image_idx) {
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = &context().command_buffers[image_idx];
 
-	VkSemaphore signal_semaphores[] = {_render_finished_sem[context().in_flight_frame_idx]};
+	VkSemaphore signal_semaphores[] = {_render_finished_sem[image_idx]};
 	submit_info.signalSemaphoreCount = 1;
 	submit_info.pSignalSemaphores = signal_semaphores;
 
@@ -779,12 +781,14 @@ void cleanup() {
 	vkDestroyQueryPool(context().device, context().query_pool_timestamps[2], nullptr);
 	vkDestroySwapchainKHR(context().device, context().swapchain, nullptr);
 	vk::event_pool::cleanup();
-	vkFreeCommandBuffers(context().device, context().cmd_pools[0],
-						 static_cast<u32>(context().command_buffers.size()), context().command_buffers.data());
+	vkFreeCommandBuffers(context().device, context().cmd_pools[0], static_cast<u32>(context().command_buffers.size()),
+						 context().command_buffers.data());
 	for (u64 i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 		vkDestroySemaphore(context().device, _image_available_sem[i], nullptr);
-		vkDestroySemaphore(context().device, _render_finished_sem[i], nullptr);
 		vkDestroyFence(context().device, _in_flight_fences[i], nullptr);
+	}
+	for(VkSemaphore sem : _render_finished_sem) {
+		vkDestroySemaphore(context().device, sem, nullptr);
 	}
 
 	for (auto pool : context().cmd_pools) {

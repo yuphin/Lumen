@@ -6,7 +6,7 @@
 #include "Framework/Base/OS.h"
 #include <stb/stb_sprintf.h>
 
-#undef USE_VALIDATION_LAYERS
+// #undef USE_VALIDATION_LAYERS
 
 #if 1
 i32 main(i32 argc, char* argv[]) {

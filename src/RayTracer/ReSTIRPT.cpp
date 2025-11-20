@@ -8,6 +8,11 @@ using namespace RestirPT;
 void ReSTIRPT::init() {
 	Integrator::init();
 
+	photon_bvh_scratch_bufs.resize(vk::MAX_FRAMES_IN_FLIGHT);
+	for(u64 i = 0; i < photon_bvh_scratch_bufs.size; i++) {
+		photon_bvh_scratch_bufs[i] = nullptr;
+	}
+
 	std::vector<glm::mat4> transformations;
 	transformations.resize(lumen_scene->prim_meshes.size);
 	for (auto& pm : lumen_scene->prim_meshes) {
@@ -241,6 +246,7 @@ void ReSTIRPT::render() {
 
 	i32 ping = pc_ray.total_frame_num % 2;
 	i32 pong = ping ^ 1;
+	u64 resource_idx = vk::context().in_flight_frame_idx;
 
 	constexpr i32 WRITE_OR_CURR_IDX = 1;
 	constexpr i32 READ_OR_PREV_IDX = 0;
@@ -304,9 +310,9 @@ void ReSTIRPT::render() {
 			.zero(caustic_photon_aabbs_buffer)
 			.blas_build(util::Slice(&photon_blas, 1), util::Slice(&photon_blas_input, 1),
 						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR,
-						util::Slice(&caustic_photon_aabbs_buffer, 1), &photon_bvh_scratch_buf)
+						util::Slice(&caustic_photon_aabbs_buffer, 1), &photon_bvh_scratch_bufs[resource_idx])
 			.tlas_build(photon_tlas, photon_bvh_instances_buf, 1,
-						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, &photon_bvh_scratch_buf,
+						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, &photon_bvh_scratch_bufs[resource_idx],
 						/*build_tlas_after_blas=*/true)
 			.bind_tlas(tlas);
 
@@ -527,8 +533,8 @@ void ReSTIRPT::destroy(bool resize) {
 		vkDeviceWaitIdle(vk::context().device);
 		photon_tlas.destroy();
 		photon_blas.destroy();
-		if (photon_bvh_scratch_buf) {
-			drm::destroy(photon_bvh_scratch_buf);
+		for(vk::Buffer* scratch_buf : photon_bvh_scratch_bufs) {
+			drm::destroy(scratch_buf);
 		}
 	}
 }

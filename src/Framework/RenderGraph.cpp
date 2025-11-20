@@ -250,7 +250,8 @@ void RenderPass::transition_resources() {
 
 	if (blas_build_data.is_valid()) {
 		for (vk::Buffer* buf : blas_build_data.source_buffers) {
-			write_impl(buf, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR, BufferSyncFlags::BUFFER_AS_BUILD);
+			read_impl(buf, VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_SHADER_READ_BIT,
+					  BufferSyncFlags::BUFFER_AS_BUILD);
 		}
 	}
 }

@@ -35,7 +35,7 @@ class ReSTIRPT final : public Integrator {
 	vk::Texture* caustics_texture;
 
 	vk::Buffer* photon_bvh_instances_buf;
-	vk::Buffer* photon_bvh_scratch_buf = nullptr;
+	lm::SmallArray<vk::Buffer*,vk::MAX_FRAMES_IN_FLIGHT> photon_bvh_scratch_bufs;
 
 	vk::Buffer* caustics_reservoir_ping_buffer;
 	vk::Buffer* caustics_reservoir_pong_buffer;
