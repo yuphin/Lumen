@@ -4,11 +4,15 @@
 #include "Framework/Base/OS.h"
 #include "Framework/Base/Memory.h"
 #include "Framework/Base/HashMap.h"
+#include <Framework/Base/SmallArray.h>
 
 namespace lm {
 class RenderPass;
 }
 namespace vk {
+////////////////////////////
+// --- Limits ---
+static constexpr u64 MAX_VERTEX_INPUTS = 8;
 struct BindingStatus {
 	bool read = false;
 	bool write = false;
@@ -35,7 +39,7 @@ struct Shader {
 	VkShaderModule create_vk_shader_module(const VkDevice& device) const;
 	u32 num_as_bindings = 0;
 
-	lm::FixedArray<std::pair<VkFormat, u32>> vertex_inputs;
+	lm::SmallArray<std::pair<VkFormat, u32>, MAX_VERTEX_INPUTS> vertex_inputs;
 	lm::HashMap<lm::String, BufferStatus> buffer_status_map;
 	lm::HashMap<u32, BindingStatus> resource_binding_map;
 

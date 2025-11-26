@@ -8,9 +8,6 @@
 #include <glslc/file_includer.h>
 #endif	//  USE_SHADERC
 
-////////////////////////////
-// --- Limits ---
-static constexpr u64 MAX_VERTEX_INPUTS = 32;
 
 thread_local lm::Arena* _arena_shaders = nullptr;
 
@@ -532,9 +529,7 @@ i32 Shader::compile(lm::RenderPass* pass) {
 		mstages.insert("rchit", shaderc_closesthit_shader);
 		mstages.insert("rmiss", shaderc_miss_shader);
 	}
-	// TODO: To small array
-	if (!vertex_inputs.initialized()) {
-		vertex_inputs = lm::fixed_array_create<std::pair<VkFormat, u32>>(_arena_shaders, MAX_VERTEX_INPUTS);
+	if (!buffer_status_map.initialized()) {
 		buffer_status_map = lm::hash_map_create<lm::String, BufferStatus>(_arena_shaders, 128);
 		resource_binding_map = lm::hash_map_create<u32, BindingStatus>(_arena_shaders, 128);
 	} else {
