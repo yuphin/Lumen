@@ -35,6 +35,7 @@ struct ResourceBinding {
 	bool write = false;
 	bool active = false;
 
+	ResourceBinding() = default;
 	ResourceBinding(vk::Buffer* buf) : buf(buf) {}
 	ResourceBinding(vk::Texture* tex) : tex(tex) {}
 	ResourceBinding(vk::Texture* tex, VkSampler sampler) : tex(tex), sampler(sampler) {}

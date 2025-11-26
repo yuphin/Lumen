@@ -333,9 +333,6 @@ RenderPass& RenderGraph::add_rt(const lm::String& name, const vk::RTPassSettings
 	lm::String macro_string;
 	PipelineStorage* pipeline_storage = add_pass_impl_common(name, settings.macros, settings.specialization_data,
 															 cached, name_with_macros, macro_string);
-	if (!pipeline_storage->as_bindings.initialized()) {
-		pipeline_storage->as_bindings = lm::fixed_array_create<vk::BVH>(_arena_rendergraph, vk::MAX_AS_BINDING_COUNT);
-	}
 	vk::PassType type = vk::PassType::RT;
 	RenderPass& pass = passes.push();
 	render_pass_init_rt(pass, type, name_with_macros, this, (u32)passes.size - 1, settings, macro_string,
@@ -1323,13 +1320,6 @@ PipelineStorage* RenderGraph::add_pass_impl_common(const lm::String& name,
 		auto new_entry = pipeline_cache.insert(
 			hash, PipelineStorage{.pipeline = vk::Pipeline(lm::str_to_cpp_str(name_with_macros))});
 		pipeline_storage = &new_entry->value;
-	}
-	if (!pipeline_storage->bound_resources.initialized()) {
-		pipeline_storage->bound_resources =
-			lm::fixed_array_create<ResourceBinding>(_arena_rendergraph, MAX_DESCRIPTORS);
-	}
-	if (!pipeline_storage->as_bindings.initialized()) {
-		pipeline_storage->as_bindings = lm::fixed_array_create<vk::BVH>(_arena_rendergraph, vk::MAX_AS_BINDING_COUNT);
 	}
 	if (!pipeline_storage->affected_buffer_pointers.initialized()) {
 		pipeline_storage->affected_buffer_pointers =

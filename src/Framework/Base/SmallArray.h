@@ -5,7 +5,7 @@ namespace lm {
 template <typename T, u64 N>
 struct SmallArray {
 	u64 size = 0;
-	T data[N];
+	T data[N] = {};
 
 	SmallArray() = default;
 

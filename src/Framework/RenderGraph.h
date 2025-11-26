@@ -37,8 +37,8 @@ class RenderPass;
 
 struct PipelineStorage {
 	vk::Pipeline pipeline;
-	lm::FixedArray<ResourceBinding> bound_resources;
-	lm::FixedArray<vk::BVH> as_bindings;
+	lm::SmallArray<ResourceBinding, MAX_DESCRIPTORS> bound_resources;
+	lm::SmallArray<vk::BVH, vk::MAX_AS_BINDING_COUNT> as_bindings;
 	lm::HashMap<lm::String, vk::BufferStatus> affected_buffer_pointers;
 	bool update_as_descriptor;
 };
