@@ -14,6 +14,16 @@
 
 namespace lm {
 
+////////////////////////////
+// --- Limits for resources in a Render Pass  ---
+static constexpr u64 MAX_RESOURCES_ZEROS = 16;
+static constexpr u64 MAX_RESOURCES_COPIES = 16;
+static constexpr u64 MAX_BUFFER_BARRIERS = 16;
+static constexpr u64 MAX_IMG_BARRIERS = 16;
+static constexpr u64 MAX_EXPLICIT_BUFFER_READ_WRITES = 16;
+static constexpr u64 MAX_EXPLICIT_IMG_READ_WRITES = 16;
+static constexpr u64 MAX_DESCRIPTORS = 32;
+
 #define TO_STR(V) (#V)
 
 #define REGISTER_BUFFER_WITH_ADDRESS(struct_type, struct_name, field_name, buffer_ptr, rg) \
@@ -34,12 +44,12 @@ struct PipelineStorage {
 };
 
 struct BufferSyncResources {
-	lm::FixedArray<VkBufferMemoryBarrier2> buffer_bariers;
-	lm::FixedArray<VkDependencyInfo> dependency_infos;
+	lm::SmallArray<VkBufferMemoryBarrier2, MAX_BUFFER_BARRIERS> buffer_bariers;
+	lm::SmallArray<VkDependencyInfo, MAX_BUFFER_BARRIERS> dependency_infos;
 };
 struct ImageSyncResources {
-	lm::FixedArray<VkImageMemoryBarrier2> img_barriers;
-	lm::FixedArray<VkDependencyInfo> dependency_infos;
+	lm::SmallArray<VkImageMemoryBarrier2, MAX_IMG_BARRIERS> img_barriers;
+	lm::SmallArray<VkDependencyInfo, MAX_IMG_BARRIERS> dependency_infos;
 };
 
 struct BufferBarrier {
@@ -170,21 +180,21 @@ class RenderPass {
 	bool is_pipeline_cached = false;
 
    private:
-	lm::FixedArray<Resource> resource_zeros;
-	lm::FixedArray<BufferBarrier> prefill_buffer_barriers;
-	lm::FixedArray<std::pair<Resource, Resource>> resource_copies;
+	lm::SmallArray<Resource, MAX_RESOURCES_ZEROS> resource_zeros;
+	lm::SmallArray<BufferBarrier, MAX_RESOURCES_ZEROS> prefill_buffer_barriers;
+	lm::SmallArray<std::pair<Resource, Resource>, MAX_RESOURCES_COPIES> resource_copies;
 	BufferSyncResources buffer_sync_resources;
 	ImageSyncResources image_sync_resources;
 	// TODO: Might be redundant?
-	lm::FixedArray<BufferBarrier> carryover_buffer_barriers;
+	lm::SmallArray<BufferBarrier, MAX_RESOURCES_ZEROS> carryover_buffer_barriers;
 	//
-	lm::FixedArray<BufferBarrier> post_execution_buffer_barriers;
-	lm::FixedArray<vk::Buffer*> explicit_buffer_writes;
-	lm::FixedArray<vk::Buffer*> explicit_buffer_reads;
-	lm::FixedArray<vk::Texture*> explicit_tex_writes;
-	lm::FixedArray<vk::Texture*> explicit_tex_reads;
-	lm::FixedArray<u32> descriptor_counts;
-	lm::FixedArray<std::tuple<vk::Texture*, VkImageLayout, VkImageLayout>> layout_transitions;
+	lm::SmallArray<BufferBarrier, MAX_RESOURCES_COPIES> post_execution_buffer_barriers;
+	lm::SmallArray<vk::Buffer*, MAX_EXPLICIT_BUFFER_READ_WRITES> explicit_buffer_writes;
+	lm::SmallArray<vk::Buffer*, MAX_EXPLICIT_BUFFER_READ_WRITES> explicit_buffer_reads;
+	lm::SmallArray<vk::Texture*, MAX_EXPLICIT_IMG_READ_WRITES> explicit_tex_writes;
+	lm::SmallArray<vk::Texture*, MAX_EXPLICIT_IMG_READ_WRITES> explicit_tex_reads;
+	lm::SmallArray<u32, MAX_DESCRIPTORS> descriptor_counts;
+	lm::SmallArray<std::tuple<vk::Texture*, VkImageLayout, VkImageLayout>, MAX_IMG_BARRIERS> layout_transitions;
 	/*
 	Note:
 	The assumption is that a SyncDescriptor is unique to a pass (either via

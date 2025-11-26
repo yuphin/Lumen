@@ -532,6 +532,7 @@ i32 Shader::compile(lm::RenderPass* pass) {
 		mstages.insert("rchit", shaderc_closesthit_shader);
 		mstages.insert("rmiss", shaderc_miss_shader);
 	}
+	// TODO: To small array
 	if (!vertex_inputs.initialized()) {
 		vertex_inputs = lm::fixed_array_create<std::pair<VkFormat, u32>>(_arena_shaders, MAX_VERTEX_INPUTS);
 		buffer_status_map = lm::hash_map_create<lm::String, BufferStatus>(_arena_shaders, 128);
@@ -554,8 +555,8 @@ i32 Shader::compile(lm::RenderPass* pass) {
 	lm::ScratchArena scratch(_arena_shaders);
 	// TODO: Make sure to include the null terminator
 	lm::String buffer = lm::str_reserve(scratch.arena, file_props.size);
-	os::file_read(file_handle, buffer.data);
-	// buffer.data[file_props.size] = '\0';
+os::file_read(file_handle, buffer.data);
+// buffer.data[file_props.size] = '\0';
 	os::file_close(file_handle);
 
 	u64 dot = lm::str_rfind(filename, ".");

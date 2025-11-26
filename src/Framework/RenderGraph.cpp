@@ -15,15 +15,6 @@ static constexpr u64 MAX_PASSES_PER_FRAME = 4096;
 static constexpr u64 MAX_PIPELINE_TASKS = 128;
 static constexpr u64 MAX_SHADER_COMPILATIONS_PER_FRAME = 1024;
 static constexpr u64 MAX_SHADERS_PER_PASS = 8;
-////////////////////////////
-// --- Limits for resources in a Render Pass  ---
-static constexpr u64 MAX_RESOURCES_ZEROS = 128;
-static constexpr u64 MAX_RESOURCES_COPIES = 128;
-static constexpr u64 MAX_BUFFER_BARRIERS = 128;
-static constexpr u64 MAX_DESCRIPTORS = 32;
-static constexpr u64 MAX_IMG_BARRIERS = 128;
-static constexpr u64 MAX_EXPLICIT_BUFFER_READ_WRITES = 128;
-static constexpr u64 MAX_EXPLICIT_IMG_READ_WRITES = 128;
 
 namespace lm {
 
@@ -383,32 +374,10 @@ void RenderPass::init() {
 	if (resources_initialized) {
 		return;
 	}
-
-	resource_zeros = lm::fixed_array_create<Resource>(_arena_rendergraph, MAX_RESOURCES_ZEROS);
-	prefill_buffer_barriers = lm::fixed_array_create<BufferBarrier>(_arena_rendergraph, MAX_RESOURCES_ZEROS);
-	carryover_buffer_barriers = lm::fixed_array_create<BufferBarrier>(_arena_rendergraph, MAX_RESOURCES_ZEROS);
-	resource_copies = lm::fixed_array_create<std::pair<Resource, Resource>>(_arena_rendergraph, MAX_RESOURCES_COPIES);
-	buffer_sync_resources.buffer_bariers =
-		lm::fixed_array_create<VkBufferMemoryBarrier2>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
-	buffer_sync_resources.dependency_infos =
-		lm::fixed_array_create<VkDependencyInfo>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
-	image_sync_resources.img_barriers =
-		lm::fixed_array_create<VkImageMemoryBarrier2>(_arena_rendergraph, MAX_IMG_BARRIERS);
-	image_sync_resources.dependency_infos =
-		lm::fixed_array_create<VkDependencyInfo>(_arena_rendergraph, MAX_IMG_BARRIERS);
-	post_execution_buffer_barriers = lm::fixed_array_create<BufferBarrier>(_arena_rendergraph, MAX_RESOURCES_COPIES);
-	explicit_buffer_writes = lm::fixed_array_create<vk::Buffer*>(_arena_rendergraph, MAX_EXPLICIT_BUFFER_READ_WRITES);
-	explicit_buffer_reads = lm::fixed_array_create<vk::Buffer*>(_arena_rendergraph, MAX_EXPLICIT_BUFFER_READ_WRITES);
-	explicit_tex_writes = lm::fixed_array_create<vk::Texture*>(_arena_rendergraph, MAX_EXPLICIT_IMG_READ_WRITES);
-	explicit_tex_reads = lm::fixed_array_create<vk::Texture*>(_arena_rendergraph, MAX_EXPLICIT_IMG_READ_WRITES);
-	descriptor_counts = lm::fixed_array_create<u32>(_arena_rendergraph, MAX_DESCRIPTORS);
-	layout_transitions = lm::fixed_array_create<std::tuple<vk::Texture*, VkImageLayout, VkImageLayout>>(
-		_arena_rendergraph, MAX_IMG_BARRIERS);
 	set_signals_buffer = lm::hash_map_create<VkBuffer, BufferSyncDescriptor>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
 	wait_signals_buffer = lm::hash_map_create<VkBuffer, BufferSyncDescriptor>(_arena_rendergraph, MAX_BUFFER_BARRIERS);
 	set_signals_img = lm::hash_map_create<VkImage, ImageSyncDescriptor>(_arena_rendergraph, MAX_IMG_BARRIERS);
 	wait_signals_img = lm::hash_map_create<VkImage, ImageSyncDescriptor>(_arena_rendergraph, MAX_IMG_BARRIERS);
-
 	resources_initialized = true;
 }
 
@@ -652,9 +621,9 @@ void RenderPass::finalize() {
 		switch (type) {
 			case vk::PassType::Graphics: {
 				auto func = [](RenderPass* pass) {
-					pass->pipeline_storage->pipeline.create_gfx_pipeline(*pass->gfx_settings, pass->descriptor_counts,
-																		 pass->gfx_settings->color_outputs,
-																		 pass->gfx_settings->depth_output);
+					pass->pipeline_storage->pipeline.create_gfx_pipeline(
+						*pass->gfx_settings, pass->descriptor_counts.to_slice(), pass->gfx_settings->color_outputs,
+						pass->gfx_settings->depth_output);
 				};
 				if (rg->multithreaded_pipeline_compilation) {
 					rg->pipeline_tasks.push_back({func, pass_idx});
@@ -665,7 +634,8 @@ void RenderPass::finalize() {
 			}
 			case vk::PassType::RT: {
 				auto func = [update_rt_descriptors](RenderPass* pass) {
-					pass->pipeline_storage->pipeline.create_rt_pipeline(*pass->rt_settings, pass->descriptor_counts,
+					pass->pipeline_storage->pipeline.create_rt_pipeline(*pass->rt_settings,
+																		pass->descriptor_counts.to_slice(),
 																		u32(pass->pipeline_storage->as_bindings.size));
 					update_rt_descriptors();
 				};
@@ -679,7 +649,7 @@ void RenderPass::finalize() {
 			case vk::PassType::Compute: {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline_storage->pipeline.create_compute_pipeline(*pass->compute_settings,
-																			 pass->descriptor_counts);
+																			 pass->descriptor_counts.to_slice());
 				};
 				if (rg->multithreaded_pipeline_compilation) {
 					rg->pipeline_tasks.push_back({func, pass_idx});
@@ -724,11 +694,8 @@ void RenderPass::post_execution_barrier(vk::Buffer* buffer, VkAccessFlags access
 }
 
 void RenderPass::run(VkCommandBuffer cmd) {
-	std::vector<VkEvent> wait_events;
+	lm::SmallArray<VkEvent, MAX_BUFFER_BARRIERS + MAX_IMG_BARRIERS> wait_events;
 	const bool use_events = rg->settings.use_events;
-	if (use_events) {
-		wait_events.reserve(wait_signals_buffer.size);
-	}
 	vk::begin_region(vk::context().device, cmd, name.data, glm::vec4(1.0f, 0.78f, 0.05f, 1.0f));
 	GPUQueryManager::begin(cmd, name.data);
 
@@ -750,9 +717,9 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			wait_events.push_back(event);
 		}
 	}
-	if (wait_events.size()) {
-		vkCmdWaitEvents2(cmd, (u32)wait_events.size(), wait_events.data(), buffer_sync.dependency_infos.data);
-		for (i32 i = 0; i < wait_events.size(); i++) {
+	if (wait_events.size) {
+		vkCmdWaitEvents2(cmd, (u32)wait_events.size, wait_events.data, buffer_sync.dependency_infos.data);
+		for (i32 i = 0; i < wait_events.size; i++) {
 			vkCmdResetEvent2(cmd, wait_events[i], buffer_sync.buffer_bariers[i].dstStageMask);
 		}
 	} else if (!use_events) {
@@ -765,17 +732,15 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 	// Prefill buffer barriers
 	{
-		std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
+		lm::SmallArray<VkBufferMemoryBarrier2, MAX_RESOURCES_ZEROS> buffer_memory_barriers;
 		if (!prefill_buffer_barriers.empty()) {
-			buffer_memory_barriers.reserve(prefill_buffer_barriers.size);
 			for (auto& barrier : prefill_buffer_barriers) {
 				auto curr_stage = pipeline_stage_from_pass_type(type, barrier.src_access_flags);
 				auto dst_stage = pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
 				buffer_memory_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
 																	 barrier.dst_access_flags, curr_stage, dst_stage));
 			}
-			auto dependency_info =
-				vk::dependency_info((u32)buffer_memory_barriers.size(), buffer_memory_barriers.data());
+			auto dependency_info = vk::dependency_info((u32)buffer_memory_barriers.size, buffer_memory_barriers.data);
 			vkCmdPipelineBarrier2(cmd, &dependency_info);
 		}
 	}
@@ -789,17 +754,15 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 	// Buffer barriers
 	{
-		std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
+		lm::SmallArray<VkBufferMemoryBarrier2, MAX_RESOURCES_ZEROS> buffer_memory_barriers;
 		if (!carryover_buffer_barriers.empty()) {
-			buffer_memory_barriers.reserve(carryover_buffer_barriers.size);
 			for (auto& barrier : carryover_buffer_barriers) {
 				auto curr_stage = pipeline_stage_from_pass_type(type, barrier.src_access_flags);
 				auto dst_stage = pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
 				buffer_memory_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
 																	 barrier.dst_access_flags, curr_stage, dst_stage));
 			}
-			auto dependency_info =
-				vk::dependency_info((u32)buffer_memory_barriers.size(), buffer_memory_barriers.data());
+			auto dependency_info = vk::dependency_info((u32)buffer_memory_barriers.size, buffer_memory_barriers.data);
 			vkCmdPipelineBarrier2(cmd, &dependency_info);
 		}
 	}
@@ -826,9 +789,9 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		}
 	}
 
-	if (wait_events.size()) {
-		vkCmdWaitEvents2(cmd, (u32)wait_events.size(), wait_events.data(), img_sync.dependency_infos.data);
-		for (i32 i = 0; i < wait_events.size(); i++) {
+	if (wait_events.size) {
+		vkCmdWaitEvents2(cmd, (u32)wait_events.size, wait_events.data, img_sync.dependency_infos.data);
+		for (i32 i = 0; i < wait_events.size; i++) {
 			vkCmdResetEvent2(cmd, wait_events[i], img_sync.img_barriers[i].dstStageMask);
 		}
 	} else if (!use_events) {
@@ -901,19 +864,21 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				vkCmdSetScissor(cmd, 0, 1, &scissor);
 
 				if (gfx_settings->vertex_buffers.size()) {
-					std::vector<VkDeviceSize> offsets(gfx_settings->vertex_buffers.size(), 0);
-					std::vector<VkBuffer> vert_buffers;
+					constexpr size_t MAX_VERTEX_BUFFERS = 4;
+					lm::SmallArray<VkDeviceSize, MAX_VERTEX_BUFFERS> offsets;
+					lm::SmallArray<VkBuffer, MAX_VERTEX_BUFFERS> vert_buffers;
+					assert(gfx_settings->vertex_buffers.size() < MAX_VERTEX_BUFFERS);
 					for (auto& buf : gfx_settings->vertex_buffers) {
 						vert_buffers.push_back(buf->handle);
 					}
-					vkCmdBindVertexBuffers(cmd, 0, (u32)vert_buffers.size(), vert_buffers.data(), offsets.data());
+					vkCmdBindVertexBuffers(cmd, 0, (u32)vert_buffers.size, vert_buffers.data, offsets.data);
 				}
 
 				if (gfx_settings->index_buffer) {
 					vkCmdBindIndexBuffer(cmd, gfx_settings->index_buffer->handle, 0, gfx_settings->index_type);
 				}
-				std::vector<VkRenderingAttachmentInfo> rendering_attachments;
-				rendering_attachments.reserve(color_outputs.size());
+				constexpr size_t MAX_RENDERING_ATTACHMENTS = 4;
+				lm::SmallArray<VkRenderingAttachmentInfo, MAX_RENDERING_ATTACHMENTS> rendering_attachments;
 				for (vk::Texture* color_output : color_outputs) {
 					vk::texture_transition(color_output, cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 					rendering_attachments.push_back(vk::rendering_attachment_info(
@@ -934,7 +899,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 												.renderArea = {{0, 0}, {gfx_settings->width, gfx_settings->height}},
 												.layerCount = 1,
 												.colorAttachmentCount = (u32)color_outputs.size(),
-												.pColorAttachments = rendering_attachments.data(),
+												.pColorAttachments = rendering_attachments.data,
 												.pDepthAttachment = depth_output ? &depth_stencil_attachment : nullptr};
 					vkCmdBeginRendering(cmd, &render_info);
 					gfx_settings->pass_func(cmd, *this);
@@ -958,17 +923,16 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 	// Post execution buffer barriers
 	{
-		std::vector<VkBufferMemoryBarrier2> post_execution_buffer_memory_barriers;
+		lm::SmallArray<VkBufferMemoryBarrier2, MAX_RESOURCES_COPIES> post_execution_buffer_memory_barriers;
 		if (!post_execution_buffer_barriers.empty()) {
-			post_execution_buffer_memory_barriers.reserve(post_execution_buffer_barriers.size);
 			for (auto& barrier : post_execution_buffer_barriers) {
 				VkPipelineStageFlags curr_stage = pipeline_stage_from_pass_type(type, barrier.src_access_flags);
 				VkPipelineStageFlags dst_stage = pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
 				post_execution_buffer_memory_barriers.push_back(vk::buffer_barrier2(
 					barrier.buffer, barrier.src_access_flags, barrier.dst_access_flags, curr_stage, dst_stage));
 			}
-			auto dependency_info = vk::dependency_info((u32)post_execution_buffer_memory_barriers.size(),
-													   post_execution_buffer_memory_barriers.data());
+			auto dependency_info = vk::dependency_info((u32)post_execution_buffer_memory_barriers.size,
+													   post_execution_buffer_memory_barriers.data);
 			vkCmdPipelineBarrier2(cmd, &dependency_info);
 		}
 	}

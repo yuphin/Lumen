@@ -13,13 +13,11 @@ struct Pipeline {
 	enum class PipelineType { GFX = 0, RT = 1, COMPUTE = 2 };
 	Pipeline(const std::string& name);
 	void cleanup();
-	void create_gfx_pipeline(const GraphicsPassSettings& settings,
-							 const lm::FixedArray<u32>& descriptor_counts, std::vector<vk::Texture*> color_outputs,
-							 vk::Texture* depth_output);
-	void create_rt_pipeline(const RTPassSettings& settings,
-							const lm::FixedArray<u32>& descriptor_counts, u32 num_as_bindings);
-	void create_compute_pipeline(const ComputePassSettings& settings,
-								 const lm::FixedArray<u32>& descriptor_counts);
+	void create_gfx_pipeline(const GraphicsPassSettings& settings, util::Slice<u32> descriptor_counts,
+							 std::vector<vk::Texture*> color_outputs, vk::Texture* depth_output);
+	void create_rt_pipeline(const RTPassSettings& settings, util::Slice<u32> descriptor_counts,
+							u32 num_as_bindings);
+	void create_compute_pipeline(const ComputePassSettings& settings, util::Slice<u32> descriptor_counts);
 	const std::array<VkStridedDeviceAddressRegionKHR, 4> get_rt_regions();
 
 	VkPipeline handle = VK_NULL_HANDLE;
@@ -46,8 +44,8 @@ struct Pipeline {
 
    private:
 	void create_pipeline_layout(const std::vector<Shader>& shaders, const std::vector<u32> push_const_sizes);
-	void create_update_template(const std::vector<Shader>& shaders, const lm::FixedArray<u32>& descriptor_counts);
-	void create_set_layout(const std::vector<Shader>& shaders, const lm::FixedArray<u32>& descriptor_counts);
+	void create_update_template(const std::vector<Shader>& shaders, util::Slice<u32> descriptor_counts);
+	void create_set_layout(const std::vector<Shader>& shaders, util::Slice<u32> descriptor_counts);
 	void create_rt_set_layout(VkShaderStageFlags stage_flags, u32 num_as_bindings);
 	u32 binding_mask;
 };

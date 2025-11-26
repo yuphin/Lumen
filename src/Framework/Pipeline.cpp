@@ -24,7 +24,7 @@ static u32 get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDes
 
 Pipeline::Pipeline(const std::string& name) : name(name) {}
 
-void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const lm::FixedArray<u32>& descriptor_counts,
+void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::Slice<u32> descriptor_counts,
 								   std::vector<vk::Texture*> color_outputs, vk::Texture* depth_output) {
 	LUMEN_ASSERT(color_outputs.size(), "No color outputs for GFX pipeline");
 	type = PipelineType::GFX;
@@ -172,7 +172,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, const l
 	}
 }
 
-void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const lm::FixedArray<u32>& descriptor_counts,
+void Pipeline::create_rt_pipeline(const RTPassSettings& settings, util::Slice<u32> descriptor_counts,
 								  u32 num_as_bindings) {
 	type = PipelineType::RT;
 	binding_mask = get_bindings_for_shader_set(settings.shaders, descriptor_types);
@@ -301,7 +301,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, const lm::Fixe
 }
 
 void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
-									   const lm::FixedArray<u32>& descriptor_counts) {
+									   util::Slice<u32> descriptor_counts) {
 	type = PipelineType::COMPUTE;
 	binding_mask = get_bindings_for_shader_set({settings.shader}, descriptor_types);
 	create_set_layout({settings.shader}, descriptor_counts);
@@ -409,7 +409,7 @@ void Pipeline::create_rt_set_layout(VkShaderStageFlags binding_stage_flags, u32 
 	vk::check(vkCreateDescriptorSetLayout(vk::context().device, &set_create_info, nullptr, &tlas_layout));
 }
 
-void Pipeline::create_set_layout(const std::vector<Shader>& shaders, const lm::FixedArray<u32>& descriptor_counts) {
+void Pipeline::create_set_layout(const std::vector<Shader>& shaders, util::Slice<u32> descriptor_counts) {
 	std::vector<VkDescriptorSetLayoutBinding> set_bindings;
 
 	if (descriptor_counts.size) {
@@ -465,7 +465,7 @@ void Pipeline::create_pipeline_layout(const std::vector<Shader>& shaders, const 
 }
 
 void Pipeline::create_update_template(const std::vector<Shader>& shaders,
-									  const lm::FixedArray<u32>& descriptor_counts) {
+									  util::Slice<u32> descriptor_counts) {
 	if (descriptor_counts.empty()) {
 		return;
 	}

@@ -26,6 +26,15 @@ struct SmallArray {
 		data[size++] = std::move(v);
 	}
 
+	template <typename... Args>
+	T& emplace_back(Args&&... args) {
+		assert(size < N);
+		T& new_element = data[size];
+		new (&new_element) T(std::forward<Args>(args)...);
+		size++;
+		return new_element;
+	}
+
 	T& push() {
 		assert(size < N);
 		return data[size++];
@@ -62,12 +71,8 @@ struct SmallArray {
 		assert(size > 0);
 		return data[size - 1];
 	}
-	util::Slice<T> to_slice() const {
-		return util::Slice(&data[0], size);
-	}
-	util::Slice<T> to_slice() {
-		return util::Slice(&data[0], size);
-	}
+	util::Slice<T> to_slice() const { return util::Slice(&data[0], size); }
+	util::Slice<T> to_slice() { return util::Slice(&data[0], size); }
 };
 template <typename T, typename... U>
 SmallArray(T, U...) -> SmallArray<T, 1 + sizeof...(U)>;
