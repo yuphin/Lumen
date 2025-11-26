@@ -285,11 +285,10 @@ void DDGI::render() {
 		auto update_probe = [&](bool is_irr) {
 			lm::String pipeline_name = is_irr ? CSTR("Update Irradiance") : CSTR("Update Depth");
 			vk::render_graph()
-				->add_compute(pipeline_name,
-							  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/update.comp")),
-							   .macros = {is_irr ? lm::fixed_array_init(arena, {vk::ShaderMacro("IRRADIANCE_UPDATE")})
-												 : lm::fixed_array_init(arena, {vk::ShaderMacro("DEPTH_UPDATE")})},
-							   .dims = {wg_x, wg_y}})
+				->add_compute(pipeline_name, {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/update.comp")),
+											  .macros = {is_irr ? vk::ShaderMacro("IRRADIANCE_UPDATE")
+																: vk::ShaderMacro("DEPTH_UPDATE")},
+											  .dims = {wg_x, wg_y}})
 				.push_constants(&pc_ray)
 				.bind({lumen_scene->scene_desc_buffer, irr_texes[!ping_pong], depth_texes[!ping_pong],
 					   irr_texes[ping_pong], depth_texes[ping_pong], ddgi_ubo_buffer, rt.radiance_tex,

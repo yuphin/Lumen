@@ -8,7 +8,6 @@
 
 ////////////////////////////
 // --- Limits for fixed size arrays inside Render Graph ---
-static constexpr u64 MAX_GLOBAL_MACRO_DEFINES = 64;
 static constexpr u64 MAX_PASSES_PER_FRAME = 4096;
 ////////////////////////////
 // --- Limits for shader and pipeline compilation inside render graph ---
@@ -1056,7 +1055,6 @@ void RenderGraph::init() {
 	}
 	// Arrays
 	passes = lm::fixed_array_create<RenderPass>(_arena_rendergraph, MAX_PASSES_PER_FRAME);
-	global_macro_defines = lm::fixed_array_create<vk::ShaderMacro>(_arena_rendergraph, MAX_GLOBAL_MACRO_DEFINES);
 	pipeline_tasks = lm::fixed_array_create<std::pair<std::function<void(RenderPass*)>, u32>>(_arena_rendergraph,
 																							  MAX_PIPELINE_TASKS);
 	shader_tasks = lm::fixed_array_create<std::function<void(RenderPass*)>>(_arena_rendergraph, 4 * MAX_PIPELINE_TASKS);
@@ -1254,7 +1252,7 @@ void RenderGraph::run_and_submit(vk::CommandBuffer& cmd) {
 	submit(cmd);
 }
 
-static void populate_macros(lm::Arena* arena, const lm::FixedArray<vk::ShaderMacro>& macros, lm::String& macro_string,
+static void populate_macros(lm::Arena* arena, const vk::ShaderMacroArray& macros, lm::String& macro_string,
 							bool& prev_nonempty) {
 	for (u64 i = 0; i < macros.size; i++) {
 		if (!macros[i].visible) {
@@ -1275,7 +1273,7 @@ static void populate_macros(lm::Arena* arena, const lm::FixedArray<vk::ShaderMac
 }
 
 PipelineStorage* RenderGraph::add_pass_impl_common(const lm::String& name,
-												   const lm::FixedArray<vk::ShaderMacro>& macros,
+												   const vk::ShaderMacroArray& macros,
 												   const lm::SpecializationConstantArray& specialization_data,
 												   bool& cached, lm::String& name_with_macros,
 												   lm::String& macro_string) {

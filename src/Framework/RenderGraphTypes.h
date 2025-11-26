@@ -11,9 +11,10 @@
 namespace lm {
 class RenderPass;
 
-
 static constexpr u64 MAX_SPEC_CONSTANTS = 8;
 static constexpr u64 MAX_SHADERS_PER_PASS = 8;
+static constexpr u64 MAX_SHADER_MACROS = 32;
+
 using SpecializationConstantArray = SmallArray<u32, MAX_SPEC_CONSTANTS>;
 
 struct dim3 {
@@ -90,6 +91,7 @@ struct ImageSyncDescriptor {
 namespace vk {
 enum class PassType { Compute, RT, Graphics };
 struct ShaderMacro {
+	ShaderMacro() = default;
 	ShaderMacro(const lm::String& name, i32 val, bool visible)
 		: name(name), val(val), has_val(true), visible(visible) {}
 	ShaderMacro(const lm::String& name, i32 val) : name(name), val(val), has_val(true) {}
@@ -104,9 +106,12 @@ struct ShaderMacro {
 	bool has_val = false;
 	bool visible = true;
 };
+
+using ShaderMacroArray = lm::SmallArray<ShaderMacro, lm::MAX_SHADER_MACROS>;
+
 struct GraphicsPassSettings {
 	std::vector<vk::Shader> shaders;
-	lm::FixedArray<ShaderMacro> macros;
+	ShaderMacroArray macros;
 	u32 width;
 	u32 height;
 	VkClearValue clear_color;
@@ -130,7 +135,7 @@ struct GraphicsPassSettings {
 
 struct RTPassSettings {
 	std::vector<vk::Shader> shaders;
-	lm::FixedArray<ShaderMacro> macros;
+	ShaderMacroArray macros;
 	u32 recursion_depth = 1;
 	lm::SpecializationConstantArray specialization_data;
 	lm::dim3 dims;
@@ -140,7 +145,7 @@ struct RTPassSettings {
 
 struct ComputePassSettings {
 	vk::Shader shader;
-	lm::FixedArray<ShaderMacro> macros;
+	ShaderMacroArray macros;
 	lm::SpecializationConstantArray specialization_data;
 	lm::dim3 dims;
 	std::function<void(VkCommandBuffer cmd, const lm::RenderPass& pass)> pass_func;

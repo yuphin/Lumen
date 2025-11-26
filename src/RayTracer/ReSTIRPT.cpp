@@ -9,7 +9,7 @@ void ReSTIRPT::init() {
 	Integrator::init();
 
 	photon_bvh_scratch_bufs.resize(vk::MAX_FRAMES_IN_FLIGHT);
-	for(u64 i = 0; i < photon_bvh_scratch_bufs.size; i++) {
+	for (u64 i = 0; i < photon_bvh_scratch_bufs.size; i++) {
 		photon_bvh_scratch_bufs[i] = nullptr;
 	}
 
@@ -252,17 +252,16 @@ void ReSTIRPT::render() {
 	constexpr i32 READ_OR_PREV_IDX = 0;
 	if (enable_photon_mapping) {
 		vk::render_graph()
-			->add_rt(
-				CSTR("PM - Trace First Diffuse"),
-				{
-					.shaders = {{CSTR("src/shaders/integrators/restir/gris/pm_trace_eye.rgen")},
-								{CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
-								{CSTR("src/shaders/ray_shadow.rmiss")},
-								{CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
-								{CSTR("src/shaders/ray.rahit")}},
-					.macros = lm::fixed_array_init(arena, {vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)}),
-					.dims = {Window::width(), Window::height()},
-				})
+			->add_rt(CSTR("PM - Trace First Diffuse"),
+					 {
+						 .shaders = {{CSTR("src/shaders/integrators/restir/gris/pm_trace_eye.rgen")},
+									 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+									 {CSTR("src/shaders/ray_shadow.rmiss")},
+									 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+									 {CSTR("src/shaders/ray.rahit")}},
+						 .macros = {vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
+						 .dims = {Window::width(), Window::height()},
+					 })
 			.push_constants(&pc_ray)
 			.bind(common_bindings)
 			.bind(photon_gbuffers[pong])
@@ -299,8 +298,8 @@ void ReSTIRPT::render() {
 									 {CSTR("src/shaders/ray_shadow.rmiss")},
 									 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
 									 {CSTR("src/shaders/ray.rahit")}},
-						 .macros = lm::fixed_array_init(arena, {vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere),
-																vk::ShaderMacro("DISABLE_PM_MIS", !enable_pm_mis)}),
+						 .macros = {vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere),
+									vk::ShaderMacro("DISABLE_PM_MIS", !enable_pm_mis)},
 						 .dims = {num_photons, 1},
 					 })
 			.push_constants(&pc_ray)
@@ -312,7 +311,8 @@ void ReSTIRPT::render() {
 						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR,
 						util::Slice(&caustic_photon_aabbs_buffer, 1), &photon_bvh_scratch_bufs[resource_idx])
 			.tlas_build(photon_tlas, photon_bvh_instances_buf, 1,
-						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR, &photon_bvh_scratch_bufs[resource_idx],
+						VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR,
+						&photon_bvh_scratch_bufs[resource_idx],
 						/*build_tlas_after_blas=*/true)
 			.bind_tlas(tlas);
 
@@ -325,9 +325,8 @@ void ReSTIRPT::render() {
 										 {CSTR("src/shaders/ray_shadow.rmiss")},
 										 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
 										 {CSTR("src/shaders/ray.rahit")}},
-							 .macros =
-								 lm::fixed_array_init(arena, {{"STREAMING_MODE", i32(streaming_method)},
-															  vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)}),
+							 .macros = {{"STREAMING_MODE", i32(streaming_method)},
+										vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere)},
 							 .dims = {Window::width(), Window::height()},
 						 })
 				.push_constants(&pc_ray)
@@ -353,11 +352,10 @@ void ReSTIRPT::render() {
 								 {CSTR("src/shaders/ray_shadow.rmiss")},
 								 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
 								 {CSTR("src/shaders/ray.rahit")}},
-					 .macros = lm::fixed_array_init(
-						 arena, {{"STREAMING_MODE", i32(streaming_method)},
-								 vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere),
-								 vk::ShaderMacro("DISABLE_PM_MIS", !enable_pm_mis),
-								 vk::ShaderMacro("ENABLE_PM", enable_photon_gather && enable_photon_mapping)}),
+					 .macros = {vk::ShaderMacro("STREAMING_MODE", i32(streaming_method)),
+								vk::ShaderMacro("ENABLE_ATMOSPHERE", enable_atmosphere),
+								vk::ShaderMacro("DISABLE_PM_MIS", !enable_pm_mis),
+								vk::ShaderMacro("ENABLE_PM", enable_photon_gather && enable_photon_mapping)},
 					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc_ray)
@@ -457,17 +455,17 @@ void ReSTIRPT::render() {
 
 				// Spatial Reuse
 				vk::render_graph()
-					->add_rt(CSTR("GRIS - Spatial Reuse"),
-							 {
-								 .shaders = {{CSTR("src/shaders/integrators/restir/gris/spatial_reuse.rgen")},
-											 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
-											 {CSTR("src/shaders/ray_shadow.rmiss")},
-											 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
-											 {CSTR("src/shaders/ray.rahit")}},
-								 .macros = lm::fixed_array_init(arena, {vk::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS",
-																						enable_defensive_formulation)}),
-								 .dims = {Window::width(), Window::height()},
-							 })
+					->add_rt(
+						CSTR("GRIS - Spatial Reuse"),
+						{
+							.shaders = {{CSTR("src/shaders/integrators/restir/gris/spatial_reuse.rgen")},
+										{CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+										{CSTR("src/shaders/ray_shadow.rmiss")},
+										{CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+										{CSTR("src/shaders/ray.rahit")}},
+							.macros = {vk::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS", enable_defensive_formulation)},
+							.dims = {Window::width(), Window::height()},
+						})
 					.push_constants(&pc_ray)
 					.bind(common_bindings)
 					.bind(reconnection_buffer)
@@ -533,7 +531,7 @@ void ReSTIRPT::destroy(bool resize) {
 		vkDeviceWaitIdle(vk::context().device);
 		photon_tlas.destroy();
 		photon_blas.destroy();
-		for(vk::Buffer* scratch_buf : photon_bvh_scratch_bufs) {
+		for (vk::Buffer* scratch_buf : photon_bvh_scratch_bufs) {
 			drm::destroy(scratch_buf);
 		}
 	}

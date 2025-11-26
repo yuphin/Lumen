@@ -89,7 +89,7 @@ class RenderGraph {
 	RenderPass& add_rt(const lm::String& name, const vk::RTPassSettings& settings);
 	RenderPass& add_gfx(const lm::String& name, const vk::GraphicsPassSettings& settings);
 	RenderPass& add_compute(const lm::String& name, const vk::ComputePassSettings& settings);
-	PipelineStorage* add_pass_impl_common(const lm::String& name, const lm::FixedArray<vk::ShaderMacro>& macros,
+	PipelineStorage* add_pass_impl_common(const lm::String& name, const vk::ShaderMacroArray& macros,
 										  const lm::SpecializationConstantArray& specialization_data, bool& cached,
 										  lm::String& name_with_macros, lm::String& macro_string);
 	void init();
@@ -100,7 +100,7 @@ class RenderGraph {
 	void destroy();
 	friend RenderPass;
 
-	lm::FixedArray<vk::ShaderMacro> global_macro_defines;
+	vk::ShaderMacroArray global_macro_defines;
 	lm::FixedArray<std::pair<std::function<void(RenderPass*)>, u32>> pipeline_tasks;
 	lm::FixedArray<std::function<void(RenderPass*)>> shader_tasks;
 	lm::FixedArray<RenderPass> passes;
@@ -174,7 +174,7 @@ class RenderPass {
 	std::unique_ptr<vk::GraphicsPassSettings> gfx_settings = nullptr;
 	std::unique_ptr<vk::RTPassSettings> rt_settings = nullptr;
 	std::unique_ptr<vk::ComputePassSettings> compute_settings = nullptr;
-	lm::FixedArray<vk::ShaderMacro> macro_defines;
+	vk::ShaderMacroArray macro_defines;
 	PipelineStorage* pipeline_storage = nullptr;
 	lm::String name;
 	bool is_pipeline_cached = false;

@@ -75,8 +75,8 @@ void PostFX::init() {
 
 	const i32 RADIX_X = (31 - std::countl_zero(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
 	const i32 RADIX_Y = (31 - std::countl_zero(fft_ping_padded->extent.height)) % 2 ? 2 : 4;
-	lm::FixedArray<vk::ShaderMacro> macros_x = lm::fixed_array_create<vk::ShaderMacro>(arena, 2);
-	lm::FixedArray<vk::ShaderMacro> macros_y = lm::fixed_array_create<vk::ShaderMacro>(arena, 2);
+	vk::ShaderMacroArray macros_x;
+	vk::ShaderMacroArray macros_y;
 	macros_x.push_back({"KERNEL_GENERATION"});
 	macros_y.push_back({"KERNEL_GENERATION"});
 	if (RADIX_X != 2) {
@@ -119,8 +119,8 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 		bool vertical = false;
 		const i32 RADIX_X = (31 - std::countl_zero(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
 		const i32 RADIX_Y = (31 - std::countl_zero(fft_ping_padded->extent.height)) % 2 ? 2 : 4;
-		lm::FixedArray<vk::ShaderMacro> macros_x = lm::fixed_array_create<vk::ShaderMacro>(arena, 1);
-		lm::FixedArray<vk::ShaderMacro> macros_y = lm::fixed_array_create<vk::ShaderMacro>(arena, 1);
+		vk::ShaderMacroArray macros_x;
+		vk::ShaderMacroArray macros_y;
 		if (RADIX_X != 2) {
 			macros_x.push_back({"RADIX", RADIX_X});
 		}

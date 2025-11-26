@@ -470,7 +470,7 @@ static void parse_shader(Shader& shader, const u32* code, u64 code_size, lm::Ren
 
 static lm::HashMap<lm::String, shaderc_shader_kind> mstages;
 
-static void add_macros(const lm::FixedArray<ShaderMacro>& macros, shaderc::CompileOptions& options) {
+static void add_macros(const ShaderMacroArray& macros, shaderc::CompileOptions& options) {
 	// TODO: Remove std::string dependency
 	for (const auto& macro : macros) {
 		if (macro.has_val) {
