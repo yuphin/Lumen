@@ -155,12 +155,10 @@ void RayTracer::init_resources() {
 }
 
 void RayTracer::cleanup_resources() {
-	std::vector<vk::Buffer*> buffer_list = {output_img_buffer, output_img_buffer_cpu, residual_buffer,
-											counter_buffer,	   rmse_val_buffer,		  rt_utils_desc_buffer};
-	std::vector<vk::Texture*> tex_list = {reference_tex, target_tex};
-	if (load_reference) {
-		buffer_list.push_back(gt_img_buffer);
-	}
+	std::initializer_list<vk::Buffer*> buffer_list = {output_img_buffer, output_img_buffer_cpu, residual_buffer,
+													  counter_buffer,	 rmse_val_buffer,		rt_utils_desc_buffer,
+													  gt_img_buffer};
+	std::initializer_list<vk::Texture*> tex_list = {reference_tex, target_tex};
 	for (vk::Buffer* b : buffer_list) {
 		prm::remove(b);
 	}

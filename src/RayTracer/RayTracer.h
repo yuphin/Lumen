@@ -41,7 +41,7 @@ class RayTracer {
 
 	RTUtilsPC rt_utils_pc;
 
-	vk::Buffer* gt_img_buffer;
+	vk::Buffer* gt_img_buffer = nullptr;
 	vk::Buffer* output_img_buffer;
 	vk::Buffer* output_img_buffer_cpu;
 	vk::Buffer* residual_buffer;
