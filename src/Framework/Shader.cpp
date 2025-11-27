@@ -8,7 +8,6 @@
 #include <glslc/file_includer.h>
 #endif	//  USE_SHADERC
 
-
 thread_local lm::Arena* _arena_shaders = nullptr;
 
 namespace vk {
@@ -321,8 +320,7 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 								const auto& res = buffer_ptr_hash_map[load_map[access_chain.base_ptr_id]];
 								auto entry = pass->rg->registered_buffer_pointers.find(lm::str_from_cstr(res.c_str()));
 								if (entry) {
-									shader.buffer_status_map.get_or_create(entry->key)->value.read =
-										true;
+									shader.buffer_status_map.get_or_create(entry->key)->value.read = true;
 								}
 							}
 						}
@@ -550,8 +548,8 @@ i32 Shader::compile(lm::RenderPass* pass) {
 	lm::ScratchArena scratch(_arena_shaders);
 	// TODO: Make sure to include the null terminator
 	lm::String buffer = lm::str_reserve(scratch.arena, file_props.size);
-os::file_read(file_handle, buffer.data);
-// buffer.data[file_props.size] = '\0';
+	os::file_read(file_handle, buffer.data);
+	// buffer.data[file_props.size] = '\0';
 	os::file_close(file_handle);
 
 	u64 dot = lm::str_rfind(filename, ".");

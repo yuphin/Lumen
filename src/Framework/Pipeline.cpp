@@ -217,8 +217,8 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, util::Slice<u3
 		entry.offset = i * sizeof(u32);
 	}
 
-	lm::SmallArray<VkPipelineShaderStageCreateInfo, lm::MAX_SHADERS_PER_PASS> stages;
-	lm::SmallArray<VkRayTracingShaderGroupCreateInfoKHR, lm::MAX_SHADERS_PER_PASS> groups;
+	lm::SmallArray<VkPipelineShaderStageCreateInfo, vk::MAX_SHADERS_PER_PASS> stages;
+	lm::SmallArray<VkRayTracingShaderGroupCreateInfoKHR, vk::MAX_SHADERS_PER_PASS> groups;
 
 	VkPipelineShaderStageCreateInfo stage{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
 	stage.pName = "main";

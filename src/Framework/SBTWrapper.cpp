@@ -54,30 +54,39 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 
 	add_indices(pipeline_info);
 	u32 sbt_size = pipeline_info.groupCount * group_handle_size;
-	std::vector<u8> shader_handle_storage(sbt_size);
+
+	constexpr size_t MAX_HANDLE_SIZE = 32;
+	constexpr size_t MAX_SBT_SIZE_BYTES = vk::MAX_SHADERS_PER_PASS * MAX_HANDLE_SIZE;
+	assert(group_handle_size <= MAX_HANDLE_SIZE);
+	assert(sbt_size < MAX_SBT_SIZE_BYTES);
+	lm::SmallArray<u8, MAX_SBT_SIZE_BYTES> shader_handle_storage;
 
 	vk::check(vkGetRayTracingShaderGroupHandlesKHR(vk::context().device, rt_pipeline, 0, pipeline_info.groupCount,
-												   sbt_size, shader_handle_storage.data()));
+												   sbt_size, shader_handle_storage.data));
 
-	std::array<std::vector<u8>, 4> stage;
-	stage[GROUP_RAYGEN] = std::vector<u8>(group_data[GROUP_RAYGEN].stride * index_count(GROUP_RAYGEN));
-	stage[GROUP_MISS] = std::vector<u8>(group_data[GROUP_MISS].stride * index_count(GROUP_MISS));
-	stage[GROUP_HIT] = std::vector<u8>(group_data[GROUP_HIT].stride * index_count(GROUP_HIT));
-	stage[GROUP_CALLABLE] = std::vector<u8>(group_data[GROUP_CALLABLE].stride * index_count(GROUP_CALLABLE));
 
-	auto copy_handles = [&](std::vector<u8>& stage_buffer, util::Slice<u32> indices, u32 stride) {
-		auto* pbuffer = stage_buffer.data();
+	constexpr size_t MAX_BYTES_PER_GROUP = MAX_SBT_SIZE_BYTES / 4;
+	std::array<lm::SmallArray<u8, MAX_BYTES_PER_GROUP>, 4> stage;
+
+	auto copy_handles = [&](util::Slice<u8> stage_buffer, util::Slice<u32> indices, u32 stride) {
+		auto* pbuffer = stage_buffer.data;
 		for (u64 index = 0; index < indices.size; index++) {
 			auto* pstart = pbuffer;
-			memcpy(pbuffer, shader_handle_storage.data() + (indices[index] * group_handle_size), group_handle_size);
+			memcpy(pbuffer, shader_handle_storage.data + (indices[index] * group_handle_size), group_handle_size);
 			pbuffer = pstart + stride;
 		}
 	};
+	stage[GROUP_RAYGEN].size = group_data[GROUP_RAYGEN].stride * index_count(GROUP_RAYGEN);
+	stage[GROUP_MISS].size = group_data[GROUP_MISS].stride * index_count(GROUP_MISS);
+	stage[GROUP_HIT].size = group_data[GROUP_HIT].stride * index_count(GROUP_HIT);
+	stage[GROUP_CALLABLE].size = group_data[GROUP_CALLABLE].stride * index_count(GROUP_CALLABLE);
+	assert((stage[GROUP_RAYGEN].size + stage[GROUP_MISS].size + stage[GROUP_HIT].size + stage[GROUP_CALLABLE].size) <= MAX_SBT_SIZE_BYTES);
 
-	copy_handles(stage[GROUP_RAYGEN], idx_array[GROUP_RAYGEN].to_slice(), group_data[GROUP_RAYGEN].stride);
-	copy_handles(stage[GROUP_MISS], idx_array[GROUP_MISS].to_slice(), group_data[GROUP_MISS].stride);
-	copy_handles(stage[GROUP_HIT], idx_array[GROUP_HIT].to_slice(), group_data[GROUP_HIT].stride);
-	copy_handles(stage[GROUP_CALLABLE], idx_array[GROUP_CALLABLE].to_slice(), group_data[GROUP_CALLABLE].stride);
+	copy_handles(stage[GROUP_RAYGEN].to_slice(), idx_array[GROUP_RAYGEN].to_slice(), group_data[GROUP_RAYGEN].stride);
+	copy_handles(stage[GROUP_MISS].to_slice(), idx_array[GROUP_MISS].to_slice(), group_data[GROUP_MISS].stride);
+	copy_handles(stage[GROUP_HIT].to_slice(), idx_array[GROUP_HIT].to_slice(), group_data[GROUP_HIT].stride);
+	copy_handles(stage[GROUP_CALLABLE].to_slice(), idx_array[GROUP_CALLABLE].to_slice(),
+				 group_data[GROUP_CALLABLE].stride);
 
 	VkBufferUsageFlags usage_flags =
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
@@ -87,8 +96,8 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 			group_data[i].buffer = prm::get_buffer({.name = "SBT " + std::to_string(i),
 													.usage = usage_flags,
 													.memory_type = vk::BUFFER_TYPE_GPU,
-													.size = stage[i].size(),
-													.data = stage[i].data()},
+													.size = stage[i].size,
+													.data = stage[i].data},
 												   /*use_mutex=*/true);
 		}
 	}

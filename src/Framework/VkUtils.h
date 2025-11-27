@@ -1,5 +1,6 @@
 #pragma once
 namespace vk {
+static constexpr u64 MAX_SHADERS_PER_PASS = 8;
 
 void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image, VkImageLayout old_layout,
 							 VkImageLayout new_layout, VkImageSubresourceRange subresource_range,

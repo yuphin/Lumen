@@ -13,7 +13,6 @@ static constexpr u64 MAX_PASSES_PER_FRAME = 4096;
 // --- Limits for shader and pipeline compilation inside render graph ---
 static constexpr u64 MAX_PIPELINE_TASKS = 128;
 static constexpr u64 MAX_SHADER_COMPILATIONS_PER_FRAME = 1024;
-static constexpr u64 MAX_SHADERS_PER_PASS = 8;
 
 namespace lm {
 
@@ -269,7 +268,7 @@ static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& a
 	switch (pass->type) {
 		case vk::PassType::RT:
 		case vk::PassType::Graphics: {
-			lm::SmallArray<std::future<vk::Shader*>, MAX_SHADERS_PER_PASS> shader_tasks;
+			lm::SmallArray<std::future<vk::Shader*>, vk::MAX_SHADERS_PER_PASS> shader_tasks;
 			for (auto& shader : active_shaders) {
 				pass->rg->shader_map_mutex.lock();
 				auto shader_entry = pass->rg->shader_cache.find(shader->name_with_macros);
@@ -1105,7 +1104,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 						existing_shaders[&passes[i]].push_back(&shader);
 						auto entry = existing_shaders_map.get_or_create(&passes[i]);
 						if (!entry->value.initialized()) {
-							entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_SHADERS_PER_PASS);
+							entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, vk::MAX_SHADERS_PER_PASS);
 						}
 						entry->value.push_back(&shader);
 					}
@@ -1118,7 +1117,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 						existing_shaders[&passes[i]].push_back(&shader);
 						auto entry = existing_shaders_map.get_or_create(&passes[i]);
 						if (!entry->value.initialized()) {
-							entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_SHADERS_PER_PASS);
+							entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, vk::MAX_SHADERS_PER_PASS);
 						}
 						entry->value.push_back(&shader);
 					}
@@ -1131,7 +1130,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 					existing_shaders[&passes[i]].push_back(&passes[i].compute_settings->shader);
 					auto entry = existing_shaders_map.get_or_create(&passes[i]);
 					if (!entry->value.initialized()) {
-						entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_SHADERS_PER_PASS);
+						entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, vk::MAX_SHADERS_PER_PASS);
 					}
 					entry->value.push_back(&passes[i].compute_settings->shader);
 				}
