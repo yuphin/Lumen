@@ -20,7 +20,7 @@ struct BindingStatus {
 };
 
 struct Shader {
-	Shader() = delete;
+	Shader() = default;
 	Shader(const lm::String& filename);
 	std::vector<u32> binary;
 	lm::String filename;

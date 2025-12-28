@@ -1,6 +1,12 @@
 #pragma once
 namespace vk {
 static constexpr u64 MAX_SHADERS_PER_PASS = 8;
+static constexpr u64 MAX_BINDINGS = 32;
+static constexpr u64 MAX_COLOR_ATTACHMENTS = 8;
+static constexpr u64 MAX_DYNAMIC_STATES = 16;
+static constexpr u64 MAX_VERTEX_BINDINGS = 16;
+static constexpr u64 MAX_VERTEX_ATTRIBUTES = 16;
+static constexpr u64 MAX_PUSH_CONSTANT_RANGES = 8;
 
 void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image, VkImageLayout old_layout,
 							 VkImageLayout new_layout, VkImageSubresourceRange subresource_range,

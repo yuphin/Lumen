@@ -509,7 +509,7 @@ static std::vector<u32> compile_file(const lm::String& source_name, shaderc_shad
 
 Shader::Shader(const lm::String& filename) : filename(filename) {}
 i32 Shader::compile(lm::RenderPass* pass) {
-	assert(name_with_macros.is_cstr());
+	assert(!name_with_macros.empty() && name_with_macros.is_cstr());
 	LUMEN_TRACE("Compiling shader: %s", name_with_macros.data);
 
 	// If we're compiling, we need to initialize shader specific arrays and hashmaps

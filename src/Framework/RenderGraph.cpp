@@ -617,7 +617,7 @@ void RenderPass::finalize() {
 			case vk::PassType::Graphics: {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline_storage->pipeline.create_gfx_pipeline(
-						*pass->gfx_settings, pass->descriptor_counts.to_slice(), pass->gfx_settings->color_outputs,
+						*pass->gfx_settings, pass->descriptor_counts.to_slice(), pass->gfx_settings->color_outputs.to_slice(),
 						pass->gfx_settings->depth_output);
 				};
 				if (rg->multithreaded_pipeline_compilation) {
@@ -893,7 +893,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 					VkRenderingInfo render_info{.sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
 												.renderArea = {{0, 0}, {gfx_settings->width, gfx_settings->height}},
 												.layerCount = 1,
-												.colorAttachmentCount = (u32)color_outputs.size(),
+												.colorAttachmentCount = (u32)color_outputs.size,
 												.pColorAttachments = rendering_attachments.data,
 												.pDepthAttachment = depth_output ? &depth_stencil_attachment : nullptr};
 					vkCmdBeginRendering(cmd, &render_info);

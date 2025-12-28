@@ -7,7 +7,9 @@
 #include "VulkanStructs.h"
 #include "PersistentResourceManager.h"
 
-static void cmd_generate_mipmaps2(vk::Texture* texture, const VkImageCreateInfo& info, VkCommandBuffer cmd) {
+namespace vk {
+
+static void cmd_generate_mipmaps(vk::Texture* texture, const VkImageCreateInfo& info, VkCommandBuffer cmd) {
 	VkFormatProperties format_properties;
 	vkGetPhysicalDeviceFormatProperties(vk::context().physical_device, info.format, &format_properties);
 	LUMEN_ASSERT((format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT),
@@ -50,8 +52,6 @@ static void cmd_generate_mipmaps2(vk::Texture* texture, const VkImageCreateInfo&
 	vk::transition_image_layout(cmd, texture->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 								VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresource_range, texture->aspect_flags);
 }
-
-namespace vk {
 
 static VkImageAspectFlags aspect_flags(VkFormat format) {
 	VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_NONE;
@@ -103,8 +103,7 @@ void texture_create(Texture* texture, const TextureDesc& desc) {
 	}
 
 	if (!texture->name.empty()) {
-		vk::set_resource_name(vk::context().device, (u64)texture->handle, texture->name.data(),
-										   VK_OBJECT_TYPE_IMAGE);
+		vk::set_resource_name(vk::context().device, (u64)texture->handle, texture->name.data(), VK_OBJECT_TYPE_IMAGE);
 	}
 
 	if (desc.sampler) {
@@ -165,7 +164,7 @@ void texture_create(Texture* texture, const TextureDesc& desc) {
 							   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 		if (desc.calc_mips) {
 			LUMEN_ASSERT(!desc.image, "Cannot generate mips for an image that was not created by the texture");
-			cmd_generate_mipmaps2(texture, image_ci, copy_cmd.handle);
+			cmd_generate_mipmaps(texture, image_ci, copy_cmd.handle);
 		} else {
 			transition_image_layout(copy_cmd.handle, texture->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 									VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresource_range, texture->aspect_flags);

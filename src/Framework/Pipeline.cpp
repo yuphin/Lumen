@@ -4,7 +4,7 @@
 namespace vk {
 // TODO: make shader filename cstr
 
-static u32 get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDescriptorType* descriptor_types) {
+static u32 get_bindings_for_shader_set(util::Slice<const Shader> shaders, VkDescriptorType* descriptor_types) {
 	u32 binding_mask = 0;
 	for (const auto& shader : shaders) {
 		for (u32 i = 0; i < 32; ++i) {
@@ -25,11 +25,12 @@ static u32 get_bindings_for_shader_set(const std::vector<Shader>& shaders, VkDes
 Pipeline::Pipeline(const std::string& name) : name(name) {}
 
 void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::Slice<u32> descriptor_counts,
-								   std::vector<vk::Texture*> color_outputs, vk::Texture* depth_output) {
-	LUMEN_ASSERT(color_outputs.size(), "No color outputs for GFX pipeline");
+								   util::Slice<vk::Texture*> color_outputs, vk::Texture* depth_output) {
+	LUMEN_ASSERT(color_outputs.size, "No color outputs for GFX pipeline");
 	type = PipelineType::GFX;
-	binding_mask = get_bindings_for_shader_set(settings.shaders, descriptor_types);
-	create_set_layout(settings.shaders, descriptor_counts);
+	util::Slice<const Shader> shaders_slice = {settings.shaders.data, (u64)settings.shaders.size};
+	binding_mask = get_bindings_for_shader_set(shaders_slice, descriptor_types);
+	create_set_layout(shaders_slice, descriptor_counts);
 	for (const auto& shader : settings.shaders) {
 		if (push_constant_size && shader.push_constant_size) {
 			LUMEN_ASSERT(push_constant_size == shader.push_constant_size,
@@ -39,8 +40,8 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::S
 			push_constant_size = shader.push_constant_size;
 		}
 	}
-	create_pipeline_layout(settings.shaders, {push_constant_size});
-	create_update_template(settings.shaders, descriptor_counts);
+	create_pipeline_layout(shaders_slice, {&push_constant_size, 1});
+	create_update_template(shaders_slice, descriptor_counts);
 
 	VkSpecializationInfo specialization_info = {};
 	lm::SmallArray<VkSpecializationMapEntry, lm::MAX_SPEC_CONSTANTS> spec_map_entries;
@@ -55,7 +56,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::S
 	specialization_info.dataSize = settings.specialization_data.size * sizeof(u32);
 	specialization_info.pData = settings.specialization_data.data;
 
-	std::vector<VkPipelineShaderStageCreateInfo> stages;
+	lm::SmallArray<VkPipelineShaderStageCreateInfo, vk::MAX_SHADERS_PER_PASS> stages;
 	for (const auto& shader : settings.shaders) {
 		VkPipelineShaderStageCreateInfo stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
 		stage.stage = shader.stage;
@@ -77,13 +78,14 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::S
 	VkPipelineMultisampleStateCreateInfo multisampling = vk::pipeline_multisample_state(VK_SAMPLE_COUNT_1_BIT);
 	multisampling.sampleShadingEnable = VK_FALSE;
 
-	std::vector<VkPipelineColorBlendAttachmentState> blend_attachment_states;
+	lm::SmallArray<VkPipelineColorBlendAttachmentState, MAX_COLOR_ATTACHMENTS> blend_attachment_states;
 	if (settings.blend_enables.empty()) {
-		blend_attachment_states = std::vector<VkPipelineColorBlendAttachmentState>(
-			color_outputs.size(),
-			vk::pipeline_color_blend_attachment_state(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-														  VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-													  VK_FALSE));
+		for (size_t i = 0; i < color_outputs.size; ++i) {
+			blend_attachment_states.push_back(
+				vk::pipeline_color_blend_attachment_state(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+															  VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+														  VK_FALSE));
+		}
 	} else {
 		for (bool blend_enable : settings.blend_enables) {
 			blend_attachment_states.push_back(
@@ -94,21 +96,23 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::S
 	}
 
 	VkPipelineColorBlendStateCreateInfo color_blend =
-		vk::pipeline_color_blend_state((u32)blend_attachment_states.size(), blend_attachment_states.data());
+		vk::pipeline_color_blend_state((u32)blend_attachment_states.size, blend_attachment_states.data);
 	color_blend.logicOpEnable = VK_FALSE;
 	color_blend.logicOp = VK_LOGIC_OP_COPY;
 	color_blend.blendConstants[0] = 0.0f;
 	color_blend.blendConstants[1] = 0.0f;
 	color_blend.blendConstants[2] = 0.0f;
 	color_blend.blendConstants[3] = 0.0f;
-	std::vector<VkDynamicState> dynamic_enables = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+	lm::SmallArray<VkDynamicState, MAX_DYNAMIC_STATES> dynamic_enables;
+	dynamic_enables.push_back(VK_DYNAMIC_STATE_VIEWPORT);
+	dynamic_enables.push_back(VK_DYNAMIC_STATE_SCISSOR);
 	VkPipelineDynamicStateCreateInfo dynamic_state_CI =
-		vk::pipeline_dynamic_state(dynamic_enables.data(), static_cast<u32>(dynamic_enables.size()));
+		vk::pipeline_dynamic_state(dynamic_enables.data, static_cast<u32>(dynamic_enables.size));
 
-	std::vector<VkVertexInputBindingDescription> binding_descs;
-	std::vector<VkVertexInputAttributeDescription> attribute_descs;
+	lm::SmallArray<VkVertexInputBindingDescription, MAX_VERTEX_BINDINGS> binding_descs;
+	lm::SmallArray<VkVertexInputAttributeDescription, MAX_VERTEX_ATTRIBUTES> attribute_descs;
 	u64 vert_shader_idx = 0;
-	for (i32 i = 0; i < settings.shaders.size(); i++) {
+	for (u64 i = 0; i < settings.shaders.size; i++) {
 		if (settings.shaders[i].stage == VK_SHADER_STAGE_VERTEX_BIT) {
 			vert_shader_idx = i;
 			break;
@@ -123,14 +127,13 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::S
 		attribute_descs.push_back(attribute_desc);
 	}
 	auto vertex_input_state = vk::pipeline_vertex_input_state();
-	vertex_input_state.vertexAttributeDescriptionCount = (u32)attribute_descs.size();
-	vertex_input_state.pVertexAttributeDescriptions = attribute_descs.data();
-	vertex_input_state.vertexBindingDescriptionCount = (u32)binding_descs.size();
-	vertex_input_state.pVertexBindingDescriptions = binding_descs.data();
+	vertex_input_state.vertexAttributeDescriptionCount = (u32)attribute_descs.size;
+	vertex_input_state.pVertexAttributeDescriptions = attribute_descs.data;
+	vertex_input_state.vertexBindingDescriptionCount = (u32)binding_descs.size;
+	vertex_input_state.pVertexBindingDescriptions = binding_descs.data;
 
 	VkFormat depth_format = VK_FORMAT_UNDEFINED;
-	std::vector<VkFormat> output_formats;
-	output_formats.reserve(color_outputs.size());
+	lm::SmallArray<VkFormat, MAX_COLOR_ATTACHMENTS> output_formats;
 	for (vk::Texture* color_output : color_outputs) {
 		output_formats.push_back(color_output->format);
 	}
@@ -139,16 +142,16 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::S
 	}
 	VkPipelineRenderingCreateInfo pipeline_rendering_create_info{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-		.colorAttachmentCount = (u32)output_formats.size(),
-		.pColorAttachmentFormats = output_formats.data(),
+		.colorAttachmentCount = (u32)output_formats.size,
+		.pColorAttachmentFormats = output_formats.data,
 		.depthAttachmentFormat = depth_format};
 
 	auto depth_stencil_state_ci = vk::pipeline_depth_stencil(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
 
 	VkGraphicsPipelineCreateInfo pipeline_CI = vk::graphics_pipeline();
 	pipeline_CI.pNext = nullptr;
-	pipeline_CI.stageCount = (u32)stages.size();
-	pipeline_CI.pStages = stages.data();
+	pipeline_CI.stageCount = (u32)stages.size;
+	pipeline_CI.pStages = stages.data;
 	pipeline_CI.pVertexInputState = &vertex_input_state;
 	pipeline_CI.pInputAssemblyState = &input_asssembly_CI;
 	pipeline_CI.pViewportState = &viewport_state;
@@ -175,7 +178,8 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::S
 void Pipeline::create_rt_pipeline(const RTPassSettings& settings, util::Slice<u32> descriptor_counts,
 								  u32 num_as_bindings) {
 	type = PipelineType::RT;
-	binding_mask = get_bindings_for_shader_set(settings.shaders, descriptor_types);
+	util::Slice<const Shader> shaders_slice = {settings.shaders.data, (u64)settings.shaders.size};
+	binding_mask = get_bindings_for_shader_set(shaders_slice, descriptor_types);
 	u32 num_as_bindings_in_shader = 0;
 	VkShaderStageFlags binding_stage_flags = 0;
 	for (const auto& shader : settings.shaders) {
@@ -193,10 +197,10 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, util::Slice<u3
 		LUMEN_WARN("No AS bindings found in RT shaders for pipeline %s", name.c_str());
 	}
 	LUMEN_ASSERT(num_as_bindings_in_shader <= MAX_AS_BINDING_COUNT, "Max 2 AS bindings are supported");
-	create_set_layout(settings.shaders, descriptor_counts);
+	create_set_layout(shaders_slice, descriptor_counts);
 	create_rt_set_layout(binding_stage_flags, num_as_bindings);
-	create_pipeline_layout(settings.shaders, {push_constant_size});
-	create_update_template(settings.shaders, descriptor_counts);
+    create_pipeline_layout(shaders_slice, {&push_constant_size, 1});
+	create_update_template(shaders_slice, descriptor_counts);
 
 	// Descriptor pool for AS descriptors
 	auto pool_size = vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, num_as_bindings);
@@ -300,18 +304,19 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, util::Slice<u3
 	}
 }
 
-void Pipeline::create_compute_pipeline(const ComputePassSettings& settings,
-									   util::Slice<u32> descriptor_counts) {
+void Pipeline::create_compute_pipeline(const ComputePassSettings& settings, util::Slice<u32> descriptor_counts) {
 	type = PipelineType::COMPUTE;
-	binding_mask = get_bindings_for_shader_set({settings.shader}, descriptor_types);
-	create_set_layout({settings.shader}, descriptor_counts);
+	util::Slice<const Shader> shader_slice(const_cast<Shader*>(&settings.shader), 1);
+	binding_mask = get_bindings_for_shader_set(shader_slice, descriptor_types);
+
+	create_set_layout(shader_slice, descriptor_counts);
 	if (settings.shader.push_constant_size > 0) {
 		push_constant_size = settings.shader.push_constant_size;
-		create_pipeline_layout({settings.shader}, {push_constant_size});
+        create_pipeline_layout(shader_slice, {&push_constant_size, 1});
 	} else {
-		create_pipeline_layout({settings.shader}, {});
+		create_pipeline_layout(shader_slice, {});
 	}
-	create_update_template({settings.shader}, descriptor_counts);
+	create_update_template(shader_slice, descriptor_counts);
 
 	auto compute_shader_module = settings.shader.create_vk_shader_module(vk::context().device);
 	VkPipelineShaderStageCreateInfo shader_stage_ci = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
@@ -376,8 +381,7 @@ void Pipeline::cleanup() {
 }
 
 void Pipeline::create_rt_set_layout(VkShaderStageFlags binding_stage_flags, u32 num_as_bindings) {
-	std::vector<VkDescriptorSetLayoutBinding> set_bindings = {};
-
+	lm::SmallArray<VkDescriptorSetLayoutBinding, MAX_BINDINGS> set_bindings;
 	for (u32 i = 0; i < num_as_bindings; ++i) {
 		VkDescriptorSetLayoutBinding binding = {};
 		binding.binding = i;
@@ -390,18 +394,19 @@ void Pipeline::create_rt_set_layout(VkShaderStageFlags binding_stage_flags, u32 
 
 	VkDescriptorSetLayoutCreateInfo set_create_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
 	set_create_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-	set_create_info.bindingCount = u32(set_bindings.size());
-	set_create_info.pBindings = set_bindings.data();
+	set_create_info.bindingCount = u32(set_bindings.size);
+	set_create_info.pBindings = set_bindings.data;
 
 	VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags_ci = {
 		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO};
-	std::vector<VkDescriptorBindingFlags> binding_flags(num_as_bindings);
+	lm::SmallArray<VkDescriptorBindingFlags, MAX_BINDINGS> binding_flags;
+	binding_flags.resize(num_as_bindings);
 	for (u32 i = 0; i < num_as_bindings; ++i) {
 		binding_flags[i] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
 		// binding_flags[i] = 0;
 	}
 	binding_flags_ci.bindingCount = num_as_bindings;
-	binding_flags_ci.pBindingFlags = binding_flags.data();
+	binding_flags_ci.pBindingFlags = binding_flags.data;
 	binding_flags_ci.pNext = nullptr;
 
 	set_create_info.pNext = &binding_flags_ci;
@@ -409,8 +414,8 @@ void Pipeline::create_rt_set_layout(VkShaderStageFlags binding_stage_flags, u32 
 	vk::check(vkCreateDescriptorSetLayout(vk::context().device, &set_create_info, nullptr, &tlas_layout));
 }
 
-void Pipeline::create_set_layout(const std::vector<Shader>& shaders, util::Slice<u32> descriptor_counts) {
-	std::vector<VkDescriptorSetLayoutBinding> set_bindings;
+void Pipeline::create_set_layout(util::Slice<const Shader> shaders, util::Slice<u32> descriptor_counts) {
+	lm::SmallArray<VkDescriptorSetLayoutBinding, MAX_BINDINGS> set_bindings;
 
 	if (descriptor_counts.size) {
 		i32 idx = 0;
@@ -436,12 +441,12 @@ void Pipeline::create_set_layout(const std::vector<Shader>& shaders, util::Slice
 
 	VkDescriptorSetLayoutCreateInfo set_create_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
 	set_create_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
-	set_create_info.bindingCount = u32(set_bindings.size());
-	set_create_info.pBindings = set_bindings.data();
+	set_create_info.bindingCount = u32(set_bindings.size);
+	set_create_info.pBindings = set_bindings.data;
 	vk::check(vkCreateDescriptorSetLayout(vk::context().device, &set_create_info, nullptr, &set_layout));
 }
 
-void Pipeline::create_pipeline_layout(const std::vector<Shader>& shaders, const std::vector<u32> push_const_sizes) {
+void Pipeline::create_pipeline_layout(util::Slice<const Shader> shaders, util::Slice<u32> push_const_sizes) {
 	VkPipelineLayoutCreateInfo create_info = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
 	VkDescriptorSetLayout set_layouts[] = {set_layout, tlas_layout};
 	create_info.setLayoutCount = type == PipelineType::RT ? 2 : 1;
@@ -450,22 +455,21 @@ void Pipeline::create_pipeline_layout(const std::vector<Shader>& shaders, const 
 	for (const Shader& shader : shaders)
 		if (shader.uses_push_constants) pc_stages |= shader.stage;
 
-	std::vector<VkPushConstantRange> pcrs;
+	lm::SmallArray<VkPushConstantRange, MAX_PUSH_CONSTANT_RANGES> pcrs;
 	for (u32 size : push_const_sizes) {
 		VkPushConstantRange pcr = {};
 		pcr.size = size;
 		pcr.stageFlags = pc_stages;
 		pcrs.push_back(pcr);
 	}
-	if (pcrs.size()) {
-		create_info.pushConstantRangeCount = (u32)pcrs.size();
-		create_info.pPushConstantRanges = pcrs.data();
+	if (pcrs.size) {
+		create_info.pushConstantRangeCount = (u32)pcrs.size;
+		create_info.pPushConstantRanges = pcrs.data;
 	}
 	vk::check(vkCreatePipelineLayout(vk::context().device, &create_info, nullptr, &pipeline_layout));
 }
 
-void Pipeline::create_update_template(const std::vector<Shader>& shaders,
-									  util::Slice<u32> descriptor_counts) {
+void Pipeline::create_update_template(util::Slice<const Shader> shaders, util::Slice<u32> descriptor_counts) {
 	if (descriptor_counts.empty()) {
 		return;
 	}
@@ -524,32 +528,33 @@ void Pipeline::create_update_template(const std::vector<Shader>& shaders,
 		return VK_PIPELINE_BIND_POINT_MAX_ENUM;
 	};
 
-	std::vector<VkDescriptorUpdateTemplateEntry> entries;
+	lm::SmallArray<VkDescriptorUpdateTemplateEntry, MAX_BINDINGS> entries;
 	LUMEN_ASSERT(count_ones(binding_mask) == descriptor_counts.size,
 				 "Descriptor size mismatch! Check shaders or the supplied descriptors.");
 	u64 offset = 0;
 	i32 idx = 0;
-	for (u32 i = 0; i < 32; ++i) {
-		if (binding_mask & (1 << i)) {
-			VkDescriptorUpdateTemplateEntry entry = {};
-			entry.dstBinding = i;
-			entry.dstArrayElement = 0;
-			entry.descriptorCount = descriptor_counts[idx];
-			entry.descriptorType = descriptor_types[i];
-			auto desc_info_size = get_desc_info_size(entry.descriptorType);
-			entry.offset = offset;
-			entry.stride = desc_info_size;
-			entries.push_back(entry);
-			offset += desc_info_size;
-			idx++;
+	for (u32 i = 0; i < MAX_BINDINGS; ++i) {
+		if ((binding_mask & (1 << i)) == 0) {
+			continue;
 		}
+		VkDescriptorUpdateTemplateEntry entry = {};
+		entry.dstBinding = i;
+		entry.dstArrayElement = 0;
+		entry.descriptorCount = descriptor_counts[idx];
+		entry.descriptorType = descriptor_types[i];
+		auto desc_info_size = get_desc_info_size(entry.descriptorType);
+		entry.offset = offset;
+		entry.stride = desc_info_size;
+		entries.push_back(entry);
+		offset += desc_info_size;
+		idx++;
 	}
 
 	VkDescriptorUpdateTemplateCreateInfo template_create_info = {
 		VK_STRUCTURE_TYPE_DESCRIPTOR_UPDATE_TEMPLATE_CREATE_INFO};
 
-	template_create_info.descriptorUpdateEntryCount = u32(entries.size());
-	template_create_info.pDescriptorUpdateEntries = entries.data();
+	template_create_info.descriptorUpdateEntryCount = u32(entries.size);
+	template_create_info.pDescriptorUpdateEntries = entries.data;
 
 	template_create_info.templateType = VK_DESCRIPTOR_UPDATE_TEMPLATE_TYPE_PUSH_DESCRIPTORS_KHR;
 	template_create_info.descriptorSetLayout = nullptr;

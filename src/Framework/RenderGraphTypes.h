@@ -7,6 +7,7 @@
 #include "Framework/Base/Memory.h"
 #include "Framework/Base/HashMap.h"
 #include "Framework/Base/SmallArray.h"
+#include "VkUtils.h"
 
 namespace lm {
 class RenderPass;
@@ -109,7 +110,7 @@ struct ShaderMacro {
 using ShaderMacroArray = lm::SmallArray<ShaderMacro, lm::MAX_SHADER_MACROS>;
 
 struct GraphicsPassSettings {
-	std::vector<vk::Shader> shaders;
+	lm::SmallArray<vk::Shader, vk::MAX_SHADERS_PER_PASS> shaders;
 	ShaderMacroArray macros;
 	u32 width;
 	u32 height;
@@ -126,14 +127,14 @@ struct GraphicsPassSettings {
 	VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
 	VkIndexType index_type = VK_INDEX_TYPE_UINT32;
 	f32 line_width = 1.0;
-	std::vector<vk::Texture*> color_outputs = {};
+	lm::SmallArray<vk::Texture*, MAX_COLOR_ATTACHMENTS> color_outputs = {};
 	vk::Texture* depth_output = nullptr;
 	std::function<void(VkCommandBuffer cmd, const lm::RenderPass& pass)> pass_func;
 	PassType type = PassType::Graphics;
 };
 
 struct RTPassSettings {
-	std::vector<vk::Shader> shaders;
+	lm::SmallArray<vk::Shader, vk::MAX_SHADERS_PER_PASS> shaders;
 	ShaderMacroArray macros;
 	u32 recursion_depth = 1;
 	lm::SpecializationConstantArray specialization_data;
