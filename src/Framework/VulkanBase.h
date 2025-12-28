@@ -8,7 +8,9 @@ void init(bool validation_layers);
 void destroy_imgui();
 void add_device_extension(const char* name);
 void recreate_swap_chain();
-std::vector<Texture*>& swapchain_images();
+
+lm::SmallArray<Texture*, MAX_SWAPCHAIN_IMAGES>& swapchain_images();
+
 u32 prepare_frame();
 VkResult submit_frame(u32 image_idx);
 lm::RenderGraph* render_graph();
