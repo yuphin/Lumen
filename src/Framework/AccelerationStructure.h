@@ -2,6 +2,7 @@
 
 #pragma once
 #include "Buffer.h"
+#include "Framework/Base/Memory.h"
 namespace vk {
 
 struct BVH {
@@ -22,10 +23,10 @@ struct BlasInput {
 	std::vector<VkAccelerationStructureBuildRangeInfoKHR> as_build_offset_info;
 	VkBuildAccelerationStructureFlagsKHR flags{0};
 };
-void blas_build(std::vector<BVH>& blases, std::vector<BlasInput>& input,
+void blas_build(lm::ScratchArena& scratch, lm::Array<BVH>& blases, lm::FixedArray<BlasInput>& inputs,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd = VK_NULL_HANDLE,
 				vk::Buffer** scratch_buffer_ref = nullptr);
-void blas_build(util::Slice<BVH> blases, util::Slice<BlasInput> input,
+void blas_build(lm::ScratchArena& scratch, util::Slice<BVH> blases, util::Slice<BlasInput> input,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd = VK_NULL_HANDLE,
 				vk::Buffer** scratch_buffer_ref = nullptr);
 void tlas_build(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,

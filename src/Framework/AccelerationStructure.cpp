@@ -46,7 +46,7 @@ void BVH::destroy() {
 }
 
 static void cmd_create_blas(VkCommandBuffer cmd_buf, std::vector<u32> indices,
-							std::vector<BuildAccelerationStructure>& build_as, VkDeviceAddress scratchAddress,
+							lm::FixedArray<BuildAccelerationStructure>& build_as, VkDeviceAddress scratchAddress,
 							VkQueryPool query_pool) {
 	if (query_pool) {
 		vkResetQueryPool(vk::context().device, query_pool, 0, static_cast<u32>(indices.size()));
@@ -71,7 +71,8 @@ static void cmd_create_blas(VkCommandBuffer cmd_buf, std::vector<u32> indices,
 		// to ensure one build is finished before starting the next one.
 		VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
 		barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
-		barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+		barrier.dstAccessMask =
+			VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
 		vkCmdPipelineBarrier(cmd_buf, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
 							 VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0,
 							 nullptr);
@@ -87,7 +88,7 @@ static void cmd_create_blas(VkCommandBuffer cmd_buf, std::vector<u32> indices,
 }
 
 static void cmd_compact_blas(VkCommandBuffer cmd_buf, std::vector<u32> indices,
-							 std::vector<BuildAccelerationStructure>& build_as, VkQueryPool query_pool) {
+							 lm::FixedArray<BuildAccelerationStructure>& build_as, VkQueryPool query_pool) {
 	u32 query_cnt{0};
 	std::vector<BVH> cleanupAS;	 // previous AS to destroy
 
@@ -195,11 +196,9 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, u32 primitive_co
 //
 
 // Existence of cmd_buf implies that cmd_buf handles submission outside of this function
-static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<BuildAccelerationStructure>& build_as,
-															   util::Slice<BlasInput> input,
-															   VkBuildAccelerationStructureFlagsKHR flags,
-															   VkCommandBuffer external_cmd_buf,
-															   vk::Buffer** scratch_buffer_ref) {
+static void build_blas_impl(lm::FixedArray<BuildAccelerationStructure>& build_as, util::Slice<BlasInput> input,
+							VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer external_cmd_buf,
+							vk::Buffer** scratch_buffer_ref) {
 	u32 num_blases = static_cast<u32>(input.size);
 	VkDeviceSize as_total_size{0};	   // Memory size of all allocated BLAS
 	u32 num_compactions{0};			   // Nb of BLAS requesting compaction
@@ -322,25 +321,27 @@ static std::vector<BuildAccelerationStructure> build_blas_impl(std::vector<Build
 	if (scratch_buffer_created && !export_scratch_buffer) {
 		drm::destroy(scratch_buffer);
 	}
-	return build_as;
 }
 
-void blas_build(std::vector<BVH>& blases, std::vector<BlasInput>& input,
+void blas_build(lm::ScratchArena& scratch, lm::Array<BVH>& blases, lm::FixedArray<BlasInput>& inputs,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer) {
-	std::vector<BuildAccelerationStructure> build_as(input.size());
-	blases.resize(input.size());
-	for (u64 i = 0; i < input.size(); i++) {
-		build_as[i].as = &blases[i];
+	auto build_as = lm::fixed_array_create<BuildAccelerationStructure>(scratch.arena, inputs.size);
+	for (u64 i = 0; i < inputs.size; i++) {
+		BuildAccelerationStructure& build_as_entry = build_as.push();
+		build_as_entry = {};
+		build_as_entry.as = &blases[i];
 	}
-	build_blas_impl(build_as, util::Slice(input.data(), input.size()), flags, cmd_buf, scratch_buffer);
+	build_blas_impl(build_as, util::Slice(inputs.data, inputs.size), flags, cmd_buf, scratch_buffer);
 }
 
-void blas_build(util::Slice<BVH> blases, util::Slice<BlasInput> input, VkBuildAccelerationStructureFlagsKHR flags,
-				VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer) {
+void blas_build(lm::ScratchArena& scratch, util::Slice<BVH> blases, util::Slice<BlasInput> input,
+				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer) {
 	LUMEN_ASSERT(blases.size == input.size, "Mismatch between input and output sizes");
-	std::vector<BuildAccelerationStructure> build_as(input.size);
+	auto build_as = lm::fixed_array_create<BuildAccelerationStructure>(scratch.arena, input.size);
 	for (u64 i = 0; i < input.size; i++) {
-		build_as[i].as = &blases[i];
+		BuildAccelerationStructure& build_as_entry = build_as.push();
+		build_as_entry = {};
+		build_as_entry.as = &blases[i];
 	}
 	build_blas_impl(build_as, input, flags, cmd_buf, scratch_buffer);
 }

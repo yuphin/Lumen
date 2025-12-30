@@ -420,8 +420,17 @@ void DDGI::create_radiance_textures() {
 	});
 }
 
-void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
-	std::vector<vk::BlasInput> blas_inputs;
+void DDGI::create_accel(vk::BVH& tlas, lm::Array<vk::BVH>& blases) {
+	if (!blases.initialized()) {
+		blases = lm::array_create<vk::BVH>(arena, lumen_scene->prim_meshes.size);
+	}
+
+	// + 1 for the sphere
+	u64 blas_inputs_size = lumen_scene->prim_meshes.size + 1;
+	blases.resize_with_value(blas_inputs_size);
+
+	lm::ScratchArena scratch = arena;
+	auto blas_inputs = lm::fixed_array_create<vk::BlasInput>(scratch.arena, blas_inputs_size);
 
 	VkDeviceAddress vertex_address = lumen_scene->vertex_buffer->device_address();
 	VkDeviceAddress idx_address = lumen_scene->index_buffer->device_address();
@@ -461,14 +470,14 @@ void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 		sphere_blas_input.as_build_offset_info.push_back(offset);
 	}
 
-	vk::blas_build(blases, blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+	vk::blas_build(scratch, blases, blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 
 	std::vector<VkAccelerationStructureInstanceKHR> tlas_instances;
 	for (const auto& pm : lumen_scene->prim_meshes) {
 		VkAccelerationStructureInstanceKHR ray_inst{};
 		ray_inst.transform = vk::to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
-		assert(pm.prim_idx < blases.size());
+		assert(pm.prim_idx < blases.size);
 		ray_inst.accelerationStructureReference = blases[pm.prim_idx].device_address();
 		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		ray_inst.mask = 0x1;
@@ -477,7 +486,7 @@ void DDGI::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 	}
 
 	{
-		const u32 sphere_blas_idx = static_cast<u32>(blases.size()) - 1;
+		const u32 sphere_blas_idx = static_cast<u32>(blases.size) - 1;
 		u32 num_probes = probe_counts.x * probe_counts.y * probe_counts.z;
 		for (u32 i = 0; i < num_probes; ++i) {
 			VkAccelerationStructureInstanceKHR sphere_inst{};

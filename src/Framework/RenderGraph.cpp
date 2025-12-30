@@ -617,8 +617,8 @@ void RenderPass::finalize() {
 			case vk::PassType::Graphics: {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline_storage->pipeline.create_gfx_pipeline(
-						*pass->gfx_settings, pass->descriptor_counts.to_slice(), pass->gfx_settings->color_outputs.to_slice(),
-						pass->gfx_settings->depth_output);
+						*pass->gfx_settings, pass->descriptor_counts.to_slice(),
+						pass->gfx_settings->color_outputs.to_slice(), pass->gfx_settings->depth_output);
 				};
 				if (rg->multithreaded_pipeline_compilation) {
 					rg->pipeline_tasks.push_back({func, pass_idx});
@@ -970,7 +970,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 	if (blas_build_data.is_valid()) {
 		GPUQueryManager::begin(cmd, "BLAS Build");
-		vk::blas_build(blas_build_data.blases, blas_build_data.blas_inputs, blas_build_data.flags, cmd,
+		ScratchArena scratch = _arena_per_frame;
+		vk::blas_build(scratch, blas_build_data.blases, blas_build_data.blas_inputs, blas_build_data.flags, cmd,
 					   blas_build_data.scratch_buffer_ref);
 		GPUQueryManager::end(cmd);
 
@@ -1271,8 +1272,7 @@ static void populate_macros(lm::Arena* arena, const vk::ShaderMacroArray& macros
 	}
 }
 
-PipelineStorage* RenderGraph::add_pass_impl_common(const lm::String& name,
-												   const vk::ShaderMacroArray& macros,
+PipelineStorage* RenderGraph::add_pass_impl_common(const lm::String& name, const vk::ShaderMacroArray& macros,
 												   const lm::SpecializationConstantArray& specialization_data,
 												   bool& cached, lm::String& name_with_macros,
 												   lm::String& macro_string) {

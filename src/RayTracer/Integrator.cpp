@@ -4,10 +4,10 @@
 #include "Framework/VkUtils.h"
 
 void Integrator::init() {
-	if(!lumen_scene) {
+	if (!lumen_scene) {
 		lumen_scene = scene::get();
 	}
-	if(!arena) {
+	if (!arena) {
 		arena = lm::arena_create(MB(1));
 	}
 	lm::Camera* cam_ptr = &lumen_scene->camera;
@@ -133,9 +133,14 @@ void Integrator::destroy(bool resize) {
 	prm::remove(output_tex);
 }
 
-void Integrator::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
-	std::vector<vk::BlasInput> blas_inputs;
+void Integrator::create_accel(vk::BVH& tlas, lm::Array<vk::BVH>& blases) {
+	if (!blases.initialized()) {
+		blases = lm::array_create<vk::BVH>(arena, lumen_scene->prim_meshes.size);
+	}
+	blases.resize_with_value(lumen_scene->prim_meshes.size);
 
+	lm::ScratchArena scratch = arena;
+	auto blas_inputs = lm::fixed_array_create<vk::BlasInput>(scratch.arena, lumen_scene->prim_meshes.size);
 	VkDeviceAddress vertex_address = lumen_scene->vertex_buffer->device_address();
 	VkDeviceAddress idx_address = lumen_scene->index_buffer->device_address();
 	for (auto& prim_mesh : lumen_scene->prim_meshes) {
@@ -143,7 +148,7 @@ void Integrator::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 											   prim_mesh.first_idx, vertex_address, idx_address);
 		blas_inputs.push_back({geo});
 	}
-	vk::blas_build(blases, blas_inputs,
+	vk::blas_build(scratch, blases, blas_inputs,
 				   VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
 					   VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 	std::vector<VkAccelerationStructureInstanceKHR> tlas_instances;
@@ -151,7 +156,7 @@ void Integrator::create_accel(vk::BVH& tlas, std::vector<vk::BVH>& blases) {
 		VkAccelerationStructureInstanceKHR ray_inst{};
 		ray_inst.transform = vk::to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;
-		assert(pm.prim_idx < blases.size());
+		assert(pm.prim_idx < blases.size);
 		ray_inst.accelerationStructureReference = blases[pm.prim_idx].device_address();
 		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		ray_inst.mask = 0xFF;

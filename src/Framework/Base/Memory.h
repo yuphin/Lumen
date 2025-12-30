@@ -92,6 +92,16 @@ struct Array {
 		reserve(new_size);
 		size = new_size;
 	}
+
+	void resize_with_value(u64 new_size, const T& default_value = T{}) {
+		static_assert(GROWABLE, "Cannot resize a fixed array");
+		reserve(new_size);
+		size = new_size;
+		for(u64 i = 0; i < new_size; i++) {
+			data[i] = default_value;
+		}
+	}
+
 	T& operator[](u64 index) {
 		assert(index < size);
 		return data[index];
