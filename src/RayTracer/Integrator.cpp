@@ -148,10 +148,11 @@ void Integrator::create_accel(vk::BVH& tlas, lm::Array<vk::BVH>& blases) {
 											   prim_mesh.first_idx, vertex_address, idx_address);
 		blas_inputs.push_back({geo});
 	}
-	vk::blas_build(scratch, blases, blas_inputs,
+	vk::blas_build(scratch, blases.to_slice(), blas_inputs.to_slice(),
 				   VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
 					   VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
-	std::vector<VkAccelerationStructureInstanceKHR> tlas_instances;
+	auto tlas_instances =
+		lm::fixed_array_create<VkAccelerationStructureInstanceKHR>(scratch.arena, lumen_scene->prim_meshes.size);
 	for (const auto& pm : lumen_scene->prim_meshes) {
 		VkAccelerationStructureInstanceKHR ray_inst{};
 		ray_inst.transform = vk::to_vk_matrix(pm.world_matrix);
@@ -161,7 +162,7 @@ void Integrator::create_accel(vk::BVH& tlas, lm::Array<vk::BVH>& blases) {
 		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		ray_inst.mask = 0xFF;
 		ray_inst.instanceShaderBindingTableRecordOffset = 0;  // We will use the same hit group for all objects
-		tlas_instances.emplace_back(ray_inst);
+		tlas_instances.push_back(ray_inst);
 	}
-	vk::tlas_build(tlas, tlas_instances, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+	vk::tlas_build(tlas, tlas_instances.to_slice(), VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }

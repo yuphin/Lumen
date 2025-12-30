@@ -6,7 +6,10 @@
 #include "Framework/CommandBuffer.h"
 
 namespace vk {
+
 static constexpr u64 BATCH_LIMIT = 256'000'000;	 // 256 MB
+static constexpr u32 MAX_BLAS_BATCH_SIZE = 256;	 // Max number of BLAS to build/compact in one go
+
 struct BuildAccelerationStructure {
 	VkAccelerationStructureBuildGeometryInfoKHR build_info{
 		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR};
@@ -45,11 +48,11 @@ void BVH::destroy() {
 	}
 }
 
-static void cmd_create_blas(VkCommandBuffer cmd_buf, std::vector<u32> indices,
+static void cmd_create_blas(VkCommandBuffer cmd_buf, util::Slice<u32> indices,
 							lm::FixedArray<BuildAccelerationStructure>& build_as, VkDeviceAddress scratchAddress,
 							VkQueryPool query_pool) {
 	if (query_pool) {
-		vkResetQueryPool(vk::context().device, query_pool, 0, static_cast<u32>(indices.size()));
+		vkResetQueryPool(vk::context().device, query_pool, 0, static_cast<u32>(indices.size));
 	}
 	u32 query_cnt{0};
 	for (const auto& idx : indices) {
@@ -87,15 +90,16 @@ static void cmd_create_blas(VkCommandBuffer cmd_buf, std::vector<u32> indices,
 	}
 }
 
-static void cmd_compact_blas(VkCommandBuffer cmd_buf, std::vector<u32> indices,
+static void cmd_compact_blas(VkCommandBuffer cmd_buf, util::Slice<u32> indices,
 							 lm::FixedArray<BuildAccelerationStructure>& build_as, VkQueryPool query_pool) {
-	u32 query_cnt{0};
-	std::vector<BVH> cleanupAS;	 // previous AS to destroy
+	u32 query_cnt = 0;
 
 	// Get the compacted size result back
-	std::vector<VkDeviceSize> compact_sizes(static_cast<u32>(indices.size()));
-	vkGetQueryPoolResults(vk::context().device, query_pool, 0, (u32)compact_sizes.size(),
-						  compact_sizes.size() * sizeof(VkDeviceSize), compact_sizes.data(), sizeof(VkDeviceSize),
+	lm::SmallArray<VkDeviceSize, MAX_BLAS_BATCH_SIZE> compact_sizes;
+	compact_sizes.resize(indices.size);
+
+	vkGetQueryPoolResults(vk::context().device, query_pool, 0, (u32)compact_sizes.size,
+						  compact_sizes.size * sizeof(VkDeviceSize), compact_sizes.data, sizeof(VkDeviceSize),
 						  VK_QUERY_RESULT_WAIT_BIT);
 
 	for (auto idx : indices) {
@@ -196,9 +200,9 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, u32 primitive_co
 //
 
 // Existence of cmd_buf implies that cmd_buf handles submission outside of this function
-static void build_blas_impl(lm::FixedArray<BuildAccelerationStructure>& build_as, util::Slice<BlasInput> input,
-							VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer external_cmd_buf,
-							vk::Buffer** scratch_buffer_ref) {
+static void build_blas_impl(lm::ScratchArena& scratch, lm::FixedArray<BuildAccelerationStructure>& build_as,
+							util::Slice<BlasInput> input, VkBuildAccelerationStructureFlagsKHR flags,
+							VkCommandBuffer external_cmd_buf, vk::Buffer** scratch_buffer_ref) {
 	u32 num_blases = static_cast<u32>(input.size);
 	VkDeviceSize as_total_size{0};	   // Memory size of all allocated BLAS
 	u32 num_compactions{0};			   // Nb of BLAS requesting compaction
@@ -208,6 +212,8 @@ static void build_blas_impl(lm::FixedArray<BuildAccelerationStructure>& build_as
 	for (u32 idx = 0; idx < num_blases; idx++) {
 		// Filling partially the VkAccelerationStructureBuildGeometryInfoKHR for
 		// querying the build sizes.
+
+		lm::ScratchArena temp_scratch = scratch.arena;
 		build_as[idx].build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 		build_as[idx].build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
 		build_as[idx].build_info.flags = input[idx].flags | flags;
@@ -218,12 +224,14 @@ static void build_blas_impl(lm::FixedArray<BuildAccelerationStructure>& build_as
 		build_as[idx].range_info = input[idx].as_build_offset_info.data();
 
 		// Finding sizes to create acceleration structures and scratch
-		std::vector<u32> maxPrimCount(input[idx].as_build_offset_info.size());
+		auto max_prim_counts = lm::fixed_array_create<u32>(temp_scratch.arena, input[idx].as_build_offset_info.size());
+
 		for (auto tt = 0; tt < input[idx].as_build_offset_info.size(); tt++) {
-			maxPrimCount[tt] = input[idx].as_build_offset_info[tt].primitiveCount;	// Number of primitives/triangles
+			max_prim_counts.push_back(
+				input[idx].as_build_offset_info[tt].primitiveCount);  // Number of primitives/triangles
 		}
 		vkGetAccelerationStructureBuildSizesKHR(context().device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
-												&build_as[idx].build_info, maxPrimCount.data(),
+												&build_as[idx].build_info, max_prim_counts.data,
 												&build_as[idx].size_info);
 
 		// Extra info
@@ -276,24 +284,26 @@ static void build_blas_impl(lm::FixedArray<BuildAccelerationStructure>& build_as
 	}
 	// Batching creation/compaction of BLAS to allow staying in restricted
 	// amount of memory
-	std::vector<u32> indices;  // Indices of the BLAS to create
-	VkDeviceSize batch_size{0};
-	VkDeviceSize batch_limit{BATCH_LIMIT};
+	lm::SmallArray<u32, MAX_BLAS_BATCH_SIZE> indices;
+	VkDeviceSize batch_size = 0;
+	VkDeviceSize batch_limit = BATCH_LIMIT;
 	for (u32 idx = 0; idx < num_blases; idx++) {
 		indices.push_back(idx);
 		batch_size += build_as[idx].size_info.accelerationStructureSize;
 		// Over the limit or last BLAS element
-		if (batch_size >= batch_limit || idx == num_blases - 1) {
+		if (batch_size >= batch_limit || idx == num_blases - 1 || indices.size == MAX_BLAS_BATCH_SIZE) {
+			util::Slice<u32> indices_slice(indices.data, indices.size);
 			if (external_cmd_buf) {
-				cmd_create_blas(external_cmd_buf, indices, build_as, scratch_buffer->device_address(),
+				cmd_create_blas(external_cmd_buf, indices_slice, build_as, scratch_buffer->device_address(),
 								compaction_query_pool);
 			} else {
 				vk::CommandBuffer cmd(true);
-				cmd_create_blas(cmd.handle, indices, build_as, scratch_buffer->device_address(), compaction_query_pool);
+				cmd_create_blas(cmd.handle, indices_slice, build_as, scratch_buffer->device_address(),
+								compaction_query_pool);
 				cmd.submit();
 				if (compaction_query_pool) {
 					cmd.begin();
-					cmd_compact_blas(cmd.handle, indices, build_as, compaction_query_pool);
+					cmd_compact_blas(cmd.handle, indices_slice, build_as, compaction_query_pool);
 					cmd.submit();
 					// Destroy the non-compacted version
 					for (auto i : indices) {
@@ -323,17 +333,6 @@ static void build_blas_impl(lm::FixedArray<BuildAccelerationStructure>& build_as
 	}
 }
 
-void blas_build(lm::ScratchArena& scratch, lm::Array<BVH>& blases, lm::FixedArray<BlasInput>& inputs,
-				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer) {
-	auto build_as = lm::fixed_array_create<BuildAccelerationStructure>(scratch.arena, inputs.size);
-	for (u64 i = 0; i < inputs.size; i++) {
-		BuildAccelerationStructure& build_as_entry = build_as.push();
-		build_as_entry = {};
-		build_as_entry.as = &blases[i];
-	}
-	build_blas_impl(build_as, util::Slice(inputs.data, inputs.size), flags, cmd_buf, scratch_buffer);
-}
-
 void blas_build(lm::ScratchArena& scratch, util::Slice<BVH> blases, util::Slice<BlasInput> input,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer) {
 	LUMEN_ASSERT(blases.size == input.size, "Mismatch between input and output sizes");
@@ -343,7 +342,7 @@ void blas_build(lm::ScratchArena& scratch, util::Slice<BVH> blases, util::Slice<
 		build_as_entry = {};
 		build_as_entry.as = &blases[i];
 	}
-	build_blas_impl(build_as, input, flags, cmd_buf, scratch_buffer);
+	build_blas_impl(scratch, build_as, input, flags, cmd_buf, scratch_buffer);
 }
 
 // Build TLAS from an array of VkAccelerationStructureInstanceKHR
@@ -351,16 +350,14 @@ void blas_build(lm::ScratchArena& scratch, util::Slice<BVH> blases, util::Slice<
 // - The resulting TLAS will be stored in m_tlas
 // - update is to rebuild the Tlas with updated matrices, flag must have the
 // 'allow_update'
-void tlas_build(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& instances,
+void tlas_build(BVH& tlas, util::Slice<VkAccelerationStructureInstanceKHR> instances,
 				VkBuildAccelerationStructureFlagsKHR flags, bool update) {
-	u32 instance_count = static_cast<u32>(instances.size());
-
 	vk::Buffer* instances_buf = drm::get({.name = "TLAS Instances Buffer",
 										  .usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 												   VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 										  .memory_type = vk::BUFFER_TYPE_GPU,
-										  .size = sizeof(VkAccelerationStructureInstanceKHR) * instances.size(),
-										  .data = instances.data(),
+										  .size = sizeof(VkAccelerationStructureInstanceKHR) * instances.size,
+										  .data = instances.data,
 										  .dedicated_allocation = true});
 	// Make sure the copy of the instance buffer are copied before triggering
 	// the acceleration structure build
@@ -374,7 +371,7 @@ void tlas_build(BVH& tlas, std::vector<VkAccelerationStructureInstanceKHR>& inst
 						 VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0,
 						 nullptr);
 	// Creating the TLAS
-	cmd_create_tlas(tlas, cmd.handle, instance_count, &scratch_buffer, /*export_scratch_buffer=*/false,
+	cmd_create_tlas(tlas, cmd.handle, instances.size, &scratch_buffer, /*export_scratch_buffer=*/false,
 					instances_buf->device_address(), flags, update);
 	cmd.submit();
 	drm::destroy(scratch_buffer);

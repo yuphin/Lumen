@@ -470,9 +470,12 @@ void DDGI::create_accel(vk::BVH& tlas, lm::Array<vk::BVH>& blases) {
 		sphere_blas_input.as_build_offset_info.push_back(offset);
 	}
 
-	vk::blas_build(scratch, blases, blas_inputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+	vk::blas_build(scratch, blases.to_slice(), blas_inputs.to_slice(),
+				   VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 
-	std::vector<VkAccelerationStructureInstanceKHR> tlas_instances;
+	u32 num_probes = probe_counts.x * probe_counts.y * probe_counts.z;
+	auto tlas_instances = lm::fixed_array_create<VkAccelerationStructureInstanceKHR>(
+		scratch.arena, lumen_scene->prim_meshes.size + num_probes);
 	for (const auto& pm : lumen_scene->prim_meshes) {
 		VkAccelerationStructureInstanceKHR ray_inst{};
 		ray_inst.transform = vk::to_vk_matrix(pm.world_matrix);
@@ -482,12 +485,11 @@ void DDGI::create_accel(vk::BVH& tlas, lm::Array<vk::BVH>& blases) {
 		ray_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		ray_inst.mask = 0x1;
 		ray_inst.instanceShaderBindingTableRecordOffset = 0;
-		tlas_instances.emplace_back(ray_inst);
+		tlas_instances.push_back(ray_inst);
 	}
 
 	{
 		const u32 sphere_blas_idx = static_cast<u32>(blases.size) - 1;
-		u32 num_probes = probe_counts.x * probe_counts.y * probe_counts.z;
 		for (u32 i = 0; i < num_probes; ++i) {
 			VkAccelerationStructureInstanceKHR sphere_inst{};
 
@@ -500,10 +502,10 @@ void DDGI::create_accel(vk::BVH& tlas, lm::Array<vk::BVH>& blases) {
 			sphere_inst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 			sphere_inst.mask = 0x2;
 			sphere_inst.instanceShaderBindingTableRecordOffset = 0;
-			tlas_instances.emplace_back(sphere_inst);
+			tlas_instances.push_back(sphere_inst);
 		}
 	}
-	vk::tlas_build(tlas, tlas_instances, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+	vk::tlas_build(tlas, tlas_instances.to_slice(), VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 glm::vec3 DDGI::probe_location(u32 index) {

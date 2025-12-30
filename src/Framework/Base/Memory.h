@@ -118,6 +118,8 @@ struct Array {
 		return data[size - 1];
 	}
 	inline bool empty() const { return size == 0; }
+	util::Slice<T> to_slice() const { return util::Slice(&data[0], size); }
+	util::Slice<T> to_slice() { return util::Slice(&data[0], size); }
 };
 
 template <typename T, bool GROWABLE = true>
