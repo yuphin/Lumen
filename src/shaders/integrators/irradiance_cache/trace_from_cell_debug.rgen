@@ -23,33 +23,6 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) buffer HashEntryBuf
 OutGBuffer gbuffers = OutGBuffer(scene_desc.g_buffer_addr);
 HashEntryBuffer hash_entries = HashEntryBuffer(scene_desc.hash_cells_addr);
 
-float compute_cell_size(vec3 pos, vec3 cam_pos, float fovy, float viewport_height, float desired_px_size) {
-	vec3 to_pos = pos - cam_pos;
-	return (2 * desired_px_size * max(abs(to_pos.x), max(abs(to_pos.y), abs(to_pos.z))) * tan(radians(fovy / 2))) /
-		   viewport_height;
-}
-
-uvec3 quantize_pos(vec3 pos, vec3 cam_pos, float fovy, float viewport_height, float desired_px_size,
-				   float base_cell_size) {
-	vec3 aligned_pos = pos - pc.min_bounds;
-	vec3 cell_center = pc.min_bounds + (vec3(uvec3(floor(aligned_pos / base_cell_size))) + 0.5) * base_cell_size;
-	float s_k = compute_cell_size(cell_center, cam_pos, fovy, viewport_height, desired_px_size);
-	float s_cell = base_cell_size * ceil(s_k / base_cell_size);
-	return uvec3(floor((aligned_pos / s_cell)));
-}
-
-uint quantize_normal(vec3 normal) {
-	const uint MAX_QUANT = 1 << 4;
-	float theta = atan(length(normal.xy), normal.z);
-	float phi = atan(normal.y, normal.x);
-	if (phi < 0.0) phi += 2.0 * PI;
-	uint theta_packed = uint((theta / PI) * float(MAX_QUANT));
-	uint phi_packed = uint((phi / (2.0 * PI)) * float(MAX_QUANT));
-	return theta_packed * MAX_QUANT + phi_packed;
-}
-
-uint hash_key(HashKey key) { return xxhash32(uvec2(xxhash32(uvec4(key.pos, key.normal)), key.material)); }
-
 void main() {
 	GBuffer gbuffer = gbuffers.d[pixel_idx];
 	if (!gbuffer_valid(gbuffer)) {
@@ -61,7 +34,7 @@ void main() {
 
 	HashKey key;
 	key.pos =
-		quantize_pos(hit_data.pos, ubo.view_pos.xyz, ubo.fovy, pc.size_y, pc.desired_px_per_cell, pc.min_cell_size);
+		quantize_pos(hit_data.pos, ubo.view_pos.xyz, ubo.fovy, pc.size_y, pc.desired_px_per_cell, pc.min_cell_size, pc.min_bounds);
 	key.normal = quantize_normal(hit_data.n_s);
 	key.material = hit_data.material_idx;
 	uint quantized_key = hash_key(key);

@@ -49,17 +49,17 @@ void IrradianceCache::init() {
 
 	frame_num = 0;
 
-	pc.min_bounds = lumen_scene->dimensions.min;
-	pc.max_bounds = lumen_scene->dimensions.max;
-	pc.size_x = Window::width();
-	pc.size_y = Window::height();
-	pc.max_hash_table_size = HASH_TABLE_SIZE;
 	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, hash_cells_addr, hash_cells_buffer, vk::render_graph());
 }
 
 void IrradianceCache::render() {
+	pc.min_bounds = lumen_scene->dimensions.min;
+	pc.max_bounds = lumen_scene->dimensions.max;
+	pc.size_x = Window::width();
+	pc.size_y = Window::height();
+	pc.max_hash_table_size = HASH_TABLE_SIZE;
 	pc.direct_lighting = direct_lighting;
 	pc.min_cell_size = min_cell_size;
 	pc.desired_px_per_cell = desired_px_per_cell;
