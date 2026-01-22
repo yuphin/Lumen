@@ -833,6 +833,9 @@ void config_init(const lm::String& integrator_name, const SceneCommon& common_co
 	} else if (name == "ddgi") {
 		_scene.config.type = INTEGRATOR_DDGI;
 		_scene.config.settings.ddgi = {};
+	} else if (name == "ircache") {
+		_scene.config.type = INTEGRATOR_IRCACHE;
+		_scene.config.settings.ircache = {};
 	}
 }
 
@@ -978,8 +981,8 @@ void load(const lm::String& path) {
 	arena_get_stats(_arena_strings, total_used, total_allocated);
 	f64 MB = 1024.0 * 1024.0;
 	LUMEN_ASSERT(!_arena_scene->next, "Scene arena should be a single block");
-	LUMEN_INFO("Scene Arena: Total memory used: %.2f MB / allocated: %.2f MB (%.2f%%)", total_used / MB, total_allocated / MB,
-			   (f64)100.0 * total_used / total_allocated);
+	LUMEN_INFO("Scene Arena: Total memory used: %.2f MB / allocated: %.2f MB (%.2f%%)", total_used / MB,
+			   total_allocated / MB, (f64)100.0 * total_used / total_allocated);
 
 	vk::render_graph()->global_macro_defines.push_back(
 		vk::ShaderMacro("ENABLE_DIFFUSE", scene_has_bsdf_type(BSDF_TYPE_DIFFUSE), /* visible = */ false));

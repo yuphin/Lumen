@@ -20,6 +20,7 @@ enum IntegratorType : u32 {
 	INTEGRATOR_RESTIRGI,
 	INTEGRATOR_DDGI,
 	INTEGRATOR_RESTIRPT,
+	INTEGRATOR_IRCACHE,
 	INTEGRATOR_COUNT
 };
 
@@ -55,6 +56,7 @@ struct ReSTIRConfig {};
 struct ReSTIRGIConfig {};
 struct ReSTIRPTConfig {};
 struct DDGIConfig {};
+struct IRCacheConfig {};
 
 struct SceneCommon {
 	CameraSettings cam_settings = {};
@@ -78,5 +80,6 @@ struct SceneConfig {
 		ReSTIRGIConfig restirgi;
 		ReSTIRPTConfig restirpt;
 		DDGIConfig ddgi;
+		IRCacheConfig ircache;
 	} settings = {};
 };

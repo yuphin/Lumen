@@ -71,6 +71,8 @@ void Integrator::update_uniform_buffers() {
 	scene_ubo.inv_projection = glm::inverse(camera.projection);
 	scene_ubo.model = glm::mat4(1.0);
 	scene_ubo.light_pos = glm::vec4(3.0f, 2.5f, 1.0f, 1.0f);
+	scene_ubo.cam_dir = scene_ubo.inv_view * glm::vec4(camera.direction, 0);
+	scene_ubo.fovy = camera.fov;
 	vk::buffer_write(scene_ubo_buffer, &scene_ubo, sizeof(scene_ubo));
 }
 

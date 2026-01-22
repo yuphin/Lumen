@@ -279,6 +279,9 @@ void RayTracer::create_integrator(IntegratorType type) {
 		case INTEGRATOR_RESTIRPT:
 			integrator = std::make_unique<ReSTIRPT>(tlas);
 			break;
+		case INTEGRATOR_IRCACHE:
+			integrator = std::make_unique<IrradianceCache>(tlas);
+			break;
 		default:
 			break;
 	}
@@ -354,7 +357,7 @@ bool RayTracer::gui() {
 
 	SceneConfig& config = scene::get()->config;
 	const char* settings[] = {"Path",	"BDPT",	  "SPPM",	   "VCM",  "PSSMLT",   "SMLT",
-							  "VCMMLT", "ReSTIR", "ReSTIR GI", "DDGI", "ReSTIR PT"};
+							  "VCMMLT", "ReSTIR", "ReSTIR GI", "DDGI", "ReSTIR PT", "Irradiance Cache"};
 
 	static i32 curr_integrator_idx = i32(config.type);
 	if (ImGui::BeginCombo("Select Integrator", settings[curr_integrator_idx])) {

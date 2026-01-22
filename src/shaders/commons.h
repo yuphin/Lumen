@@ -178,10 +178,12 @@ struct SceneUBO {
 	mat4 inv_projection;
 	vec4 light_pos;
 	vec4 view_pos;
+	vec4 cam_dir;
 	mat4 prev_view;
 	mat4 prev_projection;
 	ivec2 clicked_pos;
 	int debug_click;
+	float fovy;
 };
 
 struct Vertex {
@@ -316,6 +318,8 @@ struct Material {
 	uint64_t probe_dir_depth_addr;
 	uint64_t direct_lighting_addr;
 	uint64_t probe_offsets_addr;
+	// IRCache
+	uint64_t hash_cells_addr;
 };
 
 
