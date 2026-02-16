@@ -1,0 +1,83 @@
+integrator: 
+  type: ircache
+  path_length: 2
+  sky_col: v3f(0.000000, 0.000000, 0.000000)
+
+textures: 
+  - name: wood1.jpg
+    file: wood1.jpg
+
+
+bsdfs: 
+  - name: Glass
+    type: diffuse
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+
+  - name: Mirror
+    type: diffuse
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+
+  - name: Left Wall
+    type: diffuse
+    albedo: v3f(0.630000, 0.065000, 0.050000)
+
+  - name: Right Wall
+    type: diffuse
+    albedo: v3f(0.140000, 0.450000, 0.091000)
+
+  - name: Other Walls
+    type: diffuse
+    albedo: v3f(0.725000, 0.710000, 0.680000)
+
+  - name: Floor
+    type: diffuse
+    albedo: v3f(0.725000, 0.710000, 0.680000)
+    texture: wood1.jpg
+
+  - name: Light
+    type: diffuse
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+
+
+lights: 
+  - type: directional
+    L: v3f(5.000000, 5.000000, 5.000000)
+    pos: v3f(4.420000, 2.000000, 5.432593)
+    dir: v3f(0.420776, -2.158489, -3.000000)
+
+
+camera: 
+  fov: 45.000000
+  position: v3f(0.700000, 0.500000, 15.500000)
+  rotation: v3f(0.000000, 0.000000, 0.000000)
+  dir: v3f(-0.000000, 0.000000, 1.000000)
+
+mesh: 
+  - name: cornell_box.obj
+    materials: 
+      - refs: back_wall
+        name: Other Walls
+
+      - refs: floor
+        name: Floor
+
+      - refs: ceiling
+        name: Other Walls
+
+      - refs: left_wall
+        name: Left Wall
+
+      - refs: right_wall
+        name: Right Wall
+
+      - refs: light
+        name: Light
+
+      - refs: mirror_sphere
+        name: Mirror
+
+      - refs: glass_sphere
+        name: Glass
+
+
+
