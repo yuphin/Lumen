@@ -345,7 +345,6 @@ struct PrimInfo {
 	uint index_offset;
 	uint vertex_offset;
 	uint material_index;
-	uint pad;
 };
 
 #endif
