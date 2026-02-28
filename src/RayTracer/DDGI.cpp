@@ -181,7 +181,7 @@ void DDGI::init() {
 	desc.material_addr = lumen_scene->materials_buffer->device_address();
 	// DDGI
 	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->vertex_buffer->device_address();
 	desc.direct_lighting_addr = direct_lighting_buffer->device_address();
 	desc.probe_offsets_addr = probe_offsets_buffer->device_address();
 	desc.g_buffer_addr = g_buffer->device_address();
@@ -436,7 +436,7 @@ void DDGI::create_accel(vk::BVH& tlas, lm::Array<vk::BVH>& blases) {
 	VkDeviceAddress idx_address = lumen_scene->index_buffer->device_address();
 	for (auto& prim_mesh : lumen_scene->prim_meshes) {
 		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh.vtx_count, prim_mesh.idx_count, prim_mesh.vtx_offset,
-											   prim_mesh.first_idx, vertex_address, idx_address);
+											   prim_mesh.first_idx, vertex_address, sizeof(Vertex), idx_address);
 		blas_inputs.push_back({geo});
 	}
 

@@ -888,17 +888,9 @@ void load(const lm::String& path) {
 	_scene.mesh_lights_buffer = prm::get_buffer({.name = "Mesh Lights Buffer",
 												 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 												 .memory_type = vk::BUFFER_TYPE_GPU,
-												 .size = glm::max(_scene.gpu_lights.size, size_t(1)) * sizeof(Light),
+												 .size = glm::max(_scene.gpu_lights.size, (u64)1) * sizeof(Light),
 												 .data = _scene.gpu_lights.data});
 	_scene.total_light_area += total_light_triangle_area;
-	_scene.vertex_buffer =
-		prm::get_buffer({.name = "Vertex Buffer",
-						 .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-								  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = _scene.positions.size * sizeof(glm::vec3),
-						 .data = _scene.positions.data});
 
 	_scene.index_buffer =
 		prm::get_buffer({.name = "Index Buffer",
@@ -941,9 +933,10 @@ void load(const lm::String& path) {
 							 .size = prim_lookup.size * sizeof(PrimInfo),
 							 .data = prim_lookup.data});
 
-		_scene.compact_vertices_buffer =
+		_scene.vertex_buffer =
 			prm::get_buffer({.name = "Compact Vertices Buffer",
-							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+									  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 							 .memory_type = vk::BUFFER_TYPE_GPU,
 							 .size = vertices.size * sizeof(vertices[0]),
 							 .data = vertices.data});
@@ -1250,8 +1243,8 @@ void write() {
 }
 
 void destroy() {
-	auto buffer_list = {_scene.index_buffer,	 _scene.vertex_buffer,		_scene.compact_vertices_buffer,
-						_scene.materials_buffer, _scene.prim_lookup_buffer, _scene.mesh_lights_buffer};
+	auto buffer_list = {_scene.index_buffer, _scene.vertex_buffer, _scene.materials_buffer,
+						_scene.prim_lookup_buffer, _scene.mesh_lights_buffer};
 	for (vk::Buffer* b : buffer_list) {
 		prm::remove(b);
 	}

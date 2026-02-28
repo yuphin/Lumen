@@ -392,7 +392,7 @@ void tlas_build(BVH& tlas, vk::Buffer* instances_buf, u32 instance_count, VkBuil
 					instances_buf->device_address(), flags, update);
 }
 
-BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx, VkDeviceAddress vertex_address,
+BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx, VkDeviceAddress vertex_address, u64 vertex_stride,
 						 VkDeviceAddress index_address) {
 	u32 maxPrimitiveCount = idx_count / 3;
 
@@ -401,7 +401,7 @@ BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first
 		VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR};
 	triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;  // vec3 vertex position data.
 	triangles.vertexData.deviceAddress = vertex_address;
-	triangles.vertexStride = sizeof(glm::vec3);
+	triangles.vertexStride = vertex_stride;
 	// Describe index data (32-bit unsigned i32)
 	triangles.indexType = VK_INDEX_TYPE_UINT32;
 	triangles.indexData.deviceAddress = index_address;

@@ -147,7 +147,7 @@ void Integrator::create_accel(vk::BVH& tlas, lm::Array<vk::BVH>& blases) {
 	VkDeviceAddress idx_address = lumen_scene->index_buffer->device_address();
 	for (auto& prim_mesh : lumen_scene->prim_meshes) {
 		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh.vtx_count, prim_mesh.idx_count, prim_mesh.vtx_offset,
-											   prim_mesh.first_idx, vertex_address, idx_address);
+											   prim_mesh.first_idx, vertex_address, sizeof(Vertex), idx_address);
 		blas_inputs.push_back({geo});
 	}
 	vk::blas_build(scratch, blases.to_slice(), blas_inputs.to_slice(),

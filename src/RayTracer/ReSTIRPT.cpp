@@ -125,8 +125,8 @@ void ReSTIRPT::init() {
 
 	desc.material_addr = lumen_scene->materials_buffer->device_address();
 	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->vertex_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->vertex_buffer->device_address();
 	// ReSTIR PT (GRIS)
 	desc.transformations_addr = transformations_buffer->device_address();
 	desc.prefix_contributions_addr = prefix_contribution_buffer->device_address();
@@ -181,7 +181,7 @@ void ReSTIRPT::init() {
 	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, gris_reservoir_ping_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, lumen_scene->compact_vertices_buffer,
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, lumen_scene->vertex_buffer,
 								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, debug_vis_addr, debug_vis_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_eye_addr, photon_eye_buffer_ping, vk::render_graph());

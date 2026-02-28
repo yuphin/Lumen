@@ -66,7 +66,6 @@ struct Scene {
 
 	vk::Buffer* index_buffer;
 	vk::Buffer* vertex_buffer;
-	vk::Buffer* compact_vertices_buffer;
 	vk::Buffer* materials_buffer;
 	vk::Buffer* prim_lookup_buffer;
 	vk::Buffer* scene_desc_buffer;

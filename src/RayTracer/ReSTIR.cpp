@@ -41,7 +41,7 @@ void ReSTIR::init() {
 
 	desc.material_addr = lumen_scene->materials_buffer->device_address();
 	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->vertex_buffer->device_address();
 	// ReSTIR
 	desc.g_buffer_addr = g_buffer->device_address();
 	desc.temporal_reservoir_addr = temporal_reservoir_buffer->device_address();

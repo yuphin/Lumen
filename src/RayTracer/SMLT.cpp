@@ -180,7 +180,7 @@ void SMLT::init() {
 
 	desc.material_addr = lumen_scene->materials_buffer->device_address();
 	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->vertex_buffer->device_address();
 	// SMLT
 	desc.bootstrap_addr = bootstrap_buffer->device_address();
 	desc.cdf_addr = cdf_buffer->device_address();

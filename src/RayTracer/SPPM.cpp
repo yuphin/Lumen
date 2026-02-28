@@ -43,7 +43,7 @@ void SPPM::init() {
 
 	desc.material_addr = lumen_scene->materials_buffer->device_address();
 	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->vertex_buffer->device_address();
 	// SPPM
 	desc.sppm_data_addr = sppm_data_buffer->device_address();
 	desc.atomic_data_addr = atomic_data_buffer->device_address();

@@ -77,7 +77,7 @@ void VCM::init() {
 
 	desc.material_addr = lumen_scene->materials_buffer->device_address();
 	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->vertex_buffer->device_address();
 	// VCM
 	desc.photon_addr = photon_buffer->device_address();
 	desc.vcm_vertices_addr = vcm_light_vertices_buffer->device_address();

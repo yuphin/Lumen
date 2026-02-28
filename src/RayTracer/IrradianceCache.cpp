@@ -36,7 +36,7 @@ void IrradianceCache::init() {
 
 	desc.material_addr = lumen_scene->materials_buffer->device_address();
 	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->vertex_buffer->device_address();
 	desc.g_buffer_addr = gbuffer->device_address();
 	desc.transformations_addr = transformations_buffer->device_address();
 	desc.hash_cells_addr = hash_cells_buffer->device_address();
@@ -86,37 +86,37 @@ void IrradianceCache::render() {
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
 
-	if (1) {
-		vk::render_graph()
-			->add_rt(CSTR("Trace From IRCache Cells Debug"),
-					 {
-						 .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/trace_from_cell_debug.rgen")},
-									 {CSTR("src/shaders/integrators/irradiance_cache/ray.rmiss")},
-									 {CSTR("src/shaders/integrators/irradiance_cache/ray.rchit")},
-									 {CSTR("src/shaders/ray_shadow.rmiss")},
-									 {CSTR("src/shaders/ray.rahit")}},
-						 .dims = {Window::width(), Window::height()},
-					 })
-			.push_constants(&pc)
-			.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer})
-			.bind_texture_array(lumen_scene->scene_textures)
-			.bind_tlas(tlas);
-	} else {
-		vk::render_graph()
-			->add_rt(CSTR("Trace From IRCache Cells"),
-					 {
-						 .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/trace_from_cell.rgen")},
-									 {CSTR("src/shaders/integrators/irradiance_cache/ray.rmiss")},
-									 {CSTR("src/shaders/integrators/irradiance_cache/ray.rchit")},
-									 {CSTR("src/shaders/ray_shadow.rmiss")},
-									 {CSTR("src/shaders/ray.rahit")}},
-						 .dims = {HASH_TABLE_SIZE},
-					 })
-			.push_constants(&pc)
-			.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer})
-			.bind_texture_array(lumen_scene->scene_textures)
-			.bind_tlas(tlas);
-	}
+	// if (1) {
+	// 	vk::render_graph()
+	// 		->add_rt(CSTR("Trace From IRCache Cells Debug"),
+	// 				 {
+	// 					 .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/trace_from_cell_debug.rgen")},
+	// 								 {CSTR("src/shaders/integrators/irradiance_cache/ray.rmiss")},
+	// 								 {CSTR("src/shaders/integrators/irradiance_cache/ray.rchit")},
+	// 								 {CSTR("src/shaders/ray_shadow.rmiss")},
+	// 								 {CSTR("src/shaders/ray.rahit")}},
+	// 					 .dims = {Window::width(), Window::height()},
+	// 				 })
+	// 		.push_constants(&pc)
+	// 		.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer})
+	// 		.bind_texture_array(lumen_scene->scene_textures)
+	// 		.bind_tlas(tlas);
+	// } else {
+	// 	vk::render_graph()
+	// 		->add_rt(CSTR("Trace From IRCache Cells"),
+	// 				 {
+	// 					 .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/trace_from_cell.rgen")},
+	// 								 {CSTR("src/shaders/integrators/irradiance_cache/ray.rmiss")},
+	// 								 {CSTR("src/shaders/integrators/irradiance_cache/ray.rchit")},
+	// 								 {CSTR("src/shaders/ray_shadow.rmiss")},
+	// 								 {CSTR("src/shaders/ray.rahit")}},
+	// 					 .dims = {HASH_TABLE_SIZE},
+	// 				 })
+	// 		.push_constants(&pc)
+	// 		.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer})
+	// 		.bind_texture_array(lumen_scene->scene_textures)
+	// 		.bind_tlas(tlas);
+	// }
 }
 
 bool IrradianceCache::update() {

@@ -47,7 +47,7 @@ void ReSTIRGI::init() {
 
 	desc.material_addr = lumen_scene->materials_buffer->device_address();
 	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
-	desc.compact_vertices_addr = lumen_scene->compact_vertices_buffer->device_address();
+	desc.compact_vertices_addr = lumen_scene->vertex_buffer->device_address();
 	// ReSTIR GI
 	desc.restir_samples_addr = restir_samples_buffer->device_address();
 	desc.restir_samples_old_addr = restir_samples_old_buffer->device_address();
