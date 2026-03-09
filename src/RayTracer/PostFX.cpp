@@ -10,19 +10,7 @@
 #include "Framework/Base/Memory.h"
 #include "Framework/Base/HashMap.h"
 
-void PostFX::init() {
-	if (!arena) {
-		arena = lm::arena_create(MB(1));
-	}
-	VkSamplerCreateInfo sampler_ci = vk::sampler();
-	sampler_ci.minFilter = VK_FILTER_NEAREST;
-	sampler_ci.magFilter = VK_FILTER_NEAREST;
-	sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	sampler_ci.maxLod = FLT_MAX;
-
-	sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-	sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-	vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &img_sampler));
+void PostFX::init_fft() {
 	// Load the kernel
 	const char* img_name_kernel = "assets/kernels/Octagonal512.exr";
 	i32 width, height;
@@ -101,10 +89,26 @@ void PostFX::init() {
 	drm::destroy(kernel_ping);
 }
 
+void PostFX::init() {
+	VkSamplerCreateInfo sampler_ci = vk::sampler();
+	sampler_ci.minFilter = VK_FILTER_NEAREST;
+	sampler_ci.magFilter = VK_FILTER_NEAREST;
+	sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	sampler_ci.maxLod = FLT_MAX;
+
+	sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+	vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &img_sampler));
+}
+
 void PostFX::render(vk::Texture* input, vk::Texture* output) {
 	lm::RenderGraph* rg = vk::render_graph();
 	// Copy the original image to the padded texture
 	if (enable_bloom) {
+		if (!fft_ping_padded) {
+			init_fft();
+		}
+
 		u32 pad_width = (fft_ping_padded->extent.width + 31) / 32;
 		u32 pad_height = (fft_ping_padded->extent.height + 31) / 32;
 
@@ -163,13 +167,13 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 	}
 
 	pc_post_settings.enable_tonemapping = enable_tonemapping;
-	pc_post_settings.enable_bloom = enable_bloom;
 	pc_post_settings.bloom_amount = bloom_amount;
 	pc_post_settings.bloom_exposure = bloom_exposure;
 	pc_post_settings.width = output->extent.width;
 	pc_post_settings.height = output->extent.height;
 
 	rg->add_gfx(CSTR("Post FX"), {.shaders = {{CSTR("src/shaders/post.vert")}, {CSTR("src/shaders/post.frag")}},
+								  .macros = {vk::ShaderMacro("ENABLE_BLOOM", enable_bloom)},
 								  .width = output->extent.width,
 								  .height = output->extent.height,
 								  .clear_color = {VkClearColorValue{{0.25f, 0.25f, 0.25f, 1.0f}}},
@@ -184,8 +188,10 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 										  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 									  }})
 		.push_constants(&pc_post_settings)
-		.bind_texture_with_sampler(fft_pong_padded, img_sampler)
 		.bind_texture_with_sampler(input, img_sampler);
+	if (enable_bloom) {
+		rg->current_pass().bind_texture_with_sampler(fft_pong_padded, img_sampler);
+	}
 }
 
 bool PostFX::gui() {
@@ -195,7 +201,16 @@ bool PostFX::gui() {
 	ImGui::Text("PostFX Settings:");
 	ImGui::PopStyleColor();
 	ImGui::Checkbox("Enable ACES tonemapping", &enable_tonemapping);
-	ImGui::Checkbox("Enable bloom", &enable_bloom);
+	if (ImGui::Checkbox("Enable bloom", &enable_bloom) && !enable_bloom) {
+		vkDeviceWaitIdle(vk::context().device);
+		std::initializer_list<vk::Texture*> tex_list = {kernel_pong, fft_ping_padded, fft_pong_padded};
+		for (vk::Texture* t : tex_list) {
+			prm::remove(t);
+		}
+		kernel_pong = nullptr;
+		fft_ping_padded = nullptr;
+		fft_pong_padded = nullptr;
+	}
 	f32 exposure = log10f(bloom_exposure);
 	ImGui::SliderFloat("Bloom exposure", &exposure, -20.0f, 0.0f, "%.2f");
 	bloom_exposure = powf(10.0f, exposure);
@@ -204,9 +219,12 @@ bool PostFX::gui() {
 }
 
 void PostFX::destroy() {
-	std::vector<vk::Texture*> tex_list = {kernel_pong, fft_ping_padded, fft_pong_padded};
+	std::initializer_list<vk::Texture*> tex_list = {kernel_pong, fft_ping_padded, fft_pong_padded};
 	for (auto t : tex_list) {
 		prm::remove(t);
 	}
+	kernel_pong = nullptr;
+	fft_ping_padded = nullptr;
+	fft_pong_padded = nullptr;
 	vkDestroySampler(vk::context().device, img_sampler, 0);
 }

@@ -13,9 +13,10 @@ class PostFX {
 	void destroy();
 
    private:
-	vk::Texture* kernel_pong;
-	vk::Texture* fft_ping_padded;
-	vk::Texture* fft_pong_padded;
+	void init_fft();
+	vk::Texture* kernel_pong = nullptr;
+	vk::Texture* fft_ping_padded = nullptr;
+	vk::Texture* fft_pong_padded = nullptr;
 	VkSampler img_sampler;
 
 	PCPost pc_post_settings;
@@ -23,5 +24,4 @@ class PostFX {
 	bool enable_bloom = false;
 	f32 bloom_exposure = 1e-5f;
 	f32 bloom_amount = 0.26f;
-	lm::Arena* arena = nullptr;
 };

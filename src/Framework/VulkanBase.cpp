@@ -19,7 +19,7 @@ static constexpr u64 MAX_PHYSICAL_DEVICES = 8;
 static constexpr u64 MAX_QUEUE_FAMILIES = 16;
 static constexpr u64 MAX_DEVICE_QUEUES = 8;
 static constexpr u64 MAX_LAYER_PROPERTIES = 64;
-static constexpr u64 MAX_EXTENSION_PROPERTIES = 256;
+static constexpr u64 MAX_EXTENSION_PROPERTIES = 512;
 
 struct SwapChainSupportDetails {
 	VkSurfaceCapabilitiesKHR capabilities = {};
@@ -158,7 +158,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverity
 		// LUMEN_TRACE("Validation Warning: %s ", pCallbackData->pMessage);
 		return VK_TRUE;
 	}
-	LUMEN_ERROR("Validation Error: %s ", pCallbackData->pMessage);
+	LUMEN_WARN("Validation Error: %s ", pCallbackData->pMessage);
 	return VK_FALSE;
 }
 
@@ -298,8 +298,17 @@ static void pick_physical_device() {
 		LUMEN_ERROR("Failed to find a suitable GPU");
 	}
 	VkPhysicalDeviceProperties2 prop2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
-	prop2.pNext = &context().rt_props;
+
+
+	VkPhysicalDeviceSubgroupProperties subgroup_props{};
+	subgroup_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+	subgroup_props.pNext = &context().rt_props;
+
+	prop2.pNext = &subgroup_props;
 	vkGetPhysicalDeviceProperties2(context().physical_device, &prop2);
+	if(subgroup_props.subgroupSize != 32) {
+		LUMEN_WARN("Subgroup size is not 32. This may affect behavior");
+	}
 }
 
 static void create_logical_device() {

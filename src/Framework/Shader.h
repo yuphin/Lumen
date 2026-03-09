@@ -19,6 +19,7 @@ struct BindingStatus {
 	bool active = false;
 };
 
+
 struct Shader {
 	Shader() = default;
 	Shader(const lm::String& filename);
@@ -44,5 +45,7 @@ struct Shader {
 	lm::HashMap<u32, BindingStatus> resource_binding_map;
 
 };
+
+void shader_arena_reset();
 
 }  // namespace vk

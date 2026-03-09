@@ -1,0 +1,94 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#extension GL_KHR_shader_subgroup_ballot : enable
+
+#include "ir_commons.h"
+layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
+
+Indices indices = Indices(scene_desc.index_addr);
+Materials materials = Materials(scene_desc.material_addr);
+InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
+CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
+
+#include "ir_commons.glsl"
+
+layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnList { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnCount { uint d; };
+
+InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
+SpawnList spawn_list = SpawnList(scene_desc.surfel_spawn_list_addr);
+SpawnCount spawn_count = SpawnCount(scene_desc.surfel_spawn_count_addr);
+
+// Process SURFELIZE_PASS_TILE_SIZE_XY * SURFELIZE_PASS_TILE_SIZE_XY tiles
+// 1 threadgroup processes each pixels in a tile (1 thread = 1 pixel)
+// Coverage is selected using warp intrinsics, per workgroup (tile)
+
+// For warp size of 32 and tile size of 16, we have 256 / 32 = 8 subgroups
+#define NUM_ACTIVE_SUBGROUPS (SURFELIZE_PASS_TILE_SIZE_XY * SURFELIZE_PASS_TILE_SIZE_XY / SUBGROUP_SIZE)
+shared uint winner_pixels[NUM_ACTIVE_SUBGROUPS];
+shared float winner_coverages[NUM_ACTIVE_SUBGROUPS];
+
+layout(local_size_x = SURFELIZE_PASS_TILE_SIZE_XY, local_size_y = SURFELIZE_PASS_TILE_SIZE_XY, local_size_z = 1) in;
+void main() {
+	uvec2 pixel_coords = gl_GlobalInvocationID.xy;
+	uint pixel_idx = (pixel_coords.x * pc.size_y + pixel_coords.y);
+
+	float coverage = 1e6;
+	if (pixel_coords.x < pc.size_x && pixel_coords.y < pc.size_y) {
+		GBuffer gbuffer = gbuffers.d[pixel_idx];
+		if (gbuffer_valid(gbuffer)) {
+			coverage = 0.0;
+			// TODO: Iterate over grid next
+			HitData hit_data =
+				get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
+		}
+	}
+	// Get the minimum coverage across the subgroup
+	float min_coverage = subgroupMin(coverage);
+
+	bool i_am_min = coverage == min_coverage;
+	// Tie break
+	uvec4 ballot = subgroupBallot(i_am_min);
+	// Get the lowest subgroup idx (arbitrary)
+	uint winner = subgroupBallotFindLSB(ballot);
+
+	if (gl_SubgroupInvocationID == winner && i_am_min) {
+		winner_pixels[gl_SubgroupID] = pixel_idx;
+		winner_coverages[gl_SubgroupID] = coverage;
+	}
+	barrier();
+	// Reduce between subgroups
+	if (gl_SubgroupID == 0) {
+		float their_coverage =
+			gl_SubgroupInvocationID < NUM_ACTIVE_SUBGROUPS ? winner_coverages[gl_SubgroupInvocationID] : 1e6;
+		float min_tile_coverage = subgroupMin(their_coverage);
+		bool i_am_tile_min = min_tile_coverage == their_coverage;
+		uvec4 ballot = subgroupBallot(i_am_tile_min);
+		uint tile_winner = subgroupBallotFindLSB(ballot);
+
+		if (gl_SubgroupInvocationID == tile_winner && min_tile_coverage != 1e6) {
+			// Winner of the tile
+			uint surfel_idx = atomicAdd(spawn_count.d, 1);
+			uint winner_pixel = winner_pixels[gl_SubgroupInvocationID];
+			uvec2 winner_pixel_coords = uvec2(winner_pixel / pc.size_y, winner_pixel % pc.size_y);
+			uint tiles_x = (pc.size_x + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
+			uint tiles_y = (pc.size_y + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
+			uint max_surfels_to_spawn = tiles_x * tiles_y;
+			spawn_list.d[surfel_idx] = winner_pixel;
+			ASSERT2(surfel_idx < max_surfels_to_spawn, "Surfel spawn idx exceeded (%u) the maximum number on %v2u\n",
+					surfel_idx, winner_pixel_coords);
+		}
+	}
+}

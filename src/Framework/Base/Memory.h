@@ -1,5 +1,7 @@
 #pragma once
 #include "Utils.h"
+#include "String.h"
+
 namespace lm {
 
 enum ArenaFlags : u32 { ARENA_FLAG_NONE = 0, ARENA_FLAG_RESERVED = 1 << 0, ARENA_FLAG_SCRATCH = 1 << 1 };
@@ -14,6 +16,7 @@ struct ScratchArena {
 };
 
 struct Arena {
+	lm::String name;
 	Arena* next;
 	u8* data;
 	u64 local_offset;
@@ -28,7 +31,7 @@ struct Arena {
 constexpr u64 MIN_ARENA_RESERVE_SIZE = MB(1);
 constexpr u64 MIN_ARENA_COMMIT_SIZE = KB(64);
 
-Arena* arena_create(u64 reserve_size = MIN_ARENA_RESERVE_SIZE, u64 commit_size = MIN_ARENA_COMMIT_SIZE,
+Arena* arena_create(lm::String name, u64 reserve_size = MIN_ARENA_RESERVE_SIZE, u64 commit_size = MIN_ARENA_COMMIT_SIZE,
 					u64 header_alignment = -1);
 void arena_ensure_committed(Arena* arena, u64 target_offset);
 
@@ -97,7 +100,7 @@ struct Array {
 		static_assert(GROWABLE, "Cannot resize a fixed array");
 		reserve(new_size);
 		size = new_size;
-		for(u64 i = 0; i < new_size; i++) {
+		for (u64 i = 0; i < new_size; i++) {
 			data[i] = default_value;
 		}
 	}

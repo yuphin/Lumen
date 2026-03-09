@@ -30,6 +30,7 @@ void RayTracer::init(bool use_debug, i32 argc, char* argv[]) {
 		} else if (Window::is_key_down(KeyInput::KEY_F5)) {
 			vk::render_graph()->reload_shaders = true;
 			vk::render_graph()->shader_cache.clear();
+			vk::shader_arena_reset();
 			integrator->updated = true;
 		} else if (Window::is_key_down(KeyInput::KEY_F6)) {
 			capture_ref_img = true;
@@ -70,7 +71,6 @@ void RayTracer::init(bool use_debug, i32 argc, char* argv[]) {
 	}
 	post_fx.init();
 	init_resources();
-	LUMEN_TRACE("Memory usage: %f MB", vk::get_memory_usage(vk::context().physical_device) * 1e-6);
 }
 
 void RayTracer::init_resources() {
@@ -339,6 +339,7 @@ bool RayTracer::gui() {
 	if (ImGui::Button("Reload shaders (F5)")) {
 		vk::render_graph()->reload_shaders = true;
 		vk::render_graph()->shader_cache.clear();
+		vk::shader_arena_reset();
 		updated |= true;
 	}
 	ImGui::Checkbox("Comparison mode (F11)", &comparison_mode);

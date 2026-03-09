@@ -1,17 +1,9 @@
 #include "LumenPCH.h"
 #include "IrradianceCache.h"
 
-static constexpr uint HASH_TABLE_SIZE = 1 << 16;
-
 void IrradianceCache::init() {
 	Integrator::init();
 
-	hash_cells_buffer = prm::get_buffer({
-		.name = "Hash Cells",
-		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		.memory_type = vk::BUFFER_TYPE_GPU,
-		.size = HASH_TABLE_SIZE * sizeof(HashEntry),
-	});
 	gbuffer = prm::get_buffer({.name = "IRCache GBuffer",
 							   .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 										VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -31,15 +23,33 @@ void IrradianceCache::init() {
 		.data = transformations.data(),
 	});
 
+	// At max, we spawn 1 surfel per tile.
+	u32 tiles_x = (Window::width() + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
+	u32 tiles_y = (Window::height() + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
+	const u32 max_surfels_to_spawn = tiles_x * tiles_y;
+	surfel_spawn_list_buffer =
+		prm::get_buffer({.name = "Surfel Spawn List Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = max_surfels_to_spawn * sizeof(u32)});
+
+	surfel_spawn_count_buffer =
+		prm::get_buffer({.name = "Surfel Spawn Count Buffer",
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = sizeof(u32)});
+
 	SceneDesc desc;
 	desc.index_addr = lumen_scene->index_buffer->device_address();
-
 	desc.material_addr = lumen_scene->materials_buffer->device_address();
 	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
 	desc.compact_vertices_addr = lumen_scene->vertex_buffer->device_address();
 	desc.g_buffer_addr = gbuffer->device_address();
 	desc.transformations_addr = transformations_buffer->device_address();
-	desc.hash_cells_addr = hash_cells_buffer->device_address();
+	desc.surfel_spawn_list_addr = surfel_spawn_list_buffer->device_address();
+	desc.surfel_spawn_count_addr = surfel_spawn_count_buffer->device_address();
+
 	lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = "Scene Desc",
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -47,11 +57,11 @@ void IrradianceCache::init() {
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
 
-	frame_num = 0;
-
 	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, hash_cells_addr, hash_cells_buffer, vk::render_graph());
+
+	pc.surfel_radius = 0.03;
+	frame_num = 0;
 }
 
 void IrradianceCache::render() {
@@ -59,20 +69,12 @@ void IrradianceCache::render() {
 	pc.max_bounds = lumen_scene->dimensions.max;
 	pc.size_x = Window::width();
 	pc.size_y = Window::height();
-	pc.max_hash_table_size = HASH_TABLE_SIZE;
 	pc.direct_lighting = direct_lighting;
-	pc.min_cell_size = min_cell_size;
-	pc.desired_px_per_cell = desired_px_per_cell;
 	pc.frame_num = frame_num;
 	pc.rand = rand();
+
 	vk::render_graph()
-		->add_compute(CSTR("Clear Hash Table"),
-					  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/clear_cells.comp")),
-					   .dims = {(HASH_TABLE_SIZE + 127) / 128}})
-		.push_constants(&pc)
-		.bind(hash_cells_buffer);
-	vk::render_graph()
-		->add_rt(CSTR("Irradiance Cache"),
+		->add_rt(CSTR("GBuffer"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/primary.rgen")},
 								 {CSTR("src/shaders/integrators/irradiance_cache/ray.rmiss")},
@@ -86,37 +88,22 @@ void IrradianceCache::render() {
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
 
-	// if (1) {
-	// 	vk::render_graph()
-	// 		->add_rt(CSTR("Trace From IRCache Cells Debug"),
-	// 				 {
-	// 					 .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/trace_from_cell_debug.rgen")},
-	// 								 {CSTR("src/shaders/integrators/irradiance_cache/ray.rmiss")},
-	// 								 {CSTR("src/shaders/integrators/irradiance_cache/ray.rchit")},
-	// 								 {CSTR("src/shaders/ray_shadow.rmiss")},
-	// 								 {CSTR("src/shaders/ray.rahit")}},
-	// 					 .dims = {Window::width(), Window::height()},
-	// 				 })
-	// 		.push_constants(&pc)
-	// 		.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer})
-	// 		.bind_texture_array(lumen_scene->scene_textures)
-	// 		.bind_tlas(tlas);
-	// } else {
-	// 	vk::render_graph()
-	// 		->add_rt(CSTR("Trace From IRCache Cells"),
-	// 				 {
-	// 					 .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/trace_from_cell.rgen")},
-	// 								 {CSTR("src/shaders/integrators/irradiance_cache/ray.rmiss")},
-	// 								 {CSTR("src/shaders/integrators/irradiance_cache/ray.rchit")},
-	// 								 {CSTR("src/shaders/ray_shadow.rmiss")},
-	// 								 {CSTR("src/shaders/ray.rahit")}},
-	// 					 .dims = {HASH_TABLE_SIZE},
-	// 				 })
-	// 		.push_constants(&pc)
-	// 		.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer})
-	// 		.bind_texture_array(lumen_scene->scene_textures)
-	// 		.bind_tlas(tlas);
-	// }
+	vk::render_graph()
+		->add_compute(CSTR("Surfelize"),
+					  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfelize.comp")),
+					   .dims = {(Window::width() + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY,
+								(Window::height() + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY, 1}})
+		.push_constants(&pc)
+		.zero(surfel_spawn_count_buffer)
+		.bind({lumen_scene->scene_desc_buffer});
+	if (debug_mode) {
+		vk::render_graph()
+			->add_compute(CSTR("Debug"),
+						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/debug.comp")),
+						   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024)), 1, 1}})
+			.push_constants(&pc)
+			.bind({lumen_scene->scene_desc_buffer, output_tex});
+	}
 }
 
 bool IrradianceCache::update() {
@@ -131,15 +118,14 @@ bool IrradianceCache::update() {
 bool IrradianceCache::gui() {
 	bool result = Integrator::gui();
 	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
-	float max_cell_size = glm::distance(pc.min_bounds, pc.max_bounds) / 2.0f;
-	result |= ImGui::SliderFloat("Min cell size", &min_cell_size, 0.1f, max_cell_size);
-	result |= ImGui::SliderFloat("Desired px per cell", &desired_px_per_cell, 1.0f, 10.0f);
+	result |= ImGui::Checkbox("Debug mode", &debug_mode);
+	result |= ImGui::SliderFloat("Surfel radius", &pc.surfel_radius, 1e-6, 10);
 	return result;
 }
 
 void IrradianceCache::destroy(bool resize) {
 	Integrator::destroy(resize);
-	auto buffer_list = {gbuffer, transformations_buffer, hash_cells_buffer};
+	auto buffer_list = {gbuffer, transformations_buffer, surfel_spawn_list_buffer, surfel_spawn_count_buffer};
 	for (vk::Buffer* b : buffer_list) {
 		prm::remove(b);
 	}

@@ -15,10 +15,10 @@ class IrradianceCache : public Integrator {
    private:
 	vk::Buffer* gbuffer;
 	vk::Buffer* transformations_buffer;
-	vk::Buffer* hash_cells_buffer;
+	vk::Buffer* surfel_spawn_list_buffer;
+	vk::Buffer* surfel_spawn_count_buffer;
 	PCIRCache pc{};
 	PathConfig* config;
 	bool direct_lighting = false;
-	float min_cell_size = 0.5f;
-	float desired_px_per_cell = 4.0f;
+	bool debug_mode = true;
 };

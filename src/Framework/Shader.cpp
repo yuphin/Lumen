@@ -2,6 +2,7 @@
 #include "RenderGraph.h"
 #include <spirv_cross/spirv.h>
 #include <spirv_cross/spirv_glsl.hpp>
+#include "Framework/ThreadPool.h"
 
 #if USE_SHADERC
 #include <shaderc/shaderc.hpp>
@@ -514,7 +515,7 @@ i32 Shader::compile(lm::RenderPass* pass) {
 
 	// If we're compiling, we need to initialize shader specific arrays and hashmaps
 	if (!_arena_shaders) {
-		_arena_shaders = lm::arena_create(MB(16));
+		_arena_shaders = lm::arena_create(CSTR("Shader Arena"), MB(16));
 	}
 	if (!mstages.arena_node) {
 		mstages = lm::hash_map_create<lm::String, shaderc_shader_kind>(_arena_shaders, 8);
@@ -620,5 +621,27 @@ VkShaderModule Shader::create_vk_shader_module(const VkDevice& device) const {
 		LUMEN_ERROR("Failed to create shader module!");
 	}
 	return shader_module;
+}
+
+void shader_arena_reset() {
+
+	u32 thread_count = std::thread::hardware_concurrency();
+	std::vector<std::future<void>> threads;
+	for(u32 i = 0; i < thread_count; i++) {
+		threads.push_back(ThreadPool::submit([&](){
+			if(_arena_shaders) {
+				_arena_shaders->clear();
+			}
+		}));
+	}
+
+	for(u64 i = 0; i < threads.size(); i++) {
+		threads[i].wait();
+	}
+	if(_arena_shaders) {
+		_arena_shaders->clear();
+	}
+	mstages.clear();
+	mstages.arena_node = nullptr;
 }
 }  // namespace vk

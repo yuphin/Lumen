@@ -8,7 +8,7 @@ void Integrator::init() {
 		lumen_scene = scene::get();
 	}
 	if (!arena) {
-		arena = lm::arena_create(MB(1));
+		arena = lm::arena_create(CSTR("Integrator Arena"), MB(1));
 	}
 	lm::Camera* cam_ptr = &lumen_scene->camera;
 	Window::add_mouse_click_callback([this](MouseAction button, KeyAction action, double x, double y) {

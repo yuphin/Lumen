@@ -9,9 +9,7 @@
 #extension GL_EXT_shader_atomic_float : require
 
 #define UINT32_MAX 4294967295u
-#include "../../commons.glsl"
-#include "ir_commons.h"
-#include "ir_commons.glsl"
+#include "ir_commons_old.glsl"
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
@@ -20,16 +18,24 @@ layout(location = 0) rayPayloadEXT IRCacheHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer OutGBuffer { GBuffer d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer HashEntryBuffer { HashEntry d[]; };
 
 OutGBuffer gbuffers = OutGBuffer(scene_desc.g_buffer_addr);
+HashEntryBuffer hash_entries = HashEntryBuffer(scene_desc.hash_cells_addr);
 
 
 void main() {
+#if 1
 	const ivec2 pixel = ivec2(gl_LaunchIDEXT.xy);
 	const vec2 in_uv = (pixel + vec2(0.5)) / vec2(gl_LaunchSizeEXT.xy);
-	const vec2 ndc = in_uv * 2.0 - 1.0;
+#else
+	uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.frame_num ^ pc.rand);
+	const vec2 in_uv = vec2(rand(seed), rand(seed));
+	const ivec2 pixel = ivec2(in_uv * vec2(gl_LaunchSizeEXT.xy));
+#endif
+	const vec2 d = in_uv * 2.0 - 1.0;
 	vec3 origin = ubo.view_pos.xyz;
-	vec3 direction = vec3(sample_camera(ndc));
+	vec3 direction = vec3(sample_camera(d));
 	direction = normalize(direction);
 	GBuffer gbuffer_out;
 	init_gbuffer(gbuffer_out);
@@ -38,11 +44,35 @@ void main() {
 	const bool found_isect = payload.instance_idx != -1;
 	if (!found_isect) {
 		gbuffers.d[pixel_idx] = gbuffer_out;
+		imageStore(image, pixel, vec4(vec3(0), 1.f));
 		return;
 	}
 	HitData hit_data = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
+	const Material hit_mat = load_material(hit_data.material_idx, hit_data.uv);
 
+	HashKey key;
+	key.pos =
+		quantize_pos(hit_data.pos, ubo.view_pos.xyz, ubo.fovy, pc.size_y, pc.desired_px_per_cell, pc.min_cell_size, pc.min_bounds);
+	// key.normal = quantize_normal(hit_data.n_s);
+	key.normal = 0;
+	// key.material = hit_data.material_idx;
+	key.material = 0;
+
+	uint quantized_key = hash_key(key);
+	uint hash_idx = quantized_key % pc.max_hash_table_size;
+	vec3 col = uint_to_random_color(quantized_key);
+	// vec3 col = uvec3_to_random_color(key.pos);
+	// imageStore(image, pixel, vec4(hit_mat.albedo, 1.f));
 	gbuffer_out.barycentrics = payload.attribs;
 	gbuffer_out.primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
+	hash_entries.d[hash_idx].representative_point = gbuffer_out;
+	hash_entries.d[hash_idx].pixel = pixel;
 	gbuffers.d[pixel_idx] = gbuffer_out;
+	if (pc.frame_num > 0) {
+		float w = 1. / float(pc.frame_num + 1);
+		vec3 old_col = imageLoad(image, pixel).xyz;
+		imageStore(image, pixel, vec4(mix(old_col, col, w), 1.f));
+	} else {
+		imageStore(image, pixel, vec4(col, 1.f));
+	}
 }

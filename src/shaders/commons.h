@@ -129,6 +129,10 @@ using uvec2 = glm::uvec2;
 		if(!(cond))  { \
 			debugPrintfEXT(str, val1); \
 		}
+	#define ASSERT2(cond, str, val1, val2) \
+		if(!(cond))  { \
+			debugPrintfEXT(str, val1, val2); \
+		}
 #else
 	#define LOG_CLICKED0(str)
 	#define LOG_CLICKED(str, args)
@@ -152,7 +156,6 @@ using uvec2 = glm::uvec2;
 
 struct PCPost {
 	uint enable_tonemapping;
-	uint enable_bloom;
 	int width;
 	int height;
 	float bloom_exposure;
@@ -319,7 +322,8 @@ struct Material {
 	uint64_t direct_lighting_addr;
 	uint64_t probe_offsets_addr;
 	// IRCache
-	uint64_t hash_cells_addr;
+	uint64_t surfel_spawn_list_addr;
+	uint64_t surfel_spawn_count_addr;
 };
 
 

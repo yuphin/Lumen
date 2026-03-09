@@ -22,11 +22,12 @@ static u32 get_bindings_for_shader_set(util::Slice<const Shader> shaders, VkDesc
 	return binding_mask;
 }
 
-Pipeline::Pipeline(const std::string& name) : name(name) {}
+Pipeline::Pipeline(lm::String name) : name(name) {}
 
 void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::Slice<u32> descriptor_counts,
 								   util::Slice<vk::Texture*> color_outputs, vk::Texture* depth_output) {
 	LUMEN_ASSERT(color_outputs.size, "No color outputs for GFX pipeline");
+	assert(name.is_cstr());
 	type = PipelineType::GFX;
 	util::Slice<const Shader> shaders_slice = {settings.shaders.data, (u64)settings.shaders.size};
 	binding_mask = get_bindings_for_shader_set(shaders_slice, descriptor_types);
@@ -171,12 +172,13 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::S
 		vkDestroyShaderModule(vk::context().device, stage.module, nullptr);
 	}
 	if (!name.empty()) {
-		vk::set_resource_name(vk::context().device, (u64)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
+		vk::set_resource_name(vk::context().device, (u64)handle, name.data, VK_OBJECT_TYPE_PIPELINE);
 	}
 }
 
 void Pipeline::create_rt_pipeline(const RTPassSettings& settings, util::Slice<u32> descriptor_counts,
 								  u32 num_as_bindings) {
+	assert(name.is_cstr());
 	type = PipelineType::RT;
 	util::Slice<const Shader> shaders_slice = {settings.shaders.data, (u64)settings.shaders.size};
 	binding_mask = get_bindings_for_shader_set(shaders_slice, descriptor_types);
@@ -194,7 +196,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, util::Slice<u3
 		binding_stage_flags |= shader.stage;
 	}
 	if (num_as_bindings_in_shader == 0) {
-		LUMEN_WARN("No AS bindings found in RT shaders for pipeline %s", name.c_str());
+		LUMEN_WARN("No AS bindings found in RT shaders for pipeline %s", name.data);
 	}
 	LUMEN_ASSERT(num_as_bindings_in_shader <= MAX_AS_BINDING_COUNT, "Max 2 AS bindings are supported");
 	create_set_layout(shaders_slice, descriptor_counts);
@@ -297,7 +299,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, util::Slice<u3
 	vk::check(vkCreateRayTracingPipelinesKHR(vk::context().device, {}, {}, 1, &pipeline_CI, nullptr, &handle));
 	sbt_wrapper.create(handle, pipeline_CI);
 	if (!name.empty()) {
-		vk::set_resource_name(vk::context().device, (u64)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
+		vk::set_resource_name(vk::context().device, (u64)handle, name.data, VK_OBJECT_TYPE_PIPELINE);
 	}
 	for (auto& shader_stage : stages) {
 		vkDestroyShaderModule(vk::context().device, shader_stage.module, nullptr);
@@ -305,6 +307,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, util::Slice<u3
 }
 
 void Pipeline::create_compute_pipeline(const ComputePassSettings& settings, util::Slice<u32> descriptor_counts) {
+	assert(name.is_cstr());
 	type = PipelineType::COMPUTE;
 	util::Slice<const Shader> shader_slice(const_cast<Shader*>(&settings.shader), 1);
 	binding_mask = get_bindings_for_shader_set(shader_slice, descriptor_types);
@@ -345,7 +348,7 @@ void Pipeline::create_compute_pipeline(const ComputePassSettings& settings, util
 	vk::check(vkCreateComputePipelines(vk::context().device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle));
 	vkDestroyShaderModule(vk::context().device, compute_shader_module, nullptr);
 	if (!name.empty()) {
-		vk::set_resource_name(vk::context().device, (u64)handle, name.c_str(), VK_OBJECT_TYPE_PIPELINE);
+		vk::set_resource_name(vk::context().device, (u64)handle, name.data, VK_OBJECT_TYPE_PIPELINE);
 	}
 }
 

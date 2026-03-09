@@ -127,13 +127,11 @@ void remove(vk::Buffer* buffer) {
 	if (!buffer) return;
 	vk::buffer_destroy(buffer);
 	_buffer_pool.remove(buffer);
-	buffer = nullptr;
 }
 void remove(vk::Texture* texture) {
 	if (!texture) return;
 	vk::texture_destroy(texture);
 	_texture_pool.remove(texture);
-	texture = nullptr;
 }
 
 void destroy() {

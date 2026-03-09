@@ -1,5 +1,9 @@
 #include "../../commons.h"
 
+#define SURFELIZE_PASS_TILE_SIZE_XY 16
+
+#define SUBGROUP_SIZE 32
+
 struct PCIRCache {
 	vec3 sky_col;
 	uint frame_num;
@@ -12,11 +16,8 @@ struct PCIRCache {
 	int light_triangle_count;
 	uint dir_light_idx;
 	uint direct_lighting;
-	float min_cell_size;
-	float desired_px_per_cell;
-	uint max_hash_table_size;
 	int rand;
-	vec3 pad;
+	float surfel_radius;
 };
 
 struct IRCacheUniforms {

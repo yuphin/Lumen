@@ -11,7 +11,7 @@ struct Pipeline;
 struct Pipeline {
    public:
 	enum class PipelineType { GFX = 0, RT = 1, COMPUTE = 2 };
-	Pipeline(const std::string& name);
+	Pipeline(lm::String name);
 	void cleanup();
 	void create_gfx_pipeline(const GraphicsPassSettings& settings, util::Slice<u32> descriptor_counts,
 							 util::Slice<vk::Texture*> color_outputs, vk::Texture* depth_output);
@@ -25,7 +25,7 @@ struct Pipeline {
 	PipelineType type;
 	VkDescriptorUpdateTemplate update_template = nullptr;
 	VkShaderStageFlags pc_stages = 0;
-	std::string name;
+	lm::String name;
 	u32 push_constant_size = 0;
 	VkDescriptorType descriptor_types[32] = {};
 

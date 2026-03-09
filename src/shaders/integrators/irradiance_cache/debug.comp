@@ -1,0 +1,96 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+#include "ir_commons.h"
+layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
+
+Indices indices = Indices(scene_desc.index_addr);
+Materials materials = Materials(scene_desc.material_addr);
+InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
+CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
+
+#include "ir_commons.glsl"
+
+
+layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
+layout(binding = 1, rgba32f) uniform image2D image;
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
+InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
+
+uint xxhash32(uint p) {
+	const uint PRIME32_2 = 2246822519U, PRIME32_3 = 3266489917U;
+	const uint PRIME32_4 = 668265263U, PRIME32_5 = 374761393U;
+	uint h32 = p + PRIME32_5;
+	h32 = PRIME32_4 * ((h32 << 17) | (h32 >> (32 - 17)));
+	h32 = PRIME32_2 * (h32 ^ (h32 >> 15));
+	h32 = PRIME32_3 * (h32 ^ (h32 >> 13));
+	return h32 ^ (h32 >> 16);
+}
+
+uint xxhash32(uvec2 p) {
+	const uint PRIME32_2 = 2246822519U, PRIME32_3 = 3266489917U;
+	const uint PRIME32_4 = 668265263U, PRIME32_5 = 374761393U;
+	uint h32 = p.y + PRIME32_5 + p.x * PRIME32_3;
+	h32 = PRIME32_4 * ((h32 << 17) | (h32 >> (32 - 17)));
+	h32 = PRIME32_2 * (h32 ^ (h32 >> 15));
+	h32 = PRIME32_3 * (h32 ^ (h32 >> 13));
+	return h32 ^ (h32 >> 16);
+}
+
+uint xxhash32(uvec3 p) {
+	const uint PRIME32_2 = 2246822519U, PRIME32_3 = 3266489917U;
+	const uint PRIME32_4 = 668265263U, PRIME32_5 = 374761393U;
+	uint h32 = p.z + PRIME32_5 + p.x * PRIME32_3;
+	h32 = PRIME32_4 * ((h32 << 17) | (h32 >> (32 - 17)));
+	h32 += p.y * PRIME32_3;
+	h32 = PRIME32_4 * ((h32 << 17) | (h32 >> (32 - 17)));
+	h32 = PRIME32_2 * (h32 ^ (h32 >> 15));
+	h32 = PRIME32_3 * (h32 ^ (h32 >> 13));
+	return h32 ^ (h32 >> 16);
+}
+
+uint xxhash32(uvec4 p) {
+	const uint PRIME32_2 = 2246822519U, PRIME32_3 = 3266489917U;
+	const uint PRIME32_4 = 668265263U, PRIME32_5 = 374761393U;
+	uint h32 = p.w + PRIME32_5 + p.x * PRIME32_3;
+	h32 = PRIME32_4 * ((h32 << 17) | (h32 >> (32 - 17)));
+	h32 += p.y * PRIME32_3;
+	h32 = PRIME32_4 * ((h32 << 17) | (h32 >> (32 - 17)));
+	h32 += p.z * PRIME32_3;
+	h32 = PRIME32_4 * ((h32 << 17) | (h32 >> (32 - 17)));
+	h32 = PRIME32_2 * (h32 ^ (h32 >> 15));
+	h32 = PRIME32_3 * (h32 ^ (h32 >> 13));
+	return h32 ^ (h32 >> 16);
+}
+
+vec3 debug_col(uint num) {
+	const float INV_11 = 1.0 / 2047.0;
+	const float INV_10 = 1.0 / 1023.0;
+	return vec3((float(num & 0x7FFu)) * INV_11, (float((num >> 11) & 0x7FFu)) * INV_11,
+				(float((num >> 22) & 0x3FFu)) * INV_10);
+}
+
+vec3 uvec3_to_random_color(uvec3 value) { return debug_col(xxhash32(value)); }
+vec3 uint_to_random_color(uint value) { return debug_col(xxhash32(value)); }
+
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+void main() {
+	ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.size_y, gl_GlobalInvocationID.x % pc.size_y);
+	if (coords.x >= pc.size_x || coords.y >= pc.size_y) {
+		return;
+	}
+    GBuffer gbuffer = gbuffers.d[gl_GlobalInvocationID.x];
+	vec3 col = uint_to_random_color(gbuffer.primitive_instance_id.y);
+	imageStore(image, coords, vec4(col, 1.f));
+}

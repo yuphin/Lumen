@@ -1050,8 +1050,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 void RenderGraph::init() {
 	if (!_arena_rendergraph) {
-		_arena_rendergraph = lm::arena_create(GB(1), MB(64));
-		_arena_per_frame = lm::arena_create(MB(16), MB(1));
+		_arena_rendergraph = lm::arena_create(CSTR("Render Graph Arena (Persistent)"), GB(1), MB(64));
+		_arena_per_frame = lm::arena_create(CSTR("Render Graph Arena (Per frame)"), MB(16), MB(1));
 	}
 	// Arrays
 	passes = lm::fixed_array_create<RenderPass>(_arena_rendergraph, MAX_PASSES_PER_FRAME);
@@ -1315,7 +1315,7 @@ PipelineStorage* RenderGraph::add_pass_impl_common(const lm::String& name, const
 			entry->value.pipeline.cleanup();
 		}
 		auto new_entry = pipeline_cache.insert(
-			hash, PipelineStorage{.pipeline = vk::Pipeline(lm::str_to_cpp_str(name_with_macros))});
+			hash, PipelineStorage{.pipeline = vk::Pipeline(name_with_macros)});
 		pipeline_storage = &new_entry->value;
 	}
 	if (!pipeline_storage->affected_buffer_pointers.initialized()) {

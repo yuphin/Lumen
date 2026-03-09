@@ -18,7 +18,7 @@ void arena_ensure_committed(Arena* arena, u64 target_offset) {
 	arena->local_offset = target_offset;
 	if (target_offset <= arena->end_committed) return;
 	u64 commit_size = glm::max(MIN_ARENA_COMMIT_SIZE, util::align_pow2(target_offset - arena->end_committed, os::get_page_size()));
-	LUMEN_INFO("Commiting %llu bytes ( %f MB) for Arena", commit_size, commit_size / (1024.0 * 1024));
+	LUMEN_WARN("Commiting %llu bytes ( %f MB) for: %s", commit_size, commit_size / (1024.0 * 1024), arena->name.data);
 	bool commited = os::commit(arena->data + arena->end_committed, commit_size);
 	memset(arena->data + arena->end_committed, 0, commit_size);
 	LUMEN_ASSERT(commited, "Could not commit memory for Arena");
@@ -73,7 +73,7 @@ void* Arena::allocate(u64 size, u64 alignment, Arena** arena_node, bool zero_ini
 	if (last_block != nullptr) {
 		u64 reserve_size = glm::max(MIN_ARENA_RESERVE_SIZE, glm::max(exclusive_block_reserve_size, size));
 		u64 commit_size = glm::max(MIN_ARENA_COMMIT_SIZE, size);
-		Arena* new_arena = arena_create(reserve_size, commit_size, alignment);
+		Arena* new_arena = arena_create(curr_arena->name, reserve_size, commit_size, alignment);
 		last_block->next = new_arena;
 		curr_arena = new_arena;
 
@@ -96,7 +96,8 @@ void* Arena::allocate(u64 size, u64 alignment, Arena** arena_node, bool zero_ini
 
 void Arena::clear() { arena_pop(this, 0); }
 
-Arena* arena_create(u64 reserve_size, u64 commit_size, u64 header_alignment) {
+Arena* arena_create(lm::String name, u64 reserve_size, u64 commit_size, u64 header_alignment) {
+	LUMEN_ASSERT(name.is_cstr(), "Arena name must be a C string");
 	const u64 page_size = os::get_page_size();
 
 	if (header_alignment == -1) {
@@ -125,6 +126,7 @@ Arena* arena_create(u64 reserve_size, u64 commit_size, u64 header_alignment) {
 	arena->end_reserved = reserve_size - header_alignment;
 	arena->end_committed = commit_size - header_alignment;
 	arena->flags = ARENA_FLAG_NONE;
+	arena->name = name;
 
 	return arena;
 }
