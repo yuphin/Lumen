@@ -66,9 +66,9 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, vec3 n_s, const flo
 	vec4 target = ubo.view * vec4(dir.x, dir.y, dir.z, 0);
 	target /= target.z;
 	target = -ubo.projection * target;
-	vec2 screen_dims = vec2(pc.size_x, pc.size_y);
+	vec2 screen_dims = vec2(pc.width, pc.height);
 	coords = ivec2(0.5 * (1 + target.xy) * screen_dims - 0.5);
-	if (coords.x < 0 || coords.x >= pc.size_x || coords.y < 0 || coords.y >= pc.size_y || dot(dir, cam_nrm) < 0) {
+	if (coords.x < 0 || coords.x >= pc.width || coords.y < 0 || coords.y >= pc.height || dot(dir, cam_nrm) < 0) {
 		return vec3(0);
 	}
 	return L;
@@ -380,7 +380,7 @@ void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
 			if (save_radiance && lum > 0) {
 				connected_lights.d[pixel_idx]++;
 
-				uint idx = coords.x * pc.size_y + coords.y;
+				uint idx = coords.x * pc.height + coords.y;
 				const uint splat_cnt = light_splat_cnts.d[pixel_idx];
 				light_splat_cnts.d[pixel_idx]++;
 				splat(splat_cnt).idx = idx;
@@ -395,7 +395,7 @@ void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
 			const float lum = luminance(splat_col);
 			if (lum > 0) {
 				lum_sum += lum;
-				uint idx = coords.x * pc.size_y + coords.y;
+				uint idx = coords.x * pc.height + coords.y;
 				tmp_col.d[idx] += splat_col;
 			}
 #else
@@ -508,7 +508,7 @@ vec3 vcm_trace_eye(VCMState camera_state, float eta_vcm, float eta_vc,
 	light_path_idx *= (pc.max_depth + 1);
 	light_splat_cnts.d[pixel_idx] = 0;
 #elif VCM_MLT == 1
-	const uint num_light_paths = pc.size_x * pc.size_y;
+	const uint num_light_paths = pc.width * pc.height;
 	uint light_path_idx = uint(mlt_rand(seed, large_step) * num_light_paths);
 	uint light_splat_idx = light_path_idx * pc.max_depth * (pc.max_depth + 1);
 	uint light_path_len = light_path_cnts.d[light_path_idx];
@@ -649,13 +649,13 @@ float mlt_fill_eye() {
 	camera_state.n_s = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
 	float cos_theta = abs(dot(camera_state.n_s, direction));
 	// Defer r^2 / cos term
-	camera_state.d_vcm = cam_area * pc.size_x * pc.size_y * cos_theta * cos_theta * cos_theta;
+	camera_state.d_vcm = cam_area * pc.width * pc.height * cos_theta * cos_theta * cos_theta;
 	camera_state.d_vc = 0;
 	camera_state.d_vm = 0;
 	int depth;
 	int path_idx = 0;
-	ivec2 coords = ivec2(0.5 * (1 + dir) * vec2(pc.size_x, pc.size_y));
-	uint coords_idx = coords.x * pc.size_y + coords.y;
+	ivec2 coords = ivec2(0.5 * (1 + dir) * vec2(pc.width, pc.height));
+	uint coords_idx = coords.x * pc.height + coords.y;
 	for (depth = 1;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, camera_state.pos, tmin, camera_state.wi, tmax, 0);
 
@@ -771,7 +771,7 @@ float mlt_trace_light() {
 	// Select camera path
 	float luminance_sum = 0;
 	mlt_sampler.splat_cnt = 0;
-	uint path_idx = uint(mlt_rand(mlt_seed, large_step) * (pc.size_x * pc.size_y));
+	uint path_idx = uint(mlt_rand(mlt_seed, large_step) * (pc.width * pc.height));
 	uint path_len = light_path_cnts.d[path_idx];
 	path_idx *= (pc.max_depth + 1);
 	// Trace from light
@@ -830,7 +830,7 @@ float mlt_trace_light() {
 			if (lum_val > 0) {
 				luminance_sum += lum_val;
 				if (save_radiance) {
-					const uint idx = coords.x * pc.size_y + coords.y;
+					const uint idx = coords.x * pc.height + coords.y;
 					const uint splat_cnt = mlt_sampler.splat_cnt;
 					mlt_sampler.splat_cnt++;
 					splat(splat_cnt).idx = idx;

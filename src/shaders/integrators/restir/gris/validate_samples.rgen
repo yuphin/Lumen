@@ -31,7 +31,7 @@ void main() {
 	for (uint i = 0; i < num_spatial_samples; i++) {
 		ivec2 rand_offset = get_neighbor_offset(seed2);
 		const ivec2 coords = ivec2(gl_LaunchIDEXT.xy) + rand_offset;
-		const uint neighbor_pixel_idx = coords.x * pc.size_y + coords.y;
+		const uint neighbor_pixel_idx = coords.x * pc.height + coords.y;
 		if (any(lessThan(coords, ivec2(0))) || any(greaterThanEqual(coords, gl_LaunchSizeEXT.xy))) {
 			continue;
 		}

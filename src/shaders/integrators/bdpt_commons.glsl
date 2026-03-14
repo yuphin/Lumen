@@ -259,8 +259,8 @@ int bdpt_generate_camera_subpath(vec2 d, const vec3 origin, int max_depth,
     camera_verts.d[bdpt_path_idx].side = 1;
     light_verts.d[bdpt_path_idx].mode = 1;
 #if BDPT_MLT == 1
-    ivec2 coords = ivec2(0.5 * (1 + d) * vec2(pc.size_x, pc.size_y));
-    camera_verts.d[bdpt_path_idx].coords = coords.x * pc.size_y + coords.y;
+    ivec2 coords = ivec2(0.5 * (1 + d) * vec2(pc.width, pc.height));
+    camera_verts.d[bdpt_path_idx].coords = coords.x * pc.height + coords.y;
 #endif
     float cos_theta = dot(camera_verts.d[bdpt_path_idx].dir,
                           camera_verts.d[bdpt_path_idx].n_s);
@@ -517,9 +517,9 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
     target /= target.z;
     target = -ubo.projection * target;
     coords =
-        ivec2(0.5 * (1 + target.xy) * vec2(pc.size_x, pc.size_y) - 0.5);
-    if (coords.x < 0 || coords.x >= pc.size_x || coords.y < 0 ||
-        coords.y >= pc.size_y || dot(dir, cam_vtx(0).n_s) < 0) {
+        ivec2(0.5 * (1 + target.xy) * vec2(pc.width, pc.height) - 0.5);
+    if (coords.x < 0 || coords.x >= pc.width || coords.y < 0 ||
+        coords.y >= pc.height || dot(dir, cam_vtx(0).n_s) < 0) {
         return vec3(0);
     }
     float mis_weight = 1.0;

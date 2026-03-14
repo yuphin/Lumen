@@ -17,7 +17,7 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMReservoir
 uvec4 seed =
     init_rng(gl_GlobalInvocationID.xy, gl_NumWorkGroups.xy *uvec2(32, 1),
              pc.frame_num ^ pc.random_num);
-uint size = pc.size_x * pc.size_y;
+uint size = pc.width * pc.height;
 
 LightSamples light_samples = LightSamples(scene_desc.light_samples_addr);
 VCMReservoir_ temporal_reservoirs =

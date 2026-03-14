@@ -54,7 +54,7 @@ vec3 do_spatial_reuse(GBuffer gbuffer, Reservoir reservoir) {
 		if (any(lessThan(neighbor_coords, ivec2(0))) || any(greaterThanEqual(neighbor_coords, gl_LaunchSizeEXT.xy))) {
 			continue;
 		}
-		const uint neighbor_pixel_idx = neighbor_coords.x * pc.size_y + neighbor_coords.y;
+		const uint neighbor_pixel_idx = neighbor_coords.x * pc.height + neighbor_coords.y;
 		GBuffer neighbor_gbuffer = curr_gbuffers[neighbor_pixel_idx];
 		if (!gbuffer_data_valid(neighbor_gbuffer)) {
 			continue;
@@ -135,7 +135,7 @@ vec3 do_spatial_reuse(GBuffer gbuffer, Reservoir reservoir) {
 	col += final_contribution;
 
 	if (pc.pixel_debug == 1 && ubo.clicked_pos == ivec2(gl_LaunchIDEXT.xy)) {
-		uint linear_idx = gl_LaunchIDEXT.x * pc.size_y + gl_LaunchIDEXT.y;
+		uint linear_idx = gl_LaunchIDEXT.x * pc.height + gl_LaunchIDEXT.y;
 		debug_vis.d[linear_idx] = 1;
 		for (uint i = 0; i < num_accepted_positions; i++) {
 			debug_vis.d[accepted_positions[i]] = 1;

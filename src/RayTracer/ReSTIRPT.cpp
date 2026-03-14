@@ -195,8 +195,8 @@ void ReSTIRPT::init() {
 }
 
 void ReSTIRPT::render() {
-	pc_ray.size_x = Window::width();
-	pc_ray.size_y = Window::height();
+	pc_ray.width = Window::width();
+	pc_ray.height = Window::height();
 	pc_ray.enable_temporal_jitter = uint(enable_temporal_jitter);
 	pc_ray.num_lights = (i32)lumen_scene->gpu_lights.size;
 	pc_ray.prev_random_num = pc_ray.general_seed;

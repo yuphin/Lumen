@@ -20,13 +20,13 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) buffer AtomicData_ 
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonData_ { PhotonHash d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
 
-uint size = pc.size_x * pc.size_y;
+uint size = pc.width * pc.height;
 SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
 AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
 PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
 Materials materials = Materials(scene_desc.material_addr);
 
-uint screen_size = pc.size_x * pc.size_y;
+uint screen_size = pc.width * pc.height;
 
 #include "../../bsdf_commons.glsl"
 

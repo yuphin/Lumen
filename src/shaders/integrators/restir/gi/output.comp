@@ -24,11 +24,11 @@ ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
 Reservoirs temp_reservoirs = Reservoirs(scene_desc.temporal_reservoir_addr);
 Reservoirs spatial_reservoirs = Reservoirs(scene_desc.spatial_reservoir_addr);
 
-uint offset(const uint pingpong) { return pingpong * pc.size_x * pc.size_y; }
+uint offset(const uint pingpong) { return pingpong * pc.width * pc.height; }
 
 void main() {
-	ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.size_y, gl_GlobalInvocationID.x % pc.size_y);
-	if (gl_GlobalInvocationID.x >= pc.size_x * pc.size_y) {
+	ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.height, gl_GlobalInvocationID.x % pc.height);
+	if (gl_GlobalInvocationID.x >= pc.width * pc.height) {
 		return;
 	}
 	const uint pingpong = (pc.total_frame_num % 2);

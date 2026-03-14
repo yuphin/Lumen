@@ -121,8 +121,8 @@ void main() {
 			ivec2 prev_coords = ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
 
 			if (!(any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy)))) {
-				PhotonData prev_photon_eye = prev_photon_eye[prev_coords.x * pc.size_y + prev_coords.y];
-				PhotonReservoir prev_reservoir = in_reservoirs[prev_coords.x * pc.size_y + prev_coords.y];
+				PhotonData prev_photon_eye = prev_photon_eye[prev_coords.x * pc.height + prev_coords.y];
+				PhotonReservoir prev_reservoir = in_reservoirs[prev_coords.x * pc.height + prev_coords.y];
 				// Always true as long as pc.total_frame_num > 1
 				if (photon_reservoir_data_valid(prev_reservoir)) {
 					ASSERT(photon_data_valid(prev_photon_eye));

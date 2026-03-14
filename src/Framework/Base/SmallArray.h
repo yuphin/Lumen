@@ -4,6 +4,8 @@
 namespace lm {
 template <typename T, u64 N>
 struct SmallArray {
+	// TODO: Default initialiation to 0 is not a good idea, redundant memsets...
+	// Remove in the future
 	u64 size = 0;
 	T data[N] = {};
 

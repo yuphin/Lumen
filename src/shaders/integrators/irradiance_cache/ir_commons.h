@@ -1,23 +1,27 @@
 #include "../../commons.h"
 
 #define SURFELIZE_PASS_TILE_SIZE_XY 16
+#define ALLOCATE_PASS_WG_SIZE 256
 
 #define SUBGROUP_SIZE 32
+
+// 256K surfels
+#define MAX_SURFEL_COUNT 256 * 1024 
 
 struct PCIRCache {
 	vec3 sky_col;
 	uint frame_num;
 	vec3 min_bounds;
-	uint size_x;
+	uint width;
 	vec3 max_bounds;
-	uint size_y;
+	uint height;
 	int num_lights;
 	float total_light_area;
 	int light_triangle_count;
 	uint dir_light_idx;
 	uint direct_lighting;
 	int rand;
-	float surfel_radius;
+	float desired_surfel_radius_px;
 };
 
 struct IRCacheUniforms {
@@ -45,6 +49,15 @@ struct HashEntry {
 	// TODO: These can be optimized
 	vec3 Li; // incoming radiance from the representative point
 	float partial_jacobian;
+};
+
+struct Surfel {
+	vec3 pos;
+	float radius;
+	vec3 n_s;
+	uint age;
+	vec3 irradiance;
+	uint flags;
 };
 
 NAMESPACE_END()

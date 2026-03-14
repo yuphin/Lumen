@@ -324,6 +324,9 @@ struct Material {
 	// IRCache
 	uint64_t surfel_spawn_list_addr;
 	uint64_t surfel_spawn_count_addr;
+	uint64_t surfel_pool_addr;
+	uint64_t surfel_free_stack_addr;
+	uint64_t surfel_free_stack_count_addr;
 };
 
 

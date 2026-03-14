@@ -51,7 +51,7 @@ void main() {
 		if (any(lessThan(neighbor_coords, ivec2(0))) || any(greaterThanEqual(neighbor_coords, gl_LaunchSizeEXT.xy))) {
 			continue;
 		}
-		const uint neighbor_pixel_idx = neighbor_coords.x * pc.size_y + neighbor_coords.y;
+		const uint neighbor_pixel_idx = neighbor_coords.x * pc.height + neighbor_coords.y;
 		GBuffer neighbor_gbuffer = curr_gbuffers[neighbor_pixel_idx];
 		if (!gbuffer_data_valid(neighbor_gbuffer)) {
 			continue;
@@ -102,7 +102,7 @@ void main() {
 						any(greaterThanEqual(validation_coords, gl_LaunchSizeEXT.xy))) {
 						continue;
 					}
-					const uint validation_pixel_idx = validation_coords.x * pc.size_y + validation_coords.y;
+					const uint validation_pixel_idx = validation_coords.x * pc.height + validation_coords.y;
 					GBuffer validation_gbuffer = curr_gbuffers[validation_pixel_idx];
 					if (!gbuffer_data_valid(validation_gbuffer)) {
 						continue;

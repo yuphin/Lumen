@@ -14,19 +14,25 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Ins
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnCount { uint d; };
 
 Indices indices = Indices(scene_desc.index_addr);
 Materials materials = Materials(scene_desc.material_addr);
 InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
 CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
+SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
+SpawnCount spawn_count = SpawnCount(scene_desc.surfel_spawn_count_addr);
 
 #include "ir_commons.glsl"
 
-
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(binding = 1, rgba32f) uniform image2D image;
+layout(binding = 2) uniform sampler2D scene_textures[];
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
 InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
+
+#include "../../bsdf_commons.glsl"
 
 uint xxhash32(uint p) {
 	const uint PRIME32_2 = 2246822519U, PRIME32_3 = 3266489917U;
@@ -86,11 +92,63 @@ vec3 uint_to_random_color(uint value) { return debug_col(xxhash32(value)); }
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 void main() {
-	ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.size_y, gl_GlobalInvocationID.x % pc.size_y);
-	if (coords.x >= pc.size_x || coords.y >= pc.size_y) {
+	ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.height, gl_GlobalInvocationID.x % pc.height);
+	if (coords.x >= pc.width || coords.y >= pc.height) {
 		return;
 	}
-    GBuffer gbuffer = gbuffers.d[gl_GlobalInvocationID.x];
-	vec3 col = uint_to_random_color(gbuffer.primitive_instance_id.y);
+	GBuffer gbuffer = gbuffers.d[gl_GlobalInvocationID.x];
+
+	if (!gbuffer_valid(gbuffer)) {
+		imageStore(image, coords, vec4(vec3(0), 1.f));
+		return;
+	}
+
+	HitData hit_data =
+		get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
+	Material mat = load_material(hit_data.material_idx, hit_data.uv);
+	// vec3 col = uint_to_random_color(gbuffer.primitive_instance_id.y);
+	vec3 col = mat.albedo;
+	uint max_surfels = spawn_count.d;
+
+	float best_weight = 0.0;
+	uint best_sid = 0xFFFFFFFF;
+	for (uint sid = 0; sid < max_surfels; sid++) {
+		Surfel surfel = surfel_pool.d[sid];
+
+		vec3 diff = hit_data.pos - surfel.pos;
+		float dist = length(diff);
+		if (dist > surfel.radius) {
+			continue;
+		}
+
+		float n_dot = dot(hit_data.n_s, surfel.n_s);
+		if (n_dot < 0.3) {
+			continue;
+		}
+
+		float dist_normal = dot(diff, surfel.n_s);
+		float dist_tangent = sqrt(max(0.0, dist * dist - dist_normal * dist_normal));
+
+		// Penalize normal distance
+		float dist_aniso = sqrt(dist_tangent * dist_tangent + 4.0 * dist_normal * dist_normal);
+
+		if (dist_aniso > surfel.radius) {
+			continue;
+		}
+
+		float weight = (1.0 - dist_aniso / surfel.radius) * n_dot;
+
+		if (weight > best_weight) {
+			best_weight = weight;
+			best_sid = sid;
+		}
+	}
+
+	if (best_sid != 0xFFFFFFFF) {
+		vec3 surfel_color = uint_to_random_color(best_sid);
+		Surfel s = surfel_pool.d[best_sid];
+		col = surfel_color;
+	}
+
 	imageStore(image, coords, vec4(col, 1.f));
 }

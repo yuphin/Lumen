@@ -98,7 +98,7 @@ float mlt_L(const vec4 origin, const float cam_area) {
                 vec3 splat_col = bdpt_connect_cam(s, coords);
                 lum_sum += luminance(splat_col);
                 if (save_radiance && luminance(splat_col) > 0) {
-                    uint idx = coords.x * pc.size_y + coords.y;
+                    uint idx = coords.x * pc.height + coords.y;
                     const uint splat_cnt = mlt_sampler.splat_cnt;
                     mlt_sampler.splat_cnt++;
                     splat(splat_cnt).idx = idx;

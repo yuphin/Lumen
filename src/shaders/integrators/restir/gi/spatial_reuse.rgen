@@ -107,7 +107,7 @@ void main() {
             ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
         const ivec2 coords = clamp(ivec2(gl_LaunchIDEXT.xy) + rand_offset,
                                    ivec2(0), ivec2(gl_LaunchSizeEXT.xy) - 1);
-        const uint coords_idx = coords.x * pc.size_y + coords.y;
+        const uint coords_idx = coords.x * pc.height + coords.y;
 
         q_n = samples.d[coords_idx];
         if (length(q_n.n_s) == 0) {

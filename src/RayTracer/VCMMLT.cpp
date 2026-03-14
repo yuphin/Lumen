@@ -220,8 +220,8 @@ void VCMMLT::render() {
 	LUMEN_TRACE("Rendering sample %d...", sample_cnt++);
 	vk::CommandBuffer cmd(/*start*/ true);
 	const VCMMLTConfig& config = lumen_scene->config.settings.vcmmlt;
-	pc_ray.size_x = Window::width();
-	pc_ray.size_y = Window::height();
+	pc_ray.width = Window::width();
+	pc_ray.height = Window::height();
 	pc_ray.num_lights = i32(lumen_scene->gpu_lights.size);
 	pc_ray.time = rand() % UINT_MAX;
 	pc_ray.max_depth = lumen_scene->config.common.path_length;

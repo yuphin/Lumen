@@ -18,7 +18,7 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightSamples
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMReservoir_ { VCMReservoir d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ShouldResample { uint d; };
 
-uint size = pc.size_x * pc.size_y;
+uint size = pc.width * pc.height;
 
 LightSamples light_samples = LightSamples(scene_desc.light_samples_addr);
 ShouldResample should_resample =

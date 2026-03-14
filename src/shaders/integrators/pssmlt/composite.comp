@@ -21,9 +21,9 @@ ChainStats chain_stats = ChainStats(scene_desc.chain_stats_addr);
 MLTColor mlt_col = MLTColor(scene_desc.mlt_col_addr);
 CDFSum cdf_sum = CDFSum(scene_desc.cdf_sum_addr);
 void main() {
-    ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.size_y,
-                         gl_GlobalInvocationID.x % pc.size_y);
-    if(coords.x >= pc.size_x || coords.y >= pc.size_y) {
+    ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.height,
+                         gl_GlobalInvocationID.x % pc.height);
+    if(coords.x >= pc.width || coords.y >= pc.height) {
         return;
     }
     vec3 col = vec3(0);

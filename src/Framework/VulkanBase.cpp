@@ -158,7 +158,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverity
 		// LUMEN_TRACE("Validation Warning: %s ", pCallbackData->pMessage);
 		return VK_TRUE;
 	}
-	LUMEN_WARN("Validation Error: %s ", pCallbackData->pMessage);
+	LUMEN_ERROR("Validation Error: %s ", pCallbackData->pMessage);
 	return VK_FALSE;
 }
 

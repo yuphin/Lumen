@@ -10,9 +10,9 @@ struct PCSPPM {
 	vec3 sky_col;
 	uint frame_num;
 	vec3 min_bounds;
-	uint size_x;
+	uint width;
 	vec3 max_bounds;
-	uint size_y;
+	uint height;
 	ivec3 grid_res;
 	int num_lights;
 	uint time;

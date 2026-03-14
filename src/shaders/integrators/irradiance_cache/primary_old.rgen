@@ -52,7 +52,7 @@ void main() {
 
 	HashKey key;
 	key.pos =
-		quantize_pos(hit_data.pos, ubo.view_pos.xyz, ubo.fovy, pc.size_y, pc.desired_px_per_cell, pc.min_cell_size, pc.min_bounds);
+		quantize_pos(hit_data.pos, ubo.view_pos.xyz, ubo.fovy, pc.height, pc.desired_px_per_cell, pc.min_cell_size, pc.min_bounds);
 	// key.normal = quantize_normal(hit_data.n_s);
 	key.normal = 0;
 	// key.material = hit_data.material_idx;

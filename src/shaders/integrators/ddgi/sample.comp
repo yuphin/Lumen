@@ -37,14 +37,14 @@ GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
 
 void main() {
 	ivec2 coords = ivec2(gl_GlobalInvocationID.xy);
-	if (coords.x >= pc.size_x || coords.y >= pc.size_y) {
+	if (coords.x >= pc.width || coords.y >= pc.height) {
 		return;
 	}
 	const vec2 pixel_center = vec2(coords) + vec2(0.5);
-	const int linear_idx = int(gl_GlobalInvocationID.x * pc.size_y + gl_GlobalInvocationID.y);
+	const int linear_idx = int(gl_GlobalInvocationID.x * pc.height + gl_GlobalInvocationID.y);
 	vec3 p = gbuffer.d[linear_idx].pos;
 	vec3 n = gbuffer.d[linear_idx].normal;
-	uint idx = pc.size_y * gl_GlobalInvocationID.x + gl_GlobalInvocationID.y;
+	uint idx = pc.height * gl_GlobalInvocationID.x + gl_GlobalInvocationID.y;
 	vec3 col = pc.direct_lighting == 1 ? direct_lighting.d[idx] : vec3(0);
 	if (dot(n, n) == 0) {
 		imageStore(image, coords, vec4(col, 1.f));

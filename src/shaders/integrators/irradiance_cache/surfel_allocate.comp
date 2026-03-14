@@ -1,0 +1,88 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#extension GL_KHR_shader_subgroup_ballot : enable
+
+#include "ir_commons.h"
+layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
+
+Indices indices = Indices(scene_desc.index_addr);
+Materials materials = Materials(scene_desc.material_addr);
+InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
+CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
+
+#include "ir_commons.glsl"
+
+layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelSpawnList { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelSpawnCount { uint d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStack { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStackCount { int d; };
+
+InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
+SurfelSpawnList spawn_list = SurfelSpawnList(scene_desc.surfel_spawn_list_addr);
+SurfelSpawnCount spawn_count = SurfelSpawnCount(scene_desc.surfel_spawn_count_addr);
+SurfelFreeStack free_stack = SurfelFreeStack(scene_desc.surfel_free_stack_addr);
+SurfelFreeStackCount free_stack_count = SurfelFreeStackCount(scene_desc.surfel_free_stack_count_addr);
+SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
+
+void surfel_clear(out Surfel surfel) { surfel.radius = 0; }
+
+bool surfel_valid(Surfel surfel) { return surfel.radius != 0; }
+
+float surfel_radius_factor() { return 2.0 * pc.desired_surfel_radius_px / (ubo.projection[1][1] * pc.height); }
+
+layout(local_size_x = ALLOCATE_PASS_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
+void main() {
+	uint tid = gl_GlobalInvocationID.x;
+	if (tid >= spawn_count.d) {
+		return;
+	}
+
+	uint pixel_idx = spawn_list.d[tid];
+	GBuffer gbuffer = gbuffers.d[pixel_idx];
+
+	ASSERT1(gbuffer_valid(gbuffer), "Surfel Allocate: GBuffer must be valid for %u\n", pixel_idx);
+
+	HitData hit_data =
+		get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
+
+	Surfel surfel;
+
+	surfel.pos = hit_data.pos;
+	surfel.n_s = hit_data.n_s;
+
+	int surfel_stack_top = atomicAdd(free_stack_count.d, -1) - 1;
+
+	// Out of available indices
+	if (surfel_stack_top < 0) {
+		atomicAdd(free_stack_count.d, 1);
+		return;
+	}
+	vec4 view_pos = ubo.view * vec4(surfel.pos, 1.0);
+	const float radius_factor = surfel_radius_factor();
+
+
+	surfel.radius = view_pos.z * radius_factor;
+	surfel.age = 0;
+	surfel.irradiance = vec3(0);
+	surfel.flags = 0;
+	ASSERT0(surfel.radius > 0, "Surfel radius must be >0\n");
+
+
+	uint surfel_idx = free_stack.d[surfel_stack_top];
+	// LOG1("Surfel idx %d\n", surfel_idx);
+	surfel_pool.d[surfel_idx] = surfel;
+}

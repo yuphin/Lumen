@@ -47,7 +47,7 @@ void main() {
         uint prev_coords_idx;
         if (prev_coords.x >= 0 && prev_coords.x < gl_LaunchSizeEXT.x &&
             prev_coords.y >= 0 && prev_coords.y < gl_LaunchSizeEXT.y) {
-            prev_coords_idx = prev_coords.x * pc.size_y + prev_coords.y;
+            prev_coords_idx = prev_coords.x * pc.height + prev_coords.y;
             if (similar(samples.d[prev_coords_idx], old_samples.d[pixel_idx])) {
                 reprojection_failed = false;
             }

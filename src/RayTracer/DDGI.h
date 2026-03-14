@@ -58,7 +58,7 @@ class DDGI final : public Integrator {
 	bool direct_lighting = true;
 	bool visualize_probes = false;
 	u32 frame_idx = 0;
-	uint total_frame_idx = 0;
+	u32 total_frame_idx = 0;
 
 	vk::Buffer* sphere_vertices_buffer;
 	vk::Buffer* sphere_indices_buffer;

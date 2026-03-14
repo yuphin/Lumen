@@ -55,7 +55,7 @@ void main() {
 	float new_jacobian;
 
 	if (!(any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy)))) {
-		const uint prev_idx = prev_coords.x * pc.size_y + prev_coords.y;
+		const uint prev_idx = prev_coords.x * pc.height + prev_coords.y;
 		GBuffer prev_gbuffer = prev_gbuffers[prev_idx];
 		if (gbuffer_data_valid(prev_gbuffer)) {
 			ReconnectionData data;

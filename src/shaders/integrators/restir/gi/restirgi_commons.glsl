@@ -40,7 +40,7 @@ float p_hat(const vec3 f) { return length(f); }
 
 
 uint offset(const uint pingpong) {
-    return pingpong * pc.size_x * pc.size_y;
+    return pingpong * pc.width * pc.height;
 }
 
 

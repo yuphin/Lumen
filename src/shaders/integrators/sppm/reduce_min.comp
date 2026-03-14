@@ -17,7 +17,7 @@ layout(push_constant) uniform _PushConstantRay { PCSPPM pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer AtomicData_ { AtomicData d; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ResidualData { vec4 d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CounterData { int d; };
-uint size = pc.size_x * pc.size_y;
+uint size = pc.width * pc.height;
 ResidualData res_data = ResidualData(scene_desc.residual_addr);
 CounterData cnt = CounterData(scene_desc.counter_addr);
 AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);

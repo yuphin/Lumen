@@ -15,7 +15,7 @@ layout(push_constant) uniform _PushConstantRay { PCVCM pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightSamples { VCMRestirData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMReservoir_ { VCMReservoir d[]; };
 
-uint size = pc.size_x * pc.size_y;
+uint size = pc.width * pc.height;
 
 LightSamples light_samples = LightSamples(scene_desc.light_samples_addr);
 VCMReservoir_ temporal_reservoirs =

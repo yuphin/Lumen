@@ -78,8 +78,8 @@ void ReSTIRGI::init() {
 }
 
 void ReSTIRGI::render() {
-	pc_ray.size_x = Window::width();
-	pc_ray.size_y = Window::height();
+	pc_ray.width = Window::width();
+	pc_ray.height = Window::height();
 	pc_ray.num_lights = (i32)lumen_scene->gpu_lights.size;
 	pc_ray.random_num = rand() % UINT_MAX;
 	pc_ray.max_depth = lumen_scene->config.common.path_length;

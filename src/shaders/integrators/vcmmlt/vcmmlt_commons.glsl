@@ -116,8 +116,8 @@ float mlt_trace_eye() {
     if (save_radiance && connect_lum > 0) {
 #define splat(i) splat_data.d[splat_idx + i]
         ivec2 coords =
-            ivec2(0.5 * (1 + dir_rnd) * vec2(pc.size_x, pc.size_y));
-        const uint idx = coords.x * pc.size_y + coords.y;
+            ivec2(0.5 * (1 + dir_rnd) * vec2(pc.width, pc.height));
+        const uint idx = coords.x * pc.height + coords.y;
         const uint splat_cnt = mlt_sampler.splat_cnt;
         mlt_sampler.splat_cnt++;
         splat(splat_cnt).idx = idx;

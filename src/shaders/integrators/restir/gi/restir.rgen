@@ -139,8 +139,8 @@ void main() {
                 throughput /= rr_prob;
         }
     }
-    ivec2 coords = ivec2(0.5 * (1 + d) * vec2(pc.size_x, pc.size_y));
-    uint coords_idx = coords.x * pc.size_y + coords.y;
+    ivec2 coords = ivec2(0.5 * (1 + d) * vec2(pc.width, pc.height));
+    uint coords_idx = coords.x * pc.height + coords.y;
     // Fill in the samples buffer
     samples.d[pixel_idx].x_v = x_v;
     samples.d[pixel_idx].n_v = n_v;

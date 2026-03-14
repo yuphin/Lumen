@@ -56,8 +56,8 @@ void BDPT::render() {
 	pc_ray.total_light_area = lumen_scene->total_light_area;
 	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
 	pc_ray.frame_num = frame_num;
-	pc_ray.size_x = Window::width();
-	pc_ray.size_y = Window::height();
+	pc_ray.width = Window::width();
+	pc_ray.height = Window::height();
 	vk::render_graph()
 		->add_rt(CSTR("BDPT"),
 				 {

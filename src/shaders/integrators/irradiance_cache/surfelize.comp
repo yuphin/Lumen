@@ -31,6 +31,8 @@ InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
 SpawnList spawn_list = SpawnList(scene_desc.surfel_spawn_list_addr);
 SpawnCount spawn_count = SpawnCount(scene_desc.surfel_spawn_count_addr);
 
+#define TILE_COVERAGE_MAX 1e6
+
 // Process SURFELIZE_PASS_TILE_SIZE_XY * SURFELIZE_PASS_TILE_SIZE_XY tiles
 // 1 threadgroup processes each pixels in a tile (1 thread = 1 pixel)
 // Coverage is selected using warp intrinsics, per workgroup (tile)
@@ -41,12 +43,14 @@ shared uint winner_pixels[NUM_ACTIVE_SUBGROUPS];
 shared float winner_coverages[NUM_ACTIVE_SUBGROUPS];
 
 layout(local_size_x = SURFELIZE_PASS_TILE_SIZE_XY, local_size_y = SURFELIZE_PASS_TILE_SIZE_XY, local_size_z = 1) in;
+
+
 void main() {
 	uvec2 pixel_coords = gl_GlobalInvocationID.xy;
-	uint pixel_idx = (pixel_coords.x * pc.size_y + pixel_coords.y);
+	uint pixel_idx = (pixel_coords.x * pc.height + pixel_coords.y);
 
-	float coverage = 1e6;
-	if (pixel_coords.x < pc.size_x && pixel_coords.y < pc.size_y) {
+	float coverage = TILE_COVERAGE_MAX;
+	if (pixel_coords.x < pc.width && pixel_coords.y < pc.height) {
 		GBuffer gbuffer = gbuffers.d[pixel_idx];
 		if (gbuffer_valid(gbuffer)) {
 			coverage = 0.0;
@@ -72,21 +76,21 @@ void main() {
 	// Reduce between subgroups
 	if (gl_SubgroupID == 0) {
 		float their_coverage =
-			gl_SubgroupInvocationID < NUM_ACTIVE_SUBGROUPS ? winner_coverages[gl_SubgroupInvocationID] : 1e6;
+			gl_SubgroupInvocationID < NUM_ACTIVE_SUBGROUPS ? winner_coverages[gl_SubgroupInvocationID] : TILE_COVERAGE_MAX;
 		float min_tile_coverage = subgroupMin(their_coverage);
 		bool i_am_tile_min = min_tile_coverage == their_coverage;
 		uvec4 ballot = subgroupBallot(i_am_tile_min);
 		uint tile_winner = subgroupBallotFindLSB(ballot);
 
-		if (gl_SubgroupInvocationID == tile_winner && min_tile_coverage != 1e6) {
+		if (gl_SubgroupInvocationID == tile_winner && min_tile_coverage != TILE_COVERAGE_MAX) {
 			// Winner of the tile
 			uint surfel_idx = atomicAdd(spawn_count.d, 1);
 			uint winner_pixel = winner_pixels[gl_SubgroupInvocationID];
-			uvec2 winner_pixel_coords = uvec2(winner_pixel / pc.size_y, winner_pixel % pc.size_y);
-			uint tiles_x = (pc.size_x + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
-			uint tiles_y = (pc.size_y + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
-			uint max_surfels_to_spawn = tiles_x * tiles_y;
+			uvec2 winner_pixel_coords = uvec2(winner_pixel / pc.height, winner_pixel % pc.height);
+			uint tiles_x = (pc.width + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
+			uint tiles_y = (pc.height + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
 			spawn_list.d[surfel_idx] = winner_pixel;
+			uint max_surfels_to_spawn = tiles_x * tiles_y;
 			ASSERT2(surfel_idx < max_surfels_to_spawn, "Surfel spawn idx exceeded (%u) the maximum number on %v2u\n",
 					surfel_idx, winner_pixel_coords);
 		}

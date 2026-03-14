@@ -285,7 +285,7 @@ bool is_rough(in Material mat) {
 	return (mat.bsdf_type & BSDF_TYPE_DIFFUSE) != 0 || mat.roughness > 0.25;
 }
 
-uint offset(const uint pingpong) { return pingpong * pc.size_x * pc.size_y; }
+uint offset(const uint pingpong) { return pingpong * pc.width * pc.height; }
 
 uint pack_path_flags(uint prefix_length, uint postfix_length, uint reconnection_type, bool side) {
 	return uint(side) << 13 | (postfix_length & 0x1F) << 8 | (prefix_length & 0x1F) << 3 |

@@ -4,8 +4,8 @@ struct PCDDGI {
 	mat4 probe_rotation;
 	vec3 sky_col;
 	uint frame_num;
-	uint size_x;
-	uint size_y;
+	uint width;
+	uint height;
 	int num_lights;
 	uint time;
 	int max_depth;

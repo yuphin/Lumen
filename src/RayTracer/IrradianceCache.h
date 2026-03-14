@@ -17,8 +17,13 @@ class IrradianceCache : public Integrator {
 	vk::Buffer* transformations_buffer;
 	vk::Buffer* surfel_spawn_list_buffer;
 	vk::Buffer* surfel_spawn_count_buffer;
+	vk::Buffer* surfel_pool_buffer;
+	vk::Buffer* surfel_free_stack_counter_buffer;
+	vk::Buffer* surfel_free_stack_buffer;
+
 	PCIRCache pc{};
 	PathConfig* config;
 	bool direct_lighting = false;
 	bool debug_mode = true;
+	u32 total_frame_idx = 0;
 };
