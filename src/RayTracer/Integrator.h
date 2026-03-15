@@ -24,9 +24,9 @@ class Integrator {
 
    protected:
 	void update_uniform_buffers();
+	lm::Arena* integrator_arena();
 	SceneUBO scene_ubo{};
 	vk::Buffer* scene_ubo_buffer = nullptr;
 	const vk::BVH& tlas;
 	scene::Scene* lumen_scene = nullptr;
-	lm::Arena* arena = nullptr;
 };

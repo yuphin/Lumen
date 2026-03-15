@@ -14,13 +14,6 @@ static lm::Arena* _arena_scene = nullptr;
 static lm::Arena* _arena_strings = nullptr;
 Scene _scene = {};
 
-static void arena_get_stats(lm::Arena* arena, u64& used, u64& allocated) {
-	for (lm::Arena* curr = arena; curr; curr = curr->next) {
-		used += curr->local_offset;
-		allocated += curr->end_committed;
-	}
-}
-
 static void reflectance_to_conductor_eta_k(const glm::vec3& reflectance, glm::vec3& eta, glm::vec3& k) {
 	eta = glm::vec3(1.0f);
 	k = 2.0f * glm::sqrt(reflectance) / glm::sqrt(glm::max(glm::vec3(1.0f) - reflectance, 0.001f));

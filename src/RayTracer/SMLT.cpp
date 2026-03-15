@@ -431,7 +431,7 @@ void SMLT::render() {
 			}
 			iter += 100;
 			rg->run(cmd.handle);
-			LUMEN_TRACE("{} / {}", iter, mutation_count);
+			LUMEN_TRACE("%d / %d", iter, mutation_count);
 			rg->submit(cmd);
 		}
 		const u32 rem = mutation_count % iter_cnt;
@@ -475,7 +475,7 @@ void SMLT::prefix_scan(i32 level, i32 num_elems, i32& counter, lm::RenderGraph* 
 	auto uniform_add = [&](i32 num_wgs, i32 output_idx) {
 		++counter;
 		rg->add_compute(
-			  "PrefixScan - Uniform Add",
+			  CSTR("PrefixScan - Uniform Add"),
 			  {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/uniform_add.comp")), .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&pc_compute)
 			.bind(lumen_scene->scene_desc_buffer);

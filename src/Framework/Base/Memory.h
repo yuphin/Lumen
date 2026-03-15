@@ -33,7 +33,10 @@ constexpr u64 MIN_ARENA_COMMIT_SIZE = KB(64);
 
 Arena* arena_create(lm::String name, u64 reserve_size = MIN_ARENA_RESERVE_SIZE, u64 commit_size = MIN_ARENA_COMMIT_SIZE,
 					u64 header_alignment = -1);
+void arena_destroy(Arena* arena);
 void arena_ensure_committed(Arena* arena, u64 target_offset);
+void arena_get_stats(lm::Arena* arena, u64& used, u64& allocated);
+void get_all_arena_stats(u64& used, u64& allocated);
 
 // A dynamic array that doesn't move its elements when resizing
 template <typename T, bool GROWABLE = true>

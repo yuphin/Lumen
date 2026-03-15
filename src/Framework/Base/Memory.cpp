@@ -1,9 +1,13 @@
 #include "Memory.h"
 #include "OS.h"
+#include "SmallArray.h"
 
 namespace lm {
 constexpr u64 HEADER_SIZE = sizeof(Arena);
 static constexpr u64 ALIGNED_HEADER_SIZE = util::next_pow2(HEADER_SIZE);
+static constexpr u64 MAX_REGISTERED_ARENAS = 32;
+
+static SmallArray<Arena*, MAX_REGISTERED_ARENAS> _registered_arenas;
 
 static void arena_pop(Arena* arena, u64 target_base) {
 	for (Arena* next_arena = arena->next; next_arena; next_arena = next_arena->next) {
@@ -17,12 +21,26 @@ static void arena_pop(Arena* arena, u64 target_base) {
 void arena_ensure_committed(Arena* arena, u64 target_offset) {
 	arena->local_offset = target_offset;
 	if (target_offset <= arena->end_committed) return;
-	u64 commit_size = glm::max(MIN_ARENA_COMMIT_SIZE, util::align_pow2(target_offset - arena->end_committed, os::get_page_size()));
-	LUMEN_WARN("Commiting %llu bytes ( %f MB) for: %s", commit_size, commit_size / (1024.0 * 1024), arena->name.data);
+	u64 commit_size =
+		glm::max(MIN_ARENA_COMMIT_SIZE, util::align_pow2(target_offset - arena->end_committed, os::get_page_size()));
+	LUMEN_WARN("Committing %llu bytes ( %f MB) for: %s", commit_size, commit_size / (1024.0 * 1024), arena->name.data);
 	bool commited = os::commit(arena->data + arena->end_committed, commit_size);
 	memset(arena->data + arena->end_committed, 0, commit_size);
 	LUMEN_ASSERT(commited, "Could not commit memory for Arena");
 	arena->end_committed += commit_size;
+}
+
+void arena_get_stats(lm::Arena* arena, u64& used, u64& allocated) {
+	for (lm::Arena* curr = arena; curr; curr = curr->next) {
+		used += curr->local_offset;
+		allocated += curr->end_committed;
+	}
+}
+
+void get_all_arena_stats(u64& used, u64& allocated) {
+	for (u64 i = 0; i < _registered_arenas.size; i++) {
+		arena_get_stats(_registered_arenas[i], used, allocated);
+	}
 }
 
 ScratchArena::ScratchArena(Arena* arena_) {
@@ -128,7 +146,22 @@ Arena* arena_create(lm::String name, u64 reserve_size, u64 commit_size, u64 head
 	arena->flags = ARENA_FLAG_NONE;
 	arena->name = name;
 
+	_registered_arenas.push_back(arena);
 	return arena;
+}
+
+void arena_destroy(lm::Arena* arena) {
+	// TODO: Should we decommit?
+	arena->clear();
+	u64 found_idx = -1;
+	for(u64 i = 0; i < _registered_arenas.size; i++) {
+		if(_registered_arenas[i] == arena) {
+			found_idx = i;
+			break;
+		}
+	}
+	assert(found_idx != -1);
+	_registered_arenas.erase_unordered(found_idx);
 }
 
 }  // namespace lm

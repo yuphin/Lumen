@@ -3,12 +3,14 @@
 #include <Framework/Window.h>
 #include "Framework/VkUtils.h"
 
+static lm::Arena* _arena = nullptr;
+
 void Integrator::init() {
 	if (!lumen_scene) {
 		lumen_scene = scene::get();
 	}
-	if (!arena) {
-		arena = lm::arena_create(CSTR("Integrator Arena"), MB(1));
+	if (!_arena) {
+		_arena = lm::arena_create(CSTR("Integrator Arena"), MB(1));
 	}
 	lm::Camera* cam_ptr = &lumen_scene->camera;
 	Window::add_mouse_click_callback([this](MouseAction button, KeyAction action, double x, double y) {
@@ -76,6 +78,10 @@ void Integrator::update_uniform_buffers() {
 	vk::buffer_write(scene_ubo_buffer, &scene_ubo, sizeof(scene_ubo));
 }
 
+lm::Arena* Integrator::integrator_arena() {
+	return _arena;
+}
+
 bool Integrator::update() {
 	f32 trans_speed = 0.01f;
 	glm::vec3 front;
@@ -137,11 +143,11 @@ void Integrator::destroy(bool resize) {
 
 void Integrator::create_accel(vk::BVH& tlas, lm::Array<vk::BVH>& blases) {
 	if (!blases.initialized()) {
-		blases = lm::array_create<vk::BVH>(arena, lumen_scene->prim_meshes.size);
+		blases = lm::array_create<vk::BVH>(integrator_arena(), lumen_scene->prim_meshes.size);
 	}
 	blases.resize_with_value(lumen_scene->prim_meshes.size);
 
-	lm::ScratchArena scratch = arena;
+	lm::ScratchArena scratch = integrator_arena();
 	auto blas_inputs = lm::fixed_array_create<vk::BlasInput>(scratch.arena, lumen_scene->prim_meshes.size);
 	VkDeviceAddress vertex_address = lumen_scene->vertex_buffer->device_address();
 	VkDeviceAddress idx_address = lumen_scene->index_buffer->device_address();

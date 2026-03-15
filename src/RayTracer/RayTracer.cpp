@@ -314,7 +314,12 @@ bool RayTracer::gui() {
 		}
 	}
 
-	ImGui::Text("Memory Usage: %.2f MB", vk::get_memory_usage(vk::context().physical_device) * 1e-6);
+	ImGui::Text("GPU Memory Usage: %.2f MB", vk::get_memory_usage(vk::context().physical_device) / (1024.0f * 1024.0f));
+	u64 arena_total_used_bytes = 0;
+	u64 arena_total_allocated_bytes = 0;
+	lm::get_all_arena_stats(arena_total_used_bytes, arena_total_allocated_bytes);
+	ImGui::Text("CPU Arena Usage: %.2f MB Allocated, %.2f MB Used", arena_total_allocated_bytes / (1024.0f * 1024.0f),
+				arena_total_used_bytes / (1024.0f * 1024.0f));
 	bool updated = false;
 	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
 	if (show_cam_stats) {
@@ -357,8 +362,8 @@ bool RayTracer::gui() {
 	}
 
 	SceneConfig& config = scene::get()->config;
-	const char* settings[] = {"Path",	"BDPT",	  "SPPM",	   "VCM",  "PSSMLT",   "SMLT",
-							  "VCMMLT", "ReSTIR", "ReSTIR GI", "DDGI", "ReSTIR PT", "Irradiance Cache"};
+	const char* settings[] = {"Path",	"BDPT",	  "SPPM",	   "VCM",  "PSSMLT",	"SMLT",
+							  "VCMMLT", "ReSTIR", "ReSTIR GI", "DDGI", "ReSTIR PT", "IR Cache"};
 
 	static i32 curr_integrator_idx = i32(config.type);
 	if (ImGui::BeginCombo("Select Integrator", settings[curr_integrator_idx])) {

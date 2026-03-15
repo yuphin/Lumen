@@ -8,7 +8,7 @@
 
 ////////////////////////////
 // --- Limits for fixed size arrays inside Render Graph ---
-static constexpr u64 MAX_PASSES_PER_FRAME = 4096;
+static constexpr u64 MAX_PASSES_PER_FRAME = 1024;
 ////////////////////////////
 // --- Limits for shader and pipeline compilation inside render graph ---
 static constexpr u64 MAX_PIPELINE_TASKS = 128;
@@ -1050,7 +1050,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 void RenderGraph::init() {
 	if (!_arena_rendergraph) {
-		_arena_rendergraph = lm::arena_create(CSTR("Render Graph Arena (Persistent)"), GB(1), MB(64));
+		_arena_rendergraph = lm::arena_create(CSTR("Render Graph Arena (Persistent)"), GB(1), MB(32));
 		_arena_per_frame = lm::arena_create(CSTR("Render Graph Arena (Per frame)"), MB(16), MB(1));
 	}
 	// Arrays

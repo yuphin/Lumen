@@ -55,7 +55,7 @@ void IrradianceCache::init() {
 						 .data = &free_stack_init_value});
 
 	{
-		lm::ScratchArena scratch = arena;
+		lm::ScratchArena scratch = integrator_arena();
 		lm::FixedArray<u32> free_stack = lm::fixed_array_create<u32>(scratch.arena, MAX_SURFEL_COUNT);
 
 		for (u64 i = 0; i < MAX_SURFEL_COUNT; i++) {

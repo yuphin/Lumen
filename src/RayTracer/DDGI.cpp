@@ -422,14 +422,14 @@ void DDGI::create_radiance_textures() {
 
 void DDGI::create_accel(vk::BVH& tlas, lm::Array<vk::BVH>& blases) {
 	if (!blases.initialized()) {
-		blases = lm::array_create<vk::BVH>(arena, lumen_scene->prim_meshes.size);
+		blases = lm::array_create<vk::BVH>(integrator_arena(), lumen_scene->prim_meshes.size);
 	}
 
 	// + 1 for the sphere
 	u64 blas_inputs_size = lumen_scene->prim_meshes.size + 1;
 	blases.resize_with_value(blas_inputs_size);
 
-	lm::ScratchArena scratch = arena;
+	lm::ScratchArena scratch = integrator_arena();
 	auto blas_inputs = lm::fixed_array_create<vk::BlasInput>(scratch.arena, blas_inputs_size);
 
 	VkDeviceAddress vertex_address = lumen_scene->vertex_buffer->device_address();
