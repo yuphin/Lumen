@@ -38,11 +38,7 @@ SurfelFreeStack free_stack = SurfelFreeStack(scene_desc.surfel_free_stack_addr);
 SurfelFreeStackCount free_stack_count = SurfelFreeStackCount(scene_desc.surfel_free_stack_count_addr);
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 
-void surfel_clear(out Surfel surfel) { surfel.radius = 0; }
-
-bool surfel_valid(Surfel surfel) { return surfel.radius != 0; }
-
-float surfel_radius_factor() { return 2.0 * pc.desired_surfel_radius_px / (ubo.projection[1][1] * pc.height); }
+#include "surfel_commons.glsl"
 
 layout(local_size_x = ALLOCATE_PASS_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
 void main() {

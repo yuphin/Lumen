@@ -1,12 +1,24 @@
+#ifndef IR_COMMONS_H
+#define IR_COMMONS_H
 #include "../../commons.h"
 
 #define SURFELIZE_PASS_TILE_SIZE_XY 16
+
 #define ALLOCATE_PASS_WG_SIZE 256
 
 #define SUBGROUP_SIZE 32
 
 // 256K surfels
 #define MAX_SURFEL_COUNT 256 * 1024 
+
+// Center cell count isn't quite arbitrary
+// It should be below abs(1.0 / (2.0 * surfel_radius_factor))
+// Reason: We want to fit a surfel inside a grid with 2 x radius
+// Otherwise the surfel cell exceed the grid cell size
+// Which breaks some assumptions
+#define GRID_CENTER_CELL_COUNT_AXIS 64
+#define GRID_TRAPEZOIDAL_CELL_COUNT_AXIS 64
+#define GRID_AVG_SURFELS_PER_CELL 10
 
 struct PCIRCache {
 	vec3 sky_col;
@@ -22,6 +34,9 @@ struct PCIRCache {
 	uint direct_lighting;
 	int rand;
 	float desired_surfel_radius_px;
+	uint grid_total_cells;
+	float grid_uniform_cell_distance_threshold;
+	float scene_extent;
 };
 
 struct IRCacheUniforms {
@@ -61,3 +76,4 @@ struct Surfel {
 };
 
 NAMESPACE_END()
+#endif

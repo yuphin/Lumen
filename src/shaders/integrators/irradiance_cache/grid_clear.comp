@@ -1,0 +1,27 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#extension GL_KHR_shader_subgroup_ballot : enable
+
+#include "ir_commons.h"
+layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
+
+layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
+
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
+GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
+
+layout(local_size_x = ALLOCATE_PASS_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
+void main() {
+	uint tid = gl_GlobalInvocationID.x;
+	if (tid >= pc.grid_total_cells) {
+		return;
+	}
+
+	grid_cell_counts.d[tid] = 0;
+}

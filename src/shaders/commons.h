@@ -327,6 +327,11 @@ struct Material {
 	uint64_t surfel_pool_addr;
 	uint64_t surfel_free_stack_addr;
 	uint64_t surfel_free_stack_count_addr;
+
+	uint64_t grid_cell_counts_addr;
+	uint64_t grid_cell_offsets_addr;
+	uint64_t grid_cell_stacks_addr;
+	uint64_t grid_cell_indices_addr;
 };
 
 

@@ -1,0 +1,98 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#extension GL_KHR_shader_subgroup_ballot : enable
+
+#include "ir_commons.h"
+layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
+
+layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
+
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStackCount { int d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
+
+GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
+SurfelFreeStackCount free_stack_count = SurfelFreeStackCount(scene_desc.surfel_free_stack_count_addr);
+SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
+
+#include "surfel_commons.glsl"
+
+float base_cell_size = 2 * pc.grid_uniform_cell_distance_threshold / GRID_CENTER_CELL_COUNT_AXIS;
+float cell_growth_ratio = 1 + 2.0 / GRID_CENTER_CELL_COUNT_AXIS;
+float inv_log_cell_growth_ratio = 1.0 / log(cell_growth_ratio);
+
+#include "grid.glsl"
+
+uint linearize_grid(uvec4 grid_pos) {
+	if (grid_pos.x == GRID_TYPE_CELL) {
+		uint N = GRID_CENTER_CELL_COUNT_AXIS;
+		return grid_pos.y + grid_pos.z * N + grid_pos.w * N * N;
+	} else {
+		uint N = GRID_TRAPEZOIDAL_CELL_COUNT_AXIS;
+		uint Nc = GRID_CENTER_CELL_COUNT_AXIS;
+		return Nc * Nc * Nc + (grid_pos.x - 1) * (N * N * N) + grid_pos.y + grid_pos.z * N + grid_pos.w * N * N;
+	}
+}
+layout(local_size_x = ALLOCATE_PASS_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
+void main() {
+	uint tid = gl_GlobalInvocationID.x;
+	if (tid >= MAX_SURFEL_COUNT) {
+		return;
+	}
+	// TODO: Check surfel status?
+	Surfel surfel = surfel_pool.d[tid];
+
+	if (surfel.radius == 0.0f) {
+		return;
+	}
+
+	vec4 pos_ws = ubo.inv_view * vec4(0, 0, 0, 1);
+	// Offset around camera
+	vec3 c = surfel.pos - pos_ws.xyz;
+	float r = surfel.radius;
+
+	vec3 corners[8] = vec3[8](c + vec3(-r, -r, -r), c + vec3(-r, -r, +r), c + vec3(-r, +r, -r), c + vec3(-r, +r, +r),
+							  c + vec3(+r, -r, -r), c + vec3(+r, -r, +r), c + vec3(+r, +r, -r), c + vec3(+r, +r, +r));
+
+	uvec4 results[8];
+	for (int i = 0; i < 8; i++) {
+		results[i] = map_grid_axis(corners[i]);
+	}
+
+	uint linear_cells[8];
+	uint unique_cnt = 0;
+
+	for (uint i = 0; i < 8; i++) {
+		uint linear_idx = linearize_grid(results[i]);
+
+		bool is_duplicate = false;
+		for (uint j = 0; j < unique_cnt; j++) {
+			if (linear_idx == linear_cells[j]) {
+				is_duplicate = true;
+				break;
+			}
+		}
+		if (!is_duplicate) {
+			linear_cells[unique_cnt] = linear_idx;
+			unique_cnt++;
+		}
+	}
+
+	if(tid == 500) {
+		for(uint i = 0; i < 8; i++) {
+			debugPrintfEXT("%d - %v4u - %d\n", i, results[i], unique_cnt);
+		}
+	}
+
+	// This is fine as long as a surfel is smallar than the grid cell size
+	for(uint i = 0; i < unique_cnt; i++) {
+		atomicAdd(grid_cell_counts.d[linear_cells[i]], 1);
+	}
+}

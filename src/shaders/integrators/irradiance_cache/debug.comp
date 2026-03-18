@@ -28,57 +28,15 @@ SpawnCount spawn_count = SpawnCount(scene_desc.surfel_spawn_count_addr);
 
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(binding = 1, rgba32f) uniform image2D image;
-layout(binding = 2) uniform sampler2D scene_textures[];
+layout(binding = 2) uniform SceneUBOBuffer { SceneUBO ubo; };
+layout(binding = 3) uniform sampler2D scene_textures[];
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
 InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
 
 #include "../../bsdf_commons.glsl"
 
-uint xxhash32(uint p) {
-	const uint PRIME32_2 = 2246822519U, PRIME32_3 = 3266489917U;
-	const uint PRIME32_4 = 668265263U, PRIME32_5 = 374761393U;
-	uint h32 = p + PRIME32_5;
-	h32 = PRIME32_4 * ((h32 << 17) | (h32 >> (32 - 17)));
-	h32 = PRIME32_2 * (h32 ^ (h32 >> 15));
-	h32 = PRIME32_3 * (h32 ^ (h32 >> 13));
-	return h32 ^ (h32 >> 16);
-}
-
-uint xxhash32(uvec2 p) {
-	const uint PRIME32_2 = 2246822519U, PRIME32_3 = 3266489917U;
-	const uint PRIME32_4 = 668265263U, PRIME32_5 = 374761393U;
-	uint h32 = p.y + PRIME32_5 + p.x * PRIME32_3;
-	h32 = PRIME32_4 * ((h32 << 17) | (h32 >> (32 - 17)));
-	h32 = PRIME32_2 * (h32 ^ (h32 >> 15));
-	h32 = PRIME32_3 * (h32 ^ (h32 >> 13));
-	return h32 ^ (h32 >> 16);
-}
-
-uint xxhash32(uvec3 p) {
-	const uint PRIME32_2 = 2246822519U, PRIME32_3 = 3266489917U;
-	const uint PRIME32_4 = 668265263U, PRIME32_5 = 374761393U;
-	uint h32 = p.z + PRIME32_5 + p.x * PRIME32_3;
-	h32 = PRIME32_4 * ((h32 << 17) | (h32 >> (32 - 17)));
-	h32 += p.y * PRIME32_3;
-	h32 = PRIME32_4 * ((h32 << 17) | (h32 >> (32 - 17)));
-	h32 = PRIME32_2 * (h32 ^ (h32 >> 15));
-	h32 = PRIME32_3 * (h32 ^ (h32 >> 13));
-	return h32 ^ (h32 >> 16);
-}
-
-uint xxhash32(uvec4 p) {
-	const uint PRIME32_2 = 2246822519U, PRIME32_3 = 3266489917U;
-	const uint PRIME32_4 = 668265263U, PRIME32_5 = 374761393U;
-	uint h32 = p.w + PRIME32_5 + p.x * PRIME32_3;
-	h32 = PRIME32_4 * ((h32 << 17) | (h32 >> (32 - 17)));
-	h32 += p.y * PRIME32_3;
-	h32 = PRIME32_4 * ((h32 << 17) | (h32 >> (32 - 17)));
-	h32 += p.z * PRIME32_3;
-	h32 = PRIME32_4 * ((h32 << 17) | (h32 >> (32 - 17)));
-	h32 = PRIME32_2 * (h32 ^ (h32 >> 15));
-	h32 = PRIME32_3 * (h32 ^ (h32 >> 13));
-	return h32 ^ (h32 >> 16);
-}
+#include "hash.glsl"
+#include "grid.glsl"
 
 vec3 debug_col(uint num) {
 	const float INV_11 = 1.0 / 2047.0;
@@ -108,7 +66,7 @@ void main() {
 	Material mat = load_material(hit_data.material_idx, hit_data.uv);
 	// vec3 col = uint_to_random_color(gbuffer.primitive_instance_id.y);
 	vec3 col = mat.albedo;
-	uint max_surfels = spawn_count.d;
+	uint max_surfels = min(MAX_SURFEL_COUNT, spawn_count.d);
 
 	float best_weight = 0.0;
 	uint best_sid = 0xFFFFFFFF;
@@ -144,10 +102,19 @@ void main() {
 		}
 	}
 
+	vec3 pixel_world_pos = hit_data.pos;
+	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
+	vec3 offset = pixel_world_pos - cam_pos.xyz;
+
+	uvec4 res = map_grid_axis(offset);
+	col = uvec3_to_random_color(res.yzw) * 0.5;
+	vec3 grid_base_color = uint_to_random_color(xxhash32(res.x));
+	col *= grid_base_color;
+
 	if (best_sid != 0xFFFFFFFF) {
 		vec3 surfel_color = uint_to_random_color(best_sid);
 		Surfel s = surfel_pool.d[best_sid];
-		col = surfel_color;
+		col += surfel_color;
 	}
 
 	imageStore(image, coords, vec4(col, 1.f));
