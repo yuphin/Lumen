@@ -3,35 +3,35 @@
 
 void ReSTIR::init() {
 	Integrator::init();
-	g_buffer = prm::get_buffer({.name = "G-Buffer",
+	g_buffer = prm::get_buffer({.name = CSTR("G-Buffer"),
 								.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 										 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								.memory_type = vk::BUFFER_TYPE_GPU,
 								.size = Window::width() * Window::height()  * sizeof(RestirGBufferData)});
 
 	temporal_reservoir_buffer =
-		prm::get_buffer({.name = "Temporal Reservoirs",
+		prm::get_buffer({.name = CSTR("Temporal Reservoirs"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height()  * sizeof(RestirReservoir)});
 
 	passthrough_reservoir_buffer =
-		prm::get_buffer({.name = "Passthrough Buffer",
+		prm::get_buffer({.name = CSTR("Passthrough Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height()  * sizeof(RestirReservoir)});
 
 	spatial_reservoir_buffer =
-		prm::get_buffer({.name = "Spatial Reservoirs",
+		prm::get_buffer({.name = CSTR("Spatial Reservoirs"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height()  * sizeof(RestirReservoir)});
 
 	tmp_col_buffer =
-		prm::get_buffer({.name = "Temporary Color",
+		prm::get_buffer({.name = CSTR("Temporary Color"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height()  * sizeof(f32) * 3});
@@ -49,7 +49,7 @@ void ReSTIR::init() {
 	desc.passthrough_reservoir_addr = passthrough_reservoir_buffer->device_address();
 	desc.color_storage_addr = tmp_col_buffer->device_address();
 	lumen_scene->scene_desc_buffer =
-		prm::get_buffer({.name = "Scene Desc",
+		prm::get_buffer({.name = CSTR("Scene Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),

@@ -4,7 +4,7 @@
 void ReSTIRGI::init() {
 	Integrator::init();
 	restir_samples_buffer = prm::get_buffer({
-		.name = "ReSTIR Samples",
+		.name = CSTR("ReSTIR Samples"),
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		.memory_type = vk::BUFFER_TYPE_GPU,
@@ -12,7 +12,7 @@ void ReSTIRGI::init() {
 	});
 
 	restir_samples_old_buffer = prm::get_buffer({
-		.name = "Old ReSTIR Samples",
+		.name = CSTR("Old ReSTIR Samples"),
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		.memory_type = vk::BUFFER_TYPE_GPU,
@@ -20,7 +20,7 @@ void ReSTIRGI::init() {
 	});
 
 	temporal_reservoir_buffer = prm::get_buffer({
-		.name = "Temporal Reservoirs",
+		.name = CSTR("Temporal Reservoirs"),
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		.memory_type = vk::BUFFER_TYPE_GPU,
@@ -28,7 +28,7 @@ void ReSTIRGI::init() {
 	});
 
 	spatial_reservoir_buffer = prm::get_buffer({
-		.name = "Spatial Reservoirs",
+		.name = CSTR("Spatial Reservoirs"),
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		.memory_type = vk::BUFFER_TYPE_GPU,
@@ -36,7 +36,7 @@ void ReSTIRGI::init() {
 	});
 
 	tmp_col_buffer = prm::get_buffer({
-		.name = "Temp Color",
+		.name = CSTR("Temp Color"),
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		.memory_type = vk::BUFFER_TYPE_GPU,
 		.size = Window::width() * Window::height()  * sizeof(f32) * 3,
@@ -55,7 +55,7 @@ void ReSTIRGI::init() {
 	desc.spatial_reservoir_addr = spatial_reservoir_buffer->device_address();
 	desc.color_storage_addr = tmp_col_buffer->device_address();
 	lumen_scene->scene_desc_buffer =
-		prm::get_buffer({.name = "Scene Desc",
+		prm::get_buffer({.name = CSTR("Scene Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),

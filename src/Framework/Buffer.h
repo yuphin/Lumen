@@ -1,5 +1,7 @@
 #pragma once
 #include "VulkanContext.h"
+#include "Base/String.h"
+
 namespace vk {
 
 enum BufferType : uint32_t {
@@ -17,7 +19,7 @@ struct BufferStatus {
 };
 
 struct BufferDesc {
-	std::string_view name = "";
+	lm::String name;
 	VkBufferUsageFlags usage;
 	BufferType memory_type;
 	VkDeviceSize size;
@@ -32,7 +34,7 @@ struct BufferDesc {
 };
 
 struct Buffer {
-	std::string_view name;
+	lm::String name;
 	VkBuffer handle{};
 	VkDeviceSize size = 0;
 	VkBufferUsageFlags usage_flags = 0;

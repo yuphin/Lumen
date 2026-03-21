@@ -98,6 +98,8 @@ class RenderGraph {
 	void submit(vk::CommandBuffer& cmd);
 	void run_and_submit(vk::CommandBuffer& cmd);
 	void destroy();
+	lm::Arena* arena();
+
 	friend RenderPass;
 
 	vk::ShaderMacroArray global_macro_defines;
@@ -253,5 +255,7 @@ void render_pass_init_rt(RenderPass& pass, vk::PassType type, const lm::String& 
 void render_pass_init_compute(RenderPass&, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
 							  const vk::ComputePassSettings& compute_settings, const lm::String& macro_string,
 							  PipelineStorage* pipeline_storage, bool cached = false);
+
+lm::Arena* render_graph_arena();
 
 }  // namespace lm

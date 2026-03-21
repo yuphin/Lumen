@@ -878,7 +878,7 @@ void load(const lm::String& path) {
 	////////////////////////////
 	// --- GPU memory allocation ---
 
-	_scene.mesh_lights_buffer = prm::get_buffer({.name = "Mesh Lights Buffer",
+	_scene.mesh_lights_buffer = prm::get_buffer({.name = CSTR("Mesh Lights Buffer"),
 												 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 												 .memory_type = vk::BUFFER_TYPE_GPU,
 												 .size = glm::max(_scene.gpu_lights.size, (u64)1) * sizeof(Light),
@@ -886,7 +886,7 @@ void load(const lm::String& path) {
 	_scene.total_light_area += total_light_triangle_area;
 
 	_scene.index_buffer =
-		prm::get_buffer({.name = "Index Buffer",
+		prm::get_buffer({.name = CSTR("Index Buffer"),
 						 .usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 								  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
@@ -895,7 +895,7 @@ void load(const lm::String& path) {
 						 .data = _scene.indices.data});
 
 	_scene.materials_buffer =
-		prm::get_buffer({.name = "Materials Buffer",
+		prm::get_buffer({.name = CSTR("Materials Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = _scene.materials.size * sizeof(Material),
@@ -920,14 +920,14 @@ void load(const lm::String& path) {
 			v.uv0 = _scene.texcoords0[i];
 		}
 		_scene.prim_lookup_buffer =
-			prm::get_buffer({.name = "Prim Lookup Buffer",
+			prm::get_buffer({.name = CSTR("Prim Lookup Buffer"),
 							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 .memory_type = vk::BUFFER_TYPE_GPU,
 							 .size = prim_lookup.size * sizeof(PrimInfo),
 							 .data = prim_lookup.data});
 
 		_scene.vertex_buffer =
-			prm::get_buffer({.name = "Compact Vertices Buffer",
+			prm::get_buffer({.name = CSTR("Compact Vertices Buffer"),
 							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 									  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 							 .memory_type = vk::BUFFER_TYPE_GPU,

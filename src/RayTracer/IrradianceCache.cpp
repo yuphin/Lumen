@@ -21,7 +21,7 @@ static f32 get_px_size_per_trapezoidal_cell(f32 p11, f32 height) {
 void IrradianceCache::init() {
 	Integrator::init();
 
-	gbuffer = prm::get_buffer({.name = "IRCache GBuffer",
+	gbuffer = prm::get_buffer({.name = CSTR("IRCache GBuffer"),
 							   .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 										VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 							   .memory_type = vk::BUFFER_TYPE_GPU,
@@ -35,7 +35,7 @@ void IrradianceCache::init() {
 			transformations.push_back(pm.world_matrix);
 		}
 		transformations_buffer = prm::get_buffer({
-			.name = "Transformations Buffer",
+			.name = CSTR("Transformations Buffer"),
 			.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 			.memory_type = vk::BUFFER_TYPE_GPU,
 			.size = transformations.size * sizeof(glm::mat4),
@@ -48,20 +48,20 @@ void IrradianceCache::init() {
 	u32 tiles_y = (Window::height() + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
 	const u32 max_surfels_to_spawn = tiles_x * tiles_y;
 	surfel_spawn_list_buffer =
-		prm::get_buffer({.name = "Surfel Spawn List Buffer",
+		prm::get_buffer({.name = CSTR("Surfel Spawn List Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = max_surfels_to_spawn * sizeof(u32)});
 
 	surfel_spawn_count_buffer =
-		prm::get_buffer({.name = "Surfel Spawn Count Buffer",
+		prm::get_buffer({.name = CSTR("Surfel Spawn Count Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(u32)});
 
 	surfel_pool_buffer =
-		prm::get_buffer({.name = "Surfel Pool",
+		prm::get_buffer({.name = CSTR("Surfel Pool"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
@@ -69,7 +69,7 @@ void IrradianceCache::init() {
 
 	i32 free_stack_init_value = MAX_SURFEL_COUNT;
 	surfel_free_stack_counter_buffer =
-		prm::get_buffer({.name = "Surfel Free Stack Counter",
+		prm::get_buffer({.name = CSTR("Surfel Free Stack Counter"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(i32),
@@ -84,7 +84,7 @@ void IrradianceCache::init() {
 		}
 
 		surfel_free_stack_buffer =
-			prm::get_buffer({.name = "Grid Cell Counts",
+			prm::get_buffer({.name = CSTR("Grid Cell Counts"),
 							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 .memory_type = vk::BUFFER_TYPE_GPU,
 							 .size = MAX_SURFEL_COUNT * sizeof(u32),
@@ -93,24 +93,24 @@ void IrradianceCache::init() {
 
 	u32 grid_total_cells = get_total_grid_cells();
 	grid_cell_counts_buffer =
-		prm::get_buffer({.name = "Grid Cell Counts",
+		prm::get_buffer({.name = CSTR("Grid Cell Counts"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
 						 .size = grid_total_cells * sizeof(u32)});
 
 	grid_cell_offsets_buffer =
-		prm::get_buffer({.name = "Grid Cell Offsets",
+		prm::get_buffer({.name = CSTR("Grid Cell Offsets"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = (grid_total_cells + 1) * sizeof(i32)});
 
 	grid_cell_stacks_buffer =
-		prm::get_buffer({.name = "Grid Cell Stacks",
+		prm::get_buffer({.name = CSTR("Grid Cell Stacks"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = grid_total_cells * sizeof(i32)});
 	grid_cell_indices_buffer =
-		prm::get_buffer({.name = "Grid Indices Buffer",
+		prm::get_buffer({.name = CSTR("Grid Indices Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = GRID_AVG_SURFELS_PER_CELL * MAX_SURFEL_COUNT * sizeof(i32)});
@@ -118,34 +118,31 @@ void IrradianceCache::init() {
 	u64 num_layers = 0;
 	u64 cur_total_cells = grid_total_cells;
 	do {
-		u64 num_blocks =  glm::max(1uLL, (cur_total_cells + SCAN_WG_SIZE - 1) / SCAN_WG_SIZE);
+		u64 num_blocks = glm::max(1uLL, (cur_total_cells + SCAN_WG_SIZE - 1) / SCAN_WG_SIZE);
 		num_layers += num_blocks > 1;
 		cur_total_cells = num_blocks;
 
-	} while(cur_total_cells > 1);
+	} while (cur_total_cells > 1);
 
 	block_sums = lm::fixed_array_create<vk::Buffer*>(integrator_arena(), num_layers);
-	
+
 	cur_total_cells = grid_total_cells;
 	u64 buffer_idx = 0;
 	do {
-		u64 num_blocks =  glm::max(1uLL, (cur_total_cells + SCAN_WG_SIZE - 1) / SCAN_WG_SIZE);
-		if(num_blocks > 1) {
-
-			vk::Buffer*& buffer = block_sums.push();
-
-			buffer = prm::get_buffer(
-				{.name = "Block Sum Buffer #" + std::to_string(buffer_idx),
+		u64 num_blocks = glm::max(1uLL, (cur_total_cells + SCAN_WG_SIZE - 1) / SCAN_WG_SIZE);
+		if (num_blocks > 1) {
+			lm::String buffer_name = lm::str_concat(integrator_arena(), "Block Sum Buffer #",
+													lm::str_from_u64(integrator_arena(), buffer_idx), /*cstr=*/true);
+			block_sums.push_back(prm::get_buffer(
+				{.name = buffer_name,
 				 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 				 .memory_type = vk::BUFFER_TYPE_GPU,
-				 .size = VkDeviceSize(num_blocks * sizeof(u32))});
+				 .size = VkDeviceSize(num_blocks * sizeof(u32))}));
 			buffer_idx++;
 		}
 		cur_total_cells = num_blocks;
 
-	} while(cur_total_cells > 1);
-
-
+	} while (cur_total_cells > 1);
 
 	SceneDesc desc;
 	desc.index_addr = lumen_scene->index_buffer->device_address();
@@ -165,7 +162,7 @@ void IrradianceCache::init() {
 	desc.grid_cell_indices_addr = grid_cell_indices_buffer->device_address();
 
 	lumen_scene->scene_desc_buffer =
-		prm::get_buffer({.name = "Scene Desc",
+		prm::get_buffer({.name = CSTR("Scene Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),

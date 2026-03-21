@@ -13,117 +13,117 @@ void VCMMLT::init() {
 
 	// MLTVCM buffers
 	bootstrap_buffer =
-		prm::get_buffer({.name = "Bootstrap Buffer",
+		prm::get_buffer({.name = CSTR("Bootstrap Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config.num_bootstrap_samples * sizeof(BootstrapSample)});
 
 	cdf_buffer =
-		prm::get_buffer({.name = "CDF Buffer",
+		prm::get_buffer({.name = CSTR("CDF Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = VkDeviceSize(config.num_bootstrap_samples * 4)});
 
 	cdf_sum_buffer =
-		prm::get_buffer({.name = "CDF Sum Buffer",
+		prm::get_buffer({.name = CSTR("CDF Sum Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(f32)});
 
 	seeds_buffer =
-		prm::get_buffer({.name = "Seeds Buffer",
+		prm::get_buffer({.name = CSTR("Seeds Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config.num_mlt_threads * sizeof(VCMMLTSeedData)});
 
 	light_primary_samples_buffer =
-		prm::get_buffer({.name = "Light Primary Samples Buffer",
+		prm::get_buffer({.name = CSTR("Light Primary Samples Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config.num_mlt_threads * light_path_rand_count * sizeof(PrimarySample) * 2});
 
 	mlt_samplers_buffer =
-		prm::get_buffer({.name = "MLT Samplers Buffer",
+		prm::get_buffer({.name = CSTR("MLT Samplers Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config.num_mlt_threads * sizeof(VCMMLTSampler) * 2});
 
 	mlt_col_buffer =
-		prm::get_buffer({.name = "MLT Col Buffer",
+		prm::get_buffer({.name = CSTR("MLT Col Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * 3 * sizeof(f32)});
 
 	chain_stats_buffer =
-		prm::get_buffer({.name = "Chain Stats Buffer",
+		prm::get_buffer({.name = CSTR("Chain Stats Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = 2 * sizeof(ChainData)});
 
 	splat_buffer =
-		prm::get_buffer({.name = "Splat Buffer",
+		prm::get_buffer({.name = CSTR("Splat Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config.num_mlt_threads * (path_length * (path_length + 1)) * sizeof(Splat) * 2});
 
 	past_splat_buffer =
-		prm::get_buffer({.name = "Past Splat Buffer",
+		prm::get_buffer({.name = CSTR("Past Splat Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config.num_mlt_threads * (path_length * (path_length + 1)) * sizeof(Splat) * 2});
 
 	light_path_buffer =
-		prm::get_buffer({.name = "Light Path Buffer",
+		prm::get_buffer({.name = CSTR("Light Path Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * (path_length + 1) * sizeof(VCMVertex)});
 
 	light_path_cnt_buffer =
-		prm::get_buffer({.name = "Light Path Cnt Buffer",
+		prm::get_buffer({.name = CSTR("Light Path Cnt Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(f32)});
 
 	tmp_col_buffer =
-		prm::get_buffer({.name = "Tmp Col Buffer",
+		prm::get_buffer({.name = CSTR("Tmp Col Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(f32) * 3});
 
 	photon_buffer =
-		prm::get_buffer({.name = "Photon Buffer",
+		prm::get_buffer({.name = CSTR("Photon Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = 10 * Window::width() * Window::height() * sizeof(VCMPhotonHash)});
 
 	mlt_atomicsum_buffer =
-		prm::get_buffer({.name = "MLT Atomic Sum Buffer",
+		prm::get_buffer({.name = CSTR("MLT Atomic Sum Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config.num_mlt_threads * sizeof(SumData) * 2});
 
 	mlt_residual_buffer =
-		prm::get_buffer({.name = "MLT Residual Buffer",
+		prm::get_buffer({.name = CSTR("MLT Residual Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config.num_mlt_threads * sizeof(SumData)});
 
 	counter_buffer =
-		prm::get_buffer({.name = "Counter Buffer",
+		prm::get_buffer({.name = CSTR("Counter Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
@@ -144,8 +144,10 @@ void VCMMLT::init() {
 	do {
 		i32 num_blocks = glm::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
+			lm::String buffer_name = lm::str_concat(integrator_arena(), "Block Sum Buffer #",
+													lm::str_from_u64(integrator_arena(), i), /*cstr=*/true);
 			block_sums[i++] = prm::get_buffer(
-				{.name = "Block Sum Buffer #" + std::to_string(i),
+				{.name = buffer_name,
 				 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 				 .memory_type = vk::BUFFER_TYPE_GPU,
 				 .size = VkDeviceSize(num_blocks * 4)});
@@ -203,7 +205,7 @@ void VCMMLT::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, counter_buffer, vk::render_graph());
 
 	lumen_scene->scene_desc_buffer =
-		prm::get_buffer({.name = "Scene Desc",
+		prm::get_buffer({.name = CSTR("Scene Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),

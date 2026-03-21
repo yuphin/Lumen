@@ -75,6 +75,7 @@ static VkImageAspectFlags aspect_flags(VkFormat format) {
 	return aspect_flags;
 }
 void texture_create(Texture* texture, const TextureDesc& desc) {
+	LUMEN_ASSERT(desc.name.empty() || desc.name.is_cstr(), "Texture name must be a CSTR (null terminate)");
 	texture->name = desc.name;
 	texture->extent = desc.dimensions;
 	texture->format = desc.format;
@@ -103,7 +104,7 @@ void texture_create(Texture* texture, const TextureDesc& desc) {
 	}
 
 	if (!texture->name.empty()) {
-		vk::set_resource_name(vk::context().device, (u64)texture->handle, texture->name.data(), VK_OBJECT_TYPE_IMAGE);
+		vk::set_resource_name(vk::context().device, (u64)texture->handle, texture->name.data, VK_OBJECT_TYPE_IMAGE);
 	}
 
 	if (desc.sampler) {
@@ -138,7 +139,7 @@ void texture_create(Texture* texture, const TextureDesc& desc) {
 	subresource_range.levelCount = texture->mip_levels;
 	if (desc.data.data) {
 		assert(desc.data.size);
-		Buffer* staging_buffer = drm::get({.name = "Scratch Buffer",
+		Buffer* staging_buffer = drm::get({.name = CSTR("Scratch Buffer"),
 										   .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 										   .memory_type = BUFFER_TYPE_STAGING,
 										   .size = desc.data.size,

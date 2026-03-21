@@ -5,14 +5,14 @@ void VCM::init() {
 	Integrator::init();
 
 	photon_buffer =
-		prm::get_buffer({.name = "Photon Buffer",
+		prm::get_buffer({.name = CSTR("Photon Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = 10 * Window::width() * Window::height() * sizeof(VCMPhotonHash)});
 
 	vcm_light_vertices_buffer =
-		prm::get_buffer({.name = "VCM Light Vertices",
+		prm::get_buffer({.name = CSTR("VCM Light Vertices"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
@@ -20,53 +20,53 @@ void VCM::init() {
 								 sizeof(VCMVertex)});
 
 	light_path_cnt_buffer =
-		prm::get_buffer({.name = "Light Path Count",
+		prm::get_buffer({.name = CSTR("Light Path Count"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(f32)});
 
 	color_storage_buffer =
-		prm::get_buffer({.name = "Color Storage",
+		prm::get_buffer({.name = CSTR("Color Storage"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * 3 * sizeof(f32)});
 
 	vcm_reservoir_buffer =
-		prm::get_buffer({.name = "VCM Reservoirs",
+		prm::get_buffer({.name = CSTR("VCM Reservoirs"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(VCMReservoir)});
 
 	light_samples_buffer =
-		prm::get_buffer({.name = "Light Samples",
+		prm::get_buffer({.name = CSTR("Light Samples"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(VCMRestirData)});
 
 	should_resample_buffer =
-		prm::get_buffer({.name = "Should Resample",
+		prm::get_buffer({.name = CSTR("Should Resample"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = 4});
 
 	light_state_buffer =
-		prm::get_buffer({.name = "Light States",
+		prm::get_buffer({.name = CSTR("Light States"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(LightState)});
 
 	angle_struct_buffer =
-		prm::get_buffer({.name = "Angle Struct",
+		prm::get_buffer({.name = CSTR("Angle Struct"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = max_samples * sizeof(AngleStruct)});
 
-	avg_buffer = prm::get_buffer({.name = "Average",
+	avg_buffer = prm::get_buffer({.name = CSTR("Average"),
 								  .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 										   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 								  .memory_type = vk::BUFFER_TYPE_GPU,
@@ -92,7 +92,7 @@ void VCM::init() {
 	desc.avg_addr = avg_buffer->device_address();
 
 	lumen_scene->scene_desc_buffer =
-		prm::get_buffer({.name = "Scene Desc",
+		prm::get_buffer({.name = CSTR("Scene Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),

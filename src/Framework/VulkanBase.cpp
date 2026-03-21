@@ -299,14 +299,13 @@ static void pick_physical_device() {
 	}
 	VkPhysicalDeviceProperties2 prop2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
 
-
 	VkPhysicalDeviceSubgroupProperties subgroup_props{};
 	subgroup_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
 	subgroup_props.pNext = &context().rt_props;
 
 	prop2.pNext = &subgroup_props;
 	vkGetPhysicalDeviceProperties2(context().physical_device, &prop2);
-	if(subgroup_props.subgroupSize != 32) {
+	if (subgroup_props.subgroupSize != 32) {
 		LUMEN_WARN("Subgroup size is not 32. This may affect behavior");
 	}
 }
@@ -523,8 +522,10 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 	images.resize(image_cnt);
 	vkGetSwapchainImagesKHR(context().device, context().swapchain, &image_cnt, images.data);
 	for (u32 i = 0; i < image_cnt; i++) {
+		lm::String tex_name =
+			lm::str_concat(_rg.arena(), "Swapchain Image #", lm::str_from_u64(_rg.arena(), i), /*cstr=*/true);
 		_swapchain_images.push_back(prm::get_texture({
-			.name = "Swapchain Image #" + std::to_string(i),
+			.name = tex_name,
 			.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 			.dimensions = {extent.width, extent.height, 1},
 			.format = surface_format.format,

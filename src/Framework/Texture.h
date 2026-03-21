@@ -1,4 +1,5 @@
 #pragma once
+#include "Base/String.h"
 
 namespace vk {
 struct TextureData {
@@ -6,7 +7,7 @@ struct TextureData {
 	VkDeviceSize size = 0;
 };
 struct TextureDesc {
-	std::string_view name = "";
+	lm::String name;
 	VkImageUsageFlags usage;
 	VkExtent3D dimensions;
 	VkFormat format;
@@ -28,7 +29,7 @@ struct TextureDesc {
 	VkImage image = nullptr;
 };
 struct Texture {
-	std::string_view name;
+	lm::String name;
 	VkImage handle;
 	VkExtent3D extent;
 	VkImageView view;

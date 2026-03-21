@@ -4,35 +4,35 @@ void SPPM::init() {
 	Integrator::init();
 
 	sppm_data_buffer =
-		prm::get_buffer({.name = "SPPM Data",
+		prm::get_buffer({.name = CSTR("SPPM Data"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(SPPMData)});
 
 	atomic_data_buffer =
-		prm::get_buffer({.name = "Atomic Data",
+		prm::get_buffer({.name = CSTR("Atomic Data"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(AtomicData)});
 
 	photon_buffer =
-		prm::get_buffer({.name = "Photon Buffer",
+		prm::get_buffer({.name = CSTR("Photon Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = 10 * Window::width() * Window::height() * sizeof(PhotonHash)});
 
 	residual_buffer =
-		prm::get_buffer({.name = "Residual Buffer",
+		prm::get_buffer({.name = CSTR("Residual Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * 4 * sizeof(f32)});
 
 	counter_buffer =
-		prm::get_buffer({.name = "Counter Buffer",
+		prm::get_buffer({.name = CSTR("Counter Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
@@ -51,7 +51,7 @@ void SPPM::init() {
 	desc.residual_addr = residual_buffer->device_address();
 	desc.counter_addr = counter_buffer->device_address();
 	lumen_scene->scene_desc_buffer =
-		prm::get_buffer({.name = "Scene Desc",
+		prm::get_buffer({.name = CSTR("Scene Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),

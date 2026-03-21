@@ -16,7 +16,7 @@ void PostFX::init_fft() {
 	i32 width, height;
 	f32* data = ImageUtils::load_exr(img_name_kernel, width, height);
 	vk::Texture* kernel_org =
-		drm::get({.name = "Kernel",
+		drm::get({.name = CSTR("Kernel"),
 				  .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 				  .dimensions = {(u32)width, (u32)height, 1},
 				  .format = VK_FORMAT_R32G32B32A32_SFLOAT,
@@ -30,7 +30,7 @@ void PostFX::init_fft() {
 	u32 padded_width = 1 << u32(ceil(log2(double(Window::width() + kernel_org->extent.width))));
 	u32 padded_height = 1 << u32(ceil(log2(double(Window::height() + kernel_org->extent.height))));
 
-	auto empty_tex_desc = vk::TextureDesc{.name = "FFT - Ping",
+	auto empty_tex_desc = vk::TextureDesc{.name = CSTR("FFT - Ping"),
 										  .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
 										  .dimensions = {padded_width, padded_height, 1},
 										  .format = VK_FORMAT_R32G32B32A32_SFLOAT,

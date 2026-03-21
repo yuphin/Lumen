@@ -94,7 +94,7 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 	for (u32 i = 0; i < 4; i++) {
 		if (!stage[i].empty()) {
 			// Can be called from multiple threads
-			group_data[i].buffer = prm::get_buffer({.name = "SBT " + std::to_string(i),
+			group_data[i].buffer = prm::get_buffer({.name = CSTR("SBT Buffer"),
 													.usage = usage_flags,
 													.memory_type = vk::BUFFER_TYPE_GPU,
 													.size = stage[i].size,

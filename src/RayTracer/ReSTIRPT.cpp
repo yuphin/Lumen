@@ -20,102 +20,102 @@ void ReSTIRPT::init() {
 	}
 
 	gris_gbuffer =
-		prm::get_buffer({.name = "GRIS GBuffer",
+		prm::get_buffer({.name = CSTR("GRIS GBuffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(GBuffer)});
 
 	gris_prev_gbuffer =
-		prm::get_buffer({.name = "GRIS Previous GBuffer",
+		prm::get_buffer({.name = CSTR("GRIS Previous GBuffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(GBuffer)});
 
-	direct_lighting_texture = prm::get_texture({.name = "Direct Lighting Texture",
+	direct_lighting_texture = prm::get_texture({.name = CSTR("Direct Lighting Texture"),
 												.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 												.dimensions = {Window::width(), Window::height(), 1},
 												.format = VK_FORMAT_R32G32B32A32_SFLOAT});
 
-	caustics_texture = prm::get_texture({.name = "Caustics Texture",
+	caustics_texture = prm::get_texture({.name = CSTR("Caustics Texture"),
 										 .usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 										 .dimensions = {Window::width(), Window::height(), 1},
 										 .format = VK_FORMAT_R32G32B32A32_SFLOAT});
 	gris_reservoir_ping_buffer =
-		prm::get_buffer({.name = "GRIS Reservoirs Ping",
+		prm::get_buffer({.name = CSTR("GRIS Reservoirs Ping"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(Reservoir)});
 
 	gris_reservoir_pong_buffer =
-		prm::get_buffer({.name = "GRIS Reservoirs Pong",
+		prm::get_buffer({.name = CSTR("GRIS Reservoirs Pong"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(Reservoir)});
 
 	prefix_contribution_buffer =
-		prm::get_buffer({.name = "Prefix Contributions",
+		prm::get_buffer({.name = CSTR("Prefix Contributions"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(glm::vec3)});
 
 	debug_vis_buffer =
-		prm::get_buffer({.name = "Debug Vis",
+		prm::get_buffer({.name = CSTR("Debug Vis"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(u32)});
 	reconnection_buffer = prm::get_buffer(
-		{.name = "Reservoir Connection",
+		{.name = CSTR("Reservoir Connection"),
 		 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		 .memory_type = vk::BUFFER_TYPE_GPU,
 		 .size = Window::width() * Window::height() * sizeof(ReconnectionData) * (num_spatial_samples + 1)});
 
 	transformations_buffer = prm::get_buffer({
-		.name = "Transformations Buffer",
+		.name = CSTR("Transformations Buffer"),
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		.memory_type = vk::BUFFER_TYPE_GPU,
 		.size = transformations.size() * sizeof(glm::mat4),
 		.data = transformations.data(),
 	});
 	photon_eye_buffer_ping =
-		prm::get_buffer({.name = "Photon - Eye - Ping",
+		prm::get_buffer({.name = CSTR("Photon - Eye - Ping"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(PhotonData)});
 
 	photon_eye_buffer_pong =
-		prm::get_buffer({.name = "Photon - Eye - Pong",
+		prm::get_buffer({.name = CSTR("Photon - Eye - Pong"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(PhotonData)});
 
 	caustic_photon_aabbs_buffer =
-		prm::get_buffer({.name = "Caustic Photon AABBs",
+		prm::get_buffer({.name = CSTR("Caustic Photon AABBs"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 								  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(f32) * 6});
 	caustic_photon_light_buffer =
-		prm::get_buffer({.name = "Caustic Photon - Light",
+		prm::get_buffer({.name = CSTR("Caustic Photon - Light"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(PhotonData)});
 	photon_count_buffer =
-		prm::get_buffer({.name = "Photon Counts",
+		prm::get_buffer({.name = CSTR("Photon Counts"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = 4});
 
 	caustics_reservoir_ping_buffer =
-		prm::get_buffer({.name = "Caustics Reservoirs Ping",
+		prm::get_buffer({.name = CSTR("Caustics Reservoirs Ping"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(PhotonReservoir)});
 
 	caustics_reservoir_pong_buffer =
-		prm::get_buffer({.name = "Caustics Reservoirs Pong",
+		prm::get_buffer({.name = CSTR("Caustics Reservoirs Pong"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(PhotonReservoir)});
@@ -137,14 +137,14 @@ void ReSTIRPT::init() {
 	desc.photon_count_addr = photon_count_buffer->device_address();
 
 	lumen_scene->scene_desc_buffer =
-		prm::get_buffer({.name = "Scene Desc",
+		prm::get_buffer({.name = CSTR("Scene Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
 
 	canonical_contributions_texture = prm::get_texture({
-		.name = "Canonical Contributions Texture",
+		.name = CSTR("Canonical Contributions Texture"),
 		.usage = VK_IMAGE_USAGE_STORAGE_BIT,
 		.dimensions = {Window::width(), Window::height(), 1},
 		.format = VK_FORMAT_R16G16B16A16_SFLOAT,
@@ -162,7 +162,7 @@ void ReSTIRPT::init() {
 	tlas_instance.accelerationStructureReference = 0;
 
 	photon_bvh_instances_buf =
-		prm::get_buffer({.name = "Photon BVH Instance",
+		prm::get_buffer({.name = CSTR("Photon BVH Instance"),
 						 .usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 						 .memory_type = vk::BUFFER_TYPE_CPU_TO_GPU,
@@ -610,7 +610,7 @@ bool ReSTIRPT::gui() {
 		vkDeviceWaitIdle(vk::context().device);
 		prm::remove(reconnection_buffer);
 		reconnection_buffer = prm::get_buffer(
-			{.name = "Reservoir Connection",
+			{.name = CSTR("Reservoir Connection"),
 			 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 					  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			 .memory_type = vk::BUFFER_TYPE_GPU,

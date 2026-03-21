@@ -21,7 +21,7 @@ struct BuildAccelerationStructure {
 
 inline static bool has_flag(VkFlags item, VkFlags flag) { return (item & flag) == flag; }
 
-static BVH create_acceleration(VkAccelerationStructureCreateInfoKHR& accel, const char* name) {
+static BVH create_acceleration(VkAccelerationStructureCreateInfoKHR& accel, lm::String name) {
 	BVH result_accel;
 	// TODO: Potential synchronization issue here if multiple threads contend
 	result_accel.buffer = prm::get_buffer(
@@ -61,7 +61,7 @@ static void cmd_create_blas(VkCommandBuffer cmd_buf, util::Slice<u32> indices,
 		as_ci.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 		as_ci.size = build_as[idx].size_info.accelerationStructureSize;	 // Will be used to allocate memory.
 		if (!build_as[idx].as->accel) {
-			*build_as[idx].as = create_acceleration(as_ci, "BLAS buffer");
+			*build_as[idx].as = create_acceleration(as_ci, CSTR("BLAS buffer"));
 		}
 		// BuildInfo #2 part
 		build_as[idx].build_info.dstAccelerationStructure = build_as[idx].as->accel;  // Setting where the build lands
@@ -109,7 +109,7 @@ static void cmd_compact_blas(VkCommandBuffer cmd_buf, util::Slice<u32> indices,
 		VkAccelerationStructureCreateInfoKHR asCreateInfo{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
 		asCreateInfo.size = build_as[idx].size_info.accelerationStructureSize;
 		asCreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-		*build_as[idx].as = create_acceleration(asCreateInfo, "BLAS compact buffer");
+		*build_as[idx].as = create_acceleration(asCreateInfo, CSTR("BLAS compact buffer"));
 
 		LUMEN_ASSERT(build_as[idx].as->accel != build_as[idx].cleanup_as.accel,
 					 "BLAS compacted AS is the same as the original AS");
@@ -156,7 +156,7 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, u32 primitive_co
 		VkAccelerationStructureCreateInfoKHR create_info{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
 		create_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
 		create_info.size = size_info.accelerationStructureSize;
-		tlas = create_acceleration(create_info, "TLAS buffer");
+		tlas = create_acceleration(create_info, CSTR("TLAS buffer"));
 	}
 
 	if (!(export_scratch_buffer && *scratch_buffer_ref && (*scratch_buffer_ref)->size >= size_info.buildScratchSize)) {
@@ -169,7 +169,7 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, u32 primitive_co
 			drm::destroy(*scratch_buffer_ref);
 		}
 		*scratch_buffer_ref =
-			drm::get({.name = "TLAS Scratch Buffer",
+			drm::get({.name = CSTR("TLAS Scratch Buffer"),
 					  .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 					  .memory_type = vk::BUFFER_TYPE_STAGING,
 					  .size = size_info.buildScratchSize,
@@ -261,7 +261,7 @@ static void build_blas_impl(lm::ScratchArena& scratch, lm::FixedArray<BuildAccel
 		}
 		scratch_buffer_created = true;
 		scratch_buffer =
-			drm::get({.name = "BLAS Scratch Buffer",
+			drm::get({.name = CSTR("BLAS Scratch Buffer"),
 					  .usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 					  .memory_type = vk::BUFFER_TYPE_GPU,
 					  .size = max_scratch_size,
@@ -353,7 +353,7 @@ void blas_build(lm::ScratchArena& scratch, util::Slice<BVH> blases, util::Slice<
 // 'allow_update'
 void tlas_build(BVH& tlas, util::Slice<VkAccelerationStructureInstanceKHR> instances,
 				VkBuildAccelerationStructureFlagsKHR flags, bool update) {
-	vk::Buffer* instances_buf = drm::get({.name = "TLAS Instances Buffer",
+	vk::Buffer* instances_buf = drm::get({.name = CSTR("TLAS Instances Buffer"),
 										  .usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 												   VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 										  .memory_type = vk::BUFFER_TYPE_GPU,

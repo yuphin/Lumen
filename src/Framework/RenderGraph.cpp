@@ -1330,6 +1330,11 @@ void RenderGraph::destroy() {
 	}
 }
 
+lm::Arena* RenderGraph::arena() {
+	assert(_arena_rendergraph);
+	return _arena_rendergraph;
+}
+
 void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
 						  const vk::GraphicsPassSettings& gfx_settings, const lm::String& macro_string,
 						  PipelineStorage* pipeline_storage, bool cached) {

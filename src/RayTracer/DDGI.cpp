@@ -86,7 +86,7 @@ void DDGI::init() {
 		// Debug visualization data
 		generate_uv_sphere(sphere_indices, sphere_vertices, 16, 16, 0.05f);
 		sphere_vertices_buffer = prm::get_buffer({
-			.name = "Sphere Vertex Buffer",
+			.name = CSTR("Sphere Vertex Buffer"),
 			.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 					 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 			.memory_type = vk::BUFFER_TYPE_GPU,
@@ -95,7 +95,7 @@ void DDGI::init() {
 		});
 
 		sphere_indices_buffer = prm::get_buffer({
-			.name = "Sphere Index Buffer",
+			.name = CSTR("Sphere Index Buffer"),
 			.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 					 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
 			.memory_type = vk::BUFFER_TYPE_GPU,
@@ -108,15 +108,17 @@ void DDGI::init() {
 		sphere_desc.vertex_addr = sphere_vertices_buffer->device_address();
 
 		sphere_desc_buffer =
-			prm::get_buffer({.name = "Sphere Desc",
+			prm::get_buffer({.name = CSTR("Sphere Desc"),
 							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 .memory_type = vk::BUFFER_TYPE_GPU,
 							 .size = sizeof(SphereDesc),
 							 .data = &sphere_desc});
 
 		for (i32 i = 0; i < 2; i++) {
+			lm::String tex_name = lm::str_concat(integrator_arena(), "DDGI Irradiance ",
+												 lm::str_from_u64(integrator_arena(), i), /*cstr=*/true);
 			irr_texes[i] = prm::get_texture({
-				.name = "DDGI Irradiance " + std::to_string(i),
+				.name = tex_name,
 				.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 				.dimensions = {irradiance_width, irradiance_height, 1},
 				.format = VK_FORMAT_R16G16B16A16_SFLOAT,
@@ -124,8 +126,11 @@ void DDGI::init() {
 				.sampler = bilinear_sampler,
 			});
 
+			tex_name = lm::str_concat(integrator_arena(), "DDGI Depth ", lm::str_from_u64(integrator_arena(), i),
+									  /*cstr=*/true);
+
 			depth_texes[i] = prm::get_texture({
-				.name = "DDGI Depth " + std::to_string(i),
+				.name = tex_name,
 				.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 				.dimensions = {depth_width, depth_height, 1},
 				.format = VK_FORMAT_R16G16_SFLOAT,
@@ -137,7 +142,7 @@ void DDGI::init() {
 		create_radiance_textures();
 		// DDGI Output
 		output.tex = prm::get_texture({
-			.name = "DDGI Output",
+			.name = CSTR("DDGI Output"),
 			.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 			.dimensions = {Window::width(), Window::height(), 1},
 			.format = VK_FORMAT_R16G16B16A16_SFLOAT,
@@ -146,7 +151,7 @@ void DDGI::init() {
 		});
 	}
 	g_buffer = prm::get_buffer({
-		.name = "GBuffer",
+		.name = CSTR("GBuffer"),
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		.memory_type = vk::BUFFER_TYPE_GPU,
@@ -154,21 +159,21 @@ void DDGI::init() {
 	});
 
 	direct_lighting_buffer = prm::get_buffer({
-		.name = "Direct Lighting",
+		.name = CSTR("Direct Lighting"),
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		.memory_type = vk::BUFFER_TYPE_GPU,
 		.size = Window::width() * Window::height() * sizeof(glm::vec3),
 	});
 
 	ddgi_ubo_buffer = prm::get_buffer({
-		.name = "DDGI UBO",
+		.name = CSTR("DDGI UBO"),
 		.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		.memory_type = vk::BUFFER_TYPE_CPU_TO_GPU,
 		.size = sizeof(DDGIUniforms),
 	});
 
 	probe_offsets_buffer = prm::get_buffer({
-		.name = "Probe Offsets",
+		.name = CSTR("Probe Offsets"),
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		.memory_type = vk::BUFFER_TYPE_GPU,
@@ -193,7 +198,7 @@ void DDGI::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, g_buffer, vk::render_graph());
 
 	lumen_scene->scene_desc_buffer =
-		prm::get_buffer({.name = "Scene Desc",
+		prm::get_buffer({.name = CSTR("Scene Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
@@ -403,7 +408,7 @@ void DDGI::update_ddgi_uniforms() {
 void DDGI::create_radiance_textures() {
 	u32 num_probes = probe_counts.x * probe_counts.y * probe_counts.z;
 	rt.radiance_tex = prm::get_texture({
-		.name = "DDGI Radiance",
+		.name = CSTR("DDGI Radiance"),
 		.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		.dimensions = {rays_per_probe, num_probes, 1},
 		.format = VK_FORMAT_R16G16B16A16_SFLOAT,
@@ -411,7 +416,7 @@ void DDGI::create_radiance_textures() {
 		.sampler = nearest_sampler,
 	});
 	rt.dir_depth_tex = prm::get_texture({
-		.name = "DDGI Radiance & Tex",
+		.name = CSTR("DDGI Radiance & Tex"),
 		.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		.dimensions = {rays_per_probe, num_probes, 1},
 		.format = VK_FORMAT_R16G16B16A16_SFLOAT,

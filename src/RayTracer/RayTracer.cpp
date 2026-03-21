@@ -76,46 +76,46 @@ void RayTracer::init(bool use_debug, i32 argc, char* argv[]) {
 void RayTracer::init_resources() {
 	u32 viewport_size = Window::width() * Window::height();
 	output_img_buffer =
-		prm::get_buffer({.name = "Output Image Buffer",
+		prm::get_buffer({.name = CSTR("Output Image Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = viewport_size * 4 * 4});
 
 	output_img_buffer_cpu =
-		prm::get_buffer({.name = "Output Image CPU",
+		prm::get_buffer({.name = CSTR("Output Image CPU"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
 						 .size = viewport_size * 4 * 4});
 
 	residual_buffer =
-		prm::get_buffer({.name = "RMSE Residual",
+		prm::get_buffer({.name = CSTR("RMSE Residual"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = viewport_size * 4});
 
 	counter_buffer =
-		prm::get_buffer({.name = "RMSE Counter",
+		prm::get_buffer({.name = CSTR("RMSE Counter"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(i32)});
 
 	rmse_val_buffer =
-		prm::get_buffer({.name = "RMSE Value",
+		prm::get_buffer({.name = CSTR("RMSE Value"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
 						 .size = sizeof(f32)});
-	auto texture_desc = vk::TextureDesc{.name = "Reference Texture",
+	auto texture_desc = vk::TextureDesc{.name = CSTR("Reference Texture"),
 										.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
 												 VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 										.dimensions = {Window::width(), Window::height(), 1},
 										.format = VK_FORMAT_R32G32B32A32_SFLOAT,
 										.initial_layout = VK_IMAGE_LAYOUT_GENERAL};
 	reference_tex = prm::get_texture(texture_desc);
-	texture_desc.name = "Target Texture";
+	texture_desc.name = CSTR("Target Texture");
 	target_tex = prm::get_texture(texture_desc);
 
 	RTUtilsDesc rt_utils_desc;
@@ -127,7 +127,7 @@ void RayTracer::init_resources() {
 			LUMEN_ERROR("Could not load the reference image");
 		}
 		gt_img_buffer =
-			prm::get_buffer({.name = "Ground Truth Image",
+			prm::get_buffer({.name = CSTR("Ground Truth Image"),
 							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 .memory_type = vk::BUFFER_TYPE_GPU,
 							 .size = Window::width() * Window::height() * 4 * sizeof(f32),
@@ -142,7 +142,7 @@ void RayTracer::init_resources() {
 	rt_utils_desc.rmse_val_addr = rmse_val_buffer->device_address();
 
 	rt_utils_desc_buffer =
-		prm::get_buffer({.name = "RT Utils Desc",
+		prm::get_buffer({.name = CSTR("RT Utils Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(RTUtilsDesc),

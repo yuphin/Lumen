@@ -3,21 +3,21 @@
 void BDPT::init() {
 	Integrator::init();
 	light_path_buffer =
-		prm::get_buffer({.name = "Light Path Buffer",
+		prm::get_buffer({.name = CSTR("Light Path Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * (lumen_scene->config.common.path_length + 1) *
 								 sizeof(PathVertex)});
 	camera_path_buffer =
-		prm::get_buffer({.name = "Camera Path Buffer",
+		prm::get_buffer({.name = CSTR("Camera Path Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * (lumen_scene->config.common.path_length + 1) *
 								 sizeof(PathVertex)});
 	color_storage_buffer =
-		prm::get_buffer({.name = "Color Storage Buffer",
+		prm::get_buffer({.name = CSTR("Color Storage Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * 3 * 4});
@@ -33,7 +33,7 @@ void BDPT::init() {
 	desc.color_storage_addr = color_storage_buffer->device_address();
 
 	lumen_scene->scene_desc_buffer =
-		prm::get_buffer({.name = "Scene Desc",
+		prm::get_buffer({.name = CSTR("Scene Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),

@@ -8,6 +8,7 @@
 namespace vk {
 void buffer_create(Buffer* buffer, const BufferDesc& desc) {
 	LUMEN_ASSERT(desc.size > 0, "Buffer size can't be 0");
+	LUMEN_ASSERT(desc.name.empty() || desc.name.is_cstr(), "Buffer name must be a CSTR (null terminate)");
 	buffer->name = desc.name;
 	buffer->size = desc.size;
 	buffer->usage_flags = desc.usage;
@@ -41,13 +42,13 @@ void buffer_create(Buffer* buffer, const BufferDesc& desc) {
 	vk::check(vmaCreateBuffer(vk::context().allocator, &buffer_ci, &alloc_ci, &buffer->handle, &buffer->allocation,
 							  &alloc_info));
 	if (!buffer->name.empty()) {
-		vk::set_resource_name(vk::context().device, (u64)buffer->handle, buffer->name.data(),
+		vk::set_resource_name(vk::context().device, (u64)buffer->handle, buffer->name.data,
 										   VK_OBJECT_TYPE_BUFFER);
 	}
 	VkMemoryPropertyFlags mem_prop_flags;
 	vmaGetAllocationMemoryProperties(vk::context().allocator, buffer->allocation, &mem_prop_flags);
 	if (desc.data && (mem_prop_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) == 0) {
-		Buffer* staging_buffer = drm::get({.name = "Scratch Buffer",
+		Buffer* staging_buffer = drm::get({.name = CSTR("Scratch Buffer"),
 										   .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 										   .memory_type = BUFFER_TYPE_STAGING,
 										   .size = buffer->size,

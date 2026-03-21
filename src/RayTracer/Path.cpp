@@ -9,7 +9,7 @@ void Path::init() {
 	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
 	desc.compact_vertices_addr = lumen_scene->vertex_buffer->device_address();
 	lumen_scene->scene_desc_buffer =
-		prm::get_buffer({.name = "Scene Desc",
+		prm::get_buffer({.name = CSTR("Scene Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
