@@ -8,6 +8,8 @@
 
 #define SUBGROUP_SIZE 32
 
+#define SCAN_WG_SIZE 1024
+
 // 256K surfels
 #define MAX_SURFEL_COUNT 256 * 1024 
 
@@ -37,6 +39,10 @@ struct PCIRCache {
 	uint grid_total_cells;
 	float grid_uniform_cell_distance_threshold;
 	float scene_extent;
+};
+
+struct PCPrefixSum {
+	uint num_elems;
 };
 
 struct IRCacheUniforms {

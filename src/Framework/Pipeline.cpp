@@ -81,7 +81,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::S
 
 	lm::SmallArray<VkPipelineColorBlendAttachmentState, MAX_COLOR_ATTACHMENTS> blend_attachment_states;
 	if (settings.blend_enables.empty()) {
-		for (size_t i = 0; i < color_outputs.size; ++i) {
+		for (u64 i = 0; i < color_outputs.size; ++i) {
 			blend_attachment_states.push_back(
 				vk::pipeline_color_blend_attachment_state(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
 															  VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,

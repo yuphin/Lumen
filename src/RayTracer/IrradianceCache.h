@@ -26,6 +26,8 @@ class IrradianceCache : public Integrator {
 	vk::Buffer* grid_cell_stacks_buffer;
 	vk::Buffer* grid_cell_indices_buffer;
 
+	lm::FixedArray<vk::Buffer*> block_sums;
+
 	PCIRCache pc{};
 	PathConfig* config;
 	bool direct_lighting = false;

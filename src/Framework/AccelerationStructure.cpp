@@ -55,7 +55,7 @@ static void cmd_create_blas(VkCommandBuffer cmd_buf, util::Slice<u32> indices,
 		vkResetQueryPool(vk::context().device, query_pool, 0, static_cast<u32>(indices.size));
 	}
 	u32 query_cnt{0};
-	for (const auto& idx : indices) {
+	for (u32 idx : indices) {
 		// Actual allocation of buffer and acceleration structure.
 		VkAccelerationStructureCreateInfoKHR as_ci{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
 		as_ci.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
@@ -102,7 +102,7 @@ static void cmd_compact_blas(VkCommandBuffer cmd_buf, util::Slice<u32> indices,
 						  compact_sizes.size * sizeof(VkDeviceSize), compact_sizes.data, sizeof(VkDeviceSize),
 						  VK_QUERY_RESULT_WAIT_BIT);
 
-	for (auto idx : indices) {
+	for (u32 idx : indices) {
 		build_as[idx].cleanup_as = *build_as[idx].as;									 // previous AS to destroy
 		build_as[idx].size_info.accelerationStructureSize = compact_sizes[query_cnt++];	 // new reduced size
 		// Creating a compact version of the AS
@@ -224,9 +224,10 @@ static void build_blas_impl(lm::ScratchArena& scratch, lm::FixedArray<BuildAccel
 		build_as[idx].range_info = input[idx].as_build_offset_info.data();
 
 		// Finding sizes to create acceleration structures and scratch
-		auto max_prim_counts = lm::fixed_array_create<u32>(temp_scratch.arena, input[idx].as_build_offset_info.size());
+		lm::FixedArray<u32> max_prim_counts =
+			lm::fixed_array_create<u32>(temp_scratch.arena, input[idx].as_build_offset_info.size());
 
-		for (auto tt = 0; tt < input[idx].as_build_offset_info.size(); tt++) {
+		for (u64 tt = 0; tt < input[idx].as_build_offset_info.size(); tt++) {
 			max_prim_counts.push_back(
 				input[idx].as_build_offset_info[tt].primitiveCount);  // Number of primitives/triangles
 		}
@@ -392,8 +393,8 @@ void tlas_build(BVH& tlas, vk::Buffer* instances_buf, u32 instance_count, VkBuil
 					instances_buf->device_address(), flags, update);
 }
 
-BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx, VkDeviceAddress vertex_address, u64 vertex_stride,
-						 VkDeviceAddress index_address) {
+BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx, VkDeviceAddress vertex_address,
+						 u64 vertex_stride, VkDeviceAddress index_address) {
 	u32 maxPrimitiveCount = idx_count / 3;
 
 	// Describe buffer as array of VertexObj.

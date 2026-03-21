@@ -859,7 +859,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				vkCmdSetScissor(cmd, 0, 1, &scissor);
 
 				if (gfx_settings->vertex_buffers.size()) {
-					constexpr size_t MAX_VERTEX_BUFFERS = 4;
+					constexpr u64 MAX_VERTEX_BUFFERS = 4;
 					lm::SmallArray<VkDeviceSize, MAX_VERTEX_BUFFERS> offsets;
 					lm::SmallArray<VkBuffer, MAX_VERTEX_BUFFERS> vert_buffers;
 					assert(gfx_settings->vertex_buffers.size() < MAX_VERTEX_BUFFERS);
@@ -872,7 +872,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				if (gfx_settings->index_buffer) {
 					vkCmdBindIndexBuffer(cmd, gfx_settings->index_buffer->handle, 0, gfx_settings->index_type);
 				}
-				constexpr size_t MAX_RENDERING_ATTACHMENTS = 4;
+				constexpr u64 MAX_RENDERING_ATTACHMENTS = 4;
 				lm::SmallArray<VkRenderingAttachmentInfo, MAX_RENDERING_ATTACHMENTS> rendering_attachments;
 				for (vk::Texture* color_output : color_outputs) {
 					vk::texture_transition(color_output, cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -1098,7 +1098,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 				continue;
 			}
 			if (passes[i].type == vk::PassType::Graphics) {
-				for (auto& shader : passes[i].gfx_settings->shaders) {
+				for (vk::Shader& shader : passes[i].gfx_settings->shaders) {
 					bool entry_created = false;
 					unique_shaders_set.get_or_create({&shader, &passes[i]}, &entry_created);
 					if (!entry_created) {

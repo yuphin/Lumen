@@ -125,7 +125,7 @@ s64 s64_from_str(const String& str) {
 	bool negative = 0;
 	s64 result = 0;
 
-	size_t curr = 0;
+	u64 curr = 0;
 	for (; curr < str.size; curr++) {
 		if (char_is_digit(str[curr])) {
 			break;
@@ -179,7 +179,7 @@ String str_from_s64(Arena* arena, s64 val) {
 
 f64 f64_from_str(const String& str) {
 	f64 result = 0;
-	size_t curr = 0;
+	u64 curr = 0;
 	bool negative = false;
 
 	while (curr < str.size && char_is_whitespace(str[curr])) ++curr;

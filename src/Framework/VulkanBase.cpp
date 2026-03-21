@@ -561,7 +561,7 @@ static void create_sync_primitives() {
 	_in_flight_fences.resize(MAX_FRAMES_IN_FLIGHT);
 	_images_in_flight.resize(_swapchain_images.size);
 	// Initialize fence array elements to NULL
-	for (size_t i = 0; i < _images_in_flight.size; ++i) {
+	for (u64 i = 0; i < _images_in_flight.size; ++i) {
 		_images_in_flight[i] = VK_NULL_HANDLE;
 	}
 

@@ -111,14 +111,14 @@ bool Integrator::update() {
 	}
 	if (Window::is_key_held(KeyInput::SPACE) || Window::is_key_held(KeyInput::KEY_E)) {
 		// Right
-		auto right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
-		auto up = glm::cross(right, front);
+		glm::vec3 right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
+		glm::vec3 up = glm::cross(right, front);
 		camera.position += up * trans_speed;
 		updated = true;
 	}
 	if (Window::is_key_held(KeyInput::KEY_LEFT_CONTROL) || Window::is_key_held(KeyInput::KEY_Q)) {
-		auto right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
-		auto up = glm::cross(right, front);
+		glm::vec3 right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
+		glm::vec3 up = glm::cross(right, front);
 		camera.position -= up * trans_speed;
 		updated = true;
 	}

@@ -1,0 +1,48 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#extension GL_KHR_shader_subgroup_ballot : enable
+
+#include "ir_commons.h"
+layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
+
+layout(push_constant) uniform _PushConstantPrefixSum { PCPrefixSum pc; };
+
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStackCount { int d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
+
+GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
+
+shared uint subgroup_data[SUBGROUP_SIZE];
+
+layout(local_size_x = SCAN_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
+void main() {
+	uint tid = gl_GlobalInvocationID.x;
+
+	uint count = tid < pc.num_elems ? grid_cell_counts.d[tid] : 0;
+
+	uint sum = subgroupInclusiveAdd(count);
+
+	if (gl_SubgroupInvocationID == SUBGROUP_SIZE - 1) {
+		subgroup_data[gl_SubgroupID] = sum;
+	}
+	barrier();
+
+	if (gl_SubgroupID == 0) {
+		uint sum_subgroup = subgroup_data[gl_SubgroupInvocationID];
+		uint sum_wgs = subgroupExclusiveAdd(sum_subgroup);
+		subgroup_data[gl_SubgroupInvocationID] = sum_wgs;
+	}
+	barrier();
+	sum += subgroup_data[gl_SubgroupID];
+
+	if (tid < pc.num_elems) {
+		grid_cell_counts.d[tid] = sum;
+	}
+}

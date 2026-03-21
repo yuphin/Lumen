@@ -55,8 +55,8 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 	add_indices(pipeline_info);
 	u32 sbt_size = pipeline_info.groupCount * group_handle_size;
 
-	constexpr size_t MAX_HANDLE_SIZE = 32;
-	constexpr size_t MAX_SBT_SIZE_BYTES = vk::MAX_SHADERS_PER_PASS * MAX_HANDLE_SIZE;
+	constexpr u64 MAX_HANDLE_SIZE = 32;
+	constexpr u64 MAX_SBT_SIZE_BYTES = vk::MAX_SHADERS_PER_PASS * MAX_HANDLE_SIZE;
 	assert(group_handle_size <= MAX_HANDLE_SIZE);
 	assert(sbt_size < MAX_SBT_SIZE_BYTES);
 	lm::SmallArray<u8, MAX_SBT_SIZE_BYTES> shader_handle_storage;
@@ -65,8 +65,9 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 												   sbt_size, shader_handle_storage.data));
 
 
-	constexpr size_t MAX_BYTES_PER_GROUP = MAX_SBT_SIZE_BYTES / 4;
-	std::array<lm::SmallArray<u8, MAX_BYTES_PER_GROUP>, 4> stage;
+	constexpr u64 MAX_BYTES_PER_GROUP = MAX_SBT_SIZE_BYTES / 4;
+	lm::SmallArray<lm::SmallArray<u8, MAX_BYTES_PER_GROUP>, 4> stage;
+	stage.resize(4);
 
 	auto copy_handles = [&](util::Slice<u8> stage_buffer, util::Slice<u32> indices, u32 stride) {
 		auto* pbuffer = stage_buffer.data;

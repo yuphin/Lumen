@@ -5,7 +5,7 @@
 
 namespace vk {
 
-inline constexpr size_t MAX_RT_SHADER_PER_GROUP = 8;
+inline constexpr u64 MAX_RT_SHADER_PER_GROUP = 8;
 class SBTWrapper {
    public:
 	enum GroupType { GROUP_RAYGEN, GROUP_MISS, GROUP_HIT, GROUP_CALLABLE };

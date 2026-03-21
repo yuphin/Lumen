@@ -11,7 +11,7 @@ struct String {
 
 	String() = default;
 	String(char* str, u64 size) : data(str), size(size) {}
-	template <size_t N>
+	template <u64 N>
 	// Our strings don't end with null terminator by default
 	constexpr String(const char (&str)[N]) : data((char*)str), size(N - 1) {}
 
@@ -34,7 +34,7 @@ struct String {
 	inline bool empty() const { return size == 0; }
 	inline bool is_cstr() const { return data[size - 1] == '\0'; }
 };
-template <size_t N>
+template <u64 N>
 constexpr String cstr(const char (&str)[N]) {
 	return String{(char*)str, N};
 }
