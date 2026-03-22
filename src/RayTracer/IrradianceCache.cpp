@@ -1,6 +1,8 @@
 #include "LumenPCH.h"
 #include "IrradianceCache.h"
 
+#define DEBUG_PASSES 0
+
 static u32 get_total_grid_cells() {
 	u32 num_uniform_cells = GRID_CENTER_CELL_COUNT_AXIS * GRID_CENTER_CELL_COUNT_AXIS * GRID_CENTER_CELL_COUNT_AXIS;
 	u32 num_trapezoidal_cells =
@@ -16,6 +18,45 @@ static f32 get_max_uniform_cells(f32 desired_surfel_radius_px, f32 p11, f32 heig
 static f32 get_px_size_per_trapezoidal_cell(f32 p11, f32 height) {
 	f32 px_vertical = p11 * height / GRID_TRAPEZOIDAL_CELL_COUNT_AXIS;
 	return fabsf(px_vertical);
+}
+
+static void scan(u32 num_wgs, lm::RenderGraph* rg, vk::Buffer* scene_desc_buffer, const PCPrefixSum& pc,
+				 bool disable_sum_writes = false) {
+	rg->add_compute(CSTR("PrefixScan - Scan"),
+					{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_scan.comp")),
+					 .macros = {vk::ShaderMacro("DISABLE_SUM_WRITES", disable_sum_writes)},
+					 .dims = {(u32)num_wgs, 1, 1}})
+		.push_constants(&pc)
+		.bind(scene_desc_buffer);
+}
+static void uniform_add(u32 num_wgs, lm::RenderGraph* rg, vk::Buffer* scene_desc_buffer, const PCPrefixSum& pc) {
+	rg->add_compute(CSTR("PrefixScan - Uniform Add"),
+					{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_uniform_add.comp")),
+					 .dims = {(u32)num_wgs, 1, 1}})
+		.push_constants(&pc)
+		.bind(scene_desc_buffer);
+}
+
+static void prefix_scan(u32 level, u32 num_elems, lm::RenderGraph* rg, PCPrefixSum pc, vk::Buffer* scene_desc_buffer,
+						const lm::FixedArray<vk::Buffer*>& block_sums) {
+	u32 num_wgs = glm::max(1u, util::div_ceil(num_elems, (u32)SCAN_WG_SIZE));
+	pc = {};
+	pc.scan_sums = (u32)level > 0;
+	pc.num_elems = num_elems;
+	pc.level_idx = level;
+	if (level > 0) {
+		pc.block_sum_addr = block_sums[level - 1]->device_address();
+	}
+	if (num_wgs > 1) {
+		pc.out_addr = block_sums[level]->device_address();
+	}
+	if (num_wgs > 1) {
+		scan(num_wgs, rg, scene_desc_buffer, pc);
+		prefix_scan(level + 1, num_wgs, rg, pc, scene_desc_buffer, block_sums);
+		uniform_add(num_wgs, rg, scene_desc_buffer, pc);
+	} else {
+		scan(num_wgs, rg, scene_desc_buffer, pc, /*disable_sum_writes=*/true);
+	}
 }
 
 void IrradianceCache::init() {
@@ -95,7 +136,7 @@ void IrradianceCache::init() {
 	grid_cell_counts_buffer =
 		prm::get_buffer({.name = CSTR("Grid Cell Counts"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
+						 .memory_type = DEBUG_PASSES ? vk::BUFFER_TYPE_GPU_TO_CPU : vk::BUFFER_TYPE_GPU,
 						 .size = grid_total_cells * sizeof(u32)});
 
 	grid_cell_offsets_buffer =
@@ -118,7 +159,7 @@ void IrradianceCache::init() {
 	u64 num_layers = 0;
 	u64 cur_total_cells = grid_total_cells;
 	do {
-		u64 num_blocks = glm::max(1uLL, (cur_total_cells + SCAN_WG_SIZE - 1) / SCAN_WG_SIZE);
+		u64 num_blocks = glm::max(1uLL, util::div_ceil(cur_total_cells, (u64)SCAN_WG_SIZE));
 		num_layers += num_blocks > 1;
 		cur_total_cells = num_blocks;
 
@@ -129,7 +170,7 @@ void IrradianceCache::init() {
 	cur_total_cells = grid_total_cells;
 	u64 buffer_idx = 0;
 	do {
-		u64 num_blocks = glm::max(1uLL, (cur_total_cells + SCAN_WG_SIZE - 1) / SCAN_WG_SIZE);
+		u64 num_blocks = glm::max(1uLL, util::div_ceil(cur_total_cells, (u64)SCAN_WG_SIZE));
 		if (num_blocks > 1) {
 			lm::String buffer_name = lm::str_concat(integrator_arena(), "Block Sum Buffer #",
 													lm::str_from_u64(integrator_arena(), buffer_idx), /*cstr=*/true);
@@ -201,8 +242,10 @@ void IrradianceCache::render() {
 	pc.scene_extent = glm::length(lumen_scene->dimensions.max - lumen_scene->dimensions.min);
 
 	vk::CommandBuffer cmd;
+	if(DEBUG_PASSES) {
+		cmd.begin();
+	}
 
-	cmd.begin();
 
 	vk::render_graph()
 		->add_rt(CSTR("GBuffer"),
@@ -220,8 +263,8 @@ void IrradianceCache::render() {
 		.bind_tlas(tlas);
 
 	if (total_frame_idx == 0) {
-		u32 max_tiles_x = (Window::width() + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
-		u32 max_tiles_y = (Window::height() + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
+		u32 max_tiles_x = util::div_ceil(Window::width(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
+		u32 max_tiles_y = util::div_ceil(Window::height(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		vk::render_graph()
 			->add_compute(CSTR("Surfel: Spawn"),
 						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_spawn.comp")),
@@ -231,36 +274,32 @@ void IrradianceCache::render() {
 			.bind({lumen_scene->scene_desc_buffer});
 
 		vk::render_graph()
-			->add_compute(
-				CSTR("Surfel: Allocate"),
-				{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_allocate.comp")),
-				 .dims = {(max_tiles_x * max_tiles_y + ALLOCATE_PASS_WG_SIZE - 1) / ALLOCATE_PASS_WG_SIZE, 1, 1}})
+			->add_compute(CSTR("Surfel: Allocate"),
+						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_allocate.comp")),
+						   .dims = {util::div_ceil(max_tiles_x * max_tiles_y, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 			.push_constants(&pc)
 			.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer});
 	}
-	vk::render_graph()->run_and_submit(cmd);
-	cmd.begin();
-
 	////////////////////////////
 	// --- Surfel Grid ---
 	// Grid is rebuilt every frame
 	vk::render_graph()
 		->add_compute(CSTR("Grid: Clear"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_clear.comp")),
-					   .dims = {(grid_total_cells + ALLOCATE_PASS_WG_SIZE - 1) / ALLOCATE_PASS_WG_SIZE, 1, 1}})
+					   .dims = {util::div_ceil(grid_total_cells, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
 		.bind({lumen_scene->scene_desc_buffer});
 	// TODO: Having an indirect launch would be better here, maybe?
 	vk::render_graph()
 		->add_compute(CSTR("Grid: Count"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_count.comp")),
-					   .dims = {(MAX_SURFEL_COUNT + ALLOCATE_PASS_WG_SIZE - 1) / ALLOCATE_PASS_WG_SIZE, 1, 1}})
+					   .dims = {util::div_ceil((u32)MAX_SURFEL_COUNT, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
 		.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer});
-	vk::render_graph()->run_and_submit(cmd);
 
 	// Debug
-	{
+	if (DEBUG_PASSES) {
+		vk::render_graph()->run_and_submit(cmd);
 		u32* counts = (u32*)vk::buffer_map(grid_cell_counts_buffer);
 		lm::ScratchArena scratch = integrator_arena();
 
@@ -269,32 +308,26 @@ void IrradianceCache::render() {
 
 		u32 max_count = 0;
 
-		for (u64 i = 0; i < 1024; i++) {
+		for (u64 i = 0; i < total_cells; i++) {
 			u32 prev = i > 0 ? prefix_sums[i - 1] : 0;
 			prefix_sums.push_back(prev + counts[i]);
 			max_count = glm::max(max_count, counts[i]);
 		}
 		vk::buffer_unmap(grid_cell_counts_buffer);
 
-		PCPrefixSum pc_prefix;
-		pc_prefix.num_elems = 1024;
-
 		cmd.begin();
-		vk::render_graph()
-			->add_compute(CSTR("Grid: Scan"),
-						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_scan.comp")),
-						   .dims = {1, 1, 1}})
-			.push_constants(&pc_prefix)
-			.bind({lumen_scene->scene_desc_buffer});
+		prefix_scan(0, grid_total_cells, vk::render_graph(), PCPrefixSum(), lumen_scene->scene_desc_buffer, block_sums);
 		vk::render_graph()->run_and_submit(cmd);
 
 		u32* gpu_prefix_sums = (u32*)vk::buffer_map(grid_cell_counts_buffer);
-		for (u64 i = 0; i < 1024; i++) {
+		for (u64 i = 0; i < total_cells; i++) {
 			assert(gpu_prefix_sums[i] == prefix_sums[i]);
 		}
 		vk::buffer_unmap(grid_cell_counts_buffer);
 
 		LUMEN_INFO("Max grid cell count: %u\n", max_count);
+	} else {
+		prefix_scan(0, grid_total_cells, vk::render_graph(), PCPrefixSum(), lumen_scene->scene_desc_buffer, block_sums);
 	}
 
 	if (debug_mode) {
@@ -341,6 +374,10 @@ void IrradianceCache::destroy(bool resize) {
 						grid_cell_stacks_buffer,
 						grid_cell_indices_buffer};
 	for (vk::Buffer* b : buffer_list) {
+		prm::remove(b);
+	}
+
+	for (vk::Buffer* b : block_sums) {
 		prm::remove(b);
 	}
 }

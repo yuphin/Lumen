@@ -92,9 +92,8 @@ void main() {
 	// }
 
 	// This is fine as long as a surfel is smallar than the grid cell size
-	// for (uint i = 0; i < unique_cnt; i++) {
-	// 	atomicAdd(grid_cell_counts.d[linear_cells[i]], 1);
-	// }
+	for (uint i = 0; i < unique_cnt; i++) {
+		atomicAdd(grid_cell_counts.d[linear_cells[i]], 1);
+	}
 
-	grid_cell_counts.d[tid] = tid;
 }

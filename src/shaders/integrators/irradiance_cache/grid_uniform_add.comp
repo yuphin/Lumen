@@ -15,54 +15,25 @@ layout(push_constant) uniform _PushConstantPrefixSum { PCPrefixSum pc; };
 
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BlockSums { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer OutSums { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InSums { uint d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStackCount { int d; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
 
 GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
 BlockSums block_sums = BlockSums(pc.block_sum_addr);
-OutSums out_sums = OutSums(pc.out_addr);
-
-shared uint subgroup_data[SUBGROUP_SIZE];
+InSums in_sums = InSums(pc.out_addr);
 
 layout(local_size_x = SCAN_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
 void main() {
 	uint tid = gl_GlobalInvocationID.x;
 
-	uint count;
-
-	if (tid < pc.num_elems) {
-		count = pc.scan_sums == 0 ? grid_cell_counts.d[tid] : block_sums.d[tid];
-	} else {
-		count = 0;
-	}
-
-	uint sum = subgroupInclusiveAdd(count);
-
-	if (gl_SubgroupInvocationID == SUBGROUP_SIZE - 1) {
-		subgroup_data[gl_SubgroupID] = sum;
-	}
-	barrier();
-
-	if (gl_SubgroupID == 0) {
-		uint sum_subgroup = subgroup_data[gl_SubgroupInvocationID];
-		uint sum_wgs = subgroupExclusiveAdd(sum_subgroup);
-		subgroup_data[gl_SubgroupInvocationID] = sum_wgs;
-	}
-	barrier();
-	sum += subgroup_data[gl_SubgroupID];
+	uint block_sum = gl_WorkGroupID.x == 0 ? 0 : in_sums.d[gl_WorkGroupID.x - 1];
 
 	if (tid < pc.num_elems) {
 		if (pc.scan_sums == 0) {
-			grid_cell_counts.d[tid] = sum;
+			grid_cell_counts.d[tid] += block_sum;
 		} else {
-			block_sums.d[tid] = sum;
-
+			block_sums.d[tid] += block_sum;
 		}
-#ifndef DISABLE_SUM_WRITES
-		if ((gl_LocalInvocationID.x == SCAN_WG_SIZE - 1) || (tid == pc.num_elems - 1)) {
-			out_sums.d[gl_WorkGroupID.x] = sum;
-		}
-#endif // DISABLE_SUM_WRITES
 	}
 }

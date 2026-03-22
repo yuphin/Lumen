@@ -25,6 +25,11 @@ inline constexpr T next_pow2(T x) {
 	return x + 1;
 }
 
+template<typename T> 
+inline constexpr T div_ceil(T x, T y) {
+	return (x + y - 1) / y;
+}
+
 template <class T>
 inline constexpr T align_up_pow2(T x, u64 a) noexcept {
 	return T((x + (T(a) - 1)) & ~T(a - 1));
