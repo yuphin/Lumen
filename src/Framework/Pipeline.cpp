@@ -201,7 +201,7 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, util::Slice<u3
 	LUMEN_ASSERT(num_as_bindings_in_shader <= MAX_AS_BINDING_COUNT, "Max 2 AS bindings are supported");
 	create_set_layout(shaders_slice, descriptor_counts);
 	create_rt_set_layout(binding_stage_flags, num_as_bindings);
-    create_pipeline_layout(shaders_slice, {&push_constant_size, 1});
+	create_pipeline_layout(shaders_slice, {&push_constant_size, 1});
 	create_update_template(shaders_slice, descriptor_counts);
 
 	// Descriptor pool for AS descriptors
@@ -315,7 +315,7 @@ void Pipeline::create_compute_pipeline(const ComputePassSettings& settings, util
 	create_set_layout(shader_slice, descriptor_counts);
 	if (settings.shader.push_constant_size > 0) {
 		push_constant_size = settings.shader.push_constant_size;
-        create_pipeline_layout(shader_slice, {&push_constant_size, 1});
+		create_pipeline_layout(shader_slice, {&push_constant_size, 1});
 	} else {
 		create_pipeline_layout(shader_slice, {});
 	}
@@ -358,8 +358,6 @@ void Pipeline::cleanup() {
 	if (handle) {
 		vkDestroyPipeline(vk::context().device, handle, nullptr);
 	}
-	// Note: pipeline layout is usually given externally, but in the case
-	// of compute shaders, it's allocated internally
 	if (pipeline_layout) {
 		vkDestroyPipelineLayout(vk::context().device, pipeline_layout, nullptr);
 	}

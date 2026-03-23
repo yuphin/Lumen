@@ -40,7 +40,6 @@ static void uniform_add(u32 num_wgs, lm::RenderGraph* rg, vk::Buffer* scene_desc
 static void prefix_scan(u32 level, u32 num_elems, lm::RenderGraph* rg, PCPrefixSum pc, vk::Buffer* scene_desc_buffer,
 						const lm::FixedArray<vk::Buffer*>& block_sums) {
 	u32 num_wgs = glm::max(1u, util::div_ceil(num_elems, (u32)SCAN_WG_SIZE));
-	pc = {};
 	pc.scan_sums = (u32)level > 0;
 	pc.num_elems = num_elems;
 	pc.level_idx = level;
@@ -242,10 +241,9 @@ void IrradianceCache::render() {
 	pc.scene_extent = glm::length(lumen_scene->dimensions.max - lumen_scene->dimensions.min);
 
 	vk::CommandBuffer cmd;
-	if(DEBUG_PASSES) {
+	if (DEBUG_PASSES) {
 		cmd.begin();
 	}
-
 
 	vk::render_graph()
 		->add_rt(CSTR("GBuffer"),

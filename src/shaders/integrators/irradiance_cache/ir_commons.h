@@ -8,7 +8,7 @@
 
 #define SUBGROUP_SIZE 32
 
-#define SCAN_WG_SIZE 1024
+#define SCAN_WG_SIZE 128
 
 // 256K surfels
 #define MAX_SURFEL_COUNT 256 * 1024 

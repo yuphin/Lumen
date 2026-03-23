@@ -7,6 +7,14 @@ RayTracer* RayTracer::instance = nullptr;
 bool load_reference = false;
 bool calc_rmse = false;
 
+static void reload_shaders() {
+	vk::render_graph()->reload_shaders = true;
+	vk::render_graph()->shader_cache.clear();
+	vk::render_graph()->reload_counter++;
+	vk::shader_arena_reset();
+
+}
+
 void RayTracer::init(bool use_debug, i32 argc, char* argv[]) {
 	instance = this;
 	debug = use_debug;
@@ -28,9 +36,7 @@ void RayTracer::init(bool use_debug, i32 argc, char* argv[]) {
 		} else if (Window::is_key_down(KeyInput::KEY_F11)) {
 			comparison_mode ^= true;
 		} else if (Window::is_key_down(KeyInput::KEY_F5)) {
-			vk::render_graph()->reload_shaders = true;
-			vk::render_graph()->shader_cache.clear();
-			vk::shader_arena_reset();
+			reload_shaders();
 			integrator->updated = true;
 		} else if (Window::is_key_down(KeyInput::KEY_F6)) {
 			capture_ref_img = true;
@@ -342,9 +348,7 @@ bool RayTracer::gui() {
 		recreate_swapchain = true;
 	}
 	if (ImGui::Button("Reload shaders (F5)")) {
-		vk::render_graph()->reload_shaders = true;
-		vk::render_graph()->shader_cache.clear();
-		vk::shader_arena_reset();
+		reload_shaders();
 		updated |= true;
 	}
 	ImGui::Checkbox("Comparison mode (F11)", &comparison_mode);

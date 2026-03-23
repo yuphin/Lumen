@@ -1304,7 +1304,7 @@ PipelineStorage* RenderGraph::add_pass_impl_common(const lm::String& name, const
 	}
 
 	auto entry = pipeline_cache.find(hash);
-	if (entry && !reload_shaders) {
+	if (entry && (!reload_shaders || entry->value.reload_counter == reload_counter)) {
 		pipeline_storage = &entry->value;
 		cached = true;
 	} else {
@@ -1315,7 +1315,8 @@ PipelineStorage* RenderGraph::add_pass_impl_common(const lm::String& name, const
 			entry->value.pipeline.cleanup();
 		}
 		auto new_entry = pipeline_cache.insert(
-			hash, PipelineStorage{.pipeline = vk::Pipeline(name_with_macros)});
+			hash, PipelineStorage{.pipeline = vk::Pipeline(lm::str_dup(_arena_rendergraph, name_with_macros))});
+		new_entry->value.reload_counter = reload_counter;
 		pipeline_storage = &new_entry->value;
 	}
 	if (!pipeline_storage->affected_buffer_pointers.initialized()) {

@@ -40,6 +40,7 @@ struct PipelineStorage {
 	lm::SmallArray<ResourceBinding, MAX_DESCRIPTORS> bound_resources;
 	lm::SmallArray<vk::BVH, vk::MAX_AS_BINDING_COUNT> as_bindings;
 	lm::HashMap<lm::String, vk::BufferStatus> affected_buffer_pointers;
+	u32 reload_counter;
 	bool update_as_descriptor;
 };
 
@@ -122,6 +123,7 @@ class RenderGraph {
 	static const u32 INVALID_PASS_IDX = UINT_MAX;
 	bool dirty_pass_encountered = false;
 	bool reload_shaders = false;
+	u32 reload_counter = 0;
 };
 
 class RenderPass {
@@ -256,6 +258,5 @@ void render_pass_init_compute(RenderPass&, vk::PassType type, const lm::String& 
 							  const vk::ComputePassSettings& compute_settings, const lm::String& macro_string,
 							  PipelineStorage* pipeline_storage, bool cached = false);
 
-lm::Arena* render_graph_arena();
 
 }  // namespace lm
