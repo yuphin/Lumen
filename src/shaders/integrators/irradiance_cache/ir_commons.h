@@ -46,7 +46,6 @@ struct PCPrefixSum {
 	uint num_elems;
 	uint64_t block_sum_addr;
 	uint64_t out_addr;
-	uint level_idx;
 };
 
 struct IRCacheUniforms {

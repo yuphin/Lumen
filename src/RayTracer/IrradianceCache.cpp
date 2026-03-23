@@ -20,29 +20,30 @@ static f32 get_px_size_per_trapezoidal_cell(f32 p11, f32 height) {
 	return fabsf(px_vertical);
 }
 
-static void scan(u32 num_wgs, lm::RenderGraph* rg, vk::Buffer* scene_desc_buffer, const PCPrefixSum& pc,
-				 bool disable_sum_writes = false) {
-	rg->add_compute(CSTR("PrefixScan - Scan"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_scan.comp")),
-					 .macros = {vk::ShaderMacro("DISABLE_SUM_WRITES", disable_sum_writes)},
-					 .dims = {(u32)num_wgs, 1, 1}})
+static void scan(u32 num_wgs, vk::Buffer* scene_desc_buffer, const PCPrefixSum& pc, bool disable_sum_writes = false) {
+	vk::render_graph()
+		->add_compute(CSTR("PrefixScan - Scan"),
+					  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_scan.comp")),
+					   .macros = {vk::ShaderMacro("DISABLE_SUM_WRITES", disable_sum_writes)},
+					   .dims = {(u32)num_wgs, 1, 1}})
 		.push_constants(&pc)
 		.bind(scene_desc_buffer);
 }
-static void uniform_add(u32 num_wgs, lm::RenderGraph* rg, vk::Buffer* scene_desc_buffer, const PCPrefixSum& pc) {
-	rg->add_compute(CSTR("PrefixScan - Uniform Add"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_uniform_add.comp")),
-					 .dims = {(u32)num_wgs, 1, 1}})
+static void uniform_add(u32 num_wgs, vk::Buffer* scene_desc_buffer, const PCPrefixSum& pc) {
+	vk::render_graph()
+		->add_compute(CSTR("PrefixScan - Uniform Add"),
+					  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_uniform_add.comp")),
+					   .dims = {(u32)num_wgs, 1, 1}})
 		.push_constants(&pc)
 		.bind(scene_desc_buffer);
 }
 
-static void prefix_scan(u32 level, u32 num_elems, lm::RenderGraph* rg, PCPrefixSum pc, vk::Buffer* scene_desc_buffer,
+static void prefix_scan(u32 level, u32 num_elems, vk::Buffer* scene_desc_buffer,
 						const lm::FixedArray<vk::Buffer*>& block_sums) {
 	u32 num_wgs = glm::max(1u, util::div_ceil(num_elems, (u32)SCAN_WG_SIZE));
+	PCPrefixSum pc;
 	pc.scan_sums = (u32)level > 0;
 	pc.num_elems = num_elems;
-	pc.level_idx = level;
 	if (level > 0) {
 		pc.block_sum_addr = block_sums[level - 1]->device_address();
 	}
@@ -50,11 +51,11 @@ static void prefix_scan(u32 level, u32 num_elems, lm::RenderGraph* rg, PCPrefixS
 		pc.out_addr = block_sums[level]->device_address();
 	}
 	if (num_wgs > 1) {
-		scan(num_wgs, rg, scene_desc_buffer, pc);
-		prefix_scan(level + 1, num_wgs, rg, pc, scene_desc_buffer, block_sums);
-		uniform_add(num_wgs, rg, scene_desc_buffer, pc);
+		scan(num_wgs, scene_desc_buffer, pc);
+		prefix_scan(level + 1, num_wgs, scene_desc_buffer, block_sums);
+		uniform_add(num_wgs, scene_desc_buffer, pc);
 	} else {
-		scan(num_wgs, rg, scene_desc_buffer, pc, /*disable_sum_writes=*/true);
+		scan(num_wgs, scene_desc_buffer, pc, /*disable_sum_writes=*/true);
 	}
 }
 
@@ -314,7 +315,7 @@ void IrradianceCache::render() {
 		vk::buffer_unmap(grid_cell_counts_buffer);
 
 		cmd.begin();
-		prefix_scan(0, grid_total_cells, vk::render_graph(), PCPrefixSum(), lumen_scene->scene_desc_buffer, block_sums);
+		prefix_scan(0, grid_total_cells, lumen_scene->scene_desc_buffer, block_sums);
 		vk::render_graph()->run_and_submit(cmd);
 
 		u32* gpu_prefix_sums = (u32*)vk::buffer_map(grid_cell_counts_buffer);
@@ -325,7 +326,7 @@ void IrradianceCache::render() {
 
 		LUMEN_INFO("Max grid cell count: %u\n", max_count);
 	} else {
-		prefix_scan(0, grid_total_cells, vk::render_graph(), PCPrefixSum(), lumen_scene->scene_desc_buffer, block_sums);
+		prefix_scan(0, grid_total_cells, lumen_scene->scene_desc_buffer, block_sums);
 	}
 
 	if (debug_mode) {
