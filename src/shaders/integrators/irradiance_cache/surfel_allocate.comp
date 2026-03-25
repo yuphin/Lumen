@@ -47,6 +47,10 @@ void main() {
 		return;
 	}
 
+	if(tid == 0) {
+		LOG1("Spawn count: %u\n", spawn_count.d);
+	}
+
 	uint pixel_idx = spawn_list.d[tid];
 	GBuffer gbuffer = gbuffers.d[pixel_idx];
 

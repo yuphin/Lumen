@@ -9,27 +9,35 @@
 #extension GL_KHR_shader_subgroup_ballot : enable
 
 #include "ir_commons.h"
+layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellIndices { uint d[]; };
 
 Indices indices = Indices(scene_desc.index_addr);
 Materials materials = Materials(scene_desc.material_addr);
 InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
 CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
+GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
+GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
 
 #include "ir_commons.glsl"
+#include "grid.glsl"
 
-layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnList { uint d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnCount { uint d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
 
 InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
 SpawnList spawn_list = SpawnList(scene_desc.surfel_spawn_list_addr);
 SpawnCount spawn_count = SpawnCount(scene_desc.surfel_spawn_count_addr);
+SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 
 #define TILE_COVERAGE_MAX 1e6
 
@@ -44,7 +52,6 @@ shared float winner_coverages[NUM_ACTIVE_SUBGROUPS];
 
 layout(local_size_x = SURFELIZE_PASS_TILE_SIZE_XY, local_size_y = SURFELIZE_PASS_TILE_SIZE_XY, local_size_z = 1) in;
 
-
 void main() {
 	uvec2 pixel_coords = gl_GlobalInvocationID.xy;
 	uint pixel_idx = (pixel_coords.x * pc.height + pixel_coords.y);
@@ -54,9 +61,35 @@ void main() {
 		GBuffer gbuffer = gbuffers.d[pixel_idx];
 		if (gbuffer_valid(gbuffer)) {
 			coverage = 0.0;
-			// TODO: Iterate over grid next
 			HitData hit_data =
 				get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
+
+			vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
+			vec3 offset = hit_data.pos - cam_pos.xyz;
+			uvec4 grid_val = map_grid_axis(offset);
+			uint linear_idx = linearize_grid(grid_val);
+			uint surfel_offset = grid_cell_counts.d[linear_idx];
+			uint surfel_count = grid_cell_counts.d[linear_idx + 1] - surfel_offset;
+
+			for (uint gid = 0; gid < surfel_count; gid++) {
+				uint sid = grid_cell_indices.d[gid + surfel_offset];
+				Surfel surfel = surfel_pool.d[sid];
+
+				vec3 diff = hit_data.pos - surfel.pos;
+				float dist = length(diff);
+				if (dist > surfel.radius) continue;
+
+				float n_dot = dot(hit_data.n_s, surfel.n_s);
+				if (n_dot < 0.3) continue;
+
+				float dist_normal = dot(diff, surfel.n_s);
+				float dist_tangent = sqrt(max(0.0, dist * dist - dist_normal * dist_normal));
+				float dist_aniso = sqrt(dist_tangent * dist_tangent + 4.0 * dist_normal * dist_normal);
+				if (dist_aniso > surfel.radius) continue;
+
+				float weight = (1.0 - dist_aniso / surfel.radius) * n_dot;
+				coverage += weight;
+			}
 		}
 	}
 	// Get the minimum coverage across the subgroup
@@ -75,14 +108,16 @@ void main() {
 	barrier();
 	// Reduce between subgroups
 	if (gl_SubgroupID == 0) {
-		float their_coverage =
-			gl_SubgroupInvocationID < NUM_ACTIVE_SUBGROUPS ? winner_coverages[gl_SubgroupInvocationID] : TILE_COVERAGE_MAX;
+		float their_coverage = gl_SubgroupInvocationID < NUM_ACTIVE_SUBGROUPS
+								   ? winner_coverages[gl_SubgroupInvocationID]
+								   : TILE_COVERAGE_MAX;
 		float min_tile_coverage = subgroupMin(their_coverage);
 		bool i_am_tile_min = min_tile_coverage == their_coverage;
 		uvec4 ballot = subgroupBallot(i_am_tile_min);
 		uint tile_winner = subgroupBallotFindLSB(ballot);
 
-		if (gl_SubgroupInvocationID == tile_winner && min_tile_coverage != TILE_COVERAGE_MAX) {
+		if (gl_SubgroupInvocationID == tile_winner && min_tile_coverage != TILE_COVERAGE_MAX &&
+			min_tile_coverage == 0) {
 			// Winner of the tile
 			uint surfel_idx = atomicAdd(spawn_count.d, 1);
 			uint winner_pixel = winner_pixels[gl_SubgroupInvocationID];

@@ -201,7 +201,7 @@ void IrradianceCache::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
 
 	pc.desired_surfel_radius_px = 8;
-	pc.grid_uniform_cell_distance_threshold = 0.1;
+	pc.grid_uniform_cell_distance_threshold = 10;
 	frame_num = 0;
 	// Clear surfel pool
 	vk::CommandBuffer cmd(true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -249,7 +249,8 @@ void IrradianceCache::render() {
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
 
-	if (total_frame_idx == 0) {
+	// if (total_frame_idx == 0) {
+	if (true) {
 		u32 max_tiles_x = util::div_ceil(Window::width(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		u32 max_tiles_y = util::div_ceil(Window::height(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		vk::render_graph()
@@ -258,7 +259,7 @@ void IrradianceCache::render() {
 						   .dims = {max_tiles_x, max_tiles_y, 1}})
 			.push_constants(&pc)
 			.zero(surfel_spawn_count_buffer)
-			.bind({lumen_scene->scene_desc_buffer});
+			.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer});
 
 		vk::render_graph()
 			->add_compute(CSTR("Surfel: Allocate"),
