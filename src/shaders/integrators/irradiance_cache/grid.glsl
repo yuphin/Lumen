@@ -54,3 +54,13 @@ uvec4 map_grid_axis(vec3 pos) {
 
 	return uvec4(region, i, j, k);
 }
+uint linearize_grid(uvec4 grid_pos) {
+	if (grid_pos.x == GRID_TYPE_CELL) {
+		uint N = GRID_CENTER_CELL_COUNT_AXIS;
+		return grid_pos.y + grid_pos.z * N + grid_pos.w * N * N;
+	} else {
+		uint N = GRID_TRAPEZOIDAL_CELL_COUNT_AXIS;
+		uint Nc = GRID_CENTER_CELL_COUNT_AXIS;
+		return Nc * Nc * Nc + (grid_pos.x - 1) * (N * N * N) + grid_pos.y + grid_pos.z * N + grid_pos.w * N * N;
+	}
+}

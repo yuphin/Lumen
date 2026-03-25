@@ -16,6 +16,8 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Ind
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnCount { uint d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellIndices { uint d[]; };
 
 Indices indices = Indices(scene_desc.index_addr);
 Materials materials = Materials(scene_desc.material_addr);
@@ -23,6 +25,8 @@ InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
 CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 SpawnCount spawn_count = SpawnCount(scene_desc.surfel_spawn_count_addr);
+GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
+GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
 
 #include "ir_commons.glsl"
 
@@ -70,41 +74,86 @@ void main() {
 
 	float best_weight = 0.0;
 	uint best_sid = 0xFFFFFFFF;
-	for (uint sid = 0; sid < max_surfels; sid++) {
-		Surfel surfel = surfel_pool.d[sid];
-
-		vec3 diff = hit_data.pos - surfel.pos;
-		float dist = length(diff);
-		if (dist > surfel.radius) {
-			continue;
-		}
-
-		float n_dot = dot(hit_data.n_s, surfel.n_s);
-		if (n_dot < 0.3) {
-			continue;
-		}
-
-		float dist_normal = dot(diff, surfel.n_s);
-		float dist_tangent = sqrt(max(0.0, dist * dist - dist_normal * dist_normal));
-
-		// Penalize normal distance
-		float dist_aniso = sqrt(dist_tangent * dist_tangent + 4.0 * dist_normal * dist_normal);
-
-		if (dist_aniso > surfel.radius) {
-			continue;
-		}
-
-		float weight = (1.0 - dist_aniso / surfel.radius) * n_dot;
-
-		if (weight > best_weight) {
-			best_weight = weight;
-			best_sid = sid;
-		}
-	}
 
 	vec3 pixel_world_pos = hit_data.pos;
 	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
 	vec3 offset = pixel_world_pos - cam_pos.xyz;
+	if (false) {
+		for (uint sid = 0; sid < max_surfels; sid++) {
+			Surfel surfel = surfel_pool.d[sid];
+
+			vec3 diff = hit_data.pos - surfel.pos;
+			float dist = length(diff);
+			if (dist > surfel.radius) {
+				continue;
+			}
+
+			float n_dot = dot(hit_data.n_s, surfel.n_s);
+			if (n_dot < 0.3) {
+				continue;
+			}
+
+			float dist_normal = dot(diff, surfel.n_s);
+			float dist_tangent = sqrt(max(0.0, dist * dist - dist_normal * dist_normal));
+
+			// Penalize normal distance
+			float dist_aniso = sqrt(dist_tangent * dist_tangent + 4.0 * dist_normal * dist_normal);
+
+			if (dist_aniso > surfel.radius) {
+				continue;
+			}
+
+			float weight = (1.0 - dist_aniso / surfel.radius) * n_dot;
+
+			if (weight > best_weight) {
+				best_weight = weight;
+				best_sid = sid;
+			}
+		}
+	} else {
+
+		uvec4 grid_val = map_grid_axis(offset);
+		uint linear_idx = linearize_grid(grid_val);
+		uint surfel_count =  grid_cell_counts.d[linear_idx + 1] -  grid_cell_counts.d[linear_idx];
+		uint surfel_offset = grid_cell_counts.d[linear_idx];
+
+		for (uint gid = 0; gid < surfel_count; gid++) {
+			uint sid = grid_cell_indices.d[gid + surfel_offset];
+			Surfel surfel = surfel_pool.d[sid];
+
+			vec3 diff = hit_data.pos - surfel.pos;
+			float dist = length(diff);
+			if (dist > surfel.radius) {
+				continue;
+			}
+
+			float n_dot = dot(hit_data.n_s, surfel.n_s);
+			if (n_dot < 0.3) {
+				continue;
+			}
+
+			float dist_normal = dot(diff, surfel.n_s);
+			float dist_tangent = sqrt(max(0.0, dist * dist - dist_normal * dist_normal));
+
+			// Penalize normal distance
+			float dist_aniso = sqrt(dist_tangent * dist_tangent + 4.0 * dist_normal * dist_normal);
+
+			if (dist_aniso > surfel.radius) {
+				continue;
+			}
+
+			float weight = (1.0 - dist_aniso / surfel.radius) * n_dot;
+
+			if (weight > best_weight) {
+				best_weight = weight;
+				best_sid = sid;
+			}
+		}
+		if(ubo.debug_click == 1 && ivec2(coords) == ubo.clicked_pos) {
+			debugPrintfEXT("Surfel count %u\n", surfel_count);
+		}
+	}
+
 
 	uvec4 res = map_grid_axis(offset);
 	col = uvec3_to_random_color(res.yzw) * 0.5;

@@ -14,9 +14,12 @@ layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
 
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellOffsets { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellIndices { uint d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
 
+GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
 GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 
@@ -71,6 +74,8 @@ void main() {
 
 	// This is fine as long as a surfel is smaller than the grid cell size
 	for (uint i = 0; i < unique_cnt; i++) {
-		atomicAdd(grid_cell_counts.d[linear_cells[i]], 1);
+		uint idx = atomicAdd(grid_cell_counts.d[linear_cells[i]], -1) - 1;
+		grid_cell_indices.d[idx] = tid;
 	}
+
 }

@@ -22,8 +22,6 @@ class IrradianceCache : public Integrator {
 	vk::Buffer* surfel_free_stack_buffer;
 	// Grid
 	vk::Buffer* grid_cell_counts_buffer;
-	vk::Buffer* grid_cell_offsets_buffer;
-	vk::Buffer* grid_cell_stacks_buffer;
 	vk::Buffer* grid_cell_indices_buffer;
 
 	lm::FixedArray<vk::Buffer*> block_sums;

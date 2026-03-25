@@ -7,7 +7,8 @@ static u32 get_total_grid_cells() {
 	u32 num_uniform_cells = GRID_CENTER_CELL_COUNT_AXIS * GRID_CENTER_CELL_COUNT_AXIS * GRID_CENTER_CELL_COUNT_AXIS;
 	u32 num_trapezoidal_cells =
 		6 * GRID_TRAPEZOIDAL_CELL_COUNT_AXIS * GRID_TRAPEZOIDAL_CELL_COUNT_AXIS * GRID_TRAPEZOIDAL_CELL_COUNT_AXIS;
-	return num_uniform_cells + num_trapezoidal_cells;
+	// The +1 is for the last last cell when we're getting the surfel count from cell offsets
+	return num_uniform_cells + num_trapezoidal_cells + 1; 
 }
 
 static f32 get_max_uniform_cells(f32 desired_surfel_radius_px, f32 p11, f32 height) {
@@ -125,7 +126,7 @@ void IrradianceCache::init() {
 		}
 
 		surfel_free_stack_buffer =
-			prm::get_buffer({.name = CSTR("Grid Cell Counts"),
+			prm::get_buffer({.name = CSTR("Grid Free Stack"),
 							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 .memory_type = vk::BUFFER_TYPE_GPU,
 							 .size = MAX_SURFEL_COUNT * sizeof(u32),
@@ -139,17 +140,6 @@ void IrradianceCache::init() {
 						 .memory_type = DEBUG_PASSES ? vk::BUFFER_TYPE_GPU_TO_CPU : vk::BUFFER_TYPE_GPU,
 						 .size = grid_total_cells * sizeof(u32)});
 
-	grid_cell_offsets_buffer =
-		prm::get_buffer({.name = CSTR("Grid Cell Offsets"),
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = (grid_total_cells + 1) * sizeof(i32)});
-
-	grid_cell_stacks_buffer =
-		prm::get_buffer({.name = CSTR("Grid Cell Stacks"),
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = grid_total_cells * sizeof(i32)});
 	grid_cell_indices_buffer =
 		prm::get_buffer({.name = CSTR("Grid Indices Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -198,8 +188,6 @@ void IrradianceCache::init() {
 	desc.surfel_free_stack_addr = surfel_free_stack_buffer->device_address();
 	desc.surfel_free_stack_count_addr = surfel_free_stack_counter_buffer->device_address();
 	desc.grid_cell_counts_addr = grid_cell_counts_buffer->device_address();
-	desc.grid_cell_offsets_addr = grid_cell_offsets_buffer->device_address();
-	desc.grid_cell_stacks_addr = grid_cell_stacks_buffer->device_address();
 	desc.grid_cell_indices_addr = grid_cell_indices_buffer->device_address();
 
 	lumen_scene->scene_desc_buffer =
@@ -296,8 +284,8 @@ void IrradianceCache::render() {
 		.push_constants(&pc)
 		.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer});
 
-	// Debug
 	if (DEBUG_PASSES) {
+		// Debug
 		vk::render_graph()->run_and_submit(cmd);
 		u32* counts = (u32*)vk::buffer_map(grid_cell_counts_buffer);
 		lm::ScratchArena scratch = integrator_arena();
@@ -328,6 +316,13 @@ void IrradianceCache::render() {
 	} else {
 		prefix_scan(0, grid_total_cells, lumen_scene->scene_desc_buffer, block_sums);
 	}
+
+	vk::render_graph()
+		->add_compute(CSTR("Grid: Distribute"),
+					  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_distribute.comp")),
+					   .dims = {util::div_ceil((u32)MAX_SURFEL_COUNT, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
+		.push_constants(&pc)
+		.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer});
 
 	if (debug_mode) {
 		vk::render_graph()
@@ -369,8 +364,6 @@ void IrradianceCache::destroy(bool resize) {
 						surfel_free_stack_counter_buffer,
 						surfel_free_stack_buffer,
 						grid_cell_counts_buffer,
-						grid_cell_offsets_buffer,
-						grid_cell_stacks_buffer,
 						grid_cell_indices_buffer};
 	for (vk::Buffer* b : buffer_list) {
 		prm::remove(b);

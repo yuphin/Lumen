@@ -20,7 +20,7 @@
 // Which breaks some assumptions
 #define GRID_CENTER_CELL_COUNT_AXIS 64
 #define GRID_TRAPEZOIDAL_CELL_COUNT_AXIS 64
-#define GRID_AVG_SURFELS_PER_CELL 10
+#define GRID_AVG_SURFELS_PER_CELL 16
 
 struct PCIRCache {
 	vec3 sky_col;
