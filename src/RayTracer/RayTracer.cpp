@@ -240,7 +240,7 @@ void RayTracer::render_debug_utils() {
 		};
 		vk::render_graph()->current_pass().copy(integrator->output_tex, output_img_buffer);
 		// Calculate RMSE
-		op_reduce(CSTR("OpReduce: RMSE"), CSTR("src/shaders/rmse/calc_rmse.comp"), "OpReduce: Reduce RMSE",
+		op_reduce(CSTR("OpReduce: RMSE"), CSTR("src/shaders/rmse/calc_rmse.comp"), CSTR("OpReduce: Reduce RMSE"),
 				  CSTR("src/shaders/rmse/reduce_rmse.comp"));
 		vk::render_graph()
 			->add_compute(CSTR("Calculate RMSE"),
