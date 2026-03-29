@@ -14,8 +14,10 @@ class RenderPass;
 
 static constexpr u64 MAX_SPEC_CONSTANTS = 8;
 static constexpr u64 MAX_SHADER_MACROS = 32;
+constexpr u64 MAX_VERTEX_BUFFERS = 4;
 
 using SpecializationConstantArray = SmallArray<u32, MAX_SPEC_CONSTANTS>;
+using PassFunc = void(*)(VkCommandBuffer cmd, const lm::RenderPass& pass);
 
 struct dim3 {
 	u32 x = 1;
@@ -117,10 +119,10 @@ struct GraphicsPassSettings {
 	VkClearValue clear_color;
 	VkClearValue clear_depth_stencil;
 	VkCullModeFlags cull_mode = VK_CULL_MODE_FRONT_BIT;
-	std::vector<vk::Buffer*> vertex_buffers = {};
+	lm::SmallArray<vk::Buffer*, lm::MAX_VERTEX_BUFFERS> vertex_buffers;
 	vk::Buffer* index_buffer = nullptr;
 	lm::SpecializationConstantArray specialization_data;
-	std::vector<bool> blend_enables = {};
+	lm::SmallArray<bool, MAX_COLOR_ATTACHMENTS> blend_enables;
 	VkFrontFace front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
@@ -129,7 +131,8 @@ struct GraphicsPassSettings {
 	f32 line_width = 1.0;
 	lm::SmallArray<vk::Texture*, MAX_COLOR_ATTACHMENTS> color_outputs = {};
 	vk::Texture* depth_output = nullptr;
-	std::function<void(VkCommandBuffer cmd, const lm::RenderPass& pass)> pass_func;
+	lm::PassFunc pass_func;
+
 	PassType type = PassType::Graphics;
 };
 
@@ -139,8 +142,8 @@ struct RTPassSettings {
 	u32 recursion_depth = 1;
 	lm::SpecializationConstantArray specialization_data;
 	lm::dim3 dims;
-	std::function<void(VkCommandBuffer cmd, const lm::RenderPass& pass)> pass_func;
 	PassType type = PassType::RT;
+	lm::PassFunc pass_func;
 };
 
 struct ComputePassSettings {
@@ -148,7 +151,7 @@ struct ComputePassSettings {
 	ShaderMacroArray macros;
 	lm::SpecializationConstantArray specialization_data;
 	lm::dim3 dims;
-	std::function<void(VkCommandBuffer cmd, const lm::RenderPass& pass)> pass_func;
+	lm::PassFunc pass_func;
 	PassType type = PassType::Compute;
 };
 

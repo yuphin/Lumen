@@ -858,11 +858,9 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				vkCmdSetViewport(cmd, 0, 1, &viewport);
 				vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-				if (gfx_settings->vertex_buffers.size()) {
-					constexpr u64 MAX_VERTEX_BUFFERS = 4;
+				if (!gfx_settings->vertex_buffers.empty()) {
 					lm::SmallArray<VkDeviceSize, MAX_VERTEX_BUFFERS> offsets;
 					lm::SmallArray<VkBuffer, MAX_VERTEX_BUFFERS> vert_buffers;
-					assert(gfx_settings->vertex_buffers.size() < MAX_VERTEX_BUFFERS);
 					for (auto& buf : gfx_settings->vertex_buffers) {
 						vert_buffers.push_back(buf->handle);
 					}
