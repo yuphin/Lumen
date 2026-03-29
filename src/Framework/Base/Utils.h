@@ -2,6 +2,8 @@
 
 namespace util {
 
+#define ARRAY_LEN(x) (sizeof(x) / sizeof(x[0]))
+
 template <typename A, typename B>
 struct is_same {
 	static constexpr bool value = false;

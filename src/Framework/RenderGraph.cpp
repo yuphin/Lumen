@@ -617,8 +617,7 @@ void RenderPass::finalize() {
 			case vk::PassType::Graphics: {
 				auto func = [](RenderPass* pass) {
 					pass->pipeline_storage->pipeline.create_gfx_pipeline(
-						*pass->gfx_settings, pass->descriptor_counts.to_slice(),
-						pass->gfx_settings->color_outputs.to_slice(), pass->gfx_settings->depth_output);
+						pass->settings, pass->descriptor_counts.to_slice());
 				};
 				if (rg->multithreaded_pipeline_compilation) {
 					rg->pipeline_tasks.push_back({func, pass_idx});
@@ -629,7 +628,7 @@ void RenderPass::finalize() {
 			}
 			case vk::PassType::RT: {
 				auto func = [update_rt_descriptors](RenderPass* pass) {
-					pass->pipeline_storage->pipeline.create_rt_pipeline(*pass->rt_settings,
+					pass->pipeline_storage->pipeline.create_rt_pipeline(pass->settings,
 																		pass->descriptor_counts.to_slice(),
 																		u32(pass->pipeline_storage->as_bindings.size));
 					update_rt_descriptors();
@@ -643,7 +642,7 @@ void RenderPass::finalize() {
 			}
 			case vk::PassType::Compute: {
 				auto func = [](RenderPass* pass) {
-					pass->pipeline_storage->pipeline.create_compute_pipeline(*pass->compute_settings,
+					pass->pipeline_storage->pipeline.create_compute_pipeline(pass->settings,
 																			 pass->descriptor_counts.to_slice());
 				};
 				if (rg->multithreaded_pipeline_compilation) {
@@ -826,11 +825,11 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline_storage->pipeline.handle);
 
-				if (rt_settings->pass_func) {
-					rt_settings->pass_func(cmd, *this);
+				if (settings.pass_func) {
+					settings.pass_func(cmd, *this);
 				} else {
-					auto& regions = pipeline_storage->pipeline.get_rt_regions();
-					auto& dims = rt_settings->dims;
+					lm::SmallArray<VkStridedDeviceAddressRegionKHR, vk::NUM_SBT_GROUPS> regions = pipeline_storage->pipeline.get_rt_regions();
+					lm::dim3& dims = settings.dims;
 					vkCmdTraceRaysKHR(cmd, &regions[0], &regions[1], &regions[2], &regions[3], dims.x, dims.y, dims.z);
 				}
 				break;
@@ -838,37 +837,37 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			case vk::PassType::Compute: {
 				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_storage->pipeline.handle);
 
-				if (compute_settings->pass_func) {
-					compute_settings->pass_func(cmd, *this);
+				if (settings.pass_func) {
+					settings.pass_func(cmd, *this);
 				} else {
-					auto& dims = compute_settings->dims;
+					lm::dim3& dims = settings.dims;
 					vkCmdDispatch(cmd, dims.x, dims.y, dims.z);
 				}
 				break;
 			}
 			case vk::PassType::Graphics: {
-				auto& color_outputs = gfx_settings->color_outputs;
-				auto& depth_output = gfx_settings->depth_output;
+				lm::SmallArray<vk::Texture*, vk::MAX_COLOR_ATTACHMENTS>& color_outputs = settings.color_outputs;
+				vk::Texture* depth_output = settings.depth_output;
 				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_storage->pipeline.handle);
 
-				auto& width = gfx_settings->width;
-				auto& height = gfx_settings->height;
+				u32& width = settings.width;
+				u32& height = settings.height;
 				VkViewport viewport = vk::viewport((f32)width, (f32)height, 0.0f, 1.0f);
 				VkRect2D scissor = vk::rect2D(width, height, 0, 0);
 				vkCmdSetViewport(cmd, 0, 1, &viewport);
 				vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-				if (!gfx_settings->vertex_buffers.empty()) {
+				if (!settings.vertex_buffers.empty()) {
 					lm::SmallArray<VkDeviceSize, MAX_VERTEX_BUFFERS> offsets;
 					lm::SmallArray<VkBuffer, MAX_VERTEX_BUFFERS> vert_buffers;
-					for (auto& buf : gfx_settings->vertex_buffers) {
+					for (vk::Buffer* buf : settings.vertex_buffers) {
 						vert_buffers.push_back(buf->handle);
 					}
 					vkCmdBindVertexBuffers(cmd, 0, (u32)vert_buffers.size, vert_buffers.data, offsets.data);
 				}
 
-				if (gfx_settings->index_buffer) {
-					vkCmdBindIndexBuffer(cmd, gfx_settings->index_buffer->handle, 0, gfx_settings->index_type);
+				if (settings.index_buffer) {
+					vkCmdBindIndexBuffer(cmd, settings.index_buffer->handle, 0, settings.index_type);
 				}
 				constexpr u64 MAX_RENDERING_ATTACHMENTS = 4;
 				lm::SmallArray<VkRenderingAttachmentInfo, MAX_RENDERING_ATTACHMENTS> rendering_attachments;
@@ -876,26 +875,26 @@ void RenderPass::run(VkCommandBuffer cmd) {
 					vk::texture_transition(color_output, cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 					rendering_attachments.push_back(vk::rendering_attachment_info(
 						color_output->view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ATTACHMENT_LOAD_OP_CLEAR,
-						VK_ATTACHMENT_STORE_OP_STORE, gfx_settings->clear_color));
+						VK_ATTACHMENT_STORE_OP_STORE, settings.clear_color));
 				}
 				VkRenderingAttachmentInfo depth_stencil_attachment;
 				if (depth_output) {
 					vk::texture_transition(depth_output, cmd, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 					depth_stencil_attachment = vk::rendering_attachment_info(
 						depth_output->view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_ATTACHMENT_LOAD_OP_CLEAR,
-						VK_ATTACHMENT_STORE_OP_STORE, gfx_settings->clear_depth_stencil);
+						VK_ATTACHMENT_STORE_OP_STORE, settings.clear_depth_stencil);
 				}
 
 				// Render
 				{
 					VkRenderingInfo render_info{.sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-												.renderArea = {{0, 0}, {gfx_settings->width, gfx_settings->height}},
+												.renderArea = {{0, 0}, {settings.width, settings.height}},
 												.layerCount = 1,
 												.colorAttachmentCount = (u32)color_outputs.size,
 												.pColorAttachments = rendering_attachments.data,
 												.pDepthAttachment = depth_output ? &depth_stencil_attachment : nullptr};
 					vkCmdBeginRendering(cmd, &render_info);
-					gfx_settings->pass_func(cmd, *this);
+					settings.pass_func(cmd, *this);
 					vkCmdEndRendering(cmd);
 				}
 
@@ -1094,40 +1093,15 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 			if (passes[i].is_pipeline_cached) {
 				continue;
 			}
-			if (passes[i].type == vk::PassType::Graphics) {
-				for (vk::Shader& shader : passes[i].gfx_settings->shaders) {
-					bool entry_created = false;
-					unique_shaders_set.get_or_create({&shader, &passes[i]}, &entry_created);
-					if (!entry_created) {
-						auto entry = existing_shaders_map.get_or_create(&passes[i]);
-						if (!entry->value.initialized()) {
-							entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, vk::MAX_SHADERS_PER_PASS);
-						}
-						entry->value.push_back(&shader);
-					}
-				}
-			} else if (passes[i].type == vk::PassType::RT) {
-				for (auto& shader : passes[i].rt_settings->shaders) {
-					bool entry_created = false;
-					unique_shaders_set.get_or_create({&shader, &passes[i]}, &entry_created);
-					if (!entry_created) {
-						auto entry = existing_shaders_map.get_or_create(&passes[i]);
-						if (!entry->value.initialized()) {
-							entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, vk::MAX_SHADERS_PER_PASS);
-						}
-						entry->value.push_back(&shader);
-					}
-				}
-			} else {
-				// Compute
+			for (vk::Shader& shader : passes[i].settings.shaders) {
 				bool entry_created = false;
-				unique_shaders_set.get_or_create({&passes[i].compute_settings->shader, &passes[i]}, &entry_created);
+				unique_shaders_set.get_or_create({&shader, &passes[i]}, &entry_created);
 				if (!entry_created) {
 					auto entry = existing_shaders_map.get_or_create(&passes[i]);
 					if (!entry->value.initialized()) {
 						entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, vk::MAX_SHADERS_PER_PASS);
 					}
-					entry->value.push_back(&passes[i].compute_settings->shader);
+					entry->value.push_back(&shader);
 				}
 			}
 		}
@@ -1222,6 +1196,7 @@ void RenderGraph::reset() {
 
 		pass.blas_build_data = {};
 		pass.tlas_build_data = {};
+		pass.settings = {};
 	}
 	passes.clear();
 	pipeline_tasks.clear();
@@ -1336,14 +1311,34 @@ void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String&
 	pass.type = type;
 	pass.rg = rg;
 	pass.pass_idx = pass_idx;
-	pass.gfx_settings = std::make_unique<vk::GraphicsPassSettings>(gfx_settings);
-	pass.macro_defines = gfx_settings.macros;
 	pass.pipeline_storage = pipeline_storage;
 	pass.name = name;
 	pass.is_pipeline_cached = cached;
+	vk::PassSettings& settings = pass.settings;
+	// Common
+	settings.shaders = gfx_settings.shaders;
+	settings.macros = gfx_settings.macros;
+	settings.specialization_data = gfx_settings.specialization_data;
+	settings.pass_func = gfx_settings.pass_func;
+	// Graphics
+	settings.width = gfx_settings.width;
+	settings.height = gfx_settings.height;
+	settings.clear_color = gfx_settings.clear_color;
+	settings.clear_depth_stencil = gfx_settings.clear_depth_stencil;
+	settings.cull_mode = gfx_settings.cull_mode;
+	settings.vertex_buffers = gfx_settings.vertex_buffers;
+	settings.index_buffer = gfx_settings.index_buffer;
+	settings.blend_enables = gfx_settings.blend_enables;
+	settings.front_face = gfx_settings.front_face;
+	settings.topology = gfx_settings.topology;
+	settings.polygon_mode = gfx_settings.polygon_mode;
+	settings.sample_count = gfx_settings.sample_count;
+	settings.index_type = gfx_settings.index_type;
+	settings.line_width = gfx_settings.line_width;
+	settings.color_outputs = gfx_settings.color_outputs;
+	settings.depth_output = gfx_settings.depth_output;
 	if (!pass.is_pipeline_cached) {
-		// Shader names need to be persistent for the cache
-		for (auto& shader : pass.gfx_settings->shaders) {
+		for (vk::Shader& shader : settings.shaders) {
 			shader.name_with_macros = lm::str_concat(_arena_rendergraph, shader.filename, macro_string, /*cstr=*/true);
 		}
 	}
@@ -1357,13 +1352,20 @@ void render_pass_init_rt(RenderPass& pass, vk::PassType type, const lm::String& 
 	pass.type = type;
 	pass.rg = rg;
 	pass.pass_idx = pass_idx;
-	pass.rt_settings = std::make_unique<vk::RTPassSettings>(rt_settings);
-	pass.macro_defines = rt_settings.macros;
 	pass.pipeline_storage = pipeline_storage;
 	pass.name = name;
 	pass.is_pipeline_cached = cached;
+	vk::PassSettings& settings = pass.settings;
+	// Common
+	settings.shaders = rt_settings.shaders;
+	settings.macros = rt_settings.macros;
+	settings.specialization_data = rt_settings.specialization_data;
+	settings.dims = rt_settings.dims;
+	settings.pass_func = rt_settings.pass_func;
+	// RT
+	settings.recursion_depth = rt_settings.recursion_depth;
 	if (!pass.is_pipeline_cached) {
-		for (auto& shader : pass.rt_settings->shaders) {
+		for (vk::Shader& shader : settings.shaders) {
 			shader.name_with_macros = lm::str_concat(_arena_rendergraph, shader.filename, macro_string, /*cstr=*/true);
 		}
 	}
@@ -1377,13 +1379,18 @@ void render_pass_init_compute(RenderPass& pass, vk::PassType type, const lm::Str
 	pass.type = type;
 	pass.rg = rg;
 	pass.pass_idx = pass_idx;
-	pass.compute_settings = std::make_unique<vk::ComputePassSettings>(compute_settings);
-	pass.macro_defines = compute_settings.macros;
 	pass.pipeline_storage = pipeline_storage;
 	pass.name = name;
 	pass.is_pipeline_cached = cached;
+	vk::PassSettings& settings = pass.settings;
+	// Common
+	settings.shaders.push_back(compute_settings.shader);
+	settings.macros = compute_settings.macros;
+	settings.specialization_data = compute_settings.specialization_data;
+	settings.dims = compute_settings.dims;
+	settings.pass_func = compute_settings.pass_func;
 	if (!pass.is_pipeline_cached) {
-		pass.compute_settings->shader.name_with_macros =
+		settings.shaders[0].name_with_macros =
 			lm::str_concat(_arena_rendergraph, compute_settings.shader.filename, macro_string, /*cstr=*/true);
 	}
 	pass.init();

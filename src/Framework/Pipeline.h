@@ -13,11 +13,10 @@ struct Pipeline {
 	enum class PipelineType { GFX = 0, RT = 1, COMPUTE = 2 };
 	Pipeline(lm::String name);
 	void cleanup();
-	void create_gfx_pipeline(const GraphicsPassSettings& settings, util::Slice<u32> descriptor_counts,
-							 util::Slice<vk::Texture*> color_outputs, vk::Texture* depth_output);
-	void create_rt_pipeline(const RTPassSettings& settings, util::Slice<u32> descriptor_counts, u32 num_as_bindings);
-	void create_compute_pipeline(const ComputePassSettings& settings, util::Slice<u32> descriptor_counts);
-	const std::array<VkStridedDeviceAddressRegionKHR, 4> get_rt_regions();
+	void create_gfx_pipeline(const PassSettings& settings, util::Slice<u32> descriptor_counts);
+	void create_rt_pipeline(const PassSettings& settings, util::Slice<u32> descriptor_counts, u32 num_as_bindings);
+	void create_compute_pipeline(const PassSettings& settings, util::Slice<u32> descriptor_counts);
+	lm::SmallArray<VkStridedDeviceAddressRegionKHR, NUM_SBT_GROUPS> get_rt_regions();
 
 	VkPipeline handle = VK_NULL_HANDLE;
 	VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;

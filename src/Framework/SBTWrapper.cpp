@@ -111,13 +111,16 @@ VkDeviceAddress SBTWrapper::get_address(GroupType t) {
 	return group_data[t].buffer->device_address();
 }
 
-const VkStridedDeviceAddressRegionKHR SBTWrapper::get_region(GroupType t) {
+VkStridedDeviceAddressRegionKHR SBTWrapper::get_region(GroupType t) {
 	return VkStridedDeviceAddressRegionKHR{get_address(t), get_stride(t), get_size(t)};
 }
 
-const std::array<VkStridedDeviceAddressRegionKHR, 4> SBTWrapper::get_regions() {
-	std::array<VkStridedDeviceAddressRegionKHR, 4> regions{get_region(GROUP_RAYGEN), get_region(GROUP_MISS),
-														   get_region(GROUP_HIT), get_region(GROUP_CALLABLE)};
+lm::SmallArray<VkStridedDeviceAddressRegionKHR, NUM_SBT_GROUPS> SBTWrapper::get_regions() {
+	lm::SmallArray<VkStridedDeviceAddressRegionKHR, NUM_SBT_GROUPS> regions;
+	regions.push_back(get_region(GROUP_RAYGEN));
+	regions.push_back(get_region(GROUP_MISS));
+	regions.push_back(get_region(GROUP_HIT));
+	regions.push_back(get_region(GROUP_CALLABLE));
 	return regions;
 }
 

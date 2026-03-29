@@ -571,9 +571,10 @@ static void create_sync_primitives() {
 	VkFenceCreateInfo fence_info = fence(VK_FENCE_CREATE_SIGNALED_BIT);
 
 	for (u64 i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-		check<2>({vkCreateSemaphore(context().device, &semaphore_info, nullptr, &_image_available_sem[i]),
-				  vkCreateFence(context().device, &fence_info, nullptr, &_in_flight_fences[i])},
-				 "Failed to create synchronization primitives for a frame");
+		check(vkCreateSemaphore(context().device, &semaphore_info, nullptr, &_image_available_sem[i]),
+			  "Failed to create synchronization primitives for a frame");
+		check(vkCreateFence(context().device, &fence_info, nullptr, &_in_flight_fences[i]),
+			  "Failed to create synchronization primitives for a frame");
 	}
 	for (u64 i = 0; i < _swapchain_images.size; i++) {
 		check(vkCreateSemaphore(context().device, &semaphore_info, nullptr, &_render_finished_sem[i]));

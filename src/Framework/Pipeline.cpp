@@ -24,9 +24,8 @@ static u32 get_bindings_for_shader_set(util::Slice<const Shader> shaders, VkDesc
 
 Pipeline::Pipeline(lm::String name) : name(name) {}
 
-void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::Slice<u32> descriptor_counts,
-								   util::Slice<vk::Texture*> color_outputs, vk::Texture* depth_output) {
-	LUMEN_ASSERT(color_outputs.size, "No color outputs for GFX pipeline");
+void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32> descriptor_counts) {
+	LUMEN_ASSERT(settings.color_outputs.size, "No color outputs for GFX pipeline");
 	assert(name.is_cstr());
 	type = PipelineType::GFX;
 	util::Slice<const Shader> shaders_slice = {settings.shaders.data, (u64)settings.shaders.size};
@@ -81,7 +80,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::S
 
 	lm::SmallArray<VkPipelineColorBlendAttachmentState, MAX_COLOR_ATTACHMENTS> blend_attachment_states;
 	if (settings.blend_enables.empty()) {
-		for (u64 i = 0; i < color_outputs.size; ++i) {
+		for (u64 i = 0; i < settings.color_outputs.size; ++i) {
 			blend_attachment_states.push_back(
 				vk::pipeline_color_blend_attachment_state(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
 															  VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
@@ -135,11 +134,11 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::S
 
 	VkFormat depth_format = VK_FORMAT_UNDEFINED;
 	lm::SmallArray<VkFormat, MAX_COLOR_ATTACHMENTS> output_formats;
-	for (vk::Texture* color_output : color_outputs) {
+	for (vk::Texture* color_output : settings.color_outputs) {
 		output_formats.push_back(color_output->format);
 	}
-	if (depth_output) {
-		depth_format = depth_output->format;
+	if (settings.depth_output) {
+		depth_format = settings.depth_output->format;
 	}
 	VkPipelineRenderingCreateInfo pipeline_rendering_create_info{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
@@ -176,7 +175,7 @@ void Pipeline::create_gfx_pipeline(const GraphicsPassSettings& settings, util::S
 	}
 }
 
-void Pipeline::create_rt_pipeline(const RTPassSettings& settings, util::Slice<u32> descriptor_counts,
+void Pipeline::create_rt_pipeline(const PassSettings& settings, util::Slice<u32> descriptor_counts,
 								  u32 num_as_bindings) {
 	assert(name.is_cstr());
 	type = PipelineType::RT;
@@ -306,22 +305,23 @@ void Pipeline::create_rt_pipeline(const RTPassSettings& settings, util::Slice<u3
 	}
 }
 
-void Pipeline::create_compute_pipeline(const ComputePassSettings& settings, util::Slice<u32> descriptor_counts) {
+void Pipeline::create_compute_pipeline(const PassSettings& settings, util::Slice<u32> descriptor_counts) {
 	assert(name.is_cstr());
 	type = PipelineType::COMPUTE;
-	util::Slice<const Shader> shader_slice(const_cast<Shader*>(&settings.shader), 1);
+	const Shader& shader = settings.shaders[0];
+	util::Slice<const Shader> shader_slice(&shader, 1);
 	binding_mask = get_bindings_for_shader_set(shader_slice, descriptor_types);
 
 	create_set_layout(shader_slice, descriptor_counts);
-	if (settings.shader.push_constant_size > 0) {
-		push_constant_size = settings.shader.push_constant_size;
+	if (shader.push_constant_size > 0) {
+		push_constant_size = shader.push_constant_size;
 		create_pipeline_layout(shader_slice, {&push_constant_size, 1});
 	} else {
 		create_pipeline_layout(shader_slice, {});
 	}
 	create_update_template(shader_slice, descriptor_counts);
 
-	auto compute_shader_module = settings.shader.create_vk_shader_module(vk::context().device);
+	auto compute_shader_module = shader.create_vk_shader_module(vk::context().device);
 	VkPipelineShaderStageCreateInfo shader_stage_ci = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
 	shader_stage_ci.pName = "main";
 	shader_stage_ci.stage = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -352,7 +352,7 @@ void Pipeline::create_compute_pipeline(const ComputePassSettings& settings, util
 	}
 }
 
-const std::array<VkStridedDeviceAddressRegionKHR, 4> Pipeline::get_rt_regions() { return sbt_wrapper.get_regions(); }
+lm::SmallArray<VkStridedDeviceAddressRegionKHR, NUM_SBT_GROUPS> Pipeline::get_rt_regions() { return sbt_wrapper.get_regions(); }
 
 void Pipeline::cleanup() {
 	if (handle) {

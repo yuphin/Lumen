@@ -115,14 +115,6 @@ inline void check(VkResult result, const char* msg = 0) {
 	}
 }
 
-template <u64 Size>
-inline void check(std::array<VkResult, Size> results, const char* msg = 0) {
-	for (const auto& result : results) {
-		if (result != VK_SUCCESS) {
-			LUMEN_ERROR(msg ? msg : vk_result_to_str(result));
-		}
-	}
-}
 
 inline VkDebugUtilsMessengerCreateInfoEXT debug_messenger(PFN_vkDebugUtilsMessengerCallbackEXT debug_callback) {
 	VkDebugUtilsMessengerCreateInfoEXT CI = {};

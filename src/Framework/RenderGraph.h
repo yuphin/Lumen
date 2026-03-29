@@ -175,13 +175,10 @@ class RenderPass {
 	vk::PassType type;
 	RenderGraph* rg;
 	u32 pass_idx;
-	std::unique_ptr<vk::GraphicsPassSettings> gfx_settings = nullptr;
-	std::unique_ptr<vk::RTPassSettings> rt_settings = nullptr;
-	std::unique_ptr<vk::ComputePassSettings> compute_settings = nullptr;
-	vk::ShaderMacroArray macro_defines;
 	PipelineStorage* pipeline_storage = nullptr;
 	lm::String name;
 	bool is_pipeline_cached = false;
+	vk::PassSettings settings;
 
    private:
 	lm::SmallArray<Resource, MAX_RESOURCES_ZEROS> resource_zeros;

@@ -1,11 +1,12 @@
-#include "Buffer.h"
-#include <array>
-#include "Framework/Base/SmallArray.h"
 #pragma once
+#include "Buffer.h"
+#include "Framework/Base/SmallArray.h"
 
 namespace vk {
 
 inline constexpr u64 MAX_RT_SHADER_PER_GROUP = 8;
+inline constexpr u64 NUM_SBT_GROUPS = 4;
+
 class SBTWrapper {
    public:
 	enum GroupType { GROUP_RAYGEN, GROUP_MISS, GROUP_HIT, GROUP_CALLABLE };
@@ -21,8 +22,8 @@ class SBTWrapper {
 	u32 get_stride(GroupType t) { return group_data[t].stride; }
 	u32 get_size(GroupType t) { return get_stride(t) * index_count(t); }
 	VkDeviceAddress get_address(GroupType t);
-	const VkStridedDeviceAddressRegionKHR get_region(GroupType t);
-	const std::array<VkStridedDeviceAddressRegionKHR, 4> get_regions();
+	VkStridedDeviceAddressRegionKHR get_region(GroupType t);
+	lm::SmallArray<VkStridedDeviceAddressRegionKHR, NUM_SBT_GROUPS> get_regions();
 
    private:
 	struct GroupData {
@@ -30,8 +31,8 @@ class SBTWrapper {
 		vk::Buffer* buffer = nullptr;
 	};
 
-	std::array<GroupData, 4> group_data = {};
-	std::array<lm::SmallArray<u32, MAX_RT_SHADER_PER_GROUP>, 4> idx_array;
+	GroupData group_data[NUM_SBT_GROUPS] = {};
+	lm::SmallArray<u32, MAX_RT_SHADER_PER_GROUP> idx_array[NUM_SBT_GROUPS];
 };
 
 }  // namespace vk

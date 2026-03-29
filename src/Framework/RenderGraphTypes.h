@@ -155,4 +155,37 @@ struct ComputePassSettings {
 	PassType type = PassType::Compute;
 };
 
+struct PassSettings {
+	////////////////////////////
+	// --- Common ---
+	lm::SmallArray<vk::Shader, vk::MAX_SHADERS_PER_PASS> shaders = {};
+	ShaderMacroArray macros = {};
+	lm::SpecializationConstantArray specialization_data = {};
+	lm::dim3 dims = {};
+	lm::PassFunc pass_func = nullptr;
+
+	////////////////////////////
+	// --- Graphics ---
+	u32 width = 0;
+	u32 height = 0;
+	VkClearValue clear_color = {};
+	VkClearValue clear_depth_stencil = {};
+	VkCullModeFlags cull_mode = VK_CULL_MODE_FRONT_BIT;
+	lm::SmallArray<vk::Buffer*, lm::MAX_VERTEX_BUFFERS> vertex_buffers = {};
+	vk::Buffer* index_buffer = nullptr;
+	lm::SmallArray<bool, MAX_COLOR_ATTACHMENTS> blend_enables = {};
+	VkFrontFace front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
+	VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
+	VkIndexType index_type = VK_INDEX_TYPE_UINT32;
+	f32 line_width = 1.0;
+	lm::SmallArray<vk::Texture*, MAX_COLOR_ATTACHMENTS> color_outputs = {};
+	vk::Texture* depth_output = nullptr;
+
+	////////////////////////////
+	// --- RT ---
+	u32 recursion_depth = 1;
+};
+
 }  // namespace vk

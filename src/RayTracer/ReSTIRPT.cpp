@@ -238,11 +238,10 @@ void ReSTIRPT::render() {
 	const std::initializer_list<lm::ResourceBinding> common_bindings = {
 		output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer};
 
-	const std::array<vk::Buffer*, 2> reservoir_buffers = {gris_reservoir_ping_buffer, gris_reservoir_pong_buffer};
-	const std::array<vk::Buffer*, 2> photon_reservoir_buffers = {caustics_reservoir_ping_buffer,
-																 caustics_reservoir_pong_buffer};
-	const std::array<vk::Buffer*, 2> photon_gbuffers = {photon_eye_buffer_ping, photon_eye_buffer_pong};
-	const std::array<vk::Buffer*, 2> gbuffers = {gris_prev_gbuffer, gris_gbuffer};
+	vk::Buffer* reservoir_buffers[] = {gris_reservoir_ping_buffer, gris_reservoir_pong_buffer};
+	vk::Buffer* photon_reservoir_buffers[] = {caustics_reservoir_ping_buffer, caustics_reservoir_pong_buffer};
+	vk::Buffer* photon_gbuffers[] = {photon_eye_buffer_ping, photon_eye_buffer_pong};
+	vk::Buffer* gbuffers[] = {gris_prev_gbuffer, gris_gbuffer};
 
 	i32 ping = pc_ray.total_frame_num % 2;
 	i32 pong = ping ^ 1;
@@ -571,12 +570,11 @@ bool ReSTIRPT::gui() {
 		return result;
 	}
 	i32 curr_streaming_method = static_cast<i32>(streaming_method);
-	std::array<const char*, 2> streaming_methods = {
+	const char* streaming_methods[] = {
 		"Individual contributions",
 		"Split at reconnection",
 	};
-	if (ImGui::Combo("Streaming method", &curr_streaming_method, streaming_methods.data(),
-					 i32(streaming_methods.size()))) {
+	if (ImGui::Combo("Streaming method", &curr_streaming_method, streaming_methods, ARRAY_LEN(streaming_methods))) {
 		result = true;
 		streaming_method = static_cast<StreamingMethod>(curr_streaming_method);
 	}
@@ -591,12 +589,12 @@ bool ReSTIRPT::gui() {
 	result |= ImGui::Checkbox("Enable permutation sampling", &enable_permutation_sampling);
 	result |= ImGui::Checkbox("Enable spatial reuse", &enable_spatial_reuse);
 	result |= ImGui::Checkbox("Hide reconnection radiance", &hide_reconnection_radiance);
-	std::array<const char*, 2> mis_methods = {
+	const char* mis_methods[] = {
 		"Talbot (Reconnection only)",
 		"Pairwise",
 	};
 	i32 curr_mis_method = static_cast<i32>(mis_method);
-	if (ImGui::Combo("MIS method", &curr_mis_method, mis_methods.data(), i32(mis_methods.size()))) {
+	if (ImGui::Combo("MIS method", &curr_mis_method, mis_methods, ARRAY_LEN(mis_methods))) {
 		result = true;
 		mis_method = static_cast<MISMethod>(curr_mis_method);
 	}

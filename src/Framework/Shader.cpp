@@ -483,7 +483,7 @@ static std::vector<u32> compile_file(const lm::String& source_name, shaderc_shad
 	shaderc::Compiler compiler;
 	shaderc::CompileOptions options;
 
-	add_macros(pass->macro_defines, options);
+	add_macros(pass->settings.macros, options);
 	add_macros(pass->rg->global_macro_defines, options);
 	if (optimize) {
 		options.SetOptimizationLevel(shaderc_optimization_level_size);
