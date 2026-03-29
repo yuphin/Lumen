@@ -34,7 +34,7 @@ void camera_update_view(Camera* camera) {
 	camera_matrix = glm::rotate(camera_matrix, glm::radians(camera->rotation.x), RIGHT);
 	camera_matrix = glm::rotate(camera_matrix, glm::radians(camera->rotation.z), FORWARD);
 	camera->view = glm::inverse(camera_matrix);
-	camera->direction = glm::vec3(-camera->view[0][2], -camera->view[1][2], camera->view[2][2]);
+	camera->direction = glm::vec3(-camera->view[0][2], -camera->view[1][2], -camera->view[2][2]);
 }
 
 void camera_rotate(Camera* camera, f32 rx, f32 ry, f32 rz) {
