@@ -55,13 +55,13 @@ static bool is_read_flag(VkAccessFlags flags) {
 void RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags dst_access_flags,
 									   BufferSyncFlags flags) {
 	// Invariant : Pass with lower index should be the setter before the cmd buffer submission
-	bool pass_found = rg->buffer_resource_map.find(buffer->handle) != nullptr;
-	if (!pass_found ||
-		(is_read_flag(dst_access_flags) && is_read_flag(rg->buffer_resource_map.find(buffer->handle)->value.second))) {
+	auto* entry = rg->buffer_resource_map.find(buffer->handle);
+
+	if (!entry || (is_read_flag(dst_access_flags) && is_read_flag(entry->value.second))) {
 		return;
 	}
-	u32 opposing_pass_idx = rg->buffer_resource_map.find(buffer->handle)->value.first;
-	VkAccessFlags src_access_flags = rg->buffer_resource_map.find(buffer->handle)->value.second;
+	u32 opposing_pass_idx = entry->value.first;
+	VkAccessFlags src_access_flags = entry->value.second;
 	// If this condition fails, that means the cmd buffer is already submitted last frame
 	// For single cmd buffer setup, ignoring the else condition would be fine
 	// However when multiple cmd buffers are in flight, we must still ensure the synchronization
@@ -528,7 +528,7 @@ RenderPass& RenderPass::push_constants(void* data, u64 size, u64 alignment) {
 
 RenderPass& RenderPass::zero(const Resource& resource) {
 	if (resource.tex) {
-		LUMEN_ERROR("Unimplemented: Immage zeroing");
+		LUMEN_ERROR("Unimplemented: Image zeroing");
 	}
 	resource_zeros.push_back(resource);
 	return *this;
@@ -700,7 +700,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	for (const auto& entry : wait_signals_buffer) {
 		VkBuffer buffer = entry.key;
 		const BufferSyncDescriptor& v = entry.value;
-		VkBufferMemoryBarrier2& buffer_barrier = buffer_sync.buffer_bariers.push();
+		VkBufferMemoryBarrier2& buffer_barrier = buffer_sync.buffer_barriers.push();
 		buffer_barrier =
 			vk::buffer_barrier2(entry.key, v.src_access_flags, v.dst_access_flags,
 								pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, v.src_access_flags),
@@ -715,7 +715,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	if (wait_events.size) {
 		vkCmdWaitEvents2(cmd, (u32)wait_events.size, wait_events.data, buffer_sync.dependency_infos.data);
 		for (i32 i = 0; i < wait_events.size; i++) {
-			vkCmdResetEvent2(cmd, wait_events[i], buffer_sync.buffer_bariers[i].dstStageMask);
+			vkCmdResetEvent2(cmd, wait_events[i], buffer_sync.buffer_barriers[i].dstStageMask);
 		}
 	} else if (!use_events) {
 		for (const auto& info : buffer_sync.dependency_infos) {
@@ -1091,7 +1091,6 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 			scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
 		auto unique_shaders_map = lm::hash_map_create<RenderPass*, lm::FixedArray<vk::Shader*>>(
 			scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
-		std::unordered_map<RenderPass*, std::vector<vk::Shader*>> existing_shaders;
 
 		for (auto i = 0; i < passes.size; i++) {
 			if (passes[i].is_pipeline_cached) {
@@ -1102,7 +1101,6 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 					bool entry_created = false;
 					unique_shaders_set.get_or_create({&shader, &passes[i]}, &entry_created);
 					if (!entry_created) {
-						existing_shaders[&passes[i]].push_back(&shader);
 						auto entry = existing_shaders_map.get_or_create(&passes[i]);
 						if (!entry->value.initialized()) {
 							entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, vk::MAX_SHADERS_PER_PASS);
@@ -1115,7 +1113,6 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 					bool entry_created = false;
 					unique_shaders_set.get_or_create({&shader, &passes[i]}, &entry_created);
 					if (!entry_created) {
-						existing_shaders[&passes[i]].push_back(&shader);
 						auto entry = existing_shaders_map.get_or_create(&passes[i]);
 						if (!entry->value.initialized()) {
 							entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, vk::MAX_SHADERS_PER_PASS);
@@ -1128,7 +1125,6 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 				bool entry_created = false;
 				unique_shaders_set.get_or_create({&passes[i].compute_settings->shader, &passes[i]}, &entry_created);
 				if (!entry_created) {
-					existing_shaders[&passes[i]].push_back(&passes[i].compute_settings->shader);
 					auto entry = existing_shaders_map.get_or_create(&passes[i]);
 					if (!entry->value.initialized()) {
 						entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, vk::MAX_SHADERS_PER_PASS);
@@ -1138,7 +1134,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 			}
 		}
 
-		std::vector<std::future<void>> futures;
+		lm::SmallArray<std::future<void>, MAX_PIPELINE_TASKS * 4> futures;
 		for (const auto& entry : unique_shaders_set) {
 			vk::Shader* shader = entry.key.first;
 			RenderPass* rp = entry.key.second;
@@ -1151,7 +1147,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		}
 		// Compile and process resources for unique shaders
 		for (const auto& [hash, pass, shaders] : unique_shaders_map) {
-			futures.push_back(ThreadPool::submit(std::bind(&build_shaders, pass, shaders)));
+			futures.push_back_move(ThreadPool::submit(std::bind(&build_shaders, pass, shaders)));
 		}
 		for (auto& future : futures) {
 			future.wait();
@@ -1159,7 +1155,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		futures.clear();
 		// Process resources for duplicate shaders
 		for (const auto& [hash, pass, shaders] : existing_shaders_map) {
-			futures.push_back(ThreadPool::submit(std::bind(&build_shaders, pass, shaders)));
+			futures.push_back_move(ThreadPool::submit(std::bind(&build_shaders, pass, shaders)));
 		}
 		for (auto& future : futures) {
 			future.wait();
@@ -1171,11 +1167,10 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	}
 
 	if (pipeline_tasks.size) {
-		std::vector<std::future<void>> futures;
-		futures.reserve(pipeline_tasks.size);
+		lm::SmallArray<std::future<void>, MAX_PIPELINE_TASKS> futures;
 		for (auto& [task, idx] : pipeline_tasks) {
 			if (task) {
-				futures.push_back(ThreadPool::submit(task, &passes[idx]));
+				futures.push_back_move(ThreadPool::submit(task, &passes[idx]));
 			}
 		}
 		for (auto& future : futures) {
@@ -1206,7 +1201,7 @@ void RenderGraph::reset() {
 		pass.prefill_buffer_barriers.clear();
 		pass.carryover_buffer_barriers.clear();
 		pass.resource_copies.clear();
-		pass.buffer_sync_resources.buffer_bariers.clear();
+		pass.buffer_sync_resources.buffer_barriers.clear();
 		pass.buffer_sync_resources.dependency_infos.clear();
 		pass.image_sync_resources.img_barriers.clear();
 		pass.image_sync_resources.dependency_infos.clear();
@@ -1267,7 +1262,7 @@ static void populate_macros(lm::Arena* arena, const vk::ShaderMacroArray& macros
 		}
 		if (macros[i].has_val) {
 			macro_string = lm::str_concat(arena, macro_string, "=");
-			macro_string = lm::str_concat(arena, macro_string, lm::str_from_s64(_arena_rendergraph, macros[i].val));
+			macro_string = lm::str_concat(arena, macro_string, lm::str_from_s64(arena, macros[i].val));
 		}
 	}
 }

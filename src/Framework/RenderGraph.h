@@ -45,7 +45,7 @@ struct PipelineStorage {
 };
 
 struct BufferSyncResources {
-	lm::SmallArray<VkBufferMemoryBarrier2, MAX_BUFFER_BARRIERS> buffer_bariers;
+	lm::SmallArray<VkBufferMemoryBarrier2, MAX_BUFFER_BARRIERS> buffer_barriers;
 	lm::SmallArray<VkDependencyInfo, MAX_BUFFER_BARRIERS> dependency_infos;
 };
 struct ImageSyncResources {
@@ -217,7 +217,7 @@ class RenderPass {
 	void* push_constant_data = nullptr;
 	bool disable_execution = false;
 	bool resources_initialized = false;
-	vk::DescriptorInfo descriptor_infos[32] = {};
+	vk::DescriptorInfo descriptor_infos[MAX_DESCRIPTORS] = {};
 
 	RenderPass& read(vk::Texture* tex);
 	RenderPass& read(vk::Buffer* buffer);

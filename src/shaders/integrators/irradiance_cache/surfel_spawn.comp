@@ -77,7 +77,7 @@ void main() {
 
 				vec3 diff = hit_data.pos - surfel.pos;
 				float dist = length(diff);
-				if (dist > surfel.radius) continue;
+				if (dist > 2 *  surfel.radius) continue;
 
 				float n_dot = dot(hit_data.n_s, surfel.n_s);
 				if (n_dot < 0.3) continue;
@@ -85,9 +85,9 @@ void main() {
 				float dist_normal = dot(diff, surfel.n_s);
 				float dist_tangent = sqrt(max(0.0, dist * dist - dist_normal * dist_normal));
 				float dist_aniso = sqrt(dist_tangent * dist_tangent + 4.0 * dist_normal * dist_normal);
-				if (dist_aniso > surfel.radius) continue;
+				if (dist_aniso >  2 * surfel.radius) continue;
 
-				float weight = (1.0 - dist_aniso / surfel.radius) * n_dot;
+				float weight = (1.0 - dist_aniso / (2 * surfel.radius)) * n_dot;
 				coverage += weight;
 			}
 		}

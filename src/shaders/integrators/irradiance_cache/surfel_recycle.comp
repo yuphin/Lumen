@@ -1,0 +1,45 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#extension GL_KHR_shader_subgroup_ballot : enable
+
+#include "ir_commons.h"
+layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
+layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellIndices { uint d[]; };
+
+Indices indices = Indices(scene_desc.index_addr);
+Materials materials = Materials(scene_desc.material_addr);
+InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
+CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
+GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
+GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
+
+#include "ir_commons.glsl"
+#include "grid.glsl"
+
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnList { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnCount { uint d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
+
+InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
+SpawnList spawn_list = SpawnList(scene_desc.surfel_spawn_list_addr);
+SpawnCount spawn_count = SpawnCount(scene_desc.surfel_spawn_count_addr);
+SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
+
+layout(local_size_x = SURFELIZE_PASS_TILE_SIZE_XY, local_size_y = SURFELIZE_PASS_TILE_SIZE_XY, local_size_z = 1) in;
+
+void main() {
+}

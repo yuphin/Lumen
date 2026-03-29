@@ -8,7 +8,7 @@ static u32 get_total_grid_cells() {
 	u32 num_trapezoidal_cells =
 		6 * GRID_TRAPEZOIDAL_CELL_COUNT_AXIS * GRID_TRAPEZOIDAL_CELL_COUNT_AXIS * GRID_TRAPEZOIDAL_CELL_COUNT_AXIS;
 	// The +1 is for the last last cell when we're getting the surfel count from cell offsets
-	return num_uniform_cells + num_trapezoidal_cells + 1; 
+	return num_uniform_cells + num_trapezoidal_cells + 1;
 }
 
 static f32 get_max_uniform_cells(f32 desired_surfel_radius_px, f32 p11, f32 height) {
@@ -201,7 +201,7 @@ void IrradianceCache::init() {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
 
 	pc.desired_surfel_radius_px = 8;
-	pc.grid_uniform_cell_distance_threshold = 10;
+	pc.grid_uniform_cell_distance_threshold = 0.1;
 	frame_num = 0;
 	// Clear surfel pool
 	vk::CommandBuffer cmd(true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -253,6 +253,13 @@ void IrradianceCache::render() {
 	if (true) {
 		u32 max_tiles_x = util::div_ceil(Window::width(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		u32 max_tiles_y = util::div_ceil(Window::height(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
+		vk::render_graph()
+			->add_compute(CSTR("Surfel: Recycle"),
+						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_recycle.comp")),
+						   .dims = {max_tiles_x, max_tiles_y, 1}})
+			.push_constants(&pc)
+			.zero(surfel_spawn_count_buffer)
+			.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer});
 		vk::render_graph()
 			->add_compute(CSTR("Surfel: Spawn"),
 						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_spawn.comp")),
