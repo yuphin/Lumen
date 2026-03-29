@@ -52,6 +52,174 @@ static bool is_read_flag(VkAccessFlags flags) {
 		   (VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR);
 }
 
+static void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg,
+								 u32 pass_idx, const vk::GraphicsPassSettings& gfx_settings,
+								 const lm::String& macro_string, PipelineStorage* pipeline_storage, bool cached) {
+	assert(name.is_cstr());
+	pass.type = type;
+	pass.rg = rg;
+	pass.pass_idx = pass_idx;
+	pass.pipeline_storage = pipeline_storage;
+	pass.name = name;
+	pass.is_pipeline_cached = cached;
+	vk::PassSettings& settings = pass.settings;
+	// Common
+	settings.shaders = gfx_settings.shaders;
+	settings.macros = gfx_settings.macros;
+	settings.specialization_data = gfx_settings.specialization_data;
+	settings.pass_func = gfx_settings.pass_func;
+	// Graphics
+	settings.width = gfx_settings.width;
+	settings.height = gfx_settings.height;
+	settings.clear_color = gfx_settings.clear_color;
+	settings.clear_depth_stencil = gfx_settings.clear_depth_stencil;
+	settings.cull_mode = gfx_settings.cull_mode;
+	settings.vertex_buffers = gfx_settings.vertex_buffers;
+	settings.index_buffer = gfx_settings.index_buffer;
+	settings.blend_enables = gfx_settings.blend_enables;
+	settings.front_face = gfx_settings.front_face;
+	settings.topology = gfx_settings.topology;
+	settings.polygon_mode = gfx_settings.polygon_mode;
+	settings.sample_count = gfx_settings.sample_count;
+	settings.index_type = gfx_settings.index_type;
+	settings.line_width = gfx_settings.line_width;
+	settings.color_outputs = gfx_settings.color_outputs;
+	settings.depth_output = gfx_settings.depth_output;
+	if (!pass.is_pipeline_cached) {
+		for (vk::Shader& shader : settings.shaders) {
+			shader.name_with_macros = lm::str_concat(_arena_rendergraph, shader.filename, macro_string, /*cstr=*/true);
+		}
+	}
+	pass.init();
+}
+
+static void render_pass_init_rt(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg,
+								u32 pass_idx, const vk::RTPassSettings& rt_settings, const lm::String& macro_string,
+								PipelineStorage* pipeline_storage, bool cached) {
+	assert(name.is_cstr());
+	pass.type = type;
+	pass.rg = rg;
+	pass.pass_idx = pass_idx;
+	pass.pipeline_storage = pipeline_storage;
+	pass.name = name;
+	pass.is_pipeline_cached = cached;
+	vk::PassSettings& settings = pass.settings;
+	// Common
+	settings.shaders = rt_settings.shaders;
+	settings.macros = rt_settings.macros;
+	settings.specialization_data = rt_settings.specialization_data;
+	settings.dims = rt_settings.dims;
+	settings.pass_func = rt_settings.pass_func;
+	// RT
+	settings.recursion_depth = rt_settings.recursion_depth;
+	if (!pass.is_pipeline_cached) {
+		for (vk::Shader& shader : settings.shaders) {
+			shader.name_with_macros = lm::str_concat(_arena_rendergraph, shader.filename, macro_string, /*cstr=*/true);
+		}
+	}
+	pass.init();
+}
+
+static void render_pass_init_compute(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg,
+									 u32 pass_idx, const vk::ComputePassSettings& compute_settings,
+									 const lm::String& macro_string, PipelineStorage* pipeline_storage, bool cached) {
+	assert(name.is_cstr());
+	pass.type = type;
+	pass.rg = rg;
+	pass.pass_idx = pass_idx;
+	pass.pipeline_storage = pipeline_storage;
+	pass.name = name;
+	pass.is_pipeline_cached = cached;
+	vk::PassSettings& settings = pass.settings;
+	// Common
+	settings.shaders.push_back(compute_settings.shader);
+	settings.macros = compute_settings.macros;
+	settings.specialization_data = compute_settings.specialization_data;
+	settings.dims = compute_settings.dims;
+	settings.pass_func = compute_settings.pass_func;
+	if (!pass.is_pipeline_cached) {
+		settings.shaders[0].name_with_macros =
+			lm::str_concat(_arena_rendergraph, compute_settings.shader.filename, macro_string, /*cstr=*/true);
+	}
+	pass.init();
+}
+
+static void process_bindless_resources(RenderPass* pass, vk::Shader& shader) {
+	if (!pass->rg->settings.shader_inference) {
+		return;
+	}
+	for (const auto& entry : shader.buffer_status_map) {
+		pass->pipeline_storage->affected_buffer_pointers.insert(entry.key, entry.value);
+	}
+}
+
+static void process_bindings(RenderPass* pass, vk::Shader& shader) {
+	for (const auto& entry : shader.resource_binding_map) {
+		assert(entry.key < pass->pipeline_storage->bound_resources.size);
+		pass->pipeline_storage->bound_resources[entry.key].active = entry.value.active;
+		pass->pipeline_storage->bound_resources[entry.key].read = entry.value.read;
+		pass->pipeline_storage->bound_resources[entry.key].write = entry.value.write;
+	}
+}
+
+static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& active_shaders) {
+	// TODO: make resource processing in order
+	switch (pass->type) {
+		case vk::PassType::RT:
+		case vk::PassType::Graphics: {
+			lm::SmallArray<std::future<vk::Shader*>, vk::MAX_SHADERS_PER_PASS> shader_tasks;
+			for (auto& shader : active_shaders) {
+				pass->rg->shader_map_mutex.lock();
+				auto shader_entry = pass->rg->shader_cache.find(shader->name_with_macros);
+				pass->rg->shader_map_mutex.unlock();
+				if (shader_entry) {
+					*shader = shader_entry->value;
+				} else {
+					shader_tasks.push_back_move(ThreadPool::submit(
+						[pass](vk::Shader* shader) {
+							shader->compile(pass);
+							return shader;
+						},
+						shader));
+				}
+				// shader->compile(pass);
+			}
+			for (auto& task : shader_tasks) {
+				auto shader = task.get();
+				{
+					std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
+					pass->rg->shader_cache.insert(shader->name_with_macros, *shader);
+				}
+			}
+			for (auto& shader : active_shaders) {
+				process_bindless_resources(pass, *shader);
+				process_bindings(pass, *shader);
+			}
+		} break;
+		case vk::PassType::Compute: {
+			for (auto& shader : active_shaders) {
+				pass->rg->shader_map_mutex.lock();
+				auto shader_entry = pass->rg->shader_cache.find(shader->name_with_macros);
+				pass->rg->shader_map_mutex.unlock();
+				if (shader_entry) {
+					*shader = shader_entry->value;
+				} else {
+					shader->compile(pass);
+					{
+						std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
+						pass->rg->shader_cache.insert(shader->name_with_macros, *shader);
+					}
+				}
+				// shader->compile(pass);
+				pass->pipeline_storage->affected_buffer_pointers = shader->buffer_status_map;
+				process_bindings(pass, *shader);
+			}
+		} break;
+		default:
+			break;
+	}
+}
+
 void RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags dst_access_flags,
 									   BufferSyncFlags flags) {
 	// Invariant : Pass with lower index should be the setter before the cmd buffer submission
@@ -242,82 +410,6 @@ void RenderPass::transition_resources() {
 			read_impl(buf, VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_SHADER_READ_BIT,
 					  BufferSyncFlags::BUFFER_AS_BUILD);
 		}
-	}
-}
-
-static void process_bindless_resources(RenderPass* pass, vk::Shader& shader) {
-	if (!pass->rg->settings.shader_inference) {
-		return;
-	}
-	for (const auto& entry : shader.buffer_status_map) {
-		pass->pipeline_storage->affected_buffer_pointers.insert(entry.key, entry.value);
-	}
-}
-
-static void process_bindings(RenderPass* pass, vk::Shader& shader) {
-	for (const auto& entry : shader.resource_binding_map) {
-		assert(entry.key < pass->pipeline_storage->bound_resources.size);
-		pass->pipeline_storage->bound_resources[entry.key].active = entry.value.active;
-		pass->pipeline_storage->bound_resources[entry.key].read = entry.value.read;
-		pass->pipeline_storage->bound_resources[entry.key].write = entry.value.write;
-	}
-}
-
-static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& active_shaders) {
-	// TODO: make resource processing in order
-	switch (pass->type) {
-		case vk::PassType::RT:
-		case vk::PassType::Graphics: {
-			lm::SmallArray<std::future<vk::Shader*>, vk::MAX_SHADERS_PER_PASS> shader_tasks;
-			for (auto& shader : active_shaders) {
-				pass->rg->shader_map_mutex.lock();
-				auto shader_entry = pass->rg->shader_cache.find(shader->name_with_macros);
-				pass->rg->shader_map_mutex.unlock();
-				if (shader_entry) {
-					*shader = shader_entry->value;
-				} else {
-					shader_tasks.push_back_move(ThreadPool::submit(
-						[pass](vk::Shader* shader) {
-							shader->compile(pass);
-							return shader;
-						},
-						shader));
-				}
-				// shader->compile(pass);
-			}
-			for (auto& task : shader_tasks) {
-				auto shader = task.get();
-				{
-					std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
-					pass->rg->shader_cache.insert(shader->name_with_macros, *shader);
-				}
-			}
-			for (auto& shader : active_shaders) {
-				process_bindless_resources(pass, *shader);
-				process_bindings(pass, *shader);
-			}
-		} break;
-		case vk::PassType::Compute: {
-			for (auto& shader : active_shaders) {
-				pass->rg->shader_map_mutex.lock();
-				auto shader_entry = pass->rg->shader_cache.find(shader->name_with_macros);
-				pass->rg->shader_map_mutex.unlock();
-				if (shader_entry) {
-					*shader = shader_entry->value;
-				} else {
-					shader->compile(pass);
-					{
-						std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
-						pass->rg->shader_cache.insert(shader->name_with_macros, *shader);
-					}
-				}
-				// shader->compile(pass);
-				pass->pipeline_storage->affected_buffer_pointers = shader->buffer_status_map;
-				process_bindings(pass, *shader);
-			}
-		} break;
-		default:
-			break;
 	}
 }
 
@@ -616,8 +708,8 @@ void RenderPass::finalize() {
 		switch (type) {
 			case vk::PassType::Graphics: {
 				auto func = [](RenderPass* pass) {
-					pass->pipeline_storage->pipeline.create_gfx_pipeline(
-						pass->settings, pass->descriptor_counts.to_slice());
+					pass->pipeline_storage->pipeline.create_gfx_pipeline(pass->settings,
+																		 pass->descriptor_counts.to_slice());
 				};
 				if (rg->multithreaded_pipeline_compilation) {
 					rg->pipeline_tasks.push_back({func, pass_idx});
@@ -828,7 +920,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				if (settings.pass_func) {
 					settings.pass_func(cmd, *this);
 				} else {
-					lm::SmallArray<VkStridedDeviceAddressRegionKHR, vk::NUM_SBT_GROUPS> regions = pipeline_storage->pipeline.get_rt_regions();
+					lm::SmallArray<VkStridedDeviceAddressRegionKHR, vk::NUM_SBT_GROUPS> regions =
+						pipeline_storage->pipeline.get_rt_regions();
 					lm::dim3& dims = settings.dims;
 					vkCmdTraceRaysKHR(cmd, &regions[0], &regions[1], &regions[2], &regions[3], dims.x, dims.y, dims.z);
 				}
@@ -1302,98 +1395,6 @@ void RenderGraph::destroy() {
 lm::Arena* RenderGraph::arena() {
 	assert(_arena_rendergraph);
 	return _arena_rendergraph;
-}
-
-void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
-						  const vk::GraphicsPassSettings& gfx_settings, const lm::String& macro_string,
-						  PipelineStorage* pipeline_storage, bool cached) {
-	assert(name.is_cstr());
-	pass.type = type;
-	pass.rg = rg;
-	pass.pass_idx = pass_idx;
-	pass.pipeline_storage = pipeline_storage;
-	pass.name = name;
-	pass.is_pipeline_cached = cached;
-	vk::PassSettings& settings = pass.settings;
-	// Common
-	settings.shaders = gfx_settings.shaders;
-	settings.macros = gfx_settings.macros;
-	settings.specialization_data = gfx_settings.specialization_data;
-	settings.pass_func = gfx_settings.pass_func;
-	// Graphics
-	settings.width = gfx_settings.width;
-	settings.height = gfx_settings.height;
-	settings.clear_color = gfx_settings.clear_color;
-	settings.clear_depth_stencil = gfx_settings.clear_depth_stencil;
-	settings.cull_mode = gfx_settings.cull_mode;
-	settings.vertex_buffers = gfx_settings.vertex_buffers;
-	settings.index_buffer = gfx_settings.index_buffer;
-	settings.blend_enables = gfx_settings.blend_enables;
-	settings.front_face = gfx_settings.front_face;
-	settings.topology = gfx_settings.topology;
-	settings.polygon_mode = gfx_settings.polygon_mode;
-	settings.sample_count = gfx_settings.sample_count;
-	settings.index_type = gfx_settings.index_type;
-	settings.line_width = gfx_settings.line_width;
-	settings.color_outputs = gfx_settings.color_outputs;
-	settings.depth_output = gfx_settings.depth_output;
-	if (!pass.is_pipeline_cached) {
-		for (vk::Shader& shader : settings.shaders) {
-			shader.name_with_macros = lm::str_concat(_arena_rendergraph, shader.filename, macro_string, /*cstr=*/true);
-		}
-	}
-	pass.init();
-}
-
-void render_pass_init_rt(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
-						 const vk::RTPassSettings& rt_settings, const lm::String& macro_string,
-						 PipelineStorage* pipeline_storage, bool cached) {
-	assert(name.is_cstr());
-	pass.type = type;
-	pass.rg = rg;
-	pass.pass_idx = pass_idx;
-	pass.pipeline_storage = pipeline_storage;
-	pass.name = name;
-	pass.is_pipeline_cached = cached;
-	vk::PassSettings& settings = pass.settings;
-	// Common
-	settings.shaders = rt_settings.shaders;
-	settings.macros = rt_settings.macros;
-	settings.specialization_data = rt_settings.specialization_data;
-	settings.dims = rt_settings.dims;
-	settings.pass_func = rt_settings.pass_func;
-	// RT
-	settings.recursion_depth = rt_settings.recursion_depth;
-	if (!pass.is_pipeline_cached) {
-		for (vk::Shader& shader : settings.shaders) {
-			shader.name_with_macros = lm::str_concat(_arena_rendergraph, shader.filename, macro_string, /*cstr=*/true);
-		}
-	}
-	pass.init();
-}
-
-void render_pass_init_compute(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg,
-							  u32 pass_idx, const vk::ComputePassSettings& compute_settings,
-							  const lm::String& macro_string, PipelineStorage* pipeline_storage, bool cached) {
-	assert(name.is_cstr());
-	pass.type = type;
-	pass.rg = rg;
-	pass.pass_idx = pass_idx;
-	pass.pipeline_storage = pipeline_storage;
-	pass.name = name;
-	pass.is_pipeline_cached = cached;
-	vk::PassSettings& settings = pass.settings;
-	// Common
-	settings.shaders.push_back(compute_settings.shader);
-	settings.macros = compute_settings.macros;
-	settings.specialization_data = compute_settings.specialization_data;
-	settings.dims = compute_settings.dims;
-	settings.pass_func = compute_settings.pass_func;
-	if (!pass.is_pipeline_cached) {
-		settings.shaders[0].name_with_macros =
-			lm::str_concat(_arena_rendergraph, compute_settings.shader.filename, macro_string, /*cstr=*/true);
-	}
-	pass.init();
 }
 
 }  // namespace lm

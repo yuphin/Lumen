@@ -243,17 +243,4 @@ class RenderPass {
 	void run(VkCommandBuffer cmd);
 };
 
-void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
-						  const vk::GraphicsPassSettings& gfx_settings, const lm::String& macro_string,
-						  PipelineStorage* pipeline_storage, bool cached = false);
-
-void render_pass_init_rt(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
-						 const vk::RTPassSettings& rt_settings, const lm::String& macro_string,
-						 PipelineStorage* pipeline_storage, bool cached = false);
-
-void render_pass_init_compute(RenderPass&, vk::PassType type, const lm::String& name, RenderGraph* rg, u32 pass_idx,
-							  const vk::ComputePassSettings& compute_settings, const lm::String& macro_string,
-							  PipelineStorage* pipeline_storage, bool cached = false);
-
-
 }  // namespace lm
