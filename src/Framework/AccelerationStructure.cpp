@@ -409,7 +409,7 @@ BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first
 	// Indicate identity transform by setting transformData to null device
 	// pointer.
 	// triangles.transformData = {};
-	triangles.maxVertex = vtx_count;
+	triangles.maxVertex = vtx_offset + vtx_count - 1;
 
 	// Identify the above data as containing opaque triangles.
 	VkAccelerationStructureGeometryKHR asGeom{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
