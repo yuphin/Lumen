@@ -28,18 +28,73 @@ GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_add
 
 #include "ir_commons.glsl"
 #include "grid.glsl"
+#include "surfel_commons.glsl"
 
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnList { uint d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnCount { uint d; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStackCount { int d; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStack { uint d[]; };
 
 InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
 SpawnList spawn_list = SpawnList(scene_desc.surfel_spawn_list_addr);
 SpawnCount spawn_count = SpawnCount(scene_desc.surfel_spawn_count_addr);
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
+SurfelFreeStackCount free_stack_count = SurfelFreeStackCount(scene_desc.surfel_free_stack_count_addr);
+SurfelFreeStack free_stack = SurfelFreeStack(scene_desc.surfel_free_stack_addr);
 
-layout(local_size_x = SURFELIZE_PASS_TILE_SIZE_XY, local_size_y = SURFELIZE_PASS_TILE_SIZE_XY, local_size_z = 1) in;
+layout(local_size_x = SURFELIZE_PASS_TILE_SIZE_XY, local_size_y = 1, local_size_z = 1) in;
+
+float max_px_per_trapezoidal_cell() {
+	float px_vertical = ubo.projection[1][1] * pc.height / GRID_TRAPEZOIDAL_CELL_COUNT_AXIS;
+	return abs(px_vertical);
+}
+
+void recycle_surfel(uint surfel_id) {
+	surfel_pool.d[surfel_id].radius = 0;
+	int idx = atomicAdd(free_stack_count.d, 1);
+	free_stack.d[idx] = surfel_id;
+}
 
 void main() {
+	uint tid = gl_GlobalInvocationID.x;
+	if (tid >= MAX_SURFEL_COUNT) {
+		return;
+	}
+	Surfel surfel = surfel_pool.d[tid];
+
+	if (surfel.radius <= 0.0f) {
+		return;
+	}
+
+	vec4 view_pos = ubo.view * vec4(surfel.pos, 1.0);
+	// Surfel is behind the camera
+	if (view_pos.z >= 0.0) {
+		// TODO: Handle this later
+		return;
+	}
+	float px_size = 2 * surfel_px_size(surfel, view_pos);
+	float max_cell_size = max_px_per_trapezoidal_cell();
+	// float max_cell_size = 4 * pc.desired_surfel_radius_px;0.5  * 0.5  * 0.5  * 0.5  * 0.5  * 0.5  * 0.5  * 0.5  *
+	// if(px_size >= 1.01 * pc.desired_surfel_radius_px) {
+
+	float max_allowed_cell_size = floor(max_cell_size) - pc.desired_surfel_radius_px;
+	if(tid == 0) {
+		// LOG1("%f\n", max_allowed_cell_size);
+	}
+
+	if (px_size >= max_allowed_cell_size) {
+		// LOG3("Surfel (%u) px size %f, %f\n", tid, px_size, view_pos.z);
+		// LOG2("Recycling surfel (%u) with radius %f\n", tid, view_pos.z);
+		recycle_surfel(tid);
+		return;
+	}
+
+	if (px_size < pc.desired_surfel_radius_px) {
+		// LOG3("Surfel (%u) px size %f, %f\n", tid, px_size, view_pos.z);
+		// LOG2("Recycling surfel (%u) with radius %f\n", tid, view_pos.z);
+		recycle_surfel(tid);
+		return;
+	}
 }

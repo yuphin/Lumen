@@ -87,7 +87,7 @@ static void scroll_callback(GLFWwindow* window, double x, double y) {
 	for (auto& cb : window_ptr->mouse_scroll_callbacks) cb(x, y);
 }
 
-void init(i32 width, i32 height, bool fullscreen) {
+void init(i32 width, i32 height, bool fullscreen, bool on_second_monitor) {
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	_window.window_handle =
@@ -105,6 +105,16 @@ void init(i32 width, i32 height, bool fullscreen) {
 	// Viewport and window sizes are the same for now
 	_window.viewport_width = width;
 	_window.viewport_height = height;
+
+	if (on_second_monitor) {
+		int count;
+		GLFWmonitor** monitors = glfwGetMonitors(&count);
+		int target_monitor = (count > 1) ? 1 : 0;
+		int mx, my;
+		glfwGetMonitorPos(monitors[target_monitor], &mx, &my);
+		const GLFWvidmode* mode = glfwGetVideoMode(monitors[target_monitor]);
+		glfwSetWindowPos(_window.window_handle, mx + (mode->width - width) / 2, my + (mode->height - height) / 2);
+	}
 }
 
 void poll() { glfwPollEvents(); }

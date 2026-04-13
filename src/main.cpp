@@ -15,6 +15,10 @@ i32 main(i32 argc, char* argv[]) {
 #else
 	bool enable_debug = false;
 #endif
+	bool fullscreen = false;
+	bool on_second_monitor = false;
+	i32 width = 1920;
+	i32 height = 1080;
 	for (i32 i = 0; i < argc; ++i) {
 		if (std::strcmp(argv[i], "--validation_enable") == 0 && i + 1 < argc) {
 			if (std::strcmp(argv[i + 1], "1") == 0) {
@@ -23,13 +27,14 @@ i32 main(i32 argc, char* argv[]) {
 				enable_debug = false;
 			}
 			++i;
+		} else if (std::strcmp(argv[i], "--on-second-monitor") == 0) {
+			on_second_monitor = true;
+		} else if (std::strcmp(argv[i], "--fullscreen") == 0) {
+			fullscreen = true;
 		}
 	}
-	bool fullscreen = false;
-	i32 width = 1920;
-	i32 height = 1080;
 	ThreadPool::init();
-	Window::init(width, height, fullscreen);
+	Window::init(width, height, fullscreen, on_second_monitor);
 	{
 		RayTracer app;
 		app.init(enable_debug, argc, argv);
@@ -142,23 +147,23 @@ void hm_test() {
 	lm::Arena* arena = lm::arena_create(KB(1));
 
 	auto hm = lm::hash_map_create<u32, u32>(arena);
-	for(u32 i = 0; i < 4; i++) { 
+	for (u32 i = 0; i < 4; i++) {
 		hm.insert(i, rand() & U32_MAX);
 	}
-	
+
 	constexpr u32 HM_SIZE = 1024 * 1024;
-	for(u32 i = 0; i < HM_SIZE; i++) {
+	for (u32 i = 0; i < HM_SIZE; i++) {
 		hm.insert(i, rand() & U32_MAX);
 	}
 	auto hs = lm::hash_set_create<u32>(arena);
-	for(u32 i = 0; i < 4; i++) { 
+	for (u32 i = 0; i < 4; i++) {
 		hs.insert(i);
 	}
 
 	// for(const auto& kv: hm) {
 	// 	LUMEN_INFO("%d - %d\n", kv.key, kv.value);
 	// }
-	for(const auto& k: hs) {
+	for (const auto& k : hs) {
 		LUMEN_INFO("%d", k.key);
 	}
 	LUMEN_TRACE("----Hash Map Test End----");

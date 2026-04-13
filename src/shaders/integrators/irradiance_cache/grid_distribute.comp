@@ -36,7 +36,7 @@ void main() {
 	// TODO: Check surfel status?
 	Surfel surfel = surfel_pool.d[tid];
 
-	if (surfel.radius == 0.0f) {
+	if (surfel.radius <= 0.0f) {
 		return;
 	}
 

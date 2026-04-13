@@ -224,6 +224,7 @@ void IrradianceCache::render() {
 	pc.height = Window::height();
 	pc.direct_lighting = direct_lighting;
 	pc.frame_num = frame_num;
+	pc.total_frame_num = total_frame_idx;
 	pc.rand = rand();
 	u32 grid_total_cells = get_total_grid_cells();
 	pc.grid_total_cells = grid_total_cells;
@@ -249,32 +250,14 @@ void IrradianceCache::render() {
 		.bind_texture_array(lumen_scene->scene_textures)
 		.bind_tlas(tlas);
 
-	// if (total_frame_idx == 0) {
-	if (true) {
-		u32 max_tiles_x = util::div_ceil(Window::width(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
-		u32 max_tiles_y = util::div_ceil(Window::height(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
-		vk::render_graph()
-			->add_compute(CSTR("Surfel: Recycle"),
-						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_recycle.comp")),
-						   .dims = {max_tiles_x, max_tiles_y, 1}})
-			.push_constants(&pc)
-			.zero(surfel_spawn_count_buffer)
-			.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer});
-		vk::render_graph()
-			->add_compute(CSTR("Surfel: Spawn"),
-						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_spawn.comp")),
-						   .dims = {max_tiles_x, max_tiles_y, 1}})
-			.push_constants(&pc)
-			.zero(surfel_spawn_count_buffer)
-			.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer});
+	vk::render_graph()
+		->add_compute(CSTR("Surfel: Recycle"),
+					  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_recycle.comp")),
+					   .dims = {util::div_ceil(MAX_SURFEL_COUNT, SURFELIZE_PASS_TILE_SIZE_XY), 1, 1}})
+		.push_constants(&pc)
+		.zero(surfel_spawn_count_buffer)
+		.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer});
 
-		vk::render_graph()
-			->add_compute(CSTR("Surfel: Allocate"),
-						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_allocate.comp")),
-						   .dims = {util::div_ceil(max_tiles_x * max_tiles_y, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
-			.push_constants(&pc)
-			.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer});
-	}
 	////////////////////////////
 	// --- Surfel Grid ---
 	// Grid is rebuilt every frame
@@ -331,6 +314,25 @@ void IrradianceCache::render() {
 					   .dims = {util::div_ceil((u32)MAX_SURFEL_COUNT, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
 		.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer});
+
+	if (true) {
+		u32 max_screen_tiles_x = util::div_ceil(Window::width(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
+		u32 max_screen_tiles_y = util::div_ceil(Window::height(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
+		vk::render_graph()
+			->add_compute(CSTR("Surfel: Spawn"),
+						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_spawn.comp")),
+						   .dims = {max_screen_tiles_x, max_screen_tiles_y, 1}})
+			.push_constants(&pc)
+			.zero(surfel_spawn_count_buffer)
+			.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer, output_tex});
+
+		vk::render_graph()
+			->add_compute(CSTR("Surfel: Allocate"),
+						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_allocate.comp")),
+						   .dims = {util::div_ceil(MAX_SURFEL_COUNT, ALLOCATE_PASS_WG_SIZE), 1, 1}})
+			.push_constants(&pc)
+			.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer});
+	}
 
 	if (debug_mode) {
 		vk::render_graph()

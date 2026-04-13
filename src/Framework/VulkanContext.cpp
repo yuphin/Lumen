@@ -2,7 +2,7 @@
 #include "VulkanContext.h"
 
 namespace vk {
-VulkanContext _context;
+static VulkanContext _context;
 
 VulkanContext& context() { return _context; }
 };	// namespace VulkanContext

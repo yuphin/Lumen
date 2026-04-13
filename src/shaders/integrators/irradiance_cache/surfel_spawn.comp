@@ -12,6 +12,7 @@
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
+layout(binding = 2, rgba32f) uniform image2D image;
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
@@ -28,6 +29,7 @@ GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_add
 
 #include "ir_commons.glsl"
 #include "grid.glsl"
+#include "surfel_commons.glsl"
 
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnList { uint d[]; };
@@ -40,6 +42,8 @@ SpawnCount spawn_count = SpawnCount(scene_desc.surfel_spawn_count_addr);
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 
 #define TILE_COVERAGE_MAX 1e6
+#define RADIUS_LARGE 1e6
+#define TILE_PERIOD 3
 
 // Process SURFELIZE_PASS_TILE_SIZE_XY * SURFELIZE_PASS_TILE_SIZE_XY tiles
 // 1 threadgroup processes each pixels in a tile (1 thread = 1 pixel)
@@ -48,6 +52,7 @@ SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 // For warp size of 32 and tile size of 16, we have 256 / 32 = 8 subgroups
 #define NUM_ACTIVE_SUBGROUPS (SURFELIZE_PASS_TILE_SIZE_XY * SURFELIZE_PASS_TILE_SIZE_XY / SUBGROUP_SIZE)
 shared uint winner_pixels[NUM_ACTIVE_SUBGROUPS];
+shared uint winner_radii[NUM_ACTIVE_SUBGROUPS];
 shared float winner_coverages[NUM_ACTIVE_SUBGROUPS];
 
 layout(local_size_x = SURFELIZE_PASS_TILE_SIZE_XY, local_size_y = SURFELIZE_PASS_TILE_SIZE_XY, local_size_z = 1) in;
@@ -56,38 +61,47 @@ void main() {
 	uvec2 pixel_coords = gl_GlobalInvocationID.xy;
 	uint pixel_idx = (pixel_coords.x * pc.height + pixel_coords.y);
 
+	uvec2 tile_coords = gl_WorkGroupID.xy;
+	uint phase_x = pc.total_frame_num % TILE_PERIOD;
+	uint phase_y = (pc.total_frame_num / TILE_PERIOD) % TILE_PERIOD;
+
+	if ((tile_coords.x % TILE_PERIOD) != phase_x || (tile_coords.y % TILE_PERIOD) != phase_y) {
+		return;
+	}
+
 	float coverage = TILE_COVERAGE_MAX;
 	if (pixel_coords.x < pc.width && pixel_coords.y < pc.height) {
 		GBuffer gbuffer = gbuffers.d[pixel_idx];
 		if (gbuffer_valid(gbuffer)) {
-			coverage = 0.0;
 			HitData hit_data =
 				get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
 
+			coverage = 0.0;
 			vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
 			vec3 offset = hit_data.pos - cam_pos.xyz;
 			uvec4 grid_val = map_grid_axis(offset);
 			uint linear_idx = linearize_grid(grid_val);
 			uint surfel_offset = grid_cell_counts.d[linear_idx];
 			uint surfel_count = grid_cell_counts.d[linear_idx + 1] - surfel_offset;
+			vec4 hit_view_pos = ubo.view * vec4(hit_data.pos, 1.0);
 
 			for (uint gid = 0; gid < surfel_count; gid++) {
 				uint sid = grid_cell_indices.d[gid + surfel_offset];
 				Surfel surfel = surfel_pool.d[sid];
-
-				vec3 diff = hit_data.pos - surfel.pos;
-				float dist = length(diff);
-				if (dist > 2 *  surfel.radius) continue;
-
+				if (surfel.radius <= 0.0) continue;
+				vec3 pos_to_surfel = hit_data.pos - surfel.pos;
+				float dist_sqr = dot(pos_to_surfel, pos_to_surfel);
+				float dist = sqrt(dist_sqr);
+				float dist_normal = dot(pos_to_surfel, surfel.n_s);
+				float dist_tangent = sqrt(max(0.0, dist_sqr - dist_normal * dist_normal));
 				float n_dot = dot(hit_data.n_s, surfel.n_s);
-				if (n_dot < 0.3) continue;
 
-				float dist_normal = dot(diff, surfel.n_s);
-				float dist_tangent = sqrt(max(0.0, dist * dist - dist_normal * dist_normal));
-				float dist_aniso = sqrt(dist_tangent * dist_tangent + 4.0 * dist_normal * dist_normal);
-				if (dist_aniso >  2 * surfel.radius) continue;
+				float would_be_radius = surfel_radius_factor(pc.desired_surfel_radius_px) * hit_view_pos.z;
 
-				float weight = (1.0 - dist_aniso / (2 * surfel.radius)) * n_dot;
+				if (n_dot < 0.3 || dist_tangent > (surfel.radius + would_be_radius)) {
+					continue;
+				}
+				float weight = (1.0 - dist_tangent / (surfel.radius + would_be_radius)) * n_dot;
 				coverage += weight;
 			}
 		}
@@ -116,8 +130,7 @@ void main() {
 		uvec4 ballot = subgroupBallot(i_am_tile_min);
 		uint tile_winner = subgroupBallotFindLSB(ballot);
 
-		if (gl_SubgroupInvocationID == tile_winner && min_tile_coverage != TILE_COVERAGE_MAX &&
-			min_tile_coverage == 0) {
+		if (gl_SubgroupInvocationID == tile_winner && min_tile_coverage == 0) {
 			// Winner of the tile
 			uint surfel_idx = atomicAdd(spawn_count.d, 1);
 			uint winner_pixel = winner_pixels[gl_SubgroupInvocationID];

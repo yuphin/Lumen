@@ -41,6 +41,7 @@ InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
 
 #include "hash.glsl"
 #include "grid.glsl"
+#include "surfel_commons.glsl"
 
 vec3 debug_col(uint num) {
 	const float INV_11 = 1.0 / 2047.0;
@@ -74,10 +75,10 @@ void main() {
 
 	float best_weight = 0.0;
 	uint best_sid = 0xFFFFFFFF;
-
 	vec3 pixel_world_pos = hit_data.pos;
 	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
 	vec3 offset = pixel_world_pos - cam_pos.xyz;
+	uint overlapping_surfel_cnt = 0;
 	if (false) {
 		for (uint sid = 0; sid < max_surfels; sid++) {
 			Surfel surfel = surfel_pool.d[sid];
@@ -106,15 +107,15 @@ void main() {
 			float weight = (1.0 - dist_aniso / surfel.radius) * n_dot;
 
 			if (weight > best_weight) {
+				overlapping_surfel_cnt++;
 				best_weight = weight;
 				best_sid = sid;
 			}
 		}
 	} else {
-
 		uvec4 grid_val = map_grid_axis(offset);
 		uint linear_idx = linearize_grid(grid_val);
-		uint surfel_count =  grid_cell_counts.d[linear_idx + 1] -  grid_cell_counts.d[linear_idx];
+		uint surfel_count = grid_cell_counts.d[linear_idx + 1] - grid_cell_counts.d[linear_idx];
 		uint surfel_offset = grid_cell_counts.d[linear_idx];
 
 		for (uint gid = 0; gid < surfel_count; gid++) {
@@ -145,15 +146,12 @@ void main() {
 			float weight = (1.0 - dist_aniso / surfel.radius) * n_dot;
 
 			if (weight > best_weight) {
+				overlapping_surfel_cnt++;
 				best_weight = weight;
 				best_sid = sid;
 			}
 		}
-		if(ubo.debug_click == 1 && ivec2(coords) == ubo.clicked_pos) {
-			debugPrintfEXT("Surfel count %u\n", surfel_count);
-		}
 	}
-
 
 	uvec4 res = map_grid_axis(offset);
 	col = uvec3_to_random_color(res.yzw) * 0.5;
@@ -164,6 +162,11 @@ void main() {
 		vec3 surfel_color = uint_to_random_color(best_sid);
 		Surfel s = surfel_pool.d[best_sid];
 		col += surfel_color;
+		if (overlapping_surfel_cnt > 1) {
+			col = vec3(100, 0, 0);
+		} else {
+			col = vec3(0);
+		}
 	}
 
 	imageStore(image, coords, vec4(col, 1.f));

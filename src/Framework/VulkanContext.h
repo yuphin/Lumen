@@ -4,7 +4,7 @@
 
 namespace vk {
 
-inline constexpr i32 MAX_FRAMES_IN_FLIGHT = 3;
+inline constexpr i32 MAX_FRAMES_IN_FLIGHT = 1;
 inline constexpr u32 MAX_SWAPCHAIN_IMAGES = 8;
 inline constexpr u32 MAX_QUEUES = 16;
 inline constexpr u32 MAX_COMMAND_POOLS = 64;

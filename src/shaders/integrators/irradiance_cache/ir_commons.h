@@ -11,7 +11,7 @@
 #define SCAN_WG_SIZE 128
 
 // 256K surfels
-#define MAX_SURFEL_COUNT 256 * 1024 
+#define MAX_SURFEL_COUNT (256 * 1024)
 
 // Center cell count isn't quite arbitrary
 // It should be below abs(1.0 / (2.0 * surfel_radius_factor))
@@ -39,6 +39,8 @@ struct PCIRCache {
 	uint grid_total_cells;
 	float grid_uniform_cell_distance_threshold;
 	float scene_extent;
+	uint total_frame_num;
+	uint pad;
 };
 
 struct PCPrefixSum {
