@@ -8,7 +8,9 @@
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #extension GL_KHR_shader_subgroup_ballot : enable
 
+
 #include "ir_commons.h"
+#include "../../random.glsl"
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
@@ -57,9 +59,11 @@ shared float winner_coverages[NUM_ACTIVE_SUBGROUPS];
 
 layout(local_size_x = SURFELIZE_PASS_TILE_SIZE_XY, local_size_y = SURFELIZE_PASS_TILE_SIZE_XY, local_size_z = 1) in;
 
+
 void main() {
 	uvec2 pixel_coords = gl_GlobalInvocationID.xy;
 	uint pixel_idx = (pixel_coords.x * pc.height + pixel_coords.y);
+
 
 	uvec2 tile_coords = gl_WorkGroupID.xy;
 	uint phase_x = pc.total_frame_num % TILE_PERIOD;
@@ -106,6 +110,11 @@ void main() {
 			}
 		}
 	}
+#if 1 // JITTER
+	uvec4 seed = init_rng(pixel_coords, uvec2(pc.width, pc.height), pc.total_frame_num);
+	float jitter = rand(seed) * 1e-8;
+	coverage += jitter;
+#endif
 	// Get the minimum coverage across the subgroup
 	float min_coverage = subgroupMin(coverage);
 
@@ -130,7 +139,7 @@ void main() {
 		uvec4 ballot = subgroupBallot(i_am_tile_min);
 		uint tile_winner = subgroupBallotFindLSB(ballot);
 
-		if (gl_SubgroupInvocationID == tile_winner && min_tile_coverage == 0) {
+		if (gl_SubgroupInvocationID == tile_winner && min_tile_coverage < TILE_COVERAGE_MAX) {
 			// Winner of the tile
 			uint surfel_idx = atomicAdd(spawn_count.d, 1);
 			uint winner_pixel = winner_pixels[gl_SubgroupInvocationID];
