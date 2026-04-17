@@ -253,9 +253,8 @@ void IrradianceCache::render() {
 	vk::render_graph()
 		->add_compute(CSTR("Surfel: Recycle"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_recycle.comp")),
-					   .dims = {util::div_ceil(MAX_SURFEL_COUNT, SURFELIZE_PASS_TILE_SIZE_XY), 1, 1}})
+					   .dims = {util::div_ceil(MAX_SURFEL_COUNT, ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
-		.zero(surfel_spawn_count_buffer)
 		.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer});
 
 	////////////////////////////

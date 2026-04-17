@@ -44,7 +44,7 @@ SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 SurfelFreeStackCount free_stack_count = SurfelFreeStackCount(scene_desc.surfel_free_stack_count_addr);
 SurfelFreeStack free_stack = SurfelFreeStack(scene_desc.surfel_free_stack_addr);
 
-layout(local_size_x = SURFELIZE_PASS_TILE_SIZE_XY, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = ALLOCATE_PASS_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
 
 float max_px_per_trapezoidal_cell() {
 	float px_vertical = ubo.projection[1][1] * pc.height / GRID_TRAPEZOIDAL_CELL_COUNT_AXIS;
