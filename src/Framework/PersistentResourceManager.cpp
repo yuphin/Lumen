@@ -1,17 +1,10 @@
 
 #include "PersistentResourceManager.h"
-#include <vulkan/vulkan_core.h>
-#include <unordered_map>
+#include "Base/HashMap.h"
+#include "Base/Memory.h"
 #include "VulkanContext.h"
 #include "VkUtils.h"
-#include "Base/OS.h"
 
-#if !defined(_WIN32) && !defined(_WIN64)
-#include <sys/mman.h>
-#include <unistd.h>
-#else
-#include <windows.h>
-#endif
 static bool operator==(const VkSamplerCreateInfo& lhs, const VkSamplerCreateInfo& rhs) {
 	// Compare the individual members of VkSamplerCreateInfo
 	return lhs.sType == rhs.sType && lhs.pNext == rhs.pNext && lhs.flags == rhs.flags &&
@@ -24,71 +17,91 @@ static bool operator==(const VkSamplerCreateInfo& lhs, const VkSamplerCreateInfo
 		   lhs.unnormalizedCoordinates == rhs.unnormalizedCoordinates;
 }
 
-constexpr u64 RESERVE_SIZE = 1024ull * 1024 * 1024 * 1024 * 64;	// 64GB
+static bool sampler_eq(const VkSamplerCreateInfo& lhs, const VkSamplerCreateInfo& rhs) { return lhs == rhs; }
+
 template <typename T>
-class PersistentPool {
-   public:
-	PersistentPool() : PAGE_SIZE(os::get_page_size()) {
-#if defined(_WIN32) || defined(_WIN64)
-		data_base = (T*)VirtualAlloc(NULL, RESERVE_SIZE, MEM_RESERVE, PAGE_NOACCESS);
-		data_base = (T*)VirtualAlloc(data_base, PAGE_SIZE, MEM_COMMIT, PAGE_READWRITE);
-#else
-		data_base = (T*)mmap(NULL, RESERVE_SIZE, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-		i32 result = mprotect(data_base, ALLOC_SIZE, PROT_READ | PROT_WRITE)
-			LUMEN_ASSERT(result == 0, "Could not allocate memory");
-#endif
-		base_ptr = data_base;
-		next_page = (u8*)data_base + PAGE_SIZE;
+static void hash_value(u64& hash, const T& value) {
+	hash = lm::fnv1a_hash((void*)&value, sizeof(T), hash);
+}
+
+static void hash_f32(u64& hash, f32 value) {
+	if (value == 0.0f) {
+		value = 0.0f;
 	}
+	hash_value(hash, value);
+}
+
+static u64 sampler_hash(const VkSamplerCreateInfo& ci) {
+	u64 hash = lm::FNV_64_OFFSET_BIAS;
+	u64 pnext = reinterpret_cast<u64>(ci.pNext);
+	hash_value(hash, ci.sType);
+	hash_value(hash, pnext);
+	hash_value(hash, ci.flags);
+	hash_value(hash, ci.magFilter);
+	hash_value(hash, ci.minFilter);
+	hash_value(hash, ci.mipmapMode);
+	hash_value(hash, ci.addressModeU);
+	hash_value(hash, ci.addressModeV);
+	hash_value(hash, ci.addressModeW);
+	hash_f32(hash, ci.mipLodBias);
+	hash_value(hash, ci.anisotropyEnable);
+	hash_f32(hash, ci.maxAnisotropy);
+	hash_value(hash, ci.compareEnable);
+	hash_value(hash, ci.compareOp);
+	hash_f32(hash, ci.minLod);
+	hash_f32(hash, ci.maxLod);
+	hash_value(hash, ci.borderColor);
+	hash_value(hash, ci.unnormalizedCoordinates);
+	return hash;
+}
+
+template <typename T>
+struct PersistentPool {
+	PersistentPool(lm::String arena_name) : arena_name(arena_name) {}
+
 	T* get(bool use_mutex) {
 		std::unique_lock<std::mutex> lock(mutex, std::defer_lock);
 		if (use_mutex) {
 			lock.lock();
 		}
+		if (!arena) {
+			arena = lm::arena_create(arena_name, MB(4), MB(1));
+			free_list = lm::array_create<T*>(arena, 0, 4096);
+		}
 		if (!free_list.empty()) {
-			u64 idx = free_list.back();
-			free_list.pop_back();
-			return base_ptr + idx;
+			T* result = free_list.back();
+			--free_list.size;
+			memset(result, 0, sizeof(T));
+			return result;
 		}
-		while ((u8*)next_page - (u8*)data_base < sizeof(T)) {
-#if defined(_WIN32) || defined(_WIN64)
-			data_base = (T*)VirtualAlloc(next_page, PAGE_SIZE, MEM_COMMIT, PAGE_READWRITE);
-			next_page = (u8*)data_base + PAGE_SIZE;
-#else
-			i32 result = mprotect(next_page, PAGE_SIZE, PROT_READ | PROT_WRITE);
-			LUMEN_ASSERT(result == 0, "Could not allocate memory");
-			next_page = (u8*)next_page + PAGE_SIZE;
-#endif
-		}
-		return data_base++;
+		return (T*)arena->allocate(sizeof(T), alignof(T), nullptr, /*zero_initialize=*/true);
 	}
 
 	void remove(T* ptr) {
-		u64 idx = ptr - base_ptr;
-		free_list.push_back(idx);
+		assert(arena);
+		free_list.push_back(ptr);
 	}
 
 	void destroy() {
-		VirtualFree(base_ptr, 0, MEM_RELEASE);
-		data_base = nullptr;
-		next_page = nullptr;
-		base_ptr = nullptr;
+		if (!arena) return;
+		lm::arena_destroy(arena);
+		arena = nullptr;
+		free_list = {};
 	}
 
-   private:
-	const u64 PAGE_SIZE;
-	T* base_ptr = nullptr;
-	T* data_base = nullptr;
-	void* next_page = nullptr;
-	std::vector<u64> free_list;
+	lm::String arena_name;
+	lm::Arena* arena = nullptr;
+	lm::Array<T*> free_list;
 	std::mutex mutex;
 };
 
 namespace prm {
-PersistentPool<vk::Buffer> _buffer_pool;
-PersistentPool<vk::Texture> _texture_pool;
+PersistentPool<vk::Buffer> _buffer_pool(CSTR("Persistent Buffer Pool Arena"));
+PersistentPool<vk::Texture> _texture_pool(CSTR("Persistent Texture Pool Arena"));
 
-std::unordered_map<VkSamplerCreateInfo, VkSampler, vk::SamplerHash> _sampler_cache;
+using SamplerCache = lm::HashMap<VkSamplerCreateInfo, VkSampler, sampler_hash, sampler_eq>;
+lm::Arena* _sampler_cache_arena = nullptr;
+SamplerCache _sampler_cache;
 std::mutex _sampler_cache_mutex;
 
 VkSampler get_sampler(const VkSamplerCreateInfo& sampler_create_info, bool use_mutex) {
@@ -96,20 +109,21 @@ VkSampler get_sampler(const VkSamplerCreateInfo& sampler_create_info, bool use_m
 	if (use_mutex) {
 		lock.lock();
 	}
-	auto it = _sampler_cache.find(sampler_create_info);
-	if (it != _sampler_cache.end()) {
-		return it->second;
+	if (!_sampler_cache_arena) {
+		_sampler_cache_arena = lm::arena_create(CSTR("Sampler Cache Arena"), MB(1), KB(64));
+		_sampler_cache =
+			lm::hash_map_create<VkSamplerCreateInfo, VkSampler, sampler_hash, sampler_eq>(_sampler_cache_arena, 128);
 	}
-	auto result = _sampler_cache.insert({sampler_create_info, VkSampler()});
-	if (!result.second) {
-		return VK_NULL_HANDLE;
+	auto entry = _sampler_cache.find(sampler_create_info);
+	if (entry) {
+		return entry->value;
 	}
-	lock.unlock();
-	vk::check(vkCreateSampler(vk::context().device, &sampler_create_info, nullptr, &result.first->second),
+	VkSampler sampler = VK_NULL_HANDLE;
+	vk::check(vkCreateSampler(vk::context().device, &sampler_create_info, nullptr, &sampler),
 			  "Could not create a sampler");
-	vk::set_resource_name(vk::context().device, (u64)result.first->second, "Sampler",
-									   VK_OBJECT_TYPE_SAMPLER);
-	return result.first->second;
+	vk::set_resource_name(vk::context().device, (u64)sampler, "Sampler", VK_OBJECT_TYPE_SAMPLER);
+	_sampler_cache.insert(sampler_create_info, sampler);
+	return sampler;
 }
 vk::Texture* get_texture(const vk::TextureDesc& texture_desc, bool use_mutex) {
 	vk::Texture* texture = _texture_pool.get(use_mutex);
@@ -118,7 +132,6 @@ vk::Texture* get_texture(const vk::TextureDesc& texture_desc, bool use_mutex) {
 }
 vk::Buffer* get_buffer(const vk::BufferDesc& texture_desc, bool use_mutex) {
 	vk::Buffer* buffer = _buffer_pool.get(use_mutex);
-	memset(buffer, 0, sizeof(vk::Buffer));
 	vk::buffer_create(buffer, texture_desc);
 	return buffer;
 }
@@ -137,9 +150,16 @@ void remove(vk::Texture* texture) {
 void destroy() {
 	_buffer_pool.destroy();
 	_texture_pool.destroy();
-	for (auto& [_, sampler] : _sampler_cache) {
-		vkDestroySampler(vk::context().device, sampler, nullptr);
+	if (_sampler_cache.initialized()) {
+		for (auto& entry : _sampler_cache) {
+			vkDestroySampler(vk::context().device, entry.value, nullptr);
+		}
+		_sampler_cache.clear();
 	}
-	_sampler_cache.clear();
+	if (_sampler_cache_arena) {
+		lm::arena_destroy(_sampler_cache_arena);
+		_sampler_cache_arena = nullptr;
+		_sampler_cache = {};
+	}
 }
 }  // namespace prm
