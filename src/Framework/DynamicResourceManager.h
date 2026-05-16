@@ -1,12 +1,12 @@
 #pragma once
-#include "Buffer.h"
-#include "Texture.h"
 
 namespace vk {
-    struct Buffer;
-    struct BufferDesc;
-    struct TextureDesc;
-}
+struct Buffer;
+struct BufferDesc;
+struct TextureDesc;
+struct Texture;
+}  // namespace vk
+
 namespace drm {
 
 vk::Buffer* get(const vk::BufferDesc& desc);

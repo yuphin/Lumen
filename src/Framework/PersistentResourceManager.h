@@ -11,4 +11,4 @@ vk::Buffer* get_buffer(const vk::BufferDesc& texture_desc, bool use_mutex = fals
 void remove(vk::Buffer* buffer);
 void remove(vk::Texture* texture);
 void destroy();
-}
+}  // namespace prm
