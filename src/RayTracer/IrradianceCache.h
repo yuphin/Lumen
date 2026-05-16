@@ -30,5 +30,6 @@ class IrradianceCache : public Integrator {
 	PathConfig* config;
 	bool direct_lighting = false;
 	bool debug_mode = true;
+	bool pause_surfel_spawn = false;
 	u32 total_frame_idx = 0;
 };

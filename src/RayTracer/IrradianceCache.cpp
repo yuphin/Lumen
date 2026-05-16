@@ -213,7 +213,7 @@ void IrradianceCache::init() {
 
 	f32 max_trapezoidal_cell_size = get_px_size_per_trapezoidal_cell(scene_ubo.projection[1][1], Window::height());
 
-	LUMEN_INFO("Uniform cells limit: %u", (u32)glm::round(fabsf(max_uniform_cells)));
+	LUMEN_INFO("Uniform cells size limit (world space): %u", (u32)glm::round(fabsf(max_uniform_cells)));
 	LUMEN_INFO("Trapezoidal cell size limit (px): %u", (u32)glm::round(max_trapezoidal_cell_size));
 }
 
@@ -314,7 +314,7 @@ void IrradianceCache::render() {
 		.push_constants(&pc)
 		.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer});
 
-	if (true) {
+	if (!pause_surfel_spawn) {
 		u32 max_screen_tiles_x = util::div_ceil(Window::width(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		u32 max_screen_tiles_y = util::div_ceil(Window::height(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		vk::render_graph()
@@ -341,6 +341,14 @@ void IrradianceCache::render() {
 			.push_constants(&pc)
 			.bind({lumen_scene->scene_desc_buffer, output_tex, scene_ubo_buffer})
 			.bind_texture_array(lumen_scene->scene_textures);
+	} else {
+		vk::render_graph()
+			->add_compute(CSTR("Composite"),
+						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/composite.comp")),
+						   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024)), 1, 1}})
+			.push_constants(&pc)
+			.bind({lumen_scene->scene_desc_buffer, output_tex, scene_ubo_buffer})
+			.bind_texture_array(lumen_scene->scene_textures);
 	}
 }
 
@@ -358,7 +366,8 @@ bool IrradianceCache::gui() {
 	bool result = Integrator::gui();
 	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
 	result |= ImGui::Checkbox("Debug mode", &debug_mode);
-	result |= ImGui::SliderFloat("Surfel radius", &pc.desired_surfel_radius_px, 4, 128);
+	result |= ImGui::Checkbox("Pause surfel spawning", &pause_surfel_spawn);
+	result |= ImGui::SliderFloat("Surfel radius (px)", &pc.desired_surfel_radius_px, 4, 128);
 	result |= ImGui::SliderFloat("Uniform cell distance threshold", &pc.grid_uniform_cell_distance_threshold, 0.01, 10);
 	return result;
 }
