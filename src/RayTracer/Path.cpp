@@ -27,17 +27,17 @@ void path::init(Integrator* integrator) {
 
 void path::render(Integrator* integrator) {
 	Path& state = integrator->path;
-	state.pc_ray.width = Window::width();
-	state.pc_ray.height = Window::height();
-	state.pc_ray.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
-	state.pc_ray.time = rand() % UINT_MAX;
-	state.pc_ray.max_depth = state.path_length;
-	state.pc_ray.sky_col = integrator->lumen_scene->config.common.sky_col;
-	state.pc_ray.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc_ray.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
-	state.pc_ray.dir_light_idx = integrator->lumen_scene->dir_light_idx;
-	state.pc_ray.frame_num = integrator->frame_num;
-	state.pc_ray.direct_lighting = state.direct_lighting;
+	state.pc.width = Window::width();
+	state.pc.height = Window::height();
+	state.pc.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
+	state.pc.time = rand() % UINT_MAX;
+	state.pc.max_depth = state.path_length;
+	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
+	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
+	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc.dir_light_idx = integrator->lumen_scene->dir_light_idx;
+	state.pc.frame_num = integrator->frame_num;
+	state.pc.direct_lighting = state.direct_lighting;
 	vk::render_graph()
 		->add_rt(CSTR("Path"),
 				 {
@@ -48,7 +48,7 @@ void path::render(Integrator* integrator) {
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind({
 			integrator->output_tex,
 			integrator->scene_ubo_buffer,

@@ -52,15 +52,15 @@ void bdpt::init(Integrator* integrator) {
 
 void bdpt::render(Integrator* integrator) {
 	BDPT& state = integrator->bdpt;
-	state.pc_ray.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
-	state.pc_ray.time = rand() % UINT_MAX;
-	state.pc_ray.max_depth = integrator->lumen_scene->config.common.path_length;
-	state.pc_ray.sky_col = integrator->lumen_scene->config.common.sky_col;
-	state.pc_ray.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc_ray.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
-	state.pc_ray.frame_num = integrator->frame_num;
-	state.pc_ray.width = Window::width();
-	state.pc_ray.height = Window::height();
+	state.pc.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
+	state.pc.time = rand() % UINT_MAX;
+	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
+	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
+	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
+	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc.frame_num = integrator->frame_num;
+	state.pc.width = Window::width();
+	state.pc.height = Window::height();
 	vk::render_graph()
 		->add_rt(CSTR("BDPT"),
 				 {
@@ -76,7 +76,7 @@ void bdpt::render(Integrator* integrator) {
 		.zero(state.camera_path_buffer)
 		//.read(state.light_path_buffer) // Needed if shader inference is disabled
 		//.read(state.camera_path_buffer)
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		//.write(integrator->output_tex)
 		.bind({
 			integrator->output_tex,

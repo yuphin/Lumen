@@ -200,32 +200,32 @@ void pssmlt::init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
-	state.pc_ray.total_light_area = 0;
+	state.pc.total_light_area = 0;
 
 	integrator->frame_num = 0;
 
 	state.mutation_count = i32(Window::width() * Window::height() * config.mutations_per_pixel / f32(config.num_mlt_threads));
-	state.pc_ray.mutations_per_pixel = config.mutations_per_pixel;
+	state.pc.mutations_per_pixel = config.mutations_per_pixel;
 }
 
 void pssmlt::render(Integrator* integrator) {
 	PSSMLT& state = integrator->pssmlt;
 	const PSSMLTConfig& config = integrator->lumen_scene->config.settings.pssmlt;
-	state.pc_ray.width = Window::width();
-	state.pc_ray.height = Window::height();
-	state.pc_ray.num_lights = i32(integrator->lumen_scene->gpu_lights.size);
-	state.pc_ray.time = rand() % UINT_MAX;
-	state.pc_ray.max_depth = integrator->lumen_scene->config.common.path_length;
-	state.pc_ray.sky_col = integrator->lumen_scene->config.common.sky_col;
+	state.pc.width = Window::width();
+	state.pc.height = Window::height();
+	state.pc.num_lights = i32(integrator->lumen_scene->gpu_lights.size);
+	state.pc.time = rand() % UINT_MAX;
+	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
+	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
 	// PSSMLT related constants
-	state.pc_ray.light_rand_count = state.light_path_rand_count;
-	state.pc_ray.cam_rand_count = state.cam_path_rand_count;
-	state.pc_ray.connection_rand_count = state.connect_path_rand_count;
-	state.pc_ray.random_num = rand() % UINT_MAX;
-	state.pc_ray.num_bootstrap_samples = config.num_bootstrap_samples;
-	state.pc_ray.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc_ray.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
-	state.pc_ray.frame_num = integrator->frame_num;
+	state.pc.light_rand_count = state.light_path_rand_count;
+	state.pc.cam_rand_count = state.cam_path_rand_count;
+	state.pc.connection_rand_count = state.connect_path_rand_count;
+	state.pc.random_num = rand() % UINT_MAX;
+	state.pc.num_bootstrap_samples = config.num_bootstrap_samples;
+	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
+	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc.frame_num = integrator->frame_num;
 
 	std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		integrator->output_tex,
@@ -245,7 +245,7 @@ void pssmlt::render(Integrator* integrator) {
 					 .specialization_data = {1},
 					 .dims = {(u32)config.num_bootstrap_samples},
 				 })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.zero({state.light_path_buffer, state.camera_path_buffer})
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
@@ -260,7 +260,7 @@ void pssmlt::render(Integrator* integrator) {
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/calc_cdf.comp")),
 					   .specialization_data = {(u32)config.num_bootstrap_samples},
 					   .dims = {(u32)std::ceil(config.num_bootstrap_samples / f32(1024.0f)), 1, 1}})
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer);
 
 	lm::RenderGraph* rg = vk::render_graph();
@@ -270,7 +270,7 @@ void pssmlt::render(Integrator* integrator) {
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/select_seeds.comp")),
 					 .specialization_data = {(u32)config.num_mlt_threads},
 					 .dims = {(u32)std::ceil(config.num_mlt_threads / f32(1024.0f)), 1, 1}})
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer);
 
 	// Fill in the samplers for mutations
@@ -283,7 +283,7 @@ void pssmlt::render(Integrator* integrator) {
 							   {CSTR("src/shaders/ray.rahit")}},
 				   .dims = {(u32)config.num_mlt_threads},
 			   })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.zero({state.light_path_buffer, state.camera_path_buffer})
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
@@ -294,8 +294,8 @@ void pssmlt::render(Integrator* integrator) {
 	// Start mutations
 	{
 		auto mutate = [&](u32 i) {
-			state.pc_ray.random_num = rand() % UINT_MAX;
-			state.pc_ray.mutation_counter = i;
+			state.pc.random_num = rand() % UINT_MAX;
+			state.pc.mutation_counter = i;
 			rg->add_rt(CSTR("PSSMLT - Mutate"),
 					   {
 						   .shaders = {{CSTR("src/shaders/integrators/pssmlt/pssmlt_mutate.rgen")},
@@ -305,7 +305,7 @@ void pssmlt::render(Integrator* integrator) {
 									   {CSTR("src/shaders/ray.rahit")}},
 						   .dims = {(u32)config.num_mlt_threads},
 					   })
-				.push_constants(&state.pc_ray)
+				.push_constants(&state.pc)
 				.zero({state.light_path_buffer, state.camera_path_buffer})
 				.bind(rt_bindings)
 				.bind(integrator->lumen_scene->mesh_lights_buffer)
@@ -339,7 +339,7 @@ void pssmlt::render(Integrator* integrator) {
 	rg->add_compute(CSTR("Composition"),
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/composite.comp")),
 					 .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});
 }
 

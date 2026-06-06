@@ -4,7 +4,7 @@
 struct Integrator;
 
 struct VCM {
-	PCVCM pc_ray{};
+	PCVCM pc{};
 	VkDescriptorPool desc_pool{};
 	VkDescriptorSetLayout desc_set_layout{};
 	vk::Buffer* photon_buffer = nullptr;

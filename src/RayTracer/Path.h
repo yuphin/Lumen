@@ -4,7 +4,7 @@
 struct Integrator;
 
 struct Path {
-	PCPath pc_ray{};
+	PCPath pc{};
 	u32 path_length = 0;
 	bool direct_lighting = true;
 };

@@ -211,25 +211,25 @@ void ddgi::init(Integrator* integrator) {
 						 .data = &desc});
 
 	update_ddgi_uniforms(integrator);
-	state.pc_ray.total_light_area = 0;
+	state.pc.total_light_area = 0;
 
 	integrator->frame_num = 0;
 }
 
 void ddgi::render(Integrator* integrator) {
 	DDGI& state = integrator->ddgi;
-	state.pc_ray.width = Window::width();
-	state.pc_ray.height = Window::height();
-	state.pc_ray.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
-	state.pc_ray.time = rand() % UINT_MAX;
-	state.pc_ray.max_depth = integrator->lumen_scene->config.common.path_length;
-	state.pc_ray.sky_col = integrator->lumen_scene->config.common.sky_col;
-	state.pc_ray.first_frame = state.first_frame;
-	state.pc_ray.infinite_bounces = state.infinite_bounces;
-	state.pc_ray.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc_ray.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
-	state.pc_ray.frame_num = integrator->frame_num;
-	state.pc_ray.direct_lighting = state.direct_lighting;
+	state.pc.width = Window::width();
+	state.pc.height = Window::height();
+	state.pc.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
+	state.pc.time = rand() % UINT_MAX;
+	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
+	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
+	state.pc.first_frame = state.first_frame;
+	state.pc.infinite_bounces = state.infinite_bounces;
+	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
+	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc.frame_num = integrator->frame_num;
+	state.pc.direct_lighting = state.direct_lighting;
 	const bool ping_pong = bool(state.frame_idx % 2);	 // ping_pong true = read
 	// Generate random orientation for probes
 	{
@@ -237,7 +237,7 @@ void ddgi::render(Integrator* integrator) {
 		std::mt19937 gen(rd());
 		std::uniform_real_distribution<> dis(-1.0, 1.0);
 		glm::vec4 rands(0.5 * dis(gen) + 0.5, dis(gen), dis(gen), dis(gen));
-		state.pc_ray.probe_rotation = glm::mat4_cast(
+		state.pc.probe_rotation = glm::mat4_cast(
 			glm::angleAxis(2.0f * glm::pi<f32>() * rands.x, glm::normalize(glm::vec3(rands.y, rands.z, rands.w))));
 	}
 	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
@@ -257,7 +257,7 @@ void ddgi::render(Integrator* integrator) {
 					 .specialization_data = {1},
 					 .dims = {Window::width(), Window::height()},
 				 })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.zero(state.g_buffer)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
@@ -276,7 +276,7 @@ void ddgi::render(Integrator* integrator) {
 					 .specialization_data = {1},
 					 .dims = {(u32)state.rays_per_probe, grid_size},
 				 })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(rt_bindings)
 		.bind({integrator->lumen_scene->mesh_lights_buffer, state.ddgi_ubo_buffer, state.rt.radiance_tex, state.rt.dir_depth_tex,
 			   state.irr_texes[ping_pong], state.depth_texes[ping_pong]})
@@ -287,7 +287,7 @@ void ddgi::render(Integrator* integrator) {
 	vk::render_graph()
 		->add_compute(CSTR("Classify Probes"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/classify.comp")), .dims = {wg_x}})
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind({integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, state.ddgi_ubo_buffer, state.rt.radiance_tex, state.rt.dir_depth_tex});
 	// Update probes & borders
 	{
@@ -301,7 +301,7 @@ void ddgi::render(Integrator* integrator) {
 											  .macros = {is_irr ? vk::ShaderMacro("IRRADIANCE_UPDATE")
 																: vk::ShaderMacro("DEPTH_UPDATE")},
 											  .dims = {wg_x, wg_y}})
-				.push_constants(&state.pc_ray)
+				.push_constants(&state.pc)
 				.bind({integrator->lumen_scene->scene_desc_buffer, state.irr_texes[!ping_pong], state.depth_texes[!ping_pong],
 					   state.irr_texes[ping_pong], state.depth_texes[ping_pong], state.ddgi_ubo_buffer, state.rt.radiance_tex,
 					   state.rt.dir_depth_tex});
@@ -315,7 +315,7 @@ void ddgi::render(Integrator* integrator) {
 			->add_compute(
 				CSTR("Update Borders"),
 				{.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/update_borders.comp")), .dims = {wg_x}})
-			.push_constants(&state.pc_ray)
+			.push_constants(&state.pc)
 			.bind({state.irr_texes[!ping_pong], state.depth_texes[!ping_pong], state.ddgi_ubo_buffer});
 	}
 	// Sample probes & output into texture
@@ -324,7 +324,7 @@ void ddgi::render(Integrator* integrator) {
 	vk::render_graph()
 		->add_compute(CSTR("Sample Probes"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/sample.comp")), .dims = {wg_x, wg_y}})
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind({integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, state.output.tex, state.irr_texes[!ping_pong],
 			   state.depth_texes[!ping_pong], state.ddgi_ubo_buffer, integrator->output_tex});
 
@@ -338,7 +338,7 @@ void ddgi::render(Integrator* integrator) {
 									 {CSTR("src/shaders/ray.rahit")}},
 						 .dims = {Window::width(), Window::height()},
 					 })
-			.push_constants(&state.pc_ray)
+			.push_constants(&state.pc)
 			.bind({integrator->output_tex, integrator->scene_ubo_buffer, state.sphere_desc_buffer, integrator->lumen_scene->mesh_lights_buffer})
 			.bind_texture_array(integrator->lumen_scene->scene_textures)
 			.bind_tlas(*integrator->tlas);
@@ -350,7 +350,7 @@ void ddgi::render(Integrator* integrator) {
 		vk::render_graph()
 			->add_compute(CSTR("Relocate"),
 						  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/relocate.comp")), .dims = {wg_x}})
-			.push_constants(&state.pc_ray)
+			.push_constants(&state.pc)
 			.bind({integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, state.ddgi_ubo_buffer, state.rt.dir_depth_tex});
 	}
 	state.first_frame = false;

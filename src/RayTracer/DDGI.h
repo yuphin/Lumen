@@ -31,7 +31,7 @@ struct DDGI {
 	glm::vec3 probe_start_position{};
 	f32 tmax = 1e4f;
 	f32 tmin = 1e-3f;
-	PCDDGI pc_ray{};
+	PCDDGI pc{};
 	VkSampler bilinear_sampler = VK_NULL_HANDLE;
 	VkSampler nearest_sampler = VK_NULL_HANDLE;
 	bool first_frame = true;

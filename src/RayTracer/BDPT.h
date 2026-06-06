@@ -4,7 +4,7 @@
 struct Integrator;
 
 struct BDPT {
-	PCBDPT pc_ray{};
+	PCBDPT pc{};
 	vk::Buffer* light_path_buffer = nullptr;
 	vk::Buffer* camera_path_buffer = nullptr;
 	vk::Buffer* color_storage_buffer = nullptr;

@@ -212,12 +212,12 @@ void vcmmlt::init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
-	state.pc_ray.total_light_area = 0;
+	state.pc.total_light_area = 0;
 
 	integrator->frame_num = 0;
 
-	state.pc_ray.mutations_per_pixel = config.mutations_per_pixel;
-	state.pc_ray.num_mlt_threads = config.num_mlt_threads;
+	state.pc.mutations_per_pixel = config.mutations_per_pixel;
+	state.pc.num_mlt_threads = config.num_mlt_threads;
 }
 
 void vcmmlt::render(Integrator* integrator) {
@@ -225,28 +225,28 @@ void vcmmlt::render(Integrator* integrator) {
 	LUMEN_TRACE("Rendering sample %d...", state.sample_cnt++);
 	vk::CommandBuffer cmd(/*start*/ true);
 	const VCMMLTConfig& config = integrator->lumen_scene->config.settings.vcmmlt;
-	state.pc_ray.width = Window::width();
-	state.pc_ray.height = Window::height();
-	state.pc_ray.num_lights = i32(integrator->lumen_scene->gpu_lights.size);
-	state.pc_ray.time = rand() % UINT_MAX;
-	state.pc_ray.max_depth = integrator->lumen_scene->config.common.path_length;
-	state.pc_ray.sky_col = integrator->lumen_scene->config.common.sky_col;
-	state.pc_ray.frame_num = integrator->frame_num;
+	state.pc.width = Window::width();
+	state.pc.height = Window::height();
+	state.pc.num_lights = i32(integrator->lumen_scene->gpu_lights.size);
+	state.pc.time = rand() % UINT_MAX;
+	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
+	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
+	state.pc.frame_num = integrator->frame_num;
 	// VCMMLT related constants
-	state.pc_ray.use_vm = config.enable_vm;
-	state.pc_ray.light_rand_count = state.light_path_rand_count;
-	state.pc_ray.random_num = rand() % UINT_MAX;
-	state.pc_ray.num_bootstrap_samples = config.num_bootstrap_samples;
-	state.pc_ray.radius = integrator->lumen_scene->dimensions.radius * config.radius_factor / 100.f;
-	state.pc_ray.radius /= (f32)pow((double)state.pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
-	state.pc_ray.min_bounds = integrator->lumen_scene->dimensions.min;
-	state.pc_ray.max_bounds = integrator->lumen_scene->dimensions.max;
-	const glm::vec3 diam = state.pc_ray.max_bounds - state.pc_ray.min_bounds;
+	state.pc.use_vm = config.enable_vm;
+	state.pc.light_rand_count = state.light_path_rand_count;
+	state.pc.random_num = rand() % UINT_MAX;
+	state.pc.num_bootstrap_samples = config.num_bootstrap_samples;
+	state.pc.radius = integrator->lumen_scene->dimensions.radius * config.radius_factor / 100.f;
+	state.pc.radius /= (f32)pow((double)state.pc.frame_num + 1, 0.5 * (1 - 2.0 / 3));
+	state.pc.min_bounds = integrator->lumen_scene->dimensions.min;
+	state.pc.max_bounds = integrator->lumen_scene->dimensions.max;
+	const glm::vec3 diam = state.pc.max_bounds - state.pc.min_bounds;
 	const f32 max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
-	const i32 base_grid_res = i32(max_comp / state.pc_ray.radius);
-	state.pc_ray.grid_res = glm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
-	state.pc_ray.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc_ray.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	const i32 base_grid_res = i32(max_comp / state.pc.radius);
+	state.pc.grid_res = glm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
+	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
+	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
 
 	lm::RenderGraph* rg = vk::render_graph();
 	auto op_reduce = [&](const lm::String& op_name, const lm::String& op_shader_name, const lm::String& reduce_name,
@@ -255,14 +255,14 @@ void vcmmlt::render(Integrator* integrator) {
 		rg->add_compute(
 			  op_name,
 			  {.shader = vk::Shader(op_shader_name), .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
-			.push_constants(&state.pc_ray)
+			.push_constants(&state.pc)
 			.bind(integrator->lumen_scene->scene_desc_buffer)
 			.zero({state.mlt_residual_buffer, state.counter_buffer});
 		while (num_wgs != 1) {
 			rg->add_compute(
 				  reduce_name,
 				  {.shader = vk::Shader(reduce_shader_name), .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
-				.push_constants(&state.pc_ray)
+				.push_constants(&state.pc)
 				.bind(integrator->lumen_scene->scene_desc_buffer);
 			num_wgs = (u32)(num_wgs + 1023) / 1024;
 		}
@@ -297,7 +297,7 @@ void vcmmlt::render(Integrator* integrator) {
 				   .specialization_data = spec_consts,
 				   .dims = {Window::width() * Window::height()},
 			   })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.zero({state.chain_stats_buffer, state.mlt_atomicsum_buffer})
 		.zero(state.photon_buffer, config.enable_vm)
 		.bind(rt_bindings)
@@ -316,7 +316,7 @@ void vcmmlt::render(Integrator* integrator) {
 				   .specialization_data = spec_consts,
 				   .dims = {(u32)config.num_bootstrap_samples},
 			   })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
@@ -327,13 +327,13 @@ void vcmmlt::render(Integrator* integrator) {
 	rg->add_compute(CSTR("Calculate CDF"),
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/calc_cdf.comp")),
 					 .dims = {(u32)std::ceil(config.num_bootstrap_samples / f32(1024.0f)), 1, 1}})
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer);
 	// Select seeds
 	rg->add_compute(CSTR("Select Seeds"),
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/vcmmlt/select_seeds.comp")),
 					 .dims = {(u32)std::ceil(config.num_mlt_threads / f32(1024.0f)), 1, 1}})
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer);
 	// Fill in the samplers for mutations
 	{
@@ -350,7 +350,7 @@ void vcmmlt::render(Integrator* integrator) {
 					   .specialization_data = spec_consts,
 					   .dims = {(u32)config.num_mlt_threads},
 				   })
-			.push_constants(&state.pc_ray)
+			.push_constants(&state.pc)
 			.bind(rt_bindings)
 			.bind(integrator->lumen_scene->mesh_lights_buffer)
 			.bind_texture_array(integrator->lumen_scene->scene_textures)
@@ -361,15 +361,15 @@ void vcmmlt::render(Integrator* integrator) {
 	// Calculate normalization factor
 	rg->add_compute(CSTR("Calculate Normalization"),
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/vcmmlt/normalize.comp")), .dims = {1, 1, 1}})
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer);
 	rg->run_and_submit(cmd);
 	// Start mutations
 	{
 		lm::String mutate_name = lm::str_concat(rg->arena(), "VCMMLT - Mutate ", pipeline_postfix, /*cstr=*/true);
 		auto mutate = [&](u32 i) {
-			state.pc_ray.random_num = rand() % UINT_MAX;
-			state.pc_ray.mutation_counter = i;
+			state.pc.random_num = rand() % UINT_MAX;
+			state.pc.mutation_counter = i;
 			// Mutate
 			rg->add_rt(mutate_name,
 					   {
@@ -380,7 +380,7 @@ void vcmmlt::render(Integrator* integrator) {
 									   {CSTR("src/shaders/ray.rahit")}},
 						   .dims = {(u32)config.num_mlt_threads},
 					   })
-				.push_constants(&state.pc_ray)
+				.push_constants(&state.pc)
 				.zero(state.mlt_atomicsum_buffer)
 				.bind(rt_bindings)
 				.bind(integrator->lumen_scene->mesh_lights_buffer)
@@ -391,7 +391,7 @@ void vcmmlt::render(Integrator* integrator) {
 			rg->add_compute(
 				  CSTR("Calculate Normalization"),
 				  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcmmlt/normalize.comp")), .dims = {1, 1, 1}})
-				.push_constants(&state.pc_ray)
+				.push_constants(&state.pc)
 				.bind(integrator->lumen_scene->scene_desc_buffer);
 		};
 		const u32 iter_cnt = 100;
@@ -420,7 +420,7 @@ void vcmmlt::render(Integrator* integrator) {
 	rg->add_compute(CSTR("Composition"),
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/vcmmlt/composite.comp")),
 					 .dims = {(u32)glm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});
 }
 

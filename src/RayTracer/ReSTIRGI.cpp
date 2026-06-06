@@ -63,12 +63,12 @@ void restirgi::init(Integrator* integrator) {
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
 
-	state.pc_ray.total_light_area = 0;
+	state.pc.total_light_area = 0;
 
 	integrator->frame_num = 0;
 
-	state.pc_ray.total_frame_num = 0;
-	state.pc_ray.world_radius = integrator->lumen_scene->dimensions.radius;
+	state.pc.total_frame_num = 0;
+	state.pc.world_radius = integrator->lumen_scene->dimensions.radius;
 	assert(vk::render_graph()->settings.shader_inference == true);
 	lm::RenderGraph* rg = vk::render_graph();
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer, rg);
@@ -81,17 +81,17 @@ void restirgi::init(Integrator* integrator) {
 
 void restirgi::render(Integrator* integrator) {
 	ReSTIRGI& state = integrator->restirgi;
-	state.pc_ray.width = Window::width();
-	state.pc_ray.height = Window::height();
-	state.pc_ray.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
-	state.pc_ray.random_num = rand() % UINT_MAX;
-	state.pc_ray.max_depth = integrator->lumen_scene->config.common.path_length;
-	state.pc_ray.sky_col = integrator->lumen_scene->config.common.sky_col;
-	state.pc_ray.do_spatiotemporal = state.do_spatiotemporal;
-	state.pc_ray.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc_ray.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
-	state.pc_ray.enable_accumulation = state.enable_accumulation;
-	state.pc_ray.frame_num = integrator->frame_num;
+	state.pc.width = Window::width();
+	state.pc.height = Window::height();
+	state.pc.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
+	state.pc.random_num = rand() % UINT_MAX;
+	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
+	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
+	state.pc.do_spatiotemporal = state.do_spatiotemporal;
+	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
+	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc.enable_accumulation = state.enable_accumulation;
+	state.pc.frame_num = integrator->frame_num;
 
 	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		integrator->output_tex,
@@ -110,7 +110,7 @@ void restirgi::render(Integrator* integrator) {
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height() },
 				 })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.zero(state.restir_samples_buffer)
 		.zero(state.temporal_reservoir_buffer, !state.do_spatiotemporal)
 		.zero(state.spatial_reservoir_buffer, !state.do_spatiotemporal)
@@ -131,7 +131,7 @@ void restirgi::render(Integrator* integrator) {
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height() },
 				 })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
@@ -148,7 +148,7 @@ void restirgi::render(Integrator* integrator) {
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height() },
 				 })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
@@ -158,12 +158,12 @@ void restirgi::render(Integrator* integrator) {
 		->add_compute(CSTR("Output"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/restir/gi/output.comp")),
 					   .dims = {(u32)std::ceil(Window::width() * Window::height()  / f32(1024.0f)), 1, 1}})
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});
 	if (!state.do_spatiotemporal) {
 		state.do_spatiotemporal = true;
 	}
-	state.pc_ray.total_frame_num++;
+	state.pc.total_frame_num++;
 }
 
 bool restirgi::update(Integrator* integrator) {

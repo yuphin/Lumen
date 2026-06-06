@@ -4,7 +4,7 @@
 struct Integrator;
 
 struct SPPM {
-	PCSPPM pc_ray{};
+	PCSPPM pc{};
 	VkDescriptorPool desc_pool{};
 	VkDescriptorSetLayout desc_set_layout{};
 	vk::Buffer* sppm_data_buffer = nullptr;

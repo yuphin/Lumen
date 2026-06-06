@@ -57,7 +57,7 @@ void restir::init(Integrator* integrator) {
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
 
-	state.pc_ray.total_light_area = 0;
+	state.pc.total_light_area = 0;
 
 	integrator->frame_num = 0;
 
@@ -74,18 +74,18 @@ void restir::init(Integrator* integrator) {
 
 void restir::render(Integrator* integrator) {
 	ReSTIR& state = integrator->restir;
-	state.pc_ray.width = Window::width();
-	state.pc_ray.height = Window::height();
-	state.pc_ray.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
-	state.pc_ray.time = rand() % UINT_MAX;
-	state.pc_ray.max_depth = integrator->lumen_scene->config.common.path_length;
-	state.pc_ray.sky_col = integrator->lumen_scene->config.common.sky_col;
-	state.pc_ray.do_spatiotemporal = state.do_spatiotemporal;
-	state.pc_ray.random_num = rand() % UINT_MAX;
-	state.pc_ray.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc_ray.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
-	state.pc_ray.enable_accumulation = state.enable_accumulation;
-	state.pc_ray.frame_num = integrator->frame_num;
+	state.pc.width = Window::width();
+	state.pc.height = Window::height();
+	state.pc.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
+	state.pc.time = rand() % UINT_MAX;
+	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
+	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
+	state.pc.do_spatiotemporal = state.do_spatiotemporal;
+	state.pc.random_num = rand() % UINT_MAX;
+	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
+	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc.enable_accumulation = state.enable_accumulation;
+	state.pc.frame_num = integrator->frame_num;
 
 	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		integrator->output_tex,
@@ -105,7 +105,7 @@ void restir::render(Integrator* integrator) {
 							   {CSTR("src/shaders/ray.rahit")}},
 				   .dims = {Window::width(), Window::height() },
 			   })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.zero(state.g_buffer)
 		.zero(state.spatial_reservoir_buffer)
 		.zero(state.temporal_reservoir_buffer, !state.do_spatiotemporal)
@@ -123,7 +123,7 @@ void restir::render(Integrator* integrator) {
 							   {CSTR("src/shaders/ray.rahit")}},
 				   .dims = {Window::width(), Window::height() },
 			   })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
@@ -139,7 +139,7 @@ void restir::render(Integrator* integrator) {
 							   {CSTR("src/shaders/ray.rahit")}},
 				   .dims = {Window::width(), Window::height() },
 			   })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)

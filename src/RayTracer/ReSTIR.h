@@ -9,7 +9,7 @@ struct ReSTIR {
 	vk::Buffer* temporal_reservoir_buffer = nullptr;
 	vk::Buffer* spatial_reservoir_buffer = nullptr;
 	vk::Buffer* tmp_col_buffer = nullptr;
-	PCReSTIR pc_ray{};
+	PCReSTIR pc{};
 	bool do_spatiotemporal = false;
 	bool enable_accumulation = false;
 };

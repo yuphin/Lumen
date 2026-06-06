@@ -30,7 +30,7 @@ struct ReSTIRPT {
 	lm::SmallArray<vk::Buffer*, vk::MAX_FRAMES_IN_FLIGHT> photon_bvh_scratch_bufs;
 	vk::Buffer* caustics_reservoir_ping_buffer = nullptr;
 	vk::Buffer* caustics_reservoir_pong_buffer = nullptr;
-	RestirPT::PCReSTIRPT pc_ray{};
+	RestirPT::PCReSTIRPT pc{};
 	bool enable_accumulation = true;
 	bool direct_lighting = true;
 	bool enable_rr = false;

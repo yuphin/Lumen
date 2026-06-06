@@ -9,7 +9,7 @@ struct ReSTIRGI {
 	vk::Buffer* temporal_reservoir_buffer = nullptr;
 	vk::Buffer* spatial_reservoir_buffer = nullptr;
 	vk::Buffer* tmp_col_buffer = nullptr;
-	PCReSTIRGI pc_ray{};
+	PCReSTIRGI pc{};
 	bool do_spatiotemporal = false;
 	bool enable_accumulation = false;
 };

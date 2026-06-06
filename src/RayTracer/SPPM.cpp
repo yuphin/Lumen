@@ -72,40 +72,40 @@ void sppm::init(Integrator* integrator) {
 
 void sppm::render(Integrator* integrator) {
 	SPPM& state = integrator->sppm;
-	state.pc_ray.width = Window::width();
-	state.pc_ray.height = Window::height();
-	state.pc_ray.num_lights = i32(integrator->lumen_scene->gpu_lights.size);
-	state.pc_ray.time = rand() % UINT_MAX;
-	state.pc_ray.max_depth = integrator->lumen_scene->config.common.path_length;
-	state.pc_ray.sky_col = integrator->lumen_scene->config.common.sky_col;
-	state.pc_ray.random_num = rand() % UINT_MAX;
-	state.pc_ray.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc_ray.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
-	state.pc_ray.frame_num = integrator->frame_num;
+	state.pc.width = Window::width();
+	state.pc.height = Window::height();
+	state.pc.num_lights = i32(integrator->lumen_scene->gpu_lights.size);
+	state.pc.time = rand() % UINT_MAX;
+	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
+	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
+	state.pc.random_num = rand() % UINT_MAX;
+	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
+	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc.frame_num = integrator->frame_num;
 	SPPMConfig& config = integrator->lumen_scene->config.settings.sppm;
 	// PPM related constants
 	if (config.base_radius < 1e-7f) {
 		config.base_radius = 1e-7f;
 	}
-	state.pc_ray.min_bounds = integrator->lumen_scene->dimensions.min;
-	state.pc_ray.max_bounds = integrator->lumen_scene->dimensions.max;
-	state.pc_ray.ppm_base_radius = config.base_radius;
-	const glm::vec3 diam = state.pc_ray.max_bounds - state.pc_ray.min_bounds;
+	state.pc.min_bounds = integrator->lumen_scene->dimensions.min;
+	state.pc.max_bounds = integrator->lumen_scene->dimensions.max;
+	state.pc.ppm_base_radius = config.base_radius;
+	const glm::vec3 diam = state.pc.max_bounds - state.pc.min_bounds;
 	const f32 max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
 	const i32 base_grid_res = i32(max_comp / config.base_radius);
-	state.pc_ray.grid_res = glm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
+	state.pc.grid_res = glm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
 	auto op_reduce = [&](const lm::String& op_name, const lm::String& op_shader_name, const lm::String& reduce_name,
 						 const lm::String& reduce_shader_name) {
 		u32 num_wgs = u32((Window::width() * Window::height() + 1023) / 1024);
 		vk::render_graph()
 			->add_compute(op_name, {.shader = vk::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
-			.push_constants(&state.pc_ray)
+			.push_constants(&state.pc)
 			.bind(integrator->lumen_scene->scene_desc_buffer)
 			.zero({state.residual_buffer, state.counter_buffer});
 		while (num_wgs != 1) {
 			vk::render_graph()
 				->add_compute(reduce_name, {.shader = vk::Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
-				.push_constants(&state.pc_ray)
+				.push_constants(&state.pc)
 				.bind(integrator->lumen_scene->scene_desc_buffer);
 			num_wgs = (u32)(num_wgs + 1023) / 1024;
 		}
@@ -128,9 +128,9 @@ void sppm::render(Integrator* integrator) {
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.zero(state.photon_buffer)
-		.zero(state.sppm_data_buffer, /*cond=*/state.pc_ray.frame_num == 0)
+		.zero(state.sppm_data_buffer, /*cond=*/state.pc.frame_num == 0)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
@@ -155,7 +155,7 @@ void sppm::render(Integrator* integrator) {
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
@@ -164,14 +164,14 @@ void sppm::render(Integrator* integrator) {
 	vk::render_graph()
 		->add_compute(CSTR("Gather"), {.shader = vk::Shader(CSTR("src/shaders/integrators/sppm/gather.comp")),
 								 .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures);
 	// Composite
 	vk::render_graph()
 		->add_compute(CSTR("Composite"), {.shader = vk::Shader(CSTR("src/shaders/integrators/sppm/composite.comp")),
 									.dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});
 }
 

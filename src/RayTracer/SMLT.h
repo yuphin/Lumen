@@ -4,7 +4,7 @@
 struct Integrator;
 
 struct SMLT {
-	PCMLT pc_ray{};
+	PCMLT pc{};
 	PushConstantCompute pc_compute{};
 	vk::Buffer* bootstrap_buffer = nullptr;
 	vk::Buffer* cdf_buffer = nullptr;

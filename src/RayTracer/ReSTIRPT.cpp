@@ -176,12 +176,12 @@ void restirpt::init(Integrator* integrator) {
 						 .data = &tlas_instance,
 						 .dedicated_allocation = true});
 
-	state.pc_ray.total_light_area = 0;
+	state.pc.total_light_area = 0;
 
 	integrator->frame_num = 0;
 
-	state.pc_ray.total_frame_num = 0;
-	state.pc_ray.buffer_idx = 0;
+	state.pc.total_frame_num = 0;
+	state.pc.buffer_idx = 0;
 
 	assert(vk::render_graph()->settings.shader_inference == true);
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer, vk::render_graph());
@@ -201,44 +201,44 @@ void restirpt::init(Integrator* integrator) {
 
 void restirpt::render(Integrator* integrator) {
 	ReSTIRPT& state = integrator->restirpt;
-	state.pc_ray.width = Window::width();
-	state.pc_ray.height = Window::height();
-	state.pc_ray.enable_temporal_jitter = uint(state.enable_temporal_jitter);
-	state.pc_ray.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
-	state.pc_ray.prev_random_num = state.pc_ray.general_seed;
-	state.pc_ray.sampling_seed = rand() % UINT_MAX;
-	state.pc_ray.seed2 = rand() % UINT_MAX;
-	state.pc_ray.seed3 = rand() % UINT_MAX;
-	state.pc_ray.max_depth = state.path_length;
-	state.pc_ray.sky_col = integrator->lumen_scene->config.common.sky_col;
-	state.pc_ray.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc_ray.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
-	state.pc_ray.dir_light_idx = integrator->lumen_scene->dir_light_idx;
-	state.pc_ray.enable_accumulation = state.enable_accumulation;
-	state.pc_ray.num_spatial_samples = state.num_spatial_samples;
-	state.pc_ray.scene_extent = glm::length(integrator->lumen_scene->dimensions.max - integrator->lumen_scene->dimensions.min);
-	state.pc_ray.direct_lighting = state.direct_lighting;
-	state.pc_ray.enable_rr = state.enable_rr;
+	state.pc.width = Window::width();
+	state.pc.height = Window::height();
+	state.pc.enable_temporal_jitter = uint(state.enable_temporal_jitter);
+	state.pc.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
+	state.pc.prev_random_num = state.pc.general_seed;
+	state.pc.sampling_seed = rand() % UINT_MAX;
+	state.pc.seed2 = rand() % UINT_MAX;
+	state.pc.seed3 = rand() % UINT_MAX;
+	state.pc.max_depth = state.path_length;
+	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
+	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
+	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc.dir_light_idx = integrator->lumen_scene->dir_light_idx;
+	state.pc.enable_accumulation = state.enable_accumulation;
+	state.pc.num_spatial_samples = state.num_spatial_samples;
+	state.pc.scene_extent = glm::length(integrator->lumen_scene->dimensions.max - integrator->lumen_scene->dimensions.min);
+	state.pc.direct_lighting = state.direct_lighting;
+	state.pc.enable_rr = state.enable_rr;
 
-	state.pc_ray.spatial_radius = state.spatial_reuse_radius;
-	state.pc_ray.enable_spatial_reuse = state.enable_spatial_reuse;
-	state.pc_ray.hide_reconnection_radiance = state.hide_reconnection_radiance;
-	state.pc_ray.min_vertex_distance_ratio = state.min_vertex_distance_ratio;
-	state.pc_ray.enable_gris = state.enable_gris;
-	state.pc_ray.frame_num = integrator->frame_num;
-	state.pc_ray.pixel_debug = state.pixel_debug;
-	state.pc_ray.temporal_reuse = uint(state.enable_temporal_reuse);
-	state.pc_ray.permutation_sampling = uint(state.enable_permutation_sampling);
-	state.pc_ray.gris_separator = state.gris_separator;
-	state.pc_ray.canonical_only = state.canonical_only;
-	state.pc_ray.enable_occlusion = state.enable_occlusion;
-	state.pc_ray.num_photons = state.num_photons;
-	state.pc_ray.photon_radius = state.initial_photon_radius;
-	state.pc_ray.pm_temporal_reuse = uint(state.enable_pm_temporal_reuse);
+	state.pc.spatial_radius = state.spatial_reuse_radius;
+	state.pc.enable_spatial_reuse = state.enable_spatial_reuse;
+	state.pc.hide_reconnection_radiance = state.hide_reconnection_radiance;
+	state.pc.min_vertex_distance_ratio = state.min_vertex_distance_ratio;
+	state.pc.enable_gris = state.enable_gris;
+	state.pc.frame_num = integrator->frame_num;
+	state.pc.pixel_debug = state.pixel_debug;
+	state.pc.temporal_reuse = uint(state.enable_temporal_reuse);
+	state.pc.permutation_sampling = uint(state.enable_permutation_sampling);
+	state.pc.gris_separator = state.gris_separator;
+	state.pc.canonical_only = state.canonical_only;
+	state.pc.enable_occlusion = state.enable_occlusion;
+	state.pc.num_photons = state.num_photons;
+	state.pc.photon_radius = state.initial_photon_radius;
+	state.pc.pm_temporal_reuse = uint(state.enable_pm_temporal_reuse);
 
 	if (state.progressive_radius_reduction) {
-		state.pc_ray.photon_radius = state.curr_photon_radius * sqrtf(((f32)integrator->frame_num + 2.0f / 3.0f) / ((f32)integrator->frame_num + 1.0f));
-		state.curr_photon_radius = state.pc_ray.photon_radius;
+		state.pc.photon_radius = state.curr_photon_radius * sqrtf(((f32)integrator->frame_num + 2.0f / 3.0f) / ((f32)integrator->frame_num + 1.0f));
+		state.curr_photon_radius = state.pc.photon_radius;
 	}
 
 	const std::initializer_list<lm::ResourceBinding> common_bindings = {
@@ -249,7 +249,7 @@ void restirpt::render(Integrator* integrator) {
 	vk::Buffer* photon_gbuffers[] = {state.photon_eye_buffer_ping, state.photon_eye_buffer_pong};
 	vk::Buffer* gbuffers[] = {state.gris_prev_gbuffer, state.gris_gbuffer};
 
-	i32 ping = state.pc_ray.total_frame_num % 2;
+	i32 ping = state.pc.total_frame_num % 2;
 	i32 pong = ping ^ 1;
 	u64 resource_idx = vk::context().in_flight_frame_idx;
 
@@ -267,7 +267,7 @@ void restirpt::render(Integrator* integrator) {
 						 .macros = {vk::ShaderMacro("ENABLE_ATMOSPHERE", state.enable_atmosphere)},
 						 .dims = {Window::width(), Window::height()},
 					 })
-			.push_constants(&state.pc_ray)
+			.push_constants(&state.pc)
 			.bind(common_bindings)
 			.bind(photon_gbuffers[pong])
 			.bind_texture_array(integrator->lumen_scene->scene_textures)
@@ -306,7 +306,7 @@ void restirpt::render(Integrator* integrator) {
 									vk::ShaderMacro("DISABLE_PM_MIS", !state.enable_pm_mis)},
 						 .dims = {state.num_photons, 1},
 					 })
-			.push_constants(&state.pc_ray)
+			.push_constants(&state.pc)
 			.bind(common_bindings)
 			.bind_texture_array(integrator->lumen_scene->scene_textures)
 			.zero(state.photon_count_buffer)
@@ -333,7 +333,7 @@ void restirpt::render(Integrator* integrator) {
 										vk::ShaderMacro("ENABLE_ATMOSPHERE", state.enable_atmosphere)},
 							 .dims = {Window::width(), Window::height()},
 						 })
-				.push_constants(&state.pc_ray)
+				.push_constants(&state.pc)
 				.bind(common_bindings)
 				.bind(state.canonical_contributions_texture)
 				.bind(state.caustics_texture)
@@ -362,7 +362,7 @@ void restirpt::render(Integrator* integrator) {
 								vk::ShaderMacro("ENABLE_PM", state.enable_photon_gather && state.enable_photon_mapping)},
 					 .dims = {Window::width(), Window::height()},
 				 })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.zero(state.debug_vis_buffer)
 		.bind(common_bindings)
 		.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
@@ -373,9 +373,9 @@ void restirpt::render(Integrator* integrator) {
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
 
-	state.pc_ray.general_seed = rand() % UINT_MAX;
+	state.pc.general_seed = rand() % UINT_MAX;
 	if (state.enable_gris) {
-		bool should_do_temporal = state.enable_temporal_reuse && state.pc_ray.total_frame_num > 0;
+		bool should_do_temporal = state.enable_temporal_reuse && state.pc.total_frame_num > 0;
 		// Temporal Reuse
 		vk::render_graph()
 			->add_rt(CSTR("GRIS - Temporal Reuse"),
@@ -387,7 +387,7 @@ void restirpt::render(Integrator* integrator) {
 									 {CSTR("src/shaders/ray.rahit")}},
 						 .dims = {Window::width(), Window::height()},
 					 })
-			.push_constants(&state.pc_ray)
+			.push_constants(&state.pc)
 			.bind(common_bindings)
 			.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
 			.bind(reservoir_buffers[READ_OR_PREV_IDX])
@@ -397,7 +397,7 @@ void restirpt::render(Integrator* integrator) {
 			.bind_texture_array(integrator->lumen_scene->scene_textures)
 			.bind_tlas(*integrator->tlas)
 			.skip_execution(!should_do_temporal);
-		state.pc_ray.seed2 = rand() % UINT_MAX;
+		state.pc.seed2 = rand() % UINT_MAX;
 		if (!state.canonical_only) {
 			if (state.mis_method == ReSTIRPT::MIS_TALBOT) {
 				vk::render_graph()
@@ -410,7 +410,7 @@ void restirpt::render(Integrator* integrator) {
 											 {CSTR("src/shaders/ray.rahit")}},
 								 .dims = {Window::width(), Window::height()},
 							 })
-					.push_constants(&state.pc_ray)
+					.push_constants(&state.pc)
 					.bind(common_bindings)
 					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
 					.bind(reservoir_buffers[READ_OR_PREV_IDX])
@@ -431,7 +431,7 @@ void restirpt::render(Integrator* integrator) {
 											 {CSTR("src/shaders/ray.rahit")}},
 								 .dims = {Window::width(), Window::height()},
 							 })
-					.push_constants(&state.pc_ray)
+					.push_constants(&state.pc)
 					.bind(common_bindings)
 					.bind(state.reconnection_buffer)
 					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
@@ -449,7 +449,7 @@ void restirpt::render(Integrator* integrator) {
 											 {CSTR("src/shaders/ray.rahit")}},
 								 .dims = {Window::width(), Window::height()},
 							 })
-					.push_constants(&state.pc_ray)
+					.push_constants(&state.pc)
 					.bind(common_bindings)
 					.bind(state.reconnection_buffer)
 					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
@@ -470,7 +470,7 @@ void restirpt::render(Integrator* integrator) {
 							.macros = {vk::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS", state.enable_defensive_formulation)},
 							.dims = {Window::width(), Window::height()},
 						})
-					.push_constants(&state.pc_ray)
+					.push_constants(&state.pc)
 					.bind(common_bindings)
 					.bind(state.reconnection_buffer)
 					.bind(reservoir_buffers[WRITE_OR_CURR_IDX])
@@ -487,13 +487,13 @@ void restirpt::render(Integrator* integrator) {
 					->add_compute(CSTR("GRIS - Debug Visualiation"),
 								  {.shader = vk::Shader(CSTR("src/shaders/integrators/restir/gris/debug_vis.comp")),
 								   .dims = {num_wgs}})
-					.push_constants(&state.pc_ray)
+					.push_constants(&state.pc)
 					.bind({integrator->output_tex, integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer});
 			}
 		}
 	}
 
-	state.pc_ray.total_frame_num++;
+	state.pc.total_frame_num++;
 }
 
 bool restirpt::update(Integrator* integrator) {
@@ -630,7 +630,7 @@ bool restirpt::gui(Integrator* integrator) {
 			 .size = Window::width() * Window::height() * sizeof(ReconnectionData) * (state.num_spatial_samples + 1)});
 	}
 	if (result) {
-		state.pc_ray.total_frame_num = 0;
+		state.pc.total_frame_num = 0;
 	}
 	return result;
 }

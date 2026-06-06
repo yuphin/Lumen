@@ -98,7 +98,7 @@ void vcm::init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
-	state.pc_ray.total_light_area = 0;
+	state.pc.total_light_area = 0;
 
 	integrator->frame_num = 0;
 
@@ -119,40 +119,40 @@ void vcm::init(Integrator* integrator) {
 void vcm::render(Integrator* integrator) {
 	VCM& state = integrator->vcm;
 	const VCMConfig& config = integrator->lumen_scene->config.settings.vcm;
-	state.pc_ray.width = Window::width();
-	state.pc_ray.height = Window::height();
-	state.pc_ray.num_lights = i32(integrator->lumen_scene->gpu_lights.size);
-	state.pc_ray.time = rand() % UINT_MAX;
-	state.pc_ray.max_depth = integrator->lumen_scene->config.common.path_length;
-	state.pc_ray.sky_col = integrator->lumen_scene->config.common.sky_col;
-	state.pc_ray.frame_num = integrator->frame_num;
+	state.pc.width = Window::width();
+	state.pc.height = Window::height();
+	state.pc.num_lights = i32(integrator->lumen_scene->gpu_lights.size);
+	state.pc.time = rand() % UINT_MAX;
+	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
+	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
+	state.pc.frame_num = integrator->frame_num;
 	// VCM related constants
-	state.pc_ray.radius = integrator->lumen_scene->dimensions.radius * config.radius_factor / 100.f;
-	state.pc_ray.radius /= (f32)pow((double)state.pc_ray.frame_num + 1, 0.5 * (1 - 2.0 / 3));
-	state.pc_ray.min_bounds = integrator->lumen_scene->dimensions.min;
-	state.pc_ray.max_bounds = integrator->lumen_scene->dimensions.max;
-	state.pc_ray.use_vm = config.enable_vm;
-	state.pc_ray.use_vc = state.use_vc;
-	state.pc_ray.do_spatiotemporal = state.do_spatiotemporal;
-	state.pc_ray.random_num = rand() % UINT_MAX;
-	state.pc_ray.max_angle_samples = max_samples;
-	state.pc_ray.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc.radius = integrator->lumen_scene->dimensions.radius * config.radius_factor / 100.f;
+	state.pc.radius /= (f32)pow((double)state.pc.frame_num + 1, 0.5 * (1 - 2.0 / 3));
+	state.pc.min_bounds = integrator->lumen_scene->dimensions.min;
+	state.pc.max_bounds = integrator->lumen_scene->dimensions.max;
+	state.pc.use_vm = config.enable_vm;
+	state.pc.use_vc = state.use_vc;
+	state.pc.do_spatiotemporal = state.do_spatiotemporal;
+	state.pc.random_num = rand() % UINT_MAX;
+	state.pc.max_angle_samples = max_samples;
+	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
 	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		integrator->output_tex,
 		integrator->scene_ubo_buffer,
 		integrator->lumen_scene->scene_desc_buffer,
 	};
-	const glm::vec3 diam = state.pc_ray.max_bounds - state.pc_ray.min_bounds;
+	const glm::vec3 diam = state.pc.max_bounds - state.pc.min_bounds;
 	const f32 max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
-	const i32 base_grid_res = i32(max_comp / state.pc_ray.radius);
-	state.pc_ray.grid_res = glm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
+	const i32 base_grid_res = i32(max_comp / state.pc.radius);
+	state.pc.grid_res = glm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
 	// Prepare
 	auto& prepare_pass =
 		vk::render_graph()
 			->add_compute(CSTR("Init Reservoirs"),
 						  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/init_reservoirs.comp")),
 						   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
-			.push_constants(&state.pc_ray)
+			.push_constants(&state.pc)
 			.bind(integrator->lumen_scene->scene_desc_buffer)
 			.zero(state.photon_buffer, config.enable_vm);
 
@@ -173,7 +173,7 @@ void vcm::render(Integrator* integrator) {
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
@@ -184,10 +184,10 @@ void vcm::render(Integrator* integrator) {
 		->add_compute(CSTR("Check Reservoirs"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/check_reservoirs.comp")),
 					   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer)
 		.zero(state.should_resample_buffer);
-	state.pc_ray.random_num = rand() % UINT_MAX;
+	state.pc.random_num = rand() % UINT_MAX;
 	// Spawn light rays
 	vk::render_graph()
 		->add_rt(CSTR("VCM - Spawn Light"),
@@ -199,13 +199,13 @@ void vcm::render(Integrator* integrator) {
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.zero(state.light_state_buffer)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
-	state.pc_ray.random_num = rand() % UINT_MAX;
+	state.pc.random_num = rand() % UINT_MAX;
 	// Trace spawned rays
 	vk::render_graph()
 		->add_rt(CSTR("VCM - Trace Light"),
@@ -217,7 +217,7 @@ void vcm::render(Integrator* integrator) {
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
@@ -228,7 +228,7 @@ void vcm::render(Integrator* integrator) {
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/select_reservoirs.comp")),
 					   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.bind(integrator->lumen_scene->scene_desc_buffer)
-		.push_constants(&state.pc_ray);
+		.push_constants(&state.pc);
 
 	// Update temporal reservoirs with the selected sample
 	vk::render_graph()
@@ -236,7 +236,7 @@ void vcm::render(Integrator* integrator) {
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/update_reservoirs.comp")),
 					   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.bind(integrator->lumen_scene->scene_desc_buffer)
-		.push_constants(&state.pc_ray);
+		.push_constants(&state.pc);
 	// Trace rays from eye
 	vk::render_graph()
 		->add_rt(CSTR("VCM - Trace Eye"),
@@ -248,7 +248,7 @@ void vcm::render(Integrator* integrator) {
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
-		.push_constants(&state.pc_ray)
+		.push_constants(&state.pc)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
@@ -257,7 +257,7 @@ void vcm::render(Integrator* integrator) {
 	if (!state.do_spatiotemporal) {
 		state.do_spatiotemporal = true;
 	}
-	state.pc_ray.total_frame_num++;
+	state.pc.total_frame_num++;
 }
 
 bool vcm::update(Integrator* integrator) {
