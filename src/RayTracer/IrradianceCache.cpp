@@ -237,7 +237,7 @@ void ircache::render(Integrator* integrator) {
 	pc.height = Window::height();
 	pc.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
 	pc.total_light_area = integrator->lumen_scene->total_light_area;
-	pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	pc.dir_light_idx = integrator->lumen_scene->dir_light_idx;
 	pc.direct_lighting = state.direct_lighting;
 	pc.sampling_seed = rand() % UINT_MAX;

@@ -213,7 +213,7 @@ int bdpt_generate_light_subpath(int max_depth) {
    
 #endif
     const vec3 Le =
-    sample_Le(rands_pos, rands_dir, pc.num_lights, pc.light_triangle_count,
+    sample_Le(rands_pos, rands_dir, pc.num_lights, pc.total_light_count,
                         cos_theta, light_record, pos, wi, n, pdf_pos, pdf_dir);
     if (pdf_dir <= 0) {
         return 0;
@@ -353,7 +353,7 @@ float calc_mis_weight(int s, int t, const in PathVertex sampled) {
             // s == 0, i.e the path is on a finite light source
             // cam_vtx(t-1).area gives the area of the emitter that was hit
             cam_vtx(t - 1).pdf_rev =
-                1.0 / (pc.light_triangle_count * cam_vtx(t - 1).area);
+                1.0 / (pc.total_light_count * cam_vtx(t - 1).area);
         }
     }
     if (t > 1) {
@@ -585,8 +585,8 @@ vec3 bdpt_connect(int s, int t) {
                 const float pdf_light_w =
                     light_pdf_a_to_w(record.flags, pdf_pos_a, n,
                                      wi_len * wi_len, cos_y) /
-                    pc.light_triangle_count;
-                sampled.pdf_fwd = pdf_pos_a / pc.light_triangle_count;
+                    pc.total_light_count;
+                sampled.pdf_fwd = pdf_pos_a / pc.total_light_count;
                 sampled.pos = pos;
                 sampled.n_s = n;
                 sampled.delta = uint(is_light_delta(record.flags));

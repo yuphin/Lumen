@@ -224,7 +224,7 @@ void pssmlt::render(Integrator* integrator) {
 	state.pc.random_num = rand() % UINT_MAX;
 	state.pc.num_bootstrap_samples = config.num_bootstrap_samples;
 	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	state.pc.frame_num = integrator->frame_num;
 
 	std::initializer_list<lm::ResourceBinding> rt_bindings = {

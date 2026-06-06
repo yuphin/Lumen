@@ -214,7 +214,7 @@ void main() {
 			float mis_light = 0;
 #ifndef DISABLE_PM_MIS
 			if (mis_factor_set) {
-				float light_pick_prob = 1.0 / pc.light_triangle_count;
+				float light_pick_prob = 1.0 / pc.total_light_count;
 				float cos_from_light = max(dot(n_s, wo), 0);
 				float pdf_light_dir = cos_from_light / PI;
 				// For photon mapping, multiplication by light pick prob. is necessary

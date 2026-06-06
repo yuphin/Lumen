@@ -14,7 +14,7 @@ struct PCMLT {
 	uint time;
 	int max_depth;
 	float total_light_area;
-	int light_triangle_count;
+	int total_light_count;
 	uint dir_light_idx;
 	float mutations_per_pixel;
 	uint light_rand_count;

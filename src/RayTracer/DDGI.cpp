@@ -230,7 +230,7 @@ void ddgi::render(Integrator* integrator) {
 	state.pc.first_frame = state.first_frame;
 	state.pc.infinite_bounces = state.infinite_bounces;
 	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	state.pc.frame_num = integrator->frame_num;
 	state.pc.direct_lighting = state.direct_lighting;
 	const bool ping_pong = bool(state.frame_idx % 2);  // ping_pong true = read

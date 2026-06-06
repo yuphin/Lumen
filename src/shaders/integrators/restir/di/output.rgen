@@ -20,7 +20,7 @@ void main() {
 		return;
 	}
 	if (r.W > 0) {
-		col += r.W * calc_L_with_visibility_check(r) * pc.light_triangle_count;
+		col += r.W * calc_L_with_visibility_check(r) * pc.total_light_count;
 		temporal_reservoirs.d[pixel_idx].w_sum = r.w_sum;
 		temporal_reservoirs.d[pixel_idx].W = r.W;
 		temporal_reservoirs.d[pixel_idx].m = r.m;

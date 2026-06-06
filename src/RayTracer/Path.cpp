@@ -34,7 +34,7 @@ void path::render(Integrator* integrator) {
 	state.pc.max_depth = state.path_length;
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
 	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	state.pc.dir_light_idx = integrator->lumen_scene->dir_light_idx;
 	state.pc.frame_num = integrator->frame_num;
 	state.pc.direct_lighting = state.direct_lighting;

@@ -72,7 +72,7 @@ struct Scene {
 	vk::Buffer* mesh_lights_buffer;
 	lm::Camera camera{};
 
-	u32 total_light_triangle_cnt = 0;
+	u32 total_light_cnt = 0;
 	f32 total_light_area = 0;
 
 	struct Dimensions {

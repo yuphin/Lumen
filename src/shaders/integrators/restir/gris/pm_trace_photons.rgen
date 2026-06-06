@@ -27,7 +27,7 @@ void main() {
 	vec4 rands_pos = rand4(seed);
 	vec2 rands_dir = rand2(seed);
 
-	const vec3 Le = sample_Le(rands_pos, rands_dir, pc.num_lights, pc.light_triangle_count, cos_theta,
+	const vec3 Le = sample_Le(rands_pos, rands_dir, pc.num_lights, pc.total_light_count, cos_theta,
 									light_record, pos, wi, n, pdf_pos, pdf_dir);
 	float abs_cos_light = abs(dot(n, wi));
 	vec3 throughput;
@@ -39,7 +39,7 @@ void main() {
 		throughput = Le * abs_cos_light / (pdf_dir * pdf_pos);
 	}
 
-	float light_pick_prob = 1.0 / pc.light_triangle_count;
+	float light_pick_prob = 1.0 / pc.total_light_count;
 
 	float d_vm_common = pdf_dir == 0 ? 0 : 1.0 / (pdf_dir * eta_vm);
 	float d_vm_nee = light_pick_prob;

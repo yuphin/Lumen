@@ -89,7 +89,7 @@ void restirgi::render(Integrator* integrator) {
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
 	state.pc.do_spatiotemporal = state.do_spatiotemporal;
 	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	state.pc.enable_accumulation = state.enable_accumulation;
 	state.pc.frame_num = integrator->frame_num;
 

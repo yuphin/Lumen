@@ -246,7 +246,7 @@ void vcmmlt::render(Integrator* integrator) {
 	const i32 base_grid_res = i32(max_comp / state.pc.radius);
 	state.pc.grid_res = glm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
 	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 
 	lm::RenderGraph* rg = vk::render_graph();
 	auto op_reduce = [&](const lm::String& op_name, const lm::String& op_shader_name, const lm::String& reduce_name,

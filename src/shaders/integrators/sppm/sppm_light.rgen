@@ -51,7 +51,7 @@ void main() {
     vec2 rands_dir = rand2(seed);
 
     const vec3 Le =
-        sample_Le(rands_pos, rands_dir, pc.num_lights, pc.light_triangle_count,
+        sample_Le(rands_pos, rands_dir, pc.num_lights, pc.total_light_count,
                         cos_theta, light_record, pos, wi, n, pdf_pos, pdf_dir);
  
     float abs_cos_light = abs(dot(n, wi));

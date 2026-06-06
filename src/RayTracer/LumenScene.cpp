@@ -725,7 +725,7 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 			// Is finite
 			light.light_flags |= 1 << 4;
 			light.L = emissive_factor;
-			_scene.total_light_triangle_cnt += light.num_triangles;
+			_scene.total_light_cnt += light.num_triangles;
 		}
 	}
 
@@ -748,7 +748,7 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 		light.light_flags = l.light_flags;
 		light.pos = l.pos;
 		light.to = l.to;
-		_scene.total_light_triangle_cnt++;
+		_scene.total_light_cnt++;
 		light.world_radius = _scene.dimensions.radius;
 		light.world_center = _scene.dimensions.center;
 		if ((l.light_flags & LIGHT_DIRECTIONAL) == LIGHT_DIRECTIONAL) {

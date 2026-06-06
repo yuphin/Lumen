@@ -97,7 +97,7 @@ void main() {
 		bool side = face_forward(n_s, n_g, wo);
 
 		if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
-			const float light_pick_pdf = 1. / pc.light_triangle_count;
+			const float light_pick_pdf = 1. / pc.total_light_count;
 			col += uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo) / light_pick_pdf;
 		}
 		if (pc.first_frame == 0 && pc.infinite_bounces == 1) {

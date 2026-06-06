@@ -9,7 +9,7 @@ struct PCReSTIR {
 	uint time;
 	int max_depth;
 	float total_light_area;
-	int light_triangle_count;
+	int total_light_count;
 	uint dir_light_idx;
 	uint do_spatiotemporal;
 	uint random_num;

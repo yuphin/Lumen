@@ -10,7 +10,7 @@ struct PCDDGI {
 	uint time;
 	int max_depth;
 	float total_light_area;
-	int light_triangle_count;
+	int total_light_count;
 	uint dir_light_idx;
 	int first_frame;
 	int infinite_bounces;

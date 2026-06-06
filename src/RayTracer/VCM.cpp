@@ -136,7 +136,7 @@ void vcm::render(Integrator* integrator) {
 	state.pc.do_spatiotemporal = state.do_spatiotemporal;
 	state.pc.random_num = rand() % UINT_MAX;
 	state.pc.max_angle_samples = max_samples;
-	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		integrator->output_tex,
 		integrator->scene_ubo_buffer,

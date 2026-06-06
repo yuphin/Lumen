@@ -73,7 +73,7 @@ void main() {
 		origin.xyz = offset_ray(payload.pos, n_g);
 		last_specular = is_specular(hit_mat);
 		if (!last_specular) {
-			const float light_pick_pdf = 1. / pc.light_triangle_count;
+			const float light_pick_pdf = 1. / pc.total_light_count;
 			if (depth > 0 || pc.direct_lighting == 1) {
 				col += throughput * uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo) / light_pick_pdf;
 			}

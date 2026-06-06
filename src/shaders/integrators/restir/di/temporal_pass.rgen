@@ -53,7 +53,7 @@ void main() {
         // Generate samples
 
         const uint M = 32;
-        const uint light_samples = min(pc.light_triangle_count, 32);
+        const uint light_samples = min(pc.total_light_count, 32);
 
         if (pc.do_spatiotemporal == 1 &&
             ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0)) {
@@ -196,7 +196,7 @@ void main() {
             float cos_wo = dot(wo, n_s);
             origin = offset_ray(payload.pos, n_s);
             if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
-                const float light_pick_pdf = 1. / pc.light_triangle_count;
+                const float light_pick_pdf = 1. / pc.total_light_count;
                 col += throughput *
                        uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo,
                                             specular) /

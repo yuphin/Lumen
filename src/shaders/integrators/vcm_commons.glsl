@@ -92,7 +92,7 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state, out bool 
 	const vec4 rands_pos = rand4(seed);
 	const vec2 rands_dir = rand2(seed);
 #endif
-	const vec3 Le = sample_Le(rands_pos, rands_dir, pc.num_lights, pc.light_triangle_count, cos_theta,
+	const vec3 Le = sample_Le(rands_pos, rands_dir, pc.num_lights, pc.total_light_count, cos_theta,
 									light_record, pos, wi, n, pdf_pos, pdf_dir);
 	if (pdf_dir <= 0) {
 		return false;
@@ -133,7 +133,7 @@ vec3 vcm_get_light_radiance(in const Material mat, in const VCMState camera_stat
 	if (d == 1) {
 		return mat.emissive_factor;
 	}
-	const float pdf_light_pos = 1.0 / (payload.area * pc.light_triangle_count);
+	const float pdf_light_pos = 1.0 / (payload.area * pc.total_light_count);
 
 	const float pdf_light_dir = abs(dot(payload.n_s, -camera_state.wi)) / PI;
 	const float w_camera = pdf_light_pos * camera_state.d_vcm +
@@ -185,13 +185,13 @@ vec3 vcm_connect_light(vec3 n_s, vec3 wo, Material mat, bool side, float eta_vm,
 			if (is_light_delta(record.flags)) {
 				pdf_fwd = 0;
 			}
-			const float w_light = pdf_fwd / (pdf_pos_w / pc.light_triangle_count);
+			const float w_light = pdf_fwd / (pdf_pos_w / pc.total_light_count);
 			const float w_cam = pdf_pos_dir_w * abs(cos_x) / (pdf_pos_w * cos_y) *
 								(eta_vm + camera_state.d_vcm + camera_state.d_vc * pdf_rev);
 			const float mis_weight = 1. / (1. + w_light + w_cam);
 			if (mis_weight > 0) {
 				res =
-					mis_weight * abs(cos_x) * f * camera_state.throughput * Le / (pdf_pos_w / pc.light_triangle_count);
+					mis_weight * abs(cos_x) * f * camera_state.throughput * Le / (pdf_pos_w / pc.total_light_count);
 			}
 		}
 	}
