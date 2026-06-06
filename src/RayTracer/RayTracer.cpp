@@ -388,7 +388,7 @@ bool RayTracer::gui() {
 	if (curr_integrator_idx != i32(config.type)) {
 		updated = true;
 		vkDeviceWaitIdle(vk::context().device);
-		bool was_custom_accel = typeid(*integrator) == typeid(DDGI);
+		const bool was_custom_accel = config.type == INTEGRATOR_DDGI;
 		integrator->destroy(/*resize=*/false);
 		SceneCommon prev_scene_config = config.common;
 		// TODO: Remove
@@ -400,7 +400,7 @@ bool RayTracer::gui() {
 
 		GPUQueryManager::reset_data();
 		create_integrator((IntegratorType)curr_integrator_idx);
-		bool is_custom_accel = typeid(*integrator) == typeid(DDGI);
+		const bool is_custom_accel = config.type == INTEGRATOR_DDGI;
 		integrator->init();
 		if (was_custom_accel || is_custom_accel) {
 			destroy_accel();

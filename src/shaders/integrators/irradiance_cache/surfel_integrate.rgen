@@ -1,0 +1,128 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+
+#include "../../commons.glsl"
+#include "ir_commons.h"
+#include "ir_commons.glsl"
+const uint flags = gl_RayFlagsOpaqueEXT;
+const float tmin = 0.001;
+const float tmax = 10000.0;
+uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
+layout(location = 0) rayPayloadEXT IRCacheHitPayload payload;
+layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
+layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
+
+SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
+
+uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
+
+vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const bool side, const vec3 n_s,
+						  const vec3 wo, out bool visible) {
+	vec3 res = vec3(0);
+	// Sample light
+	vec3 wi;
+	float wi_len;
+	float pdf_light_w;
+	float pdf_light_a;
+	LightRecord record;
+	float cos_from_light;
+	const vec3 Le =
+		sample_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
+	const vec3 p = offset_ray2(pos, n_s);
+	float bsdf_pdf;
+	float cos_x = dot(n_s, wi);
+	vec3 f = eval_bsdf(n_s, wo, mat, 1, side, wi, bsdf_pdf);
+	float pdf_light;
+	any_hit_payload.hit = 1;
+	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0x1, 1, 0, 1, p, 0, wi,
+				wi_len - EPS, 1);
+	visible = any_hit_payload.hit == 0;
+	if (visible && pdf_light_w > 0) {
+		const float mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + bsdf_pdf / pdf_light_w);
+		res += mis_weight * f * abs(cos_x) * Le / pdf_light_w;
+	}
+	if (get_light_type(record.flags) == LIGHT_AREA) {
+		// Sample BSDF
+		f = sample_bsdf(n_s, wo, mat, 1, side, wi, bsdf_pdf, cos_x, seed);
+		if (bsdf_pdf != 0) {
+			traceRayEXT(tlas, flags, 0x1, 0, 0, 0, p, tmin, wi, tmax, 0);
+			if (payload.triangle_idx == record.triangle_idx && payload.instance_idx == record.instance_idx) {
+				HitData hit_data = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
+				const float wi_len = length(hit_data.pos - pos);
+				const float g = abs(dot(hit_data.n_s, -wi)) / (wi_len * wi_len);
+				const float mis_weight = 1. / (1 + pdf_light_a / (g * bsdf_pdf));
+				res += f * mis_weight * abs(cos_x) * Le / bsdf_pdf;
+			}
+		}
+	}
+	return res;
+}
+
+vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const bool side, const vec3 n_s,
+						  const vec3 wo) {
+	bool unused;
+	return uniform_sample_light(seed, mat, pos, side, n_s, wo, unused);
+}
+
+void main() {
+	uint tid = gl_LaunchIDEXT.y;
+	if (tid >= MAX_SURFEL_COUNT) {
+		return;
+	}
+
+	Surfel surfel = surfel_pool.d[tid];
+
+	if (surfel.radius <= 0.0f) {
+		return;
+	}
+
+	HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
+	vec3 surfel_origin = surfel_hit_data.pos;
+	vec3 camera_origin = ubo.inv_view[3].xyz;
+	// We're already on a surface, sample the BSDF
+
+	vec3 wo = normalize(camera_origin - surfel_origin);
+
+	Material material = load_material(surfel_hit_data.material_idx, surfel_hit_data.uv);
+
+	vec3 n_s = surfel_hit_data.n_s;
+	vec3 n_g = surfel_hit_data.n_g;
+	bool side = face_forward(n_s, n_g, wo);
+
+	vec3 wi;
+	float pdf_w;
+	float cos_theta;
+
+	vec3 f = sample_bsdf(n_s, wo, material, /*radiance=cam*/ 1, side, wi, pdf_w, cos_theta, sampling_seed);
+
+	surfel_origin = offset_ray(surfel_origin, n_g, /* is_transmission= */ false);
+
+	traceRayEXT(tlas, flags, 0x1, 0, 0, 0, surfel_origin, tmin, wi, tmax, 0);
+	const bool found_isect = payload.instance_idx != -1;
+
+	vec3 radiance = vec3(0);
+	if (!found_isect) {
+#ifdef ENABLE_ATMOSPHERE
+		vec3 atmosphere_L = shade_atmosphere(pc.dir_light_idx, pc.sky_col, surfel_origin, wi, tmax);
+#else
+		vec3 atmosphere_L = pc.sky_col;
+#endif	// ENABLE_ATMOSPHERE
+		radiance += atmosphere_L;
+	} else {
+		HitData hit_data = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
+		Material hit_mat = load_material(hit_data.material_idx, hit_data.uv);
+
+		const float light_pick_pdf = 1. / pc.light_triangle_count;
+		wo = -wi;
+		bool side = face_forward(hit_data.n_s, hit_data.n_g, wo);
+		radiance += uniform_sample_light(sampling_seed, hit_mat, hit_data.pos, side, hit_data.n_s, wo) / light_pick_pdf;
+	}
+}

@@ -32,4 +32,5 @@ class IrradianceCache : public Integrator {
 	bool debug_mode = true;
 	bool pause_surfel_spawn = false;
 	u32 total_frame_idx = 0;
+	u32 rays_per_surfel = 8;
 };

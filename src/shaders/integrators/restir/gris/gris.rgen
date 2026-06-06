@@ -43,7 +43,7 @@ void main() {
 	const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
 	const vec2 in_uv = pixel / vec2(gl_LaunchSizeEXT.xy);
 	vec2 d = in_uv * 2.0 - 1.0;
-	vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
+	vec4 origin = ubo.inv_view[3];
 	vec3 direction = vec3(sample_camera(d));
 	vec3 col = vec3(0);
 	bool debug_val = false;

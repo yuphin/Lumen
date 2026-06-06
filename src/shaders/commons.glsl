@@ -27,13 +27,13 @@ CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_a
 
 #include "bsdf_commons.glsl"
 
-vec4 sample_camera(in vec2 d) {
-	vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
+vec4 sample_camera(in vec2 ndc) {
+	vec4 target = ubo.inv_projection * vec4(ndc.x, ndc.y, 1, 1);
 	return ubo.inv_view * vec4(normalize(target.xyz), 0);  // direction
 }
 
-vec4 sample_prev_camera(in vec2 d) {
-	vec4 target = inverse(ubo.prev_projection) * vec4(d.x, d.y, 1, 1);
+vec4 sample_prev_camera(in vec2 ndc) {
+	vec4 target = inverse(ubo.prev_projection) * vec4(ndc.x, ndc.y, 1, 1);
 	return inverse(ubo.prev_view) * vec4(normalize(target.xyz), 0);	 // direction
 }
 
@@ -223,7 +223,7 @@ vec3 uniform_sample_cone(vec2 uv, float cos_max) {
 
 vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out float pdf_pos_w, out vec3 wi,
 					 out float wi_len, out float pdf_pos_a, out float cos_from_light, out LightRecord light_record,
-					 out vec3 n, out vec3 pos, out float pdf_pos_dir_w) {
+					 out vec3 n, out vec3 pos, out float pdf_dir_w) {
 	if(num_lights == 0) {
 		return vec3(0);
 	}
@@ -252,7 +252,7 @@ vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out flo
 			L = light_mat.emissive_factor;
 			pdf_pos_a = record.triangle_pdf;
 			pdf_pos_w = cos_from_light == 0 ? 0 : pdf_pos_a * wi_len_sqr / cos_from_light;
-			pdf_pos_dir_w = cos_from_light * INV_PI * record.triangle_pdf;
+			pdf_dir_w = cos_from_light * INV_PI;
 			light_record.instance_idx = light.prim_mesh_idx;
 			n = record.n_s;
 			pos = record.pos;
@@ -277,7 +277,7 @@ vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out flo
 			}
 			pdf_pos_a = 1;
 			pdf_pos_w = wi_len_sqr;
-			pdf_pos_dir_w = uniform_cone_pdf(cos_width);
+			pdf_dir_w = uniform_cone_pdf(cos_width);
 			L = light.L * faloff;
 			n = -wi;
 			pos = light.pos;
@@ -290,7 +290,7 @@ vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out flo
 			wi /= wi_len;
 			pdf_pos_a = 1;
 			pdf_pos_w = 1;
-			pdf_pos_dir_w = INV_PI / (light.world_radius * light.world_radius);
+			pdf_dir_w = INV_PI / (light.world_radius * light.world_radius);
 			L = light.L;
 			cos_from_light = 1.;
 			n = -wi;
@@ -305,8 +305,9 @@ vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out flo
 vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out float pdf_pos_w, out vec3 wi,
 					 out float wi_len, out float pdf_pos_a, out float cos_from_light, out LightRecord light_record,
 					 out vec3 n, out vec3 pos) {
-	float unused_pos_dir_w;
-	return sample_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light, light_record, n, pos, unused_pos_dir_w);
+	float unused_dir_w;
+	return sample_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light, light_record, n, pos,
+					 unused_dir_w);
 }
 
 vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out float pdf_pos_w, out vec3 wi,
@@ -315,6 +316,15 @@ vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out flo
 	vec3 unused_pos;
 	return sample_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light, light_record,
 						   unused_normal, unused_pos);
+}
+
+vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out float pdf_pos_w, out vec3 wi,
+					 out float wi_len, out float pdf_pos_a, out float pdf_dir_w, out float cos_from_light,
+					 out LightRecord light_record) {
+	vec3 unused_normal;
+	vec3 unused_pos;
+	return sample_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light, light_record,
+						   unused_normal, unused_pos, pdf_dir_w);
 }
 
 vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out vec3 wi, out float wi_len,
@@ -327,11 +337,14 @@ vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out vec
 vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out vec3 wi, out float wi_len,
 					 out float pdf_pos_w, out float pdf_pos_dir_w, out float cos_from_light,
 					 out LightRecord light_record) {
-	float unused_pdf_pos_a;
+	float pdf_pos_a;
 	vec3 unused_normal;
 	vec3 unused_pos;
-	return sample_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, unused_pdf_pos_a, cos_from_light,
-						   light_record, unused_normal, unused_pos, pdf_pos_dir_w);
+	float pdf_dir_w;
+	vec3 L = sample_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light, light_record,
+					  unused_normal, unused_pos, pdf_dir_w);
+	pdf_pos_dir_w = pdf_pos_a * pdf_dir_w;
+	return L;
 }
 
 

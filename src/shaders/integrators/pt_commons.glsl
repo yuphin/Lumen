@@ -29,8 +29,10 @@ vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const 
 		// Sample BSDF
 		f = sample_bsdf(n_s, wo, mat, 1, side, wi, bsdf_pdf, cos_x, seed);
 		if (bsdf_pdf != 0) {
+			payload.material_idx = uint(-1);
 			traceRayEXT(tlas, flags, 0x1, 0, 0, 0, p, tmin, wi, tmax, 0);
-			if (payload.triangle_idx == record.triangle_idx && payload.instance_idx == record.instance_idx) {
+			if (payload.material_idx != uint(-1) && payload.triangle_idx == record.triangle_idx &&
+				payload.instance_idx == record.instance_idx) {
 				const float wi_len = length(payload.pos - pos);
 				const float g = abs(dot(payload.n_s, -wi)) / (wi_len * wi_len);
 				const float mis_weight = 1. / (1 + pdf_light_a / (g * bsdf_pdf));

@@ -168,13 +168,9 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	float wi_len = 0;
 	float cos_from_light;
 
-	vec3 unused_n;
-	vec3 unused_pos;
-	float pdf_pos_a_dir_w;
-	Le = sample_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record, unused_n, unused_pos, pdf_pos_a_dir_w);
-
-	// TODO: Change sample_Li
-	float pdf_dir = pdf_pos_a_dir_w / pdf_light_a;
+	float pdf_dir;
+	Le = sample_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, pdf_dir, cos_from_light, record);
+	const uint light_type = get_light_type(record.flags);
 	const vec3 p = offset_ray2(pos, n_s);
 	float light_bsdf_pdf_fwd;
 	float light_bsdf_pdf_rev;
@@ -184,7 +180,7 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0, wi,
 				wi_len - EPS, 1);
 	bool visible = any_hit_payload.hit == 0;
-	is_directional_light = get_light_type(record.flags) == LIGHT_DIRECTIONAL;
+	is_directional_light = light_type == LIGHT_DIRECTIONAL;
 
 	light_dir_or_pdf = is_directional_light ? wi * wi_len : vec3(pdf_light_a, vec2(0));
 

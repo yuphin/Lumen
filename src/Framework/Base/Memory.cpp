@@ -5,7 +5,7 @@
 namespace lm {
 constexpr u64 HEADER_SIZE = sizeof(Arena);
 static constexpr u64 ALIGNED_HEADER_SIZE = util::next_pow2(HEADER_SIZE);
-static constexpr u64 MAX_REGISTERED_ARENAS = 64;
+static constexpr u64 MAX_REGISTERED_ARENAS = 128;
 
 static SmallArray<Arena*, MAX_REGISTERED_ARENAS> _registered_arenas;
 

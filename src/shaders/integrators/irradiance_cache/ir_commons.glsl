@@ -63,6 +63,10 @@ HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx) {
 	return get_hitdata(attribs, instance_idx, triangle_idx, unused);
 }
 
+HitData get_hitdata(GBuffer gbuffer) {
+	return get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
+}
+
 HitDataWithoutUVAndGeometryNormals get_hitdata_no_ng_uv(vec2 attribs, uint instance_idx, uint triangle_idx) {
 	const PrimInfo pinfo = prim_infos.d[instance_idx];
 	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;

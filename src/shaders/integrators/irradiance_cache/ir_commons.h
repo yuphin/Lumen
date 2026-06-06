@@ -34,7 +34,7 @@ struct PCIRCache {
 	int light_triangle_count;
 	uint dir_light_idx;
 	uint direct_lighting;
-	int rand;
+	uint sampling_seed;
 	float desired_surfel_radius_px;
 	uint grid_total_cells;
 	float grid_uniform_cell_distance_threshold;
@@ -68,19 +68,9 @@ struct IRCacheHitPayload {
 	float dist;
 };
 
-struct HashEntry {
-	GBuffer representative_point;
-	GBuffer hit_point;
-	ivec2 pixel;
-	// TODO: These can be optimized
-	vec3 Li; // incoming radiance from the representative point
-	float partial_jacobian;
-};
-
 struct Surfel {
-	vec3 pos;
+	GBuffer gbuffer;
 	float radius;
-	vec3 n_s;
 	uint age;
 	vec3 irradiance;
 	uint flags;

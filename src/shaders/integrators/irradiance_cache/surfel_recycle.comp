@@ -68,7 +68,8 @@ void main() {
 		return;
 	}
 
-	vec4 view_pos = ubo.view * vec4(surfel.pos, 1.0);
+	HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
+	vec4 view_pos = ubo.view * vec4(surfel_hit_data.pos, 1.0);
 	// Surfel is behind the camera
 	if (view_pos.z >= 0.0) {
 		// TODO: Handle this later

@@ -61,8 +61,7 @@ void main() {
 
 	ASSERT1(gbuffer_valid(gbuffer), "Surfel Allocate: GBuffer must be valid for %u\n", pixel_idx);
 
-	HitData hit_data =
-		get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
+	HitData hit_data = get_hitdata(gbuffer);
 
 	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
 	vec3 offset = hit_data.pos - cam_pos.xyz;
@@ -109,12 +108,13 @@ void main() {
 			uint sid = grid_cell_indices.d[gid + surfel_offset];
 			Surfel other = surfel_pool.d[sid];
 			if (other.radius <= 0.0) continue;
+			HitData other_hit_data = get_hitdata(other.gbuffer);
 
-			vec3 pos_to_other = hit_data.pos - other.pos;
+			vec3 pos_to_other = hit_data.pos - other_hit_data.pos;
 			float dist_sqr = dot(pos_to_other, pos_to_other);
-			float dist_normal = dot(pos_to_other, other.n_s);
+			float dist_normal = dot(pos_to_other, other_hit_data.n_s);
 			float dist_tangent = sqrt(max(0.0, dist_sqr - dist_normal * dist_normal));
-			float n_dot = dot(hit_data.n_s, other.n_s);
+			float n_dot = dot(hit_data.n_s, other_hit_data.n_s);
 
 			const float EPS = 1e-6;
 			if (n_dot > 0.3 && dist_tangent <= (other.radius + r + EPS)) {
@@ -124,8 +124,7 @@ void main() {
 	}
 
 	Surfel surfel;
-	surfel.pos = hit_data.pos;
-	surfel.n_s = hit_data.n_s;
+	surfel.gbuffer = gbuffer;
 	int surfel_stack_top = atomicAdd(free_stack_count.d, -1) - 1;
 	// Out of available indices
 	if (surfel_stack_top < 0) {

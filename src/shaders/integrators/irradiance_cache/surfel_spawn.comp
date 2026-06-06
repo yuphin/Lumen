@@ -77,8 +77,7 @@ void main() {
 	if (pixel_coords.x < pc.width && pixel_coords.y < pc.height) {
 		GBuffer gbuffer = gbuffers.d[pixel_idx];
 		if (gbuffer_valid(gbuffer)) {
-			HitData hit_data =
-				get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
+			HitData hit_data = get_hitdata(gbuffer);
 
 			coverage = 0.0;
 			vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
@@ -93,12 +92,13 @@ void main() {
 				uint sid = grid_cell_indices.d[gid + surfel_offset];
 				Surfel surfel = surfel_pool.d[sid];
 				if (surfel.radius <= 0.0) continue;
-				vec3 pos_to_surfel = hit_data.pos - surfel.pos;
+				HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
+				vec3 pos_to_surfel = hit_data.pos - surfel_hit_data.pos;
 				float dist_sqr = dot(pos_to_surfel, pos_to_surfel);
 				float dist = sqrt(dist_sqr);
-				float dist_normal = dot(pos_to_surfel, surfel.n_s);
+				float dist_normal = dot(pos_to_surfel, surfel_hit_data.n_s);
 				float dist_tangent = sqrt(max(0.0, dist_sqr - dist_normal * dist_normal));
-				float n_dot = dot(hit_data.n_s, surfel.n_s);
+				float n_dot = dot(hit_data.n_s, surfel_hit_data.n_s);
 
 				float would_be_radius = surfel_radius_factor(pc.desired_surfel_radius_px) * hit_view_pos.z;
 

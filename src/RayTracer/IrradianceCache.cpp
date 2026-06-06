@@ -218,17 +218,23 @@ void IrradianceCache::init() {
 }
 
 void IrradianceCache::render() {
-	pc.min_bounds = lumen_scene->dimensions.min;
-	pc.max_bounds = lumen_scene->dimensions.max;
-	pc.width = Window::width();
-	pc.height = Window::height();
-	pc.direct_lighting = direct_lighting;
+	pc.sky_col = lumen_scene->config.common.sky_col;
 	pc.frame_num = frame_num;
-	pc.total_frame_num = total_frame_idx;
-	pc.rand = rand();
+	pc.min_bounds = lumen_scene->dimensions.min;
+	pc.width = Window::width();
+	pc.max_bounds = lumen_scene->dimensions.max;
+	pc.height = Window::height();
+	pc.num_lights = (i32)lumen_scene->gpu_lights.size;
+	pc.total_light_area = lumen_scene->total_light_area;
+	pc.light_triangle_count = lumen_scene->total_light_triangle_cnt;
+	pc.dir_light_idx = lumen_scene->dir_light_idx;
+	pc.direct_lighting = direct_lighting;
+	pc.sampling_seed = rand() % UINT_MAX;
 	u32 grid_total_cells = get_total_grid_cells();
 	pc.grid_total_cells = grid_total_cells;
 	pc.scene_extent = glm::length(lumen_scene->dimensions.max - lumen_scene->dimensions.min);
+	pc.total_frame_num = total_frame_idx;
+
 
 	vk::CommandBuffer cmd;
 	if (DEBUG_PASSES) {
@@ -333,6 +339,21 @@ void IrradianceCache::render() {
 			.bind({lumen_scene->scene_desc_buffer, scene_ubo_buffer});
 	}
 
+	vk::render_graph()
+		->add_rt(CSTR("Surfel: Integrate"),
+				 {
+					 .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/surfel_integrate.rgen")},
+								 {CSTR("src/shaders/integrators/irradiance_cache/ray.rmiss")},
+								 {CSTR("src/shaders/integrators/irradiance_cache/ray.rchit")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rahit")}},
+					 .dims = {(u32)rays_per_surfel, MAX_SURFEL_COUNT},
+				 })
+		.push_constants(&pc)
+		.bind({output_tex, scene_ubo_buffer, lumen_scene->scene_desc_buffer, lumen_scene->mesh_lights_buffer})
+		.bind_texture_array(lumen_scene->scene_textures)
+		.bind_tlas(tlas);
+
 	if (debug_mode) {
 		vk::render_graph()
 			->add_compute(CSTR("Debug"),
@@ -369,6 +390,7 @@ bool IrradianceCache::gui() {
 	result |= ImGui::Checkbox("Pause surfel spawning", &pause_surfel_spawn);
 	result |= ImGui::SliderFloat("Surfel radius (px)", &pc.desired_surfel_radius_px, 4, 128);
 	result |= ImGui::SliderFloat("Uniform cell distance threshold", &pc.grid_uniform_cell_distance_threshold, 0.01, 10);
+	result |= ImGui::SliderInt("Rays per surfel", (i32*)&rays_per_surfel, 0, 256);
 	return result;
 }
 

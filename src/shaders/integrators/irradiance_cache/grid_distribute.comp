@@ -11,6 +11,13 @@
 #include "ir_commons.h"
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
+
+Indices indices = Indices(scene_desc.index_addr);
+InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
+CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
 
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 
@@ -23,6 +30,7 @@ GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices
 GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 
+#include "ir_commons.glsl"
 #include "surfel_commons.glsl"
 
 #include "grid.glsl"
@@ -41,8 +49,9 @@ void main() {
 	}
 
 	vec4 pos_ws = ubo.inv_view * vec4(0, 0, 0, 1);
+	HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
 	// Offset around camera
-	vec3 c = surfel.pos - pos_ws.xyz;
+	vec3 c = surfel_hit_data.pos - pos_ws.xyz;
 	float r = surfel.radius;
 
 	vec3 corners[8] = vec3[8](c + vec3(-r, -r, -r), c + vec3(-r, -r, +r), c + vec3(-r, +r, -r), c + vec3(-r, +r, +r),

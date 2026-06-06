@@ -66,8 +66,7 @@ void main() {
 		return;
 	}
 
-	HitData hit_data =
-		get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
+	HitData hit_data = get_hitdata(gbuffer);
 	Material mat = load_material(hit_data.material_idx, hit_data.uv);
 	// vec3 col = uint_to_random_color(gbuffer.primitive_instance_id.y);
 	vec3 col = mat.albedo;
@@ -87,19 +86,20 @@ void main() {
 	for (uint gid = 0; gid < surfel_count; gid++) {
 		uint sid = grid_cell_indices.d[gid + surfel_offset];
 		Surfel surfel = surfel_pool.d[sid];
+		HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
 
-		vec3 diff = hit_data.pos - surfel.pos;
+		vec3 diff = hit_data.pos - surfel_hit_data.pos;
 		float dist = length(diff);
 		if (dist > surfel.radius) {
 			continue;
 		}
 
-		float n_dot = dot(hit_data.n_s, surfel.n_s);
+		float n_dot = dot(hit_data.n_s, surfel_hit_data.n_s);
 		if (n_dot < 0.3) {
 			continue;
 		}
 
-		float dist_normal = dot(diff, surfel.n_s);
+		float dist_normal = dot(diff, surfel_hit_data.n_s);
 		float dist_tangent = sqrt(max(0.0, dist * dist - dist_normal * dist_normal));
 
 		// Penalize normal distance
