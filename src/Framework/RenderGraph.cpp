@@ -2,7 +2,6 @@
 #include "RenderGraph.h"
 #include "VkUtils.h"
 #include "GPUQueryManager.h"
-#include "PersistentResourceManager.h"
 #include "DynamicResourceManager.h"
 #include "Framework/ThreadPool.h"
 

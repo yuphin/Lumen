@@ -9,7 +9,6 @@
 #include "AccelerationStructure.h"
 #include "Framework/Buffer.h"
 #include "Framework/Texture.h"
-#include "Framework/Camera.h"
 #include "Framework/Base/SmallArray.h"
 
 namespace lm {

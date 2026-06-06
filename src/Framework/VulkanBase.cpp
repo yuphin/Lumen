@@ -450,7 +450,7 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 		for (const auto& available_present_mode : present_modes) {
 			// For now we prefer Mailbox
 			if (available_present_mode ==
-				(context().vsync_enabled ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_MAILBOX_KHR)) {
+				(context().vsync_enabled ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_IMMEDIATE_KHR)) {
 				return available_present_mode;
 			}
 		}
