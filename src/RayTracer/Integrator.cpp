@@ -155,8 +155,9 @@ static void default_create_accel(Integrator* integrator, vk::BVH* tlas, lm::Arra
 	VkDeviceAddress vertex_address = integrator->lumen_scene->vertex_buffer->device_address();
 	VkDeviceAddress idx_address = integrator->lumen_scene->index_buffer->device_address();
 	for (auto& prim_mesh : integrator->lumen_scene->prim_meshes) {
-		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh.vtx_count, prim_mesh.idx_count, prim_mesh.vtx_offset,
-											   prim_mesh.first_idx, vertex_address, sizeof(Vertex), idx_address);
+		vk::BlasInput geo = vk::blas_input_create(scratch.arena, prim_mesh.vtx_count, prim_mesh.idx_count,
+											   prim_mesh.vtx_offset, prim_mesh.first_idx, vertex_address,
+											   sizeof(Vertex), idx_address);
 		blas_inputs.push_back({geo});
 	}
 	vk::blas_build(scratch, blases->to_slice(), blas_inputs.to_slice(),

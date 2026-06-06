@@ -18,11 +18,16 @@ struct BVH {
 };
 
 struct BlasInput {
-	// Data used to build acceleration structure geometry
-	std::vector<VkAccelerationStructureGeometryKHR> as_geom;
-	std::vector<VkAccelerationStructureBuildRangeInfoKHR> as_build_offset_info;
+	lm::FixedArray<VkAccelerationStructureGeometryKHR> geometries;
+	lm::FixedArray<VkAccelerationStructureBuildRangeInfoKHR> build_ranges;
 	VkBuildAccelerationStructureFlagsKHR flags{0};
 };
+BlasInput blas_input_create(lm::Arena* arena, u64 geometry_capacity);
+BlasInput blas_input_create(lm::Arena* arena, u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx,
+							VkDeviceAddress vertex_address, u64 vertex_stride, VkDeviceAddress index_address);
+void blas_input_add(BlasInput* input, const VkAccelerationStructureGeometryKHR& geometry,
+					const VkAccelerationStructureBuildRangeInfoKHR& build_range);
+void blas_input_reset(BlasInput* input);
 void blas_build(lm::ScratchArena& scratch, util::Slice<BVH> blases, util::Slice<BlasInput> input,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd = VK_NULL_HANDLE,
 				vk::Buffer** scratch_buffer_ref = nullptr);
@@ -31,6 +36,4 @@ void tlas_build(BVH& tlas, util::Slice<VkAccelerationStructureInstanceKHR> insta
 void tlas_build(BVH& tlas, vk::Buffer* instances_buf, u32 instance_count, VkBuildAccelerationStructureFlagsKHR flags,
 				VkCommandBuffer cmd_buf, vk::Buffer** scratch_buffer_ref, bool update = false);
 
-BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx, VkDeviceAddress vertex_address, u64 vertex_stride,
-						 VkDeviceAddress index_address);
 }  // namespace vk

@@ -454,8 +454,9 @@ void ddgi::create_accel(Integrator* integrator, vk::BVH* tlas_ptr, lm::Array<vk:
 	VkDeviceAddress vertex_address = integrator->lumen_scene->vertex_buffer->device_address();
 	VkDeviceAddress idx_address = integrator->lumen_scene->index_buffer->device_address();
 	for (auto& prim_mesh : integrator->lumen_scene->prim_meshes) {
-		vk::BlasInput geo = vk::to_vk_geometry(prim_mesh.vtx_count, prim_mesh.idx_count, prim_mesh.vtx_offset,
-											   prim_mesh.first_idx, vertex_address, sizeof(Vertex), idx_address);
+		vk::BlasInput geo = vk::blas_input_create(scratch.arena, prim_mesh.vtx_count, prim_mesh.idx_count,
+											   prim_mesh.vtx_offset, prim_mesh.first_idx, vertex_address,
+											   sizeof(Vertex), idx_address);
 		blas_inputs.push_back({geo});
 	}
 
@@ -484,9 +485,9 @@ void ddgi::create_accel(Integrator* integrator, vk::BVH* tlas_ptr, lm::Array<vk:
 		asGeom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
 		asGeom.geometry.triangles = sphere_triangles;
 
-		vk::BlasInput& sphere_blas_input = blas_inputs.emplace_back();
-		sphere_blas_input.as_geom.push_back(asGeom);
-		sphere_blas_input.as_build_offset_info.push_back(offset);
+		vk::BlasInput sphere_blas_input = vk::blas_input_create(scratch.arena, 1);
+		vk::blas_input_add(&sphere_blas_input, asGeom, offset);
+		blas_inputs.push_back(sphere_blas_input);
 	}
 
 	vk::blas_build(scratch, blases.to_slice(), blas_inputs.to_slice(),

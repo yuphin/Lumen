@@ -190,8 +190,8 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, u32 primitive_co
 }
 
 //--------------------------------------------------------------------------------------------------
-// Create all the BLAS from the vector of BlasInput
-// - There will be one BLAS per input-vector entry
+// Create all the BLAS from the array of BlasInput
+// - There will be one BLAS per input entry
 // - There will be as many BLAS as input.size()
 // - The resulting BLAS (along with the inputs used to build) are stored in
 // m_blas,
@@ -217,19 +217,21 @@ static void build_blas_impl(lm::ScratchArena& scratch, lm::FixedArray<BuildAccel
 		build_as[idx].build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 		build_as[idx].build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
 		build_as[idx].build_info.flags = input[idx].flags | flags;
-		build_as[idx].build_info.geometryCount = static_cast<u32>(input[idx].as_geom.size());
-		build_as[idx].build_info.pGeometries = input[idx].as_geom.data();
+		LUMEN_ASSERT(input[idx].geometries.size > 0, "BLAS input must contain at least one geometry");
+		LUMEN_ASSERT(input[idx].geometries.size == input[idx].build_ranges.size,
+					 "BLAS geometry and build range counts must match");
+		build_as[idx].build_info.geometryCount = static_cast<u32>(input[idx].geometries.size);
+		build_as[idx].build_info.pGeometries = input[idx].geometries.data;
 
 		// Build range information
-		build_as[idx].range_info = input[idx].as_build_offset_info.data();
+		build_as[idx].range_info = input[idx].build_ranges.data;
 
 		// Finding sizes to create acceleration structures and scratch
 		lm::FixedArray<u32> max_prim_counts =
-			lm::fixed_array_create<u32>(temp_scratch.arena, input[idx].as_build_offset_info.size());
+			lm::fixed_array_create<u32>(temp_scratch.arena, input[idx].build_ranges.size);
 
-		for (u64 tt = 0; tt < input[idx].as_build_offset_info.size(); tt++) {
-			max_prim_counts.push_back(
-				input[idx].as_build_offset_info[tt].primitiveCount);  // Number of primitives/triangles
+		for (u64 tt = 0; tt < input[idx].build_ranges.size; tt++) {
+			max_prim_counts.push_back(input[idx].build_ranges[tt].primitiveCount);  // Number of primitives/triangles
 		}
 		vkGetAccelerationStructureBuildSizesKHR(context().device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
 												&build_as[idx].build_info, max_prim_counts.data,
@@ -393,8 +395,33 @@ void tlas_build(BVH& tlas, vk::Buffer* instances_buf, u32 instance_count, VkBuil
 					instances_buf->device_address(), flags, update);
 }
 
-BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx, VkDeviceAddress vertex_address,
-						 u64 vertex_stride, VkDeviceAddress index_address) {
+BlasInput blas_input_create(lm::Arena* arena, u64 geometry_capacity) {
+	LUMEN_ASSERT(geometry_capacity > 0, "BLAS input capacity must be greater than zero");
+	BlasInput input;
+	input.geometries = lm::fixed_array_create<VkAccelerationStructureGeometryKHR>(arena, geometry_capacity);
+	input.build_ranges = lm::fixed_array_create<VkAccelerationStructureBuildRangeInfoKHR>(arena, geometry_capacity);
+	return input;
+}
+
+void blas_input_add(BlasInput* input, const VkAccelerationStructureGeometryKHR& geometry,
+					const VkAccelerationStructureBuildRangeInfoKHR& build_range) {
+	LUMEN_ASSERT(input->geometries.initialized() && input->build_ranges.initialized(),
+				 "BLAS input must be created before adding geometry");
+	LUMEN_ASSERT(input->geometries.size == input->build_ranges.size,
+				 "BLAS geometry and build range counts must match");
+	LUMEN_ASSERT(input->geometries.size < input->geometries.capacity, "BLAS input geometry capacity exceeded");
+	input->geometries.push_back(geometry);
+	input->build_ranges.push_back(build_range);
+}
+
+void blas_input_reset(BlasInput* input) {
+	input->geometries.clear();
+	input->build_ranges.clear();
+	input->flags = 0;
+}
+
+BlasInput blas_input_create(lm::Arena* arena, u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx,
+						 VkDeviceAddress vertex_address, u64 vertex_stride, VkDeviceAddress index_address) {
 	u32 maxPrimitiveCount = idx_count / 3;
 
 	// Describe buffer as array of VertexObj.
@@ -423,11 +450,9 @@ BlasInput to_vk_geometry(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first
 	offset.primitiveOffset = first_idx * sizeof(u32);
 	offset.transformOffset = 0;
 
-	// Our blas is made from only one geometry, but could be made of many
-	// geometries
-	BlasInput input;
-	input.as_geom.emplace_back(asGeom);
-	input.as_build_offset_info.emplace_back(offset);
+	// We only create 1 geometry with this function
+	BlasInput input = blas_input_create(arena, 1);
+	blas_input_add(&input, asGeom, offset);
 	return input;
 }
 
