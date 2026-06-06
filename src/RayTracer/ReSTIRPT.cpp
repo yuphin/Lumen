@@ -9,10 +9,6 @@ using namespace RestirPT;
 void restirpt::init(Integrator* integrator) {
 	ReSTIRPT& state = integrator->restirpt;
 
-	if (!state.photon_blas_input.geometries.initialized()) {
-		state.photon_blas_input = vk::blas_input_create(integrator->arena, 1);
-	}
-
 	if (state.photon_bvh_scratch_bufs.size == 0) {
 		state.photon_bvh_scratch_bufs.resize(vk::MAX_FRAMES_IN_FLIGHT);
 		for (u64 i = 0; i < state.photon_bvh_scratch_bufs.size; i++) {
@@ -293,8 +289,7 @@ void restirpt::render(Integrator* integrator) {
 		offset.primitiveOffset = 0;
 		offset.transformOffset = 0;
 
-		vk::blas_input_reset(&state.photon_blas_input);
-		vk::blas_input_add(&state.photon_blas_input, as_geom, offset);
+		state.photon_blas_input = {.geometry = as_geom, .build_range = offset};
 
 		vk::render_graph()
 			->add_rt(CSTR("PM - Trace Photons"),
@@ -544,7 +539,6 @@ void restirpt::destroy(Integrator* integrator, bool resize) {
 		vkDeviceWaitIdle(vk::context().device);
 		state.photon_tlas.destroy();
 		state.photon_blas.destroy();
-		vk::blas_input_reset(&state.photon_blas_input);
 		for (vk::Buffer*& scratch_buf : state.photon_bvh_scratch_bufs) {
 			drm::destroy(scratch_buf);
 			scratch_buf = nullptr;

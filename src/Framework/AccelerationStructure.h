@@ -18,16 +18,12 @@ struct BVH {
 };
 
 struct BlasInput {
-	lm::FixedArray<VkAccelerationStructureGeometryKHR> geometries;
-	lm::FixedArray<VkAccelerationStructureBuildRangeInfoKHR> build_ranges;
-	VkBuildAccelerationStructureFlagsKHR flags{0};
+	VkAccelerationStructureGeometryKHR geometry;
+	VkAccelerationStructureBuildRangeInfoKHR build_range;
+	VkBuildAccelerationStructureFlagsKHR flags = 0;
 };
-BlasInput blas_input_create(lm::Arena* arena, u64 geometry_capacity);
-BlasInput blas_input_create(lm::Arena* arena, u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx,
-							VkDeviceAddress vertex_address, u64 vertex_stride, VkDeviceAddress index_address);
-void blas_input_add(BlasInput* input, const VkAccelerationStructureGeometryKHR& geometry,
-					const VkAccelerationStructureBuildRangeInfoKHR& build_range);
-void blas_input_reset(BlasInput* input);
+BlasInput blas_input_create(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx, VkDeviceAddress vertex_address,
+							u64 vertex_stride, VkDeviceAddress index_address);
 void blas_build(lm::ScratchArena& scratch, util::Slice<BVH> blases, util::Slice<BlasInput> input,
 				VkBuildAccelerationStructureFlagsKHR flags, VkCommandBuffer cmd = VK_NULL_HANDLE,
 				vk::Buffer** scratch_buffer_ref = nullptr);

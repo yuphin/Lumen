@@ -33,28 +33,26 @@ static void common_init(Integrator* integrator) {
 	}
 	if (!integrator->callbacks_registered) {
 		lm::Camera* cam_ptr = &integrator->lumen_scene->camera;
-		Window::add_mouse_click_callback(
-			[integrator](MouseAction button, KeyAction action, double x, double y) {
-				if (ImGui::GetIO().WantCaptureMouse) {
-					return;
-				}
-				if (integrator->updated && Window::is_mouse_up(MouseAction::LEFT)) {
-					integrator->updated = true;
-				}
-				if (integrator->updated && Window::is_mouse_down(MouseAction::LEFT)) {
-					integrator->updated = true;
-				}
-			});
-		Window::add_mouse_move_callback(
-			[cam_ptr, integrator](double delta_x, double delta_y, double x, double y) {
-				if (ImGui::GetIO().WantCaptureMouse) {
-					return;
-				}
-				if (Window::is_mouse_held(MouseAction::LEFT) && !Window::is_key_held(KeyInput::KEY_TAB)) {
-					lm::camera_rotate(cam_ptr, 0.05f * (f32)delta_y, -0.05f * (f32)delta_x, 0.0f);
-					integrator->updated = true;
-				}
-			});
+		Window::add_mouse_click_callback([integrator](MouseAction button, KeyAction action, double x, double y) {
+			if (ImGui::GetIO().WantCaptureMouse) {
+				return;
+			}
+			if (integrator->updated && Window::is_mouse_up(MouseAction::LEFT)) {
+				integrator->updated = true;
+			}
+			if (integrator->updated && Window::is_mouse_down(MouseAction::LEFT)) {
+				integrator->updated = true;
+			}
+		});
+		Window::add_mouse_move_callback([cam_ptr, integrator](double delta_x, double delta_y, double x, double y) {
+			if (ImGui::GetIO().WantCaptureMouse) {
+				return;
+			}
+			if (Window::is_mouse_held(MouseAction::LEFT) && !Window::is_key_held(KeyInput::KEY_TAB)) {
+				lm::camera_rotate(cam_ptr, 0.05f * (f32)delta_y, -0.05f * (f32)delta_x, 0.0f);
+				integrator->updated = true;
+			}
+		});
 		integrator->callbacks_registered = true;
 	}
 
@@ -150,14 +148,12 @@ static void default_create_accel(Integrator* integrator, vk::BVH* tlas, lm::Arra
 	blases->resize_with_value(integrator->lumen_scene->prim_meshes.size);
 
 	lm::ScratchArena scratch = integrator->arena;
-	auto blas_inputs =
-		lm::fixed_array_create<vk::BlasInput>(scratch.arena, integrator->lumen_scene->prim_meshes.size);
+	auto blas_inputs = lm::fixed_array_create<vk::BlasInput>(scratch.arena, integrator->lumen_scene->prim_meshes.size);
 	VkDeviceAddress vertex_address = integrator->lumen_scene->vertex_buffer->device_address();
 	VkDeviceAddress idx_address = integrator->lumen_scene->index_buffer->device_address();
 	for (auto& prim_mesh : integrator->lumen_scene->prim_meshes) {
-		vk::BlasInput geo = vk::blas_input_create(scratch.arena, prim_mesh.vtx_count, prim_mesh.idx_count,
-											   prim_mesh.vtx_offset, prim_mesh.first_idx, vertex_address,
-											   sizeof(Vertex), idx_address);
+		vk::BlasInput geo = vk::blas_input_create(prim_mesh.vtx_count, prim_mesh.idx_count, prim_mesh.vtx_offset,
+												  prim_mesh.first_idx, vertex_address, sizeof(Vertex), idx_address);
 		blas_inputs.push_back({geo});
 	}
 	vk::blas_build(scratch, blases->to_slice(), blas_inputs.to_slice(),

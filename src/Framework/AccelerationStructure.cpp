@@ -217,22 +217,16 @@ static void build_blas_impl(lm::ScratchArena& scratch, lm::FixedArray<BuildAccel
 		build_as[idx].build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 		build_as[idx].build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
 		build_as[idx].build_info.flags = input[idx].flags | flags;
-		LUMEN_ASSERT(input[idx].geometries.size > 0, "BLAS input must contain at least one geometry");
-		LUMEN_ASSERT(input[idx].geometries.size == input[idx].build_ranges.size,
-					 "BLAS geometry and build range counts must match");
-		build_as[idx].build_info.geometryCount = static_cast<u32>(input[idx].geometries.size);
-		build_as[idx].build_info.pGeometries = input[idx].geometries.data;
+		build_as[idx].build_info.geometryCount = 1u;
+		build_as[idx].build_info.pGeometries = &input[idx].geometry;
 
 		// Build range information
-		build_as[idx].range_info = input[idx].build_ranges.data;
+		build_as[idx].range_info = &input[idx].build_range;
 
 		// Finding sizes to create acceleration structures and scratch
-		lm::FixedArray<u32> max_prim_counts =
-			lm::fixed_array_create<u32>(temp_scratch.arena, input[idx].build_ranges.size);
+		lm::FixedArray<u32> max_prim_counts = lm::fixed_array_create<u32>(temp_scratch.arena, 1);
 
-		for (u64 tt = 0; tt < input[idx].build_ranges.size; tt++) {
-			max_prim_counts.push_back(input[idx].build_ranges[tt].primitiveCount);  // Number of primitives/triangles
-		}
+		max_prim_counts.push_back(input[idx].build_range.primitiveCount);  // Number of primitives/triangles
 		vkGetAccelerationStructureBuildSizesKHR(context().device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
 												&build_as[idx].build_info, max_prim_counts.data,
 												&build_as[idx].size_info);
@@ -395,33 +389,8 @@ void tlas_build(BVH& tlas, vk::Buffer* instances_buf, u32 instance_count, VkBuil
 					instances_buf->device_address(), flags, update);
 }
 
-BlasInput blas_input_create(lm::Arena* arena, u64 geometry_capacity) {
-	LUMEN_ASSERT(geometry_capacity > 0, "BLAS input capacity must be greater than zero");
-	BlasInput input;
-	input.geometries = lm::fixed_array_create<VkAccelerationStructureGeometryKHR>(arena, geometry_capacity);
-	input.build_ranges = lm::fixed_array_create<VkAccelerationStructureBuildRangeInfoKHR>(arena, geometry_capacity);
-	return input;
-}
-
-void blas_input_add(BlasInput* input, const VkAccelerationStructureGeometryKHR& geometry,
-					const VkAccelerationStructureBuildRangeInfoKHR& build_range) {
-	LUMEN_ASSERT(input->geometries.initialized() && input->build_ranges.initialized(),
-				 "BLAS input must be created before adding geometry");
-	LUMEN_ASSERT(input->geometries.size == input->build_ranges.size,
-				 "BLAS geometry and build range counts must match");
-	LUMEN_ASSERT(input->geometries.size < input->geometries.capacity, "BLAS input geometry capacity exceeded");
-	input->geometries.push_back(geometry);
-	input->build_ranges.push_back(build_range);
-}
-
-void blas_input_reset(BlasInput* input) {
-	input->geometries.clear();
-	input->build_ranges.clear();
-	input->flags = 0;
-}
-
-BlasInput blas_input_create(lm::Arena* arena, u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx,
-						 VkDeviceAddress vertex_address, u64 vertex_stride, VkDeviceAddress index_address) {
+BlasInput blas_input_create(u32 vtx_count, u32 idx_count, u32 vtx_offset, u32 first_idx, VkDeviceAddress vertex_address,
+							u64 vertex_stride, VkDeviceAddress index_address) {
 	u32 maxPrimitiveCount = idx_count / 3;
 
 	// Describe buffer as array of VertexObj.
@@ -439,20 +408,19 @@ BlasInput blas_input_create(lm::Arena* arena, u32 vtx_count, u32 idx_count, u32 
 	triangles.maxVertex = vtx_offset + vtx_count - 1;
 
 	// Identify the above data as containing opaque triangles.
-	VkAccelerationStructureGeometryKHR asGeom{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
-	asGeom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-	asGeom.flags = VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;	 // For AnyHit
-	asGeom.geometry.triangles = triangles;
+	VkAccelerationStructureGeometryKHR as_geom{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
+	as_geom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+	as_geom.flags = VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;  // For AnyHit
+	as_geom.geometry.triangles = triangles;
 
-	VkAccelerationStructureBuildRangeInfoKHR offset;
-	offset.firstVertex = vtx_offset;
-	offset.primitiveCount = maxPrimitiveCount;
-	offset.primitiveOffset = first_idx * sizeof(u32);
-	offset.transformOffset = 0;
+	VkAccelerationStructureBuildRangeInfoKHR build_range;
+	build_range.firstVertex = vtx_offset;
+	build_range.primitiveCount = maxPrimitiveCount;
+	build_range.primitiveOffset = first_idx * sizeof(u32);
+	build_range.transformOffset = 0;
 
 	// We only create 1 geometry with this function
-	BlasInput input = blas_input_create(arena, 1);
-	blas_input_add(&input, asGeom, offset);
+	BlasInput input = {.geometry = as_geom, .build_range = build_range};
 	return input;
 }
 

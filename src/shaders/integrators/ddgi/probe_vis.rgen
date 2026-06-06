@@ -8,19 +8,35 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
+struct AnyHitPayload {
+	int hit;
+};
+
+
+#include "../../commons.h"
 #include "ddgi_commons.h"
-#include "../../commons.glsl"
 #include "ddgi_utils.glsl"
+
+
+layout(binding = 0, rgba32f) uniform image2D image;
+layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
+layout(binding = 2) buffer SceneDesc_ { SphereDesc scene_desc; };
+layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
+layout(push_constant) uniform _PushConstantRay { PCDDGI pc; };
+
 layout(location = 0) rayPayloadEXT DDGIVisualizationHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
-layout(push_constant) uniform _PushConstantRay { PCDDGI pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GBuffer { GBufferData d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ProbeOffset { vec4 d[]; };
 const uint flags = gl_RayFlagsOpaqueEXT;
-GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
-ProbeOffset probe_offsets = ProbeOffset(scene_desc.probe_offsets_addr);
 const float tmin = 0.001;
 const float tmax = 10000.0;
+
+vec4 sample_camera(in vec2 ndc) {
+	vec4 target = ubo.inv_projection * vec4(ndc.x, ndc.y, 1, 1);
+	return ubo.inv_view * vec4(normalize(target.xyz), 0);  // direction
+}
+
 void main() {
 	const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
 	const vec2 in_uv = (pixel) / vec2(gl_LaunchSizeEXT.xy);

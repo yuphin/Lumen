@@ -4,8 +4,8 @@
 constexpr i32 IRRADIANCE_SIDE_LENGTH = 8;
 constexpr i32 DEPTH_SIDE_LENGTH = 16;
 
-static void generate_uv_sphere(lm::Array<u32>& indices, lm::Array<SphereVertex>& positions, u32 latitude,
-							   u32 longitude, f32 radius = 0.1f) {
+static void generate_uv_sphere(lm::Array<u32>& indices, lm::Array<SphereVertex>& positions, u32 latitude, u32 longitude,
+							   f32 radius = 0.1f) {
 	for (u32 lat = 0; lat <= latitude; ++lat) {
 		f32 theta = lat * glm::pi<f32>() / latitude;
 		f32 sin_theta = sin(theta);
@@ -198,8 +198,10 @@ void ddgi::init(Integrator* integrator) {
 	desc.g_buffer_addr = state.g_buffer->device_address();
 
 	assert(vk::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, direct_lighting_addr, state.direct_lighting_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer,
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, direct_lighting_addr, state.direct_lighting_buffer,
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, probe_offsets_addr, state.probe_offsets_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, state.g_buffer, vk::render_graph());
 
@@ -230,7 +232,7 @@ void ddgi::render(Integrator* integrator) {
 	state.pc.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
 	state.pc.frame_num = integrator->frame_num;
 	state.pc.direct_lighting = state.direct_lighting;
-	const bool ping_pong = bool(state.frame_idx % 2);	 // ping_pong true = read
+	const bool ping_pong = bool(state.frame_idx % 2);  // ping_pong true = read
 	// Generate random orientation for probes
 	{
 		std::random_device rd;
@@ -278,8 +280,8 @@ void ddgi::render(Integrator* integrator) {
 				 })
 		.push_constants(&state.pc)
 		.bind(rt_bindings)
-		.bind({integrator->lumen_scene->mesh_lights_buffer, state.ddgi_ubo_buffer, state.rt.radiance_tex, state.rt.dir_depth_tex,
-			   state.irr_texes[ping_pong], state.depth_texes[ping_pong]})
+		.bind({integrator->lumen_scene->mesh_lights_buffer, state.ddgi_ubo_buffer, state.rt.radiance_tex,
+			   state.rt.dir_depth_tex, state.irr_texes[ping_pong], state.depth_texes[ping_pong]})
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
 	// Classify
@@ -288,7 +290,8 @@ void ddgi::render(Integrator* integrator) {
 		->add_compute(CSTR("Classify Probes"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/classify.comp")), .dims = {wg_x}})
 		.push_constants(&state.pc)
-		.bind({integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, state.ddgi_ubo_buffer, state.rt.radiance_tex, state.rt.dir_depth_tex});
+		.bind({integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, state.ddgi_ubo_buffer,
+			   state.rt.radiance_tex, state.rt.dir_depth_tex});
 	// Update probes & borders
 	{
 		// Probes
@@ -302,9 +305,9 @@ void ddgi::render(Integrator* integrator) {
 																: vk::ShaderMacro("DEPTH_UPDATE")},
 											  .dims = {wg_x, wg_y}})
 				.push_constants(&state.pc)
-				.bind({integrator->lumen_scene->scene_desc_buffer, state.irr_texes[!ping_pong], state.depth_texes[!ping_pong],
-					   state.irr_texes[ping_pong], state.depth_texes[ping_pong], state.ddgi_ubo_buffer, state.rt.radiance_tex,
-					   state.rt.dir_depth_tex});
+				.bind({integrator->lumen_scene->scene_desc_buffer, state.irr_texes[!ping_pong],
+					   state.depth_texes[!ping_pong], state.irr_texes[ping_pong], state.depth_texes[ping_pong],
+					   state.ddgi_ubo_buffer, state.rt.radiance_tex, state.rt.dir_depth_tex});
 		};
 		update_probe(true);
 		update_probe(false);
@@ -325,8 +328,9 @@ void ddgi::render(Integrator* integrator) {
 		->add_compute(CSTR("Sample Probes"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/sample.comp")), .dims = {wg_x, wg_y}})
 		.push_constants(&state.pc)
-		.bind({integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, state.output.tex, state.irr_texes[!ping_pong],
-			   state.depth_texes[!ping_pong], state.ddgi_ubo_buffer, integrator->output_tex});
+		.bind({integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, state.output.tex,
+			   state.irr_texes[!ping_pong], state.depth_texes[!ping_pong], state.ddgi_ubo_buffer,
+			   integrator->output_tex});
 
 	if (state.visualize_probes) {
 		vk::render_graph()
@@ -339,8 +343,7 @@ void ddgi::render(Integrator* integrator) {
 						 .dims = {Window::width(), Window::height()},
 					 })
 			.push_constants(&state.pc)
-			.bind({integrator->output_tex, integrator->scene_ubo_buffer, state.sphere_desc_buffer, integrator->lumen_scene->mesh_lights_buffer})
-			.bind_texture_array(integrator->lumen_scene->scene_textures)
+			.bind({integrator->output_tex, integrator->scene_ubo_buffer, state.sphere_desc_buffer})
 			.bind_tlas(*integrator->tlas);
 	}
 	// Relocate
@@ -351,7 +354,8 @@ void ddgi::render(Integrator* integrator) {
 			->add_compute(CSTR("Relocate"),
 						  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/relocate.comp")), .dims = {wg_x}})
 			.push_constants(&state.pc)
-			.bind({integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, state.ddgi_ubo_buffer, state.rt.dir_depth_tex});
+			.bind({integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, state.ddgi_ubo_buffer,
+				   state.rt.dir_depth_tex});
 	}
 	state.first_frame = false;
 }
@@ -454,9 +458,8 @@ void ddgi::create_accel(Integrator* integrator, vk::BVH* tlas_ptr, lm::Array<vk:
 	VkDeviceAddress vertex_address = integrator->lumen_scene->vertex_buffer->device_address();
 	VkDeviceAddress idx_address = integrator->lumen_scene->index_buffer->device_address();
 	for (auto& prim_mesh : integrator->lumen_scene->prim_meshes) {
-		vk::BlasInput geo = vk::blas_input_create(scratch.arena, prim_mesh.vtx_count, prim_mesh.idx_count,
-											   prim_mesh.vtx_offset, prim_mesh.first_idx, vertex_address,
-											   sizeof(Vertex), idx_address);
+		vk::BlasInput geo = vk::blas_input_create(prim_mesh.vtx_count, prim_mesh.idx_count, prim_mesh.vtx_offset,
+												  prim_mesh.first_idx, vertex_address, sizeof(Vertex), idx_address);
 		blas_inputs.push_back({geo});
 	}
 
@@ -485,8 +488,7 @@ void ddgi::create_accel(Integrator* integrator, vk::BVH* tlas_ptr, lm::Array<vk:
 		asGeom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
 		asGeom.geometry.triangles = sphere_triangles;
 
-		vk::BlasInput sphere_blas_input = vk::blas_input_create(scratch.arena, 1);
-		vk::blas_input_add(&sphere_blas_input, asGeom, offset);
+		vk::BlasInput sphere_blas_input = {.geometry = asGeom, .build_range = offset};
 		blas_inputs.push_back(sphere_blas_input);
 	}
 
@@ -555,13 +557,13 @@ void ddgi::destroy(Integrator* integrator, bool resize) {
 	(void)resize;
 
 	vk::Buffer** buffers[] = {&state.g_buffer,
-							 &state.direct_lighting_buffer,
-							 &state.ddgi_ubo_buffer,
-							 &state.probe_offsets_buffer,
-							 &state.sphere_vertices_buffer,
-							 &state.sphere_indices_buffer,
-							 &state.sphere_desc_buffer,
-							 &state.ddgi_output_buffer};
+							  &state.direct_lighting_buffer,
+							  &state.ddgi_ubo_buffer,
+							  &state.probe_offsets_buffer,
+							  &state.sphere_vertices_buffer,
+							  &state.sphere_indices_buffer,
+							  &state.sphere_desc_buffer,
+							  &state.ddgi_output_buffer};
 	for (vk::Buffer** buffer : buffers) {
 		prm::remove(*buffer);
 		*buffer = nullptr;
