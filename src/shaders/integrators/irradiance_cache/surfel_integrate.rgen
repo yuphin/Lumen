@@ -45,8 +45,9 @@ vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const 
 	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0x1, 1, 0, 1, p, 0, wi,
 				wi_len - EPS, 1);
 	bool visible = any_hit_payload.hit == 0;
+	const float light_pick_pdf = 1. / pc.total_light_count;
 	if (visible && pdf_light_w > 0) {
-		res += f * abs(cos_x) * Le / pdf_light_w;
+		res += f * abs(cos_x) * Le / (pdf_light_w * light_pick_pdf);
 	}
 	return res;
 }
@@ -95,9 +96,7 @@ void main() {
 		HitData hit_data = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
 		Material hit_mat = load_material(hit_data.material_idx, hit_data.uv);
 
-		const float light_pick_pdf = 1. / pc.total_light_count;
-		wo = -wi;
 		bool side = face_forward(hit_data.n_s, hit_data.n_g, wo);
-		radiance += uniform_sample_light(sampling_seed, hit_mat, hit_data.pos, side, hit_data.n_s, wo) / light_pick_pdf;
+		radiance += uniform_sample_light(sampling_seed, hit_mat, hit_data.pos, side, hit_data.n_s, wo);
 	}
 }
