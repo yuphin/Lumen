@@ -1,7 +1,6 @@
 #include "Framework/RenderGraph.h"
 #include "Framework/GPUQueryManager.h"
 #include "Framework/ImageUtils.h"
-#include <tinyexr.h>
 #include "RayTracer.h"
 #include "Integrator.h"
 #include "PostFX.h"

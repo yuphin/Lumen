@@ -1,3 +1,4 @@
+#include <random>
 #include "Integrator.h"
 #include "Framework/VkUtils.h"
 #include "DDGI.h"

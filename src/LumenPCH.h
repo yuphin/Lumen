@@ -80,8 +80,6 @@ typedef double f64;
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
 #include <assert.h>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "Framework/Logger.h"
 #include <volk/volk.h>
@@ -93,33 +91,11 @@ typedef double f64;
 #include <imgui/imgui.h>
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_vulkan.h"
-#include <algorithm>
-#include <chrono>
-#include <cstdint>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <filesystem>
-#include <fstream>
-#include <functional>
 #include <future>
-#include <iostream>
-#include <optional>
 #include <queue>
-#include <set>
-#include <span>
-#include <stdexcept>
-#include <string>
 #include <thread>
-#include <utility>
-#include <vector>
 #include <span>
-#include <regex>
-#include <algorithm>
-#include <numeric>
-#include <bit>
-#include <semaphore>
-#include <random>
+#include <filesystem>
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_ENABLE_EXPERIMENTAL

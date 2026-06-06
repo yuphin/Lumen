@@ -7,6 +7,8 @@
 #include "CommandBuffer.h"
 #include "PersistentResourceManager.h"
 #include "Window.h"
+#include <unordered_map>
+#include <unordered_set>
 
 namespace vk {
 

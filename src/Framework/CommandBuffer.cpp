@@ -1,3 +1,4 @@
+#include <semaphore>
 #include "CommandBuffer.h"
 
 static u32 get_first_available_tid(u64 val) {

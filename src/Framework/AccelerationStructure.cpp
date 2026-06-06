@@ -1,4 +1,5 @@
 
+#include <numeric>
 #include "AccelerationStructure.h"
 #include "VkUtils.h"
 #include "PersistentResourceManager.h"

@@ -1,5 +1,4 @@
 #pragma once
-#include <volk/volk.h>
 #include "Base/Utils.h"
 
 namespace vk {

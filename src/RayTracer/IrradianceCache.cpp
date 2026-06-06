@@ -1,5 +1,4 @@
 #include "Integrator.h"
-#include "LumenPCH.h"
 #include "IrradianceCache.h"
 
 using namespace IRCache;
