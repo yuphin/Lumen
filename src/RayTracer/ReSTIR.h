@@ -1,22 +1,23 @@
 #pragma once
-#include "Integrator.h"
 #include "shaders/integrators/restir/di/restirdi_commons.h"
-class ReSTIR final : public Integrator {
-   public:
-	ReSTIR(const vk::BVH& tlas) : Integrator(tlas) {}
-	virtual void init() override;
-	virtual void render() override;
-	virtual bool update() override;
-	virtual bool gui() override;
-	virtual void destroy(bool resize) override;
 
-   private:
-	vk::Buffer* g_buffer;
-	vk::Buffer* passthrough_reservoir_buffer;
-	vk::Buffer* temporal_reservoir_buffer;
-	vk::Buffer* spatial_reservoir_buffer;
-	vk::Buffer* tmp_col_buffer;
+struct Integrator;
+
+struct ReSTIR {
+	vk::Buffer* g_buffer = nullptr;
+	vk::Buffer* passthrough_reservoir_buffer = nullptr;
+	vk::Buffer* temporal_reservoir_buffer = nullptr;
+	vk::Buffer* spatial_reservoir_buffer = nullptr;
+	vk::Buffer* tmp_col_buffer = nullptr;
 	PCReSTIR pc_ray{};
 	bool do_spatiotemporal = false;
 	bool enable_accumulation = false;
 };
+
+namespace restir {
+void init(Integrator* integrator);
+void render(Integrator* integrator);
+bool update(Integrator* integrator);
+bool gui(Integrator* integrator);
+void destroy(Integrator* integrator, bool resize);
+}  // namespace restir

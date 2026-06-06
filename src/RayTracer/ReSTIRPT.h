@@ -1,45 +1,36 @@
 #pragma once
+#include "Framework/AccelerationStructure.h"
 #include "Framework/Texture.h"
-#include "Integrator.h"
+#include "Framework/Base/SmallArray.h"
 #include "shaders/integrators/restir/gris/gris_commons.h"
-using namespace RestirPT;
-class ReSTIRPT final : public Integrator {
-   public:
-	ReSTIRPT(const vk::BVH& tlas) : Integrator(tlas) {}
-	virtual void init() override;
-	virtual void render() override;
-	virtual bool update() override;
-	virtual void destroy(bool resize) override;
-	virtual bool gui() override;
 
-   private:
-	enum class StreamingMethod { INDIVIDUAL_CONTRIBUTIONS, SPLITTING_AT_RECONNECTION };
+struct Integrator;
 
-	enum class MISMethod { TALBOT, PAIRWISE };
-	vk::Buffer* gris_gbuffer;
-	vk::Buffer* gris_prev_gbuffer;
-	vk::Buffer* gris_reservoir_ping_buffer;
-	vk::Buffer* gris_reservoir_pong_buffer;
-	vk::Buffer* prefix_contribution_buffer;
-	vk::Buffer* reconnection_buffer;
-	vk::Buffer* transformations_buffer;
-	vk::Buffer* debug_vis_buffer;
+struct ReSTIRPT {
+	enum StreamingMethod { STREAM_INDIVIDUAL_CONTRIBUTIONS, STREAM_SPLITTING_AT_RECONNECTION };
+	enum MISMethod { MIS_TALBOT, MIS_PAIRWISE };
 
-	vk::Buffer* photon_eye_buffer_ping;
-	vk::Buffer* photon_eye_buffer_pong;
-	vk::Buffer* caustic_photon_aabbs_buffer;
-	vk::Buffer* caustic_photon_light_buffer;
-	vk::Buffer* photon_count_buffer;
-	vk::Texture* canonical_contributions_texture;
-	vk::Texture* direct_lighting_texture;
-	vk::Texture* caustics_texture;
-
-	vk::Buffer* photon_bvh_instances_buf;
-	lm::SmallArray<vk::Buffer*,vk::MAX_FRAMES_IN_FLIGHT> photon_bvh_scratch_bufs;
-
-	vk::Buffer* caustics_reservoir_ping_buffer;
-	vk::Buffer* caustics_reservoir_pong_buffer;
-	PCReSTIRPT pc_ray{};
+	vk::Buffer* gris_gbuffer = nullptr;
+	vk::Buffer* gris_prev_gbuffer = nullptr;
+	vk::Buffer* gris_reservoir_ping_buffer = nullptr;
+	vk::Buffer* gris_reservoir_pong_buffer = nullptr;
+	vk::Buffer* prefix_contribution_buffer = nullptr;
+	vk::Buffer* reconnection_buffer = nullptr;
+	vk::Buffer* transformations_buffer = nullptr;
+	vk::Buffer* debug_vis_buffer = nullptr;
+	vk::Buffer* photon_eye_buffer_ping = nullptr;
+	vk::Buffer* photon_eye_buffer_pong = nullptr;
+	vk::Buffer* caustic_photon_aabbs_buffer = nullptr;
+	vk::Buffer* caustic_photon_light_buffer = nullptr;
+	vk::Buffer* photon_count_buffer = nullptr;
+	vk::Texture* canonical_contributions_texture = nullptr;
+	vk::Texture* direct_lighting_texture = nullptr;
+	vk::Texture* caustics_texture = nullptr;
+	vk::Buffer* photon_bvh_instances_buf = nullptr;
+	lm::SmallArray<vk::Buffer*, vk::MAX_FRAMES_IN_FLIGHT> photon_bvh_scratch_bufs;
+	vk::Buffer* caustics_reservoir_ping_buffer = nullptr;
+	vk::Buffer* caustics_reservoir_pong_buffer = nullptr;
+	RestirPT::PCReSTIRPT pc_ray{};
 	bool enable_accumulation = true;
 	bool direct_lighting = true;
 	bool enable_rr = false;
@@ -55,7 +46,6 @@ class ReSTIRPT final : public Integrator {
 	bool enable_defensive_formulation = true;
 	bool enable_occlusion = true;
 	bool enable_temporal_jitter = true;
-
 	bool enable_photon_mapping = true;
 	bool enable_photon_gather = true;
 	bool progressive_radius_reduction = false;
@@ -67,11 +57,18 @@ class ReSTIRPT final : public Integrator {
 	f32 curr_photon_radius = initial_photon_radius;
 	u32 path_length = 0;
 	u32 num_spatial_samples = 1;
-	// u32 num_photons = 1280 * 720;
 	u32 num_photons = 1920 * 1080;
-	StreamingMethod streaming_method = StreamingMethod::INDIVIDUAL_CONTRIBUTIONS;
-	MISMethod mis_method = MISMethod::PAIRWISE;
-
+	StreamingMethod streaming_method = STREAM_INDIVIDUAL_CONTRIBUTIONS;
+	MISMethod mis_method = MIS_PAIRWISE;
+	vk::BlasInput photon_blas_input;
 	vk::BVH photon_blas;
 	vk::BVH photon_tlas;
 };
+
+namespace restirpt {
+void init(Integrator* integrator);
+void render(Integrator* integrator);
+bool update(Integrator* integrator);
+void destroy(Integrator* integrator, bool resize);
+bool gui(Integrator* integrator);
+}  // namespace restirpt

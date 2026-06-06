@@ -1,22 +1,92 @@
 #include "Framework/RenderGraph.h"
 #include "Framework/GPUQueryManager.h"
+#include "Framework/ImageUtils.h"
 #include <tinyexr.h>
 #include "RayTracer.h"
+#include "Integrator.h"
+#include "PostFX.h"
 
-RayTracer* RayTracer::instance = nullptr;
-bool load_reference = false;
-bool calc_rmse = false;
+namespace ray_tracer {
+
+static bool load_reference = false;
+static bool calc_rmse = false;
+static bool initialized = false;
+static f32 cpu_avg_time = 0;
+static i32 cnt = 0;
+static Integrator active_integrator;
+static PostFX post_fx;
+static RTUtilsPC rt_utils_pc;
+static vk::Buffer* gt_img_buffer = nullptr;
+static vk::Buffer* output_img_buffer = nullptr;
+static vk::Buffer* output_img_buffer_cpu = nullptr;
+static vk::Buffer* residual_buffer = nullptr;
+static vk::Buffer* counter_buffer = nullptr;
+static vk::Buffer* rmse_val_buffer = nullptr;
+static vk::Buffer* rt_utils_desc_buffer = nullptr;
+static vk::Texture* reference_tex = nullptr;
+static vk::Texture* target_tex = nullptr;
+static clock_t start;
+static bool debug = false;
+static bool write_exr = false;
+static bool has_gt = false;
+static bool show_cam_stats = false;
+static bool comparison_mode = false;
+static bool capture_ref_img = false;
+static bool capture_target_img = false;
+static bool comparison_img_toggle = false;
+static bool img_captured = false;
+static bool show_ui = true;
+static const bool enable_shader_inference = true;
+static const bool use_events = true;
+static vk::BVH tlas;
+static lm::Array<vk::BVH> blases;
+static bool recreate_swapchain = false;
+static SceneConfig saved_configs[INTEGRATOR_COUNT];
+static bool saved_config_valid[INTEGRATOR_COUNT] = {};
+static i32 current_integrator_idx = 0;
+
+static const char* integrator_display_names[INTEGRATOR_COUNT] = {
+	"Path", "BDPT", "SPPM", "VCM", "PSSMLT", "SMLT", "VCMMLT", "ReSTIR", "ReSTIR GI", "DDGI", "ReSTIR PT",
+	"IR Cache",
+};
+
+static const lm::String integrator_config_names[INTEGRATOR_COUNT] = {
+	"path", "bdpt", "sppm", "vcm", "pssmlt", "smlt", "vcmmlt", "restir", "restirgi", "ddgi", "restirpt", "ircache",
+};
+
+static void init_resources();
+static void cleanup_resources();
+static f32 draw_frame();
+static void render(u32 idx);
+static void render_debug_utils();
+static bool gui();
+static void destroy_accel();
 
 static void reload_shaders() {
 	vk::render_graph()->reload_shaders = true;
 	vk::render_graph()->shader_cache.clear();
 	vk::render_graph()->reload_counter++;
 	vk::shader_arena_reset();
-
 }
 
-void RayTracer::init(bool use_debug, i32 argc, char* argv[]) {
-	instance = this;
+static void cache_active_config() {
+	SceneConfig& config = scene::get()->config;
+	saved_configs[config.type] = config;
+	saved_config_valid[config.type] = true;
+}
+
+static void select_integrator_config(IntegratorType type, const SceneCommon& common) {
+	if (saved_config_valid[type]) {
+		scene::get()->config = saved_configs[type];
+		scene::get()->config.common = common;
+	} else {
+		scene::config_init(integrator_config_names[type], common);
+	}
+	scene::get()->config.type = type;
+	scene::get()->config.common.integrator_name = integrator_config_names[type];
+}
+
+void init(bool use_debug, i32 argc, char* argv[]) {
 	debug = use_debug;
 	lm::String scene_name = CSTR("scenes/caustics.scene");
 	for (i32 i = 0; i < argc; i++) {
@@ -27,7 +97,7 @@ void RayTracer::init(bool use_debug, i32 argc, char* argv[]) {
 		}
 	}
 	srand((u32)time(NULL));
-	Window::add_key_callback([this](KeyInput key, KeyAction action) {
+	Window::add_key_callback([](KeyInput key, KeyAction action) {
 		if (Window::is_key_down(KeyInput::KEY_F1)) {
 			show_ui = !show_ui;
 		}
@@ -37,7 +107,7 @@ void RayTracer::init(bool use_debug, i32 argc, char* argv[]) {
 			comparison_mode ^= true;
 		} else if (Window::is_key_down(KeyInput::KEY_F5)) {
 			reload_shaders();
-			integrator->updated = true;
+			active_integrator.updated = true;
 		} else if (Window::is_key_down(KeyInput::KEY_F6)) {
 			capture_ref_img = true;
 		} else if (Window::is_key_down(KeyInput::KEY_F7)) {
@@ -70,16 +140,19 @@ void RayTracer::init(bool use_debug, i32 argc, char* argv[]) {
 	vk::render_graph()->settings.use_events = use_events;
 
 	scene::load(scene_name);
-	create_integrator(scene::get()->config.type);
-	integrator->init();
+	current_integrator_idx = i32(scene::get()->config.type);
+	cache_active_config();
+	active_integrator.tlas = &tlas;
+	integrator::set_type(&active_integrator, scene::get()->config.type);
+	integrator::init(&active_integrator);
 	if (!tlas.accel) {
-		integrator->create_accel(tlas, blases);
+		integrator::create_accel(&active_integrator, &tlas, &blases);
 	}
 	post_fx.init();
 	init_resources();
 }
 
-void RayTracer::init_resources() {
+static void init_resources() {
 	u32 viewport_size = Window::width() * Window::height();
 	output_img_buffer =
 		prm::get_buffer({.name = CSTR("Output Image Buffer"),
@@ -160,25 +233,26 @@ void RayTracer::init_resources() {
 	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, rmse_val_buffer, vk::render_graph());
 }
 
-void RayTracer::cleanup_resources() {
-	std::initializer_list<vk::Buffer*> buffer_list = {output_img_buffer, output_img_buffer_cpu, residual_buffer,
-													  counter_buffer,	 rmse_val_buffer,		rt_utils_desc_buffer,
-													  gt_img_buffer};
-	std::initializer_list<vk::Texture*> tex_list = {reference_tex, target_tex};
-	for (vk::Buffer* b : buffer_list) {
-		prm::remove(b);
+static void cleanup_resources() {
+	vk::Buffer** buffers[] = {&output_img_buffer, &output_img_buffer_cpu, &residual_buffer, &counter_buffer,
+							 &rmse_val_buffer, &rt_utils_desc_buffer, &gt_img_buffer};
+	for (vk::Buffer** buffer : buffers) {
+		prm::remove(*buffer);
+		*buffer = nullptr;
 	}
-	for (auto t : tex_list) {
-		prm::remove(t);
+	vk::Texture** textures[] = {&reference_tex, &target_tex};
+	for (vk::Texture** texture : textures) {
+		prm::remove(*texture);
+		*texture = nullptr;
 	}
 }
 
-void RayTracer::update() {
+void update() {
 	f32 frame_time = draw_frame();
 	cpu_avg_time = (1.0f - 1.0f / (cnt)) * cpu_avg_time + frame_time / (f32)cnt;
 	cpu_avg_time = 0.95f * cpu_avg_time + 0.05f * frame_time;
-	integrator->update();
-	integrator->updated = false;
+	integrator::update(&active_integrator);
+	active_integrator.updated = false;
 #if 0
 	char* stats = nullptr;
 	vmaBuildStatsString(vk::context().allocator, &stats, VK_TRUE);
@@ -187,13 +261,13 @@ void RayTracer::update() {
 #endif
 }
 
-void RayTracer::render(u32 i) {
-	integrator->render();
+static void render(u32 i) {
+	integrator::render(&active_integrator);
 	vk::Texture* input_tex = nullptr;
 	if (comparison_mode && img_captured) {
 		input_tex = comparison_img_toggle ? target_tex : reference_tex;
 	} else {
-		input_tex = integrator->output_tex;
+		input_tex = active_integrator.output_tex;
 	}
 	post_fx.render(input_tex, vk::swapchain_images()[i]);
 	render_debug_utils();
@@ -205,14 +279,14 @@ void RayTracer::render(u32 i) {
 	vk::check(vkEndCommandBuffer(cmdbuf));
 }
 
-void RayTracer::render_debug_utils() {
+static void render_debug_utils() {
 	if (write_exr) {
-		vk::render_graph()->current_pass().copy(integrator->output_tex, output_img_buffer_cpu);
+		vk::render_graph()->current_pass().copy(active_integrator.output_tex, output_img_buffer_cpu);
 	} else if (capture_ref_img) {
-		vk::render_graph()->current_pass().copy(integrator->output_tex, reference_tex);
+		vk::render_graph()->current_pass().copy(active_integrator.output_tex, reference_tex);
 
 	} else if (capture_target_img) {
-		vk::render_graph()->current_pass().copy(integrator->output_tex, target_tex);
+		vk::render_graph()->current_pass().copy(active_integrator.output_tex, target_tex);
 	}
 
 	if (capture_ref_img || capture_target_img) {
@@ -238,7 +312,7 @@ void RayTracer::render_debug_utils() {
 				num_wgs = (num_wgs + 1023) / 1024;
 			}
 		};
-		vk::render_graph()->current_pass().copy(integrator->output_tex, output_img_buffer);
+		vk::render_graph()->current_pass().copy(active_integrator.output_tex, output_img_buffer);
 		// Calculate RMSE
 		op_reduce(CSTR("OpReduce: RMSE"), CSTR("src/shaders/rmse/calc_rmse.comp"), CSTR("OpReduce: Reduce RMSE"),
 				  CSTR("src/shaders/rmse/reduce_rmse.comp"));
@@ -250,55 +324,13 @@ void RayTracer::render_debug_utils() {
 	}
 }
 
-void RayTracer::create_integrator(IntegratorType type) {
-	switch (type) {
-		case INTEGRATOR_PATH:
-			integrator = std::make_unique<Path>(tlas);
-			break;
-		case INTEGRATOR_BDPT:
-			integrator = std::make_unique<BDPT>(tlas);
-			break;
-		case INTEGRATOR_SPPM:
-			integrator = std::make_unique<SPPM>(tlas);
-			break;
-		case INTEGRATOR_VCM:
-			integrator = std::make_unique<VCM>(tlas);
-			break;
-		case INTEGRATOR_PSSMLT:
-			integrator = std::make_unique<PSSMLT>(tlas);
-			break;
-		case INTEGRATOR_SMLT:
-			integrator = std::make_unique<SMLT>(tlas);
-			break;
-		case INTEGRATOR_VCMMLT:
-			integrator = std::make_unique<VCMMLT>(tlas);
-			break;
-		case INTEGRATOR_RESTIR:
-			integrator = std::make_unique<ReSTIR>(tlas);
-			break;
-		case INTEGRATOR_RESTIRGI:
-			integrator = std::make_unique<ReSTIRGI>(tlas);
-			break;
-		case INTEGRATOR_DDGI:
-			integrator = std::make_unique<DDGI>(tlas);
-			break;
-		case INTEGRATOR_RESTIRPT:
-			integrator = std::make_unique<ReSTIRPT>(tlas);
-			break;
-		case INTEGRATOR_IRCACHE:
-			integrator = std::make_unique<IrradianceCache>(tlas);
-			break;
-		default:
-			break;
-	}
-}
-
-bool RayTracer::gui() {
+static bool gui() {
 	util::Slice<GPUQueryManager::TimestampData> query_results = GPUQueryManager::get();
 	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
 	ImGui::Text("General settings:");
 	ImGui::PopStyleColor();
-	ImGui::Text("Frame %d time (CPU) %.2f ms ( %.2f FPS )", integrator->frame_num, cpu_avg_time, 1000 / cpu_avg_time);
+	ImGui::Text("Frame %d time (CPU) %.2f ms ( %.2f FPS )", active_integrator.frame_num, cpu_avg_time,
+				1000 / cpu_avg_time);
 	double frame_time_gpu_ms = (GPUQueryManager::get_total_elapsed()) * 1e-6;
 	if (frame_time_gpu_ms > 0) {
 		ImGui::Text("Frame time (GPU) %.2f ms", frame_time_gpu_ms);
@@ -366,15 +398,11 @@ bool RayTracer::gui() {
 	}
 
 	SceneConfig& config = scene::get()->config;
-	const char* settings[] = {"Path",	"BDPT",	  "SPPM",	   "VCM",  "PSSMLT",	"SMLT",
-							  "VCMMLT", "ReSTIR", "ReSTIR GI", "DDGI", "ReSTIR PT", "IR Cache"};
-
-	static i32 curr_integrator_idx = i32(config.type);
-	if (ImGui::BeginCombo("Select Integrator", settings[curr_integrator_idx])) {
-		for (i32 n = 0; n < IM_ARRAYSIZE(settings); n++) {
-			const bool selected = curr_integrator_idx == n;
-			if (ImGui::Selectable(settings[n], selected)) {
-				curr_integrator_idx = n;
+	if (ImGui::BeginCombo("Select Integrator", integrator_display_names[current_integrator_idx])) {
+		for (i32 n = 0; n < INTEGRATOR_COUNT; n++) {
+			const bool selected = current_integrator_idx == n;
+			if (ImGui::Selectable(integrator_display_names[n], selected)) {
+				current_integrator_idx = n;
 			}
 
 			// Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
@@ -385,32 +413,28 @@ bool RayTracer::gui() {
 		ImGui::EndCombo();
 	}
 
-	if (curr_integrator_idx != i32(config.type)) {
+	if (current_integrator_idx != i32(config.type)) {
 		updated = true;
 		vkDeviceWaitIdle(vk::context().device);
 		const bool was_custom_accel = config.type == INTEGRATOR_DDGI;
-		integrator->destroy(/*resize=*/false);
-		SceneCommon prev_scene_config = config.common;
-		// TODO: Remove
-		std::string integrator_str = std::string(settings[curr_integrator_idx]);
-		integrator_str.erase(std::remove_if(integrator_str.begin(), integrator_str.end(), ::isspace),
-							 integrator_str.end());
-		std::transform(integrator_str.begin(), integrator_str.end(), integrator_str.begin(), ::tolower);
-		scene::config_init(lm::String(integrator_str.data(), integrator_str.size()), prev_scene_config);
-
+		SceneCommon common = config.common;
+		cache_active_config();
+		integrator::destroy(&active_integrator, /*resize=*/false);
+		IntegratorType new_type = IntegratorType(current_integrator_idx);
+		select_integrator_config(new_type, common);
 		GPUQueryManager::reset_data();
-		create_integrator((IntegratorType)curr_integrator_idx);
-		const bool is_custom_accel = config.type == INTEGRATOR_DDGI;
-		integrator->init();
+		integrator::set_type(&active_integrator, new_type);
+		const bool is_custom_accel = new_type == INTEGRATOR_DDGI;
+		integrator::init(&active_integrator);
 		if (was_custom_accel || is_custom_accel) {
 			destroy_accel();
-			integrator->create_accel(tlas, blases);
+			integrator::create_accel(&active_integrator, &tlas, &blases);
 		}
 	}
 	return updated;
 }
 
-f32 RayTracer::draw_frame() {
+static f32 draw_frame() {
 	if (cnt == 0) {
 		start = clock();
 	}
@@ -427,12 +451,12 @@ f32 RayTracer::draw_frame() {
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	integrator->updated |= updated;
+	active_integrator.updated |= updated;
 	if (show_ui) {
 		ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Once);
 		ImGui::Begin("Debug (F1 to hide)", &show_ui);
 		bool gui_updated = gui();
-		gui_updated |= integrator->gui();
+		gui_updated |= integrator::gui(&active_integrator);
 		gui_updated |= post_fx.gui();
 		static bool show_imgui_demo = false;
 		if (ImGui::Button("Show ImGui Demo")) {
@@ -442,7 +466,7 @@ f32 RayTracer::draw_frame() {
 			ImGui::ShowDemoWindow(&show_imgui_demo);
 		}
 		ImGui::End();
-		integrator->updated |= gui_updated;
+		active_integrator.updated |= gui_updated;
 	}
 
 	render(image_idx);
@@ -453,13 +477,13 @@ f32 RayTracer::draw_frame() {
 	if (result != VK_SUCCESS) {
 		Window::update_window_size();
 		cleanup_resources();
-		integrator->destroy(/*resize=*/true);
+		integrator::destroy(&active_integrator, /*resize=*/true);
 		post_fx.destroy();
 
-		integrator->init();
+		integrator::init(&active_integrator);
 		post_fx.init();
 		init_resources();
-		integrator->updated = true;
+		active_integrator.updated = true;
 	}
 
 	if (recreate_swapchain) {
@@ -490,7 +514,7 @@ f32 RayTracer::draw_frame() {
 	return (f32)t_diff;
 }
 
-void RayTracer::destroy_accel() {
+static void destroy_accel() {
 	tlas.destroy();
 	for (vk::BVH& blas : blases) {
 		blas.destroy();
@@ -498,15 +522,18 @@ void RayTracer::destroy_accel() {
 	blases.clear();
 }
 
-void RayTracer::cleanup() {
+void cleanup() {
 	vkDeviceWaitIdle(vk::context().device);
 	if (initialized) {
 		cleanup_resources();
-		integrator->destroy(/*resize=*/false);
+		integrator::destroy(&active_integrator, /*resize=*/false);
 		post_fx.destroy();
 		scene::destroy();
 		destroy_accel();
 		vk::destroy_imgui();
 		vk::cleanup();
+		initialized = false;
 	}
 }
+
+}  // namespace ray_tracer

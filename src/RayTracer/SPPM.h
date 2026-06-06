@@ -1,22 +1,22 @@
 #pragma once
-#include "Integrator.h"
 #include "shaders/integrators/sppm/sppm_commons.h"
-class SPPM final : public Integrator {
-   public:
-	SPPM(const vk::BVH& tlas) : Integrator(tlas) {}
-	virtual void init() override;
-	virtual void render() override;
-	virtual bool update() override;
-	virtual void destroy(bool resize) override;
 
-   private:
+struct Integrator;
+
+struct SPPM {
 	PCSPPM pc_ray{};
 	VkDescriptorPool desc_pool{};
 	VkDescriptorSetLayout desc_set_layout{};
-
-	vk::Buffer* sppm_data_buffer;
-	vk::Buffer* atomic_data_buffer;
-	vk::Buffer* photon_buffer;
-	vk::Buffer* residual_buffer;
-	vk::Buffer* counter_buffer;
+	vk::Buffer* sppm_data_buffer = nullptr;
+	vk::Buffer* atomic_data_buffer = nullptr;
+	vk::Buffer* photon_buffer = nullptr;
+	vk::Buffer* residual_buffer = nullptr;
+	vk::Buffer* counter_buffer = nullptr;
 };
+
+namespace sppm {
+void init(Integrator* integrator);
+void render(Integrator* integrator);
+bool update(Integrator* integrator);
+void destroy(Integrator* integrator, bool resize);
+}  // namespace sppm

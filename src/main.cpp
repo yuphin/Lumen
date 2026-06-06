@@ -36,13 +36,12 @@ i32 main(i32 argc, char* argv[]) {
 	ThreadPool::init();
 	Window::init(width, height, fullscreen, on_second_monitor);
 	{
-		RayTracer app;
-		app.init(enable_debug, argc, argv);
+		ray_tracer::init(enable_debug, argc, argv);
 		while (!Window::should_close()) {
 			Window::poll();
-			app.update();
+			ray_tracer::update();
 		}
-		app.cleanup();
+		ray_tracer::cleanup();
 	}
 	Window::destroy();
 	ThreadPool::destroy();

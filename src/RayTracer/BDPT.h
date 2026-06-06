@@ -1,18 +1,18 @@
 #pragma once
-#include "Integrator.h"
 #include "shaders/integrators/bdpt/bdpt_commons.h"
 
-class BDPT final : public Integrator {
-   public:
-	BDPT(const vk::BVH& tlas) : Integrator(tlas) {}
-	virtual void init() override;
-	virtual void render() override;
-	virtual bool update() override;
-	virtual void destroy(bool resize) override;
+struct Integrator;
 
-   private:
+struct BDPT {
 	PCBDPT pc_ray{};
-	vk::Buffer* light_path_buffer;
-	vk::Buffer* camera_path_buffer;
-	vk::Buffer* color_storage_buffer;
+	vk::Buffer* light_path_buffer = nullptr;
+	vk::Buffer* camera_path_buffer = nullptr;
+	vk::Buffer* color_storage_buffer = nullptr;
 };
+
+namespace bdpt {
+void init(Integrator* integrator);
+void render(Integrator* integrator);
+bool update(Integrator* integrator);
+void destroy(Integrator* integrator, bool resize);
+}  // namespace bdpt

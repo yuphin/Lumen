@@ -1,40 +1,43 @@
+#include "Integrator.h"
 #include "Path.h"
 
-void Path::init() {
-	Integrator::init();
-	SceneDesc desc;
-	desc.index_addr = lumen_scene->index_buffer->device_address();
+void path::init(Integrator* integrator) {
+	Path& state = integrator->path;
 
-	desc.material_addr = lumen_scene->materials_buffer->device_address();
-	desc.prim_info_addr = lumen_scene->prim_lookup_buffer->device_address();
-	desc.compact_vertices_addr = lumen_scene->vertex_buffer->device_address();
-	lumen_scene->scene_desc_buffer =
+	SceneDesc desc;
+	desc.index_addr = integrator->lumen_scene->index_buffer->device_address();
+
+	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
+	desc.prim_info_addr = integrator->lumen_scene->prim_lookup_buffer->device_address();
+	desc.compact_vertices_addr = integrator->lumen_scene->vertex_buffer->device_address();
+	integrator->lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = CSTR("Scene Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
 
-	frame_num = 0;
+	integrator->frame_num = 0;
 
 	assert(vk::render_graph()->settings.shader_inference == true);
 	// For shader resource dependency inference, use this macro to register a buffer address to the rendergraph
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, lumen_scene->prim_lookup_buffer, vk::render_graph());
-	path_length = lumen_scene->config.common.path_length;
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer, vk::render_graph());
+	state.path_length = integrator->lumen_scene->config.common.path_length;
 }
 
-void Path::render() {
-	pc_ray.width = Window::width();
-	pc_ray.height = Window::height();
-	pc_ray.num_lights = (i32)lumen_scene->gpu_lights.size;
-	pc_ray.time = rand() % UINT_MAX;
-	pc_ray.max_depth = path_length;
-	pc_ray.sky_col = lumen_scene->config.common.sky_col;
-	pc_ray.total_light_area = lumen_scene->total_light_area;
-	pc_ray.light_triangle_count = lumen_scene->total_light_triangle_cnt;
-	pc_ray.dir_light_idx = lumen_scene->dir_light_idx;
-	pc_ray.frame_num = frame_num;
-	pc_ray.direct_lighting = direct_lighting;
+void path::render(Integrator* integrator) {
+	Path& state = integrator->path;
+	state.pc_ray.width = Window::width();
+	state.pc_ray.height = Window::height();
+	state.pc_ray.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
+	state.pc_ray.time = rand() % UINT_MAX;
+	state.pc_ray.max_depth = state.path_length;
+	state.pc_ray.sky_col = integrator->lumen_scene->config.common.sky_col;
+	state.pc_ray.total_light_area = integrator->lumen_scene->total_light_area;
+	state.pc_ray.light_triangle_count = integrator->lumen_scene->total_light_triangle_cnt;
+	state.pc_ray.dir_light_idx = integrator->lumen_scene->dir_light_idx;
+	state.pc_ray.frame_num = integrator->frame_num;
+	state.pc_ray.direct_lighting = state.direct_lighting;
 	vk::render_graph()
 		->add_rt(CSTR("Path"),
 				 {
@@ -45,32 +48,37 @@ void Path::render() {
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
-		.push_constants(&pc_ray)
+		.push_constants(&state.pc_ray)
 		.bind({
-			output_tex,
-			scene_ubo_buffer,
-			lumen_scene->scene_desc_buffer,
+			integrator->output_tex,
+			integrator->scene_ubo_buffer,
+			integrator->lumen_scene->scene_desc_buffer,
 		})
-		.bind(lumen_scene->mesh_lights_buffer)
-		.bind_texture_array(lumen_scene->scene_textures)
-		//.write(output_tex) // Needed if the automatic shader inference is disabled
-		.bind_tlas(tlas);
+		.bind(integrator->lumen_scene->mesh_lights_buffer)
+		.bind_texture_array(integrator->lumen_scene->scene_textures)
+		//.write(integrator->output_tex) // Needed if the automatic shader inference is disabled
+		.bind_tlas(*integrator->tlas);
 }
 
-bool Path::update() {
-	frame_num++;
-	bool updated = Integrator::update();
+bool path::update(Integrator* integrator) {
+	Path& state = integrator->path;
+	integrator->frame_num++;
+	bool updated = integrator->updated;
 	if (updated) {
-		frame_num = 0;
+		integrator->frame_num = 0;
 	}
 	return updated;
 }
 
-void Path::destroy(bool resize) { Integrator::destroy(resize); }
+void path::destroy(Integrator* integrator, bool resize) {
+	(void)integrator;
+	(void)resize;
+}
 
-bool Path::gui() {
-	bool result = Integrator::gui();
-	result |= ImGui::SliderInt("Path length", (i32*)&path_length, 0, 12);
-	result |= ImGui::Checkbox("Direct lighting", &direct_lighting);
+bool path::gui(Integrator* integrator) {
+	Path& state = integrator->path;
+	bool result = false;
+	result |= ImGui::SliderInt("Path length", (i32*)&state.path_length, 0, 12);
+	result |= ImGui::Checkbox("Direct lighting", &state.direct_lighting);
 	return result;
 }
