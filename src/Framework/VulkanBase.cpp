@@ -70,9 +70,19 @@ static lm::SmallArray<const char*, MAX_INSTANCE_EXTENSIONS> get_req_extensions()
 static QueueFamilyIndices find_queue_families(VkPhysicalDevice device) {
 	QueueFamilyIndices indices;
 	u32 queue_family_count = 0;
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, nullptr);
+	vkGetPhysicalDeviceQueueFamilyProperties2(device, &queue_family_count, nullptr);
+
+	lm::SmallArray<VkQueueFamilyProperties2, MAX_QUEUE_FAMILIES> queue_families2;
+	queue_families2.resize(queue_family_count);
+	for (auto& queue_family : queue_families2) {
+		queue_family = {VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2};
+	}
+	vkGetPhysicalDeviceQueueFamilyProperties2(device, &queue_family_count, queue_families2.data);
+
 	_queue_families.resize(queue_family_count);
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, _queue_families.data);
+	for (u32 i = 0; i < queue_family_count; ++i) {
+		_queue_families[i] = queue_families2[i].queueFamilyProperties;
+	}
 
 	i32 i = 0;
 	for (const auto& queueFamily : _queue_families) {
@@ -150,14 +160,13 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverity
 													 VkDebugUtilsMessageTypeFlagsEXT messageType,
 													 const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 													 void* pUserData) {
-	// if ((messageSeverity & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-	//  VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) ==
-	//  0) {
-	//  return VK_TRUE;
-	// }
+	if ((messageSeverity &
+		 (VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) == 0) {
+		return VK_TRUE;
+	}
 
 	if ((messageSeverity & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) == 0) {
-		// LUMEN_TRACE("Validation Warning: %s ", pCallbackData->pMessage);
+		LUMEN_WARN("Validation Warning: %s ", pCallbackData->pMessage);
 		return VK_TRUE;
 	}
 	LUMEN_ERROR("Validation Error: %s ", pCallbackData->pMessage);
@@ -177,12 +186,26 @@ static void cleanup_swapchain_images() {
 	_swapchain_images.clear();
 }
 
+static VKAPI_ATTR void VKAPI_CALL get_physical_device_properties(VkPhysicalDevice device,
+																 VkPhysicalDeviceProperties* properties) {
+	VkPhysicalDeviceProperties2 properties2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+	vkGetPhysicalDeviceProperties2(device, &properties2);
+	*properties = properties2.properties;
+}
+
+static VKAPI_ATTR void VKAPI_CALL get_physical_device_memory_properties(
+	VkPhysicalDevice device, VkPhysicalDeviceMemoryProperties* properties) {
+	VkPhysicalDeviceMemoryProperties2 properties2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2};
+	vkGetPhysicalDeviceMemoryProperties2(device, &properties2);
+	*properties = properties2.memoryProperties;
+}
+
 static void create_allocator() {
 	VmaVulkanFunctions vulkan_functions = {};
 	vulkan_functions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
 	vulkan_functions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
-	vulkan_functions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
-	vulkan_functions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
+	vulkan_functions.vkGetPhysicalDeviceProperties = get_physical_device_properties;
+	vulkan_functions.vkGetPhysicalDeviceMemoryProperties = get_physical_device_memory_properties;
 	vulkan_functions.vkAllocateMemory = vkAllocateMemory;
 	vulkan_functions.vkFreeMemory = vkFreeMemory;
 	vulkan_functions.vkMapMemory = vkMapMemory;
@@ -289,9 +312,11 @@ static void pick_physical_device() {
 	for (const auto& device : devices) {
 		if (is_suitable(device)) {
 			context().physical_device = device;
-			vkGetPhysicalDeviceFeatures(context().physical_device, &context().supported_features);
-			vkGetPhysicalDeviceProperties(context().physical_device, &context().device_properties);
-			vkGetPhysicalDeviceMemoryProperties(context().physical_device, &context().memory_properties);
+			VkPhysicalDeviceFeatures2 features2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+			vkGetPhysicalDeviceFeatures2(context().physical_device, &features2);
+			context().supported_features = features2.features;
+			get_physical_device_properties(context().physical_device, &context().device_properties);
+			get_physical_device_memory_properties(context().physical_device, &context().memory_properties);
 			break;
 		}
 	}
@@ -354,8 +379,8 @@ static void create_logical_device() {
 	VkPhysicalDeviceMaintenance4FeaturesKHR maintenance4_fts = {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES_KHR};
 
-	VkPhysicalDeviceRobustness2FeaturesEXT robustness2_fts = {
-		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT};
+	VkPhysicalDeviceRobustness2FeaturesKHR robustness2_fts = {
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_KHR};
 
 	VkPhysicalDeviceRayQueryFeaturesKHR ray_query_fts = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
 	ray_query_fts.rayQuery = true;
@@ -410,13 +435,6 @@ static void create_logical_device() {
 	logical_device_CI.ppEnabledExtensionNames = _device_extensions.data;
 
 	logical_device_CI.pNext = &device_features2;
-
-	if (_enable_validation_layers) {
-		logical_device_CI.enabledLayerCount = static_cast<u32>(_validation_layers_lst.size);
-		logical_device_CI.ppEnabledLayerNames = _validation_layers_lst.data;
-	} else {
-		logical_device_CI.enabledLayerCount = 0;
-	}
 
 	check(vkCreateDevice(context().physical_device, &logical_device_CI, nullptr, &context().device),
 		  "Failed to create logical device");
@@ -636,6 +654,7 @@ static void create_instance() {
 	check(volkInitialize(), "Failed to initialize volk");
 	check(vkCreateInstance(&instance_CI, nullptr, &context().instance), "Failed to create instance");
 	volkLoadInstance(context().instance);
+	vkGetPhysicalDeviceProperties = get_physical_device_properties;
 	if (_enable_validation_layers && !check_validation_layer_support()) {
 		LUMEN_ERROR("Validation layers requested, but not available!");
 	}

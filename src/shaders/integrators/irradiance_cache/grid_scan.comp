@@ -39,14 +39,19 @@ void main() {
 
 	uint sum = subgroupInclusiveAdd(count);
 
-	if (gl_SubgroupInvocationID == SUBGROUP_SIZE - 1) {
+	if (gl_SubgroupInvocationID == gl_SubgroupSize - 1) {
 		subgroup_data[gl_SubgroupID] = sum;
 	}
 	barrier();
 
+	uint sum_wgs = 0;
 	if (gl_SubgroupID == 0) {
-		uint sum_subgroup = subgroup_data[gl_SubgroupInvocationID];
-		uint sum_wgs = subgroupExclusiveAdd(sum_subgroup);
+		uint sum_subgroup = gl_SubgroupInvocationID < gl_NumSubgroups ? subgroup_data[gl_SubgroupInvocationID] : 0;
+		sum_wgs = subgroupExclusiveAdd(sum_subgroup);
+	}
+	barrier();
+
+	if (gl_SubgroupID == 0 && gl_SubgroupInvocationID < gl_NumSubgroups) {
 		subgroup_data[gl_SubgroupInvocationID] = sum_wgs;
 	}
 	barrier();
@@ -57,12 +62,11 @@ void main() {
 			grid_cell_counts.d[tid] = sum;
 		} else {
 			block_sums.d[tid] = sum;
-
 		}
 #ifndef DISABLE_SUM_WRITES
 		if ((gl_LocalInvocationID.x == SCAN_WG_SIZE - 1) || (tid == pc.num_elems - 1)) {
 			out_sums.d[gl_WorkGroupID.x] = sum;
 		}
-#endif // DISABLE_SUM_WRITES
+#endif	// DISABLE_SUM_WRITES
 	}
 }
