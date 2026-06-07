@@ -61,8 +61,7 @@ String str_substr(const String& str, u64 begin, u64 length);
 String str_reserve(Arena* arena, u64 size);
 String str_concat(Arena* arena, const String& str1, const String& str2, bool cstr = false);
 String str_dup(Arena* arena, const String& str);
-// TODO: remove these
-String str_from_cpp_str(const std::string& str);
+// TODO: remove this
 std::string str_to_cpp_str(const lm::String& str); 
 bool str_compare(const String& str1, const String& str2);
 u64 str_rfind(const String& str1, const String& str2);

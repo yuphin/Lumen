@@ -27,8 +27,8 @@ static constexpr u64 MAX_DESCRIPTORS = 32;
 
 #define REGISTER_BUFFER_WITH_ADDRESS(struct_type, struct_name, field_name, buffer_ptr, rg) \
 	do {                                                                                   \
-		auto key = std::string(#struct_type) + '_' + std::string(#field_name);             \
-		rg->registered_buffer_pointers.insert(lm::str_from_cpp_str(key), buffer_ptr);      \
+		lm::String key = #struct_type "_" #field_name;                                     \
+		rg->registered_buffer_pointers.insert(key, buffer_ptr);                            \
 	} while (0)
 
 class RenderGraph;

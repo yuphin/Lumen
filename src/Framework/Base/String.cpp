@@ -48,7 +48,6 @@ String str_dup(Arena* arena, const String& str) {
 	return result;
 }
 
-String str_from_cpp_str(const std::string& str) { return String((char*)str.data(), str.size()); }
 std::string str_to_cpp_str(const lm::String& str) { return std::string(str.data, str.size); }
 
 bool char_is_digit(char c) { return c >= '0' && c <= '9'; }

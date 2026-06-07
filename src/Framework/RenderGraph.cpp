@@ -255,7 +255,8 @@ void RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags d
 				// This case happens when there are no dependencies to the buffer being cleared inside the render
 				// graph in a frame Yet we have to ensure syncronization because there are multiple command buffers
 				// in flight
-				// prefill_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
+				prefill_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
+			} else {
 				carryover_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
 			}
 		}
