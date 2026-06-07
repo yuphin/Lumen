@@ -14,6 +14,8 @@ struct IrradianceCache {
 	vk::Buffer* grid_cell_counts_buffer = nullptr;
 	vk::Buffer* grid_cell_indices_buffer = nullptr;
 	lm::FixedArray<vk::Buffer*> block_sums;
+
+	vk::Buffer* surfel_samples_buffer = nullptr;
 	PCIRCache pc{};
 	bool direct_lighting = false;
 	bool debug_mode = true;

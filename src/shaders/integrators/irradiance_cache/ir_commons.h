@@ -10,6 +10,8 @@
 
 #define SCAN_WG_SIZE 128
 
+#define DEFAULT_WG_SIZE 128
+
 // 256K surfels
 #define MAX_SURFEL_COUNT (256 * 1024)
 
@@ -40,7 +42,7 @@ struct PCIRCache {
 	float grid_uniform_cell_distance_threshold;
 	float scene_extent;
 	uint total_frame_num;
-	uint pad;
+	uint rays_per_surfel;
 };
 
 struct PCPrefixSum {
@@ -74,6 +76,11 @@ struct Surfel {
 	uint age;
 	vec3 irradiance;
 	uint flags;
+};
+
+struct SurfelSample {
+	vec3 radiance;
+	float hit_t;
 };
 
 NAMESPACE_END()

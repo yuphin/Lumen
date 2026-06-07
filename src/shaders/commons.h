@@ -330,6 +330,7 @@ struct Material {
 
 	uint64_t grid_cell_counts_addr;
 	uint64_t grid_cell_indices_addr;
+	uint64_t surfel_samples_addr;
 };
 
 

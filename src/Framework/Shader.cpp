@@ -562,6 +562,9 @@ i32 Shader::compile(lm::RenderPass* pass) {
 
 	shaderc_shader_kind stage = mstages.find(file_ext)->value;
 	binary = compile_file(filename, stage, buffer, pass);
+	if(lm::str_ends_with(filename, CSTR("surfel_integrate.comp"))) {
+		int a = 4;
+	}
 	parse_shader(*this, binary.data(), binary.size(), pass);
 	return 0;
 
@@ -625,21 +628,20 @@ VkShaderModule Shader::create_vk_shader_module(const VkDevice& device) const {
 }
 
 void shader_arena_reset() {
-
 	u32 thread_count = std::thread::hardware_concurrency();
 	std::vector<std::future<void>> threads;
-	for(u32 i = 0; i < thread_count; i++) {
-		threads.push_back(ThreadPool::submit([&](){
-			if(_arena_shaders) {
+	for (u32 i = 0; i < thread_count; i++) {
+		threads.push_back(ThreadPool::submit([&]() {
+			if (_arena_shaders) {
 				_arena_shaders->clear();
 			}
 		}));
 	}
 
-	for(u64 i = 0; i < threads.size(); i++) {
+	for (u64 i = 0; i < threads.size(); i++) {
 		threads[i].wait();
 	}
-	if(_arena_shaders) {
+	if (_arena_shaders) {
 		_arena_shaders->clear();
 	}
 	mstages.clear();

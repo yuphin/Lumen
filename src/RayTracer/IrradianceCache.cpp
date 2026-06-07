@@ -67,17 +67,18 @@ void ircache::init(Integrator* integrator) {
 	PCIRCache& pc = state.pc;
 	lm::FixedArray<vk::Buffer*>& block_sums = state.block_sums;
 
-
-	state.gbuffer = prm::get_buffer({.name = CSTR("IRCache GBuffer"),
-							   .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-										VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-							   .memory_type = vk::BUFFER_TYPE_GPU,
-							   .size = Window::width() * Window::height() * sizeof(GBuffer)});
+	state.gbuffer =
+		prm::get_buffer({.name = CSTR("IRCache GBuffer"),
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = Window::width() * Window::height() * sizeof(GBuffer)});
 
 	{
 		lm::ScratchArena scratch = integrator->arena;
 
-		auto transformations = lm::fixed_array_create<glm::mat4>(scratch.arena, integrator->lumen_scene->prim_meshes.size);
+		auto transformations =
+			lm::fixed_array_create<glm::mat4>(scratch.arena, integrator->lumen_scene->prim_meshes.size);
 		for (const LumenPrimMesh& pm : integrator->lumen_scene->prim_meshes) {
 			transformations.push_back(pm.world_matrix);
 		}
@@ -183,6 +184,13 @@ void ircache::init(Integrator* integrator) {
 
 	} while (cur_total_cells > 1);
 
+	state.surfel_samples_buffer =
+		prm::get_buffer({.name = CSTR("Surfel Samples"),
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = state.rays_per_surfel * MAX_SURFEL_COUNT * sizeof(IRCache::SurfelSample)});
+
 	SceneDesc desc;
 	desc.index_addr = integrator->lumen_scene->index_buffer->device_address();
 	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
@@ -197,6 +205,7 @@ void ircache::init(Integrator* integrator) {
 	desc.surfel_free_stack_count_addr = state.surfel_free_stack_counter_buffer->device_address();
 	desc.grid_cell_counts_addr = state.grid_cell_counts_buffer->device_address();
 	desc.grid_cell_indices_addr = state.grid_cell_indices_buffer->device_address();
+	desc.surfel_samples_addr = state.surfel_samples_buffer->device_address();
 
 	integrator->lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = CSTR("Scene Desc"),
@@ -206,7 +215,31 @@ void ircache::init(Integrator* integrator) {
 						 .data = &desc});
 
 	assert(vk::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, index_addr, integrator->lumen_scene->index_buffer,
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, material_addr, integrator->lumen_scene->materials_buffer,
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer,
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, integrator->lumen_scene->vertex_buffer,
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, state.gbuffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, transformations_addr, state.transformations_buffer,
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_spawn_list_addr, state.surfel_spawn_list_buffer,
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_spawn_count_addr, state.surfel_spawn_count_buffer,
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_pool_addr, state.surfel_pool_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_free_stack_addr, state.surfel_free_stack_buffer,
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_free_stack_count_addr, state.surfel_free_stack_counter_buffer,
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, grid_cell_counts_addr, state.grid_cell_counts_buffer,
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, grid_cell_indices_addr, state.grid_cell_indices_buffer,
+								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_samples_addr, state.surfel_samples_buffer, vk::render_graph());
 
 	pc.desired_surfel_radius_px = 8;
 	pc.grid_uniform_cell_distance_threshold = 0.1;
@@ -219,7 +252,8 @@ void ircache::init(Integrator* integrator) {
 	f32 max_uniform_cells =
 		get_max_uniform_cells(pc.desired_surfel_radius_px, integrator->scene_ubo.projection[1][1], Window::height());
 
-	f32 max_trapezoidal_cell_size = get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], Window::height());
+	f32 max_trapezoidal_cell_size =
+		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], Window::height());
 
 	LUMEN_INFO("Uniform cells size limit (world space): %u", (u32)glm::round(fabsf(max_uniform_cells)));
 	LUMEN_INFO("Trapezoidal cell size limit (px): %u", (u32)glm::round(max_trapezoidal_cell_size));
@@ -245,7 +279,7 @@ void ircache::render(Integrator* integrator) {
 	pc.grid_total_cells = grid_total_cells;
 	pc.scene_extent = glm::length(integrator->lumen_scene->dimensions.max - integrator->lumen_scene->dimensions.min);
 	pc.total_frame_num = state.total_frame_idx;
-
+	pc.rays_per_surfel = state.rays_per_surfel;
 
 	vk::CommandBuffer cmd;
 	if (DEBUG_PASSES) {
@@ -263,7 +297,8 @@ void ircache::render(Integrator* integrator) {
 					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&pc)
-		.bind({integrator->output_tex, integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, integrator->lumen_scene->mesh_lights_buffer})
+		.bind({integrator->output_tex, integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer,
+			   integrator->lumen_scene->mesh_lights_buffer})
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
 
@@ -351,9 +386,9 @@ void ircache::render(Integrator* integrator) {
 	}
 
 	vk::render_graph()
-		->add_rt(CSTR("Surfel: Integrate"),
+		->add_rt(CSTR("Surfel: Trace"),
 				 {
-					 .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/surfel_integrate.rgen")},
+					 .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/surfel_trace.rgen")},
 								 {CSTR("src/shaders/integrators/irradiance_cache/ray.rmiss")},
 								 {CSTR("src/shaders/integrators/irradiance_cache/ray.rchit")},
 								 {CSTR("src/shaders/ray_shadow.rmiss")},
@@ -361,9 +396,19 @@ void ircache::render(Integrator* integrator) {
 					 .dims = {(u32)state.rays_per_surfel, MAX_SURFEL_COUNT},
 				 })
 		.push_constants(&pc)
-		.bind({integrator->output_tex, integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, integrator->lumen_scene->mesh_lights_buffer})
+		.bind({integrator->output_tex, integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer,
+			   integrator->lumen_scene->mesh_lights_buffer})
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
+		.zero(state.surfel_samples_buffer)
 		.bind_tlas(*integrator->tlas);
+
+	vk::render_graph()
+		->add_compute(
+			CSTR("Surfel: Integrate"),
+			{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_integrate.comp")),
+			 .dims = {util::div_ceil((u32)MAX_SURFEL_COUNT * state.rays_per_surfel, (u32)DEFAULT_WG_SIZE), 1, 1}})
+		.push_constants(&pc)
+		.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
 
 	if (state.debug_mode) {
 		vk::render_graph()
@@ -414,14 +459,15 @@ void ircache::destroy(Integrator* integrator, bool resize) {
 	(void)resize;
 
 	vk::Buffer** buffers[] = {&state.gbuffer,
-							 &state.transformations_buffer,
-							 &state.surfel_spawn_list_buffer,
-							 &state.surfel_spawn_count_buffer,
-							 &state.surfel_pool_buffer,
-							 &state.surfel_free_stack_counter_buffer,
-							 &state.surfel_free_stack_buffer,
-							 &state.grid_cell_counts_buffer,
-							 &state.grid_cell_indices_buffer};
+							  &state.transformations_buffer,
+							  &state.surfel_spawn_list_buffer,
+							  &state.surfel_spawn_count_buffer,
+							  &state.surfel_pool_buffer,
+							  &state.surfel_free_stack_counter_buffer,
+							  &state.surfel_free_stack_buffer,
+							  &state.grid_cell_counts_buffer,
+							  &state.grid_cell_indices_buffer,
+							  &state.surfel_samples_buffer};
 	for (vk::Buffer** buffer : buffers) {
 		prm::remove(*buffer);
 		*buffer = nullptr;

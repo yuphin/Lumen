@@ -19,13 +19,15 @@ layout(location = 0) rayPayloadEXT IRCacheHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelSamples { SurfelSample d[]; };
 
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 
+SurfelSamples surfel_samples = SurfelSamples(scene_desc.surfel_samples_addr);
+
 uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
 
-vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const bool side, const vec3 n_s,
-						  const vec3 wo) {
+vec3 uniform_sample_light(inout uvec4 seed, vec3 pos, const vec3 n_s) {
 	vec3 res = vec3(0);
 	// Sample light
 	vec3 wi;
@@ -37,17 +39,14 @@ vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const 
 	const vec3 Le =
 		sample_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
 	const vec3 p = offset_ray2(pos, n_s);
-	float bsdf_pdf;
 	float cos_x = dot(n_s, wi);
-	vec3 f = eval_bsdf(n_s, wo, mat, 1, side, wi, bsdf_pdf);
-	float pdf_light;
 	any_hit_payload.hit = 1;
 	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0x1, 1, 0, 1, p, 0, wi,
 				wi_len - EPS, 1);
 	bool visible = any_hit_payload.hit == 0;
 	const float light_pick_pdf = 1. / pc.total_light_count;
 	if (visible && pdf_light_w > 0) {
-		res += f * abs(cos_x) * Le / (pdf_light_w * light_pick_pdf);
+		res += abs(cos_x) * Le / (pdf_light_w * light_pick_pdf);
 	}
 	return res;
 }
@@ -78,7 +77,7 @@ void main() {
 	float cos_theta;
 
 	// We're already on a surface, sample the BSDF
-	vec3 f = sample_bsdf(n_s, wo, material, /*radiance=cam*/ 1, side, wi, pdf_w, cos_theta, sampling_seed);
+	sample_bsdf(n_s, wo, material, /*radiance=cam*/ 1, side, wi, pdf_w, cos_theta, sampling_seed);
 	surfel_origin = offset_ray(surfel_origin, n_g, /* is_transmission= */ false);
 
 	traceRayEXT(tlas, flags, 0x1, 0, 0, 0, surfel_origin, tmin, wi, tmax, 0);
@@ -94,9 +93,13 @@ void main() {
 		radiance += atmosphere_L;
 	} else {
 		HitData hit_data = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
-		Material hit_mat = load_material(hit_data.material_idx, hit_data.uv);
-
-		bool side = face_forward(hit_data.n_s, hit_data.n_g, wo);
-		radiance += uniform_sample_light(sampling_seed, hit_mat, hit_data.pos, side, hit_data.n_s, wo);
+		radiance += uniform_sample_light(sampling_seed, hit_data.pos, hit_data.n_s);
 	}
+
+	SurfelSample surfel_sample;
+	surfel_sample.radiance = radiance;
+	surfel_sample.hit_t = payload.dist;
+
+	uint linear_idx = gl_LaunchIDEXT.y * pc.rays_per_surfel + gl_LaunchIDEXT.x;
+	surfel_samples.d[linear_idx] = surfel_sample;
 }

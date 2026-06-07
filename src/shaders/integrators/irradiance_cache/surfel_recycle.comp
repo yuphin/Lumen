@@ -30,16 +30,10 @@ GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_add
 #include "grid.glsl"
 #include "surfel_commons.glsl"
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnList { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnCount { uint d; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStackCount { int d; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStack { uint d[]; };
 
-InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
-SpawnList spawn_list = SpawnList(scene_desc.surfel_spawn_list_addr);
-SpawnCount spawn_count = SpawnCount(scene_desc.surfel_spawn_count_addr);
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 SurfelFreeStackCount free_stack_count = SurfelFreeStackCount(scene_desc.surfel_free_stack_count_addr);
 SurfelFreeStack free_stack = SurfelFreeStack(scene_desc.surfel_free_stack_addr);

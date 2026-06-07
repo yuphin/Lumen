@@ -250,14 +250,12 @@ void RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags d
 			post_execution_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
 		} else {
 			if (flags == BufferSyncFlags::BUFFER_ZERO) {
+				LUMEN_ASSERT(dst_access_flags == VK_ACCESS_TRANSFER_WRITE_BIT, "Invalid buffer zero flags");
+				// TODO: Do we need this?
 				// This case happens when there are no dependencies to the buffer being cleared inside the render
 				// graph in a frame Yet we have to ensure syncronization because there are multiple command buffers
 				// in flight
-				LUMEN_ASSERT(dst_access_flags == VK_ACCESS_TRANSFER_WRITE_BIT, "Invalid buffer zero flags");
-				prefill_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
-			} else {
-				// TODO: Check
-				// LUMEN_ASSERT(false, "Unreachable?");
+				// prefill_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
 				carryover_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
 			}
 		}
