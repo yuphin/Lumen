@@ -45,6 +45,10 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/libs PREFIX Libs FILES ${LIB_SRC})
 
 add_executable(Lumen ${src_files} ${shaders_src})
 
+if(MSVC)
+    set_source_files_properties(${shaderc_src} PROPERTIES COMPILE_OPTIONS "/wd5232")
+endif()
+
 target_compile_definitions(Lumen PRIVATE
     TINYEXR_USE_MINIZ
     USE_SHADERC
@@ -78,6 +82,9 @@ if(MSVC)
         target_compile_options(glfw PRIVATE "/MP")
     endif()
 	target_compile_options(Lumen PRIVATE "/MP")
+    # Vulkan SDK debug SPIRV-Cross libraries reference compilation PDBs that
+    # are not distributed with the SDK.
+    target_link_options(Lumen PRIVATE "$<$<CONFIG:Debug>:/IGNORE:4099>")
     # For MSVC compilation diagnostics
     # target_compile_options(Lumen PRIVATE /d1reportTime)
     # For struct layouts

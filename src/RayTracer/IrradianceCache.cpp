@@ -53,8 +53,7 @@ static void prefix_scan(u32 num_elems, u32 block_sum_offset, u32 out_offset, u32
 	if (num_wgs > 1) {
 		assert((u64)out_offset + num_wgs <= scratch_capacity);
 		scan(num_wgs, scene_desc_buffer, pc);
-		prefix_scan(num_wgs, out_offset, out_offset + num_wgs, scratch_capacity, /*scan_sums=*/true,
-					scene_desc_buffer);
+		prefix_scan(num_wgs, out_offset, out_offset + num_wgs, scratch_capacity, /*scan_sums=*/true, scene_desc_buffer);
 		uniform_add(num_wgs, scene_desc_buffer, pc);
 	} else {
 		scan(num_wgs, scene_desc_buffer, pc, /*disable_sum_writes=*/true);

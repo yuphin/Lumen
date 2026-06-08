@@ -32,4 +32,5 @@ add_subdirectory(volk SYSTEM)
 add_subdirectory(glm)
 add_subdirectory(vma)
 
+set(shaderc_src "${glslc_src};${libshaderc_util}" PARENT_SCOPE)
 set(src_files "${src_files};${glslc_src};${libshaderc_util};${imgui_src};${mitsuba_src};${tinyxml_src};${miniz_src};${offsetAllocator_src}" PARENT_SCOPE)
