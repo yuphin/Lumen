@@ -37,9 +37,9 @@ void PostFX::init_fft() {
 										  .initial_layout = VK_IMAGE_LAYOUT_GENERAL,
 										  .sampler = img_sampler};
 	fft_ping_padded = prm::get_texture(empty_tex_desc);
-	empty_tex_desc.name = "FFT - Pong";
+	empty_tex_desc.name = CSTR("FFT - Pong");
 	fft_pong_padded = prm::get_texture(empty_tex_desc);
-	empty_tex_desc.name = "Kernel - Pong";
+	empty_tex_desc.name = CSTR("Kernel - Pong");
 	vk::Texture* kernel_ping = drm::get(empty_tex_desc);
 	kernel_pong = prm::get_texture(empty_tex_desc);
 
