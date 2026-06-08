@@ -171,7 +171,7 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	float pdf_dir;
 	Le = sample_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, pdf_dir, cos_from_light,
 				   record);
-	// TODO: Should we handle this case differently? 
+	// TODO: Should we handle this case differently? Investigate this further
 	if(wi_len < EPS) {
 		return vec3(0);
 	}
