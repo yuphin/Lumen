@@ -82,6 +82,7 @@ float mlt_L_light() {
     vec3 origin = vec3(ubo.inv_view * vec4(0, 0, 0, 1));
     VCMState light_state;
     connected_lights.d[pixel_idx] = 0;
+    light_splat_cnts.d[pixel_idx] = 0;
     float lum_sum = 0;
     float eta_vc = 0, eta_vm = 0;
     bool finite;

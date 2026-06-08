@@ -764,6 +764,7 @@ void recreate_swap_chain() {
 		glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
 		glfwWaitEvents();
 	}
+	check(vkDeviceWaitIdle(context().device), "Failed to wait for device before recreating swap chain");
 	cleanup_swapchain_images();
 	VkSwapchainKHR old_swapchain = context().swapchain;
 	create_swapchain(old_swapchain);
@@ -827,7 +828,6 @@ VkResult submit_frame(u32 image_idx) {
 
 	VkResult result = vkQueuePresentKHR(context().queues[(i32)QueueType::GFX], &present_info);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-		vkDeviceWaitIdle(context().device);
 		recreate_swap_chain();
 		return result;
 	} else if (result != VK_SUCCESS) {

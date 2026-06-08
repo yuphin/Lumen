@@ -268,9 +268,9 @@ void vcmmlt::render(Integrator* integrator) {
 		}
 	};
 	auto sum_up_chain_data = [&] {
-		op_reduce(CSTR("OpReduce: Sum0"), CSTR("src/shaders/integrators/vcmmlt/sum.comp"), "OpReduce: Reduce Sum0",
+		op_reduce(CSTR("OpReduce: Sum0"), CSTR("src/shaders/integrators/vcmmlt/sum.comp"), CSTR("OpReduce: Reduce Sum0"),
 				  CSTR("src/shaders/integrators/vcmmlt/reduce_sum.comp"), {0});
-		op_reduce(CSTR("OpReduce: Sum1"), CSTR("src/shaders/integrators/vcmmlt/sum.comp"), "OpReduce: Reduce Sum1",
+		op_reduce(CSTR("OpReduce: Sum1"), CSTR("src/shaders/integrators/vcmmlt/sum.comp"), CSTR("OpReduce: Reduce Sum1"),
 				  CSTR("src/shaders/integrators/vcmmlt/reduce_sum.comp"), {1});
 	};
 	std::initializer_list<lm::ResourceBinding> rt_bindings = {

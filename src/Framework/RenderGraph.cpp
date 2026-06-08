@@ -46,9 +46,22 @@ static VkPipelineStageFlags pipeline_stage_from_pass_type(vk::PassType pass_type
 	return res;
 }
 
-static bool is_read_flag(VkAccessFlags flags) {
-	return flags &
-		   (VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR);
+static bool is_write_flag(VkAccessFlags flags) {
+	return flags & (VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT |
+					VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+					VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
+}
+
+static bool is_read_only(VkAccessFlags flags) { return flags != 0 && !is_write_flag(flags); }
+
+static VkBufferMemoryBarrier2 buffer_barrier_from_sync(VkBuffer buffer, const BufferSyncDescriptor& sync) {
+	return vk::buffer_barrier2(buffer, sync.src_access_flags, sync.dst_access_flags, sync.src_stage, sync.dst_stage);
+}
+
+static VkImageMemoryBarrier2 image_barrier_from_sync(VkImage image, const ImageSyncDescriptor& sync) {
+	return vk::image_barrier2(image, sync.src_access_flags, sync.dst_access_flags, sync.old_layout, sync.new_layout,
+							  sync.image_aspect, sync.src_stage, sync.dst_stage,
+							  vk::context().queue_indices.gfx_family.value());
 }
 
 static void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg,
@@ -148,16 +161,19 @@ static void process_bindless_resources(RenderPass* pass, vk::Shader& shader) {
 		return;
 	}
 	for (const auto& entry : shader.buffer_status_map) {
-		pass->pipeline_storage->affected_buffer_pointers.insert(entry.key, entry.value);
+		vk::BufferStatus& status = pass->pipeline_storage->affected_buffer_pointers.get_or_create(entry.key)->value;
+		status.read |= entry.value.read;
+		status.write |= entry.value.write;
 	}
 }
 
 static void process_bindings(RenderPass* pass, vk::Shader& shader) {
 	for (const auto& entry : shader.resource_binding_map) {
 		assert(entry.key < pass->pipeline_storage->bound_resources.size);
-		pass->pipeline_storage->bound_resources[entry.key].active = entry.value.active;
-		pass->pipeline_storage->bound_resources[entry.key].read = entry.value.read;
-		pass->pipeline_storage->bound_resources[entry.key].write = entry.value.write;
+		ResourceBinding& binding = pass->pipeline_storage->bound_resources[entry.key];
+		binding.active |= entry.value.active;
+		binding.read |= entry.value.read;
+		binding.write |= entry.value.write;
 	}
 }
 
@@ -219,16 +235,25 @@ static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& a
 	}
 }
 
-void RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags dst_access_flags,
-									   BufferSyncFlags flags) {
+bool RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags dst_access_flags, BufferSyncFlags flags,
+									   VkPipelineStageFlags dst_stage) {
 	// Invariant : Pass with lower index should be the setter before the cmd buffer submission
 	auto* entry = rg->buffer_resource_map.find(buffer->handle);
 
-	if (!entry || (is_read_flag(dst_access_flags) && is_read_flag(entry->value.second))) {
-		return;
+	if (!entry) {
+		return true;
 	}
-	u32 opposing_pass_idx = entry->value.first;
-	VkAccessFlags src_access_flags = entry->value.second;
+	u32 opposing_pass_idx = entry->value.pass_idx;
+	// If we're crossing frame, this dependency is not event elligible
+	const bool cross_frame_history = opposing_pass_idx >= rg->passes.size;
+	if (is_read_only(dst_access_flags) && is_read_only(entry->value.access_flags)) {
+		return entry->value.event_eligible && !cross_frame_history;
+	}
+	VkAccessFlags src_access_flags = entry->value.access_flags;
+	VkPipelineStageFlags src_stage = entry->value.stage;
+	if (!dst_stage) {
+		dst_stage = pipeline_stage_from_pass_type(type, dst_access_flags);
+	}
 	// If this condition fails, that means the cmd buffer is already submitted last frame
 	// For single cmd buffer setup, ignoring the else condition would be fine
 	// However when multiple cmd buffers are in flight, we must still ensure the synchronization
@@ -237,17 +262,24 @@ void RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags d
 		wait_signals_buffer.insert(buffer->handle, BufferSyncDescriptor{
 													   .src_access_flags = src_access_flags,
 													   .dst_access_flags = dst_access_flags,
+													   .src_stage = src_stage,
+													   .dst_stage = dst_stage,
 													   .opposing_pass_idx = opposing_pass.pass_idx,
+													   .event_eligible = entry->value.event_eligible,
 												   });
 		opposing_pass.set_signals_buffer.insert(buffer->handle, BufferSyncDescriptor{
 																	.src_access_flags = src_access_flags,
 																	.dst_access_flags = dst_access_flags,
+																	.src_stage = src_stage,
+																	.dst_stage = dst_stage,
 																	.opposing_pass_idx = pass_idx,
+																	.event_eligible = entry->value.event_eligible,
 																});
 	} else {
 		if (flags == BufferSyncFlags::BUFFER_COPY || flags == BufferSyncFlags::BUFFER_AS_BUILD) {
 			// Resource copies happens after the pass execution
-			post_execution_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
+			post_execution_buffer_barriers.push_back(
+				{buffer->handle, src_access_flags, dst_access_flags, src_stage, dst_stage});
 		} else {
 			if (flags == BufferSyncFlags::BUFFER_ZERO) {
 				LUMEN_ASSERT(dst_access_flags == VK_ACCESS_TRANSFER_WRITE_BIT, "Invalid buffer zero flags");
@@ -255,63 +287,85 @@ void RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags d
 				// This case happens when there are no dependencies to the buffer being cleared inside the render
 				// graph in a frame Yet we have to ensure syncronization because there are multiple command buffers
 				// in flight
-				prefill_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
+				prefill_buffer_barriers.push_back(
+					{buffer->handle, src_access_flags, dst_access_flags, src_stage, dst_stage});
 			} else {
-				carryover_buffer_barriers.push_back({buffer->handle, src_access_flags, dst_access_flags});
+				carryover_buffer_barriers.push_back(
+					{buffer->handle, src_access_flags, dst_access_flags, src_stage, dst_stage});
 			}
 		}
 	}
+	return entry->value.event_eligible && !cross_frame_history;
 }
 
-void RenderPass::register_dependencies(vk::Texture* tex, VkImageLayout dst_layout) {
-	const bool has_storage_bit = (tex->usage_flags & VK_IMAGE_USAGE_STORAGE_BIT) == VK_IMAGE_USAGE_STORAGE_BIT;
-	const bool eq_layouts = tex->layout == dst_layout;
-	// Note: Currently, the following optimization doesn't work for this:
-	// if (eq_layouts && (!has_storage_bit || dst_layout == VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL)) {
-	// The reason is that when both src and dst layout are VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, it's possible that prior
-	// to this pass, there was another pass that signalled a transition to READ_ONLY_OPTIMAL, and that pass might have a
-	// different pipeline type. So, for example:
-	// (compute - Image layout : general) -> (compute - Image layout: read_only (for compute only)) - (fragment - Image
-	// layout: read only) In this case: The correct synchronization is needed to ensure a fragment shader read access.
-	// So in principle it would be possible to feed that access flag in the 2nd stage,
-	// but our architecture currently doesn't allow this as we don't explicitly store the pipeline stage for signals
-	if (eq_layouts && !has_storage_bit) {
-		return;
-	}
-	auto img_resource_entry = rg->img_resource_map.find(tex->handle);
-	if (has_storage_bit && tex->layout == dst_layout && !img_resource_entry) {
-		return;
-	}
-	if (tex->layout == VK_IMAGE_LAYOUT_UNDEFINED || !img_resource_entry) {
+bool RenderPass::register_dependencies(vk::Texture* tex, VkAccessFlags dst_access_flags, VkImageLayout dst_layout) {
+	const auto* entry = rg->img_resource_map.find(tex->handle);
+	if (!entry) {
+		if (tex->layout == dst_layout) {
+			return true;
+		}
 		layout_transitions.push_back({tex, tex->layout, dst_layout});
 		tex->layout = dst_layout;
-	} else if (img_resource_entry->value < rg->passes.size) {
-		RenderPass& opposing_pass = rg->passes[img_resource_entry->value];
-		if (opposing_pass.pass_idx < pass_idx) {
-			wait_signals_img.insert(tex->handle, ImageSyncDescriptor{
-													 .old_layout = tex->layout,
-													 .new_layout = dst_layout,
-													 .opposing_pass_idx = opposing_pass.pass_idx,
-													 .image_aspect = tex->aspect_flags,
-												 });
+		return true;
+	}
 
+	const ImageResourceState& image_state = entry->value;
+	const bool cross_frame_history = image_state.pass_idx >= rg->passes.size;
+	const bool read_after_read = is_read_only(image_state.access_flags) && is_read_only(dst_access_flags);
+	if (read_after_read && image_state.layout == dst_layout) {
+		tex->layout = dst_layout;
+		return image_state.event_eligible && !cross_frame_history;
+	}
+	const VkAccessFlags src_access_flags = image_state.access_flags;
+	const VkPipelineStageFlags src_stage = image_state.stage;
+
+	if (image_state.pass_idx < rg->passes.size) {
+		RenderPass& opposing_pass = rg->passes[image_state.pass_idx];
+		if (opposing_pass.pass_idx < pass_idx) {
+			const VkPipelineStageFlags dst_stage = pipeline_stage_from_pass_type(type, dst_access_flags);
+			wait_signals_img.insert(tex->handle, ImageSyncDescriptor{
+													 .old_layout = image_state.layout,
+													 .new_layout = dst_layout,
+													 .src_access_flags = src_access_flags,
+													 .dst_access_flags = dst_access_flags,
+													 .src_stage = src_stage,
+													 .dst_stage = dst_stage,
+													 .image_aspect = tex->aspect_flags,
+													 .opposing_pass_idx = opposing_pass.pass_idx,
+													 .event_eligible = image_state.event_eligible,
+												 });
 			opposing_pass.set_signals_img.insert(tex->handle, ImageSyncDescriptor{
-																  .old_layout = tex->layout,
+																  .old_layout = image_state.layout,
 																  .new_layout = dst_layout,
-																  .opposing_pass_idx = pass_idx,
+																  .src_access_flags = src_access_flags,
+																  .dst_access_flags = dst_access_flags,
+																  .src_stage = src_stage,
+																  .dst_stage = dst_stage,
 																  .image_aspect = tex->aspect_flags,
+																  .opposing_pass_idx = pass_idx,
+																  .event_eligible = image_state.event_eligible,
 															  });
+
 			tex->layout = dst_layout;
-		} else if (tex->layout != dst_layout) {
-			// Means the opposing pass has already executed
-			layout_transitions.push_back({tex, tex->layout, dst_layout});
+		} else if (image_state.layout != dst_layout) {
+			// Multiple accesses inside one pass cannot be ordered by the graph.
+			layout_transitions.push_back({tex, image_state.layout, dst_layout});
 			tex->layout = dst_layout;
 		}
-	} else if (tex->layout != dst_layout) {
-		// Means the opposing pass has already executed
-		layout_transitions.push_back({tex, tex->layout, dst_layout});
+	} else {
+		carryover_image_barriers.push_back({
+			.image = tex->handle,
+			.src_access_flags = src_access_flags,
+			.dst_access_flags = dst_access_flags,
+			.old_layout = image_state.layout,
+			.new_layout = dst_layout,
+			.image_aspect = image_state.image_aspect,
+			.src_stage = src_stage,
+			.dst_stage = pipeline_stage_from_pass_type(type, dst_access_flags),
+		});
 		tex->layout = dst_layout;
 	}
+	return image_state.event_eligible && !cross_frame_history;
 }
 
 void RenderPass::transition_resources() {
@@ -336,11 +390,13 @@ void RenderPass::transition_resources() {
 				}
 				continue;
 			}
+			const VkAccessFlags access_flags = (bound_resource.read ? VK_ACCESS_SHADER_READ_BIT : 0) |
+											   (bound_resource.write ? VK_ACCESS_SHADER_WRITE_BIT : 0);
 			if (bound_resource.write) {
 				if (bound_resource.buf) {
-					write_impl(bound_resource.buf, VK_ACCESS_SHADER_WRITE_BIT);
+					write_impl(bound_resource.buf, access_flags);
 				} else {
-					write_impl(bound_resource.tex);
+					write_impl(bound_resource.tex, access_flags);
 				}
 			} else if (bound_resource.read) {
 				if (bound_resource.buf) {
@@ -355,8 +411,10 @@ void RenderPass::transition_resources() {
 			String buffer_str = entry.key;
 			vk::BufferStatus status = entry.value;
 			vk::Buffer* buffer = rg->registered_buffer_pointers.find(buffer_str)->value;
+			const VkAccessFlags access_flags =
+				(status.read ? VK_ACCESS_SHADER_READ_BIT : 0) | (status.write ? VK_ACCESS_SHADER_WRITE_BIT : 0);
 			if (status.write) {
-				write_impl(buffer, VK_ACCESS_SHADER_WRITE_BIT);
+				write_impl(buffer, access_flags);
 			} else if (status.read) {
 				read_impl(buffer);
 			}
@@ -381,7 +439,8 @@ void RenderPass::transition_resources() {
 
 	for (const vk::BVH& as : pipeline_storage->as_bindings) {
 		if (as.buffer) {
-			read_impl(as.buffer, VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR, BufferSyncFlags::BUFFER_AS_BUILD);
+			read_impl(as.buffer, VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR, BufferSyncFlags::NONE,
+					  VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR);
 		}
 	}
 
@@ -406,7 +465,22 @@ void RenderPass::transition_resources() {
 	if (blas_build_data.is_valid()) {
 		for (vk::Buffer* buf : blas_build_data.source_buffers) {
 			read_impl(buf, VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_SHADER_READ_BIT,
-					  BufferSyncFlags::BUFFER_AS_BUILD);
+					  BufferSyncFlags::BUFFER_AS_BUILD, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR);
+		}
+		for (vk::BVH& blas : blas_build_data.blases) {
+			if (blas.buffer) {
+				write_impl(blas.buffer, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+						   BufferSyncFlags::BUFFER_AS_BUILD, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR);
+			}
+		}
+	}
+
+	if (tlas_build_data.is_valid()) {
+		read_impl(tlas_build_data.instances_buf, VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR,
+				  BufferSyncFlags::BUFFER_AS_BUILD, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR);
+		if (tlas_build_data.tlas->buffer) {
+			write_impl(tlas_build_data.tlas->buffer, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+					   BufferSyncFlags::BUFFER_AS_BUILD, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR);
 		}
 	}
 }
@@ -750,83 +824,89 @@ void RenderPass::finalize() {
 	}
 }
 
-void RenderPass::write_impl(const vk::Buffer* buffer, VkAccessFlags access_flags, BufferSyncFlags flags) {
-	register_dependencies(buffer, access_flags, flags);
-	rg->buffer_resource_map.insert(buffer->handle, {pass_idx, access_flags});
+void RenderPass::write_impl(const vk::Buffer* buffer, VkAccessFlags access_flags, BufferSyncFlags flags,
+							VkPipelineStageFlags stage) {
+	if (!stage) {
+		stage = pipeline_stage_from_pass_type(type, access_flags);
+	}
+	const bool event_eligible = register_dependencies(buffer, access_flags, flags, stage);
+	rg->buffer_resource_map.insert(buffer->handle, {pass_idx, access_flags, stage, event_eligible});
 }
 
 void RenderPass::write_impl(vk::Texture* tex, VkAccessFlags access_flags) {
 	VkImageLayout target_layout = vk::texture_to_image_layout(tex, access_flags);
-	register_dependencies(tex, target_layout);
-	rg->img_resource_map.insert(tex->handle, pass_idx);
+	const VkPipelineStageFlags stage = pipeline_stage_from_pass_type(type, access_flags);
+	const bool event_eligible = register_dependencies(tex, access_flags, target_layout);
+	rg->img_resource_map.insert(tex->handle, {.pass_idx = pass_idx,
+											  .access_flags = access_flags,
+											  .layout = target_layout,
+											  .image_aspect = tex->aspect_flags,
+											  .stage = stage,
+											  .event_eligible = event_eligible});
 }
 
-void RenderPass::read_impl(const vk::Buffer* buffer, VkAccessFlags access_flags, BufferSyncFlags flags) {
-	register_dependencies(buffer, access_flags, flags);
-	rg->buffer_resource_map.insert(buffer->handle, {pass_idx, access_flags});
+void RenderPass::read_impl(const vk::Buffer* buffer, VkAccessFlags access_flags, BufferSyncFlags flags,
+						   VkPipelineStageFlags stage) {
+	if (!stage) {
+		stage = pipeline_stage_from_pass_type(type, access_flags);
+	}
+	const bool event_eligible = register_dependencies(buffer, access_flags, flags, stage);
+	rg->buffer_resource_map.insert(buffer->handle, {pass_idx, access_flags, stage, event_eligible});
 }
 
 void RenderPass::read_impl(vk::Texture* tex) {
-	VkImageLayout target_layout = vk::texture_to_image_layout(tex, VK_ACCESS_SHADER_READ_BIT);
-	register_dependencies(tex, target_layout);
-	rg->img_resource_map.insert(tex->handle, pass_idx);
+	constexpr VkAccessFlags access_flags = VK_ACCESS_SHADER_READ_BIT;
+	VkImageLayout target_layout = vk::texture_to_image_layout(tex, access_flags);
+	VkPipelineStageFlags stage = pipeline_stage_from_pass_type(type, access_flags);
+	const bool event_eligible = register_dependencies(tex, access_flags, target_layout);
+	rg->img_resource_map.insert(tex->handle, {.pass_idx = pass_idx,
+											  .access_flags = access_flags,
+											  .layout = target_layout,
+											  .image_aspect = tex->aspect_flags,
+											  .stage = stage,
+											  .event_eligible = event_eligible});
 }
 
 void RenderPass::post_execution_barrier(vk::Buffer* buffer, VkAccessFlags access_flags) {
-	auto src_access_flags = rg->buffer_resource_map.find(buffer->handle)->value.second;
+	auto src_access_flags = rg->buffer_resource_map.find(buffer->handle)->value.access_flags;
 	post_execution_buffer_barriers.push_back({buffer->handle, src_access_flags, access_flags});
 }
 
 void RenderPass::run(VkCommandBuffer cmd) {
-	lm::SmallArray<VkEvent, MAX_BUFFER_BARRIERS + MAX_IMG_BARRIERS> wait_events;
-	const bool use_events = rg->settings.use_events;
 	vk::begin_region(vk::context().device, cmd, name.data, glm::vec4(1.0f, 0.78f, 0.05f, 1.0f));
 	GPUQueryManager::begin(cmd, name.data);
+	const bool use_events = rg->settings.use_events;
 
-	// Wait: Buffer
-	auto& buffer_sync = buffer_sync_resources;
-	auto& img_sync = image_sync_resources;
+	// Barriers required before zeroing resources
+	lm::SmallArray<VkBufferMemoryBarrier2, MAX_BUFFER_BARRIERS + MAX_RESOURCES_ZEROS> pre_zero_buffer_barriers;
+	lm::SmallArray<VkBufferMemoryBarrier2, MAX_BUFFER_BARRIERS + MAX_RESOURCES_ZEROS> pre_execution_buffer_barriers;
 	for (const auto& entry : wait_signals_buffer) {
 		VkBuffer buffer = entry.key;
 		const BufferSyncDescriptor& v = entry.value;
-		VkBufferMemoryBarrier2& buffer_barrier = buffer_sync.buffer_barriers.push();
-		buffer_barrier =
-			vk::buffer_barrier2(entry.key, v.src_access_flags, v.dst_access_flags,
-								pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, v.src_access_flags),
-								pipeline_stage_from_pass_type(type, v.dst_access_flags));
-		buffer_sync.dependency_infos.push_back(vk::dependency_info(1, &buffer_barrier));
-		if (use_events) {
+		VkBufferMemoryBarrier2 buffer_barrier = buffer_barrier_from_sync(entry.key, v);
+		VkDependencyInfo dependency_info = vk::dependency_info(1, &buffer_barrier);
+		if (use_events && v.event_eligible) {
 			VkEvent event = rg->passes[v.opposing_pass_idx].set_signals_buffer.find(buffer)->value.event;
 			LUMEN_ASSERT(event, "Event can't be null");
-			wait_events.push_back(event);
+			vkCmdWaitEvents2(cmd, 1, &event, &dependency_info);
+			vkCmdResetEvent2(cmd, event, buffer_barrier.dstStageMask);
+		} else {
+			auto& destination = resource_zeros.empty() ? pre_execution_buffer_barriers : pre_zero_buffer_barriers;
+			destination.push_back(buffer_barrier);
 		}
 	}
-	if (wait_events.size) {
-		vkCmdWaitEvents2(cmd, (u32)wait_events.size, wait_events.data, buffer_sync.dependency_infos.data);
-		for (i32 i = 0; i < wait_events.size; i++) {
-			vkCmdResetEvent2(cmd, wait_events[i], buffer_sync.buffer_barriers[i].dstStageMask);
-		}
-	} else if (!use_events) {
-		for (const auto& info : buffer_sync.dependency_infos) {
-			vkCmdPipelineBarrier2(cmd, &info);
-		}
+	for (auto& barrier : prefill_buffer_barriers) {
+		auto curr_stage =
+			barrier.src_stage ? barrier.src_stage : pipeline_stage_from_pass_type(type, barrier.src_access_flags);
+		auto dst_stage =
+			barrier.dst_stage ? barrier.dst_stage : pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
+		pre_zero_buffer_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
+															   barrier.dst_access_flags, curr_stage, dst_stage));
 	}
-
-	// TODO: Combine barriers and signals
-
-	// Prefill buffer barriers
-	{
-		lm::SmallArray<VkBufferMemoryBarrier2, MAX_RESOURCES_ZEROS> buffer_memory_barriers;
-		if (!prefill_buffer_barriers.empty()) {
-			for (auto& barrier : prefill_buffer_barriers) {
-				auto curr_stage = pipeline_stage_from_pass_type(type, barrier.src_access_flags);
-				auto dst_stage = pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
-				buffer_memory_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
-																	 barrier.dst_access_flags, curr_stage, dst_stage));
-			}
-			auto dependency_info = vk::dependency_info((u32)buffer_memory_barriers.size, buffer_memory_barriers.data);
-			vkCmdPipelineBarrier2(cmd, &dependency_info);
-		}
+	if (!pre_zero_buffer_barriers.empty()) {
+		VkDependencyInfo dependency_info =
+			vk::dependency_info((u32)pre_zero_buffer_barriers.size, pre_zero_buffer_barriers.data);
+		vkCmdPipelineBarrier2(cmd, &dependency_info);
 	}
 
 	// Zero out resources
@@ -836,52 +916,48 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		}
 	}
 
-	// Buffer barriers
-	{
-		lm::SmallArray<VkBufferMemoryBarrier2, MAX_RESOURCES_ZEROS> buffer_memory_barriers;
-		if (!carryover_buffer_barriers.empty()) {
-			for (auto& barrier : carryover_buffer_barriers) {
-				auto curr_stage = pipeline_stage_from_pass_type(type, barrier.src_access_flags);
-				auto dst_stage = pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
-				buffer_memory_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
-																	 barrier.dst_access_flags, curr_stage, dst_stage));
-			}
-			auto dependency_info = vk::dependency_info((u32)buffer_memory_barriers.size, buffer_memory_barriers.data);
-			vkCmdPipelineBarrier2(cmd, &dependency_info);
-		}
+	// Barriers required after zeroing and before pass execution
+	for (auto& barrier : carryover_buffer_barriers) {
+		auto curr_stage =
+			barrier.src_stage ? barrier.src_stage : pipeline_stage_from_pass_type(type, barrier.src_access_flags);
+		auto dst_stage =
+			barrier.dst_stage ? barrier.dst_stage : pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
+		pre_execution_buffer_barriers.push_back(vk::buffer_barrier2(barrier.buffer, barrier.src_access_flags,
+																	barrier.dst_access_flags, curr_stage, dst_stage));
 	}
 
 	// Wait: Images
-	wait_events.clear();
+	lm::SmallArray<VkImageMemoryBarrier2, MAX_IMG_BARRIERS * 2> pre_execution_image_barriers;
 	for (const auto& entry : wait_signals_img) {
 		VkImage image = entry.key;
 		const ImageSyncDescriptor& v = entry.value;
-		if (use_events) {
+		VkImageMemoryBarrier2 img_barrier = image_barrier_from_sync(entry.key, v);
+		VkDependencyInfo dependency_info = vk::dependency_info(1, &img_barrier);
+		if (use_events && v.event_eligible) {
 			LUMEN_ASSERT(rg->passes[v.opposing_pass_idx].set_signals_img.find(image)->value.event,
 						 "Event can't be null");
-		}
-		auto src_access_flags = vk::access_flags_for_img_layout(v.old_layout);
-		auto dst_access_flags = vk::access_flags_for_img_layout(v.new_layout);
-		auto src_stage = pipeline_stage_from_pass_type(rg->passes[v.opposing_pass_idx].type, src_access_flags);
-		auto dst_stage = pipeline_stage_from_pass_type(type, dst_access_flags);
-		VkImageMemoryBarrier2& img_barrier = img_sync.img_barriers.emplace_back(
-			vk::image_barrier2(entry.key, src_access_flags, dst_access_flags, v.old_layout, v.new_layout,
-							   v.image_aspect, src_stage, dst_stage, vk::context().queue_indices.gfx_family.value()));
-		img_sync.dependency_infos.emplace_back(vk::dependency_info(1, &img_barrier));
-		if (use_events) {
-			wait_events.push_back(rg->passes[v.opposing_pass_idx].set_signals_img.find(image)->value.event);
+			VkEvent event = rg->passes[v.opposing_pass_idx].set_signals_img.find(image)->value.event;
+			vkCmdWaitEvents2(cmd, 1, &event, &dependency_info);
+			vkCmdResetEvent2(cmd, event, img_barrier.dstStageMask);
+		} else {
+			pre_execution_image_barriers.push_back(img_barrier);
 		}
 	}
 
-	if (wait_events.size) {
-		vkCmdWaitEvents2(cmd, (u32)wait_events.size, wait_events.data, img_sync.dependency_infos.data);
-		for (i32 i = 0; i < wait_events.size; i++) {
-			vkCmdResetEvent2(cmd, wait_events[i], img_sync.img_barriers[i].dstStageMask);
-		}
-	} else if (!use_events) {
-		for (const auto& info : img_sync.dependency_infos) {
-			vkCmdPipelineBarrier2(cmd, &info);
-		}
+	// Cross-frame image dependencies
+	for (const ImageBarrier& barrier : carryover_image_barriers) {
+		pre_execution_image_barriers.push_back(
+			vk::image_barrier2(barrier.image, barrier.src_access_flags, barrier.dst_access_flags, barrier.old_layout,
+							   barrier.new_layout, barrier.image_aspect, barrier.src_stage, barrier.dst_stage));
+	}
+
+	if (!pre_execution_buffer_barriers.empty() || !pre_execution_image_barriers.empty()) {
+		VkDependencyInfo dependency_info = {VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+		dependency_info.bufferMemoryBarrierCount = (u32)pre_execution_buffer_barriers.size;
+		dependency_info.pBufferMemoryBarriers = pre_execution_buffer_barriers.data;
+		dependency_info.imageMemoryBarrierCount = (u32)pre_execution_image_barriers.size;
+		dependency_info.pImageMemoryBarriers = pre_execution_image_barriers.data;
+		vkCmdPipelineBarrier2(cmd, &dependency_info);
 	}
 
 	// Transition layouts inside the pass
@@ -1009,8 +1085,12 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		lm::SmallArray<VkBufferMemoryBarrier2, MAX_RESOURCES_COPIES> post_execution_buffer_memory_barriers;
 		if (!post_execution_buffer_barriers.empty()) {
 			for (auto& barrier : post_execution_buffer_barriers) {
-				VkPipelineStageFlags curr_stage = pipeline_stage_from_pass_type(type, barrier.src_access_flags);
-				VkPipelineStageFlags dst_stage = pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
+				VkPipelineStageFlags curr_stage = barrier.src_stage
+													  ? barrier.src_stage
+													  : pipeline_stage_from_pass_type(type, barrier.src_access_flags);
+				VkPipelineStageFlags dst_stage = barrier.dst_stage
+													 ? barrier.dst_stage
+													 : pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
 				post_execution_buffer_memory_barriers.push_back(vk::buffer_barrier2(
 					barrier.buffer, barrier.src_access_flags, barrier.dst_access_flags, curr_stage, dst_stage));
 			}
@@ -1071,18 +1151,16 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				instance->accelerationStructureReference = blas_build_data.blases[i].device_address();
 			}
 			vk::buffer_unmap(tlas_build_data.instances_buf);
-#if 0
-			// TODO: Do we need a barrier here?
-			std::vector<VkBufferMemoryBarrier2> buffer_memory_barriers;
-			auto curr_stage = VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
-			auto dst_stage = VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
-			buffer_memory_barriers.push_back(vk::buffer_barrier2(
-				blas_build_data.blases[0].buffer->handle, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
-				VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR, curr_stage, dst_stage));
-			auto dependency_info =
-				vk::dependency_info((u32)buffer_memory_barriers.size(), buffer_memory_barriers.data());
+			lm::SmallArray<VkBufferMemoryBarrier2, MAX_BUFFER_BARRIERS> buffer_memory_barriers;
+			for (const vk::BVH& blas : blas_build_data.blases) {
+				buffer_memory_barriers.push_back(
+					vk::buffer_barrier2(blas.buffer->handle, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+										VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR,
+										VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+										VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR));
+			}
+			auto dependency_info = vk::dependency_info((u32)buffer_memory_barriers.size, buffer_memory_barriers.data);
 			vkCmdPipelineBarrier2(cmd, &dependency_info);
-#endif
 		}
 	}
 
@@ -1090,7 +1168,6 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		GPUQueryManager::begin(cmd, "TLAS Build");
 		vk::tlas_build(*tlas_build_data.tlas, tlas_build_data.instances_buf, tlas_build_data.instance_count,
 					   tlas_build_data.flags, cmd, tlas_build_data.scratch_buffer_ref);
-		write_impl(tlas_build_data.tlas->buffer, VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
 		GPUQueryManager::end(cmd);
 	}
 
@@ -1099,14 +1176,10 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		BufferSyncDescriptor& buffer_sync = entry.value;
 		VkBuffer buffer = entry.key;
 		LUMEN_ASSERT(buffer_sync.event == nullptr, "VkEvent should be null in the setter");
-		VkBufferMemoryBarrier2 mem_barrier =
-			vk::buffer_barrier2(buffer, buffer_sync.src_access_flags, buffer_sync.dst_access_flags,
-								pipeline_stage_from_pass_type(type, buffer_sync.src_access_flags),
-								pipeline_stage_from_pass_type(rg->passes[buffer_sync.opposing_pass_idx].type,
-															  buffer_sync.dst_access_flags));
+		VkBufferMemoryBarrier2 mem_barrier = buffer_barrier_from_sync(buffer, buffer_sync);
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);
 
-		if (use_events) {
+		if (use_events && buffer_sync.event_eligible) {
 			buffer_sync.event = vk::event_pool::get_event(cmd);
 			vkCmdSetEvent2(cmd, buffer_sync.event, &dependency_info);
 		}
@@ -1117,21 +1190,15 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		ImageSyncDescriptor& img_sync = entry.value;
 		VkImage img = entry.key;
 		LUMEN_ASSERT(img_sync.event == nullptr, "VkEvent should be null in the setter");
-		auto src_access_flags = vk::access_flags_for_img_layout(img_sync.old_layout);
-		auto dst_access_flags = vk::access_flags_for_img_layout(img_sync.new_layout);
-		auto mem_barrier = vk::image_barrier2(
-			img, vk::access_flags_for_img_layout(img_sync.old_layout),
-			vk::access_flags_for_img_layout(img_sync.new_layout), img_sync.old_layout, img_sync.new_layout,
-			img_sync.image_aspect, pipeline_stage_from_pass_type(type, src_access_flags),
-			pipeline_stage_from_pass_type(rg->passes[img_sync.opposing_pass_idx].type, dst_access_flags),
-			vk::context().queue_indices.gfx_family.value());
+		VkImageMemoryBarrier2 mem_barrier = image_barrier_from_sync(img, img_sync);
 
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &mem_barrier);
-		if (use_events) {
+		if (use_events && img_sync.event_eligible) {
 			img_sync.event = vk::event_pool::get_event(cmd);
 			vkCmdSetEvent2(cmd, img_sync.event, &dependency_info);
 		}
 	}
+
 	vk::end_region(vk::context().device, cmd);
 	GPUQueryManager::end(cmd);
 }
@@ -1150,8 +1217,8 @@ void RenderGraph::init() {
 	// Sizes are reasonable upper bounds but not hard bounds unlike arrays
 	pipeline_cache = lm::hash_map_create<u64, PipelineStorage>(_arena_rendergraph, MAX_PASSES_PER_FRAME);
 	buffer_resource_map =
-		lm::hash_map_create<VkBuffer, std::pair<u32, VkAccessFlags>>(_arena_rendergraph, 32 * MAX_PASSES_PER_FRAME);
-	img_resource_map = lm::hash_map_create<VkImage, u32>(_arena_rendergraph, 32 * MAX_PASSES_PER_FRAME);
+		lm::hash_map_create<VkBuffer, BufferResourceState>(_arena_rendergraph, 32 * MAX_PASSES_PER_FRAME);
+	img_resource_map = lm::hash_map_create<VkImage, ImageResourceState>(_arena_rendergraph, 32 * MAX_PASSES_PER_FRAME);
 	registered_buffer_pointers =
 		lm::hash_map_create<lm::String, vk::Buffer*>(_arena_rendergraph, 32 * MAX_PASSES_PER_FRAME);
 	shader_cache = lm::hash_map_create<lm::String, vk::Shader>(_arena_rendergraph, 4 * MAX_PASSES_PER_FRAME);
@@ -1255,14 +1322,21 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 }
 
 void RenderGraph::reset() {
-	// TODO: Adjust to new implementation
 	vk::event_pool::reset_events();
+	// TODO: Adjust to new implementation
+	for (auto& entry : buffer_resource_map) {
+		entry.value.pass_idx = INVALID_PASS_IDX;
+	}
+	for (auto& entry : img_resource_map) {
+		entry.value.pass_idx = INVALID_PASS_IDX;
+	}
 	for (auto& pass : passes) {
 		////////////////////////////
 		// --- Reset pass resources ---
 		pass.resource_zeros.clear();
 		pass.prefill_buffer_barriers.clear();
 		pass.carryover_buffer_barriers.clear();
+		pass.carryover_image_barriers.clear();
 		pass.resource_copies.clear();
 		pass.buffer_sync_resources.buffer_barriers.clear();
 		pass.buffer_sync_resources.dependency_infos.clear();

@@ -336,7 +336,7 @@ void smlt::render(Integrator* integrator) {
 					   .dims = {(u32)state.num_mlt_threads},
 				   })
 			.push_constants(&state.pc)
-			.zero(state.mlt_samplers_buffer)
+			.zero({state.mlt_samplers_buffer, state.light_primary_samples_buffer, state.cam_primary_samples_buffer})
 			.bind(rt_bindings)
 			.bind(integrator->lumen_scene->mesh_lights_buffer)
 			.bind_texture_array(integrator->lumen_scene->scene_textures)
@@ -352,7 +352,6 @@ void smlt::render(Integrator* integrator) {
 					   .dims = {(u32)state.num_mlt_threads},
 				   })
 			.push_constants(&state.pc)
-			.zero(state.mlt_samplers_buffer)
 			.bind(rt_bindings)
 			.bind(integrator->lumen_scene->mesh_lights_buffer)
 			.bind_texture_array(integrator->lumen_scene->scene_textures)

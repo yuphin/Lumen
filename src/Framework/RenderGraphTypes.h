@@ -77,15 +77,23 @@ struct BufferSyncDescriptor {
 	// Read-after-write is the default dependency implicitly
 	VkAccessFlags src_access_flags = VK_ACCESS_SHADER_WRITE_BIT;
 	VkAccessFlags dst_access_flags = VK_ACCESS_SHADER_READ_BIT;
+	VkPipelineStageFlags src_stage;
+	VkPipelineStageFlags dst_stage;
 	u32 opposing_pass_idx;
+	bool event_eligible = true;
 	VkEvent event = nullptr;
 };
 
 struct ImageSyncDescriptor {
 	VkImageLayout old_layout;
 	VkImageLayout new_layout;
-	u32 opposing_pass_idx;
+	VkAccessFlags src_access_flags;
+	VkAccessFlags dst_access_flags;
+	VkPipelineStageFlags src_stage;
+	VkPipelineStageFlags dst_stage;
 	VkImageAspectFlags image_aspect;
+	u32 opposing_pass_idx;
+	bool event_eligible = true;
 	VkEvent event = nullptr;
 };
 }  // namespace lm

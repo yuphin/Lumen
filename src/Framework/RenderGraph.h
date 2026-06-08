@@ -56,6 +56,35 @@ struct BufferBarrier {
 	VkBuffer buffer;
 	VkAccessFlags src_access_flags = VK_ACCESS_SHADER_WRITE_BIT;
 	VkAccessFlags dst_access_flags = VK_ACCESS_SHADER_READ_BIT;
+	VkPipelineStageFlags src_stage = 0;
+	VkPipelineStageFlags dst_stage = 0;
+};
+
+struct ImageBarrier {
+	VkImage image;
+	VkAccessFlags src_access_flags;
+	VkAccessFlags dst_access_flags;
+	VkImageLayout old_layout;
+	VkImageLayout new_layout;
+	VkImageAspectFlags image_aspect;
+	VkPipelineStageFlags src_stage;
+	VkPipelineStageFlags dst_stage;
+};
+
+struct BufferResourceState {
+	u32 pass_idx;
+	VkAccessFlags access_flags;
+	VkPipelineStageFlags stage;
+	bool event_eligible;
+};
+
+struct ImageResourceState {
+	u32 pass_idx;
+	VkAccessFlags access_flags;
+	VkImageLayout layout;
+	VkImageAspectFlags image_aspect;
+	VkPipelineStageFlags stage;
+	bool event_eligible;
 };
 
 // For now, there is only one set of BLASes to build per pass
@@ -109,9 +138,8 @@ class RenderGraph {
 
 	// vk::Pipeline Name + Macro String + Specialization Constants -> vk::Pipeline
 	lm::HashMap<u64, PipelineStorage> pipeline_cache;
-	lm::HashMap<VkBuffer, std::pair<u32, VkAccessFlags>>
-		buffer_resource_map;					 // Buffer handle - { Write Pass Idx, Access Type }
-	lm::HashMap<VkImage, u32> img_resource_map;	 // Tex2D handle - Pass Idx
+	lm::HashMap<VkBuffer, BufferResourceState> buffer_resource_map;
+	lm::HashMap<VkImage, ImageResourceState> img_resource_map;
 	lm::HashMap<lm::String, vk::Buffer*> registered_buffer_pointers;
 	// vk::Shader Name + Macro String -> vk::Shader
 	lm::HashMap<lm::String, vk::Shader> shader_cache;
@@ -187,6 +215,7 @@ class RenderPass {
 	ImageSyncResources image_sync_resources;
 	// TODO: Might be redundant?
 	lm::SmallArray<BufferBarrier, MAX_RESOURCES_ZEROS> carryover_buffer_barriers;
+	lm::SmallArray<ImageBarrier, MAX_IMG_BARRIERS> carryover_image_barriers;
 	//
 	lm::SmallArray<BufferBarrier, MAX_RESOURCES_COPIES> post_execution_buffer_barriers;
 	lm::SmallArray<vk::Buffer*, MAX_EXPLICIT_BUFFER_READ_WRITES> explicit_buffer_writes;
@@ -195,6 +224,7 @@ class RenderPass {
 	lm::SmallArray<vk::Texture*, MAX_EXPLICIT_IMG_READ_WRITES> explicit_tex_reads;
 	lm::SmallArray<u32, MAX_DESCRIPTORS> descriptor_counts;
 	lm::SmallArray<std::tuple<vk::Texture*, VkImageLayout, VkImageLayout>, MAX_IMG_BARRIERS> layout_transitions;
+	// Resource dependencies that must execute before this pass.
 	/*
 	Note:
 	The assumption is that a SyncDescriptor is unique to a pass (either via
@@ -229,14 +259,14 @@ class RenderPass {
 		BUFFER_COPY = 0x2,
 		BUFFER_AS_BUILD = 0x4,
 	};
-	void register_dependencies(const vk::Buffer* buffer, VkAccessFlags dst_access_flags,
-							   BufferSyncFlags flags = BufferSyncFlags::NONE);
-	void register_dependencies(vk::Texture* tex, VkImageLayout target_layout);
+	bool register_dependencies(const vk::Buffer* buffer, VkAccessFlags dst_access_flags,
+							   BufferSyncFlags flags = BufferSyncFlags::NONE, VkPipelineStageFlags dst_stage = 0);
+	bool register_dependencies(vk::Texture* tex, VkAccessFlags dst_access_flags, VkImageLayout target_layout);
 	void write_impl(const vk::Buffer* buffer, VkAccessFlags access_flags,
-					BufferSyncFlags flags = BufferSyncFlags::NONE);
+					BufferSyncFlags flags = BufferSyncFlags::NONE, VkPipelineStageFlags stage = 0);
 	void write_impl(vk::Texture* tex, VkAccessFlags access_flags = VK_ACCESS_SHADER_WRITE_BIT);
 	void read_impl(const vk::Buffer* buffer, VkAccessFlags access_flags = VK_ACCESS_SHADER_READ_BIT,
-				   BufferSyncFlags flags = BufferSyncFlags::NONE);
+				   BufferSyncFlags flags = BufferSyncFlags::NONE, VkPipelineStageFlags stage = 0);
 	void read_impl(vk::Texture* tex);
 
 	void run(VkCommandBuffer cmd);

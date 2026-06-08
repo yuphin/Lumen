@@ -488,12 +488,13 @@ vec3 vcm_trace_eye(VCMState camera_state, float eta_vcm, float eta_vc,
 	const float radius_sqr = radius * radius;
 
 #if VC_MLT == 1
-	uint light_path_idx = uint(mlt_rand(mlt_seed, large_step) * screen_size);
+	const uint selected_light_path = min(uint(mlt_rand(mlt_seed, large_step) * screen_size), screen_size - 1);
+	uint light_path_idx = selected_light_path;
 	uint light_splat_idx = light_path_idx * pc.max_depth * (pc.max_depth + 1);
 	uint light_path_len = light_path_cnts.d[light_path_idx];
 	mlt_sampler.splat_cnt = 0;
-	if (save_radiance && connected_lights.d[pixel_idx] > 0) {
-		const uint light_splat_cnt = light_splat_cnts.d[pixel_idx];
+	if (save_radiance && connected_lights.d[selected_light_path] > 0) {
+		const uint light_splat_cnt = light_splat_cnts.d[selected_light_path];
 		for (int i = 0; i < light_splat_cnt; i++) {
 			const vec3 light_L = light_splats.d[light_splat_idx + i].L;
 			lum += luminance(light_L);
@@ -502,11 +503,10 @@ vec3 vcm_trace_eye(VCMState camera_state, float eta_vcm, float eta_vc,
 			splat(splat_cnt).idx = light_splats.d[light_splat_idx + i].idx;
 			splat(splat_cnt).L = light_L;
 		}
-	} else if (connected_lights.d[pixel_idx] > 0) {
-		lum += tmp_lum_data.d[pixel_idx];
+	} else if (connected_lights.d[selected_light_path] > 0) {
+		lum += tmp_lum_data.d[selected_light_path];
 	}
 	light_path_idx *= (pc.max_depth + 1);
-	light_splat_cnts.d[pixel_idx] = 0;
 #elif VCM_MLT == 1
 	const uint num_light_paths = pc.width * pc.height;
 	uint light_path_idx = uint(mlt_rand(seed, large_step) * num_light_paths);

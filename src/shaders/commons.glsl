@@ -174,7 +174,7 @@ TriangleRecord sample_area_light(const vec4 rands, const int num_lights, const L
 								 out uint material_idx) {
 	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
 	material_idx = pinfo.material_index;
-	triangle_idx = uint(rands.y * light.num_triangles);
+	triangle_idx = min(uint(rands.y * light.num_triangles), light.num_triangles - 1);
 	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
 }
 
@@ -182,7 +182,7 @@ TriangleRecord sample_area_light(const vec4 rands, const int num_lights, const L
 								 out uint material_idx, out vec2 uv) {
 	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
 	material_idx = pinfo.material_index;
-	triangle_idx = uint(rands.y * light.num_triangles);
+	triangle_idx = min(uint(rands.y * light.num_triangles), light.num_triangles - 1);
 	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix, uv);
 }
 
@@ -197,20 +197,20 @@ TriangleRecord sample_area_light(const vec4 rands, const Light light, out uint m
 								 out vec2 uv) {
 	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
 	material_idx = pinfo.material_index;
-	triangle_idx = uint(rands.y * light.num_triangles);
+	triangle_idx = min(uint(rands.y * light.num_triangles), light.num_triangles - 1);
 	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix, uv);
 }
 
 TriangleRecord sample_area_light(const vec4 rands, const Light light, out uint material_idx, out uint triangle_idx) {
 	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
 	material_idx = pinfo.material_index;
-	triangle_idx = uint(rands.y * light.num_triangles);
+	triangle_idx = min(uint(rands.y * light.num_triangles), light.num_triangles - 1);
 	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
 }
 
 TriangleRecord sample_area_light(const vec4 rands, const Light light) {
 	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
-	uint triangle_idx = uint(rands.y * light.num_triangles);
+	uint triangle_idx = min(uint(rands.y * light.num_triangles), light.num_triangles - 1);
 	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
 }
 
@@ -227,7 +227,7 @@ vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out flo
 	if(num_lights == 0) {
 		return vec3(0);
 	}
-	light_record.light_idx = uint(rands_pos.x * num_lights);
+	light_record.light_idx = min(uint(rands_pos.x * num_lights), uint(num_lights - 1));
 	Light light = lights[light_record.light_idx];
 	uint light_type = get_light_type(light.light_flags);
 	vec3 L = vec3(0);
@@ -351,7 +351,7 @@ vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out vec
 vec3 sample_Le(vec4 rands_pos, vec2 rands_dir, const int num_lights, const int total_light,
 					 out float cos_from_light, out LightRecord light_record, out vec3 pos, out vec3 wi, out vec3 n,
 					 out float pdf_pos_a, out float pdf_dir_w, out float phi, out TriangleRecord record) {
-	uint light_idx = uint(rands_pos.x * num_lights);
+	uint light_idx = min(uint(rands_pos.x * num_lights), uint(num_lights - 1));
 	Light light = lights[light_idx];
 	vec3 L = vec3(0);
 	uint light_type = get_light_type(light.light_flags);

@@ -145,18 +145,19 @@ static bool is_buffer(u32 storage_class) {
 static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::ShaderResources& resources, Shader& shader,
 						const u32* code, u64 code_size, lm::RenderPass* pass) {
 	// Update the resource status of image types
-	// Storage Image -> Write
+	// Storage Image -> Read and/or Write
 	// Sampled Image -> Read
 	auto active_vars = glsl.get_active_interface_variables();
 	auto active_resources = glsl.get_shader_resources(active_vars);
-	for (auto& sampled_img : active_resources.sampled_images) {
+	for (const auto& sampled_img : active_resources.sampled_images) {
 		u32 binding = glsl.get_decoration(sampled_img.id, spv::DecorationBinding);
 		shader.resource_binding_map.insert(binding, BindingStatus{.read = true, .active = true});
 	}
-	for (auto& storage_img : active_resources.storage_images) {
-		auto binding = glsl.get_decoration(storage_img.id, spv::DecorationBinding);
+	for (const auto& storage_img : active_resources.storage_images) {
+		u32 binding = glsl.get_decoration(storage_img.id, spv::DecorationBinding);
 		BindingStatus& binding_status = shader.resource_binding_map.get_or_create(binding)->value;
-		binding_status.write = true;
+		binding_status.read |= !glsl.has_decoration(storage_img.id, spv::DecorationNonReadable);
+		binding_status.write |= !glsl.has_decoration(storage_img.id, spv::DecorationNonWritable);
 		binding_status.active = true;
 	}
 	for (auto& storage_buffer : active_resources.storage_buffers) {
@@ -193,47 +194,59 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 	std::unordered_map<u32, u32> constant_map;
 	std::unordered_map<u32, std::string> buffer_ptr_hash_map;
 
-	auto store_helper = [&](u32 store_id) {
-		if (access_chain_map.find(store_id) != access_chain_map.end()) {
-			const auto& access_chain = access_chain_map[store_id];
+	auto access_helper = [&](u32 pointer_id, bool read, bool write) -> void {
+		auto mark_binding = [&](u32 binding) -> void {
+			BindingStatus& status = shader.resource_binding_map.get_or_create(binding)->value;
+			status.read |= read;
+			status.write |= write;
+		};
+		auto mark_buffer = [&](const std::string& resource_name) -> void {
+			auto entry = pass->rg->registered_buffer_pointers.find(lm::str_from_cstr(resource_name.c_str()));
+			if (entry) {
+				BufferStatus& status = shader.buffer_status_map.get_or_create(entry->key)->value;
+				status.read |= read;
+				status.write |= write;
+			}
+		};
+
+		if (access_chain_map.find(pointer_id) != access_chain_map.end()) {
+			const auto& access_chain = access_chain_map[pointer_id];
 			if (variable_map.find(access_chain.base_ptr_id) != variable_map.end()) {
 				// Access chain has variable
-				const auto variable_storage_class = variable_map[access_chain.base_ptr_id].storage_class;
-				// TODO: Check if buffer
+				const u32 variable_storage_class = variable_map[access_chain.base_ptr_id].storage_class;
 				if (is_bound_buffer(variable_storage_class)) {
-					// Bound resource
-					auto binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
-					shader.resource_binding_map.get_or_create(binding)->value.write = true;
+					u32 binding = glsl.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
+					mark_binding(binding);
 				} else if (is_buffer(variable_storage_class)) {
 					// Via pointer
-					auto ptr_var_id = load_map[access_chain.base_ptr_id];
-					auto var_name = glsl.get_name(ptr_var_id);
-					auto var_type = glsl.get_type_from_variable(ptr_var_id);
-					assert(buffer_ptr_hash_map.find(ptr_var_id) != buffer_ptr_hash_map.end());
-					const auto& res = buffer_ptr_hash_map[ptr_var_id];
-					auto entry = pass->rg->registered_buffer_pointers.find(lm::str_from_cstr(res.c_str()));
-					if (entry) {
-						shader.buffer_status_map.get_or_create(entry->key)->value.write = true;
+					auto load_entry = load_map.find(access_chain.base_ptr_id);
+					if (load_entry != load_map.end()) {
+						auto pointer_entry = buffer_ptr_hash_map.find(load_entry->second);
+						if (pointer_entry != buffer_ptr_hash_map.end()) {
+							mark_buffer(pointer_entry->second);
+						}
 					}
 				}
 			} else if (load_map.find(access_chain.base_ptr_id) != load_map.end()) {
 				// Access chain has loads
 				// If it has loads, it should be a buffer pointer
-				const auto& res = buffer_ptr_hash_map[load_map[access_chain.base_ptr_id]];
-				auto entry = pass->rg->registered_buffer_pointers.find(lm::str_from_cstr(res.c_str()));
-				if (entry) {
-					shader.buffer_status_map.get_or_create(entry->key)->value.write = true;
+				auto pointer_entry = buffer_ptr_hash_map.find(load_map[access_chain.base_ptr_id]);
+				if (pointer_entry != buffer_ptr_hash_map.end()) {
+					mark_buffer(pointer_entry->second);
 				}
 			}
+		}
+		if (auto pointer_entry = buffer_ptr_hash_map.find(pointer_id); pointer_entry != buffer_ptr_hash_map.end()) {
+			mark_buffer(pointer_entry->second);
 		}
 		// Theoretical case where _%a_ in _OpStore %a %b_ is already a
 		// declared pointer variable In this case the resource should be
 		// bound, as it implies 0 offset Fortunately, glslang or shaderc
 		// don't do this as of SPIR-V 1.6
-		if (variable_map.find(store_id) != variable_map.end()) {
-			if (is_bound_buffer(variable_map[store_id].storage_class)) {
-				auto binding = glsl.get_decoration(store_id, spv::DecorationBinding);
-				shader.resource_binding_map.get_or_create(binding)->value.write = true;
+		if (variable_map.find(pointer_id) != variable_map.end()) {
+			if (is_bound_buffer(variable_map[pointer_id].storage_class)) {
+				auto binding = glsl.get_decoration(pointer_id, spv::DecorationBinding);
+				mark_binding(binding);
 			}
 		}
 	};
@@ -356,17 +369,26 @@ static void parse_spirv(spirv_cross::CompilerGLSL& glsl, const spirv_cross::Shad
 			case SpvOpAtomicAnd:
 			case SpvOpAtomicOr:
 			case SpvOpAtomicXor:
+			case SpvOpAtomicExchange:
+			case SpvOpAtomicCompareExchange:
+			case SpvOpAtomicCompareExchangeWeak:
+			case SpvOpAtomicFlagTestAndSet:
 			case SpvOpAtomicIAdd: {
-				u32 store_id = insn[3];
-				store_helper(store_id);
+				access_helper(insn[3], true, true);
+			} break;
+			case SpvOpAtomicLoad: {
+				access_helper(insn[3], true, false);
+			} break;
+			case SpvOpAtomicStore: {
+				access_helper(insn[1], false, true);
+			} break;
+			case SpvOpAtomicFlagClear: {
+				access_helper(insn[1], true, true);
 			} break;
 
 			case SpvOpStore: {
 				assert(word_count >= 3);
-				u32 store_id = insn[1];
-
-				store_helper(store_id);
-
+				access_helper(insn[1], false, true);
 				// Store pointers for the first time, create the hash map
 				if (access_chain_map.find(insn[2]) != access_chain_map.end()) {
 					const auto& access_chain = access_chain_map[insn[2]];
@@ -562,9 +584,6 @@ i32 Shader::compile(lm::RenderPass* pass) {
 
 	shaderc_shader_kind stage = mstages.find(file_ext)->value;
 	binary = compile_file(filename, stage, buffer, pass);
-	if(lm::str_ends_with(filename, CSTR("surfel_integrate.comp"))) {
-		int a = 4;
-	}
 	parse_shader(*this, binary.data(), binary.size(), pass);
 	return 0;
 

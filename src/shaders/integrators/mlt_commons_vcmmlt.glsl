@@ -31,6 +31,9 @@ float mlt_rand(inout uvec4 seed, bool large_step) {
         primary_sample(cnt).val += nrm_sample * eff_sigma;
         primary_sample(cnt).val -= floor(primary_sample(cnt).val);
     }
+    // Clamp to right below 1.0
+    primary_sample(cnt).val =
+        min(primary_sample(cnt).val, uintBitsToFloat(0x3f7fffff));
     primary_sample(cnt).last_modified = mlt_sampler.iter;
     return primary_sample(cnt).val;
 }

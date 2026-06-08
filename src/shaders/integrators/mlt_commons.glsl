@@ -15,6 +15,20 @@ PrimarySample get_primary_sample(uint i) {
     }
 }
 
+void set_primary_sample(uint i, PrimarySample primary_sample) {
+	if (mlt_sampler.type == 0) {
+		light_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i] = primary_sample;
+	}
+#if BDPT_MLT == 1
+	else if (mlt_sampler.type == 2) {
+		connection_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i] = primary_sample;
+	}
+#endif
+	else {
+		cam_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i] = primary_sample;
+	}
+}
+
 uint mlt_get_next() {
 	uint cnt;
 	if (mlt_sampler.type == 0) {
@@ -85,7 +99,6 @@ float mlt_rand(inout uvec4 seed, bool large_step) {
 	const uint cnt = mlt_get_next();
 	const float sigma = 0.01;
 	PrimarySample primary_sample = get_primary_sample(cnt);
-     uint mlt_sampler_type = mlt_sampler.type;
 	if (primary_sample.last_modified < mlt_sampler.last_large_step) {
 		primary_sample.val = rand(seed);
 		primary_sample.last_modified = mlt_sampler.last_large_step;
@@ -99,23 +112,14 @@ float mlt_rand(inout uvec4 seed, bool large_step) {
 		uint diff = mlt_sampler.iter - primary_sample.last_modified;
 		float nrm_sample = sqrt2 * erf_inv(2 * rand(seed) - 1);
 		float eff_sigma = sigma * sqrt(float(diff));
-		float before = primary_sample.val;
 		primary_sample.val += nrm_sample * eff_sigma;
 		primary_sample.val -= floor(primary_sample.val);
 	}
+	// Clamp to right below 1.0
+	primary_sample.val = min(primary_sample.val, uintBitsToFloat(0x3f7fffff));
 	primary_sample.last_modified = mlt_sampler.iter;
 
-	if (mlt_sampler_type == 0) {
-		light_primary_samples.d[prim_sample_idxs[mlt_sampler_type] + cnt] = primary_sample;
-	} 
-#if BDPT_MLT == 1
-	else if (mlt_sampler_type == 2) {
-		connection_primary_samples.d[prim_sample_idxs[mlt_sampler_type] + cnt] = primary_sample;
-	}
-#endif
-	else {
-		cam_primary_samples.d[prim_sample_idxs[mlt_sampler_type] + cnt] = primary_sample;
-	}
+	set_primary_sample(cnt, primary_sample);
 	return primary_sample.val;
 }
 
@@ -127,19 +131,13 @@ void mlt_accept(bool large_step) {
 void mlt_reject() {
 	const uint light_sample_cnt = mlt_sampler.num_light_samples;
 	mlt_select_type(0);
-    uint mlt_sampler_type = mlt_sampler.type;
 	for (int i = 0; i < light_sample_cnt; i++) {
 		// Restore
 		PrimarySample primary_sample = get_primary_sample(i);
 		if (primary_sample.last_modified == mlt_sampler.iter) {
 			primary_sample.val = primary_sample.backup;
 			primary_sample.last_modified = primary_sample.last_modified_backup;
-
-			if (mlt_sampler_type == 0) {
-				light_primary_samples.d[prim_sample_idxs[mlt_sampler_type] + i] = primary_sample;
-			} else {
-				cam_primary_samples.d[prim_sample_idxs[mlt_sampler_type] + i] = primary_sample;
-			}
+			set_primary_sample(i, primary_sample);
 		}
 	}
 	const uint cam_sample_cnt = mlt_sampler.num_cam_samples;
@@ -150,12 +148,7 @@ void mlt_reject() {
 		if (primary_sample.last_modified == mlt_sampler.iter) {
 			primary_sample.val = primary_sample.backup;
 			primary_sample.last_modified = primary_sample.last_modified_backup;
-
-			if (mlt_sampler_type == 0) {
-				light_primary_samples.d[prim_sample_idxs[mlt_sampler_type] + i] = primary_sample;
-			} else {
-				cam_primary_samples.d[prim_sample_idxs[mlt_sampler_type] + i] = primary_sample;
-			}
+			set_primary_sample(i, primary_sample);
 		}
 	}
 	const uint connections_cnt = mlt_sampler.num_connection_samples;
@@ -166,12 +159,7 @@ void mlt_reject() {
 		if (primary_sample.last_modified == mlt_sampler.iter) {
 			primary_sample.val = primary_sample.backup;
 			primary_sample.last_modified = primary_sample.last_modified_backup;
-
-			if (mlt_sampler_type == 0) {
-				light_primary_samples.d[prim_sample_idxs[mlt_sampler_type] + i] = primary_sample;
-			} else {
-				cam_primary_samples.d[prim_sample_idxs[mlt_sampler_type] + i] = primary_sample;
-			}
+			set_primary_sample(i, primary_sample);
 		}
 	}
 	mlt_sampler.iter--;

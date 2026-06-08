@@ -19,26 +19,29 @@ BlockSums output_data = BlockSums(pc.block_sum_addr);
 CDF cdf_data = CDF(scene_desc.cdf_addr);
 shared float block_sum;
 void main() {
-    if (gl_LocalInvocationID.x >= pc.n) {
-        return;
-    }
     if (gl_LocalInvocationID.x == 0) {
         block_sum = block_sums.d[gl_WorkGroupID.x + pc.block_idx];
     }
     uint address = gl_WorkGroupID.x * (gl_WorkGroupSize.x << 1) + pc.base_idx +
                    gl_LocalInvocationID.x;
+    const bool valid_a = gl_LocalInvocationID.x < pc.n;
+    const bool valid_b = gl_LocalInvocationID.x + gl_WorkGroupSize.x < pc.n;
     memoryBarrierShared();
     barrier();
 
     if (pc.scan_sums == 0) {
-        cdf_data.d[address] += block_sum;
-        cdf_data.d[address + gl_WorkGroupSize.x] +=
-            uint((gl_LocalInvocationID.x + gl_WorkGroupSize.x < pc.n)) *
-            block_sum;
+        if (valid_a) {
+            cdf_data.d[address] += block_sum;
+        }
+        if (valid_b) {
+            cdf_data.d[address + gl_WorkGroupSize.x] += block_sum;
+        }
     } else {
-        output_data.d[address] += block_sum;
-        output_data.d[address + gl_WorkGroupSize.x] +=
-            uint((gl_LocalInvocationID.x + gl_WorkGroupSize.x < pc.n)) *
-            block_sum;
+        if (valid_a) {
+            output_data.d[address] += block_sum;
+        }
+        if (valid_b) {
+            output_data.d[address + gl_WorkGroupSize.x] += block_sum;
+        }
     }
 }

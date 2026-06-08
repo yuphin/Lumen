@@ -71,7 +71,7 @@ static void log_bytes_colored(const char* str, u64 n, int level, bool err_stream
 }
 
 static void log_common(i32 level, const char* fmt, va_list args) {
-	thread_local char buffer[4096];
+	thread_local char buffer[8192];
 	int bytes = stbsp_vsnprintf(buffer, (int)sizeof(buffer) - 2, fmt, args);
 	if (bytes < 0) return;
 	buffer[bytes++] = '\n';

@@ -31,9 +31,6 @@ BlockSums block_sums = BlockSums(pc.block_sum_addr);
 #define CONFLICT_FREE_OFFSET(index) ((index) >> LOG_NUM_BANKS)
 shared float s_data[2048 + 64];
 void main() {
-    if(gl_GlobalInvocationID.x >= pc.num_elems) {
-        return;
-    }
     uint tid, ai, bi, mem_ai, mem_bi, bank_offset_a, bank_offset_b;
     // Load data into shared memory
     tid = gl_LocalInvocationID.x;
@@ -46,24 +43,34 @@ void main() {
     bank_offset_a = CONFLICT_FREE_OFFSET(ai);
     bank_offset_b = CONFLICT_FREE_OFFSET(bi);
     const float div = pc.scan_sums == 1 ? 1. : 1. / pc.num_elems;
+    const bool valid_a = ai < pc.n;
+    const bool valid_b = bi < pc.n;
     s_data[ai + bank_offset_a] =
-        pc.scan_sums == 0 ? bootstrap_data.d[mem_ai].lum * div
-                          : block_sums.d[mem_ai];
+        valid_a ? (pc.scan_sums == 0 ? bootstrap_data.d[mem_ai].lum * div
+                                     : block_sums.d[mem_ai])
+                : 0;
     s_data[bi + bank_offset_b] =
-        pc.scan_sums == 0
-            ? (bi < pc.n ? bootstrap_data.d[mem_bi].lum * div : 0)
-            : (bi < pc.n ? block_sums.d[mem_bi] : 0);
+        valid_b ? (pc.scan_sums == 0 ? bootstrap_data.d[mem_bi].lum * div
+                                     : block_sums.d[mem_bi])
+                : 0;
     // Traverse from leafs to root (Reduction)
     uint stride = 1;
     for (uint d = gl_WorkGroupSize.x; d > 0; d >>= 1) {
         memoryBarrierShared();
         barrier();
+        uint bi = 0;
+        float sum = 0;
         if (tid < d) {
             uint ai = 2 * stride * tid + stride - 1;
-            uint bi = ai + stride;
+            bi = ai + stride;
             ai += CONFLICT_FREE_OFFSET(ai);
             bi += CONFLICT_FREE_OFFSET(bi);
-            s_data[bi] += s_data[ai];
+            sum = s_data[bi] + s_data[ai];
+        }
+        memoryBarrierShared();
+        barrier();
+        if (tid < d) {
+            s_data[bi] = sum;
         }
         stride *= 2;
     }
@@ -83,25 +90,36 @@ void main() {
         stride >>= 1;
         memoryBarrierShared();
         barrier();
+        uint ai = 0;
+        uint bi = 0;
+        float left = 0;
+        float right = 0;
         if (tid < d) {
-            uint ai = 2 * stride * tid + stride - 1;
-            uint bi = ai + stride;
+            ai = 2 * stride * tid + stride - 1;
+            bi = ai + stride;
             ai += CONFLICT_FREE_OFFSET(ai);
             bi += CONFLICT_FREE_OFFSET(bi);
-            const float t = s_data[ai];
-            s_data[ai] = s_data[bi];
-            s_data[bi] += t;
+            left = s_data[ai];
+            right = s_data[bi];
+        }
+        memoryBarrierShared();
+        barrier();
+        if (tid < d) {
+            s_data[ai] = right;
+            s_data[bi] = right + left;
         }
     }
     // Write into device memory
     memoryBarrierShared();
     barrier();
-    if (pc.scan_sums == 0) {
-        cdf_data.d[mem_ai] = s_data[ai + bank_offset_a];
-    } else {
-        block_sums.d[mem_ai] = s_data[ai + bank_offset_a];
+    if (valid_a) {
+        if (pc.scan_sums == 0) {
+            cdf_data.d[mem_ai] = s_data[ai + bank_offset_a];
+        } else {
+            block_sums.d[mem_ai] = s_data[ai + bank_offset_a];
+        }
     }
-    if (bi < pc.n) {
+    if (valid_b) {
         if (pc.scan_sums == 0) {
             cdf_data.d[mem_bi] = s_data[bi + bank_offset_b];
         } else {
