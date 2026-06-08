@@ -160,16 +160,21 @@ vec3 get_hitdata_pos_only(vec2 attribs, uint instance_idx, uint triangle_idx) {
 	return vec3(to_world * vec4(vtx[0].pos * bary.x + vtx[1].pos * bary.y + vtx[2].pos * bary.z, 1.0));
 }
 
-vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 wo, float d_vm, out LightRecord record,
-			inout vec3 light_dir_or_pdf, out bool is_directional_light, out vec3 Le, out vec3 wi,
-			out float pdf_light_w, int depth) {
+vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 wo, float d_vm,
+			out LightRecord record, inout vec3 light_dir_or_pdf, out bool is_directional_light, out vec3 Le,
+			out vec3 wi, out float pdf_light_w, int depth) {
 	float pdf_light_a;
 	wi = vec3(0);
 	float wi_len = 0;
 	float cos_from_light;
 
 	float pdf_dir;
-	Le = sample_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, pdf_dir, cos_from_light, record);
+	Le = sample_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, pdf_dir, cos_from_light,
+				   record);
+	// TODO: Should we handle this case differently? 
+	if(wi_len < EPS) {
+		return vec3(0);
+	}
 	const uint light_type = get_light_type(record.flags);
 	const vec3 p = offset_ray2(pos, n_s);
 	float light_bsdf_pdf_fwd;
@@ -189,12 +194,13 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 		float mis_light = is_light_delta(record.flags) ? 0 : light_bsdf_pdf_fwd / pdf_light_w;
 		ASSERT(mis_light >= 0);
 #ifndef DISABLE_PM_MIS
-		float mis_eye = wi_len == 0 ? 0 : pdf_dir * light_bsdf_pdf_rev * cos_x * d_vm / (wi_len * wi_len * light_pick_pdf);
+		float mis_eye =
+			wi_len == 0 ? 0 : pdf_dir * light_bsdf_pdf_rev * cos_x * d_vm / (wi_len * wi_len * light_pick_pdf);
 		ASSERT(d_vm >= 0);
 		ASSERT(mis_eye >= 0);
 #else
 		float mis_eye = 0;
-#endif // !DISABLE_PM_MIS
+#endif	// !DISABLE_PM_MIS
 		float mis_weight = 1 / (1 + mis_light + mis_eye);
 		ASSERT(!isnan(mis_weight));
 		ASSERT(mis_weight >= 0);
@@ -297,9 +303,7 @@ void unpack_path_flags(uint packed_data, out uint reconnection_type, out uint pr
 	is_directional_light = ((packed_data >> 14) & 1) == 1;
 }
 
-uint pack_photon_flags(bool side, uint path_length) {
-	return (path_length & 0x1F) << 1 | uint(side);
-}
+uint pack_photon_flags(bool side, uint path_length) { return (path_length & 0x1F) << 1 | uint(side); }
 
 void unpack_photon_flags(uint flags, out bool side, out uint path_length) {
 	side = (flags & 1) == 1;
@@ -548,7 +552,7 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 	OcclusionData occlusion_data;
 	bool result = advance_paths(dst_gbuffer, data, dst_wi, src_jacobian, jacobian_out, reservoir_contribution,
 								jacobian_num, occlusion_data);
-	if (pc.enable_occlusion == 1) {
+	if (pc.enable_occlusion == 1 && occlusion_data.dir_length > EPS) {
 		any_hit_payload.hit = 1;
 		traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1,
 					occlusion_data.origin, 0, occlusion_data.dir, occlusion_data.dir_length - EPS, 1);
