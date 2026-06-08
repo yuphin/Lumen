@@ -41,7 +41,6 @@ SurfelFreeStack free_stack = SurfelFreeStack(scene_desc.surfel_free_stack_addr);
 SurfelFreeStackCount free_stack_count = SurfelFreeStackCount(scene_desc.surfel_free_stack_count_addr);
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
-GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
 
 #include "surfel_commons.glsl"
 #include "grid.glsl"

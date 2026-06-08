@@ -14,26 +14,25 @@ layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantPrefixSum { PCPrefixSum pc; };
 
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BlockSums { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InSums { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PrefixSumScratch { uint d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStackCount { int d; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
 
 GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
-BlockSums block_sums = BlockSums(pc.block_sum_addr);
-InSums in_sums = InSums(pc.out_addr);
+PrefixSumScratch prefix_sum_scratch = PrefixSumScratch(scene_desc.grid_prefix_sum_scratch_addr);
 
 layout(local_size_x = SCAN_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
 void main() {
 	uint tid = gl_GlobalInvocationID.x;
 
-	uint block_sum = gl_WorkGroupID.x == 0 ? 0 : in_sums.d[gl_WorkGroupID.x - 1];
+	uint block_sum =
+		gl_WorkGroupID.x == 0 ? 0 : prefix_sum_scratch.d[pc.out_offset + gl_WorkGroupID.x - 1];
 
 	if (tid < pc.num_elems) {
 		if (pc.scan_sums == 0) {
 			grid_cell_counts.d[tid] += block_sum;
 		} else {
-			block_sums.d[tid] += block_sum;
+			prefix_sum_scratch.d[pc.block_sum_offset + tid] += block_sum;
 		}
 	}
 }

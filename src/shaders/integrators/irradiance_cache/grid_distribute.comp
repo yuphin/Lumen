@@ -83,8 +83,14 @@ void main() {
 
 	// This is fine as long as a surfel is smaller than the grid cell size
 	for (uint i = 0; i < unique_cnt; i++) {
-		uint idx = atomicAdd(grid_cell_counts.d[linear_cells[i]], -1) - 1;
+		uint cell_end = atomicAdd(grid_cell_counts.d[linear_cells[i]], -1);
+		uint idx = cell_end - 1;
+#if DEBUG_GRID_INVARIANTS
+		if (cell_end == 0 || idx >= (GRID_AVG_SURFELS_PER_CELL * MAX_SURFEL_COUNT)) {
+			debugPrintfEXT("Invalid grid cell offset %u\n", idx);
+			continue;
+		}
+#endif
 		grid_cell_indices.d[idx] = tid;
 	}
-
 }

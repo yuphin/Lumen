@@ -24,7 +24,6 @@ Materials materials = Materials(scene_desc.material_addr);
 InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
 CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
-GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
 GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
 
 #include "ir_commons.glsl"

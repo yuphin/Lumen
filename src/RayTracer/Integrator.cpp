@@ -21,6 +21,10 @@ static void update_uniform_buffers(Integrator* integrator) {
 	integrator->scene_ubo.light_pos = glm::vec4(3.0f, 2.5f, 1.0f, 1.0f);
 	integrator->scene_ubo.cam_dir = integrator->scene_ubo.inv_view * glm::vec4(camera.direction, 0);
 	integrator->scene_ubo.fovy = camera.fov;
+}
+
+static void upload_scene_ubo(Integrator* integrator) {
+	integrator->scene_ubo_buffer = integrator->scene_ubo_buffers[vk::context().in_flight_frame_idx];
 	vk::buffer_write(integrator->scene_ubo_buffer, &integrator->scene_ubo, sizeof(integrator->scene_ubo));
 }
 
@@ -64,13 +68,19 @@ static void common_init(Integrator* integrator) {
 		.format = VK_FORMAT_R32G32B32A32_SFLOAT,
 		.initial_layout = VK_IMAGE_LAYOUT_GENERAL,
 	});
-	integrator->scene_ubo_buffer = prm::get_buffer({
-		.name = CSTR("Scene UBO"),
-		.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		.memory_type = vk::BUFFER_TYPE_CPU_TO_GPU,
-		.size = sizeof(SceneUBO),
-	});
+	integrator->scene_ubo_buffers.resize(vk::MAX_FRAMES_IN_FLIGHT);
+	for (u64 i = 0; i < integrator->scene_ubo_buffers.size; i++) {
+		lm::String buffer_name = lm::str_concat(integrator->arena, CSTR("Scene UBO #"),
+												lm::str_from_u64(integrator->arena, i), /*cstr=*/true);
+		integrator->scene_ubo_buffers[i] = prm::get_buffer({
+			.name = buffer_name,
+			.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			.memory_type = vk::BUFFER_TYPE_CPU_TO_GPU,
+			.size = sizeof(SceneUBO),
+		});
+	}
 	update_uniform_buffers(integrator);
+	upload_scene_ubo(integrator);
 }
 
 static bool common_gui(Integrator*) {
@@ -132,7 +142,11 @@ static bool common_update(Integrator* integrator) {
 }
 
 static void common_destroy(Integrator* integrator, bool resize) {
-	prm::remove(integrator->scene_ubo_buffer);
+	for (vk::Buffer*& scene_ubo_buffer : integrator->scene_ubo_buffers) {
+		prm::remove(scene_ubo_buffer);
+		scene_ubo_buffer = nullptr;
+	}
+	integrator->scene_ubo_buffers.clear();
 	prm::remove(integrator->lumen_scene->scene_desc_buffer);
 	prm::remove(integrator->output_tex);
 	integrator->scene_ubo_buffer = nullptr;
@@ -274,7 +288,10 @@ void init(Integrator* integrator) {
 	integrator->initialized = true;
 }
 
-void render(Integrator* integrator) { integrator->render(integrator); }
+void render(Integrator* integrator) {
+	upload_scene_ubo(integrator);
+	integrator->render(integrator);
+}
 
 bool update(Integrator* integrator) {
 	common_update(integrator);

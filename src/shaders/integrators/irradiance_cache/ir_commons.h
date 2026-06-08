@@ -48,8 +48,8 @@ struct PCIRCache {
 struct PCPrefixSum {
 	uint scan_sums;
 	uint num_elems;
-	uint64_t block_sum_addr;
-	uint64_t out_addr;
+	uint block_sum_offset;
+	uint out_offset;
 };
 
 struct IRCacheUniforms {

@@ -37,6 +37,7 @@ struct Integrator {
 	bool initialized = false;
 	u32 frame_num = 0;
 	SceneUBO scene_ubo{};
+	lm::SmallArray<vk::Buffer*, vk::MAX_FRAMES_IN_FLIGHT> scene_ubo_buffers;
 	vk::Buffer* scene_ubo_buffer = nullptr;
 	vk::BVH* tlas = nullptr;
 	scene::Scene* lumen_scene = nullptr;
