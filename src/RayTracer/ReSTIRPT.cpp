@@ -6,7 +6,9 @@ using namespace RestirPT;
 // TODO: Make sure that we handle the correct PDF computation in many light sampling (multiple lights with multiple
 // emissives)
 
-void restirpt::init(Integrator* integrator) {
+namespace restirpt {
+
+void init(Integrator* integrator) {
 	ReSTIRPT& state = integrator->restirpt;
 
 	if (state.photon_bvh_scratch_bufs.size == 0) {
@@ -198,7 +200,7 @@ void restirpt::init(Integrator* integrator) {
 	state.path_length = integrator->lumen_scene->config.common.path_length;
 }
 
-void restirpt::render(Integrator* integrator) {
+void render(Integrator* integrator) {
 	ReSTIRPT& state = integrator->restirpt;
 	state.pc.width = Window::width();
 	state.pc.height = Window::height();
@@ -493,7 +495,7 @@ void restirpt::render(Integrator* integrator) {
 	state.pc.total_frame_num++;
 }
 
-bool restirpt::update(Integrator* integrator) {
+bool update(Integrator* integrator) {
 	ReSTIRPT& state = integrator->restirpt;
 	integrator->frame_num++;
 	bool updated = integrator->updated;
@@ -504,7 +506,7 @@ bool restirpt::update(Integrator* integrator) {
 	return updated;
 }
 
-void restirpt::destroy(Integrator* integrator, bool resize) {
+void destroy(Integrator* integrator, bool resize) {
 	ReSTIRPT& state = integrator->restirpt;
 
 	vk::Buffer** buffers[] = {&state.gris_gbuffer,
@@ -546,7 +548,7 @@ void restirpt::destroy(Integrator* integrator, bool resize) {
 	}
 }
 
-bool restirpt::gui(Integrator* integrator) {
+bool gui(Integrator* integrator) {
 	ReSTIRPT& state = integrator->restirpt;
 	bool result = false;
 	result |= ImGui::Checkbox("Enable accumulation", &state.enable_accumulation);
@@ -630,3 +632,5 @@ bool restirpt::gui(Integrator* integrator) {
 	}
 	return result;
 }
+
+}  // namespace restirpt

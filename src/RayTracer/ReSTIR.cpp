@@ -2,7 +2,9 @@
 #include "Framework/RenderGraph.h"
 #include "ReSTIR.h"
 
-void restir::init(Integrator* integrator) {
+namespace restir {
+
+void init(Integrator* integrator) {
 	ReSTIR& state = integrator->restir;
 
 	state.g_buffer = prm::get_buffer({.name = CSTR("G-Buffer"),
@@ -72,7 +74,7 @@ void restir::init(Integrator* integrator) {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, state.tmp_col_buffer, rg);
 }
 
-void restir::render(Integrator* integrator) {
+void render(Integrator* integrator) {
 	ReSTIR& state = integrator->restir;
 	state.pc.width = Window::width();
 	state.pc.height = Window::height();
@@ -150,7 +152,7 @@ void restir::render(Integrator* integrator) {
 	}
 }
 
-bool restir::update(Integrator* integrator) {
+bool update(Integrator* integrator) {
 	ReSTIR& state = integrator->restir;
 	integrator->frame_num++;
 	bool updated = integrator->updated;
@@ -160,14 +162,14 @@ bool restir::update(Integrator* integrator) {
 	return updated;
 }
 
-bool restir::gui(Integrator* integrator) {
+bool gui(Integrator* integrator) {
 	ReSTIR& state = integrator->restir;
 	bool result = false;
 	result |= ImGui::Checkbox("Enable accumulation", &state.enable_accumulation);
 	return result;
 }
 
-void restir::destroy(Integrator* integrator, bool resize) {
+void destroy(Integrator* integrator, bool resize) {
 	ReSTIR& state = integrator->restir;
 	(void)resize;
 
@@ -178,3 +180,5 @@ void restir::destroy(Integrator* integrator, bool resize) {
 		*buffer = nullptr;
 	}
 }
+
+}  // namespace restir

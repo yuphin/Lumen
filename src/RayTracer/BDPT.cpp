@@ -1,7 +1,9 @@
 #include "Integrator.h"
 #include "BDPT.h"
 
-void bdpt::init(Integrator* integrator) {
+namespace bdpt {
+
+void init(Integrator* integrator) {
 	BDPT& state = integrator->bdpt;
 
 	state.light_path_buffer =
@@ -50,7 +52,7 @@ void bdpt::init(Integrator* integrator) {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, state.color_storage_buffer, vk::render_graph());
 }
 
-void bdpt::render(Integrator* integrator) {
+void render(Integrator* integrator) {
 	BDPT& state = integrator->bdpt;
 	state.pc.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
 	state.pc.time = rand() % UINT_MAX;
@@ -89,7 +91,7 @@ void bdpt::render(Integrator* integrator) {
 	//.finalize();
 }
 
-bool bdpt::update(Integrator* integrator) {
+bool update(Integrator* integrator) {
 	BDPT& state = integrator->bdpt;
 	integrator->frame_num++;
 	bool updated = integrator->updated;
@@ -99,7 +101,7 @@ bool bdpt::update(Integrator* integrator) {
 	return updated;
 }
 
-void bdpt::destroy(Integrator* integrator, bool resize) {
+void destroy(Integrator* integrator, bool resize) {
 	BDPT& state = integrator->bdpt;
 	(void)resize;
 
@@ -109,3 +111,5 @@ void bdpt::destroy(Integrator* integrator, bool resize) {
 		*buffer = nullptr;
 	}
 }
+
+}  // namespace bdpt

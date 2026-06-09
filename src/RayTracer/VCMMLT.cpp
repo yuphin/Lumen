@@ -1,13 +1,15 @@
 #include "Integrator.h"
 #include "Framework/RenderGraph.h"
 #include "VCMMLT.h"
-void vcmmlt::init(Integrator* integrator) {
-	VCMMLT& state = integrator->vcmmlt;
+namespace vcmmlt {
 
+void init(Integrator* integrator) {
+	VCMMLT& state = integrator->vcmmlt;
 
 	const VCMMLTConfig& config = integrator->lumen_scene->config.settings.vcmmlt;
 	u32 path_length = integrator->lumen_scene->config.common.path_length;
-	state.mutation_count = i32(Window::width() * Window::height() * config.mutations_per_pixel / f32(config.num_mlt_threads));
+	state.mutation_count =
+		i32(Window::width() * Window::height() * config.mutations_per_pixel / f32(config.num_mlt_threads));
 	state.light_path_rand_count = glm::max(7 + 3 * path_length, 3 + 7 * path_length);
 
 	// MLTVCM buffers
@@ -186,7 +188,8 @@ void vcmmlt::init(Integrator* integrator) {
 	desc.counter_addr = state.counter_buffer->device_address();
 
 	assert(vk::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer,
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, state.bootstrap_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, state.cdf_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, state.cdf_sum_buffer, vk::render_graph());
@@ -220,7 +223,75 @@ void vcmmlt::init(Integrator* integrator) {
 	state.pc.num_mlt_threads = config.num_mlt_threads;
 }
 
-void vcmmlt::render(Integrator* integrator) {
+static void prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg) {
+	VCMMLT& state = integrator->vcmmlt;
+	const bool scan_sums = level > 0;
+	i32 num_wgs = glm::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
+	i32 num_grids = num_wgs - i32((num_elems % 2048) != 0);
+	state.pc_compute.num_elems = num_elems;
+	auto scan = [&](i32 num_wgs, i32 idx) {
+		++counter;
+		rg->add_compute(CSTR("PrefixScan - Scan"),
+						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/prefix_scan.comp")),
+						 .dims = {(u32)num_wgs, 1, 1}})
+			.push_constants(&state.pc_compute)
+			.bind(integrator->lumen_scene->scene_desc_buffer);
+	};
+	auto uniform_add = [&](i32 num_wgs, i32 output_idx) {
+		++counter;
+		rg->add_compute(CSTR("PrefixScan - Uniform Add"),
+						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/uniform_add.comp")),
+						 .dims = {(u32)num_wgs, 1, 1}})
+			.push_constants(&state.pc_compute)
+			.bind(integrator->lumen_scene->scene_desc_buffer);
+	};
+	if (num_wgs > 1) {
+		state.pc_compute.base_idx = 0;
+		state.pc_compute.block_idx = 0;
+		state.pc_compute.n = 2 * 1024;
+		state.pc_compute.store_sum = 1;
+		state.pc_compute.scan_sums = i32(scan_sums);
+		state.pc_compute.block_sum_addr = state.block_sums[level]->device_address();
+		scan(num_grids, level);
+		i32 rem = num_elems % (2 * 1024);
+		if (rem) {
+			state.pc_compute.base_idx = num_elems - rem;
+			state.pc_compute.block_idx = num_wgs - 1;
+			state.pc_compute.n = rem;
+			scan(1, level);
+		}
+		prefix_scan(integrator, level + 1, num_wgs, counter, rg);
+		state.pc_compute.base_idx = 0;
+		state.pc_compute.block_idx = 0;
+		state.pc_compute.n = num_elems - rem;
+		state.pc_compute.store_sum = 1;
+		state.pc_compute.scan_sums = i32(scan_sums);
+		state.pc_compute.block_sum_addr = state.block_sums[level]->device_address();
+		if (scan_sums) {
+			state.pc_compute.out_addr = state.block_sums[level - 1]->device_address();
+		}
+		uniform_add(num_grids, level - 1);
+		if (rem) {
+			state.pc_compute.base_idx = num_elems - rem;
+			state.pc_compute.block_idx = num_wgs - 1;
+			state.pc_compute.n = rem;
+			uniform_add(1, level - 1);
+		}
+	} else {
+		i32 rem = num_elems % 2048;
+		state.pc_compute.n = rem == 0 ? 2048 : rem;
+		state.pc_compute.base_idx = 0;
+		state.pc_compute.block_idx = 0;
+		state.pc_compute.store_sum = 0;
+		state.pc_compute.scan_sums = bool(scan_sums);
+		if (scan_sums) {
+			state.pc_compute.block_sum_addr = state.block_sums[level - 1]->device_address();
+		}
+		scan(num_wgs, level - 1);
+	}
+}
+
+void render(Integrator* integrator) {
 	VCMMLT& state = integrator->vcmmlt;
 	LUMEN_TRACE("Rendering sample %d...", state.sample_cnt++);
 	vk::CommandBuffer cmd(/*start*/ true);
@@ -268,10 +339,10 @@ void vcmmlt::render(Integrator* integrator) {
 		}
 	};
 	auto sum_up_chain_data = [&] {
-		op_reduce(CSTR("OpReduce: Sum0"), CSTR("src/shaders/integrators/vcmmlt/sum.comp"), CSTR("OpReduce: Reduce Sum0"),
-				  CSTR("src/shaders/integrators/vcmmlt/reduce_sum.comp"), {0});
-		op_reduce(CSTR("OpReduce: Sum1"), CSTR("src/shaders/integrators/vcmmlt/sum.comp"), CSTR("OpReduce: Reduce Sum1"),
-				  CSTR("src/shaders/integrators/vcmmlt/reduce_sum.comp"), {1});
+		op_reduce(CSTR("OpReduce: Sum0"), CSTR("src/shaders/integrators/vcmmlt/sum.comp"),
+				  CSTR("OpReduce: Reduce Sum0"), CSTR("src/shaders/integrators/vcmmlt/reduce_sum.comp"), {0});
+		op_reduce(CSTR("OpReduce: Sum1"), CSTR("src/shaders/integrators/vcmmlt/sum.comp"),
+				  CSTR("OpReduce: Reduce Sum1"), CSTR("src/shaders/integrators/vcmmlt/reduce_sum.comp"), {1});
 	};
 	std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		integrator->output_tex,
@@ -424,7 +495,7 @@ void vcmmlt::render(Integrator* integrator) {
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});
 }
 
-bool vcmmlt::gui(Integrator* integrator) {
+bool gui(Integrator* integrator) {
 	VCMMLT& state = integrator->vcmmlt;
 	// bool result = false;
 	// result |= ImGui::Checkbox("Enable Light-first ordering(default = eye)", &config.light_first);
@@ -435,7 +506,7 @@ bool vcmmlt::gui(Integrator* integrator) {
 	return false;
 }
 
-bool vcmmlt::update(Integrator* integrator) {
+bool update(Integrator* integrator) {
 	VCMMLT& state = integrator->vcmmlt;
 	integrator->frame_num++;
 	bool updated = integrator->updated;
@@ -445,95 +516,17 @@ bool vcmmlt::update(Integrator* integrator) {
 	return updated;
 }
 
-void vcmmlt::prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg) {
-	VCMMLT& state = integrator->vcmmlt;
-	const bool scan_sums = level > 0;
-	i32 num_wgs = glm::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
-	i32 num_grids = num_wgs - i32((num_elems % 2048) != 0);
-	state.pc_compute.num_elems = num_elems;
-	auto scan = [&](i32 num_wgs, i32 idx) {
-		++counter;
-		rg->add_compute(CSTR("PrefixScan - Scan"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/prefix_scan.comp")),
-						 .dims = {(u32)num_wgs, 1, 1}})
-			.push_constants(&state.pc_compute)
-			.bind(integrator->lumen_scene->scene_desc_buffer);
-	};
-	auto uniform_add = [&](i32 num_wgs, i32 output_idx) {
-		++counter;
-		rg->add_compute(CSTR("PrefixScan - Uniform Add"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/uniform_add.comp")),
-						 .dims = {(u32)num_wgs, 1, 1}})
-			.push_constants(&state.pc_compute)
-			.bind(integrator->lumen_scene->scene_desc_buffer);
-	};
-	if (num_wgs > 1) {
-		state.pc_compute.base_idx = 0;
-		state.pc_compute.block_idx = 0;
-		state.pc_compute.n = 2 * 1024;
-		state.pc_compute.store_sum = 1;
-		state.pc_compute.scan_sums = i32(scan_sums);
-		state.pc_compute.block_sum_addr = state.block_sums[level]->device_address();
-		scan(num_grids, level);
-		i32 rem = num_elems % (2 * 1024);
-		if (rem) {
-			state.pc_compute.base_idx = num_elems - rem;
-			state.pc_compute.block_idx = num_wgs - 1;
-			state.pc_compute.n = rem;
-			scan(1, level);
-		}
-		prefix_scan(integrator, level + 1, num_wgs, counter, rg);
-		state.pc_compute.base_idx = 0;
-		state.pc_compute.block_idx = 0;
-		state.pc_compute.n = num_elems - rem;
-		state.pc_compute.store_sum = 1;
-		state.pc_compute.scan_sums = i32(scan_sums);
-		state.pc_compute.block_sum_addr = state.block_sums[level]->device_address();
-		if (scan_sums) {
-			state.pc_compute.out_addr = state.block_sums[level - 1]->device_address();
-		}
-		uniform_add(num_grids, level - 1);
-		if (rem) {
-			state.pc_compute.base_idx = num_elems - rem;
-			state.pc_compute.block_idx = num_wgs - 1;
-			state.pc_compute.n = rem;
-			uniform_add(1, level - 1);
-		}
-	} else {
-		i32 rem = num_elems % 2048;
-		state.pc_compute.n = rem == 0 ? 2048 : rem;
-		state.pc_compute.base_idx = 0;
-		state.pc_compute.block_idx = 0;
-		state.pc_compute.store_sum = 0;
-		state.pc_compute.scan_sums = bool(scan_sums);
-		if (scan_sums) {
-			state.pc_compute.block_sum_addr = state.block_sums[level - 1]->device_address();
-		}
-		scan(num_wgs, level - 1);
-	}
-}
-
-void vcmmlt::destroy(Integrator* integrator, bool resize) {
+void destroy(Integrator* integrator, bool resize) {
 	VCMMLT& state = integrator->vcmmlt;
 	(void)resize;
 
-	vk::Buffer** buffers[] = {&state.bootstrap_buffer,
-							 &state.cdf_buffer,
-							 &state.cdf_sum_buffer,
-							 &state.seeds_buffer,
-							 &state.mlt_samplers_buffer,
-							 &state.light_primary_samples_buffer,
-							 &state.mlt_col_buffer,
-							 &state.chain_stats_buffer,
-							 &state.splat_buffer,
-							 &state.past_splat_buffer,
-							 &state.light_path_buffer,
-							 &state.light_path_cnt_buffer,
-							 &state.tmp_col_buffer,
-							 &state.photon_buffer,
-							 &state.mlt_atomicsum_buffer,
-							 &state.mlt_residual_buffer,
-							 &state.counter_buffer};
+	vk::Buffer** buffers[] = {
+		&state.bootstrap_buffer,	&state.cdf_buffer,			&state.cdf_sum_buffer,
+		&state.seeds_buffer,		&state.mlt_samplers_buffer, &state.light_primary_samples_buffer,
+		&state.mlt_col_buffer,		&state.chain_stats_buffer,	&state.splat_buffer,
+		&state.past_splat_buffer,	&state.light_path_buffer,	&state.light_path_cnt_buffer,
+		&state.tmp_col_buffer,		&state.photon_buffer,		&state.mlt_atomicsum_buffer,
+		&state.mlt_residual_buffer, &state.counter_buffer};
 	for (vk::Buffer** buffer : buffers) {
 		prm::remove(*buffer);
 		*buffer = nullptr;
@@ -544,3 +537,5 @@ void vcmmlt::destroy(Integrator* integrator, bool resize) {
 	}
 	state.block_sums.clear();
 }
+
+}  // namespace vcmmlt

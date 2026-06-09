@@ -1,7 +1,9 @@
 #include "Integrator.h"
 #include "Path.h"
 
-void path::init(Integrator* integrator) {
+namespace path {
+
+void init(Integrator* integrator) {
 	Path& state = integrator->path;
 
 	SceneDesc desc;
@@ -25,7 +27,7 @@ void path::init(Integrator* integrator) {
 	state.path_length = integrator->lumen_scene->config.common.path_length;
 }
 
-void path::render(Integrator* integrator) {
+void render(Integrator* integrator) {
 	Path& state = integrator->path;
 	state.pc.width = Window::width();
 	state.pc.height = Window::height();
@@ -60,7 +62,7 @@ void path::render(Integrator* integrator) {
 		.bind_tlas(*integrator->tlas);
 }
 
-bool path::update(Integrator* integrator) {
+bool update(Integrator* integrator) {
 	Path& state = integrator->path;
 	integrator->frame_num++;
 	bool updated = integrator->updated;
@@ -70,15 +72,17 @@ bool path::update(Integrator* integrator) {
 	return updated;
 }
 
-void path::destroy(Integrator* integrator, bool resize) {
+void destroy(Integrator* integrator, bool resize) {
 	(void)integrator;
 	(void)resize;
 }
 
-bool path::gui(Integrator* integrator) {
+bool gui(Integrator* integrator) {
 	Path& state = integrator->path;
 	bool result = false;
 	result |= ImGui::SliderInt("Path length", (i32*)&state.path_length, 0, 12);
 	result |= ImGui::Checkbox("Direct lighting", &state.direct_lighting);
 	return result;
 }
+
+}  // namespace path

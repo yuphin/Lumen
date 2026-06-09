@@ -1,6 +1,8 @@
 #include "Integrator.h"
 #include "IrradianceCache.h"
 
+namespace ircache {
+
 using namespace IRCache;
 
 #define DEBUG_PASSES 0
@@ -60,7 +62,7 @@ static void prefix_scan(u32 num_elems, u32 block_sum_offset, u32 out_offset, u32
 	}
 }
 
-void ircache::init(Integrator* integrator) {
+void init(Integrator* integrator) {
 	IrradianceCache& state = integrator->ircache;
 	PCIRCache& pc = state.pc;
 
@@ -244,7 +246,7 @@ void ircache::init(Integrator* integrator) {
 	LUMEN_INFO("Trapezoidal cell size limit (px): %u", (u32)glm::round(max_trapezoidal_cell_size));
 }
 
-void ircache::render(Integrator* integrator) {
+void render(Integrator* integrator) {
 	IrradianceCache& state = integrator->ircache;
 	PCIRCache& pc = state.pc;
 	pc.sky_col = integrator->lumen_scene->config.common.sky_col;
@@ -417,7 +419,7 @@ void ircache::render(Integrator* integrator) {
 	}
 }
 
-bool ircache::update(Integrator* integrator) {
+bool update(Integrator* integrator) {
 	IrradianceCache& state = integrator->ircache;
 	integrator->frame_num++;
 	++state.total_frame_idx;
@@ -428,7 +430,7 @@ bool ircache::update(Integrator* integrator) {
 	return updated;
 }
 
-bool ircache::gui(Integrator* integrator) {
+bool gui(Integrator* integrator) {
 	IrradianceCache& state = integrator->ircache;
 	PCIRCache& pc = state.pc;
 	bool result = false;
@@ -441,7 +443,7 @@ bool ircache::gui(Integrator* integrator) {
 	return result;
 }
 
-void ircache::destroy(Integrator* integrator, bool resize) {
+void destroy(Integrator* integrator, bool resize) {
 	IrradianceCache& state = integrator->ircache;
 	(void)resize;
 
@@ -461,3 +463,5 @@ void ircache::destroy(Integrator* integrator, bool resize) {
 		*buffer = nullptr;
 	}
 }
+
+}  // namespace ircache

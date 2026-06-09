@@ -2,14 +2,17 @@
 #include "Framework/RenderGraph.h"
 #include "SMLT.h"
 
-void smlt::init(Integrator* integrator) {
+namespace smlt {
+
+void init(Integrator* integrator) {
 	SMLT& state = integrator->smlt;
 
 	const SMLTConfig& config = integrator->lumen_scene->config.settings.smlt;
 	state.mutations_per_pixel = config.mutations_per_pixel;
 	state.num_mlt_threads = config.num_mlt_threads;
 	state.num_bootstrap_samples = config.num_bootstrap_samples;
-	state.mutation_count = i32(Window::width() * Window::height() * state.mutations_per_pixel / f32(state.num_mlt_threads));
+	state.mutation_count =
+		i32(Window::width() * Window::height() * state.mutations_per_pixel / f32(state.num_mlt_threads));
 	u32 path_length = integrator->lumen_scene->config.common.path_length;
 	state.light_path_rand_count = 6 + 3 * path_length;
 	state.cam_path_rand_count = 3 + 7 * path_length;
@@ -28,15 +31,16 @@ void smlt::init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = VkDeviceSize(state.num_bootstrap_samples * 4)});
 
-	state.bootstrap_cpu = prm::get_buffer({.name = CSTR("Bootstrap CPU"),
-									 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-									 .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
-									 .size = state.num_bootstrap_samples * sizeof(BootstrapSample)});
+	state.bootstrap_cpu =
+		prm::get_buffer({.name = CSTR("Bootstrap CPU"),
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
+						 .size = state.num_bootstrap_samples * sizeof(BootstrapSample)});
 
 	state.cdf_cpu = prm::get_buffer({.name = CSTR("CDF CPU"),
-							   .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							   .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
-							   .size = VkDeviceSize(state.num_bootstrap_samples * 4)});
+									 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+									 .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
+									 .size = VkDeviceSize(state.num_bootstrap_samples * 4)});
 
 	state.cdf_sum_buffer =
 		prm::get_buffer({.name = CSTR("CDF Sum Buffer"),
@@ -247,7 +251,75 @@ void smlt::init(Integrator* integrator) {
 	state.pc.use_vm = 0;
 }
 
-void smlt::render(Integrator* integrator) {
+static void prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg) {
+	SMLT& state = integrator->smlt;
+	const bool scan_sums = level > 0;
+	i32 num_wgs = glm::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
+	i32 num_grids = num_wgs - i32((num_elems % 2048) != 0);
+	state.pc_compute.num_elems = num_elems;
+	auto scan = [&](i32 num_wgs, i32 idx) {
+		++counter;
+		rg->add_compute(CSTR("PrefixScan - Scan"),
+						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/prefix_scan.comp")),
+						 .dims = {(u32)num_wgs, 1, 1}})
+			.push_constants(&state.pc_compute)
+			.bind(integrator->lumen_scene->scene_desc_buffer);
+	};
+	auto uniform_add = [&](i32 num_wgs, i32 output_idx) {
+		++counter;
+		rg->add_compute(CSTR("PrefixScan - Uniform Add"),
+						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/uniform_add.comp")),
+						 .dims = {(u32)num_wgs, 1, 1}})
+			.push_constants(&state.pc_compute)
+			.bind(integrator->lumen_scene->scene_desc_buffer);
+	};
+	if (num_wgs > 1) {
+		state.pc_compute.base_idx = 0;
+		state.pc_compute.block_idx = 0;
+		state.pc_compute.n = 2 * 1024;
+		state.pc_compute.store_sum = 1;
+		state.pc_compute.scan_sums = i32(scan_sums);
+		state.pc_compute.block_sum_addr = state.block_sums[level]->device_address();
+		scan(num_grids, level);
+		i32 rem = num_elems % (2 * 1024);
+		if (rem) {
+			state.pc_compute.base_idx = num_elems - rem;
+			state.pc_compute.block_idx = num_wgs - 1;
+			state.pc_compute.n = rem;
+			scan(1, level);
+		}
+		prefix_scan(integrator, level + 1, num_wgs, counter, rg);
+		state.pc_compute.base_idx = 0;
+		state.pc_compute.block_idx = 0;
+		state.pc_compute.n = num_elems - rem;
+		state.pc_compute.store_sum = 1;
+		state.pc_compute.scan_sums = i32(scan_sums);
+		state.pc_compute.block_sum_addr = state.block_sums[level]->device_address();
+		if (scan_sums) {
+			state.pc_compute.out_addr = state.block_sums[level - 1]->device_address();
+		}
+		uniform_add(num_grids, level - 1);
+		if (rem) {
+			state.pc_compute.base_idx = num_elems - rem;
+			state.pc_compute.block_idx = num_wgs - 1;
+			state.pc_compute.n = rem;
+			uniform_add(1, level - 1);
+		}
+	} else {
+		i32 rem = num_elems % 2048;
+		state.pc_compute.n = rem == 0 ? 2048 : rem;
+		state.pc_compute.base_idx = 0;
+		state.pc_compute.block_idx = 0;
+		state.pc_compute.store_sum = 0;
+		state.pc_compute.scan_sums = bool(scan_sums);
+		if (scan_sums) {
+			state.pc_compute.block_sum_addr = state.block_sums[level - 1]->device_address();
+		}
+		scan(num_wgs, level - 1);
+	}
+}
+
+void render(Integrator* integrator) {
 	SMLT& state = integrator->smlt;
 	vk::CommandBuffer cmd(/*start*/ true);
 	state.pc.width = Window::width();
@@ -425,7 +497,7 @@ void smlt::render(Integrator* integrator) {
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});
 }
 
-bool smlt::update(Integrator* integrator) {
+bool update(Integrator* integrator) {
 	SMLT& state = integrator->smlt;
 	integrator->frame_num++;
 	bool updated = integrator->updated;
@@ -435,99 +507,31 @@ bool smlt::update(Integrator* integrator) {
 	return updated;
 }
 
-void smlt::prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg) {
-	SMLT& state = integrator->smlt;
-	const bool scan_sums = level > 0;
-	i32 num_wgs = glm::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
-	i32 num_grids = num_wgs - i32((num_elems % 2048) != 0);
-	state.pc_compute.num_elems = num_elems;
-	auto scan = [&](i32 num_wgs, i32 idx) {
-		++counter;
-		rg->add_compute(CSTR("PrefixScan - Scan"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/prefix_scan.comp")),
-						 .dims = {(u32)num_wgs, 1, 1}})
-			.push_constants(&state.pc_compute)
-			.bind(integrator->lumen_scene->scene_desc_buffer);
-	};
-	auto uniform_add = [&](i32 num_wgs, i32 output_idx) {
-		++counter;
-		rg->add_compute(CSTR("PrefixScan - Uniform Add"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/uniform_add.comp")),
-						 .dims = {(u32)num_wgs, 1, 1}})
-			.push_constants(&state.pc_compute)
-			.bind(integrator->lumen_scene->scene_desc_buffer);
-	};
-	if (num_wgs > 1) {
-		state.pc_compute.base_idx = 0;
-		state.pc_compute.block_idx = 0;
-		state.pc_compute.n = 2 * 1024;
-		state.pc_compute.store_sum = 1;
-		state.pc_compute.scan_sums = i32(scan_sums);
-		state.pc_compute.block_sum_addr = state.block_sums[level]->device_address();
-		scan(num_grids, level);
-		i32 rem = num_elems % (2 * 1024);
-		if (rem) {
-			state.pc_compute.base_idx = num_elems - rem;
-			state.pc_compute.block_idx = num_wgs - 1;
-			state.pc_compute.n = rem;
-			scan(1, level);
-		}
-		prefix_scan(integrator, level + 1, num_wgs, counter, rg);
-		state.pc_compute.base_idx = 0;
-		state.pc_compute.block_idx = 0;
-		state.pc_compute.n = num_elems - rem;
-		state.pc_compute.store_sum = 1;
-		state.pc_compute.scan_sums = i32(scan_sums);
-		state.pc_compute.block_sum_addr = state.block_sums[level]->device_address();
-		if (scan_sums) {
-			state.pc_compute.out_addr = state.block_sums[level - 1]->device_address();
-		}
-		uniform_add(num_grids, level - 1);
-		if (rem) {
-			state.pc_compute.base_idx = num_elems - rem;
-			state.pc_compute.block_idx = num_wgs - 1;
-			state.pc_compute.n = rem;
-			uniform_add(1, level - 1);
-		}
-	} else {
-		i32 rem = num_elems % 2048;
-		state.pc_compute.n = rem == 0 ? 2048 : rem;
-		state.pc_compute.base_idx = 0;
-		state.pc_compute.block_idx = 0;
-		state.pc_compute.store_sum = 0;
-		state.pc_compute.scan_sums = bool(scan_sums);
-		if (scan_sums) {
-			state.pc_compute.block_sum_addr = state.block_sums[level - 1]->device_address();
-		}
-		scan(num_wgs, level - 1);
-	}
-}
-
-void smlt::destroy(Integrator* integrator, bool resize) {
+void destroy(Integrator* integrator, bool resize) {
 	SMLT& state = integrator->smlt;
 	(void)resize;
 
 	vk::Buffer** buffers[] = {&state.bootstrap_buffer,
-							 &state.cdf_buffer,
-							 &state.cdf_sum_buffer,
-							 &state.seeds_buffer,
-							 &state.mlt_samplers_buffer,
-							 &state.light_primary_samples_buffer,
-							 &state.cam_primary_samples_buffer,
-							 &state.mlt_col_buffer,
-							 &state.chain_stats_buffer,
-							 &state.splat_buffer,
-							 &state.past_splat_buffer,
-							 &state.light_path_buffer,
-							 &state.connected_lights_buffer,
-							 &state.tmp_seeds_buffer,
-							 &state.tmp_lum_buffer,
-							 &state.prob_carryover_buffer,
-							 &state.light_path_cnt_buffer,
-							 &state.light_splats_buffer,
-							 &state.light_splat_cnts_buffer,
-							 &state.bootstrap_cpu,
-							 &state.cdf_cpu};
+							  &state.cdf_buffer,
+							  &state.cdf_sum_buffer,
+							  &state.seeds_buffer,
+							  &state.mlt_samplers_buffer,
+							  &state.light_primary_samples_buffer,
+							  &state.cam_primary_samples_buffer,
+							  &state.mlt_col_buffer,
+							  &state.chain_stats_buffer,
+							  &state.splat_buffer,
+							  &state.past_splat_buffer,
+							  &state.light_path_buffer,
+							  &state.connected_lights_buffer,
+							  &state.tmp_seeds_buffer,
+							  &state.tmp_lum_buffer,
+							  &state.prob_carryover_buffer,
+							  &state.light_path_cnt_buffer,
+							  &state.light_splats_buffer,
+							  &state.light_splat_cnts_buffer,
+							  &state.bootstrap_cpu,
+							  &state.cdf_cpu};
 	for (vk::Buffer** buffer : buffers) {
 		prm::remove(*buffer);
 		*buffer = nullptr;
@@ -538,3 +542,5 @@ void smlt::destroy(Integrator* integrator, bool resize) {
 	}
 	state.block_sums.clear();
 }
+
+}  // namespace smlt

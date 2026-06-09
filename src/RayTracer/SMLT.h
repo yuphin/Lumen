@@ -37,7 +37,6 @@ struct SMLT {
 };
 
 namespace smlt {
-void prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg);
 void init(Integrator* integrator);
 void render(Integrator* integrator);
 bool update(Integrator* integrator);

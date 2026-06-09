@@ -1,7 +1,9 @@
 #include "Integrator.h"
 #include "VCM.h"
 const i32 max_samples = 50000;
-void vcm::init(Integrator* integrator) {
+namespace vcm {
+
+void init(Integrator* integrator) {
 	VCM& state = integrator->vcm;
 
 
@@ -116,7 +118,7 @@ void vcm::init(Integrator* integrator) {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, avg_addr, state.avg_buffer, vk::render_graph());
 }
 
-void vcm::render(Integrator* integrator) {
+void render(Integrator* integrator) {
 	VCM& state = integrator->vcm;
 	const VCMConfig& config = integrator->lumen_scene->config.settings.vcm;
 	state.pc.width = Window::width();
@@ -260,7 +262,7 @@ void vcm::render(Integrator* integrator) {
 	state.pc.total_frame_num++;
 }
 
-bool vcm::update(Integrator* integrator) {
+bool update(Integrator* integrator) {
 	VCM& state = integrator->vcm;
 	integrator->frame_num++;
 	bool updated = integrator->updated;
@@ -269,7 +271,7 @@ bool vcm::update(Integrator* integrator) {
 	}
 	return updated;
 }
-void vcm::destroy(Integrator* integrator, bool resize) {
+void destroy(Integrator* integrator, bool resize) {
 	VCM& state = integrator->vcm;
 	(void)resize;
 
@@ -293,7 +295,7 @@ void vcm::destroy(Integrator* integrator, bool resize) {
 	state.desc_pool = VK_NULL_HANDLE;
 }
 
-bool vcm::gui(Integrator* integrator) {
+bool gui(Integrator* integrator) {
 	VCM& state = integrator->vcm;
 	VCMConfig& config = integrator->lumen_scene->config.settings.vcm;
 	bool result = false;
@@ -302,3 +304,5 @@ bool vcm::gui(Integrator* integrator) {
 	result |= ImGui::Checkbox("Enable VM", &config.enable_vm);
 	return result;
 }
+
+}  // namespace vcm

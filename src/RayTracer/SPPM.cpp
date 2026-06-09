@@ -1,7 +1,9 @@
 #include "Integrator.h"
 #include "SPPM.h"
 
-void sppm::init(Integrator* integrator) {
+namespace sppm {
+
+void init(Integrator* integrator) {
 	SPPM& state = integrator->sppm;
 
 
@@ -70,7 +72,7 @@ void sppm::init(Integrator* integrator) {
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, state.counter_buffer, vk::render_graph());
 }
 
-void sppm::render(Integrator* integrator) {
+void render(Integrator* integrator) {
 	SPPM& state = integrator->sppm;
 	state.pc.width = Window::width();
 	state.pc.height = Window::height();
@@ -175,7 +177,7 @@ void sppm::render(Integrator* integrator) {
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});
 }
 
-bool sppm::update(Integrator* integrator) {
+bool update(Integrator* integrator) {
 	SPPM& state = integrator->sppm;
 	integrator->frame_num++;
 	bool updated = integrator->updated;
@@ -185,7 +187,7 @@ bool sppm::update(Integrator* integrator) {
 	return updated;
 }
 
-void sppm::destroy(Integrator* integrator, bool resize) {
+void destroy(Integrator* integrator, bool resize) {
 	SPPM& state = integrator->sppm;
 	(void)resize;
 
@@ -201,3 +203,5 @@ void sppm::destroy(Integrator* integrator, bool resize) {
 	state.desc_set_layout = VK_NULL_HANDLE;
 	state.desc_pool = VK_NULL_HANDLE;
 }
+
+}  // namespace sppm

@@ -2,6 +2,9 @@
 #include "Integrator.h"
 #include "Framework/VkUtils.h"
 #include "DDGI.h"
+
+namespace ddgi {
+
 constexpr i32 IRRADIANCE_SIDE_LENGTH = 8;
 constexpr i32 DEPTH_SIDE_LENGTH = 16;
 
@@ -41,7 +44,7 @@ static void generate_uv_sphere(lm::Array<u32>& indices, lm::Array<SphereVertex>&
 	}
 }
 
-void ddgi::init(Integrator* integrator) {
+void init(Integrator* integrator) {
 	DDGI& state = integrator->ddgi;
 
 	u32 num_probes;
@@ -219,7 +222,7 @@ void ddgi::init(Integrator* integrator) {
 	integrator->frame_num = 0;
 }
 
-void ddgi::render(Integrator* integrator) {
+void render(Integrator* integrator) {
 	DDGI& state = integrator->ddgi;
 	state.pc.width = Window::width();
 	state.pc.height = Window::height();
@@ -361,7 +364,7 @@ void ddgi::render(Integrator* integrator) {
 	state.first_frame = false;
 }
 
-bool ddgi::update(Integrator* integrator) {
+bool update(Integrator* integrator) {
 	DDGI& state = integrator->ddgi;
 	integrator->frame_num++;
 	state.frame_idx++;
@@ -373,7 +376,7 @@ bool ddgi::update(Integrator* integrator) {
 	update_ddgi_uniforms(integrator);
 	return updated;
 }
-bool ddgi::gui(Integrator* integrator) {
+bool gui(Integrator* integrator) {
 	DDGI& state = integrator->ddgi;
 	bool result = false;
 	result |= ImGui::SliderFloat("Hysteresis", &state.hysteresis, 0.0f, 1.0f);
@@ -399,7 +402,7 @@ bool ddgi::gui(Integrator* integrator) {
 	return result;
 }
 
-void ddgi::update_ddgi_uniforms(Integrator* integrator) {
+void update_ddgi_uniforms(Integrator* integrator) {
 	DDGI& state = integrator->ddgi;
 	state.ddgi_ubo.probe_counts = state.probe_counts;
 	state.ddgi_ubo.hysteresis = state.hysteresis;
@@ -420,7 +423,7 @@ void ddgi::update_ddgi_uniforms(Integrator* integrator) {
 	vk::buffer_write(state.ddgi_ubo_buffer, &state.ddgi_ubo, sizeof(state.ddgi_ubo));
 }
 
-void ddgi::create_radiance_textures(Integrator* integrator) {
+void create_radiance_textures(Integrator* integrator) {
 	DDGI& state = integrator->ddgi;
 	u32 num_probes = state.probe_counts.x * state.probe_counts.y * state.probe_counts.z;
 	state.rt.radiance_tex = prm::get_texture({
@@ -441,7 +444,7 @@ void ddgi::create_radiance_textures(Integrator* integrator) {
 	});
 }
 
-void ddgi::create_accel(Integrator* integrator, vk::BVH* tlas_ptr, lm::Array<vk::BVH>* blases_ptr) {
+void create_accel(Integrator* integrator, vk::BVH* tlas_ptr, lm::Array<vk::BVH>* blases_ptr) {
 	DDGI& state = integrator->ddgi;
 	vk::BVH& tlas = *tlas_ptr;
 	lm::Array<vk::BVH>& blases = *blases_ptr;
@@ -531,7 +534,7 @@ void ddgi::create_accel(Integrator* integrator, vk::BVH* tlas_ptr, lm::Array<vk:
 	vk::tlas_build(tlas, tlas_instances.to_slice(), VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
-glm::vec3 ddgi::probe_location(Integrator* integrator, u32 index) {
+glm::vec3 probe_location(Integrator* integrator, u32 index) {
 	DDGI& state = integrator->ddgi;
 	glm::ivec3 grid_coord = probe_index_to_grid_coord(integrator, index);
 	glm::vec3 grid_pos = grid_coord_to_position(integrator, grid_coord);
@@ -539,7 +542,7 @@ glm::vec3 ddgi::probe_location(Integrator* integrator, u32 index) {
 	return grid_pos;
 }
 
-glm::ivec3 ddgi::probe_index_to_grid_coord(Integrator* integrator, u32 index) {
+glm::ivec3 probe_index_to_grid_coord(Integrator* integrator, u32 index) {
 	DDGI& state = integrator->ddgi;
 	glm::ivec3 res;
 	res.x = index % state.probe_counts.x;
@@ -548,12 +551,12 @@ glm::ivec3 ddgi::probe_index_to_grid_coord(Integrator* integrator, u32 index) {
 	return res;
 }
 
-glm::vec3 ddgi::grid_coord_to_position(Integrator* integrator, const glm::ivec3& grid_coord) {
+glm::vec3 grid_coord_to_position(Integrator* integrator, const glm::ivec3& grid_coord) {
 	DDGI& state = integrator->ddgi;
 	return glm::vec3(grid_coord) * state.probe_distance + state.probe_start_position;
 }
 
-void ddgi::destroy(Integrator* integrator, bool resize) {
+void destroy(Integrator* integrator, bool resize) {
 	DDGI& state = integrator->ddgi;
 	(void)resize;
 
@@ -591,3 +594,5 @@ void ddgi::destroy(Integrator* integrator, bool resize) {
 		depth_tex = nullptr;
 	}
 }
+
+}  // namespace ddgi

@@ -2,9 +2,10 @@
 #include <Framework/RenderGraph.h>
 #include "PSSMLT.h"
 
-void pssmlt::init(Integrator* integrator) {
-	PSSMLT& state = integrator->pssmlt;
+namespace pssmlt {
 
+void init(Integrator* integrator) {
+	PSSMLT& state = integrator->pssmlt;
 
 	u32 path_length = integrator->lumen_scene->config.common.path_length;
 	state.light_path_rand_count = 6 + 3 * path_length;
@@ -27,15 +28,16 @@ void pssmlt::init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config.num_bootstrap_samples * sizeof(f32)});
 
-	state.bootstrap_cpu = prm::get_buffer({.name = CSTR("Boostrap - CPU"),
-									 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-									 .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
-									 .size = config.num_bootstrap_samples * sizeof(BootstrapSample)});
+	state.bootstrap_cpu =
+		prm::get_buffer({.name = CSTR("Boostrap - CPU"),
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
+						 .size = config.num_bootstrap_samples * sizeof(BootstrapSample)});
 
 	state.cdf_cpu = prm::get_buffer({.name = CSTR("CDF - CPU"),
-							   .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-							   .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
-							   .size = config.num_bootstrap_samples * sizeof(f32)});
+									 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+									 .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
+									 .size = config.num_bootstrap_samples * sizeof(f32)});
 
 	state.cdf_sum_buffer =
 		prm::get_buffer({.name = CSTR("CDF Sums"),
@@ -175,7 +177,8 @@ void pssmlt::init(Integrator* integrator) {
 	desc.camera_path_addr = state.camera_path_buffer->device_address();
 
 	assert(vk::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer,
+								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, state.bootstrap_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, state.cdf_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, state.cdf_sum_buffer, vk::render_graph());
@@ -184,8 +187,8 @@ void pssmlt::init(Integrator* integrator) {
 								 vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cam_primary_samples_addr, state.cam_primary_samples_buffer,
 								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, connection_primary_samples_addr, state.connection_primary_samples_buffer,
-								 vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, connection_primary_samples_addr,
+								 state.connection_primary_samples_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_samplers_addr, state.mlt_samplers_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_col_addr, state.mlt_col_buffer, vk::render_graph());
 	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, chain_stats_addr, state.chain_stats_buffer, vk::render_graph());
@@ -204,11 +207,80 @@ void pssmlt::init(Integrator* integrator) {
 
 	integrator->frame_num = 0;
 
-	state.mutation_count = i32(Window::width() * Window::height() * config.mutations_per_pixel / f32(config.num_mlt_threads));
+	state.mutation_count =
+		i32(Window::width() * Window::height() * config.mutations_per_pixel / f32(config.num_mlt_threads));
 	state.pc.mutations_per_pixel = config.mutations_per_pixel;
 }
 
-void pssmlt::render(Integrator* integrator) {
+static void prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg) {
+	PSSMLT& state = integrator->pssmlt;
+	const bool scan_sums = level > 0;
+	i32 num_wgs = glm::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
+	i32 num_grids = num_wgs - i32((num_elems % 2048) != 0);
+	state.pc_compute.num_elems = num_elems;
+	auto scan = [&](i32 num_wgs, i32 idx) {
+		++counter;
+		rg->add_compute(CSTR("PrefixScan - Scan"),
+						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/prefix_scan.comp")),
+						 .dims = {(u32)num_wgs, 1, 1}})
+			.push_constants(&state.pc_compute)
+			.bind(integrator->lumen_scene->scene_desc_buffer);
+	};
+	auto uniform_add = [&](i32 num_wgs, i32 output_idx) {
+		++counter;
+		rg->add_compute(CSTR("PrefixScan - Uniform Add"),
+						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/uniform_add.comp")),
+						 .dims = {(u32)num_wgs, 1, 1}})
+			.push_constants(&state.pc_compute)
+			.bind(integrator->lumen_scene->scene_desc_buffer);
+	};
+	if (num_wgs > 1) {
+		state.pc_compute.base_idx = 0;
+		state.pc_compute.block_idx = 0;
+		state.pc_compute.n = 2 * 1024;
+		state.pc_compute.store_sum = 1;
+		state.pc_compute.scan_sums = i32(scan_sums);
+		state.pc_compute.block_sum_addr = state.block_sums[level]->device_address();
+		scan(num_grids, level);
+		i32 rem = num_elems % (2 * 1024);
+		if (rem) {
+			state.pc_compute.base_idx = num_elems - rem;
+			state.pc_compute.block_idx = num_wgs - 1;
+			state.pc_compute.n = rem;
+			scan(1, level);
+		}
+		prefix_scan(integrator, level + 1, num_wgs, counter, rg);
+		state.pc_compute.base_idx = 0;
+		state.pc_compute.block_idx = 0;
+		state.pc_compute.n = num_elems - rem;
+		state.pc_compute.store_sum = 1;
+		state.pc_compute.scan_sums = i32(scan_sums);
+		state.pc_compute.block_sum_addr = state.block_sums[level]->device_address();
+		if (scan_sums) {
+			state.pc_compute.out_addr = state.block_sums[level - 1]->device_address();
+		}
+		uniform_add(num_grids, level - 1);
+		if (rem) {
+			state.pc_compute.base_idx = num_elems - rem;
+			state.pc_compute.block_idx = num_wgs - 1;
+			state.pc_compute.n = rem;
+			uniform_add(1, level - 1);
+		}
+	} else {
+		i32 rem = num_elems % 2048;
+		state.pc_compute.n = rem == 0 ? 2048 : rem;
+		state.pc_compute.base_idx = 0;
+		state.pc_compute.block_idx = 0;
+		state.pc_compute.store_sum = 0;
+		state.pc_compute.scan_sums = bool(scan_sums);
+		if (scan_sums) {
+			state.pc_compute.block_sum_addr = state.block_sums[level - 1]->device_address();
+		}
+		scan(num_wgs, level - 1);
+	}
+}
+
+void render(Integrator* integrator) {
 	PSSMLT& state = integrator->pssmlt;
 	const PSSMLTConfig& config = integrator->lumen_scene->config.settings.pssmlt;
 	state.pc.width = Window::width();
@@ -343,7 +415,7 @@ void pssmlt::render(Integrator* integrator) {
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});
 }
 
-bool pssmlt::update(Integrator* integrator) {
+bool update(Integrator* integrator) {
 	PSSMLT& state = integrator->pssmlt;
 	integrator->frame_num++;
 	bool updated = integrator->updated;
@@ -353,94 +425,26 @@ bool pssmlt::update(Integrator* integrator) {
 	return updated;
 }
 
-void pssmlt::prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg) {
-	PSSMLT& state = integrator->pssmlt;
-	const bool scan_sums = level > 0;
-	i32 num_wgs = glm::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
-	i32 num_grids = num_wgs - i32((num_elems % 2048) != 0);
-	state.pc_compute.num_elems = num_elems;
-	auto scan = [&](i32 num_wgs, i32 idx) {
-		++counter;
-		rg->add_compute(CSTR("PrefixScan - Scan"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/prefix_scan.comp")),
-						 .dims = {(u32)num_wgs, 1, 1}})
-			.push_constants(&state.pc_compute)
-			.bind(integrator->lumen_scene->scene_desc_buffer);
-	};
-	auto uniform_add = [&](i32 num_wgs, i32 output_idx) {
-		++counter;
-		rg->add_compute(CSTR("PrefixScan - Uniform Add"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/uniform_add.comp")),
-						 .dims = {(u32)num_wgs, 1, 1}})
-			.push_constants(&state.pc_compute)
-			.bind(integrator->lumen_scene->scene_desc_buffer);
-	};
-	if (num_wgs > 1) {
-		state.pc_compute.base_idx = 0;
-		state.pc_compute.block_idx = 0;
-		state.pc_compute.n = 2 * 1024;
-		state.pc_compute.store_sum = 1;
-		state.pc_compute.scan_sums = i32(scan_sums);
-		state.pc_compute.block_sum_addr = state.block_sums[level]->device_address();
-		scan(num_grids, level);
-		i32 rem = num_elems % (2 * 1024);
-		if (rem) {
-			state.pc_compute.base_idx = num_elems - rem;
-			state.pc_compute.block_idx = num_wgs - 1;
-			state.pc_compute.n = rem;
-			scan(1, level);
-		}
-		prefix_scan(integrator, level + 1, num_wgs, counter, rg);
-		state.pc_compute.base_idx = 0;
-		state.pc_compute.block_idx = 0;
-		state.pc_compute.n = num_elems - rem;
-		state.pc_compute.store_sum = 1;
-		state.pc_compute.scan_sums = i32(scan_sums);
-		state.pc_compute.block_sum_addr = state.block_sums[level]->device_address();
-		if (scan_sums) {
-			state.pc_compute.out_addr = state.block_sums[level - 1]->device_address();
-		}
-		uniform_add(num_grids, level - 1);
-		if (rem) {
-			state.pc_compute.base_idx = num_elems - rem;
-			state.pc_compute.block_idx = num_wgs - 1;
-			state.pc_compute.n = rem;
-			uniform_add(1, level - 1);
-		}
-	} else {
-		i32 rem = num_elems % 2048;
-		state.pc_compute.n = rem == 0 ? 2048 : rem;
-		state.pc_compute.base_idx = 0;
-		state.pc_compute.block_idx = 0;
-		state.pc_compute.store_sum = 0;
-		state.pc_compute.scan_sums = bool(scan_sums);
-		if (scan_sums) {
-			state.pc_compute.block_sum_addr = state.block_sums[level - 1]->device_address();
-		}
-		scan(num_wgs, level - 1);
-	}
-}
-
-void pssmlt::destroy(Integrator* integrator, bool resize) {
+void destroy(Integrator* integrator, bool resize) {
 	PSSMLT& state = integrator->pssmlt;
 	(void)resize;
 
 	vk::Buffer** buffers[] = {&state.bootstrap_buffer,
-							 &state.cdf_buffer,
-							 &state.cdf_sum_buffer,
-							 &state.seeds_buffer,
-							 &state.mlt_samplers_buffer,
-							 &state.light_primary_samples_buffer,
-							 &state.cam_primary_samples_buffer,
-							 &state.connection_primary_samples_buffer,
-							 &state.mlt_col_buffer,
-							 &state.chain_stats_buffer,
-							 &state.splat_buffer,
-							 &state.past_splat_buffer,
-							 &state.light_path_buffer,
-							 &state.camera_path_buffer,
-							 &state.bootstrap_cpu,
-							 &state.cdf_cpu};
+							  &state.cdf_buffer,
+							  &state.cdf_sum_buffer,
+							  &state.seeds_buffer,
+							  &state.mlt_samplers_buffer,
+							  &state.light_primary_samples_buffer,
+							  &state.cam_primary_samples_buffer,
+							  &state.connection_primary_samples_buffer,
+							  &state.mlt_col_buffer,
+							  &state.chain_stats_buffer,
+							  &state.splat_buffer,
+							  &state.past_splat_buffer,
+							  &state.light_path_buffer,
+							  &state.camera_path_buffer,
+							  &state.bootstrap_cpu,
+							  &state.cdf_cpu};
 	for (vk::Buffer** buffer : buffers) {
 		prm::remove(*buffer);
 		*buffer = nullptr;
@@ -451,3 +455,5 @@ void pssmlt::destroy(Integrator* integrator, bool resize) {
 	}
 	state.block_sums.clear();
 }
+
+}  // namespace pssmlt
