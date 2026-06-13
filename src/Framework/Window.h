@@ -1,4 +1,5 @@
 #pragma once
+#include "Framework/Base/SmallArray.h"
 
 enum class KeyInput {
 	SPACE = 32,
@@ -129,9 +130,9 @@ enum class KeyAction { RELEASE, PRESS, REPEAT, UNKNOWN };
 enum class MouseAction { LEFT, RIGHT, MIDDLE, UNKNOWN };
 
 struct MouseInput {
-	KeyAction action;
-	double x;
-	double y;
+	KeyAction action = KeyAction::UNKNOWN;
+	double x = 0.0;
+	double y = 0.0;
 };
 
 using MouseClickCallback = std::function<void(MouseAction button, KeyAction action, double x, double y)>;
@@ -140,13 +141,17 @@ using MouseScrollCallback = std::function<void(double x, double y)>;
 using KeyCallback = std::function<void(KeyInput input, KeyAction action)>;
 namespace Window {
 
+inline constexpr u64 MAX_KEY_INPUTS = static_cast<u64>(KeyInput::MAX_KEY);
+inline constexpr u64 MOUSE_ACTION_COUNT = static_cast<u64>(MouseAction::UNKNOWN) + 1;
+inline constexpr u64 MAX_CALLBACKS_PER_TYPE = 16;
+
 struct Window {
-	std::unordered_map<KeyInput, KeyAction> key_map{};
-	std::unordered_map<MouseAction, MouseInput> mouse_map{};
-	std::vector<MouseClickCallback> mouse_click_callbacks;
-	std::vector<MouseMoveCallback> mouse_move_callbacks;
-	std::vector<MouseScrollCallback> mouse_scroll_callbacks;
-	std::vector<KeyCallback> key_callbacks;
+	lm::SmallArray<KeyAction, MAX_KEY_INPUTS> key_map;
+	lm::SmallArray<MouseInput, MOUSE_ACTION_COUNT> mouse_map;
+	lm::SmallArray<MouseClickCallback, MAX_CALLBACKS_PER_TYPE> mouse_click_callbacks;
+	lm::SmallArray<MouseMoveCallback, MAX_CALLBACKS_PER_TYPE> mouse_move_callbacks;
+	lm::SmallArray<MouseScrollCallback, MAX_CALLBACKS_PER_TYPE> mouse_scroll_callbacks;
+	lm::SmallArray<KeyCallback, MAX_CALLBACKS_PER_TYPE> key_callbacks;
 	double mouse_pos_x, mouse_pos_y;
 	double mouse_prev_x, mouse_prev_y;
 	double mouse_delta_prev_x, mouse_delta_prev_y;

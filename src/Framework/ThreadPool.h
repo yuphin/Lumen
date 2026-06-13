@@ -1,4 +1,5 @@
 #pragma once
+#include "Framework/Base/SmallArray.h"
 
 class ThreadPool {
    public:
@@ -12,7 +13,7 @@ class ThreadPool {
 	static std::queue<std::function<void()>> work_queue;
 	static std::mutex queue_mutex;
 	static std::condition_variable cv;
-	static std::vector<std::thread> threads;
+	static lm::SmallArray<std::thread, 64> threads;
 };
 
 template <typename FunctionType, typename... Args>

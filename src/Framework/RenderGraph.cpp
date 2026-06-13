@@ -61,7 +61,7 @@ static VkBufferMemoryBarrier2 buffer_barrier_from_sync(VkBuffer buffer, const Bu
 static VkImageMemoryBarrier2 image_barrier_from_sync(VkImage image, const ImageSyncDescriptor& sync) {
 	return vk::image_barrier2(image, sync.src_access_flags, sync.dst_access_flags, sync.old_layout, sync.new_layout,
 							  sync.image_aspect, sync.src_stage, sync.dst_stage,
-							  vk::context().queue_indices.gfx_family.value());
+							  vk::context().queue_indices.gfx_family);
 }
 
 static void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String& name, RenderGraph* rg,

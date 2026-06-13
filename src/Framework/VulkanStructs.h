@@ -15,12 +15,15 @@ struct SamplerHash {
 };
 
 struct QueueFamilyIndices {
-	std::optional<u32> gfx_family;
-	std::optional<u32> present_family;
-	std::optional<u32> compute_family;
+	u32 gfx_family = VK_QUEUE_FAMILY_IGNORED;
+	u32 present_family = VK_QUEUE_FAMILY_IGNORED;
+	u32 compute_family = VK_QUEUE_FAMILY_IGNORED;
 
 	// TODO: Extend to other families
-	bool is_complete() { return (gfx_family.has_value() && present_family.has_value()) && compute_family.has_value(); }
+	bool is_complete() const {
+		return gfx_family != VK_QUEUE_FAMILY_IGNORED && present_family != VK_QUEUE_FAMILY_IGNORED &&
+			   compute_family != VK_QUEUE_FAMILY_IGNORED;
+	}
 };
 
 struct DescriptorInfo {
@@ -38,10 +41,6 @@ enum class QueueType { GFX, COMPUTE, PRESENT };
 
 enum class LumenStage { L_STAGE_VERTEX, L_STAGE_FRAGMENT };
 enum class Component { L_POSITION, L_NORMAL, L_COLOR, L_UV, L_TANGENT };
-struct SpecializationMapEntry {
-	std::vector<VkSpecializationMapEntry> entry;
-	LumenStage shader_stage;
-};
 
 inline const char* vk_result_to_str(VkResult result) {
 	switch (result) {
@@ -330,15 +329,6 @@ inline VkDescriptorPoolCreateInfo descriptor_pool(u64 poolSizeCount, VkDescripto
 	return descriptorPoolInfo;
 }
 
-inline VkDescriptorPoolCreateInfo descriptor_pool(const std::vector<VkDescriptorPoolSize>& poolSizes, u64 maxSets) {
-	VkDescriptorPoolCreateInfo descriptorPoolInfo{};
-	descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	descriptorPoolInfo.poolSizeCount = static_cast<u32>(poolSizes.size());
-	descriptorPoolInfo.pPoolSizes = poolSizes.data();
-	descriptorPoolInfo.maxSets = static_cast<u32>(maxSets);
-	return descriptorPoolInfo;
-}
-
 inline VkDescriptorPoolSize descriptor_pool_size(VkDescriptorType type, u64 descriptorCount) {
 	VkDescriptorPoolSize descriptorPoolSize{};
 	descriptorPoolSize.type = type;
@@ -362,15 +352,6 @@ inline VkDescriptorSetLayoutCreateInfo descriptor_set_layout(const VkDescriptorS
 	descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	descriptorSetLayoutCreateInfo.pBindings = pBindings;
 	descriptorSetLayoutCreateInfo.bindingCount = static_cast<u32>(bindingCount);
-	return descriptorSetLayoutCreateInfo;
-}
-
-inline VkDescriptorSetLayoutCreateInfo descriptor_set_layout(
-	const std::vector<VkDescriptorSetLayoutBinding>& bindings) {
-	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
-	descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	descriptorSetLayoutCreateInfo.pBindings = bindings.data();
-	descriptorSetLayoutCreateInfo.bindingCount = static_cast<u32>(bindings.size());
 	return descriptorSetLayoutCreateInfo;
 }
 
@@ -552,16 +533,6 @@ inline VkPipelineDynamicStateCreateInfo pipeline_dynamic_state(const VkDynamicSt
 	pipelineDynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	pipelineDynamicStateCreateInfo.pDynamicStates = pDynamicStates;
 	pipelineDynamicStateCreateInfo.dynamicStateCount = dynamicStateCount;
-	pipelineDynamicStateCreateInfo.flags = flags;
-	return pipelineDynamicStateCreateInfo;
-}
-
-inline VkPipelineDynamicStateCreateInfo pipeline_dynamic_state(const std::vector<VkDynamicState>& pDynamicStates,
-															   VkPipelineDynamicStateCreateFlags flags = 0) {
-	VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo{};
-	pipelineDynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	pipelineDynamicStateCreateInfo.pDynamicStates = pDynamicStates.data();
-	pipelineDynamicStateCreateInfo.dynamicStateCount = static_cast<u32>(pDynamicStates.size());
 	pipelineDynamicStateCreateInfo.flags = flags;
 	return pipelineDynamicStateCreateInfo;
 }

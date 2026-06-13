@@ -7,7 +7,6 @@
 #include "CommandBuffer.h"
 #include "PersistentResourceManager.h"
 #include "Window.h"
-#include <unordered_map>
 #include <unordered_set>
 
 namespace vk {
@@ -341,13 +340,13 @@ static void create_logical_device() {
 	context().queue_indices = find_queue_families(context().physical_device);
 
 	lm::SmallArray<VkDeviceQueueCreateInfo, MAX_DEVICE_QUEUES> queue_CIs;
-	std::unordered_set<u32> unique_queue_families = {context().queue_indices.gfx_family.value(),
-													 context().queue_indices.present_family.value(),
-													 context().queue_indices.compute_family.value()};
+	std::unordered_set<u32> unique_queue_families = {context().queue_indices.gfx_family,
+													 context().queue_indices.present_family,
+													 context().queue_indices.compute_family};
 
-	context().queues.resize(context().queue_indices.gfx_family.has_value() +
-							context().queue_indices.present_family.has_value() +
-							context().queue_indices.compute_family.has_value());
+	context().queues.resize((context().queue_indices.gfx_family != VK_QUEUE_FAMILY_IGNORED) +
+							(context().queue_indices.present_family != VK_QUEUE_FAMILY_IGNORED) +
+							(context().queue_indices.compute_family != VK_QUEUE_FAMILY_IGNORED));
 	f32 queue_priority = 1.0f;
 	for (u32 queue_family_idx : unique_queue_families) {
 		VkDeviceQueueCreateInfo queue_CI{};
@@ -439,11 +438,11 @@ static void create_logical_device() {
 	check(vkCreateDevice(context().physical_device, &logical_device_CI, nullptr, &context().device),
 		  "Failed to create logical device");
 
-	vkGetDeviceQueue(context().device, context().queue_indices.gfx_family.value(), 0,
+	vkGetDeviceQueue(context().device, context().queue_indices.gfx_family, 0,
 					 &context().queues[(i32)QueueType::GFX]);
-	vkGetDeviceQueue(context().device, context().queue_indices.compute_family.value(), 0,
+	vkGetDeviceQueue(context().device, context().queue_indices.compute_family, 0,
 					 &context().queues[(i32)QueueType::COMPUTE]);
-	vkGetDeviceQueue(context().device, context().queue_indices.present_family.value(), 0,
+	vkGetDeviceQueue(context().device, context().queue_indices.present_family, 0,
 					 &context().queues[(i32)QueueType::PRESENT]);
 }
 
@@ -516,7 +515,7 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 	_swapchain_format = surface_format.format;
 
 	QueueFamilyIndices indices = find_queue_families(context().physical_device);
-	u32 queue_family_indices_arr[] = {indices.gfx_family.value(), indices.present_family.value()};
+	u32 queue_family_indices_arr[] = {indices.gfx_family, indices.present_family};
 
 	if (indices.gfx_family != indices.present_family) {
 		swapchain_CI.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
@@ -557,7 +556,7 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 static void create_command_pools() {
 	QueueFamilyIndices queue_family_idxs = find_queue_families(context().physical_device);
 	VkCommandPoolCreateInfo pool_info = command_pool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-	pool_info.queueFamilyIndex = queue_family_idxs.gfx_family.value();
+	pool_info.queueFamilyIndex = queue_family_idxs.gfx_family;
 	constexpr auto MAX_COMMAND_POOL_THREAD_COUNT = 64;
 	context().cmd_pools.resize(MAX_COMMAND_POOL_THREAD_COUNT);
 	for (u32 i = 0; i < MAX_COMMAND_POOL_THREAD_COUNT; i++) {

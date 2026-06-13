@@ -24,22 +24,30 @@ void save_exr(const f32* rgb, i32 width, i32 height, const char* outfilename) {
 	InitEXRImage(&image);
 	image.num_channels = 3;
 
-	std::vector<f32> images[3];
-	images[0].resize(width * height);
-	images[1].resize(width * height);
-	images[2].resize(width * height);
+	if (width <= 0 || height <= 0) {
+		LUMEN_ERROR("Cannot save an EXR with invalid dimensions: %d x %d", width, height);
+	}
+	u64 pixel_count = static_cast<u64>(width) * static_cast<u64>(height);
+	if (pixel_count > SIZE_MAX / (3 * sizeof(f32))) {
+		LUMEN_ERROR("EXR dimensions are too large: %d x %d", width, height);
+	}
+	f32* channel_data = static_cast<f32*>(malloc(3 * pixel_count * sizeof(f32)));
+	if (!channel_data) {
+		LUMEN_ERROR("Could not allocate EXR channel storage");
+	}
+	f32* images[3] = {channel_data, channel_data + pixel_count, channel_data + 2 * pixel_count};
 
 	// Split RGBRGBRGB... into R, G and B layer
-	for (i32 i = 0; i < width * height; i++) {
+	for (u64 i = 0; i < pixel_count; i++) {
 		images[0][i] = rgb[4 * i + 0];
 		images[1][i] = rgb[4 * i + 1];
 		images[2][i] = rgb[4 * i + 2];
 	}
 
 	f32* image_ptr[3];
-	image_ptr[0] = &(images[2].at(0));	// B
-	image_ptr[1] = &(images[1].at(0));	// G
-	image_ptr[2] = &(images[0].at(0));	// R
+	image_ptr[0] = images[2];  // B
+	image_ptr[1] = images[1];  // G
+	image_ptr[2] = images[0];  // R
 
 	image.images = (unsigned char**)image_ptr;
 	image.width = width;
@@ -84,5 +92,6 @@ void save_exr(const f32* rgb, i32 width, i32 height, const char* outfilename) {
 	free(header.channels);
 	free(header.pixel_types);
 	free(header.requested_pixel_types);
+	free(channel_data);
 }
 }  // namespace ImageUtils

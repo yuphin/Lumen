@@ -7,14 +7,18 @@ std::atomic_bool ThreadPool::done;
 std::queue<std::function<void()>> ThreadPool::work_queue;
 std::mutex ThreadPool::queue_mutex;
 std::condition_variable ThreadPool::cv;
-std::vector<std::thread> ThreadPool::threads;
+lm::SmallArray<std::thread, 64> ThreadPool::threads;
 void ThreadPool::init() {
 	u32 thread_count = std::thread::hardware_concurrency();
+	if (thread_count == 0) {
+		thread_count = 1;
+	} else if (thread_count > threads.capacity()) {
+		thread_count = static_cast<u32>(threads.capacity());
+	}
 	done = false;
 	try {
-		threads.reserve(thread_count);
 		for (u32 i = 0; i < thread_count; i++) {
-			threads.emplace_back([i] {
+			threads.push_back_move(std::thread([i] {
 #ifdef _WIN32
 				wchar_t threadName[64];
 				swprintf(threadName, 64, L"LumenWorker %d", i);
@@ -33,7 +37,7 @@ void ThreadPool::init() {
 					}
 					task();
 				}
-			});
+			}));
 		}
 	} catch (const std::exception& ex) {
 		LUMEN_ERROR(ex.what());
@@ -46,4 +50,5 @@ void ThreadPool::destroy() {
 	for (auto& thread : threads) {
 		thread.join();
 	}
+	threads.clear();
 }

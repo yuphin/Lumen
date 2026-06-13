@@ -96,6 +96,7 @@ typedef double f64;
 #include <thread>
 #include <span>
 #include <filesystem>
+#include "Framework/VulkanStructs.h"
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_ENABLE_EXPERIMENTAL
