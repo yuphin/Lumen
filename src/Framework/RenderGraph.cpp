@@ -1082,18 +1082,32 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 	// Post execution buffer barriers
 	{
-		lm::SmallArray<VkBufferMemoryBarrier2, MAX_RESOURCES_COPIES> post_execution_buffer_memory_barriers;
-		if (!post_execution_buffer_barriers.empty()) {
-			for (auto& barrier : post_execution_buffer_barriers) {
-				VkPipelineStageFlags curr_stage = barrier.src_stage
-													  ? barrier.src_stage
-													  : pipeline_stage_from_pass_type(type, barrier.src_access_flags);
-				VkPipelineStageFlags dst_stage = barrier.dst_stage
-													 ? barrier.dst_stage
-													 : pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
-				post_execution_buffer_memory_barriers.push_back(vk::buffer_barrier2(
-					barrier.buffer, barrier.src_access_flags, barrier.dst_access_flags, curr_stage, dst_stage));
+		lm::SmallArray<VkBufferMemoryBarrier2, MAX_RESOURCES_COPIES + MAX_BUFFER_BARRIERS>
+			post_execution_buffer_memory_barriers;
+		for (auto& barrier : post_execution_buffer_barriers) {
+			VkPipelineStageFlags curr_stage =
+				barrier.src_stage ? barrier.src_stage : pipeline_stage_from_pass_type(type, barrier.src_access_flags);
+			VkPipelineStageFlags dst_stage =
+				barrier.dst_stage ? barrier.dst_stage : pipeline_stage_from_pass_type(type, barrier.dst_access_flags);
+			post_execution_buffer_memory_barriers.push_back(vk::buffer_barrier2(
+				barrier.buffer, barrier.src_access_flags, barrier.dst_access_flags, curr_stage, dst_stage));
+		}
+		if (blas_build_data.is_valid()) {
+			for (vk::Buffer* source_buffer : blas_build_data.source_buffers) {
+				for (const Resource& zeroed_resource : resource_zeros) {
+					if (zeroed_resource.buf && zeroed_resource.buf->handle == source_buffer->handle) {
+						// If a BLAS input was zeroed, make the fill visible to the AS build.
+						post_execution_buffer_memory_barriers.push_back(vk::buffer_barrier2(
+							source_buffer->handle, VK_ACCESS_TRANSFER_WRITE_BIT,
+							VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR,
+							VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR));
+						break;
+					}
+				}
 			}
+		}
+
+		if (!post_execution_buffer_memory_barriers.empty()) {
 			auto dependency_info = vk::dependency_info((u32)post_execution_buffer_memory_barriers.size,
 													   post_execution_buffer_memory_barriers.data);
 			vkCmdPipelineBarrier2(cmd, &dependency_info);
@@ -1137,26 +1151,6 @@ void RenderPass::run(VkCommandBuffer cmd) {
 	}
 
 	if (blas_build_data.is_valid()) {
-		// First, check against resource zeros
-		// If we have a resource zero here, we should make it visible to AS build.
-		lm::SmallArray<VkBufferMemoryBarrier2, MAX_BUFFER_BARRIERS> blas_input_barriers;
-		for (vk::Buffer* source_buffer : blas_build_data.source_buffers) {
-			for (const Resource& zeroed_resource : resource_zeros) {
-				if (zeroed_resource.buf && zeroed_resource.buf->handle == source_buffer->handle) {
-					blas_input_barriers.push_back(vk::buffer_barrier2(
-						source_buffer->handle, VK_ACCESS_TRANSFER_WRITE_BIT,
-						VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR,
-						VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR));
-					break;
-				}
-			}
-		}
-		if (!blas_input_barriers.empty()) {
-			const VkDependencyInfo dependency_info =
-				vk::dependency_info((u32)blas_input_barriers.size, blas_input_barriers.data);
-			vkCmdPipelineBarrier2(cmd, &dependency_info);
-		}
-
 		GPUQueryManager::begin(cmd, "BLAS Build");
 		ScratchArena scratch = _arena_per_frame;
 		vk::blas_build(scratch, blas_build_data.blases, blas_build_data.blas_inputs, blas_build_data.flags, cmd,
