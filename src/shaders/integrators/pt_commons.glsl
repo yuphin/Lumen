@@ -13,21 +13,25 @@ vec3 uniform_sample_light(inout uvec4 seed, const Material mat, vec3 pos, const 
 	const vec3 Le =
 		sample_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, cos_from_light, record);
 	const vec3 p = offset_ray2(pos, n_s);
-	float bsdf_pdf;
-	float cos_x = dot(n_s, wi);
-	vec3 f = eval_bsdf(n_s, wo, mat, 1, side, wi, bsdf_pdf);
-	float pdf_light;
-	any_hit_payload.hit = 1;
-	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0x1, 1, 0, 1, p, 0, wi,
-				wi_len - EPS, 1);
-	visible = any_hit_payload.hit == 0;
-	if (visible && pdf_light_w > 0) {
-		const float mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + bsdf_pdf / pdf_light_w);
-		res += mis_weight * f * abs(cos_x) * Le / pdf_light_w;
+	visible = false;
+	if (wi_len > EPS && pdf_light_w > 0) {
+		float bsdf_pdf;
+		const float cos_x = dot(n_s, wi);
+		const vec3 f = eval_bsdf(n_s, wo, mat, 1, side, wi, bsdf_pdf);
+		any_hit_payload.hit = 1;
+		traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0x1, 1, 0, 1, p, 0,
+					wi, wi_len - EPS, 1);
+		visible = any_hit_payload.hit == 0;
+		if (visible) {
+			const float mis_weight = is_light_delta(record.flags) ? 1 : 1 / (1 + bsdf_pdf / pdf_light_w);
+			res += mis_weight * f * abs(cos_x) * Le / pdf_light_w;
+		}
 	}
 	if (get_light_type(record.flags) == LIGHT_AREA) {
 		// Sample BSDF
-		f = sample_bsdf(n_s, wo, mat, 1, side, wi, bsdf_pdf, cos_x, seed);
+		float bsdf_pdf;
+		float cos_x;
+		vec3 f = sample_bsdf(n_s, wo, mat, 1, side, wi, bsdf_pdf, cos_x, seed);
 		if (bsdf_pdf != 0) {
 			payload.material_idx = uint(-1);
 			traceRayEXT(tlas, flags, 0x1, 0, 0, 0, p, tmin, wi, tmax, 0);

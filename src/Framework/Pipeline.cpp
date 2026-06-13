@@ -120,11 +120,12 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 	}
 	auto& vert_shader = settings.shaders[vert_shader_idx];
 	i32 i = 0;
-	for (auto& [format, size] : vert_shader.vertex_inputs) {
-		auto binding_desc = vk::vertex_input_binding_description(i, size, VK_VERTEX_INPUT_RATE_VERTEX);
-		auto attribute_desc = vk::vertex_input_attribute_description(i, i, format, 0);
+	for (const VertexInput& input : vert_shader.vertex_inputs) {
+		auto binding_desc = vk::vertex_input_binding_description(i, input.size, VK_VERTEX_INPUT_RATE_VERTEX);
+		auto attribute_desc = vk::vertex_input_attribute_description(i, i, input.format, 0);
 		binding_descs.push_back(binding_desc);
 		attribute_descs.push_back(attribute_desc);
+		++i;
 	}
 	auto vertex_input_state = vk::pipeline_vertex_input_state();
 	vertex_input_state.vertexAttributeDescriptionCount = (u32)attribute_descs.size;

@@ -19,11 +19,15 @@ struct BindingStatus {
 	bool active = false;
 };
 
+struct VertexInput {
+	VkFormat format;
+	u32 size;
+};
 
 struct Shader {
 	Shader() = default;
 	Shader(const lm::String& filename);
-	std::vector<u32> binary;
+	lm::FixedArray<u32> binary;
 	lm::String filename;
 	lm::String name_with_macros;
 
@@ -40,7 +44,7 @@ struct Shader {
 	VkShaderModule create_vk_shader_module(const VkDevice& device) const;
 	u32 num_as_bindings = 0;
 
-	lm::SmallArray<std::pair<VkFormat, u32>, MAX_VERTEX_INPUTS> vertex_inputs;
+	lm::SmallArray<VertexInput, MAX_VERTEX_INPUTS> vertex_inputs;
 	lm::HashMap<lm::String, BufferStatus> buffer_status_map;
 	lm::HashMap<u32, BindingStatus> resource_binding_map;
 

@@ -192,7 +192,9 @@ static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& a
 				} else {
 					shader_tasks.push_back_move(ThreadPool::submit(
 						[pass](vk::Shader* shader) {
-							shader->compile(pass);
+							if (shader->compile(pass) != 0) {
+								return (vk::Shader*)nullptr;
+							}
 							return shader;
 						},
 						shader));
@@ -201,6 +203,9 @@ static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& a
 			}
 			for (auto& task : shader_tasks) {
 				auto shader = task.get();
+				if (!shader) {
+					LUMEN_ERROR("Shader compilation failed");
+				}
 				{
 					std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
 					pass->rg->shader_cache.insert(shader->name_with_macros, *shader);
@@ -219,7 +224,9 @@ static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& a
 				if (shader_entry) {
 					*shader = shader_entry->value;
 				} else {
-					shader->compile(pass);
+					if (shader->compile(pass) != 0) {
+						LUMEN_ERROR("Shader compilation failed");
+					}
 					{
 						std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
 						pass->rg->shader_cache.insert(shader->name_with_macros, *shader);

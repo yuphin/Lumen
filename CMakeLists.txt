@@ -45,13 +45,8 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/libs PREFIX Libs FILES ${LIB_SRC})
 
 add_executable(Lumen ${src_files} ${shaders_src})
 
-if(MSVC)
-    set_source_files_properties(${shaderc_src} PROPERTIES COMPILE_OPTIONS "/wd5232")
-endif()
-
 target_compile_definitions(Lumen PRIVATE
     TINYEXR_USE_MINIZ
-    USE_SHADERC
     $<$<CONFIG:Debug>:USE_VALIDATION_LAYERS>
     $<$<CONFIG:Debug>:_DEBUG>
     $<$<CONFIG:Release>:_RELEASE>
@@ -67,11 +62,10 @@ if(WIN32)
     get_filename_component(vulkan_lib_folder ${Vulkan_LIBRARIES} DIRECTORY)
     target_link_directories(Lumen PRIVATE ${vulkan_lib_folder})
     target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared glm GPUOpen::VulkanMemoryAllocator
-        $<$<CONFIG:Debug>:spirv-cross-cored> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-core>
-        $<$<CONFIG:Debug>:spirv-cross-glsld> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-glsl>)
+        $<$<CONFIG:Debug>:spirv-cross-cored> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-core>)
     target_compile_definitions(Lumen PRIVATE _CRT_SECURE_NO_WARNINGS)
 else()
-    target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared spirv-cross-core spirv-cross-glsl glm GPUOpen::VulkanMemoryAllocator)
+    target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared spirv-cross-core glm GPUOpen::VulkanMemoryAllocator)
 endif()
 # target_compile_options(Lumen PRIVATE
 #     $<$<CXX_COMPILER_ID:MSVC>:/W4>
