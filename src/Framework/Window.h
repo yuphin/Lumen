@@ -135,10 +135,25 @@ struct MouseInput {
 	double y = 0.0;
 };
 
-using MouseClickCallback = std::function<void(MouseAction button, KeyAction action, double x, double y)>;
-using MouseMoveCallback = std::function<void(double delta_x, double delta_y, double x, double y)>;
-using MouseScrollCallback = std::function<void(double x, double y)>;
-using KeyCallback = std::function<void(KeyInput input, KeyAction action)>;
+struct MouseClickCallback {
+	void (*procedure)(void*, MouseAction, KeyAction, double, double);
+	void* user_data;
+};
+
+struct MouseMoveCallback {
+	void (*procedure)(void*, double, double, double, double);
+	void* user_data;
+};
+
+struct MouseScrollCallback {
+	void (*procedure)(void*, double, double);
+	void* user_data;
+};
+
+struct KeyCallback {
+	void (*procedure)(void*, KeyInput, KeyAction);
+	void* user_data;
+};
 namespace Window {
 
 inline constexpr u64 MAX_KEY_INPUTS = static_cast<u64>(KeyInput::MAX_KEY);
@@ -176,10 +191,10 @@ bool is_mouse_up(MouseAction mb);
 bool is_mouse_held(MouseAction mb, glm::ivec2& pos);
 bool is_mouse_up(MouseAction mb, glm::ivec2& pos);
 void destroy();
-void add_mouse_click_callback(MouseClickCallback callback);
-void add_mouse_move_callback(MouseMoveCallback callback);
-void add_scroll_callback(MouseScrollCallback callback);
-void add_key_callback(KeyCallback callback);
+void add_mouse_click_callback(void (*procedure)(void*, MouseAction, KeyAction, double, double), void* user_data = nullptr);
+void add_mouse_move_callback(void (*procedure)(void*, double, double, double, double), void* user_data = nullptr);
+void add_scroll_callback(void (*procedure)(void*, double, double), void* user_data = nullptr);
+void add_key_callback(void (*procedure)(void*, KeyInput, KeyAction), void* user_data = nullptr);
 u32 width();
 u32 height();
 f32 aspect_ratio();

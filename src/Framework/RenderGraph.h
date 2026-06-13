@@ -34,6 +34,11 @@ static constexpr u64 MAX_DESCRIPTORS = 32;
 class RenderGraph;
 class RenderPass;
 
+struct PipelineTask {
+	void (*procedure)(RenderPass*);
+	u32 pass_idx;
+};
+
 struct PipelineStorage {
 	vk::Pipeline pipeline;
 	lm::SmallArray<ResourceBinding, MAX_DESCRIPTORS> bound_resources;
@@ -132,8 +137,7 @@ class RenderGraph {
 	friend RenderPass;
 
 	vk::ShaderMacroArray global_macro_defines;
-	lm::FixedArray<std::pair<std::function<void(RenderPass*)>, u32>> pipeline_tasks;
-	lm::FixedArray<std::function<void(RenderPass*)>> shader_tasks;
+	lm::FixedArray<PipelineTask> pipeline_tasks;
 	lm::FixedArray<RenderPass> passes;
 
 	// vk::Pipeline Name + Macro String + Specialization Constants -> vk::Pipeline
@@ -145,7 +149,7 @@ class RenderGraph {
 	lm::HashMap<lm::String, vk::Shader> shader_cache;
 
 	RenderGraphSettings settings;
-	std::mutex shader_map_mutex;
+	os::Mutex shader_map_mutex;
 	const bool multithreaded_pipeline_compilation = true;
 	static const u32 INVALID_PASS_IDX = UINT_MAX;
 	bool dirty_pass_encountered = false;
@@ -208,6 +212,11 @@ class RenderPass {
 	vk::PassSettings settings;
 
    private:
+	static void create_gfx_pipeline(RenderPass* pass);
+	static void create_rt_pipeline(RenderPass* pass);
+	static void create_compute_pipeline(RenderPass* pass);
+	static void update_rt_descriptors(RenderPass* pass);
+
 	lm::SmallArray<Resource, MAX_RESOURCES_ZEROS> resource_zeros;
 	lm::SmallArray<BufferBarrier, MAX_RESOURCES_ZEROS> prefill_buffer_barriers;
 	lm::SmallArray<std::pair<Resource, Resource>, MAX_RESOURCES_COPIES> resource_copies;

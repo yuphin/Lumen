@@ -2,6 +2,7 @@
 #include "PersistentResourceManager.h"
 #include "Base/HashMap.h"
 #include "Base/Memory.h"
+#include "Base/OS.h"
 #include "VulkanContext.h"
 #include "VkUtils.h"
 
@@ -60,10 +61,7 @@ struct PersistentPool {
 	PersistentPool(lm::String arena_name) : arena_name(arena_name) {}
 
 	T* get(bool use_mutex) {
-		std::unique_lock<std::mutex> lock(mutex, std::defer_lock);
-		if (use_mutex) {
-			lock.lock();
-		}
+		os::ScopedLock lock(mutex, use_mutex);
 		if (!arena) {
 			arena = lm::arena_create(arena_name, MB(4), MB(1));
 			free_list = lm::array_create<T*>(arena, 0, 4096);
@@ -92,7 +90,7 @@ struct PersistentPool {
 	lm::String arena_name;
 	lm::Arena* arena = nullptr;
 	lm::Array<T*> free_list;
-	std::mutex mutex;
+	os::Mutex mutex;
 };
 
 namespace prm {
@@ -102,13 +100,10 @@ PersistentPool<vk::Texture> _texture_pool(CSTR("Persistent Texture Pool Arena"))
 using SamplerCache = lm::HashMap<VkSamplerCreateInfo, VkSampler, sampler_hash, sampler_eq>;
 lm::Arena* _sampler_cache_arena = nullptr;
 SamplerCache _sampler_cache;
-std::mutex _sampler_cache_mutex;
+os::Mutex _sampler_cache_mutex;
 
 VkSampler get_sampler(const VkSamplerCreateInfo& sampler_create_info, bool use_mutex) {
-	std::unique_lock<std::mutex> lock(_sampler_cache_mutex, std::defer_lock);
-	if (use_mutex) {
-		lock.lock();
-	}
+	os::ScopedLock lock(_sampler_cache_mutex, use_mutex);
 	if (!_sampler_cache_arena) {
 		_sampler_cache_arena = lm::arena_create(CSTR("Sampler Cache Arena"), MB(1), KB(64));
 		_sampler_cache =

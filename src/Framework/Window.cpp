@@ -20,11 +20,12 @@ static MouseInput* get_mouse_input(Window* window, MouseAction action) {
 
 template <typename Callback, u64 N>
 static void add_callback(lm::SmallArray<Callback, N>& callbacks, Callback callback) {
+	LUMEN_ASSERT(callback.procedure, "Cannot add an empty Window callback");
 	LUMEN_ASSERT(callbacks.size < callbacks.capacity(), "Window callback capacity exceeded");
 	if (callbacks.size >= callbacks.capacity()) {
 		return;
 	}
-	callbacks.push_back_move(std::move(callback));
+	callbacks.push_back(callback);
 }
 
 static void key_callback(GLFWwindow* window, i32 key, i32 scancode, i32 action, i32 mods) {
@@ -34,7 +35,7 @@ static void key_callback(GLFWwindow* window, i32 key, i32 scancode, i32 action, 
 	auto ptr = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
 	ptr->key_map[key] = static_cast<KeyAction>(action);
 	for (auto& cb : ptr->key_callbacks) {
-		cb(static_cast<KeyInput>(key), static_cast<KeyAction>(action));
+		cb.procedure(cb.user_data, static_cast<KeyInput>(key), static_cast<KeyAction>(action));
 	}
 }
 
@@ -82,7 +83,7 @@ static void mouse_click_callback(GLFWwindow* window, i32 button, i32 action, i32
 	glfwGetCursorPos(window, &xpos, &ypos);
 	*get_mouse_input(window_ptr, mouse_button) = {callback_action, xpos, ypos};
 	for (auto& cb : window_ptr->mouse_click_callbacks) {
-		cb(mouse_button, callback_action, xpos, ypos);
+		cb.procedure(cb.user_data, mouse_button, callback_action, xpos, ypos);
 	}
 }
 
@@ -105,13 +106,13 @@ static void mouse_move_callback(GLFWwindow* window, double x, double y) {
 	}
 
 	for (auto& cb : window_ptr->mouse_move_callbacks) {
-		cb(window_ptr->mouse_delta_prev_x, window_ptr->mouse_delta_prev_y, xpos, ypos);
+		cb.procedure(cb.user_data, window_ptr->mouse_delta_prev_x, window_ptr->mouse_delta_prev_y, xpos, ypos);
 	}
 }
 
 static void scroll_callback(GLFWwindow* window, double x, double y) {
 	const auto window_ptr = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
-	for (auto& cb : window_ptr->mouse_scroll_callbacks) cb(x, y);
+	for (auto& cb : window_ptr->mouse_scroll_callbacks) cb.procedure(cb.user_data, x, y);
 }
 
 void init(i32 width, i32 height, bool fullscreen, bool on_second_monitor) {
@@ -160,15 +161,21 @@ void destroy() {
 	glfwTerminate();
 }
 
-void add_mouse_click_callback(MouseClickCallback callback) {
-	add_callback(_window.mouse_click_callbacks, std::move(callback));
+void add_mouse_click_callback(void (*procedure)(void*, MouseAction, KeyAction, double, double), void* user_data) {
+	add_callback(_window.mouse_click_callbacks, MouseClickCallback{procedure, user_data});
 }
 
-void add_mouse_move_callback(MouseMoveCallback callback) { add_callback(_window.mouse_move_callbacks, std::move(callback)); }
+void add_mouse_move_callback(void (*procedure)(void*, double, double, double, double), void* user_data) {
+	add_callback(_window.mouse_move_callbacks, MouseMoveCallback{procedure, user_data});
+}
 
-void add_scroll_callback(MouseScrollCallback callback) { add_callback(_window.mouse_scroll_callbacks, std::move(callback)); }
+void add_scroll_callback(void (*procedure)(void*, double, double), void* user_data) {
+	add_callback(_window.mouse_scroll_callbacks, MouseScrollCallback{procedure, user_data});
+}
 
-void add_key_callback(KeyCallback callback) { add_callback(_window.key_callbacks, std::move(callback)); }
+void add_key_callback(void (*procedure)(void*, KeyInput, KeyAction), void* user_data) {
+	add_callback(_window.key_callbacks, KeyCallback{procedure, user_data});
+}
 
 bool is_mouse_held(MouseAction mb, glm::ivec2& pos) {
 	const MouseInput* input = get_mouse_input(&_window, mb);

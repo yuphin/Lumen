@@ -91,9 +91,6 @@ typedef double f64;
 #include <imgui/imgui.h>
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_vulkan.h"
-#include <future>
-#include <queue>
-#include <thread>
 #include <span>
 #include <filesystem>
 #include "Framework/VulkanStructs.h"

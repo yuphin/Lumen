@@ -73,6 +73,7 @@ if(WIN32)
 else()
     target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared spirv-cross-c-shared glm GPUOpen::VulkanMemoryAllocator)
 endif()
+target_link_libraries(Lumen PRIVATE Threads::Threads)
 # target_compile_options(Lumen PRIVATE
 #     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 #     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>)

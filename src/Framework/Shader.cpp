@@ -20,7 +20,7 @@ thread_local ShaderThreadState _shader_thread_state;
 
 // We need this to be able to reset all threads' arenas
 static lm::SmallArray<lm::Arena*, MAX_SHADER_WORKER_ARENAS> _shader_worker_arenas;
-static std::mutex _shader_worker_arenas_mutex;
+static os::Mutex _shader_worker_arenas_mutex;
 
 static u64 string_content_size(const lm::String& string) {
 	return string.size && string.data[string.size - 1] == '\0' ? string.size - 1 : string.size;
@@ -30,7 +30,7 @@ static lm::String string_content(const lm::String& string) { return {string.data
 
 static lm::Arena* get_shader_arena() {
 	if (!_shader_thread_state.arena) {
-		std::lock_guard<std::mutex> lock(_shader_worker_arenas_mutex);
+		os::ScopedLock lock(_shader_worker_arenas_mutex);
 		LUMEN_ASSERT(_shader_worker_arenas.size < _shader_worker_arenas.capacity(),
 					 "Exceeded maximum shader worker arena count");
 		_shader_thread_state.arena = lm::arena_create(CSTR("Shader Arena"), MB(16), MB(1));
@@ -768,7 +768,7 @@ VkShaderModule Shader::create_vk_shader_module(const VkDevice& device) const {
 }
 
 void shader_arena_reset() {
-	std::lock_guard<std::mutex> lock(_shader_worker_arenas_mutex);
+	os::ScopedLock lock(_shader_worker_arenas_mutex);
 	for (lm::Arena* arena : _shader_worker_arenas) {
 		arena->clear();
 	}

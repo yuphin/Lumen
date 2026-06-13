@@ -1,34 +1,44 @@
 #pragma once
-#include "Framework/Base/SmallArray.h"
+#include "Framework/Base/OS.h"
 
 class ThreadPool {
    public:
-	template <typename FunctionType, typename... Args>
-	static auto submit(FunctionType&& f, Args&&... args);
+	using JobProcedure = void (*)(void*);
+
+	struct Job {
+		JobProcedure procedure = nullptr;
+		void* data = nullptr;
+	};
+
+	struct JobCounter {
+		u32 remaining = 0;
+	};
+
 	static void init();
 	static void destroy();
+	static void submit(Job job, JobCounter& counter);
+	static void wait(JobCounter& counter);
 
    private:
-	static std::atomic_bool done;
-	static std::queue<std::function<void()>> work_queue;
-	static std::mutex queue_mutex;
-	static std::condition_variable cv;
-	static lm::SmallArray<std::thread, 64> threads;
-};
+	struct QueuedJob {
+		Job job;
+		JobCounter* counter;
+	};
 
-template <typename FunctionType, typename... Args>
-auto ThreadPool::submit(FunctionType&& f, Args&&... args) {
-	using result_type = std::invoke_result_t<FunctionType, Args...>;
-	auto task = std::make_shared<std::packaged_task<result_type()>>(
-		std::bind(std::forward<FunctionType>(f), std::forward<Args>(args)...));
-	auto result = task->get_future();
-	{
-		std::lock_guard<std::mutex> lock(queue_mutex);
-		if (done) {
-			LUMEN_ERROR("ThreadPool has been terminated");
-		}
-		work_queue.emplace([task]() { (*task)(); });
-	}
-	cv.notify_one();
-	return result;
-}
+	static constexpr u32 MAX_THREADS = 64;
+	static constexpr u32 MAX_QUEUED_JOBS = 4096;
+
+	static void worker(void*);
+	static void execute(QueuedJob queued_job);
+	static bool pop_job(QueuedJob& queued_job);
+
+	static bool stopping;
+	static QueuedJob work_queue[MAX_QUEUED_JOBS];
+	static u32 queue_read;
+	static u32 queue_write;
+	static u32 queue_count;
+	static os::Mutex queue_mutex;
+	static os::ConditionVariable cv;
+	static os::Thread threads[MAX_THREADS];
+	static u32 thread_count;
+};

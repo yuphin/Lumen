@@ -177,38 +177,58 @@ static void process_bindings(RenderPass* pass, vk::Shader& shader) {
 	}
 }
 
+struct ShaderCompileTask {
+	RenderPass* pass;
+	vk::Shader* shader;
+	vk::Shader* result;
+};
+
+static void compile_shader(void* raw_task) {
+	ShaderCompileTask* task = (ShaderCompileTask*)raw_task;
+	task->result = task->shader->compile(task->pass) == 0 ? task->shader : nullptr;
+}
+
+struct BuildShadersTask {
+	RenderPass* pass;
+	lm::FixedArray<vk::Shader*> shaders;
+};
+
+struct PipelineRunTask {
+	PipelineTask task;
+	RenderPass* pass;
+};
+
 static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& active_shaders) {
 	// TODO: make resource processing in order
 	switch (pass->type) {
 		case vk::PassType::RT:
 		case vk::PassType::Graphics: {
-			lm::SmallArray<std::future<vk::Shader*>, vk::MAX_SHADERS_PER_PASS> shader_tasks;
+			lm::SmallArray<ShaderCompileTask, vk::MAX_SHADERS_PER_PASS> shader_tasks;
+			ThreadPool::JobCounter shader_counter;
 			for (auto& shader : active_shaders) {
-				pass->rg->shader_map_mutex.lock();
-				auto shader_entry = pass->rg->shader_cache.find(shader->name_with_macros);
-				pass->rg->shader_map_mutex.unlock();
-				if (shader_entry) {
-					*shader = shader_entry->value;
-				} else {
-					shader_tasks.push_back_move(ThreadPool::submit(
-						[pass](vk::Shader* shader) {
-							if (shader->compile(pass) != 0) {
-								return (vk::Shader*)nullptr;
-							}
-							return shader;
-						},
-						shader));
+				bool shader_cached = false;
+				{
+					os::ScopedLock lock(pass->rg->shader_map_mutex);
+					auto shader_entry = pass->rg->shader_cache.find(shader->name_with_macros);
+					if (shader_entry) {
+						*shader = shader_entry->value;
+						shader_cached = true;
+					}
 				}
-				// shader->compile(pass);
+				if (!shader_cached) {
+					ShaderCompileTask& task = shader_tasks.push();
+					task = {.pass = pass, .shader = shader, .result = nullptr};
+					ThreadPool::submit({compile_shader, &task}, shader_counter);
+				}
 			}
+			ThreadPool::wait(shader_counter);
 			for (auto& task : shader_tasks) {
-				auto shader = task.get();
-				if (!shader) {
+				if (!task.result) {
 					LUMEN_ERROR("Shader compilation failed");
 				}
 				{
-					std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
-					pass->rg->shader_cache.insert(shader->name_with_macros, *shader);
+					os::ScopedLock lock(pass->rg->shader_map_mutex);
+					pass->rg->shader_cache.insert(task.result->name_with_macros, *task.result);
 				}
 			}
 			for (auto& shader : active_shaders) {
@@ -218,21 +238,24 @@ static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& a
 		} break;
 		case vk::PassType::Compute: {
 			for (auto& shader : active_shaders) {
-				pass->rg->shader_map_mutex.lock();
-				auto shader_entry = pass->rg->shader_cache.find(shader->name_with_macros);
-				pass->rg->shader_map_mutex.unlock();
-				if (shader_entry) {
-					*shader = shader_entry->value;
-				} else {
+				bool shader_cached = false;
+				{
+					os::ScopedLock lock(pass->rg->shader_map_mutex);
+					auto shader_entry = pass->rg->shader_cache.find(shader->name_with_macros);
+					if (shader_entry) {
+						*shader = shader_entry->value;
+						shader_cached = true;
+					}
+				}
+				if (!shader_cached) {
 					if (shader->compile(pass) != 0) {
 						LUMEN_ERROR("Shader compilation failed");
 					}
 					{
-						std::lock_guard<std::mutex> lock(pass->rg->shader_map_mutex);
+						os::ScopedLock lock(pass->rg->shader_map_mutex);
 						pass->rg->shader_cache.insert(shader->name_with_macros, *shader);
 					}
 				}
-				// shader->compile(pass);
 				pass->pipeline_storage->affected_buffer_pointers = shader->buffer_status_map;
 				process_bindings(pass, *shader);
 			}
@@ -240,6 +263,16 @@ static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& a
 		default:
 			break;
 	}
+}
+
+static void build_shaders_job(void* raw_task) {
+	BuildShadersTask* task = (BuildShadersTask*)raw_task;
+	build_shaders(task->pass, task->shaders);
+}
+
+static void run_pipeline_job(void* raw_task) {
+	PipelineRunTask* task = (PipelineRunTask*)raw_task;
+	task->task.procedure(task->pass);
 }
 
 bool RenderPass::register_dependencies(const vk::Buffer* buffer, VkAccessFlags dst_access_flags, BufferSyncFlags flags,
@@ -760,74 +793,69 @@ RenderPass& RenderPass::tlas_build(vk::BVH& tlas, vk::Buffer* instances_buf, u32
 	return *this;
 }
 
+void RenderPass::update_rt_descriptors(RenderPass* pass) {
+	VkAccelerationStructureKHR accels[vk::MAX_AS_BINDING_COUNT];
+	u32 num_accels = 0;
+	for (u32 i = 0; i < pass->pipeline_storage->as_bindings.size; i++) {
+		if (!pass->pipeline_storage->as_bindings[i].accel) {
+			LUMEN_INFO("Using null TLAS inside %s", pass->name.data);
+		}
+		accels[i] = pass->pipeline_storage->as_bindings[i].accel;
+		++num_accels;
+	}
+	pass->pipeline_storage->pipeline.tlas_info = {
+		VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
+	pass->pipeline_storage->pipeline.tlas_info.accelerationStructureCount = num_accels;
+	pass->pipeline_storage->pipeline.tlas_info.pAccelerationStructures = accels;
+	auto descriptor_write =
+		vk::write_descriptor_set(pass->pipeline_storage->pipeline.tlas_descriptor_set,
+								 VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0,
+								 &pass->pipeline_storage->pipeline.tlas_info, num_accels);
+	vkUpdateDescriptorSets(vk::context().device, 1, &descriptor_write, 0, nullptr);
+	pass->pipeline_storage->update_as_descriptor = false;
+}
+
+void RenderPass::create_gfx_pipeline(RenderPass* pass) {
+	pass->pipeline_storage->pipeline.create_gfx_pipeline(pass->settings, pass->descriptor_counts.to_slice());
+}
+
+void RenderPass::create_rt_pipeline(RenderPass* pass) {
+	pass->pipeline_storage->pipeline.create_rt_pipeline(pass->settings, pass->descriptor_counts.to_slice(),
+														u32(pass->pipeline_storage->as_bindings.size));
+	update_rt_descriptors(pass);
+}
+
+void RenderPass::create_compute_pipeline(RenderPass* pass) {
+	pass->pipeline_storage->pipeline.create_compute_pipeline(pass->settings, pass->descriptor_counts.to_slice());
+}
+
 void RenderPass::finalize() {
 	// Create pipelines/push descriptor templates
-
-	auto update_rt_descriptors = [this]() {
-		VkAccelerationStructureKHR accels[vk::MAX_AS_BINDING_COUNT];
-		u32 num_accels = 0;
-		for (u32 i = 0; i < pipeline_storage->as_bindings.size; i++) {
-			if (!pipeline_storage->as_bindings[i].accel) {
-				LUMEN_INFO("Using null TLAS inside %s", name.data);
-			}
-			accels[i] = pipeline_storage->as_bindings[i].accel;
-			++num_accels;
-		}
-		pipeline_storage->pipeline.tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
-		pipeline_storage->pipeline.tlas_info.accelerationStructureCount = num_accels;
-		pipeline_storage->pipeline.tlas_info.pAccelerationStructures = accels;
-		auto descriptor_write = vk::write_descriptor_set(pipeline_storage->pipeline.tlas_descriptor_set,
-														 VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0,
-														 &pipeline_storage->pipeline.tlas_info, num_accels);
-		vkUpdateDescriptorSets(vk::context().device, 1, &descriptor_write, 0, nullptr);
-		pipeline_storage->update_as_descriptor = false;
-	};
 	bool rebuild_tlas_descriptors = is_pipeline_cached && pipeline_storage->update_as_descriptor;
 	if (!is_pipeline_cached) {
+		void (*procedure)(RenderPass*) = nullptr;
 		switch (type) {
-			case vk::PassType::Graphics: {
-				auto func = [](RenderPass* pass) {
-					pass->pipeline_storage->pipeline.create_gfx_pipeline(pass->settings,
-																		 pass->descriptor_counts.to_slice());
-				};
-				if (rg->multithreaded_pipeline_compilation) {
-					rg->pipeline_tasks.push_back({func, pass_idx});
-				} else {
-					func(this);
-				}
+			case vk::PassType::Graphics:
+				procedure = create_gfx_pipeline;
 				break;
-			}
-			case vk::PassType::RT: {
-				auto func = [update_rt_descriptors](RenderPass* pass) {
-					pass->pipeline_storage->pipeline.create_rt_pipeline(pass->settings,
-																		pass->descriptor_counts.to_slice(),
-																		u32(pass->pipeline_storage->as_bindings.size));
-					update_rt_descriptors();
-				};
-				if (rg->multithreaded_pipeline_compilation) {
-					rg->pipeline_tasks.push_back({func, pass_idx});
-				} else {
-					func(this);
-				}
+			case vk::PassType::RT:
+				procedure = create_rt_pipeline;
 				break;
-			}
-			case vk::PassType::Compute: {
-				auto func = [](RenderPass* pass) {
-					pass->pipeline_storage->pipeline.create_compute_pipeline(pass->settings,
-																			 pass->descriptor_counts.to_slice());
-				};
-				if (rg->multithreaded_pipeline_compilation) {
-					rg->pipeline_tasks.push_back({func, pass_idx});
-				} else {
-					func(this);
-				}
+			case vk::PassType::Compute:
+				procedure = create_compute_pipeline;
 				break;
-			}
 			default:
 				break;
 		}
+		if (procedure) {
+			if (rg->multithreaded_pipeline_compilation) {
+				rg->pipeline_tasks.push_back({procedure, pass_idx});
+			} else {
+				procedure(this);
+			}
+		}
 	} else if (rebuild_tlas_descriptors) {
-		update_rt_descriptors();
+		update_rt_descriptors(this);
 	}
 }
 
@@ -1231,9 +1259,7 @@ void RenderGraph::init() {
 	}
 	// Arrays
 	passes = lm::fixed_array_create<RenderPass>(_arena_rendergraph, MAX_PASSES_PER_FRAME);
-	pipeline_tasks = lm::fixed_array_create<std::pair<std::function<void(RenderPass*)>, u32>>(_arena_rendergraph,
-																							  MAX_PIPELINE_TASKS);
-	shader_tasks = lm::fixed_array_create<std::function<void(RenderPass*)>>(_arena_rendergraph, 4 * MAX_PIPELINE_TASKS);
+	pipeline_tasks = lm::fixed_array_create<PipelineTask>(_arena_rendergraph, MAX_PIPELINE_TASKS);
 	// Hashmaps
 	// Sizes are reasonable upper bounds but not hard bounds unlike arrays
 	pipeline_cache = lm::hash_map_create<u64, PipelineStorage>(_arena_rendergraph, MAX_PASSES_PER_FRAME);
@@ -1285,7 +1311,8 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 			}
 		}
 
-		lm::SmallArray<std::future<void>, MAX_PIPELINE_TASKS * 4> futures;
+		lm::SmallArray<BuildShadersTask, MAX_PIPELINE_TASKS * 4> shader_tasks;
+		ThreadPool::JobCounter shader_counter;
 		for (const auto& entry : unique_shaders_set) {
 			vk::Shader* shader = entry.key.first;
 			RenderPass* rp = entry.key.second;
@@ -1298,19 +1325,19 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 		}
 		// Compile and process resources for unique shaders
 		for (const auto& [hash, pass, shaders] : unique_shaders_map) {
-			futures.push_back_move(ThreadPool::submit(std::bind(&build_shaders, pass, shaders)));
+			BuildShadersTask& task = shader_tasks.push();
+			task = {.pass = pass, .shaders = shaders};
+			ThreadPool::submit({build_shaders_job, &task}, shader_counter);
 		}
-		for (auto& future : futures) {
-			future.wait();
-		}
-		futures.clear();
+		ThreadPool::wait(shader_counter);
+		shader_tasks.clear();
 		// Process resources for duplicate shaders
 		for (const auto& [hash, pass, shaders] : existing_shaders_map) {
-			futures.push_back_move(ThreadPool::submit(std::bind(&build_shaders, pass, shaders)));
+			BuildShadersTask& task = shader_tasks.push();
+			task = {.pass = pass, .shaders = shaders};
+			ThreadPool::submit({build_shaders_job, &task}, shader_counter);
 		}
-		for (auto& future : futures) {
-			future.wait();
-		}
+		ThreadPool::wait(shader_counter);
 	}
 
 	for (auto i = 0; i < passes.size; i++) {
@@ -1318,15 +1345,16 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	}
 
 	if (pipeline_tasks.size) {
-		lm::SmallArray<std::future<void>, MAX_PIPELINE_TASKS> futures;
-		for (auto& [task, idx] : pipeline_tasks) {
-			if (task) {
-				futures.push_back_move(ThreadPool::submit(task, &passes[idx]));
+		lm::SmallArray<PipelineRunTask, MAX_PIPELINE_TASKS> tasks;
+		ThreadPool::JobCounter pipeline_counter;
+		for (PipelineTask& pipeline_task : pipeline_tasks) {
+			if (pipeline_task.procedure) {
+				PipelineRunTask& task = tasks.push();
+				task = {.task = pipeline_task, .pass = &passes[pipeline_task.pass_idx]};
+				ThreadPool::submit({run_pipeline_job, &task}, pipeline_counter);
 			}
 		}
-		for (auto& future : futures) {
-			future.wait();
-		}
+		ThreadPool::wait(pipeline_counter);
 		// for (auto& [_, idx] : pipeline_tasks) {
 		// 	passes[idx].transition_resources();
 		// }

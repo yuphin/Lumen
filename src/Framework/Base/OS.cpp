@@ -15,6 +15,128 @@
 #include "Framework/Base/String.h"
 namespace os {
 
+#if defined(_WIN32) || defined(_WIN64)
+static DWORD WINAPI thread_entry(void* raw_thread) {
+	Thread* thread = (Thread*)raw_thread;
+	thread->procedure(thread->data);
+	return 0;
+}
+#else
+static void* thread_entry(void* raw_thread) {
+	Thread* thread = (Thread*)raw_thread;
+	thread->procedure(thread->data);
+	return nullptr;
+}
+#endif
+
+u32 processor_count() {
+#if defined(_WIN32) || defined(_WIN64)
+	SYSTEM_INFO sys_info;
+	GetSystemInfo(&sys_info);
+	return sys_info.dwNumberOfProcessors;
+#else
+	long count = sysconf(_SC_NPROCESSORS_ONLN);
+	return count > 0 ? (u32)count : 1;
+#endif
+}
+
+bool thread_start(Thread& thread, ThreadProcedure procedure, void* data) {
+	thread.procedure = procedure;
+	thread.data = data;
+#if defined(_WIN32) || defined(_WIN64)
+	thread.handle = CreateThread(nullptr, 0, thread_entry, &thread, 0, nullptr);
+	if (!thread.handle) {
+		thread.procedure = nullptr;
+		thread.data = nullptr;
+		return false;
+	}
+#else
+	if (pthread_create(&thread.native, nullptr, thread_entry, &thread) != 0) {
+		thread.procedure = nullptr;
+		thread.data = nullptr;
+		return false;
+	}
+	thread.started = true;
+#endif
+	return true;
+}
+
+void thread_join(Thread& thread) {
+#if defined(_WIN32) || defined(_WIN64)
+	if (!thread.handle) return;
+	WaitForSingleObject((HANDLE)thread.handle, INFINITE);
+	CloseHandle((HANDLE)thread.handle);
+	thread.handle = nullptr;
+#else
+	if (!thread.started) return;
+	pthread_join(thread.native, nullptr);
+	thread.started = false;
+#endif
+	thread.procedure = nullptr;
+	thread.data = nullptr;
+}
+
+void thread_set_name(Thread& thread, const char* name) {
+#if defined(_WIN32) || defined(_WIN64)
+	if (!thread.handle) return;
+	wchar_t wide_name[64] = {};
+	u32 i = 0;
+	for (; name[i] && i + 1 < ARRAY_SIZE(wide_name); ++i) {
+		wide_name[i] = (wchar_t)(u8)name[i];
+	}
+	wide_name[i] = L'\0';
+	SetThreadDescription((HANDLE)thread.handle, wide_name);
+#elif defined(__linux__)
+	if (thread.started) {
+		pthread_setname_np(thread.native, name);
+	}
+#endif
+}
+
+#if defined(_WIN32) || defined(_WIN64)
+void Mutex::lock() { AcquireSRWLockExclusive((PSRWLOCK)&native); }
+void Mutex::unlock() { ReleaseSRWLockExclusive((PSRWLOCK)&native); }
+
+void ConditionVariable::wait(Mutex& mutex) {
+	SleepConditionVariableSRW((PCONDITION_VARIABLE)&native, (PSRWLOCK)&mutex.native, INFINITE, 0);
+}
+void ConditionVariable::notify_one() { WakeConditionVariable((PCONDITION_VARIABLE)&native); }
+void ConditionVariable::notify_all() { WakeAllConditionVariable((PCONDITION_VARIABLE)&native); }
+
+Semaphore::Semaphore(u32 initial_count, u32 max_count) {
+	handle = CreateSemaphoreA(nullptr, (LONG)initial_count, (LONG)max_count, nullptr);
+	LUMEN_ASSERT(handle, "Failed to create semaphore");
+}
+Semaphore::~Semaphore() {
+	if (handle) CloseHandle((HANDLE)handle);
+}
+void Semaphore::acquire() { WaitForSingleObject((HANDLE)handle, INFINITE); }
+void Semaphore::release() { ReleaseSemaphore((HANDLE)handle, 1, nullptr); }
+#else
+Mutex::Mutex() { pthread_mutex_init(&native, nullptr); }
+Mutex::~Mutex() { pthread_mutex_destroy(&native); }
+void Mutex::lock() { pthread_mutex_lock(&native); }
+void Mutex::unlock() { pthread_mutex_unlock(&native); }
+
+ConditionVariable::ConditionVariable() { pthread_cond_init(&native, nullptr); }
+ConditionVariable::~ConditionVariable() { pthread_cond_destroy(&native); }
+void ConditionVariable::wait(Mutex& mutex) { pthread_cond_wait(&native, &mutex.native); }
+void ConditionVariable::notify_one() { pthread_cond_signal(&native); }
+void ConditionVariable::notify_all() { pthread_cond_broadcast(&native); }
+
+Semaphore::Semaphore(u32 initial_count, u32 max_count) {
+	(void)max_count;
+	i32 result = sem_init(&native, 0, initial_count);
+	LUMEN_ASSERT(result == 0, "Failed to create semaphore");
+}
+Semaphore::~Semaphore() { sem_destroy(&native); }
+void Semaphore::acquire() {
+	while (sem_wait(&native) != 0 && errno == EINTR) {
+	}
+}
+void Semaphore::release() { sem_post(&native); }
+#endif
+
 u64 get_page_size() {
 #if defined(_WIN32) || defined(_WIN64)
 	SYSTEM_INFO sys_info;
@@ -30,7 +152,8 @@ void reserve(void* ptr, u64 size) {
 	void* res = VirtualAlloc(ptr, size, MEM_RESERVE, PAGE_NOACCESS);
 	assert(res == ptr);
 #else
-	mmap(ptr, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	void* result = mmap(ptr, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	assert(result == ptr);
 #endif
 }
 
@@ -39,9 +162,9 @@ void* reserve(u64 reserve_size) {
 #if defined(_WIN32) || defined(_WIN64)
 	data_base = VirtualAlloc(NULL, reserve_size, MEM_RESERVE, PAGE_NOACCESS);
 #else
-	data_base = mmap(0, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if (result == MAP_FAILED) {
-		result = 0;
+	data_base = mmap(0, reserve_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if (data_base == MAP_FAILED) {
+		data_base = nullptr;
 	}
 #endif	// defined(_WIN32) || defined(_WIN64)
 	return data_base;
@@ -50,8 +173,7 @@ bool commit(void* ptr, u64 commit_size) {
 #if defined(_WIN32) || defined(_WIN64)
 	return (VirtualAlloc(ptr, commit_size, MEM_COMMIT, PAGE_READWRITE) != 0);
 #else
-	mprotect(ptr, size, PROT_READ | PROT_WRITE);
-	return true;
+	return mprotect(ptr, commit_size, PROT_READ | PROT_WRITE) == 0;
 #endif	// defined(_WIN32) || defined(_WIN64)
 }
 
@@ -94,13 +216,15 @@ u64 file_read(FileHandle handle, void* out_data, u64 size) {
 	}
 	u64 total_bytes_read = 0;
 	u64 bytes_left = size;
-	for (u64 offset = 0; offset < size; offset += total_bytes_read) {
-		int result = pread(fd, (u8*)out_data + offset, bytes_left, offset) if (result >= 0) {
-			total_bytes_read += result;
-			bytes_left -= result;
-		}
-		else {
-			return 0;  // Error reading file
+	while (bytes_left > 0) {
+		ssize_t result = pread(fd, (u8*)out_data + total_bytes_read, bytes_left, total_bytes_read);
+		if (result > 0) {
+			total_bytes_read += (u64)result;
+			bytes_left -= (u64)result;
+		} else if (result == 0) {
+			break;
+		} else if (errno != EINTR) {
+			return 0;
 		}
 	}
 	return total_bytes_read;
@@ -177,14 +301,15 @@ FileHandle file_open(const lm::String& path, AccessFlags access_flags) {
 	return (FileHandle)file_handle;
 #else
 	int flags = 0;
-	if (access_flags & AccessFlag_Read) {
+	if ((access_flags & AccessFlag_Read) && (access_flags & AccessFlag_Write)) {
+		flags |= O_RDWR | O_CREAT | O_TRUNC;
+	} else if (access_flags & AccessFlag_Read) {
 		flags |= O_RDONLY;
-	}
-	if (access_flags & AccessFlag_Write) {
+	} else if (access_flags & AccessFlag_Write) {
 		flags |= O_WRONLY | O_CREAT | O_TRUNC;
 	}
-	if (access_flags & AccessFlag_Execute) {
-		flags |= O_EXEC;
+	if (access_flags & AccessFlag_Append) {
+		flags |= O_APPEND;
 	}
 
 	int fd = open(path.data, flags, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
@@ -235,6 +360,7 @@ FileProperties file_properties(FileHandle handle) {
 			.size = file_stat.st_size, .created = file_stat.st_ctime, .modified = file_stat.st_mtime};
 		return properties;
 	}
+	return {};
 #endif
 }
 

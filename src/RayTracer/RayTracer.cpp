@@ -85,6 +85,28 @@ static void select_integrator_config(IntegratorType type, const SceneCommon& com
 	scene::get()->config.common.integrator_name = integrator_config_names[type];
 }
 
+static void key_callback(void*, KeyInput, KeyAction) {
+	if (Window::is_key_down(KeyInput::KEY_F1)) {
+		show_ui = !show_ui;
+	}
+	if (Window::is_key_down(KeyInput::KEY_F10)) {
+		write_exr = true;
+	} else if (Window::is_key_down(KeyInput::KEY_F11)) {
+		comparison_mode ^= true;
+	} else if (Window::is_key_down(KeyInput::KEY_F5)) {
+		reload_shaders();
+		active_integrator.updated = true;
+	} else if (Window::is_key_down(KeyInput::KEY_F6)) {
+		capture_ref_img = true;
+	} else if (Window::is_key_down(KeyInput::KEY_F7)) {
+		capture_target_img = true;
+	} else if (comparison_mode && Window::is_key_down(KeyInput::KEY_LEFT)) {
+		comparison_img_toggle = false;
+	} else if (comparison_mode && Window::is_key_down(KeyInput::KEY_RIGHT)) {
+		comparison_img_toggle = true;
+	}
+}
+
 void init(bool use_debug, i32 argc, char* argv[]) {
 	debug = use_debug;
 	lm::String scene_name = CSTR("scenes/caustics.scene");
@@ -96,27 +118,7 @@ void init(bool use_debug, i32 argc, char* argv[]) {
 		}
 	}
 	srand((u32)time(NULL));
-	Window::add_key_callback([](KeyInput key, KeyAction action) {
-		if (Window::is_key_down(KeyInput::KEY_F1)) {
-			show_ui = !show_ui;
-		}
-		if (Window::is_key_down(KeyInput::KEY_F10)) {
-			write_exr = true;
-		} else if (Window::is_key_down(KeyInput::KEY_F11)) {
-			comparison_mode ^= true;
-		} else if (Window::is_key_down(KeyInput::KEY_F5)) {
-			reload_shaders();
-			active_integrator.updated = true;
-		} else if (Window::is_key_down(KeyInput::KEY_F6)) {
-			capture_ref_img = true;
-		} else if (Window::is_key_down(KeyInput::KEY_F7)) {
-			capture_target_img = true;
-		} else if (comparison_mode && Window::is_key_down(KeyInput::KEY_LEFT)) {
-			comparison_img_toggle = false;
-		} else if (comparison_mode && Window::is_key_down(KeyInput::KEY_RIGHT)) {
-			comparison_img_toggle = true;
-		}
-	});
+	Window::add_key_callback(key_callback);
 
 	// Init with ray tracing extensions
 	vk::add_device_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);

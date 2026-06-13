@@ -28,6 +28,30 @@ static void upload_scene_ubo(Integrator* integrator) {
 	vk::buffer_write(integrator->scene_ubo_buffer, &integrator->scene_ubo, sizeof(integrator->scene_ubo));
 }
 
+static void mouse_click_callback(void* user_data, MouseAction, KeyAction, double, double) {
+	Integrator* integrator = (Integrator*)user_data;
+	if (ImGui::GetIO().WantCaptureMouse) {
+		return;
+	}
+	if (integrator->updated && Window::is_mouse_up(MouseAction::LEFT)) {
+		integrator->updated = true;
+	}
+	if (integrator->updated && Window::is_mouse_down(MouseAction::LEFT)) {
+		integrator->updated = true;
+	}
+}
+
+static void mouse_move_callback(void* user_data, double delta_x, double delta_y, double, double) {
+	Integrator* integrator = (Integrator*)user_data;
+	if (ImGui::GetIO().WantCaptureMouse) {
+		return;
+	}
+	if (Window::is_mouse_held(MouseAction::LEFT) && !Window::is_key_held(KeyInput::KEY_TAB)) {
+		lm::camera_rotate(&integrator->lumen_scene->camera, 0.05f * (f32)delta_y, -0.05f * (f32)delta_x, 0.0f);
+		integrator->updated = true;
+	}
+}
+
 static void common_init(Integrator* integrator) {
 	if (!integrator->lumen_scene) {
 		integrator->lumen_scene = scene::get();
@@ -36,27 +60,8 @@ static void common_init(Integrator* integrator) {
 		integrator->arena = lm::arena_create(CSTR("Integrator Arena"), MB(1), MB(1));
 	}
 	if (!integrator->callbacks_registered) {
-		lm::Camera* cam_ptr = &integrator->lumen_scene->camera;
-		Window::add_mouse_click_callback([integrator](MouseAction button, KeyAction action, double x, double y) {
-			if (ImGui::GetIO().WantCaptureMouse) {
-				return;
-			}
-			if (integrator->updated && Window::is_mouse_up(MouseAction::LEFT)) {
-				integrator->updated = true;
-			}
-			if (integrator->updated && Window::is_mouse_down(MouseAction::LEFT)) {
-				integrator->updated = true;
-			}
-		});
-		Window::add_mouse_move_callback([cam_ptr, integrator](double delta_x, double delta_y, double x, double y) {
-			if (ImGui::GetIO().WantCaptureMouse) {
-				return;
-			}
-			if (Window::is_mouse_held(MouseAction::LEFT) && !Window::is_key_held(KeyInput::KEY_TAB)) {
-				lm::camera_rotate(cam_ptr, 0.05f * (f32)delta_y, -0.05f * (f32)delta_x, 0.0f);
-				integrator->updated = true;
-			}
-		});
+		Window::add_mouse_click_callback(mouse_click_callback, integrator);
+		Window::add_mouse_move_callback(mouse_move_callback, integrator);
 		integrator->callbacks_registered = true;
 	}
 
