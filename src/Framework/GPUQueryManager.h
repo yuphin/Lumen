@@ -1,15 +1,16 @@
 #pragma once
+#include "Base/String.h"
 #include "Base/Utils.h"
 namespace GPUQueryManager {
 
 struct TimestampData {
-	std::string name;
+	lm::String name;
 	TimestampData* parent = nullptr;
 	u32 start_timestamp_idx = 0;
 	u32 end_timestamp_idx = 0;
 };
 
-void begin(VkCommandBuffer cmd, const char* name);
+void begin(VkCommandBuffer cmd, const lm::String& name);
 void end(VkCommandBuffer cmd);
 void collect(u32 curr_frame_idx);
 void collect();

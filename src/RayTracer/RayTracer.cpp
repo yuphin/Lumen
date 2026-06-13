@@ -345,9 +345,7 @@ static bool gui() {
 				parent = parent->parent;
 			}
 			double elapsed_ms = GPUQueryManager::get_elapsed(data) * 1e-6;
-			std::string indent(scope * 2, ' ');	 // Indent by 2 spaces per depth
-			std::string indented_text = std::format("{}{:.2f} ms: {}", indent, elapsed_ms, data.name);
-			ImGui::Text("%s", indented_text.c_str());
+			ImGui::Text("%*s%.2f ms: %.*s", scope * 2, "", elapsed_ms, (int)data.name.size, data.name.data);
 		}
 	}
 

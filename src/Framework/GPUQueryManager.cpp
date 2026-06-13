@@ -3,43 +3,59 @@
 
 namespace GPUQueryManager {
 
+static constexpr u32 MAX_QUERY_COUNT = 4096;
+static constexpr u32 MAX_TIMESTAMP_COUNT = 4096;
+static constexpr u64 MAX_TIMESTAMP_NAME_BYTES = MB(1);
+
 static u32 _curr_pool_idx = 0;
 
-static u64 _queries[4096];
+static u64 _queries[MAX_QUERY_COUNT];
 static u32 _curr_query_idx = 0;
 static u32 _num_collected_queries = 0;
 
-static TimestampData _data[4096];
+static TimestampData _data[MAX_TIMESTAMP_COUNT];
 static u32 _curr_timestamp_idx = 0;
 static u32 _num_collected_timestamps = 0;
 
-static std::vector<u32> _timestamp_stack;
+static u32 _timestamp_stack[MAX_TIMESTAMP_COUNT];
+static u32 _timestamp_stack_size = 0;
 
-void begin(VkCommandBuffer cmd, const char* name) {
-	LUMEN_ASSERT(_curr_query_idx < 4096, "Query pool exhausted");
+static char _timestamp_name_data[MAX_TIMESTAMP_NAME_BYTES];
+static u64 _timestamp_name_data_size = 0;
+
+void begin(VkCommandBuffer cmd, const lm::String& name) {
+	LUMEN_ASSERT(_curr_query_idx < MAX_QUERY_COUNT, "Query pool exhausted");
+	LUMEN_ASSERT(_curr_timestamp_idx < MAX_TIMESTAMP_COUNT, "Timestamp data exhausted");
 	vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vk::context().query_pool_timestamps[_curr_pool_idx],
 						_curr_query_idx);
 
-	_data[_curr_timestamp_idx].name = std::string(name);
+	u64 name_size = name.size;
+	LUMEN_ASSERT(_timestamp_name_data_size + name_size <= MAX_TIMESTAMP_NAME_BYTES, "Timestamp name data exhausted");
+	char* name_data = _timestamp_name_data + _timestamp_name_data_size;
+	memcpy(name_data, name.data, name_size);
+	_timestamp_name_data_size += name_size;
+
+	_data[_curr_timestamp_idx].name = lm::String(name_data, name_size);
 	_data[_curr_timestamp_idx].start_timestamp_idx = _curr_query_idx;
 
-	if (!_timestamp_stack.empty()) {
-		_data[_curr_timestamp_idx].parent = &_data[_timestamp_stack.back()];
+	if (_timestamp_stack_size > 0) {
+		_data[_curr_timestamp_idx].parent = &_data[_timestamp_stack[_timestamp_stack_size - 1]];
 	}
 
-	_timestamp_stack.push_back(_curr_timestamp_idx);
+	LUMEN_ASSERT(_timestamp_stack_size < ARRAY_LEN(_timestamp_stack), "Timestamp stack exhausted");
+	_timestamp_stack[_timestamp_stack_size++] = _curr_timestamp_idx;
 	_curr_timestamp_idx++;
 	_curr_query_idx++;
 }
 void end(VkCommandBuffer cmd) {
-	LUMEN_ASSERT(_curr_query_idx < 4096, "Query pool exhausted");
+	LUMEN_ASSERT(_curr_query_idx < MAX_QUERY_COUNT, "Query pool exhausted");
 	vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vk::context().query_pool_timestamps[_curr_pool_idx],
 						_curr_query_idx);
 
-	LUMEN_ASSERT(!_timestamp_stack.empty(), "Mismatched begin/end timestamps");
-	TimestampData& data = _data[_timestamp_stack.back()];
+	LUMEN_ASSERT(_timestamp_stack_size > 0, "Mismatched begin/end timestamps");
+	TimestampData& data = _data[_timestamp_stack[_timestamp_stack_size - 1]];
 	data.end_timestamp_idx = _curr_query_idx;
-	_timestamp_stack.pop_back();
+	_timestamp_stack_size--;
 	_curr_query_idx++;
 }
 
@@ -54,12 +70,13 @@ void collect(u32 curr_frame_idx) {
 		_curr_query_idx = 0;
 		_curr_timestamp_idx = 0;
 	}
+	_timestamp_name_data_size = 0;
 	_curr_pool_idx = curr_frame_idx;
-	vkResetQueryPool(vk::context().device, vk::context().query_pool_timestamps[curr_frame_idx], 0, 4096);
+	vkResetQueryPool(vk::context().device, vk::context().query_pool_timestamps[curr_frame_idx], 0, MAX_QUERY_COUNT);
 }
 
 void collect() { collect(_curr_pool_idx); }
-void reset_data() { memset(_data, 0, sizeof(TimestampData) * 4096); }
+void reset_data() { memset(_data, 0, sizeof(_data)); }
 util::Slice<TimestampData> get() { return util::Slice<TimestampData>(_data, _num_collected_timestamps); }
 
 // Assumes that collect has been called
@@ -67,7 +84,5 @@ u64 get_elapsed(const TimestampData& data) {
 	return _queries[data.end_timestamp_idx] - _queries[data.start_timestamp_idx];
 }
 
-u64 get_total_elapsed() {
-	return _num_collected_queries == 0 ? 0 : _queries[_num_collected_queries - 1] - _queries[0];
-}
+u64 get_total_elapsed() { return _num_collected_queries == 0 ? 0 : _queries[_num_collected_queries - 1] - _queries[0]; }
 }  // namespace GPUQueryManager
