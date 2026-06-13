@@ -1,15 +1,15 @@
 #include "Shader.h"
 #include "RenderGraph.h"
-#include <spirv_cross/spirv.h>
-#include <spirv_cross/spirv_cross.hpp>
+#include <spirv_cross/spirv_cross_c.h>
 #include <shaderc/shaderc.h>
 
 constexpr u64 MAX_SHADER_WORKER_ARENAS = 64;
 
 struct ShaderThreadState {
 	lm::Arena* arena = nullptr;
-	// Reused for the worker's lifetime process shutdown reclaims it.
+	// Reused for the worker's lifetime; process shutdown reclaims them.
 	shaderc_compiler_t compiler = nullptr;
+	spvc_context spirv_context = nullptr;
 };
 
 struct ShaderIncludeContext {
@@ -44,6 +44,51 @@ static shaderc_compiler_t get_shader_compiler() {
 		_shader_thread_state.compiler = shaderc_compiler_initialize();
 	}
 	return _shader_thread_state.compiler;
+}
+
+static spvc_context get_spirv_context() {
+	if (!_shader_thread_state.spirv_context &&
+		spvc_context_create(&_shader_thread_state.spirv_context) != SPVC_SUCCESS) {
+		lm::log(lm::LOG_ERROR, "Failed to create SPIRV-Cross context");
+	}
+	return _shader_thread_state.spirv_context;
+}
+
+static bool spvc_check(spvc_context context, spvc_result result, const char* operation) {
+	if (result == SPVC_SUCCESS) {
+		return true;
+	}
+	const char* error = context ? spvc_context_get_last_error_string(context) : "";
+	lm::log(lm::LOG_ERROR, "SPIRV-Cross %s failed: %s", operation, error ? error : "");
+	return false;
+}
+
+struct SpvcResourceList {
+	const spvc_reflected_resource* data = nullptr;
+	size_t size = 0;
+};
+
+static bool get_spvc_resources(spvc_context context, spvc_resources resources, spvc_resource_type type,
+							   SpvcResourceList& list) {
+	return spvc_check(context, spvc_resources_get_resource_list_for_type(resources, type, &list.data, &list.size),
+					  "resource lookup");
+}
+
+static bool create_spvc_compiler(const u32* code, u64 code_size, spvc_context& context, spvc_compiler& compiler) {
+	context = get_spirv_context();
+	if (!context) {
+		return false;
+	}
+
+	spvc_context_release_allocations(context);
+	spvc_parsed_ir parsed_ir = nullptr;
+	if (!spvc_check(context, spvc_context_parse_spirv(context, code, code_size, &parsed_ir), "SPIR-V parse")) {
+		return false;
+	}
+	return spvc_check(context,
+					  spvc_context_create_compiler(context, SPVC_BACKEND_NONE, parsed_ir,
+												   SPVC_CAPTURE_MODE_TAKE_OWNERSHIP, &compiler),
+					  "compiler creation");
 }
 
 static bool read_file(lm::Arena* arena, const lm::String& path, lm::String& contents) {
@@ -199,37 +244,37 @@ static lm::FixedArray<T> id_array_create(lm::Arena* arena, u32 id_bound) {
 }
 
 namespace vk {
-static bool get_vertex_input(spirv_cross::SPIRType::BaseType base_type, u32 vector_size, VertexInput& input) {
+static bool get_vertex_input(spvc_basetype base_type, u32 vector_size, VertexInput& input) {
 	struct VertexInputMapping {
-		spirv_cross::SPIRType::BaseType base_type;
+		spvc_basetype base_type;
 		u32 vector_size;
 		VertexInput input;
 	};
 	static const VertexInputMapping mappings[] = {
-		{spirv_cross::SPIRType::BaseType::Int, 1u, {VK_FORMAT_R32_SINT, (u32)sizeof(i32)}},
-		{spirv_cross::SPIRType::BaseType::Int, 2u, {VK_FORMAT_R32G32_SINT, 2 * (u32)sizeof(i32)}},
-		{spirv_cross::SPIRType::BaseType::Int, 3u, {VK_FORMAT_R32G32B32_SINT, 3 * (u32)sizeof(i32)}},
-		{spirv_cross::SPIRType::BaseType::Int, 4u, {VK_FORMAT_R32G32B32A32_SINT, 4 * (u32)sizeof(i32)}},
-		{spirv_cross::SPIRType::BaseType::UInt, 1u, {VK_FORMAT_R32_UINT, (u32)sizeof(u32)}},
-		{spirv_cross::SPIRType::BaseType::UInt, 2u, {VK_FORMAT_R32G32_UINT, 2 * (u32)sizeof(u32)}},
-		{spirv_cross::SPIRType::BaseType::UInt, 3u, {VK_FORMAT_R32G32B32_UINT, 3 * (u32)sizeof(u32)}},
-		{spirv_cross::SPIRType::BaseType::UInt, 4u, {VK_FORMAT_R32G32B32A32_UINT, 4 * (u32)sizeof(u32)}},
-		{spirv_cross::SPIRType::BaseType::Short, 1u, {VK_FORMAT_R16_SINT, (u32)sizeof(i16)}},
-		{spirv_cross::SPIRType::BaseType::Short, 2u, {VK_FORMAT_R16G16_SINT, 2 * (u32)sizeof(i16)}},
-		{spirv_cross::SPIRType::BaseType::Short, 3u, {VK_FORMAT_R16G16B16_SINT, 3 * (u32)sizeof(i16)}},
-		{spirv_cross::SPIRType::BaseType::Short, 4u, {VK_FORMAT_R16G16B16A16_SINT, 4 * (u32)sizeof(i16)}},
-		{spirv_cross::SPIRType::BaseType::UShort, 1u, {VK_FORMAT_R16_UINT, (u32)sizeof(u16)}},
-		{spirv_cross::SPIRType::BaseType::UShort, 2u, {VK_FORMAT_R16G16_UINT, 2 * (u32)sizeof(u16)}},
-		{spirv_cross::SPIRType::BaseType::UShort, 3u, {VK_FORMAT_R16G16B16_UINT, 3 * (u32)sizeof(u16)}},
-		{spirv_cross::SPIRType::BaseType::UShort, 4u, {VK_FORMAT_R16G16B16A16_UINT, 4 * (u32)sizeof(u16)}},
-		{spirv_cross::SPIRType::BaseType::Float, 1u, {VK_FORMAT_R32_SFLOAT, (u32)sizeof(f32)}},
-		{spirv_cross::SPIRType::BaseType::Float, 2u, {VK_FORMAT_R32G32_SFLOAT, 2 * (u32)sizeof(f32)}},
-		{spirv_cross::SPIRType::BaseType::Float, 3u, {VK_FORMAT_R32G32B32_SFLOAT, 3 * (u32)sizeof(f32)}},
-		{spirv_cross::SPIRType::BaseType::Float, 4u, {VK_FORMAT_R32G32B32A32_SFLOAT, 4 * (u32)sizeof(f32)}},
-		{spirv_cross::SPIRType::BaseType::Half, 1u, {VK_FORMAT_R16_SFLOAT, (u32)sizeof(u16)}},
-		{spirv_cross::SPIRType::BaseType::Half, 2u, {VK_FORMAT_R16G16_SFLOAT, 2 * (u32)sizeof(u16)}},
-		{spirv_cross::SPIRType::BaseType::Half, 3u, {VK_FORMAT_R16G16B16_SFLOAT, 3 * (u32)sizeof(u16)}},
-		{spirv_cross::SPIRType::BaseType::Half, 4u, {VK_FORMAT_R16G16B16A16_SFLOAT, 4 * (u32)sizeof(u16)}},
+		{SPVC_BASETYPE_INT32, 1u, {VK_FORMAT_R32_SINT, (u32)sizeof(i32)}},
+		{SPVC_BASETYPE_INT32, 2u, {VK_FORMAT_R32G32_SINT, 2 * (u32)sizeof(i32)}},
+		{SPVC_BASETYPE_INT32, 3u, {VK_FORMAT_R32G32B32_SINT, 3 * (u32)sizeof(i32)}},
+		{SPVC_BASETYPE_INT32, 4u, {VK_FORMAT_R32G32B32A32_SINT, 4 * (u32)sizeof(i32)}},
+		{SPVC_BASETYPE_UINT32, 1u, {VK_FORMAT_R32_UINT, (u32)sizeof(u32)}},
+		{SPVC_BASETYPE_UINT32, 2u, {VK_FORMAT_R32G32_UINT, 2 * (u32)sizeof(u32)}},
+		{SPVC_BASETYPE_UINT32, 3u, {VK_FORMAT_R32G32B32_UINT, 3 * (u32)sizeof(u32)}},
+		{SPVC_BASETYPE_UINT32, 4u, {VK_FORMAT_R32G32B32A32_UINT, 4 * (u32)sizeof(u32)}},
+		{SPVC_BASETYPE_INT16, 1u, {VK_FORMAT_R16_SINT, (u32)sizeof(i16)}},
+		{SPVC_BASETYPE_INT16, 2u, {VK_FORMAT_R16G16_SINT, 2 * (u32)sizeof(i16)}},
+		{SPVC_BASETYPE_INT16, 3u, {VK_FORMAT_R16G16B16_SINT, 3 * (u32)sizeof(i16)}},
+		{SPVC_BASETYPE_INT16, 4u, {VK_FORMAT_R16G16B16A16_SINT, 4 * (u32)sizeof(i16)}},
+		{SPVC_BASETYPE_UINT16, 1u, {VK_FORMAT_R16_UINT, (u32)sizeof(u16)}},
+		{SPVC_BASETYPE_UINT16, 2u, {VK_FORMAT_R16G16_UINT, 2 * (u32)sizeof(u16)}},
+		{SPVC_BASETYPE_UINT16, 3u, {VK_FORMAT_R16G16B16_UINT, 3 * (u32)sizeof(u16)}},
+		{SPVC_BASETYPE_UINT16, 4u, {VK_FORMAT_R16G16B16A16_UINT, 4 * (u32)sizeof(u16)}},
+		{SPVC_BASETYPE_FP32, 1u, {VK_FORMAT_R32_SFLOAT, (u32)sizeof(f32)}},
+		{SPVC_BASETYPE_FP32, 2u, {VK_FORMAT_R32G32_SFLOAT, 2 * (u32)sizeof(f32)}},
+		{SPVC_BASETYPE_FP32, 3u, {VK_FORMAT_R32G32B32_SFLOAT, 3 * (u32)sizeof(f32)}},
+		{SPVC_BASETYPE_FP32, 4u, {VK_FORMAT_R32G32B32A32_SFLOAT, 4 * (u32)sizeof(f32)}},
+		{SPVC_BASETYPE_FP16, 1u, {VK_FORMAT_R16_SFLOAT, (u32)sizeof(u16)}},
+		{SPVC_BASETYPE_FP16, 2u, {VK_FORMAT_R16G16_SFLOAT, 2 * (u32)sizeof(u16)}},
+		{SPVC_BASETYPE_FP16, 3u, {VK_FORMAT_R16G16B16_SFLOAT, 3 * (u32)sizeof(u16)}},
+		{SPVC_BASETYPE_FP16, 4u, {VK_FORMAT_R16G16B16A16_SFLOAT, 4 * (u32)sizeof(u16)}},
 	};
 
 	for (const VertexInputMapping& mapping : mappings) {
@@ -241,29 +286,29 @@ static bool get_vertex_input(spirv_cross::SPIRType::BaseType base_type, u32 vect
 	return false;
 }
 
-static VkShaderStageFlagBits get_shader_stage(spv::ExecutionModel execution_model) {
+static VkShaderStageFlagBits get_shader_stage(SpvExecutionModel execution_model) {
 	switch (execution_model) {
-		case spv::ExecutionModelVertex:
+		case SpvExecutionModelVertex:
 			return VK_SHADER_STAGE_VERTEX_BIT;
-		case spv::ExecutionModelFragment:
+		case SpvExecutionModelFragment:
 			return VK_SHADER_STAGE_FRAGMENT_BIT;
-		case spv::ExecutionModelGLCompute:
+		case SpvExecutionModelGLCompute:
 			return VK_SHADER_STAGE_COMPUTE_BIT;
-		case spv::ExecutionModelTaskNV:
+		case SpvExecutionModelTaskNV:
 			return VK_SHADER_STAGE_TASK_BIT_NV;
-		case spv::ExecutionModelMeshNV:
+		case SpvExecutionModelMeshNV:
 			return VK_SHADER_STAGE_MESH_BIT_NV;
-		case spv::ExecutionModelRayGenerationKHR:
+		case SpvExecutionModelRayGenerationKHR:
 			return VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-		case spv::ExecutionModelIntersectionKHR:
+		case SpvExecutionModelIntersectionKHR:
 			return VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
-		case spv::ExecutionModelAnyHitKHR:
+		case SpvExecutionModelAnyHitKHR:
 			return VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-		case spv::ExecutionModelClosestHitKHR:
+		case SpvExecutionModelClosestHitKHR:
 			return VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-		case spv::ExecutionModelMissKHR:
+		case SpvExecutionModelMissKHR:
 			return VK_SHADER_STAGE_MISS_BIT_KHR;
-		case spv::ExecutionModelCallableKHR:
+		case SpvExecutionModelCallableKHR:
 			return VK_SHADER_STAGE_CALLABLE_BIT_KHR;
 		default:
 			assert(!"Unsupported execution model");
@@ -271,73 +316,59 @@ static VkShaderStageFlagBits get_shader_stage(spv::ExecutionModel execution_mode
 	}
 }
 
-static u32 get_pc_size(spirv_cross::Compiler& compiler, const spirv_cross::SPIRType& type) {
-	u32 pc_size = 0;
-	for (auto member_type_id : type.member_types) {
-		const auto& member_type = compiler.get_type(member_type_id);
-		if (member_type.basetype == spirv_cross::SPIRType::BaseType::Struct) {
-			pc_size += get_pc_size(compiler, member_type);
-			continue;
-		}
-
-		const u32 element_count = member_type.columns * member_type.vecsize;
-		switch (member_type.basetype) {
-			case spirv_cross::SPIRType::BaseType::SByte:
-			case spirv_cross::SPIRType::BaseType::UByte:
-				pc_size += element_count;
-				break;
-			case spirv_cross::SPIRType::BaseType::Short:
-			case spirv_cross::SPIRType::BaseType::UShort:
-			case spirv_cross::SPIRType::BaseType::Half:
-				pc_size += element_count * 2;
-				break;
-			case spirv_cross::SPIRType::BaseType::Int:
-			case spirv_cross::SPIRType::BaseType::UInt:
-			case spirv_cross::SPIRType::BaseType::Float:
-				pc_size += element_count * 4;
-				break;
-			case spirv_cross::SPIRType::BaseType::Double:
-			case spirv_cross::SPIRType::BaseType::Int64:
-			case spirv_cross::SPIRType::BaseType::UInt64:
-				pc_size += element_count * 8;
-				break;
-			default:
-				LUMEN_ERROR("Unexpected push constant type!");
-		}
-	}
-	return pc_size;
-}
-
-static bool is_bound_buffer(u32 storage_class) { return storage_class == spv::StorageClassStorageBuffer; }
+static bool is_bound_buffer(u32 storage_class) { return storage_class == SpvStorageClassStorageBuffer; }
 
 static bool is_buffer(u32 storage_class) {
-	return storage_class == spv::StorageClassStorageBuffer || storage_class == spv::StorageClassPhysicalStorageBuffer;
+	return storage_class == SpvStorageClassStorageBuffer || storage_class == SpvStorageClassPhysicalStorageBuffer;
 }
 
-static void parse_spirv(spirv_cross::Compiler& compiler, Shader& shader, const u32* code, u64 code_size,
+static bool parse_spirv(spvc_context context, spvc_compiler compiler, Shader& shader, const u32* code, u64 code_size,
 						lm::RenderPass* pass, lm::Arena* scratch_arena) {
 	// Update active image and buffer status before walking individual instructions:
 	// storage images can be read and/or written, sampled images are reads, and
 	// active storage buffers must remain visible even if no access is inferred below.
-	const auto active_variables = compiler.get_active_interface_variables();
-	const auto active_resources = compiler.get_shader_resources(active_variables);
-	for (const auto& sampled_image : active_resources.sampled_images) {
-		const u32 binding = compiler.get_decoration(sampled_image.id, spv::DecorationBinding);
+	spvc_set active_variables = nullptr;
+	spvc_resources active_resources = nullptr;
+	if (!spvc_check(context, spvc_compiler_get_active_interface_variables(compiler, &active_variables),
+					"active variable lookup") ||
+		!spvc_check(context,
+					spvc_compiler_create_shader_resources_for_active_variables(compiler, &active_resources,
+																			  active_variables),
+					"active resource reflection")) {
+		return false;
+	}
+
+	SpvcResourceList resources;
+	if (!get_spvc_resources(context, active_resources, SPVC_RESOURCE_TYPE_SAMPLED_IMAGE, resources)) {
+		return false;
+	}
+	for (size_t i = 0; i < resources.size; i++) {
+		const u32 binding = spvc_compiler_get_decoration(compiler, resources.data[i].id, SpvDecorationBinding);
 		shader.resource_binding_map.insert(binding, BindingStatus{.read = true, .active = true});
 	}
-	for (const auto& storage_image : active_resources.storage_images) {
-		const u32 binding = compiler.get_decoration(storage_image.id, spv::DecorationBinding);
+	if (!get_spvc_resources(context, active_resources, SPVC_RESOURCE_TYPE_STORAGE_IMAGE, resources)) {
+		return false;
+	}
+	for (size_t i = 0; i < resources.size; i++) {
+		const spvc_reflected_resource& storage_image = resources.data[i];
+		const u32 binding = spvc_compiler_get_decoration(compiler, storage_image.id, SpvDecorationBinding);
 		BindingStatus& status = shader.resource_binding_map.get_or_create(binding)->value;
-		status.read |= !compiler.has_decoration(storage_image.id, spv::DecorationNonReadable);
-		status.write |= !compiler.has_decoration(storage_image.id, spv::DecorationNonWritable);
+		status.read |= !spvc_compiler_has_decoration(compiler, storage_image.id, SpvDecorationNonReadable);
+		status.write |= !spvc_compiler_has_decoration(compiler, storage_image.id, SpvDecorationNonWritable);
 		status.active = true;
 	}
-	for (const auto& storage_buffer : active_resources.storage_buffers) {
-		const u32 binding = compiler.get_decoration(storage_buffer.id, spv::DecorationBinding);
+	if (!get_spvc_resources(context, active_resources, SPVC_RESOURCE_TYPE_STORAGE_BUFFER, resources)) {
+		return false;
+	}
+	for (size_t i = 0; i < resources.size; i++) {
+		const u32 binding = spvc_compiler_get_decoration(compiler, resources.data[i].id, SpvDecorationBinding);
 		shader.resource_binding_map.get_or_create(binding)->value.active = true;
 	}
-	for (const auto& acceleration_structure : active_resources.acceleration_structures) {
-		const u32 set = compiler.get_decoration(acceleration_structure.id, spv::DecorationDescriptorSet);
+	if (!get_spvc_resources(context, active_resources, SPVC_RESOURCE_TYPE_ACCELERATION_STRUCTURE, resources)) {
+		return false;
+	}
+	for (size_t i = 0; i < resources.size; i++) {
+		const u32 set = spvc_compiler_get_decoration(compiler, resources.data[i].id, SpvDecorationDescriptorSet);
 		LUMEN_ASSERT(set == 1, "Acceleration structure must be in descriptor set 1");
 		shader.num_as_bindings++;
 	}
@@ -346,6 +377,7 @@ static void parse_spirv(spirv_cross::Compiler& compiler, Shader& shader, const u
 	const u32 id_bound = code[3];
 	struct Variable {
 		u32 storage_class = 0;
+		u32 type_id = 0;
 		bool valid = false;
 	};
 	struct AccessChain {
@@ -353,10 +385,15 @@ static void parse_spirv(spirv_cross::Compiler& compiler, Shader& shader, const u
 		u32 offset_idx = 0;
 		bool valid = false;
 	};
+	struct PointerType {
+		u32 pointee_type_id = 0;
+		bool valid = false;
+	};
 
 	auto access_chains = id_array_create<AccessChain>(scratch_arena, id_bound);
 	auto variables = id_array_create<Variable>(scratch_arena, id_bound);
-	auto load_ids = id_array_create<u32>(scratch_arena, id_bound);	// Result ID -> pointer ID
+	auto pointer_types = id_array_create<PointerType>(scratch_arena, id_bound);
+	auto load_ids = id_array_create<u32>(scratch_arena, id_bound);  // Result ID -> pointer ID
 	auto constant_ids = id_array_create<bool>(scratch_arena, id_bound);
 	// Pointer ID -> registered buffer pointer name.
 	auto buffer_pointer_names = id_array_create<lm::String>(scratch_arena, id_bound);
@@ -384,7 +421,8 @@ static void parse_spirv(spirv_cross::Compiler& compiler, Shader& shader, const u
 				// Access chain starts from a declared variable.
 				const u32 storage_class = variables[access_chain.base_ptr_id].storage_class;
 				if (is_bound_buffer(storage_class)) {
-					mark_binding(compiler.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding));
+					mark_binding(
+						spvc_compiler_get_decoration(compiler, access_chain.base_ptr_id, SpvDecorationBinding));
 				} else if (is_buffer(storage_class)) {
 					// Physical buffer access through a previously loaded pointer.
 					const u32 load_id = load_ids[access_chain.base_ptr_id];
@@ -407,7 +445,7 @@ static void parse_spirv(spirv_cross::Compiler& compiler, Shader& shader, const u
 		// declared pointer variable. Current shaderc/glslang output does not
 		// normally emit this, but treating it as a bound resource is correct.
 		if (variables[pointer_id].valid && is_bound_buffer(variables[pointer_id].storage_class)) {
-			mark_binding(compiler.get_decoration(pointer_id, spv::DecorationBinding));
+			mark_binding(spvc_compiler_get_decoration(compiler, pointer_id, SpvDecorationBinding));
 		}
 	};
 
@@ -419,14 +457,19 @@ static void parse_spirv(spirv_cross::Compiler& compiler, Shader& shader, const u
 		assert(word_count && instruction + word_count <= code + code_size);
 
 		switch (opcode) {
+			case SpvOpTypePointer:
+				assert(word_count == 4);
+				pointer_types[instruction[1]] = {.pointee_type_id = instruction[3], .valid = true};
+				break;
 			case SpvOpConstant:
 				constant_ids[instruction[2]] = true;
 				break;
 			case SpvOpVariable: {
 				assert(word_count >= 4);
 				const u32 storage_class = instruction[3];
-				if (storage_class != spv::StorageClassInput) {
-					variables[instruction[2]] = {.storage_class = storage_class, .valid = true};
+				if (storage_class != SpvStorageClassInput) {
+					variables[instruction[2]] = {
+						.storage_class = storage_class, .type_id = instruction[1], .valid = true};
 				}
 			} break;
 			case SpvOpAccessChain: {
@@ -445,21 +488,23 @@ static void parse_spirv(spirv_cross::Compiler& compiler, Shader& shader, const u
 			case SpvOpLoad: {
 				assert(word_count >= 4);
 				const u32 pointer_id = instruction[3];
-				const auto& result_type = compiler.get_type(instruction[1]);
-				if (result_type.basetype == spirv_cross::SPIRType::UInt64) {
+				const spvc_type result_type = spvc_compiler_get_type_handle(compiler, instruction[1]);
+				assert(result_type);
+				if (spvc_type_get_basetype(result_type) == SPVC_BASETYPE_UINT64) {
 					// We are loading a pointer, update register map
 					// Previous assumption also holds
 					if (access_chains[pointer_id].valid) {
 						const AccessChain access_chain = access_chains[pointer_id];
-						if (is_bound_buffer(compiler.get_storage_class(access_chain.base_ptr_id))) {
-							const u32 binding =
-								compiler.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
+						if (variables[access_chain.base_ptr_id].valid &&
+							is_bound_buffer(variables[access_chain.base_ptr_id].storage_class)) {
+							const u32 binding = spvc_compiler_get_decoration(
+								compiler, access_chain.base_ptr_id, SpvDecorationBinding);
 							shader.resource_binding_map.get_or_create(binding)->value.read = true;
 						}
 						access_chains[instruction[2]] = access_chain;
 						access_chains[pointer_id] = {};
 					}
-				} else if (result_type.pointer) {
+				} else if (pointer_types[instruction[1]].valid) {
 					// Loading a pointer value. Record its source pointer ID.
 					load_ids[instruction[2]] = pointer_id;
 				} else if (access_chains[pointer_id].valid) {
@@ -468,8 +513,8 @@ static void parse_spirv(spirv_cross::Compiler& compiler, Shader& shader, const u
 					const AccessChain& access_chain = access_chains[pointer_id];
 					if (variables[access_chain.base_ptr_id].valid) {
 						if (is_bound_buffer(variables[access_chain.base_ptr_id].storage_class)) {
-							const u32 binding =
-								compiler.get_decoration(access_chain.base_ptr_id, spv::DecorationBinding);
+							const u32 binding = spvc_compiler_get_decoration(
+								compiler, access_chain.base_ptr_id, SpvDecorationBinding);
 							shader.resource_binding_map.get_or_create(binding)->value.read = true;
 						}
 					} else {
@@ -486,7 +531,7 @@ static void parse_spirv(spirv_cross::Compiler& compiler, Shader& shader, const u
 					mark_buffer(buffer_pointer_names[pointer_id], true, false);
 				}
 				if (variables[pointer_id].valid && is_bound_buffer(variables[pointer_id].storage_class)) {
-					const u32 binding = compiler.get_decoration(pointer_id, spv::DecorationBinding);
+					const u32 binding = spvc_compiler_get_decoration(compiler, pointer_id, SpvDecorationBinding);
 					shader.resource_binding_map.get_or_create(binding)->value.read = true;
 				}
 			} break;
@@ -525,18 +570,26 @@ static void parse_spirv(spirv_cross::Compiler& compiler, Shader& shader, const u
 					const AccessChain& access_chain = access_chains[instruction[2]];
 					const u32 pointer_id = instruction[1];
 					if (constant_ids[access_chain.offset_idx]) {
-						const auto& pointer_type = compiler.get_type_from_variable(access_chain.base_ptr_id);
-						const auto& structure_type = compiler.get_type(pointer_type.parent_type);
-						assert(!structure_type.member_types.empty());
+						assert(variables[access_chain.base_ptr_id].valid);
+						const u32 variable_type_id = variables[access_chain.base_ptr_id].type_id;
+						assert(pointer_types[variable_type_id].valid);
+						const spvc_type structure_type =
+							spvc_compiler_get_type_handle(compiler, pointer_types[variable_type_id].pointee_type_id);
+						assert(structure_type);
+						const u32 member_count = spvc_type_get_num_member_types(structure_type);
+						assert(member_count);
 
 						lm::String container_name;
 						lm::String pointer_name;
-						const u32 member_index = compiler.get_constant(access_chain.offset_idx).scalar();
-						for (auto member_type_id : structure_type.member_types) {
-							const auto& container = compiler.get_name(member_type_id);
-							const auto& member = compiler.get_member_name(member_type_id, member_index);
-							container_name = {(char*)container.data(), (u64)container.size()};
-							pointer_name = {(char*)member.data(), (u64)member.size()};
+						const spvc_constant constant =
+							spvc_compiler_get_constant_handle(compiler, access_chain.offset_idx);
+						assert(constant);
+						const u32 member_index = spvc_constant_get_scalar_u32(constant, 0, 0);
+						for (u32 i = 0; i < member_count; i++) {
+							const u32 member_type_id = spvc_type_get_member_type(structure_type, i);
+							container_name = lm::str_from_cstr(spvc_compiler_get_name(compiler, member_type_id));
+							pointer_name =
+								lm::str_from_cstr(spvc_compiler_get_member_name(compiler, member_type_id, member_index));
 						}
 						const lm::String prefix = lm::str_concat(scratch_arena, container_name, "_");
 						buffer_pointer_names[pointer_id] = lm::str_concat(scratch_arena, prefix, pointer_name);
@@ -546,6 +599,7 @@ static void parse_spirv(spirv_cross::Compiler& compiler, Shader& shader, const u
 		}
 		instruction += word_count;
 	}
+	return true;
 }
 
 static void reset_reflection(Shader& shader, lm::Arena* arena) {
@@ -563,58 +617,86 @@ static void reset_reflection(Shader& shader, lm::Arena* arena) {
 	shader.resource_binding_map = lm::hash_map_create<u32, BindingStatus>(arena, 128);
 }
 
-static void parse_shader(Shader& shader, const u32* code, u64 code_size, lm::RenderPass* pass, lm::Arena* arena) {
-	spirv_cross::Compiler compiler(code, code_size);
-	const auto resources = compiler.get_shader_resources();
+static bool parse_shader(Shader& shader, const u32* code, u64 code_size, lm::RenderPass* pass, lm::Arena* arena) {
+	spvc_context context = nullptr;
+	spvc_compiler compiler = nullptr;
+	if (!create_spvc_compiler(code, code_size, context, compiler)) {
+		return false;
+	}
 
-	auto reflect = [&shader, &compiler](const spirv_cross::Resource& resource, VkDescriptorType type) {
-		const u32 binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-		LUMEN_ASSERT(binding < ARRAY_SIZE(shader.descriptor_types), "Shader descriptor binding is out of range");
-		shader.binding_mask |= 1 << binding;
-		shader.descriptor_types[binding] = type;
+	spvc_resources resources = nullptr;
+	if (!spvc_check(context, spvc_compiler_create_shader_resources(compiler, &resources), "resource reflection")) {
+		return false;
+	}
+
+	auto reflect = [&](spvc_resource_type resource_type, VkDescriptorType descriptor_type) {
+		SpvcResourceList list;
+		if (!get_spvc_resources(context, resources, resource_type, list)) {
+			return false;
+		}
+		for (size_t i = 0; i < list.size; i++) {
+			const u32 binding = spvc_compiler_get_decoration(compiler, list.data[i].id, SpvDecorationBinding);
+			LUMEN_ASSERT(binding < ARRAY_SIZE(shader.descriptor_types), "Shader descriptor binding is out of range");
+			shader.binding_mask |= 1 << binding;
+			shader.descriptor_types[binding] = descriptor_type;
+		}
+		return true;
 	};
 
 	auto max = [](u32 a, u32 b) { return a > b ? a : b; };
-	shader.stage = get_shader_stage(compiler.get_execution_model());
-	shader.local_size_x = max(1u, compiler.get_execution_mode_argument(spv::ExecutionModeLocalSize, 0));
-	shader.local_size_y = max(1u, compiler.get_execution_mode_argument(spv::ExecutionModeLocalSize, 1));
-	shader.local_size_z = max(1u, compiler.get_execution_mode_argument(spv::ExecutionModeLocalSize, 2));
+	shader.stage = get_shader_stage(spvc_compiler_get_execution_model(compiler));
+	shader.local_size_x =
+		max(1u, spvc_compiler_get_execution_mode_argument_by_index(compiler, SpvExecutionModeLocalSize, 0));
+	shader.local_size_y =
+		max(1u, spvc_compiler_get_execution_mode_argument_by_index(compiler, SpvExecutionModeLocalSize, 1));
+	shader.local_size_z =
+		max(1u, spvc_compiler_get_execution_mode_argument_by_index(compiler, SpvExecutionModeLocalSize, 2));
 
-	shader.uses_push_constants = !resources.push_constant_buffers.empty();
-	for (const auto& resource : resources.uniform_buffers) {
-		reflect(resource, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-	}
-	for (const auto& resource : resources.storage_buffers) {
-		reflect(resource, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-	}
-	for (const auto& resource : resources.storage_images) {
-		reflect(resource, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-	}
-	for (const auto& resource : resources.sampled_images) {
-		reflect(resource, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	if (!reflect(SPVC_RESOURCE_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) ||
+		!reflect(SPVC_RESOURCE_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) ||
+		!reflect(SPVC_RESOURCE_TYPE_STORAGE_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) ||
+		!reflect(SPVC_RESOURCE_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)) {
+		return false;
 	}
 
+	SpvcResourceList list;
+	if (!get_spvc_resources(context, resources, SPVC_RESOURCE_TYPE_STAGE_INPUT, list)) {
+		return false;
+	}
 	if (shader.stage == VK_SHADER_STAGE_VERTEX_BIT) {
-		for (const auto& resource : resources.stage_inputs) {
-			const auto& type = compiler.get_type(resource.type_id);
-			const auto& base_type = compiler.get_type(resource.base_type_id);
+		for (size_t i = 0; i < list.size; i++) {
+			const spvc_type type = spvc_compiler_get_type_handle(compiler, list.data[i].type_id);
+			const spvc_type base_type = spvc_compiler_get_type_handle(compiler, list.data[i].base_type_id);
 			VertexInput input;
-			if (get_vertex_input(base_type.basetype, type.vecsize, input)) {
+			if (get_vertex_input(spvc_type_get_basetype(base_type), spvc_type_get_vector_size(type), input)) {
 				shader.vertex_inputs.push_back(input);
 			}
 		}
 	}
 
-	LUMEN_ASSERT(resources.push_constant_buffers.size() <= 1,
-				 "Only 1 push constant is supported per shader at the moment!");
-	if (!resources.push_constant_buffers.empty()) {
-		const auto& type = compiler.get_type(resources.push_constant_buffers[0].type_id);
-		shader.push_constant_size = get_pc_size(compiler, type);
+	if (!get_spvc_resources(context, resources, SPVC_RESOURCE_TYPE_PUSH_CONSTANT, list)) {
+		return false;
 	}
+	LUMEN_ASSERT(list.size <= 1, "Only 1 push constant is supported per shader at the moment!");
+	shader.uses_push_constants = list.size != 0;
+	if (list.size) {
+		const spvc_type type = spvc_compiler_get_type_handle(compiler, list.data[0].base_type_id);
+		size_t push_constant_size = 0;
+		if (!spvc_check(context, spvc_compiler_get_declared_struct_size(compiler, type, &push_constant_size),
+						"push constant size reflection")) {
+			return false;
+		}
+		LUMEN_ASSERT(push_constant_size <= U32_MAX, "Push constant block exceeds u32 size");
+		shader.push_constant_size = (u32)push_constant_size;
+	}
+
 	if (pass->rg->settings.shader_inference) {
 		lm::ScratchArena scratch(arena);
-		parse_spirv(compiler, shader, code, code_size, pass, scratch.arena);
+		if (!parse_spirv(context, compiler, shader, code, code_size, pass, scratch.arena)) {
+			return false;
+		}
 	}
+	return true;
 }
 
 Shader::Shader(const lm::String& filename) : filename(filename) {}
@@ -666,7 +748,9 @@ i32 Shader::compile(lm::RenderPass* pass) {
 
 	// Clear shader data in case this is a recompile
 	reset_reflection(*this, arena);
-	parse_shader(*this, binary.data, binary.size, pass, arena);
+	if (!parse_shader(*this, binary.data, binary.size, pass, arena)) {
+		return -1;
+	}
 	return 0;
 }
 

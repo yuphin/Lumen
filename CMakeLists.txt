@@ -60,12 +60,18 @@ target_include_directories(Lumen PRIVATE ${Vulkan_INCLUDE_DIR};${structures_INCL
 if(WIN32)
     message("-- Adding vulkan library lib to search paths for the linker to find spirv libraries")
     get_filename_component(vulkan_lib_folder ${Vulkan_LIBRARIES} DIRECTORY)
+    get_filename_component(vulkan_sdk_folder ${vulkan_lib_folder} DIRECTORY)
     target_link_directories(Lumen PRIVATE ${vulkan_lib_folder})
     target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared glm GPUOpen::VulkanMemoryAllocator
-        $<$<CONFIG:Debug>:spirv-cross-cored> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-core>)
+        $<$<CONFIG:Debug>:spirv-cross-c-sharedd> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-c-shared>)
+    add_custom_command(TARGET Lumen POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<IF:$<CONFIG:Debug>,${vulkan_sdk_folder}/Bin/spirv-cross-c-sharedd.dll,${vulkan_sdk_folder}/Bin/spirv-cross-c-shared.dll>"
+            "$<TARGET_FILE_DIR:Lumen>"
+        VERBATIM)
     target_compile_definitions(Lumen PRIVATE _CRT_SECURE_NO_WARNINGS)
 else()
-    target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared spirv-cross-core glm GPUOpen::VulkanMemoryAllocator)
+    target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared spirv-cross-c-shared glm GPUOpen::VulkanMemoryAllocator)
 endif()
 # target_compile_options(Lumen PRIVATE
 #     $<$<CXX_COMPILER_ID:MSVC>:/W4>
