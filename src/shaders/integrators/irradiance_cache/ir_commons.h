@@ -52,10 +52,6 @@ struct PCPrefixSum {
 	uint out_offset;
 };
 
-struct IRCacheUniforms {
-	vec4 pad;
-};
-
 NAMESPACE_BEGIN(IRCache)
 
 struct GBuffer {

@@ -1,30 +1,22 @@
 #version 460
-#extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_GOOGLE_include_directive : enable
-#extension GL_EXT_debug_printf : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
-#extension GL_EXT_shader_atomic_float : require
-#extension GL_KHR_shader_subgroup_arithmetic : enable
 
 #include "ir_commons.h"
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnCount { uint d; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellIndices { uint d[]; };
 
 Indices indices = Indices(scene_desc.index_addr);
-Materials materials = Materials(scene_desc.material_addr);
 InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
 CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
-SpawnCount spawn_count = SpawnCount(scene_desc.surfel_spawn_count_addr);
 GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
 GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
 
@@ -33,15 +25,11 @@ GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_add
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(binding = 1, rgba32f) uniform image2D image;
 layout(binding = 2) uniform SceneUBOBuffer { SceneUBO ubo; };
-layout(binding = 3) uniform sampler2D scene_textures[];
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
 InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
 
-#include "../../bsdf_commons.glsl"
-
 #include "hash.glsl"
 #include "grid.glsl"
-#include "surfel_commons.glsl"
 
 vec3 debug_col(uint num) {
 	const float INV_11 = 1.0 / 2047.0;
@@ -67,10 +55,6 @@ void main() {
 	}
 
 	HitData hit_data = get_hitdata(gbuffer);
-	Material mat = load_material(hit_data.material_idx, hit_data.uv);
-	// vec3 col = uint_to_random_color(gbuffer.primitive_instance_id.y);
-	vec3 col = mat.albedo;
-	uint max_surfels = min(MAX_SURFEL_COUNT, spawn_count.d);
 
 	float best_weight = 0.0;
 	uint best_sid = 0xFFFFFFFF;
@@ -119,13 +103,12 @@ void main() {
 	}
 
 	uvec4 res = map_grid_axis(offset);
-	col = uvec3_to_random_color(res.yzw) * 0.5;
+	vec3 col = uvec3_to_random_color(res.yzw) * 0.5;
 	vec3 grid_base_color = uint_to_random_color(xxhash32(res.x));
 	col *= grid_base_color;
 
 	if (best_sid != 0xFFFFFFFF) {
 		vec3 surfel_color = uint_to_random_color(best_sid);
-		Surfel s = surfel_pool.d[best_sid];
 		col += surfel_color;
 		if (overlapping_surfel_cnt > 1) {
 			col = vec3(100, 0, 0);

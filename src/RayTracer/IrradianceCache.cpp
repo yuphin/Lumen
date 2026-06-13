@@ -365,7 +365,7 @@ void render(Integrator* integrator) {
 						   .dims = {max_screen_tiles_x, max_screen_tiles_y, 1}})
 			.push_constants(&pc)
 			.zero(state.surfel_spawn_count_buffer)
-			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer, integrator->output_tex});
+			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
 
 		vk::render_graph()
 			->add_compute(CSTR("Surfel: Allocate"),
@@ -398,7 +398,7 @@ void render(Integrator* integrator) {
 			{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_integrate.comp")),
 			 .dims = {util::div_ceil((u32)MAX_SURFEL_COUNT * state.rays_per_surfel, (u32)DEFAULT_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
-		.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
+		.bind({integrator->lumen_scene->scene_desc_buffer});
 
 	if (state.debug_mode) {
 		vk::render_graph()
@@ -406,16 +406,14 @@ void render(Integrator* integrator) {
 						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/debug.comp")),
 						   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024)), 1, 1}})
 			.push_constants(&pc)
-			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->output_tex, integrator->scene_ubo_buffer})
-			.bind_texture_array(integrator->lumen_scene->scene_textures);
+			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->output_tex, integrator->scene_ubo_buffer});
 	} else {
 		vk::render_graph()
 			->add_compute(CSTR("Composite"),
 						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/composite.comp")),
 						   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024)), 1, 1}})
 			.push_constants(&pc)
-			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->output_tex, integrator->scene_ubo_buffer})
-			.bind_texture_array(integrator->lumen_scene->scene_textures);
+			.bind({integrator->output_tex});
 	}
 }
 

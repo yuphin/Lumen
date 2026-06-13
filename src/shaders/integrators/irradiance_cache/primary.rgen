@@ -8,16 +8,13 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
-#define UINT32_MAX 4294967295u
 #include "../../commons.glsl"
 #include "ir_commons.h"
-#include "ir_commons.glsl"
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 layout(location = 0) rayPayloadEXT IRCacheHitPayload payload;
-layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer OutGBuffer { GBuffer d[]; };
 
@@ -32,7 +29,8 @@ void main() {
 	vec3 direction = vec3(sample_camera(ndc));
 	direction = normalize(direction);
 	GBuffer gbuffer_out;
-	init_gbuffer(gbuffer_out);
+	gbuffer_out.barycentrics = vec2(0);
+	gbuffer_out.primitive_instance_id = uvec2(-1);
 
 	traceRayEXT(tlas, flags, 0x1, 0, 0, 0, origin, tmin, direction, tmax, 0);
 	const bool found_isect = payload.instance_idx != -1;
@@ -40,8 +38,6 @@ void main() {
 		gbuffers.d[pixel_idx] = gbuffer_out;
 		return;
 	}
-	HitData hit_data = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
-
 	gbuffer_out.barycentrics = payload.attribs;
 	gbuffer_out.primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 	gbuffers.d[pixel_idx] = gbuffer_out;

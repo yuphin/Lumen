@@ -43,17 +43,11 @@ uvec4 map_grid_axis(vec3 pos) {
 	uint j = clamp(uint(floor((v + 1.0) * 0.5 * GRID_TRAPEZOIDAL_CELL_COUNT_AXIS)), 0,
 				   GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1u);
 
-#if 1
 	float depth_ratio = depth / pc.grid_uniform_cell_distance_threshold;
 	float max_ratio = 1e6 / pc.grid_uniform_cell_distance_threshold;
 	float k_normalized = log(depth_ratio) / log(max_ratio);
 	uint k =
 		clamp(uint(floor(k_normalized * GRID_TRAPEZOIDAL_CELL_COUNT_AXIS)), 0, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1u);
-#else
-	float growth_ratio = 1.0 + (2.0 / float(GRID_TRAPEZOIDAL_CELL_COUNT_AXIS));
-	float continuous_k = log(depth / pc.grid_uniform_cell_distance_threshold) / log(growth_ratio);
-	uint k = clamp(uint(floor(continuous_k)), 0, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1u);
-#endif
 
 	return uvec4(region, i, j, k);
 }

@@ -1,5 +1,4 @@
 #version 460
-#extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_GOOGLE_include_directive : enable
 #extension GL_EXT_debug_printf : enable
@@ -8,22 +7,18 @@
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #extension GL_KHR_shader_subgroup_ballot : enable
 
-
 #include "ir_commons.h"
 #include "../../random.glsl"
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
-layout(binding = 2, rgba32f) uniform image2D image;
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellIndices { uint d[]; };
 
 Indices indices = Indices(scene_desc.index_addr);
-Materials materials = Materials(scene_desc.material_addr);
 InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
 CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
 GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
@@ -44,7 +39,6 @@ SpawnCount spawn_count = SpawnCount(scene_desc.surfel_spawn_count_addr);
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 
 #define TILE_COVERAGE_MAX 1e6
-#define RADIUS_LARGE 1e6
 #define TILE_PERIOD 3
 
 // Process SURFELIZE_PASS_TILE_SIZE_XY * SURFELIZE_PASS_TILE_SIZE_XY tiles
@@ -54,16 +48,13 @@ SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 // For warp size of 32 and tile size of 16, we have 256 / 32 = 8 subgroups
 #define NUM_ACTIVE_SUBGROUPS (SURFELIZE_PASS_TILE_SIZE_XY * SURFELIZE_PASS_TILE_SIZE_XY / SUBGROUP_SIZE)
 shared uint winner_pixels[NUM_ACTIVE_SUBGROUPS];
-shared uint winner_radii[NUM_ACTIVE_SUBGROUPS];
 shared float winner_coverages[NUM_ACTIVE_SUBGROUPS];
 
 layout(local_size_x = SURFELIZE_PASS_TILE_SIZE_XY, local_size_y = SURFELIZE_PASS_TILE_SIZE_XY, local_size_z = 1) in;
 
-
 void main() {
 	uvec2 pixel_coords = gl_GlobalInvocationID.xy;
 	uint pixel_idx = (pixel_coords.x * pc.height + pixel_coords.y);
-
 
 	uvec2 tile_coords = gl_WorkGroupID.xy;
 	uint phase_x = pc.total_frame_num % TILE_PERIOD;
@@ -95,7 +86,6 @@ void main() {
 				HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
 				vec3 pos_to_surfel = hit_data.pos - surfel_hit_data.pos;
 				float dist_sqr = dot(pos_to_surfel, pos_to_surfel);
-				float dist = sqrt(dist_sqr);
 				float dist_normal = dot(pos_to_surfel, surfel_hit_data.n_s);
 				float dist_tangent = sqrt(max(0.0, dist_sqr - dist_normal * dist_normal));
 				float n_dot = dot(hit_data.n_s, surfel_hit_data.n_s);
@@ -110,11 +100,9 @@ void main() {
 			}
 		}
 	}
-#if 1 // JITTER
 	uvec4 seed = init_rng(pixel_coords, uvec2(pc.width, pc.height), pc.total_frame_num);
 	float jitter = rand(seed) * 1e-8;
 	coverage += jitter;
-#endif
 	// Get the minimum coverage across the subgroup
 	float min_coverage = subgroupMin(coverage);
 

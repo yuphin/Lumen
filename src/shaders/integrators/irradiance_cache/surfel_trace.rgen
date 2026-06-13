@@ -14,7 +14,6 @@
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
-uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 layout(location = 0) rayPayloadEXT IRCacheHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };

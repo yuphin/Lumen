@@ -1,50 +1,17 @@
 #version 460
-#extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_GOOGLE_include_directive : enable
-#extension GL_EXT_debug_printf : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
-#extension GL_KHR_shader_subgroup_arithmetic : enable
-#extension GL_KHR_shader_subgroup_ballot : enable
 
 #include "ir_commons.h"
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
-layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
-
-Indices indices = Indices(scene_desc.index_addr);
-Materials materials = Materials(scene_desc.material_addr);
-InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
-CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
-
-#include "ir_commons.glsl"
 
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelSpawnList { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelSpawnCount { uint d; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStack { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStackCount { int d; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellIndices { uint d[]; };
-
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelSamples { SurfelSample d[]; };
 
-InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
-SurfelSpawnList spawn_list = SurfelSpawnList(scene_desc.surfel_spawn_list_addr);
-SurfelFreeStack free_stack = SurfelFreeStack(scene_desc.surfel_free_stack_addr);
-SurfelFreeStackCount free_stack_count = SurfelFreeStackCount(scene_desc.surfel_free_stack_count_addr);
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
-GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
-
-#include "surfel_commons.glsl"
-#include "grid.glsl"
-
 SurfelSamples surfel_samples = SurfelSamples(scene_desc.surfel_samples_addr);
 
 layout(local_size_x = DEFAULT_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
