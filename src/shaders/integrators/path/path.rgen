@@ -54,7 +54,7 @@ void main() {
 			break;
 		}
 		const Material hit_mat = load_material(payload.material_idx, payload.uv);
-		if ((depth == 0 && pc.direct_lighting == 1) || last_specular){
+		if ((depth == 0 && pc.direct_lighting == 1) || last_specular) {
 			col += throughput * hit_mat.emissive_factor;
 		}
 		if (depth >= pc.max_depth - 1) {

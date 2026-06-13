@@ -10,9 +10,8 @@ struct Events {
 std::unordered_map<VkCommandBuffer, Events> _events_map;
 
 VkEvent get_event(VkCommandBuffer cmd) {
-	// Note: Render graph may be executed with a command buffer that has VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
-	// Still, it looks like the VkCommandBuffer id is still the same across each frame.
-	// TODO: Check if this is defined.
+	// VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT applies to each recording, not the command buffer object.
+	// Resetting and re-recording the same command buffer preserves its handle; freeing it does not.
 	VkEventCreateInfo event_create_info = {VK_STRUCTURE_TYPE_EVENT_CREATE_INFO};
 	if (_events_map.find(cmd) == _events_map.end()) {
 		_events_map[cmd].events.push_back(VkEvent());
