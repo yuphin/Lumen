@@ -36,7 +36,7 @@ static const bool _multithreaded_pipeline_compilation = true;
 static bool _dirty_pass_encountered = false;
 static bool _reload_shaders = false;
 static u32 _reload_counter = 0;
-static constexpr u32 INVALID_PASS_IDX = UINT_MAX;
+static constexpr u32 INVALID_PASS_IDX = U32_MAX;
 
 }  // namespace rg
 
@@ -1341,7 +1341,7 @@ void rg::init() {
 }
 
 static u64 shader_render_pass_hash(const lm::pair<vk::Shader*, RenderPass*>& entry) {
-	return default_hash(entry.first->name_with_macros);
+	return lm::hash(entry.first->name_with_macros);
 }
 
 static bool shader_render_pass_eq(const lm::pair<vk::Shader*, RenderPass*>& a,
@@ -1565,7 +1565,7 @@ static PipelineStorage* add_pass_impl_common(const lm::String& name, const vk::S
 	u64 hash = 0;
 	hash = lm::fnv1a_hash((void*)name_with_macros.data, name_with_macros.size, lm::HASH_INIT);
 	for (u32 spec_data : specialization_data) {
-		util::hash_combine(hash, spec_data);
+		lm::hash_combine(hash, spec_data);
 	}
 
 	auto* entry = _pipeline_cache.find(hash);

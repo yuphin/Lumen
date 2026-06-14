@@ -297,14 +297,14 @@ void render(Integrator* integrator) {
 	state.pc.width = Window::width();
 	state.pc.height = Window::height();
 	state.pc.num_lights = i32(integrator->lumen_scene->gpu_lights.size);
-	state.pc.time = rand() % UINT_MAX;
+	state.pc.time = rand() % U32_MAX;
 	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
 	state.pc.frame_num = integrator->frame_num;
 	// VCMMLT related constants
 	state.pc.use_vm = config.enable_vm;
 	state.pc.light_rand_count = state.light_path_rand_count;
-	state.pc.random_num = rand() % UINT_MAX;
+	state.pc.random_num = rand() % U32_MAX;
 	state.pc.num_bootstrap_samples = config.num_bootstrap_samples;
 	state.pc.radius = integrator->lumen_scene->dimensions.radius * config.radius_factor / 100.f;
 	state.pc.radius /= (f32)pow((double)state.pc.frame_num + 1, 0.5 * (1 - 2.0 / 3));
@@ -435,7 +435,7 @@ void render(Integrator* integrator) {
 	{
 		lm::String mutate_name = lm::str_concat(rg::arena(), "VCMMLT - Mutate ", pipeline_postfix, /*cstr=*/true);
 		auto mutate = [&](u32 i) {
-			state.pc.random_num = rand() % UINT_MAX;
+			state.pc.random_num = rand() % U32_MAX;
 			state.pc.mutation_counter = i;
 			// Mutate
 			rg::add_rt(mutate_name,

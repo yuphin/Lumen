@@ -158,7 +158,7 @@ void init(Integrator* integrator) {
 		}
 		cur_total_cells = num_blocks;
 	} while (cur_total_cells > 1);
-	assert(prefix_sum_scratch_elements <= UINT_MAX);
+	assert(prefix_sum_scratch_elements <= U32_MAX);
 
 	state.grid_prefix_sum_scratch_buffer =
 		prm::get_buffer({.name = CSTR("Grid Prefix Sum Scratch"),
@@ -246,7 +246,7 @@ void render(Integrator* integrator) {
 	pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	pc.dir_light_idx = integrator->lumen_scene->dir_light_idx;
 	pc.direct_lighting = state.direct_lighting;
-	pc.sampling_seed = rand() % UINT_MAX;
+	pc.sampling_seed = rand() % U32_MAX;
 	u32 grid_total_cells = get_total_grid_cells();
 	u32 prefix_sum_scratch_capacity = (u32)(state.grid_prefix_sum_scratch_buffer->size / sizeof(u32));
 	pc.grid_total_cells = grid_total_cells;

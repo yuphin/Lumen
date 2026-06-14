@@ -55,7 +55,7 @@ void init(Integrator* integrator) {
 void render(Integrator* integrator) {
 	BDPT& state = integrator->bdpt;
 	state.pc.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
-	state.pc.time = rand() % UINT_MAX;
+	state.pc.time = rand() % U32_MAX;
 	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
 	state.pc.total_light_area = integrator->lumen_scene->total_light_area;

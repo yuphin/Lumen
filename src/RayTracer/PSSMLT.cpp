@@ -282,14 +282,14 @@ void render(Integrator* integrator) {
 	state.pc.width = Window::width();
 	state.pc.height = Window::height();
 	state.pc.num_lights = i32(integrator->lumen_scene->gpu_lights.size);
-	state.pc.time = rand() % UINT_MAX;
+	state.pc.time = rand() % U32_MAX;
 	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
 	// PSSMLT related constants
 	state.pc.light_rand_count = state.light_path_rand_count;
 	state.pc.cam_rand_count = state.cam_path_rand_count;
 	state.pc.connection_rand_count = state.connect_path_rand_count;
-	state.pc.random_num = rand() % UINT_MAX;
+	state.pc.random_num = rand() % U32_MAX;
 	state.pc.num_bootstrap_samples = config.num_bootstrap_samples;
 	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
 	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
@@ -358,7 +358,7 @@ void render(Integrator* integrator) {
 	// Start mutations
 	{
 		auto mutate = [&](u32 i) {
-			state.pc.random_num = rand() % UINT_MAX;
+			state.pc.random_num = rand() % U32_MAX;
 			state.pc.mutation_counter = i;
 			rg::add_rt(CSTR("PSSMLT - Mutate"),
 					   {

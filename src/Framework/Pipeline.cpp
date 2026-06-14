@@ -507,7 +507,7 @@ void Pipeline::create_update_template(util::Slice<const Shader> shaders, util::S
 		return (i * 0x01010101) >> 24;
 	};
 
-	auto get_desc_info_size = [](VkDescriptorType type) {
+	auto get_desc_info_size = [](VkDescriptorType type) -> u64 {
 		switch (type) {
 			case VK_DESCRIPTOR_TYPE_SAMPLER:
 			case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:

@@ -19,16 +19,16 @@ i32 main(i32 argc, char* argv[]) {
 	i32 width = 1920;
 	i32 height = 1080;
 	for (i32 i = 0; i < argc; ++i) {
-		if (std::strcmp(argv[i], "--validation_enable") == 0 && i + 1 < argc) {
-			if (std::strcmp(argv[i + 1], "1") == 0) {
+		if (strcmp(argv[i], "--validation_enable") == 0 && i + 1 < argc) {
+			if (strcmp(argv[i + 1], "1") == 0) {
 				enable_debug = true;
-			} else if (std::strcmp(argv[i + 1], "0") == 0) {
+			} else if (strcmp(argv[i + 1], "0") == 0) {
 				enable_debug = false;
 			}
 			++i;
-		} else if (std::strcmp(argv[i], "--on-second-monitor") == 0) {
+		} else if (strcmp(argv[i], "--on-second-monitor") == 0) {
 			on_second_monitor = true;
-		} else if (std::strcmp(argv[i], "--fullscreen") == 0) {
+		} else if (strcmp(argv[i], "--fullscreen") == 0) {
 			fullscreen = true;
 		}
 	}

@@ -1,3 +1,5 @@
+#include "LumenPCH.h"
+
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #else
@@ -873,7 +875,9 @@ FileProperties file_properties(FileHandle handle) {
 	struct stat file_stat;
 	if (fstat(fd, &file_stat) == 0) {
 		FileProperties properties = {
-			.size = file_stat.st_size, .created = file_stat.st_ctime, .modified = file_stat.st_mtime};
+			.size = (u64)file_stat.st_size,
+			.created = (u64)file_stat.st_ctime,
+			.modified = (u64)file_stat.st_mtime};
 		return properties;
 	}
 	return {};

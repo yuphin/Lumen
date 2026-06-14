@@ -13,12 +13,6 @@ set(src_files)
 add_subdirectory(src)
 add_subdirectory(libs)
 
-set(structures_INCLUDE_DIR
-    "libs"
-    "libs/vma/include"
-    "src"
-)
-
 file(GLOB_RECURSE shaders_src CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.glsl  
     ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.comp  
@@ -54,7 +48,12 @@ target_compile_definitions(Lumen PRIVATE
 # Add precompiled headers
 target_precompile_headers(Lumen PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/src/LumenPCH.h>")
 set_source_files_properties(${LIB_SRC} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
-set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/external.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+set_source_files_properties(
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Framework/Base/OS.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/external.cpp
+    PROPERTIES
+    SKIP_PRECOMPILE_HEADERS ON
+)
 
 if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     set(LIB_WARN_OFF "/w")
@@ -62,9 +61,19 @@ else()
     set(LIB_WARN_OFF "-w")
 endif()
 
-set_source_files_properties(${LIB_SRC} PROPERTIES COMPILE_OPTIONS "${LIB_WARN_OFF}")
+set_source_files_properties(
+    ${LIB_SRC}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/external.cpp
+    PROPERTIES
+    COMPILE_OPTIONS "${LIB_WARN_OFF}"
+)
 
-target_include_directories(Lumen PRIVATE ${Vulkan_INCLUDE_DIR};${structures_INCLUDE_DIR})
+target_include_directories(Lumen PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(Lumen SYSTEM PRIVATE
+    ${Vulkan_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/vma/include
+)
 if(WIN32)
     message("-- Adding vulkan library lib to search paths for the linker to find spirv libraries")
     get_filename_component(vulkan_lib_folder ${Vulkan_LIBRARIES} DIRECTORY)
@@ -80,13 +89,21 @@ if(WIN32)
     target_compile_definitions(Lumen PRIVATE _CRT_SECURE_NO_WARNINGS)
 else()
     find_package(X11 REQUIRED)
-    target_link_libraries(Lumen PRIVATE Vulkan::Vulkan volk shaderc_shared spirv-cross-c-shared GPUOpen::VulkanMemoryAllocator X11::X11)
+    target_link_libraries(Lumen PRIVATE Vulkan::Vulkan volk::volk_headers shaderc_shared spirv-cross-c-shared
+        GPUOpen::VulkanMemoryAllocator X11::X11)
 endif()
 target_link_libraries(Lumen PRIVATE Threads::Threads)
 target_compile_definitions(Lumen PRIVATE
     $<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>
-    $<$<NOT:$<PLATFORM_ID:Windows>>:VK_USE_PLATFORM_XLIB_KHR>
 )
+if(NOT WIN32)
+    set_source_files_properties(
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/Framework/Base/OS.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/external.cpp
+        PROPERTIES
+        COMPILE_DEFINITIONS VK_USE_PLATFORM_XLIB_KHR
+    )
+endif()
 # target_compile_options(Lumen PRIVATE
 #     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 #     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>)

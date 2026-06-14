@@ -85,7 +85,7 @@ void render(Integrator* integrator) {
 	state.pc.width = Window::width();
 	state.pc.height = Window::height();
 	state.pc.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
-	state.pc.random_num = rand() % UINT_MAX;
+	state.pc.random_num = rand() % U32_MAX;
 	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
 	state.pc.do_spatiotemporal = state.do_spatiotemporal;

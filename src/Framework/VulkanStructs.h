@@ -1,14 +1,14 @@
 #pragma once
-#include "Base/Utils.h"
+#include "Base/Hash.h"
 
 namespace vk {
 
 struct SamplerHash {
 	u64 operator()(const VkSamplerCreateInfo& ci) const {
 		u64 hash = 0;
-		util::hash_combine(hash, ci.magFilter, ci.minFilter, ci.mipmapMode, ci.addressModeU, ci.addressModeV,
-						   ci.addressModeW, ci.mipLodBias, ci.anisotropyEnable, ci.maxAnisotropy, ci.compareEnable,
-						   ci.compareOp, ci.minLod, ci.maxLod, ci.borderColor, ci.unnormalizedCoordinates);
+		lm::hash_combine(hash, ci.magFilter, ci.minFilter, ci.mipmapMode, ci.addressModeU, ci.addressModeV, ci.addressModeW,
+						 ci.mipLodBias, ci.anisotropyEnable, ci.maxAnisotropy, ci.compareEnable, ci.compareOp, ci.minLod,
+						 ci.maxLod, ci.borderColor, ci.unnormalizedCoordinates);
 
 		return hash;
 	}

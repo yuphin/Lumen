@@ -70,7 +70,7 @@ To build Lumen, start cloning the repository with
 git clone --recursive https://github.com/yuphin/Lumen.git
 ```
 ### Requirements
-- Vulkan SDK
+- Vulkan SDK (Lumen uses the included SPIRV-Cross library)
 - Turing+ or RDNA2 GPU
 - CMake 3.4 or above (Credits to [@Lachei](https://github.com/lachei) for porting the project to CMake and testing it on Linux)
 

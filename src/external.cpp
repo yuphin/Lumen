@@ -3,7 +3,7 @@
 #define VOLK_IMPLEMENTATION
 #include <volk/volk.h>
 #define VMA_IMPLEMENTATION
-#include <vma/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 #define STB_SPRINTF_IMPLEMENTATION
 #include <stb/stb_sprintf.h>
 #define STB_IMAGE_IMPLEMENTATION

@@ -13,19 +13,6 @@ struct is_same<A, A> {
 	static constexpr bool value = true;
 };
 
-template <typename T, typename... Rest>
-inline void hash_combine(u64& seed, const T& v) {
-	std::hash<T> hasher;
-	seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-}
-
-template <typename T, typename... Rest>
-inline void hash_combine(u64& seed, const T& v, Rest... rest) {
-	std::hash<T> hasher;
-	seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-	hash_combine(seed, rest...);
-}
-
 template <typename T>
 struct Slice {
 	T* data = nullptr;

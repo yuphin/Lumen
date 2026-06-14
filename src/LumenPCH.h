@@ -69,18 +69,18 @@ typedef long long int s64;
 typedef float f32;
 typedef double f64;
 
-#define I8_MIN         (-127i8 - 1)
-#define I16_MIN        (-32767i16 - 1)
-#define I32_MIN        (-2147483647i32 - 1)
-#define I64_MIN        (-9223372036854775807i64 - 1)
-#define I8_MAX         127i8
-#define I16_MAX        32767i16
-#define I32_MAX        2147483647i32
-#define I64_MAX        9223372036854775807i64
-#define U8_MAX        0xffui8
-#define U16_MAX       0xffffui16
-#define U32_MAX       0xffffffffui32
-#define U64_MAX       0xffffffffffffffffui64
+#define I8_MIN        ((i8)-128)
+#define I16_MIN       ((i16)-32768)
+#define I32_MIN       (-2147483647 - 1)
+#define I64_MIN       (-9223372036854775807LL - 1)
+#define I8_MAX        ((i8)127)
+#define I16_MAX       ((i16)32767)
+#define I32_MAX       2147483647
+#define I64_MAX       9223372036854775807LL
+#define U8_MAX        ((u8)0xff)
+#define U16_MAX       ((u16)0xffff)
+#define U32_MAX       0xffffffffU
+#define U64_MAX       0xffffffffffffffffULL
 #define F32_MAX       3.40282347E+38F
 #define F32_MIN       -F32_MAX
 
@@ -98,7 +98,7 @@ typedef double f64;
 
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
-#include <vma/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 #include <imgui/imgui.h>
 #include <stb/stb_sprintf.h>
 #include "Framework/VulkanStructs.h"
