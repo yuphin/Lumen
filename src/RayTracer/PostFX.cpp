@@ -6,7 +6,13 @@
 #include "Framework/VulkanBase.h"
 #include "Framework/Window.h"
 
-void PostFX::init_fft() {
+namespace post_fx {
+
+static void init_fft(PostFX* post_fx) {
+	VkSampler& img_sampler = post_fx->img_sampler;
+	vk::Texture*& kernel_pong = post_fx->kernel_pong;
+	vk::Texture*& fft_ping_padded = post_fx->fft_ping_padded;
+	vk::Texture*& fft_pong_padded = post_fx->fft_pong_padded;
 	// Load the kernel
 	const char* img_name_kernel = "assets/kernels/Octagonal512.exr";
 	i32 width, height;
@@ -83,7 +89,7 @@ void PostFX::init_fft() {
 	drm::destroy(kernel_ping);
 }
 
-void PostFX::init() {
+void init(PostFX* post_fx) {
 	VkSamplerCreateInfo sampler_ci = vk::sampler();
 	sampler_ci.minFilter = VK_FILTER_NEAREST;
 	sampler_ci.magFilter = VK_FILTER_NEAREST;
@@ -92,14 +98,23 @@ void PostFX::init() {
 
 	sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
 	sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-	vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &img_sampler));
+	vk::check(vkCreateSampler(vk::context().device, &sampler_ci, nullptr, &post_fx->img_sampler));
 }
 
-void PostFX::render(vk::Texture* input, vk::Texture* output) {
+void add_passes(PostFX* post_fx, vk::Texture* input, vk::Texture* output) {
+	vk::Texture*& kernel_pong = post_fx->kernel_pong;
+	vk::Texture*& fft_ping_padded = post_fx->fft_ping_padded;
+	vk::Texture*& fft_pong_padded = post_fx->fft_pong_padded;
+	VkSampler& img_sampler = post_fx->img_sampler;
+	PCPost& pc_post_settings = post_fx->pc_post_settings;
+	bool& enable_tonemapping = post_fx->enable_tonemapping;
+	bool& enable_bloom = post_fx->enable_bloom;
+	f32& bloom_exposure = post_fx->bloom_exposure;
+	f32& bloom_amount = post_fx->bloom_amount;
 	// Copy the original image to the padded texture
 	if (enable_bloom) {
 		if (!fft_ping_padded) {
-			init_fft();
+			init_fft(post_fx);
 		}
 
 		u32 pad_width = (fft_ping_padded->extent.width + 31) / 32;
@@ -175,10 +190,8 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 								  .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 								  .color_outputs = {output},
 								  .pass_func =
-									  [](VkCommandBuffer cmd, const lm::RenderPass& render_pass) {
+									  [](VkCommandBuffer cmd, const lm::RenderPass&) {
 										  vkCmdDraw(cmd, 4, 1, 0, 0);
-										  ImGui::Render();
-										  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 									  }})
 		.push_constants(&pc_post_settings)
 		.bind_texture_with_sampler(input, img_sampler);
@@ -187,7 +200,14 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 	}
 }
 
-bool PostFX::gui() {
+bool gui(PostFX* post_fx) {
+	vk::Texture*& kernel_pong = post_fx->kernel_pong;
+	vk::Texture*& fft_ping_padded = post_fx->fft_ping_padded;
+	vk::Texture*& fft_pong_padded = post_fx->fft_pong_padded;
+	bool& enable_tonemapping = post_fx->enable_tonemapping;
+	bool& enable_bloom = post_fx->enable_bloom;
+	f32& bloom_exposure = post_fx->bloom_exposure;
+	f32& bloom_amount = post_fx->bloom_amount;
 	bool updated = false;
 	ImGui::NewLine();
 	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
@@ -211,7 +231,10 @@ bool PostFX::gui() {
 	return updated;
 }
 
-void PostFX::destroy() {
+void destroy(PostFX* post_fx) {
+	vk::Texture*& kernel_pong = post_fx->kernel_pong;
+	vk::Texture*& fft_ping_padded = post_fx->fft_ping_padded;
+	vk::Texture*& fft_pong_padded = post_fx->fft_pong_padded;
 	std::initializer_list<vk::Texture*> tex_list = {kernel_pong, fft_ping_padded, fft_pong_padded};
 	for (vk::Texture* t : tex_list) {
 		prm::remove(t);
@@ -219,5 +242,10 @@ void PostFX::destroy() {
 	kernel_pong = nullptr;
 	fft_ping_padded = nullptr;
 	fft_pong_padded = nullptr;
-	vkDestroySampler(vk::context().device, img_sampler, 0);
+	if (post_fx->img_sampler) {
+		vkDestroySampler(vk::context().device, post_fx->img_sampler, 0);
+	}
+	post_fx->img_sampler = VK_NULL_HANDLE;
 }
+
+}  // namespace post_fx

@@ -691,9 +691,20 @@ static bool parse_shader(Shader& shader, const u32* code, u64 code_size, lm::Ren
 	}
 
 	if (rg::settings().shader_inference) {
-		lm::ScratchArena scratch(arena);
-		if (!parse_spirv(context, compiler, shader, code, code_size, pass, scratch.arena)) {
-			return false;
+		{
+			lm::ScratchArena scratch(arena);
+			if (!parse_spirv(context, compiler, shader, code, code_size, pass, scratch.arena)) {
+				return false;
+			}
+		}
+
+		// We ultimately use the string inside buffer_status_map in the render graph
+		// Therefore we need to make sure the string is persisted in the shader arena
+		for (auto& entry : shader.buffer_status_map) {
+			const lm::String popped_key = entry.key;
+			const lm::String persistent_key = lm::str_dup(arena, popped_key);
+			assert(persistent_key.data + persistent_key.size <= popped_key.data);
+			entry.key = persistent_key;
 		}
 	}
 	return true;

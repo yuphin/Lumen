@@ -3,9 +3,7 @@
 
 namespace vk {
 
-void init_imgui();
 void init(bool validation_layers);
-void destroy_imgui();
 void add_device_extension(const char* name);
 void recreate_swap_chain();
 

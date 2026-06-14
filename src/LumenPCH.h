@@ -100,7 +100,6 @@ typedef double f64;
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
 #include <vma/vk_mem_alloc.h>
 #include <imgui/imgui.h>
-#include "imgui/imgui_impl_vulkan.h"
 #include <stb/stb_sprintf.h>
 #include "Framework/VulkanStructs.h"
 #include <initializer_list>

@@ -4,7 +4,6 @@
 #include "EventPool.h"
 #include <volk/volk.h>
 #include "VulkanBase.h"
-#include "CommandBuffer.h"
 #include "PersistentResourceManager.h"
 #include "Window.h"
 
@@ -34,13 +33,9 @@ static lm::SmallArray<VkFence, MAX_FRAMES_IN_FLIGHT> _in_flight_fences;
 static lm::SmallArray<VkFence, MAX_SWAPCHAIN_IMAGES> _images_in_flight;
 static lm::SmallArray<VkQueueFamilyProperties, MAX_QUEUES> _queue_families;
 
-static VkFormat _swapchain_format;
-
 static lm::SmallArray<Texture*, MAX_SWAPCHAIN_IMAGES> _swapchain_images;
 
 static bool _enable_validation_layers;
-
-static VkDescriptorPool _imgui_pool = 0;
 
 // -------------------------------------------------------------------------------------------------
 // Implementation
@@ -522,8 +517,6 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 	swapchain_CI.imageArrayLayers = 1;
 	swapchain_CI.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-	_swapchain_format = surface_format.format;
-
 	QueueFamilyIndices indices = find_queue_families(context().physical_device);
 	u32 queue_family_indices_arr[] = {indices.gfx_family, indices.present_family};
 
@@ -700,67 +693,12 @@ void init(bool validation_layers) {
 	create_command_pools();
 	create_command_buffers();
 	create_sync_primitives();
-	init_imgui();
 	context().query_pool_timestamps[0] = create_query_pool(VK_QUERY_TYPE_TIMESTAMP, 4096);
 	context().query_pool_timestamps[1] = create_query_pool(VK_QUERY_TYPE_TIMESTAMP, 4096);
 	context().query_pool_timestamps[2] = create_query_pool(VK_QUERY_TYPE_TIMESTAMP, 4096);
 	vkResetQueryPool(context().device, context().query_pool_timestamps[0], 0, 4096);
 	vkResetQueryPool(context().device, context().query_pool_timestamps[1], 0, 4096);
 	vkResetQueryPool(context().device, context().query_pool_timestamps[2], 0, 4096);
-}
-
-void init_imgui() {
-	VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
-										 {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
-										 {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
-										 {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
-										 {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
-										 {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
-										 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
-										 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
-										 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
-										 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
-										 {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
-
-	VkDescriptorPoolCreateInfo pool_info = {};
-	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-	pool_info.maxSets = 1000;
-	pool_info.poolSizeCount = (u32)(sizeof(pool_sizes) / sizeof(pool_sizes[0]));
-	pool_info.pPoolSizes = pool_sizes;
-	check(vkCreateDescriptorPool(context().device, &pool_info, nullptr, &_imgui_pool));
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	// Setup Platform/Renderer backends
-	ImGui::StyleColorsDark();
-	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-	Window::imgui_init();
-
-	ImGui_ImplVulkan_InitInfo init_info = {};
-	init_info.Instance = context().instance;
-	init_info.PhysicalDevice = context().physical_device;
-	init_info.Device = context().device;
-	init_info.Queue = context().queues[(i32)QueueType::GFX];
-	init_info.DescriptorPool = _imgui_pool;
-	init_info.MinImageCount = 3;
-	init_info.ImageCount = 3;
-	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-	init_info.UseDynamicRendering = true;
-	init_info.ColorAttachmentFormat = _swapchain_format;
-
-	ImGui_ImplVulkan_Init(&init_info, nullptr);
-
-	CommandBuffer cmd(true);
-	ImGui_ImplVulkan_CreateFontsTexture(cmd.handle);
-	cmd.submit(context().queues[(i32)QueueType::GFX]);
-	ImGui_ImplVulkan_DestroyFontUploadObjects();
-}
-
-void destroy_imgui() {
-	vkDestroyDescriptorPool(context().device, _imgui_pool, nullptr);
-	ImGui_ImplVulkan_Shutdown();
-	Window::imgui_shutdown();
-	ImGui::DestroyContext();
 }
 
 void add_device_extension(const char* name) { _device_extensions.push_back(name); }

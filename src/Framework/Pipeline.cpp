@@ -71,15 +71,17 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 	VkPipelineViewportStateCreateInfo viewport_state = vk::pipeline_viewport_state(1, 1, 0);
 	VkPipelineRasterizationStateCreateInfo rasterizer =
 		vk::pipeline_rasterization_state(settings.polygon_mode, settings.cull_mode, settings.front_face);
-	rasterizer.lineWidth = 1.0f;
+	rasterizer.lineWidth = settings.line_width;
 	rasterizer.depthClampEnable = VK_FALSE;
 	rasterizer.rasterizerDiscardEnable = VK_FALSE;
 	rasterizer.depthBiasEnable = VK_FALSE;
-	VkPipelineMultisampleStateCreateInfo multisampling = vk::pipeline_multisample_state(VK_SAMPLE_COUNT_1_BIT);
+	VkPipelineMultisampleStateCreateInfo multisampling = vk::pipeline_multisample_state(settings.sample_count);
 	multisampling.sampleShadingEnable = VK_FALSE;
 
 	lm::SmallArray<VkPipelineColorBlendAttachmentState, MAX_COLOR_ATTACHMENTS> blend_attachment_states;
-	if (settings.blend_enables.empty()) {
+	if (!settings.blend_attachments.empty()) {
+		blend_attachment_states = settings.blend_attachments;
+	} else if (settings.blend_enables.empty()) {
 		for (u64 i = 0; i < settings.color_outputs.size; ++i) {
 			blend_attachment_states.push_back(
 				vk::pipeline_color_blend_attachment_state(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
@@ -111,22 +113,28 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 
 	lm::SmallArray<VkVertexInputBindingDescription, MAX_VERTEX_BINDINGS> binding_descs;
 	lm::SmallArray<VkVertexInputAttributeDescription, MAX_VERTEX_ATTRIBUTES> attribute_descs;
-	u64 vert_shader_idx = 0;
-	for (u64 i = 0; i < settings.shaders.size; i++) {
-		if (settings.shaders[i].stage == VK_SHADER_STAGE_VERTEX_BIT) {
-			vert_shader_idx = i;
-			break;
+	if (!settings.vertex_bindings.empty() || !settings.vertex_attributes.empty()) {
+		binding_descs = settings.vertex_bindings;
+		attribute_descs = settings.vertex_attributes;
+	} else {
+		u64 vert_shader_idx = 0;
+		for (u64 i = 0; i < settings.shaders.size; i++) {
+			if (settings.shaders[i].stage == VK_SHADER_STAGE_VERTEX_BIT) {
+				vert_shader_idx = i;
+				break;
+			}
 		}
-	}
-	const Shader& vert_shader = settings.shaders[vert_shader_idx];
-	i32 i = 0;
-	for (const VertexInput& input : vert_shader.vertex_inputs) {
-		VkVertexInputBindingDescription binding_desc =
-			vk::vertex_input_binding_description(i, input.size, VK_VERTEX_INPUT_RATE_VERTEX);
-		VkVertexInputAttributeDescription attribute_desc = vk::vertex_input_attribute_description(i, i, input.format, 0);
-		binding_descs.push_back(binding_desc);
-		attribute_descs.push_back(attribute_desc);
-		++i;
+		const Shader& vert_shader = settings.shaders[vert_shader_idx];
+		i32 i = 0;
+		for (const VertexInput& input : vert_shader.vertex_inputs) {
+			VkVertexInputBindingDescription binding_desc =
+				vk::vertex_input_binding_description(i, input.size, VK_VERTEX_INPUT_RATE_VERTEX);
+			VkVertexInputAttributeDescription attribute_desc =
+				vk::vertex_input_attribute_description(i, i, input.format, 0);
+			binding_descs.push_back(binding_desc);
+			attribute_descs.push_back(attribute_desc);
+			++i;
+		}
 	}
 	VkPipelineVertexInputStateCreateInfo vertex_input_state = vk::pipeline_vertex_input_state();
 	vertex_input_state.vertexAttributeDescriptionCount = (u32)attribute_descs.size;
@@ -149,7 +157,7 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 		.depthAttachmentFormat = depth_format};
 
 	VkPipelineDepthStencilStateCreateInfo depth_stencil_state_ci =
-		vk::pipeline_depth_stencil(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+		vk::pipeline_depth_stencil(settings.depth_test_enable, settings.depth_write_enable, settings.depth_compare_op);
 
 	VkGraphicsPipelineCreateInfo pipeline_CI = vk::graphics_pipeline();
 	pipeline_CI.pNext = nullptr;

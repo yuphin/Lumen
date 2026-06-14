@@ -1,6 +1,7 @@
 #include "Framework/RenderGraph.h"
 #include "Framework/GPUQueryManager.h"
 #include "Framework/ImageUtils.h"
+#include "Framework/ImGuiRenderer.h"
 #include "RayTracer.h"
 #include "Integrator.h"
 #include "PostFX.h"
@@ -14,6 +15,7 @@ static f32 _cpu_avg_time = 0;
 static i32 _cnt = 0;
 static Integrator _active_integrator;
 static PostFX _post_fx;
+static ImGuiRenderer _imgui_renderer;
 static RTUtilsPC _rt_utils_pc;
 static vk::Buffer* _gt_img_buffer = nullptr;
 static vk::Buffer* _output_img_buffer = nullptr;
@@ -130,6 +132,7 @@ void init(bool use_debug, i32 argc, char* argv[]) {
 	vk::context().vsync_enabled = true;
 
 	vk::init(_debug);
+	imgui_renderer::init(&_imgui_renderer);
 	_initialized = true;
 
 	// Enable shader reflections for the render graph
@@ -146,7 +149,7 @@ void init(bool use_debug, i32 argc, char* argv[]) {
 	if (!_tlas.accel) {
 		integrator::create_accel(&_active_integrator, &_tlas, &_blases);
 	}
-	_post_fx.init();
+	post_fx::init(&_post_fx);
 	init_resources();
 }
 
@@ -267,8 +270,10 @@ static void render(u32 i) {
 	} else {
 		input_tex = _active_integrator.output_tex;
 	}
-	_post_fx.render(input_tex, vk::swapchain_images()[i]);
+	vk::Texture* output = vk::swapchain_images()[i];
+	post_fx::add_passes(&_post_fx, input_tex, output);
 	render_debug_utils();
+	imgui_renderer::add_pass(&_imgui_renderer, output);
 
 	VkCommandBuffer cmdbuf = vk::context().command_buffers[i];
 	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -441,9 +446,7 @@ static f32 draw_frame() {
 		f64 t_diff = t_end - t_begin;
 		return (f32)t_diff;
 	}
-	ImGui_ImplVulkan_NewFrame();
-	Window::imgui_new_frame();
-	ImGui::NewFrame();
+	imgui_renderer::new_frame(&_imgui_renderer);
 
 	_active_integrator.updated |= updated;
 	if (_show_ui) {
@@ -451,7 +454,7 @@ static f32 draw_frame() {
 		ImGui::Begin("Debug (F1 to hide)", &_show_ui);
 		bool gui_updated = gui();
 		gui_updated |= integrator::gui(&_active_integrator);
-		gui_updated |= _post_fx.gui();
+		gui_updated |= post_fx::gui(&_post_fx);
 		static bool _show_imgui_demo = false;
 		if (ImGui::Button("Show ImGui Demo")) {
 			_show_imgui_demo = !_show_imgui_demo;
@@ -470,10 +473,10 @@ static f32 draw_frame() {
 		Window::update_window_size();
 		cleanup_resources();
 		integrator::destroy(&_active_integrator, /*resize=*/true);
-		_post_fx.destroy();
+		post_fx::destroy(&_post_fx);
 
 		integrator::init(&_active_integrator);
-		_post_fx.init();
+		post_fx::init(&_post_fx);
 		init_resources();
 		_active_integrator.updated = true;
 	}
@@ -519,10 +522,10 @@ void cleanup() {
 	if (_initialized) {
 		cleanup_resources();
 		integrator::destroy(&_active_integrator, /*resize=*/false);
-		_post_fx.destroy();
+		post_fx::destroy(&_post_fx);
 		scene::destroy();
 		destroy_accel();
-		vk::destroy_imgui();
+		imgui_renderer::destroy(&_imgui_renderer);
 		vk::cleanup();
 		_initialized = false;
 	}

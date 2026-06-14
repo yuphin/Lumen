@@ -14,6 +14,7 @@ static constexpr u64 MAX_PASSES_PER_FRAME = 1024;
 // --- Limits for shader and pipeline compilation inside render graph ---
 static constexpr u64 MAX_PIPELINE_TASKS = 128;
 static constexpr u64 MAX_SHADER_COMPILATIONS_PER_FRAME = 1024;
+constexpr u64 MAX_RENDERING_ATTACHMENTS = 4;
 
 using namespace lm;
 
@@ -44,9 +45,8 @@ using namespace rg;
 // TODO: Investigate get_or_create behavior
 
 static PipelineStorage* add_pass_impl_common(const lm::String& name, const vk::ShaderMacroArray& macros,
-											 const lm::SpecializationConstantArray& specialization_data,
-											 bool& cached, lm::String& name_with_macros,
-											 lm::String& macro_string);
+											 const lm::SpecializationConstantArray& specialization_data, bool& cached,
+											 lm::String& name_with_macros, lm::String& macro_string);
 
 static VkPipelineStageFlags pipeline_stage_from_pass_type(vk::PassType pass_type, VkAccessFlags access_flags) {
 	VkPipelineStageFlags res = 0;
@@ -94,8 +94,8 @@ static VkImageMemoryBarrier2 image_barrier_from_sync(VkImage image, const ImageS
 }
 
 static void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::String& name, u32 pass_idx,
-								 const vk::GraphicsPassSettings& gfx_settings,
-								 const lm::String& macro_string, PipelineStorage* pipeline_storage, bool cached) {
+								 const vk::GraphicsPassSettings& gfx_settings, const lm::String& macro_string,
+								 PipelineStorage* pipeline_storage, bool cached) {
 	assert(name.is_cstr());
 	pass.type = type;
 	pass.pass_idx = pass_idx;
@@ -116,12 +116,20 @@ static void render_pass_init_gfx(RenderPass& pass, vk::PassType type, const lm::
 	settings.cull_mode = gfx_settings.cull_mode;
 	settings.vertex_buffers = gfx_settings.vertex_buffers;
 	settings.index_buffer = gfx_settings.index_buffer;
+	settings.vertex_bindings = gfx_settings.vertex_bindings;
+	settings.vertex_attributes = gfx_settings.vertex_attributes;
 	settings.blend_enables = gfx_settings.blend_enables;
+	settings.blend_attachments = gfx_settings.blend_attachments;
+	settings.color_load_ops = gfx_settings.color_load_ops;
 	settings.front_face = gfx_settings.front_face;
 	settings.topology = gfx_settings.topology;
 	settings.polygon_mode = gfx_settings.polygon_mode;
 	settings.sample_count = gfx_settings.sample_count;
 	settings.index_type = gfx_settings.index_type;
+	settings.depth_load_op = gfx_settings.depth_load_op;
+	settings.depth_test_enable = gfx_settings.depth_test_enable;
+	settings.depth_write_enable = gfx_settings.depth_write_enable;
+	settings.depth_compare_op = gfx_settings.depth_compare_op;
 	settings.line_width = gfx_settings.line_width;
 	settings.color_outputs = gfx_settings.color_outputs;
 	settings.depth_output = gfx_settings.depth_output;
@@ -160,8 +168,8 @@ static void render_pass_init_rt(RenderPass& pass, vk::PassType type, const lm::S
 }
 
 static void render_pass_init_compute(RenderPass& pass, vk::PassType type, const lm::String& name, u32 pass_idx,
-									 const vk::ComputePassSettings& compute_settings,
-									 const lm::String& macro_string, PipelineStorage* pipeline_storage, bool cached) {
+									 const vk::ComputePassSettings& compute_settings, const lm::String& macro_string,
+									 PipelineStorage* pipeline_storage, bool cached) {
 	assert(name.is_cstr());
 	pass.type = type;
 	pass.pass_idx = pass_idx;
@@ -282,7 +290,7 @@ static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& a
 						_shader_cache.insert(shader->name_with_macros, *shader);
 					}
 				}
-				pass->pipeline_storage->affected_buffer_pointers = shader->buffer_status_map;
+				process_bindless_resources(pass, *shader);
 				process_bindings(pass, *shader);
 			}
 		} break;
@@ -474,9 +482,12 @@ void RenderPass::transition_resources() {
 			descriptor_infos[i] = pipeline_storage->bound_resources[i].get_descriptor_info();
 		}
 		for (const auto& entry : pipeline_storage->affected_buffer_pointers) {
-			String buffer_str = entry.key;
+			lm::String buffer_str = entry.key;
+			assert(!buffer_str.empty());
 			vk::BufferStatus status = entry.value;
-			vk::Buffer* buffer = _registered_buffer_pointers.find(buffer_str)->value;
+			auto buffer_ptr = _registered_buffer_pointers.find(buffer_str);
+			assert(buffer_ptr);
+			vk::Buffer* buffer = buffer_ptr->value;
 			const VkAccessFlags access_flags =
 				(status.read ? VK_ACCESS_SHADER_READ_BIT : 0) | (status.write ? VK_ACCESS_SHADER_WRITE_BIT : 0);
 			if (status.write) {
@@ -486,20 +497,46 @@ void RenderPass::transition_resources() {
 			}
 		}
 	} else {
-		for (vk::Buffer* buf : explicit_buffer_reads) {
-			read_impl(buf);
-		}
-		for (vk::Buffer* buf : explicit_buffer_writes) {
-			write_impl(buf, VK_ACCESS_SHADER_WRITE_BIT);
-		}
-		for (vk::Texture* tex : explicit_tex_reads) {
-			read_impl(tex);
-		}
-		for (vk::Texture* tex : explicit_tex_writes) {
-			write_impl(tex);
-		}
 		for (i32 i = 0; i < pipeline_storage->bound_resources.size; i++) {
 			descriptor_infos[i] = pipeline_storage->bound_resources[i].get_descriptor_info();
+		}
+	}
+
+	for (vk::Buffer* buffer : explicit_buffer_reads) {
+		read_impl(buffer);
+	}
+	for (vk::Buffer* buffer : explicit_buffer_writes) {
+		write_impl(buffer, VK_ACCESS_SHADER_WRITE_BIT);
+	}
+	for (vk::Texture* texture : explicit_tex_reads) {
+		read_impl(texture);
+	}
+	for (vk::Texture* texture : explicit_tex_writes) {
+		write_impl(texture);
+	}
+
+	if (type == vk::PassType::Graphics) {
+		for (vk::Buffer* buffer : settings.vertex_buffers) {
+			read_impl(buffer, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, BufferSyncFlags::NONE,
+					  VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
+		}
+		if (settings.index_buffer) {
+			read_impl(settings.index_buffer, VK_ACCESS_INDEX_READ_BIT, BufferSyncFlags::NONE,
+					  VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
+		}
+		for (u64 i = 0; i < settings.color_outputs.size; ++i) {
+			VkAccessFlags access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			const VkAttachmentLoadOp load_op =
+				i < settings.color_load_ops.size ? settings.color_load_ops[i] : VK_ATTACHMENT_LOAD_OP_CLEAR;
+			if (load_op == VK_ATTACHMENT_LOAD_OP_LOAD) access |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+			write_impl(settings.color_outputs[i], access, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		}
+		if (settings.depth_output) {
+			VkAccessFlags access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			if (settings.depth_load_op == VK_ATTACHMENT_LOAD_OP_LOAD) {
+				access |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+			}
+			write_impl(settings.depth_output, access, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 		}
 	}
 
@@ -754,6 +791,39 @@ RenderPass& RenderPass::push_constants(void* data, u64 size, u64 alignment) {
 	return *this;
 }
 
+void RenderPass::push_descriptors(VkCommandBuffer cmd, const vk::DescriptorInfo* descriptors) const {
+	if (!pipeline_storage->pipeline.update_template) return;
+	vkCmdPushDescriptorSetWithTemplateKHR(cmd, pipeline_storage->pipeline.update_template,
+										  pipeline_storage->pipeline.pipeline_layout, 0, descriptors);
+}
+
+void RenderPass::bind_graphics_state(VkCommandBuffer cmd) const {
+	LUMEN_ASSERT(type == vk::PassType::Graphics, "Only graphics passes have graphics state");
+	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_storage->pipeline.handle);
+
+	VkViewport viewport = vk::viewport((f32)settings.width, (f32)settings.height, 0.0f, 1.0f);
+	VkRect2D scissor = vk::rect2D(settings.width, settings.height, 0, 0);
+	vkCmdSetViewport(cmd, 0, 1, &viewport);
+	vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+	if (!settings.vertex_buffers.empty()) {
+		lm::SmallArray<VkDeviceSize, MAX_VERTEX_BUFFERS> offsets;
+		lm::SmallArray<VkBuffer, MAX_VERTEX_BUFFERS> vertex_buffers;
+		for (vk::Buffer* buffer : settings.vertex_buffers) {
+			vertex_buffers.push_back(buffer->handle);
+			offsets.push_back(0);
+		}
+		vkCmdBindVertexBuffers(cmd, 0, (u32)vertex_buffers.size, vertex_buffers.data, offsets.data);
+	}
+	if (settings.index_buffer) {
+		vkCmdBindIndexBuffer(cmd, settings.index_buffer->handle, 0, settings.index_type);
+	}
+	if (pipeline_storage->pipeline.push_constant_size) {
+		vkCmdPushConstants(cmd, pipeline_storage->pipeline.pipeline_layout, pipeline_storage->pipeline.pc_stages, 0,
+						   pipeline_storage->pipeline.push_constant_size, push_constant_data);
+	}
+}
+
 RenderPass& RenderPass::zero(const Resource& resource) {
 	if (resource.tex) {
 		LUMEN_ERROR("Unimplemented: Image zeroing");
@@ -830,10 +900,9 @@ static void update_rt_descriptors(RenderPass* pass) {
 	pass->pipeline_storage->pipeline.tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
 	pass->pipeline_storage->pipeline.tlas_info.accelerationStructureCount = num_accels;
 	pass->pipeline_storage->pipeline.tlas_info.pAccelerationStructures = accels;
-	VkWriteDescriptorSet descriptor_write =
-		vk::write_descriptor_set(pass->pipeline_storage->pipeline.tlas_descriptor_set,
-								 VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0,
-								 &pass->pipeline_storage->pipeline.tlas_info, num_accels);
+	VkWriteDescriptorSet descriptor_write = vk::write_descriptor_set(
+		pass->pipeline_storage->pipeline.tlas_descriptor_set, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0,
+		&pass->pipeline_storage->pipeline.tlas_info, num_accels);
 	vkUpdateDescriptorSets(vk::context().device, 1, &descriptor_write, 0, nullptr);
 	pass->pipeline_storage->update_as_descriptor = false;
 }
@@ -891,16 +960,18 @@ void RenderPass::write_impl(const vk::Buffer* buffer, VkAccessFlags access_flags
 	_buffer_resource_map.insert(buffer->handle, {pass_idx, access_flags, stage, event_eligible});
 }
 
-void RenderPass::write_impl(vk::Texture* tex, VkAccessFlags access_flags) {
-	VkImageLayout target_layout = vk::texture_to_image_layout(tex, access_flags);
+void RenderPass::write_impl(vk::Texture* tex, VkAccessFlags access_flags, VkImageLayout target_layout) {
+	if (target_layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+		target_layout = vk::texture_to_image_layout(tex, access_flags);
+	}
 	const VkPipelineStageFlags stage = pipeline_stage_from_pass_type(type, access_flags);
 	const bool event_eligible = register_dependencies(tex, access_flags, target_layout);
 	_img_resource_map.insert(tex->handle, {.pass_idx = pass_idx,
-											  .access_flags = access_flags,
-											  .layout = target_layout,
-											  .image_aspect = tex->aspect_flags,
-											  .stage = stage,
-											  .event_eligible = event_eligible});
+										   .access_flags = access_flags,
+										   .layout = target_layout,
+										   .image_aspect = tex->aspect_flags,
+										   .stage = stage,
+										   .event_eligible = event_eligible});
 }
 
 void RenderPass::read_impl(const vk::Buffer* buffer, VkAccessFlags access_flags, BufferSyncFlags flags,
@@ -918,11 +989,11 @@ void RenderPass::read_impl(vk::Texture* tex) {
 	VkPipelineStageFlags stage = pipeline_stage_from_pass_type(type, access_flags);
 	const bool event_eligible = register_dependencies(tex, access_flags, target_layout);
 	_img_resource_map.insert(tex->handle, {.pass_idx = pass_idx,
-											  .access_flags = access_flags,
-											  .layout = target_layout,
-											  .image_aspect = tex->aspect_flags,
-											  .stage = stage,
-											  .event_eligible = event_eligible});
+										   .access_flags = access_flags,
+										   .layout = target_layout,
+										   .image_aspect = tex->aspect_flags,
+										   .stage = stage,
+										   .event_eligible = event_eligible});
 }
 
 void RenderPass::post_execution_barrier(vk::Buffer* buffer, VkAccessFlags access_flags) {
@@ -993,8 +1064,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 		VkImageMemoryBarrier2 img_barrier = image_barrier_from_sync(entry.key, v);
 		VkDependencyInfo dependency_info = vk::dependency_info(1, &img_barrier);
 		if (use_events && v.event_eligible) {
-			LUMEN_ASSERT(_passes[v.opposing_pass_idx].set_signals_img.find(image)->value.event,
-						 "Event can't be null");
+			LUMEN_ASSERT(_passes[v.opposing_pass_idx].set_signals_img.find(image)->value.event, "Event can't be null");
 			VkEvent event = _passes[v.opposing_pass_idx].set_signals_img.find(image)->value.event;
 			vkCmdWaitEvents2(cmd, 1, &event, &dependency_info);
 			vkCmdResetEvent2(cmd, event, img_barrier.dstStageMask);
@@ -1074,40 +1144,22 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			case vk::PassType::Graphics: {
 				lm::SmallArray<vk::Texture*, vk::MAX_COLOR_ATTACHMENTS>& color_outputs = settings.color_outputs;
 				vk::Texture* depth_output = settings.depth_output;
-				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_storage->pipeline.handle);
-
-				u32& width = settings.width;
-				u32& height = settings.height;
-				VkViewport viewport = vk::viewport((f32)width, (f32)height, 0.0f, 1.0f);
-				VkRect2D scissor = vk::rect2D(width, height, 0, 0);
-				vkCmdSetViewport(cmd, 0, 1, &viewport);
-				vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-				if (!settings.vertex_buffers.empty()) {
-					lm::SmallArray<VkDeviceSize, MAX_VERTEX_BUFFERS> offsets;
-					lm::SmallArray<VkBuffer, MAX_VERTEX_BUFFERS> vert_buffers;
-					for (vk::Buffer* buf : settings.vertex_buffers) {
-						vert_buffers.push_back(buf->handle);
-					}
-					vkCmdBindVertexBuffers(cmd, 0, (u32)vert_buffers.size, vert_buffers.data, offsets.data);
-				}
-
-				if (settings.index_buffer) {
-					vkCmdBindIndexBuffer(cmd, settings.index_buffer->handle, 0, settings.index_type);
-				}
-				constexpr u64 MAX_RENDERING_ATTACHMENTS = 4;
+				bind_graphics_state(cmd);
 				lm::SmallArray<VkRenderingAttachmentInfo, MAX_RENDERING_ATTACHMENTS> rendering_attachments;
-				for (vk::Texture* color_output : color_outputs) {
+				for (u64 i = 0; i < color_outputs.size; ++i) {
+					vk::Texture* color_output = color_outputs[i];
 					vk::texture_transition(color_output, cmd, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-					rendering_attachments.push_back(vk::rendering_attachment_info(
-						color_output->view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ATTACHMENT_LOAD_OP_CLEAR,
-						VK_ATTACHMENT_STORE_OP_STORE, settings.clear_color));
+					const VkAttachmentLoadOp load_op =
+						i < settings.color_load_ops.size ? settings.color_load_ops[i] : VK_ATTACHMENT_LOAD_OP_CLEAR;
+					rendering_attachments.push_back(
+						vk::rendering_attachment_info(color_output->view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+													  load_op, VK_ATTACHMENT_STORE_OP_STORE, settings.clear_color));
 				}
 				VkRenderingAttachmentInfo depth_stencil_attachment;
 				if (depth_output) {
 					vk::texture_transition(depth_output, cmd, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 					depth_stencil_attachment = vk::rendering_attachment_info(
-						depth_output->view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_ATTACHMENT_LOAD_OP_CLEAR,
+						depth_output->view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, settings.depth_load_op,
 						VK_ATTACHMENT_STORE_OP_STORE, settings.clear_depth_stencil);
 				}
 
@@ -1124,14 +1176,6 @@ void RenderPass::run(VkCommandBuffer cmd) {
 					vkCmdEndRendering(cmd);
 				}
 
-				// Present
-				for (vk::Texture* color_output : color_outputs) {
-					// If the texture is a swapchain image, it should be presented
-					bool should_present = color_output->allocation == VK_NULL_HANDLE;
-					if (should_present) {
-						vk::texture_transition(color_output, cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-					}
-				}
 				break;
 			}
 			default:
@@ -1168,7 +1212,7 @@ void RenderPass::run(VkCommandBuffer cmd) {
 
 		if (!post_execution_buffer_memory_barriers.empty()) {
 			VkDependencyInfo dependency_info = vk::dependency_info((u32)post_execution_buffer_memory_barriers.size,
-																  post_execution_buffer_memory_barriers.data);
+																   post_execution_buffer_memory_barriers.data);
 			vkCmdPipelineBarrier2(cmd, &dependency_info);
 		}
 	}
@@ -1290,8 +1334,7 @@ void rg::init() {
 	_pipeline_cache = lm::hash_map_create<u64, PipelineStorage>(_arena_rendergraph, MAX_PASSES_PER_FRAME);
 	_buffer_resource_map =
 		lm::hash_map_create<VkBuffer, BufferResourceState>(_arena_rendergraph, 32 * MAX_PASSES_PER_FRAME);
-	_img_resource_map =
-		lm::hash_map_create<VkImage, ImageResourceState>(_arena_rendergraph, 32 * MAX_PASSES_PER_FRAME);
+	_img_resource_map = lm::hash_map_create<VkImage, ImageResourceState>(_arena_rendergraph, 32 * MAX_PASSES_PER_FRAME);
 	_registered_buffer_pointers =
 		lm::hash_map_create<lm::String, vk::Buffer*>(_arena_rendergraph, 32 * MAX_PASSES_PER_FRAME);
 	_shader_cache = lm::hash_map_create<lm::String, vk::Shader>(_arena_rendergraph, 4 * MAX_PASSES_PER_FRAME);
@@ -1394,6 +1437,20 @@ void rg::run(VkCommandBuffer cmd) {
 	for (u64 i = 0; i < _passes.size; i++) {
 		_passes[i].run(cmd);
 	}
+
+	// Transition output images to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+	for (RenderPass& pass : _passes) {
+		for (vk::Texture* output : pass.settings.color_outputs) {
+			if (output->allocation != VK_NULL_HANDLE || output->layout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) continue;
+			vk::texture_transition(output, cmd, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+			_img_resource_map.insert(output->handle, {.pass_idx = INVALID_PASS_IDX,
+													  .access_flags = 0,
+													  .layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+													  .image_aspect = output->aspect_flags,
+													  .stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+													  .event_eligible = false});
+		}
+	}
 }
 
 void rg::reset() {
@@ -1482,9 +1539,8 @@ static void populate_macros(lm::Arena* arena, const vk::ShaderMacroArray& macros
 }
 
 static PipelineStorage* add_pass_impl_common(const lm::String& name, const vk::ShaderMacroArray& macros,
-											 const lm::SpecializationConstantArray& specialization_data,
-											 bool& cached, lm::String& name_with_macros,
-											 lm::String& macro_string) {
+											 const lm::SpecializationConstantArray& specialization_data, bool& cached,
+											 lm::String& name_with_macros, lm::String& macro_string) {
 	assert(name.is_cstr());
 	PipelineStorage* pipeline_storage;
 
@@ -1545,9 +1601,7 @@ void rg::register_buffer_pointer(const lm::String& name, vk::Buffer* buffer) {
 	_registered_buffer_pointers.insert(name, buffer);
 }
 
-bool rg::is_buffer_registered(const lm::String& name) {
-	return _registered_buffer_pointers.find(name) != nullptr;
-}
+bool rg::is_buffer_registered(const lm::String& name) { return _registered_buffer_pointers.find(name) != nullptr; }
 
 void rg::request_shader_reload() {
 	_reload_shaders = true;

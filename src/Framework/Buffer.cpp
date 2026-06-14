@@ -97,5 +97,8 @@ void* buffer_map(Buffer* buffer) {
 	return memory;
 }
 void buffer_unmap(Buffer* buffer) { vmaUnmapMemory(vk::context().allocator, buffer->allocation); }
+void buffer_flush(Buffer* buffer, u64 offset, u64 size) {
+	vk::check(vmaFlushAllocation(vk::context().allocator, buffer->allocation, offset, size));
+}
 
 }  // namespace vk

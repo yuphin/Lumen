@@ -52,5 +52,6 @@ void buffer_destroy(Buffer* buffer);
 void buffer_write(Buffer* buffer, void* data, u64 size);
 void* buffer_map(Buffer* buffer);
 void buffer_unmap(Buffer* buffer);
+void buffer_flush(Buffer* buffer, u64 offset = 0, u64 size = VK_WHOLE_SIZE);
 
 }  // namespace vk

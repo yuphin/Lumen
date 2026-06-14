@@ -152,6 +152,8 @@ struct RenderPass {
 	inline RenderPass& push_constants(T* data) {
 		return push_constants((void*)data, sizeof(T), alignof(T));
 	}
+	void bind_graphics_state(VkCommandBuffer cmd) const;
+	void push_descriptors(VkCommandBuffer cmd, const vk::DescriptorInfo* descriptors) const;
 
 	// Zero-ing happens before the pass runs
 	RenderPass& zero(const Resource& resource);
@@ -235,7 +237,8 @@ struct RenderPass {
 	bool register_dependencies(vk::Texture* tex, VkAccessFlags dst_access_flags, VkImageLayout target_layout);
 	void write_impl(const vk::Buffer* buffer, VkAccessFlags access_flags, BufferSyncFlags flags = BufferSyncFlags::NONE,
 					VkPipelineStageFlags stage = 0);
-	void write_impl(vk::Texture* tex, VkAccessFlags access_flags = VK_ACCESS_SHADER_WRITE_BIT);
+	void write_impl(vk::Texture* tex, VkAccessFlags access_flags = VK_ACCESS_SHADER_WRITE_BIT,
+					VkImageLayout target_layout = VK_IMAGE_LAYOUT_UNDEFINED);
 	void read_impl(const vk::Buffer* buffer, VkAccessFlags access_flags = VK_ACCESS_SHADER_READ_BIT,
 				   BufferSyncFlags flags = BufferSyncFlags::NONE, VkPipelineStageFlags stage = 0);
 	void read_impl(vk::Texture* tex);
