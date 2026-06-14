@@ -1,5 +1,6 @@
 #include "Shader.h"
 #include "RenderGraph.h"
+#include "Framework/Base/OS.h"
 #include <spirv_cross/spirv_cross_c.h>
 #include <shaderc/shaderc.h>
 
@@ -113,7 +114,7 @@ static lm::String path_join(lm::Arena* arena, const lm::String& directory, const
 }
 
 static shaderc_include_result* make_include_error(lm::Arena* arena, const char* message) {
-	auto* result = (shaderc_include_result*)arena->allocate(sizeof(shaderc_include_result));
+	shaderc_include_result* result = (shaderc_include_result*)arena->allocate(sizeof(shaderc_include_result));
 	result->source_name = "";
 	result->source_name_length = 0;
 	result->content = message;
@@ -123,7 +124,7 @@ static shaderc_include_result* make_include_error(lm::Arena* arena, const char* 
 
 static shaderc_include_result* shader_include_resolve(void* user_data, const char* requested_source, int include_type,
 													  const char* requesting_source, size_t) {
-	auto* context = (ShaderIncludeContext*)user_data;
+	ShaderIncludeContext* context = (ShaderIncludeContext*)user_data;
 	lm::Arena* arena = context->arena;
 	const lm::String requested = lm::str_from_cstr(requested_source);
 
@@ -149,7 +150,7 @@ static shaderc_include_result* shader_include_resolve(void* user_data, const cha
 		resolved_path = requested_path;
 	}
 
-	auto* result = (shaderc_include_result*)arena->allocate(sizeof(shaderc_include_result));
+	shaderc_include_result* result = (shaderc_include_result*)arena->allocate(sizeof(shaderc_include_result));
 	result->source_name = resolved_path.data;
 	result->source_name_length = string_content_size(resolved_path);
 	result->content = contents.data;
@@ -160,7 +161,7 @@ static shaderc_include_result* shader_include_resolve(void* user_data, const cha
 static void shader_include_release(void*, shaderc_include_result*) {}
 
 static void add_macros(const vk::ShaderMacroArray& macros, shaderc_compile_options_t options, lm::Arena* arena) {
-	for (const auto& macro : macros) {
+	for (const vk::ShaderMacro& macro : macros) {
 		if (macro.name.empty()) {
 			continue;
 		}
@@ -399,7 +400,7 @@ static bool parse_spirv(spvc_context context, spvc_compiler compiler, Shader& sh
 	auto buffer_pointer_names = id_array_create<lm::String>(scratch_arena, id_bound);
 
 	auto mark_buffer = [&](const lm::String& resource_name, bool read, bool write) {
-		auto entry = pass->rg->registered_buffer_pointers.find(resource_name);
+		auto* entry = pass->rg->registered_buffer_pointers.find(resource_name);
 		if (entry) {
 			BufferStatus& status = shader.buffer_status_map.get_or_create(entry->key)->value;
 			status.read |= read;

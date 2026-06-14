@@ -1,5 +1,4 @@
 #include "Logger.h"
-#include <stb/stb_sprintf.h>
 #include "Framework/Base/String.h"
 
 #if defined(_WIN32) || defined(_WIN64)

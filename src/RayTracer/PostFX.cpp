@@ -1,15 +1,10 @@
-#include "Framework/RenderGraph.h"
 #include "PostFX.h"
-#include "Framework/PersistentResourceManager.h"
+#include "Framework/CommandBuffer.h"
 #include "Framework/DynamicResourceManager.h"
-#include "Framework/Window.h"
+#include "Framework/ImageUtils.h"
+#include "Framework/PersistentResourceManager.h"
 #include "Framework/VulkanBase.h"
-
-#include "Framework/Base/String.h"
-#include "Framework/Base/OS.h"
-#include "Framework/Base/Memory.h"
-#include "Framework/Base/HashMap.h"
-#include "Framework/Base/Utils.h"
+#include "Framework/Window.h"
 
 void PostFX::init_fft() {
 	// Load the kernel
@@ -31,12 +26,12 @@ void PostFX::init_fft() {
 	u32 padded_width = 1 << u32(ceil(log2(double(Window::width() + kernel_org->extent.width))));
 	u32 padded_height = 1 << u32(ceil(log2(double(Window::height() + kernel_org->extent.height))));
 
-	auto empty_tex_desc = vk::TextureDesc{.name = CSTR("FFT - Ping"),
-										  .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-										  .dimensions = {padded_width, padded_height, 1},
-										  .format = VK_FORMAT_R32G32B32A32_SFLOAT,
-										  .initial_layout = VK_IMAGE_LAYOUT_GENERAL,
-										  .sampler = img_sampler};
+	vk::TextureDesc empty_tex_desc = {.name = CSTR("FFT - Ping"),
+									  .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+									  .dimensions = {padded_width, padded_height, 1},
+									  .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+									  .initial_layout = VK_IMAGE_LAYOUT_GENERAL,
+									  .sampler = img_sampler};
 	fft_ping_padded = prm::get_texture(empty_tex_desc);
 	empty_tex_desc.name = CSTR("FFT - Pong");
 	fft_pong_padded = prm::get_texture(empty_tex_desc);
@@ -58,8 +53,8 @@ void PostFX::init_fft() {
 
 	u32 wg_size_x = fft_ping_padded->extent.width;
 	u32 wg_size_y = fft_ping_padded->extent.height;
-	auto dim_y = (u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_x - 1) / wg_size_x;
-	auto dim_x = (u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_y - 1) / wg_size_y;
+	u32 dim_y = (u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_x - 1) / wg_size_x;
+	u32 dim_x = (u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_y - 1) / wg_size_y;
 	bool vertical = false;
 
 	const i32 RADIX_X = (31 - lm::count_leading_zeros(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
@@ -119,8 +114,8 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 			.bind(fft_ping_padded);
 		u32 wg_size_x = fft_ping_padded->extent.width;
 		u32 wg_size_y = fft_ping_padded->extent.height;
-		auto dim_y = (u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_x - 1) / wg_size_x;
-		auto dim_x = (u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_y - 1) / wg_size_y;
+		u32 dim_y = (u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_x - 1) / wg_size_x;
+		u32 dim_x = (u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_y - 1) / wg_size_y;
 		bool vertical = false;
 		const i32 RADIX_X = (31 - lm::count_leading_zeros(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
 		const i32 RADIX_Y = (31 - lm::count_leading_zeros(fft_ping_padded->extent.height)) % 2 ? 2 : 4;
@@ -221,7 +216,7 @@ bool PostFX::gui() {
 
 void PostFX::destroy() {
 	std::initializer_list<vk::Texture*> tex_list = {kernel_pong, fft_ping_padded, fft_pong_padded};
-	for (auto t : tex_list) {
+	for (vk::Texture* t : tex_list) {
 		prm::remove(t);
 	}
 	kernel_pong = nullptr;

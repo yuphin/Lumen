@@ -109,7 +109,7 @@ VkSampler get_sampler(const VkSamplerCreateInfo& sampler_create_info, bool use_m
 		_sampler_cache =
 			lm::hash_map_create<VkSamplerCreateInfo, VkSampler, sampler_hash, sampler_eq>(_sampler_cache_arena, 128);
 	}
-	auto entry = _sampler_cache.find(sampler_create_info);
+	auto* entry = _sampler_cache.find(sampler_create_info);
 	if (entry) {
 		return entry->value;
 	}
@@ -146,7 +146,7 @@ void destroy() {
 	_buffer_pool.destroy();
 	_texture_pool.destroy();
 	if (_sampler_cache.initialized()) {
-		for (auto& entry : _sampler_cache) {
+		for (lm::HashMapEntry<VkSamplerCreateInfo, VkSampler>& entry : _sampler_cache) {
 			vkDestroySampler(vk::context().device, entry.value, nullptr);
 		}
 		_sampler_cache.clear();

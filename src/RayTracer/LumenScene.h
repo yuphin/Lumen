@@ -1,16 +1,15 @@
 #pragma once
-#include "Framework/VulkanBase.h"
-#include "Framework/Window.h"
-
 #include "shaders/commons.h"
 #include "SceneConfig.h"
-#include "Framework/Buffer.h"
-#include "Framework/Texture.h"
 #include "Framework/Camera.h"
 #include "Framework/Base/String.h"
-#include "Framework/Base/OS.h"
 #include "Framework/Base/Memory.h"
 #include "Framework/Base/HashMap.h"
+
+namespace vk {
+struct Buffer;
+struct Texture;
+}  // namespace vk
 
 struct LumenPrimMesh {
 	lm::String name;

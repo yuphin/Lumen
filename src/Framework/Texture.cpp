@@ -3,8 +3,6 @@
 #include "DynamicResourceManager.h"
 #include "Framework/VulkanContext.h"
 #include "VkUtils.h"
-#include "VulkanContext.h"
-#include "VulkanStructs.h"
 #include "PersistentResourceManager.h"
 
 namespace vk {

@@ -4,7 +4,6 @@
 #include "Framework/Base/String.h"
 #include "Framework/ThreadPool.h"
 #include "Framework/Base/OS.h"
-#include <stb/stb_sprintf.h>
 
 // #undef USE_VALIDATION_LAYERS
 
@@ -72,7 +71,7 @@ void hash_set_u64_test() {
 	LUMEN_TRACE("----Hash Set Test Begin----");
 	lm::Arena* arena = lm::arena_create(GB(1));
 	auto hs = lm::hash_set_create<u64>(arena, 32);
-	auto stdhs = std::unordered_set<u64>();
+	std::unordered_set<u64> stdhs;
 	auto time_begin = std::chrono::high_resolution_clock::now();
 	constexpr u64 NUM_INSERTS = 1024 * 32;
 	for (u64 i = 0; i < NUM_INSERTS; i++) {
@@ -103,7 +102,7 @@ void hash_set_str_test() {
 	LUMEN_TRACE("----Hash Set Test Begin----");
 	lm::Arena* arena = lm::arena_create(GB(1));
 	auto hs = lm::hash_set_create<lm::String>(arena, 1024 * 1024 * 4);
-	auto stdhs = std::unordered_set<std::string>();
+	std::unordered_set<std::string> stdhs;
 	auto time_begin = std::chrono::high_resolution_clock::now();
 	constexpr u64 NUM_INSERTS = 1024 * 32;
 	for (u64 i = 0; i < NUM_INSERTS; i++) {
@@ -162,7 +161,7 @@ void hm_test() {
 	// for(const auto& kv: hm) {
 	// 	LUMEN_INFO("%d - %d\n", kv.key, kv.value);
 	// }
-	for (const auto& k : hs) {
+	for (const lm::HashMapEntry<u32, lm::Empty>& k : hs) {
 		LUMEN_INFO("%d", k.key);
 	}
 	LUMEN_TRACE("----Hash Map Test End----");
@@ -190,14 +189,14 @@ i32 main(i32 argc, char* argv[]) {
 	hm.insert(682, 800);
 	hm.remove(2);
 
-	auto entry = hm.find(682);
+	auto* entry = hm.find(682);
 	assert(entry != nullptr);
-	auto entry2 = hm.find(3);
+	auto* entry2 = hm.find(3);
 	assert(entry2 == nullptr);
-	auto entry4 = hm.find(2);
+	auto* entry4 = hm.find(2);
 	assert(entry4 == nullptr);
 
-	for (auto& e : hm) {
+	for (lm::HashMapEntry<i32, u64>& e : hm) {
 		LUMEN_INFO("HM Entry size = %d", sizeof(e));
 		LUMEN_INFO("HashMap entry: key = %d, value = %llu", e.key, e.value);
 	}
@@ -207,7 +206,7 @@ i32 main(i32 argc, char* argv[]) {
 	hs.insert(24);
 	hs.insert(541);
 	hs.insert(60);
-	for (auto& e : hs) {
+	for (lm::HashMapEntry<u64, lm::Empty>& e : hs) {
 		LUMEN_INFO("HS Entry size = %d", sizeof(e));
 		LUMEN_INFO("HashSet entry: key = %llu", e.key);
 	}

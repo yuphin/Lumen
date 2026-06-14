@@ -6,7 +6,7 @@ namespace vk {
 
 static u32 get_bindings_for_shader_set(util::Slice<const Shader> shaders, VkDescriptorType* descriptor_types) {
 	u32 binding_mask = 0;
-	for (const auto& shader : shaders) {
+	for (const Shader& shader : shaders) {
 		for (u32 i = 0; i < 32; ++i) {
 			if (shader.binding_mask & (1 << i)) {
 				if (binding_mask & (1 << i)) {
@@ -31,7 +31,7 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 	util::Slice<const Shader> shaders_slice = {settings.shaders.data, (u64)settings.shaders.size};
 	binding_mask = get_bindings_for_shader_set(shaders_slice, descriptor_types);
 	create_set_layout(shaders_slice, descriptor_counts);
-	for (const auto& shader : settings.shaders) {
+	for (const Shader& shader : settings.shaders) {
 		if (push_constant_size && shader.push_constant_size) {
 			LUMEN_ASSERT(push_constant_size == shader.push_constant_size,
 						 "Currently all shaders only support 1 push constant!");
@@ -57,7 +57,7 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 	specialization_info.pData = settings.specialization_data.data;
 
 	lm::SmallArray<VkPipelineShaderStageCreateInfo, vk::MAX_SHADERS_PER_PASS> stages;
-	for (const auto& shader : settings.shaders) {
+	for (const Shader& shader : settings.shaders) {
 		VkPipelineShaderStageCreateInfo stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
 		stage.stage = shader.stage;
 		stage.module = shader.create_vk_shader_module(vk::context().device);
@@ -118,16 +118,17 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 			break;
 		}
 	}
-	auto& vert_shader = settings.shaders[vert_shader_idx];
+	const Shader& vert_shader = settings.shaders[vert_shader_idx];
 	i32 i = 0;
 	for (const VertexInput& input : vert_shader.vertex_inputs) {
-		auto binding_desc = vk::vertex_input_binding_description(i, input.size, VK_VERTEX_INPUT_RATE_VERTEX);
-		auto attribute_desc = vk::vertex_input_attribute_description(i, i, input.format, 0);
+		VkVertexInputBindingDescription binding_desc =
+			vk::vertex_input_binding_description(i, input.size, VK_VERTEX_INPUT_RATE_VERTEX);
+		VkVertexInputAttributeDescription attribute_desc = vk::vertex_input_attribute_description(i, i, input.format, 0);
 		binding_descs.push_back(binding_desc);
 		attribute_descs.push_back(attribute_desc);
 		++i;
 	}
-	auto vertex_input_state = vk::pipeline_vertex_input_state();
+	VkPipelineVertexInputStateCreateInfo vertex_input_state = vk::pipeline_vertex_input_state();
 	vertex_input_state.vertexAttributeDescriptionCount = (u32)attribute_descs.size;
 	vertex_input_state.pVertexAttributeDescriptions = attribute_descs.data;
 	vertex_input_state.vertexBindingDescriptionCount = (u32)binding_descs.size;
@@ -147,7 +148,8 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 		.pColorAttachmentFormats = output_formats.data,
 		.depthAttachmentFormat = depth_format};
 
-	auto depth_stencil_state_ci = vk::pipeline_depth_stencil(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+	VkPipelineDepthStencilStateCreateInfo depth_stencil_state_ci =
+		vk::pipeline_depth_stencil(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
 
 	VkGraphicsPipelineCreateInfo pipeline_CI = vk::graphics_pipeline();
 	pipeline_CI.pNext = nullptr;
@@ -168,7 +170,7 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 	pipeline_CI.pDepthStencilState = &depth_stencil_state_ci;
 
 	vk::check(vkCreateGraphicsPipelines(vk::context().device, VK_NULL_HANDLE, 1, &pipeline_CI, nullptr, &handle));
-	for (auto& stage : stages) {
+	for (VkPipelineShaderStageCreateInfo& stage : stages) {
 		vkDestroyShaderModule(vk::context().device, stage.module, nullptr);
 	}
 	if (!name.empty()) {
@@ -184,7 +186,7 @@ void Pipeline::create_rt_pipeline(const PassSettings& settings, util::Slice<u32>
 	binding_mask = get_bindings_for_shader_set(shaders_slice, descriptor_types);
 	u32 num_as_bindings_in_shader = 0;
 	VkShaderStageFlags binding_stage_flags = 0;
-	for (const auto& shader : settings.shaders) {
+	for (const Shader& shader : settings.shaders) {
 		if (push_constant_size && shader.push_constant_size) {
 			LUMEN_ASSERT(push_constant_size == shader.push_constant_size,
 						 "Currently all shaders only support 1 push constant!");
@@ -205,8 +207,9 @@ void Pipeline::create_rt_pipeline(const PassSettings& settings, util::Slice<u32>
 	create_update_template(shaders_slice, descriptor_counts);
 
 	// Descriptor pool for AS descriptors
-	auto pool_size = vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, num_as_bindings);
-	auto descriptor_pool_ci = vk::descriptor_pool(1, &pool_size, 1);
+	VkDescriptorPoolSize pool_size =
+		vk::descriptor_pool_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, num_as_bindings);
+	VkDescriptorPoolCreateInfo descriptor_pool_ci = vk::descriptor_pool(1, &pool_size, 1);
 	descriptor_pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 	vk::check(vkCreateDescriptorPool(vk::context().device, &descriptor_pool_ci, nullptr, &tlas_descriptor_pool));
 	VkDescriptorSetAllocateInfo set_allocate_info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
@@ -230,7 +233,7 @@ void Pipeline::create_rt_pipeline(const PassSettings& settings, util::Slice<u32>
 	stage.pName = "main";
 
 	i32 stage_idx = 0;
-	for (const auto& shader : settings.shaders) {
+	for (const Shader& shader : settings.shaders) {
 		VkRayTracingShaderGroupCreateInfoKHR group{VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR};
 		group.anyHitShader = VK_SHADER_UNUSED_KHR;
 		group.closestHitShader = VK_SHADER_UNUSED_KHR;
@@ -284,7 +287,7 @@ void Pipeline::create_rt_pipeline(const PassSettings& settings, util::Slice<u32>
 		specialization_info.mapEntryCount = (u32)settings.specialization_data.size;
 		specialization_info.pMapEntries = spec_map_entries.data;
 		specialization_info.pData = settings.specialization_data.data;
-		for (auto& stage : stages) {
+		for (VkPipelineShaderStageCreateInfo& stage : stages) {
 			stage.pSpecializationInfo = &specialization_info;
 		}
 	}
@@ -301,7 +304,7 @@ void Pipeline::create_rt_pipeline(const PassSettings& settings, util::Slice<u32>
 	if (!name.empty()) {
 		vk::set_resource_name(vk::context().device, (u64)handle, name.data, VK_OBJECT_TYPE_PIPELINE);
 	}
-	for (auto& shader_stage : stages) {
+	for (VkPipelineShaderStageCreateInfo& shader_stage : stages) {
 		vkDestroyShaderModule(vk::context().device, shader_stage.module, nullptr);
 	}
 }
@@ -322,7 +325,7 @@ void Pipeline::create_compute_pipeline(const PassSettings& settings, util::Slice
 	}
 	create_update_template(shader_slice, descriptor_counts);
 
-	auto compute_shader_module = shader.create_vk_shader_module(vk::context().device);
+	VkShaderModule compute_shader_module = shader.create_vk_shader_module(vk::context().device);
 	VkPipelineShaderStageCreateInfo shader_stage_ci = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
 	shader_stage_ci.pName = "main";
 	shader_stage_ci.stage = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -475,7 +478,7 @@ void Pipeline::create_update_template(util::Slice<const Shader> shaders, util::S
 	if (descriptor_counts.empty()) {
 		return;
 	}
-	for (const auto& shader : shaders) {
+	for (const Shader& shader : shaders) {
 		for (u32 i = 0; i < 32; ++i) {
 			if (shader.binding_mask & (1 << i)) {
 				if (binding_mask & (1 << i)) {
@@ -544,7 +547,7 @@ void Pipeline::create_update_template(util::Slice<const Shader> shaders, util::S
 		entry.dstArrayElement = 0;
 		entry.descriptorCount = descriptor_counts[idx];
 		entry.descriptorType = descriptor_types[i];
-		auto desc_info_size = get_desc_info_size(entry.descriptorType);
+		u64 desc_info_size = get_desc_info_size(entry.descriptorType);
 		entry.offset = offset;
 		entry.stride = desc_info_size;
 		entries.push_back(entry);

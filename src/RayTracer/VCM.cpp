@@ -149,7 +149,7 @@ void render(Integrator* integrator) {
 	const i32 base_grid_res = i32(max_comp / state.pc.radius);
 	state.pc.grid_res = lm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
 	// Prepare
-	auto& prepare_pass =
+	lm::RenderPass& prepare_pass =
 		vk::render_graph()
 			->add_compute(CSTR("Init Reservoirs"),
 						  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/init_reservoirs.comp")),

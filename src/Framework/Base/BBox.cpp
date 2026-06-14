@@ -20,7 +20,7 @@ BBox bbox_transform(BBox& bbox, const lm::mat4& mat) {
 	corners[6] = mat * lm::vec4(bbox.max().x, bbox.max().y, bbox.min().z, 1.0);
 	corners[7] = mat * lm::vec4(bbox.max(), 1.0);
 	BBox result;
-	for (const auto& c : corners) {
+	for (const lm::vec3& c : corners) {
 		bbox_insert(result, c);
 	}
 	return result;

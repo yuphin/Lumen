@@ -2,9 +2,7 @@
 #include "CommandBuffer.h"
 #include "Framework/VulkanContext.h"
 #include "VkUtils.h"
-#include "VulkanContext.h"
 #include "DynamicResourceManager.h"
-#include "VulkanStructs.h"
 namespace vk {
 void buffer_create(Buffer* buffer, const BufferDesc& desc) {
 	LUMEN_ASSERT(desc.size > 0, "Buffer size can't be 0");

@@ -1,9 +1,9 @@
 #pragma once
-#include "Framework/Texture.h"
-#include "Framework/RenderGraph.h"
-#include "Framework/ImageUtils.h"
-#include "Framework/VkUtils.h"
 #include "shaders/commons.h"
+
+namespace vk {
+struct Texture;
+}
 
 class PostFX {
    public:

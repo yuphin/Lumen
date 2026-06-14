@@ -1,5 +1,4 @@
 #include "Integrator.h"
-#include <Framework/RenderGraph.h>
 #include "PSSMLT.h"
 
 namespace pssmlt {
@@ -109,7 +108,7 @@ void init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config.num_mlt_threads * (path_length * (path_length + 1)) * sizeof(Splat)});
 
-	auto path_size = lm::max(config.num_mlt_threads, config.num_bootstrap_samples);
+	u32 path_size = lm::max(config.num_mlt_threads, config.num_bootstrap_samples);
 
 	state.light_path_buffer =
 		prm::get_buffer({.name = CSTR("Light Paths"),

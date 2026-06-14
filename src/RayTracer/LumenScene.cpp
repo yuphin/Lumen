@@ -1,11 +1,12 @@
-#include "Framework/Base/BBox.h"
 #include "LumenScene.h"
-#include <stb/stb_image.h>
-#include "shaders/commons.h"
-#include "Framework/PersistentResourceManager.h"
+#include "Framework/Base/BBox.h"
 #include "Framework/Base/HashMap.h"
+#include "Framework/Base/OS.h"
+#include "Framework/PersistentResourceManager.h"
+#include "Framework/VulkanBase.h"
+#include "Framework/Window.h"
 #include <fast_obj.h>
-#include <stb/stb_sprintf.h>
+#include <stb/stb_image.h>
 
 // TODO: Add instancing to the scene format
 namespace scene {
@@ -444,7 +445,7 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 
 			lm::String texture_name = get_or_default_str(get_node(bsdf_node, "texture"), "");
 			if (!texture_name.empty()) {
-				auto entry = texture_name_to_idx.find(texture_name);
+				auto* entry = texture_name_to_idx.find(texture_name);
 				if (entry) {
 					material.texture_id = entry->value;
 				}
@@ -510,8 +511,8 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 					material.albedo = edge_tint_vec * (1.0f - reflectivity_vec) / (1.0f + reflectivity_vec) +
 									  (1.0f - edge_tint_vec) * (1.0f + lm::sqrt(reflectivity_vec)) /
 										  (1.0f - lm::sqrt(reflectivity_vec));
-					auto intermediate_term = material.albedo + 1.0f;
-					auto intermediate_term2 = material.albedo - 1.0f;
+					lm::vec3 intermediate_term = material.albedo + 1.0f;
+					lm::vec3 intermediate_term2 = material.albedo - 1.0f;
 					material.k = lm::sqrt(1.0f / (1.0f - reflectivity_vec) *
 										   (reflectivity_vec * intermediate_term * intermediate_term -
 											intermediate_term2 * intermediate_term2));
@@ -593,12 +594,12 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 			for (LumenNode* mat_ref_node = materials_refs_node->child; mat_ref_node;
 				 mat_ref_node = next_node(mat_ref_node)) {
 				lm::String mat_name = get_str(get_node(mat_ref_node, "name"));
-				auto material_entry = material_map.find(mat_name);
+				auto* material_entry = material_map.find(mat_name);
 				if (material_entry) {
 					u32 mat_idx = material_entry->value;
 					LumenNode* refs_node = get_node(mat_ref_node, "refs");
 					if (refs_node && refs_node->num_list_items) {
-						auto refs = get_str_list(scratch.arena, get_node(mat_ref_node, "refs"));
+						lm::FixedArray<lm::String> refs = get_str_list(scratch.arena, get_node(mat_ref_node, "refs"));
 						for (const lm::String& ref : refs) {
 							materials_to_objects.insert(ref, mat_idx);
 						}
@@ -678,7 +679,7 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 			prim_mesh.prim_idx = (u32)_scene.prim_meshes.size - 1;
 
 			lm::String obj_name = lm::str_from_cstr(obj->objects[shape_idx].name);
-			auto entry = materials_to_objects.find(obj_name);
+			auto* entry = materials_to_objects.find(obj_name);
 			if (entry) {
 				prim_mesh.material_idx = entry->value;
 			} else if (material_entire_mesh_idx != U32_MAX) {
@@ -698,7 +699,7 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 		}
 	}
 	// Free obj data
-	for (const auto& kv : mesh_to_obj_map) {
+	for (const lm::HashMapEntry<u32, fastObjMesh*>& kv : mesh_to_obj_map) {
 		fast_obj_destroy(kv.value);
 	}
 	// Camera
@@ -741,7 +742,7 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 
 	// Scene lights
 	_scene.total_light_area = 0;
-	for (auto i = 0; i < _scene.analytical_lights.size; i++) {
+	for (u64 i = 0; i < _scene.analytical_lights.size; i++) {
 		AnalyticalLight& l = _scene.analytical_lights[i];
 		Light light;
 		light.L = l.L;
@@ -858,12 +859,12 @@ void load(const lm::String& path) {
 	f32 total_light_triangle_area = 0.0f;
 	for (Light& l : _scene.gpu_lights) {
 		if ((l.light_flags & 0x7) == LIGHT_AREA) {
-			const auto& pm = _scene.prim_meshes[l.prim_mesh_idx];
+			const LumenPrimMesh& pm = _scene.prim_meshes[l.prim_mesh_idx];
 			l.world_matrix = pm.world_matrix;
 			u32 idx_base_offset = pm.first_idx;
 			u32 vtx_offset = pm.vtx_offset;
 			for (u32 i = 0; i < l.num_triangles; i++) {
-				auto idx_offset = idx_base_offset + 3 * i;
+				u32 idx_offset = idx_base_offset + 3 * i;
 				lm::ivec3 ind = {_scene.indices[idx_offset], _scene.indices[idx_offset + 1],
 								  _scene.indices[idx_offset + 2]};
 				ind += lm::ivec3(vtx_offset);
@@ -945,7 +946,7 @@ void load(const lm::String& path) {
 	if (!_scene.textures.size) {
 		add_default_texture();
 	} else {
-		for (const auto& texture_path : _scene.textures) {
+		for (const TextureRef& texture_path : _scene.textures) {
 			lm::ScratchArena scratch = _arena_strings;
 			i32 x, y, n;
 			lm::String img_path = lm::str_concat(scratch.arena, path_root, texture_path.relative_path);
@@ -1055,7 +1056,7 @@ void write() {
 	for (u32 i = 0; i < _scene.materials.size; i++) {
 		LumenNode* bsdf_prop = node_create(scratch.arena, "-");
 		const Material& mat = _scene.materials[i];
-		auto material_entry = _scene.material_idx_to_name.find(i);
+		auto* material_entry = _scene.material_idx_to_name.find(i);
 		assert(material_entry);
 		add_leaf_node(scratch.arena, bsdf_prop, "name", material_entry->value);
 		add_leaf_node(scratch.arena, bsdf_prop, "type", get_material_type(mat));
@@ -1168,7 +1169,7 @@ void write() {
 		auto mesh_mappings = lm::hash_map_create<lm::String, lm::FixedArray<LumenPrimMesh*>>(scratch.arena);
 
 		for (LumenPrimMesh& mesh : _scene.prim_meshes) {
-			auto entry = mesh_mappings.get_or_create(mesh.filename);
+			auto* entry = mesh_mappings.get_or_create(mesh.filename);
 			if (!entry->value.initialized()) {
 				entry->value = lm::fixed_array_create<LumenPrimMesh*>(scratch.arena, _scene.prim_meshes.size);
 			}
@@ -1176,7 +1177,7 @@ void write() {
 		}
 
 		LumenNode* meshes_node = node_create(scratch.arena, "mesh");
-		for (const auto& mesh_mapping : mesh_mappings) {
+		for (const lm::HashMapEntry<lm::String, lm::FixedArray<LumenPrimMesh*>>& mesh_mapping : mesh_mappings) {
 			LumenNode* mesh_node = node_create(scratch.arena, "-");
 			add_leaf_node(scratch.arena, mesh_node, "name", mesh_mapping.key);
 			LumenNode* materials_node = node_create(scratch.arena, "materials");
@@ -1189,7 +1190,7 @@ void write() {
 					add_leaf_node(scratch.arena, mesh_to_material_node, "refs", mesh->name);
 				}
 
-				auto material_entry = _scene.material_idx_to_name.find(mesh->material_idx);
+				auto* material_entry = _scene.material_idx_to_name.find(mesh->material_idx);
 				assert(material_entry);
 				add_leaf_node(scratch.arena, mesh_to_material_node, "name", material_entry->value);
 				add_child_node(materials_node, mesh_to_material_node);
@@ -1236,8 +1237,9 @@ void write() {
 }
 
 void destroy() {
-	auto buffer_list = {_scene.index_buffer, _scene.vertex_buffer, _scene.materials_buffer,
-						_scene.prim_lookup_buffer, _scene.mesh_lights_buffer};
+	std::initializer_list<vk::Buffer*> buffer_list = {
+		_scene.index_buffer, _scene.vertex_buffer, _scene.materials_buffer, _scene.prim_lookup_buffer,
+		_scene.mesh_lights_buffer};
 	for (vk::Buffer* b : buffer_list) {
 		prm::remove(b);
 	}

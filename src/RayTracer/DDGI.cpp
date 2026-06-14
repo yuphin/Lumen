@@ -1,4 +1,3 @@
-#include <random>
 #include "Integrator.h"
 #include "Framework/VkUtils.h"
 #include "DDGI.h"
@@ -7,6 +6,16 @@ namespace ddgi {
 
 constexpr i32 IRRADIANCE_SIDE_LENGTH = 8;
 constexpr i32 DEPTH_SIDE_LENGTH = 16;
+
+static u32 random_u32(u64& state) {
+	u64 old_state = state;
+	state = old_state * 6364136223846793005ULL + 1442695040888963407ULL;
+	u32 xorshifted = (u32)(((old_state >> 18) ^ old_state) >> 27);
+	u32 rotation = (u32)(old_state >> 59);
+	return (xorshifted >> rotation) | (xorshifted << ((-rotation) & 31));
+}
+
+static f32 random_f32(u64& state) { return (f32)(random_u32(state) >> 8) / 16777216.0f; }
 
 static void generate_uv_sphere(lm::Array<u32>& indices, lm::Array<SphereVertex>& positions, u32 latitude, u32 longitude,
 							   f32 radius = 0.1f) {
@@ -20,7 +29,7 @@ static void generate_uv_sphere(lm::Array<u32>& indices, lm::Array<SphereVertex>&
 			f32 sin_phi = sin(phi);
 			f32 cos_phi = cos(phi);
 
-			auto& vertex = positions.emplace_back();
+			SphereVertex& vertex = positions.emplace_back();
 			vertex.pos.x = radius * sin_theta * cos_phi;
 			vertex.pos.y = radius * cos_theta;
 			vertex.pos.z = radius * sin_theta * sin_phi;
@@ -46,6 +55,7 @@ static void generate_uv_sphere(lm::Array<u32>& indices, lm::Array<SphereVertex>&
 
 void init(Integrator* integrator) {
 	DDGI& state = integrator->ddgi;
+	state.rng_state = (u64)(os::time_seconds() * 1000000000.0) | 1;
 
 	u32 num_probes;
 	// DDGI Resources
@@ -227,7 +237,7 @@ void render(Integrator* integrator) {
 	state.pc.width = Window::width();
 	state.pc.height = Window::height();
 	state.pc.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
-	state.pc.time = rand() % UINT_MAX;
+	state.pc.time = random_u32(state.rng_state);
 	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
 	state.pc.first_frame = state.first_frame;
@@ -239,10 +249,8 @@ void render(Integrator* integrator) {
 	const bool ping_pong = bool(state.frame_idx % 2);  // ping_pong true = read
 	// Generate random orientation for probes
 	{
-		std::random_device rd;
-		std::mt19937 gen(rd());
-		std::uniform_real_distribution<> dis(-1.0, 1.0);
-		lm::vec4 rands(0.5 * dis(gen) + 0.5, dis(gen), dis(gen), dis(gen));
+		lm::vec4 rands(random_f32(state.rng_state), random_f32(state.rng_state) * 2.0f - 1.0f,
+					   random_f32(state.rng_state) * 2.0f - 1.0f, random_f32(state.rng_state) * 2.0f - 1.0f);
 		state.pc.probe_rotation = lm::mat4_cast(
 			lm::angle_axis(2.0f * lm::pi<f32>() * rands.x, lm::normalize(lm::vec3(rands.y, rands.z, rands.w))));
 	}
@@ -461,7 +469,7 @@ void create_accel(Integrator* integrator, vk::BVH* tlas_ptr, lm::Array<vk::BVH>*
 
 	VkDeviceAddress vertex_address = integrator->lumen_scene->vertex_buffer->device_address();
 	VkDeviceAddress idx_address = integrator->lumen_scene->index_buffer->device_address();
-	for (auto& prim_mesh : integrator->lumen_scene->prim_meshes) {
+	for (LumenPrimMesh& prim_mesh : integrator->lumen_scene->prim_meshes) {
 		vk::BlasInput geo = vk::blas_input_create(prim_mesh.vtx_count, prim_mesh.idx_count, prim_mesh.vtx_offset,
 												  prim_mesh.first_idx, vertex_address, sizeof(Vertex), idx_address);
 		blas_inputs.push_back({geo});
@@ -502,7 +510,7 @@ void create_accel(Integrator* integrator, vk::BVH* tlas_ptr, lm::Array<vk::BVH>*
 	u32 num_probes = state.probe_counts.x * state.probe_counts.y * state.probe_counts.z;
 	auto tlas_instances = lm::fixed_array_create<VkAccelerationStructureInstanceKHR>(
 		scratch.arena, integrator->lumen_scene->prim_meshes.size + num_probes);
-	for (const auto& pm : integrator->lumen_scene->prim_meshes) {
+	for (const LumenPrimMesh& pm : integrator->lumen_scene->prim_meshes) {
 		VkAccelerationStructureInstanceKHR ray_inst{};
 		ray_inst.transform = vk::to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;

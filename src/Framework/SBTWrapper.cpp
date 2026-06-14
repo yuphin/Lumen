@@ -7,16 +7,16 @@
 namespace vk {
 
 void SBTWrapper::destroy() {
-	for (auto& group : group_data) {
+	for (GroupData& group : group_data) {
 		prm::remove(group.buffer);
 	}
-	for (auto& shaders : idx_array) {
+	for (lm::SmallArray<u32, MAX_RT_SHADER_PER_GROUP>& shaders : idx_array) {
 		shaders.clear();
 	}
 }
 
 void SBTWrapper::add_indices(VkRayTracingPipelineCreateInfoKHR info) {
-	for (auto& shaders : idx_array) {
+	for (lm::SmallArray<u32, MAX_RT_SHADER_PER_GROUP>& shaders : idx_array) {
 		shaders.clear();
 	};
 	u32 stage_idx = 0;
@@ -70,9 +70,9 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 	stage.resize(4);
 
 	auto copy_handles = [&](util::Slice<u8> stage_buffer, util::Slice<u32> indices, u32 stride) {
-		auto* pbuffer = stage_buffer.data;
+		u8* pbuffer = stage_buffer.data;
 		for (u64 index = 0; index < indices.size; index++) {
-			auto* pstart = pbuffer;
+			u8* pstart = pbuffer;
 			memcpy(pbuffer, shader_handle_storage.data + (indices[index] * group_handle_size), group_handle_size);
 			pbuffer = pstart + stride;
 		}

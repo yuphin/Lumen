@@ -1,7 +1,7 @@
 #include "Framework/VulkanContext.h"
 #include "Framework/GPUQueryManager.h"
 #include "RenderGraph.h"
-#include "VulkanContext.h"
+#include "EventPool.h"
 #include <volk/volk.h>
 #include "VulkanBase.h"
 #include "CommandBuffer.h"
@@ -64,7 +64,7 @@ static QueueFamilyIndices find_queue_families(VkPhysicalDevice device) {
 
 	lm::SmallArray<VkQueueFamilyProperties2, MAX_QUEUES> queue_families2;
 	queue_families2.resize(queue_family_count);
-	for (auto& queue_family : queue_families2) {
+	for (VkQueueFamilyProperties2& queue_family : queue_families2) {
 		queue_family = {VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2};
 	}
 	vkGetPhysicalDeviceQueueFamilyProperties2(device, &queue_family_count, queue_families2.data);
@@ -75,7 +75,7 @@ static QueueFamilyIndices find_queue_families(VkPhysicalDevice device) {
 	}
 
 	i32 i = 0;
-	for (const auto& queueFamily : _queue_families) {
+	for (const VkQueueFamilyProperties& queueFamily : _queue_families) {
 		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
 			indices.gfx_family = i;
 		}
@@ -129,7 +129,8 @@ static SwapChainSupportDetails query_swapchain_support(VkPhysicalDevice device) 
 static VkResult vkExt_create_debug_messenger(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
 											 const VkAllocationCallbacks* pAllocator,
 											 VkDebugUtilsMessengerEXT* pDebugMessenger) {
-	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+	PFN_vkCreateDebugUtilsMessengerEXT func =
+		(PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
 
 	if (func != nullptr) {
 		return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
@@ -140,7 +141,8 @@ static VkResult vkExt_create_debug_messenger(VkInstance instance, const VkDebugU
 
 static void vkExt_destroy_debug_messenger(VkInstance instance, VkDebugUtilsMessengerEXT debug_messenger,
 										  const VkAllocationCallbacks* pAllocator) {
-	auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+	PFN_vkDestroyDebugUtilsMessengerEXT func =
+		(PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
 	if (func != nullptr) {
 		func(instance, debug_messenger, pAllocator);
 	}
@@ -164,7 +166,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverity
 }
 
 static void setup_debug_messenger() {
-	auto ci = debug_messenger(debug_callback);
+	VkDebugUtilsMessengerCreateInfoEXT ci = debug_messenger(debug_callback);
 
 	check(vkExt_create_debug_messenger(context().instance, &ci, nullptr, &context().debug_messenger),
 		  "Failed to set up debug messenger!");
@@ -282,7 +284,7 @@ static void pick_physical_device() {
 
 			for (const char* required_extension : _device_extensions) {
 				bool found = false;
-				for (const auto& extension : available_extensions) {
+				for (const VkExtensionProperties& extension : available_extensions) {
 					if (strcmp(required_extension, extension.extensionName) == 0) {
 						found = true;
 						break;
@@ -306,7 +308,7 @@ static void pick_physical_device() {
 		// swapchain, return true
 		return indices.is_complete() && extensions_supported && swapchain_adequate;
 	};
-	for (const auto& device : devices) {
+	for (VkPhysicalDevice device : devices) {
 		if (is_suitable(device)) {
 			context().physical_device = device;
 			VkPhysicalDeviceFeatures2 features2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
@@ -462,7 +464,7 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 	// height):
 	VkSurfaceFormatKHR surface_format =
 		[](const lm::SmallArray<VkSurfaceFormatKHR, MAX_SURFACE_FORMATS>& available_formats) {
-			for (const auto& available_format : available_formats) {
+			for (const VkSurfaceFormatKHR& available_format : available_formats) {
 				// Preferrably SRGB32 for now
 				if (available_format.format == VK_FORMAT_B8G8R8A8_SRGB &&
 					available_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
@@ -473,7 +475,7 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 		}(swapchain_support.formats);
 
 	VkPresentModeKHR present_mode = [](const lm::SmallArray<VkPresentModeKHR, MAX_PRESENT_MODES>& present_modes) {
-		for (const auto& available_present_mode : present_modes) {
+		for (VkPresentModeKHR available_present_mode : present_modes) {
 			// For now we prefer Mailbox
 			if (available_present_mode ==
 				(context().vsync_enabled ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_IMMEDIATE_KHR)) {
@@ -566,7 +568,7 @@ static void create_command_pools() {
 	QueueFamilyIndices queue_family_idxs = find_queue_families(context().physical_device);
 	VkCommandPoolCreateInfo pool_info = command_pool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 	pool_info.queueFamilyIndex = queue_family_idxs.gfx_family;
-	constexpr auto MAX_COMMAND_POOL_THREAD_COUNT = 64;
+	constexpr u32 MAX_COMMAND_POOL_THREAD_COUNT = 64;
 	context().cmd_pools.resize(MAX_COMMAND_POOL_THREAD_COUNT);
 	for (u32 i = 0; i < MAX_COMMAND_POOL_THREAD_COUNT; i++) {
 		check(vkCreateCommandPool(context().device, &pool_info, nullptr, &context().cmd_pools[i]),
@@ -620,7 +622,7 @@ static bool check_validation_layer_support() {
 	for (const char* layer_name : _validation_layers_lst) {
 		bool layer_found = false;
 
-		for (const auto& layerProperties : available_layers) {
+		for (const VkLayerProperties& layerProperties : available_layers) {
 			if (strcmp(layer_name, layerProperties.layerName) == 0) {
 				layer_found = true;
 				break;
@@ -646,7 +648,7 @@ static void create_instance() {
 	instance_CI.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	instance_CI.pApplicationInfo = &app_info;
 
-	auto extensions = get_req_extensions();
+	lm::SmallArray<const char*, MAX_INSTANCE_EXTENSIONS> extensions = get_req_extensions();
 	instance_CI.enabledExtensionCount = static_cast<u32>(extensions.size);
 	instance_CI.ppEnabledExtensionNames = extensions.data;
 
@@ -867,7 +869,7 @@ void cleanup() {
 		vkDestroySemaphore(context().device, sem, nullptr);
 	}
 
-	for (auto pool : context().cmd_pools) {
+	for (VkCommandPool pool : context().cmd_pools) {
 		vkDestroyCommandPool(context().device, pool, nullptr);
 	}
 	vkDestroySurfaceKHR(context().instance, context().surface, nullptr);

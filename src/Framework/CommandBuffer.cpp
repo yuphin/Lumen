@@ -26,10 +26,11 @@ CommandBuffer::CommandBuffer(bool begin, VkCommandBufferUsageFlags begin_flags, 
 		curr_tid = get_first_available_tid(available_command_pools);
 		available_command_pools &= ~(u64(1) << curr_tid);
 	}
-	auto cmd_buf_allocate_info = vk::command_buffer_allocate_info(vk::context().cmd_pools[curr_tid], level, 1);
+	VkCommandBufferAllocateInfo cmd_buf_allocate_info =
+		vk::command_buffer_allocate_info(vk::context().cmd_pools[curr_tid], level, 1);
 	vk::check(vkAllocateCommandBuffers(vk::context().device, &cmd_buf_allocate_info, &handle));
 	if (begin) {
-		auto begin_info = vk::command_buffer_begin_info(begin_flags);
+		VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(begin_flags);
 		vk::check(vkBeginCommandBuffer(handle, &begin_info));
 		state = CommandBufferState::RECORDING;
 	}
@@ -45,7 +46,7 @@ void CommandBuffer::begin(VkCommandBufferUsageFlags begin_flags) {
 			available_command_pools &= ~(u64(1) << curr_tid);
 		}
 	}
-	auto begin_info = vk::command_buffer_begin_info(begin_flags);
+	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(begin_flags);
 	vk::check(vkBeginCommandBuffer(handle, &begin_info));
 	state = CommandBufferState::RECORDING;
 }

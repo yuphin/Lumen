@@ -54,6 +54,7 @@ target_compile_definitions(Lumen PRIVATE
 # Add precompiled headers
 target_precompile_headers(Lumen PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/src/LumenPCH.h>")
 set_source_files_properties(${LIB_SRC} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/external.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
 target_include_directories(Lumen PRIVATE ${Vulkan_INCLUDE_DIR};${structures_INCLUDE_DIR})
 if(WIN32)

@@ -63,7 +63,7 @@ struct HashMapProbed {
 		capacity = new_capacity;
 
 		for (u64 i = 0; i < old_capacity; i++) {
-			const auto& old_entry = old_data[i];
+			const HashMapEntryType& old_entry = old_data[i];
 			if (old_entry.hash > HASH_MAP_HASH_DELETED) {
 				if constexpr (!util::is_same<T2, Empty>::value) {
 					insert(old_entry.key, old_entry.value);

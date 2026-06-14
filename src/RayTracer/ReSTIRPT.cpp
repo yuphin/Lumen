@@ -21,7 +21,7 @@ void init(Integrator* integrator) {
 	lm::ScratchArena scratch = integrator->arena;
 	auto transformations = lm::fixed_array_create<lm::mat4>(scratch.arena, integrator->lumen_scene->prim_meshes.size);
 	transformations.size = integrator->lumen_scene->prim_meshes.size;
-	for (auto& pm : integrator->lumen_scene->prim_meshes) {
+	for (LumenPrimMesh& pm : integrator->lumen_scene->prim_meshes) {
 		transformations[pm.prim_idx] = pm.world_matrix;
 	}
 

@@ -174,9 +174,9 @@ void transition_image_layout(VkCommandBuffer cmd, VkImage image, VkImageLayout o
 			break;
 	}
 
-	auto img_barrier = image_barrier2(image, src_access_flags, dst_access_flags, old_layout, new_layout, aspect_flags,
-									  source_stage, destination_stage);
-	auto dependency_info = vk::dependency_info(1, &img_barrier);
+	VkImageMemoryBarrier2 img_barrier = image_barrier2(image, src_access_flags, dst_access_flags, old_layout,
+													   new_layout, aspect_flags, source_stage, destination_stage);
+	VkDependencyInfo dependency_info = vk::dependency_info(1, &img_barrier);
 	vkCmdPipelineBarrier2(cmd, &dependency_info);
 }
 

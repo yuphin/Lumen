@@ -4,8 +4,6 @@
 #include "RayTracer.h"
 #include "Integrator.h"
 #include "PostFX.h"
-#include <stb/stb_sprintf.h>
-#include <time.h>
 
 namespace ray_tracer {
 
@@ -26,7 +24,7 @@ static vk::Buffer* rmse_val_buffer = nullptr;
 static vk::Buffer* rt_utils_desc_buffer = nullptr;
 static vk::Texture* reference_tex = nullptr;
 static vk::Texture* target_tex = nullptr;
-static clock_t start;
+static f64 start;
 static bool debug = false;
 static bool write_exr = false;
 static bool has_gt = false;
@@ -118,7 +116,7 @@ void init(bool use_debug, i32 argc, char* argv[]) {
 			scene_name = arg_str;
 		}
 	}
-	srand((u32)time(NULL));
+	srand((u32)(os::time_seconds() * 1000000000.0));
 	Window::add_key_callback(key_callback);
 
 	// Init with ray tracing extensions
@@ -189,12 +187,12 @@ static void init_resources() {
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
 						 .size = sizeof(f32)});
-	auto texture_desc = vk::TextureDesc{.name = CSTR("Reference Texture"),
-										.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-												 VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-										.dimensions = {Window::width(), Window::height(), 1},
-										.format = VK_FORMAT_R32G32B32A32_SFLOAT,
-										.initial_layout = VK_IMAGE_LAYOUT_GENERAL};
+	vk::TextureDesc texture_desc = {.name = CSTR("Reference Texture"),
+									.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+											 VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+									.dimensions = {Window::width(), Window::height(), 1},
+									.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+									.initial_layout = VK_IMAGE_LAYOUT_GENERAL};
 	reference_tex = prm::get_texture(texture_desc);
 	texture_desc.name = CSTR("Target Texture");
 	target_tex = prm::get_texture(texture_desc);
@@ -274,7 +272,7 @@ static void render(u32 i) {
 	post_fx.render(input_tex, vk::swapchain_images()[i]);
 	render_debug_utils();
 
-	auto cmdbuf = vk::context().command_buffers[i];
+	VkCommandBuffer cmdbuf = vk::context().command_buffers[i];
 	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
 	vk::render_graph()->run(cmdbuf);
@@ -437,15 +435,15 @@ static bool gui() {
 
 static f32 draw_frame() {
 	if (cnt == 0) {
-		start = clock();
+		start = os::time_seconds();
 	}
 
-	auto t_begin = Window::time_seconds() * 1000;
+	f64 t_begin = os::time_seconds() * 1000;
 	bool updated = false;
 	u32 image_idx = vk::prepare_frame();
 	if (image_idx == UINT32_MAX) {
-		auto t_end = Window::time_seconds() * 1000;
-		auto t_diff = t_end - t_begin;
+		f64 t_end = os::time_seconds() * 1000;
+		f64 t_diff = t_end - t_begin;
 		return (f32)t_diff;
 	}
 	ImGui_ImplVulkan_NewFrame();
@@ -492,15 +490,15 @@ static f32 draw_frame() {
 		recreate_swapchain = false;
 	}
 
-	auto now = clock();
-	auto diff = ((f32)now - start);
+	f64 now = os::time_seconds();
+	f64 diff = now - start;
 
 	if (write_exr) {
 		write_exr = false;
 		ImageUtils::save_exr((f32*)vk::buffer_map(output_img_buffer_cpu), Window::width(), Window::height(), "out.exr");
 		vk::buffer_unmap(output_img_buffer_cpu);
 	}
-	bool time_limit = (abs(diff / CLOCKS_PER_SEC - 5)) < 0.1;
+	bool time_limit = abs(diff - 5.0) < 0.1;
 	calc_rmse = time_limit;
 
 	if (calc_rmse && has_gt) {
@@ -509,8 +507,8 @@ static f32 draw_frame() {
 		LUMEN_TRACE("RMSE: %f", rmse * 1e6);
 		start = now;
 	}
-	auto t_end = Window::time_seconds() * 1000;
-	auto t_diff = t_end - t_begin;
+	f64 t_end = os::time_seconds() * 1000;
+	f64 t_diff = t_end - t_begin;
 	cnt++;
 	return (f32)t_diff;
 }

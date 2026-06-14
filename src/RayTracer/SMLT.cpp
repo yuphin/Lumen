@@ -105,7 +105,7 @@ void init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = state.num_mlt_threads * (path_length * (path_length + 1)) * sizeof(Splat)});
 
-	auto path_size = lm::max(state.num_mlt_threads, state.num_bootstrap_samples);
+	u32 path_size = lm::max(state.num_mlt_threads, state.num_bootstrap_samples);
 	state.light_path_buffer =
 		prm::get_buffer({.name = CSTR("Light Path Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,

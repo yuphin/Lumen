@@ -134,7 +134,7 @@ inline void set_resource_name(VkDevice device, u64 obj, const char* name, VkObje
 #endif
 }
 inline void begin_region(VkDevice device, VkCommandBuffer cmd, const char* name, lm::vec4 color) {
-	auto pfnCmdDebugMarkerBegin =
+	PFN_vkCmdDebugMarkerBeginEXT pfnCmdDebugMarkerBegin =
 		reinterpret_cast<PFN_vkCmdDebugMarkerBeginEXT>(vkGetDeviceProcAddr(device, "vkCmdDebugMarkerBeginEXT"));
 	if (pfnCmdDebugMarkerBegin) {
 		VkDebugMarkerMarkerInfoEXT info = {};
@@ -146,14 +146,14 @@ inline void begin_region(VkDevice device, VkCommandBuffer cmd, const char* name,
 }
 
 inline void end_region(VkDevice device, VkCommandBuffer cmd) {
-	auto pfnCmdDebugMarkerEnd =
+	PFN_vkCmdDebugMarkerEndEXT pfnCmdDebugMarkerEnd =
 		reinterpret_cast<PFN_vkCmdDebugMarkerEndEXT>(vkGetDeviceProcAddr(device, "vkCmdDebugMarkerEndEXT"));
 	if (pfnCmdDebugMarkerEnd) {
 		pfnCmdDebugMarkerEnd(cmd);
 	}
 }
 inline void insert(VkDevice device, VkCommandBuffer cmd, const char* name, lm::vec4 color) {
-	auto pfnCmdDebugMarkerInsert =
+	PFN_vkCmdDebugMarkerInsertEXT pfnCmdDebugMarkerInsert =
 		reinterpret_cast<PFN_vkCmdDebugMarkerInsertEXT>(vkGetDeviceProcAddr(device, "vkCmdDebugMarkerInsertEXT"));
 	if (pfnCmdDebugMarkerInsert) {
 		VkDebugMarkerMarkerInfoEXT info = {};

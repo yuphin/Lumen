@@ -101,7 +101,7 @@ static void key_callback(void* user_data, i32 key, bool pressed, bool repeat, bo
 		ImGuiKey mapped = imgui_key(key);
 		if (mapped != ImGuiKey_None) io.AddKeyEvent(mapped, pressed);
 	}
-	for (auto& callback : window->key_callbacks)
+	for (KeyCallback& callback : window->key_callbacks)
 		callback.procedure(callback.user_data, (KeyInput)key, action);
 }
 
@@ -116,7 +116,7 @@ static void mouse_button_callback(void* user_data, i32 button, bool pressed) {
 	MouseInput* input = get_mouse_input(window, mouse_button);
 	if (input) *input = {action, window->mouse_pos_x, window->mouse_pos_y};
 	if (ImGui::GetCurrentContext()) ImGui::GetIO().AddMouseButtonEvent(button, pressed);
-	for (auto& callback : window->mouse_click_callbacks)
+	for (MouseClickCallback& callback : window->mouse_click_callbacks)
 		callback.procedure(callback.user_data, mouse_button, action, window->mouse_pos_x, window->mouse_pos_y);
 }
 
@@ -133,14 +133,14 @@ static void mouse_move_callback(void* user_data, f64 x, f64 y) {
 		input.y = y;
 	}
 	if (ImGui::GetCurrentContext()) ImGui::GetIO().AddMousePosEvent((f32)x, (f32)y);
-	for (auto& callback : window->mouse_move_callbacks)
+	for (MouseMoveCallback& callback : window->mouse_move_callbacks)
 		callback.procedure(callback.user_data, window->mouse_delta_prev_x, window->mouse_delta_prev_y, x, y);
 }
 
 static void scroll_callback(void* user_data, f64 x, f64 y) {
 	Window* window = (Window*)user_data;
 	if (ImGui::GetCurrentContext()) ImGui::GetIO().AddMouseWheelEvent((f32)x, (f32)y);
-	for (auto& callback : window->mouse_scroll_callbacks) callback.procedure(callback.user_data, x, y);
+	for (MouseScrollCallback& callback : window->mouse_scroll_callbacks) callback.procedure(callback.user_data, x, y);
 }
 
 static void resize_callback(void* user_data, u32 width, u32 height) {

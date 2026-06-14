@@ -303,7 +303,7 @@ static void build_blas_impl(lm::ScratchArena& scratch, lm::FixedArray<BuildAccel
 					cmd_compact_blas(cmd.handle, indices_slice, build_as_arr, compaction_query_pool);
 					cmd.submit();
 					// Destroy the non-compacted version
-					for (auto i : indices) {
+					for (u32 i : indices) {
 						vkDestroyAccelerationStructureKHR(context().device, build_as_arr[i].cleanup_as.accel, nullptr);
 						prm::remove(build_as_arr[i].cleanup_as.buffer);
 					}

@@ -40,6 +40,7 @@ struct DDGI {
 	bool visualize_probes = false;
 	u32 frame_idx = 0;
 	u32 total_frame_idx = 0;
+	u64 rng_state = 0;
 	vk::Buffer* sphere_vertices_buffer = nullptr;
 	vk::Buffer* sphere_indices_buffer = nullptr;
 	vk::Buffer* sphere_desc_buffer = nullptr;

@@ -1,6 +1,5 @@
 #include "String.h"
 #include "Memory.h"
-#include <stb/stb_sprintf.h>
 
 namespace lm {
 

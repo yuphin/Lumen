@@ -55,7 +55,7 @@ void reset_events() {
 	if (!_event_arena) {
 		return;
 	}
-	for (auto& entry : _events_map) {
+	for (lm::HashMapEntry<VkCommandBuffer, Events>& entry : _events_map) {
 		entry.value.available_event_idx = 0;
 	}
 }
@@ -64,7 +64,7 @@ void cleanup() {
 	if (!_event_arena) {
 		return;
 	}
-	for (auto& entry : _events_map) {
+	for (lm::HashMapEntry<VkCommandBuffer, Events>& entry : _events_map) {
 		for (VkEvent event : entry.value.events) {
 			vkDestroyEvent(context().device, event, nullptr);
 		}

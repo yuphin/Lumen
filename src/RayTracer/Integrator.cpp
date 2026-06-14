@@ -1,5 +1,4 @@
 #include "Integrator.h"
-#include "shaders/commons.h"
 #include "Framework/Window.h"
 #include "Framework/VkUtils.h"
 
@@ -170,7 +169,7 @@ static void default_create_accel(Integrator* integrator, vk::BVH* tlas, lm::Arra
 	auto blas_inputs = lm::fixed_array_create<vk::BlasInput>(scratch.arena, integrator->lumen_scene->prim_meshes.size);
 	VkDeviceAddress vertex_address = integrator->lumen_scene->vertex_buffer->device_address();
 	VkDeviceAddress idx_address = integrator->lumen_scene->index_buffer->device_address();
-	for (auto& prim_mesh : integrator->lumen_scene->prim_meshes) {
+	for (LumenPrimMesh& prim_mesh : integrator->lumen_scene->prim_meshes) {
 		vk::BlasInput geo = vk::blas_input_create(prim_mesh.vtx_count, prim_mesh.idx_count, prim_mesh.vtx_offset,
 												  prim_mesh.first_idx, vertex_address, sizeof(Vertex), idx_address);
 		blas_inputs.push_back({geo});
@@ -180,7 +179,7 @@ static void default_create_accel(Integrator* integrator, vk::BVH* tlas, lm::Arra
 					   VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 	auto tlas_instances = lm::fixed_array_create<VkAccelerationStructureInstanceKHR>(
 		scratch.arena, integrator->lumen_scene->prim_meshes.size);
-	for (const auto& pm : integrator->lumen_scene->prim_meshes) {
+	for (const LumenPrimMesh& pm : integrator->lumen_scene->prim_meshes) {
 		VkAccelerationStructureInstanceKHR ray_inst{};
 		ray_inst.transform = vk::to_vk_matrix(pm.world_matrix);
 		ray_inst.instanceCustomIndex = pm.prim_idx;

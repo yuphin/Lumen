@@ -1,15 +1,13 @@
 #pragma once
-#include "CommandBuffer.h"
 #include "Framework/RenderGraphTypes.h"
-#include "Framework/VulkanStructs.h"
 #include "Pipeline.h"
-#include "Shader.h"
-#include "Texture.h"
-#include "EventPool.h"
 #include "AccelerationStructure.h"
-#include "Framework/Buffer.h"
-#include "Framework/Texture.h"
+#include "Framework/Base/OS.h"
 #include "Framework/Base/SmallArray.h"
+
+namespace vk {
+class CommandBuffer;
+}
 
 namespace lm {
 
