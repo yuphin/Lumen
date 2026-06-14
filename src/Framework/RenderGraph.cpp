@@ -793,7 +793,7 @@ RenderPass& RenderPass::tlas_build(vk::BVH& tlas, vk::Buffer* instances_buf, u32
 	return *this;
 }
 
-void RenderPass::update_rt_descriptors(RenderPass* pass) {
+static void update_rt_descriptors(RenderPass* pass) {
 	VkAccelerationStructureKHR accels[vk::MAX_AS_BINDING_COUNT];
 	u32 num_accels = 0;
 	for (u32 i = 0; i < pass->pipeline_storage->as_bindings.size; i++) {
@@ -813,17 +813,17 @@ void RenderPass::update_rt_descriptors(RenderPass* pass) {
 	pass->pipeline_storage->update_as_descriptor = false;
 }
 
-void RenderPass::create_gfx_pipeline(RenderPass* pass) {
+static void create_gfx_pipeline_proc(RenderPass* pass) {
 	pass->pipeline_storage->pipeline.create_gfx_pipeline(pass->settings, pass->descriptor_counts.to_slice());
 }
 
-void RenderPass::create_rt_pipeline(RenderPass* pass) {
+static void create_rt_pipeline_proc(RenderPass* pass) {
 	pass->pipeline_storage->pipeline.create_rt_pipeline(pass->settings, pass->descriptor_counts.to_slice(),
 														u32(pass->pipeline_storage->as_bindings.size));
 	update_rt_descriptors(pass);
 }
 
-void RenderPass::create_compute_pipeline(RenderPass* pass) {
+static void create_compute_pipeline_proc(RenderPass* pass) {
 	pass->pipeline_storage->pipeline.create_compute_pipeline(pass->settings, pass->descriptor_counts.to_slice());
 }
 
@@ -834,13 +834,13 @@ void RenderPass::finalize() {
 		void (*procedure)(RenderPass*) = nullptr;
 		switch (type) {
 			case vk::PassType::Graphics:
-				procedure = create_gfx_pipeline;
+				procedure = create_gfx_pipeline_proc;
 				break;
 			case vk::PassType::RT:
-				procedure = create_rt_pipeline;
+				procedure = create_rt_pipeline_proc;
 				break;
 			case vk::PassType::Compute:
-				procedure = create_compute_pipeline;
+				procedure = create_compute_pipeline_proc;
 				break;
 			default:
 				break;

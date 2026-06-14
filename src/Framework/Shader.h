@@ -7,7 +7,7 @@
 #include <Framework/Base/SmallArray.h>
 
 namespace lm {
-class RenderPass;
+struct RenderPass;
 }
 namespace vk {
 ////////////////////////////

@@ -32,7 +32,7 @@ static constexpr u64 MAX_DESCRIPTORS = 32;
 	} while (0)
 
 class RenderGraph;
-class RenderPass;
+struct RenderPass;
 
 struct PipelineTask {
 	void (*procedure)(RenderPass*);
@@ -175,8 +175,7 @@ class RenderGraph {
 	u32 reload_counter = 0;
 };
 
-class RenderPass {
-   public:
+struct RenderPass {
 	RenderPass() = default;
 
 	RenderPass& bind(const ResourceBinding& binding);
@@ -228,12 +227,6 @@ class RenderPass {
 	lm::String name;
 	bool is_pipeline_cached = false;
 	vk::PassSettings settings;
-
-   private:
-	static void create_gfx_pipeline(RenderPass* pass);
-	static void create_rt_pipeline(RenderPass* pass);
-	static void create_compute_pipeline(RenderPass* pass);
-	static void update_rt_descriptors(RenderPass* pass);
 
 	lm::SmallArray<Resource, MAX_RESOURCES_ZEROS> resource_zeros;
 	lm::SmallArray<BufferBarrier, MAX_RESOURCES_ZEROS> prefill_buffer_barriers;

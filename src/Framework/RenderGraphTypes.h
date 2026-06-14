@@ -10,7 +10,7 @@
 #include "VkUtils.h"
 
 namespace lm {
-class RenderPass;
+struct RenderPass;
 
 static constexpr u64 MAX_SPEC_CONSTANTS = 8;
 static constexpr u64 MAX_SHADER_MACROS = 32;
