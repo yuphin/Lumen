@@ -1453,7 +1453,7 @@ void rg::run(VkCommandBuffer cmd) {
 	}
 }
 
-void rg::reset() {
+void rg::reset_frame() {
 	vk::event_pool::reset_events();
 	// TODO: Adjust to new implementation
 	for (auto& entry : _buffer_resource_map) {
@@ -1510,7 +1510,7 @@ void rg::submit(vk::CommandBuffer& cmd) {
 	// Which enables us to get aggregate results for each pass per frame
 	GPUQueryManager::collect();
 	// The reset is needed here because the next subsequent pass may reuse the old pass' memory
-	reset();
+	reset_frame();
 }
 
 void rg::run_and_submit(vk::CommandBuffer& cmd) {

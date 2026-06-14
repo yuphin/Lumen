@@ -108,13 +108,6 @@ static void render_draw_data(VkCommandBuffer cmd, const lm::RenderPass& pass) {
 	}
 }
 
-static bool contains_texture(const lm::SmallArray<vk::Texture*, 16>& textures, vk::Texture* texture) {
-	for (vk::Texture* existing : textures) {
-		if (existing == texture) return true;
-	}
-	return false;
-}
-
 namespace imgui_renderer {
 
 void init(ImGuiRenderer* renderer) {
@@ -208,21 +201,6 @@ void add_pass(ImGuiRenderer* renderer, vk::Texture* output) {
 									.pass_func = render_draw_data})
 			.push_constants(&pc)
 			.bind(renderer->font_texture);
-
-	lm::SmallArray<vk::Texture*, 16> textures;
-	textures.push_back(renderer->font_texture);
-	for (i32 list_idx = 0; list_idx < draw_data->CmdListsCount; ++list_idx) {
-		const ImDrawList* draw_list = draw_data->CmdLists[list_idx];
-		for (const ImDrawCmd& draw_cmd : draw_list->CmdBuffer) {
-			if (draw_cmd.UserCallback) continue;
-			vk::Texture* texture = (vk::Texture*)draw_cmd.GetTexID();
-			if (texture && !contains_texture(textures, texture)) {
-				LUMEN_ASSERT(textures.size < textures.capacity(), "Too many unique ImGui textures in one frame");
-				textures.push_back(texture);
-				pass.read(texture);
-			}
-		}
-	}
 }
 
 void destroy(ImGuiRenderer* renderer) {

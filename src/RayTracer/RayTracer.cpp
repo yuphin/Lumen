@@ -468,7 +468,7 @@ static f32 draw_frame() {
 
 	render(image_idx);
 	VkResult result = vk::submit_frame(image_idx);
-	rg::reset();
+	rg::reset_frame();
 	if (result != VK_SUCCESS) {
 		Window::update_window_size();
 		cleanup_resources();

@@ -257,7 +257,7 @@ lm::RenderPass& add_gfx(const lm::String& name, const vk::GraphicsPassSettings& 
 lm::RenderPass& add_compute(const lm::String& name, const vk::ComputePassSettings& settings);
 void init();
 void run(VkCommandBuffer cmd);
-void reset();
+void reset_frame();
 void submit(vk::CommandBuffer& cmd);
 void run_and_submit(vk::CommandBuffer& cmd);
 void destroy();
