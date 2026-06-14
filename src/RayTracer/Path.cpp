@@ -8,10 +8,12 @@ void init(Integrator* integrator) {
 
 	SceneDesc desc;
 	desc.index_addr = integrator->lumen_scene->index_buffer->device_address();
-
 	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
 	desc.compact_vertices_addr = integrator->lumen_scene->vertex_buffer->device_address();
+
+	// For shader resource dependency inference, use this macro to register a buffer address to the rendergraph
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+
 	integrator->lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = CSTR("Scene Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -22,7 +24,6 @@ void init(Integrator* integrator) {
 	integrator->frame_num = 0;
 
 	assert(rg::settings().shader_inference == true);
-	// For shader resource dependency inference, use this macro to register a buffer address to the rendergraph
 	state.path_length = integrator->lumen_scene->config.common.path_length;
 }
 
