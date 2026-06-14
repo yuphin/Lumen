@@ -1,6 +1,10 @@
 #pragma once
 #include "shaders/integrators/vcmmlt/vcmmlt_commons.h"
 
+namespace vk {
+struct Buffer;
+}  // namespace vk
+
 struct Integrator;
 
 struct VCMMLT {

@@ -1,6 +1,10 @@
 #pragma once
 #include "shaders/integrators/pssmlt/pssmlt_commons.h"
 
+namespace vk {
+struct Buffer;
+}  // namespace vk
+
 struct Integrator;
 
 struct PSSMLT {

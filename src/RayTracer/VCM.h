@@ -1,6 +1,10 @@
 #pragma once
 #include "shaders/integrators/vcm/vcm_commons.h"
 
+namespace vk {
+struct Buffer;
+}  // namespace vk
+
 struct Integrator;
 
 struct VCM {

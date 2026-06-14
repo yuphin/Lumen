@@ -1,6 +1,11 @@
 #pragma once
 #include "shaders/integrators/ddgi/ddgi_commons.h"
 
+namespace vk {
+struct Buffer;
+struct Texture;
+}  // namespace vk
+
 struct Integrator;
 
 struct DDGI {
