@@ -174,21 +174,21 @@ void init(Integrator* integrator) {
 						 .size = state.rays_per_surfel * MAX_SURFEL_COUNT * sizeof(IRCache::SurfelSample)});
 
 	SceneDesc desc;
-	desc.index_addr = integrator->lumen_scene->index_buffer->device_address();
-	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
-	desc.prim_info_addr = integrator->lumen_scene->prim_lookup_buffer->device_address();
-	desc.compact_vertices_addr = integrator->lumen_scene->vertex_buffer->device_address();
-	desc.g_buffer_addr = state.gbuffer->device_address();
-	desc.transformations_addr = state.transformations_buffer->device_address();
-	desc.surfel_spawn_list_addr = state.surfel_spawn_list_buffer->device_address();
-	desc.surfel_spawn_count_addr = state.surfel_spawn_count_buffer->device_address();
-	desc.surfel_pool_addr = state.surfel_pool_buffer->device_address();
-	desc.surfel_free_stack_addr = state.surfel_free_stack_buffer->device_address();
-	desc.surfel_free_stack_count_addr = state.surfel_free_stack_counter_buffer->device_address();
-	desc.grid_cell_counts_addr = state.grid_cell_counts_buffer->device_address();
-	desc.grid_cell_indices_addr = state.grid_cell_indices_buffer->device_address();
-	desc.grid_prefix_sum_scratch_addr = state.grid_prefix_sum_scratch_buffer->device_address();
-	desc.surfel_samples_addr = state.surfel_samples_buffer->device_address();
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, index_addr, integrator->lumen_scene->index_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, material_addr, integrator->lumen_scene->materials_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, compact_vertices_addr, integrator->lumen_scene->vertex_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, g_buffer_addr, state.gbuffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, transformations_addr, state.transformations_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, surfel_spawn_list_addr, state.surfel_spawn_list_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, surfel_spawn_count_addr, state.surfel_spawn_count_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, surfel_pool_addr, state.surfel_pool_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, surfel_free_stack_addr, state.surfel_free_stack_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, surfel_free_stack_count_addr, state.surfel_free_stack_counter_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, grid_cell_counts_addr, state.grid_cell_counts_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, grid_cell_indices_addr, state.grid_cell_indices_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, grid_prefix_sum_scratch_addr, state.grid_prefix_sum_scratch_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, surfel_samples_addr, state.surfel_samples_buffer);
 
 	integrator->lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = CSTR("Scene Desc"),
@@ -198,21 +198,6 @@ void init(Integrator* integrator) {
 						 .data = &desc});
 
 	assert(rg::settings().shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, index_addr, integrator->lumen_scene->index_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, material_addr, integrator->lumen_scene->materials_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, integrator->lumen_scene->vertex_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, state.gbuffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, transformations_addr, state.transformations_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_spawn_list_addr, state.surfel_spawn_list_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_spawn_count_addr, state.surfel_spawn_count_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_pool_addr, state.surfel_pool_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_free_stack_addr, state.surfel_free_stack_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_free_stack_count_addr, state.surfel_free_stack_counter_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, grid_cell_counts_addr, state.grid_cell_counts_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, grid_cell_indices_addr, state.grid_cell_indices_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, grid_prefix_sum_scratch_addr, state.grid_prefix_sum_scratch_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_samples_addr, state.surfel_samples_buffer);
 
 	pc.desired_surfel_radius_px = 8;
 	pc.grid_uniform_cell_distance_threshold = 0.1;

@@ -46,14 +46,14 @@ void init(Integrator* integrator) {
 	desc.index_addr = integrator->lumen_scene->index_buffer->device_address();
 
 	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
-	desc.prim_info_addr = integrator->lumen_scene->prim_lookup_buffer->device_address();
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
 	desc.compact_vertices_addr = integrator->lumen_scene->vertex_buffer->device_address();
 	// SPPM
-	desc.sppm_data_addr = state.sppm_data_buffer->device_address();
-	desc.atomic_data_addr = state.atomic_data_buffer->device_address();
-	desc.photon_addr = state.photon_buffer->device_address();
-	desc.residual_addr = state.residual_buffer->device_address();
-	desc.counter_addr = state.counter_buffer->device_address();
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, sppm_data_addr, state.sppm_data_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, atomic_data_addr, state.atomic_data_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, photon_addr, state.photon_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, residual_addr, state.residual_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, counter_addr, state.counter_buffer);
 	integrator->lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = CSTR("Scene Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -64,12 +64,6 @@ void init(Integrator* integrator) {
 	integrator->frame_num = 0;
 
 	assert(rg::settings().shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, sppm_data_addr, state.sppm_data_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, atomic_data_addr, state.atomic_data_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, state.photon_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, state.residual_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, state.counter_buffer);
 }
 
 void render(Integrator* integrator) {

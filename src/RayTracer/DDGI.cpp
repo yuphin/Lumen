@@ -205,17 +205,13 @@ void init(Integrator* integrator) {
 
 	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
 	// DDGI
-	desc.prim_info_addr = integrator->lumen_scene->prim_lookup_buffer->device_address();
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
 	desc.compact_vertices_addr = integrator->lumen_scene->vertex_buffer->device_address();
-	desc.direct_lighting_addr = state.direct_lighting_buffer->device_address();
-	desc.probe_offsets_addr = state.probe_offsets_buffer->device_address();
-	desc.g_buffer_addr = state.g_buffer->device_address();
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, direct_lighting_addr, state.direct_lighting_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, probe_offsets_addr, state.probe_offsets_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, g_buffer_addr, state.g_buffer);
 
 	assert(rg::settings().shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, direct_lighting_addr, state.direct_lighting_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, probe_offsets_addr, state.probe_offsets_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, state.g_buffer);
 
 	integrator->lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = CSTR("Scene Desc"),

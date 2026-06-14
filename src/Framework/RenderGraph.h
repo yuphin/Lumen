@@ -20,10 +20,12 @@ static constexpr u64 MAX_EXPLICIT_BUFFER_READ_WRITES = 16;
 static constexpr u64 MAX_EXPLICIT_IMG_READ_WRITES = 16;
 static constexpr u64 MAX_DESCRIPTORS = 32;
 
-#define REGISTER_BUFFER_WITH_ADDRESS(struct_type, struct_name, field_name, buffer_ptr) \
-	do {                                                                               \
-		lm::String key = #struct_type "_" #field_name;                                 \
-		rg::register_buffer_pointer(key, buffer_ptr);                                  \
+#define SET_AND_REGISTER_BUFFER_ADDRESS(struct_type, struct_name, field_name, buffer_ptr) \
+	do {                                                                                  \
+		vk::Buffer* const registered_buffer = (buffer_ptr);                                \
+		(struct_name).field_name = registered_buffer->device_address();                    \
+		lm::String key = #struct_type "_" #field_name;                                    \
+		rg::register_buffer_pointer(key, registered_buffer);                               \
 	} while (0)
 
 struct RenderPass;

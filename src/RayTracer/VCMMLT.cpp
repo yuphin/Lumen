@@ -163,49 +163,31 @@ void init(Integrator* integrator) {
 	desc.index_addr = integrator->lumen_scene->index_buffer->device_address();
 
 	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
-	desc.prim_info_addr = integrator->lumen_scene->prim_lookup_buffer->device_address();
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
 	desc.compact_vertices_addr = integrator->lumen_scene->vertex_buffer->device_address();
 	// VCMMLT
-	desc.bootstrap_addr = state.bootstrap_buffer->device_address();
-	desc.cdf_addr = state.cdf_buffer->device_address();
-	desc.cdf_sum_addr = state.cdf_sum_buffer->device_address();
-	desc.seeds_addr = state.seeds_buffer->device_address();
-	desc.light_primary_samples_addr = state.light_primary_samples_buffer->device_address();
-	desc.mlt_samplers_addr = state.mlt_samplers_buffer->device_address();
-	desc.mlt_col_addr = state.mlt_col_buffer->device_address();
-	desc.chain_stats_addr = state.chain_stats_buffer->device_address();
-	desc.splat_addr = state.splat_buffer->device_address();
-	desc.past_splat_addr = state.past_splat_buffer->device_address();
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, bootstrap_addr, state.bootstrap_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, cdf_addr, state.cdf_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, cdf_sum_addr, state.cdf_sum_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, seeds_addr, state.seeds_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, light_primary_samples_addr, state.light_primary_samples_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, mlt_samplers_addr, state.mlt_samplers_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, mlt_col_addr, state.mlt_col_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, chain_stats_addr, state.chain_stats_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, splat_addr, state.splat_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, past_splat_addr, state.past_splat_buffer);
 
-	desc.vcm_vertices_addr = state.light_path_buffer->device_address();
-	desc.path_cnt_addr = state.light_path_cnt_buffer->device_address();
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, vcm_vertices_addr, state.light_path_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, path_cnt_addr, state.light_path_cnt_buffer);
 
-	desc.color_storage_addr = state.tmp_col_buffer->device_address();
-	desc.photon_addr = state.photon_buffer->device_address();
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, color_storage_addr, state.tmp_col_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, photon_addr, state.photon_buffer);
 
-	desc.mlt_atomicsum_addr = state.mlt_atomicsum_buffer->device_address();
-	desc.residual_addr = state.mlt_residual_buffer->device_address();
-	desc.counter_addr = state.counter_buffer->device_address();
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, mlt_atomicsum_addr, state.mlt_atomicsum_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, residual_addr, state.mlt_residual_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, counter_addr, state.counter_buffer);
 
 	assert(rg::settings().shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, state.bootstrap_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, state.cdf_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, state.cdf_sum_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, seeds_addr, state.seeds_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_primary_samples_addr, state.light_primary_samples_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_samplers_addr, state.mlt_samplers_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_col_addr, state.mlt_col_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, chain_stats_addr, state.chain_stats_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, splat_addr, state.splat_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, past_splat_addr, state.past_splat_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_vertices_addr, state.light_path_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, path_cnt_addr, state.light_path_cnt_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, state.tmp_col_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, state.photon_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_atomicsum_addr, state.mlt_atomicsum_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, state.mlt_residual_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, state.counter_buffer);
 
 	integrator->lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = CSTR("Scene Desc"),

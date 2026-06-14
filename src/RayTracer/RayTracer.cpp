@@ -216,10 +216,10 @@ static void init_resources() {
 		free(data);
 	}
 
-	rt_utils_desc.out_img_addr = _output_img_buffer->device_address();
-	rt_utils_desc.residual_addr = _residual_buffer->device_address();
-	rt_utils_desc.counter_addr = _counter_buffer->device_address();
-	rt_utils_desc.rmse_val_addr = _rmse_val_buffer->device_address();
+	SET_AND_REGISTER_BUFFER_ADDRESS(RTUtilsDesc, rt_utils_desc, out_img_addr, _output_img_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(RTUtilsDesc, rt_utils_desc, residual_addr, _residual_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(RTUtilsDesc, rt_utils_desc, counter_addr, _counter_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(RTUtilsDesc, rt_utils_desc, rmse_val_addr, _rmse_val_buffer);
 
 	_rt_utils_desc_buffer =
 		prm::get_buffer({.name = CSTR("RT Utils Desc"),
@@ -228,10 +228,6 @@ static void init_resources() {
 						 .size = sizeof(RTUtilsDesc),
 						 .data = &rt_utils_desc});
 
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, _output_img_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, _residual_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, _counter_buffer);
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, _rmse_val_buffer);
 }
 
 static void cleanup_resources() {
