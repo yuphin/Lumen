@@ -1569,7 +1569,7 @@ static PipelineStorage* add_pass_impl_common(const lm::String& name, const vk::S
 	}
 
 	auto* entry = _pipeline_cache.find(hash);
-	if (entry && (!_reload_shaders || entry->value.reload_counter == _reload_counter)) {
+	if (entry && entry->value.reload_counter == _reload_counter) {
 		pipeline_storage = &entry->value;
 		cached = true;
 	} else {
