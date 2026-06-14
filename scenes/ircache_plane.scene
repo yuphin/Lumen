@@ -1,0 +1,36 @@
+integrator: 
+  type: ircache
+  path_length: 2
+  sky_col: v3f(0.000000, 0.000000, 0.000000)
+
+textures: 
+  - name: wood1.jpg
+    file: wood1.jpg
+
+
+bsdfs: 
+  - name: Floor
+    type: diffuse
+    albedo: v3f(0.725000, 0.710000, 0.680000)
+    texture: wood1.jpg
+
+
+
+lights: 
+  - type: directional
+    L: v3f(5.000000, 5.000000, 5.000000)
+    pos: v3f(4.420000, 0.000000, 5.432593)
+    dir: v3f(0.420776, -2.158489, -3.000000)
+
+
+camera: 
+  fov: 45.000000
+  position: v3f(21.56,-45.50,3.46)
+  rotation: v3f(-12.30,89.60,0.00)
+  dir: v3f(-1.000000, -0.000000, 0.000000)
+
+mesh: 
+  - name: plane.obj
+    materials: 
+      - refs: plane
+        name: Floor

@@ -1,6 +1,10 @@
 #pragma once
 #include <cmath>
 
+#if defined(_MSC_VER)
+#include <intrin.h>
+#endif
+
 namespace lm {
 
 inline u32 count_leading_zeros32(u32 value) {
