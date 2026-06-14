@@ -1,11 +1,5 @@
 #include "Logger.h"
-#include "Framework/Base/String.h"
 
-#if defined(_WIN32) || defined(_WIN64)
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
 namespace lm {
 
 static void log_bytes_colored(const char* str, u64 n, int level, bool err_stream) {

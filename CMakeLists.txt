@@ -56,6 +56,14 @@ target_precompile_headers(Lumen PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRE
 set_source_files_properties(${LIB_SRC} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/external.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
+if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    set(LIB_WARN_OFF "/w")
+else()
+    set(LIB_WARN_OFF "-w")
+endif()
+
+set_source_files_properties(${LIB_SRC} PROPERTIES COMPILE_OPTIONS "${LIB_WARN_OFF}")
+
 target_include_directories(Lumen PRIVATE ${Vulkan_INCLUDE_DIR};${structures_INCLUDE_DIR})
 if(WIN32)
     message("-- Adding vulkan library lib to search paths for the linker to find spirv libraries")

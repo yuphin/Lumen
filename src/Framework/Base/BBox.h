@@ -1,3 +1,5 @@
+#pragma once
+
 namespace lm {
 struct BBox {
 	lm::vec3 min_corner{F32_MAX};
