@@ -47,7 +47,9 @@ i32 main(i32 argc, char* argv[]) {
 	return 0;
 }
 #else
-
+#include <string>
+#include <unordered_set>
+#include <chrono>
 lm::String random_string(lm::Arena* arena, u64 length) {
 	lm::ScratchArena scratch = arena;
 	lm::String result = lm::str_reserve(scratch.arena, length + 1);
@@ -69,7 +71,7 @@ std::string random_std_string(u64 length) {
 
 void hash_set_u64_test() {
 	LUMEN_TRACE("----Hash Set Test Begin----");
-	lm::Arena* arena = lm::arena_create(GB(1));
+	lm::Arena* arena = lm::arena_create(CSTR("Test"), GB(1));
 	auto hs = lm::hash_set_create<u64>(arena, 32);
 	std::unordered_set<u64> stdhs;
 	auto time_begin = std::chrono::high_resolution_clock::now();
@@ -100,7 +102,7 @@ void hash_set_u64_test() {
 
 void hash_set_str_test() {
 	LUMEN_TRACE("----Hash Set Test Begin----");
-	lm::Arena* arena = lm::arena_create(GB(1));
+	lm::Arena* arena = lm::arena_create(CSTR("Test"), GB(1));
 	auto hs = lm::hash_set_create<lm::String>(arena, 1024 * 1024 * 4);
 	std::unordered_set<std::string> stdhs;
 	auto time_begin = std::chrono::high_resolution_clock::now();
@@ -131,7 +133,7 @@ void hash_set_str_test() {
 
 void scratch_arena_test() {
 	LUMEN_TRACE("----Scratch Arena Test----");
-	lm::Arena* arena = lm::arena_create(MB(1));
+	lm::Arena* arena = lm::arena_create(CSTR("Test"), MB(1));
 	lm::FixedArray<i32> arr = lm::fixed_array_create<i32>(arena, 512);
 	{
 		lm::ScratchArena scratch = arena;
@@ -142,7 +144,7 @@ void scratch_arena_test() {
 
 void hm_test() {
 	LUMEN_TRACE("----Hash Map Test----");
-	lm::Arena* arena = lm::arena_create(KB(1));
+	lm::Arena* arena = lm::arena_create(CSTR("Test"), KB(1));
 
 	auto hm = lm::hash_map_create<u32, u32>(arena);
 	for (u32 i = 0; i < 4; i++) {
@@ -169,11 +171,10 @@ void hm_test() {
 
 i32 main(i32 argc, char* argv[]) {
 	hm_test();
-	return 0;
 	hash_set_u64_test();
 	hash_set_str_test();
 	scratch_arena_test();
-	lm::Arena* arena = lm::arena_create(GB(1), MB(1));
+	lm::Arena* arena = lm::arena_create(CSTR("Test"), GB(1), MB(1));
 
 	lm::Array<i32> arr = lm::array_create<i32>(arena);
 

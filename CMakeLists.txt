@@ -56,7 +56,7 @@ set_source_files_properties(
 )
 
 if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-    set(LIB_WARN_OFF "/w")
+    set(LIB_WARN_OFF "/W0")
 else()
     set(LIB_WARN_OFF "-w")
 endif()
