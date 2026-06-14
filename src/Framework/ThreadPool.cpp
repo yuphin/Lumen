@@ -1,5 +1,5 @@
 #include "ThreadPool.h"
-#include <stdio.h>
+#include <stb/stb_sprintf.h>
 
 bool ThreadPool::stopping = true;
 ThreadPool::QueuedJob ThreadPool::work_queue[MAX_QUEUED_JOBS] = {};
@@ -67,7 +67,7 @@ void ThreadPool::init() {
 			LUMEN_ERROR("Failed to start ThreadPool worker");
 		}
 		char name[16] = {};
-		snprintf(name, sizeof(name), "LumenWorker %u", i);
+		stbsp_snprintf(name, sizeof(name), "LumenWorker %u", i);
 		os::thread_set_name(threads[i], name);
 	}
 }

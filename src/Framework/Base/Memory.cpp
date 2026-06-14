@@ -4,7 +4,7 @@
 
 namespace lm {
 constexpr u64 HEADER_SIZE = sizeof(Arena);
-static constexpr u64 ALIGNED_HEADER_SIZE = util::next_pow2(HEADER_SIZE);
+static constexpr u64 ALIGNED_HEADER_SIZE = lm::next_pow2(HEADER_SIZE);
 static constexpr u64 MAX_REGISTERED_ARENAS = 128;
 
 static SmallArray<Arena*, MAX_REGISTERED_ARENAS> _registered_arenas;
@@ -22,7 +22,7 @@ void arena_ensure_committed(Arena* arena, u64 target_offset) {
 	arena->local_offset = target_offset;
 	if (target_offset <= arena->end_committed) return;
 	u64 commit_size =
-		lm::max(MIN_ARENA_COMMIT_SIZE, util::align_pow2(target_offset - arena->end_committed, os::get_page_size()));
+		lm::max(MIN_ARENA_COMMIT_SIZE, lm::align_pow2(target_offset - arena->end_committed, os::get_page_size()));
 	LUMEN_WARN("Committing %llu bytes ( %f MB) for: %s", commit_size, commit_size / (1024.0 * 1024), arena->name.data);
 	bool commited = os::commit(arena->data + arena->end_committed, commit_size);
 	memset(arena->data + arena->end_committed, 0, commit_size);
@@ -67,7 +67,7 @@ void* Arena::allocate(u64 size, u64 alignment, Arena** arena_node, bool zero_ini
 					  u64 exclusive_block_reserve_size) {
 	Arena* curr_arena = this;
 
-	u64 local_offset_alligned = util::align_pow2(curr_arena->local_offset, alignment);
+	u64 local_offset_alligned = lm::align_pow2(curr_arena->local_offset, alignment);
 	u64 new_pos = local_offset_alligned + size;
 
 	bool exclusive_block = exclusive_block_reserve_size > 0;
@@ -79,7 +79,7 @@ void* Arena::allocate(u64 size, u64 alignment, Arena** arena_node, bool zero_ini
 		if (arena->flags & ARENA_FLAG_SCRATCH && (this->flags & ARENA_FLAG_SCRATCH) == 0) {
 			LUMEN_ASSERT(false, "Cannot allocate after a scratch block");
 		}
-		local_offset_alligned = util::align_pow2(arena->local_offset, alignment);
+		local_offset_alligned = lm::align_pow2(arena->local_offset, alignment);
 		new_pos = local_offset_alligned + size;
 
 		if (new_pos <= arena->end_reserved) {
@@ -122,11 +122,11 @@ Arena* arena_create(lm::String name, u64 reserve_size, u64 commit_size, u64 head
 		header_alignment = ALIGNED_HEADER_SIZE;
 	} else {
 		header_alignment = header_alignment > ALIGNED_HEADER_SIZE
-							   ? util::align_pow2(header_alignment, ALIGNED_HEADER_SIZE)
+							   ? lm::align_pow2(header_alignment, ALIGNED_HEADER_SIZE)
 							   : ALIGNED_HEADER_SIZE;
 	}
-	reserve_size = util::align_pow2(reserve_size + HEADER_SIZE, page_size);
-	commit_size = lm::min(reserve_size, util::align_pow2(commit_size + HEADER_SIZE, page_size));
+	reserve_size = lm::align_pow2(reserve_size + HEADER_SIZE, page_size);
+	commit_size = lm::min(reserve_size, lm::align_pow2(commit_size + HEADER_SIZE, page_size));
 	void* base = os::reserve(reserve_size);
 	bool commited = os::commit(base, commit_size);
 	assert(commited);

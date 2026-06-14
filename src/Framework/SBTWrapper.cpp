@@ -46,7 +46,7 @@ void SBTWrapper::create(VkPipeline rt_pipeline, VkRayTracingPipelineCreateInfoKH
 	assert(pipeline_info.sType == VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR);
 	u32 group_handle_size = vk::context().rt_props.shaderGroupHandleSize;
 	u32 group_handle_alignment = vk::context().rt_props.shaderGroupHandleAlignment;
-	u32 group_stride = util::align_up_pow2(group_handle_size, group_handle_alignment);
+	u32 group_stride = lm::align_up_pow2(group_handle_size, group_handle_alignment);
 	for (GroupData& group : group_data) {
 		prm::remove(group.buffer);
 		group.stride = group_stride;

@@ -62,8 +62,8 @@ void PostFX::init_fft() {
 	auto dim_x = (u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_y - 1) / wg_size_y;
 	bool vertical = false;
 
-	const i32 RADIX_X = (31 - util::count_leading_zeros(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
-	const i32 RADIX_Y = (31 - util::count_leading_zeros(fft_ping_padded->extent.height)) % 2 ? 2 : 4;
+	const i32 RADIX_X = (31 - lm::count_leading_zeros(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
+	const i32 RADIX_Y = (31 - lm::count_leading_zeros(fft_ping_padded->extent.height)) % 2 ? 2 : 4;
 	vk::ShaderMacroArray macros_x;
 	vk::ShaderMacroArray macros_y;
 	macros_x.push_back({"KERNEL_GENERATION"});
@@ -122,8 +122,8 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 		auto dim_y = (u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_x - 1) / wg_size_x;
 		auto dim_x = (u32)(fft_ping_padded->extent.width * fft_ping_padded->extent.height + wg_size_y - 1) / wg_size_y;
 		bool vertical = false;
-		const i32 RADIX_X = (31 - util::count_leading_zeros(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
-		const i32 RADIX_Y = (31 - util::count_leading_zeros(fft_ping_padded->extent.height)) % 2 ? 2 : 4;
+		const i32 RADIX_X = (31 - lm::count_leading_zeros(fft_ping_padded->extent.width)) % 2 ? 2 : 4;
+		const i32 RADIX_Y = (31 - lm::count_leading_zeros(fft_ping_padded->extent.height)) % 2 ? 2 : 4;
 		vk::ShaderMacroArray macros_x;
 		vk::ShaderMacroArray macros_y;
 		if (RADIX_X != 2) {

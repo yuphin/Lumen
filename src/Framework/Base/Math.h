@@ -3,6 +3,68 @@
 
 namespace lm {
 
+inline u32 count_leading_zeros32(u32 value) {
+#if defined(_MSC_VER)
+	unsigned long index;
+	if (_BitScanReverse(&index, value)) {
+		return 31 - (u32)index;
+	}
+	return 32;	// Value is 0
+#elif defined(__GNUC__) || defined(__clang__)
+	if (value == 0) return 32;
+	return (u32)__builtin_clz(value);
+#else
+	if (value == 0) return 32;
+	u32 count = 0;
+	while ((value & 0x80000000) == 0) {
+		count++;
+		value <<= 1;
+	}
+	return count;
+#endif
+}
+
+inline u64 count_leading_zeros64(u64 value) {
+#if defined(_MSC_VER)
+	unsigned long index;
+#if defined(_WIN64)
+	if (_BitScanReverse64(&index, value)) {
+		return 63 - (u64)index;
+	}
+#else
+	if ((u32)(value >> 32) != 0) {
+		if (_BitScanReverse(&index, (u32)(value >> 32))) return 31 - (u64)index;
+	} else if ((u32)value != 0) {
+		if (_BitScanReverse(&index, (u32)value)) return 63 - (u64)index;
+	}
+#endif
+	return 64;
+#elif defined(__GNUC__) || defined(__clang__)
+	if (value == 0) return 64;
+	return (u64)__builtin_clzll(value);
+#else
+	if (value == 0) return 64;
+	u64 count = 0;
+	while ((value & 0x8000000000000000ull) == 0) {
+		count++;
+		value <<= 1;
+	}
+	return count;
+#endif
+}
+
+template <typename T>
+inline u32 count_leading_zeros(T value) {
+	static_assert(sizeof(T) <= 8, "Type too large for count_leading_zeros");
+
+	if constexpr (sizeof(T) <= 4) {
+		// The subtraction safely corrects the zero-padding for u8 and u16.
+		return count_leading_zeros32((u32)value) - (32 - (sizeof(T) * 8));
+	} else {
+		return (u32)count_leading_zeros64((u64)value);
+	}
+}
+
 template <typename T>
 struct Vec4;
 
@@ -87,24 +149,24 @@ using uvec2 = Vec2<u32>;
 using uvec4 = Vec4<u32>;
 using bvec3 = Vec3<bool>;
 
-#define LM_VEC_BINARY_OP(TYPE, OP)                                                                 \
-	template <typename T>                                                                           \
-	constexpr TYPE<T> operator OP(const TYPE<T>& a, const TYPE<T>& b) {                             \
-		TYPE<T> result;                                                                              \
-		for (u32 i = 0; i < TYPE<T>::length(); ++i) result[i] = a[i] OP b[i];                       \
-		return result;                                                                               \
-	}                                                                                               \
-	template <typename T>                                                                           \
-	constexpr TYPE<T> operator OP(const TYPE<T>& a, T b) {                                          \
-		TYPE<T> result;                                                                              \
-		for (u32 i = 0; i < TYPE<T>::length(); ++i) result[i] = a[i] OP b;                          \
-		return result;                                                                               \
-	}                                                                                               \
-	template <typename T>                                                                           \
-	constexpr TYPE<T> operator OP(T a, const TYPE<T>& b) {                                          \
-		TYPE<T> result;                                                                              \
-		for (u32 i = 0; i < TYPE<T>::length(); ++i) result[i] = a OP b[i];                          \
-		return result;                                                                               \
+#define LM_VEC_BINARY_OP(TYPE, OP)                                            \
+	template <typename T>                                                     \
+	constexpr TYPE<T> operator OP(const TYPE<T>& a, const TYPE<T>& b) {       \
+		TYPE<T> result;                                                       \
+		for (u32 i = 0; i < TYPE<T>::length(); ++i) result[i] = a[i] OP b[i]; \
+		return result;                                                        \
+	}                                                                         \
+	template <typename T>                                                     \
+	constexpr TYPE<T> operator OP(const TYPE<T>& a, T b) {                    \
+		TYPE<T> result;                                                       \
+		for (u32 i = 0; i < TYPE<T>::length(); ++i) result[i] = a[i] OP b;    \
+		return result;                                                        \
+	}                                                                         \
+	template <typename T>                                                     \
+	constexpr TYPE<T> operator OP(T a, const TYPE<T>& b) {                    \
+		TYPE<T> result;                                                       \
+		for (u32 i = 0; i < TYPE<T>::length(); ++i) result[i] = a OP b[i];    \
+		return result;                                                        \
 	}
 
 LM_VEC_BINARY_OP(Vec2, +)
@@ -121,16 +183,16 @@ LM_VEC_BINARY_OP(Vec4, *)
 LM_VEC_BINARY_OP(Vec4, /)
 #undef LM_VEC_BINARY_OP
 
-#define LM_VEC_COMPOUND_OP(TYPE, OP)                                                               \
-	template <typename T>                                                                           \
-	constexpr TYPE<T>& operator OP(TYPE<T>& a, const TYPE<T>& b) {                                  \
-		for (u32 i = 0; i < TYPE<T>::length(); ++i) a[i] OP b[i];                                  \
-		return a;                                                                                    \
-	}                                                                                               \
-	template <typename T>                                                                           \
-	constexpr TYPE<T>& operator OP(TYPE<T>& a, T b) {                                               \
-		for (u32 i = 0; i < TYPE<T>::length(); ++i) a[i] OP b;                                     \
-		return a;                                                                                    \
+#define LM_VEC_COMPOUND_OP(TYPE, OP)                               \
+	template <typename T>                                          \
+	constexpr TYPE<T>& operator OP(TYPE<T>& a, const TYPE<T>& b) { \
+		for (u32 i = 0; i < TYPE<T>::length(); ++i) a[i] OP b[i];  \
+		return a;                                                  \
+	}                                                              \
+	template <typename T>                                          \
+	constexpr TYPE<T>& operator OP(TYPE<T>& a, T b) {              \
+		for (u32 i = 0; i < TYPE<T>::length(); ++i) a[i] OP b;     \
+		return a;                                                  \
 	}
 
 LM_VEC_COMPOUND_OP(Vec2, +=)
@@ -147,22 +209,22 @@ LM_VEC_COMPOUND_OP(Vec4, *=)
 LM_VEC_COMPOUND_OP(Vec4, /=)
 #undef LM_VEC_COMPOUND_OP
 
-#define LM_VEC_UNARY_AND_COMPARE(TYPE)                                                             \
-	template <typename T>                                                                           \
-	constexpr TYPE<T> operator-(const TYPE<T>& v) {                                                 \
-		TYPE<T> result;                                                                              \
-		for (u32 i = 0; i < TYPE<T>::length(); ++i) result[i] = -v[i];                             \
-		return result;                                                                               \
-	}                                                                                               \
-	template <typename T>                                                                           \
-	constexpr bool operator==(const TYPE<T>& a, const TYPE<T>& b) {                                 \
-		for (u32 i = 0; i < TYPE<T>::length(); ++i)                                                 \
-			if (a[i] != b[i]) return false;                                                         \
-		return true;                                                                                 \
-	}                                                                                               \
-	template <typename T>                                                                           \
-	constexpr bool operator!=(const TYPE<T>& a, const TYPE<T>& b) {                                 \
-		return !(a == b);                                                                            \
+#define LM_VEC_UNARY_AND_COMPARE(TYPE)                                 \
+	template <typename T>                                              \
+	constexpr TYPE<T> operator-(const TYPE<T>& v) {                    \
+		TYPE<T> result;                                                \
+		for (u32 i = 0; i < TYPE<T>::length(); ++i) result[i] = -v[i]; \
+		return result;                                                 \
+	}                                                                  \
+	template <typename T>                                              \
+	constexpr bool operator==(const TYPE<T>& a, const TYPE<T>& b) {    \
+		for (u32 i = 0; i < TYPE<T>::length(); ++i)                    \
+			if (a[i] != b[i]) return false;                            \
+		return true;                                                   \
+	}                                                                  \
+	template <typename T>                                              \
+	constexpr bool operator!=(const TYPE<T>& a, const TYPE<T>& b) {    \
+		return !(a == b);                                              \
 	}
 
 LM_VEC_UNARY_AND_COMPARE(Vec2)
@@ -220,8 +282,38 @@ inline f32 sqrt(f32 value) { return sqrtf(value); }
 inline vec3 sqrt(const vec3& v) { return {sqrtf(v.x), sqrtf(v.y), sqrtf(v.z)}; }
 inline f32 round(f32 value) { return roundf(value); }
 inline f32 ceil(f32 value) { return ceilf(value); }
-inline f64 ceil(f64 value) { return std::ceil(value); }
+inline f64 ceil(f64 value) { return ceill(value); }
+inline f32 floor(f32 value) { return floorf(value); }
+inline f64 floor(f64 value) { return floorl(value); }
+inline f32 log2(f32 value) { return log2f(value); }
+inline f64 log2(f64 value) { return log2l(value); }
+inline u32 log2(u32 value) { return 31 - count_leading_zeros(value); }
+inline u64 log2(u64 value) { return 63 - count_leading_zeros(value); }
 inline vec3 fmod(const vec3& a, const vec3& b) { return {fmodf(a.x, b.x), fmodf(a.y, b.y), fmodf(a.z, b.z)}; }
+
+inline constexpr u64 align_pow2(u64 x, u64 align) { return (x + align - 1) & ~(align - 1); }
+
+template <typename T>
+inline constexpr T next_pow2(T x) {
+	if (x == 0) return 1;
+	--x;
+	x |= x >> 1;
+	x |= x >> 2;
+	x |= x >> 4;
+	x |= x >> 8;
+	x |= x >> 16;
+	return x + 1;
+}
+
+template <typename T>
+inline constexpr T div_ceil(T x, T y) {
+	return (x + y - 1) / y;
+}
+
+template <class T>
+inline constexpr T align_up_pow2(T x, u64 a) noexcept {
+	return T((x + (T(a) - 1)) & ~T(a - 1));
+}
 
 template <typename T = f32>
 constexpr T pi() {
@@ -243,9 +335,7 @@ inline vec3 cross(const vec3& a, const vec3& b) {
 inline bvec3 greaterThan(const vec3& a, const vec3& b) { return {a.x > b.x, a.y > b.y, a.z > b.z}; }
 inline bool any(const bvec3& v) { return v.x || v.y || v.z; }
 
-inline vec4 operator*(const mat4& m, const vec4& v) {
-	return m[0] * v.x + m[1] * v.y + m[2] * v.z + m[3] * v.w;
-}
+inline vec4 operator*(const mat4& m, const vec4& v) { return m[0] * v.x + m[1] * v.y + m[2] * v.z + m[3] * v.w; }
 inline mat4 operator*(const mat4& a, const mat4& b) {
 	mat4 result;
 	for (u32 i = 0; i < 4; ++i) result[i] = a * b[i];
@@ -275,12 +365,9 @@ inline mat4 rotate(const mat4& m, f32 angle, const vec3& raw_axis) {
 	f32 s = sinf(angle);
 	f32 t = 1.0f - c;
 	mat4 rotation(1.0f);
-	rotation[0] = {c + axis.x * axis.x * t, axis.y * axis.x * t + axis.z * s,
-				   axis.z * axis.x * t - axis.y * s, 0};
-	rotation[1] = {axis.x * axis.y * t - axis.z * s, c + axis.y * axis.y * t,
-				   axis.z * axis.y * t + axis.x * s, 0};
-	rotation[2] = {axis.x * axis.z * t + axis.y * s, axis.y * axis.z * t - axis.x * s,
-				   c + axis.z * axis.z * t, 0};
+	rotation[0] = {c + axis.x * axis.x * t, axis.y * axis.x * t + axis.z * s, axis.z * axis.x * t - axis.y * s, 0};
+	rotation[1] = {axis.x * axis.y * t - axis.z * s, c + axis.y * axis.y * t, axis.z * axis.y * t + axis.x * s, 0};
+	rotation[2] = {axis.x * axis.z * t + axis.y * s, axis.y * axis.z * t - axis.x * s, c + axis.z * axis.z * t, 0};
 	return m * rotation;
 }
 
@@ -383,7 +470,8 @@ inline bool decompose(const mat4& matrix, vec3& out_scale, quat& out_rotation, v
 	perspective_matrix[2][3] = 0.0f;
 	perspective_matrix[3][3] = 1.0f;
 	if (fabsf(local[0][3]) > 1e-8f || fabsf(local[1][3]) > 1e-8f || fabsf(local[2][3]) > 1e-8f) {
-		out_perspective = transpose(inverse(perspective_matrix)) * vec4(local[0][3], local[1][3], local[2][3], local[3][3]);
+		out_perspective =
+			transpose(inverse(perspective_matrix)) * vec4(local[0][3], local[1][3], local[2][3], local[3][3]);
 		local[0][3] = local[1][3] = local[2][3] = 0.0f;
 		local[3][3] = 1.0f;
 	} else {

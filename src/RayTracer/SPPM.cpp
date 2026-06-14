@@ -165,14 +165,14 @@ void render(Integrator* integrator) {
 	// Gather
 	vk::render_graph()
 		->add_compute(CSTR("Gather"), {.shader = vk::Shader(CSTR("src/shaders/integrators/sppm/gather.comp")),
-								 .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+								 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures);
 	// Composite
 	vk::render_graph()
 		->add_compute(CSTR("Composite"), {.shader = vk::Shader(CSTR("src/shaders/integrators/sppm/composite.comp")),
-									.dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+									.dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});
 }

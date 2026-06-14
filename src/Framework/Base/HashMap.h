@@ -42,7 +42,7 @@ struct HashMapProbed {
 	inline bool initialized() const { return arena_node != nullptr; }
 
 	void resize(u64 new_capacity) {
-		new_capacity = util::next_pow2(new_capacity);
+		new_capacity = lm::next_pow2(new_capacity);
 		using HashMapEntryType = HashMapEntry<T1, T2>;
 #if 0
 		Arena* new_arena_node;
@@ -76,7 +76,7 @@ struct HashMapProbed {
 		// Try to resize in-place
 		u64 hm_size = capacity * sizeof(HashMapEntryType);
 		u64 local_offset_alligned_prev =
-			util::align_pow2(arena_node->local_offset - hm_size, alignof(HashMapEntryType));
+			lm::align_pow2(arena_node->local_offset - hm_size, alignof(HashMapEntryType));
 		bool is_sequential = (arena_node->data + local_offset_alligned_prev) == (u8*)data;
 		if (is_sequential) {
 			arena_node->local_offset -= capacity * sizeof(HashMapEntryType);
@@ -360,7 +360,7 @@ HashMapProbed<T1, T2, hash_func, eq_func> hash_map_create(Arena* arena,
 	using HashMapEntryType = HashMapEntry<T1, T2>;
 	HashMapProbed<T1, T2, hash_func, eq_func> map;
 	// We also multiply the capacity by 1.5 in case we want to accomodate w.r.t hash map load percentage threshold
-	initial_capacity = util::next_pow2(3 * (initial_capacity + 1) >> 1);
+	initial_capacity = lm::next_pow2(3 * (initial_capacity + 1) >> 1);
 	map.capacity = initial_capacity;
 	Arena* arena_node;
 	map.data = (HashMapEntryType*)arena->allocate(initial_capacity * sizeof(HashMapEntryType),

@@ -4,7 +4,8 @@
 #include "RayTracer.h"
 #include "Integrator.h"
 #include "PostFX.h"
-#include <format>
+#include <stb/stb_sprintf.h>
+#include <time.h>
 
 namespace ray_tracer {
 
@@ -46,8 +47,7 @@ static bool saved_config_valid[INTEGRATOR_COUNT] = {};
 static i32 current_integrator_idx = 0;
 
 static const char* integrator_display_names[INTEGRATOR_COUNT] = {
-	"Path", "BDPT", "SPPM", "VCM", "PSSMLT", "SMLT", "VCMMLT", "ReSTIR", "ReSTIR GI", "DDGI", "ReSTIR PT",
-	"IR Cache",
+	"Path", "BDPT", "SPPM", "VCM", "PSSMLT", "SMLT", "VCMMLT", "ReSTIR", "ReSTIR GI", "DDGI", "ReSTIR PT", "IR Cache",
 };
 
 static const lm::String integrator_config_names[INTEGRATOR_COUNT] = {
@@ -237,7 +237,7 @@ static void init_resources() {
 
 static void cleanup_resources() {
 	vk::Buffer** buffers[] = {&output_img_buffer, &output_img_buffer_cpu, &residual_buffer, &counter_buffer,
-							 &rmse_val_buffer, &rt_utils_desc_buffer, &gt_img_buffer};
+							  &rmse_val_buffer,	  &rt_utils_desc_buffer,  &gt_img_buffer};
 	for (vk::Buffer** buffer : buffers) {
 		prm::remove(*buffer);
 		*buffer = nullptr;
@@ -368,12 +368,13 @@ static bool gui() {
 					camera.rotation.z);
 		ImGui::Text("Camera direction:  %.2f %.2f %.2f", camera.direction.x, camera.direction.y, camera.direction.z);
 		if (ImGui::Button("Copy camera data to clipboard")) {
-			std::string cam_pos_str = std::format(
-				"    \"position\": "
-				"[{:.2f},{:.2f},{:.2f}],\n    \"rotation\":[{:.2f},{:.2f},{:.2f}],\n    \"dir\":[{:.2f},{:.2f},{:.2f}]",
+			char cam_pos_str[256];
+			stbsp_snprintf(
+				cam_pos_str, sizeof(cam_pos_str),
+				"    \"position\": [%.2f,%.2f,%.2f],\n    \"rotation\":[%.2f,%.2f,%.2f],\n    \"dir\":[%.2f,%.2f,%.2f]",
 				camera.position.x, camera.position.y, camera.position.z, camera.rotation.x, camera.rotation.y,
 				camera.rotation.z, camera.direction.x, camera.direction.y, camera.direction.z);
-			Window::set_clipboard_text(cam_pos_str.c_str());
+			Window::set_clipboard_text(cam_pos_str);
 		}
 	}
 	if (ImGui::Checkbox("Enable VSync", &vk::context().vsync_enabled)) {

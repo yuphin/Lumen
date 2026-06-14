@@ -385,14 +385,14 @@ void render(Integrator* integrator) {
 	// Calculate CDF
 	rg->add_compute(CSTR("Calculate CDF"), {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/calc_cdf.comp")),
 											.specialization_data = {(u32)state.num_bootstrap_samples},
-											.dims = {(u32)std::ceil(state.num_bootstrap_samples / f32(1024.0f)), 1, 1}})
+											.dims = {(u32)lm::ceil(state.num_bootstrap_samples / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer);
 	// Select seeds
 	rg->add_compute(CSTR("Select Seeds"),
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/select_seeds.comp")),
 					 .specialization_data = {(u32)state.num_mlt_threads},
-					 .dims = {(u32)std::ceil(state.num_mlt_threads / f32(1024.0f)), 1, 1}})
+					 .dims = {(u32)lm::ceil(state.num_mlt_threads / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer);
 	// Fill in the samplers for mutations
@@ -492,7 +492,7 @@ void render(Integrator* integrator) {
 	// Compositions
 	rg->add_compute(CSTR("Composition"),
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/composite.comp")),
-					 .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+					 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});
 }

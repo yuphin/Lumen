@@ -153,7 +153,7 @@ void render(Integrator* integrator) {
 		vk::render_graph()
 			->add_compute(CSTR("Init Reservoirs"),
 						  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/init_reservoirs.comp")),
-						   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+						   .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 			.push_constants(&state.pc)
 			.bind(integrator->lumen_scene->scene_desc_buffer)
 			.zero(state.photon_buffer, config.enable_vm);
@@ -185,7 +185,7 @@ void render(Integrator* integrator) {
 	vk::render_graph()
 		->add_compute(CSTR("Check Reservoirs"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/check_reservoirs.comp")),
-					   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+					   .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer)
 		.zero(state.should_resample_buffer);
@@ -228,7 +228,7 @@ void render(Integrator* integrator) {
 	vk::render_graph()
 		->add_compute(CSTR("Select Reservoir"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/select_reservoirs.comp")),
-					   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+					   .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.bind(integrator->lumen_scene->scene_desc_buffer)
 		.push_constants(&state.pc);
 
@@ -236,7 +236,7 @@ void render(Integrator* integrator) {
 	vk::render_graph()
 		->add_compute(CSTR("Update Reservoirs"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/update_reservoirs.comp")),
-					   .dims = {(u32)std::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+					   .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.bind(integrator->lumen_scene->scene_desc_buffer)
 		.push_constants(&state.pc);
 	// Trace rays from eye

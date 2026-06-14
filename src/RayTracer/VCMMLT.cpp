@@ -397,13 +397,13 @@ void render(Integrator* integrator) {
 	// Calculate CDF
 	rg->add_compute(CSTR("Calculate CDF"),
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/calc_cdf.comp")),
-					 .dims = {(u32)std::ceil(config.num_bootstrap_samples / f32(1024.0f)), 1, 1}})
+					 .dims = {(u32)lm::ceil(config.num_bootstrap_samples / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer);
 	// Select seeds
 	rg->add_compute(CSTR("Select Seeds"),
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/vcmmlt/select_seeds.comp")),
-					 .dims = {(u32)std::ceil(config.num_mlt_threads / f32(1024.0f)), 1, 1}})
+					 .dims = {(u32)lm::ceil(config.num_mlt_threads / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer);
 	// Fill in the samplers for mutations

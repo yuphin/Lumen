@@ -146,7 +146,7 @@ void arena_ensure_allocated_in_the_same_block(Arena* arena, u64 new_capacity, u6
 	assert(new_capacity > old_capacity);
 	u64 bytes_needed = (new_capacity - old_capacity) * sizeof(T);
 	LUMEN_ASSERT(arena, "Did you forget to use array_create?");
-	u64 aligned_offset = util::align_pow2(arena->local_offset, alignof(T));
+	u64 aligned_offset = lm::align_pow2(arena->local_offset, alignof(T));
 	u64 diff = arena->end_reserved - aligned_offset;
 	LUMEN_ASSERT(bytes_needed <= diff, "Not enough space in Arena, consider increasing arena block size by %llu bytes",
 				 bytes_needed - diff);

@@ -159,7 +159,7 @@ void render(Integrator* integrator) {
 	vk::render_graph()
 		->add_compute(CSTR("Output"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/restir/gi/output.comp")),
-					   .dims = {(u32)std::ceil(Window::width() * Window::height()  / f32(1024.0f)), 1, 1}})
+					   .dims = {(u32)lm::ceil(Window::width() * Window::height()  / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});
 	if (!state.do_spatiotemporal) {
