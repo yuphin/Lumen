@@ -167,40 +167,39 @@ void add_pass(ImGuiRenderer* renderer, vk::Texture* output) {
 					  -1.0f - draw_data->DisplayPos.y * (2.0f / draw_data->DisplaySize.y)},
 	};
 
-	lm::RenderPass& pass =
-		rg::add_gfx(CSTR("ImGui"), {.shaders = {{CSTR("src/shaders/imgui.vert")}, {CSTR("src/shaders/imgui.frag")}},
-									.width = output->extent.width,
-									.height = output->extent.height,
-									.cull_mode = VK_CULL_MODE_NONE,
-									.vertex_buffers = {frame->vertex_buffer},
-									.index_buffer = frame->index_buffer,
-									.vertex_bindings = {{.binding = 0,
-														 .stride = sizeof(ImDrawVert),
-														 .inputRate = VK_VERTEX_INPUT_RATE_VERTEX}},
-									.vertex_attributes =
-										{
-											{.location = 0,
-											 .binding = 0,
-											 .format = VK_FORMAT_R32G32_SFLOAT,
-											 .offset = IM_OFFSETOF(ImDrawVert, pos)},
-											{.location = 1,
-											 .binding = 0,
-											 .format = VK_FORMAT_R32G32_SFLOAT,
-											 .offset = IM_OFFSETOF(ImDrawVert, uv)},
-											{.location = 2,
-											 .binding = 0,
-											 .format = VK_FORMAT_R8G8B8A8_UNORM,
-											 .offset = IM_OFFSETOF(ImDrawVert, col)},
-										},
-									.blend_attachments = {blend},
-									.color_load_ops = {VK_ATTACHMENT_LOAD_OP_LOAD},
-									.index_type = sizeof(ImDrawIdx) == 2 ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32,
-									.depth_test_enable = VK_FALSE,
-									.depth_write_enable = VK_FALSE,
-									.color_outputs = {output},
-									.pass_func = render_draw_data})
-			.push_constants(&pc)
-			.bind(renderer->font_texture);
+	rg::add_gfx(
+		CSTR("ImGui"),
+		{.shaders = {{CSTR("src/shaders/imgui.vert")}, {CSTR("src/shaders/imgui.frag")}},
+		 .width = output->extent.width,
+		 .height = output->extent.height,
+		 .cull_mode = VK_CULL_MODE_NONE,
+		 .vertex_buffers = {frame->vertex_buffer},
+		 .index_buffer = frame->index_buffer,
+		 .vertex_bindings = {{.binding = 0, .stride = sizeof(ImDrawVert), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX}},
+		 .vertex_attributes =
+			 {
+				 {.location = 0,
+				  .binding = 0,
+				  .format = VK_FORMAT_R32G32_SFLOAT,
+				  .offset = IM_OFFSETOF(ImDrawVert, pos)},
+				 {.location = 1,
+				  .binding = 0,
+				  .format = VK_FORMAT_R32G32_SFLOAT,
+				  .offset = IM_OFFSETOF(ImDrawVert, uv)},
+				 {.location = 2,
+				  .binding = 0,
+				  .format = VK_FORMAT_R8G8B8A8_UNORM,
+				  .offset = IM_OFFSETOF(ImDrawVert, col)},
+			 },
+		 .blend_attachments = {blend},
+		 .color_load_ops = {VK_ATTACHMENT_LOAD_OP_LOAD},
+		 .index_type = sizeof(ImDrawIdx) == 2 ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32,
+		 .depth_test_enable = VK_FALSE,
+		 .depth_write_enable = VK_FALSE,
+		 .color_outputs = {output},
+		 .pass_func = render_draw_data})
+		.push_constants(&pc)
+		.bind(renderer->font_texture);
 }
 
 void destroy(ImGuiRenderer* renderer) {
