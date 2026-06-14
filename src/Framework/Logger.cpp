@@ -10,7 +10,7 @@ namespace lm {
 
 static void log_bytes_colored(const char* str, u64 n, int level, bool err_stream) {
 #if defined(_WIN32) || defined(_WIN64)
-	static SRWLOCK log_lock = SRWLOCK_INIT;
+	static SRWLOCK _log_lock = SRWLOCK_INIT;
 	HANDLE h = GetStdHandle(err_stream ? STD_ERROR_HANDLE : STD_OUTPUT_HANDLE);
 
 	WORD orig = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
@@ -30,14 +30,14 @@ static void log_bytes_colored(const char* str, u64 n, int level, bool err_stream
 			break;
 	}
 
-	AcquireSRWLockExclusive(&log_lock);
+	AcquireSRWLockExclusive(&_log_lock);
 	{
 		SetConsoleTextAttribute(h, col);
 		DWORD written;
 		WriteFile(h, str, (DWORD)n, &written, nullptr);
 		SetConsoleTextAttribute(h, orig);
 	}
-	ReleaseSRWLockExclusive(&log_lock);
+	ReleaseSRWLockExclusive(&_log_lock);
 #else
 	int fd = err_stream ? STDERR_FILENO : STDOUT_FILENO;
 	const bool tty = isatty(fd);

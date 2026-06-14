@@ -7,48 +7,48 @@
 
 namespace ray_tracer {
 
-static bool load_reference = false;
-static bool calc_rmse = false;
-static bool initialized = false;
-static f32 cpu_avg_time = 0;
-static i32 cnt = 0;
-static Integrator active_integrator;
-static PostFX post_fx;
-static RTUtilsPC rt_utils_pc;
-static vk::Buffer* gt_img_buffer = nullptr;
-static vk::Buffer* output_img_buffer = nullptr;
-static vk::Buffer* output_img_buffer_cpu = nullptr;
-static vk::Buffer* residual_buffer = nullptr;
-static vk::Buffer* counter_buffer = nullptr;
-static vk::Buffer* rmse_val_buffer = nullptr;
-static vk::Buffer* rt_utils_desc_buffer = nullptr;
-static vk::Texture* reference_tex = nullptr;
-static vk::Texture* target_tex = nullptr;
-static f64 start;
-static bool debug = false;
-static bool write_exr = false;
-static bool has_gt = false;
-static bool show_cam_stats = false;
-static bool comparison_mode = false;
-static bool capture_ref_img = false;
-static bool capture_target_img = false;
-static bool comparison_img_toggle = false;
-static bool img_captured = false;
-static bool show_ui = true;
-static const bool enable_shader_inference = true;
-static const bool use_events = true;
-static vk::BVH tlas;
-static lm::Array<vk::BVH> blases;
-static bool recreate_swapchain = false;
-static SceneConfig saved_configs[INTEGRATOR_COUNT];
-static bool saved_config_valid[INTEGRATOR_COUNT] = {};
-static i32 current_integrator_idx = 0;
+static bool _load_reference = false;
+static bool _calc_rmse = false;
+static bool _initialized = false;
+static f32 _cpu_avg_time = 0;
+static i32 _cnt = 0;
+static Integrator _active_integrator;
+static PostFX _post_fx;
+static RTUtilsPC _rt_utils_pc;
+static vk::Buffer* _gt_img_buffer = nullptr;
+static vk::Buffer* _output_img_buffer = nullptr;
+static vk::Buffer* _output_img_buffer_cpu = nullptr;
+static vk::Buffer* _residual_buffer = nullptr;
+static vk::Buffer* _counter_buffer = nullptr;
+static vk::Buffer* _rmse_val_buffer = nullptr;
+static vk::Buffer* _rt_utils_desc_buffer = nullptr;
+static vk::Texture* _reference_tex = nullptr;
+static vk::Texture* _target_tex = nullptr;
+static f64 _start;
+static bool _debug = false;
+static bool _write_exr = false;
+static bool _has_gt = false;
+static bool _show_cam_stats = false;
+static bool _comparison_mode = false;
+static bool _capture_ref_img = false;
+static bool _capture_target_img = false;
+static bool _comparison_img_toggle = false;
+static bool _img_captured = false;
+static bool _show_ui = true;
+static const bool _enable_shader_inference = true;
+static const bool _use_events = true;
+static vk::BVH _tlas;
+static lm::Array<vk::BVH> _blases;
+static bool _recreate_swapchain = false;
+static SceneConfig _saved_configs[INTEGRATOR_COUNT];
+static bool _saved_config_valid[INTEGRATOR_COUNT] = {};
+static i32 _current_integrator_idx = 0;
 
-static const char* integrator_display_names[INTEGRATOR_COUNT] = {
+static const char* _integrator_display_names[INTEGRATOR_COUNT] = {
 	"Path", "BDPT", "SPPM", "VCM", "PSSMLT", "SMLT", "VCMMLT", "ReSTIR", "ReSTIR GI", "DDGI", "ReSTIR PT", "IR Cache",
 };
 
-static const lm::String integrator_config_names[INTEGRATOR_COUNT] = {
+static const lm::String _integrator_config_names[INTEGRATOR_COUNT] = {
 	"path", "bdpt", "sppm", "vcm", "pssmlt", "smlt", "vcmmlt", "restir", "restirgi", "ddgi", "restirpt", "ircache",
 };
 
@@ -61,53 +61,51 @@ static bool gui();
 static void destroy_accel();
 
 static void reload_shaders() {
-	vk::render_graph()->reload_shaders = true;
-	vk::render_graph()->shader_cache.clear();
-	vk::render_graph()->reload_counter++;
+	rg::request_shader_reload();
 	vk::shader_arena_reset();
 }
 
 static void cache_active_config() {
 	SceneConfig& config = scene::get()->config;
-	saved_configs[config.type] = config;
-	saved_config_valid[config.type] = true;
+	_saved_configs[config.type] = config;
+	_saved_config_valid[config.type] = true;
 }
 
 static void select_integrator_config(IntegratorType type, const SceneCommon& common) {
-	if (saved_config_valid[type]) {
-		scene::get()->config = saved_configs[type];
+	if (_saved_config_valid[type]) {
+		scene::get()->config = _saved_configs[type];
 		scene::get()->config.common = common;
 	} else {
-		scene::config_init(integrator_config_names[type], common);
+		scene::config_init(_integrator_config_names[type], common);
 	}
 	scene::get()->config.type = type;
-	scene::get()->config.common.integrator_name = integrator_config_names[type];
+	scene::get()->config.common.integrator_name = _integrator_config_names[type];
 }
 
 static void key_callback(void*, KeyInput, KeyAction) {
 	if (Window::is_key_down(KeyInput::KEY_F1)) {
-		show_ui = !show_ui;
+		_show_ui = !_show_ui;
 	}
 	if (Window::is_key_down(KeyInput::KEY_F10)) {
-		write_exr = true;
+		_write_exr = true;
 	} else if (Window::is_key_down(KeyInput::KEY_F11)) {
-		comparison_mode ^= true;
+		_comparison_mode ^= true;
 	} else if (Window::is_key_down(KeyInput::KEY_F5)) {
 		reload_shaders();
-		active_integrator.updated = true;
+		_active_integrator.updated = true;
 	} else if (Window::is_key_down(KeyInput::KEY_F6)) {
-		capture_ref_img = true;
+		_capture_ref_img = true;
 	} else if (Window::is_key_down(KeyInput::KEY_F7)) {
-		capture_target_img = true;
-	} else if (comparison_mode && Window::is_key_down(KeyInput::KEY_LEFT)) {
-		comparison_img_toggle = false;
-	} else if (comparison_mode && Window::is_key_down(KeyInput::KEY_RIGHT)) {
-		comparison_img_toggle = true;
+		_capture_target_img = true;
+	} else if (_comparison_mode && Window::is_key_down(KeyInput::KEY_LEFT)) {
+		_comparison_img_toggle = false;
+	} else if (_comparison_mode && Window::is_key_down(KeyInput::KEY_RIGHT)) {
+		_comparison_img_toggle = true;
 	}
 }
 
 void init(bool use_debug, i32 argc, char* argv[]) {
-	debug = use_debug;
+	_debug = use_debug;
 	lm::String scene_name = CSTR("scenes/caustics.scene");
 	for (i32 i = 0; i < argc; i++) {
 		// +1 for null terminator
@@ -131,57 +129,57 @@ void init(bool use_debug, i32 argc, char* argv[]) {
 
 	vk::context().vsync_enabled = true;
 
-	vk::init(debug);
-	initialized = true;
+	vk::init(_debug);
+	_initialized = true;
 
 	// Enable shader reflections for the render graph
-	vk::render_graph()->settings.shader_inference = enable_shader_inference;
+	rg::settings().shader_inference = _enable_shader_inference;
 	// Event based synchronization instead of barriers
-	vk::render_graph()->settings.use_events = use_events;
+	rg::settings().use_events = _use_events;
 
 	scene::load(scene_name);
-	current_integrator_idx = i32(scene::get()->config.type);
+	_current_integrator_idx = i32(scene::get()->config.type);
 	cache_active_config();
-	active_integrator.tlas = &tlas;
-	integrator::set_type(&active_integrator, scene::get()->config.type);
-	integrator::init(&active_integrator);
-	if (!tlas.accel) {
-		integrator::create_accel(&active_integrator, &tlas, &blases);
+	_active_integrator.tlas = &_tlas;
+	integrator::set_type(&_active_integrator, scene::get()->config.type);
+	integrator::init(&_active_integrator);
+	if (!_tlas.accel) {
+		integrator::create_accel(&_active_integrator, &_tlas, &_blases);
 	}
-	post_fx.init();
+	_post_fx.init();
 	init_resources();
 }
 
 static void init_resources() {
 	u32 viewport_size = Window::width() * Window::height();
-	output_img_buffer =
+	_output_img_buffer =
 		prm::get_buffer({.name = CSTR("Output Image Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = viewport_size * 4 * 4});
 
-	output_img_buffer_cpu =
+	_output_img_buffer_cpu =
 		prm::get_buffer({.name = CSTR("Output Image CPU"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU_TO_CPU,
 						 .size = viewport_size * 4 * 4});
 
-	residual_buffer =
+	_residual_buffer =
 		prm::get_buffer({.name = CSTR("RMSE Residual"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = viewport_size * 4});
 
-	counter_buffer =
+	_counter_buffer =
 		prm::get_buffer({.name = CSTR("RMSE Counter"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(i32)});
 
-	rmse_val_buffer =
+	_rmse_val_buffer =
 		prm::get_buffer({.name = CSTR("RMSE Value"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -193,54 +191,54 @@ static void init_resources() {
 									.dimensions = {Window::width(), Window::height(), 1},
 									.format = VK_FORMAT_R32G32B32A32_SFLOAT,
 									.initial_layout = VK_IMAGE_LAYOUT_GENERAL};
-	reference_tex = prm::get_texture(texture_desc);
+	_reference_tex = prm::get_texture(texture_desc);
 	texture_desc.name = CSTR("Target Texture");
-	target_tex = prm::get_texture(texture_desc);
+	_target_tex = prm::get_texture(texture_desc);
 
 	RTUtilsDesc rt_utils_desc;
-	if (load_reference) {
+	if (_load_reference) {
 		// Load the ground truth image
 		i32 width, height;
 		f32* data = ImageUtils::load_exr("out.exr", width, height);
 		if (!data) {
 			LUMEN_ERROR("Could not load the reference image");
 		}
-		gt_img_buffer =
+		_gt_img_buffer =
 			prm::get_buffer({.name = CSTR("Ground Truth Image"),
 							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 							 .memory_type = vk::BUFFER_TYPE_GPU,
 							 .size = Window::width() * Window::height() * 4 * sizeof(f32),
 							 .data = data});
-		rt_utils_desc.gt_img_addr = gt_img_buffer->device_address();
+		rt_utils_desc.gt_img_addr = _gt_img_buffer->device_address();
 		free(data);
 	}
 
-	rt_utils_desc.out_img_addr = output_img_buffer->device_address();
-	rt_utils_desc.residual_addr = residual_buffer->device_address();
-	rt_utils_desc.counter_addr = counter_buffer->device_address();
-	rt_utils_desc.rmse_val_addr = rmse_val_buffer->device_address();
+	rt_utils_desc.out_img_addr = _output_img_buffer->device_address();
+	rt_utils_desc.residual_addr = _residual_buffer->device_address();
+	rt_utils_desc.counter_addr = _counter_buffer->device_address();
+	rt_utils_desc.rmse_val_addr = _rmse_val_buffer->device_address();
 
-	rt_utils_desc_buffer =
+	_rt_utils_desc_buffer =
 		prm::get_buffer({.name = CSTR("RT Utils Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(RTUtilsDesc),
 						 .data = &rt_utils_desc});
 
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, output_img_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, residual_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, counter_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, rmse_val_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, out_img_addr, _output_img_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, residual_addr, _residual_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, counter_addr, _counter_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(RTUtilsDesc, desc, rmse_val_addr, _rmse_val_buffer);
 }
 
 static void cleanup_resources() {
-	vk::Buffer** buffers[] = {&output_img_buffer, &output_img_buffer_cpu, &residual_buffer, &counter_buffer,
-							  &rmse_val_buffer,	  &rt_utils_desc_buffer,  &gt_img_buffer};
+	vk::Buffer** buffers[] = {&_output_img_buffer, &_output_img_buffer_cpu, &_residual_buffer, &_counter_buffer,
+							  &_rmse_val_buffer,	  &_rt_utils_desc_buffer,  &_gt_img_buffer};
 	for (vk::Buffer** buffer : buffers) {
 		prm::remove(*buffer);
 		*buffer = nullptr;
 	}
-	vk::Texture** textures[] = {&reference_tex, &target_tex};
+	vk::Texture** textures[] = {&_reference_tex, &_target_tex};
 	for (vk::Texture** texture : textures) {
 		prm::remove(*texture);
 		*texture = nullptr;
@@ -249,10 +247,10 @@ static void cleanup_resources() {
 
 void update() {
 	f32 frame_time = draw_frame();
-	cpu_avg_time = (1.0f - 1.0f / (cnt)) * cpu_avg_time + frame_time / (f32)cnt;
-	cpu_avg_time = 0.95f * cpu_avg_time + 0.05f * frame_time;
-	integrator::update(&active_integrator);
-	active_integrator.updated = false;
+	_cpu_avg_time = (1.0f - 1.0f / (_cnt)) * _cpu_avg_time + frame_time / (f32)_cnt;
+	_cpu_avg_time = 0.95f * _cpu_avg_time + 0.05f * frame_time;
+	integrator::update(&_active_integrator);
+	_active_integrator.updated = false;
 #if 0
 	char* stats = nullptr;
 	vmaBuildStatsString(vk::context().allocator, &stats, VK_TRUE);
@@ -262,65 +260,62 @@ void update() {
 }
 
 static void render(u32 i) {
-	integrator::render(&active_integrator);
+	integrator::render(&_active_integrator);
 	vk::Texture* input_tex = nullptr;
-	if (comparison_mode && img_captured) {
-		input_tex = comparison_img_toggle ? target_tex : reference_tex;
+	if (_comparison_mode && _img_captured) {
+		input_tex = _comparison_img_toggle ? _target_tex : _reference_tex;
 	} else {
-		input_tex = active_integrator.output_tex;
+		input_tex = _active_integrator.output_tex;
 	}
-	post_fx.render(input_tex, vk::swapchain_images()[i]);
+	_post_fx.render(input_tex, vk::swapchain_images()[i]);
 	render_debug_utils();
 
 	VkCommandBuffer cmdbuf = vk::context().command_buffers[i];
 	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	vk::check(vkBeginCommandBuffer(cmdbuf, &begin_info));
-	vk::render_graph()->run(cmdbuf);
+	rg::run(cmdbuf);
 	vk::check(vkEndCommandBuffer(cmdbuf));
 }
 
 static void render_debug_utils() {
-	if (write_exr) {
-		vk::render_graph()->current_pass().copy(active_integrator.output_tex, output_img_buffer_cpu);
-	} else if (capture_ref_img) {
-		vk::render_graph()->current_pass().copy(active_integrator.output_tex, reference_tex);
+	if (_write_exr) {
+		rg::current_pass().copy(_active_integrator.output_tex, _output_img_buffer_cpu);
+	} else if (_capture_ref_img) {
+		rg::current_pass().copy(_active_integrator.output_tex, _reference_tex);
 
-	} else if (capture_target_img) {
-		vk::render_graph()->current_pass().copy(active_integrator.output_tex, target_tex);
+	} else if (_capture_target_img) {
+		rg::current_pass().copy(_active_integrator.output_tex, _target_tex);
 	}
 
-	if (capture_ref_img || capture_target_img) {
-		img_captured = true;
-		capture_ref_img = false;
-		capture_target_img = false;
+	if (_capture_ref_img || _capture_target_img) {
+		_img_captured = true;
+		_capture_ref_img = false;
+		_capture_target_img = false;
 	}
 
-	if (calc_rmse && has_gt) {
+	if (_calc_rmse && _has_gt) {
 		auto op_reduce = [&](const lm::String& op_name, const lm::String& op_shader_name, const lm::String& reduce_name,
 							 const lm::String& reduce_shader_name) {
 			u32 num_wgs = u32((Window::width() * Window::height() + 1023) / 1024);
-			vk::render_graph()
-				->add_compute(op_name, {.shader = vk::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
-				.push_constants(&rt_utils_pc)
-				.bind(rt_utils_desc_buffer)
-				.zero({residual_buffer, counter_buffer});
+			rg::add_compute(op_name, {.shader = vk::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
+				.push_constants(&_rt_utils_pc)
+				.bind(_rt_utils_desc_buffer)
+				.zero({_residual_buffer, _counter_buffer});
 			while (num_wgs != 1) {
-				vk::render_graph()
-					->add_compute(reduce_name, {.shader = vk::Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
-					.push_constants(&rt_utils_pc)
-					.bind(rt_utils_desc_buffer);
+				rg::add_compute(reduce_name, {.shader = vk::Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
+					.push_constants(&_rt_utils_pc)
+					.bind(_rt_utils_desc_buffer);
 				num_wgs = (num_wgs + 1023) / 1024;
 			}
 		};
-		vk::render_graph()->current_pass().copy(active_integrator.output_tex, output_img_buffer);
+		rg::current_pass().copy(_active_integrator.output_tex, _output_img_buffer);
 		// Calculate RMSE
 		op_reduce(CSTR("OpReduce: RMSE"), CSTR("src/shaders/rmse/calc_rmse.comp"), CSTR("OpReduce: Reduce RMSE"),
 				  CSTR("src/shaders/rmse/reduce_rmse.comp"));
-		vk::render_graph()
-			->add_compute(CSTR("Calculate RMSE"),
+		rg::add_compute(CSTR("Calculate RMSE"),
 						  {.shader = vk::Shader(CSTR("src/shaders/rmse/output_rmse.comp")), .dims = {1, 1, 1}})
-			.push_constants(&rt_utils_pc)
-			.bind(rt_utils_desc_buffer);
+			.push_constants(&_rt_utils_pc)
+			.bind(_rt_utils_desc_buffer);
 	}
 }
 
@@ -329,8 +324,8 @@ static bool gui() {
 	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
 	ImGui::Text("General settings:");
 	ImGui::PopStyleColor();
-	ImGui::Text("Frame %d time (CPU) %.2f ms ( %.2f FPS )", active_integrator.frame_num, cpu_avg_time,
-				1000 / cpu_avg_time);
+	ImGui::Text("Frame %d time (CPU) %.2f ms ( %.2f FPS )", _active_integrator.frame_num, _cpu_avg_time,
+				1000 / _cpu_avg_time);
 	double frame_time_gpu_ms = (GPUQueryManager::get_total_elapsed()) * 1e-6;
 	if (frame_time_gpu_ms > 0) {
 		ImGui::Text("Frame time (GPU) %.2f ms", frame_time_gpu_ms);
@@ -357,8 +352,8 @@ static bool gui() {
 	ImGui::Text("CPU Arena Usage: %.2f MB Allocated, %.2f MB Used", arena_total_allocated_bytes / (1024.0f * 1024.0f),
 				arena_total_used_bytes / (1024.0f * 1024.0f));
 	bool updated = false;
-	ImGui::Checkbox("Show camera statistics", &show_cam_stats);
-	if (show_cam_stats) {
+	ImGui::Checkbox("Show camera statistics", &_show_cam_stats);
+	if (_show_cam_stats) {
 		const lm::Camera& camera = scene::get()->camera;
 		ImGui::Text("X - Right, Y - Up, -Z - Forward");
 		ImGui::Text("Camera position: %.2f %.2f %.2f", camera.position.x, camera.position.y, camera.position.z);
@@ -376,32 +371,32 @@ static bool gui() {
 		}
 	}
 	if (ImGui::Checkbox("Enable VSync", &vk::context().vsync_enabled)) {
-		recreate_swapchain = true;
+		_recreate_swapchain = true;
 	}
 	if (ImGui::Button("Reload shaders (F5)")) {
 		reload_shaders();
 		updated |= true;
 	}
-	ImGui::Checkbox("Comparison mode (F11)", &comparison_mode);
-	if (comparison_mode && img_captured) {
+	ImGui::Checkbox("Comparison mode (F11)", &_comparison_mode);
+	if (_comparison_mode && _img_captured) {
 		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
 		const char* texts[] = {"Showing: Reference Image", "Showing: Target Image"};
-		ImGui::Text("%s\n", texts[u32(comparison_img_toggle)]);
+		ImGui::Text("%s\n", texts[u32(_comparison_img_toggle)]);
 		ImGui::PopStyleColor();
 	}
 	if (ImGui::Button("Capture reference image (F6)")) {
-		capture_ref_img = true;
+		_capture_ref_img = true;
 	}
 	if (ImGui::Button("Capture target image (F7)")) {
-		capture_target_img = true;
+		_capture_target_img = true;
 	}
 
 	SceneConfig& config = scene::get()->config;
-	if (ImGui::BeginCombo("Select Integrator", integrator_display_names[current_integrator_idx])) {
+	if (ImGui::BeginCombo("Select Integrator", _integrator_display_names[_current_integrator_idx])) {
 		for (i32 n = 0; n < INTEGRATOR_COUNT; n++) {
-			const bool selected = current_integrator_idx == n;
-			if (ImGui::Selectable(integrator_display_names[n], selected)) {
-				current_integrator_idx = n;
+			const bool selected = _current_integrator_idx == n;
+			if (ImGui::Selectable(_integrator_display_names[n], selected)) {
+				_current_integrator_idx = n;
 			}
 
 			// Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
@@ -412,30 +407,30 @@ static bool gui() {
 		ImGui::EndCombo();
 	}
 
-	if (current_integrator_idx != i32(config.type)) {
+	if (_current_integrator_idx != i32(config.type)) {
 		updated = true;
 		vkDeviceWaitIdle(vk::context().device);
 		const bool was_custom_accel = config.type == INTEGRATOR_DDGI;
 		SceneCommon common = config.common;
 		cache_active_config();
-		integrator::destroy(&active_integrator, /*resize=*/false);
-		IntegratorType new_type = IntegratorType(current_integrator_idx);
+		integrator::destroy(&_active_integrator, /*resize=*/false);
+		IntegratorType new_type = IntegratorType(_current_integrator_idx);
 		select_integrator_config(new_type, common);
 		GPUQueryManager::reset_data();
-		integrator::set_type(&active_integrator, new_type);
+		integrator::set_type(&_active_integrator, new_type);
 		const bool is_custom_accel = new_type == INTEGRATOR_DDGI;
-		integrator::init(&active_integrator);
+		integrator::init(&_active_integrator);
 		if (was_custom_accel || is_custom_accel) {
 			destroy_accel();
-			integrator::create_accel(&active_integrator, &tlas, &blases);
+			integrator::create_accel(&_active_integrator, &_tlas, &_blases);
 		}
 	}
 	return updated;
 }
 
 static f32 draw_frame() {
-	if (cnt == 0) {
-		start = os::time_seconds();
+	if (_cnt == 0) {
+		_start = os::time_seconds();
 	}
 
 	f64 t_begin = os::time_seconds() * 1000;
@@ -450,88 +445,86 @@ static f32 draw_frame() {
 	Window::imgui_new_frame();
 	ImGui::NewFrame();
 
-	active_integrator.updated |= updated;
-	if (show_ui) {
+	_active_integrator.updated |= updated;
+	if (_show_ui) {
 		ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Once);
-		ImGui::Begin("Debug (F1 to hide)", &show_ui);
+		ImGui::Begin("Debug (F1 to hide)", &_show_ui);
 		bool gui_updated = gui();
-		gui_updated |= integrator::gui(&active_integrator);
-		gui_updated |= post_fx.gui();
-		static bool show_imgui_demo = false;
+		gui_updated |= integrator::gui(&_active_integrator);
+		gui_updated |= _post_fx.gui();
+		static bool _show_imgui_demo = false;
 		if (ImGui::Button("Show ImGui Demo")) {
-			show_imgui_demo = !show_imgui_demo;
+			_show_imgui_demo = !_show_imgui_demo;
 		}
-		if (show_imgui_demo) {
-			ImGui::ShowDemoWindow(&show_imgui_demo);
+		if (_show_imgui_demo) {
+			ImGui::ShowDemoWindow(&_show_imgui_demo);
 		}
 		ImGui::End();
-		active_integrator.updated |= gui_updated;
+		_active_integrator.updated |= gui_updated;
 	}
 
 	render(image_idx);
 	VkResult result = vk::submit_frame(image_idx);
-	vk::render_graph()->reset();
-	vk::render_graph()->reload_shaders = false;
-	vk::render_graph()->dirty_pass_encountered = false;
+	rg::reset();
 	if (result != VK_SUCCESS) {
 		Window::update_window_size();
 		cleanup_resources();
-		integrator::destroy(&active_integrator, /*resize=*/true);
-		post_fx.destroy();
+		integrator::destroy(&_active_integrator, /*resize=*/true);
+		_post_fx.destroy();
 
-		integrator::init(&active_integrator);
-		post_fx.init();
+		integrator::init(&_active_integrator);
+		_post_fx.init();
 		init_resources();
-		active_integrator.updated = true;
+		_active_integrator.updated = true;
 	}
 
-	if (recreate_swapchain) {
+	if (_recreate_swapchain) {
 		vk::recreate_swap_chain();
-		recreate_swapchain = false;
+		_recreate_swapchain = false;
 	}
 
 	f64 now = os::time_seconds();
-	f64 diff = now - start;
+	f64 diff = now - _start;
 
-	if (write_exr) {
-		write_exr = false;
-		ImageUtils::save_exr((f32*)vk::buffer_map(output_img_buffer_cpu), Window::width(), Window::height(), "out.exr");
-		vk::buffer_unmap(output_img_buffer_cpu);
+	if (_write_exr) {
+		_write_exr = false;
+		ImageUtils::save_exr((f32*)vk::buffer_map(_output_img_buffer_cpu), Window::width(), Window::height(), "out.exr");
+		vk::buffer_unmap(_output_img_buffer_cpu);
 	}
 	bool time_limit = abs(diff - 5.0) < 0.1;
-	calc_rmse = time_limit;
+	_calc_rmse = time_limit;
 
-	if (calc_rmse && has_gt) {
-		f32 rmse = *(f32*)vk::buffer_map(rmse_val_buffer);
-		vk::buffer_unmap(rmse_val_buffer);
+	if (_calc_rmse && _has_gt) {
+		f32 rmse = *(f32*)vk::buffer_map(_rmse_val_buffer);
+		vk::buffer_unmap(_rmse_val_buffer);
 		LUMEN_TRACE("RMSE: %f", rmse * 1e6);
-		start = now;
+		_start = now;
 	}
 	f64 t_end = os::time_seconds() * 1000;
 	f64 t_diff = t_end - t_begin;
-	cnt++;
+	_cnt++;
 	return (f32)t_diff;
 }
 
 static void destroy_accel() {
-	tlas.destroy();
-	for (vk::BVH& blas : blases) {
+	_tlas.destroy();
+	for (vk::BVH& blas : _blases) {
 		blas.destroy();
 	}
-	blases.clear();
+	_blases.clear();
 }
 
 void cleanup() {
 	vkDeviceWaitIdle(vk::context().device);
-	if (initialized) {
+	if (_initialized) {
 		cleanup_resources();
-		integrator::destroy(&active_integrator, /*resize=*/false);
-		post_fx.destroy();
+		integrator::destroy(&_active_integrator, /*resize=*/false);
+		_post_fx.destroy();
 		scene::destroy();
 		destroy_accel();
 		vk::destroy_imgui();
 		vk::cleanup();
-		initialized = false;
+		_initialized = false;
 	}
 }
 

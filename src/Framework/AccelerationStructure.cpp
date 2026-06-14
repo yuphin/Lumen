@@ -38,7 +38,7 @@ static BVH create_acceleration(VkAccelerationStructureCreateInfoKHR& accel, lm::
 void BVH::destroy() {
 	// Destroying AS implies having to update AS descriptors in the render graph with the new AS
 	if (accel) {
-		// vk::render_graph()->update_as_descriptors(*this);
+		// rg::update_as_descriptors(*this);
 		vkDestroyAccelerationStructureKHR(vk::context().device, accel, nullptr);
 		accel = VK_NULL_HANDLE;
 	}

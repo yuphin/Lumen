@@ -211,13 +211,11 @@ void init(Integrator* integrator) {
 	desc.probe_offsets_addr = state.probe_offsets_buffer->device_address();
 	desc.g_buffer_addr = state.g_buffer->device_address();
 
-	assert(vk::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, direct_lighting_addr, state.direct_lighting_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, probe_offsets_addr, state.probe_offsets_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, state.g_buffer, vk::render_graph());
+	assert(rg::settings().shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, direct_lighting_addr, state.direct_lighting_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, probe_offsets_addr, state.probe_offsets_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, state.g_buffer);
 
 	integrator->lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = CSTR("Scene Desc"),
@@ -260,8 +258,7 @@ void render(Integrator* integrator) {
 		integrator->lumen_scene->scene_desc_buffer,
 	};
 	// Trace Primary rays and fill G buffer
-	vk::render_graph()
-		->add_rt(CSTR("DDGI - GBuffer Pass"),
+	rg::add_rt(CSTR("DDGI - GBuffer Pass"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/ddgi/primary_rays.rgen")},
 								 {CSTR("src/shaders/ray.rmiss")},
@@ -279,8 +276,7 @@ void render(Integrator* integrator) {
 		.bind_tlas(*integrator->tlas);
 	// Trace rays from probes
 	u32 grid_size = state.probe_counts.x * state.probe_counts.y * state.probe_counts.z;
-	vk::render_graph()
-		->add_rt(CSTR("DDGI - Probe Trace"),
+	rg::add_rt(CSTR("DDGI - Probe Trace"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/ddgi/trace.rgen")},
 								 {CSTR("src/shaders/ray.rmiss")},
@@ -298,8 +294,7 @@ void render(Integrator* integrator) {
 		.bind_tlas(*integrator->tlas);
 	// Classify
 	u32 wg_x = (state.probe_counts.x * state.probe_counts.y * state.probe_counts.z + 31) / 32;
-	vk::render_graph()
-		->add_compute(CSTR("Classify Probes"),
+	rg::add_compute(CSTR("Classify Probes"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/classify.comp")), .dims = {wg_x}})
 		.push_constants(&state.pc)
 		.bind({integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, state.ddgi_ubo_buffer,
@@ -311,8 +306,7 @@ void render(Integrator* integrator) {
 		u32 wg_y = state.probe_counts.z;
 		auto update_probe = [&](bool is_irr) {
 			lm::String pipeline_name = is_irr ? CSTR("Update Irradiance") : CSTR("Update Depth");
-			vk::render_graph()
-				->add_compute(pipeline_name, {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/update.comp")),
+			rg::add_compute(pipeline_name, {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/update.comp")),
 											  .macros = {is_irr ? vk::ShaderMacro("IRRADIANCE_UPDATE")
 																: vk::ShaderMacro("DEPTH_UPDATE")},
 											  .dims = {wg_x, wg_y}})
@@ -326,8 +320,7 @@ void render(Integrator* integrator) {
 		// Borders
 		// 13 WGs process 4 probes (wg = 32 threads)
 		wg_x = (state.probe_counts.x * state.probe_counts.y * state.probe_counts.z + 3) * 13 / 4;
-		vk::render_graph()
-			->add_compute(
+		rg::add_compute(
 				CSTR("Update Borders"),
 				{.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/update_borders.comp")), .dims = {wg_x}})
 			.push_constants(&state.pc)
@@ -336,8 +329,7 @@ void render(Integrator* integrator) {
 	// Sample probes & output into texture
 	wg_x = (Window::width() + 31) / 32;
 	u32 wg_y = (Window::height() + 31) / 32;
-	vk::render_graph()
-		->add_compute(CSTR("Sample Probes"),
+	rg::add_compute(CSTR("Sample Probes"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/sample.comp")), .dims = {wg_x, wg_y}})
 		.push_constants(&state.pc)
 		.bind({integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, state.output.tex,
@@ -345,8 +337,7 @@ void render(Integrator* integrator) {
 			   integrator->output_tex});
 
 	if (state.visualize_probes) {
-		vk::render_graph()
-			->add_rt(CSTR("Visualize probes"),
+		rg::add_rt(CSTR("Visualize probes"),
 					 {
 						 .shaders = {{CSTR("src/shaders/integrators/ddgi/probe_vis.rgen")},
 									 {CSTR("src/shaders/integrators/ddgi/probe_vis.rmiss")},
@@ -362,8 +353,7 @@ void render(Integrator* integrator) {
 	if (state.total_frame_idx < 5) {
 		// 13 WGs process 4 probes (wg = 32 threads)
 		wg_x = (state.probe_counts.x * state.probe_counts.y * state.probe_counts.z + 31) / 32;
-		vk::render_graph()
-			->add_compute(CSTR("Relocate"),
+		rg::add_compute(CSTR("Relocate"),
 						  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/relocate.comp")), .dims = {wg_x}})
 			.push_constants(&state.pc)
 			.bind({integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, state.ddgi_ubo_buffer,

@@ -1,7 +1,7 @@
 #include "Window.h"
 
 namespace Window {
-Window _window;
+static Window _window;
 static f64 _imgui_previous_time = 0.0;
 
 static bool valid_key_index(i32 key) { return key >= 0 && key < static_cast<i32>(MAX_KEY_INPUTS); }

@@ -25,23 +25,22 @@ struct SwapChainSupportDetails {
 	lm::SmallArray<VkPresentModeKHR, MAX_PRESENT_MODES> present_modes;
 };
 
-lm::SmallArray<const char*, MAX_VALIDATION_LAYERS> _validation_layers_lst;
-lm::SmallArray<const char*, MAX_DEVICE_EXTENSIONS> _device_extensions;
+static lm::SmallArray<const char*, MAX_VALIDATION_LAYERS> _validation_layers_lst;
+static lm::SmallArray<const char*, MAX_DEVICE_EXTENSIONS> _device_extensions;
 
-lm::SmallArray<VkSemaphore, MAX_FRAMES_IN_FLIGHT> _image_available_sem;
-lm::SmallArray<VkSemaphore, MAX_SWAPCHAIN_IMAGES> _render_finished_sem;
-lm::SmallArray<VkFence, MAX_FRAMES_IN_FLIGHT> _in_flight_fences;
-lm::SmallArray<VkFence, MAX_SWAPCHAIN_IMAGES> _images_in_flight;
-lm::SmallArray<VkQueueFamilyProperties, MAX_QUEUES> _queue_families;
+static lm::SmallArray<VkSemaphore, MAX_FRAMES_IN_FLIGHT> _image_available_sem;
+static lm::SmallArray<VkSemaphore, MAX_SWAPCHAIN_IMAGES> _render_finished_sem;
+static lm::SmallArray<VkFence, MAX_FRAMES_IN_FLIGHT> _in_flight_fences;
+static lm::SmallArray<VkFence, MAX_SWAPCHAIN_IMAGES> _images_in_flight;
+static lm::SmallArray<VkQueueFamilyProperties, MAX_QUEUES> _queue_families;
 
-lm::RenderGraph _rg;
-VkFormat _swapchain_format;
+static VkFormat _swapchain_format;
 
-lm::SmallArray<Texture*, MAX_SWAPCHAIN_IMAGES> _swapchain_images;
+static lm::SmallArray<Texture*, MAX_SWAPCHAIN_IMAGES> _swapchain_images;
 
-bool _enable_validation_layers;
+static bool _enable_validation_layers;
 
-VkDescriptorPool _imgui_pool = 0;
+static VkDescriptorPool _imgui_pool = 0;
 
 // -------------------------------------------------------------------------------------------------
 // Implementation
@@ -553,7 +552,8 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 	vkGetSwapchainImagesKHR(context().device, context().swapchain, &image_cnt, images.data);
 	for (u32 i = 0; i < image_cnt; i++) {
 		lm::String tex_name =
-			lm::str_concat(_rg.arena(), "Swapchain Image #", lm::str_from_u64(_rg.arena(), i), /*cstr=*/true);
+			lm::str_concat(rg::arena(), "Swapchain Image #",
+						   lm::str_from_u64(rg::arena(), i), /*cstr=*/true);
 		_swapchain_images.push_back(prm::get_texture({
 			.name = tex_name,
 			.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
@@ -668,7 +668,7 @@ static void create_instance() {
 	if (_enable_validation_layers && !check_validation_layer_support()) {
 		LUMEN_ERROR("Validation layers requested, but not available!");
 	}
-	_rg.init();
+	rg::init();
 	if (_enable_validation_layers) {
 		setup_debug_messenger();
 	}
@@ -847,9 +847,7 @@ VkResult submit_frame(u32 image_idx) {
 	return result;
 }
 
-lm::RenderGraph* render_graph() { return &_rg; }
-
-void cleanup_app_data() { _rg.destroy(); }
+void cleanup_app_data() { rg::destroy(); }
 
 void cleanup() {
 	cleanup_app_data();

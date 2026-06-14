@@ -17,7 +17,7 @@ struct ShaderIncludeContext {
 	lm::Arena* arena;
 };
 
-thread_local ShaderThreadState _shader_thread_state;
+static thread_local ShaderThreadState _shader_thread_state;
 
 // We need this to be able to reset all threads' arenas
 static lm::SmallArray<lm::Arena*, MAX_SHADER_WORKER_ARENAS> _shader_worker_arenas;
@@ -189,7 +189,7 @@ static shaderc_compilation_result_t compile_file(const lm::String& source_name, 
 	}
 
 	add_macros(pass->settings.macros, options, scratch_arena);
-	add_macros(pass->rg->global_macro_defines, options, scratch_arena);
+	add_macros(rg::global_macro_defines(), options, scratch_arena);
 	if (optimize) {
 		shaderc_compile_options_set_optimization_level(options, shaderc_optimization_level_size);
 	}
@@ -219,7 +219,7 @@ static bool get_shader_kind(const lm::String& filename, shaderc_shader_kind& kin
 		lm::String extension;
 		shaderc_shader_kind kind;
 	};
-	static const StageExtension stages[] = {
+	static const StageExtension _stages[] = {
 		{"vert", shaderc_vertex_shader},	   {"frag", shaderc_fragment_shader},
 		{"comp", shaderc_compute_shader},	   {"geom", shaderc_geometry_shader},
 		{"tesc", shaderc_tess_control_shader}, {"tese", shaderc_tess_evaluation_shader},
@@ -228,7 +228,7 @@ static bool get_shader_kind(const lm::String& filename, shaderc_shader_kind& kin
 		{"rint", shaderc_intersection_shader}, {"rcall", shaderc_callable_shader},
 		{"task", shaderc_task_shader},		   {"mesh", shaderc_mesh_shader},
 	};
-	for (const StageExtension& stage : stages) {
+	for (const StageExtension& stage : _stages) {
 		if (extension == stage.extension) {
 			kind = stage.kind;
 			return true;
@@ -251,7 +251,7 @@ static bool get_vertex_input(spvc_basetype base_type, u32 vector_size, VertexInp
 		u32 vector_size;
 		VertexInput input;
 	};
-	static const VertexInputMapping mappings[] = {
+	static const VertexInputMapping _mappings[] = {
 		{SPVC_BASETYPE_INT32, 1u, {VK_FORMAT_R32_SINT, (u32)sizeof(i32)}},
 		{SPVC_BASETYPE_INT32, 2u, {VK_FORMAT_R32G32_SINT, 2 * (u32)sizeof(i32)}},
 		{SPVC_BASETYPE_INT32, 3u, {VK_FORMAT_R32G32B32_SINT, 3 * (u32)sizeof(i32)}},
@@ -278,7 +278,7 @@ static bool get_vertex_input(spvc_basetype base_type, u32 vector_size, VertexInp
 		{SPVC_BASETYPE_FP16, 4u, {VK_FORMAT_R16G16B16A16_SFLOAT, 4 * (u32)sizeof(u16)}},
 	};
 
-	for (const VertexInputMapping& mapping : mappings) {
+	for (const VertexInputMapping& mapping : _mappings) {
 		if (mapping.base_type == base_type && mapping.vector_size == vector_size) {
 			input = mapping.input;
 			return true;
@@ -400,9 +400,8 @@ static bool parse_spirv(spvc_context context, spvc_compiler compiler, Shader& sh
 	auto buffer_pointer_names = id_array_create<lm::String>(scratch_arena, id_bound);
 
 	auto mark_buffer = [&](const lm::String& resource_name, bool read, bool write) {
-		auto* entry = pass->rg->registered_buffer_pointers.find(resource_name);
-		if (entry) {
-			BufferStatus& status = shader.buffer_status_map.get_or_create(entry->key)->value;
+		if (rg::is_buffer_registered(resource_name)) {
+			BufferStatus& status = shader.buffer_status_map.get_or_create(resource_name)->value;
 			status.read |= read;
 			status.write |= write;
 		}
@@ -691,7 +690,7 @@ static bool parse_shader(Shader& shader, const u32* code, u64 code_size, lm::Ren
 		shader.push_constant_size = (u32)push_constant_size;
 	}
 
-	if (pass->rg->settings.shader_inference) {
+	if (rg::settings().shader_inference) {
 		lm::ScratchArena scratch(arena);
 		if (!parse_spirv(context, compiler, shader, code, code_size, pass, scratch.arena)) {
 			return false;

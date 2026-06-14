@@ -297,17 +297,17 @@ bool window_create(Window& window, const WindowDesc& desc) {
 	window.width = window.framebuffer_width = desc.width;
 	window.height = window.framebuffer_height = desc.height;
 #if defined(_WIN32) || defined(_WIN64)
-	static bool class_registered = false;
-	static const char* class_name = "LumenWindowClass";
+	static bool _class_registered = false;
+	static const char* _class_name = "LumenWindowClass";
 	HINSTANCE instance = GetModuleHandleA(nullptr);
-	if (!class_registered) {
+	if (!_class_registered) {
 		WNDCLASSA window_class = {};
 		window_class.lpfnWndProc = window_proc;
 		window_class.hInstance = instance;
-		window_class.lpszClassName = class_name;
+		window_class.lpszClassName = _class_name;
 		window_class.hCursor = LoadCursorA(nullptr, (LPCSTR)IDC_ARROW);
 		if (!RegisterClassA(&window_class)) return false;
-		class_registered = true;
+		_class_registered = true;
 	}
 	HMONITOR primary = MonitorFromPoint({0, 0}, MONITOR_DEFAULTTOPRIMARY);
 	MonitorSelection selection = {primary, nullptr};
@@ -327,7 +327,7 @@ bool window_create(Window& window, const WindowDesc& desc) {
 				? rect.top
 				: monitor_info.rcWork.top + (monitor_info.rcWork.bottom - monitor_info.rcWork.top - height) / 2;
 	HWND handle =
-		CreateWindowExA(0, class_name, desc.title, style, x, y, width, height, nullptr, nullptr, instance, &window);
+		CreateWindowExA(0, _class_name, desc.title, style, x, y, width, height, nullptr, nullptr, instance, &window);
 	if (!handle) return false;
 	window.handle = handle;
 	ShowWindow(handle, SW_SHOW);
@@ -462,15 +462,15 @@ void window_set_clipboard_text(Window& window, const char* text) {
 }
 
 const char* window_get_clipboard_text(Window& window) {
-	static char buffer[4096];
-	buffer[0] = 0;
+	static char _buffer[4096];
+	_buffer[0] = 0;
 #if defined(_WIN32) || defined(_WIN64)
-	if (!OpenClipboard((HWND)window.handle)) return buffer;
+	if (!OpenClipboard((HWND)window.handle)) return _buffer;
 	HANDLE memory = GetClipboardData(CF_TEXT);
 	if (memory) {
 		const char* text = (const char*)GlobalLock(memory);
 		if (text) {
-			strncpy_s(buffer, sizeof(buffer), text, _TRUNCATE);
+			strncpy_s(_buffer, sizeof(_buffer), text, _TRUNCATE);
 			GlobalUnlock(memory);
 		}
 	}
@@ -479,13 +479,13 @@ const char* window_get_clipboard_text(Window& window) {
 	i32 size = 0;
 	char* text = XFetchBytes((Display*)window.display, &size);
 	if (text) {
-		if (size >= (i32)sizeof(buffer)) size = (i32)sizeof(buffer) - 1;
-		memcpy(buffer, text, size);
-		buffer[size] = 0;
+		if (size >= (i32)sizeof(_buffer)) size = (i32)sizeof(_buffer) - 1;
+		memcpy(_buffer, text, size);
+		_buffer[size] = 0;
 		XFree(text);
 	}
 #endif
-	return buffer;
+	return _buffer;
 }
 
 u32 window_required_vulkan_extensions(const char** extensions, u32 capacity) {
@@ -517,13 +517,13 @@ i32 window_create_vulkan_surface(Window& window, void* instance, void* surface) 
 f64 time_seconds() {
 #if defined(_WIN32) || defined(_WIN64)
 	LARGE_INTEGER counter;
-	static LARGE_INTEGER frequency = [] {
+	static LARGE_INTEGER _frequency = [] {
 		LARGE_INTEGER value;
 		QueryPerformanceFrequency(&value);
 		return value;
 	}();
 	QueryPerformanceCounter(&counter);
-	return (f64)counter.QuadPart / (f64)frequency.QuadPart;
+	return (f64)counter.QuadPart / (f64)_frequency.QuadPart;
 #else
 	timespec time;
 	clock_gettime(CLOCK_MONOTONIC, &time);

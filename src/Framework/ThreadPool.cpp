@@ -1,130 +1,143 @@
 #include "ThreadPool.h"
+#include "Framework/Base/OS.h"
 
-bool ThreadPool::stopping = true;
-ThreadPool::QueuedJob ThreadPool::work_queue[MAX_QUEUED_JOBS] = {};
-u32 ThreadPool::queue_read = 0;
-u32 ThreadPool::queue_write = 0;
-u32 ThreadPool::queue_count = 0;
-os::Mutex ThreadPool::queue_mutex;
-os::ConditionVariable ThreadPool::cv;
-os::Thread ThreadPool::threads[MAX_THREADS];
-u32 ThreadPool::thread_count = 0;
+namespace tp {
 
-bool ThreadPool::pop_job(QueuedJob& queued_job) {
-	if (queue_count == 0) return false;
-	queued_job = work_queue[queue_read];
-	queue_read = (queue_read + 1) % MAX_QUEUED_JOBS;
-	--queue_count;
+static constexpr u32 MAX_THREADS = 64;
+static constexpr u32 MAX_QUEUED_JOBS = 4096;
+
+struct QueuedJob {
+	Job job;
+	JobCounter* counter;
+};
+
+static bool _stopping = true;
+static QueuedJob _work_queue[MAX_QUEUED_JOBS] = {};
+static u32 _queue_read = 0;
+static u32 _queue_write = 0;
+static u32 _queue_count = 0;
+static os::Mutex _queue_mutex;
+static os::ConditionVariable _cv;
+static os::Thread _threads[MAX_THREADS];
+static u32 _thread_count = 0;
+
+static bool pop_job(QueuedJob& queued_job) {
+	if (_queue_count == 0) return false;
+	queued_job = _work_queue[_queue_read];
+	_queue_read = (_queue_read + 1) % MAX_QUEUED_JOBS;
+	--_queue_count;
 	return true;
 }
 
-void ThreadPool::execute(QueuedJob queued_job) {
+static void execute(QueuedJob queued_job) {
 	queued_job.job.procedure(queued_job.job.data);
 	{
-		os::ScopedLock lock(queue_mutex);
+		os::ScopedLock lock(_queue_mutex);
 		LUMEN_ASSERT(queued_job.counter->remaining > 0, "ThreadPool job counter underflow");
 		--queued_job.counter->remaining;
 	}
-	cv.notify_all();
+	_cv.notify_all();
 }
 
-void ThreadPool::worker(void*) {
+static void worker(void*) {
 	for (;;) {
 		QueuedJob queued_job = {};
-		queue_mutex.lock();
-		while (queue_count == 0 && !stopping) {
-			cv.wait(queue_mutex);
+		_queue_mutex.lock();
+		while (_queue_count == 0 && !_stopping) {
+			_cv.wait(_queue_mutex);
 		}
-		if (stopping && queue_count == 0) {
-			queue_mutex.unlock();
+		if (_stopping && _queue_count == 0) {
+			_queue_mutex.unlock();
 			return;
 		}
 		pop_job(queued_job);
-		queue_mutex.unlock();
+		_queue_mutex.unlock();
 		execute(queued_job);
 	}
 }
 
-void ThreadPool::init() {
+void init() {
 	{
-		os::ScopedLock lock(queue_mutex);
-		stopping = false;
-		queue_read = 0;
-		queue_write = 0;
-		queue_count = 0;
+		os::ScopedLock lock(_queue_mutex);
+		_stopping = false;
+		_queue_read = 0;
+		_queue_write = 0;
+		_queue_count = 0;
 	}
 
-	thread_count = os::processor_count();
-	if (thread_count == 0) {
-		thread_count = 1;
-	} else if (thread_count > MAX_THREADS) {
-		thread_count = MAX_THREADS;
+	_thread_count = os::processor_count();
+	if (_thread_count == 0) {
+		_thread_count = 1;
+	} else if (_thread_count > MAX_THREADS) {
+		_thread_count = MAX_THREADS;
 	}
 
-	for (u32 i = 0; i < thread_count; ++i) {
-		if (!os::thread_start(threads[i], worker, nullptr)) {
+	for (u32 i = 0; i < _thread_count; ++i) {
+		if (!os::thread_start(_threads[i], worker, nullptr)) {
 			LUMEN_ERROR("Failed to start ThreadPool worker");
 		}
 		char name[16] = {};
 		stbsp_snprintf(name, sizeof(name), "LumenWorker %u", i);
-		os::thread_set_name(threads[i], name);
+		os::thread_set_name(_threads[i], name);
 	}
 }
 
-void ThreadPool::submit(Job job, JobCounter& counter) {
+void submit(Job job, JobCounter& counter) {
 	LUMEN_ASSERT(job.procedure, "Cannot submit an empty ThreadPool job");
 	QueuedJob queued_job = {job, &counter};
 	bool execute_inline = false;
 
-	queue_mutex.lock();
-	if (stopping) {
-		queue_mutex.unlock();
+	_queue_mutex.lock();
+	if (_stopping) {
+		_queue_mutex.unlock();
 		LUMEN_ERROR("ThreadPool has been terminated");
 		return;
 	}
 	++counter.remaining;
-	if (queue_count == MAX_QUEUED_JOBS) {
+	if (_queue_count == MAX_QUEUED_JOBS) {
 		execute_inline = true;
 	} else {
-		work_queue[queue_write] = queued_job;
-		queue_write = (queue_write + 1) % MAX_QUEUED_JOBS;
-		++queue_count;
+		_work_queue[_queue_write] = queued_job;
+		_queue_write = (_queue_write + 1) % MAX_QUEUED_JOBS;
+		++_queue_count;
 	}
-	queue_mutex.unlock();
+	_queue_mutex.unlock();
 
 	if (execute_inline) {
 		execute(queued_job);
 	} else {
-		cv.notify_one();
+		_cv.notify_one();
 	}
 }
 
-void ThreadPool::wait(JobCounter& counter) {
+void wait(JobCounter& counter) {
 	for (;;) {
 		QueuedJob queued_job = {};
-		queue_mutex.lock();
+		_queue_mutex.lock();
 		if (counter.remaining == 0) {
-			queue_mutex.unlock();
+			_queue_mutex.unlock();
 			return;
 		}
 		if (pop_job(queued_job)) {
-			queue_mutex.unlock();
+			_queue_mutex.unlock();
 			execute(queued_job);
 			continue;
 		}
-		cv.wait(queue_mutex);
-		queue_mutex.unlock();
+		_cv.wait(_queue_mutex);
+		_queue_mutex.unlock();
 	}
 }
 
-void ThreadPool::destroy() {
+void destroy() {
 	{
-		os::ScopedLock lock(queue_mutex);
-		stopping = true;
+		os::ScopedLock lock(_queue_mutex);
+		_stopping = true;
 	}
-	cv.notify_all();
-	for (u32 i = 0; i < thread_count; ++i) {
-		os::thread_join(threads[i]);
+	_cv.notify_all();
+	for (u32 i = 0; i < _thread_count; ++i) {
+		os::thread_join(_threads[i]);
 	}
-	thread_count = 0;
+	_thread_count = 0;
 }
+
+}  // namespace tp

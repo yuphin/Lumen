@@ -3,7 +3,7 @@
 #include "Framework/Base/String.h"
 #include "Framework/Base/Memory.h"
 #include "Framework/Base/HashMap.h"
-#include <Framework/Base/SmallArray.h>
+#include "Framework/Base/SmallArray.h"
 
 namespace lm {
 struct RenderPass;

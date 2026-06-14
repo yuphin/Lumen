@@ -12,19 +12,19 @@ static u32 get_first_available_tid(u64 val) {
 }
 namespace vk {
 
-os::Mutex queue_mutex;
-os::Mutex command_pool_mutex;
-u64 available_command_pools = UINT64_MAX;
-os::Semaphore command_pool_semaphore{64, 64};
+static os::Mutex _queue_mutex;
+static os::Mutex _command_pool_mutex;
+static u64 _available_command_pools = UINT64_MAX;
+static os::Semaphore _command_pool_semaphore{64, 64};
 
 CommandBuffer::CommandBuffer(bool begin, VkCommandBufferUsageFlags begin_flags, vk::QueueType type,
 							 VkCommandBufferLevel level) {
 	this->type = type;
-	command_pool_semaphore.acquire();
+	_command_pool_semaphore.acquire();
 	{
-		os::ScopedLock lock(command_pool_mutex);
-		curr_tid = get_first_available_tid(available_command_pools);
-		available_command_pools &= ~(u64(1) << curr_tid);
+		os::ScopedLock lock(_command_pool_mutex);
+		curr_tid = get_first_available_tid(_available_command_pools);
+		_available_command_pools &= ~(u64(1) << curr_tid);
 	}
 	VkCommandBufferAllocateInfo cmd_buf_allocate_info =
 		vk::command_buffer_allocate_info(vk::context().cmd_pools[curr_tid], level, 1);
@@ -39,11 +39,11 @@ CommandBuffer::CommandBuffer(bool begin, VkCommandBufferUsageFlags begin_flags, 
 void CommandBuffer::begin(VkCommandBufferUsageFlags begin_flags) {
 	LUMEN_ASSERT(state != CommandBufferState::RECORDING, "Command buffer is already recording");
 	if (curr_tid == -1) {
-		command_pool_semaphore.acquire();
+		_command_pool_semaphore.acquire();
 		{
-			os::ScopedLock lock(command_pool_mutex);
-			curr_tid = get_first_available_tid(available_command_pools);
-			available_command_pools &= ~(u64(1) << curr_tid);
+			os::ScopedLock lock(_command_pool_mutex);
+			curr_tid = get_first_available_tid(_available_command_pools);
+			_available_command_pools &= ~(u64(1) << curr_tid);
 		}
 	}
 	VkCommandBufferBeginInfo begin_info = vk::command_buffer_begin_info(begin_flags);
@@ -58,7 +58,7 @@ void CommandBuffer::submit(bool wait_fences, bool queue_wait_idle) {
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = &handle;
 	{
-		os::ScopedLock lock(queue_mutex);
+		os::ScopedLock lock(_queue_mutex);
 		if (wait_fences) {
 			VkFenceCreateInfo fence_info = vk::fence();
 			VkFence fence;
@@ -85,10 +85,10 @@ CommandBuffer::~CommandBuffer() {
 	}
 	vkFreeCommandBuffers(vk::context().device, vk::context().cmd_pools[curr_tid], 1, &handle);
 	{
-		os::ScopedLock lock(command_pool_mutex);
-		available_command_pools |= u64(1) << curr_tid;
+		os::ScopedLock lock(_command_pool_mutex);
+		_available_command_pools |= u64(1) << curr_tid;
 	}
-	command_pool_semaphore.release();
+	_command_pool_semaphore.release();
 }
 
 }  // namespace vk

@@ -45,11 +45,11 @@ void init(Integrator* integrator) {
 
 	integrator->frame_num = 0;
 
-	assert(vk::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_path_addr, state.light_path_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, camera_path_addr, state.camera_path_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, state.color_storage_buffer, vk::render_graph());
+	assert(rg::settings().shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_path_addr, state.light_path_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, camera_path_addr, state.camera_path_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, state.color_storage_buffer);
 }
 
 void render(Integrator* integrator) {
@@ -63,8 +63,7 @@ void render(Integrator* integrator) {
 	state.pc.frame_num = integrator->frame_num;
 	state.pc.width = Window::width();
 	state.pc.height = Window::height();
-	vk::render_graph()
-		->add_rt(CSTR("BDPT"),
+	rg::add_rt(CSTR("BDPT"),
 				 {
 
 					 .shaders = {{CSTR("src/shaders/integrators/bdpt/bdpt.rgen")},

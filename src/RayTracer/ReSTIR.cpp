@@ -62,16 +62,13 @@ void init(Integrator* integrator) {
 	state.pc.total_light_area = 0;
 
 	integrator->frame_num = 0;
-
-
-	lm::RenderGraph* rg = vk::render_graph();
-	assert(rg->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, state.g_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, temporal_reservoir_addr, state.temporal_reservoir_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, spatial_reservoir_addr, state.spatial_reservoir_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, passthrough_reservoir_addr, state.passthrough_reservoir_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, state.tmp_col_buffer, rg);
+	assert(rg::settings().shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, state.g_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, temporal_reservoir_addr, state.temporal_reservoir_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, spatial_reservoir_addr, state.spatial_reservoir_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, passthrough_reservoir_addr, state.passthrough_reservoir_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, state.tmp_col_buffer);
 }
 
 void render(Integrator* integrator) {
@@ -95,10 +92,8 @@ void render(Integrator* integrator) {
 		integrator->lumen_scene->scene_desc_buffer,
 	};
 
-	lm::RenderGraph* rg = vk::render_graph();
-
 	// Temporal pass + path tracing
-	rg->add_rt(CSTR("ReSTIR - Temporal Pass"),
+	rg::add_rt(CSTR("ReSTIR - Temporal Pass"),
 			   {
 				   .shaders = {{CSTR("src/shaders/integrators/restir/di/temporal_pass.rgen")},
 							   {CSTR("src/shaders/ray.rmiss")},
@@ -116,7 +111,7 @@ void render(Integrator* integrator) {
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
 	// Spatial pass
-	rg->add_rt(CSTR("ReSTIR - Spatial Pass"),
+	rg::add_rt(CSTR("ReSTIR - Spatial Pass"),
 			   {
 				   .shaders = {{CSTR("src/shaders/integrators/restir/di/spatial_pass.rgen")},
 							   {CSTR("src/shaders/ray.rmiss")},
@@ -132,7 +127,7 @@ void render(Integrator* integrator) {
 		.bind_tlas(*integrator->tlas);
 
 	// Output
-	rg->add_rt(CSTR("ReSTIR - Output"),
+	rg::add_rt(CSTR("ReSTIR - Output"),
 			   {
 				   .shaders = {{CSTR("src/shaders/integrators/restir/di/output.rgen")},
 							   {CSTR("src/shaders/ray.rmiss")},

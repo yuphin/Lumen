@@ -21,9 +21,9 @@ void init(Integrator* integrator) {
 
 	integrator->frame_num = 0;
 
-	assert(vk::render_graph()->settings.shader_inference == true);
+	assert(rg::settings().shader_inference == true);
 	// For shader resource dependency inference, use this macro to register a buffer address to the rendergraph
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer, vk::render_graph());
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
 	state.path_length = integrator->lumen_scene->config.common.path_length;
 }
 
@@ -40,8 +40,7 @@ void render(Integrator* integrator) {
 	state.pc.dir_light_idx = integrator->lumen_scene->dir_light_idx;
 	state.pc.frame_num = integrator->frame_num;
 	state.pc.direct_lighting = state.direct_lighting;
-	vk::render_graph()
-		->add_rt(CSTR("Path"),
+	rg::add_rt(CSTR("Path"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/path/path.rgen")},
 								 {CSTR("src/shaders/ray.rmiss")},

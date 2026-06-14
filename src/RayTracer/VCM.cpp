@@ -1,6 +1,6 @@
 #include "Integrator.h"
 #include "VCM.h"
-const i32 max_samples = 50000;
+constexpr i32 MAX_SAMPLES = 50000;
 namespace vcm {
 
 void init(Integrator* integrator) {
@@ -67,7 +67,7 @@ void init(Integrator* integrator) {
 		prm::get_buffer({.name = CSTR("Angle Struct"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = max_samples * sizeof(AngleStruct)});
+						 .size = MAX_SAMPLES * sizeof(AngleStruct)});
 
 	state.avg_buffer = prm::get_buffer({.name = CSTR("Average"),
 								  .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
@@ -104,18 +104,18 @@ void init(Integrator* integrator) {
 
 	integrator->frame_num = 0;
 
-	assert(vk::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, state.photon_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_vertices_addr, state.vcm_light_vertices_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, path_cnt_addr, state.light_path_cnt_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, state.color_storage_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_reservoir_addr, state.vcm_reservoir_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_samples_addr, state.light_samples_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, should_resample_addr, state.should_resample_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_state_addr, state.light_state_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, angle_struct_addr, state.angle_struct_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, avg_addr, state.avg_buffer, vk::render_graph());
+	assert(rg::settings().shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, state.photon_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_vertices_addr, state.vcm_light_vertices_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, path_cnt_addr, state.light_path_cnt_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, state.color_storage_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_reservoir_addr, state.vcm_reservoir_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_samples_addr, state.light_samples_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, should_resample_addr, state.should_resample_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_state_addr, state.light_state_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, angle_struct_addr, state.angle_struct_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, avg_addr, state.avg_buffer);
 }
 
 void render(Integrator* integrator) {
@@ -137,7 +137,7 @@ void render(Integrator* integrator) {
 	state.pc.use_vc = state.use_vc;
 	state.pc.do_spatiotemporal = state.do_spatiotemporal;
 	state.pc.random_num = rand() % UINT_MAX;
-	state.pc.max_angle_samples = max_samples;
+	state.pc.max_angle_samples = MAX_SAMPLES;
 	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		integrator->output_tex,
@@ -150,8 +150,7 @@ void render(Integrator* integrator) {
 	state.pc.grid_res = lm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
 	// Prepare
 	lm::RenderPass& prepare_pass =
-		vk::render_graph()
-			->add_compute(CSTR("Init Reservoirs"),
+		rg::add_compute(CSTR("Init Reservoirs"),
 						  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/init_reservoirs.comp")),
 						   .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 			.push_constants(&state.pc)
@@ -165,8 +164,7 @@ void render(Integrator* integrator) {
 	}
 
 	// Do resampling
-	vk::render_graph()
-		->add_rt(CSTR("Resample"),
+	rg::add_rt(CSTR("Resample"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_sample.rgen")},
 								 {CSTR("src/shaders/ray.rmiss")},
@@ -182,8 +180,7 @@ void render(Integrator* integrator) {
 		.bind_tlas(*integrator->tlas);
 
 	// Check resampling
-	vk::render_graph()
-		->add_compute(CSTR("Check Reservoirs"),
+	rg::add_compute(CSTR("Check Reservoirs"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/check_reservoirs.comp")),
 					   .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
@@ -191,8 +188,7 @@ void render(Integrator* integrator) {
 		.zero(state.should_resample_buffer);
 	state.pc.random_num = rand() % UINT_MAX;
 	// Spawn light rays
-	vk::render_graph()
-		->add_rt(CSTR("VCM - Spawn Light"),
+	rg::add_rt(CSTR("VCM - Spawn Light"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_spawn_light.rgen")},
 								 {CSTR("src/shaders/ray.rmiss")},
@@ -209,8 +205,7 @@ void render(Integrator* integrator) {
 		.bind_tlas(*integrator->tlas);
 	state.pc.random_num = rand() % UINT_MAX;
 	// Trace spawned rays
-	vk::render_graph()
-		->add_rt(CSTR("VCM - Trace Light"),
+	rg::add_rt(CSTR("VCM - Trace Light"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_light.rgen")},
 								 {CSTR("src/shaders/ray.rmiss")},
@@ -225,23 +220,20 @@ void render(Integrator* integrator) {
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
 	// Select a reservoir sample
-	vk::render_graph()
-		->add_compute(CSTR("Select Reservoir"),
+	rg::add_compute(CSTR("Select Reservoir"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/select_reservoirs.comp")),
 					   .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.bind(integrator->lumen_scene->scene_desc_buffer)
 		.push_constants(&state.pc);
 
 	// Update temporal reservoirs with the selected sample
-	vk::render_graph()
-		->add_compute(CSTR("Update Reservoirs"),
+	rg::add_compute(CSTR("Update Reservoirs"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/update_reservoirs.comp")),
 					   .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.bind(integrator->lumen_scene->scene_desc_buffer)
 		.push_constants(&state.pc);
 	// Trace rays from eye
-	vk::render_graph()
-		->add_rt(CSTR("VCM - Trace Eye"),
+	rg::add_rt(CSTR("VCM - Trace Eye"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_eye.rgen")},
 								 {CSTR("src/shaders/ray.rmiss")},

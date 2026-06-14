@@ -63,13 +63,13 @@ void init(Integrator* integrator) {
 
 	integrator->frame_num = 0;
 
-	assert(vk::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, sppm_data_addr, state.sppm_data_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, atomic_data_addr, state.atomic_data_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, state.photon_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, state.residual_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, state.counter_buffer, vk::render_graph());
+	assert(rg::settings().shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, sppm_data_addr, state.sppm_data_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, atomic_data_addr, state.atomic_data_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_addr, state.photon_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, residual_addr, state.residual_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, counter_addr, state.counter_buffer);
 }
 
 void render(Integrator* integrator) {
@@ -99,14 +99,12 @@ void render(Integrator* integrator) {
 	auto op_reduce = [&](const lm::String& op_name, const lm::String& op_shader_name, const lm::String& reduce_name,
 						 const lm::String& reduce_shader_name) {
 		u32 num_wgs = u32((Window::width() * Window::height() + 1023) / 1024);
-		vk::render_graph()
-			->add_compute(op_name, {.shader = vk::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
+		rg::add_compute(op_name, {.shader = vk::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
 			.push_constants(&state.pc)
 			.bind(integrator->lumen_scene->scene_desc_buffer)
 			.zero({state.residual_buffer, state.counter_buffer});
 		while (num_wgs != 1) {
-			vk::render_graph()
-				->add_compute(reduce_name, {.shader = vk::Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
+			rg::add_compute(reduce_name, {.shader = vk::Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
 				.push_constants(&state.pc)
 				.bind(integrator->lumen_scene->scene_desc_buffer);
 			num_wgs = (u32)(num_wgs + 1023) / 1024;
@@ -120,8 +118,7 @@ void render(Integrator* integrator) {
 	};
 
 	// Trace rays from eye
-	vk::render_graph()
-		->add_rt(CSTR("SPPM - Eye"),
+	rg::add_rt(CSTR("SPPM - Eye"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/sppm/sppm_eye.rgen")},
 								 {CSTR("src/shaders/ray.rmiss")},
@@ -142,13 +139,11 @@ void render(Integrator* integrator) {
 			  CSTR("src/shaders/integrators/sppm/reduce_max.comp"));
 	op_reduce(CSTR("OpReduce: Min"), CSTR("src/shaders/integrators/sppm/min.comp"), CSTR("OpReduce: Reduce Min"),
 			  CSTR("src/shaders/integrators/sppm/reduce_min.comp"));
-	vk::render_graph()
-		->add_compute(CSTR("Bounds Calculation"),
+	rg::add_compute(CSTR("Bounds Calculation"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/sppm/calc_bounds.comp")), .dims = {1, 1, 1}})
 		.bind(integrator->lumen_scene->scene_desc_buffer);
 	// Trace from light
-	vk::render_graph()
-		->add_rt(CSTR("SPPM - Light"),
+	rg::add_rt(CSTR("SPPM - Light"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/sppm/sppm_light.rgen")},
 								 {CSTR("src/shaders/ray.rmiss")},
@@ -163,15 +158,13 @@ void render(Integrator* integrator) {
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
 	// Gather
-	vk::render_graph()
-		->add_compute(CSTR("Gather"), {.shader = vk::Shader(CSTR("src/shaders/integrators/sppm/gather.comp")),
+	rg::add_compute(CSTR("Gather"), {.shader = vk::Shader(CSTR("src/shaders/integrators/sppm/gather.comp")),
 								 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures);
 	// Composite
-	vk::render_graph()
-		->add_compute(CSTR("Composite"), {.shader = vk::Shader(CSTR("src/shaders/integrators/sppm/composite.comp")),
+	rg::add_compute(CSTR("Composite"), {.shader = vk::Shader(CSTR("src/shaders/integrators/sppm/composite.comp")),
 									.dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});

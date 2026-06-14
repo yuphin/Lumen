@@ -44,9 +44,7 @@ void PostFX::init_fft() {
 	// Copy the original kernel image to the padded texture
 	u32 pad_width = (kernel_org->extent.width + 31) / 32;
 	u32 pad_height = (kernel_org->extent.height + 31) / 32;
-
-	lm::RenderGraph* rg = vk::render_graph();
-	rg->add_compute(CSTR("Pad Kernel"),
+	rg::add_compute(CSTR("Pad Kernel"),
 					{.shader = vk::Shader(CSTR("src/shaders/bloom/pad.comp")), .dims = {pad_width, pad_height, 1}})
 		.bind_texture_with_sampler(kernel_org, img_sampler)
 		.bind(kernel_ping);
@@ -67,20 +65,20 @@ void PostFX::init_fft() {
 		macros_x.push_back({"RADIX", RADIX_X});
 		macros_y.push_back({"RADIX", RADIX_Y});
 	}
-	rg->add_compute(CSTR("FFT - Horizontal"), {.shader = vk::Shader(CSTR("src/shaders/bloom/fft.comp")),
+	rg::add_compute(CSTR("FFT - Horizontal"), {.shader = vk::Shader(CSTR("src/shaders/bloom/fft.comp")),
 											   .macros = macros_x,
 											   .specialization_data = {wg_size_x / RADIX_X, u32(vertical), 0},
 											   .dims = {dim_y, 1, 1}})
 		.bind_texture_with_sampler(kernel_ping, img_sampler)
 		.bind(kernel_pong);
 	vertical = true;
-	rg->add_compute(CSTR("FFT - Vertical"), {.shader = vk::Shader(CSTR("src/shaders/bloom/fft.comp")),
+	rg::add_compute(CSTR("FFT - Vertical"), {.shader = vk::Shader(CSTR("src/shaders/bloom/fft.comp")),
 											 .macros = macros_y,
 											 .specialization_data = {wg_size_y / RADIX_Y, u32(vertical), 0},
 											 .dims = {dim_x, 1, 1}})
 		.bind_texture_with_sampler(kernel_ping, img_sampler)
 		.bind(kernel_pong);
-	rg->run_and_submit(cmd);
+	rg::run_and_submit(cmd);
 	drm::destroy(kernel_org);
 	drm::destroy(kernel_ping);
 }
@@ -98,7 +96,6 @@ void PostFX::init() {
 }
 
 void PostFX::render(vk::Texture* input, vk::Texture* output) {
-	lm::RenderGraph* rg = vk::render_graph();
 	// Copy the original image to the padded texture
 	if (enable_bloom) {
 		if (!fft_ping_padded) {
@@ -108,7 +105,7 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 		u32 pad_width = (fft_ping_padded->extent.width + 31) / 32;
 		u32 pad_height = (fft_ping_padded->extent.height + 31) / 32;
 
-		rg->add_compute(CSTR("Pad Image"),
+		rg::add_compute(CSTR("Pad Image"),
 						{.shader = vk::Shader(CSTR("src/shaders/bloom/pad.comp")), .dims = {pad_width, pad_height, 1}})
 			.bind_texture_with_sampler(input, img_sampler)
 			.bind(fft_ping_padded);
@@ -128,7 +125,7 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 			macros_y.push_back({"RADIX", RADIX_Y});
 		}
 
-		rg->add_compute(CSTR("FFT - Horizontal"), {.shader = vk::Shader(CSTR("src/shaders/bloom/fft.comp")),
+		rg::add_compute(CSTR("FFT - Horizontal"), {.shader = vk::Shader(CSTR("src/shaders/bloom/fft.comp")),
 												   .macros = macros_x,
 												   .specialization_data = {wg_size_x / RADIX_X, u32(vertical), 0},
 												   .dims = {dim_y, 1, 1}})
@@ -136,14 +133,14 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 			.bind(fft_pong_padded)
 			.bind_texture_with_sampler(kernel_pong, img_sampler);
 		vertical = true;
-		rg->add_compute(CSTR("FFT - Vertical"), {.shader = vk::Shader(CSTR("src/shaders/bloom/fft.comp")),
+		rg::add_compute(CSTR("FFT - Vertical"), {.shader = vk::Shader(CSTR("src/shaders/bloom/fft.comp")),
 												 .macros = macros_y,
 												 .specialization_data = {wg_size_y / RADIX_Y, u32(vertical), 0},
 												 .dims = {dim_x, 1, 1}})
 			.bind_texture_with_sampler(fft_ping_padded, img_sampler)
 			.bind(fft_pong_padded)
 			.bind_texture_with_sampler(kernel_pong, img_sampler);
-		rg->add_compute(CSTR("FFT - Vertical - Inverse"),
+		rg::add_compute(CSTR("FFT - Vertical - Inverse"),
 						{.shader = vk::Shader(CSTR("src/shaders/bloom/fft.comp")),
 						 .macros = macros_y,
 						 .specialization_data = {wg_size_y / RADIX_Y, u32(vertical), 1},
@@ -152,7 +149,7 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 			.bind(fft_pong_padded)
 			.bind_texture_with_sampler(kernel_pong, img_sampler);
 		vertical = false;
-		rg->add_compute(CSTR("FFT - Horizontal - Inverse"),
+		rg::add_compute(CSTR("FFT - Horizontal - Inverse"),
 						{.shader = vk::Shader(CSTR("src/shaders/bloom/fft.comp")),
 						 .macros = macros_x,
 						 .specialization_data = {wg_size_x / RADIX_X, u32(vertical), 1},
@@ -168,7 +165,7 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 	pc_post_settings.width = output->extent.width;
 	pc_post_settings.height = output->extent.height;
 
-	rg->add_gfx(CSTR("Post FX"), {.shaders = {{CSTR("src/shaders/post.vert")}, {CSTR("src/shaders/post.frag")}},
+	rg::add_gfx(CSTR("Post FX"), {.shaders = {{CSTR("src/shaders/post.vert")}, {CSTR("src/shaders/post.frag")}},
 								  .macros = {vk::ShaderMacro("ENABLE_BLOOM", enable_bloom)},
 								  .width = output->extent.width,
 								  .height = output->extent.height,
@@ -186,7 +183,7 @@ void PostFX::render(vk::Texture* input, vk::Texture* output) {
 		.push_constants(&pc_post_settings)
 		.bind_texture_with_sampler(input, img_sampler);
 	if (enable_bloom) {
-		rg->current_pass().bind_texture_with_sampler(fft_pong_padded, img_sampler);
+		rg::current_pass().bind_texture_with_sampler(fft_pong_padded, img_sampler);
 	}
 }
 

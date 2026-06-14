@@ -184,18 +184,15 @@ void init(Integrator* integrator) {
 	state.pc.total_frame_num = 0;
 	state.pc.buffer_idx = 0;
 
-	assert(vk::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, state.gris_reservoir_ping_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, integrator->lumen_scene->vertex_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, debug_vis_addr, state.debug_vis_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_eye_addr, state.photon_eye_buffer_ping, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, caustic_photon_aabbs_addr, state.caustic_photon_aabbs_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, caustic_photon_light_addr, state.caustic_photon_light_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_count_addr, state.photon_count_buffer, vk::render_graph());
+	assert(rg::settings().shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, gris_reservoir_addr, state.gris_reservoir_ping_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, integrator->lumen_scene->vertex_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, debug_vis_addr, state.debug_vis_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_eye_addr, state.photon_eye_buffer_ping);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, caustic_photon_aabbs_addr, state.caustic_photon_aabbs_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, caustic_photon_light_addr, state.caustic_photon_light_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, photon_count_addr, state.photon_count_buffer);
 
 	state.path_length = integrator->lumen_scene->config.common.path_length;
 }
@@ -257,8 +254,7 @@ void render(Integrator* integrator) {
 	constexpr i32 WRITE_OR_CURR_IDX = 1;
 	constexpr i32 READ_OR_PREV_IDX = 0;
 	if (state.enable_photon_mapping) {
-		vk::render_graph()
-			->add_rt(CSTR("PM - Trace First Diffuse"),
+		rg::add_rt(CSTR("PM - Trace First Diffuse"),
 					 {
 						 .shaders = {{CSTR("src/shaders/integrators/restir/gris/pm_trace_eye.rgen")},
 									 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
@@ -293,8 +289,7 @@ void render(Integrator* integrator) {
 
 		state.photon_blas_input = {.geometry = as_geom, .build_range = offset};
 
-		vk::render_graph()
-			->add_rt(CSTR("PM - Trace Photons"),
+		rg::add_rt(CSTR("PM - Trace Photons"),
 					 {
 						 .shaders = {{CSTR("src/shaders/integrators/restir/gris/pm_trace_photons.rgen")},
 									 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
@@ -320,8 +315,7 @@ void render(Integrator* integrator) {
 			.bind_tlas(*integrator->tlas);
 
 		if (state.photon_tlas.accel && state.enable_photon_gather) {
-			vk::render_graph()
-				->add_rt(CSTR("Collect Photons"),
+			rg::add_rt(CSTR("Collect Photons"),
 						 {
 							 .shaders = {{CSTR("src/shaders/integrators/restir/gris/pm_collect_photons.rgen")},
 										 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
@@ -347,8 +341,7 @@ void render(Integrator* integrator) {
 	}
 
 	// Trace rays
-	vk::render_graph()
-		->add_rt(CSTR("GRIS - Generate Samples"),
+	rg::add_rt(CSTR("GRIS - Generate Samples"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/restir/gris/gris.rgen")},
 								 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
@@ -376,8 +369,7 @@ void render(Integrator* integrator) {
 	if (state.enable_gris) {
 		bool should_do_temporal = state.enable_temporal_reuse && state.pc.total_frame_num > 0;
 		// Temporal Reuse
-		vk::render_graph()
-			->add_rt(CSTR("GRIS - Temporal Reuse"),
+		rg::add_rt(CSTR("GRIS - Temporal Reuse"),
 					 {
 						 .shaders = {{CSTR("src/shaders/integrators/restir/gris/temporal_reuse.rgen")},
 									 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
@@ -399,8 +391,7 @@ void render(Integrator* integrator) {
 		state.pc.seed2 = rand() % UINT_MAX;
 		if (!state.canonical_only) {
 			if (state.mis_method == ReSTIRPT::MIS_TALBOT) {
-				vk::render_graph()
-					->add_rt(CSTR("GRIS - Spatial Reuse - Talbot"),
+				rg::add_rt(CSTR("GRIS - Spatial Reuse - Talbot"),
 							 {
 								 .shaders = {{CSTR("src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen")},
 											 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
@@ -420,8 +411,7 @@ void render(Integrator* integrator) {
 					.bind_tlas(*integrator->tlas);
 			} else {
 				// Retrace
-				vk::render_graph()
-					->add_rt(CSTR("GRIS - Retrace Reservoirs"),
+				rg::add_rt(CSTR("GRIS - Retrace Reservoirs"),
 							 {
 								 .shaders = {{CSTR("src/shaders/integrators/restir/gris/retrace_paths.rgen")},
 											 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
@@ -438,8 +428,7 @@ void render(Integrator* integrator) {
 					.bind_texture_array(integrator->lumen_scene->scene_textures)
 					.bind_tlas(*integrator->tlas);
 				// Validate
-				vk::render_graph()
-					->add_rt(CSTR("GRIS - Validate Samples"),
+				rg::add_rt(CSTR("GRIS - Validate Samples"),
 							 {
 								 .shaders = {{CSTR("src/shaders/integrators/restir/gris/validate_samples.rgen")},
 											 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
@@ -457,8 +446,7 @@ void render(Integrator* integrator) {
 					.bind_tlas(*integrator->tlas);
 
 				// Spatial Reuse
-				vk::render_graph()
-					->add_rt(
+				rg::add_rt(
 						CSTR("GRIS - Spatial Reuse"),
 						{
 							.shaders = {{CSTR("src/shaders/integrators/restir/gris/spatial_reuse.rgen")},
@@ -482,8 +470,7 @@ void render(Integrator* integrator) {
 			}
 			if (state.pixel_debug || (state.gris_separator < 1.0f && state.gris_separator > 0.0f)) {
 				u32 num_wgs = u32((Window::width() * Window::height() + 1023) / 1024);
-				vk::render_graph()
-					->add_compute(CSTR("GRIS - Debug Visualiation"),
+				rg::add_compute(CSTR("GRIS - Debug Visualiation"),
 								  {.shader = vk::Shader(CSTR("src/shaders/integrators/restir/gris/debug_vis.comp")),
 								   .dims = {num_wgs}})
 					.push_constants(&state.pc)

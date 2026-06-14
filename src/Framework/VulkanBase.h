@@ -13,7 +13,6 @@ lm::SmallArray<Texture*, MAX_SWAPCHAIN_IMAGES>& swapchain_images();
 
 u32 prepare_frame();
 VkResult submit_frame(u32 image_idx);
-lm::RenderGraph* render_graph();
 void cleanup_app_data();
 void cleanup();
 };	// namespace vk

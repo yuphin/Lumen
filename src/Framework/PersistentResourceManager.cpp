@@ -94,13 +94,13 @@ struct PersistentPool {
 };
 
 namespace prm {
-PersistentPool<vk::Buffer> _buffer_pool(CSTR("Persistent Buffer Pool Arena"));
-PersistentPool<vk::Texture> _texture_pool(CSTR("Persistent Texture Pool Arena"));
+static PersistentPool<vk::Buffer> _buffer_pool(CSTR("Persistent Buffer Pool Arena"));
+static PersistentPool<vk::Texture> _texture_pool(CSTR("Persistent Texture Pool Arena"));
 
 using SamplerCache = lm::HashMap<VkSamplerCreateInfo, VkSampler, sampler_hash, sampler_eq>;
-lm::Arena* _sampler_cache_arena = nullptr;
-SamplerCache _sampler_cache;
-os::Mutex _sampler_cache_mutex;
+static lm::Arena* _sampler_cache_arena = nullptr;
+static SamplerCache _sampler_cache;
+static os::Mutex _sampler_cache_mutex;
 
 VkSampler get_sampler(const VkSamplerCreateInfo& sampler_create_info, bool use_mutex) {
 	os::ScopedLock lock(_sampler_cache_mutex, use_mutex);

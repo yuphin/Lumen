@@ -32,7 +32,7 @@ i32 main(i32 argc, char* argv[]) {
 			fullscreen = true;
 		}
 	}
-	ThreadPool::init();
+	tp::init();
 	Window::init(width, height, fullscreen, on_second_monitor);
 	{
 		ray_tracer::init(enable_debug, argc, argv);
@@ -43,7 +43,7 @@ i32 main(i32 argc, char* argv[]) {
 		ray_tracer::cleanup();
 	}
 	Window::destroy();
-	ThreadPool::destroy();
+	tp::destroy();
 	return 0;
 }
 #else

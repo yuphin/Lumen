@@ -212,29 +212,27 @@ void init(Integrator* integrator) {
 	desc.prob_carryover_addr = state.prob_carryover_buffer->device_address();
 	desc.light_splats_addr = state.light_splats_buffer->device_address();
 	desc.light_splat_cnts_addr = state.light_splat_cnts_buffer->device_address();
-
-	lm::RenderGraph* rg = vk::render_graph();
-	assert(rg->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, state.bootstrap_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, state.cdf_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, state.cdf_sum_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, seeds_addr, state.seeds_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_primary_samples_addr, state.light_primary_samples_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cam_primary_samples_addr, state.cam_primary_samples_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_samplers_addr, state.mlt_samplers_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_col_addr, state.mlt_col_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, chain_stats_addr, state.chain_stats_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, splat_addr, state.splat_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, past_splat_addr, state.past_splat_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_vertices_addr, state.light_path_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, connected_lights_addr, state.connected_lights_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, tmp_seeds_addr, state.tmp_seeds_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, path_cnt_addr, state.light_path_cnt_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, tmp_lum_addr, state.tmp_lum_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prob_carryover_addr, state.prob_carryover_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_splats_addr, state.light_splats_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_splat_cnts_addr, state.light_splat_cnts_buffer, rg);
+	assert(rg::settings().shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, bootstrap_addr, state.bootstrap_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_addr, state.cdf_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cdf_sum_addr, state.cdf_sum_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, seeds_addr, state.seeds_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_primary_samples_addr, state.light_primary_samples_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, cam_primary_samples_addr, state.cam_primary_samples_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_samplers_addr, state.mlt_samplers_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, mlt_col_addr, state.mlt_col_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, chain_stats_addr, state.chain_stats_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, splat_addr, state.splat_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, past_splat_addr, state.past_splat_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, vcm_vertices_addr, state.light_path_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, connected_lights_addr, state.connected_lights_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, tmp_seeds_addr, state.tmp_seeds_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, path_cnt_addr, state.light_path_cnt_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, tmp_lum_addr, state.tmp_lum_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prob_carryover_addr, state.prob_carryover_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_splats_addr, state.light_splats_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, light_splat_cnts_addr, state.light_splat_cnts_buffer);
 
 	integrator->lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = CSTR("Scene Desc"),
@@ -251,7 +249,7 @@ void init(Integrator* integrator) {
 	state.pc.use_vm = 0;
 }
 
-static void prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg) {
+static void prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& counter) {
 	SMLT& state = integrator->smlt;
 	const bool scan_sums = level > 0;
 	i32 num_wgs = lm::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
@@ -259,7 +257,7 @@ static void prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& c
 	state.pc_compute.num_elems = num_elems;
 	auto scan = [&](i32 num_wgs, i32 idx) {
 		++counter;
-		rg->add_compute(CSTR("PrefixScan - Scan"),
+		rg::add_compute(CSTR("PrefixScan - Scan"),
 						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/prefix_scan.comp")),
 						 .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&state.pc_compute)
@@ -267,7 +265,7 @@ static void prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& c
 	};
 	auto uniform_add = [&](i32 num_wgs, i32 output_idx) {
 		++counter;
-		rg->add_compute(CSTR("PrefixScan - Uniform Add"),
+		rg::add_compute(CSTR("PrefixScan - Uniform Add"),
 						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/uniform_add.comp")),
 						 .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&state.pc_compute)
@@ -288,7 +286,7 @@ static void prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& c
 			state.pc_compute.n = rem;
 			scan(1, level);
 		}
-		prefix_scan(integrator, level + 1, num_wgs, counter, rg);
+		prefix_scan(integrator, level + 1, num_wgs, counter);
 		state.pc_compute.base_idx = 0;
 		state.pc_compute.block_idx = 0;
 		state.pc_compute.n = num_elems - rem;
@@ -343,12 +341,10 @@ void render(Integrator* integrator) {
 		integrator->lumen_scene->scene_desc_buffer,
 	};
 
-	lm::RenderGraph* rg = vk::render_graph();
-
 	// Start bootstrap sampling
 	{
 		// Light
-		rg->add_rt(CSTR("SMLT - Bootstrap Sampling - Light"),
+		rg::add_rt(CSTR("SMLT - Bootstrap Sampling - Light"),
 				   {
 					   .shaders = {{CSTR("src/shaders/integrators/smlt/smlt_seed_light.rgen")},
 								   {CSTR("src/shaders/ray.rmiss")},
@@ -364,7 +360,7 @@ void render(Integrator* integrator) {
 			.bind_texture_array(integrator->lumen_scene->scene_textures)
 			.bind_tlas(*integrator->tlas);
 		// Eye
-		rg->add_rt(CSTR("SMLT - Bootstrap Sampling - Eye"),
+		rg::add_rt(CSTR("SMLT - Bootstrap Sampling - Eye"),
 				   {
 					   .shaders = {{CSTR("src/shaders/integrators/smlt/smlt_seed_eye.rgen")},
 								   {CSTR("src/shaders/ray.rmiss")},
@@ -381,15 +377,15 @@ void render(Integrator* integrator) {
 			.bind_tlas(*integrator->tlas);
 	}
 	i32 counter = 0;
-	prefix_scan(integrator, 0, integrator->lumen_scene->config.settings.smlt.num_bootstrap_samples, counter, rg);
+	prefix_scan(integrator, 0, integrator->lumen_scene->config.settings.smlt.num_bootstrap_samples, counter);
 	// Calculate CDF
-	rg->add_compute(CSTR("Calculate CDF"), {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/calc_cdf.comp")),
+	rg::add_compute(CSTR("Calculate CDF"), {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/calc_cdf.comp")),
 											.specialization_data = {(u32)state.num_bootstrap_samples},
 											.dims = {(u32)lm::ceil(state.num_bootstrap_samples / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer);
 	// Select seeds
-	rg->add_compute(CSTR("Select Seeds"),
+	rg::add_compute(CSTR("Select Seeds"),
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/select_seeds.comp")),
 					 .specialization_data = {(u32)state.num_mlt_threads},
 					 .dims = {(u32)lm::ceil(state.num_mlt_threads / f32(1024.0f)), 1, 1}})
@@ -398,7 +394,7 @@ void render(Integrator* integrator) {
 	// Fill in the samplers for mutations
 	{
 		// Light
-		rg->add_rt(CSTR("SMLT - Preprocess - Light"),
+		rg::add_rt(CSTR("SMLT - Preprocess - Light"),
 				   {
 					   .shaders = {{CSTR("src/shaders/integrators/smlt/smlt_preprocess_light.rgen")},
 								   {CSTR("src/shaders/ray.rmiss")},
@@ -414,7 +410,7 @@ void render(Integrator* integrator) {
 			.bind_texture_array(integrator->lumen_scene->scene_textures)
 			.bind_tlas(*integrator->tlas);
 		// Eye
-		rg->add_rt(CSTR("SMLT - Preprocess - Eye"),
+		rg::add_rt(CSTR("SMLT - Preprocess - Eye"),
 				   {
 					   .shaders = {{CSTR("src/shaders/integrators/smlt/smlt_preprocess_eye.rgen")},
 								   {CSTR("src/shaders/ray.rmiss")},
@@ -429,14 +425,14 @@ void render(Integrator* integrator) {
 			.bind_texture_array(integrator->lumen_scene->scene_textures)
 			.bind_tlas(*integrator->tlas);
 	}
-	rg->run_and_submit(cmd);
+	rg::run_and_submit(cmd);
 	// Start mutations
 	{
 		auto mutate = [&](u32 i) {
 			state.pc.random_num = rand() % UINT_MAX;
 			state.pc.mutation_counter = i;
 			// Light
-			rg->add_rt(CSTR("PSSMLT - Mutate - Light"),
+			rg::add_rt(CSTR("PSSMLT - Mutate - Light"),
 					   {
 						   .shaders = {{CSTR("src/shaders/integrators/smlt/smlt_mutate_light.rgen")},
 									   {CSTR("src/shaders/ray.rmiss")},
@@ -451,7 +447,7 @@ void render(Integrator* integrator) {
 				.bind_texture_array(integrator->lumen_scene->scene_textures)
 				.bind_tlas(*integrator->tlas);
 			// Eye
-			rg->add_rt(CSTR("PSSMLT - Mutate - Eye"),
+			rg::add_rt(CSTR("PSSMLT - Mutate - Eye"),
 					   {
 						   .shaders = {{CSTR("src/shaders/integrators/smlt/smlt_mutate_eye.rgen")},
 									   {CSTR("src/shaders/ray.rmiss")},
@@ -475,9 +471,9 @@ void render(Integrator* integrator) {
 				mutate(i);
 			}
 			iter += 100;
-			rg->run(cmd.handle);
+			rg::run(cmd.handle);
 			LUMEN_TRACE("%d / %d", iter, state.mutation_count);
-			rg->submit(cmd);
+			rg::submit(cmd);
 		}
 		const u32 rem = state.mutation_count % iter_cnt;
 		if (rem) {
@@ -485,12 +481,12 @@ void render(Integrator* integrator) {
 			for (u32 i = 0; i < rem; i++) {
 				mutate(i);
 			}
-			rg->run(cmd.handle);
-			rg->submit(cmd);
+			rg::run(cmd.handle);
+			rg::submit(cmd);
 		}
 	}
 	// Compositions
-	rg->add_compute(CSTR("Composition"),
+	rg::add_compute(CSTR("Composition"),
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/composite.comp")),
 					 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)

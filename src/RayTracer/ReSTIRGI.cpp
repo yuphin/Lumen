@@ -71,14 +71,13 @@ void init(Integrator* integrator) {
 
 	state.pc.total_frame_num = 0;
 	state.pc.world_radius = integrator->lumen_scene->dimensions.radius;
-	assert(vk::render_graph()->settings.shader_inference == true);
-	lm::RenderGraph* rg = vk::render_graph();
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, restir_samples_addr, state.restir_samples_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, restir_samples_old_addr, state.restir_samples_old_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, temporal_reservoir_addr, state.temporal_reservoir_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, spatial_reservoir_addr, state.spatial_reservoir_buffer, rg);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, state.tmp_col_buffer, rg);
+	assert(rg::settings().shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, restir_samples_addr, state.restir_samples_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, restir_samples_old_addr, state.restir_samples_old_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, temporal_reservoir_addr, state.temporal_reservoir_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, spatial_reservoir_addr, state.spatial_reservoir_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, color_storage_addr, state.tmp_col_buffer);
 }
 
 void render(Integrator* integrator) {
@@ -102,8 +101,7 @@ void render(Integrator* integrator) {
 	};
 
 	// Trace rays
-	vk::render_graph()
-		->add_rt(CSTR("ReSTIRGI - Generate Samples"),
+	rg::add_rt(CSTR("ReSTIRGI - Generate Samples"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/restir/gi/restir.rgen")},
 								 {CSTR("src/shaders/ray.rmiss")},
@@ -123,8 +121,7 @@ void render(Integrator* integrator) {
 		.copy(state.restir_samples_buffer, state.restir_samples_old_buffer);
 
 	// Temporal reuse
-	vk::render_graph()
-		->add_rt(CSTR("ReSTIRGI - Temporal Reuse"),
+	rg::add_rt(CSTR("ReSTIRGI - Temporal Reuse"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/restir/gi/temporal_reuse.rgen")},
 								 {CSTR("src/shaders/ray.rmiss")},
@@ -140,8 +137,7 @@ void render(Integrator* integrator) {
 		.bind_tlas(*integrator->tlas);
 
 	// Spatial reuse
-	vk::render_graph()
-		->add_rt(CSTR("ReSTIRGI - Spatial Reuse"),
+	rg::add_rt(CSTR("ReSTIRGI - Spatial Reuse"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/restir/gi/spatial_reuse.rgen")},
 								 {CSTR("src/shaders/ray.rmiss")},
@@ -156,8 +152,7 @@ void render(Integrator* integrator) {
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
 	// Output
-	vk::render_graph()
-		->add_compute(CSTR("Output"),
+	rg::add_compute(CSTR("Output"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/restir/gi/output.comp")),
 					   .dims = {(u32)lm::ceil(Window::width() * Window::height()  / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)

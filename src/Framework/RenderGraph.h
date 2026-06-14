@@ -2,7 +2,6 @@
 #include "Framework/RenderGraphTypes.h"
 #include "Pipeline.h"
 #include "AccelerationStructure.h"
-#include "Framework/Base/OS.h"
 #include "Framework/Base/SmallArray.h"
 
 namespace vk {
@@ -21,15 +20,12 @@ static constexpr u64 MAX_EXPLICIT_BUFFER_READ_WRITES = 16;
 static constexpr u64 MAX_EXPLICIT_IMG_READ_WRITES = 16;
 static constexpr u64 MAX_DESCRIPTORS = 32;
 
-#define TO_STR(V) (#V)
-
-#define REGISTER_BUFFER_WITH_ADDRESS(struct_type, struct_name, field_name, buffer_ptr, rg) \
-	do {                                                                                   \
-		lm::String key = #struct_type "_" #field_name;                                     \
-		rg->registered_buffer_pointers.insert(key, buffer_ptr);                            \
+#define REGISTER_BUFFER_WITH_ADDRESS(struct_type, struct_name, field_name, buffer_ptr) \
+	do {                                                                               \
+		lm::String key = #struct_type "_" #field_name;                                 \
+		rg::register_buffer_pointer(key, buffer_ptr);                                  \
 	} while (0)
 
-class RenderGraph;
 struct RenderPass;
 
 struct PipelineTask {
@@ -132,47 +128,6 @@ struct pair {
 	bool operator==(const pair& other) const { return first == other.first && second == other.second; }
 };
 
-class RenderGraph {
-   public:
-	RenderGraph();
-	RenderPass& current_pass();
-	RenderPass& add_rt(const lm::String& name, const vk::RTPassSettings& settings);
-	RenderPass& add_gfx(const lm::String& name, const vk::GraphicsPassSettings& settings);
-	RenderPass& add_compute(const lm::String& name, const vk::ComputePassSettings& settings);
-	PipelineStorage* add_pass_impl_common(const lm::String& name, const vk::ShaderMacroArray& macros,
-										  const lm::SpecializationConstantArray& specialization_data, bool& cached,
-										  lm::String& name_with_macros, lm::String& macro_string);
-	void init();
-	void run(VkCommandBuffer cmd);
-	void reset();
-	void submit(vk::CommandBuffer& cmd);
-	void run_and_submit(vk::CommandBuffer& cmd);
-	void destroy();
-	lm::Arena* arena();
-
-	friend RenderPass;
-
-	vk::ShaderMacroArray global_macro_defines;
-	lm::FixedArray<PipelineTask> pipeline_tasks;
-	lm::FixedArray<RenderPass> passes;
-
-	// vk::Pipeline Name + Macro String + Specialization Constants -> vk::Pipeline
-	lm::HashMap<u64, PipelineStorage> pipeline_cache;
-	lm::HashMap<VkBuffer, BufferResourceState> buffer_resource_map;
-	lm::HashMap<VkImage, ImageResourceState> img_resource_map;
-	lm::HashMap<lm::String, vk::Buffer*> registered_buffer_pointers;
-	// vk::Shader Name + Macro String -> vk::Shader
-	lm::HashMap<lm::String, vk::Shader> shader_cache;
-
-	RenderGraphSettings settings;
-	os::Mutex shader_map_mutex;
-	const bool multithreaded_pipeline_compilation = true;
-	static const u32 INVALID_PASS_IDX = UINT_MAX;
-	bool dirty_pass_encountered = false;
-	bool reload_shaders = false;
-	u32 reload_counter = 0;
-};
-
 struct RenderPass {
 	RenderPass() = default;
 
@@ -216,10 +171,8 @@ struct RenderPass {
 						   bool build_tlas_after_blas = false, bool update_blas = false);
 	void init();
 	void finalize();
-	friend RenderGraph;
 
 	vk::PassType type;
-	RenderGraph* rg;
 	u32 pass_idx;
 	PipelineStorage* pipeline_storage = nullptr;
 	lm::String name;
@@ -291,3 +244,26 @@ struct RenderPass {
 };
 
 }  // namespace lm
+
+// Render Graph
+namespace rg {
+
+lm::RenderPass& current_pass();
+lm::RenderPass& add_rt(const lm::String& name, const vk::RTPassSettings& settings);
+lm::RenderPass& add_gfx(const lm::String& name, const vk::GraphicsPassSettings& settings);
+lm::RenderPass& add_compute(const lm::String& name, const vk::ComputePassSettings& settings);
+void init();
+void run(VkCommandBuffer cmd);
+void reset();
+void submit(vk::CommandBuffer& cmd);
+void run_and_submit(vk::CommandBuffer& cmd);
+void destroy();
+lm::Arena* arena();
+lm::RenderGraphSettings& settings();
+const vk::ShaderMacroArray& global_macro_defines();
+void add_global_macro(const vk::ShaderMacro& macro);
+void register_buffer_pointer(const lm::String& name, vk::Buffer* buffer);
+bool is_buffer_registered(const lm::String& name);
+void request_shader_reload();
+
+}  // namespace rg

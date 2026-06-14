@@ -26,8 +26,7 @@ static f32 get_px_size_per_trapezoidal_cell(f32 p11, f32 height) {
 }
 
 static void scan(u32 num_wgs, vk::Buffer* scene_desc_buffer, const PCPrefixSum& pc, bool disable_sum_writes = false) {
-	vk::render_graph()
-		->add_compute(CSTR("PrefixScan - Scan"),
+	rg::add_compute(CSTR("PrefixScan - Scan"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_scan.comp")),
 					   .macros = {vk::ShaderMacro("DISABLE_SUM_WRITES", disable_sum_writes)},
 					   .dims = {(u32)num_wgs, 1, 1}})
@@ -35,8 +34,7 @@ static void scan(u32 num_wgs, vk::Buffer* scene_desc_buffer, const PCPrefixSum& 
 		.bind(scene_desc_buffer);
 }
 static void uniform_add(u32 num_wgs, vk::Buffer* scene_desc_buffer, const PCPrefixSum& pc) {
-	vk::render_graph()
-		->add_compute(CSTR("PrefixScan - Uniform Add"),
+	rg::add_compute(CSTR("PrefixScan - Uniform Add"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_uniform_add.comp")),
 					   .dims = {(u32)num_wgs, 1, 1}})
 		.push_constants(&pc)
@@ -199,34 +197,22 @@ void init(Integrator* integrator) {
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
 
-	assert(vk::render_graph()->settings.shader_inference == true);
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, index_addr, integrator->lumen_scene->index_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, material_addr, integrator->lumen_scene->materials_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, integrator->lumen_scene->vertex_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, state.gbuffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, transformations_addr, state.transformations_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_spawn_list_addr, state.surfel_spawn_list_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_spawn_count_addr, state.surfel_spawn_count_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_pool_addr, state.surfel_pool_buffer, vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_free_stack_addr, state.surfel_free_stack_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_free_stack_count_addr, state.surfel_free_stack_counter_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, grid_cell_counts_addr, state.grid_cell_counts_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, grid_cell_indices_addr, state.grid_cell_indices_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, grid_prefix_sum_scratch_addr, state.grid_prefix_sum_scratch_buffer,
-								 vk::render_graph());
-	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_samples_addr, state.surfel_samples_buffer, vk::render_graph());
+	assert(rg::settings().shader_inference == true);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, index_addr, integrator->lumen_scene->index_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, material_addr, integrator->lumen_scene->materials_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, compact_vertices_addr, integrator->lumen_scene->vertex_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, g_buffer_addr, state.gbuffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, transformations_addr, state.transformations_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_spawn_list_addr, state.surfel_spawn_list_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_spawn_count_addr, state.surfel_spawn_count_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_pool_addr, state.surfel_pool_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_free_stack_addr, state.surfel_free_stack_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_free_stack_count_addr, state.surfel_free_stack_counter_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, grid_cell_counts_addr, state.grid_cell_counts_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, grid_cell_indices_addr, state.grid_cell_indices_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, grid_prefix_sum_scratch_addr, state.grid_prefix_sum_scratch_buffer);
+	REGISTER_BUFFER_WITH_ADDRESS(SceneDesc, desc, surfel_samples_addr, state.surfel_samples_buffer);
 
 	pc.desired_surfel_radius_px = 8;
 	pc.grid_uniform_cell_distance_threshold = 0.1;
@@ -273,8 +259,7 @@ void render(Integrator* integrator) {
 		cmd.begin();
 	}
 
-	vk::render_graph()
-		->add_rt(CSTR("GBuffer"),
+	rg::add_rt(CSTR("GBuffer"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/primary.rgen")},
 								 {CSTR("src/shaders/integrators/irradiance_cache/ray.rmiss")},
@@ -289,8 +274,7 @@ void render(Integrator* integrator) {
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
 
-	vk::render_graph()
-		->add_compute(CSTR("Surfel: Recycle"),
+	rg::add_compute(CSTR("Surfel: Recycle"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_recycle.comp")),
 					   .dims = {lm::div_ceil(MAX_SURFEL_COUNT, ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
@@ -299,15 +283,13 @@ void render(Integrator* integrator) {
 	////////////////////////////
 	// --- Surfel Grid ---
 	// Grid is rebuilt every frame
-	vk::render_graph()
-		->add_compute(CSTR("Grid: Clear"),
+	rg::add_compute(CSTR("Grid: Clear"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_clear.comp")),
 					   .dims = {lm::div_ceil(grid_total_cells, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
 		.bind({integrator->lumen_scene->scene_desc_buffer});
 	// TODO: Having an indirect launch would be better here, maybe?
-	vk::render_graph()
-		->add_compute(CSTR("Grid: Count"),
+	rg::add_compute(CSTR("Grid: Count"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_count.comp")),
 					   .dims = {lm::div_ceil((u32)MAX_SURFEL_COUNT, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
@@ -315,7 +297,7 @@ void render(Integrator* integrator) {
 
 	if (DEBUG_PASSES) {
 		// Debug
-		vk::render_graph()->run_and_submit(cmd);
+		rg::run_and_submit(cmd);
 		u32* counts = (u32*)vk::buffer_map(state.grid_cell_counts_buffer);
 		lm::ScratchArena scratch = integrator->arena;
 
@@ -334,7 +316,7 @@ void render(Integrator* integrator) {
 		cmd.begin();
 		prefix_scan(grid_total_cells, 0, 0, prefix_sum_scratch_capacity, /*scan_sums=*/false,
 					integrator->lumen_scene->scene_desc_buffer);
-		vk::render_graph()->run_and_submit(cmd);
+		rg::run_and_submit(cmd);
 
 		u32* gpu_prefix_sums = (u32*)vk::buffer_map(state.grid_cell_counts_buffer);
 		for (u64 i = 0; i < total_cells; i++) {
@@ -348,8 +330,7 @@ void render(Integrator* integrator) {
 					integrator->lumen_scene->scene_desc_buffer);
 	}
 
-	vk::render_graph()
-		->add_compute(CSTR("Grid: Distribute"),
+	rg::add_compute(CSTR("Grid: Distribute"),
 					  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_distribute.comp")),
 					   .macros = {vk::ShaderMacro("DEBUG_GRID_INVARIANTS", DEBUG_PASSES)},
 					   .dims = {lm::div_ceil((u32)MAX_SURFEL_COUNT, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
@@ -359,24 +340,21 @@ void render(Integrator* integrator) {
 	if (!state.pause_surfel_spawn) {
 		u32 max_screen_tiles_x = lm::div_ceil(Window::width(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		u32 max_screen_tiles_y = lm::div_ceil(Window::height(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
-		vk::render_graph()
-			->add_compute(CSTR("Surfel: Spawn"),
+		rg::add_compute(CSTR("Surfel: Spawn"),
 						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_spawn.comp")),
 						   .dims = {max_screen_tiles_x, max_screen_tiles_y, 1}})
 			.push_constants(&pc)
 			.zero(state.surfel_spawn_count_buffer)
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
 
-		vk::render_graph()
-			->add_compute(CSTR("Surfel: Allocate"),
+		rg::add_compute(CSTR("Surfel: Allocate"),
 						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_allocate.comp")),
 						   .dims = {lm::div_ceil(MAX_SURFEL_COUNT, ALLOCATE_PASS_WG_SIZE), 1, 1}})
 			.push_constants(&pc)
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
 	}
 
-	vk::render_graph()
-		->add_rt(CSTR("Surfel: Trace"),
+	rg::add_rt(CSTR("Surfel: Trace"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/surfel_trace.rgen")},
 								 {CSTR("src/shaders/integrators/irradiance_cache/ray.rmiss")},
@@ -392,8 +370,7 @@ void render(Integrator* integrator) {
 		.zero(state.surfel_samples_buffer)
 		.bind_tlas(*integrator->tlas);
 
-	vk::render_graph()
-		->add_compute(
+	rg::add_compute(
 			CSTR("Surfel: Integrate"),
 			{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_integrate.comp")),
 			 .dims = {lm::div_ceil((u32)MAX_SURFEL_COUNT * state.rays_per_surfel, (u32)DEFAULT_WG_SIZE), 1, 1}})
@@ -401,15 +378,13 @@ void render(Integrator* integrator) {
 		.bind({integrator->lumen_scene->scene_desc_buffer});
 
 	if (state.debug_mode) {
-		vk::render_graph()
-			->add_compute(CSTR("Debug"),
+		rg::add_compute(CSTR("Debug"),
 						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/debug.comp")),
 						   .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024)), 1, 1}})
 			.push_constants(&pc)
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->output_tex, integrator->scene_ubo_buffer});
 	} else {
-		vk::render_graph()
-			->add_compute(CSTR("Composite"),
+		rg::add_compute(CSTR("Composite"),
 						  {.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/composite.comp")),
 						   .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024)), 1, 1}})
 			.push_constants(&pc)

@@ -13,7 +13,7 @@ namespace scene {
 
 static lm::Arena* _arena_scene = nullptr;
 static lm::Arena* _arena_strings = nullptr;
-Scene _scene = {};
+static Scene _scene = {};
 
 static void reflectance_to_conductor_eta_k(const lm::vec3& reflectance, lm::vec3& eta, lm::vec3& k) {
 	eta = lm::vec3(1.0f);
@@ -971,17 +971,17 @@ void load(const lm::String& path) {
 	LUMEN_INFO("Scene Arena: Total memory used: %.2f MB / allocated: %.2f MB (%.2f%%)", total_used / MB,
 			   total_allocated / MB, (f64)100.0 * total_used / total_allocated);
 
-	vk::render_graph()->global_macro_defines.push_back(
+	rg::add_global_macro(
 		vk::ShaderMacro("ENABLE_DIFFUSE", scene_has_bsdf_type(BSDF_TYPE_DIFFUSE), /* visible = */ false));
-	vk::render_graph()->global_macro_defines.push_back(
+	rg::add_global_macro(
 		vk::ShaderMacro("ENABLE_MIRROR", scene_has_bsdf_type(BSDF_TYPE_MIRROR), /* visible = */ false));
-	vk::render_graph()->global_macro_defines.push_back(
+	rg::add_global_macro(
 		vk::ShaderMacro("ENABLE_GLASS", scene_has_bsdf_type(BSDF_TYPE_GLASS), /* visible = */ false));
-	vk::render_graph()->global_macro_defines.push_back(
+	rg::add_global_macro(
 		vk::ShaderMacro("ENABLE_DIELECTRIC", scene_has_bsdf_type(BSDF_TYPE_DIELECTRIC), /* visible = */ false));
-	vk::render_graph()->global_macro_defines.push_back(
+	rg::add_global_macro(
 		vk::ShaderMacro("ENABLE_CONDUCTOR", scene_has_bsdf_type(BSDF_TYPE_CONDUCTOR), /* visible = */ false));
-	vk::render_graph()->global_macro_defines.push_back(
+	rg::add_global_macro(
 		vk::ShaderMacro("ENABLE_PRINCIPLED", scene_has_bsdf_type(BSDF_TYPE_PRINCIPLED), /* visible = */ false));
 }
 

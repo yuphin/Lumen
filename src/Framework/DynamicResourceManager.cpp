@@ -54,8 +54,8 @@ struct DynamicPool {
 };
 
 namespace drm {
-thread_local DynamicPool<vk::Buffer> _buffer_pool(CSTR("Dynamic Buffer Pool Arena"));
-thread_local DynamicPool<vk::Texture> _texture_pool(CSTR("Dynamic Texture Pool Arena"));
+static thread_local DynamicPool<vk::Buffer> _buffer_pool(CSTR("Dynamic Buffer Pool Arena"));
+static thread_local DynamicPool<vk::Texture> _texture_pool(CSTR("Dynamic Texture Pool Arena"));
 
 vk::Buffer* get(const vk::BufferDesc& desc) {
 	vk::Buffer* buffer = _buffer_pool.get();
