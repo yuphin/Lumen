@@ -14,12 +14,12 @@ static void update_uniform_buffers(Integrator* integrator) {
 	integrator->scene_ubo.view = camera.view;
 	integrator->scene_ubo.prev_projection = integrator->scene_ubo.projection;
 	integrator->scene_ubo.projection = camera.projection;
-	integrator->scene_ubo.view_pos = glm::vec4(camera.position, 1);
-	integrator->scene_ubo.inv_view = glm::inverse(camera.view);
-	integrator->scene_ubo.inv_projection = glm::inverse(camera.projection);
-	integrator->scene_ubo.model = glm::mat4(1.0);
-	integrator->scene_ubo.light_pos = glm::vec4(3.0f, 2.5f, 1.0f, 1.0f);
-	integrator->scene_ubo.cam_dir = integrator->scene_ubo.inv_view * glm::vec4(camera.direction, 0);
+	integrator->scene_ubo.view_pos = lm::vec4(camera.position, 1);
+	integrator->scene_ubo.inv_view = lm::inverse(camera.view);
+	integrator->scene_ubo.inv_projection = lm::inverse(camera.projection);
+	integrator->scene_ubo.model = lm::mat4(1.0);
+	integrator->scene_ubo.light_pos = lm::vec4(3.0f, 2.5f, 1.0f, 1.0f);
+	integrator->scene_ubo.cam_dir = integrator->scene_ubo.inv_view * lm::vec4(camera.direction, 0);
 	integrator->scene_ubo.fovy = camera.fov;
 }
 
@@ -98,21 +98,21 @@ static bool common_gui(Integrator*) {
 
 static bool common_update(Integrator* integrator) {
 	f32 trans_speed = 0.01f;
-	glm::vec3 front;
+	lm::vec3 front;
 	if (Window::is_key_held(KeyInput::KEY_LEFT_SHIFT)) {
 		trans_speed *= 4;
 	}
 	lm::Camera& camera = integrator->lumen_scene->camera;
-	front.x = cos(glm::radians(camera.rotation.x)) * sin(glm::radians(camera.rotation.y));
-	front.y = sin(glm::radians(camera.rotation.x));
-	front.z = cos(glm::radians(camera.rotation.x)) * cos(glm::radians(camera.rotation.y));
-	front = glm::normalize(-front);
+	front.x = cos(lm::radians(camera.rotation.x)) * sin(lm::radians(camera.rotation.y));
+	front.y = sin(lm::radians(camera.rotation.x));
+	front.z = cos(lm::radians(camera.rotation.x)) * cos(lm::radians(camera.rotation.y));
+	front = lm::normalize(-front);
 	if (Window::is_key_held(KeyInput::KEY_W)) {
 		camera.position += front * trans_speed;
 		integrator->updated = true;
 	}
 	if (Window::is_key_held(KeyInput::KEY_A)) {
-		camera.position -= glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * trans_speed;
+		camera.position -= lm::normalize(lm::cross(front, lm::vec3(0.0f, 1.0f, 0.0f))) * trans_speed;
 		integrator->updated = true;
 	}
 	if (Window::is_key_held(KeyInput::KEY_S)) {
@@ -120,18 +120,18 @@ static bool common_update(Integrator* integrator) {
 		integrator->updated = true;
 	}
 	if (Window::is_key_held(KeyInput::KEY_D)) {
-		camera.position += glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))) * trans_speed;
+		camera.position += lm::normalize(lm::cross(front, lm::vec3(0.0f, 1.0f, 0.0f))) * trans_speed;
 		integrator->updated = true;
 	}
 	if (Window::is_key_held(KeyInput::SPACE) || Window::is_key_held(KeyInput::KEY_E)) {
-		glm::vec3 right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
-		glm::vec3 up = glm::cross(right, front);
+		lm::vec3 right = lm::normalize(lm::cross(front, lm::vec3(0.0f, 1.0f, 0.0f)));
+		lm::vec3 up = lm::cross(right, front);
 		camera.position += up * trans_speed;
 		integrator->updated = true;
 	}
 	if (Window::is_key_held(KeyInput::KEY_LEFT_CONTROL) || Window::is_key_held(KeyInput::KEY_Q)) {
-		glm::vec3 right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
-		glm::vec3 up = glm::cross(right, front);
+		lm::vec3 right = lm::normalize(lm::cross(front, lm::vec3(0.0f, 1.0f, 0.0f)));
+		lm::vec3 up = lm::cross(right, front);
 		camera.position -= up * trans_speed;
 		integrator->updated = true;
 	}

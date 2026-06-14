@@ -1,5 +1,4 @@
 
-#include <numeric>
 #include "AccelerationStructure.h"
 #include "VkUtils.h"
 #include "PersistentResourceManager.h"
@@ -201,7 +200,7 @@ static void cmd_create_tlas(BVH& tlas, VkCommandBuffer cmd_buf, u32 primitive_co
 //
 
 // Existence of cmd_buf implies that cmd_buf handles submission outside of this function
-static void build_blas_impl(lm::ScratchArena& scratch, lm::FixedArray<BuildAccelerationStructure>& build_as,
+static void build_blas_impl(lm::ScratchArena& scratch, lm::FixedArray<BuildAccelerationStructure>& build_as_arr,
 							util::Slice<BlasInput> input, VkBuildAccelerationStructureFlagsKHR flags,
 							VkCommandBuffer external_cmd_buf, vk::Buffer** scratch_buffer_ref) {
 	u32 num_blases = static_cast<u32>(input.size);
@@ -215,28 +214,28 @@ static void build_blas_impl(lm::ScratchArena& scratch, lm::FixedArray<BuildAccel
 		// querying the build sizes.
 
 		lm::ScratchArena temp_scratch = scratch.arena;
-		build_as[idx].build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-		build_as[idx].build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
-		build_as[idx].build_info.flags = input[idx].flags | flags;
-		build_as[idx].build_info.geometryCount = 1u;
-		build_as[idx].build_info.pGeometries = &input[idx].geometry;
+		build_as_arr[idx].build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+		build_as_arr[idx].build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+		build_as_arr[idx].build_info.flags = input[idx].flags | flags;
+		build_as_arr[idx].build_info.geometryCount = 1u;
+		build_as_arr[idx].build_info.pGeometries = &input[idx].geometry;
 
 		// Build range information
-		build_as[idx].range_info = &input[idx].build_range;
+		build_as_arr[idx].range_info = &input[idx].build_range;
 
 		// Finding sizes to create acceleration structures and scratch
 		lm::FixedArray<u32> max_prim_counts = lm::fixed_array_create<u32>(temp_scratch.arena, 1);
 
 		max_prim_counts.push_back(input[idx].build_range.primitiveCount);  // Number of primitives/triangles
 		vkGetAccelerationStructureBuildSizesKHR(context().device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
-												&build_as[idx].build_info, max_prim_counts.data,
-												&build_as[idx].size_info);
+												&build_as_arr[idx].build_info, max_prim_counts.data,
+												&build_as_arr[idx].size_info);
 
 		// Extra info
-		as_total_size += build_as[idx].size_info.accelerationStructureSize;
-		max_scratch_size = glm::max(max_scratch_size, build_as[idx].size_info.buildScratchSize);
+		as_total_size += build_as_arr[idx].size_info.accelerationStructureSize;
+		max_scratch_size = lm::max(max_scratch_size, build_as_arr[idx].size_info.buildScratchSize);
 		num_compactions +=
-			has_flag(build_as[idx].build_info.flags, VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
+			has_flag(build_as_arr[idx].build_info.flags, VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 	}
 
 	// Allocate the scratch buffers holding the temporary data of the
@@ -287,26 +286,26 @@ static void build_blas_impl(lm::ScratchArena& scratch, lm::FixedArray<BuildAccel
 	VkDeviceSize batch_limit = BATCH_LIMIT;
 	for (u32 idx = 0; idx < num_blases; idx++) {
 		indices.push_back(idx);
-		batch_size += build_as[idx].size_info.accelerationStructureSize;
+		batch_size += build_as_arr[idx].size_info.accelerationStructureSize;
 		// Over the limit or last BLAS element
 		if (batch_size >= batch_limit || idx == num_blases - 1 || indices.size == MAX_BLAS_BATCH_SIZE) {
 			util::Slice<u32> indices_slice(indices.data, indices.size);
 			if (external_cmd_buf) {
-				cmd_create_blas(external_cmd_buf, indices_slice, build_as, scratch_buffer->device_address(),
+				cmd_create_blas(external_cmd_buf, indices_slice, build_as_arr, scratch_buffer->device_address(),
 								compaction_query_pool);
 			} else {
 				vk::CommandBuffer cmd(true);
-				cmd_create_blas(cmd.handle, indices_slice, build_as, scratch_buffer->device_address(),
+				cmd_create_blas(cmd.handle, indices_slice, build_as_arr, scratch_buffer->device_address(),
 								compaction_query_pool);
 				cmd.submit();
 				if (compaction_query_pool) {
 					cmd.begin();
-					cmd_compact_blas(cmd.handle, indices_slice, build_as, compaction_query_pool);
+					cmd_compact_blas(cmd.handle, indices_slice, build_as_arr, compaction_query_pool);
 					cmd.submit();
 					// Destroy the non-compacted version
 					for (auto i : indices) {
-						vkDestroyAccelerationStructureKHR(context().device, build_as[i].cleanup_as.accel, nullptr);
-						prm::remove(build_as[i].cleanup_as.buffer);
+						vkDestroyAccelerationStructureKHR(context().device, build_as_arr[i].cleanup_as.accel, nullptr);
+						prm::remove(build_as_arr[i].cleanup_as.buffer);
 					}
 				}
 			}
@@ -318,9 +317,10 @@ static void build_blas_impl(lm::ScratchArena& scratch, lm::FixedArray<BuildAccel
 
 	// Logging reduction
 	if (compaction_query_pool) {
-		VkDeviceSize compact_size =
-			std::accumulate(build_as.begin(), build_as.end(), 0ULL,
-							[](const auto& a, const auto& b) { return a + b.size_info.accelerationStructureSize; });
+		VkDeviceSize compact_size = 0;
+		for(BuildAccelerationStructure& build_as : build_as_arr) {
+			compact_size += build_as.size_info.accelerationStructureSize;
+		}
 		LUMEN_TRACE("RT BLAS: reducing from: %.2f MB to: %.2f MB = (%.2f%% smaller) \n", as_total_size * 1e-6,
 					compact_size * 1e-6, (as_total_size - compact_size) / f32(as_total_size) * 100.f);
 	}

@@ -109,7 +109,7 @@ void init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = config.num_mlt_threads * (path_length * (path_length + 1)) * sizeof(Splat)});
 
-	auto path_size = glm::max(config.num_mlt_threads, config.num_bootstrap_samples);
+	auto path_size = lm::max(config.num_mlt_threads, config.num_bootstrap_samples);
 
 	state.light_path_buffer =
 		prm::get_buffer({.name = CSTR("Light Paths"),
@@ -128,7 +128,7 @@ void init(Integrator* integrator) {
 	i32 size = 0;
 	i32 arr_size = config.num_bootstrap_samples;
 	do {
-		i32 num_blocks = glm::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
+		i32 num_blocks = lm::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
 			size++;
 		}
@@ -141,7 +141,7 @@ void init(Integrator* integrator) {
 	i32 i = 0;
 	arr_size = config.num_bootstrap_samples;
 	do {
-		i32 num_blocks = glm::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
+		i32 num_blocks = lm::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
 			lm::String buffer_name = lm::str_concat(integrator->arena, "Block Sum Buffer #",
 													lm::str_from_u64(integrator->arena, i), /*cstr=*/true);
@@ -215,7 +215,7 @@ void init(Integrator* integrator) {
 static void prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg) {
 	PSSMLT& state = integrator->pssmlt;
 	const bool scan_sums = level > 0;
-	i32 num_wgs = glm::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
+	i32 num_wgs = lm::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
 	i32 num_grids = num_wgs - i32((num_elems % 2048) != 0);
 	state.pc_compute.num_elems = num_elems;
 	auto scan = [&](i32 num_wgs, i32 idx) {

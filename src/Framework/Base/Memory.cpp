@@ -22,7 +22,7 @@ void arena_ensure_committed(Arena* arena, u64 target_offset) {
 	arena->local_offset = target_offset;
 	if (target_offset <= arena->end_committed) return;
 	u64 commit_size =
-		glm::max(MIN_ARENA_COMMIT_SIZE, util::align_pow2(target_offset - arena->end_committed, os::get_page_size()));
+		lm::max(MIN_ARENA_COMMIT_SIZE, util::align_pow2(target_offset - arena->end_committed, os::get_page_size()));
 	LUMEN_WARN("Committing %llu bytes ( %f MB) for: %s", commit_size, commit_size / (1024.0 * 1024), arena->name.data);
 	bool commited = os::commit(arena->data + arena->end_committed, commit_size);
 	memset(arena->data + arena->end_committed, 0, commit_size);
@@ -89,8 +89,8 @@ void* Arena::allocate(u64 size, u64 alignment, Arena** arena_node, bool zero_ini
 		}
 	}
 	if (last_block != nullptr) {
-		u64 reserve_size = glm::max(MIN_ARENA_RESERVE_SIZE, glm::max(exclusive_block_reserve_size, size));
-		u64 commit_size = glm::max(MIN_ARENA_COMMIT_SIZE, size);
+		u64 reserve_size = lm::max(MIN_ARENA_RESERVE_SIZE, lm::max(exclusive_block_reserve_size, size));
+		u64 commit_size = lm::max(MIN_ARENA_COMMIT_SIZE, size);
 		Arena* new_arena = arena_create(curr_arena->name, reserve_size, commit_size, alignment);
 		last_block->next = new_arena;
 		curr_arena = new_arena;
@@ -126,7 +126,7 @@ Arena* arena_create(lm::String name, u64 reserve_size, u64 commit_size, u64 head
 							   : ALIGNED_HEADER_SIZE;
 	}
 	reserve_size = util::align_pow2(reserve_size + HEADER_SIZE, page_size);
-	commit_size = glm::min(reserve_size, util::align_pow2(commit_size + HEADER_SIZE, page_size));
+	commit_size = lm::min(reserve_size, util::align_pow2(commit_size + HEADER_SIZE, page_size));
 	void* base = os::reserve(reserve_size);
 	bool commited = os::commit(base, commit_size);
 	assert(commited);

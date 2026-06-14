@@ -42,6 +42,17 @@
 #define NOPROFILER
 #define NODEFERWINDOWPOS
 #define NOMCX
+#undef NOWINMESSAGES
+#undef NOWINSTYLES
+#undef NOVIRTUALKEYCODES
+#undef NOKEYSTATES
+#undef NOCLIPBOARD
+#undef NOUSER
+#undef NOSHOWWINDOW
+#undef NOSYSMETRICS
+#undef NOMEMMGR
+#undef NOMSG
+#undef NOWINOFFSETS
 #endif
 
 #define local_persist static
@@ -82,27 +93,13 @@ typedef double f64;
 #include <assert.h>
 
 #include "Framework/Logger.h"
+#include "Framework/Base/Math.h"
 #include <volk/volk.h>
 
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
 #include <vma/vk_mem_alloc.h>
-#include <GLFW/glfw3.h>
 #include <imgui/imgui.h>
-#include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_vulkan.h"
-#include <span>
-#include <filesystem>
 #include "Framework/VulkanStructs.h"
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/ext.hpp>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/euler_angles.hpp>
-#include <glm/gtx/string_cast.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtx/matrix_decompose.hpp>
-#include <glm/gtx/quaternion.hpp>
+#include <initializer_list>

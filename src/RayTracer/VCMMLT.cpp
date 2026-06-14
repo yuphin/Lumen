@@ -10,7 +10,7 @@ void init(Integrator* integrator) {
 	u32 path_length = integrator->lumen_scene->config.common.path_length;
 	state.mutation_count =
 		i32(Window::width() * Window::height() * config.mutations_per_pixel / f32(config.num_mlt_threads));
-	state.light_path_rand_count = glm::max(7 + 3 * path_length, 3 + 7 * path_length);
+	state.light_path_rand_count = lm::max(7 + 3 * path_length, 3 + 7 * path_length);
 
 	// MLTVCM buffers
 	state.bootstrap_buffer =
@@ -133,7 +133,7 @@ void init(Integrator* integrator) {
 	i32 size = 0;
 	i32 arr_size = config.num_bootstrap_samples;
 	do {
-		i32 num_blocks = glm::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
+		i32 num_blocks = lm::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
 			size++;
 		}
@@ -146,7 +146,7 @@ void init(Integrator* integrator) {
 	i32 i = 0;
 	arr_size = config.num_bootstrap_samples;
 	do {
-		i32 num_blocks = glm::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
+		i32 num_blocks = lm::max(1, (i32)ceil(arr_size / (2.0f * 1024)));
 		if (num_blocks > 1) {
 			lm::String buffer_name = lm::str_concat(integrator->arena, "Block Sum Buffer #",
 													lm::str_from_u64(integrator->arena, i), /*cstr=*/true);
@@ -226,7 +226,7 @@ void init(Integrator* integrator) {
 static void prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& counter, lm::RenderGraph* rg) {
 	VCMMLT& state = integrator->vcmmlt;
 	const bool scan_sums = level > 0;
-	i32 num_wgs = glm::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
+	i32 num_wgs = lm::max(1, (i32)ceil(num_elems / (2 * 1024.0f)));
 	i32 num_grids = num_wgs - i32((num_elems % 2048) != 0);
 	state.pc_compute.num_elems = num_elems;
 	auto scan = [&](i32 num_wgs, i32 idx) {
@@ -312,10 +312,10 @@ void render(Integrator* integrator) {
 	state.pc.radius /= (f32)pow((double)state.pc.frame_num + 1, 0.5 * (1 - 2.0 / 3));
 	state.pc.min_bounds = integrator->lumen_scene->dimensions.min;
 	state.pc.max_bounds = integrator->lumen_scene->dimensions.max;
-	const glm::vec3 diam = state.pc.max_bounds - state.pc.min_bounds;
-	const f32 max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
+	const lm::vec3 diam = state.pc.max_bounds - state.pc.min_bounds;
+	const f32 max_comp = lm::max(diam.x, lm::max(diam.y, diam.z));
 	const i32 base_grid_res = i32(max_comp / state.pc.radius);
-	state.pc.grid_res = glm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
+	state.pc.grid_res = lm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
 	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
 	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 
@@ -490,7 +490,7 @@ void render(Integrator* integrator) {
 	// Compositions
 	rg->add_compute(CSTR("Composition"),
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/vcmmlt/composite.comp")),
-					 .dims = {(u32)glm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+					 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});
 }

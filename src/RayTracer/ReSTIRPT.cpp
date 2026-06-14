@@ -19,7 +19,7 @@ void init(Integrator* integrator) {
 	}
 
 	lm::ScratchArena scratch = integrator->arena;
-	auto transformations = lm::fixed_array_create<glm::mat4>(scratch.arena, integrator->lumen_scene->prim_meshes.size);
+	auto transformations = lm::fixed_array_create<lm::mat4>(scratch.arena, integrator->lumen_scene->prim_meshes.size);
 	transformations.size = integrator->lumen_scene->prim_meshes.size;
 	for (auto& pm : integrator->lumen_scene->prim_meshes) {
 		transformations[pm.prim_idx] = pm.world_matrix;
@@ -62,7 +62,7 @@ void init(Integrator* integrator) {
 		prm::get_buffer({.name = CSTR("Prefix Contributions"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height() * sizeof(glm::vec3)});
+						 .size = Window::width() * Window::height() * sizeof(lm::vec3)});
 
 	state.debug_vis_buffer =
 		prm::get_buffer({.name = CSTR("Debug Vis"),
@@ -80,7 +80,7 @@ void init(Integrator* integrator) {
 		.name = CSTR("Transformations Buffer"),
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		.memory_type = vk::BUFFER_TYPE_GPU,
-		.size = transformations.size * sizeof(glm::mat4),
+		.size = transformations.size * sizeof(lm::mat4),
 		.data = transformations.data,
 	});
 	state.photon_eye_buffer_ping =
@@ -160,7 +160,7 @@ void init(Integrator* integrator) {
 	// For Photon TLAS
 	VkAccelerationStructureInstanceKHR tlas_instance;
 	tlas_instance.instanceCustomIndex = 0;
-	tlas_instance.transform = vk::to_vk_matrix(glm::mat4(1.0f));
+	tlas_instance.transform = vk::to_vk_matrix(lm::mat4(1.0f));
 	tlas_instance.mask = 0xFF;
 	tlas_instance.instanceShaderBindingTableRecordOffset = 0;
 	tlas_instance.flags = VK_GEOMETRY_INSTANCE_FORCE_OPAQUE_BIT_KHR;
@@ -217,7 +217,7 @@ void render(Integrator* integrator) {
 	state.pc.dir_light_idx = integrator->lumen_scene->dir_light_idx;
 	state.pc.enable_accumulation = state.enable_accumulation;
 	state.pc.num_spatial_samples = state.num_spatial_samples;
-	state.pc.scene_extent = glm::length(integrator->lumen_scene->dimensions.max - integrator->lumen_scene->dimensions.min);
+	state.pc.scene_extent = lm::length(integrator->lumen_scene->dimensions.max - integrator->lumen_scene->dimensions.min);
 	state.pc.direct_lighting = state.direct_lighting;
 	state.pc.enable_rr = state.enable_rr;
 

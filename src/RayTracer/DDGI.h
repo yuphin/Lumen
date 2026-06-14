@@ -27,8 +27,8 @@ struct DDGI {
 	f32 probe_distance = 0.5f;
 	f32 min_frontface_dist = 0.1f;
 	f32 max_distance = 0;
-	glm::ivec3 probe_counts{};
-	glm::vec3 probe_start_position{};
+	lm::ivec3 probe_counts{};
+	lm::vec3 probe_start_position{};
 	f32 tmax = 1e4f;
 	f32 tmin = 1e-3f;
 	PCDDGI pc{};
@@ -50,9 +50,9 @@ struct DDGI {
 namespace ddgi {
 void update_ddgi_uniforms(Integrator* integrator);
 void create_radiance_textures(Integrator* integrator);
-glm::vec3 probe_location(Integrator* integrator, u32 index);
-glm::ivec3 probe_index_to_grid_coord(Integrator* integrator, u32 index);
-glm::vec3 grid_coord_to_position(Integrator* integrator, const glm::ivec3& grid_coord);
+lm::vec3 probe_location(Integrator* integrator, u32 index);
+lm::ivec3 probe_index_to_grid_coord(Integrator* integrator, u32 index);
+lm::vec3 grid_coord_to_position(Integrator* integrator, const lm::ivec3& grid_coord);
 void init(Integrator* integrator);
 void render(Integrator* integrator);
 bool update(Integrator* integrator);

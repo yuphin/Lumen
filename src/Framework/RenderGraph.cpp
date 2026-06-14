@@ -622,14 +622,14 @@ RenderPass& RenderPass::bind_texture_array(lm::FixedArray<vk::Texture*> textures
 	return *this;
 }
 
-RenderPass& RenderPass::bind_buffer_array(std::span<vk::Buffer*> buffers, bool force_update) {
+RenderPass& RenderPass::bind_buffer_array(lm::FixedArray<vk::Buffer*> buffers, bool force_update) {
 	if (next_binding_idx >= pipeline_storage->bound_resources.size) {
 		for (auto& buffer : buffers) {
 			pipeline_storage->bound_resources.emplace_back(buffer);
 		}
-		descriptor_counts.push_back((u32)buffers.size());
+		descriptor_counts.push_back((u32)buffers.size);
 	} else {
-		for (auto i = 0; i < buffers.size(); i++) {
+		for (auto i = 0; i < buffers.size; i++) {
 			pipeline_storage->bound_resources[next_binding_idx + i].replace(buffers[i]);
 		}
 	}
@@ -803,14 +803,12 @@ void RenderPass::update_rt_descriptors(RenderPass* pass) {
 		accels[i] = pass->pipeline_storage->as_bindings[i].accel;
 		++num_accels;
 	}
-	pass->pipeline_storage->pipeline.tlas_info = {
-		VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
+	pass->pipeline_storage->pipeline.tlas_info = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
 	pass->pipeline_storage->pipeline.tlas_info.accelerationStructureCount = num_accels;
 	pass->pipeline_storage->pipeline.tlas_info.pAccelerationStructures = accels;
-	auto descriptor_write =
-		vk::write_descriptor_set(pass->pipeline_storage->pipeline.tlas_descriptor_set,
-								 VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0,
-								 &pass->pipeline_storage->pipeline.tlas_info, num_accels);
+	auto descriptor_write = vk::write_descriptor_set(pass->pipeline_storage->pipeline.tlas_descriptor_set,
+													 VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0,
+													 &pass->pipeline_storage->pipeline.tlas_info, num_accels);
 	vkUpdateDescriptorSets(vk::context().device, 1, &descriptor_write, 0, nullptr);
 	pass->pipeline_storage->update_as_descriptor = false;
 }
@@ -908,7 +906,7 @@ void RenderPass::post_execution_barrier(vk::Buffer* buffer, VkAccessFlags access
 }
 
 void RenderPass::run(VkCommandBuffer cmd) {
-	vk::begin_region(vk::context().device, cmd, name.data, glm::vec4(1.0f, 0.78f, 0.05f, 1.0f));
+	vk::begin_region(vk::context().device, cmd, name.data, lm::vec4(1.0f, 0.78f, 0.05f, 1.0f));
 	GPUQueryManager::begin(cmd, name);
 	const bool use_events = rg->settings.use_events;
 
@@ -1271,12 +1269,12 @@ void RenderGraph::init() {
 	shader_cache = lm::hash_map_create<lm::String, vk::Shader>(_arena_rendergraph, 4 * MAX_PASSES_PER_FRAME);
 }
 
-static u64 shader_render_pass_hash(const std::pair<vk::Shader*, RenderPass*>& entry) {
+static u64 shader_render_pass_hash(const lm::pair<vk::Shader*, RenderPass*>& entry) {
 	return default_hash(entry.first->name_with_macros);
 }
 
-static bool shader_render_pass_eq(const std::pair<vk::Shader*, RenderPass*>& a,
-								  const std::pair<vk::Shader*, RenderPass*>& b) {
+static bool shader_render_pass_eq(const lm::pair<vk::Shader*, RenderPass*>& a,
+								  const lm::pair<vk::Shader*, RenderPass*>& b) {
 	return a.first->name_with_macros == b.first->name_with_macros;
 }
 
@@ -1286,7 +1284,7 @@ void RenderGraph::run(VkCommandBuffer cmd) {
 	if (recording_or_reload) {
 		lm::ScratchArena scratch = _arena_per_frame;
 		auto unique_shaders_set =
-			lm::hash_set_create<std::pair<vk::Shader*, RenderPass*>, shader_render_pass_hash, shader_render_pass_eq>(
+			lm::hash_set_create<lm::pair<vk::Shader*, RenderPass*>, shader_render_pass_hash, shader_render_pass_eq>(
 				scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
 		// TODO: Make these FixedArrays SmallArrays
 		auto existing_shaders_map = lm::hash_map_create<RenderPass*, lm::FixedArray<vk::Shader*>>(

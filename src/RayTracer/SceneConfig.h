@@ -4,9 +4,9 @@
 
 struct CameraSettings {
 	f32 fov = 90.0f;
-	glm::vec3 pos = glm::vec3(0);
-	glm::vec3 rotation = glm::vec3(0);
-	glm::vec3 dir = glm ::vec3(0,0,-1.0f);
+	lm::vec3 pos = lm::vec3(0);
+	lm::vec3 rotation = lm::vec3(0);
+	lm::vec3 dir = lm::vec3(0, 0, -1.0f);
 };
 enum IntegratorType : u32 {
 	INTEGRATOR_PATH,
@@ -60,7 +60,7 @@ struct IRCacheConfig {};
 
 struct SceneCommon {
 	CameraSettings cam_settings = {};
-	glm::vec3 sky_col = glm::vec3(0);
+	lm::vec3 sky_col = lm::vec3(0);
 	u32 path_length = 6;
 	lm::String integrator_name = "Path";
 };

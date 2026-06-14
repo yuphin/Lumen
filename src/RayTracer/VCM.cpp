@@ -144,10 +144,10 @@ void render(Integrator* integrator) {
 		integrator->scene_ubo_buffer,
 		integrator->lumen_scene->scene_desc_buffer,
 	};
-	const glm::vec3 diam = state.pc.max_bounds - state.pc.min_bounds;
-	const f32 max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
+	const lm::vec3 diam = state.pc.max_bounds - state.pc.min_bounds;
+	const f32 max_comp = lm::max(diam.x, lm::max(diam.y, diam.z));
 	const i32 base_grid_res = i32(max_comp / state.pc.radius);
-	state.pc.grid_res = glm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
+	state.pc.grid_res = lm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
 	// Prepare
 	auto& prepare_pass =
 		vk::render_graph()

@@ -45,7 +45,7 @@ static void uniform_add(u32 num_wgs, vk::Buffer* scene_desc_buffer, const PCPref
 
 static void prefix_scan(u32 num_elems, u32 block_sum_offset, u32 out_offset, u32 scratch_capacity, bool scan_sums,
 						vk::Buffer* scene_desc_buffer) {
-	u32 num_wgs = glm::max(1u, util::div_ceil(num_elems, (u32)SCAN_WG_SIZE));
+	u32 num_wgs = lm::max(1u, util::div_ceil(num_elems, (u32)SCAN_WG_SIZE));
 	PCPrefixSum pc = {
 		.scan_sums = scan_sums,
 		.num_elems = num_elems,
@@ -77,7 +77,7 @@ void init(Integrator* integrator) {
 		lm::ScratchArena scratch = integrator->arena;
 
 		auto transformations =
-			lm::fixed_array_create<glm::mat4>(scratch.arena, integrator->lumen_scene->prim_meshes.size);
+			lm::fixed_array_create<lm::mat4>(scratch.arena, integrator->lumen_scene->prim_meshes.size);
 		for (const LumenPrimMesh& pm : integrator->lumen_scene->prim_meshes) {
 			transformations.push_back(pm.world_matrix);
 		}
@@ -85,7 +85,7 @@ void init(Integrator* integrator) {
 			.name = CSTR("Transformations Buffer"),
 			.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 			.memory_type = vk::BUFFER_TYPE_GPU,
-			.size = transformations.size * sizeof(glm::mat4),
+			.size = transformations.size * sizeof(lm::mat4),
 			.data = transformations.data,
 		});
 	}
@@ -154,7 +154,7 @@ void init(Integrator* integrator) {
 	u64 prefix_sum_scratch_elements = 0;
 	u64 cur_total_cells = grid_total_cells;
 	do {
-		u64 num_blocks = glm::max(1uLL, util::div_ceil(cur_total_cells, (u64)SCAN_WG_SIZE));
+		u64 num_blocks = lm::max(1uLL, util::div_ceil(cur_total_cells, (u64)SCAN_WG_SIZE));
 		if (num_blocks > 1) {
 			prefix_sum_scratch_elements += num_blocks;
 		}
@@ -242,8 +242,8 @@ void init(Integrator* integrator) {
 	f32 max_trapezoidal_cell_size =
 		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], Window::height());
 
-	LUMEN_INFO("Uniform cells size limit (world space): %u", (u32)glm::round(fabsf(max_uniform_cells)));
-	LUMEN_INFO("Trapezoidal cell size limit (px): %u", (u32)glm::round(max_trapezoidal_cell_size));
+	LUMEN_INFO("Uniform cells size limit (world space): %u", (u32)lm::round(fabsf(max_uniform_cells)));
+	LUMEN_INFO("Trapezoidal cell size limit (px): %u", (u32)lm::round(max_trapezoidal_cell_size));
 }
 
 void render(Integrator* integrator) {
@@ -264,7 +264,7 @@ void render(Integrator* integrator) {
 	u32 grid_total_cells = get_total_grid_cells();
 	u32 prefix_sum_scratch_capacity = (u32)(state.grid_prefix_sum_scratch_buffer->size / sizeof(u32));
 	pc.grid_total_cells = grid_total_cells;
-	pc.scene_extent = glm::length(integrator->lumen_scene->dimensions.max - integrator->lumen_scene->dimensions.min);
+	pc.scene_extent = lm::length(integrator->lumen_scene->dimensions.max - integrator->lumen_scene->dimensions.min);
 	pc.total_frame_num = state.total_frame_idx;
 	pc.rays_per_surfel = state.rays_per_surfel;
 
@@ -327,7 +327,7 @@ void render(Integrator* integrator) {
 		for (u64 i = 0; i < total_cells; i++) {
 			u32 prev = i > 0 ? prefix_sums[i - 1] : 0;
 			prefix_sums.push_back(prev + counts[i]);
-			max_count = glm::max(max_count, counts[i]);
+			max_count = lm::max(max_count, counts[i]);
 		}
 		vk::buffer_unmap(state.grid_cell_counts_buffer);
 

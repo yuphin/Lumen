@@ -4,6 +4,7 @@
 #include "RayTracer.h"
 #include "Integrator.h"
 #include "PostFX.h"
+#include <format>
 
 namespace ray_tracer {
 
@@ -372,7 +373,7 @@ static bool gui() {
 				"[{:.2f},{:.2f},{:.2f}],\n    \"rotation\":[{:.2f},{:.2f},{:.2f}],\n    \"dir\":[{:.2f},{:.2f},{:.2f}]",
 				camera.position.x, camera.position.y, camera.position.z, camera.rotation.x, camera.rotation.y,
 				camera.rotation.z, camera.direction.x, camera.direction.y, camera.direction.z);
-			glfwSetClipboardString(Window::get()->window_handle, cam_pos_str.c_str());
+			Window::set_clipboard_text(cam_pos_str.c_str());
 		}
 	}
 	if (ImGui::Checkbox("Enable VSync", &vk::context().vsync_enabled)) {
@@ -438,16 +439,16 @@ static f32 draw_frame() {
 		start = clock();
 	}
 
-	auto t_begin = glfwGetTime() * 1000;
+	auto t_begin = Window::time_seconds() * 1000;
 	bool updated = false;
 	u32 image_idx = vk::prepare_frame();
 	if (image_idx == UINT32_MAX) {
-		auto t_end = glfwGetTime() * 1000;
+		auto t_end = Window::time_seconds() * 1000;
 		auto t_diff = t_end - t_begin;
 		return (f32)t_diff;
 	}
 	ImGui_ImplVulkan_NewFrame();
-	ImGui_ImplGlfw_NewFrame();
+	Window::imgui_new_frame();
 	ImGui::NewFrame();
 
 	active_integrator.updated |= updated;
@@ -507,7 +508,7 @@ static f32 draw_frame() {
 		LUMEN_TRACE("RMSE: %f", rmse * 1e6);
 		start = now;
 	}
-	auto t_end = glfwGetTime() * 1000;
+	auto t_end = Window::time_seconds() * 1000;
 	auto t_diff = t_end - t_begin;
 	cnt++;
 	return (f32)t_diff;

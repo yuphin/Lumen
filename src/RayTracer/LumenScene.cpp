@@ -14,9 +14,9 @@ static lm::Arena* _arena_scene = nullptr;
 static lm::Arena* _arena_strings = nullptr;
 Scene _scene = {};
 
-static void reflectance_to_conductor_eta_k(const glm::vec3& reflectance, glm::vec3& eta, glm::vec3& k) {
-	eta = glm::vec3(1.0f);
-	k = 2.0f * glm::sqrt(reflectance) / glm::sqrt(glm::max(glm::vec3(1.0f) - reflectance, 0.001f));
+static void reflectance_to_conductor_eta_k(const lm::vec3& reflectance, lm::vec3& eta, lm::vec3& k) {
+	eta = lm::vec3(1.0f);
+	k = 2.0f * lm::sqrt(reflectance) / lm::sqrt(lm::max(lm::vec3(1.0f) - reflectance, 0.001f));
 };
 
 static void insert_child(LumenNode* parent, LumenNode* child) {
@@ -59,7 +59,7 @@ static LumenNode* file_parse(lm::String buffer) {
 		}
 #endif
 		if (buffer[buffer_cursor] == '\n') {
-			line_end_idx = glm::min(line_end_idx, buffer_cursor);
+			line_end_idx = lm::min(line_end_idx, buffer_cursor);
 			assert(line_end_idx != U64_MAX);
 			u64 line_cursor = curr_line_idx;
 			i32 indentation = 0;
@@ -221,7 +221,7 @@ static lm::String get_light_type_str(const AnalyticalLight& light) {
 	return "";
 }
 
-static void get_or_default_v3_2(LumenNode* node, glm::vec3& result) {
+static void get_or_default_v3_2(LumenNode* node, lm::vec3& result) {
 	if (!node || node->value.empty()) {
 		return;
 	}
@@ -243,8 +243,8 @@ static void get_or_default_v3_2(LumenNode* node, glm::vec3& result) {
 	result[comma_count++] = lm::f32_from_str(lm::String(start, ptr - start));
 }
 
-static glm::vec3 get_or_default_v3(LumenNode* node, const glm::vec3& val) {
-	glm::vec3 result = val;
+static lm::vec3 get_or_default_v3(LumenNode* node, const lm::vec3& val) {
+	lm::vec3 result = val;
 	get_or_default_v3_2(node, result);
 	return result;
 }
@@ -297,7 +297,7 @@ static void add_child_node(LumenNode* parent, LumenNode* child) {
 	child->parent = parent;
 }
 
-static lm::String str_from_vec3(lm::Arena* arena, const glm::vec3& vec) {
+static lm::String str_from_vec3(lm::Arena* arena, const lm::vec3& vec) {
 	char buf[64];
 	i32 num_chars = stbsp_snprintf(buf, sizeof(buf), "v3f(%.6g,%.6g,%.6g)", vec.x, vec.y, vec.z);
 	lm::String result;
@@ -384,15 +384,15 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 	}
 
 	// GPU Lights are allocated later
-	_scene.positions = lm::fixed_array_create<glm::vec3>(_arena_scene, total_vtx_count);
+	_scene.positions = lm::fixed_array_create<lm::vec3>(_arena_scene, total_vtx_count);
 	_scene.indices = lm::fixed_array_create<u32>(_arena_scene, total_vtx_count);
-	_scene.normals = lm::fixed_array_create<glm::vec3>(_arena_scene, total_vtx_count);
-	_scene.texcoords0 = lm::fixed_array_create<glm::vec2>(_arena_scene, total_vtx_count);
+	_scene.normals = lm::fixed_array_create<lm::vec3>(_arena_scene, total_vtx_count);
+	_scene.texcoords0 = lm::fixed_array_create<lm::vec2>(_arena_scene, total_vtx_count);
 	_scene.prim_meshes = lm::fixed_array_create<LumenPrimMesh>(_arena_scene, total_obj_count);
 	_scene.materials = lm::fixed_array_create<Material>(_arena_scene, get_child_count(bsdfs_node));
 	_scene.textures = lm::fixed_array_create<TextureRef>(_arena_scene, get_child_count(textures_node));
 	_scene.scene_textures =
-		lm::fixed_array_create<vk::Texture*>(_arena_scene, glm::max(_scene.textures.capacity, 1ull));
+		lm::fixed_array_create<vk::Texture*>(_arena_scene, lm::max(_scene.textures.capacity, 1ull));
 	_scene.analytical_lights = lm::fixed_array_create<AnalyticalLight>(_arena_scene, get_child_count(lights_node));
 	_scene.material_idx_to_name = lm::hash_map_create<u32, lm::String>(_arena_scene, get_child_count(bsdfs_node));
 
@@ -433,8 +433,8 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 		u32 bsdf_idx = 0;
 		for (LumenNode* bsdf_node = bsdfs_node->child; bsdf_node; bsdf_node = next_node(bsdf_node), bsdf_idx++) {
 			Material& material = _scene.materials.emplace_back();
-			material.albedo = get_or_default_v3(get_node(bsdf_node, "albedo"), glm::vec3(1.0f));
-			material.emissive_factor = get_or_default_v3(get_node(bsdf_node, "emissive_factor"), glm::vec3(0.0f));
+			material.albedo = get_or_default_v3(get_node(bsdf_node, "albedo"), lm::vec3(1.0f));
+			material.emissive_factor = get_or_default_v3(get_node(bsdf_node, "emissive_factor"), lm::vec3(0.0f));
 			material.texture_id = -1;
 			lm::String mat_name = get_str(get_node(bsdf_node, "name"));
 			if (!mat_name.empty()) {
@@ -496,8 +496,8 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 				// k is the absorption coefficient
 				LumenNode* reflectance = get_node(bsdf_node, "reflectance");
 				if (reflectance) {
-					glm::vec3 reflectance_val =
-						glm::clamp(get_or_default_v3(reflectance, glm::vec3(1.0f)), 0.0f, 0.9999f);
+					lm::vec3 reflectance_val =
+						lm::clamp(get_or_default_v3(reflectance, lm::vec3(1.0f)), 0.0f, 0.9999f);
 					reflectance_to_conductor_eta_k(reflectance_val, material.albedo, material.k);
 				}
 
@@ -505,14 +505,14 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 				LumenNode* edge_tint = get_node(bsdf_node, "edge_tint");
 				LumenNode* reflectivity = get_node(bsdf_node, "reflectivity");
 				if (edge_tint && reflectivity) {
-					glm::vec3 edge_tint_vec = get_or_default_v3(edge_tint, glm::vec3(1));
-					glm::vec3 reflectivity_vec = get_or_default_v3(reflectivity, glm::vec3(1));
+					lm::vec3 edge_tint_vec = get_or_default_v3(edge_tint, lm::vec3(1));
+					lm::vec3 reflectivity_vec = get_or_default_v3(reflectivity, lm::vec3(1));
 					material.albedo = edge_tint_vec * (1.0f - reflectivity_vec) / (1.0f + reflectivity_vec) +
-									  (1.0f - edge_tint_vec) * (1.0f + glm::sqrt(reflectivity_vec)) /
-										  (1.0f - glm::sqrt(reflectivity_vec));
+									  (1.0f - edge_tint_vec) * (1.0f + lm::sqrt(reflectivity_vec)) /
+										  (1.0f - lm::sqrt(reflectivity_vec));
 					auto intermediate_term = material.albedo + 1.0f;
 					auto intermediate_term2 = material.albedo - 1.0f;
-					material.k = glm::sqrt(1.0f / (1.0f - reflectivity_vec) *
+					material.k = lm::sqrt(1.0f / (1.0f - reflectivity_vec) *
 										   (reflectivity_vec * intermediate_term * intermediate_term -
 											intermediate_term2 * intermediate_term2));
 				}
@@ -526,7 +526,7 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 			} else if (type == "principled") {
 				_scene.bsdf_types |= BSDF_TYPE_PRINCIPLED;
 				material.bsdf_type = BSDF_TYPE_PRINCIPLED;
-				material.albedo = get_or_default_v3(get_node(bsdf_node, "albedo"), glm::vec3(1));
+				material.albedo = get_or_default_v3(get_node(bsdf_node, "albedo"), lm::vec3(1));
 				material.ior = get_or_default_f(get_node(bsdf_node, "ior"), 1.0f);
 				material.roughness = get_or_default_f(get_node(bsdf_node, "roughness"), 0.5f);
 				material.diffuse_trans = get_or_default_f(get_node(bsdf_node, "diffuse_transmission"), 0.0f);
@@ -562,9 +562,9 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 		for (LumenNode* light_node = lights_node->child; light_node; light_node = next_node(light_node)) {
 			lm::String type = get_str(get_node(light_node, "type"));
 			AnalyticalLight& light = _scene.analytical_lights.emplace_back();
-			light.L = get_or_default_v3(get_node(light_node, "L"), glm::vec3(0));
-			light.pos = get_or_default_v3(get_node(light_node, "pos"), glm::vec3(0));
-			light.to = get_or_default_v3(get_node(light_node, "dir"), glm::vec3(0, 0, 1));
+			light.L = get_or_default_v3(get_node(light_node, "L"), lm::vec3(0));
+			light.pos = get_or_default_v3(get_node(light_node, "pos"), lm::vec3(0));
+			light.to = get_or_default_v3(get_node(light_node, "dir"), lm::vec3(0, 0, 1));
 			if (type == "spot") {
 				light.light_flags |= LIGHT_SPOT;
 				// Is finite
@@ -614,22 +614,22 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 				}
 			}
 		}
-		glm::mat4 world_matrix = glm::mat4(1);
+		lm::mat4 world_matrix = lm::mat4(1);
 		if (transforms_node) {
-			glm::vec3 translation = get_or_default_v3(get_node(transforms_node, "translation"), glm::vec3(0));
-			glm::vec3 rotation = glm::radians(get_or_default_v3(get_node(transforms_node, "rotation"), glm::vec3(0)));
-			glm::vec3 scale = get_or_default_v3(get_node(transforms_node, "scale"), glm::vec3(1));
-			world_matrix = glm::translate(world_matrix, translation);
-			world_matrix = glm::rotate(world_matrix, rotation.x, glm::vec3(1, 0, 0));
-			world_matrix = glm::rotate(world_matrix, rotation.y, glm::vec3(0, 1, 0));
-			world_matrix = glm::rotate(world_matrix, rotation.z, glm::vec3(0, 0, 1));
-			world_matrix = glm::scale(world_matrix, scale);
+			lm::vec3 translation = get_or_default_v3(get_node(transforms_node, "translation"), lm::vec3(0));
+			lm::vec3 rotation = lm::radians(get_or_default_v3(get_node(transforms_node, "rotation"), lm::vec3(0)));
+			lm::vec3 scale = get_or_default_v3(get_node(transforms_node, "scale"), lm::vec3(1));
+			world_matrix = lm::translate(world_matrix, translation);
+			world_matrix = lm::rotate(world_matrix, rotation.x, lm::vec3(1, 0, 0));
+			world_matrix = lm::rotate(world_matrix, rotation.y, lm::vec3(0, 1, 0));
+			world_matrix = lm::rotate(world_matrix, rotation.z, lm::vec3(0, 0, 1));
+			world_matrix = lm::scale(world_matrix, scale);
 		}
 		// Load obj file
 		fastObjMesh* obj = mesh_to_obj_map.find(mesh_idx)->value;
 		for (u32 shape_idx = 0; shape_idx < obj->object_count; shape_idx++) {
-			glm::vec3 min_vtx = glm::vec3(F32_MAX);
-			glm::vec3 max_vtx = glm::vec3(F32_MIN);
+			lm::vec3 min_vtx = lm::vec3(F32_MAX);
+			lm::vec3 max_vtx = lm::vec3(F32_MIN);
 
 			LumenPrimMesh& prim_mesh = _scene.prim_meshes.emplace_back();
 			prim_mesh.name = lm::str_from_cstr(_arena_strings, obj->objects[shape_idx].name);
@@ -666,8 +666,8 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 
 					_scene.texcoords0.emplace_back(obj->texcoords[2 * idx.t + 0], obj->texcoords[2 * idx.t + 1]);
 
-					min_vtx = glm::min(_scene.positions.back(), min_vtx);
-					max_vtx = glm::max(_scene.positions.back(), max_vtx);
+					min_vtx = lm::min(_scene.positions.back(), min_vtx);
+					max_vtx = lm::max(_scene.positions.back(), max_vtx);
 					++vtx_cnt;
 				}
 				index_offset += obj->face_vertices[obj->objects[shape_idx].face_offset + i];
@@ -687,7 +687,7 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 				prim_mesh.material_idx = 0;	 // Default material
 			}
 
-			glm::vec3 emissive_factor = _scene.materials[prim_mesh.material_idx].emissive_factor;
+			lm::vec3 emissive_factor = _scene.materials[prim_mesh.material_idx].emissive_factor;
 			if (emissive_factor.x > 0 || emissive_factor.y > 0 || emissive_factor.z > 0) {
 				num_emissives++;
 			}
@@ -714,7 +714,7 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 		lm::BBox mesh_bbox(prim_mesh.min_pos, prim_mesh.max_pos);
 		lm::bbox_transform(mesh_bbox, prim_mesh.world_matrix);
 		lm::bbox_insert(scene_bbox, mesh_bbox);
-		glm::vec3 emissive_factor = _scene.materials[prim_mesh.material_idx].emissive_factor;
+		lm::vec3 emissive_factor = _scene.materials[prim_mesh.material_idx].emissive_factor;
 
 		if (emissive_factor.x > 0 || emissive_factor.y > 0 || emissive_factor.z > 0) {
 			Light& light = _scene.gpu_lights.emplace_back();
@@ -730,8 +730,8 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 	}
 
 	if (scene_bbox.is_empty()) {
-		lm::bbox_insert(scene_bbox, glm::vec3(-1.0f));
-		lm::bbox_insert(scene_bbox, glm::vec3(1.0f));
+		lm::bbox_insert(scene_bbox, lm::vec3(-1.0f));
+		lm::bbox_insert(scene_bbox, lm::vec3(1.0f));
 	}
 	_scene.dimensions.min = scene_bbox.min();
 	_scene.dimensions.max = scene_bbox.max();
@@ -864,13 +864,13 @@ void load(const lm::String& path) {
 			u32 vtx_offset = pm.vtx_offset;
 			for (u32 i = 0; i < l.num_triangles; i++) {
 				auto idx_offset = idx_base_offset + 3 * i;
-				glm::ivec3 ind = {_scene.indices[idx_offset], _scene.indices[idx_offset + 1],
+				lm::ivec3 ind = {_scene.indices[idx_offset], _scene.indices[idx_offset + 1],
 								  _scene.indices[idx_offset + 2]};
-				ind += glm::ivec3(vtx_offset);
-				const vec3 v0 = pm.world_matrix * glm::vec4(_scene.positions[ind.x], 1.0);
-				const vec3 v1 = pm.world_matrix * glm::vec4(_scene.positions[ind.y], 1.0);
-				const vec3 v2 = pm.world_matrix * glm::vec4(_scene.positions[ind.z], 1.0);
-				f32 area = 0.5f * glm::length(glm::cross(v1 - v0, v2 - v0));
+				ind += lm::ivec3(vtx_offset);
+				const vec3 v0 = pm.world_matrix * lm::vec4(_scene.positions[ind.x], 1.0);
+				const vec3 v1 = pm.world_matrix * lm::vec4(_scene.positions[ind.y], 1.0);
+				const vec3 v2 = pm.world_matrix * lm::vec4(_scene.positions[ind.z], 1.0);
+				f32 area = 0.5f * lm::length(lm::cross(v1 - v0, v2 - v0));
 				total_light_triangle_area += area;
 			}
 		}
@@ -881,7 +881,7 @@ void load(const lm::String& path) {
 	_scene.mesh_lights_buffer = prm::get_buffer({.name = CSTR("Mesh Lights Buffer"),
 												 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 												 .memory_type = vk::BUFFER_TYPE_GPU,
-												 .size = glm::max(_scene.gpu_lights.size, (u64)1) * sizeof(Light),
+												 .size = lm::max(_scene.gpu_lights.size, (u64)1) * sizeof(Light),
 												 .data = _scene.gpu_lights.data});
 	_scene.total_light_area += total_light_triangle_area;
 
@@ -1061,7 +1061,7 @@ void write() {
 		add_leaf_node(scratch.arena, bsdf_prop, "type", get_material_type(mat));
 		lm::String albedo = str_from_vec3(scratch.arena, mat.albedo);
 		add_leaf_node(scratch.arena, bsdf_prop, "albedo", albedo);
-		if (glm::any(glm::greaterThan(mat.emissive_factor, glm::vec3(0.0f)))) {
+		if (lm::any(lm::greaterThan(mat.emissive_factor, lm::vec3(0.0f)))) {
 			lm::String emissive_factor = str_from_vec3(scratch.arena, mat.emissive_factor);
 			add_leaf_node(scratch.arena, bsdf_prop, "emissive_factor", emissive_factor);
 		}
@@ -1094,13 +1094,13 @@ void write() {
 
 				// https://jcgt.org/published/0003/04/03/paper.pdf , Eqn. 14 and 15
 				// Note: albedo = eta = n from the paper
-				glm::vec3 r_num = mat.albedo - glm::vec3(1.0f);
-				glm::vec3 r_denom = mat.albedo + glm::vec3(1.0f);
-				glm::vec3 reflectivity = (r_num * r_num + mat.k * mat.k) / (r_denom * r_denom + mat.k * mat.k);
-				glm::vec3 n_min = (1.0f - reflectivity) / (1.0f + reflectivity);
-				glm::vec3 n_max = (1.0f + glm::sqrt(reflectivity)) / (1.0f - glm::sqrt(reflectivity));
+				lm::vec3 r_num = mat.albedo - lm::vec3(1.0f);
+				lm::vec3 r_denom = mat.albedo + lm::vec3(1.0f);
+				lm::vec3 reflectivity = (r_num * r_num + mat.k * mat.k) / (r_denom * r_denom + mat.k * mat.k);
+				lm::vec3 n_min = (1.0f - reflectivity) / (1.0f + reflectivity);
+				lm::vec3 n_max = (1.0f + lm::sqrt(reflectivity)) / (1.0f - lm::sqrt(reflectivity));
 
-				glm::vec3 edge_tint;
+				lm::vec3 edge_tint;
 				for (i32 c = 0; c < 3; c++) {
 					if (reflectivity[c] == 0)
 						edge_tint[c] = 0.0f;
@@ -1194,25 +1194,25 @@ void write() {
 				add_leaf_node(scratch.arena, mesh_to_material_node, "name", material_entry->value);
 				add_child_node(materials_node, mesh_to_material_node);
 
-				glm::vec3 scale;
-				glm::quat q;
-				glm::vec3 translation;
-				glm::vec3 skew;
-				glm::vec4 perspective;
-				glm::decompose(mesh->world_matrix, scale, q, translation, skew, perspective);
-				glm::vec3 rot{};
-				glm::extractEulerAngleXYZ(glm::toMat4(q), rot.x, rot.y, rot.z);
-				if (translation != glm::vec3(0.0)) {
+				lm::vec3 scale;
+				lm::quat q;
+				lm::vec3 translation;
+				lm::vec3 skew;
+				lm::vec4 perspective;
+				lm::decompose(mesh->world_matrix, scale, q, translation, skew, perspective);
+				lm::vec3 rot{};
+				lm::extract_euler_angle_xyz(lm::to_mat4(q), rot.x, rot.y, rot.z);
+				if (translation != lm::vec3(0.0)) {
 					add_leaf_node(scratch.arena, transforms_node, "translation",
 								  str_from_vec3(scratch.arena, translation));
 					has_transform = true;
 				}
-				if (rot != glm::vec3(0.0)) {
+				if (rot != lm::vec3(0.0)) {
 					add_leaf_node(scratch.arena, transforms_node, "rotation",
-								  str_from_vec3(scratch.arena, glm::degrees(rot)));
+								  str_from_vec3(scratch.arena, lm::degrees(rot)));
 					has_transform = true;
 				}
-				if (scale != glm::vec3(1.0)) {
+				if (scale != lm::vec3(1.0)) {
 					add_leaf_node(scratch.arena, transforms_node, "scale", str_from_vec3(scratch.arena, scale));
 					has_transform = true;
 				}

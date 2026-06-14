@@ -32,15 +32,15 @@
 
 #ifdef __cplusplus
 // GLSL Type
-using vec2 = glm::vec2;
-using ivec3 = glm::ivec3;
-using vec3 = glm::vec3;
-using vec4 = glm::vec4;
-using mat4 = glm::mat4; 
-using uvec4 = glm::uvec4;
-using ivec2 = glm::ivec2;
+using vec2 = lm::vec2;
+using ivec3 = lm::ivec3;
+using vec3 = lm::vec3;
+using vec4 = lm::vec4;
+using mat4 = lm::mat4;
+using uvec4 = lm::uvec4;
+using ivec2 = lm::ivec2;
 using uint = unsigned int;
-using uvec2 = glm::uvec2;
+using uvec2 = lm::uvec2;
 #define ALIGN16 alignas(16)
 #define NAMESPACE_BEGIN(name) namespace name {
 #define NAMESPACE_END() }

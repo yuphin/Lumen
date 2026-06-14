@@ -21,15 +21,15 @@ struct LumenPrimMesh {
 	u32 idx_count;
 	u32 vtx_count;
 	u32 prim_idx;
-	glm::mat4 world_matrix;
-	glm::vec3 min_pos;
-	glm::vec3 max_pos;
+	lm::mat4 world_matrix;
+	lm::vec3 min_pos;
+	lm::vec3 max_pos;
 };
 
 struct AnalyticalLight {
-	glm::vec3 pos;
-	glm::vec3 to;
-	glm::vec3 L;
+	lm::vec3 pos;
+	lm::vec3 to;
+	lm::vec3 L;
 	u32 light_flags;
 	f32 world_radius;
 	bool enabled = true;
@@ -52,10 +52,10 @@ struct TextureRef {
 namespace scene {
 
 struct Scene {
-	lm::FixedArray<glm::vec3> positions;
+	lm::FixedArray<lm::vec3> positions;
 	lm::FixedArray<u32> indices;
-	lm::FixedArray<glm::vec3> normals;
-	lm::FixedArray<glm::vec2> texcoords0;
+	lm::FixedArray<lm::vec3> normals;
+	lm::FixedArray<lm::vec2> texcoords0;
 	lm::FixedArray<LumenPrimMesh> prim_meshes;
 	lm::FixedArray<Material> materials;
 	lm::FixedArray<TextureRef> textures;
@@ -76,10 +76,10 @@ struct Scene {
 	f32 total_light_area = 0;
 
 	struct Dimensions {
-		glm::vec3 min = glm::vec3(F32_MAX);
-		glm::vec3 max = glm::vec3(F32_MIN);
-		glm::vec3 size = glm::vec3(0.f);
-		glm::vec3 center = glm::vec3(0.f);
+		lm::vec3 min = lm::vec3(F32_MAX);
+		lm::vec3 max = lm::vec3(F32_MIN);
+		lm::vec3 size = lm::vec3(0.f);
+		lm::vec3 center = lm::vec3(0.f);
 		f32 radius = 0.0f;
 	} dimensions;
 	SceneConfig config;

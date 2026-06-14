@@ -116,6 +116,24 @@ struct TlasBuildData {
 	inline bool is_valid() { return instance_count != 0; }
 };
 
+struct LayoutTransitionData {
+	vk::Texture* tex;
+	VkImageLayout src_layout;
+	VkImageLayout dst_layout;
+};
+
+template <typename T1, typename T2>
+struct pair {
+	T1 first;
+	T2 second;
+
+	bool operator!=(const pair& other) const {
+		return first != other.first || second != other.second;
+	}
+
+	bool operator==(const pair& other) const { return first == other.first && second == other.second; }
+};
+
 class RenderGraph {
    public:
 	RenderGraph();
@@ -165,7 +183,7 @@ class RenderPass {
 	RenderPass& bind_texture_with_sampler(vk::Texture* tex, VkSampler sampler);
 	RenderPass& bind(std::initializer_list<ResourceBinding> bindings);
 	RenderPass& bind_texture_array(lm::FixedArray<vk::Texture*> texes, bool force_update = false);
-	RenderPass& bind_buffer_array(std::span<vk::Buffer*> buffers, bool force_update = false);
+	RenderPass& bind_buffer_array(lm::FixedArray<vk::Buffer*> buffers, bool force_update = false);
 	RenderPass& bind_tlas(const vk::BVH& tlas);
 
 	RenderPass& read(std::initializer_list<vk::Buffer*> buffers);
@@ -219,7 +237,7 @@ class RenderPass {
 
 	lm::SmallArray<Resource, MAX_RESOURCES_ZEROS> resource_zeros;
 	lm::SmallArray<BufferBarrier, MAX_RESOURCES_ZEROS> prefill_buffer_barriers;
-	lm::SmallArray<std::pair<Resource, Resource>, MAX_RESOURCES_COPIES> resource_copies;
+	lm::SmallArray<lm::pair<Resource, Resource>, MAX_RESOURCES_COPIES> resource_copies;
 	BufferSyncResources buffer_sync_resources;
 	ImageSyncResources image_sync_resources;
 	// TODO: Might be redundant?
@@ -232,7 +250,7 @@ class RenderPass {
 	lm::SmallArray<vk::Texture*, MAX_EXPLICIT_IMG_READ_WRITES> explicit_tex_writes;
 	lm::SmallArray<vk::Texture*, MAX_EXPLICIT_IMG_READ_WRITES> explicit_tex_reads;
 	lm::SmallArray<u32, MAX_DESCRIPTORS> descriptor_counts;
-	lm::SmallArray<std::tuple<vk::Texture*, VkImageLayout, VkImageLayout>, MAX_IMG_BARRIERS> layout_transitions;
+	lm::SmallArray<LayoutTransitionData, MAX_IMG_BARRIERS> layout_transitions;
 	// Resource dependencies that must execute before this pass.
 	/*
 	Note:
@@ -271,8 +289,8 @@ class RenderPass {
 	bool register_dependencies(const vk::Buffer* buffer, VkAccessFlags dst_access_flags,
 							   BufferSyncFlags flags = BufferSyncFlags::NONE, VkPipelineStageFlags dst_stage = 0);
 	bool register_dependencies(vk::Texture* tex, VkAccessFlags dst_access_flags, VkImageLayout target_layout);
-	void write_impl(const vk::Buffer* buffer, VkAccessFlags access_flags,
-					BufferSyncFlags flags = BufferSyncFlags::NONE, VkPipelineStageFlags stage = 0);
+	void write_impl(const vk::Buffer* buffer, VkAccessFlags access_flags, BufferSyncFlags flags = BufferSyncFlags::NONE,
+					VkPipelineStageFlags stage = 0);
 	void write_impl(vk::Texture* tex, VkAccessFlags access_flags = VK_ACCESS_SHADER_WRITE_BIT);
 	void read_impl(const vk::Buffer* buffer, VkAccessFlags access_flags = VK_ACCESS_SHADER_READ_BIT,
 				   BufferSyncFlags flags = BufferSyncFlags::NONE, VkPipelineStageFlags stage = 0);

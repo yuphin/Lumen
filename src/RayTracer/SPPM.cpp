@@ -92,10 +92,10 @@ void render(Integrator* integrator) {
 	state.pc.min_bounds = integrator->lumen_scene->dimensions.min;
 	state.pc.max_bounds = integrator->lumen_scene->dimensions.max;
 	state.pc.ppm_base_radius = config.base_radius;
-	const glm::vec3 diam = state.pc.max_bounds - state.pc.min_bounds;
-	const f32 max_comp = glm::max(diam.x, glm::max(diam.y, diam.z));
+	const lm::vec3 diam = state.pc.max_bounds - state.pc.min_bounds;
+	const f32 max_comp = lm::max(diam.x, lm::max(diam.y, diam.z));
 	const i32 base_grid_res = i32(max_comp / config.base_radius);
-	state.pc.grid_res = glm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
+	state.pc.grid_res = lm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
 	auto op_reduce = [&](const lm::String& op_name, const lm::String& op_shader_name, const lm::String& reduce_name,
 						 const lm::String& reduce_shader_name) {
 		u32 num_wgs = u32((Window::width() * Window::height() + 1023) / 1024);

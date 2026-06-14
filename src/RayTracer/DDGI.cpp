@@ -11,12 +11,12 @@ constexpr i32 DEPTH_SIDE_LENGTH = 16;
 static void generate_uv_sphere(lm::Array<u32>& indices, lm::Array<SphereVertex>& positions, u32 latitude, u32 longitude,
 							   f32 radius = 0.1f) {
 	for (u32 lat = 0; lat <= latitude; ++lat) {
-		f32 theta = lat * glm::pi<f32>() / latitude;
+		f32 theta = lat * lm::pi<f32>() / latitude;
 		f32 sin_theta = sin(theta);
 		f32 cos_theta = cos(theta);
 
 		for (u32 lon = 0; lon <= longitude; ++lon) {
-			f32 phi = lon * 2.0f * glm::pi<f32>() / longitude;
+			f32 phi = lon * 2.0f * lm::pi<f32>() / longitude;
 			f32 sin_phi = sin(phi);
 			f32 cos_phi = cos(phi);
 
@@ -24,7 +24,7 @@ static void generate_uv_sphere(lm::Array<u32>& indices, lm::Array<SphereVertex>&
 			vertex.pos.x = radius * sin_theta * cos_phi;
 			vertex.pos.y = radius * cos_theta;
 			vertex.pos.z = radius * sin_theta * sin_phi;
-			vertex.normal = glm::normalize(vertex.pos);
+			vertex.normal = lm::normalize(vertex.pos);
 		}
 	}
 
@@ -50,12 +50,12 @@ void init(Integrator* integrator) {
 	u32 num_probes;
 	// DDGI Resources
 	{
-		glm::vec3 min_pos = integrator->lumen_scene->dimensions.min - vec3(0.1f);
-		glm::vec3 max_pos = integrator->lumen_scene->dimensions.max + vec3(0.1f);
-		glm::vec3 diag = (max_pos - min_pos) * 1.1f;
-		state.probe_counts = glm::ivec3(diag / state.probe_distance);
+		lm::vec3 min_pos = integrator->lumen_scene->dimensions.min - vec3(0.1f);
+		lm::vec3 max_pos = integrator->lumen_scene->dimensions.max + vec3(0.1f);
+		lm::vec3 diag = (max_pos - min_pos) * 1.1f;
+		state.probe_counts = lm::ivec3(diag / state.probe_distance);
 		state.probe_start_position = min_pos;
-		glm::vec3 bbox_div_probes = diag / glm::vec3(state.probe_counts);
+		lm::vec3 bbox_div_probes = diag / lm::vec3(state.probe_counts);
 		state.max_distance = bbox_div_probes.length() * 1.5f;
 
 		// Samplers
@@ -172,7 +172,7 @@ void init(Integrator* integrator) {
 		.name = CSTR("Direct Lighting"),
 		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		.memory_type = vk::BUFFER_TYPE_GPU,
-		.size = Window::width() * Window::height() * sizeof(glm::vec3),
+		.size = Window::width() * Window::height() * sizeof(lm::vec3),
 	});
 
 	state.ddgi_ubo_buffer = prm::get_buffer({
@@ -242,9 +242,9 @@ void render(Integrator* integrator) {
 		std::random_device rd;
 		std::mt19937 gen(rd());
 		std::uniform_real_distribution<> dis(-1.0, 1.0);
-		glm::vec4 rands(0.5 * dis(gen) + 0.5, dis(gen), dis(gen), dis(gen));
-		state.pc.probe_rotation = glm::mat4_cast(
-			glm::angleAxis(2.0f * glm::pi<f32>() * rands.x, glm::normalize(glm::vec3(rands.y, rands.z, rands.w))));
+		lm::vec4 rands(0.5 * dis(gen) + 0.5, dis(gen), dis(gen), dis(gen));
+		state.pc.probe_rotation = lm::mat4_cast(
+			lm::angle_axis(2.0f * lm::pi<f32>() * rands.x, lm::normalize(lm::vec3(rands.y, rands.z, rands.w))));
 	}
 	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		integrator->output_tex,
@@ -519,8 +519,8 @@ void create_accel(Integrator* integrator, vk::BVH* tlas_ptr, lm::Array<vk::BVH>*
 		for (u32 i = 0; i < num_probes; ++i) {
 			VkAccelerationStructureInstanceKHR sphere_inst{};
 
-			glm::vec3 position = probe_location(integrator, i);
-			glm::mat4 transform = glm::translate(glm::mat4(1.0f), position);
+			lm::vec3 position = probe_location(integrator, i);
+			lm::mat4 transform = lm::translate(lm::mat4(1.0f), position);
 
 			sphere_inst.transform = vk::to_vk_matrix(transform);
 			sphere_inst.instanceCustomIndex = i;
@@ -534,26 +534,26 @@ void create_accel(Integrator* integrator, vk::BVH* tlas_ptr, lm::Array<vk::BVH>*
 	vk::tlas_build(tlas, tlas_instances.to_slice(), VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
-glm::vec3 probe_location(Integrator* integrator, u32 index) {
+lm::vec3 probe_location(Integrator* integrator, u32 index) {
 	DDGI& state = integrator->ddgi;
-	glm::ivec3 grid_coord = probe_index_to_grid_coord(integrator, index);
-	glm::vec3 grid_pos = grid_coord_to_position(integrator, grid_coord);
+	lm::ivec3 grid_coord = probe_index_to_grid_coord(integrator, index);
+	lm::vec3 grid_pos = grid_coord_to_position(integrator, grid_coord);
 	// TODO: Add offsets
 	return grid_pos;
 }
 
-glm::ivec3 probe_index_to_grid_coord(Integrator* integrator, u32 index) {
+lm::ivec3 probe_index_to_grid_coord(Integrator* integrator, u32 index) {
 	DDGI& state = integrator->ddgi;
-	glm::ivec3 res;
+	lm::ivec3 res;
 	res.x = index % state.probe_counts.x;
 	res.y = (index / state.probe_counts.x) % state.probe_counts.y;
 	res.z = index / (state.probe_counts.x * state.probe_counts.y);
 	return res;
 }
 
-glm::vec3 grid_coord_to_position(Integrator* integrator, const glm::ivec3& grid_coord) {
+lm::vec3 grid_coord_to_position(Integrator* integrator, const lm::ivec3& grid_coord) {
 	DDGI& state = integrator->ddgi;
-	return glm::vec3(grid_coord) * state.probe_distance + state.probe_start_position;
+	return lm::vec3(grid_coord) * state.probe_distance + state.probe_start_position;
 }
 
 void destroy(Integrator* integrator, bool resize) {

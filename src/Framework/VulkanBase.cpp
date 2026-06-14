@@ -7,7 +7,6 @@
 #include "CommandBuffer.h"
 #include "PersistentResourceManager.h"
 #include "Window.h"
-#include <unordered_set>
 
 namespace vk {
 
@@ -17,8 +16,6 @@ static constexpr u64 MAX_VALIDATION_LAYERS = 8;
 static constexpr u64 MAX_DEVICE_EXTENSIONS = 64;
 static constexpr u64 MAX_INSTANCE_EXTENSIONS = 64;
 static constexpr u64 MAX_PHYSICAL_DEVICES = 8;
-static constexpr u64 MAX_QUEUE_FAMILIES = 16;
-static constexpr u64 MAX_DEVICE_QUEUES = 8;
 static constexpr u64 MAX_LAYER_PROPERTIES = 64;
 static constexpr u64 MAX_EXTENSION_PROPERTIES = 512;
 
@@ -35,7 +32,7 @@ lm::SmallArray<VkSemaphore, MAX_FRAMES_IN_FLIGHT> _image_available_sem;
 lm::SmallArray<VkSemaphore, MAX_SWAPCHAIN_IMAGES> _render_finished_sem;
 lm::SmallArray<VkFence, MAX_FRAMES_IN_FLIGHT> _in_flight_fences;
 lm::SmallArray<VkFence, MAX_SWAPCHAIN_IMAGES> _images_in_flight;
-lm::SmallArray<VkQueueFamilyProperties, MAX_QUEUE_FAMILIES> _queue_families;
+lm::SmallArray<VkQueueFamilyProperties, MAX_QUEUES> _queue_families;
 
 lm::RenderGraph _rg;
 VkFormat _swapchain_format;
@@ -51,14 +48,8 @@ VkDescriptorPool _imgui_pool = 0;
 // -------------------------------------------------------------------------------------------------
 
 static lm::SmallArray<const char*, MAX_INSTANCE_EXTENSIONS> get_req_extensions() {
-	u32 glfwExtensionCount = 0;
-	const char** glfwExtensions;
-	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
 	lm::SmallArray<const char*, MAX_INSTANCE_EXTENSIONS> extensions;
-	for (u32 i = 0; i < glfwExtensionCount; ++i) {
-		extensions.push_back(glfwExtensions[i]);
-	}
+	extensions.resize(os::window_required_vulkan_extensions(extensions.data, (u32)extensions.capacity()));
 
 	if (_enable_validation_layers) {
 		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -71,7 +62,7 @@ static QueueFamilyIndices find_queue_families(VkPhysicalDevice device) {
 	u32 queue_family_count = 0;
 	vkGetPhysicalDeviceQueueFamilyProperties2(device, &queue_family_count, nullptr);
 
-	lm::SmallArray<VkQueueFamilyProperties2, MAX_QUEUE_FAMILIES> queue_families2;
+	lm::SmallArray<VkQueueFamilyProperties2, MAX_QUEUES> queue_families2;
 	queue_families2.resize(queue_family_count);
 	for (auto& queue_family : queue_families2) {
 		queue_family = {VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2};
@@ -192,8 +183,8 @@ static VKAPI_ATTR void VKAPI_CALL get_physical_device_properties(VkPhysicalDevic
 	*properties = properties2.properties;
 }
 
-static VKAPI_ATTR void VKAPI_CALL get_physical_device_memory_properties(
-	VkPhysicalDevice device, VkPhysicalDeviceMemoryProperties* properties) {
+static VKAPI_ATTR void VKAPI_CALL get_physical_device_memory_properties(VkPhysicalDevice device,
+																		VkPhysicalDeviceMemoryProperties* properties) {
 	VkPhysicalDeviceMemoryProperties2 properties2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2};
 	vkGetPhysicalDeviceMemoryProperties2(device, &properties2);
 	*properties = properties2.memoryProperties;
@@ -255,7 +246,7 @@ static void create_allocator() {
 }
 
 static void create_surface() {
-	check(glfwCreateWindowSurface(context().instance, Window::get()->window_handle, nullptr, &context().surface),
+	check((VkResult)os::window_create_vulkan_surface(Window::get()->os_window, context().instance, &context().surface),
 		  "Failed to create window surface");
 }
 
@@ -289,12 +280,19 @@ static void pick_physical_device() {
 			available_extensions.resize(extension_cnt);
 			vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_cnt, available_extensions.data);
 
-			std::unordered_set<std::string> required_extensions(_device_extensions.begin(), _device_extensions.end());
-
-			for (const auto& extension : available_extensions) {
-				required_extensions.erase(extension.extensionName);
+			for (const char* required_extension : _device_extensions) {
+				bool found = false;
+				for (const auto& extension : available_extensions) {
+					if (strcmp(required_extension, extension.extensionName) == 0) {
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					return false;
+				}
 			}
-			return required_extensions.empty();
+			return true;
 		}(device);
 
 		// Query swaphcain support
@@ -339,11 +337,23 @@ static void pick_physical_device() {
 static void create_logical_device() {
 	context().queue_indices = find_queue_families(context().physical_device);
 
-	lm::SmallArray<VkDeviceQueueCreateInfo, MAX_DEVICE_QUEUES> queue_CIs;
-	std::unordered_set<u32> unique_queue_families = {context().queue_indices.gfx_family,
-													 context().queue_indices.present_family,
-													 context().queue_indices.compute_family};
+	lm::SmallArray<VkDeviceQueueCreateInfo, MAX_QUEUES> queue_CIs;
+	lm::SmallArray<u32, MAX_QUEUES> unique_queue_families;
+	auto push_unique_queue_family = [&unique_queue_families](u32 queue_family_idx) {
+		if (queue_family_idx == VK_QUEUE_FAMILY_IGNORED) {
+			return;
+		}
+		for (u32 existing : unique_queue_families) {
+			if (existing == queue_family_idx) {
+				return;
+			}
+		}
+		unique_queue_families.push_back(queue_family_idx);
+	};
 
+	push_unique_queue_family(context().queue_indices.gfx_family);
+	push_unique_queue_family(context().queue_indices.present_family);
+	push_unique_queue_family(context().queue_indices.compute_family);
 	context().queues.resize((context().queue_indices.gfx_family != VK_QUEUE_FAMILY_IGNORED) +
 							(context().queue_indices.present_family != VK_QUEUE_FAMILY_IGNORED) +
 							(context().queue_indices.compute_family != VK_QUEUE_FAMILY_IGNORED));
@@ -438,8 +448,7 @@ static void create_logical_device() {
 	check(vkCreateDevice(context().physical_device, &logical_device_CI, nullptr, &context().device),
 		  "Failed to create logical device");
 
-	vkGetDeviceQueue(context().device, context().queue_indices.gfx_family, 0,
-					 &context().queues[(i32)QueueType::GFX]);
+	vkGetDeviceQueue(context().device, context().queue_indices.gfx_family, 0, &context().queues[(i32)QueueType::GFX]);
 	vkGetDeviceQueue(context().device, context().queue_indices.compute_family, 0,
 					 &context().queues[(i32)QueueType::COMPUTE]);
 	vkGetDeviceQueue(context().device, context().queue_indices.present_family, 0,
@@ -480,17 +489,17 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 		if (capabilities.currentExtent.width != UINT32_MAX) {
 			return capabilities.currentExtent;
 		} else {
-			i32 width, height;
-			glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
+			u32 width, height;
+			os::window_framebuffer_size(Window::get()->os_window, width, height);
 
-			VkExtent2D actual_extent = {static_cast<u32>(width), static_cast<u32>(height)};
+			VkExtent2D actual_extent = {width, height};
 
 			// Clamp width and height
-			actual_extent.width = glm::max(capabilities.minImageExtent.width,
-										   glm::min(capabilities.maxImageExtent.width, actual_extent.width));
+			actual_extent.width = lm::max(capabilities.minImageExtent.width,
+										  lm::min(capabilities.maxImageExtent.width, actual_extent.width));
 
-			actual_extent.height = glm::max(capabilities.minImageExtent.height,
-											glm::min(capabilities.maxImageExtent.height, actual_extent.height));
+			actual_extent.height = lm::max(capabilities.minImageExtent.height,
+										   lm::min(capabilities.maxImageExtent.height, actual_extent.height));
 
 			return actual_extent;
 		}
@@ -715,7 +724,7 @@ void init_imgui() {
 	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 	pool_info.maxSets = 1000;
-	pool_info.poolSizeCount = (u32)std::size(pool_sizes);
+	pool_info.poolSizeCount = (u32)(sizeof(pool_sizes) / sizeof(pool_sizes[0]));
 	pool_info.pPoolSizes = pool_sizes;
 	check(vkCreateDescriptorPool(context().device, &pool_info, nullptr, &_imgui_pool));
 	IMGUI_CHECKVERSION();
@@ -723,7 +732,7 @@ void init_imgui() {
 	// Setup Platform/Renderer backends
 	ImGui::StyleColorsDark();
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-	ImGui_ImplGlfw_InitForVulkan(Window::get()->window_handle, true);
+	Window::imgui_init();
 
 	ImGui_ImplVulkan_InitInfo init_info = {};
 	init_info.Instance = context().instance;
@@ -748,7 +757,7 @@ void init_imgui() {
 void destroy_imgui() {
 	vkDestroyDescriptorPool(context().device, _imgui_pool, nullptr);
 	ImGui_ImplVulkan_Shutdown();
-	ImGui_ImplGlfw_Shutdown();
+	Window::imgui_shutdown();
 	ImGui::DestroyContext();
 }
 
@@ -756,12 +765,12 @@ void add_device_extension(const char* name) { _device_extensions.push_back(name)
 
 // Called after window resize or manually
 void recreate_swap_chain() {
-	i32 width = 0, height = 0;
-	glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
+	u32 width = 0, height = 0;
+	os::window_framebuffer_size(Window::get()->os_window, width, height);
 	while (width == 0 || height == 0) {
 		// Window is minimized
-		glfwGetFramebufferSize(Window::get()->window_handle, &width, &height);
-		glfwWaitEvents();
+		os::window_wait_events(Window::get()->os_window);
+		os::window_framebuffer_size(Window::get()->os_window, width, height);
 	}
 	check(vkDeviceWaitIdle(context().device), "Failed to wait for device before recreating swap chain");
 	cleanup_swapchain_images();

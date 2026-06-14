@@ -12,10 +12,9 @@ void transition_image_layout(VkCommandBuffer copy_cmd, VkImage image, VkImageLay
 							 VkImageLayout new_layout, VkImageSubresourceRange subresource_range,
 							 VkImageAspectFlags aspect_flags);
 
-inline bool has_extension(std::string_view filename, std::string_view ext) { return filename.ends_with(ext); }
 
-inline VkTransformMatrixKHR to_vk_matrix(const glm::mat4& mat) {
-	glm::mat4 temp = glm::transpose(mat);
+inline VkTransformMatrixKHR to_vk_matrix(const lm::mat4& mat) {
+	lm::mat4 temp = lm::transpose(mat);
 	VkTransformMatrixKHR out_matrix;
 	memcpy(&out_matrix, &temp, sizeof(VkTransformMatrixKHR));
 	return out_matrix;
@@ -122,7 +121,7 @@ inline VkDeviceSize get_memory_usage(VkPhysicalDevice physical_device) {
 }
 
 inline u32 calc_mip_levels(VkExtent2D extent) {
-	return static_cast<u32>(std::floor(std::log2(glm::max(extent.width, extent.height)))) + 1;
+	return static_cast<u32>(std::floor(std::log2(lm::max(extent.width, extent.height)))) + 1;
 }
 
 inline void set_resource_name(VkDevice device, u64 obj, const char* name, VkObjectType type) {
@@ -134,7 +133,7 @@ inline void set_resource_name(VkDevice device, u64 obj, const char* name, VkObje
 	}
 #endif
 }
-inline void begin_region(VkDevice device, VkCommandBuffer cmd, const char* name, glm::vec4 color) {
+inline void begin_region(VkDevice device, VkCommandBuffer cmd, const char* name, lm::vec4 color) {
 	auto pfnCmdDebugMarkerBegin =
 		reinterpret_cast<PFN_vkCmdDebugMarkerBeginEXT>(vkGetDeviceProcAddr(device, "vkCmdDebugMarkerBeginEXT"));
 	if (pfnCmdDebugMarkerBegin) {
@@ -153,7 +152,7 @@ inline void end_region(VkDevice device, VkCommandBuffer cmd) {
 		pfnCmdDebugMarkerEnd(cmd);
 	}
 }
-inline void insert(VkDevice device, VkCommandBuffer cmd, const char* name, glm::vec4 color) {
+inline void insert(VkDevice device, VkCommandBuffer cmd, const char* name, lm::vec4 color) {
 	auto pfnCmdDebugMarkerInsert =
 		reinterpret_cast<PFN_vkCmdDebugMarkerInsertEXT>(vkGetDeviceProcAddr(device, "vkCmdDebugMarkerInsertEXT"));
 	if (pfnCmdDebugMarkerInsert) {

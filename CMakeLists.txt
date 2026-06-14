@@ -15,7 +15,6 @@ add_subdirectory(libs)
 
 set(structures_INCLUDE_DIR
     "libs"
-    "libs/glfw/include"
     "libs/vma/include"
     "src"
 )
@@ -62,7 +61,7 @@ if(WIN32)
     get_filename_component(vulkan_lib_folder ${Vulkan_LIBRARIES} DIRECTORY)
     get_filename_component(vulkan_sdk_folder ${vulkan_lib_folder} DIRECTORY)
     target_link_directories(Lumen PRIVATE ${vulkan_lib_folder})
-    target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared glm GPUOpen::VulkanMemoryAllocator
+    target_link_libraries(Lumen PRIVATE Vulkan::Vulkan volk shaderc_shared GPUOpen::VulkanMemoryAllocator user32
         $<$<CONFIG:Debug>:spirv-cross-c-sharedd> $<$<NOT:$<CONFIG:Debug>>:spirv-cross-c-shared>)
     add_custom_command(TARGET Lumen POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -71,17 +70,19 @@ if(WIN32)
         VERBATIM)
     target_compile_definitions(Lumen PRIVATE _CRT_SECURE_NO_WARNINGS)
 else()
-    target_link_libraries(Lumen PRIVATE Vulkan::Vulkan glfw volk shaderc_shared spirv-cross-c-shared glm GPUOpen::VulkanMemoryAllocator)
+    find_package(X11 REQUIRED)
+    target_link_libraries(Lumen PRIVATE Vulkan::Vulkan volk shaderc_shared spirv-cross-c-shared GPUOpen::VulkanMemoryAllocator X11::X11)
 endif()
 target_link_libraries(Lumen PRIVATE Threads::Threads)
+target_compile_definitions(Lumen PRIVATE
+    $<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>
+    $<$<NOT:$<PLATFORM_ID:Windows>>:VK_USE_PLATFORM_XLIB_KHR>
+)
 # target_compile_options(Lumen PRIVATE
 #     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 #     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>)
 
 if(MSVC)
-    if(TARGET glfw)
-        target_compile_options(glfw PRIVATE "/MP")
-    endif()
 	target_compile_options(Lumen PRIVATE "/MP")
     # Vulkan SDK debug SPIRV-Cross libraries reference compilation PDBs that
     # are not distributed with the SDK.

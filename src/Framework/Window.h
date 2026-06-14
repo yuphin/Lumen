@@ -1,5 +1,6 @@
 #pragma once
 #include "Framework/Base/SmallArray.h"
+#include "Framework/Base/OS.h"
 
 enum class KeyInput {
 	SPACE = 32,
@@ -171,7 +172,7 @@ struct Window {
 	double mouse_prev_x, mouse_prev_y;
 	double mouse_delta_prev_x, mouse_delta_prev_y;
 	double mouse_last_x, mouse_last_y;
-	GLFWwindow* window_handle;
+	os::Window os_window;
 	u32 window_width;
 	u32 window_height;
 	u32 viewport_width;
@@ -188,9 +189,14 @@ bool is_key_held(KeyInput input);
 bool is_mouse_held(MouseAction mb);
 bool is_mouse_down(MouseAction mb);
 bool is_mouse_up(MouseAction mb);
-bool is_mouse_held(MouseAction mb, glm::ivec2& pos);
-bool is_mouse_up(MouseAction mb, glm::ivec2& pos);
+bool is_mouse_held(MouseAction mb, lm::ivec2& pos);
+bool is_mouse_up(MouseAction mb, lm::ivec2& pos);
 void destroy();
+void imgui_init();
+void imgui_shutdown();
+void imgui_new_frame();
+void set_clipboard_text(const char* text);
+f64 time_seconds();
 void add_mouse_click_callback(void (*procedure)(void*, MouseAction, KeyAction, double, double), void* user_data = nullptr);
 void add_mouse_move_callback(void (*procedure)(void*, double, double, double, double), void* user_data = nullptr);
 void add_scroll_callback(void (*procedure)(void*, double, double), void* user_data = nullptr);

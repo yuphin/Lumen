@@ -1,4 +1,5 @@
 #include "ThreadPool.h"
+#include <stdio.h>
 
 bool ThreadPool::stopping = true;
 ThreadPool::QueuedJob ThreadPool::work_queue[MAX_QUEUED_JOBS] = {};
