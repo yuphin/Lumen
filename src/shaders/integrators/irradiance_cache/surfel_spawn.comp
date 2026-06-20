@@ -78,6 +78,7 @@ void main() {
 			uint surfel_offset = grid_cell_counts.d[linear_idx];
 			uint surfel_count = grid_cell_counts.d[linear_idx + 1] - surfel_offset;
 			vec4 hit_view_pos = ubo.view * vec4(hit_data.pos, 1.0);
+			float would_be_radius = surfel_radius_for_position(hit_data.pos, hit_view_pos);
 
 			for (uint gid = 0; gid < surfel_count; gid++) {
 				uint sid = grid_cell_indices.d[gid + surfel_offset];
@@ -89,8 +90,6 @@ void main() {
 				float dist_normal = dot(pos_to_surfel, surfel_hit_data.n_s);
 				float dist_tangent = sqrt(max(0.0, dist_sqr - dist_normal * dist_normal));
 				float n_dot = dot(hit_data.n_s, surfel_hit_data.n_s);
-
-				float would_be_radius = surfel_radius_factor(pc.desired_surfel_radius_px) * hit_view_pos.z;
 
 				if (n_dot < 0.3 || dist_tangent > (surfel.radius + would_be_radius)) {
 					continue;

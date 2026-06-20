@@ -1,10 +1,34 @@
 #version 460
+#extension GL_EXT_scalar_block_layout : enable
 #extension GL_GOOGLE_include_directive : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
 
 #include "ir_commons.h"
+layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellIndices { uint d[]; };
+
+Indices indices = Indices(scene_desc.index_addr);
+InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
+CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
+SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
+GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
+GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
+
+#include "ir_commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
-layout(binding = 0, rgba32f) uniform image2D image;
+layout(binding = 1, rgba32f) uniform image2D image;
+layout(binding = 2) uniform SceneUBOBuffer { SceneUBO ubo; };
+
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
+InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
+#include "hash.glsl"
+#include "grid.glsl"
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 void main() {
@@ -12,5 +36,55 @@ void main() {
 	if (coords.x >= pc.width || coords.y >= pc.height) {
 		return;
 	}
-	imageStore(image, coords, vec4(0, 0, 0, 1));
+
+	GBuffer gbuffer = gbuffers.d[gl_GlobalInvocationID.x];
+
+	if (!gbuffer_valid(gbuffer)) {
+		imageStore(image, coords, vec4(vec3(0), 1.f));
+		return;
+	}
+
+	HitData hit_data = get_hitdata(gbuffer);
+
+	vec3 pixel_world_pos = hit_data.pos;
+	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
+	vec3 offset = pixel_world_pos - cam_pos.xyz;
+	uvec4 grid_val = map_grid_axis(offset);
+	uint linear_idx = linearize_grid(grid_val);
+	uint surfel_count = grid_cell_counts.d[linear_idx + 1] - grid_cell_counts.d[linear_idx];
+	uint surfel_offset = grid_cell_counts.d[linear_idx];
+
+
+	vec3 col = vec3(0);
+	for (uint gid = 0; gid < surfel_count; gid++) {
+		uint sid = grid_cell_indices.d[gid + surfel_offset];
+		Surfel surfel = surfel_pool.d[sid];
+		HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
+
+		vec3 diff = hit_data.pos - surfel_hit_data.pos;
+		float dist = length(diff);
+		if (dist > surfel.radius) {
+			continue;
+		}
+
+		float n_dot = dot(hit_data.n_s, surfel_hit_data.n_s);
+		if (n_dot < 0.3) {
+			continue;
+		}
+
+		float dist_normal = dot(diff, surfel_hit_data.n_s);
+		float dist_tangent = sqrt(max(0.0, dist * dist - dist_normal * dist_normal));
+
+		// Penalize normal distance
+		float dist_aniso = sqrt(dist_tangent * dist_tangent + 4.0 * dist_normal * dist_normal);
+
+		if (dist_aniso > surfel.radius) {
+			continue;
+		}
+
+		float weight = (1.0 - dist_aniso / surfel.radius) * n_dot;
+		col += weight * surfel.irradiance;
+	}
+
+	imageStore(image, coords, vec4(col, 1));
 }

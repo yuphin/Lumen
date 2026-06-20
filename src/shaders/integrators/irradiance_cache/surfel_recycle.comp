@@ -3,6 +3,7 @@
 #extension GL_GOOGLE_include_directive : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_debug_printf : enable
 
 #include "ir_commons.h"
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
@@ -53,15 +54,21 @@ void main() {
 
 	HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
 	vec4 view_pos = ubo.view * vec4(surfel_hit_data.pos, 1.0);
+
 	// Surfel is behind the camera
 	if (view_pos.z >= 0.0) {
 		// TODO: Handle this later
 		return;
 	}
-	float px_size = 2 * surfel_px_size(surfel, view_pos);
+
+	float px_size = 2.0 * surfel_radius_px_size_for_position(surfel, surfel_hit_data.pos, view_pos);
 	float max_cell_size = max_px_per_trapezoidal_cell();
 	float max_allowed_cell_size = floor(max_cell_size) - pc.desired_surfel_radius_px;
 	if (px_size >= max_allowed_cell_size || px_size < pc.desired_surfel_radius_px) {
+#if 0
+		debugPrintfEXT("Recycling surfel %d, px_size: %f, max_allowed_cell_size: %f, desired_surfel_radius_px: %f\n",
+					   tid, px_size, max_allowed_cell_size, pc.desired_surfel_radius_px);
+#endif
 		recycle_surfel(tid);
 	}
 }

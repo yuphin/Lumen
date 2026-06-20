@@ -56,7 +56,7 @@ static const lm::String _integrator_config_names[INTEGRATOR_COUNT] = {
 
 static void init_resources();
 static void cleanup_resources();
-static f32 draw_frame();
+static f32 prepare_frame_and_render();
 static void render(u32 idx);
 static void render_debug_utils();
 static bool gui();
@@ -227,12 +227,11 @@ static void init_resources() {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(RTUtilsDesc),
 						 .data = &rt_utils_desc});
-
 }
 
 static void cleanup_resources() {
 	vk::Buffer** buffers[] = {&_output_img_buffer, &_output_img_buffer_cpu, &_residual_buffer, &_counter_buffer,
-							  &_rmse_val_buffer,	  &_rt_utils_desc_buffer,  &_gt_img_buffer};
+							  &_rmse_val_buffer,   &_rt_utils_desc_buffer,	&_gt_img_buffer};
 	for (vk::Buffer** buffer : buffers) {
 		prm::remove(*buffer);
 		*buffer = nullptr;
@@ -245,7 +244,7 @@ static void cleanup_resources() {
 }
 
 void update() {
-	f32 frame_time = draw_frame();
+	f32 frame_time = prepare_frame_and_render();
 	_cpu_avg_time = (1.0f - 1.0f / (_cnt)) * _cpu_avg_time + frame_time / (f32)_cnt;
 	_cpu_avg_time = 0.95f * _cpu_avg_time + 0.05f * frame_time;
 	integrator::update(&_active_integrator);
@@ -253,7 +252,7 @@ void update() {
 #if 0
 	char* stats = nullptr;
 	vmaBuildStatsString(vk::context().allocator, &stats, VK_TRUE);
-	printf("Stats--\n");
+	LUMEN_INFO("Stats--\n");
 	LUMEN_TRACE("%s", stats);
 #endif
 }
@@ -314,7 +313,7 @@ static void render_debug_utils() {
 		op_reduce(CSTR("OpReduce: RMSE"), CSTR("src/shaders/rmse/calc_rmse.comp"), CSTR("OpReduce: Reduce RMSE"),
 				  CSTR("src/shaders/rmse/reduce_rmse.comp"));
 		rg::add_compute(CSTR("Calculate RMSE"),
-						  {.shader = vk::Shader(CSTR("src/shaders/rmse/output_rmse.comp")), .dims = {1, 1, 1}})
+						{.shader = vk::Shader(CSTR("src/shaders/rmse/output_rmse.comp")), .dims = {1, 1, 1}})
 			.push_constants(&_rt_utils_pc)
 			.bind(_rt_utils_desc_buffer);
 	}
@@ -429,7 +428,7 @@ static bool gui() {
 	return updated;
 }
 
-static f32 draw_frame() {
+static f32 prepare_frame_and_render() {
 	if (_cnt == 0) {
 		_start = os::time_seconds();
 	}
@@ -487,7 +486,8 @@ static f32 draw_frame() {
 
 	if (_write_exr) {
 		_write_exr = false;
-		ImageUtils::save_exr((f32*)vk::buffer_map(_output_img_buffer_cpu), Window::width(), Window::height(), "out.exr");
+		ImageUtils::save_exr((f32*)vk::buffer_map(_output_img_buffer_cpu), Window::width(), Window::height(),
+							 "out.exr");
 		vk::buffer_unmap(_output_img_buffer_cpu);
 	}
 	bool time_limit = abs(diff - 5.0) < 0.1;

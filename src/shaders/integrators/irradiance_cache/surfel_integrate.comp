@@ -32,7 +32,8 @@ void main() {
 		uint linear_idx = surfel_id * pc.rays_per_surfel + i;
 		irradiance += surfel_samples.d[linear_idx].radiance;
 	}
-	surfel.irradiance = irradiance;
+	const float alpha = 0.2f;
+	surfel.irradiance = surfel.irradiance + (irradiance - surfel.irradiance) * alpha;
 
 	surfel_pool.d[surfel_id] = surfel;
 }

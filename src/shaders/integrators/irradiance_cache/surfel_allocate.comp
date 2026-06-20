@@ -56,10 +56,9 @@ void main() {
 
 	vec4 pos_ws = ubo.inv_view * vec4(0, 0, 0, 1);
 	vec3 c = hit_data.pos - pos_ws.xyz;
-	const float radius_factor = surfel_radius_factor(pc.desired_surfel_radius_px);
 	vec4 view_pos = ubo.view * vec4(hit_data.pos, 1.0);
 
-	float r = view_pos.z * radius_factor;
+	float r = surfel_radius_for_position(hit_data.pos, view_pos);
 
 	vec3 corners[8] = vec3[8](c + vec3(-r, -r, -r), c + vec3(-r, -r, +r), c + vec3(-r, +r, -r), c + vec3(-r, +r, +r),
 							  c + vec3(+r, -r, -r), c + vec3(+r, -r, +r), c + vec3(+r, +r, -r), c + vec3(+r, +r, +r));

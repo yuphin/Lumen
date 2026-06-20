@@ -22,8 +22,9 @@ struct IrradianceCache {
 	vk::Buffer* surfel_samples_buffer = nullptr;
 	PCIRCache pc{};
 	bool direct_lighting = false;
-	bool debug_mode = true;
+	bool debug_mode = false;
 	bool pause_surfel_spawn = false;
+	bool use_camera_relative_surfel_size = true;
 	u32 total_frame_idx = 0;
 	u32 rays_per_surfel = 8;
 };

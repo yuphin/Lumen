@@ -43,6 +43,7 @@ struct PCIRCache {
 	float scene_extent;
 	uint total_frame_num;
 	uint rays_per_surfel;
+	uint use_camera_relative_surfel_size;
 };
 
 struct PCPrefixSum {
