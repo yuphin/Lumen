@@ -375,7 +375,8 @@ void render(Integrator* integrator) {
 						{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/composite.comp")),
 						 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024)), 1, 1}})
 			.push_constants(&pc)
-			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->output_tex, integrator->scene_ubo_buffer});
+			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->output_tex, integrator->scene_ubo_buffer})
+			.bind_texture_array(integrator->lumen_scene->scene_textures);
 	}
 }
 

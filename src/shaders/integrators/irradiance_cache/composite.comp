@@ -1,13 +1,20 @@
 #version 460
+#extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 
 #include "ir_commons.h"
+
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(binding = 1, rgba32f) uniform image2D image;
+layout(binding = 2) uniform SceneUBOBuffer { SceneUBO ubo; };
+layout(binding = 3) uniform sampler2D scene_textures[];
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
@@ -15,15 +22,17 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellIndi
 
 Indices indices = Indices(scene_desc.index_addr);
 InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
+Materials materials = Materials(scene_desc.material_addr);
 CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
 GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
 
+#include "../../utils.glsl"
+#include "../../bsdf_commons.glsl"
 #include "ir_commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
-layout(binding = 1, rgba32f) uniform image2D image;
-layout(binding = 2) uniform SceneUBOBuffer { SceneUBO ubo; };
+
 
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
 InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
@@ -37,10 +46,11 @@ void main() {
 		return;
 	}
 
+	vec3 col = pc.direct_lighting == 1 ? imageLoad(image, coords).xyz : vec3(0);
 	GBuffer gbuffer = gbuffers.d[gl_GlobalInvocationID.x];
 
 	if (!gbuffer_valid(gbuffer)) {
-		imageStore(image, coords, vec4(vec3(0), 1.f));
+		imageStore(image, coords, vec4(col, 1.f));
 		return;
 	}
 
@@ -54,8 +64,8 @@ void main() {
 	uint surfel_count = grid_cell_counts.d[linear_idx + 1] - grid_cell_counts.d[linear_idx];
 	uint surfel_offset = grid_cell_counts.d[linear_idx];
 
-
-	vec3 col = vec3(0);
+	vec3 irradiance_sum = vec3(0);
+	float weight_sum = 0;
 	for (uint gid = 0; gid < surfel_count; gid++) {
 		uint sid = grid_cell_indices.d[gid + surfel_offset];
 		Surfel surfel = surfel_pool.d[sid];
@@ -82,9 +92,28 @@ void main() {
 			continue;
 		}
 
-		float weight = (1.0 - dist_aniso / surfel.radius) * n_dot;
-		col += weight * surfel.irradiance;
+		float ratio = dist_aniso / surfel.radius;
+
+		float weight_pos = pow(max(1.0 - ratio, 0.0), 4.0) * (4.0 * ratio + 1.0);
+
+		float weight_normal = pow(max(dot(hit_data.n_s, surfel_hit_data.n_s), 0.0), 4.0);
+
+		float weight = weight_pos * weight_normal;
+		weight_sum += weight;
+		irradiance_sum += weight * surfel.irradiance;
 	}
 
+	vec3 irradiance = weight_sum > 0 ? irradiance_sum / weight_sum : vec3(0);
+
+	Material material = load_material(hit_data.material_idx, hit_data.uv);
+	vec3 wo = normalize(cam_pos.xyz - pixel_world_pos);
+	vec3 n_s = hit_data.n_s;
+	vec3 n_g = hit_data.n_g;
+	bool side = face_forward(n_s, n_g, wo);
+	vec3 wi = n_s;
+	vec3 f = eval_bsdf(material, wo, wi, n_s, TRANSPORT_MODE_FROM_CAMERA, side);
+
+	vec3 indirect_radiance = f * irradiance;
+	col += indirect_radiance;
 	imageStore(image, coords, vec4(col, 1));
 }

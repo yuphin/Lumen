@@ -15,11 +15,14 @@ const float tmin = 0.001;
 const float tmax = 10000.0;
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 layout(location = 0) rayPayloadEXT IRCacheHitPayload payload;
+layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer OutGBuffer { GBuffer d[]; };
 
-OutGBuffer gbuffers = OutGBuffer(scene_desc.g_buffer_addr);
+#include "ir_commons.glsl"
+#include "direct_lighting.glsl"
 
+OutGBuffer gbuffers = OutGBuffer(scene_desc.g_buffer_addr);
 
 void main() {
 	const ivec2 pixel = ivec2(gl_LaunchIDEXT.xy);
@@ -28,6 +31,8 @@ void main() {
 	vec3 origin = ubo.view_pos.xyz;
 	vec3 direction = vec3(sample_camera(ndc));
 	direction = normalize(direction);
+	uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
+	vec3 direct_lighting = vec3(0);
 	GBuffer gbuffer_out;
 	gbuffer_out.barycentrics = vec2(0);
 	gbuffer_out.primitive_instance_id = uvec2(-1);
@@ -36,9 +41,32 @@ void main() {
 	const bool found_isect = payload.instance_idx != -1;
 	if (!found_isect) {
 		gbuffers.d[pixel_idx] = gbuffer_out;
+		if (pc.direct_lighting == 1) {
+#ifdef ENABLE_ATMOSPHERE
+			direct_lighting = shade_atmosphere(pc.dir_light_idx, pc.sky_col, origin, direction, tmax);
+#else
+			direct_lighting = pc.sky_col;
+#endif	// ENABLE_ATMOSPHERE
+		}
+		imageStore(image, pixel, vec4(direct_lighting, 1));
 		return;
 	}
 	gbuffer_out.barycentrics = payload.attribs;
 	gbuffer_out.primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
 	gbuffers.d[pixel_idx] = gbuffer_out;
+
+	if (pc.direct_lighting == 1) {
+		HitData hit_data = get_hitdata(gbuffer_out);
+		vec3 wo = -direction;
+		Material material = load_material(hit_data.material_idx, hit_data.uv);
+		vec3 n_s = hit_data.n_s;
+		vec3 n_g = hit_data.n_g;
+		bool side = face_forward(n_s, n_g, wo);
+
+		direct_lighting += material.emissive_factor;
+		if (!is_specular(material)) {
+			direct_lighting += uniform_sample_light(sampling_seed, hit_data.pos, n_s, wo, material, side);
+		}
+	}
+	imageStore(image, pixel, vec4(direct_lighting, 1));
 }
