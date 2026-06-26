@@ -33,21 +33,22 @@ GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_add
 #include "ir_commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 
-
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
 InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
 #include "hash.glsl"
 #include "grid.glsl"
 
-layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = SURFELIZE_PASS_TILE_SIZE_XY, local_size_y = SURFELIZE_PASS_TILE_SIZE_XY, local_size_z = 1) in;
 void main() {
-	ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.height, gl_GlobalInvocationID.x % pc.height);
+	ivec2 coords = ivec2(gl_GlobalInvocationID.xy);
+
+	uint pixel_idx = coords.x * pc.height + coords.y;
 	if (coords.x >= pc.width || coords.y >= pc.height) {
 		return;
 	}
 
 	vec3 col = pc.direct_lighting == 1 ? imageLoad(image, coords).xyz : vec3(0);
-	GBuffer gbuffer = gbuffers.d[gl_GlobalInvocationID.x];
+	GBuffer gbuffer = gbuffers.d[pixel_idx];
 
 	if (!gbuffer_valid(gbuffer)) {
 		imageStore(image, coords, vec4(col, 1.f));
@@ -66,6 +67,8 @@ void main() {
 
 	vec3 irradiance_sum = vec3(0);
 	float weight_sum = 0;
+
+	uvec4 base = map_grid_axis(offset);
 	for (uint gid = 0; gid < surfel_count; gid++) {
 		uint sid = grid_cell_indices.d[gid + surfel_offset];
 		Surfel surfel = surfel_pool.d[sid];
@@ -73,9 +76,6 @@ void main() {
 
 		vec3 diff = hit_data.pos - surfel_hit_data.pos;
 		float dist = length(diff);
-		if (dist > surfel.radius) {
-			continue;
-		}
 
 		float n_dot = dot(hit_data.n_s, surfel_hit_data.n_s);
 		if (n_dot < 0.3) {
@@ -88,13 +88,9 @@ void main() {
 		// Penalize normal distance
 		float dist_aniso = sqrt(dist_tangent * dist_tangent + 4.0 * dist_normal * dist_normal);
 
-		if (dist_aniso > surfel.radius) {
-			continue;
-		}
-
 		float ratio = dist_aniso / surfel.radius;
 
-		float weight_pos = pow(max(1.0 - ratio, 0.0), 4.0) * (4.0 * ratio + 1.0);
+		float weight_pos = pow(max(5.0 - ratio, 0.0), 4.0) * (4.0 * ratio + 1.0);
 
 		float weight_normal = pow(max(dot(hit_data.n_s, surfel_hit_data.n_s), 0.0), 4.0);
 

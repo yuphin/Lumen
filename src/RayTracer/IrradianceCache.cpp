@@ -201,8 +201,6 @@ void init(Integrator* integrator) {
 
 	assert(rg::settings().shader_inference == true);
 
-	pc.desired_surfel_radius_px = 8;
-	pc.grid_uniform_cell_distance_threshold = 0.1;
 	integrator->frame_num = 0;
 	// Clear surfel pool
 	vk::CommandBuffer cmd(true, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -214,6 +212,13 @@ void init(Integrator* integrator) {
 
 	f32 max_trapezoidal_cell_size =
 		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], Window::height());
+		
+	// Maximum possible size
+	// Let C be the trapezoidal cell size, x is the desired radius in terms of px
+	// Per the recycle rule in surfel_recycle: (C - x ) / 2 = x 
+	//  x = floor(C/3) pixels
+	pc.desired_surfel_radius_px = lm::floor(max_trapezoidal_cell_size / 3.0f);
+	pc.grid_uniform_cell_distance_threshold = 0.1;
 
 	LUMEN_INFO("Uniform cells size limit (world space): %u", (u32)lm::round(fabsf(max_uniform_cells)));
 	LUMEN_INFO("Trapezoidal cell size limit (px): %u", (u32)lm::round(max_trapezoidal_cell_size));
@@ -241,6 +246,7 @@ void render(Integrator* integrator) {
 	pc.total_frame_num = state.total_frame_idx;
 	pc.rays_per_surfel = state.rays_per_surfel;
 	pc.use_camera_relative_surfel_size = state.use_camera_relative_surfel_size;
+	pc.debug_view = state.debug_view;
 
 	vk::CommandBuffer cmd;
 	if (DEBUG_PASSES) {
@@ -369,11 +375,14 @@ void render(Integrator* integrator) {
 						{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/debug.comp")),
 						 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024)), 1, 1}})
 			.push_constants(&pc)
-			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->output_tex, integrator->scene_ubo_buffer});
+			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->output_tex, integrator->scene_ubo_buffer})
+			.bind_texture_array(integrator->lumen_scene->scene_textures);
 	} else {
+		u32 max_screen_tiles_x = lm::div_ceil(Window::width(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
+		u32 max_screen_tiles_y = lm::div_ceil(Window::height(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		rg::add_compute(CSTR("Composite"),
 						{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/composite.comp")),
-						 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024)), 1, 1}})
+						 .dims = {max_screen_tiles_x, max_screen_tiles_y, 1}})
 			.push_constants(&pc)
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->output_tex, integrator->scene_ubo_buffer})
 			.bind_texture_array(integrator->lumen_scene->scene_textures);
@@ -394,12 +403,37 @@ bool update(Integrator* integrator) {
 bool gui(Integrator* integrator) {
 	IrradianceCache& state = integrator->ircache;
 	PCIRCache& pc = state.pc;
+	static const char* debug_view_display_names[IRCACHE_DEBUG_VIEW_COUNT] = {
+		"GBuffer albedo",
+		"GBuffer normals",
+		"Grid",
+		"Grid + surfels",
+	};
 	bool result = false;
 	result |= ImGui::Checkbox("Direct lighting", &state.direct_lighting);
 	result |= ImGui::Checkbox("Debug mode", &state.debug_mode);
+	ImGui::BeginDisabled(!state.debug_mode);
+	if (ImGui::BeginCombo("Debug view", debug_view_display_names[state.debug_view])) {
+		for (i32 n = 0; n < IRCACHE_DEBUG_VIEW_COUNT; n++) {
+			const bool selected = state.debug_view == (u32)n;
+			if (ImGui::Selectable(debug_view_display_names[n], selected)) {
+				state.debug_view = (u32)n;
+				result = true;
+			}
+
+			if (selected) {
+				ImGui::SetItemDefaultFocus();
+			}
+		}
+		ImGui::EndCombo();
+	}
+	ImGui::EndDisabled();
 	result |= ImGui::Checkbox("Pause surfel spawning", &state.pause_surfel_spawn);
 	result |= ImGui::Checkbox("Camera relative surfel size", &state.use_camera_relative_surfel_size);
-	result |= ImGui::SliderFloat("Surfel radius (px)", &pc.desired_surfel_radius_px, 4, 128);
+	f32 max_trapezoidal_cell_size =
+		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], Window::height());
+	float max_allowed_cell_size = floor(max_trapezoidal_cell_size) - pc.desired_surfel_radius_px;
+	result |= ImGui::SliderFloat("Surfel radius (px)", &pc.desired_surfel_radius_px, 4, lm::floor(max_allowed_cell_size / 2));
 	result |= ImGui::SliderFloat("Uniform cell distance threshold", &pc.grid_uniform_cell_distance_threshold, 0.01, 10);
 	result |= ImGui::SliderInt("Rays per surfel", (i32*)&state.rays_per_surfel, 0, 256);
 	return result;

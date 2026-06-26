@@ -24,6 +24,12 @@
 #define GRID_TRAPEZOIDAL_CELL_COUNT_AXIS 64
 #define GRID_AVG_SURFELS_PER_CELL 16
 
+#define IRCACHE_DEBUG_VIEW_GBUFFER_ALBEDO 0
+#define IRCACHE_DEBUG_VIEW_GBUFFER_NORMALS 1
+#define IRCACHE_DEBUG_VIEW_TRAPEZOIDAL_GRID 2
+#define IRCACHE_DEBUG_VIEW_TRAPEZOIDAL_GRID_SURFELS 3
+#define IRCACHE_DEBUG_VIEW_COUNT 4
+
 struct PCIRCache {
 	vec3 sky_col;
 	uint frame_num;
@@ -44,6 +50,7 @@ struct PCIRCache {
 	uint total_frame_num;
 	uint rays_per_surfel;
 	uint use_camera_relative_surfel_size;
+	uint debug_view;
 };
 
 struct PCPrefixSum {

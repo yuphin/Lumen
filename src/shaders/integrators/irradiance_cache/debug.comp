@@ -1,17 +1,25 @@
 #version 460
+#extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_GOOGLE_include_directive : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_debug_printf : enable
 
 #include "ir_commons.h"
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(binding = 1, rgba32f) uniform image2D image;
+layout(binding = 2) uniform SceneUBOBuffer { SceneUBO ubo; };
+layout(binding = 3) uniform sampler2D scene_textures[];
+layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellIndices { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
 
 Indices indices = Indices(scene_desc.index_addr);
 InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
@@ -19,15 +27,11 @@ CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_a
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
 GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
-
-#include "ir_commons.glsl"
-
-layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
-layout(binding = 1, rgba32f) uniform image2D image;
-layout(binding = 2) uniform SceneUBOBuffer { SceneUBO ubo; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
+Materials materials = Materials(scene_desc.material_addr);
 InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
 
+#include "../../bsdf_commons.glsl"
+#include "ir_commons.glsl"
 #include "hash.glsl"
 #include "grid.glsl"
 
@@ -56,16 +60,50 @@ void main() {
 
 	HitData hit_data = get_hitdata(gbuffer);
 
-	float best_weight = 0.0;
-	uint best_sid = 0xFFFFFFFF;
+	if (pc.debug_view == IRCACHE_DEBUG_VIEW_GBUFFER_NORMALS) {
+		imageStore(image, coords, vec4(hit_data.n_s * 0.5 + 0.5, 1.f));
+		return;
+	} else if(pc.debug_view == IRCACHE_DEBUG_VIEW_GBUFFER_ALBEDO) {
+		Material material = load_material(hit_data.material_idx, hit_data.uv);
+		imageStore(image, coords, vec4(material.albedo, 1.f));
+		return;
+	}
+
 	vec3 pixel_world_pos = hit_data.pos;
 	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
 	vec3 offset = pixel_world_pos - cam_pos.xyz;
-	uint overlapping_surfel_cnt = 0;
-	uvec4 grid_val = map_grid_axis(offset);
+
+	vec3 grid_pos;
+	uvec4 grid_val = map_grid_axis(offset, grid_pos);
 	uint linear_idx = linearize_grid(grid_val);
 	uint surfel_count = grid_cell_counts.d[linear_idx + 1] - grid_cell_counts.d[linear_idx];
 	uint surfel_offset = grid_cell_counts.d[linear_idx];
+
+	uvec4 res = map_grid_axis(offset);
+	vec3 col = uvec3_to_random_color(res.yzw) * 0.5;
+	vec3 grid_base_color = uint_to_random_color(xxhash32(res.x));
+	col *= grid_base_color;
+
+
+	vec3 pos_abs = abs(offset);
+	float max_abs_dir = max(pos_abs.x, pos_abs.y);
+	max_abs_dir = max(max_abs_dir, pos_abs.z);
+	if(abs(max_abs_dir -pos_abs.x) < 1e-3 && abs(max_abs_dir - pos_abs.z) < 1e-3) {
+		col = vec3(100,0,0);
+		// debugPrintfEXT("%v3f\n", offset);
+	}
+	if (ubo.debug_click == 1 && ivec2(coords.xy) == ubo.clicked_pos) {
+		debugPrintfEXT("Clicked %v4u - %v3f - %v3f\n", res.xyzw, offset, grid_pos);
+	}
+
+	if (pc.debug_view == IRCACHE_DEBUG_VIEW_TRAPEZOIDAL_GRID) {
+		imageStore(image, coords, vec4(col, 1.f));
+		return;
+	}
+
+	float best_weight = 0.0;
+	uint best_sid = 0xFFFFFFFF;
+	uint overlapping_surfel_cnt = 0;
 
 	for (uint gid = 0; gid < surfel_count; gid++) {
 		uint sid = grid_cell_indices.d[gid + surfel_offset];
@@ -101,11 +139,6 @@ void main() {
 			best_sid = sid;
 		}
 	}
-
-	uvec4 res = map_grid_axis(offset);
-	vec3 col = uvec3_to_random_color(res.yzw) * 0.5;
-	vec3 grid_base_color = uint_to_random_color(xxhash32(res.x));
-	col *= grid_base_color;
 
 	if (best_sid != 0xFFFFFFFF) {
 		vec3 surfel_color = uint_to_random_color(best_sid);
