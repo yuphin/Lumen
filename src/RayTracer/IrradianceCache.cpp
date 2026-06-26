@@ -5,7 +5,12 @@ namespace ircache {
 
 using namespace IRCache;
 
-#define DEBUG_PASSES 0
+#define DEBUG_PASSES 1
+
+////////////////////////////
+// --- For debug purposes  ---
+static u32 _max_surfels_in_a_grid_cell = 0;
+static bool _highlight_max_surfel_cell = false;
 
 static u32 get_total_grid_cells() {
 	u32 num_uniform_cells = GRID_CENTER_CELL_COUNT_AXIS * GRID_CENTER_CELL_COUNT_AXIS * GRID_CENTER_CELL_COUNT_AXIS;
@@ -298,14 +303,15 @@ void render(Integrator* integrator) {
 		u64 total_cells = get_total_grid_cells();
 		auto prefix_sums = lm::fixed_array_create<u32>(scratch.arena, total_cells);
 
-		u32 max_count = 0;
+		_max_surfels_in_a_grid_cell = 0;
 
 		for (u64 i = 0; i < total_cells; i++) {
-			u32 prev = i > 0 ? prefix_sums[i - 1] : 0;
+			u32 prev = i > 0 ? prefix_sums[i - 1] : 0; 
 			prefix_sums.push_back(prev + counts[i]);
-			max_count = lm::max(max_count, counts[i]);
+			_max_surfels_in_a_grid_cell = lm::max(_max_surfels_in_a_grid_cell, counts[i]);
 		}
 		vk::buffer_unmap(state.grid_cell_counts_buffer);
+		pc.max_surfels_in_a_grid_cell = _highlight_max_surfel_cell ? _max_surfels_in_a_grid_cell : 0;
 
 		cmd.begin();
 		prefix_scan(grid_total_cells, 0, 0, prefix_sum_scratch_capacity, /*scan_sums=*/false,
@@ -318,7 +324,6 @@ void render(Integrator* integrator) {
 		}
 		vk::buffer_unmap(state.grid_cell_counts_buffer);
 
-		LUMEN_INFO("Max grid cell count: %u\n", max_count);
 	} else {
 		prefix_scan(grid_total_cells, 0, 0, prefix_sum_scratch_capacity, /*scan_sums=*/false,
 					integrator->lumen_scene->scene_desc_buffer);
@@ -436,6 +441,18 @@ bool gui(Integrator* integrator) {
 	result |= ImGui::SliderFloat("Surfel radius (px)", &pc.desired_surfel_radius_px, 4, lm::floor(max_allowed_cell_size / 2));
 	result |= ImGui::SliderFloat("Uniform cell distance threshold", &pc.grid_uniform_cell_distance_threshold, 0.01, 10);
 	result |= ImGui::SliderInt("Rays per surfel", (i32*)&state.rays_per_surfel, 0, 256);
+
+
+	if(DEBUG_PASSES) {
+		ImGui::NewLine();
+		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
+		ImGui::Text("Debug Statistics:");
+		ImGui::PopStyleColor();
+		ImGui::Text("Max trapeoidal cell size (px): %u", (u32)max_trapezoidal_cell_size);
+		ImGui::Text("Max surfels in a grid cell: %u\n", _max_surfels_in_a_grid_cell);
+		ImGui::Checkbox("Highlight fullest grid cell", &_highlight_max_surfel_cell);
+
+	}
 	return result;
 }
 

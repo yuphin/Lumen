@@ -51,6 +51,7 @@ struct PCIRCache {
 	uint rays_per_surfel;
 	uint use_camera_relative_surfel_size;
 	uint debug_view;
+	uint max_surfels_in_a_grid_cell;
 };
 
 struct PCPrefixSum {
