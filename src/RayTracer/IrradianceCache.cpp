@@ -5,12 +5,13 @@ namespace ircache {
 
 using namespace IRCache;
 
-#define DEBUG_PASSES 1
+#define DEBUG_PASSES 0
 
 ////////////////////////////
 // --- For debug purposes  ---
 static u32 _max_surfels_in_a_grid_cell = 0;
 static bool _highlight_max_surfel_cell = false;
+// --- //
 
 static u32 get_total_grid_cells() {
 	u32 num_uniform_cells = GRID_CENTER_CELL_COUNT_AXIS * GRID_CENTER_CELL_COUNT_AXIS * GRID_CENTER_CELL_COUNT_AXIS;
@@ -217,10 +218,10 @@ void init(Integrator* integrator) {
 
 	f32 max_trapezoidal_cell_size =
 		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], Window::height());
-		
+
 	// Maximum possible size
 	// Let C be the trapezoidal cell size, x is the desired radius in terms of px
-	// Per the recycle rule in surfel_recycle: (C - x ) / 2 = x 
+	// Per the recycle rule in surfel_recycle: (C - x ) / 2 = x
 	//  x = floor(C/3) pixels
 	pc.desired_surfel_radius_px = lm::floor(max_trapezoidal_cell_size / 3.0f);
 	pc.grid_uniform_cell_distance_threshold = 0.1;
@@ -306,7 +307,7 @@ void render(Integrator* integrator) {
 		_max_surfels_in_a_grid_cell = 0;
 
 		for (u64 i = 0; i < total_cells; i++) {
-			u32 prev = i > 0 ? prefix_sums[i - 1] : 0; 
+			u32 prev = i > 0 ? prefix_sums[i - 1] : 0;
 			prefix_sums.push_back(prev + counts[i]);
 			_max_surfels_in_a_grid_cell = lm::max(_max_surfels_in_a_grid_cell, counts[i]);
 		}
@@ -438,12 +439,12 @@ bool gui(Integrator* integrator) {
 	f32 max_trapezoidal_cell_size =
 		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], Window::height());
 	float max_allowed_cell_size = floor(max_trapezoidal_cell_size) - pc.desired_surfel_radius_px;
-	result |= ImGui::SliderFloat("Surfel radius (px)", &pc.desired_surfel_radius_px, 4, lm::floor(max_allowed_cell_size / 2));
+	result |=
+		ImGui::SliderFloat("Surfel radius (px)", &pc.desired_surfel_radius_px, 4, lm::floor(max_allowed_cell_size / 2));
 	result |= ImGui::SliderFloat("Uniform cell distance threshold", &pc.grid_uniform_cell_distance_threshold, 0.01, 10);
 	result |= ImGui::SliderInt("Rays per surfel", (i32*)&state.rays_per_surfel, 0, 256);
 
-
-	if(DEBUG_PASSES) {
+	if (DEBUG_PASSES) {
 		ImGui::NewLine();
 		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
 		ImGui::Text("Debug Statistics:");
@@ -451,7 +452,6 @@ bool gui(Integrator* integrator) {
 		ImGui::Text("Max trapeoidal cell size (px): %u", (u32)max_trapezoidal_cell_size);
 		ImGui::Text("Max surfels in a grid cell: %u\n", _max_surfels_in_a_grid_cell);
 		ImGui::Checkbox("Highlight fullest grid cell", &_highlight_max_surfel_cell);
-
 	}
 	return result;
 }

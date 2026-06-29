@@ -12,6 +12,12 @@ uvec3 floor_cell(vec3 value, uint cell_count) {
 	return uvec3(clamp(ivec3(floor(value)), ivec3(0), ivec3(int(cell_count) - 1)));
 }
 
+uint ceil_cell(float value, uint cell_count) { return uint(clamp(int(ceil(value)), 0, int(cell_count) - 1)); }
+
+uvec3 ceil_cell(vec3 value, uint cell_count) {
+	return uvec3(clamp(ivec3(ceil(value)), ivec3(0), ivec3(int(cell_count) - 1)));
+}
+
 vec3 center_grid_position(uvec3 ijk) {
 	float cell_size = 2.0 * pc.grid_uniform_cell_distance_threshold / float(GRID_CENTER_CELL_COUNT_AXIS);
 	return vec3(ijk) * cell_size - vec3(pc.grid_uniform_cell_distance_threshold);
@@ -44,11 +50,8 @@ vec3 trapezoidal_grid_position(uint region, uint i, uint j, uint k, float depth)
 	// +Y; start = BL
 	// (u, u + 1) x (v, v + 1)
 
-	// -Y: start = TL	
+	// -Y: start = TL
 	// (u, u + 1) x (v, v + 1)
-
-
-
 
 	const float N = float(GRID_TRAPEZOIDAL_CELL_COUNT_AXIS);
 	float u = (float(i) / N) * 2.0 - 1.0;
@@ -71,7 +74,7 @@ vec3 trapezoidal_grid_position(uint region, uint i, uint j, uint k, float depth)
 	return vec3(u * depth, v * depth, -depth);
 }
 
-uvec4 map_grid_axis(vec3 pos, out vec3 grid_pos) {
+uvec4 map_grid_axis(vec3 pos, out vec3 grid_pos_begin, out vec3 grid_pos_end) {
 	vec3 pos_abs = abs(pos);
 	float max_dir = max(pos_abs.x, pos_abs.y);
 	max_dir = max(max_dir, pos_abs.z);
@@ -80,8 +83,12 @@ uvec4 map_grid_axis(vec3 pos, out vec3 grid_pos) {
 		uvec3 ijk = floor_cell(
 			((pos / pc.grid_uniform_cell_distance_threshold) + vec3(1.0)) * vec3(0.5) * GRID_CENTER_CELL_COUNT_AXIS,
 			GRID_CENTER_CELL_COUNT_AXIS);
+		uvec3 ijk_end = ceil_cell(
+			((pos / pc.grid_uniform_cell_distance_threshold) + vec3(1.0)) * vec3(0.5) * GRID_CENTER_CELL_COUNT_AXIS,
+			GRID_CENTER_CELL_COUNT_AXIS);
 
-		grid_pos = center_grid_position(ijk);
+		grid_pos_begin = center_grid_position(ijk);
+		grid_pos_end = center_grid_position(ijk_end);
 		return uvec4(GRID_TYPE_CELL, ijk);
 	}
 	uint region;
@@ -114,13 +121,15 @@ uvec4 map_grid_axis(vec3 pos, out vec3 grid_pos) {
 	float k_normalized = log(depth_ratio) / log(max_ratio);
 	uint k = floor_cell(k_normalized * GRID_TRAPEZOIDAL_CELL_COUNT_AXIS, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS);
 
-	grid_pos = trapezoidal_grid_position(region, i, j, k, depth);
+	grid_pos_begin = trapezoidal_grid_position(region, i, j, k, depth);
+	grid_pos_end = trapezoidal_grid_position(region, i + 1, j + 1, k + 1, depth);
 	return uvec4(region, i, j, k);
 }
 
 uvec4 map_grid_axis(vec3 pos) {
-	vec3 unused;
-	return map_grid_axis(pos, unused);
+	vec3 unused_begin;
+	vec3 unused_end;
+	return map_grid_axis(pos, unused_begin, unused_end);
 }
 
 uint linearize_grid(uvec4 grid_pos) {

@@ -45,6 +45,7 @@ static bool _recreate_swapchain = false;
 static SceneConfig _saved_configs[INTEGRATOR_COUNT];
 static bool _saved_config_valid[INTEGRATOR_COUNT] = {};
 static i32 _current_integrator_idx = 0;
+static bool _pause_render = false;
 
 static const char* _integrator_display_names[INTEGRATOR_COUNT] = {
 	"Path", "BDPT", "SPPM", "VCM", "PSSMLT", "SMLT", "VCMMLT", "ReSTIR", "ReSTIR GI", "DDGI", "ReSTIR PT", "IR Cache",
@@ -258,7 +259,9 @@ void update() {
 }
 
 static void render(u32 i) {
-	integrator::render(&_active_integrator);
+	if(!_pause_render) {
+		integrator::render(&_active_integrator);
+	}
 	vk::Texture* input_tex = nullptr;
 	if (_comparison_mode && _img_captured) {
 		input_tex = _comparison_img_toggle ? _target_tex : _reference_tex;
@@ -345,6 +348,7 @@ static bool gui() {
 		}
 	}
 
+	ImGui::Checkbox("Pause rendering", &_pause_render);
 	ImGui::Text("GPU Memory Usage: %.2f MB", vk::get_memory_usage(vk::context().physical_device) / (1024.0f * 1024.0f));
 	u64 arena_total_used_bytes = 0;
 	u64 arena_total_allocated_bytes = 0;

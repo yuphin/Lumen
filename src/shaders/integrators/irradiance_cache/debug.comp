@@ -42,8 +42,230 @@ vec3 debug_col(uint num) {
 				(float((num >> 22) & 0x3FFu)) * INV_10);
 }
 
+// Compute cell relative UV
+// Bottom left = (0,0)
+// Top right = (1,1)
+vec2 compute_normalized_uvs(vec3 uv, uint region) {
+	switch (region) {
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_X_AXIS:
+			return uv.zy;
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_X_AXIS:
+			return vec2(1.0 - uv.z, uv.y);
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_Y_AXIS:
+			return uv.xz;
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_Y_AXIS:
+			return vec2(uv.x, 1.0 - uv.z);
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_Z_AXIS:
+			return vec2(1.0 - uv.x, uv.y);
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_Z_AXIS:
+			return uv.xy;
+		default:
+			return vec2(0);
+	};
+}
+
 vec3 uvec3_to_random_color(uvec3 value) { return debug_col(xxhash32(value)); }
 vec3 uint_to_random_color(uint value) { return debug_col(xxhash32(value)); }
+
+
+// Let (x,y,z) cell ID
+// Neighborhood is according to NDC bottom left location for cell
+// PLUS_X:
+// Edge cases:
+// cell_begin for neighboring MINUS_Z (x == -z) and MINUS_Y (x == -y) , cell_end for neighboring PLUS_Y (x == y) and PLUS_Z (x == z)
+// left neighbor (MINUS_Z) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, x, z)
+// bottom neighbor (MINUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y, z)
+// top neighbor = (PLUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y, z)
+// right_neighbor (PLUS_Z) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, x, z)
+
+// top_left (PLUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y - 1, z) 
+// or (MINUS_Z) =  (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, x + 1, z) (the horizontal case is omitted from now)
+// top_right (PLUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y + 1, z)
+// bottom left (MINUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y - 1, z) 										
+// bottom right (MINUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y + 1, z) 
+
+
+// MINUS_Z
+// Edge cases:
+// cell_begin for neighboring MINUS_X (x == z) and MINUS_Y (y == z) , cell_end for neighboring PLUS_Y (y == -z) and PLUS_X (x == -z)
+// left neighbor (MINUS_X) = (y, 0, z)
+// bottom neighbor (MINUS_Y) = (x,0,z)
+// top neighbor = (PLUS_Y) = (x, 0, z)
+// right_neighbor (PLUS_X) = (y, 0, z)
+
+// top left (PLUS_Y) = (x - 1, 0, z)
+// top right (PLUS_Y) = (x + 1, 0, z)
+// bottom left (MINUS_Y) = (x - 1, 0, z)
+// bottom right (MINUS_Y) = (x + 1, 0, z)
+
+// MINUS_Y
+// Edge cases:
+// cell_begin for neighboring MINUS_X (x == y) and MINUS_Z (y == z) , cell_end for neighboring PLUS_Z (y == -z) and PLUS_X (x == -y)
+// left neighbor (MINUS_X) = (0,y,z)
+// bottom neighbor (PLUS_Z) = (x, 0, z)
+// top neighbor = (MINUS_Z) = (x,0,z)
+// right_neighbor (PLUS_X) = (0, y, z)
+
+// top left (MINUS_Z) = (x - 1, 0, z)
+// top right (MINUS_Z) = (x + 1, 0, z)
+// bottom left (PLUS_Z) = (x - 1, 0, z)
+// bottom right (PLUS_Z) = (x + 1, 0, z)
+
+// MINUS_X
+// Edge cases:
+// cell_begin for neighboring MINUS_Z (x == z) and MINUS_Y (x == y) , cell_end for neighboring PLUS_Y (x == -y) and PLUS_Z (x == -z)
+// left neighbor (PLUS_Z) = (0, x, z)
+// bottom neighbor (MINUS_Y) = (0, y, z)
+// top neighbor = (PLUS_Y) = (0, y, z)
+// right_neighbor (MINUS_Z) = (0, x, z)
+
+// top left (PLUS_Y) = (0, y + 1, z)	
+// top right (PLUS_Y) = (0, y - 1, z)	
+// bottom left (MINUS_Y) = (0, y + 1, z)
+// bottom right (MINUS_Y) = (0, y - 1, z)
+
+// PLUS_Z
+// Edge cases:
+// cell_begin for neighboring MINUS_X (x == -z) and MINUS_Y (y == -z) , cell_end for neighboring PLUS_Y (y == z) and PLUS_X (x == z)
+// left neighbor (PLUS_X) = (y, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+// bottom neighbor (MINUS_Y) = (x, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1,z)
+// top neighbor = (PLUS_Y) = (x, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS -1, z)
+// right_neighbor (MINUS_X) = (y, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS -1, z)
+
+// top left (PLUS_Y) = (x + 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+// top right (PLUS_Y) =  (x - 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+// bottom left (MINUS_Y) = (x + 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+// bottom right (MINUS_Y) = (x - 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+
+// PLUS_Y
+// Edge cases:
+// cell_begin for neighboring MINUS_X (x == -y) and MINUS_Z (y == -z) , cell_end for neighboring PLUS_Z (y == z) and PLUS_X (x == y)
+// left neighbor (MINUS_X) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1,y,z)
+// bottom neighbor (MINUS_Z) = (x, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+// top neighbor = (PLUS_Z) = (x, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1,z)
+// right_neighbor (PLUS_X) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y, z)
+
+// top left(PLUS_Z) = (x - 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+// top right(PLUS_Z) = (x + 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+// bottom left (MINUS_Z) = (x- 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+// bottom right (MINUS_Z) = (x + 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+
+
+uvec4 left_neighbor(uvec3 cell_id, uint region) {
+	uint N = GRID_TRAPEZOIDAL_CELL_COUNT_AXIS;
+	uint i = cell_id.x, j = cell_id.y, k = cell_id.z;
+	switch (region) {
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_X_AXIS:
+			return j > 0 ? uvec4(region, i, j - 1, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_MINUS_Z_AXIS, N - 1, i, k);
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_X_AXIS:
+			return j < N - 1 ? uvec4(region, i, j + 1, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_PLUS_Z_AXIS, 0, i, k);
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_Y_AXIS:
+			return i > 0 ? uvec4(region, i - 1, j, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_MINUS_X_AXIS, N - 1, j, k);
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_Y_AXIS:
+			return i > 0 ? uvec4(region, i - 1, j, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_MINUS_X_AXIS, 0, j, k);
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_Z_AXIS:
+			return i < N - 1 ? uvec4(region, i + 1, j, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_PLUS_X_AXIS, j, N - 1, k);
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_Z_AXIS:
+			return i > 0 ? uvec4(region, i - 1, j, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_MINUS_X_AXIS, j, 0, k);
+		default:
+			return uvec4(region, cell_id);
+	}
+}
+
+uvec4 right_neighbor(uvec3 cell_id, uint region) {
+	uint N = GRID_TRAPEZOIDAL_CELL_COUNT_AXIS;
+	uint i = cell_id.x, j = cell_id.y, k = cell_id.z;
+	switch (region) {
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_X_AXIS:
+			return j < N - 1 ? uvec4(region, i, j + 1, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_PLUS_Z_AXIS, N - 1, i, k);
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_X_AXIS:
+			return j > 0 ? uvec4(region, i, j - 1, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_MINUS_Z_AXIS, 0, i, k);
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_Y_AXIS:
+			return i < N - 1 ? uvec4(region, i + 1, j, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_PLUS_X_AXIS, N - 1, j, k);
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_Y_AXIS:
+			return i < N - 1 ? uvec4(region, i + 1, j, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_PLUS_X_AXIS, 0, j, k);
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_Z_AXIS:
+			return i > 0 ? uvec4(region, i - 1, j, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_MINUS_X_AXIS, j, N - 1, k);
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_Z_AXIS:
+			return i < N - 1 ? uvec4(region, i + 1, j, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_PLUS_X_AXIS, j, 0, k);
+		default:
+			return uvec4(region, cell_id);
+	}
+}
+
+uvec4 bottom_neighbor(uvec3 cell_id, uint region) {
+	uint N = GRID_TRAPEZOIDAL_CELL_COUNT_AXIS;
+	uint i = cell_id.x, j = cell_id.y, k = cell_id.z;
+	switch (region) {
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_X_AXIS:
+			return i > 0 ? uvec4(region, i - 1, j, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_MINUS_Y_AXIS, N - 1, j, k);
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_X_AXIS:
+			return i > 0 ? uvec4(region, i - 1, j, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_MINUS_Y_AXIS, 0, j, k);
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_Y_AXIS:
+			return j > 0 ? uvec4(region, i, j - 1, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_MINUS_Z_AXIS, i, N - 1, k);
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_Y_AXIS:
+			return j < N - 1 ? uvec4(region, i, j + 1, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_PLUS_Z_AXIS, i, 0, k);
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_Z_AXIS:
+			return j > 0 ? uvec4(region, i, j - 1, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_MINUS_Y_AXIS, i, N - 1, k);
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_Z_AXIS:
+			return j > 0 ? uvec4(region, i, j - 1, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_MINUS_Y_AXIS, i, 0, k);
+		default:
+			return uvec4(region, cell_id);
+	}
+}
+
+uvec4 top_neighbor(uvec3 cell_id, uint region) {
+	uint N = GRID_TRAPEZOIDAL_CELL_COUNT_AXIS;
+	uint i = cell_id.x, j = cell_id.y, k = cell_id.z;
+	switch (region) {
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_X_AXIS:
+			return i < N - 1 ? uvec4(region, i + 1, j, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_PLUS_Y_AXIS, N - 1, j, k);
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_X_AXIS:
+			return i < N - 1 ? uvec4(region, i + 1, j, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_PLUS_Y_AXIS, 0, j, k);
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_Y_AXIS:
+			return j < N - 1 ? uvec4(region, i, j + 1, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_PLUS_Z_AXIS, i, N - 1, k);
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_Y_AXIS:
+			return j > 0 ? uvec4(region, i, j - 1, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_MINUS_Z_AXIS, i, 0, k);
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_Z_AXIS:
+			return j < N - 1 ? uvec4(region, i, j + 1, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_PLUS_Y_AXIS, i, N - 1, k);
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_Z_AXIS:
+			return j < N - 1 ? uvec4(region, i, j + 1, k) : uvec4(GRID_TYPE_TRAPEZOIDAL_PLUS_Y_AXIS, i, 0, k);
+		default:
+			return uvec4(region, cell_id);
+	}
+}
+
+uvec4 top_left_neighbor(uvec3 cell_id, uint region) {
+	uvec4 h = left_neighbor(cell_id, region);
+	if (h.x == region) return top_neighbor(h.yzw, h.x);
+	uvec4 v = top_neighbor(cell_id, region);
+	if (v.x == region) return left_neighbor(v.yzw, v.x);
+	return v;                                              
+}
+
+uvec4 top_right_neighbor(uvec3 cell_id, uint region) {
+	uvec4 h = right_neighbor(cell_id, region);
+	if (h.x == region) return top_neighbor(h.yzw, h.x);
+	uvec4 v = top_neighbor(cell_id, region);
+	if (v.x == region) return right_neighbor(v.yzw, v.x);
+	return v;
+}
+
+uvec4 bottom_left_neighbor(uvec3 cell_id, uint region) {
+	uvec4 h = left_neighbor(cell_id, region);
+	if (h.x == region) return bottom_neighbor(h.yzw, h.x);
+	uvec4 v = bottom_neighbor(cell_id, region);
+	if (v.x == region) return left_neighbor(v.yzw, v.x);
+	return v;
+}
+
+uvec4 bottom_right_neighbor(uvec3 cell_id, uint region) {
+	uvec4 h = right_neighbor(cell_id, region);
+	if (h.x == region) return bottom_neighbor(h.yzw, h.x);
+	uvec4 v = bottom_neighbor(cell_id, region);
+	if (v.x == region) return right_neighbor(v.yzw, v.x);
+	return v;
+}
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 void main() {
@@ -63,7 +285,7 @@ void main() {
 	if (pc.debug_view == IRCACHE_DEBUG_VIEW_GBUFFER_NORMALS) {
 		imageStore(image, coords, vec4(hit_data.n_s * 0.5 + 0.5, 1.f));
 		return;
-	} else if(pc.debug_view == IRCACHE_DEBUG_VIEW_GBUFFER_ALBEDO) {
+	} else if (pc.debug_view == IRCACHE_DEBUG_VIEW_GBUFFER_ALBEDO) {
 		Material material = load_material(hit_data.material_idx, hit_data.uv);
 		imageStore(image, coords, vec4(material.albedo, 1.f));
 		return;
@@ -71,30 +293,39 @@ void main() {
 
 	vec3 pixel_world_pos = hit_data.pos;
 	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
-	vec3 offset = pixel_world_pos - cam_pos.xyz;
+	vec3 cam_relative_pos = pixel_world_pos - cam_pos.xyz;
 
-	vec3 grid_pos;
-	uvec4 grid_val = map_grid_axis(offset, grid_pos);
+	vec3 grid_pos_begin;
+	vec3 grid_pos_end;
+	uvec4 grid_val = map_grid_axis(cam_relative_pos, grid_pos_begin, grid_pos_end);
 	uint linear_idx = linearize_grid(grid_val);
 	uint surfel_count = grid_cell_counts.d[linear_idx + 1] - grid_cell_counts.d[linear_idx];
 	uint surfel_offset = grid_cell_counts.d[linear_idx];
 	bool is_max_count_cell = pc.max_surfels_in_a_grid_cell > 0 && surfel_count == pc.max_surfels_in_a_grid_cell;
 
-	uvec4 res = map_grid_axis(offset);
+	uvec4 res = map_grid_axis(cam_relative_pos);
 	vec3 col = uvec3_to_random_color(res.yzw) * 0.5;
 	vec3 grid_base_color = uint_to_random_color(xxhash32(res.x));
 	col *= grid_base_color;
 
-
-	vec3 pos_abs = abs(offset);
+	vec3 pos_abs = abs(cam_relative_pos);
 	float max_abs_dir = max(pos_abs.x, pos_abs.y);
 	max_abs_dir = max(max_abs_dir, pos_abs.z);
-	if(abs(max_abs_dir -pos_abs.x) < 1e-3 && abs(max_abs_dir - pos_abs.z) < 1e-3) {
-		col = vec3(100,0,0);
-		// debugPrintfEXT("%v3f\n", offset);
+	if (abs(max_abs_dir - pos_abs.x) < 1e-3 && abs(max_abs_dir - pos_abs.z) < 1e-3) {
+		col = vec3(100, 0, 0);
 	}
+	vec3 grid_bbox = grid_pos_end - grid_pos_begin;
+	vec3 cell_uv = (cam_relative_pos - grid_pos_begin) / (grid_pos_end - grid_pos_begin);
+
+	vec2 normalized_uvs = compute_normalized_uvs(cell_uv, grid_val.x);
 	if (ubo.debug_click == 1 && ivec2(coords.xy) == ubo.clicked_pos) {
-		debugPrintfEXT("Clicked %v4u - %v3f - %v3f\n", res.xyzw, offset, grid_pos);
+		debugPrintfEXT("Grid at mouse %v3u , region %d\n", grid_val.yzw, grid_val.x);
+		// debugPrintfEXT("grid: %v3u - uv: %v2f - begin: %v3f - end: %v3f\n", res.yzw, normalized_uvs,
+		// 			   grid_pos_begin, grid_pos_end); 
+		// debugPrintfEXT("uv: %v2f - grid_begin: %v3f - grid_end: %v3f - grid %d\n", normalized_uvs, grid_pos_begin, grid_pos_end, grid_val.x);
+		// debugPrintfEXT("grid: %v3u - top left: %v3u - top_right: %v3u - bottom_left: %v3u - bottom_right: %v3u\n", res.yzw,
+		// 			   top_left_neighbor(res.yzw, grid_val.x).yzw, top_right_neighbor(res.yzw, grid_val.x).yzw,
+		// 			   bottom_left_neighbor(res.yzw, grid_val.x).yzw, bottom_right_neighbor(res.yzw, grid_val.x).yzw);
 	}
 
 	if (pc.debug_view == IRCACHE_DEBUG_VIEW_TRAPEZOIDAL_GRID) {
@@ -146,11 +377,83 @@ void main() {
 
 	if (best_sid != 0xFFFFFFFF) {
 		vec3 surfel_color = uint_to_random_color(best_sid);
-		col += surfel_color;
 		if (overlapping_surfel_cnt > 1) {
 			col = vec3(100, 0, 100);
 		} else {
-			col = is_max_count_cell ? vec3(100, 0, 0) : vec3(0);
+			col = is_max_count_cell ? vec3(100, 0, 0) : surfel_color;
+		}
+
+		Surfel surfel = surfel_pool.d[best_sid];
+
+		HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
+
+		vec3 surfel_cam_relative_pos = surfel_hit_data.pos - cam_pos.xyz;
+
+		vec3 surfel_grid_pos_begin;
+		vec3 surfel_grid_pos_end;
+		uvec4 surfel_grid_val = map_grid_axis(surfel_cam_relative_pos, surfel_grid_pos_begin, surfel_grid_pos_end);
+		vec3 surfel_uv =
+			(surfel_cam_relative_pos - surfel_grid_pos_begin) / (surfel_grid_pos_end - surfel_grid_pos_begin);
+		vec2 normalized_uv_surfel = compute_normalized_uvs(surfel_uv, surfel_grid_val.x);
+
+		vec3 surfel_grid_bbox = surfel_grid_pos_end - surfel_grid_pos_begin;
+		float surfel_cell_edge = max(max(abs(surfel_grid_bbox.x), abs(surfel_grid_bbox.y)), abs(surfel_grid_bbox.z));
+		float radius_in_uv = surfel.radius / surfel_cell_edge;
+
+		// Determine the neighbor cells that the surfel is touching
+
+		bool neighboring_left = (normalized_uv_surfel.x - radius_in_uv) <= 0.0;
+		bool neighboring_right = (normalized_uv_surfel.x + radius_in_uv) >= 1.0;
+		bool neighboring_bottom = (normalized_uv_surfel.y - radius_in_uv) <= 0.0;
+		bool neighboring_top = (normalized_uv_surfel.y + radius_in_uv) >= 1.0;
+		bool neighboring_top_left = neighboring_top && neighboring_left;
+		bool neighboring_top_right = neighboring_top && neighboring_right;
+		bool neighboring_bottom_left = neighboring_bottom && neighboring_left;
+		bool neighboring_bottom_right = neighboring_bottom && neighboring_right;
+
+		if (ubo.debug_click == 1 && ivec2(coords.xy) == ubo.clicked_pos) {
+			// Can at most touch 3 other neighbors (excluding self)
+			uvec4 neighbors[3];
+			uint neighbor_count = 0;
+			if(neighboring_left) {
+				neighbors[neighbor_count++] = left_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+			}
+			if(neighboring_right) {
+				neighbors[neighbor_count++] = right_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+			}
+			if(neighboring_bottom) {
+				neighbors[neighbor_count++] = bottom_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+			}
+			if(neighboring_top) {
+				neighbors[neighbor_count++] = top_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+			}
+			if(neighboring_top_left) {
+				neighbors[neighbor_count++] = top_left_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+			}
+			if(neighboring_top_right) {
+				neighbors[neighbor_count++] = top_right_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+			}
+			if(neighboring_bottom_left) {
+				neighbors[neighbor_count++] = bottom_left_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+			}
+			if(neighboring_bottom_right) {
+				neighbors[neighbor_count++] = bottom_right_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+			}
+			// debugPrintfEXT("surfel uv: %v2f - radius_in_uv %f - surfel radius %f - region %d\n", normalized_uv_surfel,
+			// 			   radius_in_uv, surfel.radius, surfel_grid_val.x);
+			debugPrintfEXT(
+				"grid %v3u - left %d - right %d - bottom %d - top %d - top_left %d - top_right %d - bottom_left %d - bottom_right %d\n",
+				surfel_grid_val.yzw, neighboring_left, neighboring_right, neighboring_bottom, neighboring_top, neighboring_top_left,
+				neighboring_top_right, neighboring_bottom_left, neighboring_bottom_right);
+
+			if(neighbor_count > 0) {
+				for(uint i = 0; i < neighbor_count; i++) {
+					uvec4 n = neighbors[i];
+					debugPrintfEXT("neighbor %d - region %d - grid: %v3u\n", i, n.x, n.yzw);
+				}
+			}
+			debugPrintfEXT("----\n");
+			
 		}
 	}
 

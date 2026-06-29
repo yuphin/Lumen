@@ -31,12 +31,12 @@ SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 
 layout(local_size_x = ALLOCATE_PASS_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
 void main() {
-	uint tid = gl_GlobalInvocationID.x;
-	if (tid >= MAX_SURFEL_COUNT) {
+	uint surfel_idx = gl_GlobalInvocationID.x;
+	if (surfel_idx >= MAX_SURFEL_COUNT) {
 		return;
 	}
 	// TODO: Check surfel status?
-	Surfel surfel = surfel_pool.d[tid];
+	Surfel surfel = surfel_pool.d[surfel_idx];
 
 	if (surfel.radius <= 0.0f) {
 		return;
@@ -85,6 +85,6 @@ void main() {
 			continue;
 		}
 #endif
-		grid_cell_indices.d[idx] = tid;
+		grid_cell_indices.d[idx] = surfel_idx;
 	}
 }
