@@ -397,8 +397,11 @@ void main() {
 		vec2 normalized_uv_surfel = compute_normalized_uvs(surfel_uv, surfel_grid_val.x);
 
 		vec3 surfel_grid_bbox = surfel_grid_pos_end - surfel_grid_pos_begin;
+
 		float surfel_cell_edge = max(max(abs(surfel_grid_bbox.x), abs(surfel_grid_bbox.y)), abs(surfel_grid_bbox.z));
+		float surfel_cell_edge_diag = length(surfel_grid_bbox);
 		float radius_in_uv = surfel.radius / surfel_cell_edge;
+		float radius_in_uv_diag = surfel.radius / surfel_cell_edge_diag;
 
 		// Determine the neighbor cells that the surfel is touching
 
@@ -406,10 +409,17 @@ void main() {
 		bool neighboring_right = (normalized_uv_surfel.x + radius_in_uv) >= 1.0;
 		bool neighboring_bottom = (normalized_uv_surfel.y - radius_in_uv) <= 0.0;
 		bool neighboring_top = (normalized_uv_surfel.y + radius_in_uv) >= 1.0;
-		bool neighboring_top_left = neighboring_top && neighboring_left;
-		bool neighboring_top_right = neighboring_top && neighboring_right;
-		bool neighboring_bottom_left = neighboring_bottom && neighboring_left;
-		bool neighboring_bottom_right = neighboring_bottom && neighboring_right;
+		vec2 top_left_uv = normalized_uv_surfel + vec2(-radius_in_uv_diag, radius_in_uv_diag);
+		bool neighboring_top_left = top_left_uv.x <= 0.0 && top_left_uv.y >= 1.0;
+		vec2 top_right_uv = normalized_uv_surfel + vec2(radius_in_uv_diag, radius_in_uv_diag);
+		bool neighboring_top_right = top_right_uv.x >= 1.0 && top_right_uv.y >= 1.0;
+		vec2 bottom_left_uv = normalized_uv_surfel + vec2(-radius_in_uv_diag, -radius_in_uv_diag);
+		bool neighboring_bottom_left = bottom_left_uv.x <= 0.0 && bottom_left_uv.y <= 0.0;
+		vec2 bottom_right_uv = normalized_uv_surfel + vec2(radius_in_uv_diag, -radius_in_uv_diag);
+		bool neighboring_bottom_right = bottom_right_uv.x >= 1.0 && bottom_right_uv.y <= 0.0;
+
+		
+
 
 		if (ubo.debug_click == 1 && ivec2(coords.xy) == ubo.clicked_pos) {
 			// Can at most touch 3 other neighbors (excluding self)
