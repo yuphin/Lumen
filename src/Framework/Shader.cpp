@@ -173,7 +173,7 @@ static u64 hash_includes_recursive(lm::Arena* arena, const lm::String& includer_
 			continue;
 		}
 		u64 cursor = i + token.size;
-		while (cursor < source.size && (source[cursor] == ' ' || source[cursor] == '\t')) {
+		while (cursor < source.size && lm::char_is_whitespace(source[cursor])) {
 			cursor++;
 		}
 		if (cursor >= source.size || source[cursor] != '"') {
