@@ -46,41 +46,33 @@ struct Array {
 	u64 capacity = 0;
 	Arena* arena_node = nullptr;
 
+	void grow() {
+		if constexpr (GROWABLE) {
+			u64 new_capacity = capacity < 4 ? 4 : capacity + (capacity >> 1);
+			arena_ensure_allocated_in_the_same_block<T>(arena_node, new_capacity, capacity);
+			capacity = new_capacity;
+		} else {
+			LUMEN_ASSERT(false, "Array capacity exceeded for fixed array");
+		}
+	}
+
 	T& push() {
 		if (size == capacity) {
-			if constexpr (GROWABLE) {
-				u64 new_capacity = capacity == 0 ? 4 : 3 * (capacity >> 1);
-				arena_ensure_allocated_in_the_same_block<T>(arena_node, new_capacity, capacity);
-				capacity = new_capacity;
-			} else {
-				LUMEN_ASSERT(false, "Array capacity exceeded for fixed array");
-			}
+			grow();
 		}
 		return data[size++];
 	}
 
 	void push_back(const T& value) {
 		if (size == capacity) {
-			if constexpr (GROWABLE) {
-				u64 new_capacity = capacity == 0 ? 4 : 3 * (capacity >> 1);
-				arena_ensure_allocated_in_the_same_block<T>(arena_node, new_capacity, capacity);
-				capacity = new_capacity;
-			} else {
-				LUMEN_ASSERT(false, "Array capacity exceeded for fixed array");
-			}
+			grow();
 		}
 		data[size++] = value;
 	}
 	template <typename... Args>
 	T& emplace_back(Args&&... args) {
 		if (size == capacity) {
-			if constexpr (GROWABLE) {
-				u64 new_capacity = 0 ? 1 : 3 * ((capacity + 1) >> 1);
-				arena_ensure_allocated_in_the_same_block<T>(arena_node, new_capacity, capacity);
-				capacity = new_capacity;
-			} else {
-				LUMEN_ASSERT(false, "Array capacity exceeded for fixed array");
-			}
+			grow();
 		}
 		T* slot = &data[size++];
 		::new ((void*)slot) T(std::forward<Args>(args)...);

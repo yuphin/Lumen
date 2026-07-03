@@ -160,6 +160,104 @@ static shaderc_include_result* shader_include_resolve(void* user_data, const cha
 
 static void shader_include_release(void*, shaderc_include_result*) {}
 
+////////////////////////////
+// --- Shader disk cache ---
+static constexpr u64 SHADER_CACHE_VERSION = 1;
+static constexpr u64 MAX_SHADER_CACHE_PATH = 256;
+
+static u64 hash_includes_recursive(lm::Arena* arena, const lm::String& includer_path, const lm::String& source,
+								lm::HashSet<lm::String>& visited, u64 hash) {
+	const lm::String token = "#include";
+	for (u64 i = 0; i + token.size < source.size; i++) {
+		if (source[i] != '#' || memcmp(source.data + i, token.data, token.size) != 0) {
+			continue;
+		}
+		u64 cursor = i + token.size;
+		while (cursor < source.size && (source[cursor] == ' ' || source[cursor] == '\t')) {
+			cursor++;
+		}
+		if (cursor >= source.size || source[cursor] != '"') {
+			continue;
+		}
+		const u64 path_begin = ++cursor;
+		while (cursor < source.size && source[cursor] != '"' && source[cursor] != '\n') {
+			cursor++;
+		}
+		if (cursor >= source.size || source[cursor] != '"') {
+			continue;
+		}
+		const lm::String requested = {source.data + path_begin, cursor - path_begin};
+
+		lm::String resolved;
+		lm::String contents;
+		const u64 slash = lm::str_rfind_any(includer_path, "/\\");
+		if (slash != U64_MAX) {
+			const lm::String directory = {includer_path.data, slash};
+			const lm::String relative_path = path_join(arena, directory, requested);
+			if (read_file(arena, relative_path, contents)) {
+				resolved = relative_path;
+			}
+		}
+		if (resolved.empty()) {
+			const lm::String cwd_path = lm::str_to_cstr(arena, requested);
+			if (!read_file(arena, cwd_path, contents)) {
+				continue;
+			}
+			resolved = cwd_path;
+		}
+		bool created = false;
+		visited.get_or_create(resolved, &created);
+		if (!created) {
+			continue;
+		}
+		hash = lm::fnv1a_hash(contents.data, contents.size, hash);
+		hash = hash_includes_recursive(arena, resolved, contents, visited, hash);
+	}
+	return hash;
+}
+
+static u64 shader_cache_key(lm::Arena* scratch_arena, const lm::String& filename, const lm::String& source,
+							const lm::String& name_with_macros) {
+	u64 hash = lm::fnv1a_hash(SHADER_CACHE_VERSION);
+	hash = lm::fnv1a_hash(name_with_macros.data, string_content_size(name_with_macros), hash);
+	hash = lm::fnv1a_hash(source.data, source.size, hash);
+	lm::HashSet<lm::String> visited = lm::hash_set_create<lm::String>(scratch_arena, 64);
+	return hash_includes_recursive(scratch_arena, filename, source, visited, hash);
+}
+
+static bool shader_cache_load(lm::Arena* arena, const lm::String& path, lm::FixedArray<u32>& binary) {
+	os::FileHandle file = os::file_open(path, os::AccessFlag_Read);
+	if (!file) {
+		return false;
+	}
+	const os::FileProperties properties = os::file_properties(file);
+	if (!properties.size || properties.size % sizeof(u32)) {
+		os::file_close(file);
+		return false;
+	}
+	const u64 word_count = properties.size / sizeof(u32);
+	binary = lm::fixed_array_create<u32>(arena, word_count);
+	const u64 bytes_read = os::file_read(file, binary.data, properties.size);
+	os::file_close(file);
+	if (bytes_read != properties.size) {
+		return false;
+	}
+	binary.size = word_count;
+	return true;
+}
+
+static void shader_cache_store(const lm::String& path, const lm::FixedArray<u32>& binary) {
+	os::directory_create(CSTR("cache"));
+	os::directory_create(CSTR("cache/shaders"));
+	os::FileHandle file = os::file_open(path, os::AccessFlag_Write);
+	if (!file) {
+		LUMEN_WARN("Failed to write shader cache entry: %s", path.data);
+		return;
+	}
+	os::file_write(file, binary.data, binary.size * sizeof(u32));
+	os::file_close(file);
+}
+
 static void add_macros(const vk::ShaderMacroArray& macros, shaderc_compile_options_t options, lm::Arena* arena) {
 	for (const vk::ShaderMacro& macro : macros) {
 		if (macro.name.empty()) {
@@ -714,7 +812,6 @@ Shader::Shader(const lm::String& filename) : filename(filename) {}
 
 i32 Shader::compile(lm::RenderPass* pass) {
 	assert(!name_with_macros.empty() && name_with_macros.is_cstr());
-	LUMEN_TRACE("Compiling shader: %s", name_with_macros.data);
 
 	lm::Arena* arena = get_shader_arena();
 	shaderc_shader_kind kind;
@@ -723,7 +820,7 @@ i32 Shader::compile(lm::RenderPass* pass) {
 		return -1;
 	}
 
-	shaderc_compilation_result_t result = nullptr;
+	u64 cache_key = 0;
 	{
 		lm::ScratchArena scratch(arena);
 		lm::String source;
@@ -731,31 +828,52 @@ i32 Shader::compile(lm::RenderPass* pass) {
 			lm::log(lm::LOG_ERROR, "Failed to open shader file: %s", filename.data);
 			return -1;
 		}
-		result = compile_file(filename, kind, source, pass, scratch.arena);
+		cache_key = shader_cache_key(scratch.arena, filename, source, name_with_macros);
 	}
+	char cache_path_data[MAX_SHADER_CACHE_PATH];
+	const i32 cache_path_size =
+		stbsp_snprintf(cache_path_data, sizeof(cache_path_data), "cache/shaders/%016llx.spv", cache_key);
+	const lm::String cache_path = {cache_path_data, (u64)cache_path_size + 1};
 
-	if (!result) {
-		lm::log(lm::LOG_ERROR, "Failed to initialize shaderc for: %s", filename.data);
-		return -1;
-	}
-	if (shaderc_result_get_compilation_status(result) != shaderc_compilation_status_success) {
-		lm::log(lm::LOG_ERROR, "%s", shaderc_result_get_error_message(result));
+	if (shader_cache_load(arena, cache_path, binary)) {
+		LUMEN_TRACE("Loaded shader from cache: %s", name_with_macros.data);
+	} else {
+		LUMEN_TRACE("Compiling shader: %s", name_with_macros.data);
+		shaderc_compilation_result_t result = nullptr;
+		{
+			lm::ScratchArena scratch(arena);
+			lm::String source;
+			if (!read_file(scratch.arena, filename, source)) {
+				lm::log(lm::LOG_ERROR, "Failed to open shader file: %s", filename.data);
+				return -1;
+			}
+			result = compile_file(filename, kind, source, pass, scratch.arena);
+		}
+
+		if (!result) {
+			lm::log(lm::LOG_ERROR, "Failed to initialize shaderc for: %s", filename.data);
+			return -1;
+		}
+		if (shaderc_result_get_compilation_status(result) != shaderc_compilation_status_success) {
+			lm::log(lm::LOG_ERROR, "%s", shaderc_result_get_error_message(result));
+			shaderc_result_release(result);
+			return -1;
+		}
+
+		const u64 binary_bytes = shaderc_result_get_length(result);
+		if (!binary_bytes || binary_bytes % sizeof(u32)) {
+			lm::log(lm::LOG_ERROR, "Shaderc returned invalid SPIR-V for: %s", filename.data);
+			shaderc_result_release(result);
+			return -1;
+		}
+
+		const u64 word_count = binary_bytes / sizeof(u32);
+		binary = lm::fixed_array_create<u32>(arena, word_count);
+		memcpy(binary.data, shaderc_result_get_bytes(result), binary_bytes);
+		binary.size = word_count;
 		shaderc_result_release(result);
-		return -1;
+		shader_cache_store(cache_path, binary);
 	}
-
-	const u64 binary_bytes = shaderc_result_get_length(result);
-	if (!binary_bytes || binary_bytes % sizeof(u32)) {
-		lm::log(lm::LOG_ERROR, "Shaderc returned invalid SPIR-V for: %s", filename.data);
-		shaderc_result_release(result);
-		return -1;
-	}
-
-	const u64 word_count = binary_bytes / sizeof(u32);
-	binary = lm::fixed_array_create<u32>(arena, word_count);
-	memcpy(binary.data, shaderc_result_get_bytes(result), binary_bytes);
-	binary.size = word_count;
-	shaderc_result_release(result);
 
 	// Clear shader data in case this is a recompile
 	reset_reflection(*this, arena);

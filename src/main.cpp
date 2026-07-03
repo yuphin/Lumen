@@ -166,6 +166,62 @@ void hm_test() {
 	for (const lm::HashMapEntry<u32, lm::Empty>& k : hs) {
 		LUMEN_INFO("%d", k.key);
 	}
+
+	{
+		lm::Arena* arena = lm::arena_create(CSTR("Tombstone Test"), MB(8));
+		auto hm = lm::hash_map_create<u64, u64>(arena, 32);
+		constexpr u64 N = 300;
+		for (u64 i = 0; i < N; i++) {
+			hm.insert(i, i * 7);
+		}
+		for (u64 i = 0; i < N; i += 3) {
+			hm.remove(i);
+		}
+		for (u64 i = 0; i < N; i++) {
+			lm::HashMapEntry<u64, u64>* entry = hm.find(i);
+			if (i % 3 == 0) {
+				assert(!entry);
+			} else {
+				assert(entry && entry->value == i * 7);
+			}
+		}
+		for (u64 i = 0; i < N; i += 3) {
+			hm.insert(i, i * 9);
+		}
+		assert(hm.size == N);
+		for (u64 i = N; i < 4 * N; i++) {
+			hm.insert(i, i * 7);
+		}
+		for (u64 i = 0; i < 4 * N; i++) {
+			lm::HashMapEntry<u64, u64>* entry = hm.find(i);
+			assert(entry);
+			assert(entry->value == (i < N && i % 3 == 0 ? i * 9 : i * 7));
+		}
+		lm::arena_destroy(arena);
+	}
+	{
+		lm::Arena* arena = lm::arena_create(CSTR("Resize Test"), MB(16));
+		lm::Arena* key_arena = lm::arena_create(CSTR("Resize Test Keys"), MB(16));
+		{
+			lm::ScratchArena scratch = arena;
+			u8* garbage = (u8*)scratch.arena->allocate(MB(4), 8, nullptr, /*zero_initialize=*/false);
+			memset(garbage, 0xAB, MB(4));
+		}
+		auto hm = lm::hash_map_create<lm::String, u64>(arena, 32);
+		constexpr u64 N = 2000;
+		for (u64 i = 0; i < N; i++) {
+			lm::String key = lm::str_concat(key_arena, CSTR("key_"), lm::str_from_u64(key_arena, i));
+			hm.insert(key, i);
+		}
+		assert(hm.size == N);
+		for (u64 i = 0; i < N; i++) {
+			lm::String key = lm::str_concat(key_arena, CSTR("key_"), lm::str_from_u64(key_arena, i));
+			lm::HashMapEntry<lm::String, u64>* entry = hm.find(key);
+			assert(entry && entry->value == i);
+		}
+		lm::arena_destroy(key_arena);
+		lm::arena_destroy(arena);
+	}
 	LUMEN_TRACE("----Hash Map Test End----");
 }
 
@@ -180,6 +236,24 @@ i32 main(i32 argc, char* argv[]) {
 
 	for (i32 i = 0; i < 100'000'000; i++) {
 		arr.push_back(i);
+	}
+
+	{
+		lm::SmallArray<i32, 8> arr = {10, 20, 30, 40};
+		arr.erase_unordered(1);
+		assert(arr.size == 3);
+		assert(arr[0] == 10 && arr[1] == 40 && arr[2] == 30);
+	}
+	{
+		lm::Arena* arena = lm::arena_create(CSTR("Grow Test"), MB(8));
+		lm::Array<i32> arr = lm::array_create<i32>(arena);
+		for (i32 i = 0; i < 1000; i++) {
+			arr.emplace_back(i);
+		}
+		for (i32 i = 0; i < 1000; i++) {
+			assert(arr[i] == i);
+		}
+		lm::arena_destroy(arena);
 	}
 
 	auto hm = lm::hash_map_create<i32, u64>(arena);

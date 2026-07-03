@@ -1,6 +1,7 @@
 #include "Integrator.h"
 #include "Framework/Window.h"
 #include "Framework/VkUtils.h"
+#include "Framework/Base/OS.h"
 
 namespace integrator {
 
@@ -32,10 +33,7 @@ static void mouse_click_callback(void* user_data, MouseAction, KeyAction, double
 	if (ImGui::GetIO().WantCaptureMouse) {
 		return;
 	}
-	if (integrator->updated && Window::is_mouse_up(MouseAction::LEFT)) {
-		integrator->updated = true;
-	}
-	if (integrator->updated && Window::is_mouse_down(MouseAction::LEFT)) {
+	if (Window::is_mouse_up(MouseAction::LEFT) || Window::is_mouse_down(MouseAction::LEFT)) {
 		integrator->updated = true;
 	}
 }
@@ -96,7 +94,13 @@ static bool common_gui(Integrator*) {
 }
 
 static bool common_update(Integrator* integrator) {
-	f32 trans_speed = 0.01f;
+	constexpr f32 TRANS_SPEED_PER_SECOND = 1.66f;
+	constexpr f64 MAX_FRAME_DT_SECONDS = 0.1;
+	static f64 prev_time = os::time_seconds();
+	const f64 now = os::time_seconds();
+	const f32 dt = (f32)lm::min(now - prev_time, MAX_FRAME_DT_SECONDS);
+	prev_time = now;
+	f32 trans_speed = TRANS_SPEED_PER_SECOND * dt;
 	lm::vec3 front;
 	if (Window::is_key_held(KeyInput::KEY_LEFT_SHIFT)) {
 		trans_speed *= 4;

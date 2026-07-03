@@ -10,6 +10,7 @@ scenes/Sponza
 imgui.ini
 .*/
 build/
+cache/
 scenes/bedroom/models
 scenes/classroom/models/
 scenes/bedroom/textures

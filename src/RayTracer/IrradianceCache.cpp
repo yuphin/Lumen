@@ -22,7 +22,7 @@ static u32 get_total_grid_cells() {
 }
 
 static f32 get_max_uniform_cells(f32 desired_surfel_radius_px, f32 p11, f32 height) {
-	f32 surfel_radius_factor = 2.0 * desired_surfel_radius_px / (p11 * height);
+	f32 surfel_radius_factor = 2.0f * desired_surfel_radius_px / (p11 * height);
 	return 1.0f / (2.0f * surfel_radius_factor);
 }
 
@@ -130,8 +130,8 @@ void init(Integrator* integrator) {
 		lm::ScratchArena scratch = integrator->arena;
 		lm::FixedArray<u32> free_stack = lm::fixed_array_create<u32>(scratch.arena, MAX_SURFEL_COUNT);
 
-		for (u64 i = 0; i < MAX_SURFEL_COUNT; i++) {
-			free_stack.push_back(MAX_SURFEL_COUNT - 1 - i);
+		for (u32 i = 0; i < MAX_SURFEL_COUNT; i++) {
+			free_stack.push_back(MAX_SURFEL_COUNT - 1u - i);
 		}
 
 		state.surfel_free_stack_buffer =
@@ -214,17 +214,17 @@ void init(Integrator* integrator) {
 	cmd.submit();
 
 	f32 max_uniform_cells =
-		get_max_uniform_cells(pc.desired_surfel_radius_px, integrator->scene_ubo.projection[1][1], Window::height());
+		get_max_uniform_cells(pc.desired_surfel_radius_px, integrator->scene_ubo.projection[1][1], (f32)Window::height());
 
 	f32 max_trapezoidal_cell_size =
-		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], Window::height());
+		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], (f32)Window::height());
 
 	// Maximum possible size
 	// Let C be the trapezoidal cell size, x is the desired radius in terms of px
 	// Per the recycle rule in surfel_recycle: (C - x ) / 2 = x
 	//  x = floor(C/3) pixels
 	pc.desired_surfel_radius_px = lm::floor(max_trapezoidal_cell_size / 3.0f);
-	pc.grid_uniform_cell_distance_threshold = 0.1;
+	pc.grid_uniform_cell_distance_threshold = 0.1f;
 
 	LUMEN_INFO("Uniform cells size limit (world space): %u", (u32)lm::round(fabsf(max_uniform_cells)));
 	LUMEN_INFO("Trapezoidal cell size limit (px): %u", (u32)lm::round(max_trapezoidal_cell_size));
@@ -244,7 +244,7 @@ void render(Integrator* integrator) {
 	pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	pc.dir_light_idx = integrator->lumen_scene->dir_light_idx;
 	pc.direct_lighting = state.direct_lighting;
-	pc.sampling_seed = rand() % U32_MAX;
+	pc.sampling_seed = lm::rand_u32();
 	u32 grid_total_cells = get_total_grid_cells();
 	u32 prefix_sum_scratch_capacity = (u32)(state.grid_prefix_sum_scratch_buffer->size / sizeof(u32));
 	pc.grid_total_cells = grid_total_cells;
@@ -437,11 +437,11 @@ bool gui(Integrator* integrator) {
 	result |= ImGui::Checkbox("Pause surfel spawning", &state.pause_surfel_spawn);
 	result |= ImGui::Checkbox("Camera relative surfel size", &state.use_camera_relative_surfel_size);
 	f32 max_trapezoidal_cell_size =
-		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], Window::height());
-	float max_allowed_cell_size = floor(max_trapezoidal_cell_size) - pc.desired_surfel_radius_px;
+		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], (f32)Window::height());
+	f32 max_allowed_cell_size = floor(max_trapezoidal_cell_size) - pc.desired_surfel_radius_px;
 	result |=
-		ImGui::SliderFloat("Surfel radius (px)", &pc.desired_surfel_radius_px, 4, lm::floor(max_allowed_cell_size / 2));
-	result |= ImGui::SliderFloat("Uniform cell distance threshold", &pc.grid_uniform_cell_distance_threshold, 0.01, 10);
+		ImGui::SliderFloat("Surfel radius (px)", &pc.desired_surfel_radius_px, 4.0f, lm::floor(max_allowed_cell_size / 2.0f));
+	result |= ImGui::SliderFloat("Uniform cell distance threshold", &pc.grid_uniform_cell_distance_threshold, 0.01f, 10.0f);
 	result |= ImGui::SliderInt("Rays per surfel", (i32*)&state.rays_per_surfel, 0, 256);
 
 	if (DEBUG_PASSES) {

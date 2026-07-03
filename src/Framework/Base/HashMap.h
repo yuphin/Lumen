@@ -75,8 +75,7 @@ struct HashMapProbed {
 #else
 		// Try to resize in-place
 		u64 hm_size = capacity * sizeof(HashMapEntryType);
-		u64 local_offset_alligned_prev =
-			lm::align_pow2(arena_node->local_offset - hm_size, alignof(HashMapEntryType));
+		u64 local_offset_alligned_prev = lm::align_pow2(arena_node->local_offset - hm_size, alignof(HashMapEntryType));
 		bool is_sequential = (arena_node->data + local_offset_alligned_prev) == (u8*)data;
 		if (is_sequential) {
 			arena_node->local_offset -= capacity * sizeof(HashMapEntryType);
@@ -90,9 +89,17 @@ struct HashMapProbed {
 		HashMapEntryType* new_data =
 			(HashMapEntryType*)arena_node->allocate(alloc_size, alignof(HashMapEntryType), &new_arena_node,
 													/*zero_initialize=*/false);
-		bool is_different_block = new_arena_node != arena_node;
 
 		HashMapEntryType* old_data = data;
+		const bool in_place = new_data == old_data;
+		if (in_place) {
+			// Zero out from the tail if in_place
+			memset(new_data + capacity, 0, (new_capacity - capacity) * sizeof(HashMapEntryType));
+		} else {
+			// Zero out the entire new allocation if not in_place
+			memset(new_data, 0, alloc_size);
+		}
+
 		data = new_data;
 		u64 old_size = size;
 		size = 0;
@@ -103,6 +110,9 @@ struct HashMapProbed {
 		for (u64 i = 0; i < old_capacity; i++) {
 			if (old_data[i].hash > HASH_MAP_HASH_DELETED) {
 				old_data[i].hash = HASH_MAP_HASH_EMPTY_BUT_RESIZING;
+			} else if (old_data[i].hash == HASH_MAP_HASH_DELETED) {
+				// Reinterpret tombstones as empty
+				old_data[i].hash = HASH_MAP_HASH_EMPTY;
 			}
 		}
 		u64 processed = 0;
@@ -123,7 +133,7 @@ struct HashMapProbed {
 			}
 			++processed;
 		}
-		if (!is_different_block && is_sequential) {
+		if (in_place) {
 			for (u64 i = 0; i < old_capacity; i++) {
 				if (old_data[i].hash == HASH_MAP_HASH_EMPTY_BUT_RESIZING) {
 					old_data[i].hash = HASH_MAP_HASH_EMPTY;
@@ -139,31 +149,27 @@ struct HashMapProbed {
 		if (hash <= HASH_MAP_HASH_DELETED) {
 			hash += HASH_MAP_HASH_DELETED + 1;
 		}
-		bool old_entry_found = false;
 		u64 index = hash & (capacity - 1);
-
 		u64 probe_inc = 1;
 		while (data[index].hash > HASH_MAP_HASH_EMPTY_BUT_RESIZING) {
-			HashMapEntry<T1, T2>& entry = data[index];
-			if (entry.hash == HASH_MAP_HASH_DELETED) {
-				--num_slots;
-				break;
-			} else if (eq_func(entry.key, old_entry->key)) {
-				if constexpr (!util::is_same<T2, Empty>::value) {
-					entry.value = old_entry->value;
-				}
-				return old_entry_found;
-			}
 			index = (index + probe_inc) & (capacity - 1);
 			probe_inc++;
 		}
 		++num_slots;
 		++size;
 
+		bool old_entry_found = false;
 		HashMapEntry<T1, T2> old_entry_copy = *old_entry;
-		if (data[index].key != old_entry_copy.key && data[index].hash == HASH_MAP_HASH_EMPTY_BUT_RESIZING) {
-			*old_entry = data[index];
-			old_entry_found = true;
+		if (&data[index] != old_entry) {
+			if (data[index].hash == HASH_MAP_HASH_EMPTY_BUT_RESIZING) {
+				*old_entry = data[index];
+				old_entry_found = true;
+			} else {
+				assert(data[index].hash == HASH_MAP_HASH_EMPTY);
+				// The destination is written with old entry data
+				// Mark the old entry data from pending to empty
+				old_entry->hash = HASH_MAP_HASH_EMPTY;
+			}
 		}
 		data[index].hash = hash;
 		data[index].key = old_entry_copy.key;
@@ -184,14 +190,17 @@ struct HashMapProbed {
 		}
 
 		u64 index = hash & (capacity - 1);
-
 		u64 probe_inc = 1;
+		// The key may still live past a tombstone, so remember the first tombstone but keep
+		// probing until empty or a match
+		u64 tombstone_idx = U64_MAX;
 		while (data[index].hash != HASH_MAP_HASH_EMPTY) {
 			HashMapEntry<T1, T2>& entry = data[index];
 			if (entry.hash == HASH_MAP_HASH_DELETED) {
-				--num_slots;
-				break;
-			} else if (eq_func(entry.key, key)) {
+				if (tombstone_idx == U64_MAX) {
+					tombstone_idx = index;
+				}
+			} else if (entry.hash == hash && eq_func(entry.key, key)) {
 				if constexpr (!util::is_same<T2, Empty>::value) {
 					entry.value = value;
 				}
@@ -200,7 +209,12 @@ struct HashMapProbed {
 			index = (index + probe_inc) & (capacity - 1);
 			probe_inc++;
 		}
-		++num_slots;
+		if (tombstone_idx != U64_MAX) {
+			// Tombstones are already counted in num_slots
+			index = tombstone_idx;
+		} else {
+			++num_slots;
+		}
 		++size;
 		data[index].hash = hash;
 		data[index].key = key;
@@ -219,7 +233,8 @@ struct HashMapProbed {
 		u64 index = hash & (capacity - 1);
 		u64 probe_inc = 1;
 
-		while (data[index].hash > HASH_MAP_HASH_DELETED) {
+		// Probe over tombstones; only EMPTY terminates the chain
+		while (data[index].hash != HASH_MAP_HASH_EMPTY) {
 			if (data[index].hash == hash && eq_func(data[index].key, key)) {
 				return &data[index];
 			}
@@ -241,14 +256,15 @@ struct HashMapProbed {
 		}
 
 		u64 index = hash & (capacity - 1);
-
 		u64 probe_inc = 1;
+		u64 tombstone_idx = U64_MAX;
 		while (data[index].hash != HASH_MAP_HASH_EMPTY) {
 			HashMapEntry<T1, T2>& entry = data[index];
 			if (entry.hash == HASH_MAP_HASH_DELETED) {
-				--num_slots;
-				break;
-			} else if (eq_func(entry.key, key)) {
+				if (tombstone_idx == U64_MAX) {
+					tombstone_idx = index;
+				}
+			} else if (entry.hash == hash && eq_func(entry.key, key)) {
 				if (created) {
 					*created = false;
 				}
@@ -257,7 +273,11 @@ struct HashMapProbed {
 			index = (index + probe_inc) & (capacity - 1);
 			probe_inc++;
 		}
-		++num_slots;
+		if (tombstone_idx != U64_MAX) {
+			index = tombstone_idx;
+		} else {
+			++num_slots;
+		}
 		++size;
 		data[index].hash = hash;
 		data[index].key = key;
@@ -283,7 +303,7 @@ struct HashMapProbed {
 		u64 index = hash & (capacity - 1);
 		u64 probe_inc = 1;
 
-		while (data[index].hash > HASH_MAP_HASH_DELETED) {
+		while (data[index].hash != HASH_MAP_HASH_EMPTY) {
 			if (data[index].hash == hash && eq_func(data[index].key, key)) {
 				data[index].hash = HASH_MAP_HASH_DELETED;
 				--size;

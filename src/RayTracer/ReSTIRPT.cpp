@@ -196,9 +196,9 @@ void render(Integrator* integrator) {
 	state.pc.enable_temporal_jitter = uint(state.enable_temporal_jitter);
 	state.pc.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
 	state.pc.prev_random_num = state.pc.general_seed;
-	state.pc.sampling_seed = rand() % U32_MAX;
-	state.pc.seed2 = rand() % U32_MAX;
-	state.pc.seed3 = rand() % U32_MAX;
+	state.pc.sampling_seed = lm::rand_u32();
+	state.pc.seed2 = lm::rand_u32();
+	state.pc.seed3 = lm::rand_u32();
 	state.pc.max_depth = state.path_length;
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
 	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
@@ -357,7 +357,7 @@ void render(Integrator* integrator) {
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
 
-	state.pc.general_seed = rand() % U32_MAX;
+	state.pc.general_seed = lm::rand_u32();
 	if (state.enable_gris) {
 		bool should_do_temporal = state.enable_temporal_reuse && state.pc.total_frame_num > 0;
 		// Temporal Reuse
@@ -380,7 +380,7 @@ void render(Integrator* integrator) {
 			.bind_texture_array(integrator->lumen_scene->scene_textures)
 			.bind_tlas(*integrator->tlas)
 			.skip_execution(!should_do_temporal);
-		state.pc.seed2 = rand() % U32_MAX;
+		state.pc.seed2 = lm::rand_u32();
 		if (!state.canonical_only) {
 			if (state.mis_method == ReSTIRPT::MIS_TALBOT) {
 				rg::add_rt(CSTR("GRIS - Spatial Reuse - Talbot"),

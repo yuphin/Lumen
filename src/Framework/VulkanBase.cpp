@@ -729,7 +729,12 @@ u32 prepare_frame() {
 	VkResult result =
 		vkAcquireNextImageKHR(context().device, context().swapchain, UINT64_MAX,
 							  _image_available_sem[context().in_flight_frame_idx], VK_NULL_HANDLE, &image_idx);
-	if (result == VK_NOT_READY || result == VK_TIMEOUT || result == VK_SUBOPTIMAL_KHR) {
+	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+		recreate_swap_chain();
+		return UINT32_MAX;
+	}
+	if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+		check(result, "Failed to acquire swapchain image");
 		return UINT32_MAX;
 	}
 	if (_images_in_flight[image_idx] != VK_NULL_HANDLE) {

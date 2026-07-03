@@ -117,7 +117,7 @@ void init(bool use_debug, i32 argc, char* argv[]) {
 			scene_name = arg_str;
 		}
 	}
-	srand((u32)(os::time_seconds() * 1000000000.0));
+	lm::rand_seed((u64)(os::time_seconds() * 1000000000.0));
 	Window::add_key_callback(key_callback);
 
 	// Init with ray tracing extensions
@@ -246,7 +246,6 @@ static void cleanup_resources() {
 
 void update() {
 	f32 frame_time = prepare_frame_and_render();
-	_cpu_avg_time = (1.0f - 1.0f / (_cnt)) * _cpu_avg_time + frame_time / (f32)_cnt;
 	_cpu_avg_time = 0.95f * _cpu_avg_time + 0.05f * frame_time;
 	integrator::update(&_active_integrator);
 	_active_integrator.updated = false;

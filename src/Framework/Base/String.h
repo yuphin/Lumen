@@ -32,7 +32,7 @@ struct String {
 	inline const char* begin() const { return &data[0]; }
 	inline const char* end() const { return &data[size]; }
 	inline bool empty() const { return size == 0; }
-	inline bool is_cstr() const { return data[size - 1] == '\0'; }
+	inline bool is_cstr() const { return size != 0 && data[size - 1] == '\0'; }
 };
 template <u64 N>
 constexpr String cstr(const char (&str)[N]) {

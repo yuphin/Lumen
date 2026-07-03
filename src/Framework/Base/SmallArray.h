@@ -54,10 +54,7 @@ struct SmallArray {
 
 	void erase_unordered(u64 idx) {
 		assert(idx < size);
-		const T& a = data[idx];
-		const T& tmp = data[size - 1];
-		data[size -1] = a;
-		data[idx] = tmp;
+		data[idx] = data[size - 1];
 		size--;
 	}
 

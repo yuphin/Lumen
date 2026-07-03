@@ -118,66 +118,19 @@ struct ShaderMacro {
 
 using ShaderMacroArray = lm::SmallArray<ShaderMacro, lm::MAX_SHADER_MACROS>;
 
-struct GraphicsPassSettings {
-	lm::SmallArray<vk::Shader, vk::MAX_SHADERS_PER_PASS> shaders;
-	ShaderMacroArray macros;
-	u32 width;
-	u32 height;
-	VkClearValue clear_color;
-	VkClearValue clear_depth_stencil;
-	VkCullModeFlags cull_mode = VK_CULL_MODE_FRONT_BIT;
-	lm::SmallArray<vk::Buffer*, lm::MAX_VERTEX_BUFFERS> vertex_buffers;
-	vk::Buffer* index_buffer = nullptr;
-	lm::SmallArray<VkVertexInputBindingDescription, MAX_VERTEX_BINDINGS> vertex_bindings;
-	lm::SmallArray<VkVertexInputAttributeDescription, MAX_VERTEX_ATTRIBUTES> vertex_attributes;
-	lm::SpecializationConstantArray specialization_data;
-	lm::SmallArray<bool, MAX_COLOR_ATTACHMENTS> blend_enables;
-	lm::SmallArray<VkPipelineColorBlendAttachmentState, MAX_COLOR_ATTACHMENTS> blend_attachments;
-	lm::SmallArray<VkAttachmentLoadOp, MAX_COLOR_ATTACHMENTS> color_load_ops;
-	VkFrontFace front_face = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
-	VkSampleCountFlagBits sample_count = VK_SAMPLE_COUNT_1_BIT;
-	VkIndexType index_type = VK_INDEX_TYPE_UINT32;
-	VkAttachmentLoadOp depth_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	VkBool32 depth_test_enable = VK_TRUE;
-	VkBool32 depth_write_enable = VK_TRUE;
-	VkCompareOp depth_compare_op = VK_COMPARE_OP_LESS_OR_EQUAL;
-	f32 line_width = 1.0;
-	lm::SmallArray<vk::Texture*, MAX_COLOR_ATTACHMENTS> color_outputs = {};
-	vk::Texture* depth_output = nullptr;
-	lm::PassFunc pass_func;
-
-	PassType type = PassType::Graphics;
-};
-
-struct RTPassSettings {
-	lm::SmallArray<vk::Shader, vk::MAX_SHADERS_PER_PASS> shaders;
-	ShaderMacroArray macros;
-	u32 recursion_depth = 1;
-	lm::SpecializationConstantArray specialization_data;
-	lm::dim3 dims;
-	PassType type = PassType::RT;
-	lm::PassFunc pass_func;
-};
-
-struct ComputePassSettings {
-	vk::Shader shader;
-	ShaderMacroArray macros;
-	lm::SpecializationConstantArray specialization_data;
-	lm::dim3 dims;
-	lm::PassFunc pass_func;
-	PassType type = PassType::Compute;
-};
-
+// Single settings struct for all pass types; the pass type is set by the rg::add_* entry point.
+// NOTE: Designated initializers must follow declaration order, so common fields come first,
+// graphics fields second, RT fields third and pass_func last.
 struct PassSettings {
 	////////////////////////////
 	// --- Common ---
 	lm::SmallArray<vk::Shader, vk::MAX_SHADERS_PER_PASS> shaders = {};
+	// Convenience for compute passes, which take a single shader
+	// TODO: Remove this later?
+	vk::Shader shader = {};
 	ShaderMacroArray macros = {};
 	lm::SpecializationConstantArray specialization_data = {};
 	lm::dim3 dims = {};
-	lm::PassFunc pass_func = nullptr;
 
 	////////////////////////////
 	// --- Graphics ---
@@ -209,6 +162,12 @@ struct PassSettings {
 	////////////////////////////
 	// --- RT ---
 	u32 recursion_depth = 1;
+
+	lm::PassFunc pass_func = nullptr;
 };
+
+using GraphicsPassSettings = PassSettings;
+using RTPassSettings = PassSettings;
+using ComputePassSettings = PassSettings;
 
 }  // namespace vk

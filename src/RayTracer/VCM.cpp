@@ -113,7 +113,7 @@ void render(Integrator* integrator) {
 	state.pc.width = Window::width();
 	state.pc.height = Window::height();
 	state.pc.num_lights = i32(integrator->lumen_scene->gpu_lights.size);
-	state.pc.time = rand() % U32_MAX;
+	state.pc.time = lm::rand_u32();
 	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
 	state.pc.frame_num = integrator->frame_num;
@@ -125,7 +125,7 @@ void render(Integrator* integrator) {
 	state.pc.use_vm = config.enable_vm;
 	state.pc.use_vc = state.use_vc;
 	state.pc.do_spatiotemporal = state.do_spatiotemporal;
-	state.pc.random_num = rand() % U32_MAX;
+	state.pc.random_num = lm::rand_u32();
 	state.pc.max_angle_samples = MAX_SAMPLES;
 	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
@@ -175,7 +175,7 @@ void render(Integrator* integrator) {
 		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer)
 		.zero(state.should_resample_buffer);
-	state.pc.random_num = rand() % U32_MAX;
+	state.pc.random_num = lm::rand_u32();
 	// Spawn light rays
 	rg::add_rt(CSTR("VCM - Spawn Light"),
 				 {
@@ -192,7 +192,7 @@ void render(Integrator* integrator) {
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
-	state.pc.random_num = rand() % U32_MAX;
+	state.pc.random_num = lm::rand_u32();
 	// Trace spawned rays
 	rg::add_rt(CSTR("VCM - Trace Light"),
 				 {

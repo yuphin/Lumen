@@ -850,6 +850,21 @@ void file_close(FileHandle handle) {
 #endif
 }
 
+bool directory_create(const lm::String& path) {
+	assert(path.is_cstr());
+#if defined(_WIN32) || defined(_WIN64)
+	if (CreateDirectoryA(path.data, NULL)) {
+		return true;
+	}
+	return GetLastError() == ERROR_ALREADY_EXISTS;
+#else
+	if (mkdir(path.data, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == 0) {
+		return true;
+	}
+	return errno == EEXIST;
+#endif
+}
+
 FileProperties file_properties(FileHandle handle) {
 	if (handle == 0) {
 		return {};

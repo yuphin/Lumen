@@ -194,5 +194,7 @@ u64 file_write(FileHandle handle, void* in_data, u64 size);
 FileHandle file_open(const lm::String& path, AccessFlags access_flags);
 void file_close(FileHandle handle);
 FileProperties file_properties(FileHandle handle);
+// Returns true if it was created or already exists
+bool directory_create(const lm::String& path);
 
 }  // namespace os

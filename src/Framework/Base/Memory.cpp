@@ -73,7 +73,7 @@ void* Arena::allocate(u64 size, u64 alignment, Arena** arena_node, bool zero_ini
 	bool exclusive_block = exclusive_block_reserve_size > 0;
 	Arena* last_block = nullptr;
 	for (Arena* arena = curr_arena; arena; last_block = arena, arena = arena->next) {
-		if ((arena->flags & ARENA_FLAG_RESERVED) || (exclusive_block && local_offset_alligned > 0)) {
+		if ((arena->flags & ARENA_FLAG_RESERVED) || (exclusive_block && arena->local_offset > 0)) {
 			continue;
 		}
 		if (arena->flags & ARENA_FLAG_SCRATCH && (this->flags & ARENA_FLAG_SCRATCH) == 0) {

@@ -44,15 +44,6 @@ struct PipelineStorage {
 	bool update_as_descriptor;
 };
 
-struct BufferSyncResources {
-	lm::SmallArray<VkBufferMemoryBarrier2, MAX_BUFFER_BARRIERS> buffer_barriers;
-	lm::SmallArray<VkDependencyInfo, MAX_BUFFER_BARRIERS> dependency_infos;
-};
-struct ImageSyncResources {
-	lm::SmallArray<VkImageMemoryBarrier2, MAX_IMG_BARRIERS> img_barriers;
-	lm::SmallArray<VkDependencyInfo, MAX_IMG_BARRIERS> dependency_infos;
-};
-
 struct BufferBarrier {
 	VkBuffer buffer;
 	VkAccessFlags src_access_flags = VK_ACCESS_SHADER_WRITE_BIT;
@@ -76,6 +67,7 @@ struct BufferResourceState {
 	u32 pass_idx;
 	VkAccessFlags access_flags;
 	VkPipelineStageFlags stage;
+	u64 generation;
 	bool event_eligible;
 };
 
@@ -85,6 +77,7 @@ struct ImageResourceState {
 	VkImageLayout layout;
 	VkImageAspectFlags image_aspect;
 	VkPipelineStageFlags stage;
+	u64 generation;
 	bool event_eligible;
 };
 
@@ -183,22 +176,52 @@ struct RenderPass {
 	bool is_pipeline_cached = false;
 	vk::PassSettings settings;
 
-	lm::SmallArray<Resource, MAX_RESOURCES_ZEROS> resource_zeros;
-	lm::SmallArray<BufferBarrier, MAX_RESOURCES_ZEROS> prefill_buffer_barriers;
-	lm::SmallArray<lm::pair<Resource, Resource>, MAX_RESOURCES_COPIES> resource_copies;
-	BufferSyncResources buffer_sync_resources;
-	ImageSyncResources image_sync_resources;
-	// TODO: Might be redundant?
-	lm::SmallArray<BufferBarrier, MAX_RESOURCES_ZEROS> carryover_buffer_barriers;
-	lm::SmallArray<ImageBarrier, MAX_IMG_BARRIERS> carryover_image_barriers;
-	//
-	lm::SmallArray<BufferBarrier, MAX_RESOURCES_COPIES> post_execution_buffer_barriers;
-	lm::SmallArray<vk::Buffer*, MAX_EXPLICIT_BUFFER_READ_WRITES> explicit_buffer_writes;
-	lm::SmallArray<vk::Buffer*, MAX_EXPLICIT_BUFFER_READ_WRITES> explicit_buffer_reads;
-	lm::SmallArray<vk::Texture*, MAX_EXPLICIT_IMG_READ_WRITES> explicit_tex_writes;
-	lm::SmallArray<vk::Texture*, MAX_EXPLICIT_IMG_READ_WRITES> explicit_tex_reads;
-	lm::SmallArray<u32, MAX_DESCRIPTORS> descriptor_counts;
-	lm::SmallArray<LayoutTransitionData, MAX_IMG_BARRIERS> layout_transitions;
+	struct FrameState {
+		lm::SmallArray<Resource, MAX_RESOURCES_ZEROS> resource_zeros;
+		lm::SmallArray<BufferBarrier, MAX_RESOURCES_ZEROS> prefill_buffer_barriers;
+		lm::SmallArray<lm::pair<Resource, Resource>, MAX_RESOURCES_COPIES> resource_copies;
+		// TODO: Might be redundant?
+		lm::SmallArray<BufferBarrier, MAX_RESOURCES_ZEROS> carryover_buffer_barriers;
+		lm::SmallArray<ImageBarrier, MAX_IMG_BARRIERS> carryover_image_barriers;
+		//
+		lm::SmallArray<BufferBarrier, MAX_RESOURCES_COPIES> post_execution_buffer_barriers;
+		lm::SmallArray<vk::Buffer*, MAX_EXPLICIT_BUFFER_READ_WRITES> explicit_buffer_writes;
+		lm::SmallArray<vk::Buffer*, MAX_EXPLICIT_BUFFER_READ_WRITES> explicit_buffer_reads;
+		lm::SmallArray<vk::Texture*, MAX_EXPLICIT_IMG_READ_WRITES> explicit_tex_writes;
+		lm::SmallArray<vk::Texture*, MAX_EXPLICIT_IMG_READ_WRITES> explicit_tex_reads;
+		lm::SmallArray<u32, MAX_DESCRIPTORS> descriptor_counts;
+		lm::SmallArray<LayoutTransitionData, MAX_IMG_BARRIERS> layout_transitions;
+		BlasBuildData blas_build_data;
+		TlasBuildData tlas_build_data;
+		i32 next_binding_idx = 0;
+		i32 next_as_binding_idx = 0;
+		void* push_constant_data = nullptr;
+		bool disable_execution = false;
+
+		// Size resets only
+		void reset() {
+			resource_zeros.clear();
+			prefill_buffer_barriers.clear();
+			resource_copies.clear();
+			carryover_buffer_barriers.clear();
+			carryover_image_barriers.clear();
+			post_execution_buffer_barriers.clear();
+			explicit_buffer_writes.clear();
+			explicit_buffer_reads.clear();
+			explicit_tex_writes.clear();
+			explicit_tex_reads.clear();
+			descriptor_counts.clear();
+			layout_transitions.clear();
+			blas_build_data = {};
+			tlas_build_data = {};
+			next_binding_idx = 0;
+			next_as_binding_idx = 0;
+			push_constant_data = nullptr;
+			disable_execution = false;
+		}
+	};
+	FrameState frame;
+
 	// Resource dependencies that must execute before this pass.
 	/*
 	Note:
@@ -210,13 +233,7 @@ struct RenderPass {
 	lm::HashMap<VkBuffer, BufferSyncDescriptor> wait_signals_buffer;
 	lm::HashMap<VkImage, ImageSyncDescriptor> set_signals_img;
 	lm::HashMap<VkImage, ImageSyncDescriptor> wait_signals_img;
-	BlasBuildData blas_build_data;
-	TlasBuildData tlas_build_data;
 
-	i32 next_binding_idx = 0;
-	i32 next_as_binding_idx = 0;
-	void* push_constant_data = nullptr;
-	bool disable_execution = false;
 	bool resources_initialized = false;
 	vk::DescriptorInfo descriptor_infos[MAX_DESCRIPTORS] = {};
 

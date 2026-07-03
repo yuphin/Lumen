@@ -1,4 +1,5 @@
 #pragma once
+#include "Framework/Base/Random.h"
 #include "Framework/CommandBuffer.h"
 #include "Framework/VulkanBase.h"
 #include "Framework/Window.h"

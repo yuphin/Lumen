@@ -16,7 +16,7 @@ String str_from_f64(Arena* arena, double val) {
 	String result;
 	result.size = num_chars;
 	char* data = (char*)arena->allocate(result.size);
-	memmove(data, buf, sizeof(buf));
+	memcpy(data, buf, result.size);
 	result.data = data;
 	return result;
 }
