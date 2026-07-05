@@ -42,12 +42,13 @@ void main() {
 		return;
 	}
 
-	vec4 pos_ws = ubo.inv_view * vec4(0, 0, 0, 1);
+	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
 	HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
 	// Offset around camera
-	vec3 c = surfel_hit_data.pos - pos_ws.xyz;
+	vec3 c = surfel_hit_data.pos - cam_pos.xyz;
 	float r = surfel.radius;
 
+#if GRID_LOOKUP_MODE == GRID_LOOKUP_BBOX
 	vec3 corners[8] = vec3[8](c + vec3(-r, -r, -r), c + vec3(-r, -r, +r), c + vec3(-r, +r, -r), c + vec3(-r, +r, +r),
 							  c + vec3(+r, -r, -r), c + vec3(+r, -r, +r), c + vec3(+r, +r, -r), c + vec3(+r, +r, +r));
 
@@ -87,4 +88,22 @@ void main() {
 #endif
 		grid_cell_indices.d[idx] = surfel_idx;
 	}
+#else
+	uvec4 neighbors[4];
+	uint neighbor_count;
+	collect_neighbors(surfel_hit_data.pos, r, cam_pos.xyz, neighbors, neighbor_count);
+
+	for (uint i = 0; i < neighbor_count; i++) {
+		uint linear_idx = linearize_grid(neighbors[i]);
+		uint cell_end = atomicAdd(grid_cell_counts.d[linear_idx], -1);
+		uint idx = cell_end - 1;
+#if DEBUG_GRID_INVARIANTS
+		if (cell_end == 0 || idx >= (GRID_AVG_SURFELS_PER_CELL * MAX_SURFEL_COUNT)) {
+			debugPrintfEXT("Invalid grid cell offset %u\n", idx);
+			continue;
+		}
+#endif
+		grid_cell_indices.d[idx] = surfel_idx;
+	}
+#endif
 }

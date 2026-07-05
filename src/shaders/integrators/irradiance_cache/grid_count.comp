@@ -3,6 +3,7 @@
 #extension GL_GOOGLE_include_directive : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_debug_printf : enable
 
 #include "ir_commons.h"
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
@@ -39,12 +40,13 @@ void main() {
 		return;
 	}
 
-	vec4 pos_ws = ubo.inv_view * vec4(0, 0, 0, 1);
+	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
 	HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
 	// Offset around camera
-	vec3 c = surfel_hit_data.pos - pos_ws.xyz;
+	vec3 c = surfel_hit_data.pos - cam_pos.xyz;
 	float r = surfel.radius;
 
+#if GRID_LOOKUP_MODE == GRID_LOOKUP_BBOX
 	vec3 corners[8] = vec3[8](c + vec3(-r, -r, -r), c + vec3(-r, -r, +r), c + vec3(-r, +r, -r), c + vec3(-r, +r, +r),
 							  c + vec3(+r, -r, -r), c + vec3(+r, -r, +r), c + vec3(+r, +r, -r), c + vec3(+r, +r, +r));
 
@@ -76,4 +78,15 @@ void main() {
 	for (uint i = 0; i < unique_cnt; i++) {
 		atomicAdd(grid_cell_counts.d[linear_cells[i]], 1);
 	}
+#else
+	uvec4 neighbors[4];
+	uint neighbor_count;
+	collect_neighbors(surfel_hit_data.pos, r, cam_pos.xyz, neighbors, neighbor_count);
+
+	for(uint i = 0; i < neighbor_count; i++) {
+		uint linear_idx = linearize_grid(neighbors[i]);
+		atomicAdd(grid_cell_counts.d[linear_idx], 1);
+	}
+
+#endif
 }

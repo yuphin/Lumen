@@ -77,8 +77,7 @@ void main() {
 			uint linear_idx = linearize_grid(grid_val);
 			uint surfel_offset = grid_cell_counts.d[linear_idx];
 			uint surfel_count = grid_cell_counts.d[linear_idx + 1] - surfel_offset;
-			vec4 hit_view_pos = ubo.view * vec4(hit_data.pos, 1.0);
-			float would_be_radius = surfel_radius_for_position(hit_data.pos, hit_view_pos);
+			float would_be_radius = surfel_radius_for_position(hit_data.pos);
 
 			for (uint gid = 0; gid < surfel_count; gid++) {
 				uint sid = grid_cell_indices.d[gid + surfel_offset];

@@ -54,12 +54,12 @@ void main() {
 
 	HitData hit_data = get_hitdata(gbuffer);
 
-	vec4 pos_ws = ubo.inv_view * vec4(0, 0, 0, 1);
-	vec3 c = hit_data.pos - pos_ws.xyz;
-	vec4 view_pos = ubo.view * vec4(hit_data.pos, 1.0);
+	float r = surfel_radius_for_position(hit_data.pos);
+	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
 
-	float r = surfel_radius_for_position(hit_data.pos, view_pos);
-
+// #if GRID_LOOKUP_MODE == GRID_LOOKUP_BBOX
+#if 1
+	vec3 c = hit_data.pos - cam_pos.xyz;
 	vec3 corners[8] = vec3[8](c + vec3(-r, -r, -r), c + vec3(-r, -r, +r), c + vec3(-r, +r, -r), c + vec3(-r, +r, +r),
 							  c + vec3(+r, -r, -r), c + vec3(+r, -r, +r), c + vec3(+r, +r, -r), c + vec3(+r, +r, +r));
 
@@ -109,6 +109,37 @@ void main() {
 			}
 		}
 	}
+#else
+
+	uvec4 neighbors[4];
+	uint neighbor_count;
+
+	collect_neighbors(hit_data.pos, r, cam_pos.xyz, neighbors, neighbor_count);
+
+	for (uint i = 0; i < neighbor_count; i++) {
+		uint linear_idx = linearize_grid(neighbors[i]);
+		uint surfel_offset = grid_cell_counts.d[linear_idx];
+		uint surfel_count = grid_cell_counts.d[linear_idx + 1] - surfel_offset;
+		for (uint gid = 0; gid < surfel_count; gid++) {
+			uint sid = grid_cell_indices.d[gid + surfel_offset];
+			Surfel other = surfel_pool.d[sid];
+			if (other.radius <= 0.0) continue;
+			HitData other_hit_data = get_hitdata(other.gbuffer);
+
+			vec3 pos_to_other = hit_data.pos - other_hit_data.pos;
+			float dist_sqr = dot(pos_to_other, pos_to_other);
+			float dist_normal = dot(pos_to_other, other_hit_data.n_s);
+			float dist_tangent = sqrt(max(0.0, dist_sqr - dist_normal * dist_normal));
+			float n_dot = dot(hit_data.n_s, other_hit_data.n_s);
+
+			const float EPS = 1e-6;
+			if (n_dot > 0.3 && dist_tangent <= (other.radius + r + EPS)) {
+				return;
+			}
+		}
+	}
+
+#endif
 
 	Surfel surfel;
 	surfel.gbuffer = gbuffer;
