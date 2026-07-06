@@ -9,6 +9,7 @@ using namespace IRCache;
 // --- For debug purposes  ---
 #define DEBUG_PASSES 1
 static u32 _max_surfels_in_a_grid_cell = 0;
+static float _avg_surfels_in_a_grid_cell = 0;
 static bool _highlight_max_surfel_cell = false;
 // --- //
 
@@ -308,15 +309,12 @@ void render(Integrator* integrator) {
 		u64 total_cells = get_total_grid_cells();
 		auto prefix_sums = lm::fixed_array_create<u32>(scratch.arena, total_cells);
 
-		_max_surfels_in_a_grid_cell = 0;
 
 		for (u64 i = 0; i < total_cells; i++) {
 			u32 prev = i > 0 ? prefix_sums[i - 1] : 0;
 			prefix_sums.push_back(prev + counts[i]);
-			_max_surfels_in_a_grid_cell = lm::max(_max_surfels_in_a_grid_cell, counts[i]);
 		}
 		vk::buffer_unmap(state.grid_cell_counts_buffer);
-		pc.max_surfels_in_a_grid_cell = _highlight_max_surfel_cell ? _max_surfels_in_a_grid_cell : 0;
 
 		cmd.begin();
 		prefix_scan(grid_total_cells, 0, 0, prefix_sum_scratch_capacity, /*scan_sums=*/false,
@@ -328,6 +326,7 @@ void render(Integrator* integrator) {
 			assert(gpu_prefix_sums[i] == prefix_sums[i]);
 		}
 		vk::buffer_unmap(state.grid_cell_counts_buffer);
+		cmd.begin();
 
 	} else {
 		prefix_scan(grid_total_cells, 0, 0, prefix_sum_scratch_capacity, /*scan_sums=*/false,
@@ -348,6 +347,32 @@ void render(Integrator* integrator) {
 						 .dims = {lm::div_ceil((u32)MAX_SURFEL_COUNT, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 			.push_constants(&pc)
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
+	}
+
+	if(DEBUG_PASSES) {
+		rg::run_and_submit(cmd);
+
+		u64 total_cells = get_total_grid_cells();
+
+		_max_surfels_in_a_grid_cell = 0;
+		_avg_surfels_in_a_grid_cell = 0;
+
+		u32* counts = (u32*)vk::buffer_map(state.grid_cell_counts_buffer);
+
+		u32 active_cells = 0;
+		for(u64 i = 0; i < total_cells - 1; i++) {
+			u32 count = counts[i + 1] - counts[i];
+			if(count == 0) {
+				continue;
+			}
+			active_cells++;
+			_max_surfels_in_a_grid_cell = lm::max(_max_surfels_in_a_grid_cell, count);
+			_avg_surfels_in_a_grid_cell += count;
+		}
+		_avg_surfels_in_a_grid_cell /= (f32)active_cells;
+		vk::buffer_unmap(state.grid_cell_counts_buffer);
+		pc.max_surfels_in_a_grid_cell = _highlight_max_surfel_cell ? _max_surfels_in_a_grid_cell : 0;
+
 	}
 
 	if (!state.pause_surfel_spawn) {
@@ -468,6 +493,7 @@ bool gui(Integrator* integrator) {
 		ImGui::PopStyleColor();
 		ImGui::Text("Max trapeoidal cell size (px): %u", (u32)max_trapezoidal_cell_size);
 		ImGui::Text("Max surfels in a grid cell: %u\n", _max_surfels_in_a_grid_cell);
+		ImGui::Text("Average surfels in a grid cell: %.2f\n", _avg_surfels_in_a_grid_cell);
 		ImGui::Checkbox("Highlight fullest grid cell", &_highlight_max_surfel_cell);
 	}
 	return result;
