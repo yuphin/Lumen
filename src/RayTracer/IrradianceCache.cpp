@@ -5,10 +5,9 @@ namespace ircache {
 
 using namespace IRCache;
 
-#define DEBUG_PASSES 1
-
 ////////////////////////////
 // --- For debug purposes  ---
+#define DEBUG_PASSES 1
 static u32 _max_surfels_in_a_grid_cell = 0;
 static bool _highlight_max_surfel_cell = false;
 // --- //
@@ -32,6 +31,11 @@ static f32 get_px_size_per_trapezoidal_cell(f32 p11, f32 height) {
 }
 
 static f32 get_max_surfel_radius_px(f32 p11, f32 height) {
+	// Note: This ignores the tile period in surfel_spawn.comp
+	// SURFELIZE_PASS_TILE_SIZE_XY == 16 means we process 16 x 16 pixels per tile
+	// So for example a TILE_PERIOD of 3 implies we process 1 out of 9 tile in 1 frame
+	// This gives us a max surfel diameter of 33 pixels without overlap  (r = 16.5)
+	// If we we want to keep period lower, dedup pass needs to be enabled.
 	return lm::floor(fabsf(p11 * height / (2.0f * lm::sqrt(3.0f) * GRID_TRAPEZOIDAL_CELL_COUNT_AXIS)));
 }
 
@@ -337,6 +341,15 @@ void render(Integrator* integrator) {
 		.push_constants(&pc)
 		.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
 
+	if (state.enable_surfel_dedup) {
+		rg::add_compute(CSTR("Surfel: Dedup"),
+						{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_dedup.comp")),
+						 .macros = {vk::ShaderMacro("DEBUG_GRID_INVARIANTS", DEBUG_PASSES)},
+						 .dims = {lm::div_ceil((u32)MAX_SURFEL_COUNT, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
+			.push_constants(&pc)
+			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
+	}
+
 	if (!state.pause_surfel_spawn) {
 		u32 max_screen_tiles_x = lm::div_ceil(Window::width(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		u32 max_screen_tiles_y = lm::div_ceil(Window::height(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
@@ -436,6 +449,7 @@ bool gui(Integrator* integrator) {
 	ImGui::EndDisabled();
 	result |= ImGui::Checkbox("Pause surfel spawning", &state.pause_surfel_spawn);
 	result |= ImGui::Checkbox("Camera relative surfel size", &state.use_camera_relative_surfel_size);
+	result |= ImGui::Checkbox("Enable surfel deduplication", &state.enable_surfel_dedup);
 	f32 max_trapezoidal_cell_size =
 		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], (f32)Window::height());
 

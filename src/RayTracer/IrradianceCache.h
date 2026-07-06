@@ -26,6 +26,7 @@ struct IrradianceCache {
 	u32 debug_view = IRCACHE_DEBUG_VIEW_TRAPEZOIDAL_GRID;
 	bool pause_surfel_spawn = false;
 	bool use_camera_relative_surfel_size = true;
+	bool enable_surfel_dedup = false;
 	u32 total_frame_idx = 0;
 	u32 rays_per_surfel = 8;
 };

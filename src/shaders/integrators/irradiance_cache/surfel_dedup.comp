@@ -40,80 +40,37 @@ GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices
 #include "surfel_commons.glsl"
 #include "grid.glsl"
 
+void recycle_surfel(uint surfel_id) {
+	surfel_pool.d[surfel_id].radius = 0;
+	int idx = atomicAdd(free_stack_count.d, 1);
+	free_stack.d[idx] = surfel_id;
+}
+
 layout(local_size_x = ALLOCATE_PASS_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
 void main() {
 	uint tid = gl_GlobalInvocationID.x;
-	if (tid >= spawn_count.d) {
+	if(tid >= MAX_SURFEL_COUNT) {
 		return;
 	}
 
-	uint pixel_idx = spawn_list.d[tid];
-	GBuffer gbuffer = gbuffers.d[pixel_idx];
+	Surfel s = surfel_pool.d[tid];
 
-	ASSERT1(gbuffer_valid(gbuffer), "Surfel Allocate: GBuffer must be valid for %u\n", pixel_idx);
+	if(s.radius <= 0.0f) {
+		return;
+	}
 
-	HitData hit_data = get_hitdata(gbuffer);
+	if(s.age != pc.total_frame_num -1 ) {
+		return;
+	}
 
-	float r = surfel_radius_for_position(hit_data.pos);
+	HitData hit_data = get_hitdata(s.gbuffer);
+
 	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
-
-#if GRID_LOOKUP_MODE == GRID_LOOKUP_BBOX
-	vec3 c = hit_data.pos - cam_pos.xyz;
-	vec3 corners[8] = vec3[8](c + vec3(-r, -r, -r), c + vec3(-r, -r, +r), c + vec3(-r, +r, -r), c + vec3(-r, +r, +r),
-							  c + vec3(+r, -r, -r), c + vec3(+r, -r, +r), c + vec3(+r, +r, -r), c + vec3(+r, +r, +r));
-
-	uvec4 results[8];
-	for (int i = 0; i < 8; i++) {
-		results[i] = map_grid_axis(corners[i]);
-	}
-
-	uint linear_cells[8];
-	uint unique_cnt = 0;
-
-	for (uint i = 0; i < 8; i++) {
-		uint linear_idx = linearize_grid(results[i]);
-
-		bool is_duplicate = false;
-		for (uint j = 0; j < unique_cnt; j++) {
-			if (linear_idx == linear_cells[j]) {
-				is_duplicate = true;
-				break;
-			}
-		}
-		if (!is_duplicate) {
-			linear_cells[unique_cnt] = linear_idx;
-			unique_cnt++;
-		}
-	}
-
-	for (uint i = 0; i < unique_cnt; i++) {
-		uint linear_idx = linear_cells[i];
-		uint surfel_offset = grid_cell_counts.d[linear_idx];
-		uint surfel_count = grid_cell_counts.d[linear_idx + 1] - surfel_offset;
-		for (uint gid = 0; gid < surfel_count; gid++) {
-			uint sid = grid_cell_indices.d[gid + surfel_offset];
-			Surfel other = surfel_pool.d[sid];
-			if (other.radius <= 0.0) continue;
-			HitData other_hit_data = get_hitdata(other.gbuffer);
-
-			vec3 pos_to_other = hit_data.pos - other_hit_data.pos;
-			float dist_sqr = dot(pos_to_other, pos_to_other);
-			float dist_normal = dot(pos_to_other, other_hit_data.n_s);
-			float dist_tangent = sqrt(max(0.0, dist_sqr - dist_normal * dist_normal));
-			float n_dot = dot(hit_data.n_s, other_hit_data.n_s);
-
-			const float EPS = 1e-6;
-			if (n_dot > 0.3 && dist_tangent <= (other.radius + r + EPS)) {
-				return;
-			}
-		}
-	}
-#else
 
 	uvec4 neighbors[MAX_NEIGHBOR_PLUS_ITSELF_COUNT];
 	uint neighbor_count;
 
-	collect_neighbors(hit_data.pos, r, cam_pos.xyz, neighbors, neighbor_count);
+	collect_neighbors(hit_data.pos, s.radius, cam_pos.xyz, neighbors, neighbor_count);
 
 	for (uint i = 0; i < neighbor_count; i++) {
 		uint linear_idx = linearize_grid(neighbors[i]);
@@ -132,32 +89,15 @@ void main() {
 			float n_dot = dot(hit_data.n_s, other_hit_data.n_s);
 
 			const float EPS = 1e-6;
-			if (n_dot > 0.3 && dist_tangent <= (other.radius + r + EPS)) {
-				return;
+			if (n_dot > 0.3 && dist_tangent <= (other.radius + s.radius + EPS)) {
+
+				// earlier frame wins
+				if((other.age < s.age) || other.age == s.age && sid < tid) {
+
+					recycle_surfel(tid);
+					return;
+				}
 			}
 		}
 	}
-
-#endif
-
-	Surfel surfel;
-	surfel.gbuffer = gbuffer;
-	int surfel_stack_top = atomicAdd(free_stack_count.d, -1) - 1;
-	// Out of available indices
-	if (surfel_stack_top < 0) {
-		atomicAdd(free_stack_count.d, 1);
-		return;
-	}
-	surfel.radius = r;
-	surfel.age = pc.total_frame_num;
-	surfel.irradiance = vec3(0);
-	surfel.flags = 0;
-	ASSERT0(surfel.radius > 0, "Surfel radius must be >0\n");
-
-	uint surfel_idx = free_stack.d[surfel_stack_top];
-	if (surfel_idx >= MAX_SURFEL_COUNT) {
-		LOG0("Surfel idx can't be larger than max surfel amount!\n");
-	}
-	// LOG1("Surfel idx %d\n", surfel_idx);
-	surfel_pool.d[surfel_idx] = surfel;
 }
