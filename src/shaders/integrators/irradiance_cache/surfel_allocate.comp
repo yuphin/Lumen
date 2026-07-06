@@ -57,8 +57,7 @@ void main() {
 	float r = surfel_radius_for_position(hit_data.pos);
 	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
 
-// #if GRID_LOOKUP_MODE == GRID_LOOKUP_BBOX
-#if 1
+#if GRID_LOOKUP_MODE == GRID_LOOKUP_BBOX
 	vec3 c = hit_data.pos - cam_pos.xyz;
 	vec3 corners[8] = vec3[8](c + vec3(-r, -r, -r), c + vec3(-r, -r, +r), c + vec3(-r, +r, -r), c + vec3(-r, +r, +r),
 							  c + vec3(+r, -r, -r), c + vec3(+r, -r, +r), c + vec3(+r, +r, -r), c + vec3(+r, +r, +r));
@@ -111,7 +110,7 @@ void main() {
 	}
 #else
 
-	uvec4 neighbors[4];
+	uvec4 neighbors[MAX_NEIGHBOR_PLUS_ITSELF_COUNT];
 	uint neighbor_count;
 
 	collect_neighbors(hit_data.pos, r, cam_pos.xyz, neighbors, neighbor_count);

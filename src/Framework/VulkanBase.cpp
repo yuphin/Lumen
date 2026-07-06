@@ -28,12 +28,14 @@ static lm::SmallArray<const char*, MAX_VALIDATION_LAYERS> _validation_layers_lst
 static lm::SmallArray<const char*, MAX_DEVICE_EXTENSIONS> _device_extensions;
 
 static lm::SmallArray<VkSemaphore, MAX_FRAMES_IN_FLIGHT> _image_available_sem;
-static lm::SmallArray<VkSemaphore, MAX_SWAPCHAIN_IMAGES> _render_finished_sem;
 static lm::SmallArray<VkFence, MAX_FRAMES_IN_FLIGHT> _in_flight_fences;
+
+static lm::SmallArray<VkSemaphore, MAX_SWAPCHAIN_IMAGES> _render_finished_sem;
 static lm::SmallArray<VkFence, MAX_SWAPCHAIN_IMAGES> _images_in_flight;
+static lm::SmallArray<Texture*, MAX_SWAPCHAIN_IMAGES> _swapchain_images;
+
 static lm::SmallArray<VkQueueFamilyProperties, MAX_QUEUES> _queue_families;
 
-static lm::SmallArray<Texture*, MAX_SWAPCHAIN_IMAGES> _swapchain_images;
 
 static bool _enable_validation_layers;
 
@@ -95,8 +97,8 @@ static QueueFamilyIndices find_queue_families(VkPhysicalDevice device) {
 }
 
 static SwapChainSupportDetails query_swapchain_support(VkPhysicalDevice device) {
-	// Basically returns present modes and surface modes in a struct
-
+	// Query swaphcain support
+	// Returns present modes and surface modes in a struct
 	SwapChainSupportDetails details;
 
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, context().surface, &details.capabilities);
@@ -246,6 +248,50 @@ static void create_surface() {
 		  "Failed to create window surface");
 }
 
+static bool extensions_supported(VkPhysicalDevice device) {
+	// Check device extension support
+	u32 extension_cnt;
+	vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_cnt, nullptr);
+
+	lm::SmallArray<VkExtensionProperties, MAX_EXTENSION_PROPERTIES> available_extensions;
+	// Cap at our internal limit to avoid stack overflows, but warn if we are missing some
+	if (extension_cnt > MAX_EXTENSION_PROPERTIES) {
+		LUMEN_WARN("Device has %d extensions, but we only check the first %d", extension_cnt, MAX_EXTENSION_PROPERTIES);
+		extension_cnt = MAX_EXTENSION_PROPERTIES;
+	}
+	available_extensions.resize(extension_cnt);
+	vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_cnt, available_extensions.data);
+
+	for (const char* required_extension : _device_extensions) {
+		bool found = false;
+		for (const VkExtensionProperties& extension : available_extensions) {
+			if (strcmp(required_extension, extension.extensionName) == 0) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			return false;
+		}
+	}
+	return true;
+}
+
+static bool device_suitable(VkPhysicalDevice device) {
+	QueueFamilyIndices indices = find_queue_families(device);
+
+	bool swapchain_adequate = false;
+	bool has_extensions = extensions_supported(device);
+	if (has_extensions) {
+		SwapChainSupportDetails swapchain_support = query_swapchain_support(device);
+		// If we have a format and present mode, it's adequate
+		swapchain_adequate = !swapchain_support.formats.empty() && !swapchain_support.present_modes.empty();
+	}
+	// If we have the appropiate queue families, extensions and adequate
+	// swapchain, return true
+	return indices.is_complete() && has_extensions && swapchain_adequate;
+}
+
 static void pick_physical_device() {
 	u32 device_cnt = 0;
 	vkEnumeratePhysicalDevices(context().instance, &device_cnt, nullptr);
@@ -257,54 +303,10 @@ static void pick_physical_device() {
 	devices.resize(device_cnt);
 	vkEnumeratePhysicalDevices(context().instance, &device_cnt, devices.data);
 
-	// Is device suitable?
-	auto is_suitable = [](VkPhysicalDevice device) {
-		QueueFamilyIndices indices = find_queue_families(device);
-
-		// Check device extension support
-		auto extensions_supported = [](VkPhysicalDevice device) {
-			u32 extension_cnt;
-			vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_cnt, nullptr);
-
-			lm::SmallArray<VkExtensionProperties, MAX_EXTENSION_PROPERTIES> available_extensions;
-			// Cap at our internal limit to avoid stack overflows, but warn if we are missing some
-			if (extension_cnt > MAX_EXTENSION_PROPERTIES) {
-				LUMEN_WARN("Device has %d extensions, but we only check the first %d", extension_cnt,
-						   MAX_EXTENSION_PROPERTIES);
-				extension_cnt = MAX_EXTENSION_PROPERTIES;
-			}
-			available_extensions.resize(extension_cnt);
-			vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_cnt, available_extensions.data);
-
-			for (const char* required_extension : _device_extensions) {
-				bool found = false;
-				for (const VkExtensionProperties& extension : available_extensions) {
-					if (strcmp(required_extension, extension.extensionName) == 0) {
-						found = true;
-						break;
-					}
-				}
-				if (!found) {
-					return false;
-				}
-			}
-			return true;
-		}(device);
-
-		// Query swaphcain support
-		bool swapchain_adequate = false;
-		if (extensions_supported) {
-			SwapChainSupportDetails swapchain_support = query_swapchain_support(device);
-			// If we have a format and present mode, it's adequate
-			swapchain_adequate = !swapchain_support.formats.empty() && !swapchain_support.present_modes.empty();
-		}
-		// If we have the appropiate queue families, extensions and adequate
-		// swapchain, return true
-		return indices.is_complete() && extensions_supported && swapchain_adequate;
-	};
 	for (VkPhysicalDevice device : devices) {
-		if (is_suitable(device)) {
+		if (device_suitable(device)) {
 			context().physical_device = device;
+
 			VkPhysicalDeviceFeatures2 features2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
 			vkGetPhysicalDeviceFeatures2(context().physical_device, &features2);
 			context().supported_features = features2.features;
@@ -319,12 +321,22 @@ static void pick_physical_device() {
 	}
 	VkPhysicalDeviceProperties2 prop2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
 
+	VkPhysicalDeviceDriverProperties driver_props{};
+	driver_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
+	driver_props.pNext = &context().rt_props;
+
 	VkPhysicalDeviceSubgroupProperties subgroup_props{};
 	subgroup_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
-	subgroup_props.pNext = &context().rt_props;
+	subgroup_props.pNext = &driver_props;
 
 	prop2.pNext = &subgroup_props;
 	vkGetPhysicalDeviceProperties2(context().physical_device, &prop2);
+
+	u32 api = context().device_properties.apiVersion;
+	LUMEN_INFO("Selected GPU: %s (Vulkan %u.%u.%u, driver %s %s)", context().device_properties.deviceName,
+			   VK_API_VERSION_MAJOR(api), VK_API_VERSION_MINOR(api), VK_API_VERSION_PATCH(api), driver_props.driverName,
+			   driver_props.driverInfo);
+
 	if (subgroup_props.subgroupSize != 32) {
 		LUMEN_WARN("Subgroup size is not 32. This may affect behavior");
 	}
@@ -377,13 +389,6 @@ static void create_logical_device() {
 	features13.synchronization2 = true;
 	features13.maintenance4 = true;
 
-	VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_feature = {
-		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR};
-	VkPhysicalDeviceSynchronization2FeaturesKHR syncronization2_features = {
-		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR};
-	VkPhysicalDeviceMaintenance4FeaturesKHR maintenance4_fts = {
-		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES_KHR};
-
 	VkPhysicalDeviceRobustness2FeaturesKHR robustness2_fts = {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_KHR};
 
@@ -409,18 +414,8 @@ static void create_logical_device() {
 	features12.shaderSampledImageArrayNonUniformIndexing = true;
 	features12.scalarBlockLayout = true;
 	features12.hostQueryReset = true;
-	if (1) {
-		dynamic_rendering_feature.dynamicRendering = true;
-		syncronization2_features.synchronization2 = true;
-		maintenance4_fts.maintenance4 = true;
-		features12.pNext = &maintenance4_fts;
-		maintenance4_fts.pNext = &syncronization2_features;
-		syncronization2_features.pNext = &dynamic_rendering_feature;
-		dynamic_rendering_feature.pNext = &rt_fts;
-	} else {
-		features12.pNext = &features13;
-		features13.pNext = &rt_fts;
-	}
+	features12.pNext = &features13;
+	features13.pNext = &rt_fts;
 
 	device_features2.features.samplerAnisotropy = true;
 	device_features2.features.shaderInt64 = true;
@@ -459,7 +454,6 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 	VkSurfaceFormatKHR surface_format =
 		[](const lm::SmallArray<VkSurfaceFormatKHR, MAX_SURFACE_FORMATS>& available_formats) {
 			for (const VkSurfaceFormatKHR& available_format : available_formats) {
-				// Preferrably SRGB32 for now
 				if (available_format.format == VK_FORMAT_B8G8R8A8_SRGB &&
 					available_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
 					return available_format;
@@ -545,8 +539,7 @@ static void create_swapchain(VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) {
 	vkGetSwapchainImagesKHR(context().device, context().swapchain, &image_cnt, images.data);
 	for (u32 i = 0; i < image_cnt; i++) {
 		lm::String tex_name =
-			lm::str_concat(rg::arena(), "Swapchain Image #",
-						   lm::str_from_u64(rg::arena(), i), /*cstr=*/true);
+			lm::str_concat(rg::arena(), "Swapchain Image #", lm::str_from_u64(rg::arena(), i), /*cstr=*/true);
 		_swapchain_images.push_back(prm::get_texture({
 			.name = tex_name,
 			.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,

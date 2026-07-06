@@ -35,6 +35,10 @@ float max_px_per_trapezoidal_cell() {
 	return abs(px_vertical);
 }
 
+float max_surfel_radius_px() {
+	return abs(ubo.projection[1][1] * pc.height / (2.0f * sqrt(3.0f) * GRID_TRAPEZOIDAL_CELL_COUNT_AXIS));
+}
+
 void recycle_surfel(uint surfel_id) {
 	surfel_pool.d[surfel_id].radius = 0;
 	int idx = atomicAdd(free_stack_count.d, 1);
@@ -61,14 +65,9 @@ void main() {
 		return;
 	}
 
-	float px_size = 2.0 * surfel_radius_px_size_for_position(surfel, surfel_hit_data.pos, view_pos);
-	float max_cell_size = max_px_per_trapezoidal_cell();
-	float max_allowed_cell_size = floor(max_cell_size) - pc.desired_surfel_radius_px;
-	if (px_size >= max_allowed_cell_size || px_size < pc.desired_surfel_radius_px) {
-#if 0
-		debugPrintfEXT("Recycling surfel %d, px_size: %f, max_allowed_cell_size: %f, desired_surfel_radius_px: %f\n",
-					   tid, px_size, max_allowed_cell_size, pc.desired_surfel_radius_px);
-#endif
+	float px_size = surfel_radius_px_size_for_position(surfel, surfel_hit_data.pos, view_pos);
+	float max_radius = max_surfel_radius_px();
+	if (px_size >= max_radius || px_size < 0.9 * pc.desired_surfel_radius_px) {
 		recycle_surfel(tid);
 	}
 }

@@ -5,7 +5,7 @@ namespace ircache {
 
 using namespace IRCache;
 
-#define DEBUG_PASSES 0
+#define DEBUG_PASSES 1
 
 ////////////////////////////
 // --- For debug purposes  ---
@@ -29,6 +29,10 @@ static f32 get_max_uniform_cells(f32 desired_surfel_radius_px, f32 p11, f32 heig
 static f32 get_px_size_per_trapezoidal_cell(f32 p11, f32 height) {
 	f32 px_vertical = p11 * height / GRID_TRAPEZOIDAL_CELL_COUNT_AXIS;
 	return fabsf(px_vertical);
+}
+
+static f32 get_max_surfel_radius_px(f32 p11, f32 height) {
+	return lm::floor(fabsf(p11 * height / (2.0f * lm::sqrt(3.0f) * GRID_TRAPEZOIDAL_CELL_COUNT_AXIS)));
 }
 
 static void scan(u32 num_wgs, vk::Buffer* scene_desc_buffer, const PCPrefixSum& pc, bool disable_sum_writes = false) {
@@ -213,19 +217,15 @@ void init(Integrator* integrator) {
 	vkCmdFillBuffer(cmd.handle, state.surfel_pool_buffer->handle, 0, state.surfel_pool_buffer->size, 0);
 	cmd.submit();
 
-	f32 max_uniform_cells =
-		get_max_uniform_cells(pc.desired_surfel_radius_px, integrator->scene_ubo.projection[1][1], (f32)Window::height());
+	f32 max_uniform_cells = get_max_uniform_cells(pc.desired_surfel_radius_px, integrator->scene_ubo.projection[1][1],
+												  (f32)Window::height());
+
+	pc.desired_surfel_radius_px =
+		get_max_surfel_radius_px(integrator->scene_ubo.projection[1][1], (f32)Window::height());
+	pc.grid_uniform_cell_distance_threshold = 0.1f;
 
 	f32 max_trapezoidal_cell_size =
 		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], (f32)Window::height());
-
-	// Maximum possible size
-	// Let C be the trapezoidal cell size, x is the desired radius in terms of px
-	// Per the recycle rule in surfel_recycle: (C - x ) / 2 = x
-	//  x = floor(C/3) pixels
-	pc.desired_surfel_radius_px = lm::floor(max_trapezoidal_cell_size / 3.0f);
-	pc.grid_uniform_cell_distance_threshold = 0.1f;
-
 	LUMEN_INFO("Uniform cells size limit (world space): %u", (u32)lm::round(fabsf(max_uniform_cells)));
 	LUMEN_INFO("Trapezoidal cell size limit (px): %u", (u32)lm::round(max_trapezoidal_cell_size));
 }
@@ -438,10 +438,13 @@ bool gui(Integrator* integrator) {
 	result |= ImGui::Checkbox("Camera relative surfel size", &state.use_camera_relative_surfel_size);
 	f32 max_trapezoidal_cell_size =
 		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], (f32)Window::height());
-	f32 max_allowed_cell_size = floor(max_trapezoidal_cell_size) - pc.desired_surfel_radius_px;
+
+	f32 max_allowed_surfel_radius =
+		get_max_surfel_radius_px(integrator->scene_ubo.projection[1][1], (f32)Window::height());
+	result |= ImGui::SliderFloat("Surfel radius (px)", &pc.desired_surfel_radius_px, 4.0f,
+								 lm::floor(max_allowed_surfel_radius));
 	result |=
-		ImGui::SliderFloat("Surfel radius (px)", &pc.desired_surfel_radius_px, 4.0f, lm::floor(max_allowed_cell_size / 2.0f));
-	result |= ImGui::SliderFloat("Uniform cell distance threshold", &pc.grid_uniform_cell_distance_threshold, 0.01f, 10.0f);
+		ImGui::SliderFloat("Uniform cell distance threshold", &pc.grid_uniform_cell_distance_threshold, 0.01f, 10.0f);
 	result |= ImGui::SliderInt("Rays per surfel", (i32*)&state.rays_per_surfel, 0, 256);
 
 	if (DEBUG_PASSES) {

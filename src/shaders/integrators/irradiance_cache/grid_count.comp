@@ -79,7 +79,7 @@ void main() {
 		atomicAdd(grid_cell_counts.d[linear_cells[i]], 1);
 	}
 #else
-	uvec4 neighbors[4];
+	uvec4 neighbors[MAX_NEIGHBOR_PLUS_ITSELF_COUNT];
 	uint neighbor_count;
 	collect_neighbors(surfel_hit_data.pos, r, cam_pos.xyz, neighbors, neighbor_count);
 

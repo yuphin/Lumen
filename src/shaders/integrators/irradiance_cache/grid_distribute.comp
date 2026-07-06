@@ -89,7 +89,7 @@ void main() {
 		grid_cell_indices.d[idx] = surfel_idx;
 	}
 #else
-	uvec4 neighbors[4];
+	uvec4 neighbors[MAX_NEIGHBOR_PLUS_ITSELF_COUNT];
 	uint neighbor_count;
 	collect_neighbors(surfel_hit_data.pos, r, cam_pos.xyz, neighbors, neighbor_count);
 
