@@ -149,77 +149,142 @@ uint linearize_grid(uvec4 grid_pos) {
 	}
 }
 
-// Let (x,y,z) cell ID
-// Neighborhood is according to NDC bottom left location for cell
-// PLUS_X:
-// Edge cases:
-// cell_begin for neighboring MINUS_Z (x == -z) and MINUS_Y (x == -y) , cell_end for neighboring PLUS_Y (x == y) and
-// PLUS_Z (x == z) left neighbor (MINUS_Z) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, x, z) bottom neighbor (MINUS_Y) =
-// (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y, z) top neighbor = (PLUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y, z)
-// right_neighbor (PLUS_Z) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, x, z)
+// "depth" for the trapezoidal cell
+float get_depth(uint region, vec3 pos) {
+	switch (region) {
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_X_AXIS:
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_X_AXIS:
+			return abs(pos.x);
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_Y_AXIS:
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_Y_AXIS:
+			return abs(pos.y);
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_Z_AXIS:
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_Z_AXIS:
+			return abs(pos.z);
+		default:
+			return 0.0;
+	}
+}
 
-// top_left (PLUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y - 1, z)
-// or (MINUS_Z) =  (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, x + 1, z) (the horizontal case is omitted from now)
-// top_right (PLUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y + 1, z)
-// bottom left (MINUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y - 1, z)
-// bottom right (MINUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y + 1, z)
+// Compute cell relative UV
+// Bottom left = (0,0)
+// Top right = (1,1)
+vec2 compute_normalized_uvs(vec3 uv, uint region) {
+	switch (region) {
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_X_AXIS:
+			return uv.zy;
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_X_AXIS:
+			return vec2(1.0 - uv.z, uv.y);
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_Y_AXIS:
+			return uv.xz;
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_Y_AXIS:
+			return vec2(uv.x, 1.0 - uv.z);
+		case GRID_TYPE_TRAPEZOIDAL_PLUS_Z_AXIS:
+			return vec2(1.0 - uv.x, uv.y);
+		case GRID_TYPE_TRAPEZOIDAL_MINUS_Z_AXIS:
+			return uv.xy;
+		default:
+			return vec2(0);
+	};
+}
 
-// MINUS_Z
-// Edge cases:
-// cell_begin for neighboring MINUS_X (x == z) and MINUS_Y (y == z) , cell_end for neighboring PLUS_Y (y == -z) and
-// PLUS_X (x == -z) left neighbor (MINUS_X) = (y, 0, z) bottom neighbor (MINUS_Y) = (x,0,z) top neighbor = (PLUS_Y) =
-// (x, 0, z) right_neighbor (PLUS_X) = (y, 0, z)
 
-// top left (PLUS_Y) = (x - 1, 0, z)
-// top right (PLUS_Y) = (x + 1, 0, z)
-// bottom left (MINUS_Y) = (x - 1, 0, z)
-// bottom right (MINUS_Y) = (x + 1, 0, z)
+////////////////////////////
+// --- The following comment is a verbose description of the trapezoidal grid neighborhood rules ---
+// The code for the neighborhood rules is implemented based on the description below.
+/*
+Let (x,y,z) cell ID
+Neighborhood is according to NDC bottom left location for cell
+PLUS_X:
+Edge cases:
+cell_begin for neighboring MINUS_Z (x == -z) and MINUS_Y (x == -y)
+cell_end for neighboring PLUS_Y (x == y) and PLUS_Z (x == z)
 
-// MINUS_Y
-// Edge cases:
-// cell_begin for neighboring MINUS_X (x == y) and MINUS_Z (y == z) , cell_end for neighboring PLUS_Z (y == -z) and
-// PLUS_X (x == -y) left neighbor (MINUS_X) = (0,y,z) bottom neighbor (PLUS_Z) = (x, 0, z) top neighbor = (MINUS_Z) =
-// (x,0,z) right_neighbor (PLUS_X) = (0, y, z)
+left neighbor (MINUS_Z) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, x, z)
+bottom neighbor (MINUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y, z)
+top neighbor = (PLUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y, z)
+right_neighbor (PLUS_Z) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, x, z)
 
-// top left (MINUS_Z) = (x - 1, 0, z)
-// top right (MINUS_Z) = (x + 1, 0, z)
-// bottom left (PLUS_Z) = (x - 1, 0, z)
-// bottom right (PLUS_Z) = (x + 1, 0, z)
+top_left (PLUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y - 1, z)
+ --- OR (MINUS_Z) =  (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, x + 1, z) (the horizontal case is omitted from now) ---
+top_right (PLUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y + 1, z)
+bottom left (MINUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y - 1, z)
+bottom right (MINUS_Y) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y + 1, z)
 
-// MINUS_X
-// Edge cases:
-// cell_begin for neighboring MINUS_Z (x == z) and MINUS_Y (x == y) , cell_end for neighboring PLUS_Y (x == -y) and
-// PLUS_Z (x == -z) left neighbor (PLUS_Z) = (0, x, z) bottom neighbor (MINUS_Y) = (0, y, z) top neighbor = (PLUS_Y) =
-// (0, y, z) right_neighbor (MINUS_Z) = (0, x, z)
+MINUS_Z
+Edge cases:
+cell_begin for neighboring MINUS_X (x == z) and MINUS_Y (y == z)
+cell_end for neighboring PLUS_Y (y == -z) and PLUS_X (x == -z)
 
-// top left (PLUS_Y) = (0, y + 1, z)
-// top right (PLUS_Y) = (0, y - 1, z)
-// bottom left (MINUS_Y) = (0, y + 1, z)
-// bottom right (MINUS_Y) = (0, y - 1, z)
+left neighbor (MINUS_X) = (y, 0, z)
+bottom neighbor (MINUS_Y) = (x,0,z)
+top neighbor = (PLUS_Y) = (x, 0, z)
+right_neighbor (PLUS_X) = (y, 0, z)
 
-// PLUS_Z
-// Edge cases:
-// cell_begin for neighboring MINUS_X (x == -z) and MINUS_Y (y == -z) , cell_end for neighboring PLUS_Y (y == z) and
-// PLUS_X (x == z) left neighbor (PLUS_X) = (y, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z) bottom neighbor (MINUS_Y) = (x,
-// GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1,z) top neighbor = (PLUS_Y) = (x, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS -1, z)
-// right_neighbor (MINUS_X) = (y, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS -1, z)
+top left (PLUS_Y) = (x - 1, 0, z)
+top right (PLUS_Y) = (x + 1, 0, z)
+bottom left (MINUS_Y) = (x - 1, 0, z)
+bottom right (MINUS_Y) = (x + 1, 0, z)
 
-// top left (PLUS_Y) = (x + 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
-// top right (PLUS_Y) =  (x - 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
-// bottom left (MINUS_Y) = (x + 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
-// bottom right (MINUS_Y) = (x - 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+MINUS_Y
+Edge cases:
+cell_begin for neighboring MINUS_X (x == y) and MINUS_Z (y == z)
+cell_end for neighboring PLUS_Z (y == -z) and PLUS_X (x == -y)
 
-// PLUS_Y
-// Edge cases:
-// cell_begin for neighboring MINUS_X (x == -y) and MINUS_Z (y == -z) , cell_end for neighboring PLUS_Z (y == z) and
-// PLUS_X (x == y) left neighbor (MINUS_X) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1,y,z) bottom neighbor (MINUS_Z) = (x,
-// GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z) top neighbor = (PLUS_Z) = (x, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1,z)
-// right_neighbor (PLUS_X) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y, z)
+left neighbor (MINUS_X) = (0,y,z)
+bottom neighbor (PLUS_Z) = (x, 0, z)
+top neighbor = (MINUS_Z) = (x,0,z)
+right_neighbor (PLUS_X) = (0, y, z)
 
-// top left(PLUS_Z) = (x - 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
-// top right(PLUS_Z) = (x + 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
-// bottom left (MINUS_Z) = (x- 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
-// bottom right (MINUS_Z) = (x + 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+top left (MINUS_Z) = (x - 1, 0, z)
+top right (MINUS_Z) = (x + 1, 0, z)
+bottom left (PLUS_Z) = (x - 1, 0, z)
+bottom right (PLUS_Z) = (x + 1, 0, z)
+
+MINUS_X
+Edge cases:
+cell_begin for neighboring MINUS_Z (x == z) and MINUS_Y (x == y)
+cell_end for neighboring PLUS_Y (x == -y) and PLUS_Z (x == -z)
+left neighbor (PLUS_Z) = (0, x, z)
+bottom neighbor (MINUS_Y) = (0, y, z)
+top neighbor = (PLUS_Y) = (0, y, z)
+right_neighbor (MINUS_Z) = (0, x, z)
+
+top left (PLUS_Y) = (0, y + 1, z)
+top right (PLUS_Y) = (0, y - 1, z)
+bottom left (MINUS_Y) = (0, y + 1, z)
+bottom right (MINUS_Y) = (0, y - 1, z)
+
+PLUS_Z
+Edge cases:
+cell_begin for neighboring MINUS_X (x == -z) and MINUS_Y (y == -z)
+cell_end for neighboring PLUS_Y (y == z) and PLUS_X (x == z)
+
+left neighbor (PLUS_X) = (y, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+bottom neighbor (MINUS_Y) = (x, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1,z)
+top neighbor = (PLUS_Y) = (x, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS -1, z)
+right_neighbor (MINUS_X) = (y, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS -1, z)
+
+top left (PLUS_Y) = (x + 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+top right (PLUS_Y) =  (x - 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+bottom left (MINUS_Y) = (x + 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+bottom right (MINUS_Y) = (x - 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+
+PLUS_Y
+Edge cases:
+cell_begin for neighboring MINUS_X (x == -y) and MINUS_Z (y == -z)
+cell_end for neighboring PLUS_Z (y == z) and PLUS_X (x == y)
+
+left neighbor (MINUS_X) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1,y,z)
+bottom neighbor (MINUS_Z) = (x, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+top neighbor = (PLUS_Z) = (x, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1,z)
+right_neighbor (PLUS_X) = (GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, y, z)
+
+top left(PLUS_Z) = (x - 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+top right(PLUS_Z) = (x + 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+bottom left (MINUS_Z) = (x- 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+bottom right (MINUS_Z) = (x + 1, GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1, z)
+*/
 
 uvec4 left_neighbor(uvec3 cell_id, uint region) {
 	uint N = GRID_TRAPEZOIDAL_CELL_COUNT_AXIS;
@@ -337,47 +402,7 @@ uvec4 bottom_right_neighbor(uvec3 cell_id, uint region) {
 	return v;
 }
 
-// "depth" for the trapezoidal cell
-float get_depth(uint region, vec3 pos) {
-	switch (region) {
-		case GRID_TYPE_TRAPEZOIDAL_PLUS_X_AXIS:
-		case GRID_TYPE_TRAPEZOIDAL_MINUS_X_AXIS:
-			return abs(pos.x);
-		case GRID_TYPE_TRAPEZOIDAL_PLUS_Y_AXIS:
-		case GRID_TYPE_TRAPEZOIDAL_MINUS_Y_AXIS:
-			return abs(pos.y);
-		case GRID_TYPE_TRAPEZOIDAL_PLUS_Z_AXIS:
-		case GRID_TYPE_TRAPEZOIDAL_MINUS_Z_AXIS:
-			return abs(pos.z);
-		default:
-			return 0.0;
-	}
-}
-
-// Compute cell relative UV
-// Bottom left = (0,0)
-// Top right = (1,1)
-vec2 compute_normalized_uvs(vec3 uv, uint region) {
-	switch (region) {
-		case GRID_TYPE_TRAPEZOIDAL_PLUS_X_AXIS:
-			return uv.zy;
-		case GRID_TYPE_TRAPEZOIDAL_MINUS_X_AXIS:
-			return vec2(1.0 - uv.z, uv.y);
-		case GRID_TYPE_TRAPEZOIDAL_PLUS_Y_AXIS:
-			return uv.xz;
-		case GRID_TYPE_TRAPEZOIDAL_MINUS_Y_AXIS:
-			return vec2(uv.x, 1.0 - uv.z);
-		case GRID_TYPE_TRAPEZOIDAL_PLUS_Z_AXIS:
-			return vec2(1.0 - uv.x, uv.y);
-		case GRID_TYPE_TRAPEZOIDAL_MINUS_Z_AXIS:
-			return uv.xy;
-		default:
-			return vec2(0);
-	};
-}
-
 #define INCLUDE_DEPTH
-
 
 #ifdef INCLUDE_DEPTH
 #define MAX_NEIGHBOR_PLUS_ITSELF_COUNT 8
