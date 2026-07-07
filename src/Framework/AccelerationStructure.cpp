@@ -369,7 +369,8 @@ void tlas_build(BVH& tlas, util::Slice<VkAccelerationStructureInstanceKHR> insta
 						 VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0,
 						 nullptr);
 	// Creating the TLAS
-	cmd_create_tlas(tlas, cmd.handle, instances.size, &scratch_buffer, /*export_scratch_buffer=*/false,
+	assert(instances.size < U32_MAX);
+	cmd_create_tlas(tlas, cmd.handle, (u32)instances.size, &scratch_buffer, /*export_scratch_buffer=*/false,
 					instances_buf->device_address(), flags, update);
 	cmd.submit();
 	drm::destroy(scratch_buffer);

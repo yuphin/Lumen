@@ -81,4 +81,15 @@ void log(i32 level, const char* fmt, ...) {
 	log_common(level, fmt, args);
 	va_end(args);
 }
+
+void fatal_exit() {
+#if defined(_WIN32) || defined(_WIN64)
+	if (IsDebuggerPresent()) {
+		__debugbreak();
+	}
+	TerminateProcess(GetCurrentProcess(), (UINT)EXIT_FAILURE);
+#else
+	__builtin_trap();
+#endif
+}
 }  // namespace lm
