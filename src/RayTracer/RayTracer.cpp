@@ -258,7 +258,7 @@ void update() {
 }
 
 static void render(u32 i) {
-	if(!_pause_render) {
+	if (!_pause_render) {
 		integrator::render(&_active_integrator);
 	}
 	vk::Texture* input_tex = nullptr;
@@ -322,18 +322,15 @@ static void render_debug_utils() {
 }
 
 static bool gui() {
-	util::Slice<GPUQueryManager::TimestampData> query_results = GPUQueryManager::get();
 	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
 	ImGui::Text("General settings:");
 	ImGui::PopStyleColor();
-	ImGui::Text("Frame %d time (CPU) %.2f ms ( %.2f FPS )", _active_integrator.frame_num, _cpu_avg_time,
-				1000 / _cpu_avg_time);
-	double frame_time_gpu_ms = (GPUQueryManager::get_total_elapsed()) * 1e-6;
-	if (frame_time_gpu_ms > 0) {
-		ImGui::Text("Frame time (GPU) %.2f ms", frame_time_gpu_ms);
+	util::Slice<GPUQueryManager::TimestampData> query_results = GPUQueryManager::get();
+	if (query_results.size > 0) {
 		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 255, 0, 255));
 		ImGui::Text("Individual GPU timings:");
 		ImGui::PopStyleColor();
+		f64 frame_time_gpu_ms = 0;
 		for (u64 i = 0; i < query_results.size; i++) {
 			const GPUQueryManager::TimestampData& data = query_results[i];
 			GPUQueryManager::TimestampData* parent = data.parent;
@@ -343,9 +340,13 @@ static bool gui() {
 				parent = parent->parent;
 			}
 			double elapsed_ms = GPUQueryManager::get_elapsed(data) * 1e-6;
+			frame_time_gpu_ms += elapsed_ms;
 			ImGui::Text("%*s%.2f ms: %.*s", scope * 2, "", elapsed_ms, (int)data.name.size, data.name.data);
 		}
+		ImGui::Text("Frame time (GPU) %.2f ms", frame_time_gpu_ms);
 	}
+	ImGui::Text("Frame %d time (CPU) %.2f ms ( %.2f FPS )", _active_integrator.frame_num, _cpu_avg_time,
+				1000 / _cpu_avg_time);
 
 	ImGui::Checkbox("Pause rendering", &_pause_render);
 	ImGui::Text("GPU Memory Usage: %.2f MB", vk::get_memory_usage(vk::context().physical_device) / (1024.0f * 1024.0f));

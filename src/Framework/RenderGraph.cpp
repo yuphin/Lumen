@@ -1417,11 +1417,6 @@ void rg::reset_frame() {
 
 void rg::submit(vk::CommandBuffer& cmd) {
 	cmd.submit();
-	// This flushes all the existing timestamps
-	// TODO: Maybe add a tracking mechanism inbetween frames per pass
-	// This entails adding a mapping between a pass and a timestamp
-	// Which enables us to get aggregate results for each pass per frame
-	GPUQueryManager::collect();
 	// The reset is needed here because the next subsequent pass may reuse the old pass' memory
 	reset_frame();
 }

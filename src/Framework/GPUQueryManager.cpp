@@ -60,6 +60,8 @@ void end(VkCommandBuffer cmd) {
 }
 
 void collect(u32 curr_frame_idx) {
+	LUMEN_ASSERT(_curr_timestamp_idx * 2 == _curr_query_idx,
+				 "Mismatched begin/end timestamps: %u timestamps, %u queries", _curr_timestamp_idx, _curr_query_idx);
 	_num_collected_timestamps = _curr_timestamp_idx;
 	_num_collected_queries = _curr_query_idx;
 	// Note: curr_frame_idx is the index of the command buffer that has finished its execution
