@@ -59,11 +59,13 @@ void main() {
 	HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
 	vec4 view_pos = ubo.view * vec4(surfel_hit_data.pos, 1.0);
 
+#if 0
 	// Surfel is behind the camera
 	if (view_pos.z >= 0.0) {
 		// TODO: Handle this later
 		return;
 	}
+#endif
 
 	float px_size = surfel_radius_px_size_for_position(surfel, surfel_hit_data.pos, view_pos);
 	float max_radius = max_surfel_radius_px();
