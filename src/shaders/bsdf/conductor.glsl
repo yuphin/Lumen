@@ -30,14 +30,17 @@ vec3 sample_conductor(const Material mat, const vec3 wo, out vec3 wi, out float 
 	}
 	float D;
 	vec3 h = sample_ggx_vndf_isotropic(vec2(alpha), wo, xi, pdf_w, D);
-	vec3 F = fresnel_conductor(dot(wo, h), mat.albedo, mat.k);
+	float wo_dot_h = dot(wo, h);
+	vec3 F = fresnel_conductor(wo_dot_h, mat.albedo, mat.k);
 
 	wi = reflect(-wo, h);
 	// Make sure the reflection lies in the same hemisphere
-	if (wo.z * wi.z < 0) {
+	if (wi.z <= 0.0) {
+		wi = vec3(0);
+		pdf_w = 0.0;
 		return vec3(0);
 	}
-	pdf_w /= (4.0 * dot(wo, h));
+	pdf_w /= (4.0 * wo_dot_h);
 	cos_theta = wi.z;
 	return 0.25 * D * F * G_GGX_correlated_isotropic(alpha, wo, wi) / (wi.z * wo.z);
 }
@@ -49,25 +52,24 @@ vec3 eval_conductor(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float p
 	if (bsdf_is_effectively_delta(alpha)) {
 		return vec3(0);
 	}
-	if (wo.z * wi.z < 0) {
-		return vec3(0);
-	}
-	if (wo.z == 0 || wi.z == 0) {
+	if (wo.z <= 0.0 || wi.z <= 0.0) {
 		return vec3(0);
 	}
 	vec3 h = normalize(wo + wi);
 	// Make sure h is oriented towards the normal
 	h *= float(sign(h.z));
 
-	float jacobian = 1.0 / (4.0 * dot(wo, h));
+	float wo_dot_h = dot(wo, h);
+	float jacobian = 1.0 / (4.0 * wo_dot_h);
 
 	float D;
 	pdf_w = eval_vndf_pdf_isotropic(alpha, wo, h, D) * jacobian;
 	if (eval_reverse_pdf) {
+		// Reverse jacobian is the same as forward jacobian for reflection
 		pdf_rev_w = eval_vndf_pdf_isotropic(alpha, wi, h) * jacobian;
 	}
 
-	vec3 F = fresnel_conductor(dot(wo, h), mat.albedo, mat.k);
+	vec3 F = fresnel_conductor(wo_dot_h, mat.albedo, mat.k);
 	return 0.25 * D * F * G_GGX_correlated_isotropic(alpha, wo, wi) / (wi.z * wo.z);
 }
 
@@ -76,16 +78,14 @@ float eval_conductor_pdf(Material mat, vec3 wo, vec3 wi) {
 	if (bsdf_is_effectively_delta(alpha)) {
 		return 0.0;
 	}
-	if (wo.z * wi.z < 0) {
-		return 0.0;
-	}
-	if (wo.z == 0 || wi.z == 0) {
+	if (wo.z <= 0.0 || wi.z <= 0.0) {
 		return 0.0;
 	}
 	vec3 h = normalize(wo + wi);
 	// Make sure h is oriented towards the normal
 	h *= float(sign(h.z));
 
-	return eval_vndf_pdf_isotropic(alpha, wo, h) / (4.0 * dot(wo, h));
+	float wo_dot_h = dot(wo, h);
+	return eval_vndf_pdf_isotropic(alpha, wo, h) / (4.0 * wo_dot_h);
 }
 #endif

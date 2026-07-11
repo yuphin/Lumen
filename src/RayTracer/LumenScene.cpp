@@ -543,6 +543,19 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 				material.anisotropy = get_or_default_f(get_node(bsdf_node, "anisotropy"), 0.0f);
 				material.thin = get_or_default_i(get_node(bsdf_node, "thin"), 0);
 
+				if (material.diffuse_trans != 0.0f) {
+					LUMEN_WARN("Principled material %u: diffuse_transmission is unsupported and will be ignored", bsdf_idx);
+					material.diffuse_trans = 0.0f;
+				}
+				if (material.sheen != 0.0f) {
+					LUMEN_WARN("Principled material %u: sheen is unsupported and will be ignored", bsdf_idx);
+					material.sheen = 0.0f;
+				}
+				if (material.subsurface != 0.0f) {
+					LUMEN_WARN("Principled material %u: subsurface is unsupported and will be ignored", bsdf_idx);
+					material.subsurface = 0.0f;
+				}
+
 				if (material.roughness < 1.0f) {
 					material.bsdf_props |= BSDF_FLAG_REFLECTION;
 				}

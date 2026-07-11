@@ -23,19 +23,14 @@ bool refract(vec3 n_s, vec3 wo, bool forward_facing, float eta, uint mode, out v
 	wi = vec3(0);
 	f = vec3(0);
 	// Relative IOR (Inside / outside). If the normal direction has been changed, we take the inverse
-	float cos_i = dot(n_s, wo);
+	float cos_i = clamp(dot(n_s, wo), 0.0, 1.0);
 	inv_eta = forward_facing ? 1.0 / eta : eta;
-	const float sin2_t = inv_eta * inv_eta * (1. - cos_i * cos_i);
+	const float sin2_t = inv_eta * inv_eta * max(0.0, 1.0 - cos_i * cos_i);
 	if (sin2_t >= 1.) {
-#if 0
 		return false;
-#else
-		wi = reflect(-wo, n_s);
-#endif
-	} else {
-		const float cos_t = sqrt(1 - sin2_t);
-		wi = -inv_eta * wo + (inv_eta * cos_i - cos_t) * n_s;
 	}
+	const float cos_t = sqrt(max(0.0, 1.0 - sin2_t));
+	wi = -inv_eta * wo + (inv_eta * cos_i - cos_t) * n_s;
 	f = mode == 1 ? vec3(inv_eta * inv_eta) : vec3(1);
 	return true;
 }
@@ -66,6 +61,7 @@ float fresnel_dielectric(float cos_i, float eta, bool forward_facing) {
 
 // https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
 float fresnel_conductor(float cos_i, float eta, float k) {
+	cos_i = clamp(abs(cos_i), 0.0, 1.0);
 	float cos_sqr = cos_i * cos_i;
 	float sin_sqr = max(1.0f - cos_sqr, 0.0f);
 	float sin_4 = sin_sqr * sin_sqr;
@@ -74,11 +70,14 @@ float fresnel_conductor(float cos_i, float eta, float k) {
 	float a_sq_p_b_sq = sqrt(max(inner_term * inner_term + 4.0f * eta * eta * k * k, 0.0f));
 	float a = sqrt(max((a_sq_p_b_sq + inner_term) * 0.5f, 0.0f));
 
-	float rs = ((a_sq_p_b_sq + cos_sqr) - (2.0f * a * cos_i)) / ((a_sq_p_b_sq + cos_sqr) + (2.0f * a * cos_i));
-	float rp = ((cos_sqr * a_sq_p_b_sq + sin_4) - (2.0f * a * cos_i * sin_sqr)) /
-			   ((cos_sqr * a_sq_p_b_sq + sin_4) + (2.0f * a * cos_i * sin_sqr));
+	float rs = ((a_sq_p_b_sq + cos_sqr) - (2.0f * a * cos_i)) /
+			   ((a_sq_p_b_sq + cos_sqr) + (2.0f * a * cos_i));
 
-	return 0.5f * (rs + rs * rp);
+	float rp_ratio = ((cos_sqr * a_sq_p_b_sq + sin_4) - (2.0f * a * cos_i * sin_sqr)) /
+					 ((cos_sqr * a_sq_p_b_sq + sin_4) + (2.0f * a * cos_i * sin_sqr));
+	float rp = rs * rp_ratio;
+
+	return 0.5f * (rs + rp);
 }
 
 float fresnel_schlick(float f0, float f90, float ns) {

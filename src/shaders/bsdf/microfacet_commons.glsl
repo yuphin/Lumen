@@ -2,77 +2,96 @@
 #define MICROFACT_COMMONS_GLSL
 #include "sampling_commons.glsl"
 
-float Smith_lambda_isotropic(float alpha_sqr, float cos_theta) {
-	if (cos_theta == 0) {
-		return 0;
-	}
-	float cos_sqr = cos_theta * cos_theta;
-	float tan_sqr = max(1.0 - cos_sqr, 0) / cos_sqr;
-	return 0.5 * (sqrt(1.0 + alpha_sqr * tan_sqr) - 1);
-}
-float Smith_lambda_anisotropic(vec3 w, vec2 alpha) {
-	float cos_sqr = w.z * w.z;
-	float sin_sqr = max(1.0 - cos_sqr, 0);
-	float tan_sqr = sin_sqr / cos_sqr;
-	if (isinf(tan_sqr)) {
+// Stable form of the Smith GGX masking term. For a unit direction w, let
+//
+//   c(w)       = abs(w.z) = abs(cos(w))
+//   P_alpha(w) = sqrt((alpha.x*w.x)^2 + (alpha.y*w.y)^2 + w.z^2)
+//   Lambda(w)  = 0.5 * (P_alpha(w) / c(w) - 1)
+//
+// Starting from G1(w) = 1 / (1 + Lambda(w)) and the height-correlated form
+// G2(wo,wi) = 1 / (1 + Lambda(wo) + Lambda(wi)), algebraic cancellation gives
+//
+//   G1(w)     = 2*c(w) / (c(w) + P_alpha(w))
+//   G2(wo,wi) = 2*c(wo)*c(wi)
+//                / (c(wi)*P_alpha(wo) + c(wo)*P_alpha(wi)).
+//
+// The isotropic case below is the same expression with alpha.x = alpha.y = alpha.
+// This avoids evaluating tan(theta)^2 and the intermediate P_alpha(w) / c(w),
+// which are singular at grazing even though the final masking term tends to zero.
+float G1_GGX_anisotropic(vec3 w, vec2 alpha) {
+	if (w.z <= 0.0) {
 		return 0.0;
 	}
-	vec2 cos_phi_sqr = sin_sqr == 0.0 ? vec2(1.0, 0.0) : clamp(vec2(w.x * w.x, w.y * w.y), 0.0, 1.0) / sin_sqr;
-	float alpha_sqr = dot(cos_phi_sqr, alpha * alpha);
-	return 0.5 * (sqrt(1.0 + alpha_sqr * tan_sqr) - 1);
+
+	float projected_length = length(vec3(alpha * w.xy, w.z));
+	return 2.0 * w.z / (w.z + projected_length);
 }
 
-float G1_GGX_anisotropic(vec3 w, vec2 alpha) { return 1.0 / (1.0 + Smith_lambda_anisotropic(w, alpha)); }
-
 float G_GGX_correlated_isotropic(float alpha, vec3 wo, vec3 wi) {
-	float alpha_sqr = alpha * alpha;
-	return 1.0 / (1.0 + Smith_lambda_isotropic(alpha_sqr, wo.z) + Smith_lambda_isotropic(alpha_sqr, wi.z));
+	float cos_o = abs(wo.z);
+	float cos_i = abs(wi.z);
+	if (cos_o == 0.0 || cos_i == 0.0) {
+		return 0.0;
+	}
+	float projected_o = length(vec3(alpha * wo.xy, wo.z));
+	float projected_i = length(vec3(alpha * wi.xy, wi.z));
+	return 2.0 * cos_o * cos_i / (cos_i * projected_o + cos_o * projected_i);
 }
 
 float G_GGX_correlated_anisotropic(vec2 alpha, vec3 wo, vec3 wi) {
-	return 1.0 / (1.0 + Smith_lambda_anisotropic(wo, alpha) + Smith_lambda_anisotropic(wi, alpha));
+	float cos_o = abs(wo.z);
+	float cos_i = abs(wi.z);
+	if (cos_o == 0.0 || cos_i == 0.0) {
+		return 0.0;
+	}
+	float projected_o = length(vec3(alpha * wo.xy, wo.z));
+	float projected_i = length(vec3(alpha * wi.xy, wi.z));
+	return 2.0 * cos_o * cos_i / (cos_i * projected_o + cos_o * projected_i);
 }
 
 float D_GGX_anisotropic(vec2 alpha, vec3 h) {
-	float cos_sqr = h.z * h.z;
-	float sin_sqr = max(1.0f - cos_sqr, 0.0f);
-	float tan_sqr = sin_sqr / cos_sqr;
-	if (isinf(tan_sqr)) {
-		return 0.0f;
-	}
-	float cos_4 = cos_sqr * cos_sqr;
-	if (cos_4 < 1e-16) {
+	if (h.z <= 0.0 || min(alpha.x, alpha.y) <= 0.0) {
 		return 0.0;
 	}
-	vec2 phi_sqr = sin_sqr == 0.0 ? vec2(1.0, 0.0) : clamp(vec2(h.x * h.x, h.y * h.y), 0.0, 1.0) / sin_sqr;
-	vec2 alpha_sqr = phi_sqr / (alpha * alpha);
-	float e = tan_sqr * (alpha_sqr.x + alpha_sqr.y);
-	return 1.0 / (PI * alpha.x * alpha.y * cos_4 * (1.0 + e) * (1.0 + e));
+	float d = dot(h.xy / alpha, h.xy / alpha) + h.z * h.z;
+	return 1.0 / (PI * alpha.x * alpha.y * d * d);
 }
 
 // Eq. 19 in https://blog.selfshadow.com/publications/s2012-shading-course/hoffman/s2012_pbs_physics_math_notes.pdf
 float D_GGX_isotropic(float alpha_sqr, float cos_theta) {
+	if (alpha_sqr <= 0.0 || cos_theta <= 0.0) {
+		return 0.0;
+	}
 	float d = ((cos_theta * alpha_sqr - cos_theta) * cos_theta + 1);
+	if (d == 0.0) {
+		return 0.0;
+	}
 	return alpha_sqr / (d * d * PI);
 }
 
 // Eq. 34 in https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf
 float G1_GGX_isotropic(float alpha_sqr, float cos_theta) {
+	if (cos_theta <= 0.0) {
+		return 0.0;
+	}
 	float cos_sqr = cos_theta * cos_theta;
-	float tan_sqr = max(1.0 - cos_sqr, 0.0) / cos_sqr;
-	return 2.0 / (1.0 + sqrt(1.0 + alpha_sqr * tan_sqr));
+	return 2.0 * cos_theta / (cos_theta + sqrt(alpha_sqr + (1.0 - alpha_sqr) * cos_sqr));
 }
 
 // pdf = G1(wo) * D(h) * max(0,dot(wo,h)) / wo.z
 float eval_vndf_pdf_isotropic(float alpha, vec3 wo, vec3 h, out float D) {
 	D = 0.0;
-	if (wo.z <= 0) {
+	if (alpha <= 0.0 || wo.z <= 0.0 || h.z <= 0.0) {
 		return 0.0;
 	}
 	float alpha_sqr = alpha * alpha;
 	float G1 = G1_GGX_isotropic(alpha_sqr, wo.z);
 	D = D_GGX_isotropic(alpha_sqr, h.z);
-	return G1 * D * max(0.0, dot(wo, h)) / abs(wo.z);
+	float wo_dot_h = dot(wo, h);
+	if (wo_dot_h <= 0.0) {
+		return 0.0;
+	}
+	return G1 * D * wo_dot_h / wo.z;
 }
 
 float eval_vndf_pdf_isotropic(float alpha, vec3 wo, vec3 h) {
@@ -83,12 +102,16 @@ float eval_vndf_pdf_isotropic(float alpha, vec3 wo, vec3 h) {
 
 float eval_vndf_pdf_anisotropic(vec2 alpha, vec3 wo, vec3 h, out float D) {
 	D = 0.0;
-	if (wo.z <= 0) {
+	if (min(alpha.x, alpha.y) <= 0.0 || wo.z <= 0.0 || h.z <= 0.0) {
 		return 0.0;
 	}
 	float G1 = G1_GGX_anisotropic(wo, alpha);
 	D = D_GGX_anisotropic(alpha, h);
-	return G1 * D * max(0.0, dot(wo, h)) / abs(wo.z);
+	float wo_dot_h = dot(wo, h);
+	if (wo_dot_h <= 0.0) {
+		return 0.0;
+	}
+	return G1 * D * wo_dot_h / wo.z;
 }
 
 float eval_vndf_pdf_anisotropic(vec2 alpha, vec3 wo, vec3 h)  {
@@ -106,7 +129,7 @@ vec3 sample_ggx_vndf_common(vec2 alpha, vec3 wo, vec2 xi) {
 	float x = sin_theta * cos(phi);
 	float y = sin_theta * sin(phi);
 
-    vec3 n_h = vec3(x, y, z) + wo_hemisphere;
+	vec3 n_h = vec3(x, y, z) + wo_hemisphere;
 #else
 
 	float lensq = wo_hemisphere.x * wo_hemisphere.x + wo_hemisphere.y * wo_hemisphere.y;
@@ -121,6 +144,8 @@ vec3 sample_ggx_vndf_common(vec2 alpha, vec3 wo, vec2 xi) {
 	t2 = (1.0 - s) * sqrt(1.0 - t1 * t1) + s * t2;
 	vec3 n_h = t1 * T1 + t2 * T2 + sqrt(max(0.0, 1.0 - t1 * t1 - t2 * t2)) * wo_hemisphere;
 #endif
+	// Do we need this?
+	n_h = normalize(n_h);
 	return normalize(vec3(alpha.x * n_h.x, alpha.y * n_h.y, max(0.0, n_h.z)));
 }
 

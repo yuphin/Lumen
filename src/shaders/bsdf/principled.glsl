@@ -23,10 +23,24 @@ vec2 calc_anisotropy(float roughness, float anisotropic) {
 	return vec2(max(0.001, roughness_sqr / aspect), max(0.001, roughness_sqr * aspect));
 }
 
+float principled_diffuse_weight(const Material mat) { return (1.0 - mat.metallic) * (1.0 - mat.spec_trans); }
+
+float principled_transmission_weight(const Material mat) { return (1.0 - mat.metallic) * mat.spec_trans; }
+
+Material principled_transmission_material(Material mat) {
+	mat.bsdf_props = (mat.bsdf_props | BSDF_FLAG_TRANSMISSION) & ~BSDF_FLAG_REFLECTION;
+	return mat;
+}
+
+float principled_interface_fresnel(const Material mat, float cos_theta, bool forward_facing) {
+	return fresnel_dielectric(cos_theta, mat.ior, mat.thin == 1 ? true : forward_facing);
+}
+
 void initialize_sampling_probs(const Material mat, float F_dielectric, bool forward_facing, out float p_spec_reflect,
 							   out float p_diff, out float p_clearcoat, out float p_spec_trans) {
-	float brdf_weight = (1.0 - mat.spec_trans) * (1.0 - mat.metallic);
-	float bsdf_weight = (1.0 - mat.metallic) * mat.spec_trans;
+	float brdf_weight = principled_diffuse_weight(mat);
+	float bsdf_weight = principled_transmission_weight(mat);
+	forward_facing = mat.thin == 1 ? true : forward_facing;
 
 	// Note: forward_facing == false indicates the ray is inside the material
 
@@ -50,22 +64,19 @@ void initialize_sampling_probs(const Material mat, float F_dielectric, bool forw
 vec3 calc_disney_diffuse_factor(Material mat, vec3 wo, vec3 wi) {
 	vec3 h = normalize(wi + wo);
 
-	float f_wi, f_wo;
-	float disney_f = disney_fresnel(wi, wo, mat.roughness, f_wi, f_wo);
-	float roughness_sqr = mat.roughness * mat.roughness;
+	float f_wi = schlick_w(wi.z);
+	float f_wo = schlick_w(wo.z);
+	float cos_theta_d = dot(wi, h);
 
 	float ss = 0;
 
 	// Retro-reflection
-	float rr = 2.0 * roughness_sqr * wi.z * wi.z;
-	float f_retro = rr * (f_wi + f_wo * f_wi * f_wo * (rr - 1.0));
+	float rr = 2.0 * mat.roughness * cos_theta_d * cos_theta_d;
+	float f_retro = rr * (f_wi + f_wo + f_wi * f_wo * (rr - 1.0));
 
 	float f_diff = (1.0 - 0.5 * f_wi) * (1.0 - 0.5 * f_wo);
 	if (mat.flatness > 0.0) {
 		float fss90 = 0.5 * rr;
-		float h_dot_wi_sqr = dot(h, wi);
-		h_dot_wi_sqr *= h_dot_wi_sqr;
-
 		float f_ss = mix(1.0, fss90, f_wi) * mix(1.0, fss90, f_wo);
 		ss = 1.25 * (f_ss * (1.0 / (wi.z + wo.z) - 0.5) + 0.5);
 	}
@@ -73,16 +84,37 @@ vec3 calc_disney_diffuse_factor(Material mat, vec3 wo, vec3 wi) {
 	return mat.albedo * ss_approx_and_diff * INV_PI;
 }
 
-float calc_clearcoat_factor(Material mat, vec3 wo, vec3 wi, vec3 h, out float D) {
-	const float alpha_2 = 0.25 * 0.25;
-	D = D_GGX_isotropic(mix(0.1, 0.001, mat.clearcoat_gloss), h.z);
-	float F = fresnel_schlick(0.04, 1.0, dot(wi, h));
-	// Use the separable variant
-	float G = G1_GGX_isotropic(alpha_2, wo.z) * G1_GGX_isotropic(alpha_2, wi.z);
-	return 0.25 * mat.clearcoat * D * F * G;
+float clearcoat_alpha(const Material mat) { return mix(0.1, 0.001, mat.clearcoat_gloss); }
+
+float D_GTR1(float alpha, float cos_theta) {
+	float alpha_sqr = alpha * alpha;
+	return (alpha_sqr - 1.0) /
+		   (PI * log(alpha_sqr) * (1.0 + (alpha_sqr - 1.0) * cos_theta * cos_theta));
 }
 
-// In addition to diffuse, this includes retro reflection, fake subsurface and sheen
+vec3 sample_gtr1(float alpha, vec2 xi, out float D) {
+	float alpha_sqr = alpha * alpha;
+	float cos_theta = sqrt((1.0 - pow(alpha_sqr, 1.0 - xi.x)) / (1.0 - alpha_sqr));
+	float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
+	float phi = TWO_PI * xi.y;
+	vec3 h = vec3(sin_theta * cos(phi), sin_theta * sin(phi), cos_theta);
+	D = D_GTR1(alpha, cos_theta);
+	return h;
+}
+
+float clearcoat_pdf_from_half_vector(Material mat, vec3 wo, vec3 h) {
+	return D_GTR1(clearcoat_alpha(mat), h.z) * h.z / (4.0 * dot(wo, h));
+}
+
+float calc_clearcoat_factor(Material mat, vec3 wo, vec3 wi, vec3 h, out float D) {
+	D = D_GTR1(clearcoat_alpha(mat), h.z);
+	float F = fresnel_schlick(0.04, 1.0, dot(wi, h));
+	const float masking_alpha_sqr = 0.25 * 0.25;
+	float G = G1_GGX_isotropic(masking_alpha_sqr, wo.z) * G1_GGX_isotropic(masking_alpha_sqr, wi.z);
+	return 0.25 * mat.clearcoat * D * F * G / (4.0 * wo.z * wi.z);
+}
+
+// Diffuse response, including retro-reflection and the existing flatness approximation.
 vec3 sample_disney_diffuse(Material mat, vec3 wo, out vec3 wi, out float pdf_w, out float cos_theta, vec2 xi) {
 	wi = sample_hemisphere(xi);
 	cos_theta = wi.z;
@@ -134,29 +166,18 @@ vec3 sample_principled_brdf(const Material mat, const vec3 wo, inout vec3 wi, in
 #endif
 }
 
-// For clearcoat: We sample the GGX distribution directly and use fixed roughness values (0.25)
 vec3 sample_clearcoat(const Material mat, const vec3 wo, inout vec3 wi, inout float pdf_w, inout float cos_theta,
 					  const vec2 xi) {
-	const float alpha_2 = 0.25 * 0.25;
-
-	float cos_t = sqrt(max(0, (1.0 - pow(alpha_2, 1.0f - xi.x)) / (1.0 - alpha_2)));
-	float sin_t = sqrt(max(0, 1.0 - cos_t * cos_t));
-	float phi = TWO_PI * xi.y;
-
-	vec3 h = vec3(sin_t * cos(phi), sin_t * sin(phi), cos_t);
-
-	if (dot(h, wo) < 0.0) {
-		h *= -1.0;
-	}
+	float D;
+	vec3 h = sample_gtr1(clearcoat_alpha(mat), xi, D);
 
 	wi = reflect(-wo, h);
-	if (dot(wi, wo) < 0.0) {
+	if (wi.z <= 0.0) {
 		return vec3(0);
 	}
 
-	float D;
 	float f_clearcoat = calc_clearcoat_factor(mat, wo, wi, h, D);
-	pdf_w = D / (4.0 * dot(wo, h));
+	pdf_w = D * h.z / (4.0 * dot(wo, h));
 	cos_theta = wi.z;
 
 	return vec3(f_clearcoat);
@@ -165,19 +186,22 @@ vec3 sample_clearcoat(const Material mat, const vec3 wo, inout vec3 wi, inout fl
 vec3 eval_clearcoat(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float pdf_rev_w) {
 	pdf_w = 0;
 	pdf_rev_w = 0;
-	const float alpha_2 = 0.25 * 0.25;
+	if (min(wo.z, wi.z) <= 0.0) {
+		return vec3(0);
+	}
 	vec3 h = normalize(wo + wi);
 	float D;
 	float f_clearcoat = calc_clearcoat_factor(mat, wo, wi, h, D);
-	pdf_w = D / (4.0 * dot(wo, h));
-	// Since dot(wo, h) == dot(wi, h) here
-	pdf_rev_w = pdf_w;
+	pdf_w = D * h.z / (4.0 * dot(wo, h));
+	pdf_rev_w = D * h.z / (4.0 * dot(wi, h));
 	return vec3(f_clearcoat);
 }
 float eval_clearcoat_pdf(Material mat, vec3 wo, vec3 wi) {
+	if (min(wo.z, wi.z) <= 0.0) {
+		return 0.0;
+	}
 	vec3 h = normalize(wo + wi);
-	float D = D_GGX_isotropic(mix(0.1, 0.001, mat.clearcoat_gloss), h.z);
-	return D / (4.0 * dot(wo, h));
+	return clearcoat_pdf_from_half_vector(mat, wo, h);
 }
 
 vec3 eval_principled_brdf(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float pdf_rev_w, bool forward_facing,
@@ -251,6 +275,9 @@ float eval_principled_brdf_pdf(Material mat, vec3 wo, vec3 wi) {
 #endif
 }
 
+vec3 eval_principled(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float pdf_rev_w, bool forward_facing,
+					 uint mode, bool eval_reverse_pdf);
+
 vec3 sample_principled(const Material mat, const vec3 wo, out vec3 wi, const uint mode, const bool forward_facing,
 					   out float pdf_w, out float cos_theta, vec3 xi) {
 	wi = vec3(0);
@@ -262,75 +289,96 @@ vec3 sample_principled(const Material mat, const vec3 wo, out vec3 wi, const uin
 	}
 	float p_spec, p_diff, p_clearcoat, p_spec_trans;
 
-	float F = fresnel_dielectric(wo.z, mat.ior, forward_facing);
+	float F = principled_interface_fresnel(mat, wo.z, forward_facing);
 	initialize_sampling_probs(mat, F, forward_facing, p_spec, p_diff, p_clearcoat, p_spec_trans);
 
 	float eta = forward_facing ? mat.ior : 1.0 / mat.ior;
+	Material transmission_mat = principled_transmission_material(mat);
 
 	vec3 f = vec3(0);
 	float p_lobe = 0.0;
+	bool sampled_delta = false;
+	float clearcoat_end = p_spec + p_clearcoat;
+	float diffuse_end = clearcoat_end + p_diff;
 	if (xi.z < p_spec) {
 		f = sample_principled_brdf(mat, wo, wi, pdf_w, cos_theta, xi.xy, eta);
 		p_lobe = p_spec;
-	} else if (xi.z > p_spec && xi.z <= (p_spec + p_clearcoat)) {
+		sampled_delta = bsdf_is_effectively_delta(calc_anisotropy(mat.roughness, mat.anisotropy));
+	} else if (xi.z < clearcoat_end) {
 		f = sample_clearcoat(mat, wo, wi, pdf_w, cos_theta, xi.xy);
 		p_lobe = p_clearcoat;
-	} else if (xi.z > (p_spec + p_clearcoat) && xi.z <= (p_spec + p_clearcoat + p_diff)) {
+	} else if (xi.z < diffuse_end) {
 		f = sample_disney_diffuse(mat, wo, wi, pdf_w, cos_theta, xi.xy);
 		p_lobe = p_diff;
-	} else if (p_spec_trans >= 0.0 && xi.z <= (p_spec + p_clearcoat + p_diff + p_spec_trans)) {
-		f = sample_dielectric(mat, wo, wi, mode, forward_facing, pdf_w, cos_theta, xi.xy);
+	} else {
+		float transmission_xi = (xi.z - diffuse_end) / p_spec_trans;
+		f = principled_transmission_weight(mat) *
+			sample_dielectric(transmission_mat, wo, wi, mode, forward_facing, pdf_w, cos_theta,
+							  vec3(xi.xy, transmission_xi));
 		p_lobe = p_spec_trans;
+		sampled_delta = dielectric_is_delta(transmission_mat, dielectric_alpha(transmission_mat));
 	}
+
 	pdf_w *= p_lobe;
-	return f;
+	if (sampled_delta || pdf_w == 0.0) {
+		return f;
+	}
+
+	float unused_reverse_pdf;
+	return eval_principled(mat, wo, wi, pdf_w, unused_reverse_pdf, forward_facing, mode, false);
 }
 
 vec3 eval_principled(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float pdf_rev_w, bool forward_facing,
 					 uint mode, bool eval_reverse_pdf) {
 	pdf_w = 0.0;
 	pdf_rev_w = 0.0;
-	float alpha = mat.roughness * mat.roughness;
-
 	float p_spec, p_diff, p_clearcoat, p_spec_trans;
-	float F = fresnel_dielectric(wo.z, mat.ior, forward_facing);
+	float F = principled_interface_fresnel(mat, wo.z, forward_facing);
 	initialize_sampling_probs(mat, F, forward_facing, p_spec, p_diff, p_clearcoat, p_spec_trans);
+	float p_spec_rev = 0.0;
+	float p_diff_rev = 0.0;
+	float p_clearcoat_rev = 0.0;
+	float p_spec_trans_rev = 0.0;
+	if (eval_reverse_pdf) {
+		bool is_reflection = wo.z * wi.z > 0.0;
+		vec3 reverse_wo = is_reflection ? wi : -wi;
+		bool reverse_facing = is_reflection ? forward_facing : !forward_facing;
+		float F_rev = principled_interface_fresnel(mat, reverse_wo.z, reverse_facing);
+		initialize_sampling_probs(mat, F_rev, reverse_facing, p_spec_rev, p_diff_rev, p_clearcoat_rev,
+								  p_spec_trans_rev);
+	}
 
 	vec3 f = vec3(0);
 	float pdf = 0;
 	float pdf_rev = 0;
 
-	float brdf_weight = (1.0 - mat.spec_trans) * (1.0 - mat.metallic);
-	float bsdf_weight = (1.0 - mat.metallic) * mat.spec_trans;
+	float brdf_weight = principled_diffuse_weight(mat);
+	float bsdf_weight = principled_transmission_weight(mat);
 	if (p_spec > 0) {
 		f += eval_principled_brdf(mat, wo, wi, pdf, pdf_rev, forward_facing, mode, eval_reverse_pdf);
-		pdf *= p_spec;
-		pdf_rev *= p_spec;
-		pdf_w += pdf;
-		pdf_rev_w += pdf_rev;
+		pdf_w += p_spec * pdf;
+		pdf_rev_w += p_spec_rev * pdf_rev;
 	}
 	bool upper_hemisphere = min(wi.z, wo.z) > 0;
 	if (upper_hemisphere) {
 		if (p_diff > 0) {
 			pdf_w += p_diff * eval_disney_diffuse_pdf(wo, wi);
-			pdf_rev_w += p_diff * eval_disney_diffuse_pdf(wi, wo);
+			pdf_rev_w += p_diff_rev * eval_disney_diffuse_pdf(wi, wo);
 			f += brdf_weight * calc_disney_diffuse_factor(mat, wo, wi);
 		}
 		if (p_clearcoat > 0) {
 			f += eval_clearcoat(mat, wo, wi, pdf, pdf_rev);
-			pdf *= p_clearcoat;
-			pdf_rev *= p_clearcoat;
-			pdf_w += pdf;
-			pdf_rev_w += pdf_rev;
+			pdf_w += p_clearcoat * pdf;
+			pdf_rev_w += p_clearcoat_rev * pdf_rev;
 		}
 	}
 
 	if (p_spec_trans > 0) {
-		f += bsdf_weight * eval_dielectric(mat, wo, wi, pdf, pdf_rev, forward_facing, mode, eval_reverse_pdf);
-		pdf *= p_spec_trans;
-		pdf_rev *= p_spec_trans;
-		pdf_w += pdf;
-		pdf_rev_w += pdf_rev;
+		Material transmission_mat = principled_transmission_material(mat);
+		f += bsdf_weight *
+			 eval_dielectric(transmission_mat, wo, wi, pdf, pdf_rev, forward_facing, mode, eval_reverse_pdf);
+		pdf_w += p_spec_trans * pdf;
+		pdf_rev_w += p_spec_trans_rev * pdf_rev;
 	}
 	return f;
 }
@@ -338,7 +386,7 @@ vec3 eval_principled(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 float eval_principled_pdf(Material mat, vec3 wo, vec3 wi, bool forward_facing) {
 	float pdf = 0.0;
 	float p_spec, p_diff, p_clearcoat, p_spec_trans;
-	float F = fresnel_dielectric(wo.z, mat.ior, forward_facing);
+	float F = principled_interface_fresnel(mat, wo.z, forward_facing);
 	initialize_sampling_probs(mat, F, forward_facing, p_spec, p_diff, p_clearcoat, p_spec_trans);
 	if (p_spec > 0) {
 		pdf += p_spec * eval_principled_brdf_pdf(mat, wo, wi);
@@ -353,7 +401,8 @@ float eval_principled_pdf(Material mat, vec3 wo, vec3 wi, bool forward_facing) {
 		}
 	}
 	if (p_spec_trans > 0) {
-		pdf += p_spec_trans * eval_dielectric_pdf(mat, wo, wi, forward_facing);
+		pdf += p_spec_trans *
+			   eval_dielectric_pdf(principled_transmission_material(mat), wo, wi, forward_facing);
 	}
 	return pdf;
 }

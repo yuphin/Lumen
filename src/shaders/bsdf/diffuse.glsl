@@ -69,7 +69,7 @@ vec3 eval_disney_diffuse(Material mat, vec3 wo, vec3 wi, out float pdf_w, out fl
 		return vec3(0);
 	}
 	pdf_w = wi.z * INV_PI;
-	pdf_rev_w = pdf_w;
+	pdf_rev_w = wo.z * INV_PI;
 	return mat.albedo * disney_fresnel(wi, wo, mat.roughness) * INV_PI;
 }
 
@@ -78,7 +78,7 @@ vec3 eval_frostbite_diffuse(Material mat, vec3 wo, vec3 wi, out float pdf_w, out
 		return vec3(0);
 	}
 	pdf_w = wi.z * INV_PI;
-	pdf_rev_w = pdf_w;
+	pdf_rev_w = wo.z * INV_PI;
 	return mat.albedo * frostbite_fresnel(wi, wo, mat.roughness) * INV_PI;
 }
 

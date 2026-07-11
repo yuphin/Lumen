@@ -24,6 +24,14 @@ Material load_material(const uint material_idx, const vec2 uv) {
 bool same_hemisphere(in vec3 wi, in vec3 wo, in vec3 n) { return dot(wi, n) > 0 && dot(wo, n) > 0; }
 
 float bsdf_pdf(const Material mat, const vec3 n_s, vec3 wo, vec3 wi, bool forward_facing) {
+	// Reverse transmission queries swap the original directions, leaving wo on
+	// the opposite side of the shading frame. Express that query in the same
+	// upper-hemisphere convention used by every BSDF implementation.
+	if (dot(wo, n_s) < 0.0) {
+		wo = -wo;
+		wi = -wi;
+		forward_facing = !forward_facing;
+	}
 	vec3 T, B;
 	branchless_onb(n_s, T, B);
 	wo = to_local(wo, T, B, n_s);
@@ -83,7 +91,7 @@ vec3 sample_bsdf(vec3 n_s, vec3 wo, const Material mat, const uint mode, const b
 #endif
 #ifdef ENABLE_MIRROR
 		case BSDF_TYPE_MIRROR: {
-			f = sample_mirror(vec3(0, 0, 1), wo, wi, pdf_w, cos_theta);
+			f = sample_mirror(mat, vec3(0, 0, 1), wo, wi, pdf_w, cos_theta);
 		} break;
 #endif
 #ifdef ENABLE_GLASS
@@ -93,7 +101,7 @@ vec3 sample_bsdf(vec3 n_s, vec3 wo, const Material mat, const uint mode, const b
 #endif
 #ifdef ENABLE_DIELECTRIC
 		case BSDF_TYPE_DIELECTRIC: {
-			f = sample_dielectric(mat, wo, wi, mode, forward_facing, pdf_w, cos_theta, rands.xy);
+			f = sample_dielectric(mat, wo, wi, mode, forward_facing, pdf_w, cos_theta, rands);
 		} break;
 #endif
 #ifdef ENABLE_CONDUCTOR
