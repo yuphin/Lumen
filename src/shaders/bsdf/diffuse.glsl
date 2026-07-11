@@ -60,7 +60,7 @@ vec3 eval_lambertian_diffuse(Material mat, vec3 wo, vec3 wi, out float pdf_w, ou
 		return vec3(0);
 	}
 	pdf_w = wi.z * INV_PI;
-	pdf_rev_w = pdf_w;
+	pdf_rev_w = wo.z * INV_PI;
 	return mat.albedo * INV_PI;
 }
 

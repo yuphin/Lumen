@@ -140,7 +140,7 @@ vec3 sample_clearcoat(const Material mat, const vec3 wo, inout vec3 wi, inout fl
 	const float alpha_2 = 0.25 * 0.25;
 
 	float cos_t = sqrt(max(0, (1.0 - pow(alpha_2, 1.0f - xi.x)) / (1.0 - alpha_2)));
-	float sin_t = sqrt(max(0, 1.0 - cos_theta * cos_theta));
+	float sin_t = sqrt(max(0, 1.0 - cos_t * cos_t));
 	float phi = TWO_PI * xi.y;
 
 	vec3 h = vec3(sin_t * cos(phi), sin_t * sin(phi), cos_t);
@@ -313,7 +313,7 @@ vec3 eval_principled(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 	if (upper_hemisphere) {
 		if (p_diff > 0) {
 			pdf_w += p_diff * eval_disney_diffuse_pdf(wo, wi);
-			pdf_rev_w += pdf_w;
+			pdf_rev_w += p_diff * eval_disney_diffuse_pdf(wi, wo);
 			f += brdf_weight * calc_disney_diffuse_factor(mat, wo, wi);
 		}
 		if (p_clearcoat > 0) {

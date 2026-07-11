@@ -144,9 +144,6 @@ vec3 eval_dielectric(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 	float pt = has_transmission ? (1.0 - F) : 0.0;
 
 	float D;
-	if (eval_reverse_pdf) {
-		pdf_rev_w = eval_vndf_pdf_isotropic(alpha, wi, -h, D);
-	}
 	pdf_w = eval_vndf_pdf_isotropic(alpha, wo, h, D);
 	float G = G_GGX_correlated_isotropic(alpha, wo, wi);
 
@@ -158,7 +155,8 @@ vec3 eval_dielectric(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 
 		if (eval_reverse_pdf) {
 			float jacobian_reverse = 1.0 / (4.0 * abs(dot(wi, h)));
-			pdf_rev_w = pdf_rev_w * jacobian_reverse * prob_reflection;
+			float vndf_pdf = eval_vndf_pdf_isotropic(alpha, wi, h);
+			pdf_rev_w = vndf_pdf * jacobian_reverse * prob_reflection;
 		}
 		f = vec3(0.25 * D * G * F / abs(wo.z * wi.z));
 	} else {
@@ -168,7 +166,7 @@ vec3 eval_dielectric(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 		float jacobian = abs(dot(wi, h)) / jacobian_denom;
 
 		vec3 base_col = mat.thin == 1 ? sqrt(mat.albedo) : mat.albedo;
-		vec3 f = base_col * D * G * (1.0 - F) * abs(dot(wi, h) * dot(wo, h) / (wi.z * wo.z * jacobian_denom));
+		f = base_col * D * G * (1.0 - F) * abs(dot(wi, h) * dot(wo, h) / (wi.z * wo.z * jacobian_denom));
 		if (mode == 1) {
 			f /= (eta * eta);
 		}
@@ -176,12 +174,20 @@ vec3 eval_dielectric(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 		float prob_refraction = pt / (pr + pt);
 		pdf_w = pdf_w * jacobian * prob_refraction;
 		if (eval_reverse_pdf) {
-			// Reverse the half normal direction
-			h *= -1.0;
-			jacobian_denom = eta * dot(wi, h) + dot(wo, h);
+
+			// Compute reverse quantities for VNDF PDF evaluation
+			vec3 wi_r = -wi;
+			vec3 wo_r = -wo;
+			float eta_r = 1.0 / eta;
+			vec3 h_r = normalize(wo_r + wi_r * eta_r);
+			// Make sure h is oriented towards the normal
+			h_r *= float(sign(h_r.z));
+			jacobian_denom = eta_r * dot(wi_r, h_r) + dot(wo_r, h_r);
 			jacobian_denom *= jacobian_denom;
-			float jacobian_reverse = abs(dot(wo, h)) / jacobian_denom;
-			pdf_rev_w = pdf_rev_w * jacobian_reverse * prob_refraction;
+			float jacobian_reverse = abs(dot(wo_r, h_r)) / jacobian_denom;
+
+			float vndf_reverse_pdf = eval_vndf_pdf_isotropic(alpha, wi_r, h_r);
+			pdf_rev_w = vndf_reverse_pdf * jacobian_reverse * prob_refraction;
 		}
 	}
 
