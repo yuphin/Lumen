@@ -156,7 +156,7 @@ static void compile_shader(void* raw_task) {
 
 struct BuildShadersTask {
 	RenderPass* pass;
-	lm::FixedArray<vk::Shader*> shaders;
+	lm::SmallArray<vk::Shader*, vk::MAX_SHADERS_PER_PASS> shaders;
 };
 
 struct PipelineRunTask {
@@ -164,14 +164,15 @@ struct PipelineRunTask {
 	RenderPass* pass;
 };
 
-static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& active_shaders) {
+static void build_shaders(RenderPass* pass,
+						  const lm::SmallArray<vk::Shader*, vk::MAX_SHADERS_PER_PASS>& active_shaders) {
 	// TODO: make resource processing in order
 	switch (pass->type) {
 		case vk::PassType::RT:
 		case vk::PassType::Graphics: {
 			lm::SmallArray<ShaderCompileTask, vk::MAX_SHADERS_PER_PASS> shader_tasks;
 			tp::JobCounter shader_counter;
-			for (vk::Shader*& shader : active_shaders) {
+			for (vk::Shader* shader : active_shaders) {
 				bool shader_cached = false;
 				{
 					os::ScopedLock lock(_shader_map_mutex);
@@ -197,13 +198,13 @@ static void build_shaders(RenderPass* pass, const lm::FixedArray<vk::Shader*>& a
 					_shader_cache.insert(task.result->name_with_macros, *task.result);
 				}
 			}
-			for (vk::Shader*& shader : active_shaders) {
+			for (vk::Shader* shader : active_shaders) {
 				process_bindless_resources(pass, *shader);
 				process_bindings(pass, *shader);
 			}
 		} break;
 		case vk::PassType::Compute: {
-			for (vk::Shader*& shader : active_shaders) {
+			for (vk::Shader* shader : active_shaders) {
 				bool shader_cached = false;
 				{
 					os::ScopedLock lock(_shader_map_mutex);
@@ -1297,11 +1298,12 @@ void rg::run(VkCommandBuffer cmd) {
 		auto unique_shaders_set =
 			lm::hash_set_create<lm::pair<vk::Shader*, RenderPass*>, shader_render_pass_hash, shader_render_pass_eq>(
 				scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
-		// TODO: Make these FixedArrays SmallArrays
-		auto existing_shaders_map = lm::hash_map_create<RenderPass*, lm::FixedArray<vk::Shader*>>(
-			scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
-		auto unique_shaders_map = lm::hash_map_create<RenderPass*, lm::FixedArray<vk::Shader*>>(
-			scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
+		auto existing_shaders_map =
+			lm::hash_map_create<RenderPass*, lm::SmallArray<vk::Shader*, vk::MAX_SHADERS_PER_PASS>>(
+				scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
+		auto unique_shaders_map =
+			lm::hash_map_create<RenderPass*, lm::SmallArray<vk::Shader*, vk::MAX_SHADERS_PER_PASS>>(
+				scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
 
 		for (u64 i = 0; i < _passes.size; i++) {
 			if (_passes[i].is_pipeline_cached) {
@@ -1312,9 +1314,6 @@ void rg::run(VkCommandBuffer cmd) {
 				unique_shaders_set.get_or_create({&shader, &_passes[i]}, &entry_created);
 				if (!entry_created) {
 					auto* entry = existing_shaders_map.get_or_create(&_passes[i]);
-					if (!entry->value.initialized()) {
-						entry->value = lm::fixed_array_create<vk::Shader*>(scratch.arena, vk::MAX_SHADERS_PER_PASS);
-					}
 					entry->value.push_back(&shader);
 				}
 			}
@@ -1326,10 +1325,6 @@ void rg::run(VkCommandBuffer cmd) {
 			vk::Shader* shader = entry.key.first;
 			RenderPass* rp = entry.key.second;
 			auto* unique_shader_entry = unique_shaders_map.get_or_create(rp);
-			if (!unique_shader_entry->value.initialized()) {
-				unique_shader_entry->value =
-					lm::fixed_array_create<vk::Shader*>(scratch.arena, MAX_SHADER_COMPILATIONS_PER_FRAME);
-			}
 			unique_shader_entry->value.push_back(shader);
 		}
 		// Compile and process resources for unique shaders
