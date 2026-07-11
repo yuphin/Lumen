@@ -1169,6 +1169,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 			} else {
 				LUMEN_ASSERT(src.tex->aspect_flags == dst.tex->aspect_flags, "Aspect flags mismatch");
 				VkImageCopy region = {};
+				VkImageLayout old_src_layout = src.tex->layout;
+				VkImageLayout old_dst_layout = dst.tex->layout;
 				vk::texture_transition(src.tex, cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 				vk::texture_transition(dst.tex, cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 				region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1178,6 +1180,8 @@ void RenderPass::run(VkCommandBuffer cmd) {
 				region.extent = src.tex->extent;
 				vkCmdCopyImage(cmd, src.tex->handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst.tex->handle,
 							   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+				vk::texture_transition(src.tex, cmd, old_src_layout);
+				vk::texture_transition(dst.tex, cmd, old_dst_layout);
 			}
 		} else {  // buffer
 			if (dst.buf) {
