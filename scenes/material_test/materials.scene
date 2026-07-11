@@ -156,6 +156,158 @@ bsdfs:
     reflectivity: v3f(0.956520, 0.791550, 0.408000)
     edge_tint: v3f(0.957060, 0.863700, 0.619910)
 
+  - name: Edge Delta Below
+    type: dielectric
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    ior: 1.520000
+    roughness: 0.079000
+    transmission: 1
+    reflection: 1
+    thin: 0
+
+  - name: Edge Delta Above
+    type: dielectric
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+    ior: 1.520000
+    roughness: 0.081000
+    transmission: 1
+    reflection: 1
+    thin: 0
+
+  - name: Edge Dielectric Thick
+    type: dielectric
+    albedo: v3f(0.900000, 0.950000, 1.000000)
+    ior: 1.520000
+    roughness: 0.250000
+    transmission: 1
+    reflection: 1
+    thin: 0
+
+  - name: Edge Dielectric Thin
+    type: dielectric
+    albedo: v3f(0.900000, 0.950000, 1.000000)
+    ior: 1.520000
+    roughness: 0.250000
+    transmission: 1
+    reflection: 1
+    thin: 1
+
+  - name: Edge Mirror White
+    type: mirror
+    albedo: v3f(1.000000, 1.000000, 1.000000)
+
+  - name: Edge Mirror Tinted
+    type: mirror
+    albedo: v3f(0.150000, 0.550000, 1.000000)
+
+  - name: Edge Clearcoat Low
+    type: principled
+    albedo: v3f(0.180000, 0.180000, 0.180000)
+    ior: 1.500000
+    roughness: 0.350000
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.000000
+    metallic: 0.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.500000
+    clearcoat: 1.000000
+    clearcoat_gloss: 0.000000
+    subsurface: 0.000000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 0
+
+  - name: Edge Clearcoat High
+    type: principled
+    albedo: v3f(0.180000, 0.180000, 0.180000)
+    ior: 1.500000
+    roughness: 0.350000
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.000000
+    metallic: 0.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.500000
+    clearcoat: 1.000000
+    clearcoat_gloss: 1.000000
+    subsurface: 0.000000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 0
+
+  - name: Edge Metallic 0
+    type: principled
+    albedo: v3f(0.800000, 0.250000, 0.080000)
+    ior: 1.500000
+    roughness: 0.300000
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.000000
+    metallic: 0.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.500000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.500000
+    subsurface: 0.000000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 0
+
+  - name: Edge Metallic 50
+    type: principled
+    albedo: v3f(0.800000, 0.250000, 0.080000)
+    ior: 1.500000
+    roughness: 0.300000
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.000000
+    metallic: 0.500000
+    specular_tint: 0.000000
+    sheen_tint: 0.500000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.500000
+    subsurface: 0.000000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 0
+
+  - name: Edge Transmission 0
+    type: principled
+    albedo: v3f(0.850000, 0.950000, 1.000000)
+    ior: 1.500000
+    roughness: 0.200000
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.000000
+    metallic: 0.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.500000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.500000
+    subsurface: 0.000000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 0
+
+  - name: Edge Transmission 65
+    type: principled
+    albedo: v3f(0.850000, 0.950000, 1.000000)
+    ior: 1.500000
+    roughness: 0.200000
+    diffuse_transmission: 0.000000
+    specular_transmission: 0.650000
+    metallic: 0.000000
+    specular_tint: 0.000000
+    sheen_tint: 0.500000
+    clearcoat: 0.000000
+    clearcoat_gloss: 0.500000
+    subsurface: 0.000000
+    flatness: 0.000000
+    sheen: 0.000000
+    anisotropy: 0.000000
+    thin: 0
+
   - name: Other Walls
     type: diffuse
     albedo: v3f(0.725000, 0.710000, 0.680000)
@@ -236,6 +388,44 @@ mesh:
 
       - refs: sphere9
         name: Principled1
+
+  - name: bsdf_edge_cases.obj
+    materials:
+      - refs: edge_delta_below
+        name: Edge Delta Below
+
+      - refs: edge_delta_above
+        name: Edge Delta Above
+
+      - refs: edge_dielectric_thick
+        name: Edge Dielectric Thick
+
+      - refs: edge_dielectric_thin
+        name: Edge Dielectric Thin
+
+      - refs: edge_mirror_white
+        name: Edge Mirror White
+
+      - refs: edge_mirror_tinted
+        name: Edge Mirror Tinted
+
+      - refs: edge_clearcoat_low
+        name: Edge Clearcoat Low
+
+      - refs: edge_clearcoat_high
+        name: Edge Clearcoat High
+
+      - refs: edge_metal_0
+        name: Edge Metallic 0
+
+      - refs: edge_metal_50
+        name: Edge Metallic 50
+
+      - refs: edge_trans_0
+        name: Edge Transmission 0
+
+      - refs: edge_trans_65
+        name: Edge Transmission 65
 
 
 
