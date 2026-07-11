@@ -101,4 +101,8 @@ void buffer_flush(Buffer* buffer, u64 offset, u64 size) {
 	vk::check(vmaFlushAllocation(vk::context().allocator, buffer->allocation, offset, size));
 }
 
+void buffer_invalidate(Buffer* buffer, u64 offset, u64 size) {
+	vk::check(vmaInvalidateAllocation(vk::context().allocator, buffer->allocation, offset, size));
+}
+
 }  // namespace vk

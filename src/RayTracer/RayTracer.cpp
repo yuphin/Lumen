@@ -490,8 +490,10 @@ static f32 prepare_frame_and_render() {
 
 	if (_write_exr) {
 		_write_exr = false;
-		ImageUtils::save_exr((f32*)vk::buffer_map(_output_img_buffer_cpu), Window::width(), Window::height(),
-							 "out.exr");
+		vk::check(vkDeviceWaitIdle(vk::context().device));
+		f32* output_pixels = (f32*)vk::buffer_map(_output_img_buffer_cpu);
+		vk::buffer_invalidate(_output_img_buffer_cpu);
+		ImageUtils::save_exr(output_pixels, Window::width(), Window::height(), "out.exr");
 		vk::buffer_unmap(_output_img_buffer_cpu);
 	}
 	bool time_limit = abs(diff - 5.0) < 0.1;
