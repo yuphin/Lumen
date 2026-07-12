@@ -10,22 +10,20 @@
 #include "../commons.h"
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) readonly buffer RTUtilsDesc_ { RTUtilsDesc post_desc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Img { vec4 d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Residual { float d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CounterData { int d; };
 layout(push_constant) uniform PC { RTUtilsPC pc; };
-Img gt_img = Img(post_desc.gt_img_addr);
-Img out_img = Img(post_desc.out_img_addr);
-Residual res_data = Residual(post_desc.residual_addr);
-CounterData cnt = CounterData(post_desc.counter_addr);
+#include "../bda.glsl"
+DESC_BUFFER_RO(post_desc, gt_img, vec4);
+DESC_BUFFER_RO(post_desc, out_img, vec4);
+DESC_BUFFER(post_desc, residual, float);
+DESC_BUFFER_SCALAR(post_desc, counter, int);
 shared float data[32];
 void main() {
     uint idx = gl_GlobalInvocationID.x;
-    uint limit = cnt.d == 0 ? pc.size : ((pc.size + 1023) >> (10 * cnt.d));
+    uint limit = DEREF(counter) == 0 ? pc.size : ((pc.size + 1023) >> (10 * DEREF(counter)));
     if (idx >= limit) {
         return;
     }
-    float val = res_data.d[idx];
+    float val = DEREF(residual)[idx];
     memoryBarrier();
     barrier();
 
@@ -41,9 +39,9 @@ void main() {
         val = subgroupAdd(val);
     }
     if (gl_LocalInvocationID.x == 0) {
-        res_data.d[gl_WorkGroupID.x] = val;
+        DEREF(residual)[gl_WorkGroupID.x] = val;
     }
     if (idx == 0) {
-        cnt.d += 1;
+        DEREF(counter) += 1;
     }
 }

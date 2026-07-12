@@ -8,23 +8,19 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../bda.glsl"
 #include "pssmlt_commons.h"
 #include "../../utils.glsl"
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(set = 0, binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantCompute { PushConstantCompute pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BootstrapData { BootstrapSample d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDFSum { float d; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDF { float d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BlockSums { float d[]; };
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ResidualData { float d[]; };
-ResidualData res_data = ResidualData(scene_desc.residual_addr);
-BootstrapData bootstrap_data = BootstrapData(scene_desc.bootstrap_addr);
-CDFSum cdf_sum = CDFSum(scene_desc.cdf_sum_addr);
-CDF cdf_data = CDF(scene_desc.cdf_addr);
-BlockSums block_sums = BlockSums(pc.block_sum_addr);
+SCENE_BUFFER(residual, float);
+SCENE_BUFFER(bootstrap, BootstrapSample);
+SCENE_BUFFER_SCALAR(cdf_sum, float);
+SCENE_BUFFER(cdf, float);
+DESC_BUFFER(pc, block_sum, float);
 
 #define NUM_BANKS 32
 #define LOG_NUM_BANKS 5
@@ -46,12 +42,12 @@ void main() {
     const bool valid_a = ai < pc.n;
     const bool valid_b = bi < pc.n;
     s_data[ai + bank_offset_a] =
-        valid_a ? (pc.scan_sums == 0 ? bootstrap_data.d[mem_ai].lum * div
-                                     : block_sums.d[mem_ai])
+        valid_a ? (pc.scan_sums == 0 ? DEREF(bootstrap)[mem_ai].lum * div
+                                     : DEREF(block_sum)[mem_ai])
                 : 0;
     s_data[bi + bank_offset_b] =
-        valid_b ? (pc.scan_sums == 0 ? bootstrap_data.d[mem_bi].lum * div
-                                     : block_sums.d[mem_bi])
+        valid_b ? (pc.scan_sums == 0 ? DEREF(bootstrap)[mem_bi].lum * div
+                                     : DEREF(block_sum)[mem_bi])
                 : 0;
     // Traverse from leafs to root (Reduction)
     uint stride = 1;
@@ -81,7 +77,7 @@ void main() {
         uint idx = (gl_WorkGroupSize.x << 1) - 1;
         idx += CONFLICT_FREE_OFFSET(idx);
         if (pc.store_sum == 1) {
-            block_sums.d[block_idx] = s_data[idx];
+            DEREF(block_sum)[block_idx] = s_data[idx];
         }
         s_data[idx] = 0;
     }
@@ -114,16 +110,16 @@ void main() {
     barrier();
     if (valid_a) {
         if (pc.scan_sums == 0) {
-            cdf_data.d[mem_ai] = s_data[ai + bank_offset_a];
+            DEREF(cdf)[mem_ai] = s_data[ai + bank_offset_a];
         } else {
-            block_sums.d[mem_ai] = s_data[ai + bank_offset_a];
+            DEREF(block_sum)[mem_ai] = s_data[ai + bank_offset_a];
         }
     }
     if (valid_b) {
         if (pc.scan_sums == 0) {
-            cdf_data.d[mem_bi] = s_data[bi + bank_offset_b];
+            DEREF(cdf)[mem_bi] = s_data[bi + bank_offset_b];
         } else {
-            block_sums.d[mem_bi] = s_data[bi + bank_offset_b];
+            DEREF(block_sum)[mem_bi] = s_data[bi + bank_offset_b];
         }
     }
 }

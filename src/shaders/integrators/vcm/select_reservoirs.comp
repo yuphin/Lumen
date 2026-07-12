@@ -7,30 +7,26 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../bda.glsl"
 #include "vcm_commons.h"
 #include "../../utils.glsl"
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PCVCM pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightSamples { VCMRestirData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMReservoir_ { VCMReservoir d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ShouldResample { uint d; };
 
 uint size = pc.width * pc.height;
 
-LightSamples light_samples = LightSamples(scene_desc.light_samples_addr);
-ShouldResample should_resample =
-    ShouldResample(scene_desc.should_resample_addr);
-VCMReservoir_ temporal_reservoirs =
-    VCMReservoir_(scene_desc.vcm_reservoir_addr);
+SCENE_BUFFER(light_samples, VCMRestirData);
+SCENE_BUFFER_SCALAR(should_resample, uint);
+SCENE_BUFFER(vcm_reservoir, VCMReservoir);
 
 void main() {
     if(gl_GlobalInvocationID.x >= size) {
         return;
     }
-    VCMRestirData s = light_samples.d[gl_GlobalInvocationID.x];
+    VCMRestirData s = DEREF(light_samples)[gl_GlobalInvocationID.x];
     if(s.valid == 1) {
         const uint hidx = s.hash_idx;
-        temporal_reservoirs.d[hidx].sample_idx = gl_GlobalInvocationID.x;
+        DEREF(vcm_reservoir)[hidx].sample_idx = gl_GlobalInvocationID.x;
     } 
 }

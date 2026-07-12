@@ -8,6 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
+#include "../../bda.glsl"
 #include "bdpt_commons.h"
 #include "../../commons.glsl"
 
@@ -15,13 +16,10 @@ layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCBDPT pc; };
 // BDPT buffers
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightVertices { PathVertex d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CameraVertices { PathVertex d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
 
-LightVertices light_verts = LightVertices(scene_desc.light_path_addr);
-CameraVertices camera_verts = CameraVertices(scene_desc.camera_path_addr);
-ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
+SCENE_BUFFER(light_path, PathVertex);
+SCENE_BUFFER(camera_path, PathVertex);
+SCENE_BUFFER(color_storage, vec3);
 
 uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 uint bdpt_path_idx =
@@ -66,16 +64,16 @@ void main() {
                 vec3 splat_col = bdpt_connect_cam(s, coords);
                 if (luminance(splat_col) > 0) {
                     uint idx = coords.x * gl_LaunchSizeEXT.y + coords.y;
-                    tmp_col.d[idx] += splat_col;
+                    DEREF(color_storage)[idx] += splat_col;
                 }
             } else {
                 col += bdpt_connect(s, t);
             }
         }
     }
-    vec3 splat_img = tmp_col.d[pixel_idx];
+    vec3 splat_img = DEREF(color_storage)[pixel_idx];
     col += splat_img;
-    tmp_col.d[pixel_idx] = vec3(0);
+    DEREF(color_storage)[pixel_idx] = vec3(0);
     if (isnan(luminance(col))) {
         return;
     }

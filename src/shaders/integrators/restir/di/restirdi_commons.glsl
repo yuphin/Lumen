@@ -1,25 +1,18 @@
+#include "../../../bda.glsl"
 #include "../../../commons.glsl"
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
 layout(push_constant) uniform _PushConstantRay { PCReSTIR pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GBuffer { RestirGBufferData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer RestirReservoir_ {
-    RestirReservoir d[];
-};
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 
-ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
-GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
-RestirReservoir_ passthrough_reservoirs =
-    RestirReservoir_(scene_desc.passthrough_reservoir_addr);
-RestirReservoir_ temporal_reservoirs =
-    RestirReservoir_(scene_desc.temporal_reservoir_addr);
-RestirReservoir_ spatial_reservoirs =
-    RestirReservoir_(scene_desc.spatial_reservoir_addr);
+SCENE_BUFFER(color_storage, vec3);
+SCENE_BUFFER(g_buffer, RestirGBufferData);
+SCENE_BUFFER(passthrough_reservoir, RestirReservoir);
+SCENE_BUFFER(temporal_reservoir, RestirReservoir);
+SCENE_BUFFER(spatial_reservoir, RestirReservoir);
 
 vec3 pos;
 vec3 normal;
@@ -32,10 +25,10 @@ uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
                       pc.frame_num ^ pc.random_num);
 
 void load_g_buffer() {
-    pos = gbuffer.d[pixel_idx].pos;
-    normal = gbuffer.d[pixel_idx].normal;
-    uv = gbuffer.d[pixel_idx].uv;
-    mat_idx = gbuffer.d[pixel_idx].mat_idx;
+    pos = DEREF(g_buffer)[pixel_idx].pos;
+    normal = DEREF(g_buffer)[pixel_idx].normal;
+    uv = DEREF(g_buffer)[pixel_idx].uv;
+    mat_idx = DEREF(g_buffer)[pixel_idx].mat_idx;
     origin = vec4(ubo.inv_view * vec4(0, 0, 0, 1)).xyz;
 }
 

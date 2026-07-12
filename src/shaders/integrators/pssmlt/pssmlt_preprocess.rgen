@@ -11,15 +11,15 @@
 #include "pssmlt_commons.h"
 #include "pssmlt_commons.glsl"
 void main() {
-#define mlt_sampler mlt_samplers.d[mlt_sampler_idx]
-#define past_splat(i) past_splat_data.d[splat_idx + i]
-#define splat(i) splat_data.d[splat_idx + i]
+#define mlt_sampler DEREF(mlt_samplers)[mlt_sampler_idx]
+#define past_splat(i) DEREF(past_splat)[splat_idx + i]
+#define splat(i) DEREF(splat)[splat_idx + i]
     vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
     vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
                                                2. / gl_LaunchSizeEXT.y, 0, 1));
     area_int /= area_int.w;
     const float cam_area = abs(area_int.x * area_int.y);
-    uvec4 chain_seed = seeds_data.d[pixel_idx].chain_seed;
+    uvec4 chain_seed = DEREF(seeds)[pixel_idx].chain_seed;
 
     large_step = true;
     save_radiance = true;
@@ -32,5 +32,5 @@ void main() {
     }
     mlt_sampler.past_splat_cnt = mlt_sampler.splat_cnt;
     mlt_sampler.splat_cnt = 0;
-    seeds_data.d[pixel_idx].chain_seed = mlt_seed;
+    DEREF(seeds)[pixel_idx].chain_seed = mlt_seed;
 }

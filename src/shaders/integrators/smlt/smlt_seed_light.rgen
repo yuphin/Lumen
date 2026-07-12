@@ -12,12 +12,12 @@
 #include "smlt_commons.glsl"
 
 void main() {
-    bootstrap_data.d[pixel_idx].seed = seed;
+    DEREF(bootstrap)[pixel_idx].seed = seed;
 
     large_step = true;
     save_radiance = false;
     mlt_seed = seed;
     
-    tmp_lum_data.d[pixel_idx] = mlt_L_light();
-    tmp_seeds_data.d[pixel_idx].chain_seed = mlt_seed;
+    DEREF(tmp_lum)[pixel_idx] = mlt_L_light();
+    DEREF(tmp_seeds)[pixel_idx].chain_seed = mlt_seed;
 }

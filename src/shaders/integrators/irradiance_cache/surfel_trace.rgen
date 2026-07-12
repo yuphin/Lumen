@@ -8,6 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
+#include "../../bda.glsl"
 #include "../../commons.glsl"
 #include "ir_commons.h"
 #include "ir_commons.glsl"
@@ -17,14 +18,12 @@ const float tmax = 10000.0;
 layout(location = 0) rayPayloadEXT IRCacheHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelSamples { SurfelSample d[]; };
 
 #include "direct_lighting.glsl"
 
-SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
+SCENE_BUFFER(surfel_pool, Surfel);
 
-SurfelSamples surfel_samples = SurfelSamples(scene_desc.surfel_samples_addr);
+SCENE_BUFFER(surfel_samples, SurfelSample);
 
 uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
 
@@ -34,7 +33,7 @@ void main() {
 		return;
 	}
 
-	Surfel surfel = surfel_pool.d[tid];
+	Surfel surfel = DEREF(surfel_pool)[tid];
 
 	if (surfel.radius <= 0.0f) {
 		return;
@@ -87,5 +86,5 @@ void main() {
 	surfel_sample.hit_t = payload.dist;
 
 	uint linear_idx = gl_LaunchIDEXT.y * pc.rays_per_surfel + gl_LaunchIDEXT.x;
-	surfel_samples.d[linear_idx] = surfel_sample;
+	DEREF(surfel_samples)[linear_idx] = surfel_sample;
 }

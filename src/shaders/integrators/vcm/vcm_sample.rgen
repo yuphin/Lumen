@@ -8,6 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
+#include "../../bda.glsl"
 #include "vcm_commons.h"
 #include "../../commons.glsl"
 layout(location = 0) rayPayloadEXT HitPayload payload;
@@ -15,19 +16,13 @@ layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 
 layout(push_constant) uniform _PushConstantRay { PCVCM pc; };
 // VCM buffers
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMReservoir_ { VCMReservoir d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ShouldResample { uint d; };
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightSamples { VCMRestirData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SampleAvg { AvgStruct d; };
-LightSamples light_samples = LightSamples(scene_desc.light_samples_addr);
-ShouldResample should_resample =
-    ShouldResample(scene_desc.should_resample_addr);
+SCENE_BUFFER(light_samples, VCMRestirData);
+SCENE_BUFFER_SCALAR(should_resample, uint);
 
-VCMReservoir_ temporal_reservoirs =
-    VCMReservoir_(scene_desc.vcm_reservoir_addr);
+SCENE_BUFFER(vcm_reservoir, VCMReservoir);
 
-SampleAvg avg = SampleAvg(scene_desc.avg_addr);
+SCENE_BUFFER_SCALAR(avg, AvgStruct);
 
 uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 const uint flags = gl_RayFlagsOpaqueEXT;
@@ -156,17 +151,17 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state,
 }
 
 void main() {
-    if (should_resample.d != 0) {
+    if (DEREF(should_resample) != 0) {
         return;
     }
     if (pixel_idx == 0) {
         if(pc.frame_num == 0) {
-            avg.d.avg = 0;
-            avg.d.prev = 0;
+            DEREF(avg).avg = 0;
+            DEREF(avg).prev = 0;
         } else {
-            avg.d.avg = 0.6 * avg.d.avg + 0.4 * (pc.frame_num - avg.d.prev);
-            avg.d.prev = pc.frame_num;
-            //debugPrintfEXT("resampling %d, avg: %f\n", pc.total_frame_num, avg.d.avg);
+            DEREF(avg).avg = 0.6 * DEREF(avg).avg + 0.4 * (pc.frame_num - DEREF(avg).prev);
+            DEREF(avg).prev = pc.frame_num;
+            //debugPrintfEXT("resampling %d, avg: %f\n", pc.total_frame_num, DEREF(avg).avg);
         }
     }
 
@@ -308,8 +303,8 @@ void main() {
         s.p_hat = p_hat;
         s.valid = 1;
         s.frame_idx = pc.total_frame_num;
-        atomicAdd(temporal_reservoirs.d[s.hash_idx].factor, 1);
-        light_samples.d[pixel_idx] = s;
+        atomicAdd(DEREF(vcm_reservoir)[s.hash_idx].factor, 1);
+        DEREF(light_samples)[pixel_idx] = s;
     }
 #undef light_vtx
 }

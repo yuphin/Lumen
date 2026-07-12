@@ -15,11 +15,9 @@ layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 
 layout(push_constant) uniform _PushConstantRay { PCSPPM pc; };
 // SPPM buffers
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer AtomicData_ { AtomicData d; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonData_ { PhotonHash d[]; };
+SCENE_BUFFER_SCALAR(atomic_data, AtomicData);
+SCENE_BUFFER(photon, PhotonHash);
 
-AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
-PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
 
 uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 
@@ -72,18 +70,18 @@ void main() {
         Material hit_mat = load_material(payload.material_idx, payload.uv);
         if (d > 0) {
             // Ignore the first bounce
-            vec3 min_bnds = atomic_data.d.min_bnds;
-            vec3 max_bnds = atomic_data.d.max_bnds;
-            ivec3 grid_res = atomic_data.d.grid_res;
+            vec3 min_bnds = DEREF(atomic_data).min_bnds;
+            vec3 max_bnds = DEREF(atomic_data).max_bnds;
+            ivec3 grid_res = DEREF(atomic_data).grid_res;
             const ivec3 grid_idx =
                 get_grid_idx(payload.pos, min_bnds, max_bnds, grid_res);
             const uint h = hash(grid_idx, screen_size);
-            photons.d[h].pos = payload.pos;
-            photons.d[h].wi = -wi;
-            photons.d[h].throughput = throughput;
-            photons.d[h].nrm = n_s;
-            photons.d[h].path_len = d + 1;
-            atomicAdd(photons.d[h].photon_count, 1);
+            DEREF(photon)[h].pos = payload.pos;
+            DEREF(photon)[h].wi = -wi;
+            DEREF(photon)[h].throughput = throughput;
+            DEREF(photon)[h].nrm = n_s;
+            DEREF(photon)[h].path_len = d + 1;
+            atomicAdd(DEREF(photon)[h].photon_count, 1);
         }
         pos = offset_ray(payload.pos, n_g);
         float pdf_dir, cos_theta;

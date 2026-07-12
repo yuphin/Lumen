@@ -21,15 +21,15 @@ void main() {
     area_int /= area_int.w;
     const float cam_area = abs(area_int.x * area_int.y);
     vec3 cam_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
-    bootstrap_data.d[pixel_idx].seed = seed;
+    DEREF(bootstrap)[pixel_idx].seed = seed;
 
     large_step = true;
     save_radiance = false;
     mlt_seed = seed;
 
     if (LIGHT_FIRST == 1) {
-        bootstrap_data.d[pixel_idx].lum = mlt_trace_eye();
+        DEREF(bootstrap)[pixel_idx].lum = mlt_trace_eye();
     } else {
-        bootstrap_data.d[pixel_idx].lum = mlt_trace_light();
+        DEREF(bootstrap)[pixel_idx].lum = mlt_trace_light();
     }
 }

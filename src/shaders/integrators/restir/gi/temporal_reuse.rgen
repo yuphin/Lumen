@@ -15,16 +15,16 @@ layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 #include "restirgi_commons.glsl"
 #define M_MAX 30
 
-RestirSamples samples = RestirSamples(scene_desc.restir_samples_addr);
-RestirSamples old_samples = RestirSamples(scene_desc.restir_samples_old_addr);
-Reservoirs temp_reservoirs = Reservoirs(scene_desc.temporal_reservoir_addr);
-Reservoirs spatial_reservoirs = Reservoirs(scene_desc.spatial_reservoir_addr);
+SCENE_BUFFER(restir_samples, ReservoirSample);
+SCENE_BUFFER(restir_samples_old, ReservoirSample);
+SCENE_BUFFER(temporal_reservoir, Reservoir);
+SCENE_BUFFER(spatial_reservoir, Reservoir);
 
-#define tr temp_reservoirs.d[offset(pingpong ^ 1) + pixel_idx]
+#define tr DEREF(temporal_reservoir)[offset(pingpong ^ 1) + pixel_idx]
 void main() {
     const uint pingpong = (pc.total_frame_num % 2);
     const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
-    const ReservoirSample s = samples.d[pixel_idx];
+    const ReservoirSample s = DEREF(restir_samples)[pixel_idx];
     Reservoir r;
     if (length(s.n_s) == 0) {
         init_reservoir(r);
@@ -32,7 +32,7 @@ void main() {
         tr.W = r.W;
         tr.m = r.m;
         tr.s = r.s;
-        spatial_reservoirs.d[offset(pingpong ^ 1) + pixel_idx] = r;
+        DEREF(spatial_reservoir)[offset(pingpong ^ 1) + pixel_idx] = r;
         return;
     }
     if (pc.do_spatiotemporal == 0) {
@@ -48,18 +48,18 @@ void main() {
         if (prev_coords.x >= 0 && prev_coords.x < gl_LaunchSizeEXT.x &&
             prev_coords.y >= 0 && prev_coords.y < gl_LaunchSizeEXT.y) {
             prev_coords_idx = prev_coords.x * pc.height + prev_coords.y;
-            if (similar(samples.d[prev_coords_idx], old_samples.d[pixel_idx])) {
+            if (similar(DEREF(restir_samples)[prev_coords_idx], DEREF(restir_samples_old)[pixel_idx])) {
                 reprojection_failed = false;
             }
         }
         if (!reprojection_failed) {
-            r = temp_reservoirs.d[offset(pingpong) + prev_coords_idx];
+            r = DEREF(temporal_reservoir)[offset(pingpong) + prev_coords_idx];
         } else {
             // Reprojection failed, reset both reservoirs
             // Temporal
             init_reservoir(r);
             // Spatial
-            spatial_reservoirs.d[offset(pingpong ^ 1) + pixel_idx] = r;
+            DEREF(spatial_reservoir)[offset(pingpong ^ 1) + pixel_idx] = r;
         }
     }
     Reservoir r_new;

@@ -7,20 +7,19 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../bda.glsl"
 #include "pssmlt_commons.h"
 #include "../../utils.glsl"
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantCompute { PushConstantCompute pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BlockSums { float d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDF { float d[]; };
-BlockSums block_sums = BlockSums(pc.block_sum_addr);
-BlockSums output_data = BlockSums(pc.block_sum_addr);
-CDF cdf_data = CDF(scene_desc.cdf_addr);
+DESC_BUFFER(pc, block_sum, float);
+
+SCENE_BUFFER(cdf, float);
 shared float block_sum;
 void main() {
     if (gl_LocalInvocationID.x == 0) {
-        block_sum = block_sums.d[gl_WorkGroupID.x + pc.block_idx];
+        block_sum = DEREF(block_sum)[gl_WorkGroupID.x + pc.block_idx];
     }
     uint address = gl_WorkGroupID.x * (gl_WorkGroupSize.x << 1) + pc.base_idx +
                    gl_LocalInvocationID.x;
@@ -31,17 +30,17 @@ void main() {
 
     if (pc.scan_sums == 0) {
         if (valid_a) {
-            cdf_data.d[address] += block_sum;
+            DEREF(cdf)[address] += block_sum;
         }
         if (valid_b) {
-            cdf_data.d[address + gl_WorkGroupSize.x] += block_sum;
+            DEREF(cdf)[address + gl_WorkGroupSize.x] += block_sum;
         }
     } else {
         if (valid_a) {
-            output_data.d[address] += block_sum;
+            DEREF(block_sum)[address] += block_sum;
         }
         if (valid_b) {
-            output_data.d[address + gl_WorkGroupSize.x] += block_sum;
+            DEREF(block_sum)[address + gl_WorkGroupSize.x] += block_sum;
         }
     }
 }

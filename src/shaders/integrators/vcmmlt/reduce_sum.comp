@@ -8,34 +8,32 @@
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 
+#include "../../bda.glsl"
 #include "vcmmlt_commons.h"
 #include "../../utils.glsl"
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ResidualData { SumData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ChainStats { ChainData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CounterData { int d; };
 layout(constant_id = 0) const int MODE = 0;
 uint size = pc.num_mlt_threads;
-ResidualData res_data = ResidualData(scene_desc.residual_addr);
-CounterData cnt = CounterData(scene_desc.counter_addr);
-ChainStats chain_stats = ChainStats(scene_desc.chain_stats_addr);
+SCENE_BUFFER(residual, SumData);
+SCENE_BUFFER_SCALAR(counter, int);
+SCENE_BUFFER(chain_stats, ChainData);
 shared vec2 dataf[32];
 shared uint datau[32];
 void main() {
     uint idx = gl_GlobalInvocationID.x;
     vec2 valf;
     uint valu;
-    uint limit = cnt.d == 0 ? size : ((size + 1023) >> (10 * cnt.d));
+    uint limit = DEREF(counter) == 0 ? size : ((size + 1023) >> (10 * DEREF(counter)));
     if (idx >= limit) {
         dataf[gl_SubgroupInvocationID] = vec2(0);
         datau[gl_SubgroupInvocationID] = 0;
         return;
     }
-    valf = vec2(res_data.d[idx].x, res_data.d[idx].z);
-    valu = res_data.d[idx].y;
+    valf = vec2(DEREF(residual)[idx].x, DEREF(residual)[idx].z);
+    valu = DEREF(residual)[idx].y;
     memoryBarrier();
     barrier();
 
@@ -55,16 +53,16 @@ void main() {
         valu = subgroupAdd(valu);
     }
     if (gl_LocalInvocationID.x == 0) {
-        res_data.d[gl_WorkGroupID.x].x = valf.x;
-        res_data.d[gl_WorkGroupID.x].y = valu;
-        res_data.d[gl_WorkGroupID.x].z = valf.y;
+        DEREF(residual)[gl_WorkGroupID.x].x = valf.x;
+        DEREF(residual)[gl_WorkGroupID.x].y = valu;
+        DEREF(residual)[gl_WorkGroupID.x].z = valf.y;
     }
     if (idx == 0) {
-        cnt.d += 1;
+        DEREF(counter) += 1;
     }
     if (idx == 0) {
-        chain_stats.d[MODE].total_luminance += valf.x;
-        chain_stats.d[MODE].lum_samples += valu;
-        chain_stats.d[MODE].total_samples += valf.y;
+        DEREF(chain_stats)[MODE].total_luminance += valf.x;
+        DEREF(chain_stats)[MODE].lum_samples += valu;
+        DEREF(chain_stats)[MODE].total_samples += valf.y;
     }
 }

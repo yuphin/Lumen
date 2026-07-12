@@ -5,16 +5,15 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 
+#include "../../bda.glsl"
 #include "ir_commons.h"
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 
 layout(push_constant) uniform _PushConstantPrefixSum { PCPrefixSum pc; };
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PrefixSumScratch { uint d[]; };
 
-GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
-PrefixSumScratch prefix_sum_scratch = PrefixSumScratch(scene_desc.grid_prefix_sum_scratch_addr);
+SCENE_BUFFER(grid_cell_counts, uint);
+SCENE_BUFFER(grid_prefix_sum_scratch, uint);
 
 shared uint subgroup_data[SUBGROUP_SIZE];
 
@@ -25,7 +24,7 @@ void main() {
 	uint count;
 
 	if (tid < pc.num_elems) {
-		count = pc.scan_sums == 0 ? grid_cell_counts.d[tid] : prefix_sum_scratch.d[pc.block_sum_offset + tid];
+		count = pc.scan_sums == 0 ? DEREF(grid_cell_counts)[tid] : DEREF(grid_prefix_sum_scratch)[pc.block_sum_offset + tid];
 	} else {
 		count = 0;
 	}
@@ -52,13 +51,13 @@ void main() {
 
 	if (tid < pc.num_elems) {
 		if (pc.scan_sums == 0) {
-			grid_cell_counts.d[tid] = sum;
+			DEREF(grid_cell_counts)[tid] = sum;
 		} else {
-			prefix_sum_scratch.d[pc.block_sum_offset + tid] = sum;
+			DEREF(grid_prefix_sum_scratch)[pc.block_sum_offset + tid] = sum;
 		}
 #ifndef DISABLE_SUM_WRITES
 		if ((gl_LocalInvocationID.x == SCAN_WG_SIZE - 1) || (tid == pc.num_elems - 1)) {
-			prefix_sum_scratch.d[pc.out_offset + gl_WorkGroupID.x] = sum;
+			DEREF(grid_prefix_sum_scratch)[pc.out_offset + gl_WorkGroupID.x] = sum;
 		}
 #endif	// DISABLE_SUM_WRITES
 	}

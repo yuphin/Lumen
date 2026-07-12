@@ -7,19 +7,16 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../bda.glsl"
 #include "pssmlt_commons.h"
 #include "../../utils.glsl"
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTColor { vec3 d[]; };
 layout(binding = 0, rgba32f) uniform image2D image;
 layout(binding = 1) buffer SceneDesc_ { SceneDesc scene_desc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ChainStats { ChainData d[]; };
 layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDFSum { float d; };
-ChainStats chain_stats = ChainStats(scene_desc.chain_stats_addr);
-MLTColor mlt_col = MLTColor(scene_desc.mlt_col_addr);
-CDFSum cdf_sum = CDFSum(scene_desc.cdf_sum_addr);
+SCENE_BUFFER(chain_stats, ChainData);
+SCENE_BUFFER(mlt_col, vec3);
+SCENE_BUFFER_SCALAR(cdf_sum, float);
 void main() {
     ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.height,
                          gl_GlobalInvocationID.x % pc.height);
@@ -27,11 +24,11 @@ void main() {
         return;
     }
     vec3 col = vec3(0);
-    col += mlt_col.d[gl_GlobalInvocationID.x] * cdf_sum.d / pc.mutations_per_pixel;
+    col += DEREF(mlt_col)[gl_GlobalInvocationID.x] * DEREF(cdf_sum) / pc.mutations_per_pixel;
     if(isnan(luminance(col))) {
         return;
     }
-    mlt_col.d[gl_GlobalInvocationID.x] = vec3(0);
+    DEREF(mlt_col)[gl_GlobalInvocationID.x] = vec3(0);
     if (pc.enable_accumulation == 1 && pc.frame_num > 0) {
         float w = 1. / float(pc.frame_num + 1);
 

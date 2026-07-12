@@ -9,8 +9,9 @@
 #extension GL_EXT_shader_atomic_float : require
 
 #define SCENE_TEX_IDX 10
+#include "../../../bda.glsl"
 #include "gris_commons.glsl"
-PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
+SCENE_BUFFER(prefix_contributions, vec3);
 layout(binding = 4, std430) readonly buffer PathReconnections { ReconnectionData reconnection_data[]; };
 layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir in_reservoirs[]; };
 layout(binding = 6, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
@@ -20,8 +21,7 @@ layout(binding = 9, rgba32f) uniform image2D direct_lighting_img;
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
 uvec4 seed2 = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer DebugVisBuffer { uint d[]; };
-DebugVisBuffer debug_vis = DebugVisBuffer(scene_desc.debug_vis_addr);
+SCENE_BUFFER_RO(debug_vis, uint);
 
 // TODO: Maybe use an external buffer to supply spatial offsets?
 
@@ -119,7 +119,7 @@ vec3 do_spatial_reuse(GBuffer gbuffer, Reservoir reservoir) {
 	if (pc.hide_reconnection_radiance == 1) {
 		final_contribution = vec3(0);
 	} else {
-		final_contribution = prefix_contributions.d[pixel_idx];
+		final_contribution = DEREF(prefix_contributions)[pixel_idx];
 	}
 	if (reservoir.W > 0) {
 		final_contribution += curr_reservoir_contribution * reservoir.W;
@@ -136,9 +136,9 @@ vec3 do_spatial_reuse(GBuffer gbuffer, Reservoir reservoir) {
 
 	if (pc.pixel_debug == 1 && ubo.clicked_pos == ivec2(gl_LaunchIDEXT.xy)) {
 		uint linear_idx = gl_LaunchIDEXT.x * pc.height + gl_LaunchIDEXT.y;
-		debug_vis.d[linear_idx] = 1;
+		DEREF(debug_vis)[linear_idx] = 1;
 		for (uint i = 0; i < num_accepted_positions; i++) {
-			debug_vis.d[accepted_positions[i]] = 1;
+			DEREF(debug_vis)[accepted_positions[i]] = 1;
 		}
 	}
 	return col;

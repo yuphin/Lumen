@@ -56,7 +56,14 @@ struct Integrator {
 	IrradianceCache ircache;
 };
 
+// Sets the address and registers the buffer for shader inference
+#define SET_SCENE_BUFFER(desc, field, buffer_ptr) \
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, field##_addr, buffer_ptr)
+
 namespace integrator {
+
+SceneDesc scene_desc_base(Integrator* integrator);
+void upload_scene_desc(Integrator* integrator, const SceneDesc& desc);
 
 void set_type(Integrator* integrator, IntegratorType type);
 void init(Integrator* integrator);

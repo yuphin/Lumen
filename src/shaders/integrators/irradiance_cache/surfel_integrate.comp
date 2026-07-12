@@ -4,15 +4,14 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 
+#include "../../bda.glsl"
 #include "ir_commons.h"
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelSamples { SurfelSample d[]; };
 
-SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
-SurfelSamples surfel_samples = SurfelSamples(scene_desc.surfel_samples_addr);
+SCENE_BUFFER(surfel_pool, Surfel);
+SCENE_BUFFER(surfel_samples, SurfelSample);
 
 layout(local_size_x = DEFAULT_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
 void main() {
@@ -22,7 +21,7 @@ void main() {
 	if(surfel_id >= MAX_SURFEL_COUNT) {
 		return;
 	}
-	Surfel surfel = surfel_pool.d[surfel_id];
+	Surfel surfel = DEREF(surfel_pool)[surfel_id];
 	if(surfel.radius <= 0.0f) {
 		return;
 	}
@@ -30,11 +29,11 @@ void main() {
 	vec3 irradiance = vec3(0);
 	for(uint i = 0; i < pc.rays_per_surfel; i++) {
 		uint linear_idx = surfel_id * pc.rays_per_surfel + i;
-		irradiance += surfel_samples.d[linear_idx].radiance;
+		irradiance += DEREF(surfel_samples)[linear_idx].radiance;
 	}
 	irradiance /= float(pc.rays_per_surfel);
 	const float alpha = 0.01f;
 	surfel.irradiance = surfel.irradiance + (irradiance - surfel.irradiance) * alpha;
 
-	surfel_pool.d[surfel_id] = surfel;
+	DEREF(surfel_pool)[surfel_id] = surfel;
 }

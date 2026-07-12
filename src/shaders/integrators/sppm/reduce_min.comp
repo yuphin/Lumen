@@ -13,23 +13,21 @@
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
+#include "../../bda.glsl"
 layout(push_constant) uniform _PushConstantRay { PCSPPM pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer AtomicData_ { AtomicData d; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ResidualData { vec4 d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CounterData { int d; };
+SCENE_BUFFER_SCALAR(atomic_data, AtomicData);
+SCENE_BUFFER(residual, vec4);
+SCENE_BUFFER_SCALAR(counter, int);
 uint size = pc.width * pc.height;
-ResidualData res_data = ResidualData(scene_desc.residual_addr);
-CounterData cnt = CounterData(scene_desc.counter_addr);
-AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
 shared vec3 data[32];
 void main() {
     uint idx = gl_GlobalInvocationID.x;
     vec3 val;
-    uint limit = cnt.d == 0 ? size : ((size + 1023) >> (10 * cnt.d));
+    uint limit = DEREF(counter) == 0 ? size : ((size + 1023) >> (10 * DEREF(counter)));
     if (idx >= limit) {
         return;
     }
-    val = res_data.d[idx].xyz;
+    val = DEREF(residual)[idx].xyz;
     memoryBarrier();
     barrier();
 
@@ -45,10 +43,10 @@ void main() {
         val = subgroupMin(val);
     }
     if (gl_LocalInvocationID.x == 0) {
-        res_data.d[gl_WorkGroupID.x].xyz = val;
+        DEREF(residual)[gl_WorkGroupID.x].xyz = val;
     }
     if (idx == 0) {
-        cnt.d += 1;
-        atomic_data.d.min_bnds = val;
+        DEREF(counter) += 1;
+        DEREF(atomic_data).min_bnds = val;
     }
 }

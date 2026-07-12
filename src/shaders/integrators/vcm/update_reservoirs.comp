@@ -7,21 +7,19 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../bda.glsl"
 #include "vcm_commons.h"
 #include "../../utils.glsl"
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PCVCM pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightSamples { VCMRestirData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMReservoir_ { VCMReservoir d[]; };
 uvec4 seed =
     init_rng(gl_GlobalInvocationID.xy, gl_NumWorkGroups.xy *uvec2(32, 1),
              pc.frame_num ^ pc.random_num);
 uint size = pc.width * pc.height;
 
-LightSamples light_samples = LightSamples(scene_desc.light_samples_addr);
-VCMReservoir_ temporal_reservoirs =
-    VCMReservoir_(scene_desc.vcm_reservoir_addr);
+SCENE_BUFFER(light_samples, VCMRestirData);
+SCENE_BUFFER(vcm_reservoir, VCMReservoir);
 
 void update_reservoir(inout VCMReservoir r_new, const VCMRestirData s,
                       float w_i) {
@@ -49,11 +47,11 @@ void main() {
     if (idx >= size) {
         return;
     }
-    VCMReservoir r_prev = temporal_reservoirs.d[idx];
+    VCMReservoir r_prev = DEREF(vcm_reservoir)[idx];
     if (r_prev.sample_idx == -1) {
         return;
     }
-    VCMRestirData s = light_samples.d[r_prev.sample_idx];
+    VCMRestirData s = DEREF(light_samples)[r_prev.sample_idx];
     if (s.valid == 0) {
         return;
     }
@@ -74,11 +72,11 @@ void main() {
     }
     r.m = m_total;
     r.W = r.w_sum / (r.s.p_hat * r.m);
-    temporal_reservoirs.d[idx].w_sum = r.w_sum;
-    temporal_reservoirs.d[idx].W = r.W;
-    temporal_reservoirs.d[idx].m = r.m;
-    temporal_reservoirs.d[idx].factor--;
-    temporal_reservoirs.d[idx].sample_idx = -1;
-    temporal_reservoirs.d[idx].s = r.s;
-    light_samples.d[r_prev.sample_idx].valid = 0;
+    DEREF(vcm_reservoir)[idx].w_sum = r.w_sum;
+    DEREF(vcm_reservoir)[idx].W = r.W;
+    DEREF(vcm_reservoir)[idx].m = r.m;
+    DEREF(vcm_reservoir)[idx].factor--;
+    DEREF(vcm_reservoir)[idx].sample_idx = -1;
+    DEREF(vcm_reservoir)[idx].s = r.s;
+    DEREF(light_samples)[r_prev.sample_idx].valid = 0;
 }

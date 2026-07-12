@@ -40,28 +40,14 @@ void init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height()  * sizeof(f32) * 3});
 
-	SceneDesc desc;
-	desc.index_addr = integrator->lumen_scene->index_buffer->device_address();
-
-	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, light_triangle_cdf_addr,
-									integrator->lumen_scene->light_triangle_cdf_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, emitter_light_idx_addr,
-									integrator->lumen_scene->emitter_light_indices_buffer);
-	desc.compact_vertices_addr = integrator->lumen_scene->vertex_buffer->device_address();
+	SceneDesc desc = integrator::scene_desc_base(integrator);
 	// ReSTIR
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, g_buffer_addr, state.g_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, temporal_reservoir_addr, state.temporal_reservoir_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, spatial_reservoir_addr, state.spatial_reservoir_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, passthrough_reservoir_addr, state.passthrough_reservoir_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, color_storage_addr, state.tmp_col_buffer);
-	integrator->lumen_scene->scene_desc_buffer =
-		prm::get_buffer({.name = CSTR("Scene Desc"),
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = sizeof(SceneDesc),
-						 .data = &desc});
+	SET_SCENE_BUFFER(desc, g_buffer, state.g_buffer);
+	SET_SCENE_BUFFER(desc, temporal_reservoir, state.temporal_reservoir_buffer);
+	SET_SCENE_BUFFER(desc, spatial_reservoir, state.spatial_reservoir_buffer);
+	SET_SCENE_BUFFER(desc, passthrough_reservoir, state.passthrough_reservoir_buffer);
+	SET_SCENE_BUFFER(desc, color_storage, state.tmp_col_buffer);
+	integrator::upload_scene_desc(integrator, desc);
 
 	integrator->frame_num = 0;
 	assert(rg::settings().shader_inference == true);

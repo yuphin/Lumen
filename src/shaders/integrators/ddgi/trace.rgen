@@ -10,14 +10,13 @@
 
 #define SCENE_TEX_IDX 9
 
+#include "../../bda.glsl"
 #include "ddgi_commons.h"
 #include "../../commons.glsl"
 #include "ddgi_commons.glsl"
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCDDGI pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GBuffer { GBufferData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ProbeOffset { vec4 d[]; };
 const uint flags = gl_RayFlagsOpaqueEXT;
 #define RR_MIN_DEPTH 3
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.frame_num);
@@ -26,8 +25,8 @@ layout(binding = 5, rgba16f) uniform image2D radiance_img;
 layout(binding = 6, rgba16f) uniform image2D dir_dist_img;
 layout(binding = 7) uniform sampler2D irr_img;
 layout(binding = 8) uniform sampler2D depth_img;
-GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
-ProbeOffset probe_offsets = ProbeOffset(scene_desc.probe_offsets_addr);
+SCENE_BUFFER(g_buffer, GBufferData);
+SCENE_BUFFER(probe_offsets, vec4);
 float tmin = ddgi_uniforms.tmin;
 float tmax = ddgi_uniforms.tmax;
 #include "../pt_commons.glsl"
@@ -58,7 +57,7 @@ ivec3 probe_index_to_grid_coord(int index) {
 }
 
 vec3 probe_location(int index) {
-	vec3 offset = probe_offsets.d[index].xyz;
+	vec3 offset = DEREF(probe_offsets)[index].xyz;
 	return offset + grid_coord_to_position(probe_index_to_grid_coord(index));
 }
 

@@ -14,7 +14,7 @@ bool is_glossy(Material mat) { return (mat.bsdf_props & BSDF_FLAG_GLOSSY) != 0; 
 bool is_diffuse(Material mat) { return (mat.bsdf_props & BSDF_FLAG_DIFFUSE) != 0; }
 
 Material load_material(const uint material_idx, const vec2 uv) {
-	Material m = materials.m[material_idx];
+	Material m = DEREF(material)[material_idx];
 	if (m.texture_id > -1) {
 		m.albedo *= texture(scene_textures[m.texture_id], uv).xyz;
 	}

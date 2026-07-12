@@ -11,10 +11,10 @@
 #include "smlt_commons.h"
 #include "smlt_commons.glsl"
 void main() {
-#define mlt_sampler mlt_samplers.d[mlt_sampler_idx]
-#define past_splat(i) past_splat_data.d[splat_idx + i]
-#define splat(i) splat_data.d[splat_idx + i]
-    uvec4 chain_seed = seeds_data.d[pixel_idx].chain_seed;
+#define mlt_sampler DEREF(mlt_samplers)[mlt_sampler_idx]
+#define past_splat(i) DEREF(past_splat)[splat_idx + i]
+#define splat(i) DEREF(splat)[splat_idx + i]
+    uvec4 chain_seed = DEREF(seeds)[pixel_idx].chain_seed;
     mlt_start_chain(0);
 
     large_step = true;
@@ -22,5 +22,5 @@ void main() {
     mlt_seed = chain_seed;
 
     mlt_L_light();
-    seeds_data.d[pixel_idx].chain_seed = mlt_seed;
+    DEREF(seeds)[pixel_idx].chain_seed = mlt_seed;
 }

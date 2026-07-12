@@ -8,6 +8,7 @@
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 
+#include "../../../bda.glsl"
 #include "restirgi_commons.h"
 #include "../../../utils.glsl"
 
@@ -15,14 +16,11 @@ layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0, rgba32f) uniform image2D image;
 layout(binding = 1) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PCReSTIRGI pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer RestirSamples { ReservoirSample d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer Reservoirs { Reservoir d[]; };
 
-RestirSamples samples = RestirSamples(scene_desc.restir_samples_addr);
-ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
-Reservoirs temp_reservoirs = Reservoirs(scene_desc.temporal_reservoir_addr);
-Reservoirs spatial_reservoirs = Reservoirs(scene_desc.spatial_reservoir_addr);
+SCENE_BUFFER(restir_samples, ReservoirSample);
+SCENE_BUFFER(color_storage, vec3);
+SCENE_BUFFER(temporal_reservoir, Reservoir);
+SCENE_BUFFER(spatial_reservoir, Reservoir);
 
 uint offset(const uint pingpong) { return pingpong * pc.width * pc.height; }
 
@@ -34,11 +32,11 @@ void main() {
 	const uint pingpong = (pc.total_frame_num % 2);
 	vec3 col = vec3(0);
 	if (pc.enable_di == 1) {
-		col += tmp_col.d[gl_GlobalInvocationID.x];
+		col += DEREF(color_storage)[gl_GlobalInvocationID.x];
 	}
 	uint idx = gl_GlobalInvocationID.x;
-	tmp_col.d[gl_GlobalInvocationID.x] = vec3(0);
-	const Reservoir r = spatial_reservoirs.d[offset(pingpong) + gl_GlobalInvocationID.x];
+	DEREF(color_storage)[gl_GlobalInvocationID.x] = vec3(0);
+	const Reservoir r = DEREF(spatial_reservoir)[offset(pingpong) + gl_GlobalInvocationID.x];
 	if (r.W > 0) {
 		const ReservoirSample s = r.s;
 		const vec3 wi = normalize(s.x_s - s.x_v);

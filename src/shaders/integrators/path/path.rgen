@@ -60,7 +60,7 @@ void main() {
 		if (emitter_light_idx != INVALID_LIGHT_INDEX) {
 			const Light emitter = lights[emitter_light_idx];
 			const TriangleRecord emitter_triangle = triangle_at_bary(
-				prim_infos.d[emitter.prim_mesh_idx], vec2(0.0), payload.triangle_idx, emitter.world_matrix);
+				DEREF(prim_info)[emitter.prim_mesh_idx], vec2(0.0), payload.triangle_idx, emitter.world_matrix);
 			const float cos_from_light = dot(emitter_triangle.n_g, -direction);
 			const vec3 emitted_radiance =
 				(is_light_two_sided(emitter.light_flags) || cos_from_light > 0.0) ? hit_mat.emissive_factor : vec3(0.0);

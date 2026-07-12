@@ -7,6 +7,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 
+#include "../../bda.glsl"
 #include "ddgi_commons.h"
 #include "../../utils.glsl"
 #define WG_SIZE 16
@@ -18,10 +19,8 @@ layout(binding = 1) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 2) uniform _DDGIUniforms { DDGIUniforms ddgi_ubo; };
 layout(binding = 3) uniform sampler2D dir_dist_img;
 layout(push_constant) uniform _PushConstantRay { PCDDGI pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GBuffer { GBufferData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ProbeOffset { vec4 d[]; };
 
-ProbeOffset probe_offsets = ProbeOffset(scene_desc.probe_offsets_addr);
+SCENE_BUFFER(probe_offsets, vec4);
 
 float pow2(float v) { return dot(v, v); }
 float pow2(vec3 v) { return dot(v, v); }
@@ -44,7 +43,7 @@ void main() {
     float farthest_frontface_dist = 0;
     float closest_frontface_dist = 1e10;
 
-    vec3 current_offset = probe_offsets.d[linear_probe_id].xyz;
+    vec3 current_offset = DEREF(probe_offsets)[linear_probe_id].xyz;
 
     float offset_limit = pow2(ddgi_ubo.probe_step * 0.5);
     for (int i = 0; i < ddgi_ubo.rays_per_probe; i++) {
@@ -91,5 +90,5 @@ void main() {
     if (pow2(full_offset) < offset_limit) {
         current_offset = full_offset;
     }
-    probe_offsets.d[linear_probe_id].xyz = current_offset;
+    DEREF(probe_offsets)[linear_probe_id].xyz = current_offset;
 }

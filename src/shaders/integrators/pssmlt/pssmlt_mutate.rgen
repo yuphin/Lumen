@@ -13,15 +13,15 @@
 
 void main() {
 
-#define mlt_sampler mlt_samplers.d[mlt_sampler_idx]
-#define splat(i) splat_data.d[splat_idx + i]
-#define past_splat(i) past_splat_data.d[splat_idx + i]
+#define mlt_sampler DEREF(mlt_samplers)[mlt_sampler_idx]
+#define splat(i) DEREF(splat)[splat_idx + i]
+#define past_splat(i) DEREF(past_splat)[splat_idx + i]
     vec4 origin = ubo.inv_view * vec4(0, 0, 0, 1);
     vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
                                                2. / gl_LaunchSizeEXT.y, 0, 1));
     area_int /= area_int.w;
     const float cam_area = abs(area_int.x * area_int.y);
-    uvec4 chain_seed = seeds_data.d[pixel_idx].chain_seed;
+    uvec4 chain_seed = DEREF(seeds)[pixel_idx].chain_seed;
     const float large_step_prob = 0.3;
 
     large_step = rand(seed) < large_step_prob;
@@ -35,14 +35,14 @@ void main() {
 
     if (isnan(proposed_luminance)) {
         mlt_sampler.splat_cnt = 0;
-        seeds_data.d[pixel_idx].chain_seed = mlt_seed;
+        DEREF(seeds)[pixel_idx].chain_seed = mlt_seed;
         return;
     }
     const float accept = min(1, proposed_luminance / mlt_sampler.luminance);
     if (accept > 0) {
         const float inv_proposed_luminance = 1. / proposed_luminance;
         for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
-            mlt_col.d[splat(i).idx] +=
+            DEREF(mlt_col)[splat(i).idx] +=
                 splat(i).L * accept * inv_proposed_luminance;
         }
     }
@@ -50,7 +50,7 @@ void main() {
     const float inv_past_luminance = 1. / mlt_sampler.luminance;
 
     for (int i = 0; i < mlt_sampler.past_splat_cnt; i++) {
-        mlt_col.d[past_splat(i).idx] +=
+        DEREF(mlt_col)[past_splat(i).idx] +=
             past_splat(i).L * (1 - accept) * inv_past_luminance;
     }
     if (rand(seed) < accept) {
@@ -65,5 +65,5 @@ void main() {
         mlt_reject();
     }
     mlt_sampler.splat_cnt = 0;
-    seeds_data.d[pixel_idx].chain_seed = mlt_seed;
+    DEREF(seeds)[pixel_idx].chain_seed = mlt_seed;
 }

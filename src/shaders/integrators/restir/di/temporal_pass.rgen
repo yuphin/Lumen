@@ -62,7 +62,7 @@ void main() {
                 ivec2(0.5 * (1 + prev_pos.xy) * gl_LaunchSizeEXT.xy);
             if ((prev_coords.x < gl_LaunchSizeEXT.x && prev_coords.x >= 0) &&
                 (prev_coords.y < gl_LaunchSizeEXT.y && prev_coords.y >= 0)) {
-                r_prev = temporal_reservoirs.d[pixel_idx];
+                r_prev = DEREF(temporal_reservoir)[pixel_idx];
             }
         }
 
@@ -124,10 +124,10 @@ void main() {
         }
 
         // Write to g-buffer
-        gbuffer.d[pixel_idx].pos = pos;
-        gbuffer.d[pixel_idx].normal = normal;
-        gbuffer.d[pixel_idx].uv = uv;
-        gbuffer.d[pixel_idx].mat_idx = mat_idx;
+        DEREF(g_buffer)[pixel_idx].pos = pos;
+        DEREF(g_buffer)[pixel_idx].normal = normal;
+        DEREF(g_buffer)[pixel_idx].uv = uv;
+        DEREF(g_buffer)[pixel_idx].mat_idx = mat_idx;
 
         // Sample direction & update throughput
         vec3 col = hit_mat.emissive_factor;
@@ -194,11 +194,11 @@ void main() {
                     throughput /= rr_prob;
             }
         }
-        tmp_col.d[pixel_idx] = col;
+        DEREF(color_storage)[pixel_idx] = col;
     }
     // Save the reservoirs for spatial reuse
-    passthrough_reservoirs.d[pixel_idx].w_sum = r.w_sum;
-    passthrough_reservoirs.d[pixel_idx].W = r.W;
-    passthrough_reservoirs.d[pixel_idx].m = r.m;
-    passthrough_reservoirs.d[pixel_idx].s = r.s;
+    DEREF(passthrough_reservoir)[pixel_idx].w_sum = r.w_sum;
+    DEREF(passthrough_reservoir)[pixel_idx].W = r.W;
+    DEREF(passthrough_reservoir)[pixel_idx].m = r.m;
+    DEREF(passthrough_reservoir)[pixel_idx].s = r.s;
 }

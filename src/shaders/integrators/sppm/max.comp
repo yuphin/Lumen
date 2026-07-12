@@ -10,24 +10,23 @@
 
 #include "../../utils.glsl"
 #include "sppm_commons.h"
+#include "../../bda.glsl"
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(set = 0, binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PCSPPM pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SPPMData_ { SPPMData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer AtomicData_ { AtomicData d; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ResidualData { vec4 d[]; };
+SCENE_BUFFER(sppm_data, SPPMData);
+SCENE_BUFFER_SCALAR(atomic_data, AtomicData);
+SCENE_BUFFER(residual, vec4);
 uint size = pc.width * pc.height;
-SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
-ResidualData res_data = ResidualData(scene_desc.residual_addr);
 shared vec4 data[32];
 void main() {
     uint idx = gl_GlobalInvocationID.x;
     vec3 val = vec3(0);
     float radius_val = 0;
     if (idx < size) {
-        val = sppm_data.d[idx].p + sppm_data.d[idx].radius;
-        radius_val = sppm_data.d[idx].radius;
+        val = DEREF(sppm_data)[idx].p + DEREF(sppm_data)[idx].radius;
+        radius_val = DEREF(sppm_data)[idx].radius;
     }
     val = subgroupMax(val);
     radius_val = subgroupMax(radius_val);
@@ -44,7 +43,7 @@ void main() {
         radius_val = subgroupMax(radius_val);
     }
     if (gl_LocalInvocationID.x == 0) {
-        res_data.d[gl_WorkGroupID.x].xyz = val;
-        res_data.d[gl_WorkGroupID.x].w = radius_val;
+        DEREF(residual)[gl_WorkGroupID.x].xyz = val;
+        DEREF(residual)[gl_WorkGroupID.x].w = radius_val;
     }
 }

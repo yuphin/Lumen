@@ -4,29 +4,28 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 
+#include "../../bda.glsl"
 #include "ir_commons.h"
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 
 layout(push_constant) uniform _PushConstantPrefixSum { PCPrefixSum pc; };
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PrefixSumScratch { uint d[]; };
 
-GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
-PrefixSumScratch prefix_sum_scratch = PrefixSumScratch(scene_desc.grid_prefix_sum_scratch_addr);
+SCENE_BUFFER(grid_cell_counts, uint);
+SCENE_BUFFER(grid_prefix_sum_scratch, uint);
 
 layout(local_size_x = SCAN_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
 void main() {
 	uint tid = gl_GlobalInvocationID.x;
 
 	uint block_sum =
-		gl_WorkGroupID.x == 0 ? 0 : prefix_sum_scratch.d[pc.out_offset + gl_WorkGroupID.x - 1];
+		gl_WorkGroupID.x == 0 ? 0 : DEREF(grid_prefix_sum_scratch)[pc.out_offset + gl_WorkGroupID.x - 1];
 
 	if (tid < pc.num_elems) {
 		if (pc.scan_sums == 0) {
-			grid_cell_counts.d[tid] += block_sum;
+			DEREF(grid_cell_counts)[tid] += block_sum;
 		} else {
-			prefix_sum_scratch.d[pc.block_sum_offset + tid] += block_sum;
+			DEREF(grid_prefix_sum_scratch)[pc.block_sum_offset + tid] += block_sum;
 		}
 	}
 }

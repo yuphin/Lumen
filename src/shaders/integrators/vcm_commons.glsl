@@ -126,7 +126,7 @@ vec3 vcm_get_light_radiance(in const Material mat, in const VCMState camera_stat
 	}
 	const Light light = lights[light_idx];
 	const TriangleRecord emitter_triangle = triangle_at_bary(
-		prim_infos.d[light.prim_mesh_idx], vec2(0.0), payload.triangle_idx, light.world_matrix);
+		DEREF(prim_info)[light.prim_mesh_idx], vec2(0.0), payload.triangle_idx, light.world_matrix);
 	const float cos_from_light = dot(emitter_triangle.n_g, -camera_state.wi);
 	const vec3 Le = (is_light_two_sided(light.light_flags) || cos_from_light > 0.0)
 						? mat.emissive_factor
@@ -192,7 +192,7 @@ vec3 vcm_connect_light(vec3 n_s, vec3 wo, Material mat, bool side, float eta_vm,
 	return res;
 }
 
-#define light_vtx(i) vcm_lights.d[i]
+#define light_vtx(i) DEREF(vcm_vertices)[i]
 vec3 vcm_connect_light_vertices(uint light_path_len, uint light_path_idx, int depth, vec3 n_s, vec3 wo, Material mat,
 								bool side, float eta_vm, VCMState camera_state, float pdf_rev) {
 	vec3 res = vec3(0);
@@ -253,32 +253,32 @@ vec3 vcm_merge_light_vertices(uint light_path_len, uint light_path_idx, int dept
 		for (int y = grid_min_bnds_idx.y; y <= grid_max_bnds_idx.y; y++) {
 			for (int z = grid_min_bnds_idx.z; z <= grid_max_bnds_idx.z; z++) {
 				const uint h = hash(ivec3(x, y, z), screen_size);
-				if (photons.d[h].photon_count > 0) {
-					const vec3 pp = payload.pos - photons.d[h].pos;
+				if (DEREF(photon)[h].photon_count > 0) {
+					const vec3 pp = payload.pos - DEREF(photon)[h].pos;
 					const float dist_sqr = dot(pp, pp);
 					if (dist_sqr > r_sqr) {
 						continue;
 					}
 					// Should we?
-					uint depth = photons.d[h].path_len + depth - 1;
+					uint depth = DEREF(photon)[h].path_len + depth - 1;
 					if (depth > pc.max_depth) {
 						continue;
 					}
 					float cam_pdf_fwd, cam_pdf_rev;
-					const float cos_theta = dot(photons.d[h].wi, n_s);
-					vec3 f = eval_bsdf(n_s, wo, mat, 1, side, photons.d[h].wi, cam_pdf_fwd, cam_pdf_rev);
+					const float cos_theta = dot(DEREF(photon)[h].wi, n_s);
+					vec3 f = eval_bsdf(n_s, wo, mat, 1, side, DEREF(photon)[h].wi, cam_pdf_fwd, cam_pdf_rev);
 
 					if (f != vec3(0)) {
-						const float w_light = photons.d[h].d_vcm * eta_vc + photons.d[h].d_vm * cam_pdf_fwd;
+						const float w_light = DEREF(photon)[h].d_vcm * eta_vc + DEREF(photon)[h].d_vm * cam_pdf_fwd;
 						const float w_cam = camera_state.d_vcm * eta_vc + camera_state.d_vm * cam_pdf_rev;
 
 						const float mis_weight = 1. / (1 + w_light + w_cam);
-						float cos_nrm = dot(photons.d[h].nrm, n_s);
+						float cos_nrm = dot(DEREF(photon)[h].nrm, n_s);
 						if (cos_nrm > EPS) {
 							const float w = 1. - sqrt(dist_sqr) / radius;
 							const float w_normalization = 3.;  // 1. / (1 - 2/(3*k)) where k =
 															   // 1
-							res = w * mis_weight * photons.d[h].photon_count * photons.d[h].throughput * f *
+							res = w * mis_weight * DEREF(photon)[h].photon_count * DEREF(photon)[h].throughput * f *
 								  camera_state.throughput * normalization_factor * w_normalization;
 						}
 					}
@@ -296,7 +296,7 @@ float vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
 void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
 #endif
 					 float eta_vcm, float eta_vc, float eta_vm) {
-#define light_vtx(i) vcm_lights.d[vcm_light_path_idx + i]
+#define light_vtx(i) DEREF(vcm_vertices)[vcm_light_path_idx + i]
 	const vec3 cam_pos = origin;
 	const vec3 cam_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
 	const float radius = pc.radius;
@@ -369,18 +369,18 @@ void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
 			vec3 splat_col =
 				vcm_connect_cam(cam_pos, cam_nrm, n_s, cam_area, payload.pos, vcm_state, eta_vm, wo, mat, coords);
 #if VC_MLT == 1
-#define splat(i) light_splats.d[splat_idx + i]
+#define splat(i) DEREF(light_splats)[splat_idx + i]
 			const float lum = luminance(splat_col);
 			if (save_radiance && lum > 0) {
-				connected_lights.d[pixel_idx]++;
+				DEREF(connected_lights)[pixel_idx]++;
 
 				uint idx = coords.x * pc.height + coords.y;
-				const uint splat_cnt = light_splat_cnts.d[pixel_idx];
-				light_splat_cnts.d[pixel_idx]++;
+				const uint splat_cnt = DEREF(light_splat_cnts)[pixel_idx];
+				DEREF(light_splat_cnts)[pixel_idx]++;
 				splat(splat_cnt).idx = idx;
 				splat(splat_cnt).L = splat_col;
 			} else if (lum > 0) {
-				connected_lights.d[pixel_idx]++;
+				DEREF(connected_lights)[pixel_idx]++;
 				lum_sum += lum;
 			}
 #undef splat
@@ -390,12 +390,12 @@ void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
 			if (lum > 0) {
 				lum_sum += lum;
 				uint idx = coords.x * pc.height + coords.y;
-				tmp_col.d[idx] += splat_col;
+				DEREF(color_storage)[idx] += splat_col;
 			}
 #else
 								 if (luminance(splat_col) > 0) {
 									 uint idx = coords.x * gl_LaunchSizeEXT.y + coords.y;
-									 tmp_col.d[idx] += splat_col;
+									 DEREF(color_storage)[idx] += splat_col;
 								 }
 #endif
 		}
@@ -443,7 +443,7 @@ void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
 		vcm_state.area = payload.area;
 		vcm_state.material_idx = payload.material_idx;
 	}
-	light_path_cnts.d[pixel_idx] = path_idx;
+	DEREF(path_cnt)[pixel_idx] = path_idx;
 	// "Build" the hash grid
 	// TODO: Add sorting later
 #if VC_MLT == 0
@@ -451,14 +451,14 @@ void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
 		for (int i = 0; i < path_idx; i++) {
 			ivec3 grid_idx = get_grid_idx(light_vtx(i).pos, pc.min_bounds, pc.max_bounds, pc.grid_res);
 			uint h = hash(grid_idx, screen_size);
-			photons.d[h].pos = light_vtx(i).pos;
-			photons.d[h].wi = -light_vtx(i).wi;
-			photons.d[h].d_vm = light_vtx(i).d_vm;
-			photons.d[h].d_vcm = light_vtx(i).d_vcm;
-			photons.d[h].throughput = light_vtx(i).throughput;
-			photons.d[h].nrm = light_vtx(i).n_s;
-			photons.d[h].path_len = light_vtx(i).path_len;
-			atomicAdd(photons.d[h].photon_count, 1);
+			DEREF(photon)[h].pos = light_vtx(i).pos;
+			DEREF(photon)[h].wi = -light_vtx(i).wi;
+			DEREF(photon)[h].d_vm = light_vtx(i).d_vm;
+			DEREF(photon)[h].d_vcm = light_vtx(i).d_vcm;
+			DEREF(photon)[h].throughput = light_vtx(i).throughput;
+			DEREF(photon)[h].nrm = light_vtx(i).n_s;
+			DEREF(photon)[h].path_len = light_vtx(i).path_len;
+			atomicAdd(DEREF(photon)[h].photon_count, 1);
 		}
 	}
 #endif
@@ -471,7 +471,7 @@ void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
 vec3 vcm_trace_eye(VCMState camera_state, float eta_vcm, float eta_vc,
 #if VC_MLT == 1 || VCM_MLT == 1
 				   float eta_vm, out float lum) {
-#define splat(i) splat_data.d[splat_idx + i]
+#define splat(i) DEREF(splat)[splat_idx + i]
 	lum = 0;
 #else
 				   float eta_vm) {
@@ -485,32 +485,32 @@ vec3 vcm_trace_eye(VCMState camera_state, float eta_vcm, float eta_vc,
 	const uint selected_light_path = min(uint(mlt_rand(mlt_seed, large_step) * screen_size), screen_size - 1);
 	uint light_path_idx = selected_light_path;
 	uint light_splat_idx = light_path_idx * pc.max_depth * (pc.max_depth + 1);
-	uint light_path_len = light_path_cnts.d[light_path_idx];
+	uint light_path_len = DEREF(path_cnt)[light_path_idx];
 	mlt_sampler.splat_cnt = 0;
-	if (save_radiance && connected_lights.d[selected_light_path] > 0) {
-		const uint light_splat_cnt = light_splat_cnts.d[selected_light_path];
+	if (save_radiance && DEREF(connected_lights)[selected_light_path] > 0) {
+		const uint light_splat_cnt = DEREF(light_splat_cnts)[selected_light_path];
 		for (int i = 0; i < light_splat_cnt; i++) {
-			const vec3 light_L = light_splats.d[light_splat_idx + i].L;
+			const vec3 light_L = DEREF(light_splats)[light_splat_idx + i].L;
 			lum += luminance(light_L);
 			const uint splat_cnt = mlt_sampler.splat_cnt;
 			mlt_sampler.splat_cnt++;
-			splat(splat_cnt).idx = light_splats.d[light_splat_idx + i].idx;
+			splat(splat_cnt).idx = DEREF(light_splats)[light_splat_idx + i].idx;
 			splat(splat_cnt).L = light_L;
 		}
-	} else if (connected_lights.d[selected_light_path] > 0) {
-		lum += tmp_lum_data.d[selected_light_path];
+	} else if (DEREF(connected_lights)[selected_light_path] > 0) {
+		lum += DEREF(tmp_lum)[selected_light_path];
 	}
 	light_path_idx *= (pc.max_depth + 1);
 #elif VCM_MLT == 1
 	const uint num_light_paths = pc.width * pc.height;
 	uint light_path_idx = uint(mlt_rand(seed, large_step) * num_light_paths);
 	uint light_splat_idx = light_path_idx * pc.max_depth * (pc.max_depth + 1);
-	uint light_path_len = light_path_cnts.d[light_path_idx];
+	uint light_path_len = DEREF(path_cnt)[light_path_idx];
 	mlt_sampler.splat_cnt = 0;
 	light_path_idx *= (pc.max_depth + 1);
 #else
     uint light_path_idx = uint(rand(seed) * screen_size);
-    uint light_path_len = light_path_cnts.d[light_path_idx];
+    uint light_path_len = DEREF(path_cnt)[light_path_idx];
     light_path_idx *= (pc.max_depth + 1);
 #endif
 	vec3 col = vec3(0);
@@ -626,7 +626,7 @@ vec3 vcm_trace_eye(VCMState camera_state, float eta_vcm, float eta_vc,
 
 #if VCM_MLT == 1
 float mlt_fill_eye() {
-#define cam_vtx(i) vcm_lights.d[vcm_light_path_idx + i]
+#define cam_vtx(i) DEREF(vcm_vertices)[vcm_light_path_idx + i]
 	const float fov = ubo.projection[1][1];
 	vec3 cam_pos = vec3(ubo.inv_view * vec4(0, 0, 0, 1));
 	vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x, 2. / gl_LaunchSizeEXT.y, 0, 1));
@@ -654,7 +654,7 @@ float mlt_fill_eye() {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, camera_state.pos, tmin, camera_state.wi, tmax, 0);
 
 		if (payload.material_idx == -1) {
-			tmp_col.d[coords_idx] += camera_state.throughput * pc.sky_col;
+			DEREF(color_storage)[coords_idx] += camera_state.throughput * pc.sky_col;
 			break;
 		}
 
@@ -684,7 +684,7 @@ float mlt_fill_eye() {
 		// Get the radiance
 		if (luminance(mat.emissive_factor) > 0) {
 			vec3 L = camera_state.throughput * vcm_get_light_radiance(mat, camera_state, depth);
-			tmp_col.d[coords_idx] += L;
+			DEREF(color_storage)[coords_idx] += L;
 			lum_sum += luminance(L);
 		}
 
@@ -711,7 +711,7 @@ float mlt_fill_eye() {
 		vec3 f;
 		if (!mat_specular && depth < pc.max_depth) {
 			const vec3 L = vcm_connect_light(n_s, wo, mat, side, 0, camera_state, pdf_rev, f);
-			tmp_col.d[coords_idx] += L;
+			DEREF(color_storage)[coords_idx] += L;
 			lum_sum += luminance(L);
 		}
 
@@ -750,13 +750,13 @@ float mlt_fill_eye() {
 		camera_state.area = payload.area;
 		camera_state.material_idx = payload.material_idx;
 	}
-	light_path_cnts.d[pixel_idx] = path_idx;
+	DEREF(path_cnt)[pixel_idx] = path_idx;
 #undef cam_vtx
 	return lum_sum;
 }
 
 float mlt_trace_light() {
-#define splat(i) splat_data.d[splat_idx + chain * depth_factor + i]
+#define splat(i) DEREF(splat)[splat_idx + chain * depth_factor + i]
 	vec3 cam_pos = vec3(ubo.inv_view * vec4(0, 0, 0, 1));
 	vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x, 2. / gl_LaunchSizeEXT.y, 0, 1));
 	area_int /= area_int.w;
@@ -766,7 +766,7 @@ float mlt_trace_light() {
 	float luminance_sum = 0;
 	mlt_sampler.splat_cnt = 0;
 	uint path_idx = uint(mlt_rand(mlt_seed, large_step) * (pc.width * pc.height));
-	uint path_len = light_path_cnts.d[path_idx];
+	uint path_len = DEREF(path_cnt)[path_idx];
 	path_idx *= (pc.max_depth + 1);
 	// Trace from light
 	VCMState light_state;
@@ -835,7 +835,7 @@ float mlt_trace_light() {
 		vec3 unused;
 
 		if (!mat_specular) {
-#define cam_vtx(i) vcm_lights.d[i]
+#define cam_vtx(i) DEREF(vcm_vertices)[i]
 			// Connect to cam vertices
 			for (int i = 0; i < path_len; i++) {
 				uint t = cam_vtx(path_idx + i).path_len;

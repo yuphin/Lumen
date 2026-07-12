@@ -9,17 +9,17 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 #define SCENE_TEX_IDX 9
+#include "../../../bda.glsl"
 #include "gris_commons.glsl"
 
-PrefixContributions prefix_contributions = PrefixContributions(scene_desc.prefix_contributions_addr);
+SCENE_BUFFER(prefix_contributions, vec3);
 
 layout(binding = 4, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
 layout(binding = 5, std430) writeonly buffer OutGBuffer { GBuffer out_gbuffers[]; };
 layout(binding = 6, rgba16) writeonly uniform image2D canonical_contributions_tex;
 layout(binding = 7, rgba32f) uniform image2D direct_lighting_img;
 layout(binding = 8, rgba32f) uniform image2D caustics_texture;
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonDataBuffer { PhotonData d[]; };
-PhotonDataBuffer photon_eye_data = PhotonDataBuffer(scene_desc.photon_eye_addr);
+SCENE_BUFFER(photon_eye, PhotonData);
 
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
 uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
@@ -207,7 +207,7 @@ void main() {
 		if (emitter_light_idx != INVALID_LIGHT_INDEX) {
 			const Light emitter = lights[emitter_light_idx];
 			const TriangleRecord emitter_triangle = triangle_at_bary(
-				prim_infos.d[emitter.prim_mesh_idx], vec2(0.0), payload.triangle_idx, emitter.world_matrix);
+				DEREF(prim_info)[emitter.prim_mesh_idx], vec2(0.0), payload.triangle_idx, emitter.world_matrix);
 			emitter_normal = emitter_triangle.n_g;
 			const float cos_from_light = dot(emitter_normal, wo);
 			if (is_light_two_sided(emitter.light_flags) || cos_from_light > 0.0) {
@@ -510,7 +510,7 @@ void main() {
 		// The samples are additive, therefore set M to 1
 		reservoir.M = 1;
 		calc_reservoir_W(reservoir);
-		prefix_contributions.d[pixel_idx] = prefix_col;
+		DEREF(prefix_contributions)[pixel_idx] = prefix_col;
 		reservoir.data.seed_helpers = uvec2(pc.general_seed, pc.sampling_seed);
 		float uv_x = float(gl_LaunchIDEXT.x) / float(gl_LaunchSizeEXT.x);
 		if (pc.canonical_only == 1 || uv_x >= pc.gris_separator) {

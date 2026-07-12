@@ -1,31 +1,31 @@
 #ifndef MLT_COMMONS
 #define MLT_COMMONS
-#define mlt_sampler mlt_samplers.d[mlt_sampler_idx]
+#define mlt_sampler DEREF(mlt_samplers)[mlt_sampler_idx]
 PrimarySample get_primary_sample(uint i) {
     if(mlt_sampler.type == 0) {
-        return light_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i];
+        return DEREF(light_primary_samples)[prim_sample_idxs[mlt_sampler.type] + i];
     } 
 #if BDPT_MLT == 1
 	else if (mlt_sampler.type == 2) {
-		return connection_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i];
+		return DEREF(connection_primary_samples)[prim_sample_idxs[mlt_sampler.type] + i];
 	}
 #endif
 	else {
-        return cam_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i];
+        return DEREF(cam_primary_samples)[prim_sample_idxs[mlt_sampler.type] + i];
     }
 }
 
 void set_primary_sample(uint i, PrimarySample primary_sample) {
 	if (mlt_sampler.type == 0) {
-		light_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i] = primary_sample;
+		DEREF(light_primary_samples)[prim_sample_idxs[mlt_sampler.type] + i] = primary_sample;
 	}
 #if BDPT_MLT == 1
 	else if (mlt_sampler.type == 2) {
-		connection_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i] = primary_sample;
+		DEREF(connection_primary_samples)[prim_sample_idxs[mlt_sampler.type] + i] = primary_sample;
 	}
 #endif
 	else {
-		cam_primary_samples.d[prim_sample_idxs[mlt_sampler.type] + i] = primary_sample;
+		DEREF(cam_primary_samples)[prim_sample_idxs[mlt_sampler.type] + i] = primary_sample;
 	}
 }
 

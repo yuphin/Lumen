@@ -193,36 +193,22 @@ void init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = state.rays_per_surfel * MAX_SURFEL_COUNT * sizeof(IRCache::SurfelSample)});
 
-	SceneDesc desc;
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, index_addr, integrator->lumen_scene->index_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, material_addr, integrator->lumen_scene->materials_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, light_triangle_cdf_addr,
-									integrator->lumen_scene->light_triangle_cdf_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, emitter_light_idx_addr,
-									integrator->lumen_scene->emitter_light_indices_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, compact_vertices_addr, integrator->lumen_scene->vertex_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, g_buffer_addr, state.gbuffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, direct_lighting_addr, state.current_frame_lighting_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, transformations_addr, state.transformations_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, surfel_spawn_list_addr, state.surfel_spawn_list_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, surfel_spawn_count_addr, state.surfel_spawn_count_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, surfel_pool_addr, state.surfel_pool_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, surfel_free_stack_addr, state.surfel_free_stack_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, surfel_free_stack_count_addr,
-									state.surfel_free_stack_counter_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, grid_cell_counts_addr, state.grid_cell_counts_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, grid_cell_indices_addr, state.grid_cell_indices_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, grid_prefix_sum_scratch_addr,
-									state.grid_prefix_sum_scratch_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, surfel_samples_addr, state.surfel_samples_buffer);
+	SceneDesc desc = integrator::scene_desc_base(integrator);
+	// IRCache
+	SET_SCENE_BUFFER(desc, g_buffer, state.gbuffer);
+	SET_SCENE_BUFFER(desc, direct_lighting, state.current_frame_lighting_buffer);
+	SET_SCENE_BUFFER(desc, transformations, state.transformations_buffer);
+	SET_SCENE_BUFFER(desc, surfel_spawn_list, state.surfel_spawn_list_buffer);
+	SET_SCENE_BUFFER(desc, surfel_spawn_count, state.surfel_spawn_count_buffer);
+	SET_SCENE_BUFFER(desc, surfel_pool, state.surfel_pool_buffer);
+	SET_SCENE_BUFFER(desc, surfel_free_stack, state.surfel_free_stack_buffer);
+	SET_SCENE_BUFFER(desc, surfel_free_stack_count, state.surfel_free_stack_counter_buffer);
+	SET_SCENE_BUFFER(desc, grid_cell_counts, state.grid_cell_counts_buffer);
+	SET_SCENE_BUFFER(desc, grid_cell_indices, state.grid_cell_indices_buffer);
+	SET_SCENE_BUFFER(desc, grid_prefix_sum_scratch, state.grid_prefix_sum_scratch_buffer);
+	SET_SCENE_BUFFER(desc, surfel_samples, state.surfel_samples_buffer);
 
-	integrator->lumen_scene->scene_desc_buffer =
-		prm::get_buffer({.name = CSTR("Scene Desc"),
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = sizeof(SceneDesc),
-						 .data = &desc});
+	integrator::upload_scene_desc(integrator, desc);
 
 	assert(rg::settings().shader_inference == true);
 

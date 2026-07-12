@@ -10,16 +10,14 @@
 #include "../commons.h"
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) readonly buffer RTUtilsDesc_ { RTUtilsDesc post_desc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Img { vec4 d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Residual { float d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer RmseVal { float d; };
 layout(push_constant) uniform PC { RTUtilsPC pc; };
-Img gt_img = Img(post_desc.gt_img_addr);
-Img out_img = Img(post_desc.out_img_addr);
-Residual res_data = Residual(post_desc.residual_addr);
-RmseVal rmse_val = RmseVal(post_desc.rmse_val_addr);
+#include "../bda.glsl"
+DESC_BUFFER_RO(post_desc, gt_img, vec4);
+DESC_BUFFER_RO(post_desc, out_img, vec4);
+DESC_BUFFER(post_desc, residual, float);
+DESC_BUFFER_SCALAR(post_desc, rmse_val, float);
 
 void main() {
-  float rmse = sqrt(res_data.d[0]) / (pc.size * 3);
-  rmse_val.d = rmse;
+  float rmse = sqrt(DEREF(residual)[0]) / (pc.size * 3);
+  DEREF(rmse_val) = rmse;
 }

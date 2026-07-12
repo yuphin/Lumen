@@ -8,6 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
+#include "../../bda.glsl"
 #include "vcm_commons.h"
 #include "../../commons.glsl"
 layout(location = 0) rayPayloadEXT HitPayload payload;
@@ -15,38 +16,23 @@ layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 
 layout(push_constant) uniform _PushConstantRay { PCVCM pc; };
 // VCM buffers
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonData_ { VCMPhotonHash d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMVertex_ { VCMVertex d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightPathCnt { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMReservoir_ { VCMReservoir d[]; };
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SelectedReservoirs_ {
-    SelectedReservoirs d[];
-};
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightSamples { VCMRestirData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ShouldResample { uint d; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightStates { LightState d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer Angles { AngleStruct d[]; };
 
 layout(constant_id = 0) const int RAY_GUIDE = 0;
 
-PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
-VCMVertex_ vcm_lights = VCMVertex_(scene_desc.vcm_vertices_addr);
-LightPathCnt light_path_cnts = LightPathCnt(scene_desc.path_cnt_addr);
-ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
-LightSamples light_samples = LightSamples(scene_desc.light_samples_addr);
-ShouldResample should_resample =
-    ShouldResample(scene_desc.should_resample_addr);
-LightStates light_states = LightStates(scene_desc.light_state_addr);
-Angles angles = Angles(scene_desc.angle_struct_addr);
+SCENE_BUFFER(photon, VCMPhotonHash);
+SCENE_BUFFER(vcm_vertices, VCMVertex);
+SCENE_BUFFER(path_cnt, uint);
+SCENE_BUFFER(color_storage, vec3);
+SCENE_BUFFER(light_samples, VCMRestirData);
+SCENE_BUFFER_SCALAR(should_resample, uint);
+SCENE_BUFFER(light_state, LightState);
+SCENE_BUFFER(angle_struct, AngleStruct);
 
-VCMReservoir_ temporal_reservoirs =
-    VCMReservoir_(scene_desc.vcm_reservoir_addr);
-SelectedReservoirs_ selected_reservoirs =
-    SelectedReservoirs_(scene_desc.selected_reservoirs_addr);
+SCENE_BUFFER(vcm_reservoir, VCMReservoir);
+SCENE_BUFFER(selected_reservoirs, SelectedReservoirs);
 
 uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 const uint flags = gl_RayFlagsOpaqueEXT;
@@ -91,9 +77,9 @@ void load_vcm_state(float eta_vc, const VCMReservoir r,
         // float cos_deg = degrees(acos(cos_theta));
         // if(true) {
         // //if(light_state.hash_idx == 1231707) {
-        //     angles.d[pixel_idx % pc.max_angle_samples].is_active = 1;
-        //     angles.d[pixel_idx % pc.max_angle_samples].theta =
-        //     acos(cos_theta); angles.d[pixel_idx %
+        //     DEREF(angle_struct)[pixel_idx % pc.max_angle_samples].is_active = 1;
+        //     DEREF(angle_struct)[pixel_idx % pc.max_angle_samples].theta =
+        //     acos(cos_theta); DEREF(angle_struct)[pixel_idx %
         //     pc.max_angle_samples].phi = r.s.phi;
         // }
         W = r.W;
@@ -132,7 +118,7 @@ void main() {
     const float cam_area = abs(area_int.x * area_int.y);
     VCMState vcm_state;
 
-#define light_vtx(i) vcm_lights.d[vcm_light_path_idx + i]
+#define light_vtx(i) DEREF(vcm_vertices)[vcm_light_path_idx + i]
     const float radius = pc.radius;
     const float radius_sqr = radius * radius;
     float eta_vcm = PI * radius_sqr * screen_size;
@@ -142,16 +128,16 @@ void main() {
     bool result;
     bool finite;
     if (RAY_GUIDE == 1) {
-        const LightState light_state = light_states.d[pixel_idx];
+        const LightState light_state = DEREF(light_state)[pixel_idx];
         VCMReservoir r;
         bool use_reservoir = false;
-        if (should_resample.d == 0) {
+        if (DEREF(should_resample) == 0) {
             use_reservoir =
                 (pixel_idx ==
-                 temporal_reservoirs.d[light_state.hash_idx].selected_idx);
+                 DEREF(vcm_reservoir)[light_state.hash_idx].selected_idx);
         }
         if (use_reservoir) {
-            r = temporal_reservoirs.d[light_state.hash_idx];
+            r = DEREF(vcm_reservoir)[light_state.hash_idx];
         }
         load_vcm_state(eta_vc, r, light_state, vcm_state, use_reservoir);
         vec3 initial = vcm_state.throughput;

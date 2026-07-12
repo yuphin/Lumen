@@ -7,6 +7,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 
+#include "../../bda.glsl"
 #include "../../commons.h"
 #include "ddgi_commons.h"
 #include "ddgi_utils.glsl"
@@ -17,20 +18,18 @@ layout(location = 0) rayPayloadInEXT DDGIVisualizationHitPayload payload;
 
 layout(set = 0, binding = 2, scalar) buffer SceneDesc_ { SphereDesc scene_desc; };
 layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Vertices { SphereVertex d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
+
+SCENE_BUFFER_RO(index, uint);
+SCENE_BUFFER_RO(vertex, SphereVertex);
 
 void main() {
-    Indices indices = Indices(scene_desc.index_addr);
-    Vertices vertices = Vertices(scene_desc.vertex_addr);
-
     const uint index_offset = 3 * gl_PrimitiveID;
-    ivec3 ind = ivec3(indices.i[index_offset + 0], indices.i[index_offset + 1], indices.i[index_offset + 2]);
+    ivec3 ind = ivec3(DEREF(index)[index_offset + 0], DEREF(index)[index_offset + 1], DEREF(index)[index_offset + 2]);
 
     SphereVertex vtx[3];
-    vtx[0] = vertices.d[ind.x];
-    vtx[1] = vertices.d[ind.y];
-    vtx[2] = vertices.d[ind.z];
+    vtx[0] = DEREF(vertex)[ind.x];
+    vtx[1] = DEREF(vertex)[ind.y];
+    vtx[2] = DEREF(vertex)[ind.z];
 
 
 	const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);

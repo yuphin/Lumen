@@ -5,28 +5,20 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_debug_printf : enable
 
+#include "../../bda.glsl"
 #include "ir_commons.h"
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
-
-Indices indices = Indices(scene_desc.index_addr);
-InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
-CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
+#include "../../scene_buffers.glsl"
 
 #include "ir_commons.glsl"
 #include "surfel_commons.glsl"
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStackCount { int d; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStack { uint d[]; };
 
-SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
-SurfelFreeStackCount free_stack_count = SurfelFreeStackCount(scene_desc.surfel_free_stack_count_addr);
-SurfelFreeStack free_stack = SurfelFreeStack(scene_desc.surfel_free_stack_addr);
+SCENE_BUFFER(surfel_pool, Surfel);
+SCENE_BUFFER_SCALAR(surfel_free_stack_count, int);
+SCENE_BUFFER(surfel_free_stack, uint);
 
 layout(local_size_x = ALLOCATE_PASS_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
 
@@ -40,9 +32,9 @@ float max_surfel_radius_px() {
 }
 
 void recycle_surfel(uint surfel_id) {
-	surfel_pool.d[surfel_id].radius = 0;
-	int idx = atomicAdd(free_stack_count.d, 1);
-	free_stack.d[idx] = surfel_id;
+	DEREF(surfel_pool)[surfel_id].radius = 0;
+	int idx = atomicAdd(DEREF(surfel_free_stack_count), 1);
+	DEREF(surfel_free_stack)[idx] = surfel_id;
 }
 
 void main() {
@@ -50,7 +42,7 @@ void main() {
 	if (tid >= MAX_SURFEL_COUNT) {
 		return;
 	}
-	Surfel surfel = surfel_pool.d[tid];
+	Surfel surfel = DEREF(surfel_pool)[tid];
 
 	if (surfel.radius <= 0.0f) {
 		return;

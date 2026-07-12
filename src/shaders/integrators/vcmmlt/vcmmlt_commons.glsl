@@ -1,45 +1,29 @@
 #ifndef PSSMLT_UTILS
 #define PSSMLT_UTILS
+#include "../../bda.glsl"
 #include "../../commons.glsl"
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
 layout(constant_id = 0) const int SEEDING = 0;
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BootstrapData { BootstrapSample d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SeedsData { VCMMLTSeedData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PrimarySamples { PrimarySample d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTSamplers { VCMMLTSampler d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTColor { vec3 d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ChainStats { ChainData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer Splats { Splat d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightVertices { VCMVertex d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CameraVertices { VCMVertex d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PathCnt { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonData_ { VCMPhotonHash d[]; };
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTSumData { SumData d[]; };
 
 uint chain = 0;
 uint depth_factor = pc.max_depth * (pc.max_depth + 1);
 
-LightVertices vcm_lights = LightVertices(scene_desc.vcm_vertices_addr);
-MLTSamplers mlt_samplers = MLTSamplers(scene_desc.mlt_samplers_addr);
-MLTColor mlt_col = MLTColor(scene_desc.mlt_col_addr);
-ChainStats chain_stats = ChainStats(scene_desc.chain_stats_addr);
-Splats splat_data = Splats(scene_desc.splat_addr);
-Splats past_splat_data = Splats(scene_desc.past_splat_addr);
-BootstrapData bootstrap_data = BootstrapData(scene_desc.bootstrap_addr);
-SeedsData seeds_data = SeedsData(scene_desc.seeds_addr);
-PrimarySamples light_primary_samples =
-    PrimarySamples(scene_desc.light_primary_samples_addr);
-PrimarySamples cam_primary_samples =
-    PrimarySamples(scene_desc.cam_primary_samples_addr);
-PrimarySamples prim_samples[2] =
-    PrimarySamples[](light_primary_samples, cam_primary_samples);
-ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
-PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
-MLTSumData sum_data = MLTSumData(scene_desc.mlt_atomicsum_addr);
+SCENE_BUFFER(vcm_vertices, VCMVertex);
+SCENE_BUFFER(mlt_samplers, VCMMLTSampler);
+SCENE_BUFFER(mlt_col, vec3);
+SCENE_BUFFER(chain_stats, ChainData);
+SCENE_BUFFER(splat, Splat);
+SCENE_BUFFER(past_splat, Splat);
+SCENE_BUFFER(bootstrap, BootstrapSample);
+SCENE_BUFFER(seeds, VCMMLTSeedData);
+SCENE_BUFFER(light_primary_samples, PrimarySample);
+SCENE_BUFFER(cam_primary_samples, PrimarySample);
+SCENE_BUFFER(color_storage, vec3);
+SCENE_BUFFER(photon, VCMPhotonHash);
+SCENE_BUFFER(mlt_atomicsum, SumData);
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
@@ -63,12 +47,12 @@ uint cam_primary_sample_idx =
 uint prim_sample_idxs[2] =
     uint[](light_primary_sample_idx, cam_primary_sample_idx);
 
-PathCnt light_path_cnts = PathCnt(scene_desc.path_cnt_addr);
+SCENE_BUFFER(path_cnt, uint);
 
-#define mlt_sampler mlt_samplers.d[mlt_sampler_idx + chain]
+#define mlt_sampler DEREF(mlt_samplers)[mlt_sampler_idx + chain]
 #define primary_sample(i)                                                      \
-    light_primary_samples                                                      \
-        .d[light_primary_sample_idx + chain * pc.light_rand_count + i]
+    DEREF(light_primary_samples)[light_primary_sample_idx +                     \
+                                  chain * pc.light_rand_count + i]
 
 bool large_step, save_radiance;
 uvec4 mlt_seed;
@@ -78,9 +62,9 @@ uvec4 mlt_seed;
 float eval_target(float lum, uint c) { return c == 0 ? float(lum > 0) : lum; }
 
 float mlt_mis(float lum, float target, uint c) {
-    const float num = target / chain_stats.d[c].normalization;
-    const float denum = 1. / chain_stats.d[0].normalization +
-                        lum / chain_stats.d[1].normalization;
+    const float num = target / DEREF(chain_stats)[c].normalization;
+    const float denum = 1. / DEREF(chain_stats)[0].normalization +
+                        lum / DEREF(chain_stats)[1].normalization;
     return num / denum;
 }
 
@@ -114,7 +98,7 @@ float mlt_trace_eye() {
     const float connect_lum = luminance(col);
     lum += connect_lum;
     if (save_radiance && connect_lum > 0) {
-#define splat(i) splat_data.d[splat_idx + i]
+#define splat(i) DEREF(splat)[splat_idx + i]
         ivec2 coords =
             ivec2(0.5 * (1 + dir_rnd) * vec2(pc.width, pc.height));
         const uint idx = coords.x * pc.height + coords.y;

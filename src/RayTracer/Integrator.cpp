@@ -197,6 +197,27 @@ static void default_create_accel(Integrator* integrator, vk::BVH* tlas, lm::Arra
 	vk::tlas_build(*tlas, tlas_instances.to_slice(), VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
+SceneDesc scene_desc_base(Integrator* integrator) {
+	scene::Scene* scene = integrator->lumen_scene;
+	SceneDesc desc = {};
+	SET_SCENE_BUFFER(desc, index, scene->index_buffer);
+	SET_SCENE_BUFFER(desc, material, scene->materials_buffer);
+	SET_SCENE_BUFFER(desc, compact_vertices, scene->vertex_buffer);
+	SET_SCENE_BUFFER(desc, prim_info, scene->prim_lookup_buffer);
+	SET_SCENE_BUFFER(desc, light_triangle_cdf, scene->light_triangle_cdf_buffer);
+	SET_SCENE_BUFFER(desc, emitter_light_idx, scene->emitter_light_indices_buffer);
+	return desc;
+}
+
+void upload_scene_desc(Integrator* integrator, const SceneDesc& desc) {
+	integrator->lumen_scene->scene_desc_buffer =
+		prm::get_buffer({.name = CSTR("Scene Desc"),
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = sizeof(SceneDesc),
+						 .data = const_cast<SceneDesc*>(&desc)});
+}
+
 void set_type(Integrator* integrator, IntegratorType type) {
 	integrator->type = type;
 	integrator->gui = no_gui;

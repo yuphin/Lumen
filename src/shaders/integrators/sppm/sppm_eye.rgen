@@ -15,9 +15,8 @@ layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 
 layout(push_constant) uniform _PushConstantRay { PCSPPM pc; };
 // SPPM buffers
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SPPMData_ { SPPMData d[]; };
+SCENE_BUFFER(sppm_data, SPPMData);
 
-SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
 
 uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 const uint flags = gl_RayFlagsOpaqueEXT;
@@ -61,7 +60,7 @@ void main() {
                     tmax, 0);
         const bool found_isect = payload.material_idx != -1;
         if (!found_isect) {
-            sppm_data.d[pixel_idx].col += throughput * pc.sky_col;
+            DEREF(sppm_data)[pixel_idx].col += throughput * pc.sky_col;
             break;
         }
         if(d >= pc.max_depth - 1) {
@@ -71,7 +70,7 @@ void main() {
         const vec2 mat_uv = payload.uv;
         const Material hit_mat = load_material(mat_idx, mat_uv);
         if (d == 0 || (specular && !surface_recorded)) {
-            sppm_data.d[pixel_idx].col += throughput * hit_mat.emissive_factor;
+            DEREF(sppm_data)[pixel_idx].col += throughput * hit_mat.emissive_factor;
         }
         const vec3 wo = -direction;
         vec3 n_s = payload.n_s;
@@ -88,7 +87,7 @@ void main() {
         origin.xyz = offset_ray(pos, n_g);
         specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
         if (!surface_recorded && !specular) {
-            sppm_data.d[pixel_idx].col +=
+            DEREF(sppm_data)[pixel_idx].col +=
                 throughput *
                 sample_direct_light(seed, hit_mat, pos, side, n_s, wo,
                                     /*use_mis=*/false);
@@ -98,14 +97,14 @@ void main() {
         const bool mat_diffuse = (hit_mat.bsdf_type & BSDF_TYPE_DIFFUSE) != 0;
         if (!surface_recorded && mat_diffuse) {
             surface_recorded = true;
-            sppm_data.d[pixel_idx].wo = wo;
-            sppm_data.d[pixel_idx].p = pos;
-            sppm_data.d[pixel_idx].material_idx = mat_idx;
-            sppm_data.d[pixel_idx].uv = mat_uv;
-            sppm_data.d[pixel_idx].throughput = throughput;
-            sppm_data.d[pixel_idx].n_s = n_s;
-            sppm_data.d[pixel_idx].path_len = d;
-            sppm_data.d[pixel_idx].side = uint(side);
+            DEREF(sppm_data)[pixel_idx].wo = wo;
+            DEREF(sppm_data)[pixel_idx].p = pos;
+            DEREF(sppm_data)[pixel_idx].material_idx = mat_idx;
+            DEREF(sppm_data)[pixel_idx].uv = mat_uv;
+            DEREF(sppm_data)[pixel_idx].throughput = throughput;
+            DEREF(sppm_data)[pixel_idx].n_s = n_s;
+            DEREF(sppm_data)[pixel_idx].path_len = d;
+            DEREF(sppm_data)[pixel_idx].side = uint(side);
         }
         float pdf, cos_theta;
         const vec3 f_sampled = sample_bsdf(n_s, wo, hit_mat, 1, side,
@@ -123,6 +122,6 @@ void main() {
         }
     }
     if (pc.frame_num == 0) {
-        sppm_data.d[pixel_idx].radius = pc.ppm_base_radius;
+        DEREF(sppm_data)[pixel_idx].radius = pc.ppm_base_radius;
     }
 }

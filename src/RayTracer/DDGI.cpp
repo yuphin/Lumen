@@ -200,29 +200,15 @@ void init(Integrator* integrator) {
 		.size = sizeof(vec4) * num_probes,
 	});
 
-	SceneDesc desc;
-	desc.index_addr = integrator->lumen_scene->index_buffer->device_address();
-
-	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
+	SceneDesc desc = integrator::scene_desc_base(integrator);
 	// DDGI
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, light_triangle_cdf_addr,
-									integrator->lumen_scene->light_triangle_cdf_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, emitter_light_idx_addr,
-									integrator->lumen_scene->emitter_light_indices_buffer);
-	desc.compact_vertices_addr = integrator->lumen_scene->vertex_buffer->device_address();
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, direct_lighting_addr, state.direct_lighting_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, probe_offsets_addr, state.probe_offsets_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, g_buffer_addr, state.g_buffer);
+	SET_SCENE_BUFFER(desc, direct_lighting, state.direct_lighting_buffer);
+	SET_SCENE_BUFFER(desc, probe_offsets, state.probe_offsets_buffer);
+	SET_SCENE_BUFFER(desc, g_buffer, state.g_buffer);
 
 	assert(rg::settings().shader_inference == true);
 
-	integrator->lumen_scene->scene_desc_buffer =
-		prm::get_buffer({.name = CSTR("Scene Desc"),
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = sizeof(SceneDesc),
-						 .data = &desc});
+	integrator::upload_scene_desc(integrator, desc);
 
 	update_ddgi_uniforms(integrator);
 	integrator->frame_num = 0;

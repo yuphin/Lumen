@@ -6,29 +6,19 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_debug_printf : enable
 
+#include "../../bda.glsl"
 #include "ir_commons.h"
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 1, rgba32f) uniform image2D image;
 layout(binding = 2) uniform SceneUBOBuffer { SceneUBO ubo; };
 layout(binding = 3) uniform sampler2D scene_textures[];
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellIndices { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
+#include "../../scene_buffers.glsl"
 
-Indices indices = Indices(scene_desc.index_addr);
-InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
-CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
-SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
-GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
-GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
-Materials materials = Materials(scene_desc.material_addr);
-InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
+SCENE_BUFFER(surfel_pool, Surfel);
+SCENE_BUFFER(grid_cell_indices, uint);
+SCENE_BUFFER(grid_cell_counts, uint);
+SCENE_BUFFER(g_buffer, GBuffer);
 
 #include "../../bsdf_commons.glsl"
 #include "ir_commons.glsl"
@@ -54,7 +44,7 @@ void main() {
 	if (coords.x >= pc.width || coords.y >= pc.height) {
 		return;
 	}
-	GBuffer gbuffer = gbuffers.d[gl_GlobalInvocationID.x];
+	GBuffer gbuffer = DEREF(g_buffer)[gl_GlobalInvocationID.x];
 
 	if (!gbuffer_valid(gbuffer)) {
 		imageStore(image, coords, vec4(vec3(0), 1.f));
@@ -80,8 +70,8 @@ void main() {
 	vec3 grid_pos_end;
 	uvec4 grid_val = map_grid_axis(cam_relative_pos, grid_pos_begin, grid_pos_end);
 	uint linear_idx = linearize_grid(grid_val);
-	uint surfel_count = grid_cell_counts.d[linear_idx + 1] - grid_cell_counts.d[linear_idx];
-	uint surfel_offset = grid_cell_counts.d[linear_idx];
+	uint surfel_count = DEREF(grid_cell_counts)[linear_idx + 1] - DEREF(grid_cell_counts)[linear_idx];
+	uint surfel_offset = DEREF(grid_cell_counts)[linear_idx];
 	bool is_max_count_cell = pc.max_surfels_in_a_grid_cell > 0 && surfel_count == pc.max_surfels_in_a_grid_cell;
 
 	uvec4 res = map_grid_axis(cam_relative_pos);
@@ -117,8 +107,8 @@ void main() {
 
 	int idx = 0;
 	for (uint gid = 0; gid < surfel_count; gid++) {
-		uint sid = grid_cell_indices.d[gid + surfel_offset];
-		Surfel surfel = surfel_pool.d[sid];
+		uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
+		Surfel surfel = DEREF(surfel_pool)[sid];
 		HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
 
 		vec3 diff = hit_data.pos - surfel_hit_data.pos;
@@ -165,7 +155,7 @@ void main() {
 			col = is_max_count_cell ? vec3(100, 0, 0) : surfel_color;
 		}
 
-		Surfel surfel = surfel_pool.d[best_sid];
+		Surfel surfel = DEREF(surfel_pool)[best_sid];
 		HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
 		if (ubo.debug_click == 1 && ivec2(coords.xy) == ubo.clicked_pos) {
 			uvec4 neighbors[MAX_NEIGHBOR_PLUS_ITSELF_COUNT];

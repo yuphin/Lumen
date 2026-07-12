@@ -15,9 +15,9 @@ layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 #include "restirgi_commons.glsl"
 #define M_MAX 500
 
-Reservoirs spatial_reservoirs = Reservoirs(scene_desc.spatial_reservoir_addr);
-Reservoirs temp_reservoirs = Reservoirs(scene_desc.temporal_reservoir_addr);
-RestirSamples samples = RestirSamples(scene_desc.restir_samples_addr);
+SCENE_BUFFER(spatial_reservoir, Reservoir);
+SCENE_BUFFER(temporal_reservoir, Reservoir);
+SCENE_BUFFER(restir_samples, ReservoirSample);
 
 void combine_reservoir(inout Reservoir r1, const Reservoir r2,
                        const ReservoirSample q, const ReservoirSample q_n,
@@ -71,11 +71,11 @@ void main() {
     const float max_r = 10;
     const float dist_threshold = 0.01;
     const float angle_threshold = 25 * PI / 180;
-    ReservoirSample q = samples.d[pixel_idx];
+    ReservoirSample q = DEREF(restir_samples)[pixel_idx];
     Reservoir r_s;
    
     if (pc.do_spatiotemporal == 1) {
-        r_s = spatial_reservoirs.d[offset(pingpong ^ 1) + pixel_idx];
+        r_s = DEREF(spatial_reservoir)[offset(pingpong ^ 1) + pixel_idx];
     } else {
         init_reservoir(r_s);
     }
@@ -109,7 +109,7 @@ void main() {
                                    ivec2(0), ivec2(gl_LaunchSizeEXT.xy) - 1);
         const uint coords_idx = coords.x * pc.height + coords.y;
 
-        q_n = samples.d[coords_idx];
+        q_n = DEREF(restir_samples)[coords_idx];
         if (length(q_n.n_s) == 0) {
             continue;
         }
@@ -119,7 +119,7 @@ void main() {
             (dot(q_n.n_v, q.n_v)) < cos(angle_threshold)) {
             continue;
         }
-        Reservoir r_n = temp_reservoirs.d[offset(pingpong ^ 1) + coords_idx];
+        Reservoir r_n = DEREF(temporal_reservoir)[offset(pingpong ^ 1) + coords_idx];
         bool gt;
         combine_reservoir(r, r_n, q, q_n, gt);
         Q_h[q_cnt] = r_n.m;
@@ -153,7 +153,7 @@ void main() {
 
     r.m = min(sum, M_MAX);
     r.W = Z * phat_val == 0 ? 0 : r.w_sum / (Z * phat_val);
-#define sr spatial_reservoirs.d[offset(pingpong) + pixel_idx]
+#define sr DEREF(spatial_reservoir)[offset(pingpong) + pixel_idx]
     sr.w_sum = r.w_sum;
     sr.W = r.W;
     sr.m = r.m;

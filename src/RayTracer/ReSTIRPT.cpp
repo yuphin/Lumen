@@ -126,32 +126,17 @@ void init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(PhotonReservoir)});
 
-	SceneDesc desc;
-	desc.index_addr = integrator->lumen_scene->index_buffer->device_address();
-
-	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, light_triangle_cdf_addr,
-									integrator->lumen_scene->light_triangle_cdf_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, emitter_light_idx_addr,
-									integrator->lumen_scene->emitter_light_indices_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, compact_vertices_addr, integrator->lumen_scene->vertex_buffer);
+	SceneDesc desc = integrator::scene_desc_base(integrator);
 	// ReSTIR PT (GRIS)
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, gris_reservoir_addr, state.gris_reservoir_ping_buffer);
-	desc.transformations_addr = state.transformations_buffer->device_address();
-	desc.prefix_contributions_addr = state.prefix_contribution_buffer->device_address();
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, debug_vis_addr, state.debug_vis_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, photon_eye_addr, state.photon_eye_buffer_ping);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, caustic_photon_aabbs_addr, state.caustic_photon_aabbs_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, caustic_photon_light_addr, state.caustic_photon_light_buffer);
-	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, photon_count_addr, state.photon_count_buffer);
-
-	integrator->lumen_scene->scene_desc_buffer =
-		prm::get_buffer({.name = CSTR("Scene Desc"),
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = sizeof(SceneDesc),
-						 .data = &desc});
+	SET_SCENE_BUFFER(desc, gris_reservoir, state.gris_reservoir_ping_buffer);
+	SET_SCENE_BUFFER(desc, transformations, state.transformations_buffer);
+	SET_SCENE_BUFFER(desc, prefix_contributions, state.prefix_contribution_buffer);
+	SET_SCENE_BUFFER(desc, debug_vis, state.debug_vis_buffer);
+	SET_SCENE_BUFFER(desc, photon_eye, state.photon_eye_buffer_ping);
+	SET_SCENE_BUFFER(desc, caustic_photon_aabbs, state.caustic_photon_aabbs_buffer);
+	SET_SCENE_BUFFER(desc, caustic_photon_light, state.caustic_photon_light_buffer);
+	SET_SCENE_BUFFER(desc, photon_count, state.photon_count_buffer);
+	integrator::upload_scene_desc(integrator, desc);
 
 	state.canonical_contributions_texture = prm::get_texture({
 		.name = CSTR("Canonical Contributions Texture"),

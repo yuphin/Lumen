@@ -8,18 +8,16 @@
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 
+#include "../../bda.glsl"
 #include "vcmmlt_commons.h"
 #include "../../utils.glsl"
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BootstrapData { BootstrapSample d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SeedsData { VCMMLTSeedData d[]; };
 layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDF { float d[]; };
-BootstrapData bootstrap_data = BootstrapData(scene_desc.bootstrap_addr);
-SeedsData seeds_data = SeedsData(scene_desc.seeds_addr);
-CDF cdf_data = CDF(scene_desc.cdf_addr);
+SCENE_BUFFER(bootstrap, BootstrapSample);
+SCENE_BUFFER(seeds, VCMMLTSeedData);
+SCENE_BUFFER(cdf, float);
 uvec4 seed =
     init_rng(gl_GlobalInvocationID.xy, gl_NumWorkGroups.xy *uvec2(32, 1),
              pc.frame_num ^ pc.random_num);
@@ -32,7 +30,7 @@ uint binary_search_cdf(float random_float) {
     while(len > 0) {
         uint hlf = len >> 1;
         uint middle = first + hlf;
-        if(cdf_data.d[middle] <= random_float) {
+        if(DEREF(cdf)[middle] <= random_float) {
             first = middle + 1;
             len -= hlf + 1;
         } else {
@@ -47,6 +45,6 @@ void main() {
     uint lum_idx0 = binary_search_cdf(random_float);
     random_float = rand(seed);
     uint lum_idx1 = binary_search_cdf(random_float);
-    seeds_data.d[idx].chain0_seed = bootstrap_data.d[lum_idx0].seed;
-    seeds_data.d[idx].chain1_seed = bootstrap_data.d[lum_idx1].seed;
+    DEREF(seeds)[idx].chain0_seed = DEREF(bootstrap)[lum_idx0].seed;
+    DEREF(seeds)[idx].chain1_seed = DEREF(bootstrap)[lum_idx1].seed;
 }

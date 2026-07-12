@@ -7,26 +7,24 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../bda.glsl"
 #include "pssmlt_commons.h"
 #include "../../utils.glsl"
 // TODO
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BootstrapData { BootstrapSample d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDFSum { float d; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDF { float d[]; };
 layout(constant_id = 0) const int NUM_BOOSTRAP_SAMPLES = 0;
-CDFSum cdf_sum = CDFSum(scene_desc.cdf_sum_addr);
-CDF cdf_data = CDF(scene_desc.cdf_addr);
+SCENE_BUFFER_SCALAR(cdf_sum, float);
+SCENE_BUFFER(cdf, float);
 void main() {
     uint idx = gl_GlobalInvocationID.x;
     if(idx >= NUM_BOOSTRAP_SAMPLES) {
         return;
     }
     if (idx == 0) {
-        cdf_sum.d = cdf_data.d[pc.num_bootstrap_samples - 1];
+        DEREF(cdf_sum) = DEREF(cdf)[pc.num_bootstrap_samples - 1];
     }
-    const float inv_sum = 1. / cdf_data.d[pc.num_bootstrap_samples - 1];
-    cdf_data.d[idx] *= inv_sum;
+    const float inv_sum = 1. / DEREF(cdf)[pc.num_bootstrap_samples - 1];
+    DEREF(cdf)[idx] *= inv_sum;
 }

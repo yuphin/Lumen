@@ -5,26 +5,18 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 
+#include "../../bda.glsl"
 #include "ir_commons.h"
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
-
-Indices indices = Indices(scene_desc.index_addr);
-InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
-CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
+#include "../../scene_buffers.glsl"
 
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellIndices { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
 
-GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
-GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
-SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
+SCENE_BUFFER(grid_cell_indices, uint);
+SCENE_BUFFER(grid_cell_counts, uint);
+SCENE_BUFFER(surfel_pool, Surfel);
 
 #include "ir_commons.glsl"
 #include "grid.glsl"
@@ -36,7 +28,7 @@ void main() {
 		return;
 	}
 	// TODO: Check surfel status?
-	Surfel surfel = surfel_pool.d[surfel_idx];
+	Surfel surfel = DEREF(surfel_pool)[surfel_idx];
 
 	if (surfel.radius <= 0.0f) {
 		return;
@@ -78,7 +70,7 @@ void main() {
 
 	// This is fine as long as a surfel is smaller than the grid cell size
 	for (uint i = 0; i < unique_cnt; i++) {
-		uint cell_end = atomicAdd(grid_cell_counts.d[linear_cells[i]], -1);
+		uint cell_end = atomicAdd(DEREF(grid_cell_counts)[linear_cells[i]], -1);
 		uint idx = cell_end - 1;
 #if DEBUG_GRID_INVARIANTS
 		if (cell_end == 0 || idx >= (GRID_AVG_SURFELS_PER_CELL * MAX_SURFEL_COUNT)) {
@@ -86,7 +78,7 @@ void main() {
 			continue;
 		}
 #endif
-		grid_cell_indices.d[idx] = surfel_idx;
+		DEREF(grid_cell_indices)[idx] = surfel_idx;
 	}
 #else
 	uvec4 neighbors[MAX_NEIGHBOR_PLUS_ITSELF_COUNT];
@@ -95,7 +87,7 @@ void main() {
 
 	for (uint i = 0; i < neighbor_count; i++) {
 		uint linear_idx = linearize_grid(neighbors[i]);
-		uint cell_end = atomicAdd(grid_cell_counts.d[linear_idx], -1);
+		uint cell_end = atomicAdd(DEREF(grid_cell_counts)[linear_idx], -1);
 		uint idx = cell_end - 1;
 #if DEBUG_GRID_INVARIANTS
 		if (cell_end == 0 || idx >= (GRID_AVG_SURFELS_PER_CELL * MAX_SURFEL_COUNT)) {
@@ -103,7 +95,7 @@ void main() {
 			continue;
 		}
 #endif
-		grid_cell_indices.d[idx] = surfel_idx;
+		DEREF(grid_cell_indices)[idx] = surfel_idx;
 	}
 #endif
 }

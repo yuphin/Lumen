@@ -7,18 +7,16 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
+#include "../../bda.glsl"
 #include "pssmlt_commons.h"
 #include "../../utils.glsl"
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BootstrapData { BootstrapSample d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SeedsData { SeedData d[]; };
 layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CDF { float d[]; };
 layout(constant_id = 0) const int NUM_MLT_THREADS = 0;
-BootstrapData bootstrap_data = BootstrapData(scene_desc.bootstrap_addr);
-SeedsData seeds_data = SeedsData(scene_desc.seeds_addr);
-CDF cdf_data = CDF(scene_desc.cdf_addr);
+SCENE_BUFFER(bootstrap, BootstrapSample);
+SCENE_BUFFER(seeds, SeedData);
+SCENE_BUFFER(cdf, float);
 uvec4 seed =
     init_rng(gl_GlobalInvocationID.xy, gl_NumWorkGroups.xy *uvec2(32, 1),
              pc.frame_num ^ pc.random_num);
@@ -31,7 +29,7 @@ uint binary_search_cdf(float random_float) {
     while(len > 0) {
         uint hlf = len >> 1;
         uint middle = first + hlf;
-        if(cdf_data.d[middle] <= random_float) {
+        if(DEREF(cdf)[middle] <= random_float) {
             first = middle + 1;
             len -= hlf + 1;
         } else {
@@ -41,7 +39,7 @@ uint binary_search_cdf(float random_float) {
     return clamp(first - 1, 0, pc.num_bootstrap_samples -2);
     uint result = lum_idx;
     if (lum_idx > 0) {
-        while (result > 0 && bootstrap_data.d[result].lum == 0) {
+        while (result > 0 && DEREF(bootstrap)[result].lum == 0) {
             result--;
         }
     }
@@ -55,5 +53,5 @@ void main() {
     }
     float random_float = rand(seed);
     uint lum_idx = binary_search_cdf(random_float);
-    seeds_data.d[idx].chain_seed = bootstrap_data.d[lum_idx].seed;
+    DEREF(seeds)[idx].chain_seed = DEREF(bootstrap)[lum_idx].seed;
 }

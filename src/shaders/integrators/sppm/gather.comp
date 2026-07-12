@@ -15,16 +15,12 @@ layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 1) uniform sampler2D scene_textures[];
 layout(push_constant) uniform _PushConstantRay { PCSPPM pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SPPMData_ { SPPMData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer AtomicData_ { AtomicData d; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonData_ { PhotonHash d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
+#include "../../scene_buffers.glsl"
+SCENE_BUFFER(sppm_data, SPPMData);
+SCENE_BUFFER_SCALAR(atomic_data, AtomicData);
+SCENE_BUFFER(photon, PhotonHash);
 
 uint size = pc.width * pc.height;
-SPPMData_ sppm_data = SPPMData_(scene_desc.sppm_data_addr);
-AtomicData_ atomic_data = AtomicData_(scene_desc.atomic_data_addr);
-PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
-Materials materials = Materials(scene_desc.material_addr);
 
 uint screen_size = pc.width * pc.height;
 
@@ -45,42 +41,42 @@ void main() {
     if (idx >= size) {
         return;
     }
-    const vec3 p = sppm_data.d[idx].p;
-    float r = sppm_data.d[idx].radius;
+    const vec3 p = DEREF(sppm_data)[idx].p;
+    float r = DEREF(sppm_data)[idx].radius;
     if (r < EPS) {
         r = EPS;
     }
     const float r_sqr = r * r;
     ivec3 grid_min_bnds_idx =
-        get_grid_idx(p - r, atomic_data.d.min_bnds, atomic_data.d.max_bnds,
-                     atomic_data.d.grid_res);
+        get_grid_idx(p - r, DEREF(atomic_data).min_bnds, DEREF(atomic_data).max_bnds,
+                     DEREF(atomic_data).grid_res);
     ivec3 grid_max_bnds_idx =
-        get_grid_idx(p + r, atomic_data.d.min_bnds, atomic_data.d.max_bnds,
-                     atomic_data.d.grid_res);
+        get_grid_idx(p + r, DEREF(atomic_data).min_bnds, DEREF(atomic_data).max_bnds,
+                     DEREF(atomic_data).grid_res);
     for (int x = grid_min_bnds_idx.x; x <= grid_max_bnds_idx.x; x++) {
         for (int y = grid_min_bnds_idx.y; y <= grid_max_bnds_idx.y; y++) {
             for (int z = grid_min_bnds_idx.z; z <= grid_max_bnds_idx.z; z++) {
                 uint h = hash(ivec3(x, y, z), screen_size);
-                if (photons.d[h].photon_count > 0) {
-                    vec3 pp = p - photons.d[h].pos;
+                if (DEREF(photon)[h].photon_count > 0) {
+                    vec3 pp = p - DEREF(photon)[h].pos;
                     const float dist_sqr = dot(pp, pp);
                     if (dist_sqr > r_sqr) {
                         continue;
                     }
-                    if (pc.max_depth < (photons.d[h].path_len +
-                                            sppm_data.d[idx].path_len + 1)) {
+                    if (pc.max_depth < (DEREF(photon)[h].path_len +
+                                            DEREF(sppm_data)[idx].path_len + 1)) {
                         continue;
                     }
                     const Material mat = load_material(
-                        sppm_data.d[idx].material_idx, sppm_data.d[idx].uv);
+                        DEREF(sppm_data)[idx].material_idx, DEREF(sppm_data)[idx].uv);
                     vec3 f =
-                        eval_bsdf(mat, sppm_data.d[idx].wo, photons.d[h].wi,
-                                  sppm_data.d[idx].n_s, 1, sppm_data.d[idx].side == 1);
-                    vec3 phi = photons.d[h].photon_count *
-                               photons.d[h].throughput * f *
-                               sppm_data.d[idx].throughput;
-                    sppm_data.d[idx].phi += phi;
-                    sppm_data.d[idx].M += 1;
+                        eval_bsdf(mat, DEREF(sppm_data)[idx].wo, DEREF(photon)[h].wi,
+                                  DEREF(sppm_data)[idx].n_s, 1, DEREF(sppm_data)[idx].side == 1);
+                    vec3 phi = DEREF(photon)[h].photon_count *
+                               DEREF(photon)[h].throughput * f *
+                               DEREF(sppm_data)[idx].throughput;
+                    DEREF(sppm_data)[idx].phi += phi;
+                    DEREF(sppm_data)[idx].M += 1;
                 }
             }
         }

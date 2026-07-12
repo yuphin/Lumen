@@ -16,7 +16,7 @@ void main() {
     const float angle_threshold = 25 * PI / 180;
     const float num_neighbor_samples = 5;
     load_g_buffer();
-    const RestirReservoir curr_reservoir = passthrough_reservoirs.d[pixel_idx];
+    const RestirReservoir curr_reservoir = DEREF(passthrough_reservoir)[pixel_idx];
     RestirReservoir r;
     init_reservoir(r);
     if (curr_reservoir.W != 0) {
@@ -36,7 +36,7 @@ void main() {
                       ivec2(gl_LaunchSizeEXT.xy) - 1);
             const uint neighbor_idx = coords.x * pc.height + coords.y;
 
-            const RestirReservoir r_n = passthrough_reservoirs.d[neighbor_idx];
+            const RestirReservoir r_n = DEREF(passthrough_reservoir)[neighbor_idx];
 
             combine_reservoir(r, r_n);
             num_samples += r_n.m;
@@ -45,8 +45,8 @@ void main() {
         const float phat = calc_p_hat(r);
         r.W = r.w_sum / (r.m * calc_p_hat(r));
     }
-    spatial_reservoirs.d[pixel_idx].w_sum = r.w_sum;
-    spatial_reservoirs.d[pixel_idx].W = r.W;
-    spatial_reservoirs.d[pixel_idx].m = r.m;
-    spatial_reservoirs.d[pixel_idx].s = r.s;
+    DEREF(spatial_reservoir)[pixel_idx].w_sum = r.w_sum;
+    DEREF(spatial_reservoir)[pixel_idx].W = r.W;
+    DEREF(spatial_reservoir)[pixel_idx].m = r.m;
+    DEREF(spatial_reservoir)[pixel_idx].s = r.s;
 }

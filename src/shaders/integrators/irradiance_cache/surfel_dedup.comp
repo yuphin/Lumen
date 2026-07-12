@@ -5,45 +5,32 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 
+#include "../../bda.glsl"
 #include "ir_commons.h"
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
-
-Indices indices = Indices(scene_desc.index_addr);
-InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
-CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
+#include "../../scene_buffers.glsl"
 
 #include "ir_commons.glsl"
 
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelSpawnList { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelSpawnCount { uint d; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStack { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelFreeStackCount { int d; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellIndices { uint d[]; };
 
-InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
-SurfelSpawnList spawn_list = SurfelSpawnList(scene_desc.surfel_spawn_list_addr);
-SurfelSpawnCount spawn_count = SurfelSpawnCount(scene_desc.surfel_spawn_count_addr);
-SurfelFreeStack free_stack = SurfelFreeStack(scene_desc.surfel_free_stack_addr);
-SurfelFreeStackCount free_stack_count = SurfelFreeStackCount(scene_desc.surfel_free_stack_count_addr);
-SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
-GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
-GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
+SCENE_BUFFER(g_buffer, GBuffer);
+SCENE_BUFFER(surfel_spawn_list, uint);
+SCENE_BUFFER_SCALAR(surfel_spawn_count, uint);
+SCENE_BUFFER(surfel_free_stack, uint);
+SCENE_BUFFER_SCALAR(surfel_free_stack_count, int);
+SCENE_BUFFER(surfel_pool, Surfel);
+SCENE_BUFFER(grid_cell_counts, uint);
+SCENE_BUFFER(grid_cell_indices, uint);
 
 #include "surfel_commons.glsl"
 #include "grid.glsl"
 
 void recycle_surfel(uint surfel_id) {
-	surfel_pool.d[surfel_id].radius = 0;
-	int idx = atomicAdd(free_stack_count.d, 1);
-	free_stack.d[idx] = surfel_id;
+	DEREF(surfel_pool)[surfel_id].radius = 0;
+	int idx = atomicAdd(DEREF(surfel_free_stack_count), 1);
+	DEREF(surfel_free_stack)[idx] = surfel_id;
 }
 
 layout(local_size_x = ALLOCATE_PASS_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
@@ -53,7 +40,7 @@ void main() {
 		return;
 	}
 
-	Surfel s = surfel_pool.d[tid];
+	Surfel s = DEREF(surfel_pool)[tid];
 
 	if(s.radius <= 0.0f) {
 		return;
@@ -74,11 +61,11 @@ void main() {
 
 	for (uint i = 0; i < neighbor_count; i++) {
 		uint linear_idx = linearize_grid(neighbors[i]);
-		uint surfel_offset = grid_cell_counts.d[linear_idx];
-		uint surfel_count = grid_cell_counts.d[linear_idx + 1] - surfel_offset;
+		uint surfel_offset = DEREF(grid_cell_counts)[linear_idx];
+		uint surfel_count = DEREF(grid_cell_counts)[linear_idx + 1] - surfel_offset;
 		for (uint gid = 0; gid < surfel_count; gid++) {
-			uint sid = grid_cell_indices.d[gid + surfel_offset];
-			Surfel other = surfel_pool.d[sid];
+			uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
+			Surfel other = DEREF(surfel_pool)[sid];
 			if (other.radius <= 0.0) continue;
 			HitData other_hit_data = get_hitdata(other.gbuffer);
 

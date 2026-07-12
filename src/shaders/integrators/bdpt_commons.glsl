@@ -12,9 +12,9 @@ float light_pdf_pos;
 
 int bdpt_random_walk_light(const int max_depth, vec3 throughput,
                            const float pdf) {
-#define vtx(i, prop) light_verts.d[bdpt_path_idx + i + 1].prop
+#define vtx(i, prop) DEREF(light_path)[bdpt_path_idx + i + 1].prop
 #define vtx_assign(i, prop, expr)                                              \
-    light_verts.d[bdpt_path_idx + i + 1].prop = (expr)
+    DEREF(light_path)[bdpt_path_idx + i + 1].prop = (expr)
     if (max_depth == 0)
         return 0;
     int b = 0;
@@ -105,9 +105,9 @@ int bdpt_random_walk_light(const int max_depth, vec3 throughput,
 
 int bdpt_random_walk_eye(const int max_depth, vec3 throughput,
                          const float pdf) {
-#define vtx(i, prop) camera_verts.d[bdpt_path_idx + i + 1].prop
+#define vtx(i, prop) DEREF(camera_path)[bdpt_path_idx + i + 1].prop
 #define vtx_assign(i, prop, expr)                                              \
-    camera_verts.d[bdpt_path_idx + i + 1].prop = (expr)
+    DEREF(camera_path)[bdpt_path_idx + i + 1].prop = (expr)
     if (max_depth == 0)
         return 0;
     int b = 0;
@@ -216,27 +216,27 @@ int bdpt_generate_light_subpath(int max_depth) {
     }
     light_pdf_pos = light_sample.pdf_position_a;
 
-    light_verts.d[bdpt_path_idx].pos = light_sample.position;
-    light_verts.d[bdpt_path_idx].light_flags = light_sample.flags;
-    light_verts.d[bdpt_path_idx].light_idx = light_sample.identity.light_idx;
-    light_verts.d[bdpt_path_idx].delta = 0;
-    light_verts.d[bdpt_path_idx].dir = light_sample.wi;
-    light_verts.d[bdpt_path_idx].pdf_fwd = light_sample.pdf_position_a;
-    light_verts.d[bdpt_path_idx].n_s = light_sample.normal;
-    light_verts.d[bdpt_path_idx].side = 1;
-    light_verts.d[bdpt_path_idx].mode = 0;
+    DEREF(light_path)[bdpt_path_idx].pos = light_sample.position;
+    DEREF(light_path)[bdpt_path_idx].light_flags = light_sample.flags;
+    DEREF(light_path)[bdpt_path_idx].light_idx = light_sample.identity.light_idx;
+    DEREF(light_path)[bdpt_path_idx].delta = 0;
+    DEREF(light_path)[bdpt_path_idx].dir = light_sample.wi;
+    DEREF(light_path)[bdpt_path_idx].pdf_fwd = light_sample.pdf_position_a;
+    DEREF(light_path)[bdpt_path_idx].n_s = light_sample.normal;
+    DEREF(light_path)[bdpt_path_idx].side = 1;
+    DEREF(light_path)[bdpt_path_idx].mode = 0;
     vec3 throughput =
         light_sample.Le * light_sample.cos_from_light / light_sample.pdf_joint;
-    light_verts.d[bdpt_path_idx + 0].throughput = light_sample.Le;
+    DEREF(light_path)[bdpt_path_idx + 0].throughput = light_sample.Le;
     int num_light_verts =
         bdpt_random_walk_light(max_depth - 1, throughput, light_sample.pdf_direction_w) + 1;
     if (!is_light_finite(light_sample.flags)) {
-        light_verts.d[bdpt_path_idx + 1].pdf_fwd =
+        DEREF(light_path)[bdpt_path_idx + 1].pdf_fwd =
             light_sample.pdf_position_a *
-            abs(dot(light_sample.wi, light_verts.d[bdpt_path_idx + 1].n_s));
+            abs(dot(light_sample.wi, DEREF(light_path)[bdpt_path_idx + 1].n_s));
     }
     if (is_light_delta(light_sample.flags)) {
-        light_verts.d[bdpt_path_idx].pdf_fwd = 0;
+        DEREF(light_path)[bdpt_path_idx].pdf_fwd = 0;
     }
     return num_light_verts;
 }
@@ -248,28 +248,28 @@ int bdpt_generate_camera_subpath(vec2 d, const vec3 origin, int max_depth,
             2.0 -
         1.0;
 #endif
-    camera_verts.d[bdpt_path_idx].pos = origin;
-    camera_verts.d[bdpt_path_idx].dir = vec3(sample_camera(d));
-    camera_verts.d[bdpt_path_idx].area = cam_area;
-    camera_verts.d[bdpt_path_idx].throughput = vec3(1.0);
-    camera_verts.d[bdpt_path_idx].delta = 0;
-    camera_verts.d[bdpt_path_idx].n_s = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
-    camera_verts.d[bdpt_path_idx].side = 1;
-    light_verts.d[bdpt_path_idx].mode = 1;
+    DEREF(camera_path)[bdpt_path_idx].pos = origin;
+    DEREF(camera_path)[bdpt_path_idx].dir = vec3(sample_camera(d));
+    DEREF(camera_path)[bdpt_path_idx].area = cam_area;
+    DEREF(camera_path)[bdpt_path_idx].throughput = vec3(1.0);
+    DEREF(camera_path)[bdpt_path_idx].delta = 0;
+    DEREF(camera_path)[bdpt_path_idx].n_s = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
+    DEREF(camera_path)[bdpt_path_idx].side = 1;
+    DEREF(light_path)[bdpt_path_idx].mode = 1;
 #if BDPT_MLT == 1
     ivec2 coords = ivec2(0.5 * (1 + d) * vec2(pc.width, pc.height));
-    camera_verts.d[bdpt_path_idx].coords = coords.x * pc.height + coords.y;
+    DEREF(camera_path)[bdpt_path_idx].coords = coords.x * pc.height + coords.y;
 #endif
-    float cos_theta = dot(camera_verts.d[bdpt_path_idx].dir,
-                          camera_verts.d[bdpt_path_idx].n_s);
+    float cos_theta = dot(DEREF(camera_path)[bdpt_path_idx].dir,
+                          DEREF(camera_path)[bdpt_path_idx].n_s);
     float pdf =
         1 / (cam_area * screen_size * cos_theta * cos_theta * cos_theta);
     return bdpt_random_walk_eye(max_depth - 1, vec3(1), pdf) + 1;
 }
 
 float calc_mis_weight(int s, int t, const in PathVertex sampled) {
-#define cam_vtx(i) camera_verts.d[bdpt_path_idx + i]
-#define light_vtx(i) light_verts.d[bdpt_path_idx + i]
+#define cam_vtx(i) DEREF(camera_path)[bdpt_path_idx + i]
+#define light_vtx(i) DEREF(light_path)[bdpt_path_idx + i]
 #define remap0(i) (i != 0. ? i : 1.)
     bool s_0_changed = false;
     float s_0_pdf;
@@ -471,8 +471,8 @@ float calc_mis_weight(int s, int t, const in PathVertex sampled) {
 }
 
 vec3 bdpt_connect_cam(int s, out ivec2 coords) {
-#define cam_vtx(i) camera_verts.d[bdpt_path_idx + i]
-#define light_vtx(i) light_verts.d[bdpt_path_idx + i]
+#define cam_vtx(i) DEREF(camera_path)[bdpt_path_idx + i]
+#define light_vtx(i) DEREF(light_path)[bdpt_path_idx + i]
     PathVertex sampled;
     vec3 throughput = vec3(1.0);
     vec3 L = vec3(0);
@@ -531,14 +531,14 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
 }
 
 vec3 bdpt_connect(int s, int t) {
-#define cam_vtx(i) camera_verts.d[bdpt_path_idx + i]
-#define light_vtx(i) light_verts.d[bdpt_path_idx + i]
+#define cam_vtx(i) DEREF(camera_path)[bdpt_path_idx + i]
+#define light_vtx(i) DEREF(light_path)[bdpt_path_idx + i]
     vec3 L = vec3(0);
     PathVertex sampled;
     if (s == 0) {
         // Pure camera path
         uint mat_idx = cam_vtx(t - 1).material_idx;
-        Material mat = materials.m[mat_idx];
+        Material mat = DEREF(material)[mat_idx];
         if (mat_idx != -1) {
             L = mat.emissive_factor * cam_vtx(t - 1).throughput;
         } else {

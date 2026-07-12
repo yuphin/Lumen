@@ -8,6 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
+#include "../../bda.glsl"
 #include "vcm_commons.h"
 #include "../../commons.glsl"
 layout(location = 0) rayPayloadEXT HitPayload payload;
@@ -15,15 +16,11 @@ layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 
 layout(push_constant) uniform _PushConstantRay { PCVCM pc; };
 // VCM buffers
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonData_ { VCMPhotonHash d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer VCMVertex_ { VCMVertex d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightPathCnt { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ColorStorages { vec3 d[]; };
 
-PhotonData_ photons = PhotonData_(scene_desc.photon_addr);
-VCMVertex_ vcm_lights = VCMVertex_(scene_desc.vcm_vertices_addr);
-LightPathCnt light_path_cnts = LightPathCnt(scene_desc.path_cnt_addr);
-ColorStorages tmp_col = ColorStorages(scene_desc.color_storage_addr);
+SCENE_BUFFER(photon, VCMPhotonHash);
+SCENE_BUFFER(vcm_vertices, VCMVertex);
+SCENE_BUFFER(path_cnt, uint);
+SCENE_BUFFER(color_storage, vec3);
 
 uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 
@@ -81,9 +78,9 @@ void main() {
         debugPrintfEXT("nan\n");
         return;
     }
-    vec3 splat_img = tmp_col.d[pixel_idx];
+    vec3 splat_img = DEREF(color_storage)[pixel_idx];
     col += splat_img;
-    tmp_col.d[pixel_idx] = vec3(0);
+    DEREF(color_storage)[pixel_idx] = vec3(0);
 #undef light_vtx
     if (pc.enable_accumulation == 1 && pc.frame_num > 0) {
         float w = 1. / float(pc.frame_num + 1);

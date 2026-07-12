@@ -9,6 +9,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 #define SCENE_TEX_IDX 10
+#include "../../../bda.glsl"
 #include "pm_commons.glsl"
 layout(set = 1, binding = 1) uniform accelerationStructureEXT photon_bvh;
 
@@ -18,12 +19,9 @@ layout(binding = 6, std430) readonly buffer PrevPhotonReservoirs { PhotonReservo
 layout(binding = 7, std430) writeonly buffer CurrPhotonReservoirs { PhotonReservoir out_reservoirs[]; };
 layout(binding = 8, std430) readonly buffer PrevPhotonData { PhotonData prev_photon_eye[]; };
 layout(binding = 9, std430) readonly buffer CurrPhotonData { PhotonData photon_eye_data[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonAABBs { PhotonAABB d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonData { PhotonData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonCounts { uint val; };
-CausticPhotonAABBs photon_aabbs = CausticPhotonAABBs(scene_desc.caustic_photon_aabbs_addr);
-CausticPhotonData photon_light_data = CausticPhotonData(scene_desc.caustic_photon_light_addr);
-PhotonCounts photon_counts = PhotonCounts(scene_desc.photon_count_addr);
+SCENE_BUFFER(caustic_photon_aabbs, PhotonAABB);
+SCENE_BUFFER(caustic_photon_light, PhotonData);
+SCENE_BUFFER_SCALAR(photon_count, uint);
 
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
 uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
@@ -67,7 +65,7 @@ void main() {
 			}
 
 			int photon_idx = rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, false);
-			PhotonData photon_light = photon_light_data.d[photon_idx];
+			PhotonData photon_light = DEREF(caustic_photon_light)[photon_idx];
 
 			HitData photon_gbuffer = get_hitdata(photon_light.barycentrics, photon_light.primitive_instance_id.y,
 												 photon_light.primitive_instance_id.x);

@@ -16,19 +16,10 @@ layout(location = 0) rayPayloadInEXT HitPayload payload;
 
 layout(set = 0, binding = 2, scalar) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo prim_info[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
+#include "scene_buffers.glsl"
 
 void main() {
-	// Object data
-	Materials materials = Materials(scene_desc.material_addr);
-	Indices indices = Indices(scene_desc.index_addr);
-	InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
-	CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
-
-	PrimInfo pinfo = prim_infos.prim_info[gl_InstanceCustomIndexEXT];
+	PrimInfo pinfo = DEREF(prim_info)[gl_InstanceCustomIndexEXT];
 	// Getting the 'first index' for this mesh (offset of the mesh + offset of
 	// the triangle)
 	uint index_offset = pinfo.index_offset + 3 * gl_PrimitiveID;
@@ -36,14 +27,14 @@ void main() {
 	uint material_index = pinfo.material_index;	 // material of primitive mesh
 
 	// Indices of the triangle
-	ivec3 ind = ivec3(indices.i[index_offset + 0], indices.i[index_offset + 1], indices.i[index_offset + 2]);
+	ivec3 ind = ivec3(DEREF(index)[index_offset + 0], DEREF(index)[index_offset + 1], DEREF(index)[index_offset + 2]);
 
 	ind += ivec3(vertex_offset);
 	// Vertex of the triangle
 	Vertex vtx[3];
-	vtx[0] = compact_vertices.d[ind.x];
-	vtx[1] = compact_vertices.d[ind.y];
-	vtx[2] = compact_vertices.d[ind.z];
+	vtx[0] = DEREF(compact_vertices)[ind.x];
+	vtx[1] = DEREF(compact_vertices)[ind.y];
+	vtx[2] = DEREF(compact_vertices)[ind.z];
 	const vec3 v0 = vtx[0].pos;
 	const vec3 v1 = vtx[1].pos;
 	const vec3 v2 = vtx[2].pos;

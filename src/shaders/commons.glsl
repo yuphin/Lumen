@@ -15,21 +15,7 @@ layout(binding = 3, scalar) readonly buffer Lights { Light lights[]; };
 layout(binding = SCENE_TEX_IDX) uniform sampler2D scene_textures[];
 
 layout(set = 1, binding = 0) uniform accelerationStructureEXT tlas;
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer LightTriangleCDFs {
-	LightTriangleCDF d[];
-};
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer EmitterLightIndices { uint d[]; };
-
-Indices indices = Indices(scene_desc.index_addr);
-Materials materials = Materials(scene_desc.material_addr);
-InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
-CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
-LightTriangleCDFs light_triangle_cdf = LightTriangleCDFs(scene_desc.light_triangle_cdf_addr);
-EmitterLightIndices emitter_light_indices = EmitterLightIndices(scene_desc.emitter_light_idx_addr);
+#include "scene_buffers.glsl"
 
 #include "bsdf_commons.glsl"
 
@@ -61,12 +47,12 @@ TriangleRecord triangle_at_bary(PrimInfo pinfo, vec2 uv, uint triangle_idx, in m
 	TriangleRecord result;
 	uint index_offset = pinfo.index_offset + 3 * triangle_idx;
 	uint vertex_offset = pinfo.vertex_offset;
-	ivec3 ind = ivec3(indices.i[index_offset + 0], indices.i[index_offset + 1], indices.i[index_offset + 2]);
+	ivec3 ind = ivec3(DEREF(index)[index_offset + 0], DEREF(index)[index_offset + 1], DEREF(index)[index_offset + 2]);
 	ind += ivec3(vertex_offset);
 	Vertex vtx[3];
-	vtx[0] = compact_vertices.d[ind.x];
-	vtx[1] = compact_vertices.d[ind.y];
-	vtx[2] = compact_vertices.d[ind.z];
+	vtx[0] = DEREF(compact_vertices)[ind.x];
+	vtx[1] = DEREF(compact_vertices)[ind.y];
+	vtx[2] = DEREF(compact_vertices)[ind.z];
 	const vec3 v0 = vtx[0].pos;
 	const vec3 v1 = vtx[1].pos;
 	const vec3 v2 = vtx[2].pos;
@@ -164,7 +150,7 @@ LightLeSample empty_light_Le_sample() {
 	return result;
 }
 
-uint light_index_from_primitive(uint primitive_idx) { return emitter_light_indices.d[primitive_idx]; }
+uint light_index_from_primitive(uint primitive_idx) { return DEREF(emitter_light_idx)[primitive_idx]; }
 
 uint sample_area_light_triangle(const Light light, float xi) {
 	// Select a triangle uniformly proportional to its area using binary search on the CDF
@@ -174,19 +160,19 @@ uint sample_area_light_triangle(const Light light, float xi) {
 	while (count > 0u) {
 		const uint step = count >> 1;
 		const uint candidate = first + step;
-		if (light_triangle_cdf.d[light.triangle_cdf_offset + candidate].cumulative_area < target_area) {
+		if (DEREF(light_triangle_cdf)[light.triangle_cdf_offset + candidate].cumulative_area < target_area) {
 			first = candidate + 1u;
 			count -= step + 1u;
 		} else {
 			count = step;
 		}
 	}
-	return light_triangle_cdf.d[light.triangle_cdf_offset + min(first, light.num_triangles - 1u)].triangle_idx;
+	return DEREF(light_triangle_cdf)[light.triangle_cdf_offset + min(first, light.num_triangles - 1u)].triangle_idx;
 }
 
 TriangleRecord sample_area_light_by_area(const Light light, vec3 xi, out uint triangle_idx) {
 	triangle_idx = sample_area_light_triangle(light, xi.x);
-	return sample_triangle(prim_infos.d[light.prim_mesh_idx], xi.yz, triangle_idx, light.world_matrix);
+	return sample_triangle(DEREF(prim_info)[light.prim_mesh_idx], xi.yz, triangle_idx, light.world_matrix);
 }
 
 float spot_falloff(const Light light, float cos_theta) {
@@ -271,7 +257,7 @@ LightLiSample replay_light_Li(LightSampleIdentity identity, vec3 p, int num_ligh
 
 	switch (light_type) {
 		case LIGHT_AREA: {
-			const TriangleRecord record = triangle_at_bary(prim_infos.d[light.prim_mesh_idx], identity.bary,
+			const TriangleRecord record = triangle_at_bary(DEREF(prim_info)[light.prim_mesh_idx], identity.bary,
 														   identity.triangle_idx, light.world_matrix);
 			const vec3 to_light = record.pos - p;
 			const float distance_squared = dot(to_light, to_light);

@@ -62,11 +62,11 @@ vec3 sample_irradiance(vec3 p, vec3 n, vec3 wo) {
 		ivec3 offset = ivec3(i, i >> 1, i >> 2) & ivec3(1);
 		ivec3 offseted_probe_coord = clamp(probe_coord + offset, ivec3(0), ddgi_uniforms.probe_counts - ivec3(1));
 		int offseted_idx = probe_coord_to_idx(offseted_probe_coord);
-		float probe_state = probe_offsets.d[offseted_idx].w;
+		float probe_state = DEREF(probe_offsets)[offseted_idx].w;
 		if (probe_state == DDGI_PROBE_INACTIVE) {
 			continue;
 		}
-		vec3 offseted_probe_pos = probe_offsets.d[offseted_idx].xyz + probe_coord_to_pos(offseted_probe_coord);
+		vec3 offseted_probe_pos = DEREF(probe_offsets)[offseted_idx].xyz + probe_coord_to_pos(offseted_probe_coord);
 
 		vec3 offseted_probe_to_p = p - offseted_probe_pos;
 		vec3 dir = normalize(offseted_probe_to_p);

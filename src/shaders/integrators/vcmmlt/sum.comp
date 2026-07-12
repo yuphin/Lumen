@@ -8,6 +8,7 @@
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 
+#include "../../bda.glsl"
 #include "vcmmlt_commons.h"
 #include "../../utils.glsl"
 
@@ -15,20 +16,18 @@ layout(constant_id = 0) const int MODE = 0;
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTSumData { SumData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ResidualData { SumData d[]; };
 uint size = pc.num_mlt_threads;
 shared vec2 dataf[32];
 shared uint datau[32];
-MLTSumData sum_data = MLTSumData(scene_desc.mlt_atomicsum_addr);
-ResidualData res_data = ResidualData(scene_desc.residual_addr);
+SCENE_BUFFER(mlt_atomicsum, SumData);
+SCENE_BUFFER(residual, SumData);
 void main() {
     uint idx = gl_GlobalInvocationID.x;
     vec2 valf = vec2(0);
     uint valu = 0;
     if (idx < size) {
-            valf = vec2(sum_data.d[2 * idx + MODE].x, sum_data.d[2 * idx + MODE].z);
-            valu = sum_data.d[2 * idx + MODE].y;
+            valf = vec2(DEREF(mlt_atomicsum)[2 * idx + MODE].x, DEREF(mlt_atomicsum)[2 * idx + MODE].z);
+            valu = DEREF(mlt_atomicsum)[2 * idx + MODE].y;
     }
     valf = subgroupAdd(valf);
     valu = subgroupAdd(valu);
@@ -45,8 +44,8 @@ void main() {
         valu = subgroupAdd(valu);
     }
     if (gl_LocalInvocationID.x == 0) {
-        res_data.d[gl_WorkGroupID.x].x = valf.x;
-        res_data.d[gl_WorkGroupID.x].y = valu;
-        res_data.d[gl_WorkGroupID.x].z = valf.y;
+        DEREF(residual)[gl_WorkGroupID.x].x = valf.x;
+        DEREF(residual)[gl_WorkGroupID.x].y = valu;
+        DEREF(residual)[gl_WorkGroupID.x].z = valf.y;
     }
 }

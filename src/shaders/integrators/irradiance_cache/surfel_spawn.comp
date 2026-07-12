@@ -7,36 +7,26 @@
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #extension GL_KHR_shader_subgroup_ballot : enable
 
+#include "../../bda.glsl"
 #include "ir_commons.h"
 #include "../../random.glsl"
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer InstanceInfo { PrimInfo d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellIndices { uint d[]; };
+#include "../../scene_buffers.glsl"
 
-Indices indices = Indices(scene_desc.index_addr);
-InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
-CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
-GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
-GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
+SCENE_BUFFER(grid_cell_indices, uint);
+SCENE_BUFFER(grid_cell_counts, uint);
 
 #include "ir_commons.glsl"
 #include "grid.glsl"
 #include "surfel_commons.glsl"
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer InGBuffer { GBuffer d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnList { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SpawnCount { uint d; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
 
-InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
-SpawnList spawn_list = SpawnList(scene_desc.surfel_spawn_list_addr);
-SpawnCount spawn_count = SpawnCount(scene_desc.surfel_spawn_count_addr);
-SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
+SCENE_BUFFER(g_buffer, GBuffer);
+SCENE_BUFFER(surfel_spawn_list, uint);
+SCENE_BUFFER_SCALAR(surfel_spawn_count, uint);
+SCENE_BUFFER(surfel_pool, Surfel);
 
 #define TILE_COVERAGE_MAX 1e6
 #define TILE_PERIOD 3
@@ -66,7 +56,7 @@ void main() {
 
 	float coverage = TILE_COVERAGE_MAX;
 	if (pixel_coords.x < pc.width && pixel_coords.y < pc.height) {
-		GBuffer gbuffer = gbuffers.d[pixel_idx];
+		GBuffer gbuffer = DEREF(g_buffer)[pixel_idx];
 		if (gbuffer_valid(gbuffer)) {
 			HitData hit_data = get_hitdata(gbuffer);
 
@@ -75,13 +65,13 @@ void main() {
 			vec3 offset = hit_data.pos - cam_pos.xyz;
 			uvec4 grid_val = map_grid_axis(offset);
 			uint linear_idx = linearize_grid(grid_val);
-			uint surfel_offset = grid_cell_counts.d[linear_idx];
-			uint surfel_count = grid_cell_counts.d[linear_idx + 1] - surfel_offset;
+			uint surfel_offset = DEREF(grid_cell_counts)[linear_idx];
+			uint surfel_count = DEREF(grid_cell_counts)[linear_idx + 1] - surfel_offset;
 			float would_be_radius = surfel_radius_for_position(hit_data.pos);
 
 			for (uint gid = 0; gid < surfel_count; gid++) {
-				uint sid = grid_cell_indices.d[gid + surfel_offset];
-				Surfel surfel = surfel_pool.d[sid];
+				uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
+				Surfel surfel = DEREF(surfel_pool)[sid];
 				if (surfel.radius <= 0.0) continue;
 				HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
 				vec3 pos_to_surfel = hit_data.pos - surfel_hit_data.pos;
@@ -127,12 +117,12 @@ void main() {
 
 		if (gl_SubgroupInvocationID == tile_winner && min_tile_coverage < TILE_COVERAGE_MAX) {
 			// Winner of the tile
-			uint surfel_idx = atomicAdd(spawn_count.d, 1);
+			uint surfel_idx = atomicAdd(DEREF(surfel_spawn_count), 1);
 			uint winner_pixel = winner_pixels[gl_SubgroupInvocationID];
 			uvec2 winner_pixel_coords = uvec2(winner_pixel / pc.height, winner_pixel % pc.height);
 			uint tiles_x = (pc.width + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
 			uint tiles_y = (pc.height + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
-			spawn_list.d[surfel_idx] = winner_pixel;
+			DEREF(surfel_spawn_list)[surfel_idx] = winner_pixel;
 			uint max_surfels_to_spawn = tiles_x * tiles_y;
 			ASSERT2(surfel_idx < max_surfels_to_spawn, "Surfel spawn idx exceeded (%u) the maximum number on %v2u\n",
 					surfel_idx, winner_pixel_coords);

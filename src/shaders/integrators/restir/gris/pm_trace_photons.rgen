@@ -7,14 +7,12 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
+#include "../../../bda.glsl"
 #include "gris_commons.glsl"
 
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonData { PhotonData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CausticPhotonAABBs { PhotonAABB d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PhotonCounts { uint val; };
-CausticPhotonData photon_light_data = CausticPhotonData(scene_desc.caustic_photon_light_addr);
-CausticPhotonAABBs photon_aabbs = CausticPhotonAABBs(scene_desc.caustic_photon_aabbs_addr);
-PhotonCounts photon_counts = PhotonCounts(scene_desc.photon_count_addr);
+SCENE_BUFFER(caustic_photon_light, PhotonData);
+SCENE_BUFFER(caustic_photon_aabbs, PhotonAABB);
+SCENE_BUFFER_SCALAR(photon_count, uint);
 
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
 
@@ -74,22 +72,22 @@ void main() {
 		Material hit_mat = load_material(gbuffer.material_idx, gbuffer.uv);
 
 		if (is_rough(hit_mat) && last_specular) {
-			uint photon_idx = atomicAdd(photon_counts.val, 1);
-			photon_aabbs.d[photon_idx].min = gbuffer.pos - pc.photon_radius;
-			photon_aabbs.d[photon_idx].max = gbuffer.pos + pc.photon_radius;
+			uint photon_idx = atomicAdd(DEREF(photon_count), 1);
+			DEREF(caustic_photon_aabbs)[photon_idx].min = gbuffer.pos - pc.photon_radius;
+			DEREF(caustic_photon_aabbs)[photon_idx].max = gbuffer.pos + pc.photon_radius;
 
-			photon_light_data.d[photon_idx].barycentrics = payload.attribs;
-			photon_light_data.d[photon_idx].primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
-			photon_light_data.d[photon_idx].dir = to_spherical(wo);
-			photon_light_data.d[photon_idx].throughput = throughput;
+			DEREF(caustic_photon_light)[photon_idx].barycentrics = payload.attribs;
+			DEREF(caustic_photon_light)[photon_idx].primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
+			DEREF(caustic_photon_light)[photon_idx].dir = to_spherical(wo);
+			DEREF(caustic_photon_light)[photon_idx].throughput = throughput;
 			// side is not used
 			// Path length = Num of edges from light
-			photon_light_data.d[photon_idx].flags = pack_photon_flags(side, d + 1);
+			DEREF(caustic_photon_light)[photon_idx].flags = pack_photon_flags(side, d + 1);
 #ifdef DISABLE_PM_MIS
-			photon_light_data.d[photon_idx].d_vm = 0;
+			DEREF(caustic_photon_light)[photon_idx].d_vm = 0;
 #else
 			float d_vm = (d_vm_bsdf + d_vm_nee) * d_vm_common;
-			photon_light_data.d[photon_idx].d_vm = d_vm;
+			DEREF(caustic_photon_light)[photon_idx].d_vm = d_vm;
 			ASSERT(d_vm >= 0);
 #endif // DISABLE_PM_MIS
 		}

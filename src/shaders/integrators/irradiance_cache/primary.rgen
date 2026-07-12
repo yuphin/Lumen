@@ -8,6 +8,7 @@
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_shader_atomic_float : require
 
+#include "../../bda.glsl"
 #include "../../commons.glsl"
 #include "ir_commons.h"
 const uint flags = gl_RayFlagsOpaqueEXT;
@@ -17,17 +18,15 @@ uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 layout(location = 0) rayPayloadEXT IRCacheHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer OutGBuffer { GBuffer d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CurrentFrameLighting { vec3 d[]; };
 
 #include "ir_commons.glsl"
 #include "direct_lighting.glsl"
 
-OutGBuffer gbuffers = OutGBuffer(scene_desc.g_buffer_addr);
-CurrentFrameLighting current_frame_lighting = CurrentFrameLighting(scene_desc.direct_lighting_addr);
+SCENE_BUFFER(g_buffer, GBuffer);
+SCENE_BUFFER(direct_lighting, vec3);
 
 void store_direct_lighting(const ivec2 pixel, const vec3 radiance) {
-	current_frame_lighting.d[pixel_idx] = radiance;
+	DEREF(direct_lighting)[pixel_idx] = radiance;
 	if (pc.enable_accumulation == 0) {
 		imageStore(image, pixel, vec4(radiance, 1));
 	}
@@ -49,7 +48,7 @@ void main() {
 	traceRayEXT(tlas, flags, 0x1, 0, 0, 0, origin, tmin, direction, tmax, 0);
 	const bool found_isect = payload.instance_idx != -1;
 	if (!found_isect) {
-		gbuffers.d[pixel_idx] = gbuffer_out;
+		DEREF(g_buffer)[pixel_idx] = gbuffer_out;
 		if (pc.direct_lighting == 1) {
 #ifdef ENABLE_ATMOSPHERE
 			direct_lighting = shade_atmosphere(pc.dir_light_idx, pc.sky_col, origin, direction, tmax);
@@ -62,7 +61,7 @@ void main() {
 	}
 	gbuffer_out.barycentrics = payload.attribs;
 	gbuffer_out.primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
-	gbuffers.d[pixel_idx] = gbuffer_out;
+	DEREF(g_buffer)[pixel_idx] = gbuffer_out;
 
 	if (pc.direct_lighting == 1) {
 		HitData hit_data = get_hitdata(gbuffer_out);

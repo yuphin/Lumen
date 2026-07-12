@@ -12,11 +12,11 @@
 #include "smlt_commons.glsl"
 
 void main() {
-    uvec4 seed = tmp_seeds_data.d[pixel_idx].chain_seed;
+    uvec4 seed = DEREF(tmp_seeds)[pixel_idx].chain_seed;
 
     large_step = true;
     save_radiance = false;
     mlt_seed = seed;
 
-    bootstrap_data.d[pixel_idx].lum = mlt_L_eye();
+    DEREF(bootstrap)[pixel_idx].lum = mlt_L_eye();
 }

@@ -1,50 +1,29 @@
 #ifndef PSSMLT_UTILS
 #define PSSMLT_UTILS
+#include "../../bda.glsl"
 #include "../../commons.glsl"
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
 layout(constant_id = 0) const int SEEDING = 0;
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer BootstrapData { BootstrapSample d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SeedsData { SeedData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PrimarySamples { PrimarySample d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTSamplers { MLTSampler d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer MLTColor { vec3 d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ChainStats { ChainData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer Splats { Splat d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightVertices { VCMVertex d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CameraVertices { VCMVertex d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer PathCnt { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ConnectedLights { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer TmpSeeds { SeedData d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer TmpLuminance { float d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer ProbCarryover { uint d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightSplats { Splat d[]; };
-layout(buffer_reference, scalar, buffer_reference_align = 4) buffer LightSplatCnts { uint d[]; };
 
-TmpSeeds tmp_seeds_data = TmpSeeds(scene_desc.tmp_seeds_addr);
-TmpLuminance tmp_lum_data = TmpLuminance(scene_desc.tmp_lum_addr);
-ProbCarryover prob_carryover_data =
-    ProbCarryover(scene_desc.prob_carryover_addr);
-LightSplats light_splats = LightSplats(scene_desc.light_splats_addr);
-LightSplatCnts light_splat_cnts =
-    LightSplatCnts(scene_desc.light_splat_cnts_addr);
+SCENE_BUFFER(tmp_seeds, SeedData);
+SCENE_BUFFER(tmp_lum, float);
+SCENE_BUFFER(prob_carryover, uint);
+SCENE_BUFFER(light_splats, Splat);
+SCENE_BUFFER(light_splat_cnts, uint);
 
-LightVertices vcm_lights = LightVertices(scene_desc.vcm_vertices_addr);
-// CameraVertices camera_verts = CameraVertices(scene_desc.vcm_vertices_addr);
-ConnectedLights connected_lights =
-    ConnectedLights(scene_desc.connected_lights_addr);
-MLTSamplers mlt_samplers = MLTSamplers(scene_desc.mlt_samplers_addr);
-MLTColor mlt_col = MLTColor(scene_desc.mlt_col_addr);
-ChainStats chain_stats = ChainStats(scene_desc.chain_stats_addr);
-Splats splat_data = Splats(scene_desc.splat_addr);
-Splats past_splat_data = Splats(scene_desc.past_splat_addr);
-BootstrapData bootstrap_data = BootstrapData(scene_desc.bootstrap_addr);
-SeedsData seeds_data = SeedsData(scene_desc.seeds_addr);
-PrimarySamples light_primary_samples =
-    PrimarySamples(scene_desc.light_primary_samples_addr);
-PrimarySamples cam_primary_samples =
-    PrimarySamples(scene_desc.cam_primary_samples_addr);
+SCENE_BUFFER(vcm_vertices, VCMVertex);
+SCENE_BUFFER(connected_lights, uint);
+SCENE_BUFFER(mlt_samplers, MLTSampler);
+SCENE_BUFFER(mlt_col, vec3);
+SCENE_BUFFER(chain_stats, ChainData);
+SCENE_BUFFER(splat, Splat);
+SCENE_BUFFER(past_splat, Splat);
+SCENE_BUFFER(bootstrap, BootstrapSample);
+SCENE_BUFFER(seeds, SeedData);
+SCENE_BUFFER(light_primary_samples, PrimarySample);
+SCENE_BUFFER(cam_primary_samples, PrimarySample);
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
@@ -68,7 +47,7 @@ uint cam_primary_sample_idx =
 uint prim_sample_idxs[2] =
     uint[](light_primary_sample_idx, cam_primary_sample_idx);
 
-PathCnt light_path_cnts = PathCnt(scene_desc.path_cnt_addr);
+SCENE_BUFFER(path_cnt, uint);
 
 
 
@@ -81,8 +60,8 @@ uvec4 mlt_seed;
 float mlt_L_light() {
     vec3 origin = vec3(ubo.inv_view * vec4(0, 0, 0, 1));
     VCMState light_state;
-    connected_lights.d[pixel_idx] = 0;
-    light_splat_cnts.d[pixel_idx] = 0;
+    DEREF(connected_lights)[pixel_idx] = 0;
+    DEREF(light_splat_cnts)[pixel_idx] = 0;
     float lum_sum = 0;
     float eta_vc = 0, eta_vm = 0;
     bool finite;
@@ -123,7 +102,7 @@ float mlt_L_eye() {
     const float connect_lum = luminance(col);
     lum += connect_lum;
     if (save_radiance && connect_lum > 0) {
-#define splat(i) splat_data.d[splat_idx + i]
+#define splat(i) DEREF(splat)[splat_idx + i]
         ivec2 coords =
             ivec2(0.5 * (1 + dir_rnd) * vec2(pc.width, pc.height));
         const uint idx = coords.x * pc.height + coords.y;
