@@ -19,11 +19,17 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Ins
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Materials { Material m[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices { uint i[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer CompactVertices { Vertex d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer LightTriangleCDFs {
+	LightTriangleCDF d[];
+};
+layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer EmitterLightIndices { uint d[]; };
 
 Indices indices = Indices(scene_desc.index_addr);
 Materials materials = Materials(scene_desc.material_addr);
 InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
 CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_addr);
+LightTriangleCDFs light_triangle_cdf = LightTriangleCDFs(scene_desc.light_triangle_cdf_addr);
+EmitterLightIndices emitter_light_indices = EmitterLightIndices(scene_desc.emitter_light_idx_addr);
 
 #include "bsdf_commons.glsl"
 
@@ -39,77 +45,19 @@ vec4 sample_prev_camera(in vec2 ndc) {
 
 float uniform_cone_pdf(float cos_max) { return 1. / (TWO_PI * (1 - cos_max)); }
 
-bool is_light_finite(uint light_props) { return ((light_props >> 4) & 0x1) != 0; }
+bool is_light_finite(uint light_props) { return (light_props & LIGHT_FLAG_FINITE) != 0; }
 
-bool is_light_delta(uint light_props) { return ((light_props >> 5) & 0x1) != 0; }
+bool is_light_delta(uint light_props) { return (light_props & LIGHT_FLAG_DELTA) != 0; }
 
-uint get_light_type(uint light_props) { return uint(light_props & 0x7); }
+bool is_light_delta_position(uint light_props) { return (light_props & LIGHT_FLAG_DELTA_POSITION) != 0; }
 
-float light_pdf(const Light light, const vec3 n_s, const vec3 wi) {
-	const float cos_width = cos(30 * PI / 180);
-	uint light_type = get_light_type(light.light_flags);
-	switch (light_type) {
-		case LIGHT_AREA: {
-			return max(dot(n_s, wi) / PI, 0);
-		} break;
-		case LIGHT_SPOT: {
-			return uniform_cone_pdf(cos_width);
-		} break;
-		case LIGHT_DIRECTIONAL: {
-			return 0;
-		} break;
-	}
-}
+bool is_light_delta_direction(uint light_props) { return (light_props & LIGHT_FLAG_DELTA_DIRECTION) != 0; }
 
-float light_pdf_a_to_w(const uint light_flags, const float pdf_a, const vec3 n_s, const float wi_len_sqr,
-					   const float cos_from_light) {
-	uint light_type = get_light_type(light_flags);
-	switch (light_type) {
-		case LIGHT_AREA: {
-			return pdf_a * wi_len_sqr / cos_from_light;
-		} break;
-		case LIGHT_SPOT: {
-			return wi_len_sqr / cos_from_light;
-		} break;
-		case LIGHT_DIRECTIONAL: {
-			return 1;
-		} break;
-	}
-	return 0;
-}
+bool is_light_two_sided(uint light_props) { return (light_props & LIGHT_FLAG_TWO_SIDED) != 0; }
 
-float light_pdf(uint light_flags, const vec3 n_s, const vec3 wi) {
-	const float cos_width = cos(30 * PI / 180);
-	uint light_type = get_light_type(light_flags);
-	switch (light_type) {
-		case LIGHT_AREA: {
-			return max(dot(n_s, wi) / PI, 0);
-		}
-		case LIGHT_SPOT: {
-			return uniform_cone_pdf(cos_width);
-		}
-		case LIGHT_DIRECTIONAL: {
-			return 0;
-		}
-	}
-}
+uint get_light_type(uint light_props) { return uint(light_props & LIGHT_TYPE_MASK); }
 
-float light_pdf_Le(uint light_flags, const vec3 n_s, const vec3 wi) {
-	const float cos_width = cos(30 * PI / 180);
-	switch (get_light_type(light_flags)) {
-		case LIGHT_AREA: {
-			return max(dot(n_s, wi) / PI, 0);
-		}
-		case LIGHT_SPOT: {
-			return uniform_cone_pdf(cos_width);
-		}
-		case LIGHT_DIRECTIONAL: {
-			return 1;
-		}
-	}
-}
-
-TriangleRecord sample_triangle(PrimInfo pinfo, vec2 rands, uint triangle_idx, in mat4 world_matrix, out vec2 uv) {
+TriangleRecord triangle_at_bary(PrimInfo pinfo, vec2 uv, uint triangle_idx, in mat4 world_matrix) {
 	TriangleRecord result;
 	uint index_offset = pinfo.index_offset + 3 * triangle_idx;
 	uint vertex_offset = pinfo.vertex_offset;
@@ -122,30 +70,28 @@ TriangleRecord sample_triangle(PrimInfo pinfo, vec2 rands, uint triangle_idx, in
 	const vec3 v0 = vtx[0].pos;
 	const vec3 v1 = vtx[1].pos;
 	const vec3 v2 = vtx[2].pos;
-	const vec3 n0 = vtx[0].normal;
-	const vec3 n1 = vtx[1].normal;
-	const vec3 n2 = vtx[2].normal;
-	//    mat4x3 matrix = mat4x3(vec3(world_matrix[0]), vec3(world_matrix[1]),
-	//                           vec3(world_matrix[2]), vec3(world_matrix[3]));
-	mat4x4 inv_tr_mat = transpose(inverse(world_matrix));
-	//    mat4x3 nrm_mat = mat4x3(vec3(inv_tr_mat[0]), vec3(inv_tr_mat[1]),
-	//                            vec3(inv_tr_mat[2]), vec3(inv_tr_mat[3]));
-	uv = vec2(1 - sqrt(rands.x), rands.y * sqrt(rands.x));
 	const vec3 barycentrics = vec3(1.0 - uv.x - uv.y, uv.x, uv.y);
+	const vec3 world_v0 = vec3(world_matrix * vec4(v0, 1.0));
+	const vec3 world_v1 = vec3(world_matrix * vec4(v1, 1.0));
+	const vec3 world_v2 = vec3(world_matrix * vec4(v2, 1.0));
+	const vec3 world_e1 = world_v1 - world_v0;
+	const vec3 world_e2 = world_v2 - world_v0;
+	const vec3 world_cross = cross(world_e1, world_e2);
+	const vec3 object_n_s =
+		normalize(vtx[0].normal * barycentrics.x + vtx[1].normal * barycentrics.y + vtx[2].normal * barycentrics.z);
 
-	const vec4 etmp0 = world_matrix * vec4(v1 - v0, 1.0);
-	const vec4 etmp1 = world_matrix * vec4(v2 - v0, 1.0);
-	const vec3 pos = v0 * barycentrics.x + v1 * barycentrics.y + v2 * barycentrics.z;
-	const vec3 nrm = normalize(n0 * barycentrics.x + n1 * barycentrics.y + n2 * barycentrics.z);
-	const vec4 world_pos = world_matrix * vec4(pos, 1.0);
-	const vec3 e0 = vec3(v2 - v0);
-	const vec3 e1 = vec3(v1 - v0);
-	// LOG_CLICKED("%v3f\n", v2);
-	// LOG_CLICKED("%v3i\n", ind);
-	result.n_s = normalize(vec3(inv_tr_mat * vec4(nrm, 1.0)));
-	result.triangle_pdf = 2. / length((cross(vec3(etmp0), vec3(etmp1))));
-	result.pos = vec3(world_pos);
+	result.pos = world_v0 * barycentrics.x + world_v1 * barycentrics.y + world_v2 * barycentrics.z;
+	result.n_g = normalize(world_cross);
+	result.n_s = normalize(vec3(transpose(inverse(world_matrix)) * vec4(object_n_s, 0.0)));
+	result.bary = uv;
+	result.uv = vtx[0].uv0 * barycentrics.x + vtx[1].uv0 * barycentrics.y + vtx[2].uv0 * barycentrics.z;
+	result.triangle_pdf = 2.0 / length(world_cross);
 	return result;
+}
+
+TriangleRecord sample_triangle(PrimInfo pinfo, vec2 rands, uint triangle_idx, in mat4 world_matrix, out vec2 uv) {
+	uv = vec2(1.0 - sqrt(rands.x), rands.y * sqrt(rands.x));
+	return triangle_at_bary(pinfo, uv, triangle_idx, world_matrix);
 }
 
 TriangleRecord sample_triangle(PrimInfo pinfo, vec2 rands, uint triangle_idx, in mat4 world_matrix) {
@@ -170,50 +116,6 @@ vec3 shade_atmosphere(uint dir_light_idx, vec3 sky_col, vec3 ray_origin, vec3 ra
 	Light sampling
 */
 
-TriangleRecord sample_area_light(const vec4 rands, const int num_lights, const Light light, out uint triangle_idx,
-								 out uint material_idx) {
-	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
-	material_idx = pinfo.material_index;
-	triangle_idx = min(uint(rands.y * light.num_triangles), light.num_triangles - 1);
-	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
-}
-
-TriangleRecord sample_area_light(const vec4 rands, const int num_lights, const Light light, out uint triangle_idx,
-								 out uint material_idx, out vec2 uv) {
-	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
-	material_idx = pinfo.material_index;
-	triangle_idx = min(uint(rands.y * light.num_triangles), light.num_triangles - 1);
-	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix, uv);
-}
-
-TriangleRecord sample_area_light_with_idx(const vec4 rands, const int num_lights, const Light light,
-										  const uint triangle_idx, out uint material_idx) {
-	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
-	material_idx = pinfo.material_index;
-	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
-}
-
-TriangleRecord sample_area_light(const vec4 rands, const Light light, out uint material_idx, out uint triangle_idx,
-								 out vec2 uv) {
-	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
-	material_idx = pinfo.material_index;
-	triangle_idx = min(uint(rands.y * light.num_triangles), light.num_triangles - 1);
-	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix, uv);
-}
-
-TriangleRecord sample_area_light(const vec4 rands, const Light light, out uint material_idx, out uint triangle_idx) {
-	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
-	material_idx = pinfo.material_index;
-	triangle_idx = min(uint(rands.y * light.num_triangles), light.num_triangles - 1);
-	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
-}
-
-TriangleRecord sample_area_light(const vec4 rands, const Light light) {
-	PrimInfo pinfo = prim_infos.d[light.prim_mesh_idx];
-	uint triangle_idx = min(uint(rands.y * light.num_triangles), light.num_triangles - 1);
-	return sample_triangle(pinfo, rands.zw, triangle_idx, light.world_matrix);
-}
-
 vec3 uniform_sample_cone(vec2 uv, float cos_max) {
 	const float cos_theta = (1. - uv.x) + uv.x * cos_max;
 	const float sin_theta = sqrt(1 - cos_theta * cos_theta);
@@ -221,249 +123,302 @@ vec3 uniform_sample_cone(vec2 uv, float cos_max) {
 	return vec3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
 }
 
-vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out float pdf_pos_w, out vec3 wi,
-			   out float wi_len, out float pdf_pos_a, out float cos_from_light, out LightRecord light_record,
-			   out vec3 n, out vec3 pos, out float pdf_dir_w) {
-	if (num_lights == 0) {
-		return vec3(0);
-	}
-	light_record.light_idx = min(uint(rands_pos.x * num_lights), uint(num_lights - 1));
-	Light light = lights[light_record.light_idx];
-	uint light_type = get_light_type(light.light_flags);
-	vec3 L = vec3(0);
-	light_record.flags = light.light_flags;
-	pdf_pos_w = 0;
-	wi = vec3(0);
-	wi_len = 0;
-	pdf_pos_a = 0;
-	cos_from_light = 0;
-
-	switch (light_type) {
-		case LIGHT_AREA: {
-			uint material_idx;
-			TriangleRecord record =
-				sample_area_light(rands_pos, light, material_idx, light_record.triangle_idx, light_record.bary);
-			Material light_mat = load_material(material_idx, light_record.bary);
-			wi = record.pos - p;
-			float wi_len_sqr = dot(wi, wi);
-			wi_len = sqrt(wi_len_sqr);
-			wi /= wi_len;
-			cos_from_light = abs(dot(record.n_s, -wi));
-			L = light_mat.emissive_factor;
-			pdf_pos_a = record.triangle_pdf;
-			pdf_pos_w = cos_from_light == 0 ? 0 : pdf_pos_a * wi_len_sqr / cos_from_light;
-			pdf_dir_w = cos_from_light * INV_PI;
-			light_record.instance_idx = light.prim_mesh_idx;
-			n = record.n_s;
-			pos = record.pos;
-		} break;
-		case LIGHT_SPOT: {
-			wi = light.pos - p;
-			float wi_len_sqr = dot(wi, wi);
-			wi_len = sqrt(wi_len_sqr);
-			wi /= wi_len;
-			const vec3 light_dir = normalize(light.to - light.pos);
-			cos_from_light = dot(-wi, light_dir);
-			const float cos_width = cos(PI / 6);
-			const float cos_faloff = cos(25 * PI / 180);
-			float faloff;
-			if (cos_from_light < cos_width) {
-				faloff = 0;
-			} else if (cos_from_light >= cos_faloff) {
-				faloff = 1;
-			} else {
-				float d = (cos_from_light - cos_width) / (cos_faloff - cos_width);
-				faloff = (d * d) * (d * d);
-			}
-			pdf_pos_a = 1;
-			pdf_pos_w = wi_len_sqr;
-			pdf_dir_w = uniform_cone_pdf(cos_width);
-			L = light.L * faloff;
-			n = -wi;
-			pos = light.pos;
-		} break;
-		case LIGHT_DIRECTIONAL: {
-			const vec3 dir = normalize(light.pos - light.to);
-			const vec3 light_p = p + dir * (2 * light.world_radius);
-			wi = light_p - p;
-			wi_len = length(wi);
-			wi /= wi_len;
-			pdf_pos_a = 1;
-			pdf_pos_w = 1;
-			pdf_dir_w = INV_PI / (light.world_radius * light.world_radius);
-			L = light.L;
-			cos_from_light = 1.;
-			n = -wi;
-			pos = light_p;
-		} break;
-		default:
-			break;
-	}
-	return L;
+LightSampleIdentity invalid_light_identity() {
+	LightSampleIdentity identity;
+	identity.light_idx = INVALID_LIGHT_INDEX;
+	identity.primitive_idx = INVALID_LIGHT_INDEX;
+	identity.triangle_idx = INVALID_LIGHT_INDEX;
+	identity.bary = vec2(0.0);
+	return identity;
 }
 
-vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out float pdf_pos_w, out vec3 wi,
-			   out float wi_len, out float pdf_pos_a, out float cos_from_light, out LightRecord light_record,
-			   out vec3 n, out vec3 pos) {
-	float unused_dir_w;
-	return sample_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light, light_record, n, pos,
-					 unused_dir_w);
+LightLiSample empty_light_Li_sample() {
+	LightLiSample result;
+	result.Li = vec3(0.0);
+	result.position = vec3(0.0);
+	result.normal = vec3(0.0);
+	result.wi = vec3(0.0);
+	result.distance = 0.0;
+	result.selection_pmf = 0.0;
+	result.pdf_position_a = 0.0;
+	result.pdf_position_w = 0.0;
+	result.flags = 0u;
+	result.identity = invalid_light_identity();
+	return result;
 }
 
-vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out float pdf_pos_w, out vec3 wi,
-			   out float wi_len, out float pdf_pos_a, out float cos_from_light, out LightRecord light_record) {
-	vec3 unused_normal;
-	vec3 unused_pos;
-	return sample_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light, light_record,
-					 unused_normal, unused_pos);
+LightLeSample empty_light_Le_sample() {
+	LightLeSample result;
+	result.Le = vec3(0.0);
+	result.position = vec3(0.0);
+	result.normal = vec3(0.0);
+	result.wi = vec3(0.0);
+	result.distance = 0.0;
+	result.cos_from_light = 0.0;
+	result.selection_pmf = 0.0;
+	result.pdf_position_a = 0.0;
+	result.pdf_direction_w = 0.0;
+	result.pdf_joint = 0.0;
+	result.flags = 0u;
+	result.identity = invalid_light_identity();
+	return result;
 }
 
-vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out float pdf_pos_w, out vec3 wi,
-			   out float wi_len, out float pdf_pos_a, out float pdf_dir_w, out float cos_from_light,
-			   out LightRecord light_record) {
-	vec3 unused_normal;
-	vec3 unused_pos;
-	return sample_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light, light_record,
-					 unused_normal, unused_pos, pdf_dir_w);
-}
+uint light_index_from_primitive(uint primitive_idx) { return emitter_light_indices.d[primitive_idx]; }
 
-vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out vec3 wi, out float wi_len, out vec3 n,
-			   out vec3 pos, out float pdf_pos_a, out float cos_from_light, out LightRecord light_record) {
-	float unused_pdf_pos_w;
-	return sample_Li(rands_pos, p, num_lights, unused_pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light, light_record, n,
-					 pos);
-}
-vec3 sample_Li(const vec4 rands_pos, const vec3 p, const int num_lights, out vec3 wi, out float wi_len,
-			   out float pdf_pos_w, out float pdf_pos_dir_w, out float cos_from_light, out LightRecord light_record) {
-	float pdf_pos_a;
-	vec3 unused_normal;
-	vec3 unused_pos;
-	float pdf_dir_w;
-	vec3 L = sample_Li(rands_pos, p, num_lights, pdf_pos_w, wi, wi_len, pdf_pos_a, cos_from_light, light_record,
-					   unused_normal, unused_pos, pdf_dir_w);
-	pdf_pos_dir_w = pdf_pos_a * pdf_dir_w;
-	return L;
-}
-
-vec3 sample_Le(vec4 rands_pos, vec2 rands_dir, const int num_lights, const int total_light, out float cos_from_light,
-			   out LightRecord light_record, out vec3 pos, out vec3 wi, out vec3 n, out float pdf_pos_a,
-			   out float pdf_dir_w, out float phi, out TriangleRecord record) {
-	uint light_idx = min(uint(rands_pos.x * num_lights), uint(num_lights - 1));
-	Light light = lights[light_idx];
-	vec3 L = vec3(0);
-	uint light_type = get_light_type(light.light_flags);
-	phi = 0;
-	light_record.bary = vec2(0);
-	light_record.flags = light.light_flags;
-	light_record.light_idx = light_idx;
-	light_record.triangle_idx = -1;
-	light_record.instance_idx = -1;
-	switch (light_type) {
-		case LIGHT_AREA: {
-			uint material_idx;
-			uint triangle_idx;
-			record = sample_area_light(rands_pos, light, material_idx, light_record.triangle_idx, light_record.bary);
-			Material light_mat = load_material(material_idx, light_record.bary);
-			pos = record.pos;
-			wi = sample_hemisphere(rands_dir, record.n_s, phi);
-			L = light_mat.emissive_factor;
-			cos_from_light = max(dot(record.n_s, wi), 0);
-			pdf_pos_a = record.triangle_pdf;
-			pdf_dir_w = (dot(wi, record.n_s)) / PI;
-			light_record.triangle_idx = triangle_idx;
-			light_record.light_idx = light_idx;
-			n = record.n_s;
-		} break;
-		case LIGHT_SPOT: {
-			const float cos_width = cos(30 * PI / 180);
-			const float cos_faloff = cos(25 * PI / 180);
-			const vec3 light_dir = normalize(light.to - light.pos);
-			vec4 local_quat = to_local_quat(light_dir);
-			wi = rot_quat(invert_quat(local_quat), uniform_sample_cone(rands_dir, cos_width));
-			pos = light.pos;
-			cos_from_light = dot(wi, light_dir);
-			float faloff;
-			if (cos_from_light < cos_width) {
-				faloff = 0;
-			} else if (cos_from_light >= cos_faloff) {
-				faloff = 1;
-			} else {
-				float d = (cos_from_light - cos_width) / (cos_faloff - cos_width);
-				faloff = (d * d) * (d * d);
-			}
-			L = light.L * faloff;
-			pdf_pos_a = 1.;
-			pdf_dir_w = uniform_cone_pdf(cos_width);
-			n = wi;
-
-		} break;
-		case LIGHT_DIRECTIONAL: {
-			vec3 dir = -normalize(light.to - light.pos);
-			vec3 v1, v2;
-			make_coord_system(dir, v1, v2);
-			vec2 uv = concentric_sample_disk(rands_dir);
-			vec3 l_pos = light.world_center + light.world_radius * (uv.x * v1 + uv.y * v2);
-			pos = l_pos + dir * light.world_radius;
-			wi = -dir;
-			L = light.L;
-			pdf_pos_a = 1. / (PI * light.world_radius * light.world_radius);
-			pdf_dir_w = 1;
-			cos_from_light = 1;
-			n = wi;
-		} break;
-		default:
-			break;
-	}
-	pdf_pos_a /= total_light;
-	return L;
-}
-
-vec3 sample_Le(vec4 rands_pos, vec2 rands_dir, const int num_lights, const int total_light, out float cos_from_light,
-			   out LightRecord light_record, out vec3 pos, out vec3 wi, out vec3 n, out float pdf_pos_a,
-			   out float pdf_dir_w) {
-	float unused_phi;
-	TriangleRecord record;
-	return sample_Le(rands_pos, rands_dir, num_lights, total_light, cos_from_light, light_record, pos, wi, n, pdf_pos_a,
-					 pdf_dir_w, unused_phi, record);
-}
-
-vec3 sample_light_with_idx(const vec4 rands_pos, const vec3 p, const int num_lights, const uint light_idx,
-						   const uint triangle_idx, out vec3 pos, out vec3 n) {
-	Light light = lights[light_idx];
-	vec3 L = vec3(0);
-	uint light_type = get_light_type(light.light_flags);
-	if (light_type == LIGHT_AREA) {
-		uint material_idx;
-		vec2 uv_unused;
-		TriangleRecord record = sample_area_light_with_idx(rands_pos, num_lights, light, triangle_idx, material_idx);
-		Material light_mat = load_material(material_idx, uv_unused);
-		L = light_mat.emissive_factor;
-		pos = record.pos;
-		n = record.n_s;
-	} else if (light_type == LIGHT_SPOT) {
-		vec3 dir = normalize(p - light.pos);
-		const vec3 light_dir = normalize(light.to - light.pos);
-		const float cos_theta = dot(dir, light_dir);
-		const float cos_width = cos(PI / 6);
-		const float cos_faloff = cos(25 * PI / 180);
-		float faloff;
-		if (cos_theta < cos_width) {
-			faloff = 0;
-		} else if (cos_theta >= cos_faloff) {
-			faloff = 1;
+uint sample_area_light_triangle(const Light light, float xi) {
+	// Select a triangle uniformly proportional to its area using binary search on the CDF
+	const float target_area = xi * light.mesh_area;
+	uint first = 0u;
+	uint count = light.num_triangles;
+	while (count > 0u) {
+		const uint step = count >> 1;
+		const uint candidate = first + step;
+		if (light_triangle_cdf.d[light.triangle_cdf_offset + candidate].cumulative_area < target_area) {
+			first = candidate + 1u;
+			count -= step + 1u;
 		} else {
-			float d = (cos_theta - cos_width) / (cos_faloff - cos_width);
-			faloff = (d * d) * (d * d);
+			count = step;
 		}
-		pos = light.pos;
-		n = dir;
-		L = light.L * faloff;
-	} else if (light_type == LIGHT_DIRECTIONAL) {
-		vec3 dir = -normalize(light.to - light.pos);
-		pos = p + dir * (2 * light.world_radius);
-		n = -dir;
-		L = light.L;
 	}
-	return L;
+	return light_triangle_cdf.d[light.triangle_cdf_offset + min(first, light.num_triangles - 1u)].triangle_idx;
 }
+
+TriangleRecord sample_area_light_by_area(const Light light, vec3 xi, out uint triangle_idx) {
+	triangle_idx = sample_area_light_triangle(light, xi.x);
+	return sample_triangle(prim_infos.d[light.prim_mesh_idx], xi.yz, triangle_idx, light.world_matrix);
+}
+
+float spot_falloff(const Light light, float cos_theta) {
+	if (cos_theta < light.cos_outer) {
+		return 0.0;
+	}
+	if (cos_theta >= light.cos_inner || light.cos_inner == light.cos_outer) {
+		return 1.0;
+	}
+	const float t = (cos_theta - light.cos_outer) / (light.cos_inner - light.cos_outer);
+	return t * t * t * t;
+}
+
+float light_selection_pmf(int num_lights) { return 1.0 / float(num_lights); }
+
+float area_pdf_a_to_w(float pdf_a, float distance_squared, float abs_cos_from_light) {
+	return abs_cos_from_light == 0.0 ? 0.0 : pdf_a * distance_squared / abs_cos_from_light;
+}
+
+float light_direct_pdf_w(uint light_idx, vec3 reference_position, vec3 light_position, vec3 light_normal,
+						 int num_lights) {
+	const Light light = lights[light_idx];
+	const float selection_pmf = light_selection_pmf(num_lights);
+	if (get_light_type(light.light_flags) != LIGHT_AREA) {
+		return selection_pmf;
+	}
+	const vec3 to_light = light_position - reference_position;
+	const float distance_squared = dot(to_light, to_light);
+	const float abs_cos_from_light = abs(dot(light_normal, -normalize(to_light)));
+	return area_pdf_a_to_w(selection_pmf / light.mesh_area, distance_squared, abs_cos_from_light);
+}
+
+float light_emission_position_pdf_a(uint light_idx, int num_lights) {
+	const Light light = lights[light_idx];
+	const float selection_pmf = light_selection_pmf(num_lights);
+	switch (get_light_type(light.light_flags)) {
+		case LIGHT_AREA:
+			return selection_pmf / light.mesh_area;
+		case LIGHT_DIRECTIONAL:
+			return selection_pmf / (PI * light.world_radius * light.world_radius);
+		default:
+			return selection_pmf;
+	}
+}
+
+float light_emission_direction_pdf_w(uint light_idx, vec3 light_normal, vec3 wi) {
+	const Light light = lights[light_idx];
+	switch (get_light_type(light.light_flags)) {
+		case LIGHT_AREA: {
+			const float cos_from_light = dot(light_normal, wi);
+			return is_light_two_sided(light.light_flags) ? abs(cos_from_light) * (0.5 * INV_PI)
+														 : max(cos_from_light, 0.0) * INV_PI;
+		}
+		case LIGHT_POINT:
+			return 0.25 * INV_PI;
+		case LIGHT_SPOT:
+			return dot(normalize(light.to - light.pos), wi) >= light.cos_outer ? uniform_cone_pdf(light.cos_outer)
+																			   : 0.0;
+		case LIGHT_DIRECTIONAL:
+			return 1.0;
+	}
+	return 0.0;
+}
+
+float light_emission_pdf(uint light_idx, vec3 light_normal, vec3 wi, int num_lights) {
+	return light_emission_position_pdf_a(light_idx, num_lights) *
+		   light_emission_direction_pdf_w(light_idx, light_normal, wi);
+}
+
+LightLiSample replay_light_Li(LightSampleIdentity identity, vec3 p, int num_lights) {
+	LightLiSample result = empty_light_Li_sample();
+	if (num_lights == 0 || identity.light_idx == INVALID_LIGHT_INDEX) {
+		return result;
+	}
+
+	const uint light_idx = identity.light_idx;
+	const Light light = lights[light_idx];
+	const uint light_type = get_light_type(light.light_flags);
+	result.selection_pmf = light_selection_pmf(num_lights);
+	result.flags = light.light_flags;
+	result.identity = identity;
+
+	switch (light_type) {
+		case LIGHT_AREA: {
+			const TriangleRecord record = triangle_at_bary(prim_infos.d[light.prim_mesh_idx], identity.bary,
+														   identity.triangle_idx, light.world_matrix);
+			const vec3 to_light = record.pos - p;
+			const float distance_squared = dot(to_light, to_light);
+			result.distance = sqrt(distance_squared);
+			result.wi = to_light / result.distance;
+			result.position = record.pos;
+			result.normal = record.n_g;
+			result.pdf_position_a = result.selection_pmf / light.mesh_area;
+			const float cos_from_light = dot(record.n_g, -result.wi);
+			result.pdf_position_w = area_pdf_a_to_w(result.pdf_position_a, distance_squared, abs(cos_from_light));
+			if (is_light_two_sided(light.light_flags) || cos_from_light > 0.0) {
+				result.Li = load_material(light.material_idx, record.uv).emissive_factor;
+			}
+		} break;
+		case LIGHT_POINT:
+		case LIGHT_SPOT: {
+			const vec3 to_light = light.pos - p;
+			const float distance_squared = dot(to_light, to_light);
+			result.distance = sqrt(distance_squared);
+			result.wi = to_light / result.distance;
+			result.position = light.pos;
+			result.normal = -result.wi;
+			result.pdf_position_a = result.selection_pmf;
+			result.pdf_position_w = result.selection_pmf;
+			float falloff = 1.0;
+			if (light_type == LIGHT_SPOT) {
+				falloff = spot_falloff(light, dot(-result.wi, normalize(light.to - light.pos)));
+			}
+			result.Li = light.L * (falloff / distance_squared);
+
+		} break;
+		case LIGHT_DIRECTIONAL: {
+			result.wi = normalize(light.pos - light.to);
+			result.distance = 2.0 * light.world_radius;
+			result.position = p + result.wi * result.distance;
+			result.normal = -result.wi;
+			result.Li = light.L;
+			result.pdf_position_a = result.selection_pmf;
+			result.pdf_position_w = result.selection_pmf;
+		} break;
+	}
+	return result;
+}
+
+// Samples a light object uniformly
+LightLiSample sample_light_Li(vec4 xi, vec3 p, int num_lights) {
+	if (num_lights == 0) {
+		return empty_light_Li_sample();
+	}
+
+	LightSampleIdentity identity = invalid_light_identity();
+	identity.light_idx = min(uint(xi.x * num_lights), uint(num_lights - 1));
+	const Light light = lights[identity.light_idx];
+	if (get_light_type(light.light_flags) == LIGHT_AREA) {
+		identity.primitive_idx = light.prim_mesh_idx;
+		identity.triangle_idx = sample_area_light_triangle(light, xi.y);
+		const float sqrt_x = sqrt(xi.z);
+		identity.bary = vec2(1.0 - sqrt_x, xi.w * sqrt_x);
+	}
+	return replay_light_Li(identity, p, num_lights);
+}
+
+// Samples emitted rays.
+// pdf_position_a includes light selection
+// pdf_direction_w is conditional on that endpoint.
+// pdf_joint is their product.
+LightLeSample sample_light_Le(vec4 xi_position, vec2 xi_direction, int num_lights) {
+	LightLeSample result = empty_light_Le_sample();
+	if (num_lights == 0) {
+		return result;
+	}
+
+	const uint light_idx = min(uint(xi_position.x * num_lights), uint(num_lights - 1));
+	const Light light = lights[light_idx];
+	const uint light_type = get_light_type(light.light_flags);
+	result.selection_pmf = light_selection_pmf(num_lights);
+	result.flags = light.light_flags;
+	result.identity.light_idx = light_idx;
+
+	switch (light_type) {
+		case LIGHT_AREA: {
+			uint triangle_idx;
+			const TriangleRecord record = sample_area_light_by_area(light, xi_position.yzw, triangle_idx);
+			result.position = record.pos;
+			result.normal = record.n_g;
+			result.identity.primitive_idx = light.prim_mesh_idx;
+			result.identity.triangle_idx = triangle_idx;
+			result.identity.bary = record.bary;
+			result.pdf_position_a = result.selection_pmf / light.mesh_area;
+			result.Le = load_material(light.material_idx, record.uv).emissive_factor;
+
+			if (is_light_two_sided(light.light_flags)) {
+				const bool back_side = xi_direction.x >= 0.5;
+				const vec2 hemisphere_xi = vec2(fract(2.0 * xi_direction.x), xi_direction.y);
+				result.wi = sample_hemisphere(hemisphere_xi, back_side ? -record.n_g : record.n_g);
+				result.cos_from_light = abs(dot(record.n_g, result.wi));
+				result.pdf_direction_w = result.cos_from_light * (0.5 * INV_PI);
+			} else {
+				result.wi = sample_hemisphere(xi_direction, record.n_g);
+				result.cos_from_light = max(dot(record.n_g, result.wi), 0.0);
+				result.pdf_direction_w = result.cos_from_light * INV_PI;
+			}
+		} break;
+		case LIGHT_POINT: {
+			const float z = 1.0 - 2.0 * xi_direction.x;
+			const float radial = sqrt(max(0.0, 1.0 - z * z));
+			const float phi = TWO_PI * xi_direction.y;
+			result.position = light.pos;
+			result.wi = vec3(radial * cos(phi), radial * sin(phi), z);
+			result.normal = result.wi;
+			result.Le = light.L;
+			result.cos_from_light = 1.0;
+			result.pdf_position_a = result.selection_pmf;
+			result.pdf_direction_w = 0.25 * INV_PI;
+		} break;
+		case LIGHT_SPOT: {
+			const vec3 axis = normalize(light.to - light.pos);
+			vec3 tangent;
+			vec3 bitangent;
+			make_coord_system(axis, tangent, bitangent);
+			const vec3 local_wi = uniform_sample_cone(xi_direction, light.cos_outer);
+			result.position = light.pos;
+			result.wi = local_wi.x * tangent + local_wi.y * bitangent + local_wi.z * axis;
+			result.normal = axis;
+			result.cos_from_light = dot(result.wi, axis);
+			result.Le = light.L * spot_falloff(light, result.cos_from_light);
+			result.pdf_position_a = result.selection_pmf;
+			result.pdf_direction_w = uniform_cone_pdf(light.cos_outer);
+		} break;
+		case LIGHT_DIRECTIONAL: {
+			const vec3 emission_direction = normalize(light.to - light.pos);
+			vec3 tangent;
+			vec3 bitangent;
+			make_coord_system(emission_direction, tangent, bitangent);
+			const vec2 disk = concentric_sample_disk(xi_position.yz);
+			result.position = light.world_center - emission_direction * light.world_radius +
+							  light.world_radius * (disk.x * tangent + disk.y * bitangent);
+			result.normal = emission_direction;
+			result.wi = emission_direction;
+			result.Le = light.L;
+			result.cos_from_light = 1.0;
+			result.pdf_position_a = result.selection_pmf / (PI * light.world_radius * light.world_radius);
+			result.pdf_direction_w = 1.0;
+		} break;
+	}
+	result.pdf_joint = result.pdf_position_a * result.pdf_direction_w;
+	return result;
+}
+
 #endif

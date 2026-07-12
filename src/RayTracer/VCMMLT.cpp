@@ -164,6 +164,10 @@ void init(Integrator* integrator) {
 
 	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, light_triangle_cdf_addr,
+									integrator->lumen_scene->light_triangle_cdf_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, emitter_light_idx_addr,
+									integrator->lumen_scene->emitter_light_indices_buffer);
 	desc.compact_vertices_addr = integrator->lumen_scene->vertex_buffer->device_address();
 	// VCMMLT
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, bootstrap_addr, state.bootstrap_buffer);
@@ -195,8 +199,6 @@ void init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
-	state.pc.total_light_area = 0;
-
 	integrator->frame_num = 0;
 
 	state.pc.mutations_per_pixel = config.mutations_per_pixel;
@@ -283,6 +285,7 @@ void render(Integrator* integrator) {
 	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
 	state.pc.frame_num = integrator->frame_num;
+	state.pc.enable_accumulation = state.enable_accumulation;
 	// VCMMLT related constants
 	state.pc.use_vm = config.enable_vm;
 	state.pc.light_rand_count = state.light_path_rand_count;
@@ -296,8 +299,6 @@ void render(Integrator* integrator) {
 	const f32 max_comp = lm::max(diam.x, lm::max(diam.y, diam.z));
 	const i32 base_grid_res = i32(max_comp / state.pc.radius);
 	state.pc.grid_res = lm::max(ivec3(diam * f32(base_grid_res) / max_comp), ivec3(1));
-	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	auto op_reduce = [&](const lm::String& op_name, const lm::String& op_shader_name, const lm::String& reduce_name,
 						 const lm::String& reduce_shader_name, const lm::SpecializationConstantArray& spec_data) {
 		u32 num_wgs = u32((config.num_mlt_threads + 1023) / 1024);
@@ -475,13 +476,13 @@ void render(Integrator* integrator) {
 
 bool gui(Integrator* integrator) {
 	VCMMLT& state = integrator->vcmmlt;
-	// bool result = false;
+	bool result = false;
+	result |= ImGui::Checkbox("Enable accumulation", &state.enable_accumulation);
 	// result |= ImGui::Checkbox("Enable Light-first ordering(default = eye)", &config.light_first);
 	// if (config.light_first) {
 	//	result |= ImGui::Checkbox("Enable VM", &config.enable_vm);
 	// }
-	// return result;
-	return false;
+	return result;
 }
 
 bool update(Integrator* integrator) {

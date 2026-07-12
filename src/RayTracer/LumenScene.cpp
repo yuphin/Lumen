@@ -216,6 +216,8 @@ static lm::FixedArray<lm::String> get_str_list(lm::Arena* arena, LumenNode* node
 static lm::String get_light_type_str(const AnalyticalLight& light) {
 	if (light.light_flags & LIGHT_SPOT) {
 		return "spot";
+	} else if (light.light_flags & LIGHT_POINT) {
+		return "point";
 	} else if (light.light_flags & LIGHT_DIRECTIONAL) {
 		return "directional";
 	}
@@ -392,8 +394,7 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 	_scene.prim_meshes = lm::fixed_array_create<LumenPrimMesh>(_arena_scene, total_obj_count);
 	_scene.materials = lm::fixed_array_create<Material>(_arena_scene, get_child_count(bsdfs_node));
 	_scene.textures = lm::fixed_array_create<TextureRef>(_arena_scene, get_child_count(textures_node));
-	_scene.scene_textures =
-		lm::fixed_array_create<vk::Texture*>(_arena_scene, lm::max(_scene.textures.capacity, 1ull));
+	_scene.scene_textures = lm::fixed_array_create<vk::Texture*>(_arena_scene, lm::max(_scene.textures.capacity, 1ull));
 	_scene.analytical_lights = lm::fixed_array_create<AnalyticalLight>(_arena_scene, get_child_count(lights_node));
 	_scene.material_idx_to_name = lm::hash_map_create<u32, lm::String>(_arena_scene, get_child_count(bsdfs_node));
 
@@ -436,6 +437,7 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 			Material& material = _scene.materials.emplace_back();
 			material.albedo = get_or_default_v3(get_node(bsdf_node, "albedo"), lm::vec3(1.0f));
 			material.emissive_factor = get_or_default_v3(get_node(bsdf_node, "emissive_factor"), lm::vec3(0.0f));
+			material.emission_two_sided = get_or_default_i(get_node(bsdf_node, "two_sided"), 0);
 			material.texture_id = -1;
 			lm::String mat_name = get_str(get_node(bsdf_node, "name"));
 			if (!mat_name.empty()) {
@@ -497,8 +499,7 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 				// k is the absorption coefficient
 				LumenNode* reflectance = get_node(bsdf_node, "reflectance");
 				if (reflectance) {
-					lm::vec3 reflectance_val =
-						lm::clamp(get_or_default_v3(reflectance, lm::vec3(1.0f)), 0.0f, 0.9999f);
+					lm::vec3 reflectance_val = lm::clamp(get_or_default_v3(reflectance, lm::vec3(1.0f)), 0.0f, 0.9999f);
 					reflectance_to_conductor_eta_k(reflectance_val, material.albedo, material.k);
 				}
 
@@ -514,8 +515,8 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 					lm::vec3 intermediate_term = material.albedo + 1.0f;
 					lm::vec3 intermediate_term2 = material.albedo - 1.0f;
 					material.k = lm::sqrt(1.0f / (1.0f - reflectivity_vec) *
-										   (reflectivity_vec * intermediate_term * intermediate_term -
-											intermediate_term2 * intermediate_term2));
+										  (reflectivity_vec * intermediate_term * intermediate_term -
+										   intermediate_term2 * intermediate_term2));
 				}
 
 				material.bsdf_props = BSDF_FLAG_REFLECTION;
@@ -544,7 +545,8 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 				material.thin = get_or_default_i(get_node(bsdf_node, "thin"), 0);
 
 				if (material.diffuse_trans != 0.0f) {
-					LUMEN_WARN("Principled material %u: diffuse_transmission is unsupported and will be ignored", bsdf_idx);
+					LUMEN_WARN("Principled material %u: diffuse_transmission is unsupported and will be ignored",
+							   bsdf_idx);
 					material.diffuse_trans = 0.0f;
 				}
 				if (material.sheen != 0.0f) {
@@ -579,16 +581,26 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 			light.L = get_or_default_v3(get_node(light_node, "L"), lm::vec3(0));
 			light.pos = get_or_default_v3(get_node(light_node, "pos"), lm::vec3(0));
 			light.to = get_or_default_v3(get_node(light_node, "dir"), lm::vec3(0, 0, 1));
-			if (type == "spot") {
-				light.light_flags |= LIGHT_SPOT;
-				// Is finite
-				light.light_flags |= 1 << 4;
-				// Is delta
-				light.light_flags |= 1 << 5;
+			if (type == "point") {
+				light.light_flags = LIGHT_POINT | LIGHT_FLAG_FINITE | LIGHT_FLAG_DELTA | LIGHT_FLAG_DELTA_POSITION;
+			} else if (type == "spot") {
+				light.light_flags = LIGHT_SPOT | LIGHT_FLAG_FINITE | LIGHT_FLAG_DELTA | LIGHT_FLAG_DELTA_POSITION;
+				light.outer_angle = get_or_default_f(get_node(light_node, "outer_angle"), 30.0f);
+				light.inner_angle = get_or_default_f(get_node(light_node, "inner_angle"), 25.0f);
+				LUMEN_ASSERT(light.outer_angle > 0.0f && light.outer_angle <= 180.0f,
+							 "Spot light outer_angle must be in (0, 180] degrees");
+				LUMEN_ASSERT(light.inner_angle >= 0.0f, "Spot light inner_angle must be non-negative");
+				if (light.inner_angle > light.outer_angle) {
+					LUMEN_WARN("Spot light inner_angle must not exceed outer_angle; using %f degrees",
+							   light.outer_angle);
+					light.inner_angle = light.outer_angle;
+				}
 			} else if (type == "directional") {
-				light.light_flags |= LIGHT_DIRECTIONAL;
-				// Is delta
-				light.light_flags |= 1 << 5;
+				light.light_flags = LIGHT_DIRECTIONAL | LIGHT_FLAG_DELTA | LIGHT_FLAG_DELTA_DIRECTION;
+			} else {
+				LUMEN_WARN("Unknown analytical light type '%.*s' . Defaulting to point light", (int)type.size,
+						   type.data);
+				light.light_flags = LIGHT_POINT | LIGHT_FLAG_FINITE | LIGHT_FLAG_DELTA | LIGHT_FLAG_DELTA_POSITION;
 			}
 		}
 	}
@@ -735,11 +747,12 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 			light.world_matrix = prim_mesh.world_matrix;
 			light.num_triangles = prim_mesh.idx_count / 3;
 			light.prim_mesh_idx = prim_mesh.prim_idx;
-			light.light_flags = LIGHT_AREA;
-			// Is finite
-			light.light_flags |= 1 << 4;
+			light.material_idx = prim_mesh.material_idx;
+			light.light_flags = LIGHT_AREA | LIGHT_FLAG_FINITE;
+			if (_scene.materials[prim_mesh.material_idx].emission_two_sided != 0) {
+				light.light_flags |= LIGHT_FLAG_TWO_SIDED;
+			}
 			light.L = emissive_factor;
-			_scene.total_light_cnt += light.num_triangles;
 		}
 	}
 
@@ -754,20 +767,20 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 	_scene.dimensions.radius = scene_bbox.radius();
 
 	// Scene lights
-	_scene.total_light_area = 0;
 	for (u64 i = 0; i < _scene.analytical_lights.size; i++) {
 		AnalyticalLight& l = _scene.analytical_lights[i];
-		Light light;
+		Light light{};
 		light.L = l.L;
 		light.light_flags = l.light_flags;
 		light.pos = l.pos;
 		light.to = l.to;
-		_scene.total_light_cnt++;
+		light.cos_inner = cos(lm::radians(l.inner_angle));
+		light.cos_outer = cos(lm::radians(l.outer_angle));
 		light.world_radius = _scene.dimensions.radius;
 		light.world_center = _scene.dimensions.center;
 		if ((l.light_flags & LIGHT_DIRECTIONAL) == LIGHT_DIRECTIONAL) {
 			LUMEN_ASSERT(_scene.dir_light_idx == -1, "Only one directional light supported");
-			_scene.dir_light_idx = i;
+			_scene.dir_light_idx = (u32)_scene.gpu_lights.size;
 		}
 		_scene.gpu_lights.emplace_back(light);
 	}
@@ -869,24 +882,42 @@ void load(const lm::String& path) {
 	lm::String path_root = lm::str_substr(path, 0, lm::str_rfind_any(path, "/\\") + 1);
 	scene_init(path_root, root);
 
-	f32 total_light_triangle_area = 0.0f;
-	for (Light& l : _scene.gpu_lights) {
-		if ((l.light_flags & 0x7) == LIGHT_AREA) {
+	u64 light_triangle_count = 0;
+	for (const Light& light : _scene.gpu_lights) {
+		if ((light.light_flags & LIGHT_TYPE_MASK) == LIGHT_AREA) {
+			light_triangle_count += light.num_triangles;
+		}
+	}
+	_scene.light_triangle_cdf = lm::fixed_array_create<LightTriangleCDF>(_arena_scene, light_triangle_count);
+	_scene.emitter_light_indices = lm::fixed_array_create<u32>(_arena_scene, _scene.prim_meshes.size);
+	for (u64 i = 0; i < _scene.prim_meshes.size; i++) {
+		_scene.emitter_light_indices.push_back(INVALID_LIGHT_INDEX);
+	}
+
+	for (u32 light_idx = 0; light_idx < _scene.gpu_lights.size; light_idx++) {
+		Light& l = _scene.gpu_lights[light_idx];
+		if ((l.light_flags & LIGHT_TYPE_MASK) == LIGHT_AREA) {
 			const LumenPrimMesh& pm = _scene.prim_meshes[l.prim_mesh_idx];
 			l.world_matrix = pm.world_matrix;
+			l.triangle_cdf_offset = (u32)_scene.light_triangle_cdf.size;
+			l.material_idx = pm.material_idx;
+			_scene.emitter_light_indices[l.prim_mesh_idx] = light_idx;
+			f32 mesh_area = 0.0f;
 			u32 idx_base_offset = pm.first_idx;
 			u32 vtx_offset = pm.vtx_offset;
 			for (u32 i = 0; i < l.num_triangles; i++) {
 				u32 idx_offset = idx_base_offset + 3 * i;
 				lm::ivec3 ind = {_scene.indices[idx_offset], _scene.indices[idx_offset + 1],
-								  _scene.indices[idx_offset + 2]};
+								 _scene.indices[idx_offset + 2]};
 				ind += lm::ivec3(vtx_offset);
 				const vec3 v0 = pm.world_matrix * lm::vec4(_scene.positions[ind.x], 1.0);
 				const vec3 v1 = pm.world_matrix * lm::vec4(_scene.positions[ind.y], 1.0);
 				const vec3 v2 = pm.world_matrix * lm::vec4(_scene.positions[ind.z], 1.0);
 				f32 area = 0.5f * lm::length(lm::cross(v1 - v0, v2 - v0));
-				total_light_triangle_area += area;
+				mesh_area += area;
+				_scene.light_triangle_cdf.push_back({mesh_area, i});
 			}
+			l.mesh_area = mesh_area;
 		}
 	}
 	////////////////////////////
@@ -897,7 +928,18 @@ void load(const lm::String& path) {
 												 .memory_type = vk::BUFFER_TYPE_GPU,
 												 .size = lm::max(_scene.gpu_lights.size, (u64)1) * sizeof(Light),
 												 .data = _scene.gpu_lights.data});
-	_scene.total_light_area += total_light_triangle_area;
+	_scene.light_triangle_cdf_buffer =
+		prm::get_buffer({.name = CSTR("Light Triangle CDF Buffer"),
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = lm::max(_scene.light_triangle_cdf.size, (u64)1) * sizeof(LightTriangleCDF),
+						 .data = _scene.light_triangle_cdf.data});
+	_scene.emitter_light_indices_buffer =
+		prm::get_buffer({.name = CSTR("Emitter Light Indices Buffer"),
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = lm::max(_scene.emitter_light_indices.size, (u64)1) * sizeof(u32),
+						 .data = _scene.emitter_light_indices.data});
 
 	_scene.index_buffer =
 		prm::get_buffer({.name = CSTR("Index Buffer"),
@@ -988,8 +1030,7 @@ void load(const lm::String& path) {
 		vk::ShaderMacro("ENABLE_DIFFUSE", scene_has_bsdf_type(BSDF_TYPE_DIFFUSE), /* visible = */ false));
 	rg::add_global_macro(
 		vk::ShaderMacro("ENABLE_MIRROR", scene_has_bsdf_type(BSDF_TYPE_MIRROR), /* visible = */ false));
-	rg::add_global_macro(
-		vk::ShaderMacro("ENABLE_GLASS", scene_has_bsdf_type(BSDF_TYPE_GLASS), /* visible = */ false));
+	rg::add_global_macro(vk::ShaderMacro("ENABLE_GLASS", scene_has_bsdf_type(BSDF_TYPE_GLASS), /* visible = */ false));
 	rg::add_global_macro(
 		vk::ShaderMacro("ENABLE_DIELECTRIC", scene_has_bsdf_type(BSDF_TYPE_DIELECTRIC), /* visible = */ false));
 	rg::add_global_macro(
@@ -1163,6 +1204,12 @@ void write() {
 			add_leaf_node(scratch.arena, light_node, "L", str_from_vec3(scratch.arena, light.L));
 			add_leaf_node(scratch.arena, light_node, "pos", str_from_vec3(scratch.arena, light.pos));
 			add_leaf_node(scratch.arena, light_node, "dir", str_from_vec3(scratch.arena, light.to));
+			if ((light.light_flags & LIGHT_TYPE_MASK) == LIGHT_SPOT) {
+				add_leaf_node(scratch.arena, light_node, "inner_angle",
+							  lm::str_from_f32(scratch.arena, light.inner_angle));
+				add_leaf_node(scratch.arena, light_node, "outer_angle",
+							  lm::str_from_f32(scratch.arena, light.outer_angle));
+			}
 			add_child_node(lights_node, light_node);
 		}
 		add_child_node(root, lights_node);
@@ -1250,9 +1297,13 @@ void write() {
 }
 
 void destroy() {
-	std::initializer_list<vk::Buffer*> buffer_list = {
-		_scene.index_buffer, _scene.vertex_buffer, _scene.materials_buffer, _scene.prim_lookup_buffer,
-		_scene.mesh_lights_buffer};
+	std::initializer_list<vk::Buffer*> buffer_list = {_scene.index_buffer,
+													  _scene.vertex_buffer,
+													  _scene.materials_buffer,
+													  _scene.prim_lookup_buffer,
+													  _scene.mesh_lights_buffer,
+													  _scene.light_triangle_cdf_buffer,
+													  _scene.emitter_light_indices_buffer};
 	for (vk::Buffer* b : buffer_list) {
 		prm::remove(b);
 	}

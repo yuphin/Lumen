@@ -8,18 +8,16 @@ struct PCReSTIR {
 	int num_lights;
 	uint time;
 	int max_depth;
-	float total_light_area;
-	int total_light_count;
 	uint dir_light_idx;
 	uint do_spatiotemporal;
 	uint random_num;
 	int enable_accumulation;
+	uint light_candidate_count;
+	uint enable_gi;
 };
 
 struct RestirData {
-	uint light_idx;
-	uint light_mesh_idx;
-	uvec4 seed;
+	LightSampleIdentity identity;
 };
 
 struct RestirReservoir {

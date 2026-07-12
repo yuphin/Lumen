@@ -57,53 +57,26 @@ void update_reservoir(inout RestirReservoir r_new, const RestirData s,
 vec3 calc_L(const RestirReservoir r) {
     const Material hit_mat = load_material(mat_idx, uv);
     const vec3 wo = normalize(origin - pos);
-    vec2 uv_unused;
-    uvec4 r_seed = r.s.seed;
-    const uint light_triangle_idx = r.s.light_mesh_idx;
-    const uint light_idx = r.s.light_idx;
-    vec3 light_pos, light_n;
-    const vec4 rands_pos =
-        vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
-    vec3 Le =
-        sample_light_with_idx(rands_pos, pos, pc.num_lights, light_idx,
-                              light_triangle_idx, light_pos, light_n);
-    vec3 wi = light_pos - pos;
-    const float wi_len = length(wi);
-    wi /= wi_len;
+    const LightLiSample light_sample = replay_light_Li(r.s.identity, pos, pc.num_lights);
     // Whether it's forward facing shouldn't matter here
-    const vec3 f = eval_bsdf(hit_mat, wo, wi, normal, 1, true);
-    const float cos_x = dot(normal, wi);
-    const float g = abs(dot(light_n, -wi)) / (wi_len * wi_len);
-    return f * Le * abs(cos_x) * g;
+    const vec3 f = eval_bsdf(hit_mat, wo, light_sample.wi, normal, 1, true);
+    return f * light_sample.Li * abs(dot(normal, light_sample.wi));
 }
 
 vec3 calc_L_with_visibility_check(const RestirReservoir r) {
     const Material hit_mat = load_material(mat_idx, uv);
     const vec3 wo = normalize(origin - pos);
-    vec2 uv_unused;
-    uvec4 r_seed = r.s.seed;
-    const uint light_triangle_idx = r.s.light_mesh_idx;
-    const uint light_idx = r.s.light_idx;
-    vec3 light_pos, light_n;
-    const vec4 rands_pos =
-        vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
-    vec3 Le = sample_light_with_idx(
-        rands_pos, pos, pc.num_lights, light_idx, light_triangle_idx,
-        light_pos, light_n);
-    vec3 wi = light_pos - pos;
-    const float wi_len = length(wi);
-    wi /= wi_len;
-    const vec3 f = eval_bsdf(hit_mat, wo, wi, normal, 1, true);
-    const float cos_x = dot(normal, wi);
-    const float g = abs(dot(light_n, -wi)) / (wi_len * wi_len);
+    const LightLiSample light_sample = replay_light_Li(r.s.identity, pos, pc.num_lights);
+    const vec3 f = eval_bsdf(hit_mat, wo, light_sample.wi, normal, 1, true);
     any_hit_payload.hit = 1;
     traceRayEXT(tlas,
                 gl_RayFlagsTerminateOnFirstHitEXT |
                     gl_RayFlagsSkipClosestHitShaderEXT,
-                0xFF, 1, 0, 1, offset_ray(pos, normal), 0, wi, wi_len - EPS, 1);
+                0xFF, 1, 0, 1, offset_ray(pos, normal), 0, light_sample.wi,
+                light_sample.distance - EPS, 1);
     bool visible = any_hit_payload.hit == 0;
     if (visible) {
-        return f * Le * abs(cos_x) * g;
+        return f * light_sample.Li * abs(dot(normal, light_sample.wi));
     }
     return vec3(0);
 }

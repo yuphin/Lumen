@@ -26,8 +26,6 @@ void main() {
     init_reservoir(r_new);
     init_reservoir(r_prev);
     init_reservoir(r);
-    r.s.seed = seed;
-    r_new.s.seed = seed;
     traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin, tmin, direction, tmax, 0);
 
     pos = payload.pos;
@@ -52,8 +50,7 @@ void main() {
 
         // Generate samples
 
-        const uint M = 32;
-        const uint light_samples = min(pc.total_light_count, 32);
+        const uint light_samples = pc.num_lights > 0 ? pc.light_candidate_count : 0;
 
         if (pc.do_spatiotemporal == 1 &&
             ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0)) {
@@ -70,65 +67,37 @@ void main() {
         }
 
         for (int i = 0; i < light_samples; i++) {
-            const uvec4 light_seed = seed;
-            vec3 wi;
-            float wi_len;
-            float pdf_light;
-            LightRecord record;
-            float cos_from_light;
-            vec3 light_pos, light_n;
-            const vec3 Le = sample_Li(
-                rand4(seed), payload.pos, pc.num_lights, wi, wi_len, light_n,
-                light_pos, pdf_light, cos_from_light, record);
+            const LightLiSample light_sample = sample_light_Li(rand4(seed), payload.pos, pc.num_lights);
 
             float bsdf_pdf;
-            float cos_x = dot(normal, wi);
-            const float g = abs(cos_from_light) / (wi_len * wi_len);
             const vec3 f =
-                eval_bsdf(normal, wo, hit_mat, 1, side, wi, bsdf_pdf);
+                eval_bsdf(normal, wo, hit_mat, 1, side, light_sample.wi, bsdf_pdf);
 
-            pdf_light *= 1 / pc.num_lights;
-            // f * L * G / pdf
             RestirData s;
-            s.light_idx = record.light_idx;
-            s.light_mesh_idx = record.triangle_idx;
-            s.seed = light_seed;
-            const float p_hat = length(f * Le * abs(cos_x) * g);
-            update_reservoir(r_new, s, p_hat / pdf_light);
+            s.identity = light_sample.identity;
+            const float p_hat = length(f * light_sample.Li * abs(dot(normal, light_sample.wi)));
+            update_reservoir(r_new, s,
+                             light_sample.pdf_position_w > 0.0
+                                 ? p_hat / light_sample.pdf_position_w
+                                 : 0.0);
         }
 
         // Visibility check for the selected candidate
         if (r_new.w_sum > 0) {
-            vec2 uv_unused;
             const RestirData s = r_new.s;
-            uvec4 r_seed = s.seed;
-            const uint light_triangle_idx = s.light_mesh_idx;
-            const uint light_idx = s.light_idx;
-            vec3 light_pos, light_n;
-            const vec4 rands =
-                vec4(rand(r_seed), rand(r_seed), rand(r_seed), rand(r_seed));
-
-            vec3 Le = sample_light_with_idx(
-                rands, payload.pos, pc.num_lights, light_idx,
-                light_triangle_idx, light_pos, light_n);
-
-            vec3 wi = light_pos - payload.pos;
-            const float wi_len = length(wi);
-            wi /= wi_len;
+            const LightLiSample light_sample = replay_light_Li(s.identity, payload.pos, pc.num_lights);
 
             any_hit_payload.hit = 1;
             traceRayEXT(tlas,
                         gl_RayFlagsTerminateOnFirstHitEXT |
                             gl_RayFlagsSkipClosestHitShaderEXT,
-                        0xFF, 1, 0, 1, offset_ray2(pos, normal), 0, wi,
-                        wi_len - EPS, 1);
-            vec3 f = eval_bsdf(hit_mat, wo, wi, normal, 1, side);
-            const float cos_x = dot(normal, wi);
-            const float g = abs(dot(light_n, -wi)) / (wi_len * wi_len);
+                        0xFF, 1, 0, 1, offset_ray2(pos, normal), 0, light_sample.wi,
+                        light_sample.distance - EPS, 1);
+            vec3 f = eval_bsdf(hit_mat, wo, light_sample.wi, normal, 1, side);
             bool visible = any_hit_payload.hit == 0 && f != vec3(0);
             r_new.W = 0;
             if (visible) {
-                const float p_hat = length(f * Le * abs(cos_x) * g);
+                const float p_hat = length(f * light_sample.Li * abs(dot(normal, light_sample.wi)));
                 if (p_hat == 0) {
                     r_new.W = 0;
                 } else {
@@ -140,7 +109,9 @@ void main() {
         combine_reservoir(r, r_new);
         uint num_samples = r_new.m;
         if (pc.do_spatiotemporal == 1) {
-            r_prev.m = min(20 * r.m, r_prev.m);
+            // Limit history relative to the number of fresh candidates, not
+            // the single reservoir item inserted by combine_reservoir().
+            r_prev.m = min(20 * r_new.m, r_prev.m);
             combine_reservoir(r, r_prev);
             num_samples += r_prev.m;
         }
@@ -196,11 +167,9 @@ void main() {
             float cos_wo = dot(wo, n_s);
             origin = offset_ray(payload.pos, n_s);
             if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
-                const float light_pick_pdf = 1. / pc.total_light_count;
                 col += throughput *
-                       uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo,
-                                            specular) /
-                       light_pick_pdf;
+                       sample_direct_light(seed, hit_mat, payload.pos, side, n_s, wo,
+                                           /*use_mis=*/false, specular);
             }
             // Sample direction & update throughput
             float pdf, cos_theta;

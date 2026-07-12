@@ -16,11 +16,13 @@ struct SPPM {
 	vk::Buffer* photon_buffer = nullptr;
 	vk::Buffer* residual_buffer = nullptr;
 	vk::Buffer* counter_buffer = nullptr;
+	bool enable_accumulation = true;
 };
 
 namespace sppm {
 void init(Integrator* integrator);
 void render(Integrator* integrator);
 bool update(Integrator* integrator);
+bool gui(Integrator* integrator);
 void destroy(Integrator* integrator, bool resize);
 }  // namespace sppm

@@ -41,8 +41,10 @@ void main() {
 	vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x, 2. / gl_LaunchSizeEXT.y, 0, 1));
 	area_int /= (area_int.w);
 	const float cam_area = abs(area_int.x * area_int.y);
-	bool last_specular = false;
 	vec3 throughput = vec3(1);
+	vec3 previous_position = vec3(0.0);
+	float previous_bsdf_pdf = 0.0;
+	bool previous_nee_active = false;
 	int depth;
 	for (depth = 0;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
@@ -54,8 +56,26 @@ void main() {
 			break;
 		}
 		const Material hit_mat = load_material(payload.material_idx, payload.uv);
-		if ((depth == 0 && pc.direct_lighting == 1) || last_specular) {
-			col += throughput * hit_mat.emissive_factor;
+		const uint emitter_light_idx = light_index_from_primitive(payload.instance_idx);
+		if (emitter_light_idx != INVALID_LIGHT_INDEX) {
+			const Light emitter = lights[emitter_light_idx];
+			const TriangleRecord emitter_triangle = triangle_at_bary(
+				prim_infos.d[emitter.prim_mesh_idx], vec2(0.0), payload.triangle_idx, emitter.world_matrix);
+			const float cos_from_light = dot(emitter_triangle.n_g, -direction);
+			const vec3 emitted_radiance =
+				(is_light_two_sided(emitter.light_flags) || cos_from_light > 0.0) ? hit_mat.emissive_factor : vec3(0.0);
+			if (depth == 0) {
+				if (pc.direct_lighting == 1) {
+					col += throughput * emitted_radiance;
+				}
+			} else if (previous_nee_active) {
+				const float light_pdf = light_direct_pdf_w(emitter_light_idx, previous_position, payload.pos,
+													  emitter_triangle.n_g, pc.num_lights);
+				const float mis_weight = previous_bsdf_pdf / (previous_bsdf_pdf + light_pdf);
+				col += throughput * emitted_radiance * mis_weight;
+			} else {
+				col += throughput * emitted_radiance;
+			}
 		}
 		if (depth >= pc.max_depth - 1) {
 			break;
@@ -71,12 +91,10 @@ void main() {
 		}
 		float cos_wo = dot(wo, n_s);
 		origin.xyz = offset_ray(payload.pos, n_g);
-		last_specular = is_specular(hit_mat);
-		if (!last_specular) {
-			const float light_pick_pdf = 1. / pc.total_light_count;
-			if (depth > 0 || pc.direct_lighting == 1) {
-				col += throughput * uniform_sample_light(seed, hit_mat, payload.pos, side, n_s, wo) / light_pick_pdf;
-			}
+		const bool surface_specular = is_specular(hit_mat);
+		const bool sample_nee = !surface_specular && (depth > 0 || pc.direct_lighting == 1);
+		if (sample_nee) {
+			col += throughput * sample_direct_light(seed, hit_mat, payload.pos, side, n_s, wo, /*use_mis=*/true);
 		}
 		// Sample direction & update throughput
 		float pdf, cos_theta;
@@ -86,6 +104,9 @@ void main() {
 			break;
 		}
 		throughput *= f * abs(cos_theta) / pdf;
+		previous_position = payload.pos;
+		previous_bsdf_pdf = pdf;
+		previous_nee_active = sample_nee;
 
 		float rr_scale = 1.0;
 		if (bsdf_has_property(hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION)) {
@@ -103,7 +124,7 @@ void main() {
 		return;
 	}
 
-	if (pc.frame_num > 0) {
+	if (pc.enable_accumulation == 1 && pc.frame_num > 0) {
 		float w = 1. / float(pc.frame_num + 1);
 		vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
 		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));

@@ -52,7 +52,7 @@ void main() {
     }
     pixel(idx).col = vec3(0);
     pixel(idx).tau = vec3(0);
-    if (pc.frame_num > 0) {
+    if (pc.enable_accumulation == 1 && pc.frame_num > 0) {
         float w = 1. / float(pc.frame_num + 1);
         vec3 old_col = imageLoad(image, coords).xyz;
         imageStore(image, coords, vec4(mix(old_col, col, w), 1.f));

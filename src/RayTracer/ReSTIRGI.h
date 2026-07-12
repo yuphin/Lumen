@@ -16,6 +16,7 @@ struct ReSTIRGI {
 	PCReSTIRGI pc{};
 	bool do_spatiotemporal = false;
 	bool enable_accumulation = false;
+	bool enable_di = true;
 };
 
 namespace restirgi {

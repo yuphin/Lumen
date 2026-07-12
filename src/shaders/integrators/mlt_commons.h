@@ -13,8 +13,6 @@ struct PCMLT {
 	int num_lights;
 	uint time;
 	int max_depth;
-	float total_light_area;
-	int total_light_count;
 	uint dir_light_idx;
 	float mutations_per_pixel;
 	uint light_rand_count;
@@ -27,6 +25,7 @@ struct PCMLT {
 	int use_vc;
 	float radius;
 	uint num_mlt_threads;
+	uint enable_accumulation;
 };
 
 

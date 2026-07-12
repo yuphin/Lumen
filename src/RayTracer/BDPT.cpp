@@ -30,6 +30,10 @@ void init(Integrator* integrator) {
 
 	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, light_triangle_cdf_addr,
+									integrator->lumen_scene->light_triangle_cdf_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, emitter_light_idx_addr,
+									integrator->lumen_scene->emitter_light_indices_buffer);
 	desc.compact_vertices_addr = integrator->lumen_scene->vertex_buffer->device_address();
 	// BDPT
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, light_path_addr, state.light_path_buffer);
@@ -54,9 +58,8 @@ void render(Integrator* integrator) {
 	state.pc.time = lm::rand_u32();
 	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
-	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	state.pc.frame_num = integrator->frame_num;
+	state.pc.enable_accumulation = state.enable_accumulation;
 	state.pc.width = Window::width();
 	state.pc.height = Window::height();
 	rg::add_rt(CSTR("BDPT"),
@@ -94,6 +97,11 @@ bool update(Integrator* integrator) {
 		integrator->frame_num = 0;
 	}
 	return updated;
+}
+
+bool gui(Integrator* integrator) {
+	BDPT& state = integrator->bdpt;
+	return ImGui::Checkbox("Enable accumulation", &state.enable_accumulation);
 }
 
 void destroy(Integrator* integrator, bool resize) {

@@ -42,25 +42,15 @@ ivec3 get_grid_idx(vec3 p, vec3 min_bnds, vec3 max_bnds, ivec3 grid_res) {
 }
 
 void main() {
-    LightRecord light_record;
-    vec3 wi, pos, n;
-    float pdf_pos, pdf_dir;
-    float cos_theta;
-
     vec4 rands_pos = rand4(seed);
     vec2 rands_dir = rand2(seed);
-
-    const vec3 Le =
-        sample_Le(rands_pos, rands_dir, pc.num_lights, pc.total_light_count,
-                        cos_theta, light_record, pos, wi, n, pdf_pos, pdf_dir);
- 
-    float abs_cos_light = abs(dot(n, wi));
-    vec3 throughput;
-    if (abs_cos_light == 0 || pdf_dir <= 0) {
-        throughput = vec3(0);
-    } else {
-        throughput = Le * abs_cos_light / (pdf_dir * pdf_pos);
+    const LightLeSample light_sample = sample_light_Le(rands_pos, rands_dir, pc.num_lights);
+    if (light_sample.pdf_joint <= 0.0) {
+        return;
     }
+    vec3 wi = light_sample.wi;
+    vec3 pos = light_sample.position;
+    vec3 throughput = light_sample.Le * light_sample.cos_from_light / light_sample.pdf_joint;
 
     for (int d = 0; d < pc.max_depth; d++) {
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, pos, tmin, wi, tmax, 0);

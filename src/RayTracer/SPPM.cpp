@@ -47,6 +47,10 @@ void init(Integrator* integrator) {
 
 	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, light_triangle_cdf_addr,
+									integrator->lumen_scene->light_triangle_cdf_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, emitter_light_idx_addr,
+									integrator->lumen_scene->emitter_light_indices_buffer);
 	desc.compact_vertices_addr = integrator->lumen_scene->vertex_buffer->device_address();
 	// SPPM
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, sppm_data_addr, state.sppm_data_buffer);
@@ -75,9 +79,8 @@ void render(Integrator* integrator) {
 	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
 	state.pc.random_num = lm::rand_u32();
-	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	state.pc.frame_num = integrator->frame_num;
+	state.pc.enable_accumulation = state.enable_accumulation;
 	SPPMConfig& config = integrator->lumen_scene->config.settings.sppm;
 	// PPM related constants
 	if (config.base_radius < 1e-7f) {
@@ -172,6 +175,11 @@ bool update(Integrator* integrator) {
 		integrator->frame_num = 0;
 	}
 	return updated;
+}
+
+bool gui(Integrator* integrator) {
+	SPPM& state = integrator->sppm;
+	return ImGui::Checkbox("Enable accumulation", &state.enable_accumulation);
 }
 
 void destroy(Integrator* integrator, bool resize) {

@@ -9,6 +9,7 @@ struct Integrator;
 
 struct IrradianceCache {
 	vk::Buffer* gbuffer = nullptr;
+	vk::Buffer* current_frame_lighting_buffer = nullptr;
 	vk::Buffer* transformations_buffer = nullptr;
 	vk::Buffer* surfel_spawn_list_buffer = nullptr;
 	vk::Buffer* surfel_spawn_count_buffer = nullptr;
@@ -22,6 +23,7 @@ struct IrradianceCache {
 	vk::Buffer* surfel_samples_buffer = nullptr;
 	PCIRCache pc{};
 	bool direct_lighting = false;
+	bool enable_accumulation = false;
 	bool debug_mode = true;
 	u32 debug_view = IRCACHE_DEBUG_VIEW_TRAPEZOIDAL_GRID_SURFELS;
 	bool pause_surfel_spawn = false;

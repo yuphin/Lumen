@@ -75,15 +75,6 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, vec3 n_s, const flo
 }
 
 bool vcm_generate_light_sample(float eta_vc, out VCMState light_state, out bool finite) {
-	// Sample light
-	uint light_idx;
-	uint light_triangle_idx;
-	uint light_material_idx;
-	vec2 uv_unused;
-	LightRecord light_record;
-	vec3 wi, pos, n;
-	float pdf_pos, pdf_dir;
-	float cos_theta;
 #if VC_MLT == 1 || VCM_MLT == 1
 	const vec4 rands_pos = vec4(mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step),
 								mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step));
@@ -92,25 +83,23 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state, out bool 
 	const vec4 rands_pos = rand4(seed);
 	const vec2 rands_dir = rand2(seed);
 #endif
-	const vec3 Le = sample_Le(rands_pos, rands_dir, pc.num_lights, pc.total_light_count, cos_theta,
-									light_record, pos, wi, n, pdf_pos, pdf_dir);
-	if (pdf_dir <= 0) {
+	const LightLeSample light_sample = sample_light_Le(rands_pos, rands_dir, pc.num_lights);
+	if (light_sample.pdf_joint <= 0.0) {
 		return false;
 	}
 
-	float pdf_emit = pdf_pos * pdf_dir;
-	float pdf_direct = pdf_pos;
-	light_state.pos = pos;
-	light_state.area = 1.0 / pdf_pos;
-	light_state.wi = wi;
-	light_state.throughput = Le * cos_theta / (pdf_dir * pdf_pos);
+	light_state.pos = light_sample.position;
+	light_state.area = 1.0 / light_sample.pdf_position_a;
+	light_state.wi = light_sample.wi;
+	light_state.throughput =
+		light_sample.Le * light_sample.cos_from_light / light_sample.pdf_joint;
 
 	// Partially evaluate pdfs (area formulation)
 	// At s = 0 this is p_rev / p_fwd, in the case of area lights:
 	// p_rev = p_connect = 1/area, p_fwd = cos_theta / (PI * area)
 	// Note that pdf_fwd is in area formulation, so cos_y / r^2 is missing
 	// currently.
-	light_state.d_vcm = pdf_direct / pdf_emit;
+	light_state.d_vcm = 1.0 / light_sample.pdf_direction_w;
 	// g_prev / p_fwd
 	// Note that g_prev component in d_vc and d_vm lags by 1 iter
 	// So we initialize g_prev to cos_theta of the current iter
@@ -119,9 +108,10 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state, out bool 
 	// g_prev or pdf_prev samples from i'th vertex to i-1
 	// In that sense, cos_theta terms will be common in g_prev and pdf_pwd
 	// Similar argument, with the eta
-	finite = is_light_finite(light_record.flags);
-	if (!is_light_delta(light_record.flags)) {
-		light_state.d_vc = (finite ? cos_theta : 1) / (pdf_dir * pdf_pos);
+	finite = is_light_finite(light_sample.flags);
+	if (!is_light_delta(light_sample.flags)) {
+		light_state.d_vc = (finite ? light_sample.cos_from_light : 1.0) /
+						   light_sample.pdf_joint;
 	} else {
 		light_state.d_vc = 0;
 	}
@@ -130,68 +120,72 @@ bool vcm_generate_light_sample(float eta_vc, out VCMState light_state, out bool 
 }
 
 vec3 vcm_get_light_radiance(in const Material mat, in const VCMState camera_state, int d) {
-	if (d == 1) {
-		return mat.emissive_factor;
+	const uint light_idx = light_index_from_primitive(payload.instance_idx);
+	if (light_idx == INVALID_LIGHT_INDEX) {
+		return vec3(0.0);
 	}
-	const float pdf_light_pos = 1.0 / (payload.area * pc.total_light_count);
-
-	const float pdf_light_dir = abs(dot(payload.n_s, -camera_state.wi)) / PI;
+	const Light light = lights[light_idx];
+	const TriangleRecord emitter_triangle = triangle_at_bary(
+		prim_infos.d[light.prim_mesh_idx], vec2(0.0), payload.triangle_idx, light.world_matrix);
+	const float cos_from_light = dot(emitter_triangle.n_g, -camera_state.wi);
+	const vec3 Le = (is_light_two_sided(light.light_flags) || cos_from_light > 0.0)
+						? mat.emissive_factor
+						: vec3(0.0);
+	if (d == 1) {
+		return Le;
+	}
+	const float pdf_light_pos = light_emission_position_pdf_a(light_idx, pc.num_lights);
+	const float pdf_light_dir =
+		light_emission_direction_pdf_w(light_idx, emitter_triangle.n_g, -camera_state.wi);
 	const float w_camera = pdf_light_pos * camera_state.d_vcm +
 						   (pc.use_vc == 1 || pc.use_vm == 1 ? (pdf_light_pos * pdf_light_dir) * camera_state.d_vc : 0);
 	const float mis_weight = 1. / (1. + w_camera);
-	return mis_weight * mat.emissive_factor;
+	return mis_weight * Le;
 }
 
 vec3 vcm_connect_light(vec3 n_s, vec3 wo, Material mat, bool side, float eta_vm, VCMState camera_state,
 					   out float pdf_rev, out vec3 f) {
-	vec3 wi;
-	float wi_len;
-	float pdf_pos_w;
-	float pdf_pos_dir_w;
-	LightRecord record;
-	float cos_y;
-	vec3 res = vec3(0);
+	LightLiSample light_sample;
+	vec3 res = vec3(0.0);
 #if VC_MLT == 1
 	const vec4 rands_pos = vec4(mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step),
 								mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step));
-	const vec3 Le =
-		sample_Li(rands_pos, payload.pos, pc.num_lights, wi, wi_len, pdf_pos_w, pdf_pos_dir_w, cos_y, record);
+	light_sample = sample_light_Li(rands_pos, payload.pos, pc.num_lights);
 #elif VCM_MLT == 1
-	vec3 Le;
 	if (SEEDING == 1) {
-		Le = sample_Li(rand4(seed), payload.pos, pc.num_lights, wi, wi_len, pdf_pos_w, pdf_pos_dir_w, cos_y,
-							 record);
+		light_sample = sample_light_Li(rand4(seed), payload.pos, pc.num_lights);
 	} else {
 		const vec4 rands_pos = vec4(mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step),
 									mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step));
-		Le =
-			sample_Li(rands_pos, payload.pos, pc.num_lights, wi, wi_len, pdf_pos_w, pdf_pos_dir_w, cos_y, record);
+		light_sample = sample_light_Li(rands_pos, payload.pos, pc.num_lights);
 	}
 #else
-	const vec3 Le =
-		sample_Li(rand4(seed), payload.pos, pc.num_lights, wi, wi_len, pdf_pos_w, pdf_pos_dir_w, cos_y, record);
+	light_sample = sample_light_Li(rand4(seed), payload.pos, pc.num_lights);
 #endif
 
-	const float cos_x = dot(wi, n_s);
+	const float cos_x = dot(light_sample.wi, n_s);
 	const vec3 ray_origin = offset_ray2(payload.pos, n_s);
 	any_hit_payload.hit = 1;
 	float pdf_fwd;
-	f = eval_bsdf(n_s, wo, mat, 1, side, wi, pdf_fwd, pdf_rev);
+	f = eval_bsdf(n_s, wo, mat, 1, side, light_sample.wi, pdf_fwd, pdf_rev);
 	if (f != vec3(0)) {
 		traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1,
-					ray_origin, 0, wi, wi_len - EPS, 1);
+					ray_origin, 0, light_sample.wi, light_sample.distance - EPS, 1);
 		const bool visible = any_hit_payload.hit == 0;
 		if (visible) {
-			if (is_light_delta(record.flags)) {
+			if (is_light_delta(light_sample.flags)) {
 				pdf_fwd = 0;
 			}
-			const float w_light = pdf_fwd / (pdf_pos_w / pc.total_light_count);
-			const float w_cam = pdf_pos_dir_w * abs(cos_x) / (pdf_pos_w * cos_y) *
+			const float emission_pdf = light_emission_pdf(
+				light_sample.identity.light_idx, light_sample.normal, -light_sample.wi, pc.num_lights);
+			const float cos_y = abs(dot(light_sample.normal, -light_sample.wi));
+			const float w_light = pdf_fwd / light_sample.pdf_position_w;
+			const float w_cam = emission_pdf * abs(cos_x) / (light_sample.pdf_position_w * cos_y) *
 								(eta_vm + camera_state.d_vcm + camera_state.d_vc * pdf_rev);
 			const float mis_weight = 1. / (1. + w_light + w_cam);
 			if (mis_weight > 0) {
-				res =
-					mis_weight * abs(cos_x) * f * camera_state.throughput * Le / (pdf_pos_w / pc.total_light_count);
+				res = mis_weight * abs(cos_x) * f * camera_state.throughput *
+					  light_sample.Li / light_sample.pdf_position_w;
 			}
 		}
 	}

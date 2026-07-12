@@ -13,6 +13,10 @@ void init(Integrator* integrator) {
 
 	// For shader resource dependency inference, use this macro to register a buffer address to the rendergraph
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, light_triangle_cdf_addr,
+									integrator->lumen_scene->light_triangle_cdf_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, emitter_light_idx_addr,
+									integrator->lumen_scene->emitter_light_indices_buffer);
 
 	integrator->lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = CSTR("Scene Desc"),
@@ -35,11 +39,10 @@ void render(Integrator* integrator) {
 	state.pc.time = lm::rand_u32();
 	state.pc.max_depth = state.path_length;
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
-	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	state.pc.dir_light_idx = integrator->lumen_scene->dir_light_idx;
 	state.pc.frame_num = integrator->frame_num;
 	state.pc.direct_lighting = state.direct_lighting;
+	state.pc.enable_accumulation = state.enable_accumulation;
 	rg::add_rt(CSTR("Path"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/path/path.rgen")},
@@ -81,6 +84,7 @@ bool gui(Integrator* integrator) {
 	bool result = false;
 	result |= ImGui::SliderInt("Path length", (i32*)&state.path_length, 0, 12);
 	result |= ImGui::Checkbox("Direct lighting", &state.direct_lighting);
+	result |= ImGui::Checkbox("Enable accumulation", &state.enable_accumulation);
 	return result;
 }
 

@@ -80,6 +80,10 @@ void init(Integrator* integrator) {
 
 	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, light_triangle_cdf_addr,
+									integrator->lumen_scene->light_triangle_cdf_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, emitter_light_idx_addr,
+									integrator->lumen_scene->emitter_light_indices_buffer);
 	desc.compact_vertices_addr = integrator->lumen_scene->vertex_buffer->device_address();
 	// VCM
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, photon_addr, state.photon_buffer);
@@ -100,8 +104,6 @@ void init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
-	state.pc.total_light_area = 0;
-
 	integrator->frame_num = 0;
 
 	assert(rg::settings().shader_inference == true);
@@ -117,6 +119,7 @@ void render(Integrator* integrator) {
 	state.pc.max_depth = integrator->lumen_scene->config.common.path_length;
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
 	state.pc.frame_num = integrator->frame_num;
+	state.pc.enable_accumulation = state.enable_accumulation;
 	// VCM related constants
 	state.pc.radius = integrator->lumen_scene->dimensions.radius * config.radius_factor / 100.f;
 	state.pc.radius /= (f32)pow((double)state.pc.frame_num + 1, 0.5 * (1 - 2.0 / 3));
@@ -127,7 +130,6 @@ void render(Integrator* integrator) {
 	state.pc.do_spatiotemporal = state.do_spatiotemporal;
 	state.pc.random_num = lm::rand_u32();
 	state.pc.max_angle_samples = MAX_SAMPLES;
-	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		integrator->output_tex,
 		integrator->scene_ubo_buffer,
@@ -283,6 +285,7 @@ bool gui(Integrator* integrator) {
 	bool path_length_changed = ImGui::SliderInt("Path length", (i32*)&integrator->lumen_scene->config.common.path_length, 0, 12);
 	result |= path_length_changed;
 	result |= ImGui::Checkbox("Enable VM", &config.enable_vm);
+	result |= ImGui::Checkbox("Enable accumulation", &state.enable_accumulation);
 	return result;
 }
 

@@ -52,6 +52,7 @@ int bdpt_random_walk_light(const int max_depth, vec3 throughput,
         vtx_assign(b, pos, payload.pos);
         vtx_assign(b, uv, payload.uv);
         vtx_assign(b, material_idx, payload.material_idx);
+		vtx_assign(b, light_idx, light_index_from_primitive(payload.instance_idx));
         vtx_assign(b, throughput, throughput);
         vtx_assign(b, side, uint(side));
         vtx_assign(b, mode, 0);
@@ -147,6 +148,7 @@ int bdpt_random_walk_eye(const int max_depth, vec3 throughput,
         vtx_assign(b, pos, payload.pos);
         vtx_assign(b, uv, payload.uv);
         vtx_assign(b, material_idx, payload.material_idx);
+		vtx_assign(b, light_idx, light_index_from_primitive(payload.instance_idx));
         vtx_assign(b, throughput, throughput);
         vtx_assign(b, side, uint(side));
         vtx_assign(b, mode, 1);
@@ -197,10 +199,6 @@ int bdpt_random_walk_eye(const int max_depth, vec3 throughput,
 }
 
 int bdpt_generate_light_subpath(int max_depth) {
-    LightRecord light_record;
-    vec3 wi, pos, n;
-    float pdf_pos, pdf_dir;
-    float cos_theta;
 #if BDPT_MLT == 1
     const vec4 rands_pos =
         vec4(mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step),
@@ -212,32 +210,32 @@ int bdpt_generate_light_subpath(int max_depth) {
     const vec2 rands_dir = rand2(seed);
    
 #endif
-    const vec3 Le =
-    sample_Le(rands_pos, rands_dir, pc.num_lights, pc.total_light_count,
-                        cos_theta, light_record, pos, wi, n, pdf_pos, pdf_dir);
-    if (pdf_dir <= 0) {
+    const LightLeSample light_sample = sample_light_Le(rands_pos, rands_dir, pc.num_lights);
+    if (light_sample.pdf_joint <= 0.0) {
         return 0;
     }
-    light_pdf_pos = pdf_pos;
+    light_pdf_pos = light_sample.pdf_position_a;
 
-    light_verts.d[bdpt_path_idx].pos = pos;
-    light_verts.d[bdpt_path_idx].light_flags = light_record.flags;
+    light_verts.d[bdpt_path_idx].pos = light_sample.position;
+    light_verts.d[bdpt_path_idx].light_flags = light_sample.flags;
+    light_verts.d[bdpt_path_idx].light_idx = light_sample.identity.light_idx;
     light_verts.d[bdpt_path_idx].delta = 0;
-    light_verts.d[bdpt_path_idx].dir = wi;
-    light_verts.d[bdpt_path_idx].pdf_fwd = pdf_pos;
-    light_verts.d[bdpt_path_idx].n_s = n;
+    light_verts.d[bdpt_path_idx].dir = light_sample.wi;
+    light_verts.d[bdpt_path_idx].pdf_fwd = light_sample.pdf_position_a;
+    light_verts.d[bdpt_path_idx].n_s = light_sample.normal;
     light_verts.d[bdpt_path_idx].side = 1;
     light_verts.d[bdpt_path_idx].mode = 0;
     vec3 throughput =
-        Le * cos_theta / (pdf_dir * light_verts.d[bdpt_path_idx + 0].pdf_fwd);
-    light_verts.d[bdpt_path_idx + 0].throughput = Le;
+        light_sample.Le * light_sample.cos_from_light / light_sample.pdf_joint;
+    light_verts.d[bdpt_path_idx + 0].throughput = light_sample.Le;
     int num_light_verts =
-        bdpt_random_walk_light(max_depth - 1, throughput, pdf_dir) + 1;
-    if (!is_light_finite(light_record.flags)) {
+        bdpt_random_walk_light(max_depth - 1, throughput, light_sample.pdf_direction_w) + 1;
+    if (!is_light_finite(light_sample.flags)) {
         light_verts.d[bdpt_path_idx + 1].pdf_fwd =
-            pdf_pos * abs(dot(wi, light_verts.d[bdpt_path_idx + 1].n_s));
+            light_sample.pdf_position_a *
+            abs(dot(light_sample.wi, light_verts.d[bdpt_path_idx + 1].n_s));
     }
-    if (is_light_delta(light_record.flags)) {
+    if (is_light_delta(light_sample.flags)) {
         light_verts.d[bdpt_path_idx].pdf_fwd = 0;
     }
     return num_light_verts;
@@ -342,8 +340,8 @@ float calc_mis_weight(int s, int t, const in PathVertex sampled) {
                     pdf_rev = light_pdf_pos;
                     pdf_rev *= abs(dot(dir, cam_vtx(t - 1).n_s));
                 } else {
-                    pdf_rev = light_pdf(light_vtx(0).light_flags,
-                                        light_vtx(0).n_s, dir);
+                    pdf_rev = light_emission_direction_pdf_w(
+                        light_vtx(0).light_idx, light_vtx(0).n_s, dir);
                     pdf_rev *=
                         abs(dot(dir, cam_vtx(t - 1).n_s)) / (dir_len * dir_len);
                 }
@@ -352,8 +350,8 @@ float calc_mis_weight(int s, int t, const in PathVertex sampled) {
         } else {
             // s == 0, i.e the path is on a finite light source
             // cam_vtx(t-1).area gives the area of the emitter that was hit
-            cam_vtx(t - 1).pdf_rev =
-                1.0 / (pc.total_light_count * cam_vtx(t - 1).area);
+            cam_vtx(t - 1).pdf_rev = light_emission_position_pdf_a(
+                cam_vtx(t - 1).light_idx, pc.num_lights);
         }
     }
     if (t > 1) {
@@ -547,26 +545,17 @@ vec3 bdpt_connect(int s, int t) {
             L = vec3(1, 1, 1) * cam_vtx(t - 1).throughput;
         }
     } else if (s == 1) {
-        vec3 wi;
-        float wi_len;
-        float pdf_pos_a;
-        vec3 n;
-        vec3 pos;
-        LightRecord record;
-        float cos_y;
 #if BDPT_MLT == 1
         const vec4 rands_pos = vec4(
             mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step),
             mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step));
-        const vec3 Le =
-            sample_Li(rands_pos, cam_vtx(t - 1).pos, pc.num_lights,
-                            wi, wi_len, n, pos, pdf_pos_a, cos_y, record);
+        const LightLiSample light_sample =
+            sample_light_Li(rands_pos, cam_vtx(t - 1).pos, pc.num_lights);
 #else
-        const vec3 Le =
-            sample_Li(rand4(seed), cam_vtx(t - 1).pos, pc.num_lights, wi,
-                            wi_len, n, pos, pdf_pos_a, cos_y, record);
+        const LightLiSample light_sample =
+            sample_light_Li(rand4(seed), cam_vtx(t - 1).pos, pc.num_lights);
 #endif
-        const float cos_x = abs(dot(wi, cam_vtx(t - 1).n_s));
+        const float cos_x = abs(dot(light_sample.wi, cam_vtx(t - 1).n_s));
         const vec3 ray_origin =
             offset_ray2(cam_vtx(t - 1).pos, cam_vtx(t - 1).n_s);
         any_hit_payload.hit = 1;
@@ -574,24 +563,22 @@ vec3 bdpt_connect(int s, int t) {
         // TODO
         const Material mat =
             load_material(cam_vtx(t - 1).material_idx, cam_vtx(t - 1).uv);
-        const vec3 f = eval_bsdf(mat, wo, wi, cam_vtx(t - 1).n_s, cam_vtx(t - 1).mode, cam_vtx(t - 1).side == 1);
+        const vec3 f = eval_bsdf(mat, wo, light_sample.wi, cam_vtx(t - 1).n_s,
+                                 cam_vtx(t - 1).mode, cam_vtx(t - 1).side == 1);
         if (f != vec3(0)) {
             traceRayEXT(tlas,
                         gl_RayFlagsTerminateOnFirstHitEXT |
                             gl_RayFlagsSkipClosestHitShaderEXT,
-                        0xFF, 1, 0, 1, ray_origin, 0, wi, wi_len - EPS, 1);
+                        0xFF, 1, 0, 1, ray_origin, 0, light_sample.wi,
+                        light_sample.distance - EPS, 1);
             const bool visible = any_hit_payload.hit == 0;
             if (visible) {
-                const float pdf_light_w =
-                    light_pdf_a_to_w(record.flags, pdf_pos_a, n,
-                                     wi_len * wi_len, cos_y) /
-                    pc.total_light_count;
-                sampled.pdf_fwd = pdf_pos_a / pc.total_light_count;
-                sampled.pos = pos;
-                sampled.n_s = n;
-                sampled.delta = uint(is_light_delta(record.flags));
-                L = cam_vtx(t - 1).throughput * f * abs(cos_x) * Le /
-                    pdf_light_w;
+                sampled.pdf_fwd = light_sample.pdf_position_a;
+                sampled.pos = light_sample.position;
+                sampled.n_s = light_sample.normal;
+                sampled.delta = uint(is_light_delta(light_sample.flags));
+                L = cam_vtx(t - 1).throughput * f * abs(cos_x) *
+                    light_sample.Li / light_sample.pdf_position_w;
             }
         }
     } else {

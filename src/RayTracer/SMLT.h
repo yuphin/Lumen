@@ -38,11 +38,13 @@ struct SMLT {
 	i32 mutation_count = 0;
 	i32 light_path_rand_count = 0;
 	i32 cam_path_rand_count = 0;
+	bool enable_accumulation = true;
 };
 
 namespace smlt {
 void init(Integrator* integrator);
 void render(Integrator* integrator);
 bool update(Integrator* integrator);
+bool gui(Integrator* integrator);
 void destroy(Integrator* integrator, bool resize);
 }  // namespace smlt

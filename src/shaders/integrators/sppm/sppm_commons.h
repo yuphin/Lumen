@@ -17,11 +17,10 @@ struct PCSPPM {
 	int num_lights;
 	uint time;
 	int max_depth;
-	float total_light_area;
-	int total_light_count;
 	uint dir_light_idx;
 	uint random_num;
 	float ppm_base_radius;
+	uint enable_accumulation;
 };
 
 struct SPPMData {

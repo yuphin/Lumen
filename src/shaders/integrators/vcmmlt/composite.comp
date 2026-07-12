@@ -43,7 +43,7 @@ void main() {
     col += tmp_col.d[gl_GlobalInvocationID.x];
     mlt_col.d[gl_GlobalInvocationID.x] = vec3(0);
     tmp_col.d[gl_GlobalInvocationID.x] = vec3(0);
-    if (pc.frame_num > 0) {
+    if (pc.enable_accumulation == 1 && pc.frame_num > 0) {
         float w = 1. / float(pc.frame_num + 1);
 
         vec3 old_col = imageLoad(image, ivec2(coords)).xyz;

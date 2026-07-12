@@ -31,6 +31,8 @@ struct AnalyticalLight {
 	lm::vec3 L;
 	u32 light_flags;
 	f32 world_radius;
+	f32 inner_angle;
+	f32 outer_angle;
 	bool enabled = true;
 };
 
@@ -62,6 +64,8 @@ struct Scene {
 	lm::FixedArray<AnalyticalLight> analytical_lights;
 	lm::HashMap<u32, lm::String> material_idx_to_name{};
 	lm::FixedArray<Light> gpu_lights;
+	lm::FixedArray<LightTriangleCDF> light_triangle_cdf;
+	lm::FixedArray<u32> emitter_light_indices;
 
 	vk::Buffer* index_buffer;
 	vk::Buffer* vertex_buffer;
@@ -69,10 +73,9 @@ struct Scene {
 	vk::Buffer* prim_lookup_buffer;
 	vk::Buffer* scene_desc_buffer;
 	vk::Buffer* mesh_lights_buffer;
+	vk::Buffer* light_triangle_cdf_buffer;
+	vk::Buffer* emitter_light_indices_buffer;
 	lm::Camera camera{};
-
-	u32 total_light_cnt = 0;
-	f32 total_light_area = 0;
 
 	struct Dimensions {
 		lm::vec3 min = lm::vec3(F32_MAX);

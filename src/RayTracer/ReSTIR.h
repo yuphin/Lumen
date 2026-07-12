@@ -16,6 +16,8 @@ struct ReSTIR {
 	PCReSTIR pc{};
 	bool do_spatiotemporal = false;
 	bool enable_accumulation = false;
+	bool enable_gi = false;
+	u32 light_candidate_count = 32;
 };
 
 namespace restir {

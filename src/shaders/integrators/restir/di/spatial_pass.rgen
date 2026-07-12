@@ -21,7 +21,10 @@ void main() {
     init_reservoir(r);
     if (curr_reservoir.W != 0) {
         combine_reservoir(r, curr_reservoir);
-        uint num_samples = r.m;
+        // combine_reservoir() treats each input reservoir as one streaming
+        // candidate, so r.m is 1 here.  The normalization must instead count
+        // every candidate represented by the current reservoir.
+        uint num_samples = curr_reservoir.m;
         for (int i = 0; i < num_neighbor_samples; i++) {
             // Choose a neighbor pixel
             const float randa = rand(seed) * 2 * PI;

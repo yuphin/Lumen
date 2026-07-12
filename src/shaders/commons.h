@@ -29,6 +29,16 @@
 #define LIGHT_SPOT 1 << 0
 #define LIGHT_AREA 1 << 1
 #define LIGHT_DIRECTIONAL 1 << 2
+#define LIGHT_POINT 1 << 3
+#define LIGHT_TYPE_MASK 0xF
+
+#define LIGHT_FLAG_FINITE 1 << 4
+#define LIGHT_FLAG_DELTA 1 << 5
+#define LIGHT_FLAG_DELTA_POSITION 1 << 6
+#define LIGHT_FLAG_DELTA_DIRECTION 1 << 7
+#define LIGHT_FLAG_TWO_SIDED 1 << 8
+
+#define INVALID_LIGHT_INDEX 0xFFFFFFFFu
 
 #ifdef __cplusplus
 // GLSL Type
@@ -215,6 +225,23 @@ struct Light {
 	uint light_flags;
 	vec3 world_center;
 	float world_radius;
+	float mesh_area;
+	uint triangle_cdf_offset;
+	uint material_idx;
+	float cos_inner;
+	float cos_outer;
+};
+
+struct LightTriangleCDF {
+	float cumulative_area;
+	uint triangle_idx;
+};
+
+struct LightSampleIdentity {
+	uint light_idx;
+	uint primitive_idx;
+	uint triangle_idx;
+	vec2 bary;
 };
 
 struct Material {
@@ -239,6 +266,7 @@ struct Material {
 	float flatness;
 	float anisotropy;
 	uint thin;
+	uint emission_two_sided;
 };
 
 // Scene buffer addresses
@@ -247,6 +275,8 @@ struct Material {
 	uint64_t index_addr;
 	uint64_t material_addr;
 	uint64_t prim_info_addr;
+	uint64_t light_triangle_cdf_addr;
+	uint64_t emitter_light_idx_addr;
 	// NEE
 	uint64_t mesh_lights_addr;
 	uint64_t light_vis_addr;

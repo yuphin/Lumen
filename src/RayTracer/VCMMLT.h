@@ -31,6 +31,7 @@ struct VCMMLT {
 	i32 mutation_count = 0;
 	i32 light_path_rand_count = 0;
 	i32 sample_cnt = 0;
+	bool enable_accumulation = true;
 };
 
 namespace vcmmlt {

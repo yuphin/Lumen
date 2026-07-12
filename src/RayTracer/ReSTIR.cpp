@@ -45,6 +45,10 @@ void init(Integrator* integrator) {
 
 	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, light_triangle_cdf_addr,
+									integrator->lumen_scene->light_triangle_cdf_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, emitter_light_idx_addr,
+									integrator->lumen_scene->emitter_light_indices_buffer);
 	desc.compact_vertices_addr = integrator->lumen_scene->vertex_buffer->device_address();
 	// ReSTIR
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, g_buffer_addr, state.g_buffer);
@@ -58,8 +62,6 @@ void init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = sizeof(SceneDesc),
 						 .data = &desc});
-
-	state.pc.total_light_area = 0;
 
 	integrator->frame_num = 0;
 	assert(rg::settings().shader_inference == true);
@@ -75,9 +77,9 @@ void render(Integrator* integrator) {
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
 	state.pc.do_spatiotemporal = state.do_spatiotemporal;
 	state.pc.random_num = lm::rand_u32();
-	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	state.pc.enable_accumulation = state.enable_accumulation;
+	state.pc.light_candidate_count = state.light_candidate_count;
+	state.pc.enable_gi = state.enable_gi;
 	state.pc.frame_num = integrator->frame_num;
 
 	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
@@ -155,6 +157,8 @@ bool gui(Integrator* integrator) {
 	ReSTIR& state = integrator->restir;
 	bool result = false;
 	result |= ImGui::Checkbox("Enable accumulation", &state.enable_accumulation);
+	result |= ImGui::Checkbox("Indirect lighting (GI)", &state.enable_gi);
+	result |= ImGui::SliderInt("Light candidates", (i32*)&state.light_candidate_count, 1, 64);
 	return result;
 }
 

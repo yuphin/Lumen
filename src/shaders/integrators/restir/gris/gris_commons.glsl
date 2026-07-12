@@ -161,21 +161,19 @@ vec3 get_hitdata_pos_only(vec2 attribs, uint instance_idx, uint triangle_idx) {
 }
 
 vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 wo, float d_vm,
-			out LightRecord record, inout vec3 light_dir_or_pdf, out bool is_directional_light, out vec3 Le,
+			out LightSampleIdentity identity, inout vec3 light_dir_or_pdf, out bool is_directional_light, out vec3 Le,
 			out vec3 wi, out float pdf_light_w, int depth) {
-	float pdf_light_a;
-	wi = vec3(0);
-	float wi_len = 0;
-	float cos_from_light;
-
-	float pdf_dir;
-	Le = sample_Li(rand4(seed), pos, pc.num_lights, pdf_light_w, wi, wi_len, pdf_light_a, pdf_dir, cos_from_light,
-				   record);
+	const LightLiSample light_sample = sample_light_Li(rand4(seed), pos, pc.num_lights);
+	identity = light_sample.identity;
+	Le = light_sample.Li;
+	wi = light_sample.wi;
+	pdf_light_w = light_sample.pdf_position_w;
+	const float wi_len = light_sample.distance;
 	// TODO: Should we handle this case differently? Investigate this further
 	if(wi_len < EPS) {
 		return vec3(0);
 	}
-	const uint light_type = get_light_type(record.flags);
+	const uint light_type = get_light_type(light_sample.flags);
 	const vec3 p = offset_ray2(pos, n_s);
 	float light_bsdf_pdf_fwd;
 	float light_bsdf_pdf_rev;
@@ -187,15 +185,18 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	bool visible = any_hit_payload.hit == 0;
 	is_directional_light = light_type == LIGHT_DIRECTIONAL;
 
-	light_dir_or_pdf = is_directional_light ? wi * wi_len : vec3(pdf_light_a, vec2(0));
+	light_dir_or_pdf = vec3(light_sample.pdf_position_a, vec2(0));
 
-	const float light_pick_pdf = 1. / pc.total_light_count;
 	if (visible && pdf_light_w > 0 && cos_x > 0) {
-		float mis_light = is_light_delta(record.flags) ? 0 : light_bsdf_pdf_fwd / pdf_light_w;
+		float mis_light = is_light_delta(light_sample.flags) ? 0 : light_bsdf_pdf_fwd / pdf_light_w;
 		ASSERT(mis_light >= 0);
 #ifndef DISABLE_PM_MIS
-		float mis_eye =
-			wi_len == 0 ? 0 : pdf_dir * light_bsdf_pdf_rev * cos_x * d_vm / (wi_len * wi_len * light_pick_pdf);
+		const float pdf_dir = light_emission_direction_pdf_w(
+			light_sample.identity.light_idx, light_sample.normal, -light_sample.wi);
+		float mis_eye = wi_len == 0
+						? 0
+						: pdf_dir * light_bsdf_pdf_rev * cos_x * d_vm /
+							  (wi_len * wi_len * light_sample.selection_pmf);
 		ASSERT(d_vm >= 0);
 		ASSERT(mis_eye >= 0);
 #else
@@ -204,7 +205,7 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 		float mis_weight = 1 / (1 + mis_light + mis_eye);
 		ASSERT(!isnan(mis_weight));
 		ASSERT(mis_weight >= 0);
-		return mis_weight * f_light * abs(cos_x) * Le / (light_pick_pdf * pdf_light_w);
+		return mis_weight * f_light * abs(cos_x) * Le / pdf_light_w;
 	}
 	return vec3(0);
 }
@@ -365,10 +366,6 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 		rc_hit_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
 	} else {
 		light = lights[data.rc_primitive_instance_id.y];
-		if (!is_directional_light) {
-			rc_gbuffer = get_hitdata(data.rc_barycentrics, light.prim_mesh_idx, data.rc_primitive_instance_id.x);
-			rc_hit_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
-		}
 	}
 
 	uint prefix_depth = 0;
@@ -421,14 +418,24 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 			ASSERT(data.debug_sampling_seed == reservoir_seed)
 #endif
 
-			vec3 dst_postfix_wi = (rc_type == RECONNECTION_TYPE_NEE && is_directional_light)
-									  ? data.rc_Li
-									  : (rc_gbuffer.pos - dst_gbuffer.pos);
+			LightLiSample replayed_light;
+			vec3 dst_postfix_wi;
+			if (rc_type == RECONNECTION_TYPE_NEE) {
+				LightSampleIdentity identity;
+				identity.light_idx = data.rc_primitive_instance_id.y;
+				identity.primitive_idx = light.prim_mesh_idx;
+				identity.triangle_idx = data.rc_primitive_instance_id.x;
+				identity.bary = data.rc_barycentrics;
+				replayed_light = replay_light_Li(identity, org_pos, pc.num_lights);
+				dst_postfix_wi = replayed_light.wi * replayed_light.distance;
+			} else {
+				dst_postfix_wi = rc_gbuffer.pos - dst_gbuffer.pos;
+			}
 
 			float wi_len_sqr = dot(dst_postfix_wi, dst_postfix_wi);
 			float wi_len = sqrt(wi_len_sqr);
 			dst_postfix_wi /= wi_len;
-			occlusion_data.origin = offset_ray2(is_directional_light ? org_pos : dst_gbuffer.pos, dst_gbuffer.n_s);
+			occlusion_data.origin = offset_ray2(org_pos, dst_gbuffer.n_s);
 			occlusion_data.dir = dst_postfix_wi;
 			occlusion_data.dir_length = wi_len;
 			set_bounce_flag(bounce_flags, prefix_depth + 1, true);
@@ -450,7 +457,6 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 				return false;
 			}
 #endif
-			const float light_pick_pdf = 1. / pc.total_light_count;
 			if (rc_type == RECONNECTION_TYPE_NEE) {
 				// In this case directly re-use the NEE result
 				ASSERT(prefix_depth != 0);	// Can't process direct lighting
@@ -459,18 +465,10 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 #if DEBUG == 1
 				ASSERT(reconnection_seed == data.debug_seed);
 #endif
-				float pdf_light_w;
-				float mis_weight;
-
-				bool is_emissive_light = !is_light_delta(light.light_flags);
-				if (is_emissive_light) {
-					pdf_light_w = data.rc_Li.x * wi_len_sqr / abs(dot(rc_gbuffer.n_s, dst_postfix_wi));
-					mis_weight = 1.0 / (1.0 + dst_postfix_pdf / pdf_light_w);
-				} else {
-					pdf_light_w = 1.0;
-					mis_weight = 1.0;
-				}
-				reservoir_contribution *= light.L * mis_weight / (light_pick_pdf * pdf_light_w);
+				const float mis_weight = is_light_delta(replayed_light.flags)
+										 ? 1.0
+										 : 1.0 / (1.0 + dst_postfix_pdf / replayed_light.pdf_position_w);
+				reservoir_contribution *= replayed_light.Li * mis_weight / replayed_light.pdf_position_w;
 #if LOG_GRIS
 				LOG_CLICKED3("NEE: %d - %d = %v3f\n", prefix_depth, (data.path_flags) >> 16, reservoir_contribution);
 #endif
@@ -501,7 +499,7 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 
 				if (rc_type == RECONNECTION_TYPE_NEE_AFTER_RC) {
 					reservoir_contribution *= rc_postfix_f * abs(dot(rc_gbuffer.n_s, rc_wi_post)) /
-											  (light_pick_pdf * uintBitsToFloat(data.rc_seed));
+											  uintBitsToFloat(data.rc_seed);
 
 				} else if (rc_type != RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
 					jacobian_num *= rc_pdf_post;

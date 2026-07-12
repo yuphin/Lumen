@@ -75,7 +75,7 @@ void main() {
 		Material hit_material = load_material(hit_data.material_idx, hit_data.uv);
 
 		bool forward_facing = face_forward(hit_data.n_s, hit_data.n_g, wo);
-		radiance += uniform_sample_light(sampling_seed, hit_data.pos, hit_data.n_s, wo, hit_material, forward_facing);
+		radiance += sample_direct_light(sampling_seed, hit_data.pos, hit_data.n_s, wo, hit_material, forward_facing);
 	}
 
 	if (pdf_w <= 0.0 || cos_theta <= 0.0) {

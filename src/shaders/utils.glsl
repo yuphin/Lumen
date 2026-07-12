@@ -44,16 +44,39 @@ struct AnyHitPayload {
 
 struct TriangleRecord {
 	vec3 pos;
+	vec3 n_g;
 	vec3 n_s;
+	vec2 bary;
+	vec2 uv;
 	float triangle_pdf;
 };
 
-struct LightRecord {
-	uint light_idx;
+struct LightLiSample {
+	vec3 Li;
+	vec3 position;
+	vec3 normal;
+	vec3 wi;
+	float distance;
+	float selection_pmf;
+	float pdf_position_a;
+	float pdf_position_w;
 	uint flags;
-	vec2 bary;
-	uint triangle_idx;
-	uint instance_idx;
+	LightSampleIdentity identity;
+};
+
+struct LightLeSample {
+	vec3 Le;
+	vec3 position;
+	vec3 normal;
+	vec3 wi;
+	float distance;
+	float cos_from_light;
+	float selection_pmf;
+	float pdf_position_a;
+	float pdf_direction_w;
+	float pdf_joint;
+	uint flags;
+	LightSampleIdentity identity;
 };
 
 #define pow5(x) (((x) * (x)) * ((x) * (x)) * (x))

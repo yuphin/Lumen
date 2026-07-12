@@ -31,11 +31,13 @@ struct PSSMLT {
 	i32 light_path_rand_count = 0;
 	i32 cam_path_rand_count = 0;
 	i32 connect_path_rand_count = 0;
+	bool enable_accumulation = true;
 };
 
 namespace pssmlt {
 void init(Integrator* integrator);
 void render(Integrator* integrator);
 bool update(Integrator* integrator);
+bool gui(Integrator* integrator);
 void destroy(Integrator* integrator, bool resize);
 }  // namespace pssmlt

@@ -19,36 +19,28 @@ PhotonCounts photon_counts = PhotonCounts(scene_desc.photon_count_addr);
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
 
 void main() {
-	LightRecord light_record;
-	vec3 wi, pos, n;
-	float pdf_pos, pdf_dir;
-	float cos_theta;
-
 	vec4 rands_pos = rand4(seed);
 	vec2 rands_dir = rand2(seed);
 
-	const vec3 Le = sample_Le(rands_pos, rands_dir, pc.num_lights, pc.total_light_count, cos_theta,
-									light_record, pos, wi, n, pdf_pos, pdf_dir);
-	float abs_cos_light = abs(dot(n, wi));
-	vec3 throughput;
+	const LightLeSample light_sample = sample_light_Le(rands_pos, rands_dir, pc.num_lights);
+	if (light_sample.pdf_joint <= 0.0) {
+		return;
+	}
+	vec3 wi = light_sample.wi;
+	vec3 pos = light_sample.position;
+	vec3 throughput = light_sample.Le * light_sample.cos_from_light / light_sample.pdf_joint;
 
 	float eta_vm = PI * pc.photon_radius * pc.photon_radius * pc.num_photons;
-	if (abs_cos_light == 0 || pdf_dir <= 0) {
-		throughput = vec3(0);
-	} else {
-		throughput = Le * abs_cos_light / (pdf_dir * pdf_pos);
-	}
+	float d_vm_common = light_sample.pdf_direction_w == 0
+						? 0
+						: 1.0 / (light_sample.pdf_direction_w * eta_vm);
+	float d_vm_nee = light_sample.selection_pmf;
+	float d_vm_bsdf = light_sample.selection_pmf / light_sample.pdf_position_a;
 
-	float light_pick_prob = 1.0 / pc.total_light_count;
+	bool finite = is_light_finite(light_sample.flags);
 
-	float d_vm_common = pdf_dir == 0 ? 0 : 1.0 / (pdf_dir * eta_vm);
-	float d_vm_nee = light_pick_prob;
-	float d_vm_bsdf =  light_pick_prob / pdf_pos;
-
-	bool finite = is_light_finite(light_record.flags);
-
-	if (!is_light_delta(light_record.flags)) {
-		d_vm_bsdf *= (finite ? abs_cos_light : 1.0);
+	if (!is_light_delta(light_sample.flags)) {
+		d_vm_bsdf *= (finite ? light_sample.cos_from_light : 1.0);
 	} else {
 		d_vm_bsdf = 0;
 	}

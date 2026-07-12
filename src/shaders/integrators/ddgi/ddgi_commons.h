@@ -9,12 +9,11 @@ struct PCDDGI {
 	int num_lights;
 	uint time;
 	int max_depth;
-	float total_light_area;
-	int total_light_count;
 	uint dir_light_idx;
 	int first_frame;
 	int infinite_bounces;
 	int direct_lighting;
+	int enable_accumulation;
 };
 
 struct DDGIUniforms {

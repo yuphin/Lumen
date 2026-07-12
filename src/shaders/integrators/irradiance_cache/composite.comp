@@ -19,6 +19,7 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Com
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer SurfelPool { Surfel d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellCounts { uint d[]; };
 layout(buffer_reference, scalar, buffer_reference_align = 4) buffer GridCellIndices { uint d[]; };
+layout(buffer_reference, scalar, buffer_reference_align = 4) buffer CurrentFrameLighting { vec3 d[]; };
 
 Indices indices = Indices(scene_desc.index_addr);
 InstanceInfo prim_infos = InstanceInfo(scene_desc.prim_info_addr);
@@ -27,6 +28,7 @@ CompactVertices compact_vertices = CompactVertices(scene_desc.compact_vertices_a
 SurfelPool surfel_pool = SurfelPool(scene_desc.surfel_pool_addr);
 GridCellIndices grid_cell_indices = GridCellIndices(scene_desc.grid_cell_indices_addr);
 GridCellCounts grid_cell_counts = GridCellCounts(scene_desc.grid_cell_counts_addr);
+CurrentFrameLighting current_frame_lighting = CurrentFrameLighting(scene_desc.direct_lighting_addr);
 
 #include "../../utils.glsl"
 #include "../../bsdf_commons.glsl"
@@ -39,6 +41,15 @@ InGBuffer gbuffers = InGBuffer(scene_desc.g_buffer_addr);
 #include "grid.glsl"
 
 layout(local_size_x = SURFELIZE_PASS_TILE_SIZE_XY, local_size_y = SURFELIZE_PASS_TILE_SIZE_XY, local_size_z = 1) in;
+
+void store_output(const ivec2 coords, vec3 col) {
+	if (pc.enable_accumulation == 1 && pc.frame_num > 0) {
+		const float weight = 1.0 / float(pc.frame_num + 1);
+		col = mix(imageLoad(image, coords).xyz, col, weight);
+	}
+	imageStore(image, coords, vec4(col, 1));
+}
+
 void main() {
 	ivec2 coords = ivec2(gl_GlobalInvocationID.xy);
 
@@ -47,11 +58,11 @@ void main() {
 		return;
 	}
 
-	vec3 col = pc.direct_lighting == 1 ? imageLoad(image, coords).xyz : vec3(0);
+	vec3 col = pc.direct_lighting == 1 ? current_frame_lighting.d[pixel_idx] : vec3(0);
 	GBuffer gbuffer = gbuffers.d[pixel_idx];
 
 	if (!gbuffer_valid(gbuffer)) {
-		imageStore(image, coords, vec4(col, 1.f));
+		store_output(coords, col);
 		return;
 	}
 
@@ -111,5 +122,5 @@ void main() {
 
 	vec3 indirect_radiance = f * irradiance;
 	col += indirect_radiance;
-	imageStore(image, coords, vec4(col, 1));
+	store_output(coords, col);
 }

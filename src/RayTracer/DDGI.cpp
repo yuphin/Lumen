@@ -206,6 +206,10 @@ void init(Integrator* integrator) {
 	desc.material_addr = integrator->lumen_scene->materials_buffer->device_address();
 	// DDGI
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, light_triangle_cdf_addr,
+									integrator->lumen_scene->light_triangle_cdf_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, emitter_light_idx_addr,
+									integrator->lumen_scene->emitter_light_indices_buffer);
 	desc.compact_vertices_addr = integrator->lumen_scene->vertex_buffer->device_address();
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, direct_lighting_addr, state.direct_lighting_buffer);
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, probe_offsets_addr, state.probe_offsets_buffer);
@@ -221,8 +225,6 @@ void init(Integrator* integrator) {
 						 .data = &desc});
 
 	update_ddgi_uniforms(integrator);
-	state.pc.total_light_area = 0;
-
 	integrator->frame_num = 0;
 }
 
@@ -236,10 +238,9 @@ void render(Integrator* integrator) {
 	state.pc.sky_col = integrator->lumen_scene->config.common.sky_col;
 	state.pc.first_frame = state.first_frame;
 	state.pc.infinite_bounces = state.infinite_bounces;
-	state.pc.total_light_area = integrator->lumen_scene->total_light_area;
-	state.pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	state.pc.frame_num = integrator->frame_num;
 	state.pc.direct_lighting = state.direct_lighting;
+	state.pc.enable_accumulation = state.enable_accumulation;
 	const bool ping_pong = bool(state.frame_idx % 2);  // ping_pong true = read
 	// Generate random orientation for probes
 	{
@@ -387,6 +388,7 @@ bool gui(Integrator* integrator) {
 	result |= ImGui::SliderFloat("Normal bias", &state.normal_bias, 0.0f, 1.0f);
 	result |= ImGui::Checkbox("Infinite bounces", &state.infinite_bounces);
 	result |= ImGui::Checkbox("Direct lighting", &state.direct_lighting);
+	result |= ImGui::Checkbox("Enable accumulation", &state.enable_accumulation);
 	result |= ImGui::Checkbox("Visualize probes", &state.visualize_probes);
 	ImGui::Text("Probe dimensions: %dx%dx%d", state.probe_counts.x, state.probe_counts.y, state.probe_counts.z);
 	ImGui::Text("Probe distance: %f", state.probe_distance);

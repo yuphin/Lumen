@@ -91,11 +91,10 @@ void main() {
             n_s = shading_nrm;
         }
         if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
-            const float light_pick_pdf = 1. / pc.total_light_count;
             const vec3 val = throughput *
-                             uniform_sample_light(seed, hit_mat, payload.pos, side,
-                                                  shading_nrm, wo, specular) /
-                             light_pick_pdf;
+                             sample_direct_light(seed, hit_mat, payload.pos, side,
+                                                 shading_nrm, wo, /*use_mis=*/false,
+                                                 specular);
             if (depth > 0) {
                 L_o += val;
             } else {

@@ -10,9 +10,8 @@ struct PCBDPT {
 	int num_lights;
 	uint time;
 	int max_depth;
-	float total_light_area;
-	int total_light_count;
 	uint dir_light_idx;
+	uint enable_accumulation;
 };
 
 struct PathVertex {

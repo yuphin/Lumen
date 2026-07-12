@@ -38,8 +38,6 @@ struct PCIRCache {
 	vec3 max_bounds;
 	uint height;
 	int num_lights;
-	float total_light_area;
-	int total_light_count;
 	uint dir_light_idx;
 	uint direct_lighting;
 	uint sampling_seed;
@@ -52,6 +50,7 @@ struct PCIRCache {
 	uint use_camera_relative_surfel_size;
 	uint debug_view;
 	uint max_surfels_in_a_grid_cell;
+	uint enable_accumulation;
 };
 
 struct PCPrefixSum {

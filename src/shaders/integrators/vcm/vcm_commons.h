@@ -12,8 +12,6 @@ struct PCVCM {
 	int num_lights;
 	uint time;
 	int max_depth;
-	float total_light_area;
-	int total_light_count;
 	uint dir_light_idx;
 	float radius;
 	int use_vm;
@@ -22,25 +20,17 @@ struct PCVCM {
 	uint random_num;
 	uint max_angle_samples;
 	uint total_frame_num;
+	uint enable_accumulation;
 };
 
 
 struct VCMRestirData {
-	uvec4 seed;
-	vec3 pos;
 	float p_hat;
 	vec3 dir;
-	float pdf_posdir;
-	vec3 normal;
-	float pdf_pos;
 	float pdf_dir;
-	float triangle_pdf;
-	uint light_material_idx;
 	uint hash_idx;
 	uint valid;
 	uint frame_idx;
-	float phi;
-	uint pad;
 };
 
 struct VCMReservoir {
@@ -72,12 +62,15 @@ struct AngleStruct {
 
 struct LightState {
 	vec3 pos;
-	float triangle_pdf;
+	float pdf_position_a;
 	vec3 dir;
 	uint hash_idx;
 	vec3 normal;
+	float pdf_direction_w;
 	vec3 Le;
 	uint light_flags;
+	float cos_from_light;
+	float area;
 };
 
 struct SelectedReservoirs {

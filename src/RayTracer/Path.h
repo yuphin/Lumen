@@ -7,6 +7,7 @@ struct Path {
 	PCPath pc{};
 	u32 path_length = 0;
 	bool direct_lighting = true;
+	bool enable_accumulation = true;
 };
 
 namespace path {

@@ -85,6 +85,11 @@ void init(Integrator* integrator) {
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(GBuffer)});
+	state.current_frame_lighting_buffer =
+		prm::get_buffer({.name = CSTR("IRCache Current Frame Lighting"),
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = Window::width() * Window::height() * sizeof(lm::vec3)});
 
 	{
 		lm::ScratchArena scratch = integrator->arena;
@@ -192,8 +197,13 @@ void init(Integrator* integrator) {
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, index_addr, integrator->lumen_scene->index_buffer);
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, material_addr, integrator->lumen_scene->materials_buffer);
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, prim_info_addr, integrator->lumen_scene->prim_lookup_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, light_triangle_cdf_addr,
+									integrator->lumen_scene->light_triangle_cdf_buffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, emitter_light_idx_addr,
+									integrator->lumen_scene->emitter_light_indices_buffer);
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, compact_vertices_addr, integrator->lumen_scene->vertex_buffer);
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, g_buffer_addr, state.gbuffer);
+	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, direct_lighting_addr, state.current_frame_lighting_buffer);
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, transformations_addr, state.transformations_buffer);
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, surfel_spawn_list_addr, state.surfel_spawn_list_buffer);
 	SET_AND_REGISTER_BUFFER_ADDRESS(SceneDesc, desc, surfel_spawn_count_addr, state.surfel_spawn_count_buffer);
@@ -245,10 +255,9 @@ void render(Integrator* integrator) {
 	pc.max_bounds = integrator->lumen_scene->dimensions.max;
 	pc.height = Window::height();
 	pc.num_lights = (i32)integrator->lumen_scene->gpu_lights.size;
-	pc.total_light_area = integrator->lumen_scene->total_light_area;
-	pc.total_light_count = integrator->lumen_scene->total_light_cnt;
 	pc.dir_light_idx = integrator->lumen_scene->dir_light_idx;
 	pc.direct_lighting = state.direct_lighting;
+	pc.enable_accumulation = state.enable_accumulation;
 	pc.sampling_seed = lm::rand_u32();
 	u32 grid_total_cells = get_total_grid_cells();
 	u32 prefix_sum_scratch_capacity = (u32)(state.grid_prefix_sum_scratch_buffer->size / sizeof(u32));
@@ -455,6 +464,7 @@ bool gui(Integrator* integrator) {
 	};
 	bool result = false;
 	result |= ImGui::Checkbox("Direct lighting", &state.direct_lighting);
+	result |= ImGui::Checkbox("Enable accumulation", &state.enable_accumulation);
 	result |= ImGui::Checkbox("Debug mode", &state.debug_mode);
 	ImGui::BeginDisabled(!state.debug_mode);
 	if (ImGui::BeginCombo("Debug view", debug_view_display_names[state.debug_view])) {
@@ -504,6 +514,7 @@ void destroy(Integrator* integrator, bool resize) {
 	(void)resize;
 
 	vk::Buffer** buffers[] = {&state.gbuffer,
+							  &state.current_frame_lighting_buffer,
 							  &state.transformations_buffer,
 							  &state.surfel_spawn_list_buffer,
 							  &state.surfel_spawn_count_buffer,

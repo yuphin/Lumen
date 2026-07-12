@@ -42,6 +42,7 @@ struct DDGI {
 	bool first_frame = true;
 	bool infinite_bounces = true;
 	bool direct_lighting = true;
+	bool enable_accumulation = false;
 	bool visualize_probes = false;
 	u32 frame_idx = 0;
 	u32 total_frame_idx = 0;

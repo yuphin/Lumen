@@ -23,6 +23,7 @@ struct VCM {
 	vk::Buffer* avg_buffer = nullptr;
 	bool do_spatiotemporal = false;
 	bool use_vc = true;
+	bool enable_accumulation = true;
 };
 
 namespace vcm {

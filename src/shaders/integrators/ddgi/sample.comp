@@ -33,7 +33,13 @@ GBuffer gbuffer = GBuffer(scene_desc.g_buffer_addr);
 
 #include "ddgi_irradiance.glsl"
 
-
+void store_output(ivec2 coords, vec3 col) {
+	if (pc.enable_accumulation == 1 && pc.frame_num > 0) {
+		const float weight = 1.0 / float(pc.frame_num + 1);
+		col = mix(imageLoad(image, coords).xyz, col, weight);
+	}
+	imageStore(image, coords, vec4(col, 1.0));
+}
 
 void main() {
 	ivec2 coords = ivec2(gl_GlobalInvocationID.xy);
@@ -47,12 +53,12 @@ void main() {
 	uint idx = pc.height * gl_GlobalInvocationID.x + gl_GlobalInvocationID.y;
 	vec3 col = pc.direct_lighting == 1 ? direct_lighting.d[idx] : vec3(0);
 	if (dot(n, n) == 0) {
-		imageStore(image, coords, vec4(col, 1.f));
+		store_output(coords, col);
 		return;
 	}
 	vec3 wo = normalize((ubo.inv_view * vec4(0, 0, 0, 1)).xyz - p);
 	vec3 irradiance = sample_irradiance(p, n, wo);
 	col += gbuffer.d[idx].albedo / PI * irradiance;
-	imageStore(image, coords, vec4(col, 1.f));
+	store_output(coords, col);
 	imageStore(irr_output_img, coords, vec4(irradiance, 1.0f));
 }

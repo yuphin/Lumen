@@ -8,14 +8,13 @@ struct PCReSTIRGI {
 	int num_lights;
 	uint time;
 	int max_depth;
-	float total_light_area;
-	int total_light_count;
 	uint dir_light_idx;
 	uint do_spatiotemporal;
 	uint random_num;
 	uint total_frame_num;
 	float world_radius;
 	int enable_accumulation;
+	int enable_di;
 };
 
 struct ReservoirSample {

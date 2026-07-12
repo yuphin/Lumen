@@ -213,12 +213,14 @@ void set_type(Integrator* integrator, IntegratorType type) {
 			integrator->init = bdpt::init;
 			integrator->render = bdpt::render;
 			integrator->update = bdpt::update;
+			integrator->gui = bdpt::gui;
 			integrator->destroy = bdpt::destroy;
 			break;
 		case INTEGRATOR_SPPM:
 			integrator->init = sppm::init;
 			integrator->render = sppm::render;
 			integrator->update = sppm::update;
+			integrator->gui = sppm::gui;
 			integrator->destroy = sppm::destroy;
 			break;
 		case INTEGRATOR_VCM:
@@ -232,12 +234,14 @@ void set_type(Integrator* integrator, IntegratorType type) {
 			integrator->init = pssmlt::init;
 			integrator->render = pssmlt::render;
 			integrator->update = pssmlt::update;
+			integrator->gui = pssmlt::gui;
 			integrator->destroy = pssmlt::destroy;
 			break;
 		case INTEGRATOR_SMLT:
 			integrator->init = smlt::init;
 			integrator->render = smlt::render;
 			integrator->update = smlt::update;
+			integrator->gui = smlt::gui;
 			integrator->destroy = smlt::destroy;
 			break;
 		case INTEGRATOR_VCMMLT:
