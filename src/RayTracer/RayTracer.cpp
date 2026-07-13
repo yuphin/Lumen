@@ -10,6 +10,8 @@
 
 namespace ray_tracer {
 
+////////////////////////////
+// --- Globals ---
 static bool _load_reference = false;
 static bool _calc_rmse = false;
 static bool _initialized = false;
@@ -56,6 +58,7 @@ static const char* _integrator_display_names[INTEGRATOR_COUNT] = {
 static const lm::String _integrator_config_names[INTEGRATOR_COUNT] = {
 	"path", "bdpt", "sppm", "vcm", "pssmlt", "smlt", "vcmmlt", "restir", "restirgi", "ddgi", "restirpt", "ircache",
 };
+///////////////////////////////
 
 static void init_resources();
 static void cleanup_resources();
