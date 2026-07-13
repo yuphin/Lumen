@@ -28,6 +28,25 @@ struct Arena {
 	void clear();
 };
 
+struct ArenaStats {
+	lm::String name;
+	u64 id = 0;
+	u64 used = 0;
+	u64 committed = 0;
+	u64 reserved = 0;
+	u32 block_count = 0;
+};
+
+struct ArenaMemorySummary {
+	u64 used = 0;
+	u64 committed = 0;
+	u64 reserved = 0;
+	u32 arena_count = 0;
+	u32 block_count = 0;
+};
+
+using ArenaStatsCallback = void (*)(const ArenaStats& stats);
+
 constexpr u64 MIN_ARENA_RESERVE_SIZE = MB(1);
 constexpr u64 MIN_ARENA_COMMIT_SIZE = KB(64);
 
@@ -37,6 +56,7 @@ void arena_destroy(Arena* arena);
 void arena_ensure_committed(Arena* arena, u64 target_offset);
 void arena_get_stats(lm::Arena* arena, u64& used, u64& allocated);
 void get_all_arena_stats(u64& used, u64& allocated);
+ArenaMemorySummary get_all_arena_stats(ArenaStatsCallback callback = nullptr);
 
 // A dynamic array that doesn't move its elements when resizing
 template <typename T, bool GROWABLE = true>

@@ -47,6 +47,7 @@ struct LumenNode {
 
 struct TextureRef {
 	lm::String name;
+	lm::String allocation_name;
 	lm::String relative_path;
 };
 

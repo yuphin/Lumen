@@ -1,5 +1,6 @@
 #pragma once
 #include "Base/String.h"
+#include "VulkanMemoryStatistics.h"
 
 namespace vk {
 struct TextureData {
@@ -41,6 +42,7 @@ struct Texture {
 	u32 mip_levels;
 	u32 array_layers;
 	VmaAllocation allocation = VK_NULL_HANDLE;
+	GpuAllocationRecord allocation_record;
 };
 
 void texture_create(Texture* texture, const TextureDesc& desc);

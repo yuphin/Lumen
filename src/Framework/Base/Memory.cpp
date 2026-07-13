@@ -8,6 +8,11 @@ static constexpr u64 ALIGNED_HEADER_SIZE = lm::next_pow2(HEADER_SIZE);
 static constexpr u64 MAX_REGISTERED_ARENAS = 128;
 
 static SmallArray<Arena*, MAX_REGISTERED_ARENAS> _registered_arenas;
+// For registered_arenas
+static os::Mutex _registered_arenas_mutex;
+
+static Arena* arena_create_internal(lm::String name, u64 reserve_size, u64 commit_size, u64 header_alignment,
+									bool register_root);
 
 static void arena_pop(Arena* arena, u64 target_base) {
 	for (Arena* next_arena = arena->next; next_arena; next_arena = next_arena->next) {
@@ -38,9 +43,47 @@ void arena_get_stats(lm::Arena* arena, u64& used, u64& allocated) {
 }
 
 void get_all_arena_stats(u64& used, u64& allocated) {
+	ArenaMemorySummary summary = get_all_arena_stats();
+	used += summary.used;
+	allocated += summary.committed;
+}
+
+ArenaMemorySummary get_all_arena_stats(ArenaStatsCallback callback) {
+	ArenaMemorySummary result = {};
+	SmallArray<ArenaStats, MAX_REGISTERED_ARENAS> arena_stats;
+	os::ScopedLock lock(_registered_arenas_mutex);
 	for (u64 i = 0; i < _registered_arenas.size; i++) {
-		arena_get_stats(_registered_arenas[i], used, allocated);
+		Arena* root = _registered_arenas[i];
+		ArenaStats stats = {.name = root->name, .id = (u64)root};
+		for (Arena* block = root; block; block = block->next) {
+			stats.used += block->local_offset;
+			stats.committed += block->end_committed;
+			stats.reserved += block->end_reserved;
+			++stats.block_count;
+		}
+		result.used += stats.used;
+		result.committed += stats.committed;
+		result.reserved += stats.reserved;
+		result.block_count += stats.block_count;
+		++result.arena_count;
+		arena_stats.push_back(stats);
 	}
+	for (u64 i = 1; i < arena_stats.size; ++i) {
+		ArenaStats stats = arena_stats[i];
+		u64 insertion_idx = i;
+		// Sort from largest to smallest used memory
+		while (insertion_idx > 0 && arena_stats[insertion_idx - 1].used < stats.used) {
+			arena_stats[insertion_idx] = arena_stats[insertion_idx - 1];
+			--insertion_idx;
+		}
+		arena_stats[insertion_idx] = stats;
+	}
+	if (callback) {
+		for (const ArenaStats& stats : arena_stats) {
+			callback(stats);
+		}
+	}
+	return result;
 }
 
 ScratchArena::ScratchArena(Arena* arena_) {
@@ -91,7 +134,8 @@ void* Arena::allocate(u64 size, u64 alignment, Arena** arena_node, bool zero_ini
 	if (last_block != nullptr) {
 		u64 reserve_size = lm::max(MIN_ARENA_RESERVE_SIZE, lm::max(exclusive_block_reserve_size, size));
 		u64 commit_size = lm::max(MIN_ARENA_COMMIT_SIZE, size);
-		Arena* new_arena = arena_create(curr_arena->name, reserve_size, commit_size, alignment);
+		Arena* new_arena = arena_create_internal(curr_arena->name, reserve_size, commit_size, alignment,
+												 /*register_root=*/false);
 		last_block->next = new_arena;
 		curr_arena = new_arena;
 
@@ -114,7 +158,8 @@ void* Arena::allocate(u64 size, u64 alignment, Arena** arena_node, bool zero_ini
 
 void Arena::clear() { arena_pop(this, 0); }
 
-Arena* arena_create(lm::String name, u64 reserve_size, u64 commit_size, u64 header_alignment) {
+static Arena* arena_create_internal(lm::String name, u64 reserve_size, u64 commit_size, u64 header_alignment,
+									bool register_root) {
 	LUMEN_ASSERT(name.is_cstr(), "Arena name must be a C string");
 	const u64 page_size = os::get_page_size();
 
@@ -146,16 +191,24 @@ Arena* arena_create(lm::String name, u64 reserve_size, u64 commit_size, u64 head
 	arena->flags = ARENA_FLAG_NONE;
 	arena->name = name;
 
-	_registered_arenas.push_back(arena);
+	if (register_root) {
+		os::ScopedLock lock(_registered_arenas_mutex);
+		_registered_arenas.push_back(arena);
+	}
 	return arena;
+}
+
+Arena* arena_create(lm::String name, u64 reserve_size, u64 commit_size, u64 header_alignment) {
+	return arena_create_internal(name, reserve_size, commit_size, header_alignment, /*register_root=*/true);
 }
 
 void arena_destroy(lm::Arena* arena) {
 	// TODO: Should we decommit?
 	arena->clear();
+	os::ScopedLock lock(_registered_arenas_mutex);
 	u64 found_idx = -1;
-	for(u64 i = 0; i < _registered_arenas.size; i++) {
-		if(_registered_arenas[i] == arena) {
+	for (u64 i = 0; i < _registered_arenas.size; i++) {
+		if (_registered_arenas[i] == arena) {
 			found_idx = i;
 			break;
 		}

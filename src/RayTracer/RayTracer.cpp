@@ -2,6 +2,8 @@
 #include "Framework/GPUQueryManager.h"
 #include "Framework/ImageUtils.h"
 #include "Framework/ImGuiRenderer.h"
+#include "Framework/VulkanMemoryStatistics.h"
+#include "Framework/Base/Memory.h"
 #include "RayTracer.h"
 #include "Integrator.h"
 #include "PostFX.h"
@@ -321,6 +323,188 @@ static void render_debug_utils() {
 	}
 }
 
+static void format_memory_size(u64 bytes, char* output, u64 output_size) {
+	static const char* units[] = {"B", "KiB", "MiB", "GiB", "TiB"};
+	f64 value = (f64)bytes;
+	u32 unit_idx = 0;
+	while (value >= 1024.0 && unit_idx + 1 < ARRAY_SIZE(units)) {
+		value /= 1024.0;
+		++unit_idx;
+	}
+	if (unit_idx == 0) {
+		stbsp_snprintf(output, (int)output_size, "%llu B", bytes);
+	} else {
+		stbsp_snprintf(output, (int)output_size, "%.2f %s", value, units[unit_idx]);
+	}
+}
+
+static void format_memory_properties(VkMemoryPropertyFlags flags, char* output, u64 output_size) {
+	u64 cursor = 0;
+	auto append = [&](const char* label) {
+		if (cursor >= output_size) return;
+		i32 written = stbsp_snprintf(output + cursor, (int)(output_size - cursor), "%s%s", cursor ? ", " : "", label);
+		if (written > 0) cursor += (u64)written;
+	};
+	if (flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) append("Device local");
+	if (flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) append("Host visible");
+	if (flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) append("Host coherent");
+	if (flags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) append("Host cached");
+	if (flags & VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT) append("Lazy");
+	if (cursor == 0) {
+		stbsp_snprintf(output, (int)output_size, "None");
+	}
+}
+
+static void draw_gpu_allocation_row(const vk::GpuAllocationStats& stats) {
+	char size[32];
+	char properties[128];
+	format_memory_size(stats.size, size, ARRAY_SIZE(size));
+	format_memory_properties(stats.memory_properties, properties, ARRAY_SIZE(properties));
+
+	ImGui::PushID((const void*)stats.id);
+	ImGui::TableNextRow();
+	ImGui::TableSetColumnIndex(0);
+	ImGui::TextUnformatted(stats.name);
+	ImGui::TableSetColumnIndex(1);
+	ImGui::TextUnformatted(size);
+	ImGui::TableSetColumnIndex(2);
+	ImGui::Text("%u (type %u)", stats.heap_index, stats.memory_type_index);
+	ImGui::TableSetColumnIndex(3);
+	ImGui::TextUnformatted(properties);
+	ImGui::PopID();
+}
+
+static void draw_arena_row(const lm::ArenaStats& stats) {
+	char used[32];
+	char committed[32];
+	char reserved[32];
+	format_memory_size(stats.used, used, ARRAY_SIZE(used));
+	format_memory_size(stats.committed, committed, ARRAY_SIZE(committed));
+	format_memory_size(stats.reserved, reserved, ARRAY_SIZE(reserved));
+
+	u64 name_size = stats.name.is_cstr() ? stats.name.size - 1 : stats.name.size;
+	ImGui::PushID((const void*)stats.id);
+	ImGui::TableNextRow();
+	ImGui::TableSetColumnIndex(0);
+	ImGui::Text("%.*s", (i32)name_size, stats.name.data);
+	ImGui::TableSetColumnIndex(1);
+	ImGui::TextUnformatted(used);
+	ImGui::TableSetColumnIndex(2);
+	ImGui::TextUnformatted(committed);
+	ImGui::TableSetColumnIndex(3);
+	ImGui::TextUnformatted(reserved);
+	ImGui::TableSetColumnIndex(4);
+	ImGui::Text("%u", stats.block_count);
+	ImGui::PopID();
+}
+
+static void draw_gpu_allocation_table(const char* table_id, vk::GpuAllocationKind kind) {
+	ImGuiTableFlags table_flags = ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
+								  ImGuiTableFlags_SizingStretchProp;
+	if (!ImGui::BeginTable(table_id, 4, table_flags)) return;
+	ImGui::TableSetupColumn("Name");
+	ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed);
+	ImGui::TableSetupColumn("Heap", ImGuiTableColumnFlags_WidthFixed);
+	ImGui::TableSetupColumn("Properties");
+	ImGui::TableHeadersRow();
+	vk::get_gpu_memory_stats(kind, draw_gpu_allocation_row);
+	ImGui::EndTable();
+}
+
+static void draw_memory_usage_gui() {
+	if (!ImGui::CollapsingHeader("Memory Usage", ImGuiTreeNodeFlags_DefaultOpen)) return;
+
+	vk::GpuMemorySummary gpu = vk::get_gpu_memory_stats();
+	lm::ArenaMemorySummary cpu = lm::get_all_arena_stats();
+	char allocation_bytes[32];
+	char block_bytes[32];
+	char driver_usage[32];
+	char driver_budget[32];
+	char cpu_used[32];
+	char cpu_committed[32];
+	char cpu_reserved[32];
+	format_memory_size(gpu.allocation_bytes, allocation_bytes, ARRAY_SIZE(allocation_bytes));
+	format_memory_size(gpu.block_bytes, block_bytes, ARRAY_SIZE(block_bytes));
+	format_memory_size(gpu.driver_usage_bytes, driver_usage, ARRAY_SIZE(driver_usage));
+	format_memory_size(gpu.driver_budget_bytes, driver_budget, ARRAY_SIZE(driver_budget));
+	format_memory_size(cpu.used, cpu_used, ARRAY_SIZE(cpu_used));
+	format_memory_size(cpu.committed, cpu_committed, ARRAY_SIZE(cpu_committed));
+	format_memory_size(cpu.reserved, cpu_reserved, ARRAY_SIZE(cpu_reserved));
+
+	ImGui::Text("VMA allocations: %s in %u allocations", allocation_bytes, gpu.allocation_count);
+	ImGui::Text("VMA blocks: %s in %u blocks", block_bytes, gpu.block_count);
+	ImGui::Text("Heap usage (total): %s / %s", driver_usage, driver_budget);
+	ImGui::Text("CPU arenas: %s used, %s committed, %s reserved", cpu_used, cpu_committed, cpu_reserved);
+	ImGui::Separator();
+
+	char buffer_bytes[32];
+	format_memory_size(gpu.tracked_buffer_bytes, buffer_bytes, ARRAY_SIZE(buffer_bytes));
+	bool buffers_open = ImGui::TreeNode("Buffers");
+	ImGui::SameLine();
+	ImGui::TextDisabled("(%u, %s)", gpu.tracked_buffer_count, buffer_bytes);
+	if (buffers_open) {
+		draw_gpu_allocation_table("##BufferMemoryTable", vk::GPU_ALLOCATION_BUFFER);
+		ImGui::TreePop();
+	}
+
+	char image_bytes[32];
+	format_memory_size(gpu.tracked_image_bytes, image_bytes, ARRAY_SIZE(image_bytes));
+	bool images_open = ImGui::TreeNode("Images");
+	ImGui::SameLine();
+	ImGui::TextDisabled("(%u, %s)", gpu.tracked_image_count, image_bytes);
+	if (images_open) {
+		draw_gpu_allocation_table("##ImageMemoryTable", vk::GPU_ALLOCATION_IMAGE);
+		ImGui::TreePop();
+	}
+
+	if (gpu.untracked_count || gpu.untracked_bytes) {
+		char untracked_bytes[32];
+		format_memory_size(gpu.untracked_bytes, untracked_bytes, ARRAY_SIZE(untracked_bytes));
+		bool other_open = ImGui::TreeNode("Other / Untracked");
+		ImGui::SameLine();
+		ImGui::TextDisabled("(%u, %s)", gpu.untracked_count, untracked_bytes);
+		if (other_open) {
+			ImGui::TextWrapped("VMA allocations not created through Lumen's buffer or image wrappers.");
+			if (ImGui::BeginTable(
+					"##UntrackedMemoryTable", 3,
+					ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
+				ImGui::TableSetupColumn("Category");
+				ImGui::TableSetupColumn("Count", ImGuiTableColumnFlags_WidthFixed);
+				ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed);
+				ImGui::TableHeadersRow();
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				ImGui::TextUnformatted("Other / Untracked");
+				ImGui::TableSetColumnIndex(1);
+				ImGui::Text("%u", gpu.untracked_count);
+				ImGui::TableSetColumnIndex(2);
+				ImGui::TextUnformatted(untracked_bytes);
+				ImGui::EndTable();
+			}
+			ImGui::TreePop();
+		}
+	}
+
+	bool arenas_open = ImGui::TreeNode("CPU Arenas");
+	ImGui::SameLine();
+	ImGui::TextDisabled("(%u arenas, %u blocks)", cpu.arena_count, cpu.block_count);
+	if (arenas_open) {
+		ImGuiTableFlags table_flags = ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg |
+									  ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp;
+		if (ImGui::BeginTable("##ArenaMemoryTable", 5, table_flags)) {
+			ImGui::TableSetupColumn("Name");
+			ImGui::TableSetupColumn("Used", ImGuiTableColumnFlags_WidthFixed);
+			ImGui::TableSetupColumn("Committed", ImGuiTableColumnFlags_WidthFixed);
+			ImGui::TableSetupColumn("Reserved", ImGuiTableColumnFlags_WidthFixed);
+			ImGui::TableSetupColumn("Blocks", ImGuiTableColumnFlags_WidthFixed);
+			ImGui::TableHeadersRow();
+			lm::get_all_arena_stats(draw_arena_row);
+			ImGui::EndTable();
+		}
+		ImGui::TreePop();
+	}
+}
+
 static bool gui() {
 	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
 	ImGui::Text("General settings:");
@@ -349,12 +533,7 @@ static bool gui() {
 				1000 / _cpu_avg_time);
 
 	ImGui::Checkbox("Pause rendering", &_pause_render);
-	ImGui::Text("GPU Memory Usage: %.2f MB", vk::get_memory_usage(vk::context().physical_device) / (1024.0f * 1024.0f));
-	u64 arena_total_used_bytes = 0;
-	u64 arena_total_allocated_bytes = 0;
-	lm::get_all_arena_stats(arena_total_used_bytes, arena_total_allocated_bytes);
-	ImGui::Text("CPU Arena Usage: %.2f MB Allocated, %.2f MB Used", arena_total_allocated_bytes / (1024.0f * 1024.0f),
-				arena_total_used_bytes / (1024.0f * 1024.0f));
+	draw_memory_usage_gui();
 	bool updated = false;
 	ImGui::Checkbox("Show camera statistics", &_show_cam_stats);
 	if (_show_cam_stats) {

@@ -1,6 +1,7 @@
 #pragma once
 #include "VulkanContext.h"
 #include "Base/String.h"
+#include "VulkanMemoryStatistics.h"
 
 namespace vk {
 
@@ -39,6 +40,7 @@ struct Buffer {
 	VkDeviceSize size = 0;
 	VkBufferUsageFlags usage_flags = 0;
 	VmaAllocation allocation = VK_NULL_HANDLE;
+	GpuAllocationRecord allocation_record;
 
 	VkDeviceAddress device_address() const {
 		VkBufferDeviceAddressInfo info = {.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = handle};

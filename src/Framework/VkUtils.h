@@ -110,16 +110,6 @@ inline VkImageMemoryBarrier2 image_barrier2(VkImage image, VkAccessFlags src_acc
 	return result;
 }
 
-inline VkDeviceSize get_memory_usage(VkPhysicalDevice physical_device) {
-	VkPhysicalDeviceMemoryProperties2 props = {};
-	props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
-	VkPhysicalDeviceMemoryBudgetPropertiesEXT budget_props = {};
-	budget_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT;
-	props.pNext = &budget_props;
-	vkGetPhysicalDeviceMemoryProperties2(physical_device, &props);
-	return budget_props.heapUsage[0];
-}
-
 inline u32 calc_mip_levels(VkExtent2D extent) {
 	return static_cast<u32>(lm::log2(lm::max(extent.width, extent.height))) + 1;
 }

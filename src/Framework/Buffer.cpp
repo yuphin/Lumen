@@ -39,6 +39,7 @@ void buffer_create(Buffer* buffer, const BufferDesc& desc) {
 	VmaAllocationInfo alloc_info;
 	vk::check(vmaCreateBuffer(vk::context().allocator, &buffer_ci, &alloc_ci, &buffer->handle, &buffer->allocation,
 							  &alloc_info));
+	vk::gpu_allocation_register(&buffer->allocation_record, buffer->allocation, vk::GPU_ALLOCATION_BUFFER, buffer->name);
 	if (!buffer->name.empty()) {
 		vk::set_resource_name(vk::context().device, (u64)buffer->handle, buffer->name.data,
 										   VK_OBJECT_TYPE_BUFFER);
@@ -74,7 +75,10 @@ VkDescriptorBufferInfo buffer_descriptor(const vk::Buffer* buffer) {
 	return buffer_info;
 }
 
-void buffer_destroy(Buffer* buffer) { vmaDestroyBuffer(vk::context().allocator, buffer->handle, buffer->allocation); }
+void buffer_destroy(Buffer* buffer) {
+	vk::gpu_allocation_unregister(&buffer->allocation_record);
+	vmaDestroyBuffer(vk::context().allocator, buffer->handle, buffer->allocation);
+}
 
 void buffer_write(Buffer* buffer, void* data, u64 size) {
 	VkMemoryPropertyFlags mem_prop_flags;

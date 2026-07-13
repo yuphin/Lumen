@@ -424,6 +424,7 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 			LUMEN_ASSERT(!name.empty() && !file.empty(), "Texture name and file must be specified");
 			TextureRef ref;
 			ref.name = name;
+			ref.allocation_name = lm::str_to_cstr(_arena_strings, name);
 			ref.relative_path = lm::str_to_cstr(_arena_strings, file);
 			_scene.textures.push_back(ref);
 			texture_name_to_idx.insert(name, (u32)_scene.textures.size - 1);
@@ -788,7 +789,8 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 static void add_default_texture() {
 	u8 nil[4] = {0, 0, 0, 0};
 	_scene.scene_textures.push_back(
-		prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+		prm::get_texture({.name = CSTR("Default Scene Texture"),
+						  .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 						  .dimensions = {1, 1, 1},
 						  .format = VK_FORMAT_R8G8B8A8_SRGB,
 						  .data = {.data = nil, .size = sizeof(nil)},
@@ -1008,7 +1010,8 @@ void load(const lm::String& path) {
 			unsigned char* data = stbi_load(img_path.data, &x, &y, &n, 4);
 
 			_scene.scene_textures.push_back(
-				prm::get_texture({.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+				prm::get_texture({.name = texture_path.allocation_name,
+								  .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 								  .dimensions = {(u32)x, (u32)y, 1},
 								  .format = VK_FORMAT_R8G8B8A8_SRGB,
 								  .data = {.data = data, .size = u64(x * y * 4)},

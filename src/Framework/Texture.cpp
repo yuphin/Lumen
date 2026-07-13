@@ -97,6 +97,8 @@ void texture_create(Texture* texture, const TextureDesc& desc) {
 
 		vk::check(vmaCreateImage(vk::context().allocator, &image_ci, &alloc_ci, &texture->handle, &texture->allocation,
 								 &alloc_info));
+		vk::gpu_allocation_register(&texture->allocation_record, texture->allocation, vk::GPU_ALLOCATION_IMAGE,
+								texture->name);
 	} else {
 		texture->handle = desc.image;
 	}
@@ -187,6 +189,7 @@ void texture_create(Texture* texture, const TextureDesc& desc) {
 }
 void texture_destroy(Texture* texture) {
 	if (texture->allocation) {
+		vk::gpu_allocation_unregister(&texture->allocation_record);
 		vmaDestroyImage(vk::context().allocator, texture->handle, texture->allocation);
 	}
 	vkDestroyImageView(vk::context().device, texture->view, nullptr);

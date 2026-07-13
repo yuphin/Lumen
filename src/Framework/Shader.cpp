@@ -21,6 +21,7 @@ static thread_local ShaderThreadState _shader_thread_state;
 
 // We need this to be able to reset all threads' arenas
 static lm::SmallArray<lm::Arena*, MAX_SHADER_WORKER_ARENAS> _shader_worker_arenas;
+static char _shader_worker_arena_names[MAX_SHADER_WORKER_ARENAS][64] = {};
 static os::Mutex _shader_worker_arenas_mutex;
 
 static u64 string_content_size(const lm::String& string) {
@@ -34,7 +35,12 @@ static lm::Arena* get_shader_arena() {
 		os::ScopedLock lock(_shader_worker_arenas_mutex);
 		LUMEN_ASSERT(_shader_worker_arenas.size < _shader_worker_arenas.capacity(),
 					 "Exceeded maximum shader worker arena count");
-		_shader_thread_state.arena = lm::arena_create(CSTR("Shader Arena"), MB(16), MB(1));
+		u64 arena_idx = _shader_worker_arenas.size;
+		char* arena_name_data = _shader_worker_arena_names[arena_idx];
+		i32 arena_name_size = stbsp_snprintf(arena_name_data, sizeof(_shader_worker_arena_names[arena_idx]),
+										  "Shader Arena [Thread %llu]", arena_idx);
+		lm::String arena_name = {arena_name_data, (u64)arena_name_size + 1};
+		_shader_thread_state.arena = lm::arena_create(arena_name, MB(16), MB(1));
 		_shader_worker_arenas.push_back(_shader_thread_state.arena);
 	}
 	return _shader_thread_state.arena;
