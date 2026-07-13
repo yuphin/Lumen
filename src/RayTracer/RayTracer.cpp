@@ -14,7 +14,7 @@ static bool _load_reference = false;
 static bool _calc_rmse = false;
 static bool _initialized = false;
 static f32 _cpu_avg_time = 0;
-static i32 _cnt = 0;
+static i32 _frame = 0;
 static Integrator _active_integrator;
 static PostFX _post_fx;
 static ImGuiRenderer _imgui_renderer;
@@ -612,7 +612,7 @@ static bool gui() {
 }
 
 static f32 prepare_frame_and_render() {
-	if (_cnt == 0) {
+	if (_frame == 0) {
 		_start = os::time_seconds();
 	}
 
@@ -686,7 +686,7 @@ static f32 prepare_frame_and_render() {
 	}
 	f64 t_end = os::time_seconds() * 1000;
 	f64 t_diff = t_end - t_begin;
-	_cnt++;
+	_frame++;
 	return (f32)t_diff;
 }
 
