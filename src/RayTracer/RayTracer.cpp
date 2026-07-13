@@ -415,7 +415,7 @@ static void draw_gpu_allocation_table(const char* table_id, vk::GpuAllocationKin
 }
 
 static void draw_memory_usage_gui() {
-	if (!ImGui::CollapsingHeader("Memory Usage", ImGuiTreeNodeFlags_DefaultOpen)) return;
+	if (!ImGui::CollapsingHeader("Memory Usage")) return;
 
 	vk::GpuMemorySummary gpu = vk::get_gpu_memory_stats();
 	lm::ArenaMemorySummary cpu = lm::get_all_arena_stats();
