@@ -218,10 +218,15 @@ vec3 vcm_connect_light_vertices(uint light_path_len, uint light_path_idx, int de
 			if (f_light != vec3(0) && f_cam != vec3(0)) {
 				cam_pdf_fwd *= abs(cos_light) / len_sqr;
 				light_pdf_fwd *= abs(cos_cam) / len_sqr;
-				const float w_light = cam_pdf_fwd * (eta_vm + light_vtx(light_path_idx + i).d_vcm +
-													 light_pdf_rev * light_vtx(light_path_idx + i).d_vc);
-				const float w_camera = light_pdf_fwd * (eta_vm + camera_state.d_vcm + pdf_rev * camera_state.d_vc);
+				const float light_factor = eta_vm + light_vtx(light_path_idx + i).d_vcm +
+										   light_pdf_rev * light_vtx(light_path_idx + i).d_vc;
+				const float cam_factor = eta_vm + camera_state.d_vcm + pdf_rev * camera_state.d_vc;
+				const float w_light = light_factor == 0.0 ? 0.0 : cam_pdf_fwd * light_factor;
+				const float w_camera = cam_factor == 0.0 ? 0.0 : light_pdf_fwd * cam_factor;
 				const float mis_weight = 1. / (1 + w_camera + w_light);
+				if (!(mis_weight > 0)) {
+					continue;
+				}
 				const vec3 ray_origin = offset_ray2(payload.pos, n_s);
 				const bool visible = !connection_occluded(ray_origin, dir, len, 0xFF);
 				if (visible) {
@@ -263,10 +268,17 @@ vec3 vcm_merge_light_vertices(uint light_path_len, uint light_path_idx, int dept
 					vec3 f = eval_bsdf(n_s, wo, mat, 1, side, DEREF(photon)[h].wi, cam_pdf_fwd, cam_pdf_rev);
 
 					if (f != vec3(0)) {
-						const float w_light = DEREF(photon)[h].d_vcm * eta_vc + DEREF(photon)[h].d_vm * cam_pdf_fwd;
-						const float w_cam = camera_state.d_vcm * eta_vc + camera_state.d_vm * cam_pdf_rev;
+						const float photon_vcm = DEREF(photon)[h].d_vcm;
+						const float photon_vm = DEREF(photon)[h].d_vm;
+						const float w_light = (photon_vcm == 0.0 ? 0.0 : photon_vcm * eta_vc) +
+											  (photon_vm == 0.0 ? 0.0 : photon_vm * cam_pdf_fwd);
+						const float w_cam = (camera_state.d_vcm == 0.0 ? 0.0 : camera_state.d_vcm * eta_vc) +
+											(camera_state.d_vm == 0.0 ? 0.0 : camera_state.d_vm * cam_pdf_rev);
 
 						const float mis_weight = 1. / (1 + w_light + w_cam);
+						if (!(mis_weight > 0)) {
+							continue;
+						}
 						float cos_nrm = dot(DEREF(photon)[h].nrm, n_s);
 						if (cos_nrm > EPS) {
 							const float w = 1. - sqrt(dist_sqr) / radius;
@@ -856,10 +868,15 @@ float mlt_trace_light() {
 					if (f_light != vec3(0) && f_cam != vec3(0)) {
 						cam_pdf_fwd *= abs(cos_light) / len_sqr;
 						light_pdf_fwd *= abs(cos_cam) / len_sqr;
-						const float w_light = cam_pdf_fwd * (light_state.d_vcm + pdf_rev * light_state.d_vc);
-						const float w_cam =
-							light_pdf_fwd * (cam_vtx(path_idx + i).d_vcm + cam_pdf_rev * cam_vtx(path_idx + i).d_vc);
+						const float light_factor = light_state.d_vcm + pdf_rev * light_state.d_vc;
+						const float cam_factor =
+							cam_vtx(path_idx + i).d_vcm + cam_pdf_rev * cam_vtx(path_idx + i).d_vc;
+						const float w_light = light_factor == 0.0 ? 0.0 : cam_pdf_fwd * light_factor;
+						const float w_cam = cam_factor == 0.0 ? 0.0 : light_pdf_fwd * cam_factor;
 						const float mis_weight = 1. / (1 + w_light + w_cam);
+						if (!(mis_weight > 0)) {
+							continue;
+						}
 						const vec3 ray_origin = offset_ray(hit_pos, n_s);
 						const bool visible = !connection_occluded(ray_origin, -dir, len, 0xFF);
 						if (visible) {
