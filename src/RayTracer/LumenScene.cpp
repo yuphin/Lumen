@@ -508,16 +508,18 @@ static void scene_init(const lm::String& path_root, LumenNode* root) {
 				LumenNode* edge_tint = get_node(bsdf_node, "edge_tint");
 				LumenNode* reflectivity = get_node(bsdf_node, "reflectivity");
 				if (edge_tint && reflectivity) {
-					lm::vec3 edge_tint_vec = get_or_default_v3(edge_tint, lm::vec3(1));
-					lm::vec3 reflectivity_vec = get_or_default_v3(reflectivity, lm::vec3(1));
+					// The mapping is singular at a reflectivity of 1, so we clamp
+					lm::vec3 edge_tint_vec = lm::clamp(get_or_default_v3(edge_tint, lm::vec3(1)), 0.0f, 1.0f);
+					lm::vec3 reflectivity_vec = lm::clamp(get_or_default_v3(reflectivity, lm::vec3(0)), 0.0f, 0.99f);
 					material.albedo = edge_tint_vec * (1.0f - reflectivity_vec) / (1.0f + reflectivity_vec) +
 									  (1.0f - edge_tint_vec) * (1.0f + lm::sqrt(reflectivity_vec)) /
 										  (1.0f - lm::sqrt(reflectivity_vec));
 					lm::vec3 intermediate_term = material.albedo + 1.0f;
 					lm::vec3 intermediate_term2 = material.albedo - 1.0f;
-					material.k = lm::sqrt(1.0f / (1.0f - reflectivity_vec) *
-										  (reflectivity_vec * intermediate_term * intermediate_term -
-										   intermediate_term2 * intermediate_term2));
+					material.k = lm::sqrt(lm::max(1.0f / (1.0f - reflectivity_vec) *
+													  (reflectivity_vec * intermediate_term * intermediate_term -
+													   intermediate_term2 * intermediate_term2),
+												  lm::vec3(0.0f)));
 				}
 
 				material.bsdf_props = BSDF_FLAG_REFLECTION;
