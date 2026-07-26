@@ -225,7 +225,7 @@ vec3 vcm_connect_light_vertices(uint light_path_len, uint light_path_idx, int de
 				const vec3 ray_origin = offset_ray2(payload.pos, n_s);
 				const bool visible = !connection_occluded(ray_origin, dir, len, 0xFF);
 				if (visible) {
-					res = mis_weight * G * camera_state.throughput * light_vtx(light_path_idx + i).throughput * f_cam *
+					res += mis_weight * G * camera_state.throughput * light_vtx(light_path_idx + i).throughput * f_cam *
 						  f_light;
 				}
 			}
@@ -272,8 +272,8 @@ vec3 vcm_merge_light_vertices(uint light_path_len, uint light_path_idx, int dept
 							const float w = 1. - sqrt(dist_sqr) / radius;
 							const float w_normalization = 3.;  // 1. / (1 - 2/(3*k)) where k =
 															   // 1
-							res = w * mis_weight * DEREF(photon)[h].photon_count * DEREF(photon)[h].throughput * f *
-								  camera_state.throughput * normalization_factor * w_normalization;
+							res += w * mis_weight * DEREF(photon)[h].photon_count * DEREF(photon)[h].throughput * f *
+								   camera_state.throughput * normalization_factor * w_normalization;
 						}
 					}
 				}
