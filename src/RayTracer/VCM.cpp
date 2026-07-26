@@ -6,7 +6,6 @@ namespace vcm {
 void init(Integrator* integrator) {
 	VCM& state = integrator->vcm;
 
-
 	state.photon_buffer =
 		prm::get_buffer({.name = CSTR("Photon Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
@@ -19,8 +18,8 @@ void init(Integrator* integrator) {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height() * (integrator->lumen_scene->config.common.path_length + 1) *
-								 sizeof(VCMVertex)});
+						 .size = Window::width() * Window::height() *
+								 (integrator->lumen_scene->config.common.path_length + 1) * sizeof(VCMVertex)});
 
 	state.light_path_cnt_buffer =
 		prm::get_buffer({.name = CSTR("Light Path Count"),
@@ -70,10 +69,10 @@ void init(Integrator* integrator) {
 						 .size = MAX_SAMPLES * sizeof(AngleStruct)});
 
 	state.avg_buffer = prm::get_buffer({.name = CSTR("Average"),
-								  .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-										   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-								  .memory_type = vk::BUFFER_TYPE_GPU,
-								  .size = sizeof(AvgStruct)});
+										.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+												 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+										.memory_type = vk::BUFFER_TYPE_GPU,
+										.size = sizeof(AvgStruct)});
 
 	SceneDesc desc = integrator::scene_desc_base(integrator);
 	// VCM
@@ -127,8 +126,8 @@ void render(Integrator* integrator) {
 	// Prepare
 	lm::RenderPass& prepare_pass =
 		rg::add_compute(CSTR("Init Reservoirs"),
-						  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/init_reservoirs.comp")),
-						   .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+						{.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/init_reservoirs.comp")),
+						 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 			.push_constants(&state.pc)
 			.bind(integrator->lumen_scene->scene_desc_buffer)
 			.zero(state.photon_buffer, config.enable_vm);
@@ -141,14 +140,14 @@ void render(Integrator* integrator) {
 
 	// Do resampling
 	rg::add_rt(CSTR("Resample"),
-				 {
-					 .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_sample.rgen")},
-								 {CSTR("src/shaders/ray.rmiss")},
-								 {CSTR("src/shaders/ray_shadow.rmiss")},
-								 {CSTR("src/shaders/ray.rchit")},
-								 {CSTR("src/shaders/ray.rahit")}},
-					 .dims = {Window::width(), Window::height()},
-				 })
+			   {
+				   .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_sample.rgen")},
+							   {CSTR("src/shaders/ray.rmiss")},
+							   {CSTR("src/shaders/ray_shadow.rmiss")},
+							   {CSTR("src/shaders/ray.rchit")},
+							   {CSTR("src/shaders/ray.rahit")}},
+				   .dims = {Window::width(), Window::height()},
+			   })
 		.push_constants(&state.pc)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
@@ -157,22 +156,22 @@ void render(Integrator* integrator) {
 
 	// Check resampling
 	rg::add_compute(CSTR("Check Reservoirs"),
-					  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/check_reservoirs.comp")),
-					   .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+					{.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/check_reservoirs.comp")),
+					 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer)
 		.zero(state.should_resample_buffer);
 	state.pc.random_num = lm::rand_u32();
 	// Spawn light rays
 	rg::add_rt(CSTR("VCM - Spawn Light"),
-				 {
-					 .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_spawn_light.rgen")},
-								 {CSTR("src/shaders/ray.rmiss")},
-								 {CSTR("src/shaders/ray_shadow.rmiss")},
-								 {CSTR("src/shaders/ray.rchit")},
-								 {CSTR("src/shaders/ray.rahit")}},
-					 .dims = {Window::width(), Window::height()},
-				 })
+			   {
+				   .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_spawn_light.rgen")},
+							   {CSTR("src/shaders/ray.rmiss")},
+							   {CSTR("src/shaders/ray_shadow.rmiss")},
+							   {CSTR("src/shaders/ray.rchit")},
+							   {CSTR("src/shaders/ray.rahit")}},
+				   .dims = {Window::width(), Window::height()},
+			   })
 		.push_constants(&state.pc)
 		.zero(state.light_state_buffer)
 		.bind(rt_bindings)
@@ -182,14 +181,14 @@ void render(Integrator* integrator) {
 	state.pc.random_num = lm::rand_u32();
 	// Trace spawned rays
 	rg::add_rt(CSTR("VCM - Trace Light"),
-				 {
-					 .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_light.rgen")},
-								 {CSTR("src/shaders/ray.rmiss")},
-								 {CSTR("src/shaders/ray_shadow.rmiss")},
-								 {CSTR("src/shaders/ray.rchit")},
-								 {CSTR("src/shaders/ray.rahit")}},
-					 .dims = {Window::width(), Window::height()},
-				 })
+			   {
+				   .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_light.rgen")},
+							   {CSTR("src/shaders/ray.rmiss")},
+							   {CSTR("src/shaders/ray_shadow.rmiss")},
+							   {CSTR("src/shaders/ray.rchit")},
+							   {CSTR("src/shaders/ray.rahit")}},
+				   .dims = {Window::width(), Window::height()},
+			   })
 		.push_constants(&state.pc)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
@@ -197,27 +196,27 @@ void render(Integrator* integrator) {
 		.bind_tlas(*integrator->tlas);
 	// Select a reservoir sample
 	rg::add_compute(CSTR("Select Reservoir"),
-					  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/select_reservoirs.comp")),
-					   .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+					{.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/select_reservoirs.comp")),
+					 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.bind(integrator->lumen_scene->scene_desc_buffer)
 		.push_constants(&state.pc);
 
 	// Update temporal reservoirs with the selected sample
 	rg::add_compute(CSTR("Update Reservoirs"),
-					  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/update_reservoirs.comp")),
-					   .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+					{.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/update_reservoirs.comp")),
+					 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.bind(integrator->lumen_scene->scene_desc_buffer)
 		.push_constants(&state.pc);
 	// Trace rays from eye
 	rg::add_rt(CSTR("VCM - Trace Eye"),
-				 {
-					 .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_eye.rgen")},
-								 {CSTR("src/shaders/ray.rmiss")},
-								 {CSTR("src/shaders/ray_shadow.rmiss")},
-								 {CSTR("src/shaders/ray.rchit")},
-								 {CSTR("src/shaders/ray.rahit")}},
-					 .dims = {Window::width(), Window::height()},
-				 })
+			   {
+				   .shaders = {{CSTR("src/shaders/integrators/vcm/vcm_eye.rgen")},
+							   {CSTR("src/shaders/ray.rmiss")},
+							   {CSTR("src/shaders/ray_shadow.rmiss")},
+							   {CSTR("src/shaders/ray.rchit")},
+							   {CSTR("src/shaders/ray.rahit")}},
+				   .dims = {Window::width(), Window::height()},
+			   })
 		.push_constants(&state.pc)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
@@ -243,16 +242,11 @@ void destroy(Integrator* integrator, bool resize) {
 	VCM& state = integrator->vcm;
 	(void)resize;
 
-	vk::Buffer** buffers[] = {&state.photon_buffer,
-							 &state.vcm_light_vertices_buffer,
-							 &state.light_path_cnt_buffer,
-							 &state.color_storage_buffer,
-							 &state.vcm_reservoir_buffer,
-							 &state.light_samples_buffer,
-							 &state.light_state_buffer,
-							 &state.should_resample_buffer,
-							 &state.angle_struct_buffer,
-							 &state.avg_buffer};
+	vk::Buffer** buffers[] = {&state.photon_buffer,			&state.vcm_light_vertices_buffer,
+							  &state.light_path_cnt_buffer, &state.color_storage_buffer,
+							  &state.vcm_reservoir_buffer,	&state.light_samples_buffer,
+							  &state.light_state_buffer,	&state.should_resample_buffer,
+							  &state.angle_struct_buffer,	&state.avg_buffer};
 	for (vk::Buffer** buffer : buffers) {
 		prm::remove(*buffer);
 		*buffer = nullptr;
@@ -267,10 +261,16 @@ bool gui(Integrator* integrator) {
 	VCM& state = integrator->vcm;
 	VCMConfig& config = integrator->lumen_scene->config.settings.vcm;
 	bool result = false;
-	bool path_length_changed = ImGui::SliderInt("Path length", (i32*)&integrator->lumen_scene->config.common.path_length, 0, 12);
+	bool path_length_changed =
+		ImGui::SliderInt("Path length", (i32*)&integrator->lumen_scene->config.common.path_length, 0, 12);
 	result |= path_length_changed;
 	result |= ImGui::Checkbox("Enable VM", &config.enable_vm);
 	result |= ImGui::Checkbox("Enable accumulation", &state.enable_accumulation);
+	if (path_length_changed) {
+		vkDeviceWaitIdle(vk::context().device);
+		destroy(integrator, /*resize=*/false);
+		init(integrator);
+	}
 	return result;
 }
 

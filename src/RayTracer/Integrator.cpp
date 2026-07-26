@@ -210,6 +210,8 @@ SceneDesc scene_desc_base(Integrator* integrator) {
 }
 
 void upload_scene_desc(Integrator* integrator, const SceneDesc& desc) {
+	// Integrators may re-init without a common_destroy, so re-create the buffer
+	prm::remove(integrator->lumen_scene->scene_desc_buffer);
 	integrator->lumen_scene->scene_desc_buffer =
 		prm::get_buffer({.name = CSTR("Scene Desc"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
