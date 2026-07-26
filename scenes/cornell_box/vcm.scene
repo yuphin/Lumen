@@ -1,7 +1,7 @@
 integrator: 
   type: vcm
   path_length: 6
-  sky_col: v3f(1.000000, 1.000000, 1.000000)
+  sky_col: v3f(0.000000, 0.000000, 0.000000)
   enable_vm: 0
   radius_factor: 0.025000
 
@@ -35,7 +35,7 @@ bsdfs:
 
   - name: Light
     type: diffuse
-    albedo: v3f(1.000000, 1.000000, 1.000000)
+    albedo: v3f(0.000000, 0.000000, 0.000000)
     emissive_factor: v3f(17.000000, 12.000000, 4.000000)
 
 

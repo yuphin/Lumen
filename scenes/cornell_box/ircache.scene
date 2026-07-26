@@ -48,9 +48,9 @@ lights:
 
 camera: 
   fov: 45.000000
-  position: v3f(0.700000, 0.500000, 15.500000)
-  rotation: v3f(0.000000, 0.000000, 0.000000)
-  dir: v3f(-0.000000, 0.000000, 1.000000)
+  position: v3f(0.59,0.50,11.41)
+  rotation: v3f(-17.65,-0.10,0.00)
+  dir: v3f(0.00,-0.30,-0.95)
 
 mesh: 
   - name: cornell_box.obj

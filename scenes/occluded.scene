@@ -31,7 +31,7 @@ bsdfs:
 
   - name: Light
     type: diffuse
-    albedo: v3f(1.000000, 1.000000, 1.000000)
+    albedo: v3f(0.000000, 0.000000, 0.000000)
     emissive_factor: v3f(51.000000, 36.000000, 12.000000)
 
 
