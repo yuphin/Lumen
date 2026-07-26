@@ -13,6 +13,7 @@
 #include "../../commons.glsl"
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
+#include "../../shadow_ray.glsl"
 
 layout(push_constant) uniform _PushConstantRay { PCVCM pc; };
 // VCM buffers
@@ -79,12 +80,7 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
         return L;
     }
     if (cam_pdf_ratio > 0.0) {
-        any_hit_payload.hit = 1;
-        traceRayEXT(tlas,
-                    gl_RayFlagsTerminateOnFirstHitEXT |
-                        gl_RayFlagsSkipClosestHitShaderEXT,
-                    0xFF, 1, 0, 1, ray_origin, 0, dir, len - EPS, 1);
-        if (any_hit_payload.hit == 0) {
+        if (!connection_occluded(ray_origin, dir, len, 0xFF)) {
             const float w_light = (cam_pdf_ratio / (screen_size)) *
                                   (eta_vm + state.d_vcm + pdf_rev * state.d_vc);
             const float mis_weight = 1. / (1. + w_light);

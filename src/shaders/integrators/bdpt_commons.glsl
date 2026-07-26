@@ -1,6 +1,8 @@
 #ifndef BDPT_COMMONS
 #define BDPT_COMMONS
 
+#include "../shadow_ray.glsl"
+
 #ifndef BDPT_MLT
 #define BDPT_MLT 0
 #endif
@@ -497,13 +499,7 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
         return L;
     }
     if (cam_pdf_ratio > 0.0) {
-        any_hit_payload.hit = 1;
-        traceRayEXT(tlas,
-                    gl_RayFlagsTerminateOnFirstHitEXT |
-                        gl_RayFlagsSkipClosestHitShaderEXT,
-                    0xFF, 1, 0, 1, ray_origin, 0, dir, len - EPS, 1);
-
-        if (any_hit_payload.hit == 0) {
+        if (!connection_occluded(ray_origin, dir, len, 0xFF)) {
             sampled.pos = cam_vtx(0).pos;
             sampled.n_s = cam_vtx(0).n_s;
             // We / pdf_we * abs(cos_theta) = cam_pdf_ratio
@@ -558,7 +554,6 @@ vec3 bdpt_connect(int s, int t) {
         const float cos_x = abs(dot(light_sample.wi, cam_vtx(t - 1).n_s));
         const vec3 ray_origin =
             offset_ray2(cam_vtx(t - 1).pos, cam_vtx(t - 1).n_s);
-        any_hit_payload.hit = 1;
         vec3 wo = normalize(cam_vtx(t - 2).pos - cam_vtx(t - 1).pos);
         // TODO
         const Material mat =
@@ -566,12 +561,9 @@ vec3 bdpt_connect(int s, int t) {
         const vec3 f = eval_bsdf(mat, wo, light_sample.wi, cam_vtx(t - 1).n_s,
                                  cam_vtx(t - 1).mode, cam_vtx(t - 1).side == 1);
         if (f != vec3(0)) {
-            traceRayEXT(tlas,
-                        gl_RayFlagsTerminateOnFirstHitEXT |
-                            gl_RayFlagsSkipClosestHitShaderEXT,
-                        0xFF, 1, 0, 1, ray_origin, 0, light_sample.wi,
-                        light_sample.distance - EPS, 1);
-            const bool visible = any_hit_payload.hit == 0;
+            // Vertex is on the emitter
+            const bool visible = !connection_occluded(
+                ray_origin, light_sample.wi, light_sample.distance, 0xFF);
             if (visible) {
                 sampled.pdf_fwd = light_sample.pdf_position_a;
                 sampled.pos = light_sample.position;
@@ -603,12 +595,8 @@ vec3 bdpt_connect(int s, int t) {
                 vec3 ray_origin =
                     offset_ray2(cam_vtx(t - 1).pos, cam_vtx(t - 1).n_s);
                 // Check visibility
-                any_hit_payload.hit = 1;
-                traceRayEXT(tlas,
-                            gl_RayFlagsTerminateOnFirstHitEXT |
-                                gl_RayFlagsSkipClosestHitShaderEXT,
-                            0xFF, 1, 0, 1, ray_origin, 0, d, len - EPS, 1);
-                const bool visible = any_hit_payload.hit == 0;
+                const bool visible =
+                    !connection_occluded(ray_origin, d, len, 0xFF);
                 if (visible) {
                     L = light_vtx(s - 1).throughput * G * brdf1 * brdf2 *
                         cam_vtx(t - 1).throughput;

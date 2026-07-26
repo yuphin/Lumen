@@ -1,6 +1,8 @@
 #ifndef VCM_COMMONS
 #define VCM_COMMONS
 
+#include "../shadow_ray.glsl"
+
 #ifndef VC_MLT
 #define VC_MLT 0
 #endif
@@ -48,10 +50,7 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, vec3 n_s, const flo
 		return L;
 	}
 	if (cam_pdf_ratio > 0.0) {
-		any_hit_payload.hit = 1;
-		traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1,
-					ray_origin, 0, dir, len - EPS, 1);
-		if (any_hit_payload.hit == 0) {
+		if (!connection_occluded(ray_origin, dir, len, 0xFF)) {
 			const float w_light = (cam_pdf_ratio / (screen_size)) * (eta_vm + state.d_vcm + pdf_rev * state.d_vc);
 
 			const float mis_weight = 1. / (1. + w_light);
@@ -165,13 +164,11 @@ vec3 vcm_connect_light(vec3 n_s, vec3 wo, Material mat, bool side, float eta_vm,
 
 	const float cos_x = dot(light_sample.wi, n_s);
 	const vec3 ray_origin = offset_ray2(payload.pos, n_s);
-	any_hit_payload.hit = 1;
 	float pdf_fwd;
 	f = eval_bsdf(n_s, wo, mat, 1, side, light_sample.wi, pdf_fwd, pdf_rev);
 	if (f != vec3(0)) {
-		traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1,
-					ray_origin, 0, light_sample.wi, light_sample.distance - EPS, 1);
-		const bool visible = any_hit_payload.hit == 0;
+		// Vertex is on the emitter
+		const bool visible = !connection_occluded(ray_origin, light_sample.wi, light_sample.distance, 0xFF);
 		if (visible) {
 			if (is_light_delta(light_sample.flags)) {
 				pdf_fwd = 0;
@@ -226,10 +223,7 @@ vec3 vcm_connect_light_vertices(uint light_path_len, uint light_path_idx, int de
 				const float w_camera = light_pdf_fwd * (eta_vm + camera_state.d_vcm + pdf_rev * camera_state.d_vc);
 				const float mis_weight = 1. / (1 + w_camera + w_light);
 				const vec3 ray_origin = offset_ray2(payload.pos, n_s);
-				any_hit_payload.hit = 1;
-				traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1,
-							ray_origin, 0, dir, len - EPS, 1);
-				const bool visible = any_hit_payload.hit == 0;
+				const bool visible = !connection_occluded(ray_origin, dir, len, 0xFF);
 				if (visible) {
 					res = mis_weight * G * camera_state.throughput * light_vtx(light_path_idx + i).throughput * f_cam *
 						  f_light;
@@ -867,10 +861,7 @@ float mlt_trace_light() {
 							light_pdf_fwd * (cam_vtx(path_idx + i).d_vcm + cam_pdf_rev * cam_vtx(path_idx + i).d_vc);
 						const float mis_weight = 1. / (1 + w_light + w_cam);
 						const vec3 ray_origin = offset_ray(hit_pos, n_s);
-						any_hit_payload.hit = 1;
-						traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF,
-									1, 0, 1, ray_origin, 0, -dir, len - EPS, 1);
-						const bool visible = any_hit_payload.hit == 0;
+						const bool visible = !connection_occluded(ray_origin, -dir, len, 0xFF);
 						if (visible) {
 							const vec3 L = mis_weight * G * light_state.throughput * cam_vtx(path_idx + i).throughput *
 										   f_cam * f_light;

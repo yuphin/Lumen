@@ -3,6 +3,7 @@
 #include "../../../commons.glsl"
 layout(location = 0) rayPayloadEXT GrisHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
+#include "../../../shadow_ray.glsl"
 layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc; };
 
 #define LOG_GRIS 0
@@ -166,8 +167,7 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	wi = light_sample.wi;
 	pdf_light_w = light_sample.pdf_position_w;
 	const float wi_len = light_sample.distance;
-	// TODO: Should we handle this case differently? Investigate this further
-	if(wi_len < EPS) {
+	if (wi_len <= EPS) {
 		return vec3(0);
 	}
 	const uint light_type = get_light_type(light_sample.flags);
@@ -176,10 +176,7 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	float light_bsdf_pdf_rev;
 	float cos_x = max(0, dot(n_s, wi));
 	vec3 f_light = eval_bsdf(n_s, wo, hit_mat, 1, side, wi, light_bsdf_pdf_fwd, light_bsdf_pdf_rev);
-	any_hit_payload.hit = 1;
-	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 1, 0, 1, p, 0, wi,
-				wi_len - EPS, 1);
-	bool visible = any_hit_payload.hit == 0;
+	bool visible = !connection_occluded(p, wi, wi_len, 0xFF);
 	is_directional_light = light_type == LIGHT_DIRECTIONAL;
 
 	light_dir_or_pdf = vec3(light_sample.pdf_position_a, vec2(0));

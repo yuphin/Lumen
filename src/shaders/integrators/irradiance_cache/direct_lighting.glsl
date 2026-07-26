@@ -1,6 +1,8 @@
 #ifndef IR_DIRECT_LIGHTING_GLSL
 #define IR_DIRECT_LIGHTING_GLSL
 
+#include "../../shadow_ray.glsl"
+
 vec3 sample_direct_light(inout uvec4 seed, vec3 pos, const vec3 n_s, vec3 wo, Material hit_material,
 						 bool forward_facing) {
 	if (pc.num_lights == 0) {
@@ -17,11 +19,7 @@ vec3 sample_direct_light(inout uvec4 seed, vec3 pos, const vec3 n_s, vec3 wo, Ma
 	const vec3 f = eval_bsdf(hit_material, wo, light_sample.wi, n_s, /*mode=*/1,
 							 /*forward_facing=*/forward_facing);
 
-	any_hit_payload.hit = 1;
-	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0x1, 1, 0, 1, p, 0,
-				light_sample.wi, light_sample.distance - EPS, 1);
-
-	if (any_hit_payload.hit == 0) {
+	if (!connection_occluded(p, light_sample.wi, light_sample.distance, 0x1)) {
 		return f * abs(cos_x) * light_sample.Li / light_sample.pdf_position_w;
 	}
 	return vec3(0);

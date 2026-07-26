@@ -12,6 +12,7 @@
 #include "../../../commons.glsl"
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
+#include "../../../shadow_ray.glsl"
 #include "restirgi_commons.glsl"
 #define M_MAX 500
 
@@ -138,12 +139,7 @@ void main() {
                 (r.s.bsdf_props & BSDF_FLAG_TRANSMISSION) == BSDF_FLAG_TRANSMISSION;
             bool visible = true;
             if (!mat_transmissive) {
-                any_hit_payload.hit = 1;
-                traceRayEXT(tlas,
-                            gl_RayFlagsTerminateOnFirstHitEXT |
-                                gl_RayFlagsSkipClosestHitShaderEXT,
-                            0xFF, 1, 0, 1, o, 0, dir, len - EPS, 1);
-                visible = any_hit_payload.hit == 0;
+                visible = !connection_occluded(o, dir, len, 0xFF);
             }
             if (visible) {
                 Z += Q_h[i];

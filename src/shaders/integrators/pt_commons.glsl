@@ -1,5 +1,7 @@
 #ifndef PT_COMMONS
 #define PT_COMMONS
+
+#include "../shadow_ray.glsl"
 vec3 sample_direct_light(inout uvec4 seed, const Material mat, vec3 pos, const bool side, const vec3 n_s,
 						 vec3 wo, bool use_mis, out bool visible) {
 	visible = false;
@@ -15,10 +17,7 @@ vec3 sample_direct_light(inout uvec4 seed, const Material mat, vec3 pos, const b
 	float bsdf_pdf;
 	const float cos_x = dot(n_s, light_sample.wi);
 	const vec3 f = eval_bsdf(n_s, wo, mat, 1, side, light_sample.wi, bsdf_pdf);
-	any_hit_payload.hit = 1;
-	traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0x1, 1, 0, 1,
-				offset_ray2(pos, n_s), 0.0, light_sample.wi, light_sample.distance - EPS, 1);
-	visible = any_hit_payload.hit == 0;
+	visible = !connection_occluded(offset_ray2(pos, n_s), light_sample.wi, light_sample.distance, 0x1);
 	if (!visible) {
 		return vec3(0.0);
 	}

@@ -87,14 +87,11 @@ void main() {
             const RestirData s = r_new.s;
             const LightLiSample light_sample = replay_light_Li(s.identity, payload.pos, pc.num_lights);
 
-            any_hit_payload.hit = 1;
-            traceRayEXT(tlas,
-                        gl_RayFlagsTerminateOnFirstHitEXT |
-                            gl_RayFlagsSkipClosestHitShaderEXT,
-                        0xFF, 1, 0, 1, offset_ray2(pos, normal), 0, light_sample.wi,
-                        light_sample.distance - EPS, 1);
+            const bool unoccluded =
+                !connection_occluded(offset_ray2(pos, normal), light_sample.wi,
+                                     light_sample.distance, 0xFF);
             vec3 f = eval_bsdf(hit_mat, wo, light_sample.wi, normal, 1, side);
-            bool visible = any_hit_payload.hit == 0 && f != vec3(0);
+            bool visible = unoccluded && f != vec3(0);
             r_new.W = 0;
             if (visible) {
                 const float p_hat = length(f * light_sample.Li * abs(dot(normal, light_sample.wi)));

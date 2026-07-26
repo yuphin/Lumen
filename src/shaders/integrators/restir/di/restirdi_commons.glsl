@@ -2,6 +2,7 @@
 #include "../../../commons.glsl"
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
+#include "../../../shadow_ray.glsl"
 layout(push_constant) uniform _PushConstantRay { PCReSTIR pc; };
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
@@ -61,13 +62,9 @@ vec3 calc_L_with_visibility_check(const RestirReservoir r) {
     const vec3 wo = normalize(origin - pos);
     const LightLiSample light_sample = replay_light_Li(r.s.identity, pos, pc.num_lights);
     const vec3 f = eval_bsdf(hit_mat, wo, light_sample.wi, normal, 1, true);
-    any_hit_payload.hit = 1;
-    traceRayEXT(tlas,
-                gl_RayFlagsTerminateOnFirstHitEXT |
-                    gl_RayFlagsSkipClosestHitShaderEXT,
-                0xFF, 1, 0, 1, offset_ray(pos, normal), 0, light_sample.wi,
-                light_sample.distance - EPS, 1);
-    bool visible = any_hit_payload.hit == 0;
+    bool visible = !connection_occluded(offset_ray(pos, normal),
+                                        light_sample.wi,
+                                        light_sample.distance, 0xFF);
     if (visible) {
         return f * light_sample.Li * abs(dot(normal, light_sample.wi));
     }
