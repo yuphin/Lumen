@@ -7,7 +7,6 @@
 #define BDPT_MLT 0
 #endif
 
-float light_pdf_pos;
 #if BDPT_MLT == 1
 #include "mlt_commons.glsl"
 #endif
@@ -220,8 +219,6 @@ int bdpt_generate_light_subpath(int max_depth) {
     if (light_sample.pdf_joint <= 0.0) {
         return 0;
     }
-    light_pdf_pos = light_sample.pdf_position_a;
-
     DEREF(light_path)[bdpt_path_idx].pos = light_sample.position;
     DEREF(light_path)[bdpt_path_idx].light_flags = light_sample.flags;
     DEREF(light_path)[bdpt_path_idx].light_idx = light_sample.identity.light_idx;
@@ -286,6 +283,8 @@ float calc_mis_weight(int s, int t, const in PathVertex sampled) {
     vec3 s_0_pdf_pos;
     vec3 s_0_pdf_nrm;
     uint s_0_pdf_nrm_g;
+    uint s_0_light_flags;
+    uint s_0_light_idx;
     bool t_0_changed = false;
     uint idx_1 = -1;
     float idx_1_val;
@@ -306,10 +305,14 @@ float calc_mis_weight(int s, int t, const in PathVertex sampled) {
         s_0_pdf_pos = light_vtx(0).pos;
         s_0_pdf_nrm = light_vtx(0).n_s;
         s_0_pdf_nrm_g = light_vtx(0).packed_n_g;
+        s_0_light_flags = light_vtx(0).light_flags;
+        s_0_light_idx = light_vtx(0).light_idx;
         light_vtx(0).pdf_fwd = sampled.pdf_fwd;
         light_vtx(0).pos = sampled.pos;
         light_vtx(0).n_s = sampled.n_s;
         light_vtx(0).packed_n_g = sampled.packed_n_g;
+        light_vtx(0).light_flags = sampled.light_flags;
+        light_vtx(0).light_idx = sampled.light_idx;
         s_0_changed = true;
     }
     if (t == 1) {
@@ -340,12 +343,12 @@ float calc_mis_weight(int s, int t, const in PathVertex sampled) {
             vec3 dir = (cam_vtx(t - 1).pos - light_vtx(s - 1).pos);
             float dir_len = length(dir);
             dir /= dir_len;
-            const Material mat = load_material(light_vtx(s - 1).material_idx,
-                                               light_vtx(s - 1).uv);
-            vec3 wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
             float pdf_rev;
             if (s >= 2) {
-                wo = normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
+                const Material mat = load_material(light_vtx(s - 1).material_idx,
+                                                   light_vtx(s - 1).uv);
+                const vec3 wo =
+                    normalize(light_vtx(s - 2).pos - light_vtx(s - 1).pos);
                 pdf_rev = bsdf_pdf(mat, light_vtx(s - 1).n_s,
                                    unpack_normal_octahedral(light_vtx(s - 1).packed_n_g), wo, dir,
                                    light_vtx(s - 1).side == 1);
@@ -355,7 +358,8 @@ float calc_mis_weight(int s, int t, const in PathVertex sampled) {
             } else if (s == 1) {
                 if (!is_light_finite(light_vtx(0).light_flags)) {
                     // Note: All the infinite lights are of directional type
-                    pdf_rev = light_pdf_pos;
+                    pdf_rev = light_emission_position_pdf_a(
+                        light_vtx(0).light_idx, pc.num_lights);
                     pdf_rev *= abs(dot(dir, unpack_normal_octahedral(cam_vtx(t - 1).packed_n_g)));
                 } else {
                     pdf_rev = light_emission_direction_pdf_w(
@@ -478,6 +482,8 @@ float calc_mis_weight(int s, int t, const in PathVertex sampled) {
         light_vtx(0).pos = s_0_pdf_pos;
         light_vtx(0).n_s = s_0_pdf_nrm;
         light_vtx(0).packed_n_g = s_0_pdf_nrm_g;
+        light_vtx(0).light_flags = s_0_light_flags;
+        light_vtx(0).light_idx = s_0_light_idx;
     }
     if (t_0_changed) {
         cam_vtx(0).pdf_fwd = s_0_pdf;
@@ -606,6 +612,8 @@ vec3 bdpt_connect(int s, int t) {
                 sampled.pos = light_sample.position;
                 sampled.n_s = light_sample.normal;
                 sampled.packed_n_g = pack_normal_octahedral(light_sample.normal);
+                sampled.light_flags = light_sample.flags;
+                sampled.light_idx = light_sample.identity.light_idx;
                 sampled.delta = uint(is_light_delta(light_sample.flags));
                 L = cam_vtx(t - 1).throughput * f * abs(cos_x) *
                     light_sample.Li / light_sample.pdf_position_w;
