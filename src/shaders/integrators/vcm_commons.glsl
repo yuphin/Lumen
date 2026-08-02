@@ -145,7 +145,7 @@ vec3 vcm_get_light_radiance(in const Material mat, in const VCMState camera_stat
 }
 
 vec3 vcm_connect_light(const vec3 n_s, const vec3 n_g, const vec3 wo, const Material mat, const bool side,
-					   const float eta_vm, const VCMState camera_state, out float pdf_rev, out vec3 f) {
+					   const float eta_vm, const VCMState camera_state) {
 	LightLiSample light_sample;
 	vec3 res = vec3(0.0);
 #if VC_MLT == 1
@@ -167,8 +167,9 @@ vec3 vcm_connect_light(const vec3 n_s, const vec3 n_g, const vec3 wo, const Mate
 	const float cos_x_s = dot(light_sample.wi, n_s);
 	const float cos_x_g = dot(light_sample.wi, n_g);
 	const vec3 ray_origin = offset_ray2(payload.pos, n_g, dot(light_sample.wi, n_g) < 0.0);
-	float pdf_fwd;
-	f = eval_bsdf(n_s, n_g, wo, mat, TRANSPORT_MODE_FROM_CAMERA, side, light_sample.wi, pdf_fwd, pdf_rev);
+	float pdf_fwd, pdf_rev;
+	const vec3 f =
+		eval_bsdf(n_s, n_g, wo, mat, TRANSPORT_MODE_FROM_CAMERA, side, light_sample.wi, pdf_fwd, pdf_rev);
 	if (f != vec3(0)) {
 		// Vertex is on the emitter
 		const bool visible = !connection_occluded(ray_origin, light_sample.wi, light_sample.distance, 0xFF);
@@ -195,7 +196,7 @@ vec3 vcm_connect_light(const vec3 n_s, const vec3 n_g, const vec3 wo, const Mate
 #define light_vtx(i) DEREF(vcm_vertices)[i]
 vec3 vcm_connect_light_vertices(uint light_path_len, uint light_path_idx, int depth, const vec3 n_s,
 								const vec3 n_g, const vec3 wo, const Material mat, const bool side,
-								const float eta_vm, const VCMState camera_state, const float pdf_rev) {
+								const float eta_vm, const VCMState camera_state) {
 	vec3 res = vec3(0);
 	for (int i = 0; i < light_path_len; i++) {
 		uint s = light_vtx(light_path_idx + i).path_len;
@@ -213,9 +214,9 @@ vec3 vcm_connect_light_vertices(uint light_path_len, uint light_path_idx, int de
 		const float cos_light = dot(light_n_g, -dir);
 		const float G = abs(cos_light * cos_cam) / len_sqr;
 		if (G > 0) {
-			float cam_pdf_fwd, light_pdf_fwd, light_pdf_rev;
-			const vec3 f_cam =
-				eval_bsdf(n_s, n_g, wo, mat, TRANSPORT_MODE_FROM_CAMERA, side, dir, cam_pdf_fwd);
+			float cam_pdf_fwd, cam_pdf_rev, light_pdf_fwd, light_pdf_rev;
+			const vec3 f_cam = eval_bsdf(n_s, n_g, wo, mat, TRANSPORT_MODE_FROM_CAMERA, side, dir, cam_pdf_fwd,
+										 cam_pdf_rev);
 			const Material light_mat =
 				load_material(light_vertex.material_idx, light_vertex.uv);
 			// TODO: what about anisotropic BSDFS?
@@ -226,7 +227,7 @@ vec3 vcm_connect_light_vertices(uint light_path_len, uint light_path_idx, int de
 				cam_pdf_fwd *= abs(cos_light) / len_sqr;
 				light_pdf_fwd *= abs(cos_cam) / len_sqr;
 				const float light_factor = eta_vm + light_vertex.d_vcm + light_pdf_rev * light_vertex.d_vc;
-				const float cam_factor = eta_vm + camera_state.d_vcm + pdf_rev * camera_state.d_vc;
+				const float cam_factor = eta_vm + camera_state.d_vcm + cam_pdf_rev * camera_state.d_vc;
 				const float w_light = light_factor == 0.0 ? 0.0 : cam_pdf_fwd * light_factor;
 				const float w_camera = cam_factor == 0.0 ? 0.0 : light_pdf_fwd * cam_factor;
 				const float mis_weight = 1. / (1 + w_camera + w_light);
@@ -248,7 +249,7 @@ vec3 vcm_connect_light_vertices(uint light_path_len, uint light_path_idx, int de
 
 #if VC_MLT == 0
 vec3 vcm_merge_light_vertices(uint light_path_len, uint light_path_idx, int depth, vec3 n_s, vec3 n_g, vec3 wo,
-							  Material mat, bool side, float eta_vc, VCMState camera_state, float pdf_rev, float radius,
+							  Material mat, bool side, float eta_vc, VCMState camera_state, float radius,
 							  float normalization_factor) {
 	float r_sqr = radius * radius;
 	vec3 res = vec3(0);
@@ -571,23 +572,21 @@ vec3 vcm_trace_eye(VCMState camera_state, float eta_vcm, float eta_vc,
 			// }
 		}
 		// Connect to light
-		float pdf_rev;
-		vec3 f;
 		if (!mat_specular && depth < pc.max_depth) {
-			col += vcm_connect_light(n_s, n_g, wo, mat, side, eta_vm, camera_state, pdf_rev, f);
+			col += vcm_connect_light(n_s, n_g, wo, mat, side, eta_vm, camera_state);
 		}
 
 		// Connect to light vertices
 		if (!mat_specular) {
 			col += vcm_connect_light_vertices(light_path_len, light_path_idx, depth, n_s, n_g, wo, mat, side, eta_vm,
-											  camera_state, pdf_rev);
+											  camera_state);
 		}
 #if VC_MLT == 0
 		// Vertex merging
 		float r_sqr = radius * radius;
 		if (!mat_specular && pc.use_vm == 1) {
 			col += vcm_merge_light_vertices(light_path_len, light_path_idx, depth, n_s, n_g, wo, mat, side, eta_vc,
-										camera_state, pdf_rev, radius, normalization_factor);
+											  camera_state, radius, normalization_factor);
 		}
 #endif
 		if (depth >= pc.max_depth) {
@@ -595,6 +594,7 @@ vec3 vcm_trace_eye(VCMState camera_state, float eta_vcm, float eta_vc,
 		}
 
 		// Scattering
+		vec3 f;
 		float pdf_dir;
 		float cos_theta;
 #if VC_MLT == 1 || VCM_MLT == 1
@@ -612,7 +612,7 @@ vec3 vcm_trace_eye(VCMState camera_state, float eta_vcm, float eta_vc,
 		if (f == vec3(0) || pdf_dir == 0 || (!same_hemisphere && !mat_transmissive)) {
 			break;
 		}
-		pdf_rev = pdf_dir;
+		float pdf_rev = pdf_dir;
 		if (!mat_specular) {
 			pdf_rev = bsdf_pdf(mat, n_s, n_g, camera_state.wi, wo, side);
 		}
@@ -727,10 +727,8 @@ float mlt_fill_eye() {
 		}
 
 		// Connect to light
-		float pdf_rev;
-		vec3 f;
 		if (!mat_specular && depth < pc.max_depth) {
-			const vec3 L = vcm_connect_light(n_s, n_g, wo, mat, side, 0, camera_state, pdf_rev, f);
+			const vec3 L = vcm_connect_light(n_s, n_g, wo, mat, side, 0, camera_state);
 			DEREF(color_storage)[coords_idx] += L;
 			lum_sum += luminance(L);
 		}
@@ -739,6 +737,7 @@ float mlt_fill_eye() {
 			break;
 		}
 		// Scattering
+		vec3 f;
 		float pdf_dir;
 		float cos_theta;
 		f = sample_bsdf(n_s, n_g, wo, mat, TRANSPORT_MODE_FROM_CAMERA, side, camera_state.wi, pdf_dir, cos_theta,
@@ -749,7 +748,7 @@ float mlt_fill_eye() {
 		if (f == vec3(0) || pdf_dir == 0 || (!same_hemisphere && !mat_transmissive)) {
 			break;
 		}
-		pdf_rev = pdf_dir;
+		float pdf_rev = pdf_dir;
 		if (!mat_specular) {
 			pdf_rev = bsdf_pdf(mat, n_s, n_g, camera_state.wi, wo, side);
 		}
