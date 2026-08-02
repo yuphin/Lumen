@@ -8,18 +8,21 @@ void init(Integrator* integrator) {
 
 	state.light_path_buffer =
 		prm::get_buffer({.name = CSTR("Light Path Buffer"),
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * (integrator->lumen_scene->config.common.path_length + 1) *
 								 sizeof(PathVertex)});
 	state.camera_path_buffer =
 		prm::get_buffer({.name = CSTR("Camera Path Buffer"),
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * (integrator->lumen_scene->config.common.path_length + 1) *
 								 sizeof(PathVertex)});
+	state.path_counts_buffer =
+		prm::get_buffer({.name = CSTR("BDPT Path Counts"),
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = Window::width() * Window::height() * sizeof(BDPTPathCounts)});
 	state.color_storage_buffer =
 		prm::get_buffer({.name = CSTR("Color Storage Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
@@ -30,6 +33,7 @@ void init(Integrator* integrator) {
 	// BDPT
 	SET_SCENE_BUFFER(desc, light_path, state.light_path_buffer);
 	SET_SCENE_BUFFER(desc, camera_path, state.camera_path_buffer);
+	SET_SCENE_BUFFER(desc, path_cnt, state.path_counts_buffer);
 	SET_SCENE_BUFFER(desc, color_storage, state.color_storage_buffer);
 	integrator::upload_scene_desc(integrator, desc);
 
@@ -48,28 +52,52 @@ void render(Integrator* integrator) {
 	state.pc.enable_accumulation = state.enable_accumulation;
 	state.pc.width = Window::width();
 	state.pc.height = Window::height();
-	rg::add_rt(CSTR("BDPT"),
-				 {
+	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
+		integrator->output_tex,
+		integrator->scene_ubo_buffer,
+		integrator->lumen_scene->scene_desc_buffer,
+	};
 
-					 .shaders = {{CSTR("src/shaders/integrators/bdpt/bdpt.rgen")},
+	rg::add_rt(CSTR("BDPT - Trace Eye"),
+				 {
+					 .shaders = {{CSTR("src/shaders/integrators/bdpt/bdpt_eye.rgen")},
 								 {CSTR("src/shaders/ray.rmiss")},
 								 {CSTR("src/shaders/ray_shadow.rmiss")},
 								 {CSTR("src/shaders/ray.rchit")},
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
-		.zero(state.light_path_buffer)
-		.zero(state.camera_path_buffer)
-		.zero(state.color_storage_buffer)
-		//.read(state.light_path_buffer) // Needed if shader inference is disabled
-		//.read(state.camera_path_buffer)
 		.push_constants(&state.pc)
-		//.write(integrator->output_tex)
-		.bind({
-			integrator->output_tex,
-			integrator->scene_ubo_buffer,
-			integrator->lumen_scene->scene_desc_buffer,
-		})
+		.bind(rt_bindings)
+		.bind(integrator->lumen_scene->mesh_lights_buffer)
+		.bind_texture_array(integrator->lumen_scene->scene_textures)
+		.bind_tlas(*integrator->tlas);
+	rg::add_rt(CSTR("BDPT - Trace Light"),
+				 {
+					 .shaders = {{CSTR("src/shaders/integrators/bdpt/bdpt_light.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
+					 .dims = {Window::width(), Window::height()},
+				 })
+		.push_constants(&state.pc)
+		.bind(rt_bindings)
+		.bind(integrator->lumen_scene->mesh_lights_buffer)
+		.bind_texture_array(integrator->lumen_scene->scene_textures)
+		.bind_tlas(*integrator->tlas);
+	rg::add_rt(CSTR("BDPT - Connect"),
+				 {
+					 .shaders = {{CSTR("src/shaders/integrators/bdpt/bdpt_connect.rgen")},
+								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ray_shadow.rmiss")},
+								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ray.rahit")}},
+					 .dims = {Window::width(), Window::height()},
+				 })
+		.zero(state.color_storage_buffer)
+		.push_constants(&state.pc)
+		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
@@ -99,7 +127,8 @@ void destroy(Integrator* integrator, bool resize) {
 	BDPT& state = integrator->bdpt;
 	(void)resize;
 
-	vk::Buffer** buffers[] = {&state.light_path_buffer, &state.camera_path_buffer, &state.color_storage_buffer};
+	vk::Buffer** buffers[] = {&state.light_path_buffer, &state.camera_path_buffer, &state.path_counts_buffer,
+							  &state.color_storage_buffer};
 	for (vk::Buffer** buffer : buffers) {
 		prm::remove(*buffer);
 		*buffer = nullptr;

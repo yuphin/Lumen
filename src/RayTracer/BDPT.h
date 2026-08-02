@@ -11,6 +11,7 @@ struct BDPT {
 	PCBDPT pc{};
 	vk::Buffer* light_path_buffer = nullptr;
 	vk::Buffer* camera_path_buffer = nullptr;
+	vk::Buffer* path_counts_buffer = nullptr;
 	vk::Buffer* color_storage_buffer = nullptr;
 	bool enable_accumulation = true;
 };

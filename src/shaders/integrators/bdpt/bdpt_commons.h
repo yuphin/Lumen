@@ -14,6 +14,11 @@ struct PCBDPT {
 	uint enable_accumulation;
 };
 
+struct BDPTPathCounts {
+	uint eye_vertex_count;
+	uint light_vertex_count;
+};
+
 struct PathVertex {
 	vec3 dir;
 	vec3 n_s;

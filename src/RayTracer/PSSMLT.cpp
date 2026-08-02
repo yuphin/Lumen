@@ -112,15 +112,13 @@ void init(Integrator* integrator) {
 
 	state.light_path_buffer =
 		prm::get_buffer({.name = CSTR("Light Paths"),
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = path_size * (path_length + 1) * sizeof(MLTPathVertex)});
 
 	state.camera_path_buffer =
 		prm::get_buffer({.name = CSTR("Camera Paths"),
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = path_size * (path_length + 1) * sizeof(MLTPathVertex)});
 
@@ -284,7 +282,6 @@ void render(Integrator* integrator) {
 					 .dims = {(u32)config.num_bootstrap_samples},
 				 })
 		.push_constants(&state.pc)
-		.zero({state.light_path_buffer, state.camera_path_buffer})
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
@@ -319,7 +316,6 @@ void render(Integrator* integrator) {
 				   .dims = {(u32)config.num_mlt_threads},
 			   })
 		.push_constants(&state.pc)
-		.zero({state.light_path_buffer, state.camera_path_buffer})
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
@@ -341,7 +337,6 @@ void render(Integrator* integrator) {
 						   .dims = {(u32)config.num_mlt_threads},
 					   })
 				.push_constants(&state.pc)
-				.zero({state.light_path_buffer, state.camera_path_buffer})
 				.bind(rt_bindings)
 				.bind(integrator->lumen_scene->mesh_lights_buffer)
 				.bind_texture_array(integrator->lumen_scene->scene_textures)

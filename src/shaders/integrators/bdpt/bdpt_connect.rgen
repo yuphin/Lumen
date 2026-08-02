@@ -1,0 +1,53 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_atomic_float : require
+
+#define BDPT_RNG_STREAM_SALT 0x0156924Bu
+#include "bdpt_pass_commons.glsl"
+
+void main() {
+	const BDPTPathCounts path_counts = DEREF(path_cnt)[pixel_idx];
+	const int num_cam_paths = int(path_counts.eye_vertex_count);
+	const int num_light_paths = int(path_counts.light_vertex_count);
+	vec3 col = vec3(0);
+
+	for (int t = 1; t <= num_cam_paths; t++) {
+		for (int s = 0; s <= num_light_paths; s++) {
+			const int depth = s + t - 2;
+			if (depth > pc.max_depth - 1 || depth < 0 ||
+				(s == 1 && t == 1)) {
+				continue;
+			}
+
+			if (t == 1) {
+				ivec2 coords;
+				const vec3 splat_col = bdpt_connect_cam(s, coords);
+				if (luminance(splat_col) > 0.0) {
+					const uint idx = uint(coords.x) * gl_LaunchSizeEXT.y +
+						uint(coords.y);
+					RGB_BUFFER_ATOMIC_ADD(color_storage, idx, splat_col);
+				}
+			} else {
+				col += bdpt_connect(s, t);
+			}
+		}
+	}
+
+	if (isnan(luminance(col))) {
+		return;
+	}
+	if (pc.enable_accumulation == 1 && pc.frame_num > 0) {
+		const float w = 1.0 / float(pc.frame_num + 1);
+		const vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+		imageStore(image, ivec2(gl_LaunchIDEXT.xy),
+				   vec4(mix(old_col, col, w), 1.0));
+	} else {
+		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.0));
+	}
+}
