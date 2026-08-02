@@ -56,7 +56,7 @@ void main() {
 		vec3 to_prev = pos - gbuffer.pos;
 		float dist_sqr = dot(to_prev, to_prev);
 		to_prev /= sqrt(dist_sqr);
-		float cos_theta_wo = abs(dot(wi, gbuffer.n_s));
+		float cos_theta_wo = abs(dot(wi, gbuffer.n_g));
 
 		d_vm_common = cos_theta_wo > 0 ? d_vm_common / cos_theta_wo : 0;
 		if(d == 0) {
@@ -94,15 +94,17 @@ void main() {
 		last_specular = !is_rough(hit_mat);
 		pos = offset_ray(gbuffer.pos, n_g);
 		float pdf_dir, cos_theta;
-		const vec3 f = sample_bsdf(n_s, wo, hit_mat, 0, side, wi, pdf_dir, cos_theta, seed);
+		const vec3 f = sample_bsdf(n_s, n_g, wo, hit_mat, TRANSPORT_MODE_FROM_LIGHT, side, wi, pdf_dir,
+								   cos_theta, seed);
 		float abs_cos_theta = abs(cos_theta);
+		const float mis_cos_theta = abs(dot(wi, n_g));
 		throughput *= f * abs_cos_theta / pdf_dir;
 
 		bool is_specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
-		d_vm_common *= abs_cos_theta;
+		d_vm_common *= mis_cos_theta;
 		if (!is_specular) {
 			// TODO: Is side correct here?
-			float pdf_rev = bsdf_pdf(hit_mat, n_s, wi, wo, side);
+			float pdf_rev = bsdf_pdf(hit_mat, n_s, n_g, wi, wo, side);
 			// pdf_rev / pdf_fwd
 			if(d == 0) {
 				d_vm_nee /= pdf_rev;

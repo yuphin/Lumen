@@ -94,12 +94,14 @@ void main() {
 		const bool surface_specular = is_specular(hit_mat);
 		const bool sample_nee = !surface_specular && (depth > 0 || pc.direct_lighting == 1);
 		if (sample_nee) {
-			col += throughput * sample_direct_light(seed, hit_mat, payload.pos, side, n_s, wo, /*use_mis=*/true);
+			col += throughput *
+				   sample_direct_light(seed, hit_mat, payload.pos, side, n_s, n_g, wo, /*use_mis=*/true);
 		}
 		// Sample direction & update throughput
 		float pdf, cos_theta;
 
-		const vec3 f = sample_bsdf(n_s, wo, hit_mat, 1 /*radiance=cam*/, side, direction, pdf, cos_theta, seed);
+		const vec3 f = sample_bsdf(n_s, n_g, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, side, direction, pdf,
+								   cos_theta, seed);
 		if (pdf == 0) {
 			break;
 		}

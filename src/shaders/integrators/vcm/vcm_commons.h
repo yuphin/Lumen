@@ -83,6 +83,7 @@ struct VCMVertex {
 	vec3 wi;
 	vec3 wo;
 	vec3 n_s;
+	uint packed_n_g;
 	vec3 pos;
 	vec2 uv;
 	vec3 throughput;

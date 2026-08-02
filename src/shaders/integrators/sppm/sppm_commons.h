@@ -33,6 +33,7 @@ struct SPPMData {
 	uint material_idx;
 	vec2 uv;
 	vec3 n_s;
+	vec3 n_g;
 	int M;
 	float N;
 	float radius;

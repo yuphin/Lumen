@@ -190,12 +190,13 @@ void main() {
 			throughput_until_rc = throughput;
 #endif	// STREAMING_MODE == STREAMING_MODE_SPLIT
 			vec3 to_prev = origin.xyz - gbuffer.pos;
-			reconnection_data.rc_partial_jacobian = abs(dot(n_s, wo)) * rc_partial_jacobian / dot(to_prev, to_prev);
+			reconnection_data.rc_partial_jacobian =
+				abs(dot(n_g, wo)) * rc_partial_jacobian / dot(to_prev, to_prev);
 		}
 
 		connectable = !connectable_vertex_found && curr_rough;
 
-		float cos_theta_wo = abs(dot(n_s, wo));
+		float cos_theta_wo = abs(dot(n_g, wo));
 		d_vm = cos_theta_wo > 0 ? d_vm / cos_theta_wo : 0;
 		if (mis_factor_set) {
 			ASSERT(debug_val == true);
@@ -301,10 +302,10 @@ void main() {
 		// Sample direction
 		float cos_theta;
 
-		const vec3 f =
-			sample_bsdf(n_s, wo, hit_mat, 1 /*radiance=cam*/, side, direction, bsdf_pdf_fwd, cos_theta, sampling_seed);
+		const vec3 f = sample_bsdf(n_s, n_g, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, side, direction, bsdf_pdf_fwd,
+								   cos_theta, sampling_seed);
 
-		float bsdf_pdf_rev = bsdf_pdf(hit_mat, n_s, direction, wo, side);
+		float bsdf_pdf_rev = bsdf_pdf(hit_mat, n_s, n_g, direction, wo, side);
 
 		if (connectable_this_vertex) {
 			reconnection_data.rc_partial_jacobian *= bsdf_pdf_fwd;
@@ -321,7 +322,7 @@ void main() {
 			vec3 Le;
 			vec3 nee_wi;
 			float nee_pdf_light_w;
-			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, wo, mis_factor_set ? d_vm : 0.0, light_identity,
+			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, n_g, wo, mis_factor_set ? d_vm : 0.0, light_identity,
 							 reconnection_data.rc_Li, is_directional_light, Le, nee_wi, nee_pdf_light_w, depth);
 			vec3 contribution = Li * throughput;
 			// At 0 depth, we let ReSTIR DI handle the direct lighting
@@ -405,7 +406,8 @@ void main() {
 		}
 
 		float abs_cos_theta = abs(cos_theta);
-		d_vm *= abs_cos_theta;
+		const float mis_cos_theta = abs(dot(direction, n_g));
+		d_vm *= mis_cos_theta;
 		if (mis_factor_set) {
 			ASSERT(debug_val == true);
 			if (!vertex_specular) {
@@ -422,7 +424,7 @@ void main() {
 		vec3 f_cos = f * abs(cos_theta);
 		throughput *= f_cos / bsdf_pdf_fwd;
 		if (!mis_factor_set && is_rough(hit_mat)) {
-			d_vm = PI * pc.photon_radius * pc.photon_radius * pc.num_photons * abs_cos_theta / bsdf_pdf_fwd;
+			d_vm = PI * pc.photon_radius * pc.photon_radius * pc.num_photons * mis_cos_theta / bsdf_pdf_fwd;
 			debug_val = true;
 		}
 

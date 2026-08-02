@@ -89,7 +89,7 @@ void main() {
         if (!surface_recorded && !specular) {
             DEREF(sppm_data)[pixel_idx].col +=
                 throughput *
-                sample_direct_light(seed, hit_mat, pos, side, n_s, wo,
+                sample_direct_light(seed, hit_mat, pos, side, n_s, n_g, wo,
                                     /*use_mis=*/false);
         }
 
@@ -103,11 +103,12 @@ void main() {
             DEREF(sppm_data)[pixel_idx].uv = mat_uv;
             DEREF(sppm_data)[pixel_idx].throughput = throughput;
             DEREF(sppm_data)[pixel_idx].n_s = n_s;
+            DEREF(sppm_data)[pixel_idx].n_g = n_g;
             DEREF(sppm_data)[pixel_idx].path_len = d;
             DEREF(sppm_data)[pixel_idx].side = uint(side);
         }
         float pdf, cos_theta;
-        const vec3 f_sampled = sample_bsdf(n_s, wo, hit_mat, 1, side,
+        const vec3 f_sampled = sample_bsdf(n_s, n_g, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, side,
                                            direction, pdf, cos_theta, seed);
         if (pdf < 1e-20 || dot(f_sampled, f_sampled) < 1e-20) {
             break;

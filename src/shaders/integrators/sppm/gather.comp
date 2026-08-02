@@ -69,9 +69,9 @@ void main() {
                     }
                     const Material mat = load_material(
                         DEREF(sppm_data)[idx].material_idx, DEREF(sppm_data)[idx].uv);
-                    vec3 f =
-                        eval_bsdf(mat, DEREF(sppm_data)[idx].wo, DEREF(photon)[h].wi,
-                                  DEREF(sppm_data)[idx].n_s, 1, DEREF(sppm_data)[idx].side == 1);
+                    vec3 f = eval_bsdf(DEREF(sppm_data)[idx].n_s, DEREF(sppm_data)[idx].n_g,
+                                       DEREF(sppm_data)[idx].wo, mat, TRANSPORT_MODE_FROM_CAMERA,
+                                       DEREF(sppm_data)[idx].side == 1, DEREF(photon)[h].wi);
                     vec3 phi = DEREF(photon)[h].photon_count *
                                DEREF(photon)[h].throughput * f *
                                DEREF(sppm_data)[idx].throughput;

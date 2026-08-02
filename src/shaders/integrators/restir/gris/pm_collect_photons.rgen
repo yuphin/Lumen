@@ -82,7 +82,9 @@ void main() {
 
 			float cam_pdf_fwd;
 			float cam_pdf_rev;
-			vec3 f = eval_bsdf(cam_gbuffer.n_s, wo, cam_hit_mat, 1, eye_side, wi, cam_pdf_fwd, cam_pdf_rev);
+			vec3 f = eval_bsdf(cam_gbuffer.n_s, cam_gbuffer.n_g, wo, cam_hit_mat, TRANSPORT_MODE_FROM_CAMERA,
+							   eye_side, wi,
+							   cam_pdf_fwd, cam_pdf_rev);
 
 			float mis_weight = 1.0 / (1.0 + photon_light.d_vm * cam_pdf_fwd);
 
@@ -131,7 +133,8 @@ void main() {
 
 					float cam_pdf_fwd_temp;
 					float cam_pdf_rev_temp;
-					vec3 f_temp = eval_bsdf(cam_gbuffer.n_s, wo, cam_hit_mat, 1, eye_side, wi_prev, cam_pdf_fwd_temp,
+					vec3 f_temp = eval_bsdf(cam_gbuffer.n_s, cam_gbuffer.n_g, wo, cam_hit_mat,
+										 TRANSPORT_MODE_FROM_CAMERA, eye_side, wi_prev, cam_pdf_fwd_temp,
 											cam_pdf_rev_temp);
 					float mis_weight_temp = 1.0 / (1.0 + prev_reservoir.d_vm * cam_pdf_fwd_temp);
 					vec3 temp_contribution = mis_weight_temp * f_temp * prev_reservoir.flux * photon_eye.throughput;
@@ -176,7 +179,8 @@ void main() {
 
 						float cam_pdf_fwd_prev;
 						float cam_pdf_rev_prev;
-						vec3 f_prev = eval_bsdf(prev_cam_gbuffer.n_s, wo_prev, prev_cam_hit_mat, 1, eye_side_prev, wi,
+						vec3 f_prev = eval_bsdf(prev_cam_gbuffer.n_s, prev_cam_gbuffer.n_g, wo_prev, prev_cam_hit_mat,
+										   TRANSPORT_MODE_FROM_CAMERA, eye_side_prev, wi,
 												cam_pdf_fwd_prev, cam_pdf_rev_prev);
 
 						float mis_weight_prev = 1.0 / (1.0 + canonical_reservoir.d_vm * cam_pdf_fwd_prev);

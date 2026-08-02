@@ -141,6 +141,10 @@ vec3 oct_decode(vec2 o) {
 	return normalize(v);
 }
 
+uint pack_normal_octahedral(const vec3 n) { return packSnorm2x16(oct_encode(n)); }
+
+vec3 unpack_normal_octahedral(const uint packed_n) { return oct_decode(unpackSnorm2x16(packed_n)); }
+
 // Creates a quaternion s.t the unit vector v becomes (0,0,1)
 vec4 to_local_quat(vec3 v) {
 	if (v.z < -0.99999f) return vec4(1, 0, 0, 0);

@@ -5,6 +5,7 @@ struct MLTPathVertex {
 	vec3 dir;
 	uint delta;
 	vec3 n_s;
+	uint packed_n_g;
 	float area;
 	vec3 pos;
 	uint light_idx;

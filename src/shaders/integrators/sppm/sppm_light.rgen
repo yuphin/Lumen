@@ -85,8 +85,9 @@ void main() {
         }
         pos = offset_ray(payload.pos, n_g);
         float pdf_dir, cos_theta;
-        const vec3 f = sample_bsdf(n_s, wo, hit_mat, 0, side, wi, pdf_dir,
-                                   cos_theta, seed);
+        const vec3 f = sample_bsdf(n_s, n_g, wo, hit_mat,
+                                   TRANSPORT_MODE_FROM_LIGHT, side, wi,
+                                   pdf_dir, cos_theta, seed);
         throughput *= f * abs(cos_theta) / pdf_dir;
 
         if (f == vec3(0) || pdf_dir == 0) {

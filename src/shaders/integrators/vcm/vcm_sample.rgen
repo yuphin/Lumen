@@ -53,7 +53,8 @@ ivec3 get_grid_idx(vec3 p, vec3 min_bnds, vec3 max_bnds, ivec3 grid_res) {
     return res;
 }
 
-vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
+vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 n_s,
+                     const vec3 n_g,
                      const float cam_A, const vec3 pos, const in VCMState state,
                      const float eta_vm, const vec3 wo, const Material mat,
                      out ivec2 coords) {
@@ -61,7 +62,7 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
     vec3 dir = cam_pos - pos;
     float len = length(dir);
     dir /= len;
-    float cos_y = dot(dir, nrm);
+    float cos_y = dot(dir, n_g);
     float cos_theta = dot(cam_nrm, -dir);
     if (cos_theta <= 0.) {
         return L;
@@ -72,10 +73,10 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 nrm,
     // simplifies to abs(cos(theta)) / (A * cos^3(theta) * len^2)
     float cos_3_theta = cos_theta * cos_theta * cos_theta;
     const float cam_pdf_ratio = abs(cos_y) / (cam_A * cos_3_theta * len * len);
-    vec3 ray_origin = offset_ray(pos, nrm);
+    vec3 ray_origin = offset_ray(pos, n_g, dot(dir, n_g) < 0.0);
     float pdf_rev, pdf_fwd;
-    const vec3 f = eval_bsdf(nrm, wo, mat, 0, dot(payload.n_s, wo) > 0,
-                             dir, pdf_fwd, pdf_rev);
+    const vec3 f = eval_bsdf(n_s, n_g, wo, mat, TRANSPORT_MODE_FROM_LIGHT,
+                             dot(payload.n_s, wo) > 0, dir, pdf_fwd, pdf_rev);
     if (f == vec3(0)) {
         return L;
     }
@@ -223,7 +224,7 @@ void main() {
             const bool mat_specular =
                 (mat.bsdf_props & BSDF_FLAG_SPECULAR) == BSDF_FLAG_SPECULAR;
             // Complete the missing geometry terms
-            float cos_theta_wo = abs(dot(wo, n_s));
+            const float cos_theta_wo = abs(dot(wo, n_g));
             // Can't connect from specular to camera path, can't merge either
             light_state.d_vcm *= dist_sqr;
             light_state.d_vcm /= cos_theta_wo;
@@ -239,7 +240,7 @@ void main() {
                 // Connect to camera
                 ivec2 coords;
                 vec3 splat_col = vcm_connect_cam(
-                    cam_pos, cam_nrm, n_s, cam_area, payload.pos,
+                    cam_pos, cam_nrm, n_s, n_g, cam_area, payload.pos,
                     light_state, eta_vm, wo, mat, coords);
                 float lum = luminance(splat_col);
                 if (lum > 0) {
@@ -250,9 +251,9 @@ void main() {
             // Continue the walk
             float pdf_dir;
             float cos_theta;
-            const vec3 f =
-                sample_bsdf(n_s, wo, mat, 0, side, light_state.wi,
-                            pdf_dir, cos_theta, seed);
+            const vec3 f = sample_bsdf(
+                n_s, n_g, wo, mat, TRANSPORT_MODE_FROM_LIGHT, side,
+                light_state.wi, pdf_dir, cos_theta, seed);
             const bool same_hemisphere =
                 same_hemisphere(light_state.wi, wo, n_s);
 
@@ -264,18 +265,19 @@ void main() {
             }
             float pdf_rev = pdf_dir;
             if (!mat_specular) {
-                pdf_rev = bsdf_pdf(mat, n_s, light_state.wi, wo, side);
+                pdf_rev = bsdf_pdf(mat, n_s, n_g, light_state.wi, wo, side);
             }
             const float abs_cos_theta = abs(cos_theta);
+            const float mis_cos_theta = abs(dot(light_state.wi, n_g));
 
-            light_state.pos = offset_ray(payload.pos, n_s);
+            light_state.pos = offset_ray(payload.pos, n_g);
             // Note, same cancellations also occur here from now on
             // see _vcm_generate_light_sample_
             if (!mat_specular) {
                 light_state.d_vc =
-                    (abs_cos_theta / pdf_dir) *
+                    (mis_cos_theta / pdf_dir) *
                     (eta_vm + light_state.d_vcm + pdf_rev * light_state.d_vc);
-                light_state.d_vm = (abs_cos_theta / pdf_dir) *
+                light_state.d_vm = (mis_cos_theta / pdf_dir) *
                                    (1 + light_state.d_vcm * eta_vc +
                                     pdf_rev * light_state.d_vm);
                 light_state.d_vcm = 1.0 / pdf_dir;
@@ -283,8 +285,8 @@ void main() {
                 // Specular pdf has value = inf, so d_vcm = 0;
                 light_state.d_vcm = 0;
                 // pdf_fwd = pdf_rev = delta -> cancels
-                light_state.d_vc *= abs_cos_theta;
-                light_state.d_vm *= abs_cos_theta;
+                light_state.d_vc *= mis_cos_theta;
+                light_state.d_vm *= mis_cos_theta;
             }
 
             light_state.throughput *= f * abs_cos_theta / pdf_dir;

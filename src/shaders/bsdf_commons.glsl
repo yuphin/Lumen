@@ -23,7 +23,21 @@ Material load_material(const uint material_idx, const vec2 uv) {
 
 bool same_hemisphere(in vec3 wi, in vec3 wo, in vec3 n) { return dot(wi, n) > 0 && dot(wo, n) > 0; }
 
-float bsdf_pdf(const Material mat, const vec3 n_s, vec3 wo, vec3 wi, bool forward_facing) {
+float adjoint_factor(const vec3 n_s, const vec3 n_g, const vec3 wo, const vec3 wi) {
+	const float numerator = abs(dot(wo, n_s)) * abs(dot(wi, n_g));
+	const float denominator = abs(dot(wo, n_g)) * abs(dot(wi, n_s));
+	return denominator > 0.0 ? numerator / denominator : 0.0;
+}
+
+bool valid_shading_normal_pair(const vec3 n_s, const vec3 n_g, const vec3 wo, const vec3 wi) {
+	return dot(wo, n_s) * dot(wo, n_g) > 0.0 && dot(wi, n_s) * dot(wi, n_g) > 0.0;
+}
+
+float bsdf_pdf(const Material mat, const vec3 n_s, const vec3 n_g, vec3 wo, vec3 wi, bool forward_facing) {
+	if (!valid_shading_normal_pair(n_s, n_g, wo, wi)) {
+		return 0.0;
+	}
+
 	// Reverse transmission queries swap the original directions, leaving wo on
 	// the opposite side of the shading frame. Express that query in the same
 	// upper-hemisphere convention used by every BSDF implementation.
@@ -73,8 +87,8 @@ float bsdf_pdf(const Material mat, const vec3 n_s, vec3 wo, vec3 wi, bool forwar
 	return 0;
 }
 
-vec3 sample_bsdf(vec3 n_s, vec3 wo, const Material mat, const uint mode, const bool forward_facing, out vec3 wi,
-				 out float pdf_w, out float cos_theta, vec3 rands) {
+vec3 sample_bsdf_raw(vec3 n_s, vec3 wo, const Material mat, const uint mode, const bool forward_facing, out vec3 wi,
+					 out float pdf_w, out float cos_theta, vec3 rands) {
 	vec3 f = vec3(0);
 	pdf_w = 0;
 	cos_theta = 0;
@@ -121,15 +135,29 @@ vec3 sample_bsdf(vec3 n_s, vec3 wo, const Material mat, const uint mode, const b
 	return f;
 }
 
-// Consumes seed 3 times -> seed.w is incremented by 3
-vec3 sample_bsdf(vec3 n_s, vec3 wo, const Material mat, const uint mode, const bool forward_facing, out vec3 wi,
-				 out float pdf_w, out float cos_theta, inout uvec4 seed) {
-	vec3 rands = rand3(seed);
-	return sample_bsdf(n_s, wo, mat, mode, forward_facing, wi, pdf_w, cos_theta, rands);
+vec3 sample_bsdf(const vec3 n_s, const vec3 n_g, const vec3 wo, const Material mat, const uint mode,
+				 const bool forward_facing, out vec3 wi, out float pdf_w, out float cos_theta, const vec3 rands) {
+	vec3 f = sample_bsdf_raw(n_s, wo, mat, mode, forward_facing, wi, pdf_w, cos_theta, rands);
+	if (!valid_shading_normal_pair(n_s, n_g, wo, wi)) {
+		wi = vec3(0.0);
+		pdf_w = 0.0;
+		cos_theta = 0.0;
+		return vec3(0.0);
+	}
+	if (mode == TRANSPORT_MODE_FROM_LIGHT) {
+		f *= adjoint_factor(n_s, n_g, wo, wi);
+	}
+	return f;
 }
 
-vec3 eval_bsdf(const vec3 n_s, vec3 wo, const Material mat, const uint mode, const bool forward_facing, vec3 wi,
-			   out float pdf_w, out float pdf_rev_w, bool eval_reverse) {
+// Consumes seed 3 times -> seed.w is incremented by 3
+vec3 sample_bsdf(const vec3 n_s, const vec3 n_g, const vec3 wo, const Material mat, const uint mode,
+				 const bool forward_facing, out vec3 wi, out float pdf_w, out float cos_theta, inout uvec4 seed) {
+	return sample_bsdf(n_s, n_g, wo, mat, mode, forward_facing, wi, pdf_w, cos_theta, rand3(seed));
+}
+
+vec3 eval_bsdf_raw(const vec3 n_s, vec3 wo, const Material mat, const uint mode, const bool forward_facing, vec3 wi,
+				   out float pdf_w, out float pdf_rev_w, bool eval_reverse) {
 	pdf_w = 0;
 	pdf_rev_w = 0;
 	vec3 f = vec3(0);
@@ -174,18 +202,35 @@ vec3 eval_bsdf(const vec3 n_s, vec3 wo, const Material mat, const uint mode, con
 	return f;
 }
 
-vec3 eval_bsdf(const vec3 n_s, vec3 wo, const Material mat, const uint mode, const bool forward_facing, vec3 wi,
-			   out float pdf_w, out float pdf_rev_w) {
-	return eval_bsdf(n_s, wo, mat, mode, forward_facing, wi, pdf_w, pdf_rev_w, true);
-}
-vec3 eval_bsdf(const vec3 n_s, const vec3 wo, const Material mat, const uint mode, const bool forward_facing,
-			   const vec3 dir, out float pdf_w) {
-	float unused_pdf;
-	return eval_bsdf(n_s, wo, mat, mode, forward_facing, dir, pdf_w, unused_pdf, false);
+vec3 eval_bsdf(const vec3 n_s, const vec3 n_g, const vec3 wo, const Material mat, const uint mode,
+			   const bool forward_facing, const vec3 wi, out float pdf_w, out float pdf_rev_w,
+			   const bool eval_reverse) {
+	if (!valid_shading_normal_pair(n_s, n_g, wo, wi)) {
+		pdf_w = 0.0;
+		pdf_rev_w = 0.0;
+		return vec3(0.0);
+	}
+
+	vec3 f = eval_bsdf_raw(n_s, wo, mat, mode, forward_facing, wi, pdf_w, pdf_rev_w, eval_reverse);
+	if (mode == TRANSPORT_MODE_FROM_LIGHT) {
+		f *= adjoint_factor(n_s, n_g, wo, wi);
+	}
+	return f;
 }
 
-vec3 eval_bsdf(const Material mat, const vec3 wo, const vec3 wi, const vec3 n_s, uint mode, bool forward_facing) {
+vec3 eval_bsdf(const vec3 n_s, const vec3 n_g, const vec3 wo, const Material mat, const uint mode,
+			   const bool forward_facing, const vec3 wi, out float pdf_w, out float pdf_rev_w) {
+	return eval_bsdf(n_s, n_g, wo, mat, mode, forward_facing, wi, pdf_w, pdf_rev_w, true);
+}
+vec3 eval_bsdf(const vec3 n_s, const vec3 n_g, const vec3 wo, const Material mat, const uint mode,
+			   const bool forward_facing, const vec3 dir, out float pdf_w) {
+	float unused_pdf;
+	return eval_bsdf(n_s, n_g, wo, mat, mode, forward_facing, dir, pdf_w, unused_pdf, false);
+}
+
+vec3 eval_bsdf(const vec3 n_s, const vec3 n_g, const vec3 wo, const Material mat, const uint mode,
+			   const bool forward_facing, const vec3 wi) {
 	float unused_rev_pdf;
-    float unused_pdf;
-	return eval_bsdf(n_s, wo, mat, mode, forward_facing, wi, unused_pdf, unused_rev_pdf, false);
+	float unused_pdf;
+	return eval_bsdf(n_s, n_g, wo, mat, mode, forward_facing, wi, unused_pdf, unused_rev_pdf, false);
 }

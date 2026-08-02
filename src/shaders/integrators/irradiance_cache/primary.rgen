@@ -73,7 +73,7 @@ void main() {
 
 		direct_lighting += material.emissive_factor;
 		if (!is_specular(material)) {
-			direct_lighting += sample_direct_light(sampling_seed, hit_data.pos, n_s, wo, material, side);
+			direct_lighting += sample_direct_light(sampling_seed, hit_data.pos, n_s, n_g, wo, material, side);
 		}
 	}
 	store_direct_lighting(pixel, direct_lighting);

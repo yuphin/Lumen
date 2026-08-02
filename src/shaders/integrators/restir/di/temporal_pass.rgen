@@ -44,6 +44,7 @@ void main() {
             side = false;
         }
         normal = n_s;
+        geometric_normal = n_g;
         float cos_wo = dot(wo, n_s);
 
         const Material hit_mat = load_material(mat_idx, uv);
@@ -71,7 +72,7 @@ void main() {
 
             float bsdf_pdf;
             const vec3 f =
-                eval_bsdf(normal, wo, hit_mat, 1, side, light_sample.wi, bsdf_pdf);
+                eval_bsdf(normal, n_g, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, side, light_sample.wi, bsdf_pdf);
 
             RestirData s;
             s.identity = light_sample.identity;
@@ -90,7 +91,7 @@ void main() {
             const bool unoccluded =
                 !connection_occluded(offset_ray2(pos, normal), light_sample.wi,
                                      light_sample.distance, 0xFF);
-            vec3 f = eval_bsdf(hit_mat, wo, light_sample.wi, normal, 1, side);
+            vec3 f = eval_bsdf(normal, n_g, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, side, light_sample.wi);
             bool visible = unoccluded && f != vec3(0);
             r_new.W = 0;
             if (visible) {
@@ -123,13 +124,14 @@ void main() {
         // Write to g-buffer
         DEREF(g_buffer)[pixel_idx].pos = pos;
         DEREF(g_buffer)[pixel_idx].normal = normal;
+        DEREF(g_buffer)[pixel_idx].n_g = n_g;
         DEREF(g_buffer)[pixel_idx].uv = uv;
         DEREF(g_buffer)[pixel_idx].mat_idx = mat_idx;
 
         // Sample direction & update throughput
         vec3 col = hit_mat.emissive_factor;
         float pdf, cos_theta;
-        vec3 f = sample_bsdf(normal, wo, hit_mat, 1 /*radiance=cam*/, side,
+        vec3 f = sample_bsdf(normal, n_g, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, side,
                              direction, pdf, cos_theta, seed);
         throughput *= f * abs(cos_theta) / pdf;
         bool specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
@@ -165,14 +167,13 @@ void main() {
             origin = offset_ray(payload.pos, n_s);
             if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
                 col += throughput *
-                       sample_direct_light(seed, hit_mat, payload.pos, side, n_s, wo,
+                       sample_direct_light(seed, hit_mat, payload.pos, side, n_s, n_g, wo,
                                            /*use_mis=*/false, specular);
             }
             // Sample direction & update throughput
             float pdf, cos_theta;
-            const vec3 f = sample_bsdf(n_s, wo, hit_mat,
-                                       1
-                                       /*radiance=cam*/,
+            const vec3 f = sample_bsdf(n_s, n_g, wo, hit_mat,
+                                       TRANSPORT_MODE_FROM_CAMERA,
                                        side, direction, pdf, cos_theta, seed);
             if (pdf == 0) {
                 break;

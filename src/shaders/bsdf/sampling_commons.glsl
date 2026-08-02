@@ -31,7 +31,7 @@ bool refract(vec3 n_s, vec3 wo, bool forward_facing, float eta, uint mode, out v
 	}
 	const float cos_t = sqrt(max(0.0, 1.0 - sin2_t));
 	wi = -inv_eta * wo + (inv_eta * cos_i - cos_t) * n_s;
-	f = mode == 1 ? vec3(inv_eta * inv_eta) : vec3(1);
+	f = mode == TRANSPORT_MODE_FROM_CAMERA ? vec3(inv_eta * inv_eta) : vec3(1);
 	return true;
 }
 

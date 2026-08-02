@@ -90,10 +90,10 @@ void main() {
             n_s = shading_nrm;
         }
         if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
-            const vec3 val = throughput *
-                             sample_direct_light(seed, hit_mat, payload.pos, side,
-                                                 shading_nrm, wo, /*use_mis=*/false,
-                                                 specular);
+			const vec3 val = throughput *
+							 sample_direct_light(seed, hit_mat, payload.pos, side,
+											 shading_nrm, geometry_nrm, wo, /*use_mis=*/false,
+											 specular);
             if (depth > 0) {
                 L_o += val;
             } else {
@@ -102,8 +102,8 @@ void main() {
         }
         // Sample direction & update throughput
         float pdf, cos_theta;
-        const vec3 f = sample_bsdf(shading_nrm, wo, hit_mat, 1 /*radiance=cam*/,
-                                   side, direction, pdf, cos_theta, seed);
+		const vec3 f = sample_bsdf(shading_nrm, geometry_nrm, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA,
+								   side, direction, pdf, cos_theta, seed);
 
         if (pdf == 0) {
             break;

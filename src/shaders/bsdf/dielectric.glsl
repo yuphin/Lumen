@@ -247,7 +247,7 @@ vec3 eval_dielectric(Material mat, vec3 wo, vec3 wi, out float pdf_w, out float 
 		}
 		f = mat.albedo * D * G_GGX_correlated_isotropic(alpha, wo, wi) * (1.0 - F) *
 			abs(dot(wi, h) * dot(wo, h) / (wi.z * wo.z * denominator_sqr));
-		if (mode == 1) {
+		if (mode == TRANSPORT_MODE_FROM_CAMERA) {
 			f /= eta * eta;
 		}
 	}

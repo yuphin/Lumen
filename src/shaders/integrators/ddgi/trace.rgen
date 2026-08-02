@@ -96,7 +96,7 @@ void main() {
 		bool side = face_forward(n_s, n_g, wo);
 
 		if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
-			col += sample_direct_light(seed, hit_mat, payload.pos, side, n_s, wo, /*use_mis=*/false);
+			col += sample_direct_light(seed, hit_mat, payload.pos, side, n_s, n_g, wo, /*use_mis=*/false);
 		}
 		if (pc.first_frame == 0 && pc.infinite_bounces == 1) {
 			vec3 irradiance = sample_irradiance(payload.pos, n_s, -d);

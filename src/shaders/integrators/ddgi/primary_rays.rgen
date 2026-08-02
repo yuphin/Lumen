@@ -54,7 +54,8 @@ void main() {
 		DEREF(g_buffer)[pixel_idx].albedo = hit_mat.albedo;
 		// Shade
 		if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
-			col += throughput * sample_direct_light(seed, hit_mat, payload.pos, side, n_s, wo, /*use_mis=*/false);
+			col += throughput *
+				   sample_direct_light(seed, hit_mat, payload.pos, side, n_s, n_g, wo, /*use_mis=*/false);
 		}
 	}
 	DEREF(direct_lighting)[pixel_idx] = col;
