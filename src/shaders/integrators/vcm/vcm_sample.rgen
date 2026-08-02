@@ -270,7 +270,7 @@ void main() {
             const float abs_cos_theta = abs(cos_theta);
             const float mis_cos_theta = abs(dot(light_state.wi, n_g));
 
-            light_state.pos = offset_ray(payload.pos, n_g);
+            light_state.pos = offset_ray(payload.pos, n_g, dot(light_state.wi, n_g) < 0.0);
             // Note, same cancellations also occur here from now on
             // see _vcm_generate_light_sample_
             if (!mat_specular) {

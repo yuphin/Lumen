@@ -441,7 +441,7 @@ void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
 		const float abs_cos_theta = abs(cos_theta);
 		const float mis_cos_theta = abs(dot(vcm_state.wi, n_g));
 
-		vcm_state.pos = offset_ray(payload.pos, n_g);
+		vcm_state.pos = offset_ray(payload.pos, n_g, dot(vcm_state.wi, n_g) < 0.0);
 		// Note, same cancellations also occur here from now on
 		// see _vcm_generate_light_sample_
 		if (!mat_specular) {
@@ -619,7 +619,7 @@ vec3 vcm_trace_eye(VCMState camera_state, float eta_vcm, float eta_vc,
 		const float abs_cos_theta = abs(cos_theta);
 		const float mis_cos_theta = abs(dot(camera_state.wi, n_g));
 
-		camera_state.pos = offset_ray(payload.pos, n_g);
+		camera_state.pos = offset_ray(payload.pos, n_g, dot(camera_state.wi, n_g) < 0.0);
 		// Note, same cancellations also occur here from now on
 		// see _vcm_generate_light_sample_
 		if (!mat_specular) {
@@ -755,7 +755,7 @@ float mlt_fill_eye() {
 		const float abs_cos_theta = abs(cos_theta);
 		const float mis_cos_theta = abs(dot(camera_state.wi, n_g));
 
-		camera_state.pos = offset_ray(payload.pos, n_g);
+		camera_state.pos = offset_ray(payload.pos, n_g, dot(camera_state.wi, n_g) < 0.0);
 		// Note, same cancellations also occur here from now on
 		// see _vcm_generate_light_sample_
 		if (!mat_specular) {
@@ -935,7 +935,7 @@ float mlt_trace_light() {
 		const float abs_cos_theta = abs(cos_theta);
 		const float mis_cos_theta = abs(dot(light_state.wi, n_g));
 
-		light_state.pos = offset_ray(payload.pos, n_g);
+		light_state.pos = offset_ray(payload.pos, n_g, dot(light_state.wi, n_g) < 0.0);
 		// Note, same cancellations also occur here from now on
 		// see _vcm_generate_light_sample_
 		if (!mat_specular) {
