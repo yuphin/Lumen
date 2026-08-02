@@ -441,7 +441,7 @@ void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
 		const float abs_cos_theta = abs(cos_theta);
 		const float mis_cos_theta = abs(dot(vcm_state.wi, n_g));
 
-		vcm_state.pos = offset_ray(payload.pos, n_g, dot(vcm_state.wi, n_g) < 0.0);
+		vcm_state.pos = offset_ray(payload.pos, n_g, vcm_state.wi);
 		// Note, same cancellations also occur here from now on
 		// see _vcm_generate_light_sample_
 		if (!mat_specular) {
@@ -619,7 +619,7 @@ vec3 vcm_trace_eye(VCMState camera_state, float eta_vcm, float eta_vc,
 		const float abs_cos_theta = abs(cos_theta);
 		const float mis_cos_theta = abs(dot(camera_state.wi, n_g));
 
-		camera_state.pos = offset_ray(payload.pos, n_g, dot(camera_state.wi, n_g) < 0.0);
+		camera_state.pos = offset_ray(payload.pos, n_g, camera_state.wi);
 		// Note, same cancellations also occur here from now on
 		// see _vcm_generate_light_sample_
 		if (!mat_specular) {
@@ -712,7 +712,7 @@ float mlt_fill_eye() {
 			cam_vtx(path_idx).wo = wo;
 			cam_vtx(path_idx).n_s = n_s;
 			cam_vtx(path_idx).packed_n_g = pack_normal_octahedral(n_g);
-			cam_vtx(path_idx).pos = offset_ray(payload.pos, n_g);
+			cam_vtx(path_idx).pos = payload.pos;
 			cam_vtx(path_idx).uv = payload.uv;
 			cam_vtx(path_idx).material_idx = payload.material_idx;
 			cam_vtx(path_idx).area = payload.area;
@@ -755,7 +755,7 @@ float mlt_fill_eye() {
 		const float abs_cos_theta = abs(cos_theta);
 		const float mis_cos_theta = abs(dot(camera_state.wi, n_g));
 
-		camera_state.pos = offset_ray(payload.pos, n_g, dot(camera_state.wi, n_g) < 0.0);
+		camera_state.pos = offset_ray(payload.pos, n_g, camera_state.wi);
 		// Note, same cancellations also occur here from now on
 		// see _vcm_generate_light_sample_
 		if (!mat_specular) {
@@ -896,7 +896,7 @@ float mlt_trace_light() {
 						if (!(mis_weight > 0)) {
 							continue;
 						}
-						const vec3 ray_origin = offset_ray(hit_pos, n_g, dot(-dir, n_g) < 0.0);
+						const vec3 ray_origin = offset_ray(hit_pos, n_g, -dir);
 						const bool visible = !connection_occluded(ray_origin, -dir, len, 0xFF);
 						if (visible) {
 							const vec3 L = mis_weight * G * light_state.throughput * cam_vtx(path_idx + i).throughput *
@@ -935,7 +935,7 @@ float mlt_trace_light() {
 		const float abs_cos_theta = abs(cos_theta);
 		const float mis_cos_theta = abs(dot(light_state.wi, n_g));
 
-		light_state.pos = offset_ray(payload.pos, n_g, dot(light_state.wi, n_g) < 0.0);
+		light_state.pos = offset_ray(payload.pos, n_g, light_state.wi);
 		// Note, same cancellations also occur here from now on
 		// see _vcm_generate_light_sample_
 		if (!mat_specular) {

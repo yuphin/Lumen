@@ -112,6 +112,10 @@ vec3 offset_ray(const vec3 p, const vec3 n, bool flip) {
 	return flip ? offset_ray(p, -n) : offset_ray(p, n);
 }
 
+vec3 offset_ray(const vec3 p, const vec3 n, const vec3 direction) {
+	return offset_ray(p, n, dot(direction, n) < 0.0);
+}
+
 vec3 offset_ray2(const vec3 p, const vec3 n) {
 	const float float_scale = 2.0f / 65536.0f;
 	return p + float_scale * n;

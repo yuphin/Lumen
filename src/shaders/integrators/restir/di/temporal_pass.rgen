@@ -89,7 +89,7 @@ void main() {
             const LightLiSample light_sample = replay_light_Li(s.identity, payload.pos, pc.num_lights);
 
             const bool unoccluded =
-                !connection_occluded(offset_ray2(pos, normal), light_sample.wi,
+                !connection_occluded(offset_ray2(pos, n_g, dot(light_sample.wi, n_g) < 0.0), light_sample.wi,
                                      light_sample.distance, 0xFF);
             vec3 f = eval_bsdf(normal, n_g, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, side, light_sample.wi);
             bool visible = unoccluded && f != vec3(0);
@@ -133,9 +133,9 @@ void main() {
         float pdf, cos_theta;
         vec3 f = sample_bsdf(normal, n_g, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, side,
                              direction, pdf, cos_theta, seed);
+        origin = offset_ray(pos, n_g, direction);
         throughput *= f * abs(cos_theta) / pdf;
         bool specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
-        origin = offset_ray(pos, n_g);
         // Do traditional path tracing
         for (int depth = 1;; depth++) {
             traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin, tmin, direction,
@@ -164,7 +164,6 @@ void main() {
                 side = false;
             }
             float cos_wo = dot(wo, n_s);
-            origin = offset_ray(payload.pos, n_s);
             if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
                 col += throughput *
                        sample_direct_light(seed, hit_mat, payload.pos, side, n_s, n_g, wo,
@@ -178,6 +177,7 @@ void main() {
             if (pdf == 0) {
                 break;
             }
+            origin = offset_ray(payload.pos, n_g, direction);
             throughput *= f * abs(cos_theta) / pdf;
             specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
             float rr_scale = 1.0;

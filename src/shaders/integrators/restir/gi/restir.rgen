@@ -33,6 +33,7 @@ void main() {
     vec3 direction = vec3(sample_camera(d));
     vec3 col = vec3(0);
     vec3 x_v = vec3(0), n_v = vec3(0);
+    uint packed_n_g_v = 0;
     vec3 x_s = vec3(0), n_s = vec3(0);
     float p_q = 0;
     vec3 L_o = vec3(0);
@@ -84,7 +85,7 @@ void main() {
             shading_nrm = -shading_nrm;
             side = false;
         }
-        const vec3 pos = offset_ray(payload.pos, geometry_nrm);
+        const vec3 pos = payload.pos;
         if (depth == 1) {
             x_s = pos;
             n_s = shading_nrm;
@@ -112,6 +113,7 @@ void main() {
         if (depth == 0) {
             x_v = pos;
             n_v = shading_nrm;
+            packed_n_g_v = pack_normal_octahedral(geometry_nrm);
             p_q = pdf;
             x_f = f;
             mat_idx = payload.material_idx;
@@ -124,7 +126,7 @@ void main() {
             t0 = f * abs(cos_theta) / pdf;
         }
         specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
-        origin.xyz = pos;
+        origin.xyz = offset_ray(pos, geometry_nrm, direction);
         float rr_scale = 1.0;
         if (bsdf_has_property(hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION)) {
             rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
@@ -142,6 +144,7 @@ void main() {
     // Fill in the samples buffer
     DEREF(restir_samples)[pixel_idx].x_v = x_v;
     DEREF(restir_samples)[pixel_idx].n_v = n_v;
+    DEREF(restir_samples)[pixel_idx].packed_n_g_v = packed_n_g_v;
     DEREF(restir_samples)[pixel_idx].x_s = x_s;
     DEREF(restir_samples)[pixel_idx].n_s = n_s;
     DEREF(restir_samples)[pixel_idx].L_o = L_o;

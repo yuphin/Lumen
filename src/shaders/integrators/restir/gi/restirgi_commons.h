@@ -22,6 +22,7 @@ struct ReservoirSample {
 	float p_q;
 	vec3 n_v;
 	uint bsdf_props;
+	uint packed_n_g_v;
 	vec3 x_s;
 	uint mat_idx;
 	vec3 n_s;

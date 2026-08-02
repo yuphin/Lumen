@@ -58,7 +58,6 @@ void main() {
 			break;
 		}
 
-		origin.xyz = offset_ray(gbuffer.pos, n_g);
 		float pdf_dir, cos_theta;
 		const vec3 f = sample_bsdf(n_s, n_g, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, side, direction, pdf_dir,
 								   cos_theta, seed);
@@ -67,6 +66,7 @@ void main() {
 		if (f == vec3(0) || pdf_dir == 0) {
 			break;
 		}
+		origin.xyz = offset_ray(gbuffer.pos, n_g, direction);
 		if (d > RR_MIN_DEPTH) {
 			float rr_prob = min(0.95f, luminance(throughput));
 			if (rr_prob < rand(seed))

@@ -73,7 +73,7 @@ vec3 vcm_connect_cam(const vec3 cam_pos, const vec3 cam_nrm, const vec3 n_s,
     // simplifies to abs(cos(theta)) / (A * cos^3(theta) * len^2)
     float cos_3_theta = cos_theta * cos_theta * cos_theta;
     const float cam_pdf_ratio = abs(cos_y) / (cam_A * cos_3_theta * len * len);
-    vec3 ray_origin = offset_ray(pos, n_g, dot(dir, n_g) < 0.0);
+    vec3 ray_origin = offset_ray(pos, n_g, dir);
     float pdf_rev, pdf_fwd;
     const vec3 f = eval_bsdf(n_s, n_g, wo, mat, TRANSPORT_MODE_FROM_LIGHT,
                              dot(payload.n_s, wo) > 0, dir, pdf_fwd, pdf_rev);
@@ -270,7 +270,7 @@ void main() {
             const float abs_cos_theta = abs(cos_theta);
             const float mis_cos_theta = abs(dot(light_state.wi, n_g));
 
-            light_state.pos = offset_ray(payload.pos, n_g, dot(light_state.wi, n_g) < 0.0);
+            light_state.pos = offset_ray(payload.pos, n_g, light_state.wi);
             // Note, same cancellations also occur here from now on
             // see _vcm_generate_light_sample_
             if (!mat_specular) {

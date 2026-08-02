@@ -100,7 +100,7 @@ int bdpt_random_walk_light(const int max_depth, vec3 throughput,
             pdf_rev *= abs(dot(unpack_normal_octahedral(vtx(prev, packed_n_g)), wo)) / (wo_len * wo_len);
         }
         vtx_assign(prev, pdf_rev, pdf_rev);
-        ray_pos = offset_ray(payload.pos, n_g);
+        ray_pos = offset_ray(payload.pos, n_g, wi);
     }
 #undef vtx
 #undef vtx_assign
@@ -197,7 +197,7 @@ int bdpt_random_walk_eye(const int max_depth, vec3 throughput,
             pdf_rev *= abs(dot(unpack_normal_octahedral(vtx(prev, packed_n_g)), wo)) / (wo_len * wo_len);
         }
         vtx_assign(prev, pdf_rev, pdf_rev);
-        ray_pos = offset_ray(payload.pos, n_g);
+        ray_pos = offset_ray(payload.pos, n_g, wi);
     }
 #undef vtx
 #undef vtx_assign

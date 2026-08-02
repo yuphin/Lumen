@@ -84,7 +84,6 @@ void main() {
         }
         float cos_wo = dot(wo, n_s);
         const vec3 pos = payload.pos;
-        origin.xyz = offset_ray(pos, n_g);
         specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
         if (!surface_recorded && !specular) {
             DEREF(sppm_data)[pixel_idx].col +=
@@ -113,6 +112,7 @@ void main() {
         if (pdf < 1e-20 || dot(f_sampled, f_sampled) < 1e-20) {
             break;
         }
+        origin.xyz = offset_ray(pos, n_g, direction);
         throughput *= f_sampled * abs(cos_theta) / pdf;
         if (d > RR_MIN_DEPTH) {
             float rr_prob = luminance(throughput);

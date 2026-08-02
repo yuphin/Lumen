@@ -14,7 +14,7 @@ vec3 sample_direct_light(inout uvec4 seed, vec3 pos, const vec3 n_s, const vec3 
 		return vec3(0);
 	}
 
-	const vec3 p = offset_ray2(pos, n_g);
+	const vec3 p = offset_ray2(pos, n_g, dot(light_sample.wi, n_g) < 0.0);
 	const float cos_x = dot(n_s, light_sample.wi);
 	const vec3 f = eval_bsdf(n_s, n_g, wo, hit_material, TRANSPORT_MODE_FROM_CAMERA,
 							 /*forward_facing=*/forward_facing, light_sample.wi);

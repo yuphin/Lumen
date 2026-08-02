@@ -416,11 +416,10 @@ void main() {
 		}
 
 		const bool is_transmission = bsdf_has_property(hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION);
-		origin.xyz = offset_ray(gbuffer.pos, n_g, is_transmission);
-
 		if (bsdf_pdf_fwd == 0) {
 			break;
 		}
+		origin.xyz = offset_ray(gbuffer.pos, n_g, direction);
 		vec3 f_cos = f * abs(cos_theta);
 		throughput *= f_cos / bsdf_pdf_fwd;
 		if (!mis_factor_set && is_rough(hit_mat)) {

@@ -92,7 +92,6 @@ void main() {
 #endif // DISABLE_PM_MIS
 		}
 		last_specular = !is_rough(hit_mat);
-		pos = offset_ray(gbuffer.pos, n_g);
 		float pdf_dir, cos_theta;
 		const vec3 f = sample_bsdf(n_s, n_g, wo, hit_mat, TRANSPORT_MODE_FROM_LIGHT, side, wi, pdf_dir,
 								   cos_theta, seed);
@@ -117,6 +116,7 @@ void main() {
 		if (f == vec3(0) || pdf_dir == 0) {
 			break;
 		}
+		pos = offset_ray(gbuffer.pos, n_g, wi);
 		if (d > RR_MIN_DEPTH) {
 			float rr_prob = min(0.95f, luminance(throughput));
 			if (rr_prob < rand(seed))

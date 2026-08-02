@@ -66,7 +66,7 @@ vec3 calc_L_with_visibility_check(const RestirReservoir r) {
     const LightLiSample light_sample = replay_light_Li(r.s.identity, pos, pc.num_lights);
     const vec3 f = eval_bsdf(normal, geometric_normal, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, true,
                              light_sample.wi);
-    bool visible = !connection_occluded(offset_ray(pos, geometric_normal),
+    bool visible = !connection_occluded(offset_ray(pos, geometric_normal, light_sample.wi),
                                         light_sample.wi,
                                         light_sample.distance, 0xFF);
     if (visible) {

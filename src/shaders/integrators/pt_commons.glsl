@@ -17,7 +17,8 @@ vec3 sample_direct_light(inout uvec4 seed, const Material mat, vec3 pos, const b
 	float bsdf_pdf;
 	const float cos_x = dot(n_s, light_sample.wi);
 	const vec3 f = eval_bsdf(n_s, n_g, wo, mat, TRANSPORT_MODE_FROM_CAMERA, side, light_sample.wi, bsdf_pdf);
-	visible = !connection_occluded(offset_ray2(pos, n_g), light_sample.wi, light_sample.distance, 0x1);
+	visible = !connection_occluded(offset_ray2(pos, n_g, dot(light_sample.wi, n_g) < 0.0), light_sample.wi,
+								 light_sample.distance, 0x1);
 	if (!visible) {
 		return vec3(0.0);
 	}

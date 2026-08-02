@@ -90,7 +90,6 @@ void main() {
 			side = false;
 		}
 		float cos_wo = dot(wo, n_s);
-		origin.xyz = offset_ray(payload.pos, n_g);
 		const bool surface_specular = is_specular(hit_mat);
 		const bool sample_nee = !surface_specular && (depth > 0 || pc.direct_lighting == 1);
 		if (sample_nee) {
@@ -105,6 +104,7 @@ void main() {
 		if (pdf == 0) {
 			break;
 		}
+		origin.xyz = offset_ray(payload.pos, n_g, direction);
 		throughput *= f * abs(cos_theta) / pdf;
 		previous_position = payload.pos;
 		previous_bsdf_pdf = pdf;

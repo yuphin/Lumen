@@ -54,7 +54,7 @@ void main() {
 
 	// We're already on a surface, sample the BSDF
 	sample_bsdf(n_s, n_g, wo, material, TRANSPORT_MODE_FROM_CAMERA, side, wi, pdf_w, cos_theta, sampling_seed);
-	surfel_origin = offset_ray(surfel_origin, n_g, /* is_transmission= */ false);
+	surfel_origin = offset_ray(surfel_origin, n_g, wi);
 
 	traceRayEXT(tlas, flags, 0x1, 0, 0, 0, surfel_origin, tmin, wi, tmax, 0);
 	const bool found_isect = payload.instance_idx != -1;

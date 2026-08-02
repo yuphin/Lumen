@@ -11,6 +11,7 @@ const float tmax = 10000.0;
 void init_s(out ReservoirSample s) {
     s.x_v = vec3(0);
     s.n_v = vec3(0);
+    s.packed_n_g_v = 0;
     s.x_s = vec3(0);
     s.n_s = vec3(0);
     s.L_o = vec3(0);

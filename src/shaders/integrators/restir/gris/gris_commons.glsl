@@ -383,11 +383,9 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 		bool dst_side = face_forward(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo);
 		org_pos = dst_gbuffer.pos;
 		Material dst_hit_mat = load_material(dst_gbuffer.material_idx, dst_gbuffer.uv);
-		bool is_transmission = bsdf_has_property(dst_hit_mat.bsdf_props, BSDF_FLAG_TRANSMISSION);
-		dst_gbuffer.pos = offset_ray(dst_gbuffer.pos, dst_gbuffer.n_g, is_transmission);
 
 		if (rc_type != RECONNECTION_TYPE_NEE) {
-			float rc_wi_len = length(rc_gbuffer.pos - dst_gbuffer.pos);
+			float rc_wi_len = length(rc_gbuffer.pos - org_pos);
 			dst_far = rc_wi_len > pc.min_vertex_distance_ratio * pc.scene_extent;
 		} else {
 			dst_far = true;
@@ -425,7 +423,7 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 				replayed_light = replay_light_Li(identity, org_pos, pc.num_lights);
 				dst_postfix_wi = replayed_light.wi * replayed_light.distance;
 			} else {
-				dst_postfix_wi = rc_gbuffer.pos - dst_gbuffer.pos;
+				dst_postfix_wi = rc_gbuffer.pos - org_pos;
 			}
 
 			float wi_len_sqr = dot(dst_postfix_wi, dst_postfix_wi);
@@ -532,13 +530,14 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 
 		prefix_throughput *= f * abs(cos_theta) / pdf;
 
-		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, dst_gbuffer.pos, tmin, dst_wi, tmax, 0);
+		const vec3 ray_origin = offset_ray(org_pos, dst_gbuffer.n_g, dst_wi);
+		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, ray_origin, tmin, dst_wi, tmax, 0);
 		const bool found_isect = payload.instance_idx != -1;
 		if (!found_isect) {
 			return false;
 		}
 
-		vec3 prev_pos = dst_gbuffer.pos;
+		vec3 prev_pos = org_pos;
 		dst_gbuffer = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
 		prev_far = length(dst_gbuffer.pos - prev_pos) > pc.min_vertex_distance_ratio * pc.scene_extent;
 		prefix_depth++;
