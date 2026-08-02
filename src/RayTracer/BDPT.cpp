@@ -22,7 +22,8 @@ void init(Integrator* integrator) {
 								 sizeof(PathVertex)});
 	state.color_storage_buffer =
 		prm::get_buffer({.name = CSTR("Color Storage Buffer"),
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * 3 * 4});
 	SceneDesc desc = integrator::scene_desc_base(integrator);
@@ -59,6 +60,7 @@ void render(Integrator* integrator) {
 				 })
 		.zero(state.light_path_buffer)
 		.zero(state.camera_path_buffer)
+		.zero(state.color_storage_buffer)
 		//.read(state.light_path_buffer) // Needed if shader inference is disabled
 		//.read(state.camera_path_buffer)
 		.push_constants(&state.pc)
@@ -71,7 +73,11 @@ void render(Integrator* integrator) {
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
-	//.finalize();
+	rg::add_compute(CSTR("BDPT - Resolve Splats"),
+					{.shader = vk::Shader(CSTR("src/shaders/integrators/bdpt/bdpt_resolve.comp")),
+					 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
+		.push_constants(&state.pc)
+		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});
 }
 
 bool update(Integrator* integrator) {

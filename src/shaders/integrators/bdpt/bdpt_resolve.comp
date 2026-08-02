@@ -1,0 +1,32 @@
+#version 460
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+
+#include "../../bda.glsl"
+#include "../../atomic_rgb.glsl"
+#include "bdpt_commons.h"
+
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0, rgba32f) uniform image2D image;
+layout(binding = 1) buffer SceneDesc_ { SceneDesc scene_desc; };
+layout(push_constant) uniform _PushConstantCompute { PCBDPT pc; };
+
+SCENE_BUFFER(color_storage, float);
+
+void main() {
+    const uint pixel_idx = gl_GlobalInvocationID.x;
+    if (pixel_idx >= pc.width * pc.height) {
+        return;
+    }
+
+    const ivec2 coords = ivec2(pixel_idx / pc.height, pixel_idx % pc.height);
+    const vec3 splat = RGB_BUFFER_LOAD(color_storage, pixel_idx);
+    const float accumulation_weight =
+        pc.enable_accumulation == 1 && pc.frame_num > 0
+            ? 1.0 / float(pc.frame_num + 1)
+            : 1.0;
+    const vec3 col = imageLoad(image, coords).xyz + accumulation_weight * splat;
+    imageStore(image, coords, vec4(col, 1.0));
+}

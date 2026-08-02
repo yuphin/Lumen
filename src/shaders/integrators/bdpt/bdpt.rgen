@@ -9,6 +9,7 @@
 #extension GL_EXT_shader_atomic_float : require
 
 #include "../../bda.glsl"
+#include "../../atomic_rgb.glsl"
 #include "bdpt_commons.h"
 #include "../../commons.glsl"
 
@@ -19,7 +20,7 @@ layout(push_constant) uniform _PushConstantRay { PCBDPT pc; };
 
 SCENE_BUFFER(light_path, PathVertex);
 SCENE_BUFFER(camera_path, PathVertex);
-SCENE_BUFFER(color_storage, vec3);
+SCENE_BUFFER(color_storage, float);
 
 uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 uint bdpt_path_idx =
@@ -64,16 +65,13 @@ void main() {
                 vec3 splat_col = bdpt_connect_cam(s, coords);
                 if (luminance(splat_col) > 0) {
                     uint idx = coords.x * gl_LaunchSizeEXT.y + coords.y;
-                    DEREF(color_storage)[idx] += splat_col;
+                    RGB_BUFFER_ATOMIC_ADD(color_storage, idx, splat_col);
                 }
             } else {
                 col += bdpt_connect(s, t);
             }
         }
     }
-    vec3 splat_img = DEREF(color_storage)[pixel_idx];
-    col += splat_img;
-    DEREF(color_storage)[pixel_idx] = vec3(0);
     if (isnan(luminance(col))) {
         return;
     }
