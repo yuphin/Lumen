@@ -20,7 +20,7 @@ layout(push_constant) uniform _PushConstantRay { PCVCM pc; };
 SCENE_BUFFER(photon, VCMPhotonHash);
 SCENE_BUFFER(vcm_vertices, VCMVertex);
 SCENE_BUFFER(path_cnt, uint);
-SCENE_BUFFER(color_storage, vec3);
+SCENE_BUFFER(color_storage, float);
 
 uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
 
@@ -78,9 +78,9 @@ void main() {
         debugPrintfEXT("nan\n");
         return;
     }
-    vec3 splat_img = DEREF(color_storage)[pixel_idx];
+    vec3 splat_img = RGB_BUFFER_LOAD(color_storage, pixel_idx);
     col += splat_img;
-    DEREF(color_storage)[pixel_idx] = vec3(0);
+    RGB_BUFFER_STORE(color_storage, pixel_idx, vec3(0));
 #undef light_vtx
     if (pc.enable_accumulation == 1 && pc.frame_num > 0) {
         float w = 1. / float(pc.frame_num + 1);

@@ -16,3 +16,5 @@ scenes/classroom/models/
 scenes/bedroom/textures
 scenes/classroom/textures
 TODO.md
+docs/
+tests/

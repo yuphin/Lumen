@@ -1,6 +1,7 @@
 #ifndef PSSMLT_UTILS
 #define PSSMLT_UTILS
 #include "../../bda.glsl"
+#include "../../atomic_rgb.glsl"
 #include "../../commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
 layout(constant_id = 0) const int SEEDING = 0;
@@ -10,7 +11,7 @@ layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 SCENE_BUFFER(light_path, MLTPathVertex);
 SCENE_BUFFER(camera_path, MLTPathVertex);
 SCENE_BUFFER(mlt_samplers, MLTSampler);
-SCENE_BUFFER(mlt_col, vec3);
+SCENE_BUFFER(mlt_col, float);
 SCENE_BUFFER(chain_stats, ChainData);
 SCENE_BUFFER(splat, Splat);
 SCENE_BUFFER(past_splat, Splat);

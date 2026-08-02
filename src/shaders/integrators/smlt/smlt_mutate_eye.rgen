@@ -38,15 +38,17 @@ void main() {
     if (accept > 0) {
         const float inv_proposed_luminance = 1. / proposed_luminance;
         for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
-            DEREF(mlt_col)[splat(i).idx] +=
-                splat(i).L * accept * inv_proposed_luminance;
+            RGB_BUFFER_ATOMIC_ADD(
+                mlt_col, splat(i).idx,
+                splat(i).L * accept * inv_proposed_luminance);
         }
     }
 
     const float inv_past_luminance = 1. / mlt_sampler.luminance;
     for (int i = 0; i < mlt_sampler.past_splat_cnt; i++) {
-        DEREF(mlt_col)[past_splat(i).idx] +=
-            past_splat(i).L * (1 - accept) * inv_past_luminance;
+        RGB_BUFFER_ATOMIC_ADD(
+            mlt_col, past_splat(i).idx,
+            past_splat(i).L * (1 - accept) * inv_past_luminance);
     }
     if (rand(seed) < accept) {
         mlt_sampler.past_splat_cnt = mlt_sampler.splat_cnt;

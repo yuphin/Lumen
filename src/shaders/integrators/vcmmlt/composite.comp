@@ -9,6 +9,7 @@
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 
 #include "../../bda.glsl"
+#include "../../atomic_rgb.glsl"
 #include "vcmmlt_commons.h"
 #include "../../utils.glsl"
 
@@ -17,8 +18,8 @@ layout(binding = 0, rgba32f) uniform image2D image;
 layout(binding = 1) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
 SCENE_BUFFER(chain_stats, ChainData);
-SCENE_BUFFER(color_storage, vec3);
-SCENE_BUFFER(mlt_col, vec3);
+SCENE_BUFFER(color_storage, float);
+SCENE_BUFFER(mlt_col, float);
 SCENE_BUFFER_SCALAR(cdf_sum, float);
 void main() {
     ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.height,
@@ -30,16 +31,16 @@ void main() {
         float factor =
             DEREF(chain_stats)[i].normalization /
             (pc.mutations_per_pixel);
-        col +=  DEREF(mlt_col)[gl_GlobalInvocationID.x] * factor;
-        // col += DEREF(mlt_col)[gl_GlobalInvocationID.x] * DEREF(cdf_sum) /
+        col += RGB_BUFFER_LOAD(mlt_col, gl_GlobalInvocationID.x) * factor;
+        // col += RGB_BUFFER_LOAD(mlt_col, gl_GlobalInvocationID.x) * DEREF(cdf_sum) /
         //        (pc.mutations_per_pixel);
-        // col += 0.5 * DEREF(mlt_col)[gl_GlobalInvocationID.x] *
+        // col += 0.5 * RGB_BUFFER_LOAD(mlt_col, gl_GlobalInvocationID.x) *
         //        DEREF(chain_stats)[i].normalization * pc.width * pc.height /
         //        (DEREF(chain_stats)[i].total_samples);
     }
-    col += DEREF(color_storage)[gl_GlobalInvocationID.x];
-    DEREF(mlt_col)[gl_GlobalInvocationID.x] = vec3(0);
-    DEREF(color_storage)[gl_GlobalInvocationID.x] = vec3(0);
+    col += RGB_BUFFER_LOAD(color_storage, gl_GlobalInvocationID.x);
+    RGB_BUFFER_STORE(mlt_col, gl_GlobalInvocationID.x, vec3(0));
+    RGB_BUFFER_STORE(color_storage, gl_GlobalInvocationID.x, vec3(0));
     if (pc.enable_accumulation == 1 && pc.frame_num > 0) {
         float w = 1. / float(pc.frame_num + 1);
 

@@ -653,6 +653,7 @@ static bool parse_spirv(spvc_context context, spvc_compiler compiler, Shader& sh
 			case SpvOpAtomicCompareExchange:
 			case SpvOpAtomicCompareExchangeWeak:
 			case SpvOpAtomicFlagTestAndSet:
+			case SpvOpAtomicFAddEXT:
 			case SpvOpAtomicIAdd:
 				access_helper(instruction[3], true, true);
 				break;

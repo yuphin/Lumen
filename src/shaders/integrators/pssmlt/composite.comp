@@ -8,6 +8,7 @@
 #extension GL_EXT_shader_atomic_float : require
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #include "../../bda.glsl"
+#include "../../atomic_rgb.glsl"
 #include "pssmlt_commons.h"
 #include "../../utils.glsl"
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
@@ -15,7 +16,7 @@ layout(binding = 0, rgba32f) uniform image2D image;
 layout(binding = 1) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
 SCENE_BUFFER(chain_stats, ChainData);
-SCENE_BUFFER(mlt_col, vec3);
+SCENE_BUFFER(mlt_col, float);
 SCENE_BUFFER_SCALAR(cdf_sum, float);
 void main() {
     ivec2 coords = ivec2(gl_GlobalInvocationID.x / pc.height,
@@ -24,11 +25,11 @@ void main() {
         return;
     }
     vec3 col = vec3(0);
-    col += DEREF(mlt_col)[gl_GlobalInvocationID.x] * DEREF(cdf_sum) / pc.mutations_per_pixel;
+    col += RGB_BUFFER_LOAD(mlt_col, gl_GlobalInvocationID.x) * DEREF(cdf_sum) / pc.mutations_per_pixel;
     if(isnan(luminance(col))) {
         return;
     }
-    DEREF(mlt_col)[gl_GlobalInvocationID.x] = vec3(0);
+    RGB_BUFFER_STORE(mlt_col, gl_GlobalInvocationID.x, vec3(0));
     if (pc.enable_accumulation == 1 && pc.frame_num > 0) {
         float w = 1. / float(pc.frame_num + 1);
 

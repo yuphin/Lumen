@@ -25,7 +25,7 @@ layout(constant_id = 0) const int RAY_GUIDE = 0;
 SCENE_BUFFER(photon, VCMPhotonHash);
 SCENE_BUFFER(vcm_vertices, VCMVertex);
 SCENE_BUFFER(path_cnt, uint);
-SCENE_BUFFER(color_storage, vec3);
+SCENE_BUFFER(color_storage, float);
 SCENE_BUFFER(light_samples, VCMRestirData);
 SCENE_BUFFER_SCALAR(should_resample, uint);
 SCENE_BUFFER(light_state, LightState);

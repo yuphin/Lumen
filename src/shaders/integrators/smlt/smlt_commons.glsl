@@ -1,6 +1,7 @@
 #ifndef PSSMLT_UTILS
 #define PSSMLT_UTILS
 #include "../../bda.glsl"
+#include "../../atomic_rgb.glsl"
 #include "../../commons.glsl"
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
@@ -16,7 +17,7 @@ SCENE_BUFFER(light_splat_cnts, uint);
 SCENE_BUFFER(vcm_vertices, VCMVertex);
 SCENE_BUFFER(connected_lights, uint);
 SCENE_BUFFER(mlt_samplers, MLTSampler);
-SCENE_BUFFER(mlt_col, vec3);
+SCENE_BUFFER(mlt_col, float);
 SCENE_BUFFER(chain_stats, ChainData);
 SCENE_BUFFER(splat, Splat);
 SCENE_BUFFER(past_splat, Splat);

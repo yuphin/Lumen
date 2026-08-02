@@ -1,6 +1,7 @@
 #ifndef PSSMLT_UTILS
 #define PSSMLT_UTILS
 #include "../../bda.glsl"
+#include "../../atomic_rgb.glsl"
 #include "../../commons.glsl"
 layout(location = 0) rayPayloadEXT HitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
@@ -13,7 +14,7 @@ uint depth_factor = pc.max_depth * (pc.max_depth + 1);
 
 SCENE_BUFFER(vcm_vertices, VCMVertex);
 SCENE_BUFFER(mlt_samplers, VCMMLTSampler);
-SCENE_BUFFER(mlt_col, vec3);
+SCENE_BUFFER(mlt_col, float);
 SCENE_BUFFER(chain_stats, ChainData);
 SCENE_BUFFER(splat, Splat);
 SCENE_BUFFER(past_splat, Splat);
@@ -21,7 +22,7 @@ SCENE_BUFFER(bootstrap, BootstrapSample);
 SCENE_BUFFER(seeds, VCMMLTSeedData);
 SCENE_BUFFER(light_primary_samples, PrimarySample);
 SCENE_BUFFER(cam_primary_samples, PrimarySample);
-SCENE_BUFFER(color_storage, vec3);
+SCENE_BUFFER(color_storage, float);
 SCENE_BUFFER(photon, VCMPhotonHash);
 SCENE_BUFFER(mlt_atomicsum, SumData);
 const uint flags = gl_RayFlagsOpaqueEXT;

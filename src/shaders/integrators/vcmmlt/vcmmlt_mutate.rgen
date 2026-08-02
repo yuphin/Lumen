@@ -73,15 +73,17 @@ void main() {
         const float mis =
             mlt_mis(proposed_luminance, proposed_target, chain_idx);
         for (int i = 0; i < mlt_sampler.splat_cnt; i++) {
-            DEREF(mlt_col)[splat(i).idx] +=
-                splat(i).L * accept * mis * inv_proposed_target;
+            RGB_BUFFER_ATOMIC_ADD(
+                mlt_col, splat(i).idx,
+                splat(i).L * accept * mis * inv_proposed_target);
         }
     }
     const float inv_curr_target = 1. / curr_target;
     const float mis = mlt_mis(mlt_sampler.luminance, curr_target, chain_idx);
     for (int i = 0; i < mlt_sampler.past_splat_cnt; i++) {
-        DEREF(mlt_col)[past_splat(i).idx] +=
-            past_splat(i).L * (1 - accept) * mis * inv_curr_target;
+        RGB_BUFFER_ATOMIC_ADD(
+            mlt_col, past_splat(i).idx,
+            past_splat(i).L * (1 - accept) * mis * inv_curr_target);
     }
     if (rand(seed) < accept) {
         mlt_sampler.past_splat_cnt = mlt_sampler.splat_cnt;

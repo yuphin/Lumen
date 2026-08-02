@@ -2,6 +2,7 @@
 #define VCM_COMMONS
 
 #include "../shadow_ray.glsl"
+#include "../atomic_rgb.glsl"
 
 #ifndef VC_MLT
 #define VC_MLT 0
@@ -405,12 +406,12 @@ void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
 			if (lum > 0) {
 				lum_sum += lum;
 				uint idx = coords.x * pc.height + coords.y;
-				DEREF(color_storage)[idx] += splat_col;
+				RGB_BUFFER_ATOMIC_ADD(color_storage, idx, splat_col);
 			}
 #else
 								 if (luminance(splat_col) > 0) {
 									 uint idx = coords.x * gl_LaunchSizeEXT.y + coords.y;
-									 DEREF(color_storage)[idx] += splat_col;
+									 RGB_BUFFER_ATOMIC_ADD(color_storage, idx, splat_col);
 								 }
 #endif
 		}
@@ -674,7 +675,7 @@ float mlt_fill_eye() {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, camera_state.pos, tmin, camera_state.wi, tmax, 0);
 
 		if (payload.material_idx == -1) {
-			DEREF(color_storage)[coords_idx] += camera_state.throughput * pc.sky_col;
+			RGB_BUFFER_ATOMIC_ADD(color_storage, coords_idx, camera_state.throughput * pc.sky_col);
 			break;
 		}
 
@@ -703,7 +704,7 @@ float mlt_fill_eye() {
 		// Get the radiance
 		if (luminance(mat.emissive_factor) > 0) {
 			vec3 L = camera_state.throughput * vcm_get_light_radiance(mat, camera_state, depth);
-			DEREF(color_storage)[coords_idx] += L;
+			RGB_BUFFER_ATOMIC_ADD(color_storage, coords_idx, L);
 			lum_sum += luminance(L);
 		}
 
@@ -729,7 +730,7 @@ float mlt_fill_eye() {
 		// Connect to light
 		if (!mat_specular && depth < pc.max_depth) {
 			const vec3 L = vcm_connect_light(n_s, n_g, wo, mat, side, 0, camera_state);
-			DEREF(color_storage)[coords_idx] += L;
+			RGB_BUFFER_ATOMIC_ADD(color_storage, coords_idx, L);
 			lum_sum += luminance(L);
 		}
 
