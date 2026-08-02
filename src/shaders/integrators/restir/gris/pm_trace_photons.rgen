@@ -46,12 +46,12 @@ void main() {
 	bool last_specular = false;
 	for (int d = 0; d < pc.max_depth; d++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, pos, tmin, wi, tmax, 0);
-		bool found_isect = payload.instance_idx != -1;
+		bool found_isect = surface_ref_valid(payload.surface);
 		if (!found_isect) {
 			break;
 		}
 
-		HitData gbuffer = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
+		SurfaceData gbuffer = load_surface(payload.surface);
 
 		vec3 to_prev = pos - gbuffer.pos;
 		float dist_sqr = dot(to_prev, to_prev);
@@ -76,8 +76,7 @@ void main() {
 			DEREF(caustic_photon_aabbs)[photon_idx].min = gbuffer.pos - pc.photon_radius;
 			DEREF(caustic_photon_aabbs)[photon_idx].max = gbuffer.pos + pc.photon_radius;
 
-			DEREF(caustic_photon_light)[photon_idx].barycentrics = payload.attribs;
-			DEREF(caustic_photon_light)[photon_idx].primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
+			DEREF(caustic_photon_light)[photon_idx].surface = payload.surface;
 			DEREF(caustic_photon_light)[photon_idx].dir = to_spherical(wo);
 			DEREF(caustic_photon_light)[photon_idx].throughput = throughput;
 			// side is not used

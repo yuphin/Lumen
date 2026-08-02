@@ -85,9 +85,9 @@ void render(Integrator* integrator) {
 	rg::add_rt(CSTR("ReSTIRGI - Generate Samples"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/restir/gi/restir.rgen")},
-								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/surface.rmiss")},
 								 {CSTR("src/shaders/ray_shadow.rmiss")},
-								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/surface.rchit")},
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height() },
 				 })
@@ -105,9 +105,9 @@ void render(Integrator* integrator) {
 	rg::add_rt(CSTR("ReSTIRGI - Temporal Reuse"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/restir/gi/temporal_reuse.rgen")},
-								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/surface.rmiss")},
 								 {CSTR("src/shaders/ray_shadow.rmiss")},
-								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/surface.rchit")},
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height() },
 				 })
@@ -121,9 +121,9 @@ void render(Integrator* integrator) {
 	rg::add_rt(CSTR("ReSTIRGI - Spatial Reuse"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/restir/gi/spatial_reuse.rgen")},
-								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/surface.rmiss")},
 								 {CSTR("src/shaders/ray_shadow.rmiss")},
-								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/surface.rchit")},
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height() },
 				 })

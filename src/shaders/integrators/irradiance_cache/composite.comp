@@ -25,7 +25,7 @@ SCENE_BUFFER(direct_lighting, vec3);
 #include "ir_commons.glsl"
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 
-SCENE_BUFFER(g_buffer, GBuffer);
+SCENE_BUFFER(g_buffer, SurfaceRef);
 #include "hash.glsl"
 #include "grid.glsl"
 
@@ -48,14 +48,14 @@ void main() {
 	}
 
 	vec3 col = pc.direct_lighting == 1 ? DEREF(direct_lighting)[pixel_idx] : vec3(0);
-	GBuffer gbuffer = DEREF(g_buffer)[pixel_idx];
+	SurfaceRef gbuffer = DEREF(g_buffer)[pixel_idx];
 
-	if (!gbuffer_valid(gbuffer)) {
+	if (!surface_ref_valid(gbuffer)) {
 		store_output(coords, col);
 		return;
 	}
 
-	HitData hit_data = get_hitdata(gbuffer);
+	SurfaceData hit_data = load_surface(gbuffer);
 
 	vec3 pixel_world_pos = hit_data.pos;
 	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
@@ -72,7 +72,7 @@ void main() {
 	for (uint gid = 0; gid < surfel_count; gid++) {
 		uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
 		Surfel surfel = DEREF(surfel_pool)[sid];
-		HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
+		SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
 
 		vec3 diff = hit_data.pos - surfel_hit_data.pos;
 		float dist = length(diff);

@@ -206,6 +206,7 @@ SceneDesc scene_desc_base(Integrator* integrator) {
 	SET_SCENE_BUFFER(desc, prim_info, scene->prim_lookup_buffer);
 	SET_SCENE_BUFFER(desc, light_triangle_cdf, scene->light_triangle_cdf_buffer);
 	SET_SCENE_BUFFER(desc, emitter_light_idx, scene->emitter_light_indices_buffer);
+	SET_SCENE_BUFFER(desc, transformations, scene->transformations_buffer);
 	return desc;
 }
 

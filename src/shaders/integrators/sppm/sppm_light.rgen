@@ -10,7 +10,8 @@
 
 #include "sppm_commons.h"
 #include "../../commons.glsl"
-layout(location = 0) rayPayloadEXT HitPayload payload;
+#include "../../surface.glsl"
+layout(location = 0) rayPayloadEXT SurfaceHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 
 layout(push_constant) uniform _PushConstantRay { PCSPPM pc; };
@@ -52,31 +53,26 @@ void main() {
 
     for (int d = 0; d < pc.max_depth; d++) {
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, pos, tmin, wi, tmax, 0);
-        bool found_isect = payload.material_idx != -1;
+        bool found_isect = surface_ref_valid(payload.surface);
         if (!found_isect) {
             break;
         }
+        const SurfaceData surface = load_surface(payload.surface);
         const vec3 wo = -wi;
-        vec3 n_s = payload.n_s;
-        bool side = true;
-        vec3 n_g = payload.n_g;
-        if (dot(payload.n_g, wo) < 0.)
-            n_g = -n_g;
-        if (dot(n_g, payload.n_s) < 0) {
-            n_s = -n_s;
-            side = false;
-        }
+        vec3 n_s = surface.n_s;
+        vec3 n_g = surface.n_g;
+        const bool side = face_forward(n_s, n_g, wo);
         float cos_wo = dot(wo, n_s);
-        Material hit_mat = load_material(payload.material_idx, payload.uv);
+        Material hit_mat = load_material(surface.material_idx, surface.uv);
         if (d > 0) {
             // Ignore the first bounce
             vec3 min_bnds = DEREF(atomic_data).min_bnds;
             vec3 max_bnds = DEREF(atomic_data).max_bnds;
             ivec3 grid_res = DEREF(atomic_data).grid_res;
             const ivec3 grid_idx =
-                get_grid_idx(payload.pos, min_bnds, max_bnds, grid_res);
+                get_grid_idx(surface.pos, min_bnds, max_bnds, grid_res);
             const uint h = hash(grid_idx, screen_size);
-            DEREF(photon)[h].pos = payload.pos;
+            DEREF(photon)[h].pos = surface.pos;
             DEREF(photon)[h].wi = -wi;
             DEREF(photon)[h].throughput = throughput;
             DEREF(photon)[h].nrm = n_s;
@@ -92,7 +88,7 @@ void main() {
         if (f == vec3(0) || pdf_dir == 0) {
             break;
         }
-        pos = offset_ray(payload.pos, n_g, wi);
+        pos = offset_ray(surface.pos, n_g, wi);
         if (d > RR_MIN_DEPTH) {
             float rr_prob = min(0.95f, luminance(throughput));
             if (rr_prob < rand(seed))

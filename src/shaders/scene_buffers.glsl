@@ -9,5 +9,6 @@ SCENE_BUFFER_RO(index, uint);
 SCENE_BUFFER_RO(compact_vertices, Vertex);
 SCENE_BUFFER_RO(light_triangle_cdf, LightTriangleCDF);
 SCENE_BUFFER_RO(emitter_light_idx, uint);
+SCENE_BUFFER_RO(transformations, InstanceTransform);
 
 #endif

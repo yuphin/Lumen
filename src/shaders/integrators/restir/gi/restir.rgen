@@ -11,7 +11,8 @@
 #include "../../../bda.glsl"
 #include "restirgi_commons.h"
 #include "../../../commons.glsl"
-layout(location = 0) rayPayloadEXT HitPayload payload;
+#include "../../../surface.glsl"
+layout(location = 0) rayPayloadEXT SurfaceHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCReSTIRGI pc; };
 const uint flags = gl_RayFlagsOpaqueEXT;
@@ -32,13 +33,11 @@ void main() {
     vec4 target = ubo.inv_projection * vec4(d.x, d.y, 1, 1);
     vec3 direction = vec3(sample_camera(d));
     vec3 col = vec3(0);
-    vec3 x_v = vec3(0), n_v = vec3(0);
-    uint packed_n_g_v = 0;
-    vec3 x_s = vec3(0), n_s = vec3(0);
+    SurfaceRef x_v_surface = invalid_surface_ref();
+    SurfaceRef x_s_surface = invalid_surface_ref();
     float p_q = 0;
     vec3 L_o = vec3(0);
     vec3 x_f = vec3(0);
-    uint mat_idx = -1;
     uint bsdf_props = 0;
     vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
                                                2. / gl_LaunchSizeEXT.y, 0, 1));
@@ -50,7 +49,7 @@ void main() {
     for (int depth = 0;; depth++) {
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction,
                     tmax, 0);
-        const bool found_isect = payload.material_idx != -1;
+        const bool found_isect = surface_ref_valid(payload.surface);
         if (depth >= pc.max_depth - 1) {
             break;
         }
@@ -65,8 +64,8 @@ void main() {
             break;
         }
 
-        const Material hit_mat =
-            load_material(payload.material_idx, payload.uv);
+        const SurfaceData surface = load_surface(payload.surface);
+        const Material hit_mat = load_material(surface.material_idx, surface.uv);
         if (depth == 0 || specular) {
             const vec3 val = throughput * hit_mat.emissive_factor;
             if (depth > 0) {
@@ -76,23 +75,16 @@ void main() {
             }
         }
         const vec3 wo = -direction;
-        vec3 shading_nrm = payload.n_s;
-        bool side = true;
-        vec3 geometry_nrm = payload.n_g;
-        if (dot(payload.n_g, wo) < 0.)
-            geometry_nrm = -geometry_nrm;
-        if (dot(geometry_nrm, payload.n_s) < 0) {
-            shading_nrm = -shading_nrm;
-            side = false;
-        }
-        const vec3 pos = payload.pos;
+        vec3 shading_nrm = surface.n_s;
+        vec3 geometry_nrm = surface.n_g;
+        const bool side = face_forward(shading_nrm, geometry_nrm, wo);
+        const vec3 pos = surface.pos;
         if (depth == 1) {
-            x_s = pos;
-            n_s = shading_nrm;
+            x_s_surface = payload.surface;
         }
         if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
 			const vec3 val = throughput *
-							 sample_direct_light(seed, hit_mat, payload.pos, side,
+							 sample_direct_light(seed, hit_mat, surface.pos, side,
 											 shading_nrm, geometry_nrm, wo, /*use_mis=*/false,
 											 specular);
             if (depth > 0) {
@@ -111,12 +103,9 @@ void main() {
         }
 
         if (depth == 0) {
-            x_v = pos;
-            n_v = shading_nrm;
-            packed_n_g_v = pack_normal_octahedral(geometry_nrm);
+            x_v_surface = payload.surface;
             p_q = pdf;
             x_f = f;
-            mat_idx = payload.material_idx;
             bsdf_props = hit_mat.bsdf_props;
         }
 
@@ -142,15 +131,11 @@ void main() {
     ivec2 coords = ivec2(0.5 * (1 + d) * vec2(pc.width, pc.height));
     uint coords_idx = coords.x * pc.height + coords.y;
     // Fill in the samples buffer
-    DEREF(restir_samples)[pixel_idx].x_v = x_v;
-    DEREF(restir_samples)[pixel_idx].n_v = n_v;
-    DEREF(restir_samples)[pixel_idx].packed_n_g_v = packed_n_g_v;
-    DEREF(restir_samples)[pixel_idx].x_s = x_s;
-    DEREF(restir_samples)[pixel_idx].n_s = n_s;
+    DEREF(restir_samples)[pixel_idx].x_v_surface = x_v_surface;
+    DEREF(restir_samples)[pixel_idx].x_s_surface = x_s_surface;
     DEREF(restir_samples)[pixel_idx].L_o = L_o;
     DEREF(restir_samples)[pixel_idx].p_q = p_q;
     DEREF(restir_samples)[pixel_idx].f = x_f;
-    DEREF(restir_samples)[pixel_idx].mat_idx = mat_idx;
     DEREF(restir_samples)[pixel_idx].bsdf_props = bsdf_props;
     DEREF(color_storage)[pixel_idx] += col;
 }

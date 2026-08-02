@@ -29,6 +29,8 @@ SCENE_BUFFER(probe_offsets, vec4);
 SCENE_BUFFER(direct_lighting, vec3);
 SCENE_BUFFER(g_buffer, GBufferData);
 
+#include "../../surface.glsl"
+
 #include "ddgi_irradiance.glsl"
 
 void store_output(ivec2 coords, vec3 col) {
@@ -46,16 +48,19 @@ void main() {
 	}
 	const vec2 pixel_center = vec2(coords) + vec2(0.5);
 	const int linear_idx = int(gl_GlobalInvocationID.x * pc.height + gl_GlobalInvocationID.y);
-	vec3 p = DEREF(g_buffer)[linear_idx].pos;
-	vec3 n = DEREF(g_buffer)[linear_idx].normal;
 	uint idx = pc.height * gl_GlobalInvocationID.x + gl_GlobalInvocationID.y;
 	vec3 col = pc.direct_lighting == 1 ? DEREF(direct_lighting)[idx] : vec3(0);
-	if (dot(n, n) == 0) {
+	const SurfaceRef surface_ref = DEREF(g_buffer)[linear_idx].surface;
+	if (!surface_ref_valid(surface_ref)) {
 		store_output(coords, col);
 		return;
 	}
-	vec3 wo = normalize((ubo.inv_view * vec4(0, 0, 0, 1)).xyz - p);
-	vec3 irradiance = sample_irradiance(p, n, wo);
+	const SurfaceData surface = load_surface(surface_ref);
+	vec3 n_s = surface.n_s;
+	vec3 n_g = surface.n_g;
+	vec3 wo = normalize((ubo.inv_view * vec4(0, 0, 0, 1)).xyz - surface.pos);
+	face_forward(n_s, n_g, wo);
+	vec3 irradiance = sample_irradiance(surface.pos, n_s, wo);
 	col += DEREF(g_buffer)[idx].albedo / PI * irradiance;
 	store_output(coords, col);
 	imageStore(irr_output_img, coords, vec4(irradiance, 1.0f));

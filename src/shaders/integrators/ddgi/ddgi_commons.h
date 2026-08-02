@@ -37,15 +37,13 @@ struct DDGIUniforms {
 };
 
 struct GBufferData {
-	vec3 pos;
-	uint mat_idx;
-	vec3 normal;
-	uint pad;
-	vec2 uv;
-	vec2 pad2;
+	SurfaceRef surface;
 	vec3 albedo;
-	uint pad3;
 };
+
+#ifdef __cplusplus
+static_assert(sizeof(GBufferData) == 28);
+#endif
 
 struct ALIGN16 SphereDesc {
 	uint64_t index_addr;

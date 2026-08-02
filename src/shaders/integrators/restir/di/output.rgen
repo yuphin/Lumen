@@ -12,7 +12,7 @@
 #include "restirdi_commons.glsl"
 
 void main() {
-	load_g_buffer();
+	const bool surface_valid = load_g_buffer();
 	vec3 col = vec3(0);
 	const RestirReservoir r = DEREF(spatial_reservoir)[pixel_idx];
 	if (pc.enable_gi == 1) {
@@ -21,7 +21,7 @@ void main() {
 	if (isnan(luminance(col))) {
 		return;
 	}
-	if (r.W > 0) {
+	if (surface_valid && r.W > 0) {
 		col += r.W * calc_L_with_visibility_check(r);
 		DEREF(temporal_reservoir)[pixel_idx].w_sum = r.w_sum;
 		DEREF(temporal_reservoir)[pixel_idx].W = r.W;

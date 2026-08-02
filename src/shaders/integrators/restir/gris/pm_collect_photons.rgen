@@ -33,8 +33,7 @@ void main() {
 
 	vec3 col = vec3(0);
 	if (photon_data_valid(photon_eye)) {
-		HitData cam_gbuffer = get_hitdata(photon_eye.barycentrics, photon_eye.primitive_instance_id.y,
-										  photon_eye.primitive_instance_id.x);
+		SurfaceData cam_gbuffer = load_surface(photon_eye.surface);
 		Material cam_hit_mat = load_material(cam_gbuffer.material_idx, cam_gbuffer.uv);
 		ASSERT(is_rough(cam_hit_mat));
 
@@ -67,8 +66,7 @@ void main() {
 			int photon_idx = rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, false);
 			PhotonData photon_light = DEREF(caustic_photon_light)[photon_idx];
 
-			HitData photon_gbuffer = get_hitdata(photon_light.barycentrics, photon_light.primitive_instance_id.y,
-												 photon_light.primitive_instance_id.x);
+			SurfaceData photon_gbuffer = load_surface(photon_light.surface);
 
 			bool unused;
 			uint photon_path_length;
@@ -95,8 +93,8 @@ void main() {
 
 			ASSERT(!isnan(photon_light.d_vm));
 			bool merged =
-				stream_photon_reservoir(seed, canonical_reservoir, photon_light.throughput, photon_light.barycentrics,
-										photon_light.primitive_instance_id, photon_light.dir, photon_light.d_vm,
+				stream_photon_reservoir(seed, canonical_reservoir, photon_light.throughput, photon_light.surface,
+										photon_light.dir, photon_light.d_vm,
 										calc_target_pdf(contribution), 1.0);
 			if (merged) {
 				selected_contribution = contribution;
@@ -126,9 +124,7 @@ void main() {
 				// Always true as long as pc.total_frame_num > 1
 				if (photon_reservoir_data_valid(prev_reservoir)) {
 					ASSERT(photon_data_valid(prev_photon_eye));
-					HitData prev_photon_gbuffer =
-						get_hitdata(prev_reservoir.barycentrics, prev_reservoir.primitive_instance_id.y,
-									prev_reservoir.primitive_instance_id.x);
+					SurfaceData prev_photon_gbuffer = load_surface(prev_reservoir.surface);
 					vec3 wi_prev = from_spherical(prev_reservoir.wi);
 
 					float cam_pdf_fwd_temp;
@@ -166,9 +162,7 @@ void main() {
 
 					// Bias correction
 					if (photon_reservoir_data_valid(canonical_reservoir)) {
-						HitData prev_cam_gbuffer =
-							get_hitdata(prev_photon_eye.barycentrics, prev_photon_eye.primitive_instance_id.y,
-										prev_photon_eye.primitive_instance_id.x);
+						SurfaceData prev_cam_gbuffer = load_surface(prev_photon_eye.surface);
 						Material prev_cam_hit_mat = load_material(prev_cam_gbuffer.material_idx, prev_cam_gbuffer.uv);
 						vec3 wo_prev = from_spherical(prev_photon_eye.dir);
 						vec3 wi = from_spherical(canonical_reservoir.wi);
@@ -187,9 +181,7 @@ void main() {
 						vec3 prev_contribution =
 							mis_weight_prev * f_prev * canonical_reservoir.flux * prev_photon_eye.throughput;
 
-						HitData canonical_photon_gbuffer =
-							get_hitdata(canonical_reservoir.barycentrics, canonical_reservoir.primitive_instance_id.y,
-										canonical_reservoir.primitive_instance_id.x);
+						SurfaceData canonical_photon_gbuffer = load_surface(canonical_reservoir.surface);
 						uint canonical_photon_path_length;
 						unpack_photon_flags(canonical_reservoir.flags, unused, canonical_photon_path_length);
 						float target_pdf_in_neighbor;

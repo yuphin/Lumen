@@ -23,7 +23,7 @@ SCENE_BUFFER(grid_cell_counts, uint);
 #include "surfel_commons.glsl"
 
 
-SCENE_BUFFER(g_buffer, GBuffer);
+SCENE_BUFFER(g_buffer, SurfaceRef);
 SCENE_BUFFER(surfel_spawn_list, uint);
 SCENE_BUFFER_SCALAR(surfel_spawn_count, uint);
 SCENE_BUFFER(surfel_pool, Surfel);
@@ -56,9 +56,9 @@ void main() {
 
 	float coverage = TILE_COVERAGE_MAX;
 	if (pixel_coords.x < pc.width && pixel_coords.y < pc.height) {
-		GBuffer gbuffer = DEREF(g_buffer)[pixel_idx];
-		if (gbuffer_valid(gbuffer)) {
-			HitData hit_data = get_hitdata(gbuffer);
+		SurfaceRef gbuffer = DEREF(g_buffer)[pixel_idx];
+		if (surface_ref_valid(gbuffer)) {
+			SurfaceData hit_data = load_surface(gbuffer);
 
 			coverage = 0.0;
 			vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
@@ -73,7 +73,7 @@ void main() {
 				uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
 				Surfel surfel = DEREF(surfel_pool)[sid];
 				if (surfel.radius <= 0.0) continue;
-				HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
+				SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
 				vec3 pos_to_surfel = hit_data.pos - surfel_hit_data.pos;
 				float dist_sqr = dot(pos_to_surfel, pos_to_surfel);
 				float dist_normal = dot(pos_to_surfel, surfel_hit_data.n_s);

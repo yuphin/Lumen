@@ -15,7 +15,7 @@
 SCENE_BUFFER(prefix_contributions, vec3);
 
 layout(binding = 4, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
-layout(binding = 5, std430) writeonly buffer OutGBuffer { GBuffer out_gbuffers[]; };
+layout(binding = 5, std430) writeonly buffer OutGBuffer { SurfaceRef out_gbuffers[]; };
 layout(binding = 6, rgba16) writeonly uniform image2D canonical_contributions_tex;
 layout(binding = 7, rgba32f) uniform image2D direct_lighting_img;
 layout(binding = 8, rgba32f) uniform image2D caustics_texture;
@@ -48,7 +48,7 @@ void main() {
 	vec3 col = vec3(0);
 	bool debug_val = false;
 
-	GBuffer gbuffer_out;
+	SurfaceRef gbuffer_out;
 	init_gbuffer(gbuffer_out);
 
 	// General variables
@@ -103,7 +103,7 @@ void main() {
 	int depth = 0;
 	for (;; depth++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
-		const bool found_isect = payload.instance_idx != -1;
+		const bool found_isect = surface_ref_valid(payload.surface);
 
 		if (!found_isect) {
 #ifdef ENABLE_ATMOSPHERE
@@ -139,8 +139,8 @@ void main() {
 			break;
 		}
 
-		float triangle_area = 0;
-		HitData gbuffer = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx, triangle_area);
+		SurfaceData gbuffer = load_surface(payload.surface);
+		const float triangle_area = gbuffer.area;
 		const Material hit_mat = load_material(gbuffer.material_idx, gbuffer.uv);
 
 		record_path_flag(path_flags, is_rough(hit_mat), depth);
@@ -170,10 +170,7 @@ void main() {
 		const bool connectable_this_vertex = was_connectable && prev_rough && constraints_satisfied;
 
 		if (connectable_this_vertex) {
-			vec2 rc_barycentrics = payload.attribs;
-			uvec2 rc_primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
-			reconnection_data.rc_barycentrics = rc_barycentrics;
-			reconnection_data.rc_primitive_instance_id = rc_primitive_instance_id;
+			reconnection_data.rc_surface = payload.surface;
 			reconnection_data.rc_coords = rc_coords;
 #if DEBUG == 1
 			reconnection_data.debug_sampling_seed = sampling_seed;
@@ -202,13 +199,14 @@ void main() {
 			ASSERT(debug_val == true);
 		}
 
-		const uint emitter_light_idx = light_index_from_primitive(payload.instance_idx);
+		const uint emitter_light_idx = light_index_from_primitive(payload.surface.primitive_instance_id.y);
 		vec3 emitted_radiance = vec3(0.0);
 		vec3 emitter_normal = n_s;
 		if (emitter_light_idx != INVALID_LIGHT_INDEX) {
 			const Light emitter = lights[emitter_light_idx];
 			const TriangleRecord emitter_triangle = triangle_at_bary(
-				DEREF(prim_info)[emitter.prim_mesh_idx], vec2(0.0), payload.triangle_idx, emitter.world_matrix);
+				DEREF(prim_info)[emitter.prim_mesh_idx], vec2(0.0), payload.surface.primitive_instance_id.x,
+				emitter.world_matrix);
 			emitter_normal = emitter_triangle.n_g;
 			const float cos_from_light = dot(emitter_normal, wo);
 			if (is_light_two_sided(emitter.light_flags) || cos_from_light > 0.0) {
@@ -219,8 +217,7 @@ void main() {
 		if (depth == 0) {
 			// Fill in GBuffer
 			direct_lighting += throughput * emitted_radiance;
-			gbuffer_out.barycentrics = payload.attribs;
-			gbuffer_out.primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
+			gbuffer_out = payload.surface;
 		} else {
 			float pdf_light_w = emitter_light_idx == INVALID_LIGHT_INDEX
 									? 0.0
@@ -333,8 +330,8 @@ void main() {
 				reconnection_data.rc_coords = rc_coords;
 				// reconnection_data.rc_partial_jacobian = rc_partial_jacobian;
 				reconnection_data.rc_partial_jacobian = 1;
-				reconnection_data.rc_barycentrics = light_identity.bary;
-				reconnection_data.rc_primitive_instance_id =
+				reconnection_data.rc_surface.barycentrics = light_identity.bary;
+				reconnection_data.rc_surface.primitive_instance_id =
 					uvec2(light_identity.triangle_idx, light_identity.light_idx);
 #if DEBUG == 1
 				reconnection_data.debug_seed = debug_seed;

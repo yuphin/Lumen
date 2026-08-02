@@ -20,6 +20,8 @@ SCENE_BUFFER(sppm_data, SPPMData);
 SCENE_BUFFER_SCALAR(atomic_data, AtomicData);
 SCENE_BUFFER(photon, PhotonHash);
 
+#include "../../surface.glsl"
+
 uint size = pc.width * pc.height;
 
 uint screen_size = pc.width * pc.height;
@@ -41,6 +43,16 @@ void main() {
     if (idx >= size) {
         return;
     }
+    const SurfaceRef surface_ref = DEREF(sppm_data)[idx].surface;
+    if (!surface_ref_valid(surface_ref)) {
+        return;
+    }
+    const SurfaceData surface = load_surface(surface_ref);
+    const Material mat = load_material(surface.material_idx, surface.uv);
+    const vec3 wo = DEREF(sppm_data)[idx].wo;
+    vec3 n_s = surface.n_s;
+    vec3 n_g = surface.n_g;
+    const bool side = face_forward(n_s, n_g, wo);
     const vec3 p = DEREF(sppm_data)[idx].p;
     float r = DEREF(sppm_data)[idx].radius;
     if (r < EPS) {
@@ -67,11 +79,8 @@ void main() {
                                             DEREF(sppm_data)[idx].path_len + 1)) {
                         continue;
                     }
-                    const Material mat = load_material(
-                        DEREF(sppm_data)[idx].material_idx, DEREF(sppm_data)[idx].uv);
-                    vec3 f = eval_bsdf(DEREF(sppm_data)[idx].n_s, DEREF(sppm_data)[idx].n_g,
-                                       DEREF(sppm_data)[idx].wo, mat, TRANSPORT_MODE_FROM_CAMERA,
-                                       DEREF(sppm_data)[idx].side == 1, DEREF(photon)[h].wi);
+                    vec3 f = eval_bsdf(n_s, n_g, wo, mat, TRANSPORT_MODE_FROM_CAMERA,
+                                       side, DEREF(photon)[h].wi);
                     vec3 phi = DEREF(photon)[h].photon_count *
                                DEREF(photon)[h].throughput * f *
                                DEREF(sppm_data)[idx].throughput;

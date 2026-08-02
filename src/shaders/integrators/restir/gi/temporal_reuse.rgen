@@ -10,7 +10,7 @@
 
 #include "restirgi_commons.h"
 #include "../../../commons.glsl"
-layout(location = 0) rayPayloadEXT HitPayload payload;
+layout(location = 0) rayPayloadEXT SurfaceHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 #include "restirgi_commons.glsl"
 #define M_MAX 30
@@ -26,7 +26,7 @@ void main() {
     const vec2 pixel = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
     const ReservoirSample s = DEREF(restir_samples)[pixel_idx];
     Reservoir r;
-    if (length(s.n_s) == 0) {
+    if (!surface_ref_valid(s.x_v_surface) || !surface_ref_valid(s.x_s_surface)) {
         init_reservoir(r);
         tr.w_sum = r.w_sum;
         tr.W = r.W;
@@ -35,10 +35,11 @@ void main() {
         DEREF(spatial_reservoir)[offset(pingpong ^ 1) + pixel_idx] = r;
         return;
     }
+    const SurfaceData s_v = load_surface(s.x_v_surface);
     if (pc.do_spatiotemporal == 0) {
         init_reservoir(r);
     } else {
-        vec4 prev_pos = ubo.prev_view * vec4(s.x_v, 1);
+        vec4 prev_pos = ubo.prev_view * vec4(s_v.pos, 1);
         prev_pos /= prev_pos.z;
         prev_pos = -ubo.prev_projection * prev_pos;
         const vec2 prev_ndc = prev_pos.xy;
@@ -48,8 +49,15 @@ void main() {
         if (prev_coords.x >= 0 && prev_coords.x < gl_LaunchSizeEXT.x &&
             prev_coords.y >= 0 && prev_coords.y < gl_LaunchSizeEXT.y) {
             prev_coords_idx = prev_coords.x * pc.height + prev_coords.y;
-            if (similar(DEREF(restir_samples)[prev_coords_idx], DEREF(restir_samples_old)[pixel_idx])) {
-                reprojection_failed = false;
+            const ReservoirSample current_reprojected = DEREF(restir_samples)[prev_coords_idx];
+            const ReservoirSample previous_current = DEREF(restir_samples_old)[pixel_idx];
+            if (surface_ref_valid(current_reprojected.x_v_surface) &&
+                surface_ref_valid(previous_current.x_v_surface)) {
+                const SurfaceData current_reprojected_v = load_surface(current_reprojected.x_v_surface);
+                const SurfaceData previous_current_v = load_surface(previous_current.x_v_surface);
+                if (similar(current_reprojected_v, previous_current_v)) {
+                    reprojection_failed = false;
+                }
             }
         }
         if (!reprojection_failed) {

@@ -18,7 +18,7 @@ layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 SCENE_BUFFER(surfel_pool, Surfel);
 SCENE_BUFFER(grid_cell_indices, uint);
 SCENE_BUFFER(grid_cell_counts, uint);
-SCENE_BUFFER(g_buffer, GBuffer);
+SCENE_BUFFER(g_buffer, SurfaceRef);
 
 #include "../../bsdf_commons.glsl"
 #include "ir_commons.glsl"
@@ -44,14 +44,14 @@ void main() {
 	if (coords.x >= pc.width || coords.y >= pc.height) {
 		return;
 	}
-	GBuffer gbuffer = DEREF(g_buffer)[gl_GlobalInvocationID.x];
+	SurfaceRef gbuffer = DEREF(g_buffer)[gl_GlobalInvocationID.x];
 
-	if (!gbuffer_valid(gbuffer)) {
+	if (!surface_ref_valid(gbuffer)) {
 		imageStore(image, coords, vec4(vec3(0), 1.f));
 		return;
 	}
 
-	HitData hit_data = get_hitdata(gbuffer);
+	SurfaceData hit_data = load_surface(gbuffer);
 
 	if (pc.debug_view == IRCACHE_DEBUG_VIEW_GBUFFER_NORMALS) {
 		imageStore(image, coords, vec4(hit_data.n_s * 0.5 + 0.5, 1.f));
@@ -109,7 +109,7 @@ void main() {
 	for (uint gid = 0; gid < surfel_count; gid++) {
 		uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
 		Surfel surfel = DEREF(surfel_pool)[sid];
-		HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
+		SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
 
 		vec3 diff = hit_data.pos - surfel_hit_data.pos;
 		float dist = length(diff);
@@ -156,7 +156,7 @@ void main() {
 		}
 
 		Surfel surfel = DEREF(surfel_pool)[best_sid];
-		HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
+		SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
 		if (ubo.debug_click == 1 && ivec2(coords.xy) == ubo.clicked_pos) {
 			uvec4 neighbors[MAX_NEIGHBOR_PLUS_ITSELF_COUNT];
 			uint neighbor_count;

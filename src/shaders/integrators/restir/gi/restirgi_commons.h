@@ -18,16 +18,12 @@ struct PCReSTIRGI {
 };
 
 struct ReservoirSample {
-	vec3 x_v;
-	float p_q;
-	vec3 n_v;
-	uint bsdf_props;
-	uint packed_n_g_v;
-	vec3 x_s;
-	uint mat_idx;
-	vec3 n_s;
+	SurfaceRef x_v_surface;
+	SurfaceRef x_s_surface;
 	vec3 L_o;
+	float p_q;
 	vec3 f;
+	uint bsdf_props;
 };
 
 struct Reservoir {
@@ -37,3 +33,8 @@ struct Reservoir {
 	uint pad;
 	ReservoirSample s;
 };
+
+#ifdef __cplusplus
+static_assert(sizeof(ReservoirSample) == 64);
+static_assert(sizeof(Reservoir) == 80);
+#endif

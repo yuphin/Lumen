@@ -28,21 +28,17 @@ void main() {
     init_reservoir(r);
     traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin, tmin, direction, tmax, 0);
 
-    pos = payload.pos;
-    uv = payload.uv;
-    mat_idx = payload.material_idx;
-    const bool found_isect = mat_idx != -1;
-    const vec3 wo = normalize(origin - pos);
+    const SurfaceRef primary_surface = payload.surface;
+    const bool found_isect = surface_ref_valid(primary_surface);
     if (found_isect) {
-        vec3 n_s = payload.n_s;
-        bool side = true;
-        vec3 n_g = payload.n_g;
-        if (dot(payload.n_g, wo) < 0.)
-            n_g = -n_g;
-        if (dot(n_g, payload.n_s) < 0) {
-            n_s = -n_s;
-            side = false;
-        }
+        const SurfaceData surface = load_surface(primary_surface);
+        pos = surface.pos;
+        uv = surface.uv;
+        mat_idx = surface.material_idx;
+        const vec3 wo = normalize(origin - pos);
+        vec3 n_s = surface.n_s;
+        vec3 n_g = surface.n_g;
+        const bool side = face_forward(n_s, n_g, wo);
         normal = n_s;
         geometric_normal = n_g;
         float cos_wo = dot(wo, n_s);
@@ -68,7 +64,7 @@ void main() {
         }
 
         for (int i = 0; i < light_samples; i++) {
-            const LightLiSample light_sample = sample_light_Li(rand4(seed), payload.pos, pc.num_lights);
+            const LightLiSample light_sample = sample_light_Li(rand4(seed), pos, pc.num_lights);
 
             float bsdf_pdf;
             const vec3 f =
@@ -86,7 +82,7 @@ void main() {
         // Visibility check for the selected candidate
         if (r_new.w_sum > 0) {
             const RestirData s = r_new.s;
-            const LightLiSample light_sample = replay_light_Li(s.identity, payload.pos, pc.num_lights);
+            const LightLiSample light_sample = replay_light_Li(s.identity, pos, pc.num_lights);
 
             const bool unoccluded =
                 !connection_occluded(offset_ray2(pos, n_g, dot(light_sample.wi, n_g) < 0.0), light_sample.wi,
@@ -122,11 +118,7 @@ void main() {
         }
 
         // Write to g-buffer
-        DEREF(g_buffer)[pixel_idx].pos = pos;
-        DEREF(g_buffer)[pixel_idx].normal = normal;
-        DEREF(g_buffer)[pixel_idx].n_g = n_g;
-        DEREF(g_buffer)[pixel_idx].uv = uv;
-        DEREF(g_buffer)[pixel_idx].mat_idx = mat_idx;
+        DEREF(g_buffer)[pixel_idx] = primary_surface;
 
         // Sample direction & update throughput
         vec3 col = hit_mat.emissive_factor;
@@ -140,7 +132,7 @@ void main() {
         for (int depth = 1;; depth++) {
             traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin, tmin, direction,
                         tmax, 0);
-            const bool found_isect = payload.material_idx != -1;
+            const bool found_isect = surface_ref_valid(payload.surface);
             if (depth >= pc.max_depth - 1) {
                 break;
             }
@@ -148,25 +140,19 @@ void main() {
                 col += throughput * pc.sky_col;
                 break;
             }
-            const Material hit_mat =
-                load_material(payload.material_idx, payload.uv);
+            const SurfaceData bounce_surface = load_surface(payload.surface);
+            const Material hit_mat = load_material(bounce_surface.material_idx, bounce_surface.uv);
             if (specular) {
                 col += throughput * hit_mat.emissive_factor;
             }
             const vec3 wo = -direction;
-            vec3 n_s = payload.n_s;
-            bool side = true;
-            vec3 n_g = payload.n_g;
-            if (dot(payload.n_g, wo) < 0.)
-                n_g = -n_g;
-            if (dot(n_g, payload.n_s) < 0) {
-                n_s = -n_s;
-                side = false;
-            }
+            vec3 n_s = bounce_surface.n_s;
+            vec3 n_g = bounce_surface.n_g;
+            const bool side = face_forward(n_s, n_g, wo);
             float cos_wo = dot(wo, n_s);
             if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
                 col += throughput *
-                       sample_direct_light(seed, hit_mat, payload.pos, side, n_s, n_g, wo,
+                       sample_direct_light(seed, hit_mat, bounce_surface.pos, side, n_s, n_g, wo,
                                            /*use_mis=*/false, specular);
             }
             // Sample direction & update throughput
@@ -177,7 +163,7 @@ void main() {
             if (pdf == 0) {
                 break;
             }
-            origin = offset_ray(payload.pos, n_g, direction);
+            origin = offset_ray(bounce_surface.pos, n_g, direction);
             throughput *= f * abs(cos_theta) / pdf;
             specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
             float rr_scale = 1.0;
@@ -193,6 +179,8 @@ void main() {
             }
         }
         DEREF(color_storage)[pixel_idx] = col;
+    } else {
+        DEREF(g_buffer)[pixel_idx] = invalid_surface_ref();
     }
     // Save the reservoirs for spatial reuse
     DEREF(passthrough_reservoir)[pixel_idx].w_sum = r.w_sum;

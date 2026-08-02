@@ -62,20 +62,8 @@ struct PCPrefixSum {
 
 NAMESPACE_BEGIN(IRCache)
 
-struct GBuffer {
-	vec2 barycentrics;
-	uvec2 primitive_instance_id;
-};
-
-struct IRCacheHitPayload {
-	vec2 attribs;
-	uint instance_idx;
-	uint triangle_idx;
-	float dist;
-};
-
 struct Surfel {
-	GBuffer gbuffer;
+	SurfaceRef gbuffer;
 	float radius;
 	uint age;
 	vec3 irradiance;
@@ -86,6 +74,10 @@ struct SurfelSample {
 	vec3 radiance;
 	float hit_t;
 };
+
+#ifdef __cplusplus
+static_assert(sizeof(Surfel) == 40);
+#endif
 
 NAMESPACE_END()
 #endif

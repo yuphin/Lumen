@@ -44,11 +44,6 @@ struct PCReSTIRPT {
 	uint pm_temporal_reuse;
 };
 
-struct GBuffer {
-	vec2 barycentrics;
-	uvec2 primitive_instance_id;
-};
-
 struct GrisData {
 #if DEBUG == 1
 	uvec4 debug_sampling_seed;
@@ -62,9 +57,8 @@ struct GrisData {
 	// 1b is_directional_light | 1b side | 5b postfix_length| 5b prefix_length |3b
 	// is_nee/is_nee_postfix/emissive_after_rc/emissive/default
 	uint path_flags;
-	vec2 rc_barycentrics;
+	SurfaceRef rc_surface;
 	uvec2 seed_helpers;
-	uvec2 rc_primitive_instance_id;
 	uint rc_coords;
 	float rc_partial_jacobian;	// g * rc_pdf (* rc_postfix_pdf)
 };
@@ -85,16 +79,8 @@ struct ReconnectionData {
 	float target_pdf_in_neighbor;
 };
 
-struct GrisHitPayload {
-	vec2 attribs;
-	uint instance_idx;
-	uint triangle_idx;
-	float dist;
-};
-
 struct PhotonData {
-	vec2 barycentrics;
-	uvec2 primitive_instance_id;
+	SurfaceRef surface;
 	vec3 throughput;
 	//  5b eye/light path length | 1b side
 	uint flags; 
@@ -108,8 +94,7 @@ struct PhotonAABB {
 	vec3 max;
 };
 struct PhotonReservoir {
-	vec2 barycentrics;
-	uvec2 primitive_instance_id;
+	SurfaceRef surface;
 	vec3 flux;
 	uint M;
 	vec2 wi;
@@ -120,5 +105,12 @@ struct PhotonReservoir {
 	uint flags; 
 	float pad;
 };
+
+#ifdef __cplusplus
+static_assert(sizeof(GrisData) == 96);
+static_assert(sizeof(Reservoir) == 112);
+static_assert(sizeof(PhotonData) == 48);
+static_assert(sizeof(PhotonReservoir) == 64);
+#endif
 
 NAMESPACE_END()

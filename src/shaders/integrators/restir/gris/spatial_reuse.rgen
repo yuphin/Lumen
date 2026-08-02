@@ -15,7 +15,7 @@ SCENE_BUFFER(prefix_contributions, vec3);
 layout(binding = 4, std430) readonly buffer PathReconnections { ReconnectionData reconnection_data[]; };
 layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir in_reservoirs[]; };
 layout(binding = 6, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
-layout(binding = 7, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
+layout(binding = 7, std430) readonly buffer CurrGBuffer { SurfaceRef curr_gbuffers[]; };
 layout(binding = 8, rgba16) uniform image2D canonical_contributions_tex;
 layout(binding = 9, rgba32f) uniform image2D direct_lighting_img;
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
@@ -25,9 +25,8 @@ SCENE_BUFFER_RO(debug_vis, uint);
 
 // TODO: Maybe use an external buffer to supply spatial offsets?
 
-vec3 do_spatial_reuse(GBuffer gbuffer, Reservoir reservoir) {
-	HitData canonical_gbuffer =
-		get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
+vec3 do_spatial_reuse(SurfaceRef gbuffer, Reservoir reservoir) {
+	SurfaceData canonical_gbuffer = load_surface(gbuffer);
 	Reservoir canonical_reservoir = in_reservoirs[pixel_idx];
 
 	int num_spatial_samples = pc.enable_spatial_reuse == 1 ? int(pc.num_spatial_samples) : 0;
@@ -55,7 +54,7 @@ vec3 do_spatial_reuse(GBuffer gbuffer, Reservoir reservoir) {
 			continue;
 		}
 		const uint neighbor_pixel_idx = neighbor_coords.x * pc.height + neighbor_coords.y;
-		GBuffer neighbor_gbuffer = curr_gbuffers[neighbor_pixel_idx];
+		SurfaceRef neighbor_gbuffer = curr_gbuffers[neighbor_pixel_idx];
 		if (!gbuffer_data_valid(neighbor_gbuffer)) {
 			continue;
 		}
@@ -69,9 +68,7 @@ vec3 do_spatial_reuse(GBuffer gbuffer, Reservoir reservoir) {
 		data.reservoir_contribution = vec3(0);
 		data.jacobian = 0;
 		data.target_pdf_in_neighbor = 0;
-		HitData unpacked_neighbor_gbuffer =
-			get_hitdata(neighbor_gbuffer.barycentrics, neighbor_gbuffer.primitive_instance_id.y,
-						neighbor_gbuffer.primitive_instance_id.x);
+		SurfaceData unpacked_neighbor_gbuffer = load_surface(neighbor_gbuffer);
 		vec3 primary_direction = get_primary_direction(uvec2(gl_LaunchIDEXT.xy));
 		retrace_paths(canonical_gbuffer, neighbor_reservoir.data, primary_direction, uvec2(neighbor_coords),
 					  neighbor_reservoir.data.rc_partial_jacobian, data.jacobian, data.reservoir_contribution,
@@ -149,7 +146,7 @@ void main() {
 	if (uv_x >= pc.gris_separator) {
 		return;
 	}
-	GBuffer gbuffer = curr_gbuffers[pixel_idx];
+	SurfaceRef gbuffer = curr_gbuffers[pixel_idx];
 	Reservoir reservoir;
 	init_reservoir(reservoir);
 	vec3 col;

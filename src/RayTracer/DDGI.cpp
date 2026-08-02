@@ -244,9 +244,9 @@ void render(Integrator* integrator) {
 	rg::add_rt(CSTR("DDGI - GBuffer Pass"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/ddgi/primary_rays.rgen")},
-								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ddgi/surface.rmiss")},
 								 {CSTR("src/shaders/ray_shadow.rmiss")},
-								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ddgi/surface.rchit")},
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .specialization_data = {1},
 					 .dims = {Window::width(), Window::height()},
@@ -262,9 +262,9 @@ void render(Integrator* integrator) {
 	rg::add_rt(CSTR("DDGI - Probe Trace"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/ddgi/trace.rgen")},
-								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/ddgi/surface.rmiss")},
 								 {CSTR("src/shaders/ray_shadow.rmiss")},
-								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/ddgi/surface.rchit")},
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .specialization_data = {1},
 					 .dims = {(u32)state.rays_per_probe, grid_size},

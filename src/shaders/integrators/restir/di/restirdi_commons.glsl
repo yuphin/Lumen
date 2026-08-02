@@ -1,6 +1,7 @@
 #include "../../../bda.glsl"
 #include "../../../commons.glsl"
-layout(location = 0) rayPayloadEXT HitPayload payload;
+#include "../../../surface.glsl"
+layout(location = 0) rayPayloadEXT SurfaceHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 #include "../../../shadow_ray.glsl"
 layout(push_constant) uniform _PushConstantRay { PCReSTIR pc; };
@@ -10,7 +11,7 @@ const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 
 SCENE_BUFFER(color_storage, vec3);
-SCENE_BUFFER(g_buffer, RestirGBufferData);
+SCENE_BUFFER(g_buffer, SurfaceRef);
 SCENE_BUFFER(passthrough_reservoir, RestirReservoir);
 SCENE_BUFFER(temporal_reservoir, RestirReservoir);
 SCENE_BUFFER(spatial_reservoir, RestirReservoir);
@@ -21,18 +22,26 @@ vec3 geometric_normal;
 vec2 uv;
 uint mat_idx;
 vec3 origin;
+bool forward_facing;
 
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
                       pc.frame_num ^ pc.random_num);
 
-void load_g_buffer() {
-    pos = DEREF(g_buffer)[pixel_idx].pos;
-    normal = DEREF(g_buffer)[pixel_idx].normal;
-    geometric_normal = DEREF(g_buffer)[pixel_idx].n_g;
-    uv = DEREF(g_buffer)[pixel_idx].uv;
-    mat_idx = DEREF(g_buffer)[pixel_idx].mat_idx;
+bool load_g_buffer() {
     origin = vec4(ubo.inv_view * vec4(0, 0, 0, 1)).xyz;
+    const SurfaceRef surface_ref = DEREF(g_buffer)[pixel_idx];
+    if (!surface_ref_valid(surface_ref)) {
+        return false;
+    }
+    const SurfaceData surface = load_surface(surface_ref);
+    pos = surface.pos;
+    normal = surface.n_s;
+    geometric_normal = surface.n_g;
+    uv = surface.uv;
+    mat_idx = surface.material_idx;
+    forward_facing = face_forward(normal, geometric_normal, normalize(origin - pos));
+    return true;
 }
 
 void init_reservoir(out RestirReservoir r_new) {
@@ -54,8 +63,7 @@ vec3 calc_L(const RestirReservoir r) {
     const Material hit_mat = load_material(mat_idx, uv);
     const vec3 wo = normalize(origin - pos);
     const LightLiSample light_sample = replay_light_Li(r.s.identity, pos, pc.num_lights);
-    // Whether it's forward facing shouldn't matter here
-    const vec3 f = eval_bsdf(normal, geometric_normal, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, true,
+    const vec3 f = eval_bsdf(normal, geometric_normal, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, forward_facing,
                              light_sample.wi);
     return f * light_sample.Li * abs(dot(normal, light_sample.wi));
 }
@@ -64,7 +72,7 @@ vec3 calc_L_with_visibility_check(const RestirReservoir r) {
     const Material hit_mat = load_material(mat_idx, uv);
     const vec3 wo = normalize(origin - pos);
     const LightLiSample light_sample = replay_light_Li(r.s.identity, pos, pc.num_lights);
-    const vec3 f = eval_bsdf(normal, geometric_normal, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, true,
+    const vec3 f = eval_bsdf(normal, geometric_normal, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, forward_facing,
                              light_sample.wi);
     bool visible = !connection_occluded(offset_ray(pos, geometric_normal, light_sample.wi),
                                         light_sample.wi,

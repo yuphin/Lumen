@@ -35,7 +35,7 @@ void main() {
 	}
 
 	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
-	HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
+	SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
 	// Offset around camera
 	vec3 c = surfel_hit_data.pos - cam_pos.xyz;
 	float r = surfel.radius;

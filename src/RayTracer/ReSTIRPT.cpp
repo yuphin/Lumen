@@ -18,24 +18,17 @@ void init(Integrator* integrator) {
 		}
 	}
 
-	lm::ScratchArena scratch = integrator->arena;
-	auto transformations = lm::fixed_array_create<lm::mat4>(scratch.arena, integrator->lumen_scene->prim_meshes.size);
-	transformations.size = integrator->lumen_scene->prim_meshes.size;
-	for (LumenPrimMesh& pm : integrator->lumen_scene->prim_meshes) {
-		transformations[pm.prim_idx] = pm.world_matrix;
-	}
-
 	state.gris_gbuffer =
 		prm::get_buffer({.name = CSTR("GRIS GBuffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height() * sizeof(RestirPT::GBuffer)});
+						 .size = Window::width() * Window::height() * sizeof(SurfaceRef)});
 
 	state.gris_prev_gbuffer =
 		prm::get_buffer({.name = CSTR("GRIS Previous GBuffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height() * sizeof(RestirPT::GBuffer)});
+						 .size = Window::width() * Window::height() * sizeof(SurfaceRef)});
 
 	state.direct_lighting_texture = prm::get_texture({.name = CSTR("Direct Lighting Texture"),
 												.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -76,13 +69,6 @@ void init(Integrator* integrator) {
 		 .memory_type = vk::BUFFER_TYPE_GPU,
 		 .size = Window::width() * Window::height() * sizeof(ReconnectionData) * (state.num_spatial_samples + 1)});
 
-	state.transformations_buffer = prm::get_buffer({
-		.name = CSTR("Transformations Buffer"),
-		.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		.memory_type = vk::BUFFER_TYPE_GPU,
-		.size = transformations.size * sizeof(lm::mat4),
-		.data = transformations.data,
-	});
 	state.photon_eye_buffer_ping =
 		prm::get_buffer({.name = CSTR("Photon - Eye - Ping"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -129,7 +115,6 @@ void init(Integrator* integrator) {
 	SceneDesc desc = integrator::scene_desc_base(integrator);
 	// ReSTIR PT (GRIS)
 	SET_SCENE_BUFFER(desc, gris_reservoir, state.gris_reservoir_ping_buffer);
-	SET_SCENE_BUFFER(desc, transformations, state.transformations_buffer);
 	SET_SCENE_BUFFER(desc, prefix_contributions, state.prefix_contribution_buffer);
 	SET_SCENE_BUFFER(desc, debug_vis, state.debug_vis_buffer);
 	SET_SCENE_BUFFER(desc, photon_eye, state.photon_eye_buffer_ping);
@@ -234,9 +219,9 @@ void render(Integrator* integrator) {
 		rg::add_rt(CSTR("PM - Trace First Diffuse"),
 					 {
 						 .shaders = {{CSTR("src/shaders/integrators/restir/gris/pm_trace_eye.rgen")},
-									 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+									 {CSTR("src/shaders/surface.rmiss")},
 									 {CSTR("src/shaders/ray_shadow.rmiss")},
-									 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+									 {CSTR("src/shaders/surface.rchit")},
 									 {CSTR("src/shaders/ray.rahit")}},
 						 .macros = {vk::ShaderMacro("ENABLE_ATMOSPHERE", state.enable_atmosphere)},
 						 .dims = {Window::width(), Window::height()},
@@ -269,9 +254,9 @@ void render(Integrator* integrator) {
 		rg::add_rt(CSTR("PM - Trace Photons"),
 					 {
 						 .shaders = {{CSTR("src/shaders/integrators/restir/gris/pm_trace_photons.rgen")},
-									 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+									 {CSTR("src/shaders/surface.rmiss")},
 									 {CSTR("src/shaders/ray_shadow.rmiss")},
-									 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+									 {CSTR("src/shaders/surface.rchit")},
 									 {CSTR("src/shaders/ray.rahit")}},
 						 .macros = {vk::ShaderMacro("ENABLE_ATMOSPHERE", state.enable_atmosphere),
 									vk::ShaderMacro("DISABLE_PM_MIS", !state.enable_pm_mis)},
@@ -295,9 +280,9 @@ void render(Integrator* integrator) {
 			rg::add_rt(CSTR("Collect Photons"),
 						 {
 							 .shaders = {{CSTR("src/shaders/integrators/restir/gris/pm_collect_photons.rgen")},
-										 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+										 {CSTR("src/shaders/surface.rmiss")},
 										 {CSTR("src/shaders/ray_shadow.rmiss")},
-										 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+										 {CSTR("src/shaders/surface.rchit")},
 										 {CSTR("src/shaders/ray.rahit")}},
 							 .macros = {{"STREAMING_MODE", i32(state.streaming_method)},
 										vk::ShaderMacro("ENABLE_ATMOSPHERE", state.enable_atmosphere)},
@@ -321,9 +306,9 @@ void render(Integrator* integrator) {
 	rg::add_rt(CSTR("GRIS - Generate Samples"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/restir/gris/gris.rgen")},
-								 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+								 {CSTR("src/shaders/surface.rmiss")},
 								 {CSTR("src/shaders/ray_shadow.rmiss")},
-								 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+								 {CSTR("src/shaders/surface.rchit")},
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .macros = {vk::ShaderMacro("STREAMING_MODE", i32(state.streaming_method)),
 								vk::ShaderMacro("ENABLE_ATMOSPHERE", state.enable_atmosphere),
@@ -349,9 +334,9 @@ void render(Integrator* integrator) {
 		rg::add_rt(CSTR("GRIS - Temporal Reuse"),
 					 {
 						 .shaders = {{CSTR("src/shaders/integrators/restir/gris/temporal_reuse.rgen")},
-									 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+									 {CSTR("src/shaders/surface.rmiss")},
 									 {CSTR("src/shaders/ray_shadow.rmiss")},
-									 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+									 {CSTR("src/shaders/surface.rchit")},
 									 {CSTR("src/shaders/ray.rahit")}},
 						 .dims = {Window::width(), Window::height()},
 					 })
@@ -371,9 +356,9 @@ void render(Integrator* integrator) {
 				rg::add_rt(CSTR("GRIS - Spatial Reuse - Talbot"),
 							 {
 								 .shaders = {{CSTR("src/shaders/integrators/restir/gris/spatial_reuse_talbot.rgen")},
-											 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+											 {CSTR("src/shaders/surface.rmiss")},
 											 {CSTR("src/shaders/ray_shadow.rmiss")},
-											 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+											 {CSTR("src/shaders/surface.rchit")},
 											 {CSTR("src/shaders/ray.rahit")}},
 								 .dims = {Window::width(), Window::height()},
 							 })
@@ -391,9 +376,9 @@ void render(Integrator* integrator) {
 				rg::add_rt(CSTR("GRIS - Retrace Reservoirs"),
 							 {
 								 .shaders = {{CSTR("src/shaders/integrators/restir/gris/retrace_paths.rgen")},
-											 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+											 {CSTR("src/shaders/surface.rmiss")},
 											 {CSTR("src/shaders/ray_shadow.rmiss")},
-											 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+											 {CSTR("src/shaders/surface.rchit")},
 											 {CSTR("src/shaders/ray.rahit")}},
 								 .dims = {Window::width(), Window::height()},
 							 })
@@ -408,9 +393,9 @@ void render(Integrator* integrator) {
 				rg::add_rt(CSTR("GRIS - Validate Samples"),
 							 {
 								 .shaders = {{CSTR("src/shaders/integrators/restir/gris/validate_samples.rgen")},
-											 {CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+											 {CSTR("src/shaders/surface.rmiss")},
 											 {CSTR("src/shaders/ray_shadow.rmiss")},
-											 {CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+											 {CSTR("src/shaders/surface.rchit")},
 											 {CSTR("src/shaders/ray.rahit")}},
 								 .dims = {Window::width(), Window::height()},
 							 })
@@ -427,9 +412,9 @@ void render(Integrator* integrator) {
 						CSTR("GRIS - Spatial Reuse"),
 						{
 							.shaders = {{CSTR("src/shaders/integrators/restir/gris/spatial_reuse.rgen")},
-										{CSTR("src/shaders/integrators/restir/gris/ray.rmiss")},
+										{CSTR("src/shaders/surface.rmiss")},
 										{CSTR("src/shaders/ray_shadow.rmiss")},
-										{CSTR("src/shaders/integrators/restir/gris/ray.rchit")},
+										{CSTR("src/shaders/surface.rchit")},
 										{CSTR("src/shaders/ray.rahit")}},
 							.macros = {vk::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS", state.enable_defensive_formulation)},
 							.dims = {Window::width(), Window::height()},
@@ -476,7 +461,6 @@ void destroy(Integrator* integrator, bool resize) {
 	vk::Buffer** buffers[] = {&state.gris_gbuffer,
 							 &state.gris_reservoir_ping_buffer,
 							 &state.gris_reservoir_pong_buffer,
-							 &state.transformations_buffer,
 							 &state.prefix_contribution_buffer,
 							 &state.reconnection_buffer,
 							 &state.gris_prev_gbuffer,

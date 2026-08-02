@@ -16,7 +16,6 @@ struct ReSTIRPT {
 	vk::Buffer* gris_reservoir_pong_buffer = nullptr;
 	vk::Buffer* prefix_contribution_buffer = nullptr;
 	vk::Buffer* reconnection_buffer = nullptr;
-	vk::Buffer* transformations_buffer = nullptr;
 	vk::Buffer* debug_vis_buffer = nullptr;
 	vk::Buffer* photon_eye_buffer_ping = nullptr;
 	vk::Buffer* photon_eye_buffer_pong = nullptr;

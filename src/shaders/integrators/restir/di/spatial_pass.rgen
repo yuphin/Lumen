@@ -15,10 +15,14 @@ void main() {
     const float depth_threshold = 0.01;
     const float angle_threshold = 25 * PI / 180;
     const float num_neighbor_samples = 5;
-    load_g_buffer();
+    const bool surface_valid = load_g_buffer();
     const RestirReservoir curr_reservoir = DEREF(passthrough_reservoir)[pixel_idx];
     RestirReservoir r;
     init_reservoir(r);
+    if (!surface_valid) {
+        DEREF(spatial_reservoir)[pixel_idx] = r;
+        return;
+    }
     if (curr_reservoir.W != 0) {
         combine_reservoir(r, curr_reservoir);
         // combine_reservoir() treats each input reservoir as one streaming

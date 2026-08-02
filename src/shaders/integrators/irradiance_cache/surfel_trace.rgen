@@ -15,7 +15,7 @@
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
-layout(location = 0) rayPayloadEXT IRCacheHitPayload payload;
+layout(location = 0) rayPayloadEXT SurfaceHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 
@@ -39,7 +39,7 @@ void main() {
 		return;
 	}
 
-	HitData surfel_hit_data = get_hitdata(surfel.gbuffer);
+	SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
 	vec3 surfel_origin = surfel_hit_data.pos;
 	vec3 camera_origin = ubo.inv_view[3].xyz;
 	vec3 wo = normalize(camera_origin - surfel_origin);
@@ -57,7 +57,7 @@ void main() {
 	surfel_origin = offset_ray(surfel_origin, n_g, wi);
 
 	traceRayEXT(tlas, flags, 0x1, 0, 0, 0, surfel_origin, tmin, wi, tmax, 0);
-	const bool found_isect = payload.instance_idx != -1;
+	const bool found_isect = surface_ref_valid(payload.surface);
 
 	vec3 radiance = vec3(0);
 	if (!found_isect) {
@@ -68,7 +68,7 @@ void main() {
 #endif	// ENABLE_ATMOSPHERE
 		radiance += atmosphere_L;
 	} else {
-		HitData hit_data = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
+		SurfaceData hit_data = load_surface(payload.surface);
 
 		vec3 wo = -wi;
 		Material hit_material = load_material(hit_data.material_idx, hit_data.uv);

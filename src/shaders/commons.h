@@ -39,6 +39,7 @@
 #define LIGHT_FLAG_TWO_SIDED 1 << 8
 
 #define INVALID_LIGHT_INDEX 0xFFFFFFFFu
+#define INVALID_SURFACE_ID 0xFFFFFFFFu
 
 #ifdef __cplusplus
 // GLSL Type
@@ -204,6 +205,51 @@ struct Vertex {
 	vec3 normal;
 	vec2 uv0;
 };
+
+struct SurfaceRef {
+	vec2 barycentrics;
+	// x: triangle primitive ID, y: instance custom index.
+	uvec2 primitive_instance_id;
+};
+
+struct SurfaceHitPayload {
+	SurfaceRef surface;
+	float dist;
+};
+
+struct DDGISurfaceHitPayload {
+	SurfaceRef surface;
+	float dist;
+	uint hit_kind;
+};
+
+// Normal to world is transpose(inverse(object_to_wonormal_to_world)
+// This is precomputed from the CPU side
+struct InstanceTransform {
+	vec3 object_to_world_x;
+	vec3 object_to_world_y;
+	vec3 object_to_world_z;
+	vec3 object_to_world_translation;
+	vec3 normal_to_world_x;
+	vec3 normal_to_world_y;
+	vec3 normal_to_world_z;
+};
+
+#ifdef __cplusplus
+inline SurfaceRef invalid_surface_ref() {
+	return {.barycentrics = vec2(0.0f), .primitive_instance_id = uvec2(INVALID_SURFACE_ID)};
+}
+
+inline bool surface_ref_valid(const SurfaceRef& ref) {
+	return ref.primitive_instance_id.x != INVALID_SURFACE_ID &&
+		   ref.primitive_instance_id.y != INVALID_SURFACE_ID;
+}
+
+static_assert(sizeof(SurfaceRef) == 16);
+static_assert(sizeof(SurfaceHitPayload) == 20);
+static_assert(sizeof(DDGISurfaceHitPayload) == 24);
+static_assert(sizeof(InstanceTransform) == 84);
+#endif
 
 // struct EmissiveLight {
 // 	mat4 world_matrix;

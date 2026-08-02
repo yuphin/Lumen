@@ -16,8 +16,7 @@ uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.general_seed);
 uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed2);
 
 void init_photon_eye_data(inout PhotonData data) {
-	data.barycentrics = vec2(0);
-	data.primitive_instance_id = uvec2(-1);
+	data.surface = invalid_surface_ref();
 	data.dir = vec2(0);
 	data.throughput = vec3(0);
 }
@@ -35,12 +34,12 @@ void main() {
 
 	for (int d = 0; d < pc.max_depth; d++) {
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, origin.xyz, tmin, direction, tmax, 0);
-		bool found_isect = payload.instance_idx != -1;
+		bool found_isect = surface_ref_valid(payload.surface);
 		if (!found_isect) {
 			break;
 		}
 
-		HitData gbuffer = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
+		SurfaceData gbuffer = load_surface(payload.surface);
 		const vec3 wo = -direction;
 		vec3 n_s = gbuffer.n_s;
 		vec3 n_g = gbuffer.n_g;
@@ -49,8 +48,7 @@ void main() {
 		float cos_wo = dot(wo, n_s);
 		Material hit_mat = load_material(gbuffer.material_idx, gbuffer.uv);
 		if (is_rough(hit_mat)) {
-			photon_eye.barycentrics = payload.attribs;
-			photon_eye.primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
+			photon_eye.surface = payload.surface;
 			photon_eye.dir = to_spherical(wo);
 			photon_eye.throughput = throughput;
 			// Path length = Num of edges from eye

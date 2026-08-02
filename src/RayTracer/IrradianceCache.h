@@ -10,7 +10,6 @@ struct Integrator;
 struct IrradianceCache {
 	vk::Buffer* gbuffer = nullptr;
 	vk::Buffer* current_frame_lighting_buffer = nullptr;
-	vk::Buffer* transformations_buffer = nullptr;
 	vk::Buffer* surfel_spawn_list_buffer = nullptr;
 	vk::Buffer* surfel_spawn_count_buffer = nullptr;
 	vk::Buffer* surfel_pool_buffer = nullptr;

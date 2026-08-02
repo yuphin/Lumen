@@ -13,7 +13,7 @@
 SCENE_BUFFER(prefix_contributions, vec3);
 layout(binding = 4, std430) readonly buffer InReservoirs { Reservoir in_reservoirs[]; };
 layout(binding = 5, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
-layout(binding = 6, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
+layout(binding = 6, std430) readonly buffer CurrGBuffer { SurfaceRef curr_gbuffers[]; };
 layout(binding = 7, rgba16) uniform image2D canonical_contributions_tex;
 layout(binding = 8, rgba32f) uniform image2D direct_lighting_img;
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.total_frame_num);
@@ -21,13 +21,12 @@ uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.total_frame_num
 #define MAX_SPATIAL_SAMPLES 12
 
 void main() {
-	GBuffer gbuffer = curr_gbuffers[pixel_idx];
+	SurfaceRef gbuffer = curr_gbuffers[pixel_idx];
 	if (!gbuffer_data_valid(gbuffer)) {
 		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(0));
 		return;
 	}
-	HitData canonical_gbuffer =
-		get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
+	SurfaceData canonical_gbuffer = load_surface(gbuffer);
 
 	Reservoir reservoir;
 	init_reservoir(reservoir);
@@ -52,14 +51,12 @@ void main() {
 			continue;
 		}
 		const uint neighbor_pixel_idx = neighbor_coords.x * pc.height + neighbor_coords.y;
-		GBuffer neighbor_gbuffer = curr_gbuffers[neighbor_pixel_idx];
+		SurfaceRef neighbor_gbuffer = curr_gbuffers[neighbor_pixel_idx];
 		if (!gbuffer_data_valid(neighbor_gbuffer)) {
 			continue;
 		}
 
-		HitData unpacked_neighbor_gbuffer =
-			get_hitdata(neighbor_gbuffer.barycentrics, neighbor_gbuffer.primitive_instance_id.y,
-						neighbor_gbuffer.primitive_instance_id.x);
+		SurfaceData unpacked_neighbor_gbuffer = load_surface(neighbor_gbuffer);
 		bool valid_reservoir = false;
 		const Reservoir neighbor_reservoir = in_reservoirs[neighbor_pixel_idx];
 		float jacobian = 0;
@@ -103,14 +100,12 @@ void main() {
 						continue;
 					}
 					const uint validation_pixel_idx = validation_coords.x * pc.height + validation_coords.y;
-					GBuffer validation_gbuffer = curr_gbuffers[validation_pixel_idx];
+					SurfaceRef validation_gbuffer = curr_gbuffers[validation_pixel_idx];
 					if (!gbuffer_data_valid(validation_gbuffer)) {
 						continue;
 					}
 					const Reservoir validation_reservoir = in_reservoirs[validation_pixel_idx];
-					HitData unpacked_validation_gbuffer =
-						get_hitdata(validation_gbuffer.barycentrics, validation_gbuffer.primitive_instance_id.y,
-									validation_gbuffer.primitive_instance_id.x);
+					SurfaceData unpacked_validation_gbuffer = load_surface(validation_gbuffer);
 					float target_pdf_in_neighbor = 0;
 					vec3 primary_direction = get_primary_direction(uvec2(validation_coords.xy));
 					bool valid = retrace_paths_and_evaluate(unpacked_validation_gbuffer, neighbor_reservoir.data,

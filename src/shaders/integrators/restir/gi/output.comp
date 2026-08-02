@@ -16,6 +16,7 @@ layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(binding = 0, rgba32f) uniform image2D image;
 layout(binding = 1) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(push_constant) uniform _PushConstantRay { PCReSTIRGI pc; };
+#include "../../../surface.glsl"
 
 SCENE_BUFFER(restir_samples, ReservoirSample);
 SCENE_BUFFER(color_storage, vec3);
@@ -37,10 +38,12 @@ void main() {
 	uint idx = gl_GlobalInvocationID.x;
 	DEREF(color_storage)[gl_GlobalInvocationID.x] = vec3(0);
 	const Reservoir r = DEREF(spatial_reservoir)[offset(pingpong) + gl_GlobalInvocationID.x];
-	if (r.W > 0) {
+	if (r.W > 0 && surface_ref_valid(r.s.x_v_surface) && surface_ref_valid(r.s.x_s_surface)) {
 		const ReservoirSample s = r.s;
-		const vec3 wi = normalize(s.x_s - s.x_v);
-		col += s.f * abs(dot(wi, s.n_v)) * s.L_o * r.W;
+		const SurfaceData x_v = load_surface(s.x_v_surface);
+		const SurfaceData x_s = load_surface(s.x_s_surface);
+		const vec3 wi = normalize(x_s.pos - x_v.pos);
+		col += s.f * abs(dot(wi, x_v.n_s)) * s.L_o * r.W;
 	}
 	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
 		imageStore(image, ivec2(coords), vec4(col, 1.f));

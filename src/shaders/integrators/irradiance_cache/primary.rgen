@@ -15,14 +15,14 @@ const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
-layout(location = 0) rayPayloadEXT IRCacheHitPayload payload;
+layout(location = 0) rayPayloadEXT SurfaceHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 
 #include "ir_commons.glsl"
 #include "direct_lighting.glsl"
 
-SCENE_BUFFER(g_buffer, GBuffer);
+SCENE_BUFFER(g_buffer, SurfaceRef);
 SCENE_BUFFER(direct_lighting, vec3);
 
 void store_direct_lighting(const ivec2 pixel, const vec3 radiance) {
@@ -41,12 +41,10 @@ void main() {
 	direction = normalize(direction);
 	uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
 	vec3 direct_lighting = vec3(0);
-	GBuffer gbuffer_out;
-	gbuffer_out.barycentrics = vec2(0);
-	gbuffer_out.primitive_instance_id = uvec2(-1);
+	SurfaceRef gbuffer_out = invalid_surface_ref();
 
 	traceRayEXT(tlas, flags, 0x1, 0, 0, 0, origin, tmin, direction, tmax, 0);
-	const bool found_isect = payload.instance_idx != -1;
+	const bool found_isect = surface_ref_valid(payload.surface);
 	if (!found_isect) {
 		DEREF(g_buffer)[pixel_idx] = gbuffer_out;
 		if (pc.direct_lighting == 1) {
@@ -59,12 +57,11 @@ void main() {
 		store_direct_lighting(pixel, direct_lighting);
 		return;
 	}
-	gbuffer_out.barycentrics = payload.attribs;
-	gbuffer_out.primitive_instance_id = uvec2(payload.triangle_idx, payload.instance_idx);
+	gbuffer_out = payload.surface;
 	DEREF(g_buffer)[pixel_idx] = gbuffer_out;
 
 	if (pc.direct_lighting == 1) {
-		HitData hit_data = get_hitdata(gbuffer_out);
+		SurfaceData hit_data = load_surface(gbuffer_out);
 		vec3 wo = -direction;
 		Material material = load_material(hit_data.material_idx, hit_data.uv);
 		vec3 n_s = hit_data.n_s;

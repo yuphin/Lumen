@@ -11,7 +11,7 @@ void init(Integrator* integrator) {
 								.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 										 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 								.memory_type = vk::BUFFER_TYPE_GPU,
-								.size = Window::width() * Window::height()  * sizeof(RestirGBufferData)});
+								.size = Window::width() * Window::height()  * sizeof(SurfaceRef)});
 
 	state.temporal_reservoir_buffer =
 		prm::get_buffer({.name = CSTR("Temporal Reservoirs"),
@@ -78,9 +78,9 @@ void render(Integrator* integrator) {
 	rg::add_rt(CSTR("ReSTIR - Temporal Pass"),
 			   {
 				   .shaders = {{CSTR("src/shaders/integrators/restir/di/temporal_pass.rgen")},
-							   {CSTR("src/shaders/ray.rmiss")},
-							   {CSTR("src/shaders/ray_shadow.rmiss")},
-							   {CSTR("src/shaders/ray.rchit")},
+								   {CSTR("src/shaders/surface.rmiss")},
+								   {CSTR("src/shaders/ray_shadow.rmiss")},
+								   {CSTR("src/shaders/surface.rchit")},
 							   {CSTR("src/shaders/ray.rahit")}},
 				   .dims = {Window::width(), Window::height() },
 			   })
@@ -96,9 +96,9 @@ void render(Integrator* integrator) {
 	rg::add_rt(CSTR("ReSTIR - Spatial Pass"),
 			   {
 				   .shaders = {{CSTR("src/shaders/integrators/restir/di/spatial_pass.rgen")},
-							   {CSTR("src/shaders/ray.rmiss")},
-							   {CSTR("src/shaders/ray_shadow.rmiss")},
-							   {CSTR("src/shaders/ray.rchit")},
+								   {CSTR("src/shaders/surface.rmiss")},
+								   {CSTR("src/shaders/ray_shadow.rmiss")},
+								   {CSTR("src/shaders/surface.rchit")},
 							   {CSTR("src/shaders/ray.rahit")}},
 				   .dims = {Window::width(), Window::height() },
 			   })
@@ -112,9 +112,9 @@ void render(Integrator* integrator) {
 	rg::add_rt(CSTR("ReSTIR - Output"),
 			   {
 				   .shaders = {{CSTR("src/shaders/integrators/restir/di/output.rgen")},
-							   {CSTR("src/shaders/ray.rmiss")},
-							   {CSTR("src/shaders/ray_shadow.rmiss")},
-							   {CSTR("src/shaders/ray.rchit")},
+								   {CSTR("src/shaders/surface.rmiss")},
+								   {CSTR("src/shaders/ray_shadow.rmiss")},
+								   {CSTR("src/shaders/surface.rchit")},
 							   {CSTR("src/shaders/ray.rahit")}},
 				   .dims = {Window::width(), Window::height() },
 			   })

@@ -966,12 +966,27 @@ void load(const lm::String& path) {
 		// GPU friendlier data
 		lm::FixedArray<PrimInfo> prim_lookup = lm::fixed_array_create<PrimInfo>(scratch.arena, _scene.prim_meshes.size);
 		lm::FixedArray<Vertex> vertices = lm::fixed_array_create<Vertex>(scratch.arena, _scene.positions.size);
+		lm::FixedArray<InstanceTransform> transformations =
+			lm::fixed_array_create<InstanceTransform>(scratch.arena, _scene.prim_meshes.size);
+		prim_lookup.size = _scene.prim_meshes.size;
+		transformations.size = _scene.prim_meshes.size;
 
 		for (const LumenPrimMesh& pm : _scene.prim_meshes) {
-			PrimInfo& gpu_pm = prim_lookup.emplace_back();
+			assert(pm.prim_idx < prim_lookup.size);
+			PrimInfo& gpu_pm = prim_lookup[pm.prim_idx];
 			gpu_pm.index_offset = pm.first_idx;
 			gpu_pm.vertex_offset = pm.vtx_offset;
 			gpu_pm.material_index = pm.material_idx;
+
+			const lm::mat4 normal_to_world = lm::transpose(lm::inverse(pm.world_matrix));
+			InstanceTransform& transform = transformations[pm.prim_idx];
+			transform.object_to_world_x = lm::vec3(pm.world_matrix[0]);
+			transform.object_to_world_y = lm::vec3(pm.world_matrix[1]);
+			transform.object_to_world_z = lm::vec3(pm.world_matrix[2]);
+			transform.object_to_world_translation = lm::vec3(pm.world_matrix[3]);
+			transform.normal_to_world_x = lm::vec3(normal_to_world[0]);
+			transform.normal_to_world_y = lm::vec3(normal_to_world[1]);
+			transform.normal_to_world_z = lm::vec3(normal_to_world[2]);
 		}
 		for (u64 i = 0; i < _scene.positions.size; i++) {
 			Vertex& v = vertices.emplace_back();
@@ -993,6 +1008,13 @@ void load(const lm::String& path) {
 							 .memory_type = vk::BUFFER_TYPE_GPU,
 							 .size = vertices.size * sizeof(vertices[0]),
 							 .data = vertices.data});
+
+		_scene.transformations_buffer =
+			prm::get_buffer({.name = CSTR("Instance Transformations Buffer"),
+							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+							 .memory_type = vk::BUFFER_TYPE_GPU,
+							 .size = transformations.size * sizeof(InstanceTransform),
+							 .data = transformations.data});
 	}
 	// Create a sampler for textures
 	VkSamplerCreateInfo sampler_ci = vk::sampler();
@@ -1306,6 +1328,7 @@ void destroy() {
 													  _scene.vertex_buffer,
 													  _scene.materials_buffer,
 													  _scene.prim_lookup_buffer,
+													  _scene.transformations_buffer,
 													  _scene.mesh_lights_buffer,
 													  _scene.light_triangle_cdf_buffer,
 													  _scene.emitter_light_indices_buffer};

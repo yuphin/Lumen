@@ -13,8 +13,8 @@
 SCENE_BUFFER(prefix_contributions, vec3);
 layout(binding = 4, std430) buffer OutReservoirs { Reservoir curr_reservoirs[]; };
 layout(binding = 5, std430) readonly buffer InReservoirs { Reservoir prev_reservoirs[]; };
-layout(binding = 6, std430) readonly buffer CurrGBuffer { GBuffer curr_gbuffers[]; };
-layout(binding = 7, std430) readonly buffer PrevGBuffer { GBuffer prev_gbuffers[]; };
+layout(binding = 6, std430) readonly buffer CurrGBuffer { SurfaceRef curr_gbuffers[]; };
+layout(binding = 7, std430) readonly buffer PrevGBuffer { SurfaceRef prev_gbuffers[]; };
 layout(binding = 8, rgba16) uniform image2D canonical_contributions_tex;
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.seed3);
 
@@ -30,14 +30,13 @@ ivec2 get_permuted_coords(inout uvec4 seed, ivec2 coords) {
 void main() {
 	Reservoir reservoir;
 	init_reservoir(reservoir);
-	GBuffer gbuffer = curr_gbuffers[pixel_idx];
+	SurfaceRef gbuffer = curr_gbuffers[pixel_idx];
 	if (!gbuffer_data_valid(gbuffer)) {
 		return;
 	}
 	Reservoir canonical_reservoir = curr_reservoirs[pixel_idx];
 
-	HitData canonical_gbuffer =
-		get_hitdata(gbuffer.barycentrics, gbuffer.primitive_instance_id.y, gbuffer.primitive_instance_id.x);
+	SurfaceData canonical_gbuffer = load_surface(gbuffer);
 	vec4 prev_pos = ubo.prev_view * vec4(canonical_gbuffer.pos, 1);
 	prev_pos /= prev_pos.z;
 	prev_pos = -ubo.prev_projection * prev_pos;
@@ -56,7 +55,7 @@ void main() {
 
 	if (!(any(lessThan(prev_coords, ivec2(0))) || any(greaterThanEqual(prev_coords, gl_LaunchSizeEXT.xy)))) {
 		const uint prev_idx = prev_coords.x * pc.height + prev_coords.y;
-		GBuffer prev_gbuffer = prev_gbuffers[prev_idx];
+		SurfaceRef prev_gbuffer = prev_gbuffers[prev_idx];
 		if (gbuffer_data_valid(prev_gbuffer)) {
 			ReconnectionData data;
 			data.reservoir_contribution = vec3(0);
@@ -64,8 +63,7 @@ void main() {
 			data.target_pdf_in_neighbor = 0;
 
 			const Reservoir prev_reservoir = prev_reservoirs[prev_idx];
-			HitData prev_hitdata = get_hitdata(prev_gbuffer.barycentrics, prev_gbuffer.primitive_instance_id.y,
-											   prev_gbuffer.primitive_instance_id.x);
+			SurfaceData prev_hitdata = load_surface(prev_gbuffer);
 
 			vec3 primary_direction = get_primary_direction(uvec2(gl_LaunchIDEXT.xy));
 			vec3 prev_primary_direction = get_prev_primary_direction(uvec2(prev_coords));

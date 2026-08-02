@@ -84,29 +84,12 @@ void init(Integrator* integrator) {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height() * sizeof(GBuffer)});
+						 .size = Window::width() * Window::height() * sizeof(SurfaceRef)});
 	state.current_frame_lighting_buffer =
 		prm::get_buffer({.name = CSTR("IRCache Current Frame Lighting"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(lm::vec3)});
-
-	{
-		lm::ScratchArena scratch = integrator->arena;
-
-		auto transformations =
-			lm::fixed_array_create<lm::mat4>(scratch.arena, integrator->lumen_scene->prim_meshes.size);
-		for (const LumenPrimMesh& pm : integrator->lumen_scene->prim_meshes) {
-			transformations.push_back(pm.world_matrix);
-		}
-		state.transformations_buffer = prm::get_buffer({
-			.name = CSTR("Transformations Buffer"),
-			.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-			.memory_type = vk::BUFFER_TYPE_GPU,
-			.size = transformations.size * sizeof(lm::mat4),
-			.data = transformations.data,
-		});
-	}
 
 	// At max, we spawn 1 surfel per tile.
 	u32 tiles_x = (Window::width() + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
@@ -197,7 +180,6 @@ void init(Integrator* integrator) {
 	// IRCache
 	SET_SCENE_BUFFER(desc, g_buffer, state.gbuffer);
 	SET_SCENE_BUFFER(desc, direct_lighting, state.current_frame_lighting_buffer);
-	SET_SCENE_BUFFER(desc, transformations, state.transformations_buffer);
 	SET_SCENE_BUFFER(desc, surfel_spawn_list, state.surfel_spawn_list_buffer);
 	SET_SCENE_BUFFER(desc, surfel_spawn_count, state.surfel_spawn_count_buffer);
 	SET_SCENE_BUFFER(desc, surfel_pool, state.surfel_pool_buffer);
@@ -262,8 +244,8 @@ void render(Integrator* integrator) {
 	rg::add_rt(CSTR("GBuffer"),
 			   {
 				   .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/primary.rgen")},
-							   {CSTR("src/shaders/integrators/irradiance_cache/ray.rmiss")},
-							   {CSTR("src/shaders/integrators/irradiance_cache/ray.rchit")},
+								   {CSTR("src/shaders/surface.rmiss")},
+								   {CSTR("src/shaders/surface.rchit")},
 							   {CSTR("src/shaders/ray_shadow.rmiss")},
 							   {CSTR("src/shaders/ray.rahit")}},
 				   .dims = {Window::width(), Window::height()},
@@ -390,8 +372,8 @@ void render(Integrator* integrator) {
 	rg::add_rt(CSTR("Surfel: Trace"),
 			   {
 				   .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/surfel_trace.rgen")},
-							   {CSTR("src/shaders/integrators/irradiance_cache/ray.rmiss")},
-							   {CSTR("src/shaders/integrators/irradiance_cache/ray.rchit")},
+								   {CSTR("src/shaders/surface.rmiss")},
+								   {CSTR("src/shaders/surface.rchit")},
 							   {CSTR("src/shaders/ray_shadow.rmiss")},
 							   {CSTR("src/shaders/ray.rahit")}},
 				   .dims = {(u32)state.rays_per_surfel, MAX_SURFEL_COUNT},
@@ -501,7 +483,6 @@ void destroy(Integrator* integrator, bool resize) {
 
 	vk::Buffer** buffers[] = {&state.gbuffer,
 							  &state.current_frame_lighting_buffer,
-							  &state.transformations_buffer,
 							  &state.surfel_spawn_list_buffer,
 							  &state.surfel_spawn_count_buffer,
 							  &state.surfel_pool_buffer,

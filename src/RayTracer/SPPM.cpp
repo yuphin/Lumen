@@ -104,9 +104,9 @@ void render(Integrator* integrator) {
 	rg::add_rt(CSTR("SPPM - Eye"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/sppm/sppm_eye.rgen")},
-								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/surface.rmiss")},
 								 {CSTR("src/shaders/ray_shadow.rmiss")},
-								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/surface.rchit")},
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })
@@ -129,9 +129,9 @@ void render(Integrator* integrator) {
 	rg::add_rt(CSTR("SPPM - Light"),
 				 {
 					 .shaders = {{CSTR("src/shaders/integrators/sppm/sppm_light.rgen")},
-								 {CSTR("src/shaders/ray.rmiss")},
+								 {CSTR("src/shaders/surface.rmiss")},
 								 {CSTR("src/shaders/ray_shadow.rmiss")},
-								 {CSTR("src/shaders/ray.rchit")},
+								 {CSTR("src/shaders/surface.rchit")},
 								 {CSTR("src/shaders/ray.rahit")}},
 					 .dims = {Window::width(), Window::height()},
 				 })

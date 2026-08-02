@@ -1,14 +1,14 @@
 #include "../../../bda.glsl"
 #include "gris_commons.h"
 #include "../../../commons.glsl"
-layout(location = 0) rayPayloadEXT GrisHitPayload payload;
+#include "../../../surface.glsl"
+layout(location = 0) rayPayloadEXT SurfaceHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 #include "../../../shadow_ray.glsl"
 layout(push_constant) uniform _PushConstantRay { PCReSTIRPT pc; };
 
 #define LOG_GRIS 0
 
-SCENE_BUFFER_RO(transformations, mat4);
 const uint flags = gl_RayFlagsOpaqueEXT;
 const float tmin = 0.001;
 const float tmax = 10000.0;
@@ -29,27 +29,6 @@ uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 #define STREAMING_MODE STREAMING_MODE_INDIVIDUAL
 #endif	// STREAMING_MODE
 
-struct HitData {
-	vec3 pos;
-	vec3 n_g;
-	vec3 n_s;
-	vec2 uv;
-	uint material_idx;
-};
-
-struct HitDataWithoutUVAndGeometryNormals {
-	vec3 pos;
-	vec3 n_s;
-	uint material_idx;
-};
-
-struct HitDataWithoutGeometryNormals {
-	vec3 pos;
-	vec3 n_s;
-	uint material_idx;
-	vec2 uv;
-};
-
 struct OcclusionData {
 	vec3 origin;
 	vec3 dir;
@@ -60,102 +39,6 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 	const float randa = rand(seed) * 2 * PI;
 	const float randr = sqrt(rand(seed)) * pc.spatial_radius;
 	return ivec2(floor(cos(randa) * randr), floor(sin(randa) * randr));
-}
-
-HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx, out float area) {
-	const PrimInfo pinfo = DEREF(prim_info)[instance_idx];
-	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
-	const ivec3 ind = ivec3(pinfo.vertex_offset) +
-					  ivec3(DEREF(index)[index_offset + 0], DEREF(index)[index_offset + 1], DEREF(index)[index_offset + 2]);
-	const vec3 bary = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
-	const mat4 to_world = DEREF(transformations)[instance_idx];
-	const mat4 tsp_inv_to_world = transpose(inverse(to_world));
-
-	HitData gbuffer;
-	Vertex vtx[3];
-
-	vtx[0] = DEREF(compact_vertices)[ind.x];
-	vtx[1] = DEREF(compact_vertices)[ind.y];
-	vtx[2] = DEREF(compact_vertices)[ind.z];
-
-	gbuffer.pos = vec3(to_world * vec4(vtx[0].pos * bary.x + vtx[1].pos * bary.y + vtx[2].pos * bary.z, 1.0));
-	gbuffer.n_s = normalize(
-		vec3(tsp_inv_to_world * vec4(vtx[0].normal * bary.x + vtx[1].normal * bary.y + vtx[2].normal * bary.z, 1.0)));
-	const vec3 e0 = vtx[2].pos - vtx[0].pos;
-	const vec3 e1 = vtx[1].pos - vtx[0].pos;
-
-	const vec4 e0t = to_world * vec4(vtx[2].pos - vtx[0].pos, 0);
-	const vec4 e1t = to_world * vec4(vtx[1].pos - vtx[0].pos, 0);
-	area = 0.5 * length(cross(vec3(e0t), vec3(e1t)));
-	gbuffer.n_g = normalize((tsp_inv_to_world * vec4(cross(e0, e1), 0)).xyz);
-	gbuffer.uv = vtx[0].uv0 * bary.x + vtx[1].uv0 * bary.y + vtx[2].uv0 * bary.z;
-	gbuffer.material_idx = pinfo.material_index;
-	return gbuffer;
-}
-
-HitData get_hitdata(vec2 attribs, uint instance_idx, uint triangle_idx) {
-	float unused;
-	return get_hitdata(attribs, instance_idx, triangle_idx, unused);
-}
-
-HitDataWithoutUVAndGeometryNormals get_hitdata_no_ng_uv(vec2 attribs, uint instance_idx, uint triangle_idx) {
-	const PrimInfo pinfo = DEREF(prim_info)[instance_idx];
-	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
-	const ivec3 ind = ivec3(pinfo.vertex_offset) +
-					  ivec3(DEREF(index)[index_offset + 0], DEREF(index)[index_offset + 1], DEREF(index)[index_offset + 2]);
-	const vec3 bary = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
-	const mat4 to_world = DEREF(transformations)[instance_idx];
-	const mat4 tsp_inv_to_world = transpose(inverse(to_world));
-	HitDataWithoutUVAndGeometryNormals gbuffer;
-	Vertex vtx[3];
-
-	vtx[0] = DEREF(compact_vertices)[ind.x];
-	vtx[1] = DEREF(compact_vertices)[ind.y];
-	vtx[2] = DEREF(compact_vertices)[ind.z];
-	gbuffer.pos = vec3(to_world * vec4(vtx[0].pos * bary.x + vtx[1].pos * bary.y + vtx[2].pos * bary.z, 1.0));
-	gbuffer.n_s =
-		vec3(tsp_inv_to_world * vec4(vtx[0].normal * bary.x + vtx[1].normal * bary.y + vtx[2].normal * bary.z, 1.0));
-	gbuffer.material_idx = pinfo.material_index;
-	return gbuffer;
-}
-
-HitDataWithoutGeometryNormals get_hitdata_no_ng(vec2 attribs, uint instance_idx, uint triangle_idx) {
-	const PrimInfo pinfo = DEREF(prim_info)[instance_idx];
-	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
-	const ivec3 ind = ivec3(pinfo.vertex_offset) +
-					  ivec3(DEREF(index)[index_offset + 0], DEREF(index)[index_offset + 1], DEREF(index)[index_offset + 2]);
-	const vec3 bary = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
-	const mat4 to_world = DEREF(transformations)[instance_idx];
-	const mat4 tsp_inv_to_world = transpose(inverse(to_world));
-	HitDataWithoutGeometryNormals gbuffer;
-	Vertex vtx[3];
-
-	vtx[0] = DEREF(compact_vertices)[ind.x];
-	vtx[1] = DEREF(compact_vertices)[ind.y];
-	vtx[2] = DEREF(compact_vertices)[ind.z];
-	gbuffer.pos = vec3(to_world * vec4(vtx[0].pos * bary.x + vtx[1].pos * bary.y + vtx[2].pos * bary.z, 1.0));
-	gbuffer.n_s =
-		vec3(tsp_inv_to_world * vec4(vtx[0].normal * bary.x + vtx[1].normal * bary.y + vtx[2].normal * bary.z, 1.0));
-	gbuffer.material_idx = pinfo.material_index;
-	gbuffer.uv = vtx[0].uv0 * bary.x + vtx[1].uv0 * bary.y + vtx[2].uv0 * bary.z;
-	return gbuffer;
-}
-
-vec3 get_hitdata_pos_only(vec2 attribs, uint instance_idx, uint triangle_idx) {
-	const PrimInfo pinfo = DEREF(prim_info)[instance_idx];
-	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
-	const ivec3 ind = ivec3(pinfo.vertex_offset) +
-					  ivec3(DEREF(index)[index_offset + 0], DEREF(index)[index_offset + 1], DEREF(index)[index_offset + 2]);
-	const vec3 bary = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
-	const mat4 to_world = DEREF(transformations)[instance_idx];
-	const mat4 tsp_inv_to_world = transpose(inverse(to_world));
-	HitDataWithoutGeometryNormals gbuffer;
-	Vertex vtx[3];
-
-	vtx[0] = DEREF(compact_vertices)[ind.x];
-	vtx[1] = DEREF(compact_vertices)[ind.y];
-	vtx[2] = DEREF(compact_vertices)[ind.z];
-	return vec3(to_world * vec4(vtx[0].pos * bary.x + vtx[1].pos * bary.y + vtx[2].pos * bary.z, 1.0));
 }
 
 vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 n_g, vec3 wo, float d_vm,
@@ -217,14 +100,11 @@ vec3 from_spherical(const vec2 v) {
 	return vec3(sin_theta * cos(v.x), cos(v.y), sin_theta * sin(v.x));
 }
 
-void init_gbuffer(out GBuffer gbuffer) {
-	gbuffer.barycentrics = vec2(0);
-	gbuffer.primitive_instance_id = uvec2(-1);
-}
+void init_gbuffer(out SurfaceRef gbuffer) { gbuffer = invalid_surface_ref(); }
 
 void init_data(out GrisData data) {
 	data.path_flags = 0;
-	data.rc_primitive_instance_id = uvec2(-1);
+	data.rc_surface = invalid_surface_ref();
 }
 
 void init_reservoir(out Reservoir r) {
@@ -237,7 +117,7 @@ void init_reservoir(out Reservoir r) {
 
 bool reservoir_data_valid(in GrisData data) { return data.path_flags != 0; }
 
-bool gbuffer_data_valid(in GBuffer gbuffer) { return gbuffer.primitive_instance_id.y != -1; }
+bool gbuffer_data_valid(in SurfaceRef gbuffer) { return surface_ref_valid(gbuffer); }
 
 bool update_reservoir(inout uvec4 seed, inout Reservoir r_new, const GrisData data, float target_pdf,
 					  float inv_source_pdf) {
@@ -325,7 +205,7 @@ vec3 get_prev_primary_direction(uvec2 coords) {
 	return normalize(sample_prev_camera(d).xyz);
 }
 
-bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float src_jacobian, out float jacobian_out,
+bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, float src_jacobian, out float jacobian_out,
 				   out vec3 reservoir_contribution, out float jacobian_num, out OcclusionData occlusion_data) {
 	// Note: The source reservoir always corresponds to the canonical reservoir because retracing only happens on
 	// pairwise mode
@@ -351,17 +231,16 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 	bool is_directional_light;
 	unpack_path_flags(data.path_flags, rc_type, rc_prefix_length, rc_postfix_length, rc_side, is_directional_light);
 
-	HitData rc_gbuffer;
+	SurfaceData rc_gbuffer;
 	Material rc_hit_mat;
 
 	// Unconditionally initializing here causes corruption when rc_type is NEE
 	Light light;
 	if (rc_type != RECONNECTION_TYPE_NEE) {
-		rc_gbuffer =
-			get_hitdata(data.rc_barycentrics, data.rc_primitive_instance_id.y, data.rc_primitive_instance_id.x);
+		rc_gbuffer = load_surface(data.rc_surface);
 		rc_hit_mat = load_material(rc_gbuffer.material_idx, rc_gbuffer.uv);
 	} else {
-		light = lights[data.rc_primitive_instance_id.y];
+		light = lights[data.rc_surface.primitive_instance_id.y];
 	}
 
 	uint prefix_depth = 0;
@@ -416,10 +295,10 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 			vec3 dst_postfix_wi;
 			if (rc_type == RECONNECTION_TYPE_NEE) {
 				LightSampleIdentity identity;
-				identity.light_idx = data.rc_primitive_instance_id.y;
+				identity.light_idx = data.rc_surface.primitive_instance_id.y;
 				identity.primitive_idx = light.prim_mesh_idx;
-				identity.triangle_idx = data.rc_primitive_instance_id.x;
-				identity.bary = data.rc_barycentrics;
+				identity.triangle_idx = data.rc_surface.primitive_instance_id.x;
+				identity.bary = data.rc_surface.barycentrics;
 				replayed_light = replay_light_Li(identity, org_pos, pc.num_lights);
 				dst_postfix_wi = replayed_light.wi * replayed_light.distance;
 			} else {
@@ -532,19 +411,19 @@ bool advance_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 
 		const vec3 ray_origin = offset_ray(org_pos, dst_gbuffer.n_g, dst_wi);
 		traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, ray_origin, tmin, dst_wi, tmax, 0);
-		const bool found_isect = payload.instance_idx != -1;
+		const bool found_isect = surface_ref_valid(payload.surface);
 		if (!found_isect) {
 			return false;
 		}
 
 		vec3 prev_pos = org_pos;
-		dst_gbuffer = get_hitdata(payload.attribs, payload.instance_idx, payload.triangle_idx);
+		dst_gbuffer = load_surface(payload.surface);
 		prev_far = length(dst_gbuffer.pos - prev_pos) > pc.min_vertex_distance_ratio * pc.scene_extent;
 		prefix_depth++;
 	}
 }
 
-bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float src_jacobian, out float jacobian_out,
+bool retrace_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, float src_jacobian, out float jacobian_out,
 				   out vec3 reservoir_contribution, out float jacobian_num) {
 	OcclusionData occlusion_data;
 	bool result = advance_paths(dst_gbuffer, data, dst_wi, src_jacobian, jacobian_out, reservoir_contribution,
@@ -563,14 +442,14 @@ bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float 
 	return result;
 }
 
-bool retrace_paths(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, out float jacobian_out,
+bool retrace_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, out float jacobian_out,
 				   out vec3 reservoir_contribution) {
 	float unused_jacobian;
 	return retrace_paths(dst_gbuffer, data, dst_wi, data.rc_partial_jacobian, jacobian_out, reservoir_contribution,
 						 unused_jacobian);
 }
 
-bool retrace_paths_and_evaluate(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, float src_jacobian,
+bool retrace_paths_and_evaluate(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, float src_jacobian,
 								out float target_pdf) {
 	vec3 reservoir_contribution;
 	float jacobian = 0;
@@ -581,7 +460,7 @@ bool retrace_paths_and_evaluate(in HitData dst_gbuffer, in GrisData data, vec3 d
 	return result;
 }
 
-bool retrace_paths_and_evaluate(in HitData dst_gbuffer, in GrisData data, vec3 dst_wi, out float target_pdf) {
+bool retrace_paths_and_evaluate(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, out float target_pdf) {
 	return retrace_paths_and_evaluate(dst_gbuffer, data, dst_wi, data.rc_partial_jacobian, target_pdf);
 }
 

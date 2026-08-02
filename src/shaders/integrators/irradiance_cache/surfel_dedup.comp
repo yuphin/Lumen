@@ -15,7 +15,7 @@ layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
 
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 
-SCENE_BUFFER(g_buffer, GBuffer);
+SCENE_BUFFER(g_buffer, SurfaceRef);
 SCENE_BUFFER(surfel_spawn_list, uint);
 SCENE_BUFFER_SCALAR(surfel_spawn_count, uint);
 SCENE_BUFFER(surfel_free_stack, uint);
@@ -50,7 +50,7 @@ void main() {
 		return;
 	}
 
-	HitData hit_data = get_hitdata(s.gbuffer);
+	SurfaceData hit_data = load_surface(s.gbuffer);
 
 	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
 
@@ -67,7 +67,7 @@ void main() {
 			uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
 			Surfel other = DEREF(surfel_pool)[sid];
 			if (other.radius <= 0.0) continue;
-			HitData other_hit_data = get_hitdata(other.gbuffer);
+			SurfaceData other_hit_data = load_surface(other.gbuffer);
 
 			vec3 pos_to_other = hit_data.pos - other_hit_data.pos;
 			float dist_sqr = dot(pos_to_other, pos_to_other);

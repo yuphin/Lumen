@@ -13,8 +13,9 @@
 #include "../../bda.glsl"
 #include "ddgi_commons.h"
 #include "../../commons.glsl"
+#include "../../surface.glsl"
 #include "ddgi_commons.glsl"
-layout(location = 0) rayPayloadEXT HitPayload payload;
+layout(location = 0) rayPayloadEXT DDGISurfaceHitPayload payload;
 layout(location = 1) rayPayloadEXT AnyHitPayload any_hit_payload;
 layout(push_constant) uniform _PushConstantRay { PCDDGI pc; };
 const uint flags = gl_RayFlagsOpaqueEXT;
@@ -79,7 +80,7 @@ void main() {
 	vec3 d = normalize(mat3(pc.probe_rotation) * spherical_fibonacci(ray_id, ddgi_uniforms.rays_per_probe));
 	payload.dist = tmax;
 	traceRayEXT(tlas, flags, 0x1, 0, 0, 0, o, tmin, d, tmax, 0);
-	const bool found_isect = payload.material_idx != -1;
+	const bool found_isect = surface_ref_valid(payload.surface);
 	vec3 col = vec3(0);
 	float dist;
 	if (!found_isect) {
@@ -89,17 +90,18 @@ void main() {
 		dist = -0.2 * payload.dist;
 	} else {
 		dist = payload.dist;
-		const Material hit_mat = load_material(payload.material_idx, payload.uv);
+		const SurfaceData surface = load_surface(payload.surface);
+		const Material hit_mat = load_material(surface.material_idx, surface.uv);
 		const vec3 wo = -d;
-		vec3 n_s = payload.n_s;
-		vec3 n_g = payload.n_g;
+		vec3 n_s = surface.n_s;
+		vec3 n_g = surface.n_g;
 		bool side = face_forward(n_s, n_g, wo);
 
 		if ((hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) == 0) {
-			col += sample_direct_light(seed, hit_mat, payload.pos, side, n_s, n_g, wo, /*use_mis=*/false);
+			col += sample_direct_light(seed, hit_mat, surface.pos, side, n_s, n_g, wo, /*use_mis=*/false);
 		}
 		if (pc.first_frame == 0 && pc.infinite_bounces == 1) {
-			vec3 irradiance = sample_irradiance(payload.pos, n_s, -d);
+			vec3 irradiance = sample_irradiance(surface.pos, n_s, -d);
 			col += hit_mat.albedo / PI * irradiance;
 		}
 	}

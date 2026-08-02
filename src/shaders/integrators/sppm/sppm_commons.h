@@ -25,21 +25,21 @@ struct PCSPPM {
 
 struct SPPMData {
 	vec3 p;
+	SurfaceRef surface;
 	vec3 wo;
 	vec3 tau;
 	vec3 col;
 	vec3 phi;
 	vec3 throughput;
-	uint material_idx;
-	vec2 uv;
-	vec3 n_s;
-	vec3 n_g;
 	int M;
 	float N;
 	float radius;
 	int path_len;
-	uint side;
 };
+
+#ifdef __cplusplus
+static_assert(sizeof(SPPMData) == 104);
+#endif
 
 struct PhotonHash {
 	vec3 pos;

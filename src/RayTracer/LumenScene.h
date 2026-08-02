@@ -72,6 +72,7 @@ struct Scene {
 	vk::Buffer* vertex_buffer;
 	vk::Buffer* materials_buffer;
 	vk::Buffer* prim_lookup_buffer;
+	vk::Buffer* transformations_buffer;
 	vk::Buffer* scene_desc_buffer;
 	vk::Buffer* mesh_lights_buffer;
 	vk::Buffer* light_triangle_cdf_buffer;
