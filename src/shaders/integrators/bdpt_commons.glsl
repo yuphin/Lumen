@@ -7,6 +7,8 @@
 #define BDPT_MLT 0
 #endif
 
+const uint BDPT_MISS_MATERIAL_INDEX = 0xffffffffu;
+
 #if BDPT_MLT == 1
 #include "mlt_commons.glsl"
 #endif
@@ -31,7 +33,7 @@ int bdpt_random_walk_light(const int max_depth, vec3 throughput,
     while (true) {
         prev = b - 1;
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, ray_pos, tmin, wi, tmax, 0);
-        if (payload.material_idx == -1) {
+        if (payload.material_idx == BDPT_MISS_MATERIAL_INDEX) {
             break;
         }
 
@@ -126,9 +128,10 @@ int bdpt_random_walk_eye(const int max_depth, vec3 throughput,
     while (true) {
         prev = b - 1;
         traceRayEXT(tlas, flags, 0xFF, 0, 0, 0, ray_pos, tmin, wi, tmax, 0);
-        if (payload.material_idx == -1) {
+        if (payload.material_idx == BDPT_MISS_MATERIAL_INDEX) {
             vtx_assign(b, throughput, throughput);
             vtx_assign(b, pdf_fwd, pdf_fwd);
+            vtx_assign(b, material_idx, BDPT_MISS_MATERIAL_INDEX);
             b++;
             break;
         }
@@ -570,17 +573,17 @@ vec3 bdpt_connect_cam(int s, out ivec2 coords) {
 vec3 bdpt_connect(int s, int t) {
 #define cam_vtx(i) DEREF(camera_path)[bdpt_path_idx + i]
 #define light_vtx(i) DEREF(light_path)[bdpt_path_idx + i]
+    const uint cam_material_idx = cam_vtx(t - 1).material_idx;
+    if (cam_material_idx == BDPT_MISS_MATERIAL_INDEX) {
+        return s == 0 ? cam_vtx(t - 1).throughput * pc.sky_col : vec3(0);
+    }
+
     vec3 L = vec3(0);
     PathVertex sampled;
     if (s == 0) {
         // Pure camera path
-        uint mat_idx = cam_vtx(t - 1).material_idx;
-        Material mat = DEREF(material)[mat_idx];
-        if (mat_idx != -1) {
-            L = mat.emissive_factor * cam_vtx(t - 1).throughput;
-        } else {
-            L = vec3(1, 1, 1) * cam_vtx(t - 1).throughput;
-        }
+        const Material mat = DEREF(material)[cam_material_idx];
+        L = mat.emissive_factor * cam_vtx(t - 1).throughput;
     } else if (s == 1) {
 #if BDPT_MLT == 1
         const vec4 rands_pos = vec4(
