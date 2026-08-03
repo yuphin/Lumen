@@ -19,12 +19,18 @@ static u32 _num_collected_timestamps = 0;
 
 static u32 _timestamp_stack[MAX_TIMESTAMP_COUNT];
 static u32 _timestamp_stack_size = 0;
+static bool _aggregate_active = false;
+static u32 _suppressed_scope_depth = 0;
 
 static char _timestamp_name_data[MAX_TIMESTAMP_NAME_BYTES];
 static u64 _timestamp_name_data_size = 0;
 
 void begin(VkCommandBuffer cmd, const lm::String& name) {
-	LUMEN_ASSERT(_curr_query_idx < MAX_QUERY_COUNT, "Query pool exhausted");
+	if (_aggregate_active) {
+		_suppressed_scope_depth++;
+		return;
+	}
+	LUMEN_ASSERT(_curr_query_idx + 2 <= MAX_QUERY_COUNT, "Query pool exhausted");
 	LUMEN_ASSERT(_curr_timestamp_idx < MAX_TIMESTAMP_COUNT, "Timestamp data exhausted");
 	vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vk::context().query_pool_timestamps[_curr_pool_idx],
 						_curr_query_idx);
@@ -48,6 +54,11 @@ void begin(VkCommandBuffer cmd, const lm::String& name) {
 	_curr_query_idx++;
 }
 void end(VkCommandBuffer cmd) {
+	if (_aggregate_active) {
+		LUMEN_ASSERT(_suppressed_scope_depth > 0, "Mismatched timestamp end inside aggregate scope");
+		_suppressed_scope_depth--;
+		return;
+	}
 	LUMEN_ASSERT(_curr_query_idx < MAX_QUERY_COUNT, "Query pool exhausted");
 	vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vk::context().query_pool_timestamps[_curr_pool_idx],
 						_curr_query_idx);
@@ -59,7 +70,24 @@ void end(VkCommandBuffer cmd) {
 	_curr_query_idx++;
 }
 
+void begin_aggregate(VkCommandBuffer cmd, const lm::String& name) {
+	LUMEN_ASSERT(!_aggregate_active, "GPU timestamp aggregate scopes cannot be nested");
+	LUMEN_ASSERT(_suppressed_scope_depth == 0, "Suppressed timestamp scopes were not balanced");
+	begin(cmd, name);
+	_aggregate_active = true;
+}
+
+void end_aggregate(VkCommandBuffer cmd) {
+	LUMEN_ASSERT(_aggregate_active, "Mismatched aggregate timestamp end");
+	LUMEN_ASSERT(_suppressed_scope_depth == 0, "Cannot end aggregate with open timestamp scopes");
+	_aggregate_active = false;
+	end(cmd);
+}
+
 void collect(u32 curr_frame_idx) {
+	LUMEN_ASSERT(!_aggregate_active, "Cannot collect timestamps inside an aggregate scope");
+	LUMEN_ASSERT(_suppressed_scope_depth == 0, "Cannot collect timestamps with suppressed scopes open");
+	LUMEN_ASSERT(_timestamp_stack_size == 0, "Cannot collect timestamps with open scopes");
 	LUMEN_ASSERT(_curr_timestamp_idx * 2 == _curr_query_idx,
 				 "Mismatched begin/end timestamps: %u timestamps, %u queries", _curr_timestamp_idx, _curr_query_idx);
 	_num_collected_timestamps = _curr_timestamp_idx;

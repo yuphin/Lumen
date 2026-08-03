@@ -1,4 +1,5 @@
 #include "Integrator.h"
+#include "Framework/GPUQueryManager.h"
 #include "Framework/RenderGraph.h"
 #include "VCMMLT.h"
 namespace vcmmlt {
@@ -274,6 +275,7 @@ void render(Integrator* integrator) {
 	state.pc.enable_accumulation = state.enable_accumulation;
 	// VCMMLT related constants
 	state.pc.use_vm = config.enable_vm;
+	state.pc.use_vc = 1;
 	state.pc.light_rand_count = state.light_path_rand_count;
 	state.pc.random_num = lm::rand_u32();
 	state.pc.num_bootstrap_samples = config.num_bootstrap_samples;
@@ -439,7 +441,9 @@ void render(Integrator* integrator) {
 			for (i32 i = 0; i < iter_cnt; i++) {
 				mutate(cnt++);
 			}
+			GPUQueryManager::begin_aggregate(cmd.handle, CSTR("VCMMLT - Mutation Batch"));
 			rg::run(cmd.handle);
+			GPUQueryManager::end_aggregate(cmd.handle);
 			rg::submit(cmd);
 		}
 		const u32 rem = state.mutation_count % iter_cnt;
@@ -448,7 +452,9 @@ void render(Integrator* integrator) {
 			for (u32 i = 0; i < rem; i++) {
 				mutate(cnt++);
 			}
+			GPUQueryManager::begin_aggregate(cmd.handle, CSTR("VCMMLT - Mutation Batch"));
 			rg::run(cmd.handle);
+			GPUQueryManager::end_aggregate(cmd.handle);
 			rg::submit(cmd);
 		}
 	}

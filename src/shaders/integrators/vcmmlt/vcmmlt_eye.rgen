@@ -30,12 +30,13 @@ void main() {
         vec3 origin = vec3(ubo.inv_view * vec4(0, 0, 0, 1));
         VCMState light_state;
         float lum_sum = 0;
-        float eta_vc = 0, eta_vm = 0;
+        float eta_vcm, eta_vc, eta_vm;
+        vcmmlt_mis_factors(eta_vcm, eta_vc, eta_vm);
         bool finite;
         if (!vcm_generate_light_sample(eta_vc, light_state, finite)) {
             return;
         }
-        vcm_fill_light(origin, light_state, finite, 0, eta_vc, eta_vm);
+        vcm_fill_light(origin, light_state, finite, eta_vcm, eta_vc, eta_vm);
     } else {
         mlt_fill_eye();
     }

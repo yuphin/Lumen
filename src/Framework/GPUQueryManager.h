@@ -12,6 +12,8 @@ struct TimestampData {
 
 void begin(VkCommandBuffer cmd, const lm::String& name);
 void end(VkCommandBuffer cmd);
+void begin_aggregate(VkCommandBuffer cmd, const lm::String& name);
+void end_aggregate(VkCommandBuffer cmd);
 void collect(u32 curr_frame_idx);
 void collect();
 void reset_data();

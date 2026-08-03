@@ -69,6 +69,13 @@ float mlt_mis(float lum, float target, uint c) {
     return num / denum;
 }
 
+void vcmmlt_mis_factors(out float eta_vcm, out float eta_vc,
+                        out float eta_vm) {
+    eta_vcm = PI * pc.radius * pc.radius * screen_size;
+    eta_vc = pc.use_vc == 1 ? 1.0 / eta_vcm : 0.0;
+    eta_vm = pc.use_vm == 1 ? eta_vcm : 0.0;
+}
+
 float mlt_trace_eye() {
     vec3 origin = vec3(ubo.inv_view * vec4(0, 0, 0, 1));
     vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
@@ -88,14 +95,15 @@ float mlt_trace_eye() {
     camera_state.n_s = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
     float cos_theta = abs(dot(camera_state.n_s, direction));
     // Defer r^2 / cos term
-    // Temporary hack?
-    // TODO: Investigate
     camera_state.d_vcm =
         cam_area * screen_size * cos_theta * cos_theta * cos_theta;
     camera_state.d_vc = 0;
     camera_state.d_vm = 0;
     float lum = 0;
-    vec3 col = vcm_trace_eye(camera_state, 0, 0, 0, lum);
+    float eta_vcm, eta_vc, eta_vm;
+    vcmmlt_mis_factors(eta_vcm, eta_vc, eta_vm);
+    vec3 col =
+        vcm_trace_eye(camera_state, eta_vcm, eta_vc, eta_vm, lum);
     const float connect_lum = luminance(col);
     lum += connect_lum;
     if (save_radiance && connect_lum > 0) {
