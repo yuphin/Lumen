@@ -52,6 +52,9 @@ void render(Integrator* integrator) {
 	state.pc.enable_accumulation = state.enable_accumulation;
 	state.pc.width = Window::width();
 	state.pc.height = Window::height();
+	state.pc.strategy_s = state.strategy_s;
+	state.pc.strategy_t = state.strategy_t;
+	state.pc.isolate_strategy = state.isolate_strategy;
 	const std::initializer_list<lm::ResourceBinding> rt_bindings = {
 		integrator->output_tex,
 		integrator->scene_ubo_buffer,
@@ -120,7 +123,56 @@ bool update(Integrator* integrator) {
 
 bool gui(Integrator* integrator) {
 	BDPT& state = integrator->bdpt;
-	return ImGui::Checkbox("Enable accumulation", &state.enable_accumulation);
+	u32& path_length = integrator->lumen_scene->config.common.path_length;
+	bool result = false;
+	const bool path_length_changed = ImGui::SliderInt("Path length", (i32*)&path_length, 1, 12);
+	result |= path_length_changed;
+	result |= ImGui::Checkbox("Enable accumulation", &state.enable_accumulation);
+	result |= ImGui::Checkbox("Isolate (s, t) strategy", &state.isolate_strategy);
+
+	const i32 strategy_depth = state.strategy_s + state.strategy_t - 2;
+	if (strategy_depth < 0 || strategy_depth >= (i32)path_length ||
+		(state.strategy_s == 1 && state.strategy_t == 1)) {
+		state.strategy_s = 0;
+		state.strategy_t = 2;
+	}
+
+	char selected_strategy[64];
+	stbsp_snprintf(selected_strategy, ARRAY_LEN(selected_strategy), "s = %d, t = %d (depth %d)", state.strategy_s,
+				   state.strategy_t, state.strategy_s + state.strategy_t - 2);
+	ImGui::BeginDisabled(!state.isolate_strategy);
+	if (ImGui::BeginCombo("Connection strategy", selected_strategy)) {
+		for (i32 depth = 0; depth < (i32)path_length; depth++) {
+			for (i32 s = 0; s <= depth + 1; s++) {
+				const i32 t = depth + 2 - s;
+				if (s == 1 && t == 1) {
+					continue;
+				}
+
+				char strategy[64];
+				stbsp_snprintf(strategy, ARRAY_LEN(strategy), "s = %d, t = %d (depth %d)", s, t, depth);
+				const bool selected = state.strategy_s == s && state.strategy_t == t;
+				if (ImGui::Selectable(strategy, selected)) {
+					state.strategy_s = s;
+					state.strategy_t = t;
+					result = true;
+				}
+				if (selected) {
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+		}
+		ImGui::EndCombo();
+	}
+	ImGui::EndDisabled();
+	ImGui::TextDisabled("s: light vertices, t: camera vertices");
+
+	if (path_length_changed) {
+		vkDeviceWaitIdle(vk::context().device);
+		destroy(integrator, /*resize=*/false);
+		init(integrator);
+	}
+	return result;
 }
 
 void destroy(Integrator* integrator, bool resize) {

@@ -14,6 +14,9 @@ struct BDPT {
 	vk::Buffer* path_counts_buffer = nullptr;
 	vk::Buffer* color_storage_buffer = nullptr;
 	bool enable_accumulation = true;
+	bool isolate_strategy = false;
+	i32 strategy_s = 0;
+	i32 strategy_t = 2;
 };
 
 namespace bdpt {

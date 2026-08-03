@@ -12,6 +12,9 @@ struct PCBDPT {
 	int max_depth;
 	uint dir_light_idx;
 	uint enable_accumulation;
+	int strategy_s;
+	int strategy_t;
+	uint isolate_strategy;
 };
 
 struct BDPTPathCounts {
