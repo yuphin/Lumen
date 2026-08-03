@@ -23,6 +23,15 @@ void init_reservoir(out VCMReservoir r_new) {
     r_new.w_sum = 0;
     r_new.W = 0;
     r_new.m = 0;
+    r_new.sample_idx = ~0u;
+    r_new.selected_idx = ~0u;
+    r_new.factor = 0;
+    r_new.s.p_hat = 0;
+    r_new.s.dir = vec3(0);
+    r_new.s.pdf_dir = 0;
+    r_new.s.hash_idx = 0;
+    r_new.s.valid = 0;
+    r_new.s.frame_idx = 0;
 }
 
 void main() {
@@ -31,6 +40,5 @@ void main() {
     }
     VCMReservoir r_new;
     init_reservoir(r_new);
-    r_new.sample_idx = -1;
     DEREF(vcm_reservoir)[gl_GlobalInvocationID.x] = r_new;
 }

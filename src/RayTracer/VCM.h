@@ -22,6 +22,7 @@ struct VCM {
 	vk::Buffer* angle_struct_buffer = nullptr;
 	vk::Buffer* avg_buffer = nullptr;
 	bool do_spatiotemporal = false;
+	bool enable_ray_guiding = false;
 	bool use_vc = true;
 	bool enable_accumulation = true;
 };

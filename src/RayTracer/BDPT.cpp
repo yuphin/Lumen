@@ -10,14 +10,14 @@ void init(Integrator* integrator) {
 		prm::get_buffer({.name = CSTR("Light Path Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height() * (integrator->lumen_scene->config.common.path_length + 1) *
-								 sizeof(PathVertex)});
+						 .size = Window::width() * Window::height() *
+								 (integrator->lumen_scene->config.common.path_length + 1) * sizeof(PathVertex)});
 	state.camera_path_buffer =
 		prm::get_buffer({.name = CSTR("Camera Path Buffer"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height() * (integrator->lumen_scene->config.common.path_length + 1) *
-								 sizeof(PathVertex)});
+						 .size = Window::width() * Window::height() *
+								 (integrator->lumen_scene->config.common.path_length + 1) * sizeof(PathVertex)});
 	state.path_counts_buffer =
 		prm::get_buffer({.name = CSTR("BDPT Path Counts"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -62,42 +62,42 @@ void render(Integrator* integrator) {
 	};
 
 	rg::add_rt(CSTR("BDPT - Trace Eye"),
-				 {
-					 .shaders = {{CSTR("src/shaders/integrators/bdpt/bdpt_eye.rgen")},
-								 {CSTR("src/shaders/ray.rmiss")},
-								 {CSTR("src/shaders/ray_shadow.rmiss")},
-								 {CSTR("src/shaders/ray.rchit")},
-								 {CSTR("src/shaders/ray.rahit")}},
-					 .dims = {Window::width(), Window::height()},
-				 })
+			   {
+				   .shaders = {{CSTR("src/shaders/integrators/bdpt/bdpt_eye.rgen")},
+							   {CSTR("src/shaders/ray.rmiss")},
+							   {CSTR("src/shaders/ray_shadow.rmiss")},
+							   {CSTR("src/shaders/ray.rchit")},
+							   {CSTR("src/shaders/ray.rahit")}},
+				   .dims = {Window::width(), Window::height()},
+			   })
 		.push_constants(&state.pc)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
 	rg::add_rt(CSTR("BDPT - Trace Light"),
-				 {
-					 .shaders = {{CSTR("src/shaders/integrators/bdpt/bdpt_light.rgen")},
-								 {CSTR("src/shaders/ray.rmiss")},
-								 {CSTR("src/shaders/ray_shadow.rmiss")},
-								 {CSTR("src/shaders/ray.rchit")},
-								 {CSTR("src/shaders/ray.rahit")}},
-					 .dims = {Window::width(), Window::height()},
-				 })
+			   {
+				   .shaders = {{CSTR("src/shaders/integrators/bdpt/bdpt_light.rgen")},
+							   {CSTR("src/shaders/ray.rmiss")},
+							   {CSTR("src/shaders/ray_shadow.rmiss")},
+							   {CSTR("src/shaders/ray.rchit")},
+							   {CSTR("src/shaders/ray.rahit")}},
+				   .dims = {Window::width(), Window::height()},
+			   })
 		.push_constants(&state.pc)
 		.bind(rt_bindings)
 		.bind(integrator->lumen_scene->mesh_lights_buffer)
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
 	rg::add_rt(CSTR("BDPT - Connect"),
-				 {
-					 .shaders = {{CSTR("src/shaders/integrators/bdpt/bdpt_connect.rgen")},
-								 {CSTR("src/shaders/ray.rmiss")},
-								 {CSTR("src/shaders/ray_shadow.rmiss")},
-								 {CSTR("src/shaders/ray.rchit")},
-								 {CSTR("src/shaders/ray.rahit")}},
-					 .dims = {Window::width(), Window::height()},
-				 })
+			   {
+				   .shaders = {{CSTR("src/shaders/integrators/bdpt/bdpt_connect.rgen")},
+							   {CSTR("src/shaders/ray.rmiss")},
+							   {CSTR("src/shaders/ray_shadow.rmiss")},
+							   {CSTR("src/shaders/ray.rchit")},
+							   {CSTR("src/shaders/ray.rahit")}},
+				   .dims = {Window::width(), Window::height()},
+			   })
 		.zero(state.color_storage_buffer)
 		.push_constants(&state.pc)
 		.bind(rt_bindings)
@@ -131,8 +131,7 @@ bool gui(Integrator* integrator) {
 	result |= ImGui::Checkbox("Isolate (s, t) strategy", &state.isolate_strategy);
 
 	const i32 strategy_depth = state.strategy_s + state.strategy_t - 2;
-	if (strategy_depth < 0 || strategy_depth >= (i32)path_length ||
-		(state.strategy_s == 1 && state.strategy_t == 1)) {
+	if (strategy_depth < 0 || strategy_depth >= (i32)path_length || (state.strategy_s == 1 && state.strategy_t == 1)) {
 		state.strategy_s = 0;
 		state.strategy_t = 2;
 	}
