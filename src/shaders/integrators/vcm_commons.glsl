@@ -178,11 +178,27 @@ vec3 vcm_connect_light(const vec3 n_s, const vec3 n_g, const vec3 wo, const Mate
 			if (is_light_delta(light_sample.flags)) {
 				pdf_fwd = 0;
 			}
-			const float emission_pdf = light_emission_pdf(
-				light_sample.identity.light_idx, light_sample.normal, -light_sample.wi, pc.num_lights);
-			const float cos_y = abs(dot(light_sample.normal, -light_sample.wi));
 			const float w_light = pdf_fwd / light_sample.pdf_position_w;
-			const float w_cam = emission_pdf * abs(cos_x_g) / (light_sample.pdf_position_w * cos_y) *
+			float light_walk_to_nee_pdf_ratio;
+			if (is_light_finite(light_sample.flags)) {
+				const float emission_direction_pdf = light_emission_direction_pdf_w(
+					light_sample.identity.light_idx, light_sample.normal, -light_sample.wi);
+				const float distance_sqr = light_sample.distance * light_sample.distance;
+				// Derivation
+				// We have p_emit_w * cx / (p_position_w * cy)  [r^2 cancels]
+				// p_emit_w = pdf_a * pdf_dir_w 
+				// p_position_w = pdf_a * r^2 / cy
+				// Simplify:
+				// pdf_dir_w * cx / r^2
+				light_walk_to_nee_pdf_ratio = emission_direction_pdf * abs(cos_x_g) / distance_sqr;
+			} else {
+				const float emission_pdf = light_emission_pdf(
+					light_sample.identity.light_idx, light_sample.normal, -light_sample.wi, pc.num_lights);
+				const float cos_y = abs(dot(light_sample.normal, -light_sample.wi));
+				light_walk_to_nee_pdf_ratio =
+					emission_pdf * abs(cos_x_g) / (light_sample.pdf_position_w * cos_y);
+			}
+			const float w_cam = light_walk_to_nee_pdf_ratio *
 								(eta_vm + camera_state.d_vcm + camera_state.d_vc * pdf_rev);
 			const float mis_weight = 1. / (1. + w_light + w_cam);
 			if (mis_weight > 0) {
