@@ -25,6 +25,7 @@ struct VCM {
 	bool enable_ray_guiding = false;
 	bool use_vc = true;
 	bool enable_accumulation = true;
+	f32 radius_factor = 0.0f;
 };
 
 namespace vcm {

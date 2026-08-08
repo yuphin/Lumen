@@ -8,6 +8,7 @@ void init(Integrator* integrator) {
 	state.do_spatiotemporal = false;
 	state.pc.do_spatiotemporal = 0;
 	state.pc.total_frame_num = 0;
+	state.radius_factor = integrator->lumen_scene->config.settings.vcm.radius_factor;
 
 	state.photon_buffer =
 		prm::get_buffer({.name = CSTR("Photon Buffer"),
@@ -113,8 +114,10 @@ void render(Integrator* integrator) {
 	state.pc.frame_num = integrator->frame_num;
 	state.pc.enable_accumulation = state.enable_accumulation;
 	// VCM related constants
-	state.pc.radius = integrator->lumen_scene->dimensions.radius * config.radius_factor / 100.f;
-	state.pc.radius /= (f32)pow((double)state.pc.frame_num + 1, 0.5 * (1 - 2.0 / 3));
+	if(config.enable_vm) {
+		state.pc.radius = integrator->lumen_scene->dimensions.radius * state.radius_factor / 100.f;
+		state.pc.radius /= (f32)pow((double)state.pc.frame_num + 1, 0.5 * (1 - 2.0 / 3));
+	}
 	state.pc.min_bounds = integrator->lumen_scene->dimensions.min;
 	state.pc.max_bounds = integrator->lumen_scene->dimensions.max;
 	state.pc.use_vm = config.enable_vm;
@@ -285,8 +288,13 @@ bool gui(Integrator* integrator) {
 		ImGui::SliderInt("Path length", (i32*)&integrator->lumen_scene->config.common.path_length, 0, 12);
 	result |= path_length_changed;
 	result |= ImGui::Checkbox("Enable VM", &config.enable_vm);
-	const bool ray_guiding_changed =
-		ImGui::Checkbox("Enable ray guiding (experimental)", &state.enable_ray_guiding);
+
+	ImGui::BeginDisabled(!config.enable_vm);
+	ImGui::Text("Scene radius (base): %f\n", integrator->lumen_scene->dimensions.radius);
+	ImGui::Text("Current radius: %f\n", state.pc.radius);
+	result |= ImGui::SliderFloat("Radius factor (%)", &state.radius_factor, 0.0f, 100.0f);
+	ImGui::EndDisabled();
+	const bool ray_guiding_changed = ImGui::Checkbox("Enable ray guiding (experimental)", &state.enable_ray_guiding);
 	result |= ray_guiding_changed;
 	result |= ImGui::Checkbox("Enable accumulation", &state.enable_accumulation);
 	if (path_length_changed || ray_guiding_changed) {
