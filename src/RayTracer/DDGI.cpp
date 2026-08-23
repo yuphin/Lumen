@@ -12,7 +12,8 @@ static u32 random_u32(u64& state) {
 	state = old_state * 6364136223846793005ULL + 1442695040888963407ULL;
 	u32 xorshifted = (u32)(((old_state >> 18) ^ old_state) >> 27);
 	u32 rotation = (u32)(old_state >> 59);
-	return (xorshifted >> rotation) | (xorshifted << ((-rotation) & 31));
+	rotation = (-(i32)rotation);
+	return (xorshifted >> rotation) | (xorshifted << ((rotation) & 31));
 }
 
 static f32 random_f32(u64& state) { return (f32)(random_u32(state) >> 8) / 16777216.0f; }

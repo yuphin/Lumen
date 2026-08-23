@@ -42,8 +42,8 @@ SurfaceData load_surface(const SurfaceRef ref) {
 	const uint instance_idx = ref.primitive_instance_id.y;
 	const PrimInfo pinfo = DEREF(prim_info)[instance_idx];
 	const uint index_offset = pinfo.index_offset + 3 * triangle_idx;
-	const ivec3 indices = ivec3(pinfo.vertex_offset) +
-		ivec3(DEREF(index)[index_offset], DEREF(index)[index_offset + 1], DEREF(index)[index_offset + 2]);
+	const ivec3 indices = ivec3(pinfo.vertex_offset) + ivec3(DEREF(index)[index_offset], DEREF(index)[index_offset + 1],
+															 DEREF(index)[index_offset + 2]);
 	const Vertex v0 = DEREF(compact_vertices)[indices.x];
 	const Vertex v1 = DEREF(compact_vertices)[indices.y];
 	const Vertex v2 = DEREF(compact_vertices)[indices.z];
@@ -58,8 +58,8 @@ SurfaceData load_surface(const SurfaceRef ref) {
 	SurfaceData surface;
 	surface.pos = transform_surface_point(transform, object_pos);
 	surface.n_g = normalize(world_cross);
-	surface.n_s = normalize(transform_surface_normal(
-		transform, v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z));
+	surface.n_s =
+		normalize(transform_surface_normal(transform, v0.normal * bary.x + v1.normal * bary.y + v2.normal * bary.z));
 	surface.uv = v0.uv0 * bary.x + v1.uv0 * bary.y + v2.uv0 * bary.z;
 	surface.material_idx = pinfo.material_index;
 	surface.area = 0.5 * length(world_cross);

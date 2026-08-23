@@ -109,6 +109,8 @@ void main() {
 	for (uint gid = 0; gid < surfel_count; gid++) {
 		uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
 		Surfel surfel = DEREF(surfel_pool)[sid];
+		if(surfel.radius <= 0.0) continue;
+
 		SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
 
 		vec3 diff = hit_data.pos - surfel_hit_data.pos;

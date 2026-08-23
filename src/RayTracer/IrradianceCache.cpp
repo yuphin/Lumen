@@ -387,7 +387,7 @@ void render(Integrator* integrator) {
 
 	rg::add_compute(CSTR("Surfel: Integrate"),
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_integrate.comp")),
-					 .dims = {lm::div_ceil((u32)MAX_SURFEL_COUNT * state.rays_per_surfel, (u32)DEFAULT_WG_SIZE), 1, 1}})
+					 .dims = {lm::div_ceil((u32)MAX_SURFEL_COUNT, (u32)DEFAULT_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
 		.bind({integrator->lumen_scene->scene_desc_buffer});
 
