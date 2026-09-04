@@ -14,11 +14,12 @@ SCENE_BUFFER(surfel_pool, Surfel);
 SCENE_BUFFER(surfel_samples, SurfelSample);
 
 layout(local_size_x = DEFAULT_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
+// One invocation per surfel
 void main() {
 	// TODO: Use shared memory
-	uint surfel_id = gl_GlobalInvocationID.x / pc.rays_per_surfel;
+	uint surfel_id = gl_GlobalInvocationID.x;
 
-	if(surfel_id >= MAX_SURFEL_COUNT) {
+	if(surfel_id >= MAX_SURFEL_COUNT || pc.rays_per_surfel == 0u) {
 		return;
 	}
 	Surfel surfel = DEREF(surfel_pool)[surfel_id];

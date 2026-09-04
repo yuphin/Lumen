@@ -75,6 +75,23 @@ static void prefix_scan(u32 num_elems, u32 block_sum_offset, u32 out_offset, u32
 	}
 }
 
+static void update_scene_desc(Integrator* integrator) {
+	IrradianceCache& state = integrator->ircache;
+	SceneDesc desc = integrator::scene_desc_base(integrator);
+	SET_SCENE_BUFFER(desc, g_buffer, state.gbuffer);
+	SET_SCENE_BUFFER(desc, direct_lighting, state.current_frame_lighting_buffer);
+	SET_SCENE_BUFFER(desc, surfel_spawn_list, state.surfel_spawn_list_buffer);
+	SET_SCENE_BUFFER(desc, surfel_spawn_count, state.surfel_spawn_count_buffer);
+	SET_SCENE_BUFFER(desc, surfel_pool, state.surfel_pool_buffer);
+	SET_SCENE_BUFFER(desc, surfel_free_stack, state.surfel_free_stack_buffer);
+	SET_SCENE_BUFFER(desc, surfel_free_stack_count, state.surfel_free_stack_counter_buffer);
+	SET_SCENE_BUFFER(desc, grid_cell_counts, state.grid_cell_counts_buffer);
+	SET_SCENE_BUFFER(desc, grid_cell_indices, state.grid_cell_indices_buffer);
+	SET_SCENE_BUFFER(desc, grid_prefix_sum_scratch, state.grid_prefix_sum_scratch_buffer);
+	SET_SCENE_BUFFER(desc, surfel_samples, state.surfel_samples_buffer);
+	integrator::upload_scene_desc(integrator, desc);
+}
+
 void init(Integrator* integrator) {
 	IrradianceCache& state = integrator->ircache;
 	PCIRCache& pc = state.pc;
@@ -169,28 +186,14 @@ void init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = VkDeviceSize(prefix_sum_scratch_elements * sizeof(u32))});
 
+	u32 rpp = lm::max(state.rays_per_surfel, 1u);
 	state.surfel_samples_buffer =
 		prm::get_buffer({.name = CSTR("Surfel Samples"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = state.rays_per_surfel * MAX_SURFEL_COUNT * sizeof(IRCache::SurfelSample)});
-
-	SceneDesc desc = integrator::scene_desc_base(integrator);
-	// IRCache
-	SET_SCENE_BUFFER(desc, g_buffer, state.gbuffer);
-	SET_SCENE_BUFFER(desc, direct_lighting, state.current_frame_lighting_buffer);
-	SET_SCENE_BUFFER(desc, surfel_spawn_list, state.surfel_spawn_list_buffer);
-	SET_SCENE_BUFFER(desc, surfel_spawn_count, state.surfel_spawn_count_buffer);
-	SET_SCENE_BUFFER(desc, surfel_pool, state.surfel_pool_buffer);
-	SET_SCENE_BUFFER(desc, surfel_free_stack, state.surfel_free_stack_buffer);
-	SET_SCENE_BUFFER(desc, surfel_free_stack_count, state.surfel_free_stack_counter_buffer);
-	SET_SCENE_BUFFER(desc, grid_cell_counts, state.grid_cell_counts_buffer);
-	SET_SCENE_BUFFER(desc, grid_cell_indices, state.grid_cell_indices_buffer);
-	SET_SCENE_BUFFER(desc, grid_prefix_sum_scratch, state.grid_prefix_sum_scratch_buffer);
-	SET_SCENE_BUFFER(desc, surfel_samples, state.surfel_samples_buffer);
-
-	integrator::upload_scene_desc(integrator, desc);
+						 .size = (VkDeviceSize)rpp * MAX_SURFEL_COUNT * sizeof(SurfelSample)});
+	update_scene_desc(integrator);
 
 	assert(rg::settings().shader_inference == true);
 
@@ -244,8 +247,8 @@ void render(Integrator* integrator) {
 	rg::add_rt(CSTR("GBuffer"),
 			   {
 				   .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/primary.rgen")},
-								   {CSTR("src/shaders/surface.rmiss")},
-								   {CSTR("src/shaders/surface.rchit")},
+							   {CSTR("src/shaders/surface.rmiss")},
+							   {CSTR("src/shaders/surface.rchit")},
 							   {CSTR("src/shaders/ray_shadow.rmiss")},
 							   {CSTR("src/shaders/ray.rahit")}},
 				   .dims = {Window::width(), Window::height()},
@@ -286,7 +289,6 @@ void render(Integrator* integrator) {
 		u64 total_cells = get_total_grid_cells();
 		auto prefix_sums = lm::fixed_array_create<u32>(scratch.arena, total_cells);
 
-
 		for (u64 i = 0; i < total_cells; i++) {
 			u32 prev = i > 0 ? prefix_sums[i - 1] : 0;
 			prefix_sums.push_back(prev + counts[i]);
@@ -326,7 +328,7 @@ void render(Integrator* integrator) {
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
 	}
 
-	if(DEBUG_PASSES) {
+	if (DEBUG_PASSES) {
 		rg::run_and_submit(cmd);
 
 		u64 total_cells = get_total_grid_cells();
@@ -337,9 +339,9 @@ void render(Integrator* integrator) {
 		u32* counts = (u32*)vk::buffer_map(state.grid_cell_counts_buffer);
 
 		u32 active_cells = 0;
-		for(u64 i = 0; i < total_cells - 1; i++) {
+		for (u64 i = 0; i < total_cells - 1; i++) {
 			u32 count = counts[i + 1] - counts[i];
-			if(count == 0) {
+			if (count == 0) {
 				continue;
 			}
 			active_cells++;
@@ -349,7 +351,6 @@ void render(Integrator* integrator) {
 		_avg_surfels_in_a_grid_cell /= (f32)active_cells;
 		vk::buffer_unmap(state.grid_cell_counts_buffer);
 		pc.max_surfels_in_a_grid_cell = _highlight_max_surfel_cell ? _max_surfels_in_a_grid_cell : 0;
-
 	}
 
 	if (!state.pause_surfel_spawn) {
@@ -372,11 +373,11 @@ void render(Integrator* integrator) {
 	rg::add_rt(CSTR("Surfel: Trace"),
 			   {
 				   .shaders = {{CSTR("src/shaders/integrators/irradiance_cache/surfel_trace.rgen")},
-								   {CSTR("src/shaders/surface.rmiss")},
-								   {CSTR("src/shaders/surface.rchit")},
+							   {CSTR("src/shaders/surface.rmiss")},
+							   {CSTR("src/shaders/surface.rchit")},
 							   {CSTR("src/shaders/ray_shadow.rmiss")},
 							   {CSTR("src/shaders/ray.rahit")}},
-				   .dims = {(u32)state.rays_per_surfel, MAX_SURFEL_COUNT},
+				   .dims = {pc.rays_per_surfel, MAX_SURFEL_COUNT},
 			   })
 		.push_constants(&pc)
 		.bind({integrator->output_tex, integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer,
@@ -462,7 +463,26 @@ bool gui(Integrator* integrator) {
 								 lm::floor(max_allowed_surfel_radius));
 	result |=
 		ImGui::SliderFloat("Uniform cell distance threshold", &pc.grid_uniform_cell_distance_threshold, 0.01f, 10.0f);
-	result |= ImGui::SliderInt("Rays per surfel", (i32*)&state.rays_per_surfel, 0, 256);
+	const u32 min_rays_per_surfel = 1u;
+	const u32 max_rays_per_surfel = 256u;
+	bool num_rays_changed =
+		ImGui::SliderScalar("Rays per surfel", ImGuiDataType_U32, &state.rays_per_surfel, &min_rays_per_surfel,
+							&max_rays_per_surfel, "%u", ImGuiSliderFlags_AlwaysClamp);
+
+	if (num_rays_changed) {
+		vk::check(vkDeviceWaitIdle(vk::context().device));
+		prm::remove(state.surfel_samples_buffer);
+		u32 rpp = lm::max(state.rays_per_surfel, 1u);
+		state.surfel_samples_buffer =
+			prm::get_buffer({.name = CSTR("Surfel Samples"),
+							 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+									  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+							 .memory_type = vk::BUFFER_TYPE_GPU,
+							 .size = (VkDeviceSize)rpp * MAX_SURFEL_COUNT * sizeof(SurfelSample)});
+		update_scene_desc(integrator);
+	}
+
+	result |= num_rays_changed;
 
 	if (DEBUG_PASSES) {
 		ImGui::NewLine();
