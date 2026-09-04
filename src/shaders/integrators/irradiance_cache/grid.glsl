@@ -428,7 +428,6 @@ void collect_neighbors(vec3 surfel_pos, float surfel_radius, vec3 cam_pos,
 
 	vec3 surfel_grid_bbox = surfel_grid_pos_end - surfel_grid_pos_begin;
 	float surfel_cell_edge = max(max(abs(surfel_grid_bbox.x), abs(surfel_grid_bbox.y)), abs(surfel_grid_bbox.z));
-	float surfel_cell_edge_diag = length(surfel_grid_bbox);
 	float radius_in_uv = surfel_radius / surfel_cell_edge;
 
 	const float CELL_EPS = 1e-3;

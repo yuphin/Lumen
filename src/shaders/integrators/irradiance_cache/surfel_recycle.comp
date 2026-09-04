@@ -15,7 +15,6 @@ layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
 #include "ir_commons.glsl"
 #include "surfel_commons.glsl"
 
-
 SCENE_BUFFER(surfel_pool, Surfel);
 SCENE_BUFFER_SCALAR(surfel_free_stack_count, int);
 SCENE_BUFFER(surfel_free_stack, uint);
@@ -62,6 +61,10 @@ void main() {
 	float px_size = surfel_radius_px_size_for_position(surfel, surfel_hit_data.pos, view_pos);
 	float max_radius = max_surfel_radius_px();
 	if (px_size >= max_radius || px_size < 0.9 * pc.desired_surfel_radius_px) {
+		// float dist_relative = surfel_dist_from_camera( surfel_hit_data.pos);
+		// float dist_z = view_pos.z;
+		// debugPrintfEXT("Recycling with px_size %f (max radius: %f), dist_relative: %f, dist_z: %f\n", px_size,
+		// 			   max_radius, dist_relative, dist_z);
 		recycle_surfel(tid);
 	}
 }
