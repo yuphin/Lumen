@@ -28,6 +28,7 @@ layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 SCENE_BUFFER(g_buffer, SurfaceRef);
 #include "hash.glsl"
 #include "grid.glsl"
+#include "surfel_commons.glsl"
 
 layout(local_size_x = SURFELIZE_PASS_TILE_SIZE_XY, local_size_y = SURFELIZE_PASS_TILE_SIZE_XY, local_size_z = 1) in;
 
@@ -72,32 +73,12 @@ void main() {
 	for (uint gid = 0; gid < surfel_count; gid++) {
 		uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
 		Surfel surfel = DEREF(surfel_pool)[sid];
-		if(surfel.radius <= 0.0) continue;
-
+		if (surfel.radius <= 0.0) continue;
 
 		SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
 
-		vec3 from_surfel_center = hit_data.pos - surfel_hit_data.pos;
-		float dist = length(from_surfel_center);
-
-		float n_dot = dot(hit_data.n_s, surfel_hit_data.n_s);
-		if (n_dot < 0.3) {
-			continue;
-		}
-
-		float dist_normal = dot(from_surfel_center, surfel_hit_data.n_s);
-		float dist_tangent = sqrt(max(0.0, dist * dist - dist_normal * dist_normal));
-
-		// Penalize normal distance
-		float dist_aniso = sqrt(dist_tangent * dist_tangent + 4.0 * dist_normal * dist_normal);
-
-		float ratio = dist_aniso / surfel.radius;
-
-		float weight_pos = pow(max(5.0 - ratio, 0.0), 4.0) * (4.0 * ratio + 1.0);
-
-		float weight_normal = pow(max(dot(hit_data.n_s, surfel_hit_data.n_s), 0.0), 4.0);
-
-		float weight = weight_pos * weight_normal;
+		float weight = surfel_reconstruction_weight(hit_data.pos - surfel_hit_data.pos, hit_data.n_s,
+													 surfel_hit_data.n_s, surfel.radius);
 		weight_sum += weight;
 		irradiance_sum += weight * surfel.irradiance;
 	}

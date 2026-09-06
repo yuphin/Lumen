@@ -54,6 +54,11 @@ void main() {
 
 	// We're already on a surface, sample the BSDF
 	sample_bsdf(n_s, n_g, wo, material, TRANSPORT_MODE_FROM_CAMERA, side, wi, pdf_w, cos_theta, sampling_seed);
+	
+	if (pdf_w <= 0.0 || cos_theta <= 0.0) {
+		return;
+	}
+
 	surfel_origin = offset_ray(surfel_origin, n_g, wi);
 
 	traceRayEXT(tlas, flags, 0x1, 0, 0, 0, surfel_origin, tmin, wi, tmax, 0);
@@ -75,11 +80,7 @@ void main() {
 
 		bool forward_facing = face_forward(hit_data.n_s, hit_data.n_g, wo);
 		radiance += sample_direct_light(sampling_seed, hit_data.pos, hit_data.n_s, hit_data.n_g, wo, hit_material,
-											forward_facing);
-	}
-
-	if (pdf_w <= 0.0 || cos_theta <= 0.0) {
-		return;
+										forward_facing);
 	}
 
 	SurfelSample surfel_sample;

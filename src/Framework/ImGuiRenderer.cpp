@@ -35,6 +35,7 @@ static void ensure_buffer(vk::Buffer*& buffer, u64& capacity, u64 required, VkBu
 static void upload_draw_data(ImGuiFrameResources* frame, ImDrawData* draw_data) {
 	const u64 vertex_size = u64(draw_data->TotalVtxCount) * sizeof(ImDrawVert);
 	const u64 index_size = u64(draw_data->TotalIdxCount) * sizeof(ImDrawIdx);
+
 	ensure_buffer(frame->vertex_buffer, frame->vertex_capacity, vertex_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 				  CSTR("ImGui Vertex Buffer"));
 	ensure_buffer(frame->index_buffer, frame->index_capacity, index_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
@@ -116,7 +117,7 @@ void init(ImGuiRenderer* renderer) {
 	ImGui::StyleColorsDark();
 	ImGuiIO& io = ImGui::GetIO();
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-	io.BackendRendererName = "lumen_render_graph";
+	io.BackendRendererName = "lumen";
 	io.BackendRendererUserData = renderer;
 	io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
 	Window::imgui_init();

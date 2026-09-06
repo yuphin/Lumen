@@ -430,6 +430,7 @@ bool gui(Integrator* integrator) {
 		"GBuffer normals",
 		"Grid",
 		"Grid + surfels",
+		"Largest surfel weight",
 	};
 	bool result = false;
 	result |= ImGui::Checkbox("Direct lighting", &state.direct_lighting);
@@ -451,6 +452,10 @@ bool gui(Integrator* integrator) {
 		ImGui::EndCombo();
 	}
 	ImGui::EndDisabled();
+	if (state.debug_mode && state.debug_view == IRCACHE_DEBUG_VIEW_SURFEL_WEIGHT_FRACTION) {
+		ImGui::TextWrapped("Largest weight / total weight. White: one surfel dominates. "
+						   "Darker: more blending. Magenta: no contribution.");
+	}
 	result |= ImGui::Checkbox("Pause surfel spawning", &state.pause_surfel_spawn);
 	result |= ImGui::Checkbox("Camera relative surfel size", &state.use_camera_relative_surfel_size);
 	result |= ImGui::Checkbox("Enable surfel deduplication", &state.enable_surfel_dedup);

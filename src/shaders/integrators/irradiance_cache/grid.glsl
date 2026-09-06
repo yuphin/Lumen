@@ -1,4 +1,4 @@
-#define GRID_TYPE_CELL 0
+#define GRID_TYPE_UNIFORM_CELL 0
 #define GRID_TYPE_TRAPEZOIDAL_PLUS_X_AXIS 1
 #define GRID_TYPE_TRAPEZOIDAL_MINUS_X_AXIS 2
 #define GRID_TYPE_TRAPEZOIDAL_PLUS_Y_AXIS 3
@@ -95,7 +95,7 @@ uvec4 map_grid_axis(vec3 pos, out vec3 grid_pos_begin, out vec3 grid_pos_end) {
 
 		grid_pos_begin = center_grid_position(ijk);
 		grid_pos_end = center_grid_position(ijk_end);
-		return uvec4(GRID_TYPE_CELL, ijk);
+		return uvec4(GRID_TYPE_UNIFORM_CELL, ijk);
 	}
 	uint region;
 	float depth;
@@ -139,7 +139,7 @@ uvec4 map_grid_axis(vec3 pos) {
 }
 
 uint linearize_grid(uvec4 grid_pos) {
-	if (grid_pos.x == GRID_TYPE_CELL) {
+	if (grid_pos.x == GRID_TYPE_UNIFORM_CELL) {
 		uint N = GRID_CENTER_CELL_COUNT_AXIS;
 		return grid_pos.y + grid_pos.z * N + grid_pos.w * N * N;
 	} else {
@@ -187,7 +187,6 @@ vec2 compute_normalized_uvs(vec3 uv, uint region) {
 			return vec2(0);
 	};
 }
-
 
 ////////////////////////////
 // --- The following comment is a verbose description of the trapezoidal grid neighborhood rules ---
@@ -404,6 +403,11 @@ uvec4 bottom_right_neighbor(uvec3 cell_id, uint region) {
 
 #define INCLUDE_DEPTH
 
+// #define KERNEL_SUPPORT_R
+#define KERNEL_SUPPORT_2R
+
+#ifdef KERNEL_SUPPORT_R
+
 #ifdef INCLUDE_DEPTH
 #define MAX_NEIGHBOR_PLUS_ITSELF_COUNT 8
 #else
@@ -417,34 +421,34 @@ void collect_neighbors(vec3 surfel_pos, float surfel_radius, vec3 cam_pos,
 	vec3 surfel_cam_relative_pos = surfel_pos - cam_pos;
 	uvec4 surfel_grid_val = map_grid_axis(surfel_cam_relative_pos, surfel_grid_pos_begin, surfel_grid_pos_end);
 
-	if (surfel_grid_val.x == GRID_TYPE_CELL) {
+	if (surfel_grid_val.x == GRID_TYPE_UNIFORM_CELL) {
 		neighbors[0] = surfel_grid_val;
 		neighbor_count = 1;
 		return;
 	}
 
 	vec3 surfel_uv = (surfel_cam_relative_pos - surfel_grid_pos_begin) / (surfel_grid_pos_end - surfel_grid_pos_begin);
-	vec2 normalized_uv_surfel = compute_normalized_uvs(surfel_uv, surfel_grid_val.x);
+	vec2 normalized_surfel_uv = compute_normalized_uvs(surfel_uv, surfel_grid_val.x);
 
 	vec3 surfel_grid_bbox = surfel_grid_pos_end - surfel_grid_pos_begin;
 	float surfel_cell_edge = max(max(abs(surfel_grid_bbox.x), abs(surfel_grid_bbox.y)), abs(surfel_grid_bbox.z));
 	float radius_in_uv = surfel_radius / surfel_cell_edge;
 
 	const float CELL_EPS = 1e-3;
-	bool neighboring_left = (normalized_uv_surfel.x - radius_in_uv) < -CELL_EPS;
-	bool neighboring_right = (normalized_uv_surfel.x + radius_in_uv) > (1.0 + CELL_EPS);
-	bool neighboring_bottom = (normalized_uv_surfel.y - radius_in_uv) < -CELL_EPS;
-	bool neighboring_top = (normalized_uv_surfel.y + radius_in_uv) > (1.0 + CELL_EPS);
+	bool neighboring_left = (normalized_surfel_uv.x - radius_in_uv) < -CELL_EPS;
+	bool neighboring_right = (normalized_surfel_uv.x + radius_in_uv) > (1.0 + CELL_EPS);
+	bool neighboring_bottom = (normalized_surfel_uv.y - radius_in_uv) < -CELL_EPS;
+	bool neighboring_top = (normalized_surfel_uv.y + radius_in_uv) > (1.0 + CELL_EPS);
 
 	// Diagonals
 	float r2 = radius_in_uv * radius_in_uv;
-	vec2 d_tl = vec2(0.0, 1.0) - normalized_uv_surfel;
+	vec2 d_tl = vec2(0.0, 1.0) - normalized_surfel_uv;
 	bool neighboring_top_left = dot(d_tl, d_tl) < r2;
-	vec2 d_tr = vec2(1.0, 1.0) - normalized_uv_surfel;
+	vec2 d_tr = vec2(1.0, 1.0) - normalized_surfel_uv;
 	bool neighboring_top_right = dot(d_tr, d_tr) < r2;
-	vec2 d_bl = vec2(0.0, 0.0) - normalized_uv_surfel;
+	vec2 d_bl = vec2(0.0, 0.0) - normalized_surfel_uv;
 	bool neighboring_bottom_left = dot(d_bl, d_bl) < r2;
-	vec2 d_br = vec2(1.0, 0.0) - normalized_uv_surfel;
+	vec2 d_br = vec2(1.0, 0.0) - normalized_surfel_uv;
 	bool neighboring_bottom_right = dot(d_br, d_br) < r2;
 
 #ifdef INCLUDE_DEPTH
@@ -582,3 +586,116 @@ void collect_neighbors(vec3 surfel_pos, float surfel_radius, vec3 cam_pos,
 	debugPrintfEXT("----\n");
 #endif
 }
+
+#elif defined(KERNEL_SUPPORT_2R)
+#ifdef INCLUDE_DEPTH
+#define MAX_NEIGHBOR_PLUS_ITSELF_COUNT 18
+#else
+#define MAX_NEIGHBOR_PLUS_ITSELF_COUNT 9
+#endif	// INCLUDE_DEPTH
+
+void collect_neighbors(vec3 surfel_pos, float surfel_radius, vec3 cam_pos,
+					   inout uvec4 neighbors[MAX_NEIGHBOR_PLUS_ITSELF_COUNT], out uint neighbor_count) {
+
+
+	vec3 surfel_grid_pos_begin;
+	vec3 surfel_grid_pos_end;
+	vec3 surfel_cam_relative_pos = surfel_pos - cam_pos;
+	uvec4 surfel_grid_val = map_grid_axis(surfel_cam_relative_pos, surfel_grid_pos_begin, surfel_grid_pos_end);
+
+	if (surfel_grid_val.x == GRID_TYPE_UNIFORM_CELL) {
+		neighbors[0] = surfel_grid_val;
+		neighbor_count = 1;
+		return;
+	}
+
+
+	neighbor_count = 0;
+	// Itself
+	neighbors[neighbor_count++] = surfel_grid_val;
+	// Left
+	neighbors[neighbor_count++] = left_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+	// Right
+	neighbors[neighbor_count++] = right_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+
+	// Top
+	uvec4 top = top_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+	neighbors[neighbor_count++] = top;
+
+	// Bottom
+	uvec4 bottom = bottom_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+	neighbors[neighbor_count++] = bottom;
+
+	// Top-Left
+	uvec4 tl = top_left_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+	if(!all(equal(tl, top))) {
+		neighbors[neighbor_count++] = tl;
+	}
+	// Top-Right
+	uvec4 tr = top_right_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+	if(!all(equal(tr, top))) {
+		neighbors[neighbor_count++] = tr;
+	}
+	// Bottom-Left
+	uvec4 bl = bottom_left_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+	if(!all(equal(bl, bottom))) {
+		neighbors[neighbor_count++] = bl;
+	}
+
+	// Bottom-Right
+	uvec4 br = bottom_right_neighbor(surfel_grid_val.yzw, surfel_grid_val.x);
+	if(!all(equal(br, bottom))) {
+		neighbors[neighbor_count++] = br;
+	}
+
+
+
+#ifdef INCLUDE_DEPTH
+	float max_ratio = 1e6 / pc.grid_uniform_cell_distance_threshold;
+	float Nf = float(GRID_TRAPEZOIDAL_CELL_COUNT_AXIS);
+	float depth_begin = pc.grid_uniform_cell_distance_threshold * pow(max_ratio, float(surfel_grid_val.w) / Nf);
+	float depth_end = pc.grid_uniform_cell_distance_threshold * pow(max_ratio, float(surfel_grid_val.w + 1) / Nf);
+	float depth_curr = get_depth(surfel_grid_val.x, surfel_cam_relative_pos);
+
+	float support_radius = 2.0 * surfel_radius;
+	bool crossing_down = (depth_curr - support_radius < depth_begin) && surfel_grid_val.w > 0;
+	bool crossing_up =
+		(depth_curr + support_radius > depth_end) && surfel_grid_val.w < GRID_TRAPEZOIDAL_CELL_COUNT_AXIS - 1;
+	bool depth_diff = crossing_down || crossing_up;
+	int direction = crossing_down ? -1 : 1;
+
+	if(depth_diff) {
+		uint adjacent_depth = uint(int(surfel_grid_val.w) + direction);
+		// Itself
+		neighbors[neighbor_count++] = uvec4(neighbors[0].xyz, adjacent_depth);
+		// Left
+		neighbors[neighbor_count++] = uvec4(neighbors[1].xyz, adjacent_depth);
+		// Right
+		neighbors[neighbor_count++] = uvec4(neighbors[2].xyz, adjacent_depth);
+		// Top
+		neighbors[neighbor_count++] = uvec4(top.xyz, adjacent_depth);
+		// Bottom
+		neighbors[neighbor_count++] = uvec4(bottom.xyz, adjacent_depth);
+
+		// Top-Left
+		if(!all(equal(tl, top))) {
+			neighbors[neighbor_count++] = uvec4(tl.xyz, adjacent_depth);
+		}
+		// Top-Right
+		if(!all(equal(tr, top))) {
+			neighbors[neighbor_count++] = uvec4(tr.xyz, adjacent_depth);
+		}
+		// Bottom-Left
+		if(!all(equal(bl, bottom))) {
+			neighbors[neighbor_count++] = uvec4(bl.xyz, adjacent_depth);
+		}
+		// Bottom-Right
+		if(!all(equal(br, bottom))) {
+			neighbors[neighbor_count++] = uvec4(br.xyz, adjacent_depth);
+		}
+	}
+
+#endif
+}
+
+#endif
