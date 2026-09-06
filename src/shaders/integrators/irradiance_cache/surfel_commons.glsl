@@ -35,7 +35,7 @@ float surfel_reconstruction_weight(vec3 from_surfel_center, vec3 normal, vec3 su
 
 	// Penalize normal distance
 	float dist_aniso = sqrt(dist_tangent * dist_tangent + 4.0 * dist_normal * dist_normal);
-	float ratio = dist_aniso / (2.0f * radius);
+	float ratio = dist_aniso / (4.0f * radius);
 	float one_minus_ratio_sqr = (1.0 - ratio) * (1.0 - ratio);
 	float one_minus_ratio_sqr_sqr = one_minus_ratio_sqr * one_minus_ratio_sqr;
 	float weight_pos = ratio >= 1.0 ? 0.0 : one_minus_ratio_sqr_sqr * (1.0 + 4.0 * ratio);
