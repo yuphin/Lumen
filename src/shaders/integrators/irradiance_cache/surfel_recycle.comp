@@ -47,6 +47,11 @@ void main() {
 		return;
 	}
 
+#ifdef CLEAR_SURFELS
+	recycle_surfel(tid);
+	return;
+#endif
+
 	SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
 	vec4 view_pos = ubo.view * vec4(surfel_hit_data.pos, 1.0);
 

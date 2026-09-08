@@ -7,7 +7,7 @@ using namespace IRCache;
 
 ////////////////////////////
 // --- For debug purposes  ---
-#define DEBUG_PASSES 1
+#define DEBUG_PASSES 0
 static u32 _max_surfels_in_a_grid_cell = 0;
 static float _avg_surfels_in_a_grid_cell = 0;
 static bool _highlight_max_surfel_cell = false;
@@ -261,9 +261,12 @@ void render(Integrator* integrator) {
 
 	rg::add_compute(CSTR("Surfel: Recycle"),
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_recycle.comp")),
+					 .macros = {vk::ShaderMacro("CLEAR_SURFELS", state.clear_surfels)},
 					 .dims = {lm::div_ceil(MAX_SURFEL_COUNT, ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
 		.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
+
+	state.clear_surfels = false;
 
 	////////////////////////////
 	// --- Surfel Grid ---
@@ -322,7 +325,8 @@ void render(Integrator* integrator) {
 	if (state.enable_surfel_dedup) {
 		rg::add_compute(CSTR("Surfel: Dedup"),
 						{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_dedup.comp")),
-						 .macros = {vk::ShaderMacro("DEBUG_GRID_INVARIANTS", DEBUG_PASSES)},
+						 .macros = {vk::ShaderMacro("DEBUG_GRID_INVARIANTS", DEBUG_PASSES),
+									vk::ShaderMacro("SURFEL_HEXAGONAL_PLACEMENT", i32(state.hexagonal_placement))},
 						 .dims = {lm::div_ceil((u32)MAX_SURFEL_COUNT, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 			.push_constants(&pc)
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
@@ -358,6 +362,7 @@ void render(Integrator* integrator) {
 		u32 max_screen_tiles_y = lm::div_ceil(Window::height(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		rg::add_compute(CSTR("Surfel: Spawn"),
 						{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_spawn.comp")),
+						 .macros = {vk::ShaderMacro("SURFEL_HEXAGONAL_PLACEMENT", i32(state.hexagonal_placement))},
 						 .dims = {max_screen_tiles_x, max_screen_tiles_y, 1}})
 			.push_constants(&pc)
 			.zero(state.surfel_spawn_count_buffer)
@@ -365,6 +370,7 @@ void render(Integrator* integrator) {
 
 		rg::add_compute(CSTR("Surfel: Allocate"),
 						{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_allocate.comp")),
+						 .macros = {vk::ShaderMacro("SURFEL_HEXAGONAL_PLACEMENT", i32(state.hexagonal_placement))},
 						 .dims = {lm::div_ceil(MAX_SURFEL_COUNT, ALLOCATE_PASS_WG_SIZE), 1, 1}})
 			.push_constants(&pc)
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
@@ -457,8 +463,13 @@ bool gui(Integrator* integrator) {
 						   "Darker: more blending. Magenta: no contribution.");
 	}
 	result |= ImGui::Checkbox("Pause surfel spawning", &state.pause_surfel_spawn);
+	if (ImGui::Button("Clear surfels")) {
+		state.clear_surfels = true;
+		result = true;
+	}
 	result |= ImGui::Checkbox("Camera relative surfel size", &state.use_camera_relative_surfel_size);
 	result |= ImGui::Checkbox("Enable surfel deduplication", &state.enable_surfel_dedup);
+	result |= ImGui::Checkbox("Hexagonal surfel placement", &state.hexagonal_placement);
 	f32 max_trapezoidal_cell_size =
 		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], (f32)Window::height());
 

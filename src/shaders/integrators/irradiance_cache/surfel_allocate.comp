@@ -84,13 +84,7 @@ void main() {
 			SurfaceData other_hit_data = load_surface(other.gbuffer);
 
 			vec3 pos_to_other = hit_data.pos - other_hit_data.pos;
-			float dist_sqr = dot(pos_to_other, pos_to_other);
-			float dist_normal = dot(pos_to_other, other_hit_data.n_s);
-			float dist_tangent = sqrt(max(0.0, dist_sqr - dist_normal * dist_normal));
-			float n_dot = dot(hit_data.n_s, other_hit_data.n_s);
-
-			const float EPS = 1e-6;
-			if (n_dot > 0.3 && dist_tangent <= (other.radius + r + EPS)) {
+			if (surfel_covers_point(pos_to_other, hit_data.n_s, other_hit_data.n_s, other.radius, r)) {
 				return;
 			}
 		}
@@ -113,13 +107,7 @@ void main() {
 			SurfaceData other_hit_data = load_surface(other.gbuffer);
 
 			vec3 pos_to_other = hit_data.pos - other_hit_data.pos;
-			float dist_sqr = dot(pos_to_other, pos_to_other);
-			float dist_normal = dot(pos_to_other, other_hit_data.n_s);
-			float dist_tangent = sqrt(max(0.0, dist_sqr - dist_normal * dist_normal));
-			float n_dot = dot(hit_data.n_s, other_hit_data.n_s);
-
-			const float EPS = 1e-6;
-			if (n_dot > 0.3 && dist_tangent <= (other.radius + r + EPS)) {
+			if (surfel_covers_point(pos_to_other, hit_data.n_s, other_hit_data.n_s, other.radius, r)) {
 				return;
 			}
 		}

@@ -30,6 +30,27 @@ SCENE_BUFFER(surfel_pool, Surfel);
 
 #define TILE_COVERAGE_MAX 1e6
 #define TILE_PERIOD 3
+#define SURFACE_GRAZING_ANGLE_THRESHOLD 0.1
+
+
+bool is_lattice_pixel(uvec2 pixel, float radius_px) {
+	float dx = sqrt(3.0) * radius_px;
+	float dy = 1.5 * radius_px;
+
+	vec2 px_center = vec2(pixel) + 0.5;
+
+	int row = int(floor(px_center.y / dy + 0.5));
+
+	// Odd row -> shifted by half spacing
+	float shift_x = ((row & 1) != 0) ? 0.5 * dx : 0.0;
+
+	// Normalized column pos
+	int column = int(floor((px_center.x - shift_x) / dx + 0.5));
+
+	vec2 lattice_point = vec2(float(column) * dx + shift_x, float(row) * dy);
+
+	return all(equal(ivec2(pixel), ivec2(floor(lattice_point))));
+}
 
 // Process SURFELIZE_PASS_TILE_SIZE_XY * SURFELIZE_PASS_TILE_SIZE_XY tiles
 // 1 threadgroup processes each pixels in a tile (1 thread = 1 pixel)
@@ -60,31 +81,49 @@ void main() {
 		if (surface_ref_valid(gbuffer)) {
 			SurfaceData hit_data = load_surface(gbuffer);
 
-			coverage = 0.0;
 			vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
 			vec3 offset = hit_data.pos - cam_pos.xyz;
-			uvec4 grid_val = map_grid_axis(offset);
-			uint linear_idx = linearize_grid(grid_val);
-			uint surfel_offset = DEREF(grid_cell_counts)[linear_idx];
-			uint surfel_count = DEREF(grid_cell_counts)[linear_idx + 1] - surfel_offset;
-			float would_be_radius = surfel_radius_for_position(hit_data.pos);
 
-			for (uint gid = 0; gid < surfel_count; gid++) {
-				uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
-				Surfel surfel = DEREF(surfel_pool)[sid];
-				if (surfel.radius <= 0.0) continue;
-				SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
-				vec3 pos_to_surfel = hit_data.pos - surfel_hit_data.pos;
-				float dist_sqr = dot(pos_to_surfel, pos_to_surfel);
-				float dist_normal = dot(pos_to_surfel, surfel_hit_data.n_s);
-				float dist_tangent = sqrt(max(0.0, dist_sqr - dist_normal * dist_normal));
-				float n_dot = dot(hit_data.n_s, surfel_hit_data.n_s);
+#if SURFEL_HEXAGONAL_PLACEMENT
+			float grazing_angle = abs(dot(hit_data.n_g, normalize(-offset)));
+			bool valid_point = is_lattice_pixel(pixel_coords, pc.desired_surfel_radius_px) || grazing_angle < SURFACE_GRAZING_ANGLE_THRESHOLD;
+#else
+			bool valid_point = true;
+#endif // SURFEL_HEXAGONAL_PLACEMENT
+			if (valid_point) {
+				coverage = 0.0;
+				uvec4 grid_val = map_grid_axis(offset);
+				uint linear_idx = linearize_grid(grid_val);
+				uint surfel_offset = DEREF(grid_cell_counts)[linear_idx];
+				uint surfel_count = DEREF(grid_cell_counts)[linear_idx + 1] - surfel_offset;
+				float would_be_radius = surfel_radius_for_position(hit_data.pos);
 
-				if (n_dot < 0.3 || dist_tangent > (surfel.radius + would_be_radius)) {
-					continue;
+				for (uint gid = 0; gid < surfel_count; gid++) {
+					uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
+					Surfel surfel = DEREF(surfel_pool)[sid];
+					if (surfel.radius <= 0.0) continue;
+					SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
+					vec3 pos_to_surfel = hit_data.pos - surfel_hit_data.pos;
+#if SURFEL_HEXAGONAL_PLACEMENT
+					if (surfel_covers_point(pos_to_surfel, hit_data.n_s, surfel_hit_data.n_s, surfel.radius,
+											would_be_radius)) {
+						coverage = TILE_COVERAGE_MAX;
+						break;
+					}
+#else
+					float dist_sqr = dot(pos_to_surfel, pos_to_surfel);
+					float dist_normal = dot(pos_to_surfel, surfel_hit_data.n_s);
+					float dist_tangent = sqrt(max(0.0, dist_sqr - dist_normal * dist_normal));
+					float n_dot = dot(hit_data.n_s, surfel_hit_data.n_s);
+					float min_spacing = surfel_min_dist(surfel.radius, would_be_radius);
+
+					if (n_dot < 0.3 || dist_tangent > min_spacing) {
+						continue;
+					}
+					float weight = (1.0 - dist_tangent / min_spacing) * n_dot;
+					coverage += weight;
+#endif // SURFEL_HEXAGONAL_PLACEMENT
 				}
-				float weight = (1.0 - dist_tangent / (surfel.radius + would_be_radius)) * n_dot;
-				coverage += weight;
 			}
 		}
 	}
@@ -120,9 +159,11 @@ void main() {
 			uint surfel_idx = atomicAdd(DEREF(surfel_spawn_count), 1);
 			uint winner_pixel = winner_pixels[gl_SubgroupInvocationID];
 			uvec2 winner_pixel_coords = uvec2(winner_pixel / pc.height, winner_pixel % pc.height);
+			DEREF(surfel_spawn_list)[surfel_idx] = winner_pixel;
+
+			// Assertion
 			uint tiles_x = (pc.width + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
 			uint tiles_y = (pc.height + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
-			DEREF(surfel_spawn_list)[surfel_idx] = winner_pixel;
 			uint max_surfels_to_spawn = tiles_x * tiles_y;
 			ASSERT2(surfel_idx < max_surfels_to_spawn, "Surfel spawn idx exceeded (%u) the maximum number on %v2u\n",
 					surfel_idx, winner_pixel_coords);

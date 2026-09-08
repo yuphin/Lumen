@@ -167,8 +167,11 @@ void main() {
 			// debugPrintfEXT("(%d)Surfel %d, dist %f, n_dot %f, weight %f\n", idx, sid, dist_aniso, n_dot, weight);
 		}
 
-		if (weight > best_weight) {
+		if (weight > 0.0) {
 			overlapping_surfel_cnt++;
+		}
+
+		if (weight > best_weight) {
 			best_weight = weight;
 			best_sid = sid;
 		}

@@ -1,3 +1,4 @@
+
 float surfel_radius_factor(float desired_surfel_radius_px) {
 	return 2.0 * desired_surfel_radius_px / (ubo.projection[1][1] * pc.height);
 }
@@ -21,6 +22,29 @@ float surfel_radius_for_position(vec3 world_pos) {
 float surfel_radius_px_size_for_position(Surfel surfel, vec3 world_pos, vec4 view_pos) {
 	float dist = pc.use_camera_relative_surfel_size > 0 ? surfel_dist_from_camera(world_pos) : view_pos.z;
 	return abs(ubo.projection[1][1] * pc.height * surfel.radius / (2.0 * dist));
+}
+
+float surfel_min_dist(float radius_a, float radius_b) {
+	// const float factor = sqrt(3.0) * 0.5;
+	const float factor = 1.0;
+	return factor * (radius_a + radius_b);
+}
+
+bool surfel_covers_point(vec3 from_surfel_center, vec3 normal, vec3 surfel_normal, float radius,
+						 float candidate_radius) {
+#if SURFEL_HEXAGONAL_PLACEMENT
+	float dist_normal = dot(from_surfel_center, surfel_normal);
+	float dist_sqr = dot(from_surfel_center, from_surfel_center) + 3.0 * dist_normal * dist_normal;
+	return dot(normal, surfel_normal) > 0.3 && dist_sqr < radius * radius;
+#else
+	float dist_sqr = dot(from_surfel_center, from_surfel_center);
+	float dist_normal = dot(from_surfel_center, surfel_normal);
+	float dist_tangent = sqrt(max(0.0, dist_sqr - dist_normal * dist_normal));
+	float n_dot = dot(normal, surfel_normal);
+
+	const float spacing_epsilon = 1e-6;
+	return n_dot > 0.3 && dist_tangent <= (surfel_min_dist(radius, candidate_radius) + spacing_epsilon);
+#endif
 }
 
 float surfel_reconstruction_weight(vec3 from_surfel_center, vec3 normal, vec3 surfel_normal, float radius) {
