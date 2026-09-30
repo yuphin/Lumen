@@ -6,7 +6,7 @@ static constexpr lm::vec3 UP = lm::vec3(0, 1, 0);
 static constexpr lm::vec3 RIGHT = lm::vec3(1, 0, 0);
 static constexpr lm::vec3 FORWARD = lm::vec3(0, 0, 1);
 static void camera_init_projection(Camera* camera, f32 aspect_ratio) {
-	camera->projection = lm::mat4(1.0f);
+	camera->projection = lm::mat4(0.0f);
 	camera->projection[0][0] = 1 / (aspect_ratio * tanf(lm::radians(camera->fov / 2)));
 	camera->projection[1][1] = -1 / (tanf(lm::radians(camera->fov / 2)));
 	camera->projection[2][2] = camera->far_plane / (camera->near_plane - camera->far_plane);

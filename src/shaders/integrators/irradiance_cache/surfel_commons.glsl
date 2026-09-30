@@ -16,7 +16,24 @@ float surfel_radius_for_position(vec3 world_pos) {
 		vec4 view_pos = ubo.view * vec4(world_pos, 1.0);
 		dist = view_pos.z;
 	}
-	return abs(surfel_radius_factor(pc.desired_surfel_radius_px) * dist);
+	float result = abs(surfel_radius_factor(pc.desired_surfel_radius_px) * dist);
+
+#if SURFEL_HEXAGONAL_PLACEMENT
+	// Quantize radius
+	/*
+	Define r = b * s^k
+	b * s^k <= R < b * s^(k+1)
+	where R is the continuous radius
+	then k <= log(R / b) / log(s) < k + 1
+
+	*/
+
+	const float base_radius = 0.01;
+	const float radius_step = 1.1;
+	float level = floor(log(result / base_radius) / log(radius_step));
+	return base_radius * pow(radius_step, level);
+#endif	// SURFEL_HEXAGONAL_PLACEMENT
+	return result;
 }
 
 float surfel_radius_px_size_for_position(Surfel surfel, vec3 world_pos, vec4 view_pos) {
@@ -59,7 +76,10 @@ float surfel_reconstruction_weight(vec3 from_surfel_center, vec3 normal, vec3 su
 
 	// Penalize normal distance
 	float dist_aniso = sqrt(dist_tangent * dist_tangent + 4.0 * dist_normal * dist_normal);
-	float ratio = dist_aniso / (4.0f * radius);
+	float ratio = dist_aniso / (2.0f * radius);
+#ifdef KERNEL_SUPPORT_2R
+	ratio = dist_aniso / (4.0f * radius);
+#endif
 	float one_minus_ratio_sqr = (1.0 - ratio) * (1.0 - ratio);
 	float one_minus_ratio_sqr_sqr = one_minus_ratio_sqr * one_minus_ratio_sqr;
 	float weight_pos = ratio >= 1.0 ? 0.0 : one_minus_ratio_sqr_sqr * (1.0 + 4.0 * ratio);

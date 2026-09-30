@@ -10,6 +10,7 @@
 #include "../../bda.glsl"
 #include "ir_commons.h"
 #include "../../random.glsl"
+#include "../../utils.glsl"
 layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
@@ -22,7 +23,6 @@ SCENE_BUFFER(grid_cell_counts, uint);
 #include "grid.glsl"
 #include "surfel_commons.glsl"
 
-
 SCENE_BUFFER(g_buffer, SurfaceRef);
 SCENE_BUFFER(surfel_spawn_list, uint);
 SCENE_BUFFER_SCALAR(surfel_spawn_count, uint);
@@ -30,27 +30,80 @@ SCENE_BUFFER(surfel_pool, Surfel);
 
 #define TILE_COVERAGE_MAX 1e6
 #define TILE_PERIOD 3
-#define SURFACE_GRAZING_ANGLE_THRESHOLD 0.1
 
+#if SURFEL_HEXAGONAL_PLACEMENT
+vec2 lattice_offset(vec2 pos, float radius) {
+	float dx = sqrt(3.0) * radius;
+	// dx * sqrt(3) / 2 => 1.5 * radius
+	float dy = 1.5 * radius;
+	int first_row = int(floor(pos.y / dy));
+	vec2 best = vec2(0.0);
+	float best_dist = 1e30;
+	// Compare the nearest column in each of the two surrounding rows.
+	for (int j = 0; j < 2; ++j) {
+		int row = first_row + j;
+		// Shift accounts for hexagonal grid
+		float shift = ((row & 1) != 0) ? 0.5 * dx : 0.0;
+		// Ignore shift for column calculation
+		float column = floor((pos.x - shift) / dx + 0.5);
 
-bool is_lattice_pixel(uvec2 pixel, float radius_px) {
-	float dx = sqrt(3.0) * radius_px;
-	float dy = 1.5 * radius_px;
-
-	vec2 px_center = vec2(pixel) + 0.5;
-
-	int row = int(floor(px_center.y / dy + 0.5));
-
-	// Odd row -> shifted by half spacing
-	float shift_x = ((row & 1) != 0) ? 0.5 * dx : 0.0;
-
-	// Normalized column pos
-	int column = int(floor((px_center.x - shift_x) / dx + 0.5));
-
-	vec2 lattice_point = vec2(float(column) * dx + shift_x, float(row) * dy);
-
-	return all(equal(ivec2(pixel), ivec2(floor(lattice_point))));
+		vec2 candidate = vec2(column * dx + shift, float(row) * dy);
+		vec2 delta = candidate - pos;
+		float d2 = dot(delta, delta);
+		if (d2 < best_dist) {
+			best = candidate;
+			best_dist = d2;
+		}
+	}
+	return best;
 }
+
+bool valid_hex_lattice(SurfaceData source, out uint target_pixel, out SurfaceData target_hit) {
+	float radius = surfel_radius_for_position(source.pos);
+	// Quantize normal
+	vec2 encoded = round(oct_encode(source.n_g) * 8.0) / 8.0;
+	vec3 plane_normal = oct_decode(encoded);
+	vec3 tU, tV;
+	branchless_onb(plane_normal, tU, tV);
+
+	// projected 3D -> 2D pos along the tangent frame
+	vec2 projected_pos = vec2(dot(source.pos, tU), dot(source.pos, tV));
+
+	// Bounds:
+	// offset.x -> [-sqrt(3) * r  /2 , sqrt(3) * r / 2]
+	// offset.y -> [-r, r]
+	vec2 offset = lattice_offset(projected_pos, radius) - projected_pos;
+	vec3 delta = tU * offset.x + tV * offset.y;
+	// Correct onto the actual tangent plane without changing the snapped UV.
+	delta -= plane_normal * (dot(source.n_g, delta) / dot(source.n_g, plane_normal));
+	vec3 proposed = source.pos + delta;
+
+	vec4 clip = ubo.projection * ubo.view * vec4(proposed, 1.0);
+	if (clip.w <= 0.0) {
+		return false;
+	}
+	vec2 screen_uv = 0.5 * (clip.xy / clip.w + vec2(1.0));
+	if (any(lessThan(screen_uv, vec2(0.0))) || any(greaterThanEqual(screen_uv, vec2(1.0)))) {
+		return false;
+	}
+	uvec2 pixel = uvec2(floor(screen_uv * vec2(pc.width, pc.height)));
+	target_pixel = pixel.x * pc.height + pixel.y;
+
+	SurfaceRef ref = DEREF(g_buffer)[target_pixel];
+	// Not a surface
+	if (!surface_ref_valid(ref)) {
+		return false;
+	}
+	target_hit = load_surface(ref);
+	// Surface mismatch
+	if (dot(source.n_g, target_hit.n_g) <= 0.9) {
+		return false;
+	}
+	// Positional error
+	vec3 error = target_hit.pos - proposed;
+	return dot(error, error) <= 0.25 * radius * radius;
+}
+#endif
 
 // Process SURFELIZE_PASS_TILE_SIZE_XY * SURFELIZE_PASS_TILE_SIZE_XY tiles
 // 1 threadgroup processes each pixels in a tile (1 thread = 1 pixel)
@@ -76,22 +129,23 @@ void main() {
 	}
 
 	float coverage = TILE_COVERAGE_MAX;
+	uint candidate_pixel = pixel_idx;
 	if (pixel_coords.x < pc.width && pixel_coords.y < pc.height) {
 		SurfaceRef gbuffer = DEREF(g_buffer)[pixel_idx];
 		if (surface_ref_valid(gbuffer)) {
-			SurfaceData hit_data = load_surface(gbuffer);
-
-			vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
-			vec3 offset = hit_data.pos - cam_pos.xyz;
+			SurfaceData source_hit = load_surface(gbuffer);
 
 #if SURFEL_HEXAGONAL_PLACEMENT
-			float grazing_angle = abs(dot(hit_data.n_g, normalize(-offset)));
-			bool valid_point = is_lattice_pixel(pixel_coords, pc.desired_surfel_radius_px) || grazing_angle < SURFACE_GRAZING_ANGLE_THRESHOLD;
+			SurfaceData hit_data;
+			bool valid_point = valid_hex_lattice(source_hit, candidate_pixel, hit_data);
 #else
+			SurfaceData hit_data = source_hit;
 			bool valid_point = true;
-#endif // SURFEL_HEXAGONAL_PLACEMENT
+#endif	// SURFEL_HEXAGONAL_PLACEMENT
 			if (valid_point) {
 				coverage = 0.0;
+				vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
+				vec3 offset = hit_data.pos - cam_pos.xyz;
 				uvec4 grid_val = map_grid_axis(offset);
 				uint linear_idx = linearize_grid(grid_val);
 				uint surfel_offset = DEREF(grid_cell_counts)[linear_idx];
@@ -122,7 +176,7 @@ void main() {
 					}
 					float weight = (1.0 - dist_tangent / min_spacing) * n_dot;
 					coverage += weight;
-#endif // SURFEL_HEXAGONAL_PLACEMENT
+#endif	// SURFEL_HEXAGONAL_PLACEMENT
 				}
 			}
 		}
@@ -140,7 +194,7 @@ void main() {
 	uint winner = subgroupBallotFindLSB(ballot);
 
 	if (gl_SubgroupInvocationID == winner && i_am_min) {
-		winner_pixels[gl_SubgroupID] = pixel_idx;
+		winner_pixels[gl_SubgroupID] = candidate_pixel;
 		winner_coverages[gl_SubgroupID] = coverage;
 	}
 	barrier();

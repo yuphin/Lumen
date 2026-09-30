@@ -403,8 +403,8 @@ uvec4 bottom_right_neighbor(uvec3 cell_id, uint region) {
 
 #define INCLUDE_DEPTH
 
-// #define KERNEL_SUPPORT_R
-#define KERNEL_SUPPORT_2R
+#define KERNEL_SUPPORT_R
+// #define KERNEL_SUPPORT_2R
 
 #ifdef KERNEL_SUPPORT_R
 
