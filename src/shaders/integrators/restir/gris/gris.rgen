@@ -187,8 +187,7 @@ void main() {
 			throughput_until_rc = throughput;
 #endif	// STREAMING_MODE == STREAMING_MODE_SPLIT
 			vec3 to_prev = origin.xyz - gbuffer.pos;
-			reconnection_data.rc_partial_jacobian =
-				abs(dot(n_g, wo)) * rc_partial_jacobian / dot(to_prev, to_prev);
+			reconnection_data.rc_partial_jacobian = abs(dot(n_g, wo)) * rc_partial_jacobian / dot(to_prev, to_prev);
 		}
 
 		connectable = !connectable_vertex_found && curr_rough;
@@ -204,9 +203,9 @@ void main() {
 		vec3 emitter_normal = n_s;
 		if (emitter_light_idx != INVALID_LIGHT_INDEX) {
 			const Light emitter = lights[emitter_light_idx];
-			const TriangleRecord emitter_triangle = triangle_at_bary(
-				DEREF(prim_info)[emitter.prim_mesh_idx], vec2(0.0), payload.surface.primitive_instance_id.x,
-				emitter.world_matrix);
+			const TriangleRecord emitter_triangle =
+				triangle_at_bary(DEREF(prim_info)[emitter.prim_mesh_idx], vec2(0.0),
+								 payload.surface.primitive_instance_id.x, emitter.world_matrix);
 			emitter_normal = emitter_triangle.n_g;
 			const float cos_from_light = dot(emitter_normal, wo);
 			if (is_light_two_sided(emitter.light_flags) || cos_from_light > 0.0) {
@@ -219,10 +218,10 @@ void main() {
 			direct_lighting += throughput * emitted_radiance;
 			gbuffer_out = payload.surface;
 		} else {
-			float pdf_light_w = emitter_light_idx == INVALID_LIGHT_INDEX
-									? 0.0
-									: light_direct_pdf_w(emitter_light_idx, origin.xyz, gbuffer.pos,
-														 emitter_normal, pc.num_lights);
+			float pdf_light_w =
+				emitter_light_idx == INVALID_LIGHT_INDEX
+					? 0.0
+					: light_direct_pdf_w(emitter_light_idx, origin.xyz, gbuffer.pos, emitter_normal, pc.num_lights);
 			float mis_bsdf;
 
 			float mis_light = 0;
@@ -319,14 +318,15 @@ void main() {
 			vec3 Le;
 			vec3 nee_wi;
 			float nee_pdf_light_w;
-			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, n_g, wo, mis_factor_set ? d_vm : 0.0, light_identity,
-							 reconnection_data.rc_Li, is_directional_light, Le, nee_wi, nee_pdf_light_w, depth);
+			vec3 Li =
+				do_nee(seed, gbuffer.pos, hit_mat, side, n_s, n_g, wo, mis_factor_set ? d_vm : 0.0, light_identity,
+					   reconnection_data.rc_Li, is_directional_light, Le, nee_wi, nee_pdf_light_w, depth);
 			vec3 contribution = Li * throughput;
 			// At 0 depth, we let ReSTIR DI handle the direct lighting
 			bool nee_connectable = depth > 0 && connectable;
 
-			// Stream the NEE path at the reconnection vertex
 			if (nee_connectable && any(greaterThan(Li, vec3(0)))) {
+				// Stream the NEE path at the reconnection vertex
 				reconnection_data.rc_coords = rc_coords;
 				// reconnection_data.rc_partial_jacobian = rc_partial_jacobian;
 				reconnection_data.rc_partial_jacobian = 1;
@@ -359,6 +359,7 @@ void main() {
 				}
 
 			} else if (connectable_vertex_found) {
+				// Stream after the reconnection vertex
 				reconnection_data.rc_Li = postfix_throughput * Li;
 				reconnection_data.reservoir_contribution = calc_target_pdf(contribution);
 				reconnection_data.path_flags =
@@ -385,6 +386,11 @@ void main() {
 				}
 #endif	// STREAMING_MODE == STREAMING_MODE_SPLIT
 				valid_reservoir = valid_reservoir || merged;
+			} else if (depth > 0) {
+				// We don't have a connectable vertex yet
+				// And yet nee_connectable is false
+				// Add to prefix contribution
+				prefix_col += contribution;
 			}
 
 			if (depth > 0) {

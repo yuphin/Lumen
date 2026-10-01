@@ -25,7 +25,6 @@ float surfel_radius_for_position(vec3 world_pos) {
 	b * s^k <= R < b * s^(k+1)
 	where R is the continuous radius
 	then k <= log(R / b) / log(s) < k + 1
-
 	*/
 
 	const float base_radius = 0.01;
