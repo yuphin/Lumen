@@ -364,6 +364,7 @@ void render(Integrator* integrator) {
 	// Calculate CDF
 	rg::add_compute(CSTR("Calculate CDF"),
 					{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/calc_cdf.comp")),
+					 .specialization_data = {(u32)config.num_bootstrap_samples},
 					 .dims = {(u32)lm::ceil(config.num_bootstrap_samples / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer);
