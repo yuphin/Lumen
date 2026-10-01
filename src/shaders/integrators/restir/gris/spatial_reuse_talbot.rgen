@@ -38,9 +38,8 @@ void main() {
 
 	uint seed_helper = pc.general_seed;
 	ivec2 offsets[MAX_SPATIAL_SAMPLES];
-	for (int i = 0; i < MAX_SPATIAL_SAMPLES; i++) {
-		ivec2 offset = get_neighbor_offset(seed);
-		offsets[i++] = offset;
+	for (int i = 0; i < num_spatial_samples; i++) {
+		offsets[i] = get_neighbor_offset(seed);
 	}
 	float mis_weight_sum = 0;
 	float curr_new_partial_jacobian = 0;
