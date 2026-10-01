@@ -42,51 +42,55 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 }
 
 vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 n_g, vec3 wo, float d_vm,
-			out LightSampleIdentity identity, inout vec3 light_dir_or_pdf, out bool is_directional_light, out vec3 Le,
-			out vec3 wi, out float pdf_light_w, int depth) {
+			out LightSampleIdentity identity, out bool is_directional_light, out vec3 Le, out vec3 wi,
+			out float pdf_light_w, int depth) {
 	const LightLiSample light_sample = sample_light_Li(rand4(seed), pos, pc.num_lights);
 	identity = light_sample.identity;
 	Le = light_sample.Li;
 	wi = light_sample.wi;
 	pdf_light_w = light_sample.pdf_position_w;
+	is_directional_light = get_light_type(light_sample.flags) == LIGHT_DIRECTIONAL;
 	const float wi_len = light_sample.distance;
-	if (wi_len <= EPS) {
+	if (wi_len <= EPS || pdf_light_w <= 0 || Le == vec3(0)) {
 		return vec3(0);
 	}
-	const uint light_type = get_light_type(light_sample.flags);
-	const vec3 p = offset_ray2(pos, n_g, dot(wi, n_g) < 0.0);
 	float light_bsdf_pdf_fwd;
 	float light_bsdf_pdf_rev;
-	float cos_x_s = max(0, dot(n_s, wi));
-	float cos_x_g = abs(dot(n_g, wi));
-	vec3 f_light = eval_bsdf(n_s, n_g, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, side, wi, light_bsdf_pdf_fwd,
-							   light_bsdf_pdf_rev);
-	bool visible = !connection_occluded(p, wi, wi_len, 0xFF);
-	is_directional_light = light_type == LIGHT_DIRECTIONAL;
-
-	light_dir_or_pdf = vec3(light_sample.pdf_position_a, vec2(0));
-
-	if (visible && pdf_light_w > 0 && cos_x_s > 0 && f_light != vec3(0.0)) {
-		float mis_light = is_light_delta(light_sample.flags) ? 0 : light_bsdf_pdf_fwd / pdf_light_w;
-		ASSERT(mis_light >= 0);
 #ifndef DISABLE_PM_MIS
-		const float pdf_dir = light_emission_direction_pdf_w(
-			light_sample.identity.light_idx, light_sample.normal, -light_sample.wi);
-		float mis_eye = wi_len == 0
-						? 0
-						: pdf_dir * light_bsdf_pdf_rev * cos_x_g * d_vm /
-							  (wi_len * wi_len * light_sample.selection_pmf);
-		ASSERT(d_vm >= 0);
-		ASSERT(mis_eye >= 0);
+	const bool eval_reverse_pdf = true;
 #else
-		float mis_eye = 0;
+	const bool eval_reverse_pdf = false;
 #endif	// !DISABLE_PM_MIS
-		float mis_weight = 1 / (1 + mis_light + mis_eye);
-		ASSERT(!isnan(mis_weight));
-		ASSERT(mis_weight >= 0);
-		return mis_weight * f_light * abs(cos_x_s) * Le / pdf_light_w;
+	vec3 f_light = eval_bsdf(n_s, n_g, wo, hit_mat, TRANSPORT_MODE_FROM_CAMERA, side, wi, light_bsdf_pdf_fwd,
+							 light_bsdf_pdf_rev, eval_reverse_pdf);
+
+	if (f_light == vec3(0)) {
+		return vec3(0);
 	}
-	return vec3(0);
+
+	const vec3 p = offset_ray2(pos, n_g, dot(wi, n_g) < 0.0);
+	if (connection_occluded(p, wi, wi_len, 0xFF)) {
+		return vec3(0);
+	}
+
+	float mis_light = is_light_delta(light_sample.flags) ? 0 : light_bsdf_pdf_fwd / pdf_light_w;
+	ASSERT(mis_light >= 0);
+#ifndef DISABLE_PM_MIS
+	const float cos_x_g = abs(dot(n_g, wi));
+	const float pdf_dir =
+		light_emission_direction_pdf_w(light_sample.identity.light_idx, light_sample.normal, -light_sample.wi);
+	float mis_eye =
+		wi_len == 0 ? 0
+					: pdf_dir * light_bsdf_pdf_rev * cos_x_g * d_vm / (wi_len * wi_len * light_sample.selection_pmf);
+	ASSERT(d_vm >= 0);
+	ASSERT(mis_eye >= 0);
+#else
+	float mis_eye = 0;
+#endif	// !DISABLE_PM_MIS
+	float mis_weight = 1 / (1 + mis_light + mis_eye);
+	ASSERT(!isnan(mis_weight));
+	ASSERT(mis_weight >= 0);
+	return mis_weight * f_light * abs(dot(n_s, wi)) * Le / pdf_light_w;
 }
 
 vec2 to_spherical(const vec3 v) {
@@ -205,8 +209,9 @@ vec3 get_prev_primary_direction(uvec2 coords) {
 	return normalize(sample_prev_camera(d).xyz);
 }
 
-bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, float src_jacobian, out float jacobian_out,
-				   out vec3 reservoir_contribution, out float jacobian_num, out OcclusionData occlusion_data) {
+bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, float src_jacobian,
+				   out float jacobian_out, out vec3 reservoir_contribution, out float jacobian_num,
+				   out OcclusionData occlusion_data) {
 	// Note: The source reservoir always corresponds to the canonical reservoir because retracing only happens on
 	// pairwise mode
 	reservoir_contribution = vec3(0);
@@ -308,8 +313,7 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 			float wi_len_sqr = dot(dst_postfix_wi, dst_postfix_wi);
 			float wi_len = sqrt(wi_len_sqr);
 			dst_postfix_wi /= wi_len;
-			occlusion_data.origin =
-				offset_ray2(org_pos, dst_gbuffer.n_g, dot(dst_postfix_wi, dst_gbuffer.n_g) < 0.0);
+			occlusion_data.origin = offset_ray2(org_pos, dst_gbuffer.n_g, dot(dst_postfix_wi, dst_gbuffer.n_g) < 0.0);
 			occlusion_data.dir = dst_postfix_wi;
 			occlusion_data.dir_length = wi_len;
 			set_bounce_flag(bounce_flags, prefix_depth + 1, true);
@@ -320,9 +324,9 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 			float rc_cos_x = dot(dst_gbuffer.n_s, dst_postfix_wi);
 			float dst_postfix_pdf;
 			float unused_rev_pdf;
-			vec3 dst_postfix_f = eval_bsdf(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo, dst_hit_mat,
-										   TRANSPORT_MODE_FROM_CAMERA, dst_side, dst_postfix_wi,
-										   dst_postfix_pdf, unused_rev_pdf, false);
+			vec3 dst_postfix_f =
+				eval_bsdf(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo, dst_hit_mat, TRANSPORT_MODE_FROM_CAMERA, dst_side,
+						  dst_postfix_wi, dst_postfix_pdf, unused_rev_pdf, false);
 			reservoir_contribution = prefix_throughput * abs(rc_cos_x) * dst_postfix_f;
 
 #if 0
@@ -341,8 +345,8 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 				ASSERT(reconnection_seed == data.debug_seed);
 #endif
 				const float mis_weight = is_light_delta(replayed_light.flags)
-										 ? 1.0
-										 : 1.0 / (1.0 + dst_postfix_pdf / replayed_light.pdf_position_w);
+											 ? 1.0
+											 : 1.0 / (1.0 + dst_postfix_pdf / replayed_light.pdf_position_w);
 				reservoir_contribution *= replayed_light.Li * mis_weight / replayed_light.pdf_position_w;
 #if LOG_GRIS
 				LOG_CLICKED3("NEE: %d - %d = %v3f\n", prefix_depth, (data.path_flags) >> 16, reservoir_contribution);
@@ -360,9 +364,9 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 
 				const vec3 rc_wi_post = from_spherical(data.rc_wi);
 				float rc_pdf_post;
-				vec3 rc_postfix_f = eval_bsdf(rc_gbuffer.n_s, rc_gbuffer.n_g, -dst_postfix_wi, rc_hit_mat,
-										 TRANSPORT_MODE_FROM_CAMERA, rc_post_side, rc_wi_post,
-											  rc_pdf_post, unused_rev_pdf, false);
+				vec3 rc_postfix_f =
+					eval_bsdf(rc_gbuffer.n_s, rc_gbuffer.n_g, -dst_postfix_wi, rc_hit_mat, TRANSPORT_MODE_FROM_CAMERA,
+							  rc_post_side, rc_wi_post, rc_pdf_post, unused_rev_pdf, false);
 
 				float mis_weight = 1.0;
 				if (rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
@@ -374,8 +378,8 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 				}
 
 				if (rc_type == RECONNECTION_TYPE_NEE_AFTER_RC) {
-					reservoir_contribution *= rc_postfix_f * abs(dot(rc_gbuffer.n_s, rc_wi_post)) /
-											  uintBitsToFloat(data.rc_seed);
+					reservoir_contribution *=
+						rc_postfix_f * abs(dot(rc_gbuffer.n_s, rc_wi_post)) / uintBitsToFloat(data.rc_seed);
 
 				} else if (rc_type != RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
 					jacobian_num *= rc_pdf_post;
@@ -399,9 +403,8 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 		}
 
 		float pdf, cos_theta;
-		const vec3 f = sample_bsdf(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo, dst_hit_mat,
-								   TRANSPORT_MODE_FROM_CAMERA, dst_side,
-								   dst_wi, pdf, cos_theta, reservoir_seed);
+		const vec3 f = sample_bsdf(dst_gbuffer.n_s, dst_gbuffer.n_g, dst_wo, dst_hit_mat, TRANSPORT_MODE_FROM_CAMERA,
+								   dst_side, dst_wi, pdf, cos_theta, reservoir_seed);
 
 		if (pdf == 0) {
 			return false;
@@ -423,8 +426,8 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 	}
 }
 
-bool retrace_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, float src_jacobian, out float jacobian_out,
-				   out vec3 reservoir_contribution, out float jacobian_num) {
+bool retrace_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, float src_jacobian,
+				   out float jacobian_out, out vec3 reservoir_contribution, out float jacobian_num) {
 	OcclusionData occlusion_data;
 	bool result = advance_paths(dst_gbuffer, data, dst_wi, src_jacobian, jacobian_out, reservoir_contribution,
 								jacobian_num, occlusion_data);

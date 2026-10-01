@@ -38,14 +38,14 @@ struct ReSTIRPT {
 	bool hide_reconnection_radiance = false;
 	bool enable_temporal_reuse = true;
 	bool enable_pm_temporal_reuse = true;
-	bool enable_gris = false;
+	bool enable_gris = true;
 	bool pixel_debug = false;
 	bool enable_permutation_sampling = false;
 	bool enable_atmosphere = false;
 	bool enable_defensive_formulation = true;
 	bool enable_occlusion = true;
 	bool enable_temporal_jitter = true;
-	bool enable_photon_mapping = true;
+	bool enable_photon_mapping = false;
 	bool enable_photon_gather = true;
 	bool progressive_radius_reduction = false;
 	bool enable_pm_mis = false;
