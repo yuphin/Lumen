@@ -526,8 +526,12 @@ static bool gui() {
 				scope++;
 				parent = parent->parent;
 			}
-			double elapsed_ms = GPUQueryManager::get_elapsed(data) * 1e-6;
-			frame_time_gpu_ms += elapsed_ms;
+			f64 elapsed_ms = GPUQueryManager::get_elapsed_ms(data);
+			// Only top level scopes count toward the frame time.
+			// A nested scope is already inside its parent's interval
+			if (scope == 0) {
+				frame_time_gpu_ms += elapsed_ms;
+			}
 			ImGui::Text("%*s%.2f ms: %.*s", scope * 2, "", elapsed_ms, (int)data.name.size, data.name.data);
 		}
 		ImGui::Text("Frame time (GPU) %.2f ms", frame_time_gpu_ms);

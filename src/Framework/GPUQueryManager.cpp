@@ -32,7 +32,7 @@ void begin(VkCommandBuffer cmd, const lm::String& name) {
 	}
 	LUMEN_ASSERT(_curr_query_idx + 2 <= MAX_QUERY_COUNT, "Query pool exhausted");
 	LUMEN_ASSERT(_curr_timestamp_idx < MAX_TIMESTAMP_COUNT, "Timestamp data exhausted");
-	vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vk::context().query_pool_timestamps[_curr_pool_idx],
+	vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vk::context().query_pool_timestamps[_curr_pool_idx],
 						_curr_query_idx);
 
 	u64 name_size = name.size;
@@ -110,8 +110,9 @@ void reset_data() { memset(_data, 0, sizeof(_data)); }
 util::Slice<TimestampData> get() { return util::Slice<TimestampData>(_data, _num_collected_timestamps); }
 
 // Assumes that collect has been called
-u64 get_elapsed(const TimestampData& data) {
-	return _queries[data.end_timestamp_idx] - _queries[data.start_timestamp_idx];
+f64 get_elapsed_ms(const TimestampData& data) {
+	u64 ticks = _queries[data.end_timestamp_idx] - _queries[data.start_timestamp_idx];
+	return ticks * vk::context().device_properties.limits.timestampPeriod * 1e-6;
 }
 
 u64 get_total_elapsed() { return _num_collected_queries == 0 ? 0 : _queries[_num_collected_queries - 1] - _queries[0]; }
