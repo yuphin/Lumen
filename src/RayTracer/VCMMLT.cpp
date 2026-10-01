@@ -377,19 +377,18 @@ void render(Integrator* integrator) {
 	// Fill in the samplers for mutations
 	{
 		// Fill
-		lm::String preprocess_name =
-			lm::str_concat(rg::arena(), "VCMMLT - Preprocess ", pipeline_postfix, /*cstr=*/true);
-		rg::add_rt(preprocess_name,
+		rg::add_rt(CSTR("VCMMLT - Preprocess"),
 				   {
 					   .shaders = {{CSTR("src/shaders/integrators/vcmmlt/vcmmlt_preprocess.rgen")},
 								   {CSTR("src/shaders/ray.rmiss")},
 								   {CSTR("src/shaders/ray_shadow.rmiss")},
 								   {CSTR("src/shaders/ray.rchit")},
 								   {CSTR("src/shaders/ray.rahit")}},
-					   .specialization_data = spec_consts,
+					   .specialization_data = {0, u32(config.light_first)},
 					   .dims = {(u32)config.num_mlt_threads},
 				   })
 			.push_constants(&state.pc)
+			.zero({state.mlt_samplers_buffer, state.light_primary_samples_buffer})
 			.bind(rt_bindings)
 			.bind(integrator->lumen_scene->mesh_lights_buffer)
 			.bind_texture_array(integrator->lumen_scene->scene_textures)
@@ -417,6 +416,7 @@ void render(Integrator* integrator) {
 									   {CSTR("src/shaders/ray_shadow.rmiss")},
 									   {CSTR("src/shaders/ray.rchit")},
 									   {CSTR("src/shaders/ray.rahit")}},
+						   .specialization_data = {0, u32(config.light_first)},
 						   .dims = {(u32)config.num_mlt_threads},
 					   })
 				.push_constants(&state.pc)

@@ -108,7 +108,7 @@ float mlt_trace_eye() {
     const float connect_lum = luminance(col);
     lum += connect_lum;
     if (save_radiance && connect_lum > 0) {
-#define splat(i) DEREF(splat)[splat_idx + i]
+#define splat(i) DEREF(splat)[splat_idx + chain * depth_factor + i]
         ivec2 coords =
             ivec2(0.5 * (1 + dir_rnd) * vec2(pc.width, pc.height));
         const uint idx = coords.x * pc.height + coords.y;

@@ -149,18 +149,10 @@ vec3 vcm_connect_light(const vec3 n_s, const vec3 n_g, const vec3 wo, const Mate
 					   const float eta_vm, const VCMState camera_state) {
 	LightLiSample light_sample;
 	vec3 res = vec3(0.0);
-#if VC_MLT == 1
+#if VC_MLT == 1 || VCM_MLT == 1
 	const vec4 rands_pos = vec4(mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step),
 								mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step));
 	light_sample = sample_light_Li(rands_pos, payload.pos, pc.num_lights);
-#elif VCM_MLT == 1
-	if (SEEDING == 1) {
-		light_sample = sample_light_Li(rand4(seed), payload.pos, pc.num_lights);
-	} else {
-		const vec4 rands_pos = vec4(mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step),
-									mlt_rand(mlt_seed, large_step), mlt_rand(mlt_seed, large_step));
-		light_sample = sample_light_Li(rands_pos, payload.pos, pc.num_lights);
-	}
 #else
 	light_sample = sample_light_Li(rand4(seed), payload.pos, pc.num_lights);
 #endif
@@ -538,7 +530,7 @@ vec3 vcm_trace_eye(VCMState camera_state, float eta_vcm, float eta_vc,
 	light_path_idx *= (pc.max_depth + 1);
 #elif VCM_MLT == 1
 	const uint num_light_paths = pc.width * pc.height;
-	uint light_path_idx = uint(mlt_rand(seed, large_step) * num_light_paths);
+	uint light_path_idx = uint(mlt_rand(mlt_seed, large_step) * num_light_paths);
 	uint light_splat_idx = light_path_idx * pc.max_depth * (pc.max_depth + 1);
 	uint light_path_len = DEREF(path_cnt)[light_path_idx];
 	mlt_sampler.splat_cnt = 0;
@@ -669,7 +661,7 @@ float mlt_fill_eye() {
 	vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x, 2. / gl_LaunchSizeEXT.y, 0, 1));
 	area_int /= area_int.z;
 	const float cam_area = abs(area_int.x * area_int.y);
-	vec2 dir = vec2(rand(seed), rand(seed)) * 2.0 - 1.0;
+	vec2 dir = vec2(rand(mlt_seed), rand(mlt_seed)) * 2.0 - 1.0;
 	const vec3 direction = sample_camera(dir).xyz;
 	VCMState camera_state;
 	float lum_sum = 0;
@@ -758,7 +750,7 @@ float mlt_fill_eye() {
 		float pdf_dir;
 		float cos_theta;
 		f = sample_bsdf(n_s, n_g, wo, mat, TRANSPORT_MODE_FROM_CAMERA, side, camera_state.wi, pdf_dir, cos_theta,
-						seed);
+						mlt_seed);
 
 		const bool mat_transmissive = (mat.bsdf_props & BSDF_FLAG_TRANSMISSION) == BSDF_FLAG_TRANSMISSION;
 		const bool same_hemisphere = same_hemisphere(camera_state.wi, wo, n_s);
