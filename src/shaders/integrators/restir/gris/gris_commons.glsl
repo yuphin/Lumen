@@ -42,14 +42,14 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 }
 
 vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 n_g, vec3 wo, float d_vm,
-			out LightSampleIdentity identity, out bool is_directional_light, out vec3 Le, out vec3 wi,
+			out LightSampleIdentity identity, out bool is_delta_light, out vec3 Le, out vec3 wi,
 			out float pdf_light_w, int depth) {
 	const LightLiSample light_sample = sample_light_Li(rand4(seed), pos, pc.num_lights);
 	identity = light_sample.identity;
 	Le = light_sample.Li;
 	wi = light_sample.wi;
 	pdf_light_w = light_sample.pdf_position_w;
-	is_directional_light = get_light_type(light_sample.flags) == LIGHT_DIRECTIONAL;
+	is_delta_light = is_light_delta(light_sample.flags);
 	const float wi_len = light_sample.distance;
 	if (wi_len <= EPS || pdf_light_w <= 0 || Le == vec3(0)) {
 		return vec3(0);
@@ -176,12 +176,12 @@ uint pack_path_flags(uint prefix_length, uint postfix_length, uint reconnection_
 }
 
 void unpack_path_flags(uint packed_data, out uint reconnection_type, out uint prefix_length, out uint postfix_length,
-					   out bool side, out bool is_directional_light) {
+					   out bool side, out bool is_delta_light) {
 	reconnection_type = (packed_data & 0x7);
 	prefix_length = (packed_data >> 3) & 0x1F;
 	postfix_length = (packed_data >> 8) & 0x1F;
 	side = ((packed_data >> 13) & 1) == 1;
-	is_directional_light = ((packed_data >> 14) & 1) == 1;
+	is_delta_light = ((packed_data >> 14) & 1) == 1;
 }
 
 uint pack_photon_flags(bool side, uint path_length) { return (path_length & 0x1F) << 1 | uint(side); }
@@ -233,8 +233,8 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 	uint rc_prefix_length;
 	uint rc_postfix_length;
 	bool rc_side;
-	bool is_directional_light;
-	unpack_path_flags(data.path_flags, rc_type, rc_prefix_length, rc_postfix_length, rc_side, is_directional_light);
+	bool is_delta_light;
+	unpack_path_flags(data.path_flags, rc_type, rc_prefix_length, rc_postfix_length, rc_side, is_delta_light);
 
 	SurfaceData rc_gbuffer;
 	Material rc_hit_mat;
@@ -381,8 +381,8 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 					ASSERT(rc_postfix_length == 1);
 					mis_weight = 1.0 / (1 + uintBitsToFloat(data.rc_seed) / dst_postfix_pdf);
 				} else if (rc_type == RECONNECTION_TYPE_NEE_AFTER_RC) {
-					// TODO: Handle directional light
-					mis_weight = 1.0 / (1 + rc_pdf_post / uintBitsToFloat(data.rc_seed));
+					// BSDF sampling cannot reach a delta light, so NEE keeps the full weight
+					mis_weight = is_delta_light ? 1.0 : 1.0 / (1 + rc_pdf_post / uintBitsToFloat(data.rc_seed));
 				}
 
 				if (rc_type == RECONNECTION_TYPE_NEE_AFTER_RC) {

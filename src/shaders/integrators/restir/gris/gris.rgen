@@ -312,14 +312,14 @@ void main() {
 		if (!vertex_specular) {
 			uint rc_seed = seed.w;
 			uvec4 debug_seed = seed;
-			bool is_directional_light;
+			bool is_delta_light;
 			LightSampleIdentity light_identity;
 
 			vec3 Le;
 			vec3 nee_wi;
 			float nee_pdf_light_w;
 			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, n_g, wo, mis_factor_set ? d_vm : 0.0,
-							 light_identity, is_directional_light, Le, nee_wi, nee_pdf_light_w, depth);
+							 light_identity, is_delta_light, Le, nee_wi, nee_pdf_light_w, depth);
 			vec3 contribution = Li * throughput;
 			// At 0 depth, we let ReSTIR DI handle the direct lighting
 			bool nee_connectable = depth > 0 && connectable;
@@ -341,7 +341,7 @@ void main() {
 				reconnection_data.reservoir_contribution = calc_target_pdf(contribution);
 				reconnection_data.path_flags = (reconnection_data.path_flags & 0xFFFF0000) |
 											   pack_path_flags(depth, 1, RECONNECTION_TYPE_NEE, side) |
-											   uint(is_directional_light) << 14;
+											   uint(is_delta_light) << 14;
 
 				bool merged =
 					stream_reservoir(seed, reservoir, reconnection_data, reconnection_data.reservoir_contribution, 1.0);
@@ -373,7 +373,8 @@ void main() {
 					ASSERT(postfix_throughput == vec3(1));
 					reservoir.data.rc_wi = to_spherical(nee_wi);
 					reservoir.data.rc_Li = Le;
-					reservoir.data.path_flags = (reservoir.data.path_flags & ~0x7u) | RECONNECTION_TYPE_NEE_AFTER_RC;
+					reservoir.data.path_flags = (reservoir.data.path_flags & ~0x7u) | RECONNECTION_TYPE_NEE_AFTER_RC |
+												uint(is_delta_light) << 14;
 					reservoir.data.rc_seed = floatBitsToUint(nee_pdf_light_w);
 					if (bsdf_pdf_fwd != 0) {
 						reservoir.data.rc_partial_jacobian /= bsdf_pdf_fwd;
@@ -483,9 +484,9 @@ void main() {
 			uint rc_prefix_length;
 			uint rc_postfix_length;
 			bool side;
-			bool is_directional_light;
+			bool is_delta_light;
 			unpack_path_flags(reservoir.data.path_flags, rc_type, rc_prefix_length, rc_postfix_length, side,
-							  is_directional_light);
+							  is_delta_light);
 			ASSERT(reservoir.data.path_flags != 0);
 			ASSERT(rc_type != RECONNECTION_TYPE_INVALID);
 
