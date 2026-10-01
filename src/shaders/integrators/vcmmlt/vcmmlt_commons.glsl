@@ -31,7 +31,7 @@ const float tmax = 10000.0;
 #define RR_MIN_DEPTH 3
 uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy,
                       pc.frame_num ^ pc.random_num);
-uint screen_size = gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y;
+uint screen_size = pc.width * pc.height;
 uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 uint splat_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y) *
                  2 * ((pc.max_depth * (pc.max_depth + 1)));
@@ -79,8 +79,7 @@ void vcmmlt_mis_factors(out float eta_vcm, out float eta_vc,
 
 float mlt_trace_eye() {
     vec3 origin = vec3(ubo.inv_view * vec4(0, 0, 0, 1));
-    vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
-                                               2. / gl_LaunchSizeEXT.y, 0, 1));
+    vec4 area_int = (ubo.inv_projection * vec4(2. / pc.width, 2. / pc.height, 0, 1));
     area_int /= area_int.z;
     const float cam_area = abs(area_int.x * area_int.y);
     VCMState camera_state;

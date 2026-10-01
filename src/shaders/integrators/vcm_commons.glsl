@@ -788,7 +788,7 @@ float mlt_fill_eye() {
 float mlt_trace_light() {
 #define splat(i) DEREF(splat)[splat_idx + chain * depth_factor + i]
 	vec3 cam_pos = vec3(ubo.inv_view * vec4(0, 0, 0, 1));
-	vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x, 2. / gl_LaunchSizeEXT.y, 0, 1));
+	vec4 area_int = (ubo.inv_projection * vec4(2. / pc.width, 2. / pc.height, 0, 1));
 	area_int /= area_int.z;
 	const float cam_area = abs(area_int.x * area_int.y);
 	vec3 cam_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
