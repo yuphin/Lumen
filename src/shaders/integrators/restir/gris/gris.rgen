@@ -508,6 +508,7 @@ void main() {
 		col += direct_lighting;
 	}
 
+	const float uv_x = float(gl_LaunchIDEXT.x) / float(gl_LaunchSizeEXT.x);
 	if (pc.enable_gris == 1) {
 		ASSERT(reservoir.w_sum >= reservoir.target_pdf);
 		// The samples are additive, therefore set M to 1
@@ -515,7 +516,6 @@ void main() {
 		calc_reservoir_W(reservoir);
 		DEREF(prefix_contributions)[pixel_idx] = prefix_col;
 		reservoir.data.seed_helpers = uvec2(pc.general_seed, pc.sampling_seed);
-		float uv_x = float(gl_LaunchIDEXT.x) / float(gl_LaunchSizeEXT.x);
 		if (pc.canonical_only == 1 || uv_x >= pc.gris_separator) {
 			col = prefix_col + selected_contribution * reservoir.W;
 			if (pc.direct_lighting == 1) {
@@ -541,6 +541,11 @@ void main() {
 #ifdef ENABLE_PM
 	col += imageLoad(caustics_texture, ivec2(gl_LaunchIDEXT.xy)).xyz;
 #endif	// ENABLE_PM
+
+	const bool skip = pc.enable_gris == 1 && pc.canonical_only == 0 && uv_x < pc.gris_separator;
+	if (skip) {
+		return;
+	}
 
 	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
 		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));

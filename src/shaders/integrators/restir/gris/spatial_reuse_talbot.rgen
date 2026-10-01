@@ -20,12 +20,7 @@ uvec4 seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.total_frame_num
 
 #define MAX_SPATIAL_SAMPLES 12
 
-void main() {
-	SurfaceRef gbuffer = curr_gbuffers[pixel_idx];
-	if (!gbuffer_data_valid(gbuffer)) {
-		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(0));
-		return;
-	}
+vec3 do_talbot_reuse(SurfaceRef gbuffer) {
 	SurfaceData canonical_gbuffer = load_surface(gbuffer);
 
 	Reservoir reservoir;
@@ -138,25 +133,33 @@ void main() {
 	if (reservoir.W > 0) {
 		final_contribution += curr_reservoir_contribution * reservoir.W;
 	}
+	return final_contribution;
+}
+
+void main() {
+	SurfaceRef gbuffer = curr_gbuffers[pixel_idx];
+	vec3 col;
+	if (!gbuffer_data_valid(gbuffer)) {
+		Reservoir reservoir;
+		init_reservoir(reservoir);
+		out_reservoirs[pixel_idx] = reservoir;
+		col = imageLoad(direct_lighting_img, ivec2(gl_LaunchIDEXT.xy)).xyz;
+	} else {
+		col = do_talbot_reuse(gbuffer);
+		if (pc.direct_lighting == 1) {
+			col += imageLoad(direct_lighting_img, ivec2(gl_LaunchIDEXT.xy)).xyz;
+		}
+	}
 
 	float uv_x = float(gl_LaunchIDEXT.x) / float(gl_LaunchSizeEXT.x);
 	if (uv_x >= pc.gris_separator) {
 		return;
 	}
-
-	vec3 col = vec3(0);
-	if (pc.direct_lighting == 1) {
-		col += imageLoad(direct_lighting_img, ivec2(gl_LaunchIDEXT.xy)).xyz;
-	}
-
-	col += final_contribution;
-
-	ivec2 neighbor_coords = ivec2(gl_LaunchIDEXT.xy);
 	if (pc.enable_accumulation == 0 || pc.frame_num == 0) {
-		imageStore(image, ivec2(neighbor_coords), vec4(col, 1.f));
+		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(col, 1.f));
 	} else {
 		float w = 1. / float(pc.frame_num + 1);
-		vec3 old_col = imageLoad(image, ivec2(neighbor_coords)).xyz;
-		imageStore(image, ivec2(neighbor_coords), vec4(mix(old_col, col, w), 1.f));
+		vec3 old_col = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
+		imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(mix(old_col, col, w), 1.f));
 	}
 }
