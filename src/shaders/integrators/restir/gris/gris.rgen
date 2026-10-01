@@ -16,7 +16,7 @@ SCENE_BUFFER(prefix_contributions, vec3);
 
 layout(binding = 4, std430) writeonly buffer OutReservoirs { Reservoir out_reservoirs[]; };
 layout(binding = 5, std430) writeonly buffer OutGBuffer { SurfaceRef out_gbuffers[]; };
-layout(binding = 6, rgba16) writeonly uniform image2D canonical_contributions_tex;
+layout(binding = 6, rgba16f) writeonly uniform image2D canonical_contributions_tex;
 layout(binding = 7, rgba32f) uniform image2D direct_lighting_img;
 layout(binding = 8, rgba32f) uniform image2D caustics_texture;
 SCENE_BUFFER(photon_eye, PhotonData);

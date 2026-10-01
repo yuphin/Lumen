@@ -13,7 +13,7 @@
 #include "pm_commons.glsl"
 layout(set = 1, binding = 1) uniform accelerationStructureEXT photon_bvh;
 
-layout(binding = 4, rgba16) writeonly uniform image2D canonical_contributions_tex;
+layout(binding = 4, rgba16f) writeonly uniform image2D canonical_contributions_tex;
 layout(binding = 5, rgba32f) uniform image2D caustics_texture;
 layout(binding = 6, std430) readonly buffer PrevPhotonReservoirs { PhotonReservoir in_reservoirs[]; };
 layout(binding = 7, std430) writeonly buffer CurrPhotonReservoirs { PhotonReservoir out_reservoirs[]; };
