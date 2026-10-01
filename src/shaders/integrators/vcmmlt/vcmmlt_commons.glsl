@@ -62,11 +62,12 @@ uvec4 mlt_seed;
 
 float eval_target(float lum, uint c) { return c == 0 ? float(lum > 0) : lum; }
 
-float mlt_mis(float lum, float target, uint c) {
-    const float num = target / DEREF(chain_stats)[c].normalization;
-    const float denum = 1. / DEREF(chain_stats)[0].normalization +
-                        lum / DEREF(chain_stats)[1].normalization;
-    return num / denum;
+float mlt_splat_weight(float lum) {
+    const float count0 = float((pc.mutation_count + 1) / 2);
+    const float count1 = float(pc.mutation_count / 2);
+    const float pdf_sum = count0 / DEREF(chain_stats)[0].normalization +
+                          count1 * lum / DEREF(chain_stats)[1].normalization;
+    return float(pc.mutation_count) / pdf_sum;
 }
 
 void vcmmlt_mis_factors(out float eta_vcm, out float eta_vc,

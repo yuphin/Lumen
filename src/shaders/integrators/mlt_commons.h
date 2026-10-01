@@ -26,6 +26,7 @@ struct PCMLT {
 	float radius;
 	uint num_mlt_threads;
 	uint enable_accumulation;
+	uint mutation_count;
 };
 
 

@@ -9,8 +9,8 @@ void init(Integrator* integrator) {
 
 	const VCMMLTConfig& config = integrator->lumen_scene->config.settings.vcmmlt;
 	u32 path_length = integrator->lumen_scene->config.common.path_length;
-	state.mutation_count =
-		i32(Window::width() * Window::height() * config.mutations_per_pixel / f32(config.num_mlt_threads));
+	state.pc.mutation_count =
+		u32(Window::width() * Window::height() * config.mutations_per_pixel / f32(config.num_mlt_threads));
 	state.light_path_rand_count = lm::max(7 + 3 * path_length, 3 + 7 * path_length);
 
 	// MLTVCM buffers
@@ -433,10 +433,10 @@ void render(Integrator* integrator) {
 				.bind(integrator->lumen_scene->scene_desc_buffer);
 		};
 		const u32 iter_cnt = 100;
-		const u32 freq = state.mutation_count / iter_cnt;
+		const u32 freq = state.pc.mutation_count / iter_cnt;
 		u32 cnt = 0;
 		for (u32 f = 0; f < freq; f++) {
-			LUMEN_TRACE("Mutation: %d / %d", cnt, state.mutation_count);
+			LUMEN_TRACE("Mutation: %d / %d", cnt, state.pc.mutation_count);
 			cmd.begin();
 			for (i32 i = 0; i < iter_cnt; i++) {
 				mutate(cnt++);
@@ -446,7 +446,7 @@ void render(Integrator* integrator) {
 			GPUQueryManager::end_aggregate(cmd.handle);
 			rg::submit(cmd);
 		}
-		const u32 rem = state.mutation_count % iter_cnt;
+		const u32 rem = state.pc.mutation_count % iter_cnt;
 		if (rem) {
 			cmd.begin();
 			for (u32 i = 0; i < rem; i++) {

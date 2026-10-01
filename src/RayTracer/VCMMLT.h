@@ -28,7 +28,6 @@ struct VCMMLT {
 	vk::Buffer* counter_buffer = nullptr;
 	lm::Array<vk::Buffer*> block_sums;
 	vk::Buffer* light_path_cnt_buffer = nullptr;
-	i32 mutation_count = 0;
 	i32 light_path_rand_count = 0;
 	i32 sample_cnt = 0;
 	bool enable_accumulation = true;
