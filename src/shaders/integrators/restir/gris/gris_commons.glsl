@@ -17,8 +17,8 @@ uint pixel_idx = (gl_LaunchIDEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y);
 
 #define RECONNECTION_TYPE_INVALID 0
 #define RECONNECTION_TYPE_NEE 1
-#define RECONNECTION_TYPE_EMISSIVE_AFTER_RC 2
-#define RECONNECTION_TYPE_EMISSIVE 3
+#define RECONNECTION_TYPE_EMISSIVE_AT_RC 2
+#define RECONNECTION_TYPE_EMISSIVE_AFTER_RC 3
 #define RECONNECTION_TYPE_NEE_AFTER_RC 4
 #define RECONNECTION_TYPE_DEFAULT 5
 
@@ -353,15 +353,14 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 #endif
 				jacobian = 1;
 			} else {
-				const bool connection_to_nee_vertex = rc_postfix_length == 2;
 				float g = abs(dot(dst_postfix_wi, rc_gbuffer.n_g)) / wi_len_sqr;
 
-				ASSERT(rc_type == RECONNECTION_TYPE_DEFAULT || rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC ||
-					   rc_type == RECONNECTION_TYPE_NEE_AFTER_RC);
+				ASSERT(rc_type == RECONNECTION_TYPE_DEFAULT || rc_type == RECONNECTION_TYPE_EMISSIVE_AT_RC ||
+					   rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC || rc_type == RECONNECTION_TYPE_NEE_AFTER_RC);
 				jacobian_num = dst_postfix_pdf * g;
 
 				// Important: Sidedness is checked before face_forward reorients n_g
-				if (rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC && rc_hit_mat.emission_two_sided == 0 &&
+				if (rc_type == RECONNECTION_TYPE_EMISSIVE_AT_RC && rc_hit_mat.emission_two_sided == 0 &&
 					dot(rc_gbuffer.n_g, -dst_postfix_wi) <= 0.0) {
 					reservoir_contribution = vec3(0);
 					jacobian_num = 0;
@@ -377,9 +376,12 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 							  rc_post_side, rc_wi_post, rc_pdf_post, unused_rev_pdf, false);
 
 				float mis_weight = 1.0;
-				if (rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
+				if (rc_type == RECONNECTION_TYPE_EMISSIVE_AT_RC) {
 					ASSERT(rc_postfix_length == 1);
 					mis_weight = jacobian_num / (jacobian_num + uintBitsToFloat(data.rc_seed));
+				} else if (rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
+					ASSERT(rc_postfix_length == 2);
+					mis_weight = rc_pdf_post / (rc_pdf_post + uintBitsToFloat(data.rc_seed));
 				} else if (rc_type == RECONNECTION_TYPE_NEE_AFTER_RC) {
 					// BSDF sampling cannot reach a delta light, so NEE keeps the full weight
 					mis_weight = is_delta_light ? 1.0 : 1.0 / (1 + rc_pdf_post / uintBitsToFloat(data.rc_seed));
@@ -389,7 +391,7 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 					reservoir_contribution *=
 						rc_postfix_f * abs(dot(rc_gbuffer.n_s, rc_wi_post)) / uintBitsToFloat(data.rc_seed);
 
-				} else if (rc_type != RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
+				} else if (rc_type != RECONNECTION_TYPE_EMISSIVE_AT_RC) {
 					jacobian_num *= rc_pdf_post;
 					reservoir_contribution *= rc_postfix_f * abs(dot(rc_gbuffer.n_s, rc_wi_post)) / rc_pdf_post;
 				}

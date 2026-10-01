@@ -55,7 +55,7 @@ struct GrisData {
 	uint rc_seed;
 	// Layout for the path flags
 	// 1b is_delta_light | 1b side | 5b postfix_length| 5b prefix_length |3b
-	// is_nee/is_nee_postfix/emissive_after_rc/emissive/default
+	// nee/nee_after_rc/emissive_at_rc/emissive_after_rc/default
 	uint path_flags;
 	SurfaceRef rc_surface;
 	uvec2 seed_helpers;

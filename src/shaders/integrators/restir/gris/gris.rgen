@@ -244,25 +244,32 @@ void main() {
 			vec3 partial_contrib = mis_weight * emitted_radiance;
 
 			if (connectable_vertex_found && depth > 1) {
-				const bool stream_individually = STREAMING_MODE == STREAMING_MODE_INDIVIDUAL || was_connectable;
+				const bool emissive_after_rc = depth == prefix_depth + 2;
+				const bool stream_individually =
+					STREAMING_MODE == STREAMING_MODE_INDIVIDUAL || was_connectable || emissive_after_rc;
 				if (stream_individually) {
 					// Stream in the emissive contribution
-					// If the previous vertex was the connection vertex, delay MIS computation to the shifting phase
-					vec3 partial_contrib_for_rc = (was_connectable ? emitted_radiance : partial_contrib);
+					// At or right after the reconnection vertex, delay MIS computation to the shifting phase
+					const bool defer_mis = was_connectable || emissive_after_rc;
+					vec3 partial_contrib_for_rc = (defer_mis ? emitted_radiance : partial_contrib);
 					reconnection_data.rc_Li = postfix_throughput * partial_contrib_for_rc;
 
 					vec3 contrib = partial_contrib_for_rc * throughput;
+					uint emissive_rc_type = RECONNECTION_TYPE_DEFAULT;
 					if (was_connectable) {
 						contrib *= mis_weight;
+						emissive_rc_type = RECONNECTION_TYPE_EMISSIVE_AT_RC;
 						reconnection_data.rc_seed =
 							floatBitsToUint(light_emission_position_pdf_a(emitter_light_idx, pc.num_lights));
+					} else if (emissive_after_rc) {
+						contrib *= mis_weight;
+						emissive_rc_type = RECONNECTION_TYPE_EMISSIVE_AFTER_RC;
+						reconnection_data.rc_seed = floatBitsToUint(pdf_light_w);
 					}
 					reconnection_data.reservoir_contribution = calc_target_pdf(contrib);
 					reconnection_data.path_flags =
 						(reconnection_data.path_flags & 0xFFFF0000) |
-						pack_path_flags(prefix_depth, depth - prefix_depth,
-										was_connectable ? RECONNECTION_TYPE_EMISSIVE_AFTER_RC : RECONNECTION_TYPE_DEFAULT,
-										side);
+						pack_path_flags(prefix_depth, depth - prefix_depth, emissive_rc_type, side);
 					bool merged =
 						stream_reservoir(seed, reservoir, reconnection_data, reconnection_data.reservoir_contribution, 1.0);
 					if (merged) {
