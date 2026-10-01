@@ -98,7 +98,7 @@ void main() {
 
     if (chain_idx == 1) {
         const float swap_prob =
-            min(1, mlt_sampler_mux(0).luminance / mlt_sampler_mux(1).luminance);
+            min(1, mlt_sampler_mux(1 - chain).luminance / mlt_sampler.luminance);
         if (rand(seed) < swap_prob) {
             mlt_sampler_mux(0).swap = (mlt_sampler_mux(0).swap + 1) % 2;
             mlt_sampler_mux(1).swap = (mlt_sampler_mux(1).swap + 1) % 2;
