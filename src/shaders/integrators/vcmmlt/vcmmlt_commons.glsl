@@ -80,7 +80,7 @@ float mlt_trace_eye() {
     vec3 origin = vec3(ubo.inv_view * vec4(0, 0, 0, 1));
     vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x,
                                                2. / gl_LaunchSizeEXT.y, 0, 1));
-    area_int /= area_int.w;
+    area_int /= area_int.z;
     const float cam_area = abs(area_int.x * area_int.y);
     VCMState camera_state;
     // Generate camera sample

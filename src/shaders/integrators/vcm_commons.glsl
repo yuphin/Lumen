@@ -333,7 +333,7 @@ void vcm_fill_light(vec3 origin, VCMState vcm_state, bool finite_light,
 	const float radius = pc.radius;
 	const float radius_sqr = radius * radius;
 	vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x, 2. / gl_LaunchSizeEXT.y, 0, 1));
-	area_int /= (area_int.w);
+	area_int /= (area_int.z);
 	const float cam_area = abs(area_int.x * area_int.y);
 	int depth;
 	int path_idx = 0;
@@ -667,7 +667,7 @@ float mlt_fill_eye() {
 	const float fov = ubo.projection[1][1];
 	vec3 cam_pos = vec3(ubo.inv_view * vec4(0, 0, 0, 1));
 	vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x, 2. / gl_LaunchSizeEXT.y, 0, 1));
-	area_int /= area_int.w;
+	area_int /= area_int.z;
 	const float cam_area = abs(area_int.x * area_int.y);
 	vec2 dir = vec2(rand(seed), rand(seed)) * 2.0 - 1.0;
 	const vec3 direction = sample_camera(dir).xyz;
@@ -797,7 +797,7 @@ float mlt_trace_light() {
 #define splat(i) DEREF(splat)[splat_idx + chain * depth_factor + i]
 	vec3 cam_pos = vec3(ubo.inv_view * vec4(0, 0, 0, 1));
 	vec4 area_int = (ubo.inv_projection * vec4(2. / gl_LaunchSizeEXT.x, 2. / gl_LaunchSizeEXT.y, 0, 1));
-	area_int /= area_int.w;
+	area_int /= area_int.z;
 	const float cam_area = abs(area_int.x * area_int.y);
 	vec3 cam_nrm = vec3(-ubo.inv_view * vec4(0, 0, 1, 0));
 	// Select camera path
