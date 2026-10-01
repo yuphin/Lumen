@@ -244,33 +244,34 @@ void main() {
 			vec3 partial_contrib = mis_weight * emitted_radiance;
 
 			if (connectable_vertex_found && depth > 1) {
-#if STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
-				// Stream in the emissive contribution
-				// If the previous vertex was the connection vertex, delay MIS computation to the shifting phase
-				vec3 partial_contrib_for_rc = (was_connectable ? emitted_radiance : partial_contrib);
-				reconnection_data.rc_Li = postfix_throughput * partial_contrib_for_rc;
+				const bool stream_individually = STREAMING_MODE == STREAMING_MODE_INDIVIDUAL || was_connectable;
+				if (stream_individually) {
+					// Stream in the emissive contribution
+					// If the previous vertex was the connection vertex, delay MIS computation to the shifting phase
+					vec3 partial_contrib_for_rc = (was_connectable ? emitted_radiance : partial_contrib);
+					reconnection_data.rc_Li = postfix_throughput * partial_contrib_for_rc;
 
-				vec3 contrib = partial_contrib_for_rc * throughput;
-				if (was_connectable) {
-					contrib *= mis_weight;
-					reconnection_data.rc_seed =
-						floatBitsToUint(light_emission_position_pdf_a(emitter_light_idx, pc.num_lights));
+					vec3 contrib = partial_contrib_for_rc * throughput;
+					if (was_connectable) {
+						contrib *= mis_weight;
+						reconnection_data.rc_seed =
+							floatBitsToUint(light_emission_position_pdf_a(emitter_light_idx, pc.num_lights));
+					}
+					reconnection_data.reservoir_contribution = calc_target_pdf(contrib);
+					reconnection_data.path_flags =
+						(reconnection_data.path_flags & 0xFFFF0000) |
+						pack_path_flags(prefix_depth, depth - prefix_depth,
+										was_connectable ? RECONNECTION_TYPE_EMISSIVE_AFTER_RC : RECONNECTION_TYPE_DEFAULT,
+										side);
+					bool merged =
+						stream_reservoir(seed, reservoir, reconnection_data, reconnection_data.reservoir_contribution, 1.0);
+					if (merged) {
+						selected_contribution = contrib;
+					}
+					valid_reservoir = valid_reservoir || merged;
+				} else {
+					postfix_L += partial_contrib * postfix_throughput;
 				}
-				reconnection_data.reservoir_contribution = calc_target_pdf(contrib);
-				reconnection_data.path_flags =
-					(reconnection_data.path_flags & 0xFFFF0000) |
-					pack_path_flags(prefix_depth, depth - prefix_depth,
-									was_connectable ? RECONNECTION_TYPE_EMISSIVE_AFTER_RC : RECONNECTION_TYPE_DEFAULT,
-									side);
-				bool merged =
-					stream_reservoir(seed, reservoir, reconnection_data, reconnection_data.reservoir_contribution, 1.0);
-				if (merged) {
-					selected_contribution = contrib;
-				}
-				valid_reservoir = valid_reservoir || merged;
-#else	// STREAMING_MODE != STREAMING_MODE_INDIVIDUAL
-				postfix_L += partial_contrib * postfix_throughput;
-#endif	// STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 			} else if (depth > 1) {
 				prefix_col += partial_contrib * throughput;
 			}
@@ -381,11 +382,6 @@ void main() {
 						reservoir.data.rc_partial_jacobian /= bsdf_pdf_fwd;
 					}
 				}
-#if STREAMING_MODE == STREAMING_MODE_SPLIT
-				else if (connectable_this_vertex) {
-					postfix_L += Li * postfix_throughput;
-				}
-#endif	// STREAMING_MODE == STREAMING_MODE_SPLIT
 				valid_reservoir = valid_reservoir || merged;
 			} else if (depth > 0) {
 				// We don't have a connectable vertex yet
