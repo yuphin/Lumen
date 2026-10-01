@@ -15,16 +15,14 @@ layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 layout(push_constant) uniform _PushConstantRay { PCMLT pc; };
 layout(binding = 0) buffer SceneDesc_ { SceneDesc scene_desc; };
 layout(constant_id = 0) const int NUM_BOOSTRAP_SAMPLES = 0;
-SCENE_BUFFER_SCALAR(cdf_sum, float);
+SCENE_BUFFER_SCALAR_RO(cdf_sum, float);
 SCENE_BUFFER(cdf, float);
 void main() {
     uint idx = gl_GlobalInvocationID.x;
     if(idx >= NUM_BOOSTRAP_SAMPLES) {
         return;
     }
-    if (idx == 0) {
-        DEREF(cdf_sum) = DEREF(cdf)[pc.num_bootstrap_samples - 1];
-    }
-    const float inv_sum = 1. / DEREF(cdf)[pc.num_bootstrap_samples - 1];
-    DEREF(cdf)[idx] *= inv_sum;
+    const float sum = DEREF(cdf_sum);
+    DEREF(cdf)[idx] = sum > 0. ? DEREF(cdf)[idx] / sum
+                             : float(idx) / float(pc.num_bootstrap_samples);
 }

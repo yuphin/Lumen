@@ -21,10 +21,7 @@ uvec4 seed =
     init_rng(gl_GlobalInvocationID.xy, gl_NumWorkGroups.xy *uvec2(32, 1),
              pc.frame_num ^ pc.random_num);
 uint binary_search_cdf(float random_float) {
-   uint l = 0;
-    uint r = pc.num_bootstrap_samples;
-    uint lum_idx = -1;
-    uint len = r - l;
+    uint len = pc.num_bootstrap_samples;
     uint first = 0;
     while(len > 0) {
         uint hlf = len >> 1;
@@ -36,15 +33,7 @@ uint binary_search_cdf(float random_float) {
             len = hlf;
         }
     }
-    return clamp(first - 1, 0, pc.num_bootstrap_samples -2);
-    uint result = lum_idx;
-    if (lum_idx > 0) {
-        while (result > 0 && DEREF(bootstrap)[result].lum == 0) {
-            result--;
-        }
-    }
-
-    return result;
+    return first - 1;
 }
 void main() {
     uint idx = gl_GlobalInvocationID.x;

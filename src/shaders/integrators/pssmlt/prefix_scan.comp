@@ -78,6 +78,8 @@ void main() {
         idx += CONFLICT_FREE_OFFSET(idx);
         if (pc.store_sum == 1) {
             DEREF(block_sum)[block_idx] = s_data[idx];
+        } else {
+            DEREF(cdf_sum) = s_data[idx];
         }
         s_data[idx] = 0;
     }
