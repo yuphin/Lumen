@@ -51,8 +51,8 @@ SurfaceData load_surface(const SurfaceRef ref) {
 	const InstanceTransform transform = DEREF(transformations)[instance_idx];
 
 	const vec3 object_pos = v0.pos * bary.x + v1.pos * bary.y + v2.pos * bary.z;
-	const vec3 world_e0 = transform_surface_direction(transform, v2.pos - v0.pos);
-	const vec3 world_e1 = transform_surface_direction(transform, v1.pos - v0.pos);
+	const vec3 world_e0 = transform_surface_direction(transform, v1.pos - v0.pos);
+	const vec3 world_e1 = transform_surface_direction(transform, v2.pos - v0.pos);
 	const vec3 world_cross = cross(world_e0, world_e1);
 
 	SurfaceData surface;

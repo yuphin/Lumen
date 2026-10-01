@@ -57,12 +57,12 @@ void main() {
 
 	const vec2 uv = uv0 * barycentrics.x + uv1 * barycentrics.y + uv2 * barycentrics.z;
 
-	const vec3 e0 = v2 - v0;
-	const vec3 e1 = v1 - v0;
+	const vec3 e0 = v1 - v0;
+	const vec3 e1 = v2 - v0;
 	const vec3 e0t = gl_ObjectToWorldEXT * vec4(e0, 0);
 	const vec3 e1t = gl_ObjectToWorldEXT * vec4(e1, 0);
 
-	payload.n_g = normalize(vec3(cross(e0, e1) * gl_WorldToObjectEXT));
+	payload.n_g = normalize(cross(e0t, e1t));
 	payload.n_s = world_nrm;
 	payload.pos = world_pos;
 	payload.uv = uv;

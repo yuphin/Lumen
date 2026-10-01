@@ -360,6 +360,14 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 					   rc_type == RECONNECTION_TYPE_NEE_AFTER_RC);
 				jacobian_num = dst_postfix_pdf * g;
 
+				// Important: Sidedness is checked before face_forward reorients n_g
+				if (rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC && rc_hit_mat.emission_two_sided == 0 &&
+					dot(rc_gbuffer.n_g, -dst_postfix_wi) <= 0.0) {
+					reservoir_contribution = vec3(0);
+					jacobian_num = 0;
+					return false;
+				}
+
 				bool rc_post_side = face_forward(rc_gbuffer.n_s, rc_gbuffer.n_g, -dst_postfix_wi);
 
 				const vec3 rc_wi_post = from_spherical(data.rc_wi);

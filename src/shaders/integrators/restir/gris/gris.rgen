@@ -247,7 +247,7 @@ void main() {
 #if STREAMING_MODE == STREAMING_MODE_INDIVIDUAL
 				// Stream in the emissive contribution
 				// If the previous vertex was the connection vertex, delay MIS computation to the shifting phase
-				vec3 partial_contrib_for_rc = (was_connectable ? hit_mat.emissive_factor : partial_contrib);
+				vec3 partial_contrib_for_rc = (was_connectable ? emitted_radiance : partial_contrib);
 				reconnection_data.rc_Li = postfix_throughput * partial_contrib_for_rc;
 
 				vec3 contrib = partial_contrib_for_rc * throughput;
