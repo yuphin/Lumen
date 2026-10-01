@@ -253,7 +253,8 @@ void main() {
 				vec3 contrib = partial_contrib_for_rc * throughput;
 				if (was_connectable) {
 					contrib *= mis_weight;
-					reconnection_data.rc_seed = floatBitsToUint(pdf_light_w);
+					reconnection_data.rc_seed =
+						floatBitsToUint(light_emission_position_pdf_a(emitter_light_idx, pc.num_lights));
 				}
 				reconnection_data.reservoir_contribution = calc_target_pdf(contrib);
 				reconnection_data.path_flags =

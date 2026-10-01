@@ -379,7 +379,7 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 				float mis_weight = 1.0;
 				if (rc_type == RECONNECTION_TYPE_EMISSIVE_AFTER_RC) {
 					ASSERT(rc_postfix_length == 1);
-					mis_weight = 1.0 / (1 + uintBitsToFloat(data.rc_seed) / dst_postfix_pdf);
+					mis_weight = jacobian_num / (jacobian_num + uintBitsToFloat(data.rc_seed));
 				} else if (rc_type == RECONNECTION_TYPE_NEE_AFTER_RC) {
 					// BSDF sampling cannot reach a delta light, so NEE keeps the full weight
 					mis_weight = is_delta_light ? 1.0 : 1.0 / (1 + rc_pdf_post / uintBitsToFloat(data.rc_seed));
