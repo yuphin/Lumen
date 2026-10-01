@@ -448,17 +448,19 @@ void main() {
 #endif	// STREAMING_MODE == STREAMING_MODE_SPLIT
 
 		rc_partial_jacobian = bsdf_pdf_fwd;
-		if (pc.enable_rr == 1) {
+		// Roulette only after the reconnection vertex
+		if (pc.enable_rr == 1 && connectable_vertex_found && !connectable_this_vertex) {
 			float rr_scale = 1.0;
 			if (is_transmission) {
 				rr_scale *= side ? 1. / hit_mat.ior : hit_mat.ior;
 			}
 			if (depth > RR_MIN_DEPTH) {
-				float rr_prob = min(0.95f, luminance(throughput) * rr_scale);
-				if (rr_prob == 0 || rr_prob < rand(seed))
+				float rr_prob = min(0.95f, luminance(postfix_throughput) * rr_scale);
+				if (rr_prob == 0 || rr_prob < rand(seed)) {
 					break;
-				else
-					throughput /= rr_prob;
+				}
+				throughput /= rr_prob;
+				postfix_throughput /= rr_prob;
 			}
 		}
 	}
