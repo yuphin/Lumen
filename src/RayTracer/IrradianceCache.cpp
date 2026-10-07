@@ -7,7 +7,7 @@ using namespace IRCache;
 
 ////////////////////////////
 // --- For debug purposes  ---
-#define DEBUG_PASSES 0
+#define DEBUG_PASSES 1
 static u32 _max_surfels_in_a_grid_cell = 0;
 static float _avg_surfels_in_a_grid_cell = 0;
 static bool _highlight_max_surfel_cell = false;

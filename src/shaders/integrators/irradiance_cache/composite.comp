@@ -69,7 +69,6 @@ void main() {
 	vec3 irradiance_sum = vec3(0);
 	float weight_sum = 0;
 
-	uvec4 base = map_grid_axis(offset);
 	for (uint gid = 0; gid < surfel_count; gid++) {
 		uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
 		Surfel surfel = DEREF(surfel_pool)[sid];

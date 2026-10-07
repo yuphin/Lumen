@@ -238,6 +238,7 @@ void main() {
 			} else {
 				mis_bsdf = 0;
 			}
+			// BSDF sampling
 			float mis_weight = 1.0 / (1 + mis_bsdf + mis_light);
 			ASSERT(!isnan(mis_weight));
 
@@ -270,8 +271,8 @@ void main() {
 					reconnection_data.path_flags =
 						(reconnection_data.path_flags & 0xFFFF0000) |
 						pack_path_flags(prefix_depth, depth - prefix_depth, emissive_rc_type, side);
-					bool merged =
-						stream_reservoir(seed, reservoir, reconnection_data, reconnection_data.reservoir_contribution, 1.0);
+					bool merged = stream_reservoir(seed, reservoir, reconnection_data,
+												   reconnection_data.reservoir_contribution, 1.0);
 					if (merged) {
 						selected_contribution = contrib;
 					}
@@ -301,6 +302,13 @@ void main() {
 		if (depth >= pc.max_depth - 1) {
 			break;
 		}
+
+#ifdef ENABLE_PM
+		// Emission at this vertex has no PM competitor, NEE and continuation from it do
+		if (was_connectable && !is_rough(hit_mat)) {
+			mis_factor_set = true;
+		}
+#endif	// ENABLE_PM
 
 		vertex_specular = (hit_mat.bsdf_props & BSDF_FLAG_SPECULAR) != 0;
 
@@ -433,13 +441,6 @@ void main() {
 			d_vm = PI * pc.photon_radius * pc.photon_radius * pc.num_photons * mis_cos_theta / bsdf_pdf_fwd;
 			debug_val = true;
 		}
-
-#ifdef ENABLE_PM
-		// Modify the throuhgput for SDS paths (for photon mapping)
-		if (was_connectable && !is_rough(hit_mat)) {
-			mis_factor_set = true;
-		}
-#endif	// ENABLE_PM
 
 		if (connectable_vertex_found && !connectable_this_vertex) {
 			postfix_throughput *= f_cos / bsdf_pdf_fwd;
