@@ -46,7 +46,6 @@ void main() {
 	vec4 origin = ubo.inv_view[3];
 	vec3 direction = vec3(sample_camera(d));
 	vec3 col = vec3(0);
-	bool debug_val = false;
 
 	SurfaceRef gbuffer_out;
 	init_gbuffer(gbuffer_out);
@@ -99,6 +98,7 @@ void main() {
 	bool mis_factor_set = false;
 	vec3 debug_col = vec3(0);
 	float d_vm = 0;
+	int merge_depth = -1;
 
 	int depth = 0;
 	for (;; depth++) {
@@ -195,7 +195,7 @@ void main() {
 		float cos_theta_wo = abs(dot(n_g, wo));
 		d_vm = cos_theta_wo > 0 ? d_vm / cos_theta_wo : 0;
 		if (mis_factor_set) {
-			ASSERT(debug_val == true);
+			ASSERT(merge_depth >= 0);
 		}
 
 		const uint emitter_light_idx = light_index_from_primitive(payload.surface.primitive_instance_id.y);
@@ -305,7 +305,7 @@ void main() {
 
 #ifdef ENABLE_PM
 		// Emission at this vertex has no PM competitor, NEE and continuation from it do
-		if (was_connectable && !is_rough(hit_mat)) {
+		if (merge_depth >= 0 && depth == merge_depth + 1 && !is_rough(hit_mat)) {
 			mis_factor_set = true;
 		}
 #endif	// ENABLE_PM
@@ -424,7 +424,7 @@ void main() {
 		const float mis_cos_theta = abs(dot(direction, n_g));
 		d_vm *= mis_cos_theta;
 		if (mis_factor_set) {
-			ASSERT(debug_val == true);
+			ASSERT(merge_depth >= 0);
 			if (!vertex_specular) {
 				d_vm *= bsdf_pdf_rev / bsdf_pdf_fwd;
 			}
@@ -437,9 +437,9 @@ void main() {
 		origin.xyz = offset_ray(gbuffer.pos, n_g, direction);
 		vec3 f_cos = f * abs(cos_theta);
 		throughput *= f_cos / bsdf_pdf_fwd;
-		if (!mis_factor_set && is_rough(hit_mat)) {
+		if (merge_depth < 0 && is_rough(hit_mat)) {
 			d_vm = PI * pc.photon_radius * pc.photon_radius * pc.num_photons * mis_cos_theta / bsdf_pdf_fwd;
-			debug_val = true;
+			merge_depth = depth;
 		}
 
 		if (connectable_vertex_found && !connectable_this_vertex) {
