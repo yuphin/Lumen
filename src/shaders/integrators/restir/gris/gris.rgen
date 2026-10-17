@@ -212,6 +212,12 @@ void main() {
 				emitted_radiance = hit_mat.emissive_factor;
 			}
 		}
+#ifdef DISABLE_PM_MIS
+		// PM owns this path, zero it before any output or reservoir route
+		if (mis_factor_set) {
+			emitted_radiance = vec3(0);
+		}
+#endif	// DISABLE_PM_MIS
 
 		if (depth == 0) {
 			// Fill in GBuffer
@@ -285,11 +291,6 @@ void main() {
 			if (depth == 1) {
 				direct_lighting += partial_contrib * throughput;
 			} else {
-#ifdef DISABLE_PM_MIS
-				if (mis_factor_set) {
-					partial_contrib = vec3(0);
-				}
-#endif	// DISABLE_PM_MIS
 				col += partial_contrib * throughput;
 				float lum = luminance(partial_contrib * throughput);
 				if (mis_factor_set && lum > 0) {
@@ -336,6 +337,12 @@ void main() {
 			float nee_pdf_light_w;
 			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, n_g, wo, mis_factor_set ? d_vm : 0.0,
 							 light_identity, is_delta_light, Le, nee_wi, nee_pdf_light_w, depth);
+#ifdef DISABLE_PM_MIS
+			// PM owns this path, zero it before any output or reservoir route
+			if (mis_factor_set) {
+				Li = vec3(0);
+			}
+#endif	// DISABLE_PM_MIS
 			vec3 contribution = Li * throughput;
 			// At 0 depth, we let ReSTIR DI handle the direct lighting
 			bool nee_connectable = depth > 0 && connectable;
@@ -405,11 +412,6 @@ void main() {
 			}
 
 			if (depth > 0) {
-#ifdef DISABLE_PM_MIS
-				if (mis_factor_set) {
-					contribution = vec3(0);
-				}
-#endif	// DISABLE_PM_MIS
 				col += contribution;
 				if (mis_factor_set) {
 					debug_col += contribution;
