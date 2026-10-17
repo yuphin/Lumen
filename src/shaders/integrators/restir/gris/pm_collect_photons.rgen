@@ -52,10 +52,13 @@ void main() {
 
 		vec3 selected_contribution = vec3(0);
 		vec3 wo = from_spherical(photon_eye.dir);
+		vec3 cam_n_s = cam_gbuffer.n_s;
+		vec3 cam_n_g = cam_gbuffer.n_g;
+		const bool eye_side = face_forward(cam_n_s, cam_n_g, wo);
 
-		bool eye_side;
+		bool unused_side;
 		uint eye_path_length;
-		unpack_photon_flags(photon_eye.flags, eye_side, eye_path_length);
+		unpack_photon_flags(photon_eye.flags, unused_side, eye_path_length);
 
 		while (traverse) {
 			traverse = rayQueryProceedEXT(ray_query);
@@ -74,14 +77,13 @@ void main() {
 			unpack_photon_flags(photon_light.flags, unused, photon_path_length);
 
 			vec3 wi = from_spherical(photon_light.dir);
-			if (!is_photon_valid(cam_gbuffer, photon_gbuffer, wi, eye_path_length, photon_path_length)) {
+			if (!is_photon_valid(cam_gbuffer, photon_gbuffer, eye_path_length, photon_path_length)) {
 				continue;
 			}
 
 			float cam_pdf_fwd;
 			float cam_pdf_rev;
-			vec3 f = eval_bsdf(cam_gbuffer.n_s, cam_gbuffer.n_g, wo, cam_hit_mat, TRANSPORT_MODE_FROM_CAMERA,
-							   eye_side, wi,
+			vec3 f = eval_bsdf(cam_n_s, cam_n_g, wo, cam_hit_mat, TRANSPORT_MODE_FROM_CAMERA, eye_side, wi,
 							   cam_pdf_fwd, cam_pdf_rev);
 
 			float mis_weight = 1.0 / (1.0 + photon_light.d_vm * cam_pdf_fwd);
@@ -129,9 +131,8 @@ void main() {
 
 					float cam_pdf_fwd_temp;
 					float cam_pdf_rev_temp;
-					vec3 f_temp = eval_bsdf(cam_gbuffer.n_s, cam_gbuffer.n_g, wo, cam_hit_mat,
-										 TRANSPORT_MODE_FROM_CAMERA, eye_side, wi_prev, cam_pdf_fwd_temp,
-											cam_pdf_rev_temp);
+					vec3 f_temp = eval_bsdf(cam_n_s, cam_n_g, wo, cam_hit_mat, TRANSPORT_MODE_FROM_CAMERA, eye_side,
+											wi_prev, cam_pdf_fwd_temp, cam_pdf_rev_temp);
 					float mis_weight_temp = 1.0 / (1.0 + prev_reservoir.d_vm * cam_pdf_fwd_temp);
 					vec3 temp_contribution = mis_weight_temp * f_temp * prev_reservoir.flux * photon_eye.throughput;
 
@@ -143,8 +144,7 @@ void main() {
 					unpack_photon_flags(prev_reservoir.flags, unused, prev_photon_path_length);
 
 					float target_pdf;
-					if (!is_photon_valid(cam_gbuffer, prev_photon_gbuffer, wi_prev, eye_path_length,
-										 prev_photon_path_length)) {
+					if (!is_photon_valid(cam_gbuffer, prev_photon_gbuffer, eye_path_length, prev_photon_path_length)) {
 						target_pdf = 0;
 					} else {
 						target_pdf = calc_target_pdf(temp_contribution);
@@ -166,16 +166,18 @@ void main() {
 						Material prev_cam_hit_mat = load_material(prev_cam_gbuffer.material_idx, prev_cam_gbuffer.uv);
 						vec3 wo_prev = from_spherical(prev_photon_eye.dir);
 						vec3 wi = from_spherical(canonical_reservoir.wi);
+						vec3 prev_cam_n_s = prev_cam_gbuffer.n_s;
+						vec3 prev_cam_n_g = prev_cam_gbuffer.n_g;
+						const bool eye_side_prev = face_forward(prev_cam_n_s, prev_cam_n_g, wo_prev);
 
-						bool eye_side_prev;
 						uint eye_path_length_prev;
-						unpack_photon_flags(prev_photon_eye.flags, eye_side_prev, eye_path_length_prev);
+						unpack_photon_flags(prev_photon_eye.flags, unused, eye_path_length_prev);
 
 						float cam_pdf_fwd_prev;
 						float cam_pdf_rev_prev;
-						vec3 f_prev = eval_bsdf(prev_cam_gbuffer.n_s, prev_cam_gbuffer.n_g, wo_prev, prev_cam_hit_mat,
-										   TRANSPORT_MODE_FROM_CAMERA, eye_side_prev, wi,
-												cam_pdf_fwd_prev, cam_pdf_rev_prev);
+						vec3 f_prev = eval_bsdf(prev_cam_n_s, prev_cam_n_g, wo_prev, prev_cam_hit_mat,
+												TRANSPORT_MODE_FROM_CAMERA, eye_side_prev, wi, cam_pdf_fwd_prev,
+												cam_pdf_rev_prev);
 
 						float mis_weight_prev = 1.0 / (1.0 + canonical_reservoir.d_vm * cam_pdf_fwd_prev);
 						vec3 prev_contribution =
@@ -185,7 +187,7 @@ void main() {
 						uint canonical_photon_path_length;
 						unpack_photon_flags(canonical_reservoir.flags, unused, canonical_photon_path_length);
 						float target_pdf_in_neighbor;
-						if (!is_photon_valid(prev_cam_gbuffer, canonical_photon_gbuffer, wi, eye_path_length_prev,
+						if (!is_photon_valid(prev_cam_gbuffer, canonical_photon_gbuffer, eye_path_length_prev,
 											 canonical_photon_path_length)) {
 							target_pdf_in_neighbor = 0;
 						} else {

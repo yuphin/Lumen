@@ -98,7 +98,7 @@ bool stream_photon_reservoir(inout uvec4 seed, inout PhotonReservoir r_new, vec3
 	return update_photon_reservoir(seed, r_new, flux, surface, wi, d_vm, target_pdf, inv_source_pdf);
 }
 
-bool is_photon_valid(SurfaceData cam_gbuffer, SurfaceData photon_gbuffer, vec3 wi, uint eye_path_length,
+bool is_photon_valid(SurfaceData cam_gbuffer, SurfaceData photon_gbuffer, uint eye_path_length,
 					 uint photon_path_length) {
 	// Check 1
 	if (!photon_is_nearby(cam_gbuffer.pos, photon_gbuffer.pos, pc.photon_radius)) {
@@ -110,10 +110,6 @@ bool is_photon_valid(SurfaceData cam_gbuffer, SurfaceData photon_gbuffer, vec3 w
 	}
 	// // Check 3
 	if (dot(photon_gbuffer.n_s, cam_gbuffer.n_s) < 0.5) {
-		return false;
-	}
-	// // Check 4
-	if (dot(cam_gbuffer.n_s, wi) <= 0) {
 		return false;
 	}
 	return true;
