@@ -79,9 +79,11 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	const float cos_x_g = abs(dot(n_g, wi));
 	const float pdf_dir =
 		light_emission_direction_pdf_w(light_sample.identity.light_idx, light_sample.normal, -light_sample.wi);
-	float mis_eye =
-		wi_len == 0 ? 0
-					: pdf_dir * light_bsdf_pdf_rev * cos_x_g * d_vm / (wi_len * wi_len);
+	const float photon_falloff =
+		is_light_finite(light_sample.flags)
+			? wi_len * wi_len
+			: light_sample.selection_pmf / light_emission_position_pdf_a(light_sample.identity.light_idx, pc.num_lights);
+	float mis_eye = pdf_dir * light_bsdf_pdf_rev * cos_x_g * d_vm / photon_falloff;
 	ASSERT(d_vm >= 0);
 	ASSERT(mis_eye >= 0);
 #else
