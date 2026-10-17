@@ -227,9 +227,8 @@ void main() {
 			float mis_light = 0;
 #ifndef DISABLE_PM_MIS
 			if (mis_factor_set && emitter_light_idx != INVALID_LIGHT_INDEX) {
-				float cos_from_light = abs(dot(emitter_normal, wo));
 				float emission_pdf = light_emission_pdf(emitter_light_idx, emitter_normal, wo, pc.num_lights);
-				mis_light = cos_from_light == 0 ? 0 : emission_pdf * d_vm / cos_from_light;
+				mis_light = emission_pdf * d_vm;
 			}
 #endif	// !DISABLE_PM_MIS
 
