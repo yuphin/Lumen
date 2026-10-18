@@ -42,8 +42,8 @@ ivec2 get_neighbor_offset(inout uvec4 seed) {
 }
 
 vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, vec3 n_g, vec3 wo, float d_vm,
-			out LightSampleIdentity identity, out bool is_delta_light, out vec3 Le, out vec3 wi,
-			out float pdf_light_w, int depth) {
+			out LightSampleIdentity identity, out bool is_delta_light, out vec3 Le, out vec3 wi, out float pdf_light_w,
+			int depth) {
 	const LightLiSample light_sample = sample_light_Li(rand4(seed), pos, pc.num_lights);
 	identity = light_sample.identity;
 	Le = light_sample.Li;
@@ -79,10 +79,10 @@ vec3 do_nee(inout uvec4 seed, vec3 pos, Material hit_mat, bool side, vec3 n_s, v
 	const float cos_x_g = abs(dot(n_g, wi));
 	const float pdf_dir =
 		light_emission_direction_pdf_w(light_sample.identity.light_idx, light_sample.normal, -light_sample.wi);
-	const float photon_falloff =
-		is_light_finite(light_sample.flags)
-			? wi_len * wi_len
-			: light_sample.selection_pmf / light_emission_position_pdf_a(light_sample.identity.light_idx, pc.num_lights);
+	const float photon_falloff = is_light_finite(light_sample.flags)
+									 ? wi_len * wi_len
+									 : light_sample.selection_pmf / light_emission_position_pdf_a(
+																		light_sample.identity.light_idx, pc.num_lights);
 	float mis_eye = pdf_dir * light_bsdf_pdf_rev * cos_x_g * d_vm / photon_falloff;
 	ASSERT(d_vm >= 0);
 	ASSERT(mis_eye >= 0);

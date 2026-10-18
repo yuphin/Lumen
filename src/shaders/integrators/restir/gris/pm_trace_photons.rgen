@@ -72,22 +72,24 @@ void main() {
 
 		if (is_rough(hit_mat) && last_specular) {
 			uint photon_idx = atomicAdd(DEREF(photon_count), 1);
-			DEREF(caustic_photon_aabbs)[photon_idx].min = gbuffer.pos - pc.photon_radius;
-			DEREF(caustic_photon_aabbs)[photon_idx].max = gbuffer.pos + pc.photon_radius;
+			if (photon_idx < pc.num_photons) {
+				DEREF(caustic_photon_aabbs)[photon_idx].min = gbuffer.pos - pc.photon_radius;
+				DEREF(caustic_photon_aabbs)[photon_idx].max = gbuffer.pos + pc.photon_radius;
 
-			DEREF(caustic_photon_light)[photon_idx].surface = payload.surface;
-			DEREF(caustic_photon_light)[photon_idx].dir = to_spherical(wo);
-			DEREF(caustic_photon_light)[photon_idx].throughput = throughput;
-			// side is not used
-			// Path length = Num of edges from light
-			DEREF(caustic_photon_light)[photon_idx].flags = pack_photon_flags(side, d + 1);
+				DEREF(caustic_photon_light)[photon_idx].surface = payload.surface;
+				DEREF(caustic_photon_light)[photon_idx].dir = to_spherical(wo);
+				DEREF(caustic_photon_light)[photon_idx].throughput = throughput;
+				// side is not used
+				// Path length = Num of edges from light
+				DEREF(caustic_photon_light)[photon_idx].flags = pack_photon_flags(side, d + 1);
 #ifdef DISABLE_PM_MIS
-			DEREF(caustic_photon_light)[photon_idx].d_vm = 0;
+				DEREF(caustic_photon_light)[photon_idx].d_vm = 0;
 #else
-			float d_vm = (d_vm_bsdf + d_vm_nee) * d_vm_common;
-			DEREF(caustic_photon_light)[photon_idx].d_vm = d_vm;
-			ASSERT(d_vm >= 0);
+				float d_vm = (d_vm_bsdf + d_vm_nee) * d_vm_common;
+				DEREF(caustic_photon_light)[photon_idx].d_vm = d_vm;
+				ASSERT(d_vm >= 0);
 #endif // DISABLE_PM_MIS
+			}
 		}
 		last_specular = !is_rough(hit_mat);
 		float pdf_dir, cos_theta;

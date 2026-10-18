@@ -8,6 +8,44 @@ using namespace RestirPT;
 
 namespace restirpt {
 
+////////////////////////////
+// Debug
+#define DEBUG_PASSES 0
+// Includes the deposits dropped past the capacity
+static u32 _num_photon_deposits = 0;
+// --- //
+
+static constexpr u32 MAX_NUM_PHOTONS = 4 * 1920 * 1080;
+
+static void create_photon_buffers(ReSTIRPT& state) {
+	state.caustic_photon_aabbs_buffer =
+		prm::get_buffer({.name = CSTR("Caustic Photon AABBs"),
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+								  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = (VkDeviceSize)state.num_photons * sizeof(f32) * 6});
+	state.caustic_photon_light_buffer =
+		prm::get_buffer({.name = CSTR("Caustic Photon - Light"),
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = (VkDeviceSize)state.num_photons * sizeof(PhotonData)});
+}
+
+static void update_scene_desc(Integrator* integrator) {
+	ReSTIRPT& state = integrator->restirpt;
+	SceneDesc desc = integrator::scene_desc_base(integrator);
+	// ReSTIR PT (GRIS)
+	SET_SCENE_BUFFER(desc, gris_reservoir, state.gris_reservoir_ping_buffer);
+	SET_SCENE_BUFFER(desc, prefix_contributions, state.prefix_contribution_buffer);
+	SET_SCENE_BUFFER(desc, debug_vis, state.debug_vis_buffer);
+	SET_SCENE_BUFFER(desc, photon_eye, state.photon_eye_buffer_ping);
+	SET_SCENE_BUFFER(desc, caustic_photon_aabbs, state.caustic_photon_aabbs_buffer);
+	SET_SCENE_BUFFER(desc, caustic_photon_light, state.caustic_photon_light_buffer);
+	SET_SCENE_BUFFER(desc, photon_count, state.photon_count_buffer);
+	integrator::upload_scene_desc(integrator, desc);
+}
+
 void init(Integrator* integrator) {
 	ReSTIRPT& state = integrator->restirpt;
 
@@ -81,23 +119,12 @@ void init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(PhotonData)});
 
-	state.caustic_photon_aabbs_buffer =
-		prm::get_buffer({.name = CSTR("Caustic Photon AABBs"),
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								  VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-								  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height() * sizeof(f32) * 6});
-	state.caustic_photon_light_buffer =
-		prm::get_buffer({.name = CSTR("Caustic Photon - Light"),
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height() * sizeof(PhotonData)});
+	create_photon_buffers(state);
 	state.photon_count_buffer =
 		prm::get_buffer({.name = CSTR("Photon Counts"),
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .memory_type = DEBUG_PASSES ? vk::BUFFER_TYPE_GPU_TO_CPU : vk::BUFFER_TYPE_GPU,
 						 .size = 4});
 
 	state.caustics_reservoir_ping_buffer =
@@ -112,16 +139,7 @@ void init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(PhotonReservoir)});
 
-	SceneDesc desc = integrator::scene_desc_base(integrator);
-	// ReSTIR PT (GRIS)
-	SET_SCENE_BUFFER(desc, gris_reservoir, state.gris_reservoir_ping_buffer);
-	SET_SCENE_BUFFER(desc, prefix_contributions, state.prefix_contribution_buffer);
-	SET_SCENE_BUFFER(desc, debug_vis, state.debug_vis_buffer);
-	SET_SCENE_BUFFER(desc, photon_eye, state.photon_eye_buffer_ping);
-	SET_SCENE_BUFFER(desc, caustic_photon_aabbs, state.caustic_photon_aabbs_buffer);
-	SET_SCENE_BUFFER(desc, caustic_photon_light, state.caustic_photon_light_buffer);
-	SET_SCENE_BUFFER(desc, photon_count, state.photon_count_buffer);
-	integrator::upload_scene_desc(integrator, desc);
+	update_scene_desc(integrator);
 
 	state.canonical_contributions_texture = prm::get_texture({
 		.name = CSTR("Canonical Contributions Texture"),
@@ -216,6 +234,9 @@ void render(Integrator* integrator) {
 	constexpr i32 WRITE_OR_CURR_IDX = 1;
 	constexpr i32 READ_OR_PREV_IDX = 0;
 	if (state.enable_photon_mapping) {
+#if DEBUG_PASSES
+		vk::CommandBuffer cmd(/*begin=*/true);
+#endif	// DEBUG_PASSES
 		rg::add_rt(CSTR("PM - Trace First Diffuse"),
 					 {
 						 .shaders = {{CSTR("src/shaders/integrators/restir/gris/pm_trace_eye.rgen")},
@@ -275,6 +296,12 @@ void render(Integrator* integrator) {
 						&state.photon_bvh_scratch_bufs[resource_idx],
 						/*build_tlas_after_blas=*/true)
 			.bind_tlas(*integrator->tlas);
+
+#if DEBUG_PASSES
+		rg::run_and_submit(cmd);
+		_num_photon_deposits = *(u32*)vk::buffer_map(state.photon_count_buffer);
+		vk::buffer_unmap(state.photon_count_buffer);
+#endif	// DEBUG_PASSES
 
 		if (state.photon_tlas.accel && state.enable_photon_gather) {
 			rg::add_rt(CSTR("Collect Photons"),
@@ -514,9 +541,15 @@ bool gui(Integrator* integrator) {
 
 	result |= ImGui::Checkbox("Enable photon mapping", &state.enable_photon_mapping);
 	if (state.enable_photon_mapping) {
-		bool num_photons_changed =
-			ImGui::SliderInt("Num photons", (i32*)&state.num_photons, 1, Window::width() * Window::height());
+		bool num_photons_changed = ImGui::SliderInt("Num photons", (i32*)&state.num_photons, 1, MAX_NUM_PHOTONS,
+													"%d", ImGuiSliderFlags_AlwaysClamp);
 		result |= num_photons_changed;
+		if (DEBUG_PASSES) {
+			ImGui::Text("Photon deposits: %u / %u", _num_photon_deposits, state.num_photons);
+			if (_num_photon_deposits > state.num_photons) {
+				ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Deposits past the capacity are dropped");
+			}
+		}
 		result |= ImGui::SliderFloat("Initial photon radius", &state.initial_photon_radius, 0.0f, 0.1f);
 		result |= ImGui::Checkbox("Progressive radius reduction", &state.progressive_radius_reduction);
 		ImGui::Text("Current photon radius: %f", state.curr_photon_radius);
@@ -530,6 +563,10 @@ bool gui(Integrator* integrator) {
 				state.photon_blas.destroy();
 				state.photon_tlas.destroy();
 			}
+			prm::remove(state.caustic_photon_aabbs_buffer);
+			prm::remove(state.caustic_photon_light_buffer);
+			create_photon_buffers(state);
+			update_scene_desc(integrator);
 		}
 	}
 	if (!state.enable_gris) {

@@ -44,6 +44,7 @@ void main() {
 
 		bool traverse = true;
 		int counter = 0;
+		const uint num_deposits = DEREF(photon_count);
 
 		vec3 phi = vec3(0);
 
@@ -67,6 +68,9 @@ void main() {
 			}
 
 			int photon_idx = rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, false);
+			if (uint(photon_idx) >= num_deposits) {
+				continue;
+			}
 			PhotonData photon_light = DEREF(caustic_photon_light)[photon_idx];
 
 			SurfaceData photon_gbuffer = load_surface(photon_light.surface);
