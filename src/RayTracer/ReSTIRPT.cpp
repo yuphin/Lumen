@@ -302,6 +302,7 @@ void render(Integrator* integrator) {
 		}
 	}
 
+	const bool enable_pm = state.enable_photon_gather && state.enable_photon_mapping;
 	// Trace rays
 	rg::add_rt(CSTR("GRIS - Generate Samples"),
 				 {
@@ -313,7 +314,7 @@ void render(Integrator* integrator) {
 					 .macros = {vk::ShaderMacro("STREAMING_MODE", i32(state.streaming_method)),
 								vk::ShaderMacro("ENABLE_ATMOSPHERE", state.enable_atmosphere),
 								vk::ShaderMacro("DISABLE_PM_MIS", !state.enable_pm_mis),
-								vk::ShaderMacro("ENABLE_PM", state.enable_photon_gather && state.enable_photon_mapping)},
+								vk::ShaderMacro("ENABLE_PM", enable_pm)},
 					 .dims = {Window::width(), Window::height()},
 				 })
 		.push_constants(&state.pc)
@@ -338,6 +339,7 @@ void render(Integrator* integrator) {
 									 {CSTR("src/shaders/ray_shadow.rmiss")},
 									 {CSTR("src/shaders/surface.rchit")},
 									 {CSTR("src/shaders/ray.rahit")}},
+						 .macros = {vk::ShaderMacro("ENABLE_PM", enable_pm)},
 						 .dims = {Window::width(), Window::height()},
 					 })
 			.push_constants(&state.pc)
@@ -360,6 +362,7 @@ void render(Integrator* integrator) {
 											 {CSTR("src/shaders/ray_shadow.rmiss")},
 											 {CSTR("src/shaders/surface.rchit")},
 											 {CSTR("src/shaders/ray.rahit")}},
+								 .macros = {vk::ShaderMacro("ENABLE_PM", enable_pm)},
 								 .dims = {Window::width(), Window::height()},
 							 })
 					.push_constants(&state.pc)
@@ -380,6 +383,7 @@ void render(Integrator* integrator) {
 											 {CSTR("src/shaders/ray_shadow.rmiss")},
 											 {CSTR("src/shaders/surface.rchit")},
 											 {CSTR("src/shaders/ray.rahit")}},
+								 .macros = {vk::ShaderMacro("ENABLE_PM", enable_pm)},
 								 .dims = {Window::width(), Window::height()},
 							 })
 					.push_constants(&state.pc)
@@ -416,7 +420,8 @@ void render(Integrator* integrator) {
 										{CSTR("src/shaders/ray_shadow.rmiss")},
 										{CSTR("src/shaders/surface.rchit")},
 										{CSTR("src/shaders/ray.rahit")}},
-							.macros = {vk::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS", state.enable_defensive_formulation)},
+							.macros = {vk::ShaderMacro("ENABLE_DEFENSIVE_PAIRWISE_MIS", state.enable_defensive_formulation),
+									   vk::ShaderMacro("ENABLE_PM", enable_pm)},
 							.dims = {Window::width(), Window::height()},
 						})
 					.push_constants(&state.pc)

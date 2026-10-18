@@ -259,6 +259,9 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 	bool dst_far;
 	bool dst_rough = true;
 	bool prev_rough = dst_rough;
+#ifdef ENABLE_PM
+	int merge_depth = -1;
+#endif	// ENABLE_PM
 
 	vec3 org_pos;
 	while (true) {
@@ -279,6 +282,16 @@ bool advance_paths(in SurfaceData dst_gbuffer, in GrisData data, vec3 dst_wi, fl
 
 		prev_rough = dst_rough;
 		dst_rough = is_rough(dst_hit_mat);
+#ifdef ENABLE_PM
+		// If the dst is not rough, this belongs to a PM path. Reject.
+		if (merge_depth >= 0 && prefix_depth == merge_depth + 1 && !dst_rough) {
+			return false;
+		}
+		// Set merge_depth if not set
+		if (merge_depth < 0 && dst_rough) {
+			merge_depth = int(prefix_depth);
+		}
+#endif	// ENABLE_PM
 
 		// A simple way to impose the distance condition without breaking symmetry
 		if (rc_type == RECONNECTION_TYPE_NEE && dst_rough &&

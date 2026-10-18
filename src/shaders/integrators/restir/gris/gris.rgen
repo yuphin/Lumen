@@ -95,7 +95,7 @@ void main() {
 
 	uint path_flags = 0;
 
-	bool mis_factor_set = false;
+	bool valid_pm_path = false;
 	vec3 debug_col = vec3(0);
 	float d_vm = 0;
 	int merge_depth = -1;
@@ -190,11 +190,12 @@ void main() {
 			reconnection_data.rc_partial_jacobian = abs(dot(n_g, wo)) * rc_partial_jacobian / dot(to_prev, to_prev);
 		}
 
-		connectable = !connectable_vertex_found && curr_rough;
+		// PM paths and ReSTIR PT paths are mutually exclusive
+		connectable = !connectable_vertex_found && curr_rough && !valid_pm_path;
 
 		float cos_theta_wo = abs(dot(n_g, wo));
 		d_vm = cos_theta_wo > 0 ? d_vm / cos_theta_wo : 0;
-		if (mis_factor_set) {
+		if (valid_pm_path) {
 			ASSERT(merge_depth >= 0);
 		}
 
@@ -214,7 +215,7 @@ void main() {
 		}
 #ifdef DISABLE_PM_MIS
 		// PM owns this path, zero it before any output or reservoir route
-		if (mis_factor_set) {
+		if (valid_pm_path) {
 			emitted_radiance = vec3(0);
 		}
 #endif	// DISABLE_PM_MIS
@@ -232,7 +233,7 @@ void main() {
 
 			float mis_light = 0;
 #ifndef DISABLE_PM_MIS
-			if (mis_factor_set && emitter_light_idx != INVALID_LIGHT_INDEX) {
+			if (valid_pm_path && emitter_light_idx != INVALID_LIGHT_INDEX) {
 				float emission_pdf = light_emission_pdf(emitter_light_idx, emitter_normal, wo, pc.num_lights);
 				mis_light = emission_pdf * d_vm;
 			}
@@ -293,7 +294,7 @@ void main() {
 			} else {
 				col += partial_contrib * throughput;
 				float lum = luminance(partial_contrib * throughput);
-				if (mis_factor_set && lum > 0) {
+				if (valid_pm_path && lum > 0) {
 					debug_col += partial_contrib * throughput;
 				}
 			}
@@ -304,9 +305,8 @@ void main() {
 		}
 
 #ifdef ENABLE_PM
-		// Emission at this vertex has no PM competitor, NEE and continuation from it do
 		if (merge_depth >= 0 && depth == merge_depth + 1 && !is_rough(hit_mat)) {
-			mis_factor_set = true;
+			valid_pm_path = true;
 		}
 #endif	// ENABLE_PM
 
@@ -335,11 +335,11 @@ void main() {
 			vec3 Le;
 			vec3 nee_wi;
 			float nee_pdf_light_w;
-			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, n_g, wo, mis_factor_set ? d_vm : 0.0,
+			vec3 Li = do_nee(seed, gbuffer.pos, hit_mat, side, n_s, n_g, wo, valid_pm_path ? d_vm : 0.0,
 							 light_identity, is_delta_light, Le, nee_wi, nee_pdf_light_w, depth);
 #ifdef DISABLE_PM_MIS
 			// PM owns this path, zero it before any output or reservoir route
-			if (mis_factor_set) {
+			if (valid_pm_path) {
 				Li = vec3(0);
 			}
 #endif	// DISABLE_PM_MIS
@@ -413,7 +413,7 @@ void main() {
 
 			if (depth > 0) {
 				col += contribution;
-				if (mis_factor_set) {
+				if (valid_pm_path) {
 					debug_col += contribution;
 				}
 			} else {
@@ -424,7 +424,7 @@ void main() {
 		float abs_cos_theta = abs(cos_theta);
 		const float mis_cos_theta = abs(dot(direction, n_g));
 		d_vm *= mis_cos_theta;
-		if (mis_factor_set) {
+		if (valid_pm_path) {
 			ASSERT(merge_depth >= 0);
 			if (!vertex_specular) {
 				d_vm *= bsdf_pdf_rev / bsdf_pdf_fwd;
