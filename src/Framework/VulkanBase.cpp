@@ -698,12 +698,11 @@ void add_device_extension(const char* name) { _device_extensions.push_back(name)
 
 // Called after window resize or manually
 void recreate_swap_chain() {
-	u32 width = 0, height = 0;
-	os::window_framebuffer_size(Window::get()->os_window, width, height);
-	while (width == 0 || height == 0) {
-		// Window is minimized
+	VkSurfaceCapabilitiesKHR caps;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context().physical_device, context().surface, &caps);
+	while (caps.currentExtent.width == 0 || caps.currentExtent.height == 0) {
 		os::window_wait_events(Window::get()->os_window);
-		os::window_framebuffer_size(Window::get()->os_window, width, height);
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context().physical_device, context().surface, &caps);
 	}
 	check(vkDeviceWaitIdle(context().device), "Failed to wait for device before recreating swap chain");
 	cleanup_swapchain_images();

@@ -40,7 +40,7 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 			push_constant_size = shader.push_constant_size;
 		}
 	}
-	create_pipeline_layout(shaders_slice, {&push_constant_size, 1});
+	create_pipeline_layout(shaders_slice, {&push_constant_size, push_constant_size ? 1u : 0u});
 	create_update_template(shaders_slice, descriptor_counts);
 
 	VkSpecializationInfo specialization_info = {};
@@ -211,7 +211,7 @@ void Pipeline::create_rt_pipeline(const PassSettings& settings, util::Slice<u32>
 	LUMEN_ASSERT(num_as_bindings_in_shader <= MAX_AS_BINDING_COUNT, "Max 2 AS bindings are supported");
 	create_set_layout(shaders_slice, descriptor_counts);
 	create_rt_set_layout(binding_stage_flags, num_as_bindings);
-	create_pipeline_layout(shaders_slice, {&push_constant_size, 1});
+	create_pipeline_layout(shaders_slice, {&push_constant_size, push_constant_size ? 1u : 0u});
 	create_update_template(shaders_slice, descriptor_counts);
 
 	// Descriptor pool for AS descriptors
