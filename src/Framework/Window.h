@@ -178,7 +178,7 @@ struct Window {
 	u32 viewport_width;
 	u32 viewport_height;
 };
-void init(i32 width, i32 height, bool fullscreen, bool on_second_monitor);
+void init(i32 width, i32 height, bool fullscreen, bool on_second_monitor, const char* title = "Lumen");
 Window* get();
 void update_window_size();
 void poll();

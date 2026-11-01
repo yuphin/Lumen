@@ -158,13 +158,13 @@ static void focus_callback(void* user_data, bool focused) {
 	if (ImGui::GetCurrentContext()) ImGui::GetIO().AddFocusEvent(focused);
 }
 
-void init(i32 width, i32 height, bool fullscreen, bool on_second_monitor) {
+void init(i32 width, i32 height, bool fullscreen, bool on_second_monitor, const char* title) {
 	_window.key_map.resize(MAX_KEY_INPUTS);
 	for (KeyAction& action : _window.key_map) action = KeyAction::RELEASE;
 	_window.mouse_map.resize(MOUSE_ACTION_COUNT);
 	for (MouseInput& input : _window.mouse_map) input = {};
 	os::WindowDesc desc = {
-		.title = "Lumen",
+		.title = title,
 		.width = (u32)width,
 		.height = (u32)height,
 		.fullscreen = fullscreen,
