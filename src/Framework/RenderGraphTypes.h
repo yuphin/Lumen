@@ -118,22 +118,21 @@ struct ShaderMacro {
 
 using ShaderMacroArray = lm::SmallArray<ShaderMacro, lm::MAX_SHADER_MACROS>;
 
-// Single settings struct for all pass types; the pass type is set by the rg::add_* entry point.
-// NOTE: Designated initializers must follow declaration order, so common fields come first,
-// graphics fields second, RT fields third and pass_func last.
+// NOTE: Designated initializers must follow declaration order
 struct PassSettings {
-	////////////////////////////
-	// --- Common ---
-	lm::SmallArray<vk::Shader, vk::MAX_SHADERS_PER_PASS> shaders = {};
+	lm::SmallArray<lm::String, vk::MAX_SHADERS_PER_PASS> shaders = {};
 	// Convenience for compute passes, which take a single shader
 	// TODO: Remove this later?
-	vk::Shader shader = {};
+	lm::String shader = {};
 	ShaderMacroArray macros = {};
 	lm::SpecializationConstantArray specialization_data = {};
 	lm::dim3 dims = {};
+	// Ray tracing only
+	u32 recursion_depth = 1;
+	lm::PassFunc pass_func = nullptr;
+};
 
-	////////////////////////////
-	// --- Graphics ---
+struct GraphicsPassSettings {
 	u32 width = 0;
 	u32 height = 0;
 	VkClearValue clear_color = {};
@@ -158,15 +157,8 @@ struct PassSettings {
 	f32 line_width = 1.0;
 	lm::SmallArray<vk::Texture*, MAX_COLOR_ATTACHMENTS> color_outputs = {};
 	vk::Texture* depth_output = nullptr;
-
-	////////////////////////////
-	// --- RT ---
-	u32 recursion_depth = 1;
-
-	lm::PassFunc pass_func = nullptr;
 };
 
-using GraphicsPassSettings = PassSettings;
 using RTPassSettings = PassSettings;
 using ComputePassSettings = PassSettings;
 

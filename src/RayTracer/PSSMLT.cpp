@@ -187,7 +187,7 @@ static void prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& c
 	auto scan = [&](i32 num_wgs, i32 idx) {
 		++counter;
 		rg::add_compute(CSTR("PrefixScan - Scan"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/prefix_scan.comp")),
+						{.shader = CSTR("src/shaders/integrators/pssmlt/prefix_scan.comp"),
 						 .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&state.pc_compute)
 			.bind(integrator->lumen_scene->scene_desc_buffer);
@@ -195,7 +195,7 @@ static void prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& c
 	auto uniform_add = [&](i32 num_wgs, i32 output_idx) {
 		++counter;
 		rg::add_compute(CSTR("PrefixScan - Uniform Add"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/uniform_add.comp")),
+						{.shader = CSTR("src/shaders/integrators/pssmlt/uniform_add.comp"),
 						 .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&state.pc_compute)
 			.bind(integrator->lumen_scene->scene_desc_buffer);
@@ -291,7 +291,7 @@ void render(Integrator* integrator) {
 	prefix_scan(integrator, 0, config.num_bootstrap_samples, counter);
 	// Calculate CDF
 	rg::add_compute(CSTR("Calculate CDF"),
-					  {.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/calc_cdf.comp")),
+					  {.shader = CSTR("src/shaders/integrators/pssmlt/calc_cdf.comp"),
 					   .specialization_data = {(u32)config.num_bootstrap_samples},
 					   .dims = {(u32)lm::ceil(config.num_bootstrap_samples / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
@@ -299,7 +299,7 @@ void render(Integrator* integrator) {
 
 	// Select seeds
 	rg::add_compute(CSTR("Select Seeds"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/select_seeds.comp")),
+					{.shader = CSTR("src/shaders/integrators/pssmlt/select_seeds.comp"),
 					 .specialization_data = {(u32)config.num_mlt_threads},
 					 .dims = {(u32)lm::ceil(config.num_mlt_threads / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
@@ -367,7 +367,7 @@ void render(Integrator* integrator) {
 	}
 	// Compositions
 	rg::add_compute(CSTR("Composition"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/composite.comp")),
+					{.shader = CSTR("src/shaders/integrators/pssmlt/composite.comp"),
 					 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});

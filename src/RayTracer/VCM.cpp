@@ -138,7 +138,7 @@ void render(Integrator* integrator) {
 	if (state.enable_ray_guiding) {
 		lm::RenderPass& prepare_pass =
 			rg::add_compute(CSTR("Init Reservoirs"),
-							{.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/init_reservoirs.comp")),
+							{.shader = CSTR("src/shaders/integrators/vcm/init_reservoirs.comp"),
 							 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 				.push_constants(&state.pc)
 				.bind(integrator->lumen_scene->scene_desc_buffer)
@@ -167,7 +167,7 @@ void render(Integrator* integrator) {
 			.bind_tlas(*integrator->tlas);
 
 		rg::add_compute(CSTR("Check Reservoirs"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/check_reservoirs.comp")),
+						{.shader = CSTR("src/shaders/integrators/vcm/check_reservoirs.comp"),
 						 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 			.push_constants(&state.pc)
 			.bind(integrator->lumen_scene->scene_desc_buffer)
@@ -217,13 +217,13 @@ void render(Integrator* integrator) {
 
 	if (state.enable_ray_guiding) {
 		rg::add_compute(CSTR("Select Reservoir"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/select_reservoirs.comp")),
+						{.shader = CSTR("src/shaders/integrators/vcm/select_reservoirs.comp"),
 						 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 			.bind(integrator->lumen_scene->scene_desc_buffer)
 			.push_constants(&state.pc);
 
 		rg::add_compute(CSTR("Update Reservoirs"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/vcm/update_reservoirs.comp")),
+						{.shader = CSTR("src/shaders/integrators/vcm/update_reservoirs.comp"),
 						 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 			.bind(integrator->lumen_scene->scene_desc_buffer)
 			.push_constants(&state.pc);

@@ -42,7 +42,7 @@ static f32 get_max_surfel_radius_px(f32 p11, f32 height) {
 
 static void scan(u32 num_wgs, vk::Buffer* scene_desc_buffer, const PCPrefixSum& pc, bool disable_sum_writes = false) {
 	rg::add_compute(CSTR("PrefixScan - Scan"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_scan.comp")),
+					{.shader = CSTR("src/shaders/integrators/irradiance_cache/grid_scan.comp"),
 					 .macros = {vk::ShaderMacro("DISABLE_SUM_WRITES", disable_sum_writes)},
 					 .dims = {(u32)num_wgs, 1, 1}})
 		.push_constants(&pc)
@@ -50,7 +50,7 @@ static void scan(u32 num_wgs, vk::Buffer* scene_desc_buffer, const PCPrefixSum& 
 }
 static void uniform_add(u32 num_wgs, vk::Buffer* scene_desc_buffer, const PCPrefixSum& pc) {
 	rg::add_compute(CSTR("PrefixScan - Uniform Add"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_uniform_add.comp")),
+					{.shader = CSTR("src/shaders/integrators/irradiance_cache/grid_uniform_add.comp"),
 					 .dims = {(u32)num_wgs, 1, 1}})
 		.push_constants(&pc)
 		.bind(scene_desc_buffer);
@@ -260,7 +260,7 @@ void render(Integrator* integrator) {
 		.bind_tlas(*integrator->tlas);
 
 	rg::add_compute(CSTR("Surfel: Recycle"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_recycle.comp")),
+					{.shader = CSTR("src/shaders/integrators/irradiance_cache/surfel_recycle.comp"),
 					 .macros = {vk::ShaderMacro("CLEAR_SURFELS", state.clear_surfels)},
 					 .dims = {lm::div_ceil(MAX_SURFEL_COUNT, ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
@@ -272,13 +272,13 @@ void render(Integrator* integrator) {
 	// --- Surfel Grid ---
 	// Grid is rebuilt every frame
 	rg::add_compute(CSTR("Grid: Clear"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_clear.comp")),
+					{.shader = CSTR("src/shaders/integrators/irradiance_cache/grid_clear.comp"),
 					 .dims = {lm::div_ceil(grid_total_cells, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
 		.bind({integrator->lumen_scene->scene_desc_buffer});
 	// TODO: Having an indirect launch would be better here, maybe?
 	rg::add_compute(CSTR("Grid: Count"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_count.comp")),
+					{.shader = CSTR("src/shaders/integrators/irradiance_cache/grid_count.comp"),
 					 .dims = {lm::div_ceil((u32)MAX_SURFEL_COUNT, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
 		.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
@@ -316,7 +316,7 @@ void render(Integrator* integrator) {
 	}
 
 	rg::add_compute(CSTR("Grid: Distribute"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/grid_distribute.comp")),
+					{.shader = CSTR("src/shaders/integrators/irradiance_cache/grid_distribute.comp"),
 					 .macros = {vk::ShaderMacro("DEBUG_GRID_INVARIANTS", DEBUG_PASSES)},
 					 .dims = {lm::div_ceil((u32)MAX_SURFEL_COUNT, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
@@ -324,7 +324,7 @@ void render(Integrator* integrator) {
 
 	if (state.enable_surfel_dedup) {
 		rg::add_compute(CSTR("Surfel: Dedup"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_dedup.comp")),
+						{.shader = CSTR("src/shaders/integrators/irradiance_cache/surfel_dedup.comp"),
 						 .macros = {vk::ShaderMacro("DEBUG_GRID_INVARIANTS", DEBUG_PASSES),
 									vk::ShaderMacro("SURFEL_HEXAGONAL_PLACEMENT", i32(state.hexagonal_placement))},
 						 .dims = {lm::div_ceil((u32)MAX_SURFEL_COUNT, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
@@ -361,7 +361,7 @@ void render(Integrator* integrator) {
 		u32 max_screen_tiles_x = lm::div_ceil(Window::width(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		u32 max_screen_tiles_y = lm::div_ceil(Window::height(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		rg::add_compute(CSTR("Surfel: Spawn"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_spawn.comp")),
+						{.shader = CSTR("src/shaders/integrators/irradiance_cache/surfel_spawn.comp"),
 						 .macros = {vk::ShaderMacro("SURFEL_HEXAGONAL_PLACEMENT", i32(state.hexagonal_placement))},
 						 .dims = {max_screen_tiles_x, max_screen_tiles_y, 1}})
 			.push_constants(&pc)
@@ -369,7 +369,7 @@ void render(Integrator* integrator) {
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
 
 		rg::add_compute(CSTR("Surfel: Allocate"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_allocate.comp")),
+						{.shader = CSTR("src/shaders/integrators/irradiance_cache/surfel_allocate.comp"),
 						 .macros = {vk::ShaderMacro("SURFEL_HEXAGONAL_PLACEMENT", i32(state.hexagonal_placement))},
 						 .dims = {lm::div_ceil(MAX_SURFEL_COUNT, ALLOCATE_PASS_WG_SIZE), 1, 1}})
 			.push_constants(&pc)
@@ -393,14 +393,14 @@ void render(Integrator* integrator) {
 		.bind_tlas(*integrator->tlas);
 
 	rg::add_compute(CSTR("Surfel: Integrate"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/surfel_integrate.comp")),
+					{.shader = CSTR("src/shaders/integrators/irradiance_cache/surfel_integrate.comp"),
 					 .dims = {lm::div_ceil((u32)MAX_SURFEL_COUNT, (u32)DEFAULT_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
 		.bind({integrator->lumen_scene->scene_desc_buffer});
 
 	if (state.debug_mode) {
 		rg::add_compute(CSTR("Debug"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/debug.comp")),
+						{.shader = CSTR("src/shaders/integrators/irradiance_cache/debug.comp"),
 						 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024)), 1, 1}})
 			.push_constants(&pc)
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->output_tex, integrator->scene_ubo_buffer})
@@ -409,7 +409,7 @@ void render(Integrator* integrator) {
 		u32 max_screen_tiles_x = lm::div_ceil(Window::width(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		u32 max_screen_tiles_y = lm::div_ceil(Window::height(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		rg::add_compute(CSTR("Composite"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/irradiance_cache/composite.comp")),
+						{.shader = CSTR("src/shaders/integrators/irradiance_cache/composite.comp"),
 						 .dims = {max_screen_tiles_x, max_screen_tiles_y, 1}})
 			.push_constants(&pc)
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->output_tex, integrator->scene_ubo_buffer})

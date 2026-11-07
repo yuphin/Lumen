@@ -4,12 +4,15 @@
 namespace lm {
 template <typename T, u64 N>
 struct SmallArray {
-	// TODO: Default initialiation to 0 is not a good idea, redundant memsets...
-	// Remove in the future
 	u64 size = 0;
-	T data[N] = {};
+	// This avoids initialization and redundant memsets during construction
+	// initialization is now done in push or resize
+	union {
+		T data[N];
+	};
 
-	SmallArray() = default;
+	// Needed to avoid zero initialization
+	constexpr SmallArray() {}
 
 	constexpr SmallArray(std::initializer_list<T> init) {
 		assert(init.size() <= N);
@@ -39,6 +42,7 @@ struct SmallArray {
 
 	T& push() {
 		assert(size < N);
+		new (&data[size]) T{};
 		return data[size++];
 	}
 
@@ -47,9 +51,12 @@ struct SmallArray {
 		--size;
 	}
 
-	void resize(u64 new_capacity) {
-		assert(new_capacity <= N);
-		size = new_capacity;
+	void resize(u64 new_size) {
+		assert(new_size <= N);
+		for (u64 i = size; i < new_size; i++) {
+			new (&data[i]) T{};
+		}
+		size = new_size;
 	}
 
 	void erase_unordered(u64 idx) {

@@ -105,7 +105,7 @@ void render(Integrator* integrator) {
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
 		.bind_tlas(*integrator->tlas);
 	rg::add_compute(CSTR("BDPT - Resolve Splats"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/bdpt/bdpt_resolve.comp")),
+					{.shader = CSTR("src/shaders/integrators/bdpt/bdpt_resolve.comp"),
 					 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});

@@ -279,7 +279,7 @@ void render(Integrator* integrator) {
 	// Classify
 	u32 wg_x = (state.probe_counts.x * state.probe_counts.y * state.probe_counts.z + 31) / 32;
 	rg::add_compute(CSTR("Classify Probes"),
-					  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/classify.comp")), .dims = {wg_x}})
+					  {.shader = CSTR("src/shaders/integrators/ddgi/classify.comp"), .dims = {wg_x}})
 		.push_constants(&state.pc)
 		.bind({integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, state.ddgi_ubo_buffer,
 			   state.rt.radiance_tex, state.rt.dir_depth_tex});
@@ -290,7 +290,7 @@ void render(Integrator* integrator) {
 		u32 wg_y = state.probe_counts.z;
 		auto update_probe = [&](bool is_irr) {
 			lm::String pipeline_name = is_irr ? CSTR("Update Irradiance") : CSTR("Update Depth");
-			rg::add_compute(pipeline_name, {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/update.comp")),
+			rg::add_compute(pipeline_name, {.shader = CSTR("src/shaders/integrators/ddgi/update.comp"),
 											  .macros = {is_irr ? vk::ShaderMacro("IRRADIANCE_UPDATE")
 																: vk::ShaderMacro("DEPTH_UPDATE")},
 											  .dims = {wg_x, wg_y}})
@@ -306,7 +306,7 @@ void render(Integrator* integrator) {
 		wg_x = (state.probe_counts.x * state.probe_counts.y * state.probe_counts.z + 3) * 13 / 4;
 		rg::add_compute(
 				CSTR("Update Borders"),
-				{.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/update_borders.comp")), .dims = {wg_x}})
+				{.shader = CSTR("src/shaders/integrators/ddgi/update_borders.comp"), .dims = {wg_x}})
 			.push_constants(&state.pc)
 			.bind({state.irr_texes[!ping_pong], state.depth_texes[!ping_pong], state.ddgi_ubo_buffer});
 	}
@@ -314,7 +314,7 @@ void render(Integrator* integrator) {
 	wg_x = (Window::width() + 31) / 32;
 	u32 wg_y = (Window::height() + 31) / 32;
 	rg::add_compute(CSTR("Sample Probes"),
-					  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/sample.comp")), .dims = {wg_x, wg_y}})
+					  {.shader = CSTR("src/shaders/integrators/ddgi/sample.comp"), .dims = {wg_x, wg_y}})
 		.push_constants(&state.pc)
 		.bind({integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, state.output.tex,
 			   state.irr_texes[!ping_pong], state.depth_texes[!ping_pong], state.ddgi_ubo_buffer,
@@ -338,7 +338,7 @@ void render(Integrator* integrator) {
 		// 13 WGs process 4 probes (wg = 32 threads)
 		wg_x = (state.probe_counts.x * state.probe_counts.y * state.probe_counts.z + 31) / 32;
 		rg::add_compute(CSTR("Relocate"),
-						  {.shader = vk::Shader(CSTR("src/shaders/integrators/ddgi/relocate.comp")), .dims = {wg_x}})
+						  {.shader = CSTR("src/shaders/integrators/ddgi/relocate.comp"), .dims = {wg_x}})
 			.push_constants(&state.pc)
 			.bind({integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer, state.ddgi_ubo_buffer,
 				   state.rt.dir_depth_tex});

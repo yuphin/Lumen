@@ -171,7 +171,8 @@ void add_pass(ImGuiRenderer* renderer, vk::Texture* output) {
 	rg::add_gfx(
 		CSTR("ImGui"),
 		{.shaders = {{CSTR("src/shaders/imgui.vert")}, {CSTR("src/shaders/imgui.frag")}},
-		 .width = output->extent.width,
+		 .pass_func = render_draw_data},
+		{.width = output->extent.width,
 		 .height = output->extent.height,
 		 .cull_mode = VK_CULL_MODE_NONE,
 		 .vertex_buffers = {frame->vertex_buffer},
@@ -197,8 +198,7 @@ void add_pass(ImGuiRenderer* renderer, vk::Texture* output) {
 		 .index_type = sizeof(ImDrawIdx) == 2 ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32,
 		 .depth_test_enable = VK_FALSE,
 		 .depth_write_enable = VK_FALSE,
-		 .color_outputs = {output},
-		 .pass_func = render_draw_data})
+		 .color_outputs = {output}})
 		.push_constants(&pc)
 		.bind(renderer->font_texture);
 }

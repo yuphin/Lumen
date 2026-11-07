@@ -292,7 +292,7 @@ static shaderc_compilation_result_t compile_file(const lm::String& source_name, 
 		return nullptr;
 	}
 
-	add_macros(pass->settings.macros, options, scratch_arena);
+	add_macros(pass->build->settings.macros, options, scratch_arena);
 	add_macros(rg::global_macro_defines(), options, scratch_arena);
 	if (optimize) {
 		shaderc_compile_options_set_optimization_level(options, shaderc_optimization_level_size);

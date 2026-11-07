@@ -465,7 +465,7 @@ void render(Integrator* integrator) {
 			if (state.pixel_debug || (state.gris_separator < 1.0f && state.gris_separator > 0.0f)) {
 				u32 num_wgs = u32((Window::width() * Window::height() + 1023) / 1024);
 				rg::add_compute(CSTR("GRIS - Debug Visualiation"),
-								  {.shader = vk::Shader(CSTR("src/shaders/integrators/restir/gris/debug_vis.comp")),
+								  {.shader = CSTR("src/shaders/integrators/restir/gris/debug_vis.comp"),
 								   .dims = {num_wgs}})
 					.push_constants(&state.pc)
 					.bind({integrator->output_tex, integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer});

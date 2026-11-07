@@ -201,7 +201,7 @@ static void prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& c
 	auto scan = [&](i32 num_wgs, i32 idx) {
 		++counter;
 		rg::add_compute(CSTR("PrefixScan - Scan"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/prefix_scan.comp")),
+						{.shader = CSTR("src/shaders/integrators/pssmlt/prefix_scan.comp"),
 						 .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&state.pc_compute)
 			.bind(integrator->lumen_scene->scene_desc_buffer);
@@ -209,7 +209,7 @@ static void prefix_scan(Integrator* integrator, i32 level, i32 num_elems, i32& c
 	auto uniform_add = [&](i32 num_wgs, i32 output_idx) {
 		++counter;
 		rg::add_compute(CSTR("PrefixScan - Uniform Add"),
-						{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/uniform_add.comp")),
+						{.shader = CSTR("src/shaders/integrators/pssmlt/uniform_add.comp"),
 						 .dims = {(u32)num_wgs, 1, 1}})
 			.push_constants(&state.pc_compute)
 			.bind(integrator->lumen_scene->scene_desc_buffer);
@@ -292,14 +292,14 @@ void render(Integrator* integrator) {
 		u32 num_wgs = u32((config.num_mlt_threads + 1023) / 1024);
 		rg::add_compute(
 			  op_name,
-			  {.shader = vk::Shader(op_shader_name), .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
+			  {.shader = op_shader_name, .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
 			.push_constants(&state.pc)
 			.bind(integrator->lumen_scene->scene_desc_buffer)
 			.zero({state.mlt_residual_buffer, state.counter_buffer});
 		while (num_wgs != 1) {
 			rg::add_compute(
 				  reduce_name,
-				  {.shader = vk::Shader(reduce_shader_name), .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
+				  {.shader = reduce_shader_name, .specialization_data = spec_data, .dims = {num_wgs, 1, 1}})
 				.push_constants(&state.pc)
 				.bind(integrator->lumen_scene->scene_desc_buffer);
 			num_wgs = (u32)(num_wgs + 1023) / 1024;
@@ -363,14 +363,14 @@ void render(Integrator* integrator) {
 	prefix_scan(integrator, 0, config.num_bootstrap_samples, counter);
 	// Calculate CDF
 	rg::add_compute(CSTR("Calculate CDF"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/pssmlt/calc_cdf.comp")),
+					{.shader = CSTR("src/shaders/integrators/pssmlt/calc_cdf.comp"),
 					 .specialization_data = {(u32)config.num_bootstrap_samples},
 					 .dims = {(u32)lm::ceil(config.num_bootstrap_samples / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer);
 	// Select seeds
 	rg::add_compute(CSTR("Select Seeds"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/vcmmlt/select_seeds.comp")),
+					{.shader = CSTR("src/shaders/integrators/vcmmlt/select_seeds.comp"),
 					 .dims = {(u32)lm::ceil(config.num_mlt_threads / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer);
@@ -398,7 +398,7 @@ void render(Integrator* integrator) {
 	}
 	// Calculate normalization factor
 	rg::add_compute(CSTR("Calculate Normalization"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/vcmmlt/normalize.comp")), .dims = {1, 1, 1}})
+					{.shader = CSTR("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
 		.push_constants(&state.pc)
 		.bind(integrator->lumen_scene->scene_desc_buffer);
 	rg::run_and_submit(cmd);
@@ -429,7 +429,7 @@ void render(Integrator* integrator) {
 			// Normalization
 			rg::add_compute(
 				  CSTR("Calculate Normalization"),
-				  {.shader = vk::Shader(CSTR("src/shaders/integrators/vcmmlt/normalize.comp")), .dims = {1, 1, 1}})
+				  {.shader = CSTR("src/shaders/integrators/vcmmlt/normalize.comp"), .dims = {1, 1, 1}})
 				.push_constants(&state.pc)
 				.bind(integrator->lumen_scene->scene_desc_buffer);
 		};
@@ -461,7 +461,7 @@ void render(Integrator* integrator) {
 	}
 	// Compositions
 	rg::add_compute(CSTR("Composition"),
-					{.shader = vk::Shader(CSTR("src/shaders/integrators/vcmmlt/composite.comp")),
+					{.shader = CSTR("src/shaders/integrators/vcmmlt/composite.comp"),
 					 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024.0f)), 1, 1}})
 		.push_constants(&state.pc)
 		.bind({integrator->output_tex, integrator->lumen_scene->scene_desc_buffer});

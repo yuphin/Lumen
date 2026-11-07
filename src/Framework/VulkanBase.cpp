@@ -45,7 +45,7 @@ static bool _enable_validation_layers;
 
 static lm::SmallArray<const char*, MAX_INSTANCE_EXTENSIONS> get_req_extensions() {
 	lm::SmallArray<const char*, MAX_INSTANCE_EXTENSIONS> extensions;
-	extensions.resize(os::window_required_vulkan_extensions(extensions.data, (u32)extensions.capacity()));
+	extensions.size = os::window_required_vulkan_extensions(extensions.data, (u32)extensions.capacity());
 
 	if (_enable_validation_layers) {
 		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);

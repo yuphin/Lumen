@@ -178,6 +178,7 @@ struct Window {
 	u32 viewport_width;
 	u32 viewport_height;
 };
+extern Window _window;
 void init(i32 width, i32 height, bool fullscreen, bool on_second_monitor, const char* title = "Lumen");
 Window* get();
 void update_window_size();
@@ -201,8 +202,8 @@ void add_mouse_click_callback(void (*procedure)(void*, MouseAction, KeyAction, d
 void add_mouse_move_callback(void (*procedure)(void*, double, double, double, double), void* user_data = nullptr);
 void add_scroll_callback(void (*procedure)(void*, double, double), void* user_data = nullptr);
 void add_key_callback(void (*procedure)(void*, KeyInput, KeyAction), void* user_data = nullptr);
-u32 width();
-u32 height();
+inline u32 width() { return _window.viewport_width; }
+inline u32 height() { return _window.viewport_height; }
 f32 aspect_ratio();
 
 };	// namespace Window

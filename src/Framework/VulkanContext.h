@@ -39,6 +39,8 @@ struct VulkanContext {
     bool vsync_enabled = false;
 };
 
-VulkanContext& context();
+extern VulkanContext _context;
+
+inline VulkanContext& context() { return _context; }
 
 };  // namespace vk

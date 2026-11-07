@@ -123,6 +123,20 @@ struct pair {
 	bool operator==(const pair& other) const { return first == other.first && second == other.second; }
 };
 
+struct PipelineBuild {
+	vk::PassSettings settings;
+	lm::SmallArray<vk::Shader, vk::MAX_SHADERS_PER_PASS> shaders;
+};
+
+template <typename K, typename V>
+struct SyncEntry {
+	K key;
+	V value;
+};
+
+template <typename K, typename V>
+using SyncList = lm::FixedArray<SyncEntry<K, V>>;
+
 struct RenderPass {
 	RenderPass() = default;
 
@@ -174,7 +188,12 @@ struct RenderPass {
 	PipelineStorage* pipeline_storage = nullptr;
 	lm::String name;
 	bool is_pipeline_cached = false;
-	vk::PassSettings settings;
+	lm::dim3 dims;
+	lm::PassFunc pass_func = nullptr;
+	// Graphics passes only, in the per-frame arena
+	const vk::GraphicsPassSettings* gfx = nullptr;
+	// Uncached passes only
+	PipelineBuild* build = nullptr;
 
 	struct FrameState {
 		lm::SmallArray<Resource, MAX_RESOURCES_ZEROS> resource_zeros;
@@ -229,10 +248,10 @@ struct RenderPass {
 	Buffer or Image). Which is reasonable because each pass is comprised of a
 	single shader dispatch
 	*/
-	lm::HashMap<VkBuffer, BufferSyncDescriptor> set_signals_buffer;
-	lm::HashMap<VkBuffer, BufferSyncDescriptor> wait_signals_buffer;
-	lm::HashMap<VkImage, ImageSyncDescriptor> set_signals_img;
-	lm::HashMap<VkImage, ImageSyncDescriptor> wait_signals_img;
+	SyncList<VkBuffer, BufferSyncDescriptor> set_signals_buffer;
+	SyncList<VkBuffer, BufferSyncDescriptor> wait_signals_buffer;
+	SyncList<VkImage, ImageSyncDescriptor> set_signals_img;
+	SyncList<VkImage, ImageSyncDescriptor> wait_signals_img;
 
 	bool resources_initialized = false;
 	vk::DescriptorInfo descriptor_infos[MAX_DESCRIPTORS] = {};
@@ -272,7 +291,8 @@ namespace rg {
 
 lm::RenderPass& current_pass();
 lm::RenderPass& add_rt(const lm::String& name, const vk::RTPassSettings& settings);
-lm::RenderPass& add_gfx(const lm::String& name, const vk::GraphicsPassSettings& settings);
+lm::RenderPass& add_gfx(const lm::String& name, const vk::PassSettings& settings,
+						const vk::GraphicsPassSettings& gfx);
 lm::RenderPass& add_compute(const lm::String& name, const vk::ComputePassSettings& settings);
 void init();
 void run(VkCommandBuffer cmd);

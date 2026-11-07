@@ -13,9 +13,12 @@ struct Pipeline {
 	enum class PipelineType { GFX = 0, RT = 1, COMPUTE = 2 };
 	Pipeline(lm::String name);
 	void cleanup();
-	void create_gfx_pipeline(const PassSettings& settings, util::Slice<u32> descriptor_counts);
-	void create_rt_pipeline(const PassSettings& settings, util::Slice<u32> descriptor_counts, u32 num_as_bindings);
-	void create_compute_pipeline(const PassSettings& settings, util::Slice<u32> descriptor_counts);
+	void create_gfx_pipeline(util::Slice<const Shader> shaders, const PassSettings& settings,
+							 const GraphicsPassSettings& gfx, util::Slice<u32> descriptor_counts);
+	void create_rt_pipeline(util::Slice<const Shader> shaders, const PassSettings& settings,
+							util::Slice<u32> descriptor_counts, u32 num_as_bindings);
+	void create_compute_pipeline(const Shader& shader, const PassSettings& settings,
+								 util::Slice<u32> descriptor_counts);
 	lm::SmallArray<VkStridedDeviceAddressRegionKHR, NUM_SBT_GROUPS> get_rt_regions();
 
 	VkPipeline handle = VK_NULL_HANDLE;

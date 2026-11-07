@@ -9,6 +9,7 @@ inline constexpr u64 HASH_MAP_HASH_EMPTY = 0;
 inline constexpr u64 HASH_MAP_HASH_EMPTY_BUT_RESIZING = 1;
 inline constexpr u64 HASH_MAP_HASH_DELETED = 2;
 inline constexpr u64 HASH_MAP_LOAD_PERCENTAGE_THRESHOLD = 70;
+inline constexpr u64 HASH_MAP_MAX_ENTRY_SIZE = KB(2);
 
 template <typename T>
 inline bool default_eq(const T& a, const T& b) {
@@ -30,153 +31,32 @@ struct HashMapEntry<T, Empty> {
 	T key;
 };
 
-template <typename T1, typename T2, u64 (*hash_func)(const T1&), bool (*eq_func)(const T1&, const T1&)>
-struct HashMapProbed {
-	HashMapEntry<T1, T2>* data = nullptr;
+struct HashMapBase {
 	u64 size = 0;
 	// Also includes the deleted entries
 	u64 num_slots = 0;
 	u64 capacity = 0;
 	Arena* arena_node = nullptr;
+};
+
+// In place resizing
+void* hash_map_resize(HashMapBase* map, void* data, u64 new_capacity, u64 entry_size, u64 entry_alignment,
+					  u64 (*entry_hash)(const void*));
+
+template <typename T1, typename T2, u64 (*hash_func)(const T1&), bool (*eq_func)(const T1&, const T1&)>
+struct HashMapProbed : HashMapBase {
+	HashMapEntry<T1, T2>* data = nullptr;
 
 	inline bool initialized() const { return arena_node != nullptr; }
 
+	static u64 entry_hash(const void* entry) { return hash_func(((const HashMapEntry<T1, T2>*)entry)->key); }
+
 	void resize(u64 new_capacity) {
-		new_capacity = lm::next_pow2(new_capacity);
 		using HashMapEntryType = HashMapEntry<T1, T2>;
-#if 0
-		Arena* new_arena_node;
-		// When we re-size, we need to allocate into a new block
-		HashMapEntryType* new_data = (HashMapEntryType*)arena_node->allocate(
-			new_capacity * sizeof(HashMapEntryType), alignof(HashMapEntryType), &new_arena_node,
-			/*zero_initialize=*/true,
-			/*exclusive_block_reserve_size=*/new_capacity * sizeof(HashMapEntryType));
-
-
-		HashMapEntryType* old_data = data;
-		data = new_data;
-		size = 0;
-		num_slots = 0;
-		arena_node->local_offset -= capacity * sizeof(HashMapEntryType);
-		arena_node = new_arena_node;
-		u64 old_capacity = capacity;
-		capacity = new_capacity;
-
-		for (u64 i = 0; i < old_capacity; i++) {
-			const HashMapEntryType& old_entry = old_data[i];
-			if (old_entry.hash > HASH_MAP_HASH_DELETED) {
-				if constexpr (!util::is_same<T2, Empty>::value) {
-					insert(old_entry.key, old_entry.value);
-				} else {
-					insert(old_entry.key);
-				}
-			}
-		}
-#else
-		// Try to resize in-place
-		u64 hm_size = capacity * sizeof(HashMapEntryType);
-		u64 local_offset_alligned_prev = lm::align_pow2(arena_node->local_offset - hm_size, alignof(HashMapEntryType));
-		bool is_sequential = (arena_node->data + local_offset_alligned_prev) == (u8*)data;
-		if (is_sequential) {
-			arena_node->local_offset -= capacity * sizeof(HashMapEntryType);
-		} else {
-			LUMEN_WARN("Hash Map: Not resizing in-place. You may want to re-think your hashmap allocation strategy");
-		}
-
-		// TODO: Do we need to make sure it's exclusive if initial size isn't given?
-		Arena* new_arena_node;
-		u64 alloc_size = new_capacity * sizeof(HashMapEntryType);
-		HashMapEntryType* new_data =
-			(HashMapEntryType*)arena_node->allocate(alloc_size, alignof(HashMapEntryType), &new_arena_node,
-													/*zero_initialize=*/false);
-
-		HashMapEntryType* old_data = data;
-		const bool in_place = new_data == old_data;
-		if (in_place) {
-			// Zero out from the tail if in_place
-			memset(new_data + capacity, 0, (new_capacity - capacity) * sizeof(HashMapEntryType));
-		} else {
-			// Zero out the entire new allocation if not in_place
-			memset(new_data, 0, alloc_size);
-		}
-
-		data = new_data;
-		u64 old_size = size;
-		size = 0;
-		num_slots = 0;
-		arena_node = new_arena_node;
-		u64 old_capacity = capacity;
-		capacity = new_capacity;
-		for (u64 i = 0; i < old_capacity; i++) {
-			if (old_data[i].hash > HASH_MAP_HASH_DELETED) {
-				old_data[i].hash = HASH_MAP_HASH_EMPTY_BUT_RESIZING;
-			} else if (old_data[i].hash == HASH_MAP_HASH_DELETED) {
-				// Reinterpret tombstones as empty
-				old_data[i].hash = HASH_MAP_HASH_EMPTY;
-			}
-		}
-		u64 processed = 0;
-		u64 scan_idx = 0;
-		HashMapEntry<T1, T2>* old_entry = nullptr;
-		bool old_entry_found = false;
-		while (processed < old_size) {
-			if (!old_entry_found) {
-				for (; scan_idx < old_capacity; ++scan_idx) {
-					if (old_data[scan_idx].hash == HASH_MAP_HASH_EMPTY_BUT_RESIZING) {
-						break;
-					}
-				}
-				old_entry = &old_data[scan_idx++];
-			}
-			if (old_entry) {
-				old_entry_found = insert_during_resize(old_entry);
-			}
-			++processed;
-		}
-		if (in_place) {
-			for (u64 i = 0; i < old_capacity; i++) {
-				if (old_data[i].hash == HASH_MAP_HASH_EMPTY_BUT_RESIZING) {
-					old_data[i].hash = HASH_MAP_HASH_EMPTY;
-				}
-			}
-		}
-
-#endif
-	}
-
-	bool insert_during_resize(HashMapEntry<T1, T2>* old_entry) {
-		u64 hash = hash_func(old_entry->key);
-		if (hash <= HASH_MAP_HASH_DELETED) {
-			hash += HASH_MAP_HASH_DELETED + 1;
-		}
-		u64 index = hash & (capacity - 1);
-		u64 probe_inc = 1;
-		while (data[index].hash > HASH_MAP_HASH_EMPTY_BUT_RESIZING) {
-			index = (index + probe_inc) & (capacity - 1);
-			probe_inc++;
-		}
-		++num_slots;
-		++size;
-
-		bool old_entry_found = false;
-		HashMapEntry<T1, T2> old_entry_copy = *old_entry;
-		if (&data[index] != old_entry) {
-			if (data[index].hash == HASH_MAP_HASH_EMPTY_BUT_RESIZING) {
-				*old_entry = data[index];
-				old_entry_found = true;
-			} else {
-				assert(data[index].hash == HASH_MAP_HASH_EMPTY);
-				// The destination is written with old entry data
-				// Mark the old entry data from pending to empty
-				old_entry->hash = HASH_MAP_HASH_EMPTY;
-			}
-		}
-		data[index].hash = hash;
-		data[index].key = old_entry_copy.key;
-		if constexpr (!util::is_same<T2, Empty>::value) {
-			data[index].value = old_entry_copy.value;
-		}
-		return old_entry_found;
+		static_assert(std::is_trivially_copyable_v<HashMapEntryType>);
+		static_assert(sizeof(HashMapEntryType) <= HASH_MAP_MAX_ENTRY_SIZE);
+		data = (HashMapEntryType*)hash_map_resize(this, data, new_capacity, sizeof(HashMapEntryType),
+												  alignof(HashMapEntryType), entry_hash);
 	}
 
 	HashMapEntry<T1, T2>* insert(const T1& key, const T2& value) {

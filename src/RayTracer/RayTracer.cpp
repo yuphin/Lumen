@@ -304,12 +304,12 @@ static void render_debug_utils() {
 		auto op_reduce = [&](const lm::String& op_name, const lm::String& op_shader_name, const lm::String& reduce_name,
 							 const lm::String& reduce_shader_name) {
 			u32 num_wgs = u32((Window::width() * Window::height() + 1023) / 1024);
-			rg::add_compute(op_name, {.shader = vk::Shader(op_shader_name), .dims = {num_wgs, 1, 1}})
+			rg::add_compute(op_name, {.shader = op_shader_name, .dims = {num_wgs, 1, 1}})
 				.push_constants(&_rt_utils_pc)
 				.bind(_rt_utils_desc_buffer)
 				.zero({_residual_buffer, _counter_buffer});
 			while (num_wgs != 1) {
-				rg::add_compute(reduce_name, {.shader = vk::Shader(reduce_shader_name), .dims = {num_wgs, 1, 1}})
+				rg::add_compute(reduce_name, {.shader = reduce_shader_name, .dims = {num_wgs, 1, 1}})
 					.push_constants(&_rt_utils_pc)
 					.bind(_rt_utils_desc_buffer);
 				num_wgs = (num_wgs + 1023) / 1024;
@@ -320,7 +320,7 @@ static void render_debug_utils() {
 		op_reduce(CSTR("OpReduce: RMSE"), CSTR("src/shaders/rmse/calc_rmse.comp"), CSTR("OpReduce: Reduce RMSE"),
 				  CSTR("src/shaders/rmse/reduce_rmse.comp"));
 		rg::add_compute(CSTR("Calculate RMSE"),
-						{.shader = vk::Shader(CSTR("src/shaders/rmse/output_rmse.comp")), .dims = {1, 1, 1}})
+						{.shader = CSTR("src/shaders/rmse/output_rmse.comp"), .dims = {1, 1, 1}})
 			.push_constants(&_rt_utils_pc)
 			.bind(_rt_utils_desc_buffer);
 	}

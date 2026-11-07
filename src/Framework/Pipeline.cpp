@@ -24,14 +24,14 @@ static u32 get_bindings_for_shader_set(util::Slice<const Shader> shaders, VkDesc
 
 Pipeline::Pipeline(lm::String name) : name(name) {}
 
-void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32> descriptor_counts) {
-	LUMEN_ASSERT(settings.color_outputs.size, "No color outputs for GFX pipeline");
+void Pipeline::create_gfx_pipeline(util::Slice<const Shader> shaders, const PassSettings& settings,
+								   const GraphicsPassSettings& gfx, util::Slice<u32> descriptor_counts) {
+	LUMEN_ASSERT(gfx.color_outputs.size, "No color outputs for GFX pipeline");
 	assert(name.is_cstr());
 	type = PipelineType::GFX;
-	util::Slice<const Shader> shaders_slice = {settings.shaders.data, (u64)settings.shaders.size};
-	binding_mask = get_bindings_for_shader_set(shaders_slice, descriptor_types);
-	create_set_layout(shaders_slice, descriptor_counts);
-	for (const Shader& shader : settings.shaders) {
+	binding_mask = get_bindings_for_shader_set(shaders, descriptor_types);
+	create_set_layout(shaders, descriptor_counts);
+	for (const Shader& shader : shaders) {
 		if (push_constant_size && shader.push_constant_size) {
 			LUMEN_ASSERT(push_constant_size == shader.push_constant_size,
 						 "Currently all shaders only support 1 push constant!");
@@ -40,8 +40,8 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 			push_constant_size = shader.push_constant_size;
 		}
 	}
-	create_pipeline_layout(shaders_slice, {&push_constant_size, push_constant_size ? 1u : 0u});
-	create_update_template(shaders_slice, descriptor_counts);
+	create_pipeline_layout(shaders, {&push_constant_size, push_constant_size ? 1u : 0u});
+	create_update_template(shaders, descriptor_counts);
 
 	VkSpecializationInfo specialization_info = {};
 	lm::SmallArray<VkSpecializationMapEntry, lm::MAX_SPEC_CONSTANTS> spec_map_entries;
@@ -57,7 +57,7 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 	specialization_info.pData = settings.specialization_data.data;
 
 	lm::SmallArray<VkPipelineShaderStageCreateInfo, vk::MAX_SHADERS_PER_PASS> stages;
-	for (const Shader& shader : settings.shaders) {
+	for (const Shader& shader : shaders) {
 		VkPipelineShaderStageCreateInfo stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
 		stage.stage = shader.stage;
 		stage.module = shader.create_vk_shader_module(vk::context().device);
@@ -67,29 +67,29 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 	}
 
 	VkPipelineInputAssemblyStateCreateInfo input_asssembly_CI =
-		vk::pipeline_vertex_input_assembly_state(settings.topology, 0, VK_FALSE);
+		vk::pipeline_vertex_input_assembly_state(gfx.topology, 0, VK_FALSE);
 	VkPipelineViewportStateCreateInfo viewport_state = vk::pipeline_viewport_state(1, 1, 0);
 	VkPipelineRasterizationStateCreateInfo rasterizer =
-		vk::pipeline_rasterization_state(settings.polygon_mode, settings.cull_mode, settings.front_face);
-	rasterizer.lineWidth = settings.line_width;
+		vk::pipeline_rasterization_state(gfx.polygon_mode, gfx.cull_mode, gfx.front_face);
+	rasterizer.lineWidth = gfx.line_width;
 	rasterizer.depthClampEnable = VK_FALSE;
 	rasterizer.rasterizerDiscardEnable = VK_FALSE;
 	rasterizer.depthBiasEnable = VK_FALSE;
-	VkPipelineMultisampleStateCreateInfo multisampling = vk::pipeline_multisample_state(settings.sample_count);
+	VkPipelineMultisampleStateCreateInfo multisampling = vk::pipeline_multisample_state(gfx.sample_count);
 	multisampling.sampleShadingEnable = VK_FALSE;
 
 	lm::SmallArray<VkPipelineColorBlendAttachmentState, MAX_COLOR_ATTACHMENTS> blend_attachment_states;
-	if (!settings.blend_attachments.empty()) {
-		blend_attachment_states = settings.blend_attachments;
-	} else if (settings.blend_enables.empty()) {
-		for (u64 i = 0; i < settings.color_outputs.size; ++i) {
+	if (!gfx.blend_attachments.empty()) {
+		blend_attachment_states = gfx.blend_attachments;
+	} else if (gfx.blend_enables.empty()) {
+		for (u64 i = 0; i < gfx.color_outputs.size; ++i) {
 			blend_attachment_states.push_back(
 				vk::pipeline_color_blend_attachment_state(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
 															  VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
 														  VK_FALSE));
 		}
 	} else {
-		for (bool blend_enable : settings.blend_enables) {
+		for (bool blend_enable : gfx.blend_enables) {
 			blend_attachment_states.push_back(
 				vk::pipeline_color_blend_attachment_state(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
 															  VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
@@ -113,18 +113,18 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 
 	lm::SmallArray<VkVertexInputBindingDescription, MAX_VERTEX_BINDINGS> binding_descs;
 	lm::SmallArray<VkVertexInputAttributeDescription, MAX_VERTEX_ATTRIBUTES> attribute_descs;
-	if (!settings.vertex_bindings.empty() || !settings.vertex_attributes.empty()) {
-		binding_descs = settings.vertex_bindings;
-		attribute_descs = settings.vertex_attributes;
+	if (!gfx.vertex_bindings.empty() || !gfx.vertex_attributes.empty()) {
+		binding_descs = gfx.vertex_bindings;
+		attribute_descs = gfx.vertex_attributes;
 	} else {
 		u64 vert_shader_idx = 0;
-		for (u64 i = 0; i < settings.shaders.size; i++) {
-			if (settings.shaders[i].stage == VK_SHADER_STAGE_VERTEX_BIT) {
+		for (u64 i = 0; i < shaders.size; i++) {
+			if (shaders[i].stage == VK_SHADER_STAGE_VERTEX_BIT) {
 				vert_shader_idx = i;
 				break;
 			}
 		}
-		const Shader& vert_shader = settings.shaders[vert_shader_idx];
+		const Shader& vert_shader = shaders[vert_shader_idx];
 		i32 i = 0;
 		for (const VertexInput& input : vert_shader.vertex_inputs) {
 			VkVertexInputBindingDescription binding_desc =
@@ -144,11 +144,11 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 
 	VkFormat depth_format = VK_FORMAT_UNDEFINED;
 	lm::SmallArray<VkFormat, MAX_COLOR_ATTACHMENTS> output_formats;
-	for (vk::Texture* color_output : settings.color_outputs) {
+	for (vk::Texture* color_output : gfx.color_outputs) {
 		output_formats.push_back(color_output->format);
 	}
-	if (settings.depth_output) {
-		depth_format = settings.depth_output->format;
+	if (gfx.depth_output) {
+		depth_format = gfx.depth_output->format;
 	}
 	VkPipelineRenderingCreateInfo pipeline_rendering_create_info{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
@@ -157,7 +157,7 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 		.depthAttachmentFormat = depth_format};
 
 	VkPipelineDepthStencilStateCreateInfo depth_stencil_state_ci =
-		vk::pipeline_depth_stencil(settings.depth_test_enable, settings.depth_write_enable, settings.depth_compare_op);
+		vk::pipeline_depth_stencil(gfx.depth_test_enable, gfx.depth_write_enable, gfx.depth_compare_op);
 
 	VkGraphicsPipelineCreateInfo pipeline_CI = vk::graphics_pipeline();
 	pipeline_CI.pNext = nullptr;
@@ -186,15 +186,14 @@ void Pipeline::create_gfx_pipeline(const PassSettings& settings, util::Slice<u32
 	}
 }
 
-void Pipeline::create_rt_pipeline(const PassSettings& settings, util::Slice<u32> descriptor_counts,
-								  u32 num_as_bindings) {
+void Pipeline::create_rt_pipeline(util::Slice<const Shader> shaders, const PassSettings& settings,
+								  util::Slice<u32> descriptor_counts, u32 num_as_bindings) {
 	assert(name.is_cstr());
 	type = PipelineType::RT;
-	util::Slice<const Shader> shaders_slice = {settings.shaders.data, (u64)settings.shaders.size};
-	binding_mask = get_bindings_for_shader_set(shaders_slice, descriptor_types);
+	binding_mask = get_bindings_for_shader_set(shaders, descriptor_types);
 	u32 num_as_bindings_in_shader = 0;
 	VkShaderStageFlags binding_stage_flags = 0;
-	for (const Shader& shader : settings.shaders) {
+	for (const Shader& shader : shaders) {
 		if (push_constant_size && shader.push_constant_size) {
 			LUMEN_ASSERT(push_constant_size == shader.push_constant_size,
 						 "Currently all shaders only support 1 push constant!");
@@ -209,10 +208,10 @@ void Pipeline::create_rt_pipeline(const PassSettings& settings, util::Slice<u32>
 		LUMEN_WARN("No AS bindings found in RT shaders for pipeline %s", name.data);
 	}
 	LUMEN_ASSERT(num_as_bindings_in_shader <= MAX_AS_BINDING_COUNT, "Max 2 AS bindings are supported");
-	create_set_layout(shaders_slice, descriptor_counts);
+	create_set_layout(shaders, descriptor_counts);
 	create_rt_set_layout(binding_stage_flags, num_as_bindings);
-	create_pipeline_layout(shaders_slice, {&push_constant_size, push_constant_size ? 1u : 0u});
-	create_update_template(shaders_slice, descriptor_counts);
+	create_pipeline_layout(shaders, {&push_constant_size, push_constant_size ? 1u : 0u});
+	create_update_template(shaders, descriptor_counts);
 
 	// Descriptor pool for AS descriptors
 	VkDescriptorPoolSize pool_size =
@@ -241,7 +240,7 @@ void Pipeline::create_rt_pipeline(const PassSettings& settings, util::Slice<u32>
 	stage.pName = "main";
 
 	i32 stage_idx = 0;
-	for (const Shader& shader : settings.shaders) {
+	for (const Shader& shader : shaders) {
 		VkRayTracingShaderGroupCreateInfoKHR group{VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR};
 		group.anyHitShader = VK_SHADER_UNUSED_KHR;
 		group.closestHitShader = VK_SHADER_UNUSED_KHR;
@@ -317,10 +316,10 @@ void Pipeline::create_rt_pipeline(const PassSettings& settings, util::Slice<u32>
 	}
 }
 
-void Pipeline::create_compute_pipeline(const PassSettings& settings, util::Slice<u32> descriptor_counts) {
+void Pipeline::create_compute_pipeline(const Shader& shader, const PassSettings& settings,
+									   util::Slice<u32> descriptor_counts) {
 	assert(name.is_cstr());
 	type = PipelineType::COMPUTE;
-	const Shader& shader = settings.shaders[0];
 	util::Slice<const Shader> shader_slice(&shader, 1);
 	binding_mask = get_bindings_for_shader_set(shader_slice, descriptor_types);
 

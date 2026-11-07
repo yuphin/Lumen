@@ -1,7 +1,7 @@
 #include "Window.h"
 
 namespace Window {
-static Window _window;
+Window _window;
 static f64 _imgui_previous_time = 0.0;
 
 static bool valid_key_index(i32 key) { return key >= 0 && key < static_cast<i32>(MAX_KEY_INPUTS); }
@@ -270,7 +270,5 @@ void update_window_size() {
 }
 void set_clipboard_text(const char* text) { os::window_set_clipboard_text(_window.os_window, text); }
 f64 time_seconds() { return os::time_seconds(); }
-u32 width() { return _window.viewport_width; }
-u32 height() { return _window.viewport_height; }
 f32 aspect_ratio() { return (f32)_window.viewport_width / _window.viewport_height; }
 }  // namespace Window
