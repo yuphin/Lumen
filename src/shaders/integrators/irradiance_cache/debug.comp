@@ -85,7 +85,7 @@ void main() {
 			SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
 			float weight = surfel_reconstruction_weight(hit_data.pos - surfel_hit_data.pos, hit_data.n_s,
 														surfel_hit_data.n_s, surfel.radius);
-			uint age = pc.total_frame_num - surfel.age;
+			uint age = pc.total_frame_num - surfel.birth_frame;
 			weight_sum += weight;
 			log_age_sum += weight * log2(1.0 + float(age));
 			if (weight > max_weight) {

@@ -46,7 +46,7 @@ void main() {
 		return;
 	}
 
-	if(s.age != pc.total_frame_num -1 ) {
+	if(s.birth_frame != pc.total_frame_num -1 ) {
 		return;
 	}
 
@@ -74,7 +74,7 @@ void main() {
 			if (covered) {
 
 				// earlier frame wins
-				if((other.age < s.age) || other.age == s.age && sid < tid) {
+				if((other.birth_frame < s.birth_frame) || other.birth_frame == s.birth_frame && sid < tid) {
 
 					recycle_surfel(tid);
 					return;

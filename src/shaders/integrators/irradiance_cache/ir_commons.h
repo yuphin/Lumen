@@ -67,7 +67,7 @@ NAMESPACE_BEGIN(IRCache)
 struct Surfel {
 	SurfaceRef gbuffer;
 	float radius;
-	uint age;
+	uint birth_frame;
 	vec3 irradiance;
 	uint flags;
 };

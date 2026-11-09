@@ -124,7 +124,7 @@ void main() {
 		return;
 	}
 	surfel.radius = r;
-	surfel.age = pc.total_frame_num;
+	surfel.birth_frame = pc.total_frame_num;
 	surfel.irradiance = vec3(0);
 	surfel.flags = 0;
 	ASSERT0(surfel.radius > 0, "Surfel radius must be >0\n");
