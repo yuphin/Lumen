@@ -7,7 +7,7 @@ using namespace IRCache;
 
 ////////////////////////////
 // --- For debug purposes  ---
-#define DEBUG_PASSES 1
+#define DEBUG_PASSES 0
 static u32 _max_surfels_in_a_grid_cell = 0;
 static float _avg_surfels_in_a_grid_cell = 0;
 static bool _highlight_max_surfel_cell = false;
@@ -437,6 +437,7 @@ bool gui(Integrator* integrator) {
 		"Grid",
 		"Grid + surfels",
 		"Largest surfel weight",
+		"Surfel age",
 	};
 	bool result = false;
 	result |= ImGui::Checkbox("Direct lighting", &state.direct_lighting);
@@ -458,10 +459,6 @@ bool gui(Integrator* integrator) {
 		ImGui::EndCombo();
 	}
 	ImGui::EndDisabled();
-	if (state.debug_mode && state.debug_view == IRCACHE_DEBUG_VIEW_SURFEL_WEIGHT_FRACTION) {
-		ImGui::TextWrapped("Largest weight / total weight. White: one surfel dominates. "
-						   "Darker: more blending. Magenta: no contribution.");
-	}
 	result |= ImGui::Checkbox("Pause surfel spawning", &state.pause_surfel_spawn);
 	if (ImGui::Button("Clear surfels")) {
 		state.clear_surfels = true;

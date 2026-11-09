@@ -34,10 +34,8 @@ vec3 debug_col(uint num) {
 				(float((num >> 22) & 0x3FFu)) * INV_10);
 }
 
-
 vec3 uvec3_to_random_color(uvec3 value) { return debug_col(xxhash32(value)); }
 vec3 uint_to_random_color(uint value) { return debug_col(xxhash32(value)); }
-
 
 layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 void main() {
@@ -74,9 +72,11 @@ void main() {
 	uint surfel_count = DEREF(grid_cell_counts)[linear_idx + 1] - DEREF(grid_cell_counts)[linear_idx];
 	uint surfel_offset = DEREF(grid_cell_counts)[linear_idx];
 
-	if (pc.debug_view == IRCACHE_DEBUG_VIEW_SURFEL_WEIGHT_FRACTION) {
+	if (pc.debug_view == IRCACHE_DEBUG_VIEW_SURFEL_WEIGHT_FRACTION || pc.debug_view == IRCACHE_DEBUG_VIEW_SURFEL_AGE) {
 		float weight_sum = 0.0;
 		float max_weight = 0.0;
+		float log_age_sum = 0.0;
+		uint dominant_age = 0;
 		for (uint gid = 0; gid < surfel_count; gid++) {
 			uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
 			Surfel surfel = DEREF(surfel_pool)[sid];
@@ -84,15 +84,34 @@ void main() {
 
 			SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
 			float weight = surfel_reconstruction_weight(hit_data.pos - surfel_hit_data.pos, hit_data.n_s,
-														 surfel_hit_data.n_s, surfel.radius);
+														surfel_hit_data.n_s, surfel.radius);
+			uint age = pc.total_frame_num - surfel.age;
 			weight_sum += weight;
-			max_weight = max(max_weight, weight);
+			log_age_sum += weight * log2(1.0 + float(age));
+			if (weight > max_weight) {
+				max_weight = weight;
+				dominant_age = age;
+			}
 		}
 
-		float fraction = weight_sum > 0.0 ? max_weight / weight_sum : 0.0;
-		vec3 col = weight_sum > 0.0 ? vec3(fraction) : vec3(1, 0, 1);
-		if (ubo.debug_click == 1 && ivec2(coords.xy) == ubo.clicked_pos) {
-			debugPrintfEXT("Surfel weights: max %f, sum %f, fraction %f\n", max_weight, weight_sum, fraction);
+		vec3 col = vec3(1, 0, 1);
+		bool clicked = ubo.debug_click == 1 && ivec2(coords.xy) == ubo.clicked_pos;
+		if (pc.debug_view == IRCACHE_DEBUG_VIEW_SURFEL_WEIGHT_FRACTION) {
+			float fraction = weight_sum > 0.0 ? max_weight / weight_sum : 0.0;
+			if (weight_sum > 0.0) col = vec3(fraction);
+			if (clicked)
+				debugPrintfEXT("Surfel weights: max %f, sum %f, fraction %f\n", max_weight, weight_sum, fraction);
+		} else {
+			if (weight_sum > 0.0) {
+				// Map weighted log weight to [0,1]
+				float t = clamp(log_age_sum / (weight_sum * log2(1025.0)), 0.0, 1.0);
+				col = t < 0.5 ? mix(vec3(1, 0, 0), vec3(1, 1, 0), 2.0 * t)
+							  : mix(vec3(1, 1, 0), vec3(0, 1, 0), 2.0 * t - 1.0);
+			}
+			if (clicked) {
+				float avg_age = weight_sum > 0.0 ? exp2(log_age_sum / weight_sum) - 1.0 : 0.0;
+				debugPrintfEXT("Surfel age: dominant %u frames, weighted %f frames\n", dominant_age, avg_age);
+			}
 		}
 		imageStore(image, coords, vec4(col, 1.f));
 		return;
@@ -135,7 +154,7 @@ void main() {
 	for (uint gid = 0; gid < surfel_count; gid++) {
 		uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
 		Surfel surfel = DEREF(surfel_pool)[sid];
-		if(surfel.radius <= 0.0) continue;
+		if (surfel.radius <= 0.0) continue;
 
 		SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
 
@@ -160,10 +179,9 @@ void main() {
 			continue;
 		}
 
-
 		float weight = (1.0 - dist_aniso / surfel.radius) * n_dot;
 
-		if (ubo.debug_click == 1 && ivec2(coords.xy) == ubo.clicked_pos) { 
+		if (ubo.debug_click == 1 && ivec2(coords.xy) == ubo.clicked_pos) {
 			// debugPrintfEXT("(%d)Surfel %d, dist %f, n_dot %f, weight %f\n", idx, sid, dist_aniso, n_dot, weight);
 		}
 
