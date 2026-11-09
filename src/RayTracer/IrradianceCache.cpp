@@ -89,6 +89,7 @@ static void update_scene_desc(Integrator* integrator) {
 	SET_SCENE_BUFFER(desc, grid_cell_indices, state.grid_cell_indices_buffer);
 	SET_SCENE_BUFFER(desc, grid_prefix_sum_scratch, state.grid_prefix_sum_scratch_buffer);
 	SET_SCENE_BUFFER(desc, surfel_samples, state.surfel_samples_buffer);
+	SET_SCENE_BUFFER(desc, surfel_history, state.surfel_history_buffer);
 	integrator::upload_scene_desc(integrator, desc);
 }
 
@@ -131,6 +132,14 @@ void init(Integrator* integrator) {
 								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = MAX_SURFEL_COUNT * sizeof(Surfel)});
+
+	// This is separate from Surfel buffer to keep it lean
+	state.surfel_history_buffer =
+		prm::get_buffer({.name = CSTR("Surfel History"),
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = MAX_SURFEL_COUNT * sizeof(SurfelHistory)});
 
 	i32 free_stack_init_value = MAX_SURFEL_COUNT;
 	state.surfel_free_stack_counter_buffer =
@@ -209,6 +218,7 @@ void init(Integrator* integrator) {
 	pc.desired_surfel_radius_px =
 		get_max_surfel_radius_px(integrator->scene_ubo.projection[1][1], (f32)Window::height());
 	pc.grid_uniform_cell_distance_threshold = 0.1f;
+	pc.max_history_age = SURFEL_MAX_HISTORY_AGE;
 
 	f32 max_trapezoidal_cell_size =
 		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], (f32)Window::height());
@@ -271,9 +281,8 @@ void render(Integrator* integrator) {
 	////////////////////////////
 	// --- Surfel Grid ---
 	// Grid is rebuilt every frame
-	rg::add_compute(CSTR("Grid: Clear"),
-					{.shader = CSTR("src/shaders/integrators/irradiance_cache/grid_clear.comp"),
-					 .dims = {lm::div_ceil(grid_total_cells, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
+	rg::add_compute(CSTR("Grid: Clear"), {.shader = CSTR("src/shaders/integrators/irradiance_cache/grid_clear.comp"),
+										  .dims = {lm::div_ceil(grid_total_cells, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
 		.bind({integrator->lumen_scene->scene_desc_buffer});
 	// TODO: Having an indirect launch would be better here, maybe?
@@ -399,18 +408,16 @@ void render(Integrator* integrator) {
 		.bind({integrator->lumen_scene->scene_desc_buffer});
 
 	if (state.debug_mode) {
-		rg::add_compute(CSTR("Debug"),
-						{.shader = CSTR("src/shaders/integrators/irradiance_cache/debug.comp"),
-						 .dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024)), 1, 1}})
+		rg::add_compute(CSTR("Debug"), {.shader = CSTR("src/shaders/integrators/irradiance_cache/debug.comp"),
+										.dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024)), 1, 1}})
 			.push_constants(&pc)
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->output_tex, integrator->scene_ubo_buffer})
 			.bind_texture_array(integrator->lumen_scene->scene_textures);
 	} else {
 		u32 max_screen_tiles_x = lm::div_ceil(Window::width(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		u32 max_screen_tiles_y = lm::div_ceil(Window::height(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
-		rg::add_compute(CSTR("Composite"),
-						{.shader = CSTR("src/shaders/integrators/irradiance_cache/composite.comp"),
-						 .dims = {max_screen_tiles_x, max_screen_tiles_y, 1}})
+		rg::add_compute(CSTR("Composite"), {.shader = CSTR("src/shaders/integrators/irradiance_cache/composite.comp"),
+											.dims = {max_screen_tiles_x, max_screen_tiles_y, 1}})
 			.push_constants(&pc)
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->output_tex, integrator->scene_ubo_buffer})
 			.bind_texture_array(integrator->lumen_scene->scene_textures);
@@ -432,12 +439,7 @@ bool gui(Integrator* integrator) {
 	IrradianceCache& state = integrator->ircache;
 	PCIRCache& pc = state.pc;
 	static const char* debug_view_display_names[IRCACHE_DEBUG_VIEW_COUNT] = {
-		"GBuffer albedo",
-		"GBuffer normals",
-		"Grid",
-		"Grid + surfels",
-		"Largest surfel weight",
-		"Surfel age",
+		"GBuffer albedo", "GBuffer normals", "Grid", "Grid + surfels", "Largest surfel weight", "Surfel age",
 	};
 	bool result = false;
 	result |= ImGui::Checkbox("Direct lighting", &state.direct_lighting);
@@ -478,6 +480,8 @@ bool gui(Integrator* integrator) {
 		ImGui::SliderFloat("Uniform cell distance threshold", &pc.grid_uniform_cell_distance_threshold, 0.01f, 10.0f);
 	const u32 min_rays_per_surfel = 1u;
 	const u32 max_rays_per_surfel = 256u;
+	result |= ImGui::SliderFloat("Max history age", &pc.max_history_age, 1.0f, 4096.0f, "%.0f",
+								 ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp);
 	bool num_rays_changed =
 		ImGui::SliderScalar("Rays per surfel", ImGuiDataType_U32, &state.rays_per_surfel, &min_rays_per_surfel,
 							&max_rays_per_surfel, "%u", ImGuiSliderFlags_AlwaysClamp);
@@ -524,7 +528,8 @@ void destroy(Integrator* integrator, bool resize) {
 							  &state.grid_cell_counts_buffer,
 							  &state.grid_cell_indices_buffer,
 							  &state.grid_prefix_sum_scratch_buffer,
-							  &state.surfel_samples_buffer};
+							  &state.surfel_samples_buffer,
+							  &state.surfel_history_buffer};
 	for (vk::Buffer** buffer : buffers) {
 		prm::remove(*buffer);
 		*buffer = nullptr;

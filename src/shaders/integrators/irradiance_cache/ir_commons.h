@@ -24,6 +24,8 @@
 #define GRID_TRAPEZOIDAL_CELL_COUNT_AXIS 64
 #define GRID_AVG_SURFELS_PER_CELL 16
 
+#define SURFEL_MAX_HISTORY_AGE 1024.0
+
 #define IRCACHE_DEBUG_VIEW_GBUFFER_ALBEDO 0
 #define IRCACHE_DEBUG_VIEW_GBUFFER_NORMALS 1
 #define IRCACHE_DEBUG_VIEW_TRAPEZOIDAL_GRID 2
@@ -53,6 +55,7 @@ struct PCIRCache {
 	uint debug_view;
 	uint max_surfels_in_a_grid_cell;
 	uint enable_accumulation;
+	float max_history_age;
 };
 
 struct PCPrefixSum {
@@ -77,8 +80,14 @@ struct SurfelSample {
 	float hit_t;
 };
 
+// Per surfel age
+struct SurfelHistory {
+	float effective_age;
+};
+
 #ifdef __cplusplus
 static_assert(sizeof(Surfel) == 40);
+static_assert(sizeof(SurfelHistory) == 4);
 #endif
 
 NAMESPACE_END()

@@ -21,6 +21,7 @@ SCENE_BUFFER_SCALAR(surfel_spawn_count, uint);
 SCENE_BUFFER(surfel_free_stack, uint);
 SCENE_BUFFER_SCALAR(surfel_free_stack_count, int);
 SCENE_BUFFER(surfel_pool, Surfel);
+SCENE_BUFFER(surfel_history, SurfelHistory);
 SCENE_BUFFER(grid_cell_counts, uint);
 SCENE_BUFFER(grid_cell_indices, uint);
 
@@ -135,4 +136,5 @@ void main() {
 	}
 	// LOG1("Surfel idx %d\n", surfel_idx);
 	DEREF(surfel_pool)[surfel_idx] = surfel;
+	DEREF(surfel_history)[surfel_idx] = SurfelHistory(0.0);
 }
