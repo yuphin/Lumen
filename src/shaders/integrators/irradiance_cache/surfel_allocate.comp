@@ -90,7 +90,7 @@ void main() {
 			}
 		}
 	}
-#else
+#else // GRID_LOOKUP_TRAPEZOIDAL_NEIGHBORS
 
 	uvec4 neighbors[MAX_NEIGHBOR_PLUS_ITSELF_COUNT];
 	uint neighbor_count;
@@ -127,7 +127,8 @@ void main() {
 	surfel.radius = r;
 	surfel.birth_frame = pc.total_frame_num;
 	surfel.irradiance = vec3(0);
-	surfel.flags = 0;
+	bool back_facing = dot(hit_data.n_g, cam_pos.xyz - hit_data.pos) < 0.0;
+	surfel.flags = back_facing ? SURFEL_FLAG_BACK_FACING : 0u;
 	ASSERT0(surfel.radius > 0, "Surfel radius must be >0\n");
 
 	uint surfel_idx = DEREF(surfel_free_stack)[surfel_stack_top];

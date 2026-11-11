@@ -40,52 +40,44 @@ void main() {
 	}
 
 	SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
-	vec3 surfel_origin = surfel_hit_data.pos;
-	vec3 camera_origin = ubo.inv_view[3].xyz;
-	vec3 wo = normalize(camera_origin - surfel_origin);
-	Material material = load_material(surfel_hit_data.material_idx, surfel_hit_data.uv);
-
 	vec3 n_s = surfel_hit_data.n_s;
 	vec3 n_g = surfel_hit_data.n_g;
-	bool side = face_forward(n_s, n_g, wo);
-	vec3 wi;
-	float pdf_w;
-	float cos_theta;
-
-	// We're already on a surface, sample the BSDF
-	sample_bsdf(n_s, n_g, wo, material, TRANSPORT_MODE_FROM_CAMERA, side, wi, pdf_w, cos_theta, sampling_seed);
-	
-	if (pdf_w <= 0.0 || cos_theta <= 0.0) {
-		return;
+	if ((surfel.flags & SURFEL_FLAG_BACK_FACING) != 0) {
+		n_g = -n_g;
+	}
+	if (dot(n_g, n_s) < 0.0) {
+		n_s = -n_s;
 	}
 
-	surfel_origin = offset_ray(surfel_origin, n_g, wi);
-
-	traceRayEXT(tlas, flags, 0x1, 0, 0, 0, surfel_origin, tmin, wi, tmax, 0);
-	const bool found_isect = surface_ref_valid(payload.surface);
+	vec3 wi = sample_hemisphere(rand2(sampling_seed), n_s);
 
 	vec3 radiance = vec3(0);
-	if (!found_isect) {
+	float hit_t = 0.0;
+	if (dot(wi, n_g) > 0.0) {
+		vec3 surfel_origin = offset_ray(surfel_hit_data.pos, n_g, wi);
+		traceRayEXT(tlas, flags, 0x1, 0, 0, 0, surfel_origin, tmin, wi, tmax, 0);
+		hit_t = payload.dist;
+
+		if (!surface_ref_valid(payload.surface)) {
 #ifdef ENABLE_ATMOSPHERE
-		vec3 atmosphere_L = shade_atmosphere(pc.dir_light_idx, pc.sky_col, surfel_origin, wi, tmax);
+			radiance = shade_atmosphere(pc.dir_light_idx, pc.sky_col, surfel_origin, wi, tmax);
 #else
-		vec3 atmosphere_L = pc.sky_col;
+			radiance = pc.sky_col;
 #endif	// ENABLE_ATMOSPHERE
-		radiance += atmosphere_L;
-	} else {
-		SurfaceData hit_data = load_surface(payload.surface);
-
-		vec3 wo = -wi;
-		Material hit_material = load_material(hit_data.material_idx, hit_data.uv);
-
-		bool forward_facing = face_forward(hit_data.n_s, hit_data.n_g, wo);
-		radiance += sample_direct_light(sampling_seed, hit_data.pos, hit_data.n_s, hit_data.n_g, wo, hit_material,
-										forward_facing);
+		} else {
+			SurfaceData hit_data = load_surface(payload.surface);
+			vec3 wo = -wi;
+			Material hit_material = load_material(hit_data.material_idx, hit_data.uv);
+			bool forward_facing = face_forward(hit_data.n_s, hit_data.n_g, wo);
+			radiance = sample_direct_light(sampling_seed, hit_data.pos, hit_data.n_s, hit_data.n_g, wo, hit_material,
+										   forward_facing);
+		}
 	}
 
 	SurfelSample surfel_sample;
-	surfel_sample.radiance = radiance * cos_theta / pdf_w;
-	surfel_sample.hit_t = payload.dist;
+	// cosine sample pdf = 1/ pi 
+	surfel_sample.radiance = radiance * PI;
+	surfel_sample.hit_t = hit_t;
 
 	uint linear_idx = gl_LaunchIDEXT.y * pc.rays_per_surfel + gl_LaunchIDEXT.x;
 	DEREF(surfel_samples)[linear_idx] = surfel_sample;
