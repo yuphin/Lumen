@@ -27,6 +27,17 @@ SCENE_BUFFER(surfel_samples, SurfelSample);
 
 uvec4 sampling_seed = init_rng(gl_LaunchIDEXT.xy, gl_LaunchSizeEXT.xy, pc.sampling_seed);
 
+uvec2 sobol_2d(uint i) {
+	uint x = bitfieldReverse(i);
+	uint y = 0u;
+	for (uint v = 1u << 31; i != 0u; i >>= 1, v ^= v >> 1) {
+		if ((i & 1u) != 0u) {
+			y ^= v;
+		}
+	}
+	return uvec2(x, y);
+}
+
 void main() {
 	uint tid = gl_LaunchIDEXT.y;
 	if (tid >= MAX_SURFEL_COUNT) {
@@ -49,7 +60,14 @@ void main() {
 		n_s = -n_s;
 	}
 
+#if 1
+	uvec2 scramble = pcg4d(uvec4(tid, pc.sampling_seed, 0u, 0u)).xy;
+	uvec2 bits = sobol_2d(gl_LaunchIDEXT.x) ^ scramble;
+	vec2 xi = vec2(uint_to_float(bits.x), uint_to_float(bits.y));
+	vec3 wi = sample_hemisphere(xi, n_s);
+#else
 	vec3 wi = sample_hemisphere(rand2(sampling_seed), n_s);
+#endif
 
 	vec3 radiance = vec3(0);
 	float hit_t = 0.0;
@@ -75,7 +93,7 @@ void main() {
 	}
 
 	SurfelSample surfel_sample;
-	// cosine sample pdf = 1/ pi 
+	// cosine sample pdf = 1/ pi
 	surfel_sample.radiance = radiance * PI;
 	surfel_sample.hit_t = hit_t;
 
