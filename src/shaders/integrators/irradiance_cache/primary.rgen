@@ -24,6 +24,7 @@ layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 
 SCENE_BUFFER(g_buffer, SurfaceRef);
 SCENE_BUFFER(direct_lighting, vec3);
+SCENE_BUFFER(pixel_geometry, PixelGeometry);
 
 void store_direct_lighting(const ivec2 pixel, const vec3 radiance) {
 	DEREF(direct_lighting)[pixel_idx] = radiance;
@@ -47,6 +48,7 @@ void main() {
 	const bool found_isect = surface_ref_valid(payload.surface);
 	if (!found_isect) {
 		DEREF(g_buffer)[pixel_idx] = gbuffer_out;
+		DEREF(pixel_geometry)[pixel_idx] = PixelGeometry(0.0, 0u);
 		if (pc.direct_lighting == 1) {
 #ifdef ENABLE_ATMOSPHERE
 			direct_lighting = shade_atmosphere(pc.dir_light_idx, pc.sky_col, origin, direction, tmax);
@@ -60,14 +62,15 @@ void main() {
 	gbuffer_out = payload.surface;
 	DEREF(g_buffer)[pixel_idx] = gbuffer_out;
 
-	if (pc.direct_lighting == 1) {
-		SurfaceData hit_data = load_surface(gbuffer_out);
-		vec3 wo = -direction;
-		Material material = load_material(hit_data.material_idx, hit_data.uv);
-		vec3 n_s = hit_data.n_s;
-		vec3 n_g = hit_data.n_g;
-		bool side = face_forward(n_s, n_g, wo);
+	SurfaceData hit_data = load_surface(gbuffer_out);
+	vec3 wo = -direction;
+	vec3 n_s = hit_data.n_s;
+	vec3 n_g = hit_data.n_g;
+	bool side = face_forward(n_s, n_g, wo);
+	DEREF(pixel_geometry)[pixel_idx] = PixelGeometry(payload.dist, pack_normal_octahedral(n_s));
 
+	if (pc.direct_lighting == 1) {
+		Material material = load_material(hit_data.material_idx, hit_data.uv);
 		direct_lighting += material.emissive_factor;
 		if (!is_specular(material)) {
 			direct_lighting += sample_direct_light(sampling_seed, hit_data.pos, n_s, n_g, wo, material, side);

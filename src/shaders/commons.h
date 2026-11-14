@@ -409,6 +409,7 @@ struct Material {
 	uint64_t grid_prefix_sum_scratch_addr;
 	uint64_t surfel_samples_addr;
 	uint64_t surfel_history_addr;
+	uint64_t pixel_geometry_addr;
 };
 
 

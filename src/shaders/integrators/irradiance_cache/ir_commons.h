@@ -87,9 +87,16 @@ struct SurfelHistory {
 	float effective_age;
 };
 
+// Per pixel, t = 0 for a miss
+struct PixelGeometry {
+	float t;
+	uint normal;
+};
+
 #ifdef __cplusplus
 static_assert(sizeof(Surfel) == 40);
 static_assert(sizeof(SurfelHistory) == 4);
+static_assert(sizeof(PixelGeometry) == 8);
 #endif
 
 NAMESPACE_END()

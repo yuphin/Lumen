@@ -90,6 +90,7 @@ static void update_scene_desc(Integrator* integrator) {
 	SET_SCENE_BUFFER(desc, grid_prefix_sum_scratch, state.grid_prefix_sum_scratch_buffer);
 	SET_SCENE_BUFFER(desc, surfel_samples, state.surfel_samples_buffer);
 	SET_SCENE_BUFFER(desc, surfel_history, state.surfel_history_buffer);
+	SET_SCENE_BUFFER(desc, pixel_geometry, state.pixel_geometry_buffer);
 	integrator::upload_scene_desc(integrator, desc);
 }
 
@@ -108,6 +109,11 @@ void init(Integrator* integrator) {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(lm::vec3)});
+	state.pixel_geometry_buffer =
+		prm::get_buffer({.name = CSTR("IRCache Pixel Geometry"),
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+						 .memory_type = vk::BUFFER_TYPE_GPU,
+						 .size = Window::width() * Window::height() * sizeof(PixelGeometry)});
 
 	// At max, we spawn 1 surfel per tile.
 	u32 tiles_x = (Window::width() + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
@@ -439,8 +445,7 @@ bool gui(Integrator* integrator) {
 	IrradianceCache& state = integrator->ircache;
 	PCIRCache& pc = state.pc;
 	static const char* debug_view_display_names[IRCACHE_DEBUG_VIEW_COUNT] = {
-		"GBuffer albedo", "GBuffer normals", "Grid", "Grid + surfels", "Largest surfel weight", "Surfel age",
-	};
+		"GBuffer albedo", "GBuffer normals", "Grid", "Grid + surfels", "Largest surfel weight", "Surfel age"};
 	bool result = false;
 	result |= ImGui::Checkbox("Direct lighting", &state.direct_lighting);
 	result |= ImGui::Checkbox("Enable accumulation", &state.enable_accumulation);
@@ -529,7 +534,8 @@ void destroy(Integrator* integrator, bool resize) {
 							  &state.grid_cell_indices_buffer,
 							  &state.grid_prefix_sum_scratch_buffer,
 							  &state.surfel_samples_buffer,
-							  &state.surfel_history_buffer};
+							  &state.surfel_history_buffer,
+							  &state.pixel_geometry_buffer};
 	for (vk::Buffer** buffer : buffers) {
 		prm::remove(*buffer);
 		*buffer = nullptr;

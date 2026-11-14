@@ -11,5 +11,5 @@ layout(location = 0) rayPayloadInEXT SurfaceHitPayload payload;
 void main() {
 	payload.surface.barycentrics = attribs;
 	payload.surface.primitive_instance_id = uvec2(gl_PrimitiveID, gl_InstanceCustomIndexEXT);
-	payload.dist = gl_RayTminEXT + gl_HitTEXT;
+	payload.dist = gl_HitTEXT;
 }
