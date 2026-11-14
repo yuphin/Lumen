@@ -16,6 +16,7 @@ layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 #include "../../scene_buffers.glsl"
 
 SCENE_BUFFER(surfel_pool, Surfel);
+SCENE_BUFFER(surfel_details, SurfelDetail);
 SCENE_BUFFER(grid_cell_indices, uint);
 SCENE_BUFFER(grid_cell_counts, uint);
 SCENE_BUFFER(g_buffer, SurfaceRef);
@@ -82,10 +83,9 @@ void main() {
 			Surfel surfel = DEREF(surfel_pool)[sid];
 			if (surfel.radius <= 0.0) continue;
 
-			SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
-			float weight = surfel_reconstruction_weight(hit_data.pos - surfel_hit_data.pos, hit_data.n_s,
-														surfel_hit_data.n_s, surfel.radius);
-			uint age = pc.total_frame_num - surfel.birth_frame;
+			float weight = surfel_reconstruction_weight(hit_data.pos - surfel.pos, hit_data.n_s,
+														unpack_normal_octahedral(surfel.n_s), surfel.radius);
+			uint age = pc.total_frame_num - DEREF(surfel_details)[sid].birth_frame;
 			weight_sum += weight;
 			log_age_sum += weight * log2(1.0 + float(age));
 			if (weight > max_weight) {
@@ -156,20 +156,20 @@ void main() {
 		Surfel surfel = DEREF(surfel_pool)[sid];
 		if (surfel.radius <= 0.0) continue;
 
-		SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
+		vec3 surfel_n_s = unpack_normal_octahedral(surfel.n_s);
 
-		vec3 diff = hit_data.pos - surfel_hit_data.pos;
+		vec3 diff = hit_data.pos - surfel.pos;
 		float dist = length(diff);
 		if (dist > surfel.radius) {
 			continue;
 		}
 
-		float n_dot = dot(hit_data.n_s, surfel_hit_data.n_s);
+		float n_dot = dot(hit_data.n_s, surfel_n_s);
 		if (n_dot < 0.3) {
 			continue;
 		}
 
-		float dist_normal = dot(diff, surfel_hit_data.n_s);
+		float dist_normal = dot(diff, surfel_n_s);
 		float dist_tangent = sqrt(max(0.0, dist * dist - dist_normal * dist_normal));
 
 		// Penalize normal distance
@@ -205,11 +205,10 @@ void main() {
 		}
 
 		Surfel surfel = DEREF(surfel_pool)[best_sid];
-		SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
 		if (ubo.debug_click == 1 && ivec2(coords.xy) == ubo.clicked_pos) {
 			uvec4 neighbors[MAX_NEIGHBOR_PLUS_ITSELF_COUNT];
 			uint neighbor_count;
-			collect_neighbors(surfel_hit_data.pos, surfel.radius, cam_pos.xyz, neighbors, neighbor_count);
+			collect_neighbors(surfel.pos, surfel.radius, cam_pos.xyz, neighbors, neighbor_count);
 			debugPrintfEXT("Selected id %d\n", best_sid);
 		}
 	}

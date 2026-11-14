@@ -12,7 +12,7 @@ layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 
 SCENE_BUFFER(surfel_pool, Surfel);
 SCENE_BUFFER(surfel_samples, SurfelSample);
-SCENE_BUFFER(surfel_history, SurfelHistory);
+SCENE_BUFFER(surfel_details, SurfelDetail);
 
 layout(local_size_x = DEFAULT_WG_SIZE, local_size_y = 1, local_size_z = 1) in;
 // One invocation per surfel
@@ -35,14 +35,12 @@ void main() {
 	}
 	irradiance /= float(pc.rays_per_surfel);
 
-	SurfelHistory history = DEREF(surfel_history)[surfel_id];
-
 	// Age surfels
-	// Note: This per-surfel age can change dynamically 
-	history.effective_age = min(history.effective_age + 1.0, pc.max_history_age);
-	const float alpha = 1.0 / history.effective_age;
+	// Note: This per-surfel age can change dynamically
+	float effective_age = min(DEREF(surfel_details)[surfel_id].effective_age + 1.0, pc.max_history_age);
+	const float alpha = 1.0 / effective_age;
 	surfel.irradiance = surfel.irradiance + (irradiance - surfel.irradiance) * alpha;
 
-	DEREF(surfel_pool)[surfel_id] = surfel;
-	DEREF(surfel_history)[surfel_id] = history;
+	DEREF(surfel_pool)[surfel_id].irradiance = surfel.irradiance;
+	DEREF(surfel_details)[surfel_id].effective_age = effective_age;
 }

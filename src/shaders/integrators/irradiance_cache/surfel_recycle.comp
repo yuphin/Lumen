@@ -16,6 +16,7 @@ layout(binding = 1) uniform SceneUBOBuffer { SceneUBO ubo; };
 #include "surfel_commons.glsl"
 
 SCENE_BUFFER(surfel_pool, Surfel);
+SCENE_BUFFER(surfel_details, SurfelDetail);
 SCENE_BUFFER_SCALAR(surfel_free_stack_count, int);
 SCENE_BUFFER(surfel_free_stack, uint);
 
@@ -52,7 +53,7 @@ void main() {
 	return;
 #endif
 
-	SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
+	SurfaceData surfel_hit_data = load_surface(DEREF(surfel_details)[tid].gbuffer);
 	vec4 view_pos = ubo.view * vec4(surfel_hit_data.pos, 1.0);
 
 #if 0
@@ -71,5 +72,9 @@ void main() {
 		// debugPrintfEXT("Recycling with px_size %f (max radius: %f), dist_relative: %f, dist_z: %f\n", px_size,
 		// 			   max_radius, dist_relative, dist_z);
 		recycle_surfel(tid);
+		return;
 	}
+
+	DEREF(surfel_pool)[tid].pos = surfel_hit_data.pos;
+	DEREF(surfel_pool)[tid].n_s = pack_normal_octahedral(surfel_hit_data.n_s);
 }

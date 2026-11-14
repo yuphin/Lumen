@@ -22,6 +22,7 @@ layout(push_constant) uniform _PushConstantRay { PCIRCache pc; };
 #include "direct_lighting.glsl"
 
 SCENE_BUFFER(surfel_pool, Surfel);
+SCENE_BUFFER(surfel_details, SurfelDetail);
 
 SCENE_BUFFER(surfel_samples, SurfelSample);
 
@@ -50,10 +51,11 @@ void main() {
 		return;
 	}
 
-	SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
+	SurfelDetail detail = DEREF(surfel_details)[tid];
+	SurfaceData surfel_hit_data = load_surface(detail.gbuffer);
 	vec3 n_s = surfel_hit_data.n_s;
 	vec3 n_g = surfel_hit_data.n_g;
-	if ((surfel.flags & SURFEL_FLAG_BACK_FACING) != 0) {
+	if ((detail.flags & SURFEL_FLAG_BACK_FACING) != 0) {
 		n_g = -n_g;
 	}
 	if (dot(n_g, n_s) < 0.0) {

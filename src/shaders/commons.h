@@ -401,6 +401,7 @@ struct Material {
 	uint64_t surfel_spawn_list_addr;
 	uint64_t surfel_spawn_count_addr;
 	uint64_t surfel_pool_addr;
+	uint64_t surfel_details_addr;
 	uint64_t surfel_free_stack_addr;
 	uint64_t surfel_free_stack_count_addr;
 
@@ -408,7 +409,6 @@ struct Material {
 	uint64_t grid_cell_indices_addr;
 	uint64_t grid_prefix_sum_scratch_addr;
 	uint64_t surfel_samples_addr;
-	uint64_t surfel_history_addr;
 	uint64_t pixel_geometry_addr;
 };
 

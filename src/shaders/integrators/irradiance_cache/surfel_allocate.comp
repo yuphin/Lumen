@@ -21,7 +21,7 @@ SCENE_BUFFER_SCALAR(surfel_spawn_count, uint);
 SCENE_BUFFER(surfel_free_stack, uint);
 SCENE_BUFFER_SCALAR(surfel_free_stack_count, int);
 SCENE_BUFFER(surfel_pool, Surfel);
-SCENE_BUFFER(surfel_history, SurfelHistory);
+SCENE_BUFFER(surfel_details, SurfelDetail);
 SCENE_BUFFER(grid_cell_counts, uint);
 SCENE_BUFFER(grid_cell_indices, uint);
 
@@ -82,10 +82,9 @@ void main() {
 			uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
 			Surfel other = DEREF(surfel_pool)[sid];
 			if (other.radius <= 0.0) continue;
-			SurfaceData other_hit_data = load_surface(other.gbuffer);
 
-			vec3 pos_to_other = hit_data.pos - other_hit_data.pos;
-			if (surfel_covers_point(pos_to_other, hit_data.n_s, other_hit_data.n_s, other.radius, r)) {
+			vec3 pos_to_other = hit_data.pos - other.pos;
+			if (surfel_covers_point(pos_to_other, hit_data.n_s, unpack_normal_octahedral(other.n_s), other.radius, r)) {
 				return;
 			}
 		}
@@ -105,10 +104,9 @@ void main() {
 			uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
 			Surfel other = DEREF(surfel_pool)[sid];
 			if (other.radius <= 0.0) continue;
-			SurfaceData other_hit_data = load_surface(other.gbuffer);
 
-			vec3 pos_to_other = hit_data.pos - other_hit_data.pos;
-			if (surfel_covers_point(pos_to_other, hit_data.n_s, other_hit_data.n_s, other.radius, r)) {
+			vec3 pos_to_other = hit_data.pos - other.pos;
+			if (surfel_covers_point(pos_to_other, hit_data.n_s, unpack_normal_octahedral(other.n_s), other.radius, r)) {
 				return;
 			}
 		}
@@ -116,20 +114,25 @@ void main() {
 
 #endif
 
-	Surfel surfel;
-	surfel.gbuffer = gbuffer;
 	int surfel_stack_top = atomicAdd(DEREF(surfel_free_stack_count), -1) - 1;
 	// Out of available indices
 	if (surfel_stack_top < 0) {
 		atomicAdd(DEREF(surfel_free_stack_count), 1);
 		return;
 	}
+	Surfel surfel;
+	surfel.pos = hit_data.pos;
 	surfel.radius = r;
-	surfel.birth_frame = pc.total_frame_num;
 	surfel.irradiance = vec3(0);
-	bool back_facing = dot(hit_data.n_g, cam_pos.xyz - hit_data.pos) < 0.0;
-	surfel.flags = back_facing ? SURFEL_FLAG_BACK_FACING : 0u;
+	surfel.n_s = pack_normal_octahedral(hit_data.n_s);
 	ASSERT0(surfel.radius > 0, "Surfel radius must be >0\n");
+
+	SurfelDetail detail;
+	detail.gbuffer = gbuffer;
+	detail.birth_frame = pc.total_frame_num;
+	bool back_facing = dot(hit_data.n_g, cam_pos.xyz - hit_data.pos) < 0.0;
+	detail.flags = back_facing ? SURFEL_FLAG_BACK_FACING : 0u;
+	detail.effective_age = 0.0;
 
 	uint surfel_idx = DEREF(surfel_free_stack)[surfel_stack_top];
 	if (surfel_idx >= MAX_SURFEL_COUNT) {
@@ -137,5 +140,5 @@ void main() {
 	}
 	// LOG1("Surfel idx %d\n", surfel_idx);
 	DEREF(surfel_pool)[surfel_idx] = surfel;
-	DEREF(surfel_history)[surfel_idx] = SurfelHistory(0.0);
+	DEREF(surfel_details)[surfel_idx] = detail;
 }

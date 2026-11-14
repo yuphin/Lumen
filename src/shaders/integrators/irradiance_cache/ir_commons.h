@@ -70,21 +70,22 @@ struct PCPrefixSum {
 NAMESPACE_BEGIN(IRCache)
 
 struct Surfel {
-	SurfaceRef gbuffer;
+	vec3 pos;
 	float radius;
-	uint birth_frame;
 	vec3 irradiance;
+	uint n_s;
+};
+
+struct SurfelDetail {
+	SurfaceRef gbuffer;
+	uint birth_frame;
 	uint flags;
+	float effective_age;
 };
 
 struct SurfelSample {
 	vec3 radiance;
 	float hit_t;
-};
-
-// Per surfel age
-struct SurfelHistory {
-	float effective_age;
 };
 
 // Per pixel, t = 0 for a miss
@@ -94,8 +95,8 @@ struct PixelGeometry {
 };
 
 #ifdef __cplusplus
-static_assert(sizeof(Surfel) == 40);
-static_assert(sizeof(SurfelHistory) == 4);
+static_assert(sizeof(Surfel) == 32);
+static_assert(sizeof(SurfelDetail) == 28);
 static_assert(sizeof(PixelGeometry) == 8);
 #endif
 

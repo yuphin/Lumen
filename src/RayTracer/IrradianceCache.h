@@ -13,6 +13,7 @@ struct IrradianceCache {
 	vk::Buffer* surfel_spawn_list_buffer = nullptr;
 	vk::Buffer* surfel_spawn_count_buffer = nullptr;
 	vk::Buffer* surfel_pool_buffer = nullptr;
+	vk::Buffer* surfel_details_buffer = nullptr;
 	vk::Buffer* surfel_free_stack_counter_buffer = nullptr;
 	vk::Buffer* surfel_free_stack_buffer = nullptr;
 	vk::Buffer* grid_cell_counts_buffer = nullptr;
@@ -20,7 +21,6 @@ struct IrradianceCache {
 	vk::Buffer* grid_prefix_sum_scratch_buffer = nullptr;
 
 	vk::Buffer* surfel_samples_buffer = nullptr;
-	vk::Buffer* surfel_history_buffer = nullptr;
 	vk::Buffer* pixel_geometry_buffer = nullptr;
 	PCIRCache pc{};
 	bool direct_lighting = false;

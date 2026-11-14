@@ -83,13 +83,13 @@ static void update_scene_desc(Integrator* integrator) {
 	SET_SCENE_BUFFER(desc, surfel_spawn_list, state.surfel_spawn_list_buffer);
 	SET_SCENE_BUFFER(desc, surfel_spawn_count, state.surfel_spawn_count_buffer);
 	SET_SCENE_BUFFER(desc, surfel_pool, state.surfel_pool_buffer);
+	SET_SCENE_BUFFER(desc, surfel_details, state.surfel_details_buffer);
 	SET_SCENE_BUFFER(desc, surfel_free_stack, state.surfel_free_stack_buffer);
 	SET_SCENE_BUFFER(desc, surfel_free_stack_count, state.surfel_free_stack_counter_buffer);
 	SET_SCENE_BUFFER(desc, grid_cell_counts, state.grid_cell_counts_buffer);
 	SET_SCENE_BUFFER(desc, grid_cell_indices, state.grid_cell_indices_buffer);
 	SET_SCENE_BUFFER(desc, grid_prefix_sum_scratch, state.grid_prefix_sum_scratch_buffer);
 	SET_SCENE_BUFFER(desc, surfel_samples, state.surfel_samples_buffer);
-	SET_SCENE_BUFFER(desc, surfel_history, state.surfel_history_buffer);
 	SET_SCENE_BUFFER(desc, pixel_geometry, state.pixel_geometry_buffer);
 	integrator::upload_scene_desc(integrator, desc);
 }
@@ -139,13 +139,11 @@ void init(Integrator* integrator) {
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = MAX_SURFEL_COUNT * sizeof(Surfel)});
 
-	// This is separate from Surfel buffer to keep it lean
-	state.surfel_history_buffer =
-		prm::get_buffer({.name = CSTR("Surfel History"),
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-								  VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+	state.surfel_details_buffer =
+		prm::get_buffer({.name = CSTR("Surfel Details"),
+						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = MAX_SURFEL_COUNT * sizeof(SurfelHistory)});
+						 .size = MAX_SURFEL_COUNT * sizeof(SurfelDetail)});
 
 	i32 free_stack_init_value = MAX_SURFEL_COUNT;
 	state.surfel_free_stack_counter_buffer =
@@ -528,13 +526,13 @@ void destroy(Integrator* integrator, bool resize) {
 							  &state.surfel_spawn_list_buffer,
 							  &state.surfel_spawn_count_buffer,
 							  &state.surfel_pool_buffer,
+							  &state.surfel_details_buffer,
 							  &state.surfel_free_stack_counter_buffer,
 							  &state.surfel_free_stack_buffer,
 							  &state.grid_cell_counts_buffer,
 							  &state.grid_cell_indices_buffer,
 							  &state.grid_prefix_sum_scratch_buffer,
 							  &state.surfel_samples_buffer,
-							  &state.surfel_history_buffer,
 							  &state.pixel_geometry_buffer};
 	for (vk::Buffer** buffer : buffers) {
 		prm::remove(*buffer);

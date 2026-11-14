@@ -156,19 +156,19 @@ void main() {
 					uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
 					Surfel surfel = DEREF(surfel_pool)[sid];
 					if (surfel.radius <= 0.0) continue;
-					SurfaceData surfel_hit_data = load_surface(surfel.gbuffer);
-					vec3 pos_to_surfel = hit_data.pos - surfel_hit_data.pos;
+					vec3 surfel_n_s = unpack_normal_octahedral(surfel.n_s);
+					vec3 pos_to_surfel = hit_data.pos - surfel.pos;
 #if SURFEL_HEXAGONAL_PLACEMENT
-					if (surfel_covers_point(pos_to_surfel, hit_data.n_s, surfel_hit_data.n_s, surfel.radius,
+					if (surfel_covers_point(pos_to_surfel, hit_data.n_s, surfel_n_s, surfel.radius,
 											would_be_radius)) {
 						coverage = TILE_COVERAGE_MAX;
 						break;
 					}
 #else
 					float dist_sqr = dot(pos_to_surfel, pos_to_surfel);
-					float dist_normal = dot(pos_to_surfel, surfel_hit_data.n_s);
+					float dist_normal = dot(pos_to_surfel, surfel_n_s);
 					float dist_tangent = sqrt(max(0.0, dist_sqr - dist_normal * dist_normal));
-					float n_dot = dot(hit_data.n_s, surfel_hit_data.n_s);
+					float n_dot = dot(hit_data.n_s, surfel_n_s);
 					float min_spacing = surfel_min_dist(surfel.radius, would_be_radius);
 
 					if (n_dot < 0.3 || dist_tangent > min_spacing) {

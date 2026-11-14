@@ -21,6 +21,7 @@ SCENE_BUFFER_SCALAR(surfel_spawn_count, uint);
 SCENE_BUFFER(surfel_free_stack, uint);
 SCENE_BUFFER_SCALAR(surfel_free_stack_count, int);
 SCENE_BUFFER(surfel_pool, Surfel);
+SCENE_BUFFER(surfel_details, SurfelDetail);
 SCENE_BUFFER(grid_cell_counts, uint);
 SCENE_BUFFER(grid_cell_indices, uint);
 
@@ -46,18 +47,19 @@ void main() {
 		return;
 	}
 
-	if(s.birth_frame != pc.total_frame_num -1 ) {
+	uint birth_frame = DEREF(surfel_details)[tid].birth_frame;
+	if(birth_frame != pc.total_frame_num -1 ) {
 		return;
 	}
 
-	SurfaceData hit_data = load_surface(s.gbuffer);
+	vec3 n_s = unpack_normal_octahedral(s.n_s);
 
 	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
 
 	uvec4 neighbors[MAX_NEIGHBOR_PLUS_ITSELF_COUNT];
 	uint neighbor_count;
 
-	collect_neighbors(hit_data.pos, s.radius, cam_pos.xyz, neighbors, neighbor_count);
+	collect_neighbors(s.pos, s.radius, cam_pos.xyz, neighbors, neighbor_count);
 
 	for (uint i = 0; i < neighbor_count; i++) {
 		uint linear_idx = linearize_grid(neighbors[i]);
@@ -67,14 +69,15 @@ void main() {
 			uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
 			Surfel other = DEREF(surfel_pool)[sid];
 			if (other.radius <= 0.0) continue;
-			SurfaceData other_hit_data = load_surface(other.gbuffer);
 
-			vec3 pos_to_other = hit_data.pos - other_hit_data.pos;
-			bool covered = surfel_covers_point(pos_to_other, hit_data.n_s, other_hit_data.n_s, other.radius, s.radius);
+			vec3 pos_to_other = s.pos - other.pos;
+			bool covered =
+				surfel_covers_point(pos_to_other, n_s, unpack_normal_octahedral(other.n_s), other.radius, s.radius);
 			if (covered) {
+				uint other_birth_frame = DEREF(surfel_details)[sid].birth_frame;
 
 				// earlier frame wins
-				if((other.birth_frame < s.birth_frame) || other.birth_frame == s.birth_frame && sid < tid) {
+				if((other_birth_frame < birth_frame) || other_birth_frame == birth_frame && sid < tid) {
 
 					recycle_surfel(tid);
 					return;
