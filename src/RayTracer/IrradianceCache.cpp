@@ -402,7 +402,6 @@ void render(Integrator* integrator) {
 		.bind({integrator->output_tex, integrator->scene_ubo_buffer, integrator->lumen_scene->scene_desc_buffer,
 			   integrator->lumen_scene->mesh_lights_buffer})
 		.bind_texture_array(integrator->lumen_scene->scene_textures)
-		.zero(state.surfel_samples_buffer)
 		.bind_tlas(*integrator->tlas);
 
 	rg::add_compute(CSTR("Surfel: Integrate"),
