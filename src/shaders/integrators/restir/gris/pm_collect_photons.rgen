@@ -100,7 +100,7 @@ void main() {
 			ASSERT(!isnan(photon_light.d_vm));
 			bool merged =
 				stream_photon_reservoir(seed, canonical_reservoir, photon_light.throughput, photon_light.surface,
-										photon_light.dir, photon_light.d_vm,
+										photon_light.dir, photon_light.d_vm, photon_light.flags,
 										calc_target_pdf(contribution), 1.0);
 			if (merged) {
 				selected_contribution = contribution;

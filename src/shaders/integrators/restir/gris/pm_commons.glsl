@@ -50,7 +50,7 @@ bool photon_is_nearby(vec3 p, vec3 photon_p, float r) {
 }
 
 bool update_photon_reservoir(inout uvec4 seed, inout PhotonReservoir r_new, vec3 flux, SurfaceRef surface, vec2 wi,
-							 float d_vm, float target_pdf, float inv_source_pdf) {
+							 float d_vm, uint flags, float target_pdf, float inv_source_pdf) {
 	float w_i = target_pdf * inv_source_pdf;
 	r_new.w_sum += w_i;
 	if (rand(seed) * r_new.w_sum < w_i) {
@@ -59,6 +59,7 @@ bool update_photon_reservoir(inout uvec4 seed, inout PhotonReservoir r_new, vec3
 		r_new.wi = wi;
 		r_new.target_pdf = target_pdf;
 		r_new.d_vm = d_vm;
+		r_new.flags = flags;
 		return true;
 	}
 	return false;
@@ -72,6 +73,7 @@ void init_reservoir(out PhotonReservoir r) {
 	r.target_pdf = 0;
 	r.d_vm = 0;
 	r.surface = invalid_surface_ref();
+	r.flags = 0;
 }
 
 bool photon_data_valid(PhotonData photon) { return surface_ref_valid(photon.surface); }
@@ -86,16 +88,16 @@ bool combine_reservoir(inout uvec4 seed, inout PhotonReservoir target_reservoir,
 		return false;
 	}
 	return update_photon_reservoir(seed, target_reservoir, input_reservoir.flux, input_reservoir.surface,
-								   input_reservoir.wi, input_reservoir.d_vm, target_pdf, inv_source_pdf);
+								   input_reservoir.wi, input_reservoir.d_vm, input_reservoir.flags, target_pdf, inv_source_pdf);
 }
 
 bool stream_photon_reservoir(inout uvec4 seed, inout PhotonReservoir r_new, vec3 flux, SurfaceRef surface, vec2 wi,
-							 float d_vm, float target_pdf, float inv_source_pdf) {
+							 float d_vm, uint flags, float target_pdf, float inv_source_pdf) {
 	r_new.M++;
 	if (target_pdf <= 0.0 || isnan(inv_source_pdf) || inv_source_pdf <= 0.0) {
 		return false;
 	}
-	return update_photon_reservoir(seed, r_new, flux, surface, wi, d_vm, target_pdf, inv_source_pdf);
+	return update_photon_reservoir(seed, r_new, flux, surface, wi, d_vm, flags, target_pdf, inv_source_pdf);
 }
 
 bool is_photon_valid(SurfaceData cam_gbuffer, SurfaceData photon_gbuffer, uint eye_path_length,
