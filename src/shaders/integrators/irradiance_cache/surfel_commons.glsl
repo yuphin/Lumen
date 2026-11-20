@@ -63,25 +63,40 @@ bool surfel_covers_point(vec3 from_surfel_center, vec3 normal, vec3 surfel_norma
 #endif
 }
 
+#if defined(RADIUS_R) || defined(RADIUS_2R)
+
+float surfel_kernel_reach(float radius) {
+#ifdef RADIUS_2R
+	return 4.0f * radius;
+#else
+	return 2.0f * radius;
+#endif
+}
+
 float surfel_reconstruction_weight(vec3 from_surfel_center, vec3 normal, vec3 surfel_normal, float radius) {
+	float reach = surfel_kernel_reach(radius);
+	float dist_sqr = dot(from_surfel_center, from_surfel_center);
+	if (dist_sqr >= reach * reach) {
+		return 0.0;
+	}
+
 	float n_dot = dot(normal, surfel_normal);
 	if (n_dot < 0.3) {
 		return 0.0;
 	}
 
-	float dist = length(from_surfel_center);
 	float dist_normal = dot(from_surfel_center, surfel_normal);
-	float dist_tangent = sqrt(max(0.0, dist * dist - dist_normal * dist_normal));
+	float dist_tangent_sqr = max(0.0, dist_sqr - dist_normal * dist_normal);
 
 	// Penalize normal distance
-	float dist_aniso = sqrt(dist_tangent * dist_tangent + 4.0 * dist_normal * dist_normal);
-	float ratio = dist_aniso / (2.0f * radius);
-#ifdef KERNEL_SUPPORT_2R
-	ratio = dist_aniso / (4.0f * radius);
-#endif
+	float dist_aniso = sqrt(dist_tangent_sqr + 4.0 * dist_normal * dist_normal);
+	float ratio = dist_aniso / reach;
 	float one_minus_ratio_sqr = (1.0 - ratio) * (1.0 - ratio);
 	float one_minus_ratio_sqr_sqr = one_minus_ratio_sqr * one_minus_ratio_sqr;
 	float weight_pos = ratio >= 1.0 ? 0.0 : one_minus_ratio_sqr_sqr * (1.0 + 4.0 * ratio);
-	float weight_normal = pow(max(n_dot, 0.0), 4.0);
+	float n_dot_sqr = n_dot * n_dot;
+	float weight_normal = n_dot_sqr * n_dot_sqr;
 	return weight_pos * weight_normal;
 }
+
+#endif  // RADIUS_R || RADIUS_2R

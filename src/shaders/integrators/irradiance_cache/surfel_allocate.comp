@@ -94,7 +94,13 @@ void main() {
 	uvec4 neighbors[MAX_NEIGHBOR_PLUS_ITSELF_COUNT];
 	uint neighbor_count;
 
+#ifdef RADIUS_2R
+	// Hack: This should be fine as a surfel is already registered for its neighbors 
+	neighbors[0] = map_grid_axis(hit_data.pos - cam_pos.xyz);
+	neighbor_count = 1;
+#else
 	collect_neighbors(hit_data.pos, r, cam_pos.xyz, neighbors, neighbor_count);
+#endif
 
 	for (uint i = 0; i < neighbor_count; i++) {
 		uint linear_idx = linearize_grid(neighbors[i]);

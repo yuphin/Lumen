@@ -5,6 +5,7 @@
 #extension GL_EXT_debug_printf : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
+#extension GL_KHR_shader_subgroup_arithmetic : enable
 
 #include "../../bda.glsl"
 #include "ir_commons.h"
@@ -32,6 +33,27 @@ SCENE_BUFFER(g_buffer, SurfaceRef);
 
 layout(local_size_x = SURFELIZE_PASS_TILE_SIZE_XY, local_size_y = SURFELIZE_PASS_TILE_SIZE_XY, local_size_z = 1) in;
 
+// 4 cells in plane * 2 for depth slices  = 8 cells
+#define MAX_CELLS_PER_WG 8
+#define MAX_SURFELS_PER_WG 512
+#define NO_CELL 0xFFFFFFFFu
+
+// tile size = 16
+// == 256 pixels per WG
+
+const uint NUM_PX_PER_WG = SURFELIZE_PASS_TILE_SIZE_XY * SURFELIZE_PASS_TILE_SIZE_XY;
+const uint NUM_SUBGROUPS_PER_WG = NUM_PX_PER_WG / 32;
+shared uint subgroup_cell[NUM_SUBGROUPS_PER_WG * MAX_CELLS_PER_WG];
+shared uint tile_surfel_offsets[MAX_CELLS_PER_WG];
+shared uint tile_surfel_counts[MAX_CELLS_PER_WG];
+// sum of the above
+shared uint total_surfel_count;
+
+// Surfel data
+shared vec4 tile_surfel_pos_radius[MAX_SURFELS_PER_WG];
+shared vec3 tile_surfel_irradiance[MAX_SURFELS_PER_WG];
+shared vec3 tile_surfel_n_s[MAX_SURFELS_PER_WG];
+
 void store_output(const ivec2 coords, vec3 col) {
 	if (pc.enable_accumulation == 1 && pc.frame_num > 0) {
 		const float weight = 1.0 / float(pc.frame_num + 1);
@@ -42,48 +64,204 @@ void store_output(const ivec2 coords, vec3 col) {
 
 void main() {
 	ivec2 coords = ivec2(gl_GlobalInvocationID.xy);
-
 	uint pixel_idx = coords.x * pc.height + coords.y;
-	if (coords.x >= pc.width || coords.y >= pc.height) {
+	uint tid = gl_LocalInvocationIndex;
+
+	bool in_bounds = coords.x < pc.width && coords.y < pc.height;
+	bool has_surface = false;
+	uint this_cell = NO_CELL;
+	SurfaceData hit_data;
+	vec3 cam_pos = vec3(ubo.inv_view * vec4(0, 0, 0, 1));
+	if (in_bounds) {
+		SurfaceRef gbuffer = DEREF(g_buffer)[pixel_idx];
+		has_surface = surface_ref_valid(gbuffer);
+		if (has_surface) {
+			hit_data = load_surface(gbuffer);
+			this_cell = linearize_grid(map_grid_axis(hit_data.pos - cam_pos));
+		}
+	}
+
+	uint prev_cell = 0;
+	// Load the smallest MAX_CELLS_PER_WG cells
+	// The cell ids are stored in increasing order
+	for (uint k = 0; k < MAX_CELLS_PER_WG; k++) {
+		uint greater_cell = (k == 0 || this_cell > prev_cell) ? this_cell : NO_CELL;
+		greater_cell = subgroupMin(greater_cell);
+		if (subgroupElect()) {
+			subgroup_cell[gl_SubgroupID * MAX_CELLS_PER_WG + k] = greater_cell;
+		}
+		prev_cell = greater_cell;
+	}
+	barrier();
+
+	// Merge across subgroups
+	// Each thread holds 2
+	uint tile_cell[MAX_CELLS_PER_WG];
+	prev_cell = 0;
+	uvec2 candidate_cells =
+		uvec2(subgroup_cell[gl_SubgroupInvocationID], subgroup_cell[gl_SubgroupInvocationID + gl_SubgroupSize]);
+	for (uint k = 0; k < MAX_CELLS_PER_WG; k++) {
+		// candidate_cells > prev_cells ? candidate_cells : NO_CELL
+		uvec2 larger = mix(uvec2(NO_CELL), candidate_cells, greaterThan(candidate_cells, uvec2(prev_cell)));
+		uvec2 cells = k == 0 ? candidate_cells : larger;
+		tile_cell[k] = subgroupMin(min(cells.x, cells.y));
+		prev_cell = tile_cell[k];
+	}
+
+	// Set up per cell offset + count
+	if (gl_SubgroupID == 0) {
+		uint cell_idx = gl_SubgroupInvocationID;
+		uint surfel_offset = 0;
+		uint surfel_count = 0;
+		if (cell_idx < MAX_CELLS_PER_WG && tile_cell[cell_idx] != NO_CELL) {
+			surfel_offset = DEREF(grid_cell_counts)[tile_cell[cell_idx]];
+			surfel_count = DEREF(grid_cell_counts)[tile_cell[cell_idx] + 1] - surfel_offset;
+		}
+		uint surfel_begin = subgroupExclusiveAdd(surfel_count);
+		// Drop if count exceeds MAX_SURFELS_PER_WG
+		if (surfel_begin + surfel_count > MAX_SURFELS_PER_WG) {
+			surfel_count = 0;
+		}
+		uint total_count = subgroupAdd(surfel_count);
+		if (cell_idx < MAX_CELLS_PER_WG) {
+			tile_surfel_offsets[cell_idx] = surfel_offset;
+			tile_surfel_counts[cell_idx] = surfel_count;
+		}
+		if (cell_idx == 0) {
+			total_surfel_count = total_count;
+		}
+	}
+	barrier();
+
+	// Load surfels in parallel, across all threads
+	for (uint idx = tid; idx < total_surfel_count; idx += NUM_PX_PER_WG) {
+		uint start = 0;
+		// Find the cell this tid belong to
+		for (uint k = 0; k < MAX_CELLS_PER_WG; k++) {
+			uint surfel_idx = idx - start;
+			if (surfel_idx < tile_surfel_counts[k]) {
+				uint sid = DEREF(grid_cell_indices)[surfel_idx + tile_surfel_offsets[k]];
+				Surfel surfel = DEREF(surfel_pool)[sid];
+				tile_surfel_pos_radius[idx] = vec4(surfel.pos, surfel.radius);
+				tile_surfel_irradiance[idx] = surfel.irradiance;
+				tile_surfel_n_s[idx] = unpack_normal_octahedral(surfel.n_s);
+				break;
+			}
+			start += tile_surfel_counts[k];
+		}
+	}
+	barrier();
+
+	if (!in_bounds) {
 		return;
 	}
 
 	vec3 col = pc.direct_lighting == 1 ? DEREF(direct_lighting)[pixel_idx] : vec3(0);
-	SurfaceRef gbuffer = DEREF(g_buffer)[pixel_idx];
-
-	if (!surface_ref_valid(gbuffer)) {
+	if (!has_surface) {
 		store_output(coords, col);
 		return;
 	}
 
-	SurfaceData hit_data = load_surface(gbuffer);
-
-	vec3 pixel_world_pos = hit_data.pos;
-	vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
-	vec3 offset = pixel_world_pos - cam_pos.xyz;
-	uvec4 grid_val = map_grid_axis(offset);
-	uint linear_idx = linearize_grid(grid_val);
-	uint surfel_count = DEREF(grid_cell_counts)[linear_idx + 1] - DEREF(grid_cell_counts)[linear_idx];
-	uint surfel_offset = DEREF(grid_cell_counts)[linear_idx];
+	bool overflow = false;
+	uint surfel_begin = 0;
+	uint surfel_end = 0;
+	uint start = 0;
+	for (uint k = 0; k < MAX_CELLS_PER_WG; k++) {
+		if (tile_cell[k] == this_cell && tile_surfel_counts[k] > 0) {
+			overflow = true;
+			surfel_begin = start;
+			surfel_end = surfel_begin + tile_surfel_counts[k];
+			break;
+		}
+		start += tile_surfel_counts[k];
+	}
+	if (!overflow) {
+		surfel_begin = DEREF(grid_cell_counts)[this_cell];
+		surfel_end = DEREF(grid_cell_counts)[this_cell + 1];
+	}
 
 	vec3 irradiance_sum = vec3(0);
 	float weight_sum = 0;
 
-	for (uint gid = 0; gid < surfel_count; gid++) {
-		uint sid = DEREF(grid_cell_indices)[gid + surfel_offset];
-		Surfel surfel = DEREF(surfel_pool)[sid];
-		if (surfel.radius <= 0.0) continue;
+#if LINEAR_FIT
+	// Linear fit: E(x, y) = c + g.x * x + g.y * y over the pixel's tangent plane
+	// The pixel is at the origin -> E(0,0) = c is the result
+	vec3 tangent, bitangent;
+	branchless_onb(hit_data.n_s, tangent, bitangent);
+	float inv_scale = 1.0 / surfel_radius_for_position(hit_data.pos);
+	// Definition: S_x = sum_(w_i * x_i)
+	vec2 sum_p = vec2(0);	// S_x and S_y
+	vec3 sum_pp = vec3(0);	// S_xx, S_xy, S_yy
+	vec3 irradiance_sum_x = vec3(0);
+	vec3 irradiance_sum_y = vec3(0);
+	vec3 irradiance_min = vec3(1e30);
+	vec3 irradiance_max = vec3(0);
+#endif
 
-		float weight = surfel_reconstruction_weight(hit_data.pos - surfel.pos, hit_data.n_s,
-													 unpack_normal_octahedral(surfel.n_s), surfel.radius);
+	for (uint surfel_idx = surfel_begin; surfel_idx < surfel_end; surfel_idx++) {
+		Surfel surfel;
+		vec4 pos_radius;
+		if (overflow) {
+			pos_radius = tile_surfel_pos_radius[surfel_idx];
+		} else {
+			surfel = DEREF(surfel_pool)[DEREF(grid_cell_indices)[surfel_idx]];
+			pos_radius = vec4(surfel.pos, surfel.radius);
+		}
+		vec3 from_surfel = hit_data.pos - pos_radius.xyz;
+		float reach = surfel_kernel_reach(pos_radius.w);
+		if (pos_radius.w <= 0.0 || dot(from_surfel, from_surfel) >= reach * reach) continue;
+
+		vec3 surfel_irradiance;
+		vec3 surfel_n_s;
+		if (overflow) {
+			surfel_irradiance = tile_surfel_irradiance[surfel_idx];
+			surfel_n_s = tile_surfel_n_s[surfel_idx];
+		} else {
+			surfel_irradiance = surfel.irradiance;
+			surfel_n_s = unpack_normal_octahedral(surfel.n_s);
+		}
+
+		float weight = surfel_reconstruction_weight(from_surfel, hit_data.n_s, surfel_n_s, pos_radius.w);
 		weight_sum += weight;
-		irradiance_sum += weight * surfel.irradiance;
+		irradiance_sum += weight * surfel_irradiance;
+#if LINEAR_FIT
+		if (weight > 0.0) {
+			vec3 to_surfel = -from_surfel * inv_scale;
+			// Local coords: (x_i, y_i) w.r.t surfel center
+			vec2 p = vec2(dot(to_surfel, tangent), dot(to_surfel, bitangent));
+			sum_p += weight * p;
+			sum_pp += weight * vec3(p.x * p.x, p.x * p.y, p.y * p.y);
+			irradiance_sum_x += weight * p.x * surfel_irradiance;
+			irradiance_sum_y += weight * p.y * surfel_irradiance;
+			irradiance_min = min(irradiance_min, surfel_irradiance);
+			irradiance_max = max(irradiance_max, surfel_irradiance);
+		}
+#endif
 	}
 
 	vec3 irradiance = weight_sum > 0 ? irradiance_sum / weight_sum : vec3(0);
 
+#if LINEAR_FIT
+	if (weight_sum > 0) {
+		float regularization = 1e-2 * weight_sum;
+		float m11 = sum_pp.x + regularization;
+		float m12 = sum_pp.y;
+		float m22 = sum_pp.z + regularization;
+		float cof0 = m11 * m22 - m12 * m12;								  // C_00 = +(m11 m22 - m12^2)
+		float cof1 = sum_p.y * m12 - sum_p.x * m22;						  // C_10 = -(S_x m22 - S_y m12)
+		float cof2 = sum_p.x * m12 - sum_p.y * m11;						  // C_20 = +(S_x m12 - S_y m11)
+		float det = weight_sum * cof0 + sum_p.x * cof1 + sum_p.y * cof2;  // det(M)
+		if (det > 1e-12 * weight_sum * cof0) {
+			// Cramer's rule
+			vec3 fit = (cof0 * irradiance_sum + cof1 * irradiance_sum_x + cof2 * irradiance_sum_y) / det;
+			vec3 span = irradiance_max - irradiance_min;
+			irradiance = clamp(fit, max(irradiance_min - 0.5 * span, vec3(0)), irradiance_max + 0.5 * span);
+		}
+	}
+#endif
+
 	Material material = load_material(hit_data.material_idx, hit_data.uv);
-	vec3 wo = normalize(cam_pos.xyz - pixel_world_pos);
+	vec3 wo = normalize(cam_pos - hit_data.pos);
 	vec3 n_s = hit_data.n_s;
 	vec3 n_g = hit_data.n_g;
 	bool side = face_forward(n_s, n_g, wo);

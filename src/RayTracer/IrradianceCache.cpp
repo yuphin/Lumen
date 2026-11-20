@@ -285,6 +285,7 @@ void render(Integrator* integrator) {
 	////////////////////////////
 	// --- Surfel Grid ---
 	// Grid is rebuilt every frame
+	vk::ShaderMacro radius_macro = state.radius_2r ? vk::ShaderMacro("RADIUS_2R") : vk::ShaderMacro("RADIUS_R");
 	rg::add_compute(CSTR("Grid: Clear"), {.shader = CSTR("src/shaders/integrators/irradiance_cache/grid_clear.comp"),
 										  .dims = {lm::div_ceil(grid_total_cells, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
@@ -292,6 +293,7 @@ void render(Integrator* integrator) {
 	// TODO: Having an indirect launch would be better here, maybe?
 	rg::add_compute(CSTR("Grid: Count"),
 					{.shader = CSTR("src/shaders/integrators/irradiance_cache/grid_count.comp"),
+					 .macros = {radius_macro},
 					 .dims = {lm::div_ceil((u32)MAX_SURFEL_COUNT, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
 		.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
@@ -330,7 +332,7 @@ void render(Integrator* integrator) {
 
 	rg::add_compute(CSTR("Grid: Distribute"),
 					{.shader = CSTR("src/shaders/integrators/irradiance_cache/grid_distribute.comp"),
-					 .macros = {vk::ShaderMacro("DEBUG_GRID_INVARIANTS", DEBUG_PASSES)},
+					 .macros = {vk::ShaderMacro("DEBUG_GRID_INVARIANTS", DEBUG_PASSES), radius_macro},
 					 .dims = {lm::div_ceil((u32)MAX_SURFEL_COUNT, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 		.push_constants(&pc)
 		.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
@@ -339,7 +341,8 @@ void render(Integrator* integrator) {
 		rg::add_compute(CSTR("Surfel: Dedup"),
 						{.shader = CSTR("src/shaders/integrators/irradiance_cache/surfel_dedup.comp"),
 						 .macros = {vk::ShaderMacro("DEBUG_GRID_INVARIANTS", DEBUG_PASSES),
-									vk::ShaderMacro("SURFEL_HEXAGONAL_PLACEMENT", i32(state.hexagonal_placement))},
+									vk::ShaderMacro("SURFEL_HEXAGONAL_PLACEMENT", i32(state.hexagonal_placement)),
+									radius_macro},
 						 .dims = {lm::div_ceil((u32)MAX_SURFEL_COUNT, (u32)ALLOCATE_PASS_WG_SIZE), 1, 1}})
 			.push_constants(&pc)
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
@@ -383,7 +386,8 @@ void render(Integrator* integrator) {
 
 		rg::add_compute(CSTR("Surfel: Allocate"),
 						{.shader = CSTR("src/shaders/integrators/irradiance_cache/surfel_allocate.comp"),
-						 .macros = {vk::ShaderMacro("SURFEL_HEXAGONAL_PLACEMENT", i32(state.hexagonal_placement))},
+						 .macros = {vk::ShaderMacro("SURFEL_HEXAGONAL_PLACEMENT", i32(state.hexagonal_placement)),
+									radius_macro},
 						 .dims = {lm::div_ceil(MAX_SURFEL_COUNT, ALLOCATE_PASS_WG_SIZE), 1, 1}})
 			.push_constants(&pc)
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->scene_ubo_buffer});
@@ -412,6 +416,7 @@ void render(Integrator* integrator) {
 
 	if (state.debug_mode) {
 		rg::add_compute(CSTR("Debug"), {.shader = CSTR("src/shaders/integrators/irradiance_cache/debug.comp"),
+										.macros = {radius_macro},
 										.dims = {(u32)lm::ceil(Window::width() * Window::height() / f32(1024)), 1, 1}})
 			.push_constants(&pc)
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->output_tex, integrator->scene_ubo_buffer})
@@ -420,6 +425,7 @@ void render(Integrator* integrator) {
 		u32 max_screen_tiles_x = lm::div_ceil(Window::width(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		u32 max_screen_tiles_y = lm::div_ceil(Window::height(), (u32)SURFELIZE_PASS_TILE_SIZE_XY);
 		rg::add_compute(CSTR("Composite"), {.shader = CSTR("src/shaders/integrators/irradiance_cache/composite.comp"),
+											.macros = {vk::ShaderMacro("LINEAR_FIT", int(state.linear_fitting)), radius_macro},
 											.dims = {max_screen_tiles_x, max_screen_tiles_y, 1}})
 			.push_constants(&pc)
 			.bind({integrator->lumen_scene->scene_desc_buffer, integrator->output_tex, integrator->scene_ubo_buffer})
@@ -471,6 +477,8 @@ bool gui(Integrator* integrator) {
 	result |= ImGui::Checkbox("Camera relative surfel size", &state.use_camera_relative_surfel_size);
 	result |= ImGui::Checkbox("Enable surfel deduplication", &state.enable_surfel_dedup);
 	result |= ImGui::Checkbox("Hexagonal surfel placement", &state.hexagonal_placement);
+	result |= ImGui::Checkbox("Linear fitting", &state.linear_fitting);
+	result |= ImGui::Checkbox("2R radius reach", &state.radius_2r);
 	f32 max_trapezoidal_cell_size =
 		get_px_size_per_trapezoidal_cell(integrator->scene_ubo.projection[1][1], (f32)Window::height());
 

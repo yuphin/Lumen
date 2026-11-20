@@ -25,13 +25,15 @@ struct IrradianceCache {
 	PCIRCache pc{};
 	bool direct_lighting = false;
 	bool enable_accumulation = false;
-	bool debug_mode = true;
+	bool debug_mode = false;
 	u32 debug_view = IRCACHE_DEBUG_VIEW_TRAPEZOIDAL_GRID_SURFELS;
 	bool pause_surfel_spawn = false;
 	bool clear_surfels = false;
 	bool use_camera_relative_surfel_size = true;
 	bool enable_surfel_dedup = false;
 	bool hexagonal_placement = true;
+	bool linear_fitting = true;
+	bool radius_2r = true;
 	u32 total_frame_idx = 0;
 	u32 rays_per_surfel = 8;
 };

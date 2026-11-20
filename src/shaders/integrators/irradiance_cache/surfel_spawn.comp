@@ -58,7 +58,9 @@ vec2 lattice_offset(vec2 pos, float radius) {
 	return best;
 }
 
-bool valid_hex_lattice(SurfaceData source, out uint target_pixel, out SurfaceData target_hit) {
+// Note: off_surface is true when the lattice point is rejected
+bool valid_hex_lattice(SurfaceData source, out uint target_pixel, out SurfaceData target_hit, out bool off_surface) {
+	off_surface = false;
 	float radius = surfel_radius_for_position(source.pos);
 	// Quantize normal
 	vec2 encoded = round(oct_encode(source.n_g) * 8.0) / 8.0;
@@ -92,16 +94,17 @@ bool valid_hex_lattice(SurfaceData source, out uint target_pixel, out SurfaceDat
 	SurfaceRef ref = DEREF(g_buffer)[target_pixel];
 	// Not a surface
 	if (!surface_ref_valid(ref)) {
+		off_surface = true;
 		return false;
 	}
 	target_hit = load_surface(ref);
-	// Surface mismatch
-	if (dot(source.n_g, target_hit.n_g) <= 0.9) {
-		return false;
-	}
-	// Positional error
 	vec3 error = target_hit.pos - proposed;
-	return dot(error, error) <= 0.25 * radius * radius;
+	if (dot(source.n_g, target_hit.n_g) > 0.9 && dot(error, error) <= 0.25 * radius * radius) {
+		return true;
+	}
+	vec3 cam_pos = (ubo.inv_view * vec4(0, 0, 0, 1)).xyz;
+	off_surface = distance(target_hit.pos, cam_pos) > distance(proposed, cam_pos);
+	return false;
 }
 #endif
 
@@ -137,13 +140,27 @@ void main() {
 
 #if SURFEL_HEXAGONAL_PLACEMENT
 			SurfaceData hit_data;
-			bool valid_point = valid_hex_lattice(source_hit, candidate_pixel, hit_data);
+			bool off_surface;
+			bool on_lattice = valid_hex_lattice(source_hit, candidate_pixel, hit_data, off_surface);
+			bool valid_point = on_lattice || off_surface;
+			if (!on_lattice) {
+				// Surface can't hold lattice arrangement. Propose own pixel
+				candidate_pixel = pixel_idx;
+				hit_data = source_hit;
+			}
 #else
 			SurfaceData hit_data = source_hit;
 			bool valid_point = true;
 #endif	// SURFEL_HEXAGONAL_PLACEMENT
 			if (valid_point) {
+#if SURFEL_HEXAGONAL_PLACEMENT
+				// The coverage being 1.0 shouldn't matter here
+				// It's to ensure lattice points have priority over non-lattice points
+				// per subgroupMin below
+				coverage = on_lattice ? 0.0 : 1.0;
+#else
 				coverage = 0.0;
+#endif
 				vec4 cam_pos = ubo.inv_view * vec4(0, 0, 0, 1);
 				vec3 offset = hit_data.pos - cam_pos.xyz;
 				uvec4 grid_val = map_grid_axis(offset);
@@ -159,8 +176,8 @@ void main() {
 					vec3 surfel_n_s = unpack_normal_octahedral(surfel.n_s);
 					vec3 pos_to_surfel = hit_data.pos - surfel.pos;
 #if SURFEL_HEXAGONAL_PLACEMENT
-					if (surfel_covers_point(pos_to_surfel, hit_data.n_s, surfel_n_s, surfel.radius,
-											would_be_radius)) {
+					float cover_radius = on_lattice ? surfel.radius : surfel_min_dist(surfel.radius, would_be_radius);
+					if (surfel_covers_point(pos_to_surfel, hit_data.n_s, surfel_n_s, cover_radius, would_be_radius)) {
 						coverage = TILE_COVERAGE_MAX;
 						break;
 					}

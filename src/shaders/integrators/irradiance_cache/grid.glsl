@@ -403,10 +403,10 @@ uvec4 bottom_right_neighbor(uvec3 cell_id, uint region) {
 
 #define INCLUDE_DEPTH
 
-#define KERNEL_SUPPORT_R
-// #define KERNEL_SUPPORT_2R
+// #define RADIUS_R
+// #define RADIUS_2R
 
-#ifdef KERNEL_SUPPORT_R
+#ifdef RADIUS_R
 
 #ifdef INCLUDE_DEPTH
 #define MAX_NEIGHBOR_PLUS_ITSELF_COUNT 8
@@ -587,7 +587,7 @@ void collect_neighbors(vec3 surfel_pos, float surfel_radius, vec3 cam_pos,
 #endif
 }
 
-#elif defined(KERNEL_SUPPORT_2R)
+#elif defined(RADIUS_2R)
 #ifdef INCLUDE_DEPTH
 #define MAX_NEIGHBOR_PLUS_ITSELF_COUNT 18
 #else
