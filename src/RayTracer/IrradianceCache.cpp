@@ -90,7 +90,6 @@ static void update_scene_desc(Integrator* integrator) {
 	SET_SCENE_BUFFER(desc, grid_cell_indices, state.grid_cell_indices_buffer);
 	SET_SCENE_BUFFER(desc, grid_prefix_sum_scratch, state.grid_prefix_sum_scratch_buffer);
 	SET_SCENE_BUFFER(desc, surfel_samples, state.surfel_samples_buffer);
-	SET_SCENE_BUFFER(desc, pixel_geometry, state.pixel_geometry_buffer);
 	integrator::upload_scene_desc(integrator, desc);
 }
 
@@ -109,11 +108,6 @@ void init(Integrator* integrator) {
 						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 						 .memory_type = vk::BUFFER_TYPE_GPU,
 						 .size = Window::width() * Window::height() * sizeof(lm::vec3)});
-	state.pixel_geometry_buffer =
-		prm::get_buffer({.name = CSTR("IRCache Pixel Geometry"),
-						 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-						 .memory_type = vk::BUFFER_TYPE_GPU,
-						 .size = Window::width() * Window::height() * sizeof(PixelGeometry)});
 
 	// At max, we spawn 1 surfel per tile.
 	u32 tiles_x = (Window::width() + SURFELIZE_PASS_TILE_SIZE_XY - 1) / SURFELIZE_PASS_TILE_SIZE_XY;
@@ -539,8 +533,7 @@ void destroy(Integrator* integrator, bool resize) {
 							  &state.grid_cell_counts_buffer,
 							  &state.grid_cell_indices_buffer,
 							  &state.grid_prefix_sum_scratch_buffer,
-							  &state.surfel_samples_buffer,
-							  &state.pixel_geometry_buffer};
+							  &state.surfel_samples_buffer};
 	for (vk::Buffer** buffer : buffers) {
 		prm::remove(*buffer);
 		*buffer = nullptr;

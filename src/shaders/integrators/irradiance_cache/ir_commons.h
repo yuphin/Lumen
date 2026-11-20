@@ -88,16 +88,9 @@ struct SurfelSample {
 	float hit_t;
 };
 
-// Per pixel, t = 0 for a miss
-struct PixelGeometry {
-	float t;
-	uint normal;
-};
-
 #ifdef __cplusplus
 static_assert(sizeof(Surfel) == 32);
 static_assert(sizeof(SurfelDetail) == 28);
-static_assert(sizeof(PixelGeometry) == 8);
 #endif
 
 NAMESPACE_END()

@@ -21,7 +21,6 @@ struct IrradianceCache {
 	vk::Buffer* grid_prefix_sum_scratch_buffer = nullptr;
 
 	vk::Buffer* surfel_samples_buffer = nullptr;
-	vk::Buffer* pixel_geometry_buffer = nullptr;
 	PCIRCache pc{};
 	bool direct_lighting = false;
 	bool enable_accumulation = false;
